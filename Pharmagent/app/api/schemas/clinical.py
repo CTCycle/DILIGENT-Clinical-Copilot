@@ -40,15 +40,7 @@ class PatientOutputReport(BaseModel):
         examples=["This is a sample note."])
     
 
-#------------------------------------------------------------------------------
-class PatientDiseases(BaseModel):
-    diseases: List[str] = Field(
-        ...,
-        default_factory=list, 
-        description="List of detected disease names")
-    count: int = Field(
-        ..., 
-        description="Number of diseases found")
+   
 
 #------------------------------------------------------------------------------  
 class Monography(BaseModel):
