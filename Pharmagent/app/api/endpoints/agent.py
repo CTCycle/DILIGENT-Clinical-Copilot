@@ -1,16 +1,22 @@
+import time
+
+import pandas as pd
 from fastapi import APIRouter, status
 from fastapi.concurrency import run_in_threadpool
 
 from Pharmagent.app.utils.serializer import DataSerializer
-from Pharmagent.app.utils.services.extraction import PatientInfoExtraction, DiseasesExtraction
+from Pharmagent.app.utils.services.parser import DiseasesParsing
+from Pharmagent.app.utils.services.patients import PatientCase
 from Pharmagent.app.api.models.server import OllamaClient
 from Pharmagent.app.api.schemas.clinical import PatientData, PatientOutputReport
 
-from Pharmagent.app.constants import DATA_PATH
+from Pharmagent.app.constants import DATA_PATH, PARSER_MODEL
 from Pharmagent.app.logger import logger
 
 router = APIRouter(prefix="/agent", tags=["agent"])
 
+patient = PatientCase()
+serializer = DataSerializer()
 
 ###############################################################################
 @router.post(
@@ -19,22 +25,26 @@ router = APIRouter(prefix="/agent", tags=["agent"])
         status_code=status.HTTP_202_ACCEPTED)
 
 async def start_clinical_agent(payload: PatientData) -> PatientOutputReport:
-    logger.info(f'Starting clinical agent processing for patient: {payload.name or "Unknown"}')
+    logger.info(f'Starting clinical agent processing for patient: {payload.name or "Unknown"}') 
 
-    processor = PatientInfoExtraction(payload)
-    sections = processor.extract_textual_sections() 
-    
-    serializer = DataSerializer()
-    serializer.save_patients_info(sections) 
+    # 1. Extract each section from the patient info and save entry into database
+    # Text sections are: anamnesis, blood tests, additional tests, drugs 
+    logger.info('Processing data to extract known sections and save new patient to database')
+    sections, patient_table = await run_in_threadpool(
+        patient.extract_sections_from_text, payload)    
+    await run_in_threadpool(serializer.save_patients_info, patient_table)
 
-    # do diseases extraction
-    # to check validity
-    extractor = DiseasesExtraction(model="llama3.1:8b")  # adjust model if needed
-    clinical_text = sections if isinstance(sections, str) else "\n\n".join(
-        [v for v in (sections.values() if isinstance(sections, dict) else []) if isinstance(v, str)])
+    # 2. Initialize Ollama client and pull the model if not already done
+    parser = DiseasesParsing(timeout_s=300)
+    logger.info(f'Extracting diseases from patient anamnesis using {parser.model}')
 
-    diseases_json = await run_in_threadpool(extractor.extract, clinical_text)
-    logger.info("Disease extraction: %d found", len(diseases_json.get("diseases", [])))
-    
+    start_time = time.time()
+    diseases = await parser.extract_diseases_from_text(sections.get('anamnesis', None))
+    elapsed = time.time() - start_time
+    logger.info(f"Time elapsed for diseases extraction: {elapsed:.2f} seconds.")
+
+
+    pass
+
 
     return {'status': 'success'}

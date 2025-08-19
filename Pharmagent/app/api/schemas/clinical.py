@@ -41,12 +41,15 @@ class PatientOutputReport(BaseModel):
     
 
 #------------------------------------------------------------------------------
-class Diseases(BaseModel):
-    diseases: Annotated[
-        List[Annotated[str, Field(min_length=1, max_length=200)]],
-        Field(description="Canonical disease/condition name.")
-    ]
-    
+class PatientDiseases(BaseModel):
+    diseases: List[str] = Field(
+        ...,
+        default_factory=list, 
+        description="List of detected disease names")
+    count: int = Field(
+        ..., 
+        description="Number of diseases found")
+
 #------------------------------------------------------------------------------  
 class Monography(BaseModel):
     title: str

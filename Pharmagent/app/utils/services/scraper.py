@@ -70,7 +70,6 @@ class LiverToxClient:
                             f.write(chunk)
                             pbar.update(len(chunk))
 
-        return {
-            "file_path": str(file_path),
-            "size": file_size,
-            "last_modified": last_modified}
+        return {"file_path": str(file_path),
+                "size": file_size,
+                "last_modified": last_modified}
