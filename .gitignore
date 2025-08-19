@@ -1,0 +1,10 @@
+Pharmagent/setup/python/*
+Pharmagent/setup/.env
+
+__pycache__
+*.vscode
+*.db
+*.log
+*.npy
+*.egg-info
+!.gitkeep
