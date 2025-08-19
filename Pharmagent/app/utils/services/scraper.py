@@ -1,8 +1,10 @@
 from __future__ import annotations
 
 
-import requests
+import os
+import tarfile
 from pathlib import Path
+
 from typing import Any, Dict, Optional
 
 import httpx
@@ -20,31 +22,13 @@ class LiverToxClient:
     def __init__(self):        
         self.base_url = "https://ftp.ncbi.nlm.nih.gov/pub/litarch/29/31/"
         self.file_name = "livertox_NBK547852.tar.gz"
+        self.tar_file_path = os.path.join(SOURCES_PATH, self.file_name)
         self.chunk_size = 8192
 
     #--------------------------------------------------------------------------
-    async def download_bulk_data(self, dest_path: Path) -> dict:
-        """
-        Asynchronously downloads the file with a progress bar.
-        Prints "Downloading file N" at start.
-
-        Args:
-            dest_path (Path): Directory where the file will be saved.
-
-        Returns:
-            dict: {
-                "file_path": Path to downloaded file,
-                "size": File size in bytes (int),
-                "last_modified": HTTP Last-Modified header (str)
-            }
-
-        Raises:
-            httpx.HTTPStatusError: For HTTP errors.
-            Exception: For other errors.
-            
-        """
+    async def download_bulk_data(self, dest_path: Path) -> Dict[str, Any]:        
         url = self.base_url + self.file_name
-        print(f"Downloading file {self.file_name}...")
+        print(f"Downloading file {self.file_name}")
 
         async with httpx.AsyncClient(timeout=30.0) as client:
             # HEAD request for size and last-modified
@@ -73,3 +57,25 @@ class LiverToxClient:
         return {"file_path": str(file_path),
                 "size": file_size,
                 "last_modified": last_modified}
+    
+    #--------------------------------------------------------------------------
+    def convert_file_to_dataframe(self) -> pd.DataFrame:        
+        records = []
+        with tarfile.open(self.tar_file_path, "r:gz") as tar:
+            for member in tar.getmembers():
+                if not member.isfile():
+                    continue
+                name = member.name.lower()
+                if name.endswith(".csv") or name.endswith(".tsv"):
+                    fileobj = tar.extractfile(member)
+                    if fileobj is None:
+                        continue
+                    df = pd.read_csv(fileobj, sep="\t" if name.endswith(".tsv") else ",")
+                    records.append(df)                
+
+        if not records:
+            raise ValueError("No supported tabular files found in archive.")
+        
+        return pd.concat(records, ignore_index=True)
+    
+    

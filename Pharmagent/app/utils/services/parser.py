@@ -9,7 +9,6 @@ import pandas as pd
 
 from Pharmagent.app.api.models.server import OllamaClient, OllamaError
 from Pharmagent.app.utils.serializer import DataSerializer
-from Pharmagent.app.api.schemas.clinical import PatientDiseases
 from Pharmagent.app.api.models.prompts import DISEASE_EXTRACTION_PROMPT
 from Pharmagent.app.constants import PARSER_MODEL
 from Pharmagent.app.logger import logger
@@ -39,7 +38,7 @@ class DiseasesParsing:
         self.client.pull(model_name or self.model)
 
     #--------------------------------------------------------------------------
-    async def extract_diseases_from_text(self, text: str) -> PatientDiseases | None:
+    async def extract_diseases_from_text(self, text: str) -> Dict[str, Any]:
         if text is None:
             return
         
@@ -68,21 +67,8 @@ class DiseasesParsing:
                 data = json.loads(llm_response)
             except Exception as e:
                 logger.error(f"Could not parse LLM response as JSON: {llm_response}")
-                data = None
+                return
+            
+        return data
 
-        # 2. Validate and add count field
-        if data and isinstance(data, dict) and "diseases" in data and isinstance(data["diseases"], list):
-            # Remove duplicates and inject count
-            unique_diseases = list({disease.strip() for disease in data["diseases"] if isinstance(disease, str)})
-            data["diseases"] = unique_diseases
-            data["count"] = len(unique_diseases)
-        else:
-            logger.error(f"LLM response is missing or invalid: {llm_response}")
-            raise ValueError(f"Could not find valid 'diseases' field in LLM response: {llm_response}")
-
-        # 3. Parse as PatientDiseases
-        try:
-            return PatientDiseases(**data)
-        except Exception as e:
-            logger.error(f"Final data parse failed: {data}")
-            raise ValueError(f"Final data parse failed: {data}") from e
+ 
