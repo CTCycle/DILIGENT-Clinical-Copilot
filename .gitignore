@@ -1,6 +1,9 @@
 Pharmagent/setup/python/*
 Pharmagent/setup/.env
 
+Pharmagent/app/resources/sources/*
+Pharmagent/app/resources/database/documents/*
+
 __pycache__
 *.vscode
 *.db
