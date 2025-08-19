@@ -51,10 +51,10 @@ class OllamaClient:
     def __init__(
         self,
         base_url: Optional[str] = None,
-        timeout_s: float = 60.0,
+        timeout_s: float = 120.0,
         keepalive_connections: int = 10,
         keepalive_max: int = 20) -> None:
-        self.base_url = (base_url or os.getenv("OLLAMA_BASE_URL") or DEFAULT_OLLAMA_HOST).rstrip("/")
+        self.base_url = (base_url or DEFAULT_OLLAMA_HOST).rstrip("/")
         limits = httpx.Limits(max_keepalive_connections=keepalive_connections, max_connections=keepalive_max)
         timeout = httpx.Timeout(timeout_s)
         self._client = httpx.AsyncClient(base_url=self.base_url, timeout=timeout, limits=limits)

@@ -13,6 +13,7 @@ LOGS_PATH = join(RSC_PATH, 'logs')
 # [ENDPOINS]
 ###############################################################################
 API_BASE_URL = "http://127.0.0.1:8000"
+PARSER_MODEL = "deepseek-r1:14b"
 
 
 
