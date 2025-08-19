@@ -7,7 +7,7 @@ PROJECT_DIR = join(ROOT_DIR, 'Pharmagent')
 RSC_PATH = join(PROJECT_DIR, 'resources')
 DATA_PATH = join(RSC_PATH, 'database')
 DOCS_PATH = join(DATA_PATH, 'documents')
-SOURCES_PATH = join(RSC_PATH, 'sources')
+SOURCES_PATH = join(DATA_PATH, 'sources')
 LOGS_PATH = join(RSC_PATH, 'logs')
 
 # [ENDPOINS]

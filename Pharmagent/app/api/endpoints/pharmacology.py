@@ -20,7 +20,7 @@ LT_client = LiverToxClient()
 
 async def fetch_bulk_livertox():        
     try:        
-        path = await LT_client.download_bulk_archive(SOURCES_PATH)        
+        results = await LT_client.download_bulk_data(SOURCES_PATH)        
     except Exception as e:
         raise HTTPException(status_code=502, detail=f"Bulk download failed: {e}")
-    return {"saved_to": str(path)}
+    return results
