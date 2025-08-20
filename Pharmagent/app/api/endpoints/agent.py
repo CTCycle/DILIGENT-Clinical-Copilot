@@ -5,8 +5,7 @@ from fastapi import APIRouter, status
 from fastapi.concurrency import run_in_threadpool
 
 from Pharmagent.app.utils.serializer import DataSerializer
-from Pharmagent.app.utils.services.parser import DiseasesParsing
-from Pharmagent.app.utils.services.patients import PatientCase
+from Pharmagent.app.utils.services.parser import PatientCase, DiseasesParsing
 from Pharmagent.app.api.models.server import OllamaClient
 from Pharmagent.app.api.schemas.clinical import PatientData, PatientOutputReport
 

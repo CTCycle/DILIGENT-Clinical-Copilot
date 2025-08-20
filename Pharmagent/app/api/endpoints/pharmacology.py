@@ -19,11 +19,11 @@ LT_client = LiverToxClient()
     summary="Fetch LiverTox monograph data (FTP bulk or live web)")
 
 async def fetch_bulk_livertox(
-    extract: bool = Query(False, description="Extract data from the downloaded files and save it into database")):
+    convert_to_dataframe: bool = Query(False, description="Extract data from the downloaded file and save it into database")):
       
     try:        
         results = await LT_client.download_bulk_data(SOURCES_PATH)
-        if extract:
+        if convert_to_dataframe:
             livertox_data = LT_client.convert_file_to_dataframe()        
     except Exception as e:
         raise HTTPException(status_code=502, detail=f"Bulk download failed: {e}")
