@@ -42,8 +42,8 @@ if exist "%DOTENV%" (
 REM ============================================================================
 REM == Defaults if not provided in .env
 REM ============================================================================
-if not defined FASTAPI_HOST  set "FASTAPI_HOST=127.0.0.1"
-if not defined FASTAPI_PORT  set "FASTAPI_PORT=8000"
+if not defined FASTAPI_HOST set "FASTAPI_HOST=127.0.0.1"
+if not defined FASTAPI_PORT set "FASTAPI_PORT=8000"
 if not defined RELOAD set "RELOAD=true"
 
 REM uvicorn target (aligns with your imports)
@@ -53,9 +53,9 @@ REM Map RELOAD env to flag
 set "RELOAD_FLAG="
 if /i "%RELOAD%"=="true" set "RELOAD_FLAG=--reload"
 
-set "DOCS_URL=http://%HOST%:%PORT%/docs"
+set "DOCS_URL=http://%FASTAPI_HOST%:%FASTAPI_PORT%/docs"
 
-echo [INFO] FASTAPI_HOST=%HOST%  FASTAPI_PORT=%PORT%  RELOAD=%RELOAD%
+echo [INFO] FASTAPI_HOST=%FASTAPI_HOST%  FASTAPI_PORT=%FASTAPI_PORT%  RELOAD=%RELOAD%
 echo [INFO] Starting FastAPI app from %UVICORN_MODULE% ...
 start "" "%DOCS_URL%"
 uvicorn %UVICORN_MODULE% --host "%FASTAPI_HOST%" --port %FASTAPI_PORT% %RELOAD_FLAG% --log-level debug

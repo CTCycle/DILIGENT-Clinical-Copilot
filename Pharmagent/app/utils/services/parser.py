@@ -9,7 +9,7 @@ from typing import Any, Dict, Tuple, List, Optional
 import pandas as pd
 
 from Pharmagent.app.api.models.server import OllamaClient, OllamaError
-from Pharmagent.app.api.schemas.clinical import PatientData
+from Pharmagent.app.api.schemas.clinical import PatientData, PatientDiseases
 from Pharmagent.app.api.models.prompts import DISEASE_EXTRACTION_PROMPT
 from Pharmagent.app.constants import PARSER_MODEL
 from Pharmagent.app.logger import logger
@@ -104,8 +104,8 @@ class DiseasesParsing:
         return result
 
     #--------------------------------------------------------------------------
-    async def extract_diseases_from_text(self, text: str) -> Dict[str, Any]:
-        if text is None:
+    async def extract_diseases(self, text: str) -> Dict[str, Any]:
+        if not text:
             return
         
         # LLM messages: system prompt + user content
@@ -138,6 +138,28 @@ class DiseasesParsing:
         data = self.validate_json_schema(data)
 
         return data
+    
+    #--------------------------------------------------------------------------
+    async def extract_diseases_with_validation(self, text: str) -> Dict[str, Any]:        
+        if not text:
+            return {"diseases": [], "hepatic_diseases": []}
+        try:
+            parsed: PatientDiseases = await self.client.llm_structured_call(                
+                model=self.model,
+                system_prompt=DISEASE_EXTRACTION_PROMPT,
+                user_prompt=text,
+                schema=PatientDiseases,
+                temperature=self.temperature,
+                use_json_mode=True,
+                max_repair_attempts=2)
+            
+        except Exception as e:
+            raise RuntimeError(f"Failed to extract diseases (structured): {e}") from e
+
+        diseases = self.normalize_unique(parsed.diseases)
+        hepatic = [h for h in self.normalize_unique(parsed.hepatic_diseases) if h in diseases]
+
+        return {"diseases": diseases, "hepatic_diseases": hepatic}
     
     #--------------------------------------------------------------------------
     def validate_json_schema(self, output: dict) -> dict:    

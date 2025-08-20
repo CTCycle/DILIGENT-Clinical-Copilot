@@ -5,10 +5,11 @@ import re
 import json
 import asyncio
 import inspect
-from typing import Any, Dict, List, Optional, AsyncGenerator, Callable, Awaitable, Union
+from typing import Any, Dict, List, Optional, AsyncGenerator, Callable, Awaitable, Union, Type
 
 import httpx
 from pydantic import BaseModel, ValidationError
+from langchain_core.output_parsers import PydanticOutputParser
 
 from Pharmagent.app.constants import DATA_PATH
 from Pharmagent.app.logger import logger
@@ -224,6 +225,84 @@ class OllamaClient:
                     yield evt
         except httpx.TimeoutException as e:
             raise OllamaTimeout("Timed out during streamed chat response") from e
+        
+    #--------------------------------------------------------------------------
+    async def llm_structured_call(
+        self,
+        *,        
+        model: str,
+        system_prompt: str,
+        user_prompt: str,
+        schema: Type[BaseModel],
+        temperature: float = 0.0,
+        use_json_mode: bool = True,
+        max_repair_attempts: int = 2) -> BaseModel:
+        
+        """
+        Call your Ollama LLM and validate the response against a Pydantic schema
+        using LangChain's PydanticOutputParser.
+
+        - Injects format instructions so the LLM knows to return the expected JSON.
+        - Parses & validates. If invalid, makes up to `max_repair_attempts` repair calls.
+        - Returns an instance of `schema` (a Pydantic model).
+
+        This function is LLM-agnostic beyond the Ollama client; you can reuse it
+        across parsers by supplying different prompts/schemas.
+
+        """
+        parser = PydanticOutputParser(pydantic_object=schema)
+        format_instructions = parser.get_format_instructions()
+
+        messages = [
+            {"role": "system", "content": f"{system_prompt.strip()}\n\n{format_instructions}"},
+            {"role": "user", "content": user_prompt}]
+
+        try:
+            raw = await self.chat(
+                model=model,
+                messages=messages,
+                format="json" if use_json_mode else None,
+                options={"temperature": temperature})
+            
+        except OllamaError as e:
+            raise RuntimeError(f"LLM call failed: {e}") from e
+
+        # Unify to text for the LC parser
+        text = json.dumps(raw) if isinstance(raw, dict) else str(raw)
+
+        # First parse attempt + bounded auto-repair loop
+        for attempt in range(max_repair_attempts + 1):
+            try:
+                return parser.parse(text)
+            except Exception as err:
+                if attempt >= max_repair_attempts:
+                    # Surface original model output in logs for debugging
+                    logger.error("Structured parse failed after retries. Last text: %s", text)
+                    raise RuntimeError(f"Structured parsing failed: {err}") from err
+
+                # Ask the model to repair to valid JSON that matches the schema.
+                repair_messages = [
+                    {"role": "system", "content": system_prompt.strip()},
+                    {
+                        "role": "user",
+                        "content": (
+                            "The previous reply did not match the required JSON schema.\n"
+                            "Follow these format instructions exactly and return ONLY a valid JSON object:\n"
+                            f"{format_instructions}\n\n"
+                            f"Previous reply:\n{text}"
+                        ),
+                    },
+                ]
+                try:
+                    raw = await self.chat(
+                        model=model,
+                        messages=repair_messages,
+                        format="json" if use_json_mode else None,
+                        options={"temperature": 0.0})
+                    text = json.dumps(raw) if isinstance(raw, dict) else str(raw)
+                    
+                except OllamaError as e:
+                    raise RuntimeError(f"Repair attempt failed: {e}") from e
 
     #--------------------------------------------------------------------------
     @staticmethod

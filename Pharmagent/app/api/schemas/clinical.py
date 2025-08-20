@@ -1,6 +1,7 @@
-from typing import Any, Dict, Iterable, List, Literal, Optional
-from typing_extensions import Annotated
-from pydantic import BaseModel, Field
+import json
+from typing import Any, Dict, List, Optional, Type
+
+from pydantic import BaseModel, Field, model_validator, field_validator
 
 from Pharmagent.app.api.schemas.placeholders import EXAMPLE_INPUT_DATA
 
@@ -39,9 +40,33 @@ class PatientOutputReport(BaseModel):
         description="Multiline text output with the final report.",
         examples=["This is a sample note."])
     
+#------------------------------------------------------------------------------
+class PatientDiseases(BaseModel):
+    diseases: List[str] = Field(default_factory=list)
+    hepatic_diseases: List[str] = Field(default_factory=list)
 
-   
+    @field_validator("diseases", "hepatic_diseases")
+    def strip_and_nonempty(cls, v):
+        # Clean up each string, skip empty/None
+        return [str(item).strip() for item in v if item and str(item).strip()]
 
+    @field_validator("diseases", "hepatic_diseases")
+    def must_be_unique(cls, v):
+        if len(v) != len(set(map(str.lower, v))):
+            raise ValueError("List must contain unique items (case-insensitive)")
+        return v
+
+    @model_validator(mode="after")
+    def hepatic_subset_of_diseases(self):
+        disease_set = set(s.strip().lower() for s in self.diseases)
+        hepatic_set = set(s.strip().lower() for s in self.hepatic_diseases)
+        missing = hepatic_set - disease_set
+        if missing:
+            raise ValueError(
+                f"hepatic_diseases contains items not present in diseases: {sorted(missing)}"
+            )
+        return self
+    
 #------------------------------------------------------------------------------  
 class Monography(BaseModel):
     title: str

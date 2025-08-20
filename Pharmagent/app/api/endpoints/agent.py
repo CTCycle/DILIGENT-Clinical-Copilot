@@ -38,9 +38,11 @@ async def start_clinical_agent(payload: PatientData) -> PatientOutputReport:
     logger.info(f'Extracting diseases from patient anamnesis using {parser.model}')
 
     start_time = time.time()
-    diseases = await parser.extract_diseases_from_text(sections.get('anamnesis', None))
+    diseases = await parser.extract_diseases_with_validation(sections.get('anamnesis', None))
     elapsed = time.time() - start_time
     logger.info(f"Time elapsed for diseases extraction: {elapsed:.2f} seconds.")
+
+    logger.info(diseases)
 
 
     pass
