@@ -111,8 +111,7 @@ class DiseasesParsing:
         # LLM messages: system prompt + user content
         messages = [
             {"role": "system", "content": DISEASE_EXTRACTION_PROMPT},
-            {"role": "user", "content": text}
-            ]
+            {"role": "user", "content": text}]
         
         try:
             llm_response = await self.client.chat(
@@ -139,6 +138,7 @@ class DiseasesParsing:
 
         return data
     
+    # uses lanchain as wrapper to perform persing and validation to patient diseases model    
     #--------------------------------------------------------------------------
     async def extract_diseases_with_validation(self, text: str) -> Dict[str, Any]:        
         if not text:

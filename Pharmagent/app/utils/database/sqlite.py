@@ -1,11 +1,11 @@
 import os
 import pandas as pd
-import lancedb  
-import sqlalchemy
+
 from sqlalchemy.orm import declarative_base, sessionmaker
-from sqlalchemy import Column, Float, Integer, String, UniqueConstraint, create_engine
+from sqlalchemy import Column, String, UniqueConstraint, create_engine
 from sqlalchemy.dialects.sqlite import insert
 
+from Pharmagent.app.utils.singleton import singleton
 from Pharmagent.app.constants import DATA_PATH
 from Pharmagent.app.logger import logger
 
@@ -38,6 +38,7 @@ class Patients(Base):
 
 # [DATABASE]
 ###############################################################################
+@singleton
 class PharmagentDatabase:
 
     def __init__(self): 
@@ -91,4 +92,5 @@ class PharmagentDatabase:
 
  
     
-    
+#------------------------------------------------------------------------------
+database = PharmagentDatabase()   

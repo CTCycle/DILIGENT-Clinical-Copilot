@@ -4,7 +4,7 @@ EV = EnvironmentVariables()
 import os
 from fastapi import FastAPI
 
-from Pharmagent.app.utils.database.sqlite import PharmagentDatabase
+from Pharmagent.app.utils.database.sqlite import database
 from Pharmagent.app.api.endpoints.agent import router as report_router
 from Pharmagent.app.api.endpoints.ollama import router as models_router
 from Pharmagent.app.api.endpoints.pharmacology import router as pharma_router
@@ -13,7 +13,6 @@ from Pharmagent.app.logger import logger
 
 ###############################################################################
 # initialize the database if it has not been created
-database = PharmagentDatabase()
 if not os.path.exists(database.db_path):    
     logger.info('Database not found, creating instance and making all tables')
     database.initialize_database()
