@@ -20,3 +20,25 @@ Given a piece of text (which may be in any language), identify and extract all t
   "hepatic_diseases": ["hepatitis B", "liver cirrhosis"]
 }
 """
+
+BLOOD_TEST_EXTRACTION_PROMPT = """
+You extract BLOOD TEST results from raw clinical text and return ONLY a JSON object
+that validates Pydantic schema `PatientBloodTests` with fields:
+- source_text: the EXACT original text you parsed
+- entries: an array of BloodTest objects with fields:
+  name (string, minimally normalized), value (number or null), value_text (string or null),
+  unit (string or null), cutoff (number or null), cutoff_unit (string or null),
+  note (string or null), context_date (YYYY-MM-DD or original date string if parsing failed).
+
+STRICT RULES:
+- Do NOT invent tests. Only include results explicitly present in the text.
+- If a numeric result is present, put its numeric form in `value` (dot-decimal), and leave `value_text` null.
+  If the result is textual (e.g., ratios like '1:80'), put it in `value_text` and leave `value` null.
+- Preserve the unit exactly as found (minimally normalized; trim trailing dots).
+- If a cutoff / upper limit appears, set `cutoff` and `cutoff_unit` (often same as unit).
+- Keep short notes from parentheses unrelated to cutoff in `note`.
+- If the text contains a date heading for a batch (e.g., 30.07.2025 or 'Giugno 26, 2025'),
+  copy it as ISO YYYY-MM-DD into `context_date`; if you can’t convert, keep the raw string.
+- Do NOT collapse distinct measurements; output one entry per finding.
+- The output MUST be valid JSON for PatientBloodTests. No commentary.
+"""

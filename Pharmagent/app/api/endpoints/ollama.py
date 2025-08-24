@@ -19,8 +19,12 @@ router = APIRouter(prefix="/models", tags=["models"])
     description="Synchronously pull an Ollama model by name. If the model already exists locally, no pull is performed.")
 
 async def pull_model(
-    name: str = Query(..., description="Exact Ollama model name, e.g. 'llama3.1:8b'"),
-    stream: bool = Query(False, description="If True, stream pull from Ollama. Endpoint returns only final status (no SSE).")
+    name: str = Query(
+        ..., 
+        description="Exact Ollama model name, e.g. 'llama3.1:8b'"),
+    stream: bool = Query(
+        False, 
+        description="If True, stream pull from Ollama. Endpoint returns only final status (no SSE).")
     ) -> ModelPullResponse:
     try:
         async with OllamaClient() as client:

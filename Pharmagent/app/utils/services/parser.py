@@ -2,19 +2,22 @@ from __future__ import annotations
 
 import os
 import re
-import json
 import unicodedata
-from typing import Any, Dict, Tuple, List, Optional
+from datetime import date
+from typing import Any, Dict, Tuple, List, Optional, Iterable, Iterator
 
 import pandas as pd
 
-from Pharmagent.app.api.models.server import OllamaClient, OllamaError
-from Pharmagent.app.api.schemas.clinical import PatientData, PatientDiseases
-from Pharmagent.app.api.models.prompts import DISEASE_EXTRACTION_PROMPT
+from Pharmagent.app.api.models.server import OllamaClient
+from Pharmagent.app.api.schemas.regex import TITER_RE, NUMERIC_RE, CUTOFF_IN_PAREN_RE, ITALIAN_MONTHS, DATE_PATS
+from Pharmagent.app.api.schemas.clinical import PatientData, PatientDiseases, BloodTest, PatientBloodTests
+from Pharmagent.app.api.models.prompts import DISEASE_EXTRACTION_PROMPT, BLOOD_TEST_EXTRACTION_PROMPT
 from Pharmagent.app.constants import PARSER_MODEL
 from Pharmagent.app.logger import logger
 
 DEFAULT_OLLAMA_HOST = os.getenv("OLLAMA_HOST", "http://localhost:11434")
+
+
 
 
 ###############################################################################
@@ -78,22 +81,16 @@ class PatientCase:
     
 
 ###############################################################################
-class DiseasesParsing:
+class DiseasesParser:
     
-    def __init__(self, base_url: Optional[str] = None,
-        timeout_s: float = 180.0, temperature: float = 0.0) -> None:        
+    def __init__(self, timeout_s: float = 300.0, temperature: float = 0.0) -> None:        
         self.temperature = float(temperature)
-        self.client = OllamaClient(base_url=base_url, timeout_s=timeout_s)
+        self.client = OllamaClient(base_url=None, timeout_s=timeout_s)        
+        self.JSON_schema = {'diseases': List[str], 'hepatic_diseases': List[str]}
         self.model = PARSER_MODEL
-        self.JSON_schema = {'diseases': List[str], 
-                            'hepatic_diseases': List[str]}
-
+        
     #--------------------------------------------------------------------------
-    def get_selected_model(self, model_name: Optional[str] = None) -> None:
-        self.client.pull(model_name or self.model)
-
-    #--------------------------------------------------------------------------
-    def normalize_unique(self, lst):
+    def normalize_unique(self, lst : List[str]):
         seen = set()
         result = []
         for x in lst:
@@ -101,46 +98,12 @@ class DiseasesParsing:
             if norm and norm not in seen:
                 seen.add(norm)
                 result.append(norm)
-        return result
 
-    #--------------------------------------------------------------------------
-    async def extract_diseases(self, text: str) -> Dict[str, Any]:
-        if not text:
-            return
-        
-        # LLM messages: system prompt + user content
-        messages = [
-            {"role": "system", "content": DISEASE_EXTRACTION_PROMPT},
-            {"role": "user", "content": text}]
-        
-        try:
-            llm_response = await self.client.chat(
-                model=self.model,
-                messages=messages,
-                format="json")
-            
-        except OllamaError as e:
-            # Customize exception handling/logging as needed
-            raise RuntimeError(f"Failed to extract diseases: {e}") from e
-
-        data = None
-        # 1. Parse LLM response to dict if necessary
-        if isinstance(llm_response, dict):
-            data = llm_response
-        elif isinstance(llm_response, str):
-            try:
-                data = json.loads(llm_response)
-            except Exception as e:
-                logger.error(f"Could not parse LLM response as JSON: {llm_response}")
-                return
-            
-        data = self.validate_json_schema(data)
-
-        return data
+        return result    
     
     # uses lanchain as wrapper to perform persing and validation to patient diseases model    
     #--------------------------------------------------------------------------
-    async def extract_diseases_with_validation(self, text: str) -> Dict[str, Any]:        
+    async def extract_diseases(self, text: str) -> Dict[str, Any]:        
         if not text:
             return {"diseases": [], "hepatic_diseases": []}
         try:
@@ -183,3 +146,231 @@ class DiseasesParsing:
     
 
 
+
+###############################################################################
+class BloodTestParser:
+    """
+    Minimal parser that assumes the input `text` is already the blood-test section.
+    Strategy:
+    1) Try LLM structured extraction to `PatientBloodTests`.
+    2) If it fails, fall back to deterministic parsing.
+    3) Post-process: dedupe + light normalization; always return a valid `PatientBloodTests`.
+
+    """
+    def __init__(self, *, model: str | None = None, temperature: float = 0.0, timeout_s: float = 300.0) -> None:
+        self.model = (model or PARSER_MODEL).strip()
+        self.temperature = float(temperature)
+        self.client = OllamaClient(base_url=None, timeout_s=timeout_s)
+
+    #--------------------------------------------------------------------------
+    def normalize_strings(self, s: str | None) -> str | None:
+            if s is None:
+                return None
+            s2 = re.sub(r"\s+", " ", s).strip().rstrip(",:;.- ")
+            return s2 or None
+
+    #--------------------------------------------------------------------------
+    def clean_text(self, text: str) -> str:        
+        t = unicodedata.normalize("NFKC", text or "")
+        t = t.replace("\r\n", "\n").replace("\r", "\n")
+        t = "\n".join(line.rstrip() for line in t.split("\n")).strip()
+        return t
+
+    #--------------------------------------------------------------------------
+    def dedupe_and_tidy(self, items: list[BloodTest]) -> list[BloodTest]: 
+        seen: set[tuple[Any, ...]] = set()
+        out: list[BloodTest] = []
+        for it in items or []:
+            key = (
+                self.normalize_strings(it.name) or "",
+                it.value,
+                self.normalize_strings(it.value_text),
+                (self.normalize_strings(it.unit).rstrip(".") if self.normalize_strings(it.unit) else None),
+                it.cutoff,
+                (self.normalize_strings(it.cutoff_unit).rstrip(".") if self.normalize_strings(it.cutoff_unit) else None),
+                self.normalize_strings(it.note),
+                self.normalize_strings(it.context_date))
+            if key in seen:
+                continue
+            seen.add(key)
+            out.append(
+                BloodTest(
+                    name=self.normalize_strings(it.name) or "",
+                    value=it.value,
+                    value_text=self.normalize_strings(it.value_text),
+                    unit=(self.normalize_strings(it.unit).rstrip(".") if self.normalize_strings(it.unit) else None),
+                    cutoff=it.cutoff,
+                    cutoff_unit=(self.normalize_strings(it.cutoff_unit).rstrip(".") if self.normalize_strings(it.cutoff_unit) else None),
+                    note=self.normalize_strings(it.note),
+                    context_date=self.normalize_strings(it.context_date)))
+            
+        return out
+    
+    #--------------------------------------------------------------------------
+    def parse_blood_test_results(self, text: str) -> Iterator[BloodTest]:
+        for ctx_date, segment in self.iterate_date_segments(text):
+            # 1) titer-like first (avoid numeric overlap)
+            used_spans: list[tuple[int, int]] = []
+            for m in TITER_RE.finditer(segment):
+                name = m.group("name").strip()
+                ratio = m.group("ratio").replace(" ", "")
+                start, end = m.span()
+                used_spans.append((start, end))
+                yield BloodTest(
+                    name=name,
+                    value=None,
+                    value_text=ratio,
+                    unit=None,
+                    cutoff=None,
+                    cutoff_unit=None,
+                    note=None,
+                    context_date=ctx_date)
+
+            # 2) numeric values (with optional units/notes/cutoffs)
+            for cand in self.split_candidates(segment):
+                for m in NUMERIC_RE.finditer(cand):
+                    start, end = m.span()
+                    if any(not (end <= s or start >= e) for s, e in used_spans):
+                        continue  # skip overlaps already captured as titers
+
+                    name = m.group("name").strip()
+                    raw_val = m.group("value")
+                    unit = self.clean_unit(m.group("unit"))
+                    paren = m.group("paren")
+                    cutoff = None
+                    note = None
+                    cutoff_unit = None
+
+                    if paren:
+                        cut = CUTOFF_IN_PAREN_RE.search(paren)
+                        if cut:
+                            cutoff = float(cut.group(1).replace(",", "."))
+                            cutoff_unit = unit
+                        else:
+                            note = paren.strip("() ").strip()
+
+                    try:
+                        value = float(raw_val.replace(",", "."))
+                        value_text = None
+                    except ValueError:
+                        value = None
+                        value_text = raw_val
+
+                    # trim common leading/trailing noise around names
+                    name = re.sub(r"\b(Labor|BLOOD TESTS)\b[:\s]*$", "", name, flags=re.I).strip()
+                    if not name:
+                        continue
+
+                    yield BloodTest(
+                        name=name,
+                        value=value,
+                        value_text=value_text,
+                        unit=unit,
+                        cutoff=cutoff,
+                        cutoff_unit=cutoff_unit,
+                        note=note,
+                        context_date=ctx_date)
+
+    #--------------------------------------------------------------------------          
+    def _normalize_text(self, text: str) -> str:
+        text = text.replace("\u00b5", "μ")  # µ -> μ
+        text = re.sub(r"[ \t]+", " ", text)  # compact spaces
+        text = re.sub(r"\s*\)\s*,", "),", text)  # tidy '),'
+        return text
+
+    #--------------------------------------------------------------------------
+    def parse_date_string(self, s: str | None) -> str | None:
+        if not s:
+            return None
+        # dd.mm.yyyy
+        m = re.fullmatch(r"(\d{1,2})\.(\d{1,2})\.(\d{4})", s)
+        if m:
+            d, mth, y = map(int, m.groups())
+            try:
+                return date(y, mth, d).isoformat()
+            except ValueError:
+                return s
+        # Month DD YYYY (Italian month)
+        m2 = re.fullmatch(r"([A-Za-zÀ-ÿ]+)\s+(\d{1,2})[.,]?\s*(\d{4})", s, flags=re.I)
+        if m2:
+            mon_name, d, y = m2.groups()
+            mon = ITALIAN_MONTHS.get(mon_name.lower())
+            if mon:
+                try:
+                    return date(int(y), mon, int(d)).isoformat()
+                except ValueError:
+                    return s
+        return None
+
+    #--------------------------------------------------------------------------
+    def iterate_date_segments(self, text: str) -> Iterator[tuple[Optional[str], str]]:        
+        text = self._normalize_text(text)
+
+        markers: list[tuple[int, int, str]] = []
+        for pat in DATE_PATS:
+            for m in pat.finditer(text):
+                raw = m.groupdict().get("d") or (
+                    f"{m.group('m')} {m.group('day')}.{m.group('year')}" if "m" in m.groupdict() else None)
+                if raw is None:
+                    continue
+                markers.append((m.start(), m.end(), raw))
+
+        markers.sort(key=lambda x: (x[0], -(x[1] - x[0])))  # leftmost, prefer longer span
+        pruned: list[tuple[int, int, str]] = []
+        last_end = -1
+        for s, e, raw in markers:
+            if s >= last_end:
+                pruned.append((s, e, raw))
+                last_end = e
+
+        if not pruned:
+            yield (None, text)
+            return
+
+        prev_end = 0
+        current_date: Optional[str] = None
+        for s, e, raw in pruned:
+            if s > prev_end:
+                seg = text[prev_end:s].strip(" \n:")
+                if seg:
+                    yield (self.parse_date_string(current_date) if current_date else None, seg)
+            current_date = raw
+            prev_end = e
+
+        tail = text[prev_end:].strip(" \n:")
+        if tail:
+            yield (self.parse_date_string(current_date) if current_date else None, tail)
+
+    #--------------------------------------------------------------------------
+    def clean_unit(self, u: Optional[str]) -> Optional[str]:
+        if not u:
+            return None
+        u = u.strip()
+        u = re.split(r"[,;]|(?=\s[A-Za-zÀ-ÿ])", u)[0]  # stop at delimiter or new word
+        return u.rstrip(".")
+
+    #--------------------------------------------------------------------------
+    def split_candidates(self, segment: str) -> Iterable[str]:
+        """Split around commas/newlines but keep commas inside parentheses."""
+        tmp = []
+        depth = 0
+        for ch in segment:
+            if ch == "(":
+                depth += 1
+            elif ch == ")":
+                depth = max(0, depth - 1)
+            tmp.append("§" if (ch == "," and depth > 0) else ch)
+        safe = "".join(tmp)
+        for p in re.split(r"[,\n]+", safe):
+            yield p.replace("§", ",").strip(" .;:")
+
+    #--------------------------------------------------------------------------
+    async def extract_blood_test_results(self, text: str) -> PatientBloodTests:        
+        cleaned = self.clean_text(text)
+        if not cleaned:
+            return PatientBloodTests(source_text="", entries=[])
+
+        parsed = entries = list(self.parse_blood_test_results(cleaned))  
+        entries = self.dedupe_and_tidy(parsed)
+
+        return PatientBloodTests(source_text=(parsed.source_text or cleaned), entries=entries)

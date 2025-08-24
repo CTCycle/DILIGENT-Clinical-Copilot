@@ -1,6 +1,6 @@
 # EMADB AutoPilot
 
-## 1. Project Overview
+## 1. Introduction
 This project aims to develop a framework that autonomously navigates multiple drug-related online resources to retrieve data regarding drugs interactions and EMA drugs adverse reactions reports. Initially designed to browse the EMA database of EudraVigilance (European Database of suspected adverse drug reaction reports), the project has now been expanded to incorporate additional functionalities.
 
 **EudraVigilance Integration**
