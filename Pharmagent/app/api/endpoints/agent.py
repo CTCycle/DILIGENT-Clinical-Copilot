@@ -5,8 +5,7 @@ from fastapi import APIRouter, status
 from fastapi.concurrency import run_in_threadpool
 
 from Pharmagent.app.utils.serializer import DataSerializer
-from Pharmagent.app.utils.services.parser import PatientCase, DiseasesParsing
-from Pharmagent.app.api.models.server import OllamaClient
+from Pharmagent.app.utils.services.parser import PatientCase, DiseasesParser, BloodTestParser
 from Pharmagent.app.api.schemas.clinical import PatientData, PatientOutputReport
 
 from Pharmagent.app.constants import DATA_PATH, PARSER_MODEL
@@ -34,17 +33,21 @@ async def start_clinical_agent(payload: PatientData) -> PatientOutputReport:
     await run_in_threadpool(serializer.save_patients_info, patient_table)
 
     # 2. Initialize Ollama client and pull the model if not already done
-    parser = DiseasesParsing(timeout_s=300)
+    parser = DiseasesParser()
     logger.info(f'Extracting diseases from patient anamnesis using {parser.model}')
 
     start_time = time.time()
-    diseases = await parser.extract_diseases_with_validation(sections.get('anamnesis', None))
+    diseases = await parser.extract_diseases(sections.get('anamnesis', None))
     elapsed = time.time() - start_time
     logger.info(f"Time elapsed for diseases extraction: {elapsed:.2f} seconds.")
 
-    logger.info(diseases)
+    parser = BloodTestParser()
+    logger.info(f'Extracting blood tests analysis from patient lab results using {parser.model}')
+    start_time = time.time()
+    blood_test_results = await parser.extract_blood_test_results(sections.get('blood_tests', None))
+    elapsed = time.time() - start_time
 
-
+   
     pass
 
 
