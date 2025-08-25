@@ -1,7 +1,7 @@
 from fastapi import APIRouter, HTTPException, Query, status
 
 from Pharmagent.app.utils.serializer import DataSerializer
-from Pharmagent.app.api.models.server import OllamaClient, OllamaError, OllamaTimeout
+from Pharmagent.app.api.models.providers import OllamaClient, OllamaError, OllamaTimeout
 from Pharmagent.app.api.schemas.models import ModelPullResponse, ModelListResponse
 
 from Pharmagent.app.constants import DATA_PATH
@@ -39,7 +39,7 @@ async def pull_model(
                 model=name)
 
     except Exception as exc:
-        from Pharmagent.app.api.models.server import OllamaError, OllamaTimeout
+        from Pharmagent.app.api.models.providers import OllamaError, OllamaTimeout
         if isinstance(exc, OllamaTimeout):
             raise HTTPException(status_code=504, detail=str(exc))
         if isinstance(exc, OllamaError):

@@ -8,7 +8,7 @@ from typing import Any, Dict, Tuple, List, Optional, Iterable, Iterator
 
 import pandas as pd
 
-from Pharmagent.app.api.models.server import OllamaClient
+from Pharmagent.app.api.models.providers import OllamaClient
 from Pharmagent.app.api.schemas.regex import TITER_RE, NUMERIC_RE, CUTOFF_IN_PAREN_RE, ITALIAN_MONTHS, DATE_PATS
 from Pharmagent.app.api.schemas.clinical import PatientData, PatientDiseases, BloodTest, PatientBloodTests
 from Pharmagent.app.api.models.prompts import DISEASE_EXTRACTION_PROMPT, BLOOD_TEST_EXTRACTION_PROMPT
@@ -373,4 +373,4 @@ class BloodTestParser:
         parsed = entries = list(self.parse_blood_test_results(cleaned))  
         entries = self.dedupe_and_tidy(parsed)
 
-        return PatientBloodTests(source_text=(parsed.source_text or cleaned), entries=entries)
+        return PatientBloodTests(source_text=cleaned, entries=entries)

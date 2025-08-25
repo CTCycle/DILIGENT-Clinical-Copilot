@@ -5,7 +5,7 @@ import re
 import json
 import asyncio
 import inspect
-from typing import Any, Dict, List, Optional, AsyncGenerator, Callable, Awaitable, Union, Type
+from typing import Any, Dict, List, Optional, Literal, AsyncGenerator, Callable, Awaitable, Union, Type
 
 import httpx
 from pydantic import BaseModel, ValidationError
@@ -334,4 +334,13 @@ class OllamaClient:
             return None
 
     
+###############################################################################
+class LLMError(RuntimeError):
+    pass
 
+class LLMTimeout(LLMError):
+    """Raised when requests exceed the configured timeout."""
+
+ProgressCb = Callable[[Dict[str, Any]], Union[None, Awaitable[None]]]
+
+ProviderName = Literal["openai", "azure-openai", "anthropic", "gemini"]

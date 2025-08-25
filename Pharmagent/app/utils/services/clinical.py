@@ -8,7 +8,7 @@ from typing import Any, Dict, Tuple, List, Optional
 
 import pandas as pd
 
-from Pharmagent.app.api.models.server import OllamaClient, OllamaError
+from Pharmagent.app.api.models.providers import OllamaClient, OllamaError
 from Pharmagent.app.api.schemas.diseases import PatientDiseases
 from Pharmagent.app.api.models.prompts import DISEASE_EXTRACTION_PROMPT
 from Pharmagent.app.constants import PARSER_MODEL
