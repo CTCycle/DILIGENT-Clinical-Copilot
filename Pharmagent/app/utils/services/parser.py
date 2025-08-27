@@ -11,9 +11,8 @@ import pandas as pd
 from Pharmagent.app.api.models.providers import OllamaClient
 from Pharmagent.app.api.schemas.regex import TITER_RE, NUMERIC_RE, CUTOFF_IN_PAREN_RE, ITALIAN_MONTHS, DATE_PATS
 from Pharmagent.app.api.schemas.clinical import PatientData, PatientDiseases, BloodTest, PatientBloodTests
-from Pharmagent.app.api.models.prompts import DISEASE_EXTRACTION_PROMPT, BLOOD_TEST_EXTRACTION_PROMPT
+from Pharmagent.app.api.models.prompts import DISEASE_EXTRACTION_PROMPT
 from Pharmagent.app.constants import PARSER_MODEL
-from Pharmagent.app.logger import logger
 
 DEFAULT_OLLAMA_HOST = os.getenv("OLLAMA_HOST", "http://localhost:11434")
 

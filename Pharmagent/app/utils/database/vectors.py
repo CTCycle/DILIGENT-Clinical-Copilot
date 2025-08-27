@@ -1,9 +1,7 @@
 import os
-import pandas as pd
 import lancedb  
 
 from Pharmagent.app.constants import RSC_PATH
-from Pharmagent.app.logger import logger
 
       
 

@@ -1,6 +1,5 @@
 import time
 
-import pandas as pd
 from fastapi import APIRouter, status
 from fastapi.concurrency import run_in_threadpool
 
@@ -8,7 +7,6 @@ from Pharmagent.app.utils.serializer import DataSerializer
 from Pharmagent.app.utils.services.parser import PatientCase, DiseasesParser, BloodTestParser
 from Pharmagent.app.api.schemas.clinical import PatientData, PatientOutputReport
 
-from Pharmagent.app.constants import DATA_PATH, PARSER_MODEL
 from Pharmagent.app.logger import logger
 
 router = APIRouter(prefix="/agent", tags=["agent"])

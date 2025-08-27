@@ -1,10 +1,8 @@
 from fastapi import APIRouter, HTTPException, Query, status
 
-from Pharmagent.app.utils.serializer import DataSerializer
 from Pharmagent.app.api.models.providers import OllamaClient, OllamaError, OllamaTimeout
 from Pharmagent.app.api.schemas.models import ModelPullResponse, ModelListResponse
 
-from Pharmagent.app.constants import DATA_PATH
 from Pharmagent.app.logger import logger
 
 router = APIRouter(prefix="/models", tags=["models"])

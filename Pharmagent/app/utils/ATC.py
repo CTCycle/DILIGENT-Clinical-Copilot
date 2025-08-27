@@ -1,7 +1,6 @@
 import requests
 from bs4 import BeautifulSoup
 
-from PharmacoNLP.commons.constants import CONFIG, DOWNLOAD_PATH
 from PharmacoNLP.commons.logger import logger
 
 

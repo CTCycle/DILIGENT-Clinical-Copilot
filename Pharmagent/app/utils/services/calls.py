@@ -4,7 +4,7 @@ import os
 import re
 import json
 import unicodedata
-from typing import Any, Dict, Tuple, List, Optional
+from typing import Any, Dict, Tuple, List
 
 import pandas as pd
 
@@ -125,7 +125,7 @@ class DiseasesParsing:
         elif isinstance(llm_response, str):
             try:
                 data = json.loads(llm_response)
-            except Exception as e:
+            except Exception:
                 logger.error(f"Could not parse LLM response as JSON: {llm_response}")
                 return
             
@@ -226,7 +226,7 @@ class DiseasesParsing:
         elif isinstance(llm_response, str):
             try:
                 data = json.loads(llm_response)
-            except Exception as e:
+            except Exception:
                 logger.error(f"Could not parse LLM response as JSON: {llm_response}")
                 return
             

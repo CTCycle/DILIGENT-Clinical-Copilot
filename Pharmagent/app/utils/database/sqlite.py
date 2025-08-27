@@ -7,7 +7,6 @@ from sqlalchemy.dialects.sqlite import insert
 
 from Pharmagent.app.utils.singleton import singleton
 from Pharmagent.app.constants import DATA_PATH
-from Pharmagent.app.logger import logger
 
 Base = declarative_base()
 

@@ -1,11 +1,8 @@
 from fastapi import APIRouter, HTTPException, Query
 
-from Pharmagent.app.utils.serializer import DataSerializer
 from Pharmagent.app.utils.services.scraper import LiverToxClient
-from Pharmagent.app.api.schemas.clinical import PatientData
 
 from Pharmagent.app.constants import SOURCES_PATH
-from Pharmagent.app.logger import logger
 
 router = APIRouter(prefix="/pharmacology", tags=["pharmacology"])
 
