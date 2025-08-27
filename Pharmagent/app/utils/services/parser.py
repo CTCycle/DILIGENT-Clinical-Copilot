@@ -32,7 +32,7 @@ class PatientCase:
             "missing_tags": list(self.expected_tags), 
             "all_tags_present": False}        
 
-    #--------------------------------------------------------------------------
+    #-------------------------------------------------------------------------
     def clean_patient_info(self, text: str) -> str:        
         # Normalize unicode width/compatibility (e.g., μ → μ, fancy quotes → ASCII where possible)
         processed_text = unicodedata.normalize("NFKC", text)
@@ -45,7 +45,7 @@ class PatientCase:
 
         return processed_text 
     
-    #--------------------------------------------------------------------------
+    #-------------------------------------------------------------------------
     def split_text_by_tags(self, text : str, name : str | None = None) -> Dict[str, Any]:        
         hits = [(m.group(1).strip(), m.start(), m.end()) for m in self.HEADER_RE.finditer(text)]
         if not hits:
@@ -68,7 +68,7 @@ class PatientCase:
        
         return sections
     
-    #--------------------------------------------------------------------------
+    #-------------------------------------------------------------------------
     def extract_sections_from_text(self, payload : PatientData) -> Tuple[Dict[str, Any], pd.DataFrame]:  
         full_text = self.clean_patient_info(payload.info)        
         sections = self.split_text_by_tags(full_text, payload.name)  
@@ -88,7 +88,7 @@ class DiseasesParser:
         self.JSON_schema = {'diseases': List[str], 'hepatic_diseases': List[str]}
         self.model = PARSER_MODEL
         
-    #--------------------------------------------------------------------------
+    #-------------------------------------------------------------------------
     def normalize_unique(self, lst : List[str]):
         seen = set()
         result = []
@@ -101,7 +101,7 @@ class DiseasesParser:
         return result    
     
     # uses lanchain as wrapper to perform persing and validation to patient diseases model    
-    #--------------------------------------------------------------------------
+    #-------------------------------------------------------------------------
     async def extract_diseases(self, text: str) -> Dict[str, Any]:        
         if not text:
             return {"diseases": [], "hepatic_diseases": []}
@@ -123,7 +123,7 @@ class DiseasesParser:
 
         return {"diseases": diseases, "hepatic_diseases": hepatic}
     
-    #--------------------------------------------------------------------------
+    #-------------------------------------------------------------------------
     def validate_json_schema(self, output: dict) -> dict:    
         for key in ['diseases', 'hepatic_diseases']:
             if key not in output or not isinstance(output[key], list):
@@ -161,21 +161,21 @@ class BloodTestParser:
         self.temperature = float(temperature)
         self.client = OllamaClient(base_url=None, timeout_s=timeout_s)
 
-    #--------------------------------------------------------------------------
+    #-------------------------------------------------------------------------
     def normalize_strings(self, s: str | None) -> str | None:
             if s is None:
                 return None
             s2 = re.sub(r"\s+", " ", s).strip().rstrip(",:;.- ")
             return s2 or None
 
-    #--------------------------------------------------------------------------
+    #-------------------------------------------------------------------------
     def clean_text(self, text: str) -> str:        
         t = unicodedata.normalize("NFKC", text or "")
         t = t.replace("\r\n", "\n").replace("\r", "\n")
         t = "\n".join(line.rstrip() for line in t.split("\n")).strip()
         return t
 
-    #--------------------------------------------------------------------------
+    #-------------------------------------------------------------------------
     def dedupe_and_tidy(self, items: list[BloodTest]) -> list[BloodTest]: 
         seen: set[tuple[Any, ...]] = set()
         out: list[BloodTest] = []
@@ -205,7 +205,7 @@ class BloodTestParser:
             
         return out
     
-    #--------------------------------------------------------------------------
+    #-------------------------------------------------------------------------
     def parse_blood_test_results(self, text: str) -> Iterator[BloodTest]:
         for ctx_date, segment in self.iterate_date_segments(text):
             # 1) titer-like first (avoid numeric overlap)
@@ -270,14 +270,14 @@ class BloodTestParser:
                         note=note,
                         context_date=ctx_date)
 
-    #--------------------------------------------------------------------------          
+    #-------------------------------------------------------------------------          
     def _normalize_text(self, text: str) -> str:
         text = text.replace("\u00b5", "μ")  # µ -> μ
         text = re.sub(r"[ \t]+", " ", text)  # compact spaces
         text = re.sub(r"\s*\)\s*,", "),", text)  # tidy '),'
         return text
 
-    #--------------------------------------------------------------------------
+    #-------------------------------------------------------------------------
     def parse_date_string(self, s: str | None) -> str | None:
         if not s:
             return None
@@ -301,7 +301,7 @@ class BloodTestParser:
                     return s
         return None
 
-    #--------------------------------------------------------------------------
+    #-------------------------------------------------------------------------
     def iterate_date_segments(self, text: str) -> Iterator[tuple[Optional[str], str]]:        
         text = self._normalize_text(text)
 
@@ -340,7 +340,7 @@ class BloodTestParser:
         if tail:
             yield (self.parse_date_string(current_date) if current_date else None, tail)
 
-    #--------------------------------------------------------------------------
+    #-------------------------------------------------------------------------
     def clean_unit(self, u: Optional[str]) -> Optional[str]:
         if not u:
             return None
@@ -348,7 +348,7 @@ class BloodTestParser:
         u = re.split(r"[,;]|(?=\s[A-Za-zÀ-ÿ])", u)[0]  # stop at delimiter or new word
         return u.rstrip(".")
 
-    #--------------------------------------------------------------------------
+    #-------------------------------------------------------------------------
     def split_candidates(self, segment: str) -> Iterable[str]:
         """Split around commas/newlines but keep commas inside parentheses."""
         tmp = []
@@ -363,7 +363,7 @@ class BloodTestParser:
         for p in re.split(r"[,\n]+", safe):
             yield p.replace("§", ",").strip(" .;:")
 
-    #--------------------------------------------------------------------------
+    #-------------------------------------------------------------------------
     async def extract_blood_test_results(self, text: str) -> PatientBloodTests:        
         cleaned = self.clean_text(text)
         if not cleaned:

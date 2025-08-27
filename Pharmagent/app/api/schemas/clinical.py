@@ -92,7 +92,7 @@ class BloodTest(BaseModel):
         v = re.sub(r"\s+", " ", v.strip())
         return v.rstrip(",:;.- ")
 
-#------------------------------------------------------------------------------  
+#-----------------------------------------------------------------------------  
 class PatientBloodTests(BaseModel):
     """Container with original text and all parsed test entries."""
 

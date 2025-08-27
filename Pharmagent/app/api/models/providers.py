@@ -59,19 +59,19 @@ class OllamaClient:
         timeout = httpx.Timeout(timeout_s)
         self._client = httpx.AsyncClient(base_url=self.base_url, timeout=timeout, limits=limits)
 
-    #--------------------------------------------------------------------------
+    #-------------------------------------------------------------------------
     async def close(self) -> None:
         await self._client.aclose()
 
-    #--------------------------------------------------------------------------
+    #-------------------------------------------------------------------------
     async def __aenter__(self) -> "OllamaClient":
         return self
 
-    #--------------------------------------------------------------------------
+    #-------------------------------------------------------------------------
     async def __aexit__(self, exc_type, exc, tb) -> None:
         await self.close()
 
-    #--------------------------------------------------------------------------
+    #-------------------------------------------------------------------------
     @staticmethod
     def _raise_for_status(resp: httpx.Response) -> None:
         try:
@@ -80,7 +80,7 @@ class OllamaClient:
             detail = resp.text
             raise OllamaError(f"Ollama HTTP {resp.status_code}: {detail}") from e
 
-    #--------------------------------------------------------------------------
+    #-------------------------------------------------------------------------
     @staticmethod
     async def _maybe_await(cb: Optional[ProgressCb], evt: Dict[str, Any]) -> None:
         if cb is None:
@@ -93,7 +93,7 @@ class OllamaClient:
             # attach minimal context; callers can log externally
             raise OllamaError(f"Progress callback failed: {e!r}") from e
 
-    #--------------------------------------------------------------------------
+    #-------------------------------------------------------------------------
     async def list_models(self) -> List[str]:
         try:
             resp = await self._client.get("/api/tags")
@@ -103,7 +103,7 @@ class OllamaClient:
         payload = resp.json()
         return [m["name"] for m in payload.get("models", []) if "name" in m]
 
-    #--------------------------------------------------------------------------
+    #-------------------------------------------------------------------------
     async def pull(
         self,
         name: str,
@@ -144,7 +144,7 @@ class OllamaClient:
         except httpx.TimeoutException as e:
             raise OllamaTimeout(f"Timed out pulling model '{name}'") from e
 
-    #--------------------------------------------------------------------------
+    #-------------------------------------------------------------------------
     async def check_model_availability(self, name: str, *, auto_pull: bool = True) -> None:
         names = set(await self.list_models())
         if name not in names and auto_pull:
@@ -152,7 +152,7 @@ class OllamaClient:
         elif name not in names:
             raise OllamaError(f"Model '{name}' not found and auto_pull=False")
 
-    #--------------------------------------------------------------------------
+    #-------------------------------------------------------------------------
     async def chat(
         self,
         *,
@@ -190,7 +190,7 @@ class OllamaClient:
                 return content
         return str(content)
 
-    #--------------------------------------------------------------------------
+    #-------------------------------------------------------------------------
     async def chat_stream(
         self,
         *,
@@ -225,7 +225,7 @@ class OllamaClient:
         except httpx.TimeoutException as e:
             raise OllamaTimeout("Timed out during streamed chat response") from e
         
-    #--------------------------------------------------------------------------
+    #-------------------------------------------------------------------------
     async def llm_structured_call(
         self,
         *,        
@@ -303,7 +303,7 @@ class OllamaClient:
                 except OllamaError as e:
                     raise RuntimeError(f"Repair attempt failed: {e}") from e
 
-    #--------------------------------------------------------------------------
+    #-------------------------------------------------------------------------
     @staticmethod
     def parse_json(obj_or_text: Dict[str, Any] | str) -> Optional[Dict[str, Any]]:
         """

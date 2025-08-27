@@ -23,7 +23,7 @@ class LiverToxClient:
         self.tar_file_path = os.path.join(SOURCES_PATH, self.file_name)
         self.chunk_size = 8192
 
-    #--------------------------------------------------------------------------
+    #-------------------------------------------------------------------------
     async def download_bulk_data(self, dest_path: Path) -> Dict[str, Any]:        
         url = self.base_url + self.file_name
         print(f"Downloading file {self.file_name}")
@@ -56,7 +56,7 @@ class LiverToxClient:
                 "size": file_size,
                 "last_modified": last_modified}
     
-    #--------------------------------------------------------------------------
+    #-------------------------------------------------------------------------
     def convert_file_to_dataframe(self) -> pd.DataFrame:        
         records = []
         with tarfile.open(self.tar_file_path, "r:gz") as tar:

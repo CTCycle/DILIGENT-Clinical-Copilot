@@ -22,11 +22,11 @@ class HepatoPatterns:
         self.JSON_schema = {'diseases': List[str], 
                             'hepatic_diseases': List[str]}
 
-    #--------------------------------------------------------------------------
+    #-------------------------------------------------------------------------
     def get_selected_model(self, model_name: Optional[str] = None) -> None:
         self.client.pull(model_name or self.model)
 
-    #--------------------------------------------------------------------------
+    #-------------------------------------------------------------------------
     def normalize_unique(self, lst):
         seen = set()
         result = []
@@ -37,7 +37,7 @@ class HepatoPatterns:
                 result.append(norm)
         return result
 
-    #--------------------------------------------------------------------------
+    #-------------------------------------------------------------------------
     async def extract_diseases(self, text: str) -> Dict[str, Any]:
         if not text:
             return
@@ -73,7 +73,7 @@ class HepatoPatterns:
         return data
     
     # uses lanchain as wrapper to perform persing and validation to patient diseases model    
-    #--------------------------------------------------------------------------
+    #-------------------------------------------------------------------------
     async def extract_diseases(self, text: str) -> Dict[str, Any]:        
         if not text:
             return {"diseases": [], "hepatic_diseases": []}
@@ -95,7 +95,7 @@ class HepatoPatterns:
 
         return {"diseases": diseases, "hepatic_diseases": hepatic}
     
-    #--------------------------------------------------------------------------
+    #-------------------------------------------------------------------------
     def validate_json_schema(self, output: dict) -> dict:    
         for key in ['diseases', 'hepatic_diseases']:
             if key not in output or not isinstance(output[key], list):
