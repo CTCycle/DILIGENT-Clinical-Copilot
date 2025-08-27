@@ -1,7 +1,7 @@
 import re
 from typing import List, Literal, Optional
 
-from pydantic import BaseModel, Field, model_validator, field_validator
+from pydantic import BaseModel, Field, field_validator, model_validator
 
 from Pharmagent.app.api.schemas.placeholders import EXAMPLE_INPUT_DATA
 
@@ -15,13 +15,15 @@ class PatientData(BaseModel):
     - Strips whitespace, requires at least 1 char after stripping.
     - Caps size to prevent abuse and oversized payloads.
     """
+
     name: Optional[str] = Field(
         None,
         min_length=1,
         max_length=200,
         strip_whitespace=True,
         description="Name of the patient (optional).",
-        examples=["Marco Rossi"])
+        examples=["Marco Rossi"],
+    )
 
     info: str = Field(
         ...,
@@ -29,19 +31,21 @@ class PatientData(BaseModel):
         max_length=20000,
         strip_whitespace=True,
         description="Multiline text input with patient's info.",
-        examples=[EXAMPLE_INPUT_DATA])
+        examples=[EXAMPLE_INPUT_DATA],
+    )
 
 
 ###############################################################################
-class PatientOutputReport(BaseModel):    
+class PatientOutputReport(BaseModel):
     report: str = Field(
         ...,
         min_length=1,
         max_length=200,
-        strip_whitespace=True,        
+        strip_whitespace=True,
         description="Multiline text output with the final report.",
-        examples=["This is a sample note."])
-    
+        examples=["This is a sample note."],
+    )
+
 
 ###############################################################################
 class PatientDiseases(BaseModel):
@@ -66,25 +70,37 @@ class PatientDiseases(BaseModel):
         missing = hepatic_set - disease_set
         if missing:
             raise ValueError(
-                f"hepatic_diseases contains items not present in diseases: {sorted(missing)}")
-        
+                f"hepatic_diseases contains items not present in diseases: {sorted(missing)}"
+            )
+
         return self
-    
+
 
 ###############################################################################
 class BloodTest(BaseModel):
     """A single blood test result extracted from text."""
-    name: str = Field(..., description="Test name exactly as found (minimally normalized).")
+
+    name: str = Field(
+        ..., description="Test name exactly as found (minimally normalized)."
+    )
     value: float | None = Field(
-        None, description="Numeric value if applicable (dot-decimal).")
+        None, description="Numeric value if applicable (dot-decimal)."
+    )
     value_text: str | None = Field(
-        None, description="Raw textual value when not numeric (e.g., '1:80').")
+        None, description="Raw textual value when not numeric (e.g., '1:80')."
+    )
     unit: str | None = Field(None, description="Unit as found, if present.")
     cutoff: float | None = Field(None, description="Cutoff/upper limit if provided.")
-    cutoff_unit: str | None = Field(None, description="Cutoff unit if specified; often same as unit.")
-    note: str | None = Field(None, description="Parenthetical note not related to cutoff.")
+    cutoff_unit: str | None = Field(
+        None, description="Cutoff unit if specified; often same as unit."
+    )
+    note: str | None = Field(
+        None, description="Parenthetical note not related to cutoff."
+    )
     context_date: str | None = Field(
-        None, description="ISO YYYY-MM-DD if parsed, else original date string for this batch.")
+        None,
+        description="ISO YYYY-MM-DD if parsed, else original date string for this batch.",
+    )
 
     @field_validator("name")
     @classmethod
@@ -92,21 +108,11 @@ class BloodTest(BaseModel):
         v = re.sub(r"\s+", " ", v.strip())
         return v.rstrip(",:;.- ")
 
-#-----------------------------------------------------------------------------  
+
+# -----------------------------------------------------------------------------
 class PatientBloodTests(BaseModel):
     """Container with original text and all parsed test entries."""
 
-    source_text: str = Field(
-        ..., 
-        description="Original text used for parsing.")
-    
-    entries: list[BloodTest] = Field(
-        default_factory=list)
+    source_text: str = Field(..., description="Original text used for parsing.")
 
-   
-
-
-
-
-
-
+    entries: list[BloodTest] = Field(default_factory=list)

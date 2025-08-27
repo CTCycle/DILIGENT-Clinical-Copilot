@@ -1,10 +1,9 @@
 import asyncio
-from typing import Optional, Any
+from typing import Any, Optional
+
 import httpx
 
-
-from Pharmagent.app.constants import API_BASE_URL, AGENT_API_URL
-
+from Pharmagent.app.constants import AGENT_API_URL, API_BASE_URL
 
 
 ###############################################################################
@@ -16,6 +15,7 @@ def _extract_text(result: Any) -> str:
                 return val
     try:
         import json
+
         return json.dumps(result, ensure_ascii=False, indent=2)
     except Exception:
         return str(result)

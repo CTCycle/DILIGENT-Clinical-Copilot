@@ -1,4 +1,5 @@
 import gradio as gr
+
 from Pharmagent.client.controllers import run_agent
 
 with gr.Blocks(title="Patient Agent UI", analytics_enabled=False) as demo:
@@ -25,12 +26,12 @@ with gr.Blocks(title="Patient Agent UI", analytics_enabled=False) as demo:
         interactive=False,
     )
 
-    run_btn.click(fn=run_agent, inputs=[name, input_box], outputs=output_box, api_name="run_agent")
+    run_btn.click(
+        fn=run_agent, inputs=[name, input_box], outputs=output_box, api_name="run_agent"
+    )
     input_box.change(lambda _: "", inputs=input_box, outputs=output_box)
 
 if __name__ == "__main__":
     demo.queue(max_size=32).launch(
-        server_name="127.0.0.1",
-        server_port=7861,
-        inbrowser=True  
+        server_name="127.0.0.1", server_port=7861, inbrowser=True
     )

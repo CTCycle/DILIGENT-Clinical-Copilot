@@ -1,18 +1,27 @@
 from __future__ import annotations
 
-import os
-import re
-import json
 import asyncio
 import inspect
-from typing import Any, Dict, List, Optional, Literal, AsyncGenerator, Callable, Awaitable, Union, Type
+import json
+import os
+import re
+from collections.abc import AsyncGenerator, Awaitable
+from typing import (
+    Any,
+    Callable,
+    Dict,
+    List,
+    Literal,
+    Optional,
+    Type,
+    Union,
+)
 
 import httpx
-from pydantic import BaseModel
 from langchain_core.output_parsers import PydanticOutputParser
+from pydantic import BaseModel
 
 from Pharmagent.app.logger import logger
-
 
 DEFAULT_OLLAMA_HOST = os.getenv("OLLAMA_HOST", "http://localhost:11434")
 
@@ -20,6 +29,7 @@ DEFAULT_OLLAMA_HOST = os.getenv("OLLAMA_HOST", "http://localhost:11434")
 ###############################################################################
 class OllamaError(RuntimeError):
     pass
+
 
 class OllamaTimeout(OllamaError):
     """Raised when requests to Ollama exceed the configured timeout."""
@@ -48,30 +58,37 @@ class OllamaClient:
                 format="json")
 
     """
+
     def __init__(
         self,
         base_url: Optional[str] = None,
         timeout_s: float = 120.0,
         keepalive_connections: int = 10,
-        keepalive_max: int = 20) -> None:
+        keepalive_max: int = 20,
+    ) -> None:
         self.base_url = (base_url or DEFAULT_OLLAMA_HOST).rstrip("/")
-        limits = httpx.Limits(max_keepalive_connections=keepalive_connections, max_connections=keepalive_max)
+        limits = httpx.Limits(
+            max_keepalive_connections=keepalive_connections,
+            max_connections=keepalive_max,
+        )
         timeout = httpx.Timeout(timeout_s)
-        self._client = httpx.AsyncClient(base_url=self.base_url, timeout=timeout, limits=limits)
+        self._client = httpx.AsyncClient(
+            base_url=self.base_url, timeout=timeout, limits=limits
+        )
 
-    #-------------------------------------------------------------------------
+    # -------------------------------------------------------------------------
     async def close(self) -> None:
         await self._client.aclose()
 
-    #-------------------------------------------------------------------------
-    async def __aenter__(self) -> "OllamaClient":
+    # -------------------------------------------------------------------------
+    async def __aenter__(self) -> OllamaClient:
         return self
 
-    #-------------------------------------------------------------------------
+    # -------------------------------------------------------------------------
     async def __aexit__(self, exc_type, exc, tb) -> None:
         await self.close()
 
-    #-------------------------------------------------------------------------
+    # -------------------------------------------------------------------------
     @staticmethod
     def _raise_for_status(resp: httpx.Response) -> None:
         try:
@@ -80,7 +97,7 @@ class OllamaClient:
             detail = resp.text
             raise OllamaError(f"Ollama HTTP {resp.status_code}: {detail}") from e
 
-    #-------------------------------------------------------------------------
+    # -------------------------------------------------------------------------
     @staticmethod
     async def _maybe_await(cb: Optional[ProgressCb], evt: Dict[str, Any]) -> None:
         if cb is None:
@@ -93,7 +110,7 @@ class OllamaClient:
             # attach minimal context; callers can log externally
             raise OllamaError(f"Progress callback failed: {e!r}") from e
 
-    #-------------------------------------------------------------------------
+    # -------------------------------------------------------------------------
     async def list_models(self) -> List[str]:
         try:
             resp = await self._client.get("/api/tags")
@@ -103,15 +120,15 @@ class OllamaClient:
         payload = resp.json()
         return [m["name"] for m in payload.get("models", []) if "name" in m]
 
-    #-------------------------------------------------------------------------
+    # -------------------------------------------------------------------------
     async def pull(
         self,
         name: str,
         *,
         stream: bool = False,
         progress_callback: Optional[ProgressCb] = None,
-        poll_sleep_s: float = 0.05) -> None:
-
+        poll_sleep_s: float = 0.05,
+    ) -> None:
         """
         Pull a model by name. If stream=True, will iterate server events and optionally
         invoke progress_callback(event_dict) (sync or async).
@@ -144,15 +161,17 @@ class OllamaClient:
         except httpx.TimeoutException as e:
             raise OllamaTimeout(f"Timed out pulling model '{name}'") from e
 
-    #-------------------------------------------------------------------------
-    async def check_model_availability(self, name: str, *, auto_pull: bool = True) -> None:
+    # -------------------------------------------------------------------------
+    async def check_model_availability(
+        self, name: str, *, auto_pull: bool = True
+    ) -> None:
         names = set(await self.list_models())
         if name not in names and auto_pull:
             await self.pull(name, stream=False)
         elif name not in names:
             raise OllamaError(f"Model '{name}' not found and auto_pull=False")
 
-    #-------------------------------------------------------------------------
+    # -------------------------------------------------------------------------
     async def chat(
         self,
         *,
@@ -160,7 +179,8 @@ class OllamaClient:
         messages: List[Dict[str, str]],
         format: Optional[str] = "json",
         options: Optional[Dict[str, Any]] = None,
-        keep_alive: Optional[str] = None) -> Dict[str, Any] | str:
+        keep_alive: Optional[str] = None,
+    ) -> Dict[str, Any] | str:
         """
         Non-streaming chat. Returns parsed JSON (dict) if possible, else raw string.
         """
@@ -190,7 +210,7 @@ class OllamaClient:
                 return content
         return str(content)
 
-    #-------------------------------------------------------------------------
+    # -------------------------------------------------------------------------
     async def chat_stream(
         self,
         *,
@@ -198,7 +218,8 @@ class OllamaClient:
         messages: List[Dict[str, str]],
         format: Optional[str] = None,
         options: Optional[Dict[str, Any]] = None,
-        keep_alive: Optional[str] = None) -> AsyncGenerator[Dict[str, Any], None]:
+        keep_alive: Optional[str] = None,
+    ) -> AsyncGenerator[Dict[str, Any], None]:
         """
         Streamed chat. Yields each event (already JSON-decoded).
         Caller can aggregate tokens or forward server-sent chunks to a client.
@@ -224,19 +245,19 @@ class OllamaClient:
                     yield evt
         except httpx.TimeoutException as e:
             raise OllamaTimeout("Timed out during streamed chat response") from e
-        
-    #-------------------------------------------------------------------------
+
+    # -------------------------------------------------------------------------
     async def llm_structured_call(
         self,
-        *,        
+        *,
         model: str,
         system_prompt: str,
         user_prompt: str,
         schema: Type[BaseModel],
         temperature: float = 0.0,
         use_json_mode: bool = True,
-        max_repair_attempts: int = 2) -> BaseModel:
-        
+        max_repair_attempts: int = 2,
+    ) -> BaseModel:
         """
         Call your Ollama LLM and validate the response against a Pydantic schema
         using LangChain's PydanticOutputParser.
@@ -253,16 +274,21 @@ class OllamaClient:
         format_instructions = parser.get_format_instructions()
 
         messages = [
-            {"role": "system", "content": f"{system_prompt.strip()}\n\n{format_instructions}"},
-            {"role": "user", "content": user_prompt}]
+            {
+                "role": "system",
+                "content": f"{system_prompt.strip()}\n\n{format_instructions}",
+            },
+            {"role": "user", "content": user_prompt},
+        ]
 
         try:
             raw = await self.chat(
                 model=model,
                 messages=messages,
                 format="json" if use_json_mode else None,
-                options={"temperature": temperature})
-            
+                options={"temperature": temperature},
+            )
+
         except OllamaError as e:
             raise RuntimeError(f"LLM call failed: {e}") from e
 
@@ -276,7 +302,9 @@ class OllamaClient:
             except Exception as err:
                 if attempt >= max_repair_attempts:
                     # Surface original model output in logs for debugging
-                    logger.error("Structured parse failed after retries. Last text: %s", text)
+                    logger.error(
+                        "Structured parse failed after retries. Last text: %s", text
+                    )
                     raise RuntimeError(f"Structured parsing failed: {err}") from err
 
                 # Ask the model to repair to valid JSON that matches the schema.
@@ -297,13 +325,14 @@ class OllamaClient:
                         model=model,
                         messages=repair_messages,
                         format="json" if use_json_mode else None,
-                        options={"temperature": 0.0})
+                        options={"temperature": 0.0},
+                    )
                     text = json.dumps(raw) if isinstance(raw, dict) else str(raw)
-                    
+
                 except OllamaError as e:
                     raise RuntimeError(f"Repair attempt failed: {e}") from e
 
-    #-------------------------------------------------------------------------
+    # -------------------------------------------------------------------------
     @staticmethod
     def parse_json(obj_or_text: Dict[str, Any] | str) -> Optional[Dict[str, Any]]:
         """
@@ -332,13 +361,15 @@ class OllamaClient:
         except json.JSONDecodeError:
             return None
 
-    
+
 ###############################################################################
 class LLMError(RuntimeError):
     pass
 
+
 class LLMTimeout(LLMError):
     """Raised when requests exceed the configured timeout."""
+
 
 ProgressCb = Callable[[Dict[str, Any]], Union[None, Awaitable[None]]]
 
