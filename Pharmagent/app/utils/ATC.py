@@ -13,7 +13,7 @@ class ATCRequests:
         self.base_URL = 'https://atcddd.fhi.no/atc_ddd_index/'
         self.configuration = configuration                 
                
-    #--------------------------------------------------------------------------
+    #-------------------------------------------------------------------------
     def get_single_ATC_code(self, payload): 
 
         response = requests.post(self.base_URL, data=payload)
@@ -42,7 +42,7 @@ class ATCRequests:
 
         return atc_dict
 
-    #--------------------------------------------------------------------------
+    #-------------------------------------------------------------------------
     def fetch_multiple_ATC_by_name(self, payloads): 
         
         for pl in payloads:

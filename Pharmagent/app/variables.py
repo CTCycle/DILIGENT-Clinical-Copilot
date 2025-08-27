@@ -15,7 +15,7 @@ class EnvironmentVariables:
         else:
             logger.error(f".env file not found at: {self.env_path}")   
     
-    #--------------------------------------------------------------------------
+    #-------------------------------------------------------------------------
     def get_environment_variables(self):                  
         return dict(os.environ)
        

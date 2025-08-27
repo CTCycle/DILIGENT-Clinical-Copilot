@@ -46,11 +46,11 @@ class PharmagentDatabase:
         self.Session = sessionmaker(bind=self.engine, future=True)
         self.insert_batch_size = 5000
               
-    #--------------------------------------------------------------------------       
+    #-------------------------------------------------------------------------       
     def initialize_database(self):
         Base.metadata.create_all(self.engine)     
 
-    #--------------------------------------------------------------------------
+    #-------------------------------------------------------------------------
     def upsert_dataframe(self, df: pd.DataFrame, table_cls):
         table = table_cls.__table__
         session = self.Session()
@@ -80,16 +80,16 @@ class PharmagentDatabase:
         finally:
             session.close()
    
-    #--------------------------------------------------------------------------
+    #-------------------------------------------------------------------------
     def save_documents(self, documents: pd.DataFrame):
         self.upsert_dataframe(documents, Documents)
 
-    #--------------------------------------------------------------------------
+    #-------------------------------------------------------------------------
     def save_patients_info(self, patients: pd.DataFrame):
         self.upsert_dataframe(patients, Patients)
        
 
  
     
-#------------------------------------------------------------------------------
+#-----------------------------------------------------------------------------
 database = PharmagentDatabase()   

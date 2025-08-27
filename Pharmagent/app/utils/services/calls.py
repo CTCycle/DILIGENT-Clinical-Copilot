@@ -30,7 +30,7 @@ class PatientCase:
             "missing_tags": list(self.expected_tags), 
             "all_tags_present": False}        
 
-    #--------------------------------------------------------------------------
+    #-------------------------------------------------------------------------
     def clean_patient_info(self, text: str) -> str:        
         # Normalize unicode width/compatibility (e.g., μ → μ, fancy quotes → ASCII where possible)
         processed_text = unicodedata.normalize("NFKC", text)
@@ -43,7 +43,7 @@ class PatientCase:
 
         return processed_text 
     
-    #--------------------------------------------------------------------------
+    #-------------------------------------------------------------------------
     def split_text_by_tags(self, text : str, name : str | None = None) -> Dict[str, Any]:        
         hits = [(m.group(1).strip(), m.start(), m.end()) for m in self.HEADER_RE.finditer(text)]
         if not hits:
@@ -66,7 +66,7 @@ class PatientCase:
        
         return sections
     
-    #--------------------------------------------------------------------------
+    #-------------------------------------------------------------------------
     def extract_sections_from_text(self, payload : PatientData) -> Tuple[Dict[str, Any], pd.DataFrame]:  
         full_text = self.clean_patient_info(payload.info)        
         sections = self.split_text_by_tags(full_text, payload.name)  
@@ -86,7 +86,7 @@ class DiseasesParsing:
         self.JSON_schema = {'diseases': List[str], 'hepatic_diseases': List[str]}
         self.model = PARSER_MODEL
 
-    #--------------------------------------------------------------------------
+    #-------------------------------------------------------------------------
     def normalize_unique(self, lst : List[str]):
         seen = set()
         result = []
@@ -98,7 +98,7 @@ class DiseasesParsing:
 
         return result
 
-    #--------------------------------------------------------------------------
+    #-------------------------------------------------------------------------
     async def extract_diseases(self, text: str) -> Dict[str, Any]:
         if not text:
             return
@@ -134,7 +134,7 @@ class DiseasesParsing:
         return data
     
     # uses lanchain as wrapper to perform persing and validation to patient diseases model    
-    #--------------------------------------------------------------------------
+    #-------------------------------------------------------------------------
     async def extract_diseases(self, text: str) -> Dict[str, Any]:        
         if not text:
             return {"diseases": [], "hepatic_diseases": []}
@@ -156,7 +156,7 @@ class DiseasesParsing:
 
         return {"diseases": diseases, "hepatic_diseases": hepatic}
     
-    #--------------------------------------------------------------------------
+    #-------------------------------------------------------------------------
     def validate_json_schema(self, output: dict) -> dict:    
         for key in ['diseases', 'hepatic_diseases']:
             if key not in output or not isinstance(output[key], list):
@@ -187,7 +187,7 @@ class DiseasesParsing:
         self.JSON_schema = {'diseases': List[str], 'hepatic_diseases': List[str]}
         self.model = PARSER_MODEL
         
-    #--------------------------------------------------------------------------
+    #-------------------------------------------------------------------------
     def normalize_unique(self, lst : List[str]):
         seen = set()
         result = []
@@ -199,7 +199,7 @@ class DiseasesParsing:
 
         return result
 
-    #--------------------------------------------------------------------------
+    #-------------------------------------------------------------------------
     async def extract_diseases(self, text: str) -> Dict[str, Any]:
         if not text:
             return
@@ -235,7 +235,7 @@ class DiseasesParsing:
         return data
     
     # uses lanchain as wrapper to perform persing and validation to patient diseases model    
-    #--------------------------------------------------------------------------
+    #-------------------------------------------------------------------------
     async def extract_diseases(self, text: str) -> Dict[str, Any]:        
         if not text:
             return {"diseases": [], "hepatic_diseases": []}
@@ -257,7 +257,7 @@ class DiseasesParsing:
 
         return {"diseases": diseases, "hepatic_diseases": hepatic}
     
-    #--------------------------------------------------------------------------
+    #-------------------------------------------------------------------------
     def validate_json_schema(self, output: dict) -> dict:    
         for key in ['diseases', 'hepatic_diseases']:
             if key not in output or not isinstance(output[key], list):
