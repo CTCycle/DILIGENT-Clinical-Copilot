@@ -1,16 +1,15 @@
 import os
-import lancedb  
+
+import lancedb
 
 from Pharmagent.app.constants import RSC_PATH
 
-      
 
 ###############################################################################
 class VectorDatabase:
-
     def __init__(self):
         self.collection = "embeddings"
-        self.db_path = os.path.join(RSC_PATH, 'fragments.lancedb')
+        self.db_path = os.path.join(RSC_PATH, "fragments.lancedb")
         self.db = lancedb.connect(self.db_path)
         try:
             self.col = self.db.open_collection(self.collection)
@@ -23,7 +22,3 @@ class VectorDatabase:
 
     def search(self, query_vec, k=5):
         return self.col.search(query_vec, k=k)
-
- 
-    
-    

@@ -1,5 +1,4 @@
-
-EXAMPLE_INPUT_DATA = '''
+EXAMPLE_INPUT_DATA = """
 # ANAMNESIS
 - Epatomegalia e steatosi epatica grado III con sospetta NASH
 - Attuale: Epatopatia con pattern misto
@@ -22,4 +21,4 @@ Ecografia addome (06.08.2025): Fegato in sede, dimensionalmente nei limiti, cara
 Clexane 80mg/0,8ml sir [mg] 80-0-0-80 s.c.
 Pantozol 40 mg cpr [cpr] 0-0-0-0 per os
  Xarelto 20 mg cpr [cpr] 0-0-0-0 per os sospeso dall'08.08
-'''
+"""

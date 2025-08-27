@@ -1,8 +1,7 @@
 from fastapi import APIRouter, HTTPException, Query, status
 
 from Pharmagent.app.api.models.providers import OllamaClient, OllamaError, OllamaTimeout
-from Pharmagent.app.api.schemas.models import ModelPullResponse, ModelListResponse
-
+from Pharmagent.app.api.schemas.models import ModelListResponse, ModelPullResponse
 from Pharmagent.app.logger import logger
 
 router = APIRouter(prefix="/models", tags=["models"])
@@ -14,36 +13,35 @@ router = APIRouter(prefix="/models", tags=["models"])
     response_model=ModelPullResponse,
     status_code=status.HTTP_200_OK,
     summary="Pull a specific Ollama model",
-    description="Synchronously pull an Ollama model by name. If the model already exists locally, no pull is performed.")
-
+    description="Synchronously pull an Ollama model by name. If the model already exists locally, no pull is performed.",
+)
 async def pull_model(
-    name: str = Query(
-        ..., 
-        description="Exact Ollama model name, e.g. 'llama3.1:8b'"),
+    name: str = Query(..., description="Exact Ollama model name, e.g. 'llama3.1:8b'"),
     stream: bool = Query(
-        False, 
-        description="If True, stream pull from Ollama. Endpoint returns only final status (no SSE).")
-    ) -> ModelPullResponse:
+        False,
+        description="If True, stream pull from Ollama. Endpoint returns only final status (no SSE).",
+    ),
+) -> ModelPullResponse:
     try:
         async with OllamaClient() as client:
             local = set(await client.list_models())
             already = name in local
             if not already:
-                logger.info(f'Downloading model {name} from Ollama library')
+                logger.info(f"Downloading model {name} from Ollama library")
                 await client.pull(name, stream=stream)
-            return ModelPullResponse(
-                status="success",
-                pulled=(not already),
-                model=name)
+            return ModelPullResponse(status="success", pulled=(not already), model=name)
 
     except Exception as exc:
         from Pharmagent.app.api.models.providers import OllamaError, OllamaTimeout
+
         if isinstance(exc, OllamaTimeout):
             raise HTTPException(status_code=504, detail=str(exc))
         if isinstance(exc, OllamaError):
             raise HTTPException(status_code=502, detail=str(exc))
-        raise HTTPException(status_code=500, detail="Unexpected error while pulling model")
-    
+        raise HTTPException(
+            status_code=500, detail="Unexpected error while pulling model"
+        )
+
 
 ###############################################################################
 @router.get(
@@ -51,18 +49,19 @@ async def pull_model(
     response_model=ModelListResponse,
     status_code=status.HTTP_200_OK,
     summary="List locally available Ollama models",
-    description="Returns the list of model tags already present on the Ollama host.")
-
+    description="Returns the list of model tags already present on the Ollama host.",
+)
 async def list_available_models() -> ModelListResponse:
     try:
         async with OllamaClient() as client:
             models = await client.list_models()
         return ModelListResponse(models=models, count=len(models))
     except Exception as exc:
-        # Map specific client exceptions to HTTP errors where possible        
+        # Map specific client exceptions to HTTP errors where possible
         if isinstance(exc, OllamaTimeout):
             raise HTTPException(status_code=504, detail=str(exc))
         if isinstance(exc, OllamaError):
             raise HTTPException(status_code=502, detail=str(exc))
-        raise HTTPException(status_code=500, detail="Unexpected error while listing models")
-    
+        raise HTTPException(
+            status_code=500, detail="Unexpected error while listing models"
+        )
