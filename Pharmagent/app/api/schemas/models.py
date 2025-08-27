@@ -1,8 +1,6 @@
-from typing import Any, Optional, List, Literal
-from typing_extensions import Annotated
+from typing import List, Literal
 from pydantic import BaseModel, Field
 
-from Pharmagent.app.api.schemas.placeholders import EXAMPLE_INPUT_DATA
 
 
 

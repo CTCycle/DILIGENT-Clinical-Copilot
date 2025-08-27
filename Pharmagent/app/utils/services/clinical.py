@@ -1,12 +1,8 @@
 from __future__ import annotations
 
-import os
-import re
-import unicodedata
 import json
-from typing import Any, Dict, Tuple, List, Optional
+from typing import Any, Dict, List, Optional
 
-import pandas as pd
 
 from Pharmagent.app.api.models.providers import OllamaClient, OllamaError
 from Pharmagent.app.api.schemas.diseases import PatientDiseases
@@ -68,7 +64,7 @@ class HepatoPatterns:
         elif isinstance(llm_response, str):
             try:
                 data = json.loads(llm_response)
-            except Exception as e:
+            except Exception:
                 logger.error(f"Could not parse LLM response as JSON: {llm_response}")
                 return
             

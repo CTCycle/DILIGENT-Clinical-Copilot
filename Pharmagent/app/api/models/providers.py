@@ -8,10 +8,9 @@ import inspect
 from typing import Any, Dict, List, Optional, Literal, AsyncGenerator, Callable, Awaitable, Union, Type
 
 import httpx
-from pydantic import BaseModel, ValidationError
+from pydantic import BaseModel
 from langchain_core.output_parsers import PydanticOutputParser
 
-from Pharmagent.app.constants import DATA_PATH
 from Pharmagent.app.logger import logger
 
 

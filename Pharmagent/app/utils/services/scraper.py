@@ -5,14 +5,12 @@ import os
 import tarfile
 from pathlib import Path
 
-from typing import Any, Dict, Optional
+from typing import Any, Dict
 
 import httpx
 import pandas as pd
-from bs4 import BeautifulSoup 
 from tqdm import tqdm 
 
-from Pharmagent.app.api.schemas.clinical import PatientData
 from Pharmagent.app.constants import SOURCES_PATH
 
 ###############################################################################

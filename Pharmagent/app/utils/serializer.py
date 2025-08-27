@@ -2,8 +2,6 @@ import pandas as pd
 
 from Pharmagent.app.utils.database.sqlite import database
 
-from Pharmagent.app.constants import DATA_PATH
-from Pharmagent.app.logger import logger
 
 
 # [DATA SERIALIZATION]
