@@ -6,7 +6,7 @@ from PharmacoNLP.commons.logger import logger
 # [SCRAPER]
 ###############################################################################
 class ATCRequests:
-    def __init__(self, configuration: dict):
+    def __init__(self, configuration: dict[str, Any]):
         self.base_URL = "https://atcddd.fhi.no/atc_ddd_index/"
         self.configuration = configuration
 

@@ -34,7 +34,7 @@ class Patients(Base):
 ###############################################################################
 @singleton
 class PharmagentDatabase:
-    def __init__(self):
+    def __init__(self) -> None:
         self.db_path = os.path.join(DATA_PATH, "Pharmagent_database.db")
         self.engine = create_engine(
             f"sqlite:///{self.db_path}", echo=False, future=True

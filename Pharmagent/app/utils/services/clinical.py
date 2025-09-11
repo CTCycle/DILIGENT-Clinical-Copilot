@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 import json
-from typing import Any, Dict, List, Optional
+from typing import Any, List, Optional
 
 from Pharmagent.app.api.models.prompts import DISEASE_EXTRACTION_PROMPT
 from Pharmagent.app.api.models.providers import OllamaClient, OllamaError
@@ -21,7 +21,7 @@ class HepatoPatterns:
         self.temperature = float(temperature)
         self.client = OllamaClient(base_url=base_url, timeout_s=timeout_s)
         self.model = PARSER_MODEL
-        self.JSON_schema = {"diseases": List[str], "hepatic_diseases": List[str]}
+        self.JSON_schema = {"diseases": list[str], "hepatic_diseases": list[str]}
 
     # -------------------------------------------------------------------------
     def get_selected_model(self, model_name: Optional[str] = None) -> None:
@@ -39,7 +39,7 @@ class HepatoPatterns:
         return result
 
     # -------------------------------------------------------------------------
-    async def extract_diseases(self, text: str) -> Dict[str, Any]:
+    async def extract_diseases(self, text: str) -> dict[str, Any]:
         if not text:
             return
 
@@ -75,7 +75,7 @@ class HepatoPatterns:
 
     # uses lanchain as wrapper to perform persing and validation to patient diseases model
     # -------------------------------------------------------------------------
-    async def extract_diseases(self, text: str) -> Dict[str, Any]:
+    async def extract_diseases(self, text: str) -> dict[str, Any]:
         if not text:
             return {"diseases": [], "hepatic_diseases": []}
         try:

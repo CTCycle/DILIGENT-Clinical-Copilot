@@ -14,14 +14,14 @@ from Pharmagent.app.constants import SOURCES_PATH
 
 ###############################################################################
 class LiverToxClient:
-    def __init__(self):
+    def __init__(self) -> None:
         self.base_url = "https://ftp.ncbi.nlm.nih.gov/pub/litarch/29/31/"
         self.file_name = "livertox_NBK547852.tar.gz"
         self.tar_file_path = os.path.join(SOURCES_PATH, self.file_name)
         self.chunk_size = 8192
 
     # -------------------------------------------------------------------------
-    async def download_bulk_data(self, dest_path: Path) -> Dict[str, Any]:
+    async def download_bulk_data(self, dest_path: Path) -> dict[str, Any]:
         url = self.base_url + self.file_name
         print(f"Downloading file {self.file_name}")
 

@@ -6,7 +6,7 @@ from Pharmagent.app.utils.database.sqlite import database
 # [DATA SERIALIZATION]
 ###############################################################################
 class DataSerializer:
-    def __init__(self):
+    def __init__(self) -> None:
         pass
 
     # -------------------------------------------------------------------------

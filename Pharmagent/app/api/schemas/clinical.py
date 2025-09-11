@@ -49,8 +49,8 @@ class PatientOutputReport(BaseModel):
 
 ###############################################################################
 class PatientDiseases(BaseModel):
-    diseases: List[str] = Field(default_factory=list)
-    hepatic_diseases: List[str] = Field(default_factory=list)
+    diseases: list[str] = Field(default_factory=list)
+    hepatic_diseases: list[str] = Field(default_factory=list)
 
     @field_validator("diseases", "hepatic_diseases")
     def strip_and_nonempty(cls, v):

@@ -6,17 +6,7 @@ import json
 import os
 import re
 from collections.abc import AsyncGenerator, Awaitable
-from typing import (
-    Any,
-    Callable,
-    Dict,
-    List,
-    Literal,
-    Optional,
-    Type,
-    Union,
-)
-
+from typing import Any, Literal
 import httpx
 from langchain_core.output_parsers import PydanticOutputParser
 from pydantic import BaseModel
@@ -35,7 +25,7 @@ class OllamaTimeout(OllamaError):
     """Raised when requests to Ollama exceed the configured timeout."""
 
 
-ProgressCb = Callable[[Dict[str, Any]], Union[None, Awaitable[None]]]
+ProgressCb = Callable[[dict[str, Any]], None | Awaitable[None]]
 
 
 ###############################################################################
@@ -99,19 +89,19 @@ class OllamaClient:
 
     # -------------------------------------------------------------------------
     @staticmethod
-    async def _maybe_await(cb: Optional[ProgressCb], evt: Dict[str, Any]) -> None:
+    async def _maybe_await(cb: Optional[ProgressCb], evt: dict[str, Any]) -> None:
         if cb is None:
             return
         try:
             res = cb(evt)
             if inspect.isawaitable(res):
-                await res  # type: ignore[func-returns-value]
+                await res  [func-returns-value]
         except Exception as e:  # don't break the pull loop on callback errors
             # attach minimal context; callers can log externally
             raise OllamaError(f"Progress callback failed: {e!r}") from e
 
     # -------------------------------------------------------------------------
-    async def list_models(self) -> List[str]:
+    async def list_models(self) -> list[str]:
         try:
             resp = await self._client.get("/api/tags")
         except httpx.TimeoutException as e:
@@ -176,15 +166,15 @@ class OllamaClient:
         self,
         *,
         model: str,
-        messages: List[Dict[str, str]],
+        messages: list[dict[str, str]],
         format: Optional[str] = "json",
-        options: Optional[Dict[str, Any]] = None,
+        options: Optional[dict[str, Any]] = None,
         keep_alive: Optional[str] = None,
-    ) -> Dict[str, Any] | str:
+    ) -> dict[str, Any] | str:
         """
         Non-streaming chat. Returns parsed JSON (dict) if possible, else raw string.
         """
-        body: Dict[str, Any] = {"model": model, "messages": messages, "stream": False}
+        body: dict[str, Any] = {"model": model, "messages": messages, "stream": False}
         if format:
             body["format"] = format
         if options:
@@ -215,16 +205,16 @@ class OllamaClient:
         self,
         *,
         model: str,
-        messages: List[Dict[str, str]],
+        messages: list[dict[str, str]],
         format: Optional[str] = None,
-        options: Optional[Dict[str, Any]] = None,
+        options: Optional[dict[str, Any]] = None,
         keep_alive: Optional[str] = None,
-    ) -> AsyncGenerator[Dict[str, Any], None]:
+    ) -> AsyncGenerator[dict[str, Any], None]:
         """
         Streamed chat. Yields each event (already JSON-decoded).
         Caller can aggregate tokens or forward server-sent chunks to a client.
         """
-        body: Dict[str, Any] = {"model": model, "messages": messages, "stream": True}
+        body: dict[str, Any] = {"model": model, "messages": messages, "stream": True}
         if format:
             body["format"] = format
         if options:
@@ -334,7 +324,7 @@ class OllamaClient:
 
     # -------------------------------------------------------------------------
     @staticmethod
-    def parse_json(obj_or_text: Dict[str, Any] | str) -> Optional[Dict[str, Any]]:
+    def parse_json(obj_or_text: dict[str, Any] | str) -> Optional[dict[str, Any]]:
         """
         Robustly return a dict JSON object from either a dict or a text blob with JSON inside.
 
@@ -371,6 +361,6 @@ class LLMTimeout(LLMError):
     """Raised when requests exceed the configured timeout."""
 
 
-ProgressCb = Callable[[Dict[str, Any]], Union[None, Awaitable[None]]]
+ProgressCb = Callable[[dict[str, Any]], None | Awaitable[None]]
 
 ProviderName = Literal["openai", "azure-openai", "anthropic", "gemini"]
