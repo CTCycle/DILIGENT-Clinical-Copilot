@@ -18,5 +18,5 @@ class ModelPullResponse(BaseModel):
 ###############################################################################
 class ModelListResponse(BaseModel):
     status: Literal["success"] = "success"
-    models: List[str] = Field(..., description="List of available LLMs")
+    models: list[str] = Field(..., description="List of available LLMs")
     count: int

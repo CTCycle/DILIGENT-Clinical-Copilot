@@ -7,7 +7,7 @@ from Pharmagent.app.constants import RSC_PATH
 
 ###############################################################################
 class VectorDatabase:
-    def __init__(self):
+    def __init__(self) -> None:
         self.collection = "embeddings"
         self.db_path = os.path.join(RSC_PATH, "fragments.lancedb")
         self.db = lancedb.connect(self.db_path)

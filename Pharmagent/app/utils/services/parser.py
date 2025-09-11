@@ -5,7 +5,7 @@ import re
 import unicodedata
 from collections.abc import Iterable, Iterator
 from datetime import date
-from typing import Any, Dict, List, Optional, Tuple
+from typing import Any, List, Optional, Tuple
 
 import pandas as pd
 
@@ -31,7 +31,7 @@ DEFAULT_OLLAMA_HOST = os.getenv("OLLAMA_HOST", "http://localhost:11434")
 
 ###############################################################################
 class PatientCase:
-    def __init__(self):
+    def __init__(self) -> None:
         self.HEADER_RE = re.compile(r"^[ \t]*#{1,6}[ \t]+(.+?)\s*$", re.MULTILINE)
         self.expected_tags = ("ANAMNESIS", "BLOOD TESTS", "ADDITIONAL TESTS", "DRUGS")
         self.response = {
@@ -56,7 +56,7 @@ class PatientCase:
         return processed_text
 
     # -------------------------------------------------------------------------
-    def split_text_by_tags(self, text: str, name: str | None = None) -> Dict[str, Any]:
+    def split_text_by_tags(self, text: str, name: str | None = None) -> dict[str, Any]:
         hits = [
             (m.group(1).strip(), m.start(), m.end())
             for m in self.HEADER_RE.finditer(text)
@@ -91,7 +91,7 @@ class PatientCase:
     # -------------------------------------------------------------------------
     def extract_sections_from_text(
         self, payload: PatientData
-    ) -> Tuple[Dict[str, Any], pd.DataFrame]:
+    ) -> tuple[dict[str, Any], pd.DataFrame]:
         full_text = self.clean_patient_info(payload.info)
         sections = self.split_text_by_tags(full_text, payload.name)
 
@@ -106,11 +106,11 @@ class DiseasesParser:
     def __init__(self, timeout_s: float = 300.0, temperature: float = 0.0) -> None:
         self.temperature = float(temperature)
         self.client = OllamaClient(base_url=None, timeout_s=timeout_s)
-        self.JSON_schema = {"diseases": List[str], "hepatic_diseases": List[str]}
+        self.JSON_schema = {"diseases": list[str], "hepatic_diseases": list[str]}
         self.model = PARSER_MODEL
 
     # -------------------------------------------------------------------------
-    def normalize_unique(self, lst: List[str]):
+    def normalize_unique(self, lst: list[str]):
         seen = set()
         result = []
         for x in lst:
@@ -123,7 +123,7 @@ class DiseasesParser:
 
     # uses lanchain as wrapper to perform persing and validation to patient diseases model
     # -------------------------------------------------------------------------
-    async def extract_diseases(self, text: str) -> Dict[str, Any]:
+    async def extract_diseases(self, text: str) -> dict[str, Any]:
         if not text:
             return {"diseases": [], "hepatic_diseases": []}
         try:
