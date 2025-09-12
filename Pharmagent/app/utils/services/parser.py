@@ -4,7 +4,7 @@ import os
 import re
 import unicodedata
 from collections.abc import Iterable, Iterator
-from datetime import date
+from datetime import date, datetime
 from typing import Any
 
 import pandas as pd
@@ -427,3 +427,64 @@ class BloodTestParser:
         entries = self.dedupe_and_tidy(parsed)
 
         return PatientBloodTests(source_text=cleaned, entries=entries)
+
+    # -------------------------------------------------------------------------
+    def _parse_iso(self, s: str | None) -> datetime | None:
+        if not s:
+            return None
+        try:
+            return datetime.fromisoformat(s)
+        except Exception:
+            return None
+
+    # -------------------------------------------------------------------------
+    def _latest_by_name(
+        self, entries: list[BloodTest], target: str
+    ) -> BloodTest | None:
+        target_low = target.strip().lower()
+        dated: list[tuple[datetime | None, BloodTest]] = []
+        fallback: BloodTest | None = None
+        for e in entries or []:
+            name = (e.name or "").strip().lower()
+            if name != target_low:
+                continue
+            fallback = e  # keep last seen in case dates are missing
+            dt = self._parse_iso(e.context_date)
+            dated.append((dt, e))
+
+        if dated:
+            dated.sort(key=lambda t: (t[0] is None, t[0]))
+            return dated[-1][1]
+        return fallback
+
+    # -------------------------------------------------------------------------
+    def extract_hepatic_inputs(self, blood_tests: PatientBloodTests) -> dict[str, Any]:
+        """Return latest ALAT and ANA entries in a compact dict.
+
+        Output example:
+        {
+            "ALAT": {"value": 189.0, "value_text": None, "unit": "U/L", "date": "2025-06-26"},
+            "ANA":  {"value": None,  "value_text": "1:80", "unit": None,  "date": "2025-06-26"}
+        }
+        """
+        entries = getattr(blood_tests, "entries", []) or []
+        latest_alat = self._latest_by_name(entries, "ALAT")
+        latest_ana = self._latest_by_name(entries, "ANA")
+
+        out: dict[str, Any] = {}
+        if latest_alat is not None:
+            out["ALAT"] = {
+                "value": latest_alat.value,
+                "value_text": latest_alat.value_text,
+                "unit": latest_alat.unit,
+                "date": latest_alat.context_date,
+            }
+        if latest_ana is not None:
+            out["ANA"] = {
+                "value": latest_ana.value,
+                "value_text": latest_ana.value_text,
+                "unit": latest_ana.unit,
+                "date": latest_ana.context_date,
+            }
+
+        return out

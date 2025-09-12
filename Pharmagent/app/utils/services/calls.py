@@ -108,7 +108,7 @@ class DiseasesParsing:
                 seen.add(norm)
                 result.append(norm)
 
-        return result    
+        return result
 
     # uses lanchain as wrapper to perform persing and validation to patient diseases model
     # -------------------------------------------------------------------------
@@ -128,7 +128,7 @@ class DiseasesParsing:
 
         except Exception as e:
             raise RuntimeError(f"Failed to extract diseases (structured): {e}") from e
-        
+
         diseases = self.normalize_unique(parsed.diseases)
         hepatic = [
             h for h in self.normalize_unique(parsed.hepatic_diseases) if h in diseases
@@ -153,4 +153,3 @@ class DiseasesParsing:
             raise ValueError("hepatic diseases were not validated")
 
         return {"diseases": diseases, "hepatic_diseases": hepatic_diseases}
-
