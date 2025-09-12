@@ -1,3 +1,5 @@
+from __future__ import annotations
+
 from fastapi import APIRouter, HTTPException, Query
 
 from Pharmagent.app.constants import SOURCES_PATH

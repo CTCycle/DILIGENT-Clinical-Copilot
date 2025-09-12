@@ -1,3 +1,6 @@
+from __future__ import annotations
+
+
 ###############################################################################
 class Configuration:
     def __init__(self) -> None:

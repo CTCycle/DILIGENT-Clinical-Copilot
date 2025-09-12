@@ -1,3 +1,5 @@
+from __future__ import annotations
+
 DISEASE_EXTRACTION_PROMPT = """
 You are a medical entity extraction assistant. 
 Given a piece of text (which may be in any language), identify and extract all the **names of diseases** mentioned in the text.  

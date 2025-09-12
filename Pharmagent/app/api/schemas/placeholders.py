@@ -1,3 +1,5 @@
+from __future__ import annotations
+
 EXAMPLE_INPUT_DATA = """
 # ANAMNESIS
 - Epatomegalia e steatosi epatica grado III con sospetta NASH
