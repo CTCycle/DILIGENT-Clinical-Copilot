@@ -2,14 +2,15 @@ from __future__ import annotations
 
 import requests
 from bs4 import BeautifulSoup
-from PharmacoNLP.commons.logger import logger
+from Pharmagent.app.logger import logger
+from Pharmagent.app.constants import ATC_BASE_URL
 
 
 # [SCRAPER]
 ###############################################################################
 class ATCRequests:
     def __init__(self, configuration: dict[str, Any]):
-        self.base_URL = "https://atcddd.fhi.no/atc_ddd_index/"
+        self.base_URL = ATC_BASE_URL
         self.configuration = configuration
 
     # -------------------------------------------------------------------------

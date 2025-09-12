@@ -26,8 +26,6 @@ from Pharmagent.app.api.schemas.regex import (
 )
 from Pharmagent.app.constants import PARSER_MODEL
 
-DEFAULT_OLLAMA_HOST = os.getenv("OLLAMA_HOST", "http://localhost:11434")
-
 
 ###############################################################################
 class PatientCase:
@@ -177,7 +175,6 @@ class BloodTestParser:
     3) Post-process: dedupe + light normalization; always return a valid `PatientBloodTests`.
 
     """
-
     def __init__(
         self,
         *,
@@ -318,7 +315,7 @@ class BloodTestParser:
 
     # -------------------------------------------------------------------------
     def _normalize_text(self, text: str) -> str:
-        text = text.replace("\u00b5", "μ")  # µ -> μ
+        text = text.replace("\u00b5", "μ")  
         text = re.sub(r"[ \t]+", " ", text)  # compact spaces
         text = re.sub(r"\s*\)\s*,", "),", text)  # tidy '),'
         return text
@@ -429,7 +426,7 @@ class BloodTestParser:
         return PatientBloodTests(source_text=cleaned, entries=entries)
 
     # -------------------------------------------------------------------------
-    def _parse_iso(self, s: str | None) -> datetime | None:
+    def parse_date_iso_format(self, s: str | None) -> datetime | None:
         if not s:
             return None
         try:
@@ -438,7 +435,7 @@ class BloodTestParser:
             return None
 
     # -------------------------------------------------------------------------
-    def _latest_by_name(
+    def get_latest_by_name(
         self, entries: list[BloodTest], target: str
     ) -> BloodTest | None:
         target_low = target.strip().lower()
@@ -449,7 +446,7 @@ class BloodTestParser:
             if name != target_low:
                 continue
             fallback = e  # keep last seen in case dates are missing
-            dt = self._parse_iso(e.context_date)
+            dt = self.parse_date_iso_format(e.context_date)
             dated.append((dt, e))
 
         if dated:
@@ -458,7 +455,7 @@ class BloodTestParser:
         return fallback
 
     # -------------------------------------------------------------------------
-    def extract_hepatic_inputs(self, blood_tests: PatientBloodTests) -> dict[str, Any]:
+    def extract_hepatic_markers(self, blood_tests: PatientBloodTests) -> dict[str, Any]:
         """Return latest ALAT and ANA entries in a compact dict.
 
         Output example:
@@ -468,8 +465,8 @@ class BloodTestParser:
         }
         """
         entries = getattr(blood_tests, "entries", []) or []
-        latest_alat = self._latest_by_name(entries, "ALAT")
-        latest_ana = self._latest_by_name(entries, "ANA")
+        latest_alat = self.get_latest_by_name(entries, "ALAT")
+        latest_ana = self.get_latest_by_name(entries, "ANA")
 
         out: dict[str, Any] = {}
         if latest_alat is not None:
