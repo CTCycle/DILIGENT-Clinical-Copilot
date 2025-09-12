@@ -26,12 +26,20 @@ class PatientData(BaseModel):
         examples=["Marco Rossi"],
     )
 
-    info: str = Field(
-        ...,
+    info: str | None = Field(
+        None,
         min_length=1,
         max_length=20000,
         description="Multiline text input with patient's info.",
         examples=[EXAMPLE_INPUT_DATA],
+    )
+
+    from_files: bool = Field(
+        False,
+        description=(
+            "If true, ignore provided info and load all .txt files from default path."
+        ),
+        examples=[False],
     )
 
     @field_validator("name", mode="before")
@@ -44,10 +52,20 @@ class PatientData(BaseModel):
 
     @field_validator("info", mode="before")
     @classmethod
-    def _strip_info(cls, v: str) -> str:
+    def _strip_info(cls, v: str | None) -> str | None:
         if v is None:
             return v
         return str(v).strip()
+
+    @model_validator(mode="after")
+    def _require_info_or_files(self) -> "PatientData":
+        # Require either direct info text or from_files=True
+        if not self.from_files:
+            if self.info is None or not str(self.info).strip():
+                raise ValueError(
+                    "Either provide 'info' text or set 'from_files' to true."
+                )
+        return self
 
 
 ###############################################################################
