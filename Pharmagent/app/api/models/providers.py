@@ -6,7 +6,7 @@ import json
 import os
 import re
 from collections.abc import AsyncGenerator, Awaitable, Callable
-from typing import Any, Literal, TypeAlias
+from typing import Any, Literal, TypeAlias, TypeVar, cast
 import httpx
 from langchain_core.output_parsers import PydanticOutputParser
 from pydantic import BaseModel
@@ -14,6 +14,11 @@ from pydantic import BaseModel
 from Pharmagent.app.logger import logger
 
 DEFAULT_OLLAMA_HOST = os.getenv("OLLAMA_HOST", "http://localhost:11434")
+
+# Type variable for typed schema returns
+T = TypeVar("T", bound=BaseModel)
+
+ProviderName = Literal["openai", "azure-openai", "anthropic", "gemini"]
 
 
 ###############################################################################
@@ -48,7 +53,6 @@ class OllamaClient:
                 format="json")
 
     """
-
     def __init__(
         self,
         base_url: str | None = None,
@@ -119,6 +123,7 @@ class OllamaClient:
         progress_callback: ProgressCb | None = None,
         poll_sleep_s: float = 0.05,
     ) -> None:
+        
         """
         Pull a model by name. If stream=True, will iterate server events and optionally
         invoke progress_callback(event_dict) (sync or async).
@@ -171,8 +176,10 @@ class OllamaClient:
         options: dict[str, Any] | None = None,
         keep_alive: str | None = None,
     ) -> dict[str, Any] | str:
+        
         """
         Non-streaming chat. Returns parsed JSON (dict) if possible, else raw string.
+
         """
         body: dict[str, Any] = {"model": model, "messages": messages, "stream": False}
         if format:
@@ -243,11 +250,11 @@ class OllamaClient:
         model: str,
         system_prompt: str,
         user_prompt: str,
-        schema: type[BaseModel],
+        schema: type[T],
         temperature: float = 0.0,
         use_json_mode: bool = True,
         max_repair_attempts: int = 2,
-    ) -> BaseModel:
+    ) -> T:
         """
         Call your Ollama LLM and validate the response against a Pydantic schema
         using LangChain's PydanticOutputParser.
@@ -288,7 +295,7 @@ class OllamaClient:
         # First parse attempt + bounded auto-repair loop
         for attempt in range(max_repair_attempts + 1):
             try:
-                return parser.parse(text)
+                return cast(T, parser.parse(text))
             except Exception as err:
                 if attempt >= max_repair_attempts:
                     # Surface original model output in logs for debugging
@@ -325,6 +332,8 @@ class OllamaClient:
         # If execution reaches here, no valid model could be parsed and no
         # exception was raised within the loop (should be unreachable).
         raise RuntimeError("No structured output produced by the model")
+
+    
 
     # -------------------------------------------------------------------------
     @staticmethod
@@ -365,4 +374,4 @@ class LLMTimeout(LLMError):
     """Raised when requests exceed the configured timeout."""
 
 
-ProviderName = Literal["openai", "azure-openai", "anthropic", "gemini"]
+
