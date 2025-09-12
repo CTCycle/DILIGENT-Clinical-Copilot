@@ -48,7 +48,7 @@ async def process_single_patient(single_payload: PatientData) -> dict[str, Any]:
     bt_elapsed = time.time() - start_time
     logger.info(f"Time elapsed for blood tests extraction: {bt_elapsed:.2f} seconds.")
 
-    hepatic_inputs: dict[str, Any] = test_parser.extract_hepatic_inputs(blood_test_results)
+    hepatic_inputs: dict[str, Any] = test_parser.extract_hepatic_markers(blood_test_results)
     is_valid_patient = ("ALAT" in hepatic_inputs) and ("ANA" in hepatic_inputs)
     logger.info('Current patient data is valid, proceeding with disease extraction')
 

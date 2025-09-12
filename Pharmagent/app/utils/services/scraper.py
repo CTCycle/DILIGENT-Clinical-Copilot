@@ -9,14 +9,18 @@ import httpx
 import pandas as pd
 from tqdm import tqdm
 
-from Pharmagent.app.constants import SOURCES_PATH
+from Pharmagent.app.constants import (
+    SOURCES_PATH,
+    LIVERTOX_BASE_URL,
+    LIVERTOX_ARCHIVE,
+)
 
 
 ###############################################################################
 class LiverToxClient:
     def __init__(self) -> None:
-        self.base_url = "https://ftp.ncbi.nlm.nih.gov/pub/litarch/29/31/"
-        self.file_name = "livertox_NBK547852.tar.gz"
+        self.base_url = LIVERTOX_BASE_URL
+        self.file_name = LIVERTOX_ARCHIVE
         self.tar_file_path = os.path.join(SOURCES_PATH, self.file_name)
         self.chunk_size = 8192
 
