@@ -1,3 +1,5 @@
+from __future__ import annotations
+
 import logging
 import logging.config
 import os
@@ -12,7 +14,7 @@ log_filename = os.path.join(LOGS_PATH, f"FEXT_{current_timestamp}.log")
 
 # Define logger configuration
 ###############################################################################
-LOG_CONFIG : dict[str, Any] = {
+LOG_CONFIG: dict[str, Any] = {
     "version": 1,
     "disable_existing_loggers": False,
     "formatters": {

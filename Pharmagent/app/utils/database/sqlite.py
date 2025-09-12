@@ -1,3 +1,5 @@
+from __future__ import annotations
+
 import os
 
 import pandas as pd
@@ -43,11 +45,11 @@ class PharmagentDatabase:
         self.insert_batch_size = 5000
 
     # -------------------------------------------------------------------------
-    def initialize_database(self):
+    def initialize_database(self) -> None:
         Base.metadata.create_all(self.engine)
 
     # -------------------------------------------------------------------------
-    def upsert_dataframe(self, df: pd.DataFrame, table_cls):
+    def upsert_dataframe(self, df: pd.DataFrame, table_cls) -> None:
         table = table_cls.__table__
         session = self.Session()
         try:
@@ -66,7 +68,7 @@ class PharmagentDatabase:
                 stmt = insert(table).values(batch)
                 # Columns to update on conflict
                 update_cols = {
-                    c: getattr(stmt.excluded, c)
+                    c: getattr(stmt.excluded, c)  # type: ignore
                     for c in batch[0]
                     if c not in unique_cols
                 }
@@ -80,11 +82,11 @@ class PharmagentDatabase:
             session.close()
 
     # -------------------------------------------------------------------------
-    def save_documents(self, documents: pd.DataFrame):
+    def save_documents(self, documents: pd.DataFrame) -> None:
         self.upsert_dataframe(documents, Documents)
 
     # -------------------------------------------------------------------------
-    def save_patients_info(self, patients: pd.DataFrame):
+    def save_patients_info(self, patients: pd.DataFrame) -> None:
         self.upsert_dataframe(patients, Patients)
 
 

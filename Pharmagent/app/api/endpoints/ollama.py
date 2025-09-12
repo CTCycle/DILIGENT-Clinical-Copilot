@@ -1,3 +1,5 @@
+from __future__ import annotations
+
 from fastapi import APIRouter, HTTPException, Query, status
 
 from Pharmagent.app.api.models.providers import OllamaClient, OllamaError, OllamaTimeout

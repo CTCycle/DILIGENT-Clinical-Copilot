@@ -5,8 +5,8 @@ import inspect
 import json
 import os
 import re
-from collections.abc import AsyncGenerator, Awaitable
-from typing import Any, Literal
+from collections.abc import AsyncGenerator, Awaitable, Callable
+from typing import Any, Literal, TypeAlias
 import httpx
 from langchain_core.output_parsers import PydanticOutputParser
 from pydantic import BaseModel
@@ -25,7 +25,7 @@ class OllamaTimeout(OllamaError):
     """Raised when requests to Ollama exceed the configured timeout."""
 
 
-ProgressCb = Callable[[dict[str, Any]], None | Awaitable[None]]
+ProgressCb: TypeAlias = Callable[[dict[str, Any]], None | Awaitable[None]]
 
 
 ###############################################################################
@@ -51,7 +51,7 @@ class OllamaClient:
 
     def __init__(
         self,
-        base_url: Optional[str] = None,
+        base_url: str | None = None,
         timeout_s: float = 120.0,
         keepalive_connections: int = 10,
         keepalive_max: int = 20,
@@ -89,13 +89,13 @@ class OllamaClient:
 
     # -------------------------------------------------------------------------
     @staticmethod
-    async def _maybe_await(cb: Optional[ProgressCb], evt: dict[str, Any]) -> None:
+    async def _maybe_await(cb: ProgressCb | None, evt: dict[str, Any]) -> None:
         if cb is None:
             return
         try:
             res = cb(evt)
             if inspect.isawaitable(res):
-                await res  [func-returns-value]
+                await res
         except Exception as e:  # don't break the pull loop on callback errors
             # attach minimal context; callers can log externally
             raise OllamaError(f"Progress callback failed: {e!r}") from e
@@ -116,7 +116,7 @@ class OllamaClient:
         name: str,
         *,
         stream: bool = False,
-        progress_callback: Optional[ProgressCb] = None,
+        progress_callback: ProgressCb | None = None,
         poll_sleep_s: float = 0.05,
     ) -> None:
         """
@@ -167,9 +167,9 @@ class OllamaClient:
         *,
         model: str,
         messages: list[dict[str, str]],
-        format: Optional[str] = "json",
-        options: Optional[dict[str, Any]] = None,
-        keep_alive: Optional[str] = None,
+        format: str | None = "json",
+        options: dict[str, Any] | None = None,
+        keep_alive: str | None = None,
     ) -> dict[str, Any] | str:
         """
         Non-streaming chat. Returns parsed JSON (dict) if possible, else raw string.
@@ -206,9 +206,9 @@ class OllamaClient:
         *,
         model: str,
         messages: list[dict[str, str]],
-        format: Optional[str] = None,
-        options: Optional[dict[str, Any]] = None,
-        keep_alive: Optional[str] = None,
+        format: str | None = None,
+        options: dict[str, Any] | None = None,
+        keep_alive: str | None = None,
     ) -> AsyncGenerator[dict[str, Any], None]:
         """
         Streamed chat. Yields each event (already JSON-decoded).
@@ -243,7 +243,7 @@ class OllamaClient:
         model: str,
         system_prompt: str,
         user_prompt: str,
-        schema: Type[BaseModel],
+        schema: type[BaseModel],
         temperature: float = 0.0,
         use_json_mode: bool = True,
         max_repair_attempts: int = 2,
@@ -322,9 +322,13 @@ class OllamaClient:
                 except OllamaError as e:
                     raise RuntimeError(f"Repair attempt failed: {e}") from e
 
+        # If execution reaches here, no valid model could be parsed and no
+        # exception was raised within the loop (should be unreachable).
+        raise RuntimeError("No structured output produced by the model")
+
     # -------------------------------------------------------------------------
     @staticmethod
-    def parse_json(obj_or_text: dict[str, Any] | str) -> Optional[dict[str, Any]]:
+    def parse_json(obj_or_text: dict[str, Any] | str) -> dict[str, Any] | None:
         """
         Robustly return a dict JSON object from either a dict or a text blob with JSON inside.
 
@@ -360,7 +364,5 @@ class LLMError(RuntimeError):
 class LLMTimeout(LLMError):
     """Raised when requests exceed the configured timeout."""
 
-
-ProgressCb = Callable[[dict[str, Any]], None | Awaitable[None]]
 
 ProviderName = Literal["openai", "azure-openai", "anthropic", "gemini"]

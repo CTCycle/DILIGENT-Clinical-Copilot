@@ -5,7 +5,7 @@ import re
 import unicodedata
 from collections.abc import Iterable, Iterator
 from datetime import date
-from typing import Any, List, Optional, Tuple
+from typing import Any
 
 import pandas as pd
 
@@ -95,7 +95,8 @@ class PatientCase:
         full_text = self.clean_patient_info(payload.info)
         sections = self.split_text_by_tags(full_text, payload.name)
 
-        patient_table = pd.DataFrame.from_dict([sections], orient="columns")
+        # Use DataFrame constructor for a list of dict rows (typed correctly)
+        patient_table = pd.DataFrame([sections])
         patient_table["name"] = self.response["name"]
 
         return sections, patient_table
@@ -110,9 +111,9 @@ class DiseasesParser:
         self.model = PARSER_MODEL
 
     # -------------------------------------------------------------------------
-    def normalize_unique(self, lst: list[str]):
-        seen = set()
-        result = []
+    def normalize_unique(self, lst: list[str]) -> list[str]:
+        seen: set[str] = set()
+        result: list[str] = []
         for x in lst:
             norm = x.strip().lower()
             if norm and norm not in seen:
@@ -123,11 +124,11 @@ class DiseasesParser:
 
     # uses lanchain as wrapper to perform persing and validation to patient diseases model
     # -------------------------------------------------------------------------
-    async def extract_diseases(self, text: str) -> dict[str, Any]:
-        if not text:
+    async def extract_diseases(self, text: str | None) -> dict[str, Any]:
+        if text is None:
             return {"diseases": [], "hepatic_diseases": []}
         try:
-            parsed: PatientDiseases = await self.client.llm_structured_call(
+            parsed: Any = await self.client.llm_structured_call(
                 model=self.model,
                 system_prompt=DISEASE_EXTRACTION_PROMPT,
                 user_prompt=text,
@@ -207,45 +208,40 @@ class BloodTestParser:
         seen: set[tuple[Any, ...]] = set()
         out: list[BloodTest] = []
         for it in items or []:
+            norm_name = self.normalize_strings(it.name)
+            norm_value_text = self.normalize_strings(it.value_text)
+            norm_unit = self.normalize_strings(it.unit)
+            unit_clean = norm_unit.rstrip(".") if norm_unit is not None else None
+            norm_cutoff_unit = self.normalize_strings(it.cutoff_unit)
+            cutoff_unit_clean = (
+                norm_cutoff_unit.rstrip(".") if norm_cutoff_unit is not None else None
+            )
+            norm_note = self.normalize_strings(it.note)
+            norm_context_date = self.normalize_strings(it.context_date)
+
             key = (
-                self.normalize_strings(it.name) or "",
+                norm_name or "",
                 it.value,
-                self.normalize_strings(it.value_text),
-                (
-                    self.normalize_strings(it.unit).rstrip(".")
-                    if self.normalize_strings(it.unit)
-                    else None
-                ),
+                norm_value_text,
+                unit_clean,
                 it.cutoff,
-                (
-                    self.normalize_strings(it.cutoff_unit).rstrip(".")
-                    if self.normalize_strings(it.cutoff_unit)
-                    else None
-                ),
-                self.normalize_strings(it.note),
-                self.normalize_strings(it.context_date),
+                cutoff_unit_clean,
+                norm_note,
+                norm_context_date,
             )
             if key in seen:
                 continue
             seen.add(key)
             out.append(
                 BloodTest(
-                    name=self.normalize_strings(it.name) or "",
+                    name=norm_name or "",
                     value=it.value,
-                    value_text=self.normalize_strings(it.value_text),
-                    unit=(
-                        self.normalize_strings(it.unit).rstrip(".")
-                        if self.normalize_strings(it.unit)
-                        else None
-                    ),
+                    value_text=norm_value_text,
+                    unit=unit_clean,
                     cutoff=it.cutoff,
-                    cutoff_unit=(
-                        self.normalize_strings(it.cutoff_unit).rstrip(".")
-                        if self.normalize_strings(it.cutoff_unit)
-                        else None
-                    ),
-                    note=self.normalize_strings(it.note),
-                    context_date=self.normalize_strings(it.context_date),
+                    cutoff_unit=cutoff_unit_clean,
+                    note=norm_note,
+                    context_date=norm_context_date,
                 )
             )
 
@@ -352,7 +348,7 @@ class BloodTestParser:
         return None
 
     # -------------------------------------------------------------------------
-    def iterate_date_segments(self, text: str) -> Iterator[tuple[Optional[str], str]]:
+    def iterate_date_segments(self, text: str) -> Iterator[tuple[str | None, str]]:
         text = self._normalize_text(text)
 
         markers: list[tuple[int, int, str]] = []
@@ -382,7 +378,7 @@ class BloodTestParser:
             return
 
         prev_end = 0
-        current_date: Optional[str] = None
+        current_date: str | None = None
         for s, e, raw in pruned:
             if s > prev_end:
                 seg = text[prev_end:s].strip(" \n:")
@@ -399,12 +395,12 @@ class BloodTestParser:
             yield (self.parse_date_string(current_date) if current_date else None, tail)
 
     # -------------------------------------------------------------------------
-    def clean_unit(self, u: Optional[str]) -> Optional[str]:
+    def clean_unit(self, u: str | None) -> str | None:
         if not u:
             return None
-        u = u.strip()
-        u = re.split(r"[,;]|(?=\s[A-Za-zÀ-ÿ])", u)[0]  # stop at delimiter or new word
-        return u.rstrip(".")
+        s = u.strip()
+        s = re.split(r"[,;]|(?=\s[A-Za-z�-�])", s)[0]  # stop at delimiter or new word
+        return s.rstrip(".")
 
     # -------------------------------------------------------------------------
     def split_candidates(self, segment: str) -> Iterable[str]:

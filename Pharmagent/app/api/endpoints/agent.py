@@ -1,4 +1,7 @@
+from __future__ import annotations
+
 import time
+from typing import Any
 
 from fastapi import APIRouter, status
 from fastapi.concurrency import run_in_threadpool
@@ -16,11 +19,13 @@ router = APIRouter(prefix="/agent", tags=["agent"])
 
 patient = PatientCase()
 serializer = DataSerializer()
+disease_parser = DiseasesParser()
+test_parser = BloodTestParser()
 
 
 ###############################################################################
 @router.post("", response_model=None, status_code=status.HTTP_202_ACCEPTED)
-async def start_clinical_agent(payload: PatientData) -> PatientOutputReport:
+async def start_clinical_agent(payload: PatientData) -> PatientOutputReport | dict[str, Any]:
     logger.info(
         f"Starting clinical agent processing for patient: {payload.name or 'Unknown'}"
     )
@@ -36,23 +41,24 @@ async def start_clinical_agent(payload: PatientData) -> PatientOutputReport:
     await run_in_threadpool(serializer.save_patients_info, patient_table)
 
     # 2. Initialize Ollama client and pull the model if not already done
-    parser = DiseasesParser()
-    logger.info(f"Extracting diseases from patient anamnesis using {parser.model}")
+    
+    logger.info(f"Extracting diseases from patient anamnesis using {disease_parser.model}")
 
     start_time = time.time()
-    diseases = await parser.extract_diseases(sections.get("anamnesis", None))
+    diseases = await disease_parser.extract_diseases(sections.get("anamnesis", None))
     elapsed = time.time() - start_time
     logger.info(f"Time elapsed for diseases extraction: {elapsed:.2f} seconds.")
 
-    parser = BloodTestParser()
+    
     logger.info(
-        f"Extracting blood tests analysis from patient lab results using {parser.model}"
+        f"Extracting blood tests analysis from patient lab results using {test_parser.model}"
     )
     start_time = time.time()
-    blood_test_results = await parser.extract_blood_test_results(
-        sections.get("blood_tests", None)
+    blood_test_results = await test_parser.extract_blood_test_results(
+        sections.get("blood_tests") or ""
     )
     elapsed = time.time() - start_time
+    logger.info(f"Time elapsed for blood tests extraction: {elapsed:.2f} seconds.")
 
     pass
 

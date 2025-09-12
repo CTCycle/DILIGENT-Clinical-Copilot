@@ -1,5 +1,7 @@
+from __future__ import annotations
+
 import re
-from typing import List, Literal, Optional
+from typing import Literal, Any
 
 from pydantic import BaseModel, Field, field_validator, model_validator
 
@@ -16,11 +18,10 @@ class PatientData(BaseModel):
     - Caps size to prevent abuse and oversized payloads.
     """
 
-    name: Optional[str] = Field(
+    name: str | None = Field(
         None,
         min_length=1,
         max_length=200,
-        strip_whitespace=True,
         description="Name of the patient (optional).",
         examples=["Marco Rossi"],
     )
@@ -29,10 +30,24 @@ class PatientData(BaseModel):
         ...,
         min_length=1,
         max_length=20000,
-        strip_whitespace=True,
         description="Multiline text input with patient's info.",
         examples=[EXAMPLE_INPUT_DATA],
     )
+
+    @field_validator("name", mode="before")
+    @classmethod
+    def _strip_name(cls, v):
+        if v is None:
+            return v
+        s = str(v).strip()
+        return s or None
+
+    @field_validator("info", mode="before")
+    @classmethod
+    def _strip_info(cls, v: str) -> str:
+        if v is None:
+            return v
+        return str(v).strip()
 
 
 ###############################################################################
@@ -41,10 +56,16 @@ class PatientOutputReport(BaseModel):
         ...,
         min_length=1,
         max_length=200,
-        strip_whitespace=True,
         description="Multiline text output with the final report.",
         examples=["This is a sample note."],
     )
+
+    @field_validator("report", mode="before")
+    @classmethod
+    def _strip_report(cls, v: str) -> str:
+        if v is None:
+            return v
+        return str(v).strip()
 
 
 ###############################################################################
@@ -53,7 +74,7 @@ class PatientDiseases(BaseModel):
     hepatic_diseases: list[str] = Field(default_factory=list)
 
     @field_validator("diseases", "hepatic_diseases")
-    def strip_and_nonempty(cls, v):
+    def strip_and_nonempty(cls, v) -> list[str]:
         # Clean up each string, skip empty/None
         return [str(item).strip() for item in v if item and str(item).strip()]
 

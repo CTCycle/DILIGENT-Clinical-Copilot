@@ -1,3 +1,5 @@
+from __future__ import annotations
+
 from Pharmagent.app.variables import EnvironmentVariables
 
 EV = EnvironmentVariables()

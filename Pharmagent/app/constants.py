@@ -1,3 +1,5 @@
+from __future__ import annotations
+
 from os.path import abspath, join
 
 # [PATHS]
@@ -8,6 +10,7 @@ RSC_PATH = join(PROJECT_DIR, "resources")
 DATA_PATH = join(RSC_PATH, "database")
 DOCS_PATH = join(DATA_PATH, "documents")
 SOURCES_PATH = join(DATA_PATH, "sources")
+TASKS_PATH = join(DATA_PATH, "tasks")
 LOGS_PATH = join(RSC_PATH, "logs")
 
 # [ENDPOINS]
