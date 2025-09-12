@@ -41,16 +41,14 @@ async def process_single_patient(single_payload: PatientData) -> dict[str, Any]:
     )
     await run_in_threadpool(serializer.save_patients_info, patient_table)
 
-    # 2. Run disease extraction using a parser LLM     
+    # 2. Run disease extraction using a parser LLM
     logger.info(
         f"Extracting diseases from patient anamnesis using {disease_parser.model}"
     )
     start_time = time.time()
-    diseases = await disease_parser.extract_diseases(
-        sections.get("anamnesis", None)
-    )
-    elapsed = time.time() - start_time
-    logger.info(f"Time elapsed for diseases extraction: {elapsed:.2f} seconds.")
+    diseases = await disease_parser.extract_diseases(sections.get("anamnesis", None))
+    DE_time = time.time() - start_time
+    logger.info(f"Time elapsed for diseases extraction: {DE_time:.2f} seconds.")
 
     # 3. Run blood tests extraction using regex patterns (deterministic)
     # return a data model with info about performed blood tests
@@ -61,9 +59,12 @@ async def process_single_patient(single_payload: PatientData) -> dict[str, Any]:
     blood_test_results = await test_parser.extract_blood_test_results(
         sections.get("blood_tests") or ""
     )
-    elapsed2 = time.time() - start_time
-    logger.info(
-        f"Time elapsed for blood tests extraction: {elapsed2:.2f} seconds."
+    BTR_time = time.time() - start_time
+    logger.info(f"Time elapsed for blood tests extraction: {BTR_time:.2f} seconds.")
+
+    # Extract latest ALAT and ANA via parser utility for hepatic calculations
+    hepatic_inputs: dict[str, Any] = test_parser.extract_hepatic_inputs(
+        blood_test_results
     )
 
     return {
@@ -72,19 +73,22 @@ async def process_single_patient(single_payload: PatientData) -> dict[str, Any]:
         "blood_tests": blood_test_results.model_dump()
         if hasattr(blood_test_results, "model_dump")
         else blood_test_results.__dict__,
-        "timings": {"diseases_s": elapsed, "blood_tests_s": elapsed2},
+        "hepatic_inputs": hepatic_inputs,
+        "timings": {"diseases_s": DE_time, "blood_tests_s": BTR_time},
     }
 
 
 ###############################################################################
 @router.post("", response_model=None, status_code=status.HTTP_202_ACCEPTED)
-async def start_clinical_agent(payload: PatientData) -> PatientOutputReport | dict[str, Any]:
+async def start_clinical_agent(
+    payload: PatientData,
+) -> PatientOutputReport | dict[str, Any]:
     logger.info(
         f"Starting clinical agent processing for patient: {payload.name or 'Unknown'}"
     )
 
     # If from_files is true, process all .txt files from default TASKS_PATH
-    if payload.from_files:        
+    if payload.from_files:
         txt_files = [
             join(TASKS_PATH, f)
             for f in os.listdir(TASKS_PATH)
@@ -92,7 +96,9 @@ async def start_clinical_agent(payload: PatientData) -> PatientOutputReport | di
         ]
 
         if not txt_files:
-            logger.info("No .txt files found in default path. Try upon adding new files or set from_files to False")
+            logger.info(
+                "No .txt files found in default path. Try upon adding new files or set from_files to False"
+            )
             return {"status": "success", "processed": 0, "patients": []}
 
         results: list[dict[str, Any]] = []

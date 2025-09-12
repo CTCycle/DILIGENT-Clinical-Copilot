@@ -53,6 +53,7 @@ class OllamaClient:
                 format="json")
 
     """
+
     def __init__(
         self,
         base_url: str | None = None,
@@ -123,7 +124,6 @@ class OllamaClient:
         progress_callback: ProgressCb | None = None,
         poll_sleep_s: float = 0.05,
     ) -> None:
-        
         """
         Pull a model by name. If stream=True, will iterate server events and optionally
         invoke progress_callback(event_dict) (sync or async).
@@ -176,7 +176,6 @@ class OllamaClient:
         options: dict[str, Any] | None = None,
         keep_alive: str | None = None,
     ) -> dict[str, Any] | str:
-        
         """
         Non-streaming chat. Returns parsed JSON (dict) if possible, else raw string.
 
@@ -333,8 +332,6 @@ class OllamaClient:
         # exception was raised within the loop (should be unreachable).
         raise RuntimeError("No structured output produced by the model")
 
-    
-
     # -------------------------------------------------------------------------
     @staticmethod
     def parse_json(obj_or_text: dict[str, Any] | str) -> dict[str, Any] | None:
@@ -372,6 +369,3 @@ class LLMError(RuntimeError):
 
 class LLMTimeout(LLMError):
     """Raised when requests exceed the configured timeout."""
-
-
-
