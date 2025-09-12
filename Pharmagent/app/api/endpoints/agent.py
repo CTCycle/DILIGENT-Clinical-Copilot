@@ -29,52 +29,52 @@ test_parser = BloodTestParser()
 
 
 # ----------------------------------------------------------------------------
-async def process_single_patient(single_payload: PatientData) -> dict[str, Any]:
-    """Run the agent pipeline for one patient and return results."""
-    # 1. Extract each section from the patient info and save entry into database
-    # Text sections are: anamnesis, blood tests, additional tests, drugs
-    logger.info(
-        "Processing data to extract known sections and save new patient to database"
-    )
+async def process_single_patient(single_payload: PatientData) -> dict[str, Any]:    
+    # 1) Extract each section and save patient info
+    logger.info("Processing data save new patient to database")
     sections, patient_table = await run_in_threadpool(
         patient.extract_sections_from_text, single_payload
     )
     await run_in_threadpool(serializer.save_patients_info, patient_table)
 
-    # 2. Run disease extraction using a parser LLM
+    # 2) Extract blood tests and hepatic inputs
     logger.info(
-        f"Extracting diseases from patient anamnesis using {disease_parser.model}"
-    )
-    start_time = time.time()
-    diseases = await disease_parser.extract_diseases(sections.get("anamnesis", None))
-    DE_time = time.time() - start_time
-    logger.info(f"Time elapsed for diseases extraction: {DE_time:.2f} seconds.")
-
-    # 3. Run blood tests extraction using regex patterns (deterministic)
-    # return a data model with info about performed blood tests
-    logger.info(
-        f"Extracting blood tests analysis from patient lab results using {test_parser.model}"
+        f"Extracting blood tests analysis from lab results using {test_parser.model}"
     )
     start_time = time.time()
     blood_test_results = await test_parser.extract_blood_test_results(
         sections.get("blood_tests") or ""
     )
-    BTR_time = time.time() - start_time
-    logger.info(f"Time elapsed for blood tests extraction: {BTR_time:.2f} seconds.")
+    bt_elapsed = time.time() - start_time
+    logger.info(f"Time elapsed for blood tests extraction: {bt_elapsed:.2f} seconds.")
 
-    # Extract latest ALAT and ANA via parser utility for hepatic calculations
-    hepatic_inputs: dict[str, Any] = test_parser.extract_hepatic_inputs(
-        blood_test_results
-    )
+    hepatic_inputs: dict[str, Any] = test_parser.extract_hepatic_inputs(blood_test_results)
+    is_valid_patient = ("ALAT" in hepatic_inputs) and ("ANA" in hepatic_inputs)
+    logger.info('Current patient data is valid, proceeding with disease extraction')
+
+    # 3) Only then, extract diseases if hepatic inputs are present
+    diseases: dict[str, Any] | None = None 
+    dis_elapsed = 0.0   
+    if is_valid_patient:
+        logger.info(
+            f"Extracting diseases from patient anamnesis using {disease_parser.model}"
+        )
+        start_time = time.time()
+        diseases = await disease_parser.extract_diseases(sections.get("anamnesis", None))
+        dis_elapsed = time.time() - start_time
+        logger.info(f"Time elapsed for diseases extraction: {dis_elapsed:.2f} seconds.")
+    else:
+        logger.info("Hepatic inputs not available (ALAT and/or ANA missing). Skipping disease extraction.")
 
     return {
         "name": single_payload.name or "Unknown",
-        "diseases": diseases,
+        "is_valid": is_valid_patient,
+        "diseases": diseases or {},
         "blood_tests": blood_test_results.model_dump()
         if hasattr(blood_test_results, "model_dump")
         else blood_test_results.__dict__,
         "hepatic_inputs": hepatic_inputs,
-        "timings": {"diseases_s": DE_time, "blood_tests_s": BTR_time},
+        "timings": {"diseases_s": dis_elapsed, "blood_tests_s": bt_elapsed},
     }
 
 
@@ -119,4 +119,11 @@ async def start_clinical_agent(
 
     # Fallback: process the provided single payload
     single_result = await process_single_patient(payload)
+    if not single_result.get("ready_for_hepatic", False):
+        return {
+            "status": "unsuccess",
+            "processed": 0,
+            "reason": "Required hepatic inputs (ALAT, ANA) not found",
+            "patients": [single_result],
+        }
     return {"status": "success", "processed": 1, "patients": [single_result]}
