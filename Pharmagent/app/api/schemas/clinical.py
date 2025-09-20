@@ -24,15 +24,7 @@ class PatientData(BaseModel):
         max_length=200,
         description="Name of the patient (optional).",
         examples=["Marco Rossi"],
-    )
-
-    info: str | None = Field(
-        None,
-        min_length=1,
-        max_length=20000,
-        description="Legacy multiline text input with patient's info.",
-        examples=[EXAMPLE_INPUT_DATA],
-    )
+    )    
 
     anamnesis: str | None = Field(
         None,
@@ -69,7 +61,7 @@ class PatientData(BaseModel):
         description="Reference maximum for ALP.",
         examples=["150", "150 U/L"],
     )
-    flags: list[str] = Field(
+    symptoms: list[str] = Field(
         default_factory=list, description="Additional boolean options from the UI."
     )
 
@@ -81,7 +73,7 @@ class PatientData(BaseModel):
         stripped = str(value).strip()
         return stripped or None
 
-    @field_validator("info", "anamnesis", "drugs", "exams", "alt", "alt_max", "alp", "alp_max", mode="before")
+    @field_validator("anamnesis", "drugs", "exams", "alt", "alt_max", "alp", "alp_max", mode="before")
     @classmethod
     def _strip_text(cls, value: str | None) -> str | None:
         if value is None:
@@ -91,7 +83,7 @@ class PatientData(BaseModel):
 
     @model_validator(mode="after")
     def _require_sections(self) -> "PatientData":
-        if any((self.info, self.anamnesis, self.drugs, self.exams)):
+        if any((self.anamnesis, self.drugs, self.exams)):
             return self
         raise ValueError("Provide at least one clinical section before submitting.")
 
@@ -138,9 +130,7 @@ class PatientData(BaseModel):
             markers["ALP"] = entry
         return markers
 
-    def compose_structured_text(self) -> str | None:
-        if self.info:
-            return self.info
+    def compose_structured_text(self) -> str | None:        
         sections: list[str] = []
         if self.anamnesis:
             sections.append(f"# ANAMNESIS\n{self.anamnesis}")

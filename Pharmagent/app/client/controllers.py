@@ -11,7 +11,7 @@ from Pharmagent.app.constants import (
     BATCH_AGENT_API_URL,
 )
 
-
+# [HELPERS]
 ###############################################################################
 def _extract_text(result: Any) -> str:
     if isinstance(result, dict):
@@ -24,14 +24,33 @@ def _extract_text(result: Any) -> str:
     except Exception:
         return str(result)
 
-
+# -----------------------------------------------------------------------------
 def _sanitize_field(value: str | None) -> str | None:
     if value is None:
         return None
     stripped = value.strip()
     return stripped or None
 
+# -----------------------------------------------------------------------------
+def reset_agent_fields() -> tuple[
+    str,
+    str,
+    str,
+    str,
+    str,
+    str,
+    str,
+    str,
+    list[str],
+    bool,
+    str,
+]:
+    return "", "", "", "", "", "", "", "", [], False, ""
 
+
+# trigger function to start the agent on button click. Payload is optional depending
+# on the requested endpoint URL (defined through run_agent function)
+# -----------------------------------------------------------------------------
 async def _trigger_agent(url: str, payload: dict[str, Any] | None = None) -> str:
     try:
         async with httpx.AsyncClient(timeout=120) as client:
@@ -60,6 +79,8 @@ async def _trigger_agent(url: str, payload: dict[str, Any] | None = None) -> str
         return f"[ERROR] Unexpected error: {exc}"
 
 
+# [AGENT RUNNING LOGIC]
+###############################################################################
 async def run_agent(
     patient_name: str | None,
     anamnesis: str,
@@ -69,7 +90,7 @@ async def run_agent(
     alt_max: str,
     alp: str,
     alp_max: str,
-    flags: list[str],
+    symptoms: list[str],
     process_from_files: bool,
 ) -> str:
     if process_from_files:
@@ -85,7 +106,7 @@ async def run_agent(
         "alt_max": _sanitize_field(alt_max),
         "alp": _sanitize_field(alp),
         "alp_max": _sanitize_field(alp_max),
-        "flags": flags or [],
+        "symptoms": symptoms or [],
     }
 
     if not any(cleaned_payload[key] for key in ("anamnesis", "drugs", "exams")):
@@ -95,17 +116,3 @@ async def run_agent(
     return await _trigger_agent(url, cleaned_payload)
 
 
-def reset_agent_fields() -> tuple[
-    str,
-    str,
-    str,
-    str,
-    str,
-    str,
-    str,
-    str,
-    list[str],
-    bool,
-    str,
-]:
-    return "", "", "", "", "", "", "", "", [], False, ""
