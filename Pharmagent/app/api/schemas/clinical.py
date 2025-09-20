@@ -245,9 +245,7 @@ class BloodTest(BaseModel):
 
 # -----------------------------------------------------------------------------
 class PatientBloodTests(BaseModel):
-    """Container with original text and all parsed test entries."""
-
-    source_text: str = Field(..., description="Original text used for parsing.")
+    """Container for parsed blood test entries."""
 
     entries: list[BloodTest] = Field(default_factory=list)
 
@@ -282,7 +280,6 @@ class DrugEntry(BaseModel):
 
 # -----------------------------------------------------------------------------
 class PatientDrugs(BaseModel):
-    """Container with original drug text and parsed entries."""
+    """Container for parsed drug entries."""
 
-    source_text: str = Field(..., description="Original text used for parsing.")
     entries: list[DrugEntry] = Field(default_factory=list)

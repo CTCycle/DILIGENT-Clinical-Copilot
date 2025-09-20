@@ -15,7 +15,7 @@ from Pharmagent.app.utils.services.parser import (
     DrugsParser,
 )
 from Pharmagent.app.api.schemas.clinical import PatientData
-from Pharmagent.app.api.schemas.regex import CUTOFF_IN_PAREN_RE, NUMERIC_RE
+from Pharmagent.app.utils.patterns import CUTOFF_IN_PAREN_RE, NUMERIC_RE
 from Pharmagent.app.constants import TASKS_PATH
 from Pharmagent.app.logger import logger
 
@@ -42,7 +42,6 @@ async def process_single_patient(payload: PatientData) -> dict[str, Any]:
     diseases = await disease_parser.extract_diseases(payload.anamnesis)
     elapsed = time.perf_counter() - start_time
     logger.info(f"Disease extraction required {elapsed:.4f} seconds")
-
     drug_data = drugs_parser.parse_drug_list(payload.drugs)
 
     # Placeholder for LLM-driven workflow. Will be replaced with concrete logic.
@@ -146,3 +145,4 @@ async def start_batch_clinical_agent() -> dict[str, Any]:
         results.append(case)
 
     return {"status": "success", "processed": len(results), "patients": results}
+

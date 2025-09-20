@@ -18,14 +18,23 @@ from Pharmagent.app.api.schemas.clinical import (
     PatientDiseases,
     PatientDrugs,
 )
-from Pharmagent.app.api.schemas.regex import (
+from Pharmagent.app.constants import PARSER_MODEL
+from Pharmagent.app.utils.patterns import (
     CUTOFF_IN_PAREN_RE,
     DATE_PATS,
+    DRUG_BRACKET_TRAIL_RE,
+    DRUG_BULLET_RE,
+    DRUG_SCHEDULE_RE,
+    DRUG_SUSPENSION_DATE_RE,
+    DRUG_SUSPENSION_RE,
     ITALIAN_MONTHS,
     NUMERIC_RE,
+    PATIENT_SECTION_HEADER_RE,
     TITER_RE,
+    FORM_DESCRIPTORS,
+    FORM_TOKENS,
+    UNIT_TOKENS
 )
-from Pharmagent.app.constants import PARSER_MODEL
 
 ALT_LABELS = {"ALT", "ALAT"}
 ALP_LABELS = {"ALP"}
@@ -34,7 +43,7 @@ ALP_LABELS = {"ALP"}
 ###############################################################################
 class PatientCase:
     def __init__(self) -> None:
-        self.HEADER_RE = re.compile(r"^[ \t]*#{1,6}[ \t]+(.+?)\s*$", re.MULTILINE)
+        self.HEADER_RE = PATIENT_SECTION_HEADER_RE
         self.expected_tags = ("ANAMNESIS", "BLOOD TESTS", "ADDITIONAL TESTS", "DRUGS")
         self.response = {
             "name": "Unknown",
@@ -470,12 +479,12 @@ class BloodTestParser:
     async def extract_blood_test_results(self, text: str) -> PatientBloodTests:
         cleaned = self.clean_text(text)
         if not cleaned:
-            return PatientBloodTests(source_text="", entries=[])
+            return PatientBloodTests(entries=[])
 
         parsed = entries = list(self.parse_blood_test_results(cleaned))
         entries = self.dedupe_and_tidy(parsed)
 
-        return PatientBloodTests(source_text=cleaned, entries=entries)
+        return PatientBloodTests(entries=entries)
 
     # -------------------------------------------------------------------------
     def parse_date_iso_format(self, s: str | None) -> datetime | None:
@@ -549,79 +558,12 @@ class BloodTestParser:
 
 ###############################################################################
 class DrugsParser:
-    FORM_TOKENS = {
-        "cpr",
-        "compresse",
-        "compressa",
-        "caps",
-        "capsule",
-        "capsula",
-        "sir",
-        "scir",
-        "sciroppo",
-        "gtt",
-        "gocce",
-        "fiale",
-        "fiala",
-        "spray",
-        "gel",
-        "crema",
-        "granulato",
-        "bustine",
-        "supp",
-        "supposta",
-        "supposte",
-        "unguento",
-        "pomata",
-        "sol",
-        "soluzione",
-        "sospensione",
-        "collirio",
-        "aerosol",
-        "tbl",
-        "cp",
-        "drg",
-    }
-    FORM_DESCRIPTORS = {
-        "rivestite",
-        "retard",
-        "oro",
-        "sublinguale",
-        "sublinguali",
-        "prolungato",
-        "prolungata",
-        "rilascio",
-        "modificato",
-        "masticabile",
-        "depot",
-        "lp",
-    }
-    UNIT_TOKENS = {
-        "mg",
-        "mcg",
-        "ug",
-        "g",
-        "kg",
-        "ml",
-        "l",
-        "ui",
-        "u",
-        "dose",
-        "dosi",
-        "puff",
-        "puffs",
-    }
-
-    SCHEDULE_RE = re.compile(
-        r"(?P<schedule>\d+(?:[.,]\d+)?(?:\s*-\s*\d+(?:[.,]\d+)?){1,3})"
-    )
-    BULLET_RE = re.compile(r"^[\-\u2022\u2023\u2043\*]+\s*")
-    BRACKET_TRAIL_RE = re.compile(r"\[(?P<content>[^\]]+)\]\s*$")
-    SUSPENSION_RE = re.compile(r"\bsospes[oa]\b", re.IGNORECASE)
-    SUSPENSION_DATE_RE = re.compile(
-        r"\bsospes[oa](?:\s+(?:dal|dall'))?\s*(?P<date>\d{1,2}[./]\d{1,2}(?:[./]\d{2,4})?)",
-        re.IGNORECASE,
-    )
+    
+    SCHEDULE_RE = DRUG_SCHEDULE_RE
+    BULLET_RE = DRUG_BULLET_RE
+    BRACKET_TRAIL_RE = DRUG_BRACKET_TRAIL_RE
+    SUSPENSION_RE = DRUG_SUSPENSION_RE
+    SUSPENSION_DATE_RE = DRUG_SUSPENSION_DATE_RE
 
     # -------------------------------------------------------------------------
     def clean_text(self, text: str | None) -> str:
@@ -642,13 +584,13 @@ class DrugsParser:
     def parse_drug_list(self, text: str | None) -> PatientDrugs:
         cleaned = self.clean_text(text)
         if not cleaned:
-            return PatientDrugs(source_text="", entries=[])
+            return PatientDrugs(entries=[])
         entries: list[DrugEntry] = []
         for raw_line in cleaned.split("\n"):
             entry = self._parse_line(raw_line)
             if entry is not None:
                 entries.append(entry)
-        return PatientDrugs(source_text=cleaned, entries=entries)
+        return PatientDrugs(entries=entries)
 
     # -------------------------------------------------------------------------
     def _parse_line(self, line: str) -> DrugEntry | None:
@@ -718,18 +660,18 @@ class DrugsParser:
         dosage_tokens: list[str] = []
         for token in remainder:
             normalized = self._normalize_token(token)
-            if normalized in self.FORM_TOKENS:
+            if normalized in FORM_TOKENS:
                 mode_tokens.append(token)
                 continue
             if mode_tokens and (
-                normalized in self.FORM_DESCRIPTORS
+                normalized in FORM_DESCRIPTORS
                 or not self._token_has_numeric(token)
             ):
                 mode_tokens.append(token)
                 continue
             if (
                 self._token_has_numeric(token)
-                or normalized in self.UNIT_TOKENS
+                or normalized in UNIT_TOKENS
                 or "/" in token
             ):
                 dosage_tokens.append(token)
@@ -751,10 +693,10 @@ class DrugsParser:
     ) -> None:
         while name_tokens:
             normalized = self._normalize_token(name_tokens[-1])
-            if normalized in self.FORM_TOKENS:
+            if normalized in FORM_TOKENS:
                 mode_tokens.insert(0, name_tokens.pop())
                 continue
-            if mode_tokens and normalized in self.FORM_DESCRIPTORS:
+            if mode_tokens and normalized in FORM_DESCRIPTORS:
                 mode_tokens.insert(0, name_tokens.pop())
                 continue
             break
