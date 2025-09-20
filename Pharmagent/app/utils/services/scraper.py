@@ -3,7 +3,7 @@ from __future__ import annotations
 import os
 import tarfile
 from pathlib import Path
-from typing import Any, Dict
+from typing import Any
 
 import httpx
 import pandas as pd

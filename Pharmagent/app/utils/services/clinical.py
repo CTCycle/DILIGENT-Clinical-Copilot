@@ -1,13 +1,9 @@
 from __future__ import annotations
 
-import json
-from typing import Any, List, Optional
+from typing import Optional
 
-from Pharmagent.app.api.models.prompts import DISEASE_EXTRACTION_PROMPT
-from Pharmagent.app.api.models.providers import OllamaClient, OllamaError
-from Pharmagent.app.api.schemas.clinical import PatientDiseases
+from Pharmagent.app.api.models.providers import OllamaClient
 from Pharmagent.app.constants import PARSER_MODEL
-from Pharmagent.app.logger import logger
 
 
 ###############################################################################
