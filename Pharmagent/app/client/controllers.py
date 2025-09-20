@@ -11,6 +11,7 @@ from Pharmagent.app.constants import (
     BATCH_AGENT_API_URL,
 )
 
+
 # [HELPERS]
 ###############################################################################
 def _extract_text(result: Any) -> str:
@@ -24,12 +25,14 @@ def _extract_text(result: Any) -> str:
     except Exception:
         return str(result)
 
+
 # -----------------------------------------------------------------------------
 def _sanitize_field(value: str | None) -> str | None:
     if value is None:
         return None
     stripped = value.strip()
     return stripped or None
+
 
 # -----------------------------------------------------------------------------
 def reset_agent_fields() -> tuple[
@@ -114,5 +117,3 @@ async def run_agent(
 
     url = f"{API_BASE_URL}{AGENT_API_URL}"
     return await _trigger_agent(url, cleaned_payload)
-
-

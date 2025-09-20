@@ -22,5 +22,3 @@ class HepatoPatterns:
         self.client = OllamaClient(base_url=base_url, timeout_s=timeout_s)
         self.model = PARSER_MODEL
         self.JSON_schema = {"diseases": list[str], "hepatic_diseases": list[str]}
-
-    

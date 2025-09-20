@@ -17,6 +17,7 @@ from Pharmagent.app.constants import (
     OPENAI_API_BASE,
     GEMINI_API_BASE,
 )
+
 OPENAI_API_KEY = os.getenv("OPENAI_API_KEY")
 GEMINI_API_KEY = os.getenv("GEMINI_API_KEY")
 
@@ -29,6 +30,7 @@ ProviderName = Literal["openai", "azure-openai", "anthropic", "gemini"]
 ###############################################################################
 class OllamaError(RuntimeError):
     pass
+
 
 class OllamaTimeout(OllamaError):
     """Raised when requests to Ollama exceed the configured timeout."""
@@ -506,7 +508,9 @@ class CloudLLMClient:
         keep_alive: str | None = None,  # unused but kept for compatibility
     ) -> dict[str, Any] | str:
         if self.provider == "openai":
-            return await self._chat_openai(model=model, messages=messages, format=format, options=options)
+            return await self._chat_openai(
+                model=model, messages=messages, format=format, options=options
+            )
         if self.provider == "gemini":
             return await self._chat_gemini(model=model, messages=messages)
         raise LLMError(f"Provider '{self.provider}' does not support chat yet")
@@ -540,8 +544,8 @@ class CloudLLMClient:
         self._raise_for_status(resp)
 
         data = resp.json()
-        content = (
-            ((data.get("choices") or [{}])[0].get("message") or {}).get("content", "")
+        content = ((data.get("choices") or [{}])[0].get("message") or {}).get(
+            "content", ""
         )
         if isinstance(content, dict):
             return content
@@ -554,14 +558,20 @@ class CloudLLMClient:
 
     # ---------------------------------------------------------------------
     @staticmethod
-    def _to_gemini_contents(messages: list[dict[str, str]]) -> tuple[list[dict[str, Any]], str | None]:
+    def _to_gemini_contents(
+        messages: list[dict[str, str]],
+    ) -> tuple[list[dict[str, Any]], str | None]:
         contents: list[dict[str, Any]] = []
         system_text: str | None = None
         for m in messages:
             role = m.get("role", "user")
             text = m.get("content", "")
             if role == "system":
-                system_text = f"{(system_text + '\n') if system_text else ''}{text}" if text else system_text
+                system_text = (
+                    f"{(system_text + '\n') if system_text else ''}{text}"
+                    if text
+                    else system_text
+                )
                 continue
             gem_role = "user" if role == "user" else "model"
             contents.append({"role": gem_role, "parts": [{"text": text}]})
@@ -620,7 +630,10 @@ class CloudLLMClient:
         format_instructions = parser.get_format_instructions()
 
         messages = [
-            {"role": "system", "content": f"{system_prompt.strip()}\n\n{format_instructions}"},
+            {
+                "role": "system",
+                "content": f"{system_prompt.strip()}\n\n{format_instructions}",
+            },
             {"role": "user", "content": user_prompt},
         ]
 

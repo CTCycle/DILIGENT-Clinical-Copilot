@@ -68,7 +68,6 @@ def create_interface() -> gr.Blocks:
                         lines=1,
                         scale=2,
                     )
-                
 
             with gr.Column(scale=1):
                 patient_name = gr.Textbox(
@@ -137,7 +136,6 @@ def launch_interface() -> None:
         inbrowser=True,
     )
 
+
 if __name__ == "__main__":
     launch_interface()
-
-
