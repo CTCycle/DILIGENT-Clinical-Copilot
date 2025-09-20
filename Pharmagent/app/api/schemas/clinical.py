@@ -5,7 +5,6 @@ from typing import Literal, Any
 
 from pydantic import BaseModel, Field, field_validator, model_validator
 
-from Pharmagent.app.api.schemas.placeholders import EXAMPLE_INPUT_DATA
 
 Comparator = Literal["<=", "<", ">=", ">"]
 

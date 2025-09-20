@@ -1,6 +1,5 @@
 from __future__ import annotations
 
-import re
 from pathlib import Path
 import time
 from typing import Any
@@ -15,7 +14,6 @@ from Pharmagent.app.utils.services.parser import (
     DrugsParser,
 )
 from Pharmagent.app.api.schemas.clinical import PatientData
-from Pharmagent.app.utils.patterns import CUTOFF_IN_PAREN_RE, NUMERIC_RE
 from Pharmagent.app.constants import TASKS_PATH
 from Pharmagent.app.logger import logger
 
@@ -42,9 +40,13 @@ async def process_single_patient(payload: PatientData) -> dict[str, Any]:
     diseases = await disease_parser.extract_diseases(payload.anamnesis)
     elapsed = time.perf_counter() - start_time
     logger.info(f"Disease extraction required {elapsed:.4f} seconds")
-    drug_data = drugs_parser.parse_drug_list(payload.drugs)
 
-    # Placeholder for LLM-driven workflow. Will be replaced with concrete logic.
+    start_time = time.perf_counter()
+    drug_data = drugs_parser.parse_drug_list(payload.drugs)
+    elapsed = time.perf_counter() - start_time
+    logger.info(f"Drugs extraction required {elapsed:.4f} seconds")
+
+   
     return {
         "name": payload.name or "Unknown",
         "anamnesis": payload.anamnesis,
@@ -72,11 +74,7 @@ async def start_single_clinical_agent(
     alp: str | None = Body(default=None),
     alp_max: str | None = Body(default=None),
     symptoms: list[str] | None = Body(default=None),
-) -> dict[str, Any]:
-    logger.info(
-        f"Starting clinical agent processing for patient: {name}" or "Unknown",
-    )
-
+) -> dict[str, Any]:    
     try:
         payload = PatientData(
             name=name,
