@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import re
 from pathlib import Path
+import time
 from typing import Any
 
 from fastapi import APIRouter, Body, HTTPException, status
@@ -23,36 +24,30 @@ ALT_LABELS = {"ALT", "ALAT"}
 ALP_LABELS = {"ALP"}
 
 
-# [HELPERS]
-###############################################################################
-def _sanitize_text(value: str | None) -> str | None:
-    if value is None:
-        return None
-    stripped = value.strip()
-    return stripped or None
-
-
-
-
 # [ENPOINTS]
 ###############################################################################
-async def process_single_patient(single_payload: PatientData) -> dict[str, Any]:
+async def process_single_patient(payload: PatientData) -> dict[str, Any]:
     logger.info(
-        "Launching placeholder LLM workflow for patient: %s",
-        single_payload.name or "Unknown",
+        f"Starting Drug-Induced Liver Injury (DILI) analysis for patient: {payload.name}" or "Unknown"
     )
+
+    start_time = time.perf_counter()
+    diseases = await disease_parser.extract_diseases(payload.anamnesis)
+    elapsed = time.perf_counter() - start_time
+    logger.info(f"Disease extraction required {elapsed:.4f} seconds")
+
+
     # Placeholder for LLM-driven workflow. Will be replaced with concrete logic.
     return {
-        "name": single_payload.name or "Unknown",
-        "anamnesis": single_payload.anamnesis,
-        "drugs": single_payload.drugs,
-        "exams": single_payload.exams,
-        "alt": single_payload.alt,
-        "alt_max": single_payload.alt_max,
-        "alp": single_payload.alp,
-        "alp_max": single_payload.alp_max,
-        "symptoms": single_payload.symptoms,
-        "note": "LLM workflow pending implementation.",
+        "name": payload.name or "Unknown",
+        "anamnesis": payload.anamnesis,
+        "drugs": payload.drugs,
+        "exams": payload.exams,
+        "alt": payload.alt,
+        "alt_max": payload.alt_max,
+        "alp": payload.alp,
+        "alp_max": payload.alp_max,
+        "symptoms": payload.symptoms,       
     }
 
 
@@ -70,20 +65,19 @@ async def start_single_clinical_agent(
     symptoms: list[str] | None = Body(default=None),
 ) -> dict[str, Any]:
     logger.info(
-        "Starting clinical agent processing for patient: %s",
-        _sanitize_text(name) or "Unknown",
+        f"Starting clinical agent processing for patient: {name}" or "Unknown",
     )
 
     try:
         payload = PatientData(
-            name=_sanitize_text(name),
-            anamnesis=_sanitize_text(anamnesis),
-            drugs=_sanitize_text(drugs),
-            exams=_sanitize_text(exams),
-            alt=_sanitize_text(alt),
-            alt_max=_sanitize_text(alt_max),
-            alp=_sanitize_text(alp),
-            alp_max=_sanitize_text(alp_max),
+            name=name,
+            anamnesis=anamnesis,
+            drugs=drugs,
+            exams=exams,
+            alt=alt,
+            alt_max=alt_max,
+            alp=alp,
+            alp_max=alp_max,
             symptoms=symptoms or [],
         )
     except ValidationError as exc:
@@ -116,15 +110,15 @@ async def start_batch_clinical_agent() -> dict[str, Any]:
         cleaned_text = patient_case.clean_patient_info(text)
         sections =  patient_case.split_text_by_tags(cleaned_text, path.stem) 
 
-        anamnesis_section = _sanitize_text(sections.get("anamnesis"))
-        drugs_section = _sanitize_text(sections.get("drugs"))
-        exams_section = _sanitize_text(sections.get("additional_tests"))
+        anamnesis_section = sections.get("anamnesis")
+        drugs_section = sections.get("drugs")
+        exams_section = sections.get("additional_tests")
 
         hepatic_markers = lab_parser.parse_hepatic_markers(sections.get("blood_tests"))        
 
         try:
             patient_payload = PatientData(
-                name=_sanitize_text(path.stem),
+                name=path.stem,
                 anamnesis=anamnesis_section,
                 drugs=drugs_section,
                 exams=exams_section,
