@@ -25,6 +25,8 @@ from Pharmagent.app.api.schemas.regex import (
 )
 from Pharmagent.app.constants import PARSER_MODEL
 
+ALT_LABELS = {"ALT", "ALAT"}
+ALP_LABELS = {"ALP"}
 
 ###############################################################################
 class PatientCase:
@@ -319,6 +321,40 @@ class BloodTestParser:
         text = re.sub(r"[ \t]+", " ", text)  # compact spaces
         text = re.sub(r"\s*\)\s*,", "),", text)  # tidy '),'
         return text
+    
+    # -----------------------------------------------------------------------------
+    def _format_marker_value(self, value: str | None, unit: str | None) -> str | None:
+        if not value:
+            return None
+        unit_part = unit.strip() if unit else ""
+        return f"{value} {unit_part}".strip()
+    
+    # -----------------------------------------------------------------------------
+    def parse_hepatic_markers(self, section: str | None) -> dict[str, Any]:
+        markers: dict[str, Any] = {
+            "alt": None,
+            "alt_max": None,
+            "alp": None,
+            "alp_max": None,
+        }
+        if not section:
+            return markers
+
+        for match in NUMERIC_RE.finditer(section):
+            raw_name = (match.group("name") or "").replace(":", "").strip().upper()
+            normalized = raw_name.replace(" ", "")
+            formatted_value = self._format_marker_value(
+                match.group("value"), match.group("unit")
+            )
+            cutoff_value = self._extract_cutoff(match.group("paren"))
+            if normalized in ALT_LABELS:
+                markers["alt"] = formatted_value
+                markers["alt_max"] = cutoff_value
+            elif normalized in ALP_LABELS:
+                markers["alp"] = formatted_value
+                markers["alp_max"] = cutoff_value
+
+        return markers
 
     # -------------------------------------------------------------------------
     def parse_date_string(self, s: str | None) -> str | None:
@@ -342,6 +378,18 @@ class BloodTestParser:
                     return date(int(y), mon, int(d)).isoformat()
                 except ValueError:
                     return s
+        return None
+    
+    # -------------------------------------------------------------------------
+    def _extract_cutoff(self, text: str | None) -> str | None:
+        if not text:
+            return None
+        cutoff_match = CUTOFF_IN_PAREN_RE.search(text)
+        if cutoff_match:
+            return cutoff_match.group(1)
+        max_match = re.search(r"max[: ]*([0-9]+(?:[.,][0-9]+)?)", text, re.IGNORECASE)
+        if max_match:
+            return max_match.group(1)
         return None
 
     # -------------------------------------------------------------------------
