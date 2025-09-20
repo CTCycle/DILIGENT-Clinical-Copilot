@@ -14,7 +14,6 @@ from Pharmagent.app.api.models.providers import OllamaClient
 from Pharmagent.app.api.schemas.clinical import (
     BloodTest,
     PatientBloodTests,
-    PatientData,
     PatientDiseases,
 )
 from Pharmagent.app.api.schemas.regex import (
@@ -88,10 +87,10 @@ class PatientCase:
 
     # -------------------------------------------------------------------------
     def extract_sections_from_text(
-        self, payload: PatientData
+        self, text: str, name: str | None = None
     ) -> tuple[dict[str, Any], pd.DataFrame]:
-        full_text = self.clean_patient_info(payload.info)
-        sections = self.split_text_by_tags(full_text, payload.name)
+        full_text = self.clean_patient_info(text)
+        sections = self.split_text_by_tags(full_text, name)
 
         # Use DataFrame constructor for a list of dict rows (typed correctly)
         patient_table = pd.DataFrame([sections])
@@ -175,6 +174,7 @@ class BloodTestParser:
     3) Post-process: dedupe + light normalization; always return a valid `PatientBloodTests`.
 
     """
+
     def __init__(
         self,
         *,
@@ -315,7 +315,7 @@ class BloodTestParser:
 
     # -------------------------------------------------------------------------
     def _normalize_text(self, text: str) -> str:
-        text = text.replace("\u00b5", "μ")  
+        text = text.replace("\u00b5", "μ")
         text = re.sub(r"[ \t]+", " ", text)  # compact spaces
         text = re.sub(r"\s*\)\s*,", "),", text)  # tidy '),'
         return text

@@ -24,8 +24,7 @@ class PatientData(BaseModel):
         max_length=200,
         description="Name of the patient (optional).",
         examples=["Marco Rossi"],
-    )    
-
+    )
     anamnesis: str | None = Field(
         None,
         max_length=20000,
@@ -73,7 +72,9 @@ class PatientData(BaseModel):
         stripped = str(value).strip()
         return stripped or None
 
-    @field_validator("anamnesis", "drugs", "exams", "alt", "alt_max", "alp", "alp_max", mode="before")
+    @field_validator(
+        "anamnesis", "drugs", "exams", "alt", "alt_max", "alp", "alp_max", mode="before"
+    )
     @classmethod
     def _strip_text(cls, value: str | None) -> str | None:
         if value is None:
@@ -130,7 +131,7 @@ class PatientData(BaseModel):
             markers["ALP"] = entry
         return markers
 
-    def compose_structured_text(self) -> str | None:        
+    def compose_structured_text(self) -> str | None:
         sections: list[str] = []
         if self.anamnesis:
             sections.append(f"# ANAMNESIS\n{self.anamnesis}")
@@ -160,6 +161,7 @@ class PatientData(BaseModel):
         if not sections:
             return None
         return "\n\n".join(section.strip() for section in sections if section.strip())
+
 
 ###############################################################################
 class PatientOutputReport(BaseModel):
