@@ -8,7 +8,7 @@ from Pharmagent.app.client.controllers import (
     run_agent_from_files,
 )
 
-
+###############################################################################
 def create_interface() -> gr.Blocks:
     with gr.Blocks(
         title="Pharmagent Clinical Copilot",
@@ -19,6 +19,11 @@ def create_interface() -> gr.Blocks:
 
         with gr.Row():
             with gr.Column(scale=3):
+                patient_name = gr.Textbox(
+                    label="Patient Name",
+                    placeholder="e.g., Marco Rossi",
+                    lines=1,
+                )
                 anamnesis = gr.Textbox(
                     label="Anamnesis",
                     placeholder="Enter anamnesis details...",
@@ -46,17 +51,20 @@ def create_interface() -> gr.Blocks:
                     label="ALP (U/L)",
                     placeholder="e.g., 140 or 140 U/L",
                     lines=1,
-                )
+                )                
+                has_disease = gr.Checkbox(
+                    label="Patient with hepatic diseases",
+                    value=False
+                )                
                 flags = gr.CheckboxGroup(
-                    label="Workflow Options",
-                    choices=["Flag Alpha", "Flag Beta", "Flag Gamma"],
+                    label="Observed symptoms",
+                    choices=["Hitterus", "Pain", "Scretching"]
                 )
 
-            with gr.Column(scale=1):
-                patient_name = gr.Textbox(
-                    label="Patient Name",
-                    placeholder="e.g., Marco Rossi",
-                    lines=1,
+            with gr.Column(scale=1):                
+                from_files = gr.Checkbox(
+                    label="Process patients from files",
+                    value=False
                 )
                 with gr.Column():
                     run_button = gr.Button("Run Workflow", variant="primary")
