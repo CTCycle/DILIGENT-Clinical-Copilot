@@ -88,7 +88,7 @@ async def process_single_patient(single_payload: PatientData) -> dict[str, Any]:
 
     return {
         "name": single_payload.name or "Unknown",
-        "flags": single_payload.flags,
+        "symptoms": single_payload.symptoms,
         "is_valid": is_valid_patient,
         "diseases": diseases or {},
         "blood_tests": blood_test_results.model_dump()

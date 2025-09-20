@@ -22,6 +22,14 @@ def create_interface() -> gr.Blocks:
                     lines=8,
                     max_lines=16,
                 )
+                has_diseases = gr.Checkbox(
+                    label="Has hepatic diseases",
+                    value=False,
+                )
+                symptoms = gr.CheckboxGroup(
+                    label="Observed symptoms",
+                    choices=["Hitterus", "Pain", "Scretching"],
+                )
                 drugs = gr.Textbox(
                     label="Current Drugs",
                     placeholder="List current therapies, dosage and schedule...",
@@ -60,10 +68,7 @@ def create_interface() -> gr.Blocks:
                         lines=1,
                         scale=2,
                     )
-                flags = gr.CheckboxGroup(
-                    label="Workflow Options",
-                    choices=["Hitterus", "Pain", "Scretching"],
-                )
+                
 
             with gr.Column(scale=1):
                 patient_name = gr.Textbox(
@@ -97,7 +102,7 @@ def create_interface() -> gr.Blocks:
                 alt_max,
                 alp,
                 alp_max,
-                flags,
+                symptoms,
                 process_from_files,
             ],
             outputs=output,
@@ -114,7 +119,7 @@ def create_interface() -> gr.Blocks:
                 alt_max,
                 alp,
                 alp_max,
-                flags,
+                symptoms,
                 process_from_files,
                 output,
             ],
@@ -131,7 +136,6 @@ def launch_interface() -> None:
         server_port=7861,
         inbrowser=True,
     )
-
 
 if __name__ == "__main__":
     launch_interface()
