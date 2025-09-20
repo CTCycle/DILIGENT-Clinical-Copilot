@@ -7,15 +7,17 @@ from typing import Any
 from fastapi import APIRouter, Body, HTTPException, status
 from pydantic import ValidationError
 
+from Pharmagent.app.utils.services.parser import PatientCase, DiseasesParser, BloodTestParser
 from Pharmagent.app.api.schemas.clinical import PatientData
 from Pharmagent.app.api.schemas.regex import CUTOFF_IN_PAREN_RE, NUMERIC_RE
 from Pharmagent.app.constants import TASKS_PATH
 from Pharmagent.app.logger import logger
-from Pharmagent.app.utils.services.parser import PatientCase
 
 router = APIRouter(tags=["agent"])
 
 patient_case = PatientCase()
+disease_parser = DiseasesParser()
+lab_parser = BloodTestParser()
 
 ALT_LABELS = {"ALT", "ALAT"}
 ALP_LABELS = {"ALP"}
@@ -29,56 +31,7 @@ def _sanitize_text(value: str | None) -> str | None:
     stripped = value.strip()
     return stripped or None
 
-# -----------------------------------------------------------------------------
-def _extract_sections(raw_text: str, name: str | None) -> dict[str, str]:
-    cleaned = patient_case.clean_patient_info(raw_text)
-    return patient_case.split_text_by_tags(cleaned, name)
 
-# -----------------------------------------------------------------------------
-def _format_marker_value(value: str | None, unit: str | None) -> str | None:
-    if not value:
-        return None
-    unit_part = unit.strip() if unit else ""
-    return f"{value} {unit_part}".strip()
-
-# -----------------------------------------------------------------------------
-def _extract_cutoff(paren_text: str | None) -> str | None:
-    if not paren_text:
-        return None
-    cutoff_match = CUTOFF_IN_PAREN_RE.search(paren_text)
-    if cutoff_match:
-        return cutoff_match.group(1)
-    max_match = re.search(r"max[: ]*([0-9]+(?:[.,][0-9]+)?)", paren_text, re.IGNORECASE)
-    if max_match:
-        return max_match.group(1)
-    return None
-
-# -----------------------------------------------------------------------------
-def _parse_hepatic_markers(section: str | None) -> dict[str, Any]:
-    markers: dict[str, Any] = {
-        "alt": None,
-        "alt_max": None,
-        "alp": None,
-        "alp_max": None,
-    }
-    if not section:
-        return markers
-
-    for match in NUMERIC_RE.finditer(section):
-        raw_name = (match.group("name") or "").replace(":", "").strip().upper()
-        normalized = raw_name.replace(" ", "")
-        formatted_value = _format_marker_value(
-            match.group("value"), match.group("unit")
-        )
-        cutoff_value = _extract_cutoff(match.group("paren"))
-        if normalized in ALT_LABELS:
-            markers["alt"] = formatted_value
-            markers["alt_max"] = cutoff_value
-        elif normalized in ALP_LABELS:
-            markers["alp"] = formatted_value
-            markers["alp_max"] = cutoff_value
-
-    return markers
 
 
 # [ENPOINTS]
@@ -146,7 +99,6 @@ async def start_single_clinical_agent(
 @router.post("/batch-agent", response_model=None, status_code=status.HTTP_202_ACCEPTED)
 async def start_batch_clinical_agent() -> dict[str, Any]:
     txt_files = [path for path in Path(TASKS_PATH).glob("*.txt") if path.is_file()]
-
     if not txt_files:
         logger.info(
             "No .txt files found in default path. Add new files and rerun the batch agent."
@@ -157,15 +109,18 @@ async def start_batch_clinical_agent() -> dict[str, Any]:
     for path in txt_files:
         try:
             text = path.read_text(encoding="utf-8")
-        except Exception as exc:  # noqa: BLE001
+        except Exception as exc:  
             logger.error(f"Failed reading {path}: {exc}")
             continue
 
-        sections = _extract_sections(text, path.stem)
-        hepatic_markers = _parse_hepatic_markers(sections.get("blood_tests"))
+        cleaned_text = patient_case.clean_patient_info(text)
+        sections =  patient_case.split_text_by_tags(cleaned_text, path.stem) 
+
         anamnesis_section = _sanitize_text(sections.get("anamnesis"))
         drugs_section = _sanitize_text(sections.get("drugs"))
         exams_section = _sanitize_text(sections.get("additional_tests"))
+
+        hepatic_markers = lab_parser.parse_hepatic_markers(sections.get("blood_tests"))        
 
         try:
             patient_payload = PatientData(
