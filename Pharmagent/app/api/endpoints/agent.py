@@ -1,15 +1,14 @@
 from __future__ import annotations
 
 import time
-from typing import Any
-import os
-from os.path import isfile, join
 from pathlib import Path
+from typing import Any
 
-from fastapi import APIRouter, status
+from fastapi import APIRouter, HTTPException, status
 from fastapi.concurrency import run_in_threadpool
+from pydantic import ValidationError
 
-from Pharmagent.app.api.schemas.clinical import PatientData, PatientOutputReport
+from Pharmagent.app.api.schemas.clinical import PatientData
 from Pharmagent.app.logger import logger
 from Pharmagent.app.utils.serializer import DataSerializer
 from Pharmagent.app.utils.services.parser import (
@@ -19,8 +18,7 @@ from Pharmagent.app.utils.services.parser import (
 )
 from Pharmagent.app.constants import TASKS_PATH
 
-# Single router: exposes one POST endpoint at /agent
-router = APIRouter(prefix="/agent", tags=["agent"])
+router = APIRouter(tags=["agent"])
 
 patient = PatientCase()
 serializer = DataSerializer()
@@ -56,7 +54,9 @@ async def process_single_patient(single_payload: PatientData) -> dict[str, Any]:
     bt_elapsed = time.time() - start_time
     logger.info(f"Time elapsed for blood tests extraction: {bt_elapsed:.2f} seconds.")
 
-    hepatic_inputs: dict[str, Any] = test_parser.extract_hepatic_markers(blood_test_results)
+    hepatic_inputs: dict[str, Any] = test_parser.extract_hepatic_markers(
+        blood_test_results
+    )
     manual_markers = single_payload.manual_hepatic_markers()
     for marker, data in manual_markers.items():
         existing = hepatic_inputs.get(marker, {})
@@ -72,9 +72,13 @@ async def process_single_patient(single_payload: PatientData) -> dict[str, Any]:
             f"Extracting diseases from patient anamnesis using {disease_parser.model}"
         )
         start_time = time.time()
-        diseases = await disease_parser.extract_diseases(sections.get("anamnesis", None))
+        diseases = await disease_parser.extract_diseases(
+            sections.get("anamnesis", None)
+        )
         dis_elapsed = time.time() - start_time
-        logger.info(f"Time elapsed for diseases extraction: {dis_elapsed:.2f} seconds.")
+        logger.info(
+            f"Time elapsed for diseases extraction: {dis_elapsed:.2f} seconds."
+        )
     else:
         diseases = None
         dis_elapsed = 0.0
@@ -94,47 +98,21 @@ async def process_single_patient(single_payload: PatientData) -> dict[str, Any]:
         "timings": {"diseases_s": dis_elapsed, "blood_tests_s": bt_elapsed},
     }
 
+
 ###############################################################################
-@router.post("", response_model=None, status_code=status.HTTP_202_ACCEPTED)
-async def start_clinical_agent(
-    payload: PatientData,
-) -> PatientOutputReport | dict[str, Any]:
+@router.post("/agent", response_model=None, status_code=status.HTTP_202_ACCEPTED)
+async def start_single_clinical_agent(payload: PatientData) -> dict[str, Any]:
     logger.info(
         f"Starting clinical agent processing for patient: {payload.name or 'Unknown'}"
     )
 
-    # If from_files is true, process all .txt files from default TASKS_PATH
-    if payload.from_files:
-        txt_files = [
-            join(TASKS_PATH, f)
-            for f in os.listdir(TASKS_PATH)
-            if isfile(join(TASKS_PATH, f)) and f.lower().endswith(".txt")
-        ]
+    try:
+        single_result = await process_single_patient(payload)
+    except ValueError as exc:
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY, detail=str(exc)
+        ) from exc
 
-        if not txt_files:
-            logger.info(
-                "No .txt files found in default path. Try upon adding new files or set from_files to False"
-            )
-            return {"status": "success", "processed": 0, "patients": []}
-
-        results: list[dict[str, Any]] = []
-        for path in txt_files:
-            try:
-                with open(path, "r", encoding="utf-8") as fh:
-                    text = fh.read()
-            except Exception as e:
-                logger.error(f"Failed reading {path}: {e}")
-                continue
-
-            patient_name = Path(path).stem  # filename (no extension) as patient name
-            patient = PatientData(name=patient_name, info=text, from_files=False)
-            case = await process_single_patient(patient)
-            results.append(case)
-
-        return {"status": "success", "processed": len(results), "patients": results}
-
-    # Fallback: process the provided single payload
-    single_result = await process_single_patient(payload)
     if not single_result.get("is_valid", False):
         return {
             "status": "unsuccess",
@@ -143,3 +121,43 @@ async def start_clinical_agent(
             "patients": [single_result],
         }
     return {"status": "success", "processed": 1, "patients": [single_result]}
+
+
+###############################################################################
+@router.post("/batch-agent", response_model=None, status_code=status.HTTP_202_ACCEPTED)
+async def start_batch_clinical_agent() -> dict[str, Any]:
+    txt_files = [
+        path
+        for path in Path(TASKS_PATH).glob("*.txt")
+        if path.is_file()
+    ]
+
+    if not txt_files:
+        logger.info(
+            "No .txt files found in default path. Add new files and rerun the batch agent."
+        )
+        return {"status": "success", "processed": 0, "patients": []}
+
+    results: list[dict[str, Any]] = []
+    for path in txt_files:
+        try:
+            text = path.read_text(encoding="utf-8")
+        except Exception as exc:  # noqa: BLE001
+            logger.error(f"Failed reading {path}: {exc}")
+            continue
+
+        try:
+            patient_payload = PatientData(name=path.stem, info=text)
+        except ValidationError as exc:
+            logger.error(f"Invalid data for patient {path.stem}: {exc}")
+            continue
+
+        try:
+            case = await process_single_patient(patient_payload)
+        except ValueError as exc:
+            logger.error(f"Failed processing patient {path.stem}: {exc}")
+            continue
+
+        results.append(case)
+
+    return {"status": "success", "processed": len(results), "patients": results}

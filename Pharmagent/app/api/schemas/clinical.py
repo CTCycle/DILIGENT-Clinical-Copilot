@@ -14,7 +14,7 @@ Comparator = Literal["<=", "<", ">=", ">"]
 class PatientData(BaseModel):
     """
     Input schema for submitting structured clinical data.
-    - Accepts manual clinical sections or falls back to file-based loading.
+    - Accepts manual clinical sections captured in the GUI.
     - Normalizes whitespace and keeps compat with legacy single-text payloads.
     """
 
@@ -30,7 +30,8 @@ class PatientData(BaseModel):
         None,
         min_length=1,
         max_length=20000,
-        description="Legacy multiline text input with patient's info."        
+        description="Legacy multiline text input with patient's info.",
+        examples=[EXAMPLE_INPUT_DATA],
     )
 
     anamnesis: str | None = Field(
@@ -50,23 +51,26 @@ class PatientData(BaseModel):
     )
     alt: str | None = Field(
         None,
-        description="ALT/ALAT laboratory value.",
+        description="ALT laboratory value.",
         examples=["189", "189 U/L"],
+    )
+    alt_max: str | None = Field(
+        None,
+        description="Reference maximum for ALT.",
+        examples=["47", "47 U/L"],
     )
     alp: str | None = Field(
         None,
         description="ALP laboratory value.",
         examples=["140", "140 U/L"],
     )
+    alp_max: str | None = Field(
+        None,
+        description="Reference maximum for ALP.",
+        examples=["150", "150 U/L"],
+    )
     flags: list[str] = Field(
         default_factory=list, description="Additional boolean options from the UI."
-    )
-    from_files: bool = Field(
-        False,
-        description=(
-            "If true, ignore manual sections and load all .txt files from default path."
-        ),
-        examples=[False],
     )
 
     @field_validator("name", mode="before")
@@ -77,7 +81,7 @@ class PatientData(BaseModel):
         stripped = str(value).strip()
         return stripped or None
 
-    @field_validator("info", "anamnesis", "drugs", "exams", "alt", "alp", mode="before")
+    @field_validator("info", "anamnesis", "drugs", "exams", "alt", "alt_max", "alp", "alp_max", mode="before")
     @classmethod
     def _strip_text(cls, value: str | None) -> str | None:
         if value is None:
@@ -86,12 +90,10 @@ class PatientData(BaseModel):
         return stripped or None
 
     @model_validator(mode="after")
-    def _require_sections_or_files(self) -> "PatientData":
-        if self.from_files:
-            return self
+    def _require_sections(self) -> "PatientData":
         if any((self.info, self.anamnesis, self.drugs, self.exams)):
             return self
-        raise ValueError("Either provide clinical sections or set 'from_files' to true.")
+        raise ValueError("Provide at least one clinical section before submitting.")
 
     @staticmethod
     def _coerce_marker(value: str | None) -> tuple[float | None, str | None]:
@@ -109,21 +111,31 @@ class PatientData(BaseModel):
     def manual_hepatic_markers(self) -> dict[str, Any]:
         markers: dict[str, Any] = {}
         alt_value, alt_text = self._coerce_marker(self.alt)
-        if alt_value is not None or alt_text is not None:
-            markers["ALAT"] = {
+        alt_cutoff, alt_cutoff_text = self._coerce_marker(self.alt_max)
+        if any((alt_value is not None, alt_text, alt_cutoff, alt_cutoff_text)):
+            entry: dict[str, Any] = {
                 "value": alt_value,
                 "value_text": alt_text,
                 "unit": None,
                 "date": None,
             }
+            if alt_cutoff is not None or alt_cutoff_text is not None:
+                entry["cutoff"] = alt_cutoff
+                entry["cutoff_text"] = alt_cutoff_text
+            markers["ALAT"] = entry
         alp_value, alp_text = self._coerce_marker(self.alp)
-        if alp_value is not None or alp_text is not None:
-            markers["ALP"] = {
+        alp_cutoff, alp_cutoff_text = self._coerce_marker(self.alp_max)
+        if any((alp_value is not None, alp_text, alp_cutoff, alp_cutoff_text)):
+            entry = {
                 "value": alp_value,
                 "value_text": alp_text,
                 "unit": None,
                 "date": None,
             }
+            if alp_cutoff is not None or alp_cutoff_text is not None:
+                entry["cutoff"] = alp_cutoff
+                entry["cutoff_text"] = alp_cutoff_text
+            markers["ALP"] = entry
         return markers
 
     def compose_structured_text(self) -> str | None:
@@ -133,10 +145,20 @@ class PatientData(BaseModel):
         if self.anamnesis:
             sections.append(f"# ANAMNESIS\n{self.anamnesis}")
         blood_lines: list[str] = []
-        if self.alt:
-            blood_lines.append(f"ALAT: {self.alt}")
-        if self.alp:
-            blood_lines.append(f"ALP: {self.alp}")
+        if self.alt or self.alt_max:
+            alt_tokens: list[str] = []
+            if self.alt:
+                alt_tokens.append(str(self.alt))
+            if self.alt_max:
+                alt_tokens.append(f"(max {self.alt_max})")
+            blood_lines.append(f"ALAT: {' '.join(alt_tokens).strip()}")
+        if self.alp or self.alp_max:
+            alp_tokens: list[str] = []
+            if self.alp:
+                alp_tokens.append(str(self.alp))
+            if self.alp_max:
+                alp_tokens.append(f"(max {self.alp_max})")
+            blood_lines.append(f"ALP: {' '.join(alp_tokens).strip()}")
         blood_body = "\n".join(line for line in blood_lines if line)
         if blood_body or self.exams:
             parts = [part for part in (blood_body, self.exams) if part]

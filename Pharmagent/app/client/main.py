@@ -2,11 +2,8 @@ from __future__ import annotations
 
 import gradio as gr
 
-from Pharmagent.app.client.controllers import (
-    reset_agent_fields,
-    run_agent,
-    run_agent_from_files,
-)
+from Pharmagent.app.client.controllers import reset_agent_fields, run_agent
+
 
 ###############################################################################
 def create_interface() -> gr.Blocks:
@@ -19,11 +16,6 @@ def create_interface() -> gr.Blocks:
 
         with gr.Row():
             with gr.Column(scale=3):
-                patient_name = gr.Textbox(
-                    label="Patient Name",
-                    placeholder="e.g., Marco Rossi",
-                    lines=1,
-                )
                 anamnesis = gr.Textbox(
                     label="Anamnesis",
                     placeholder="Enter anamnesis details...",
@@ -42,34 +34,51 @@ def create_interface() -> gr.Blocks:
                     lines=8,
                     max_lines=16,
                 )
-                alt = gr.Textbox(
-                    label="ALT / ALAT (U/L)",
-                    placeholder="e.g., 189 or 189 U/L",
-                    lines=1,
-                )
-                alp = gr.Textbox(
-                    label="ALP (U/L)",
-                    placeholder="e.g., 140 or 140 U/L",
-                    lines=1,
-                )                
-                has_disease = gr.Checkbox(
-                    label="Patient with hepatic diseases",
-                    value=False
-                )                
+                with gr.Row():
+                    alt = gr.Textbox(
+                        label="ALT",
+                        placeholder="e.g., 189 or 189 U/L",
+                        lines=1,
+                        scale=3,
+                    )
+                    alt_max = gr.Textbox(
+                        label="ALT Max",
+                        placeholder="e.g., 47 U/L",
+                        lines=1,
+                        scale=2,
+                    )
+                with gr.Row():
+                    alp = gr.Textbox(
+                        label="ALP",
+                        placeholder="e.g., 140 or 140 U/L",
+                        lines=1,
+                        scale=3,
+                    )
+                    alp_max = gr.Textbox(
+                        label="ALP Max",
+                        placeholder="e.g., 150 U/L",
+                        lines=1,
+                        scale=2,
+                    )
                 flags = gr.CheckboxGroup(
-                    label="Observed symptoms",
-                    choices=["Hitterus", "Pain", "Scretching"]
+                    label="Workflow Options",
+                    choices=["Hitterus", "Pain", "Scretching"],
                 )
 
-            with gr.Column(scale=1):                
-                from_files = gr.Checkbox(
+            with gr.Column(scale=1):
+                patient_name = gr.Textbox(
+                    label="Patient Name",
+                    placeholder="e.g., Marco Rossi",
+                    lines=1,
+                )
+                process_from_files = gr.Checkbox(
                     label="Process patients from files",
-                    value=False
+                    value=False,
                 )
                 with gr.Column():
                     run_button = gr.Button("Run Workflow", variant="primary")
-                    files_button = gr.Button("Process Task Files")
                     reset_button = gr.Button("Reset Form", variant="secondary")
+                    clear_button = gr.Button("Clear Output")
                 output = gr.Textbox(
                     label="Agent Output",
                     lines=18,
@@ -79,24 +88,43 @@ def create_interface() -> gr.Blocks:
 
         run_button.click(
             fn=run_agent,
-            inputs=[patient_name, anamnesis, drugs, exams, alt, alp, flags],
+            inputs=[
+                patient_name,
+                anamnesis,
+                drugs,
+                exams,
+                alt,
+                alt_max,
+                alp,
+                alp_max,
+                flags,
+                process_from_files,
+            ],
             outputs=output,
             api_name="run_agent",
         )
-        files_button.click(
-            fn=run_agent_from_files,
-            inputs=[flags],
-            outputs=output,
-            api_name="run_agent_from_files",
-        )
         reset_button.click(
             fn=reset_agent_fields,
-            outputs=[patient_name, anamnesis, drugs, exams, alt, alp, flags, output],
+            outputs=[
+                patient_name,
+                anamnesis,
+                drugs,
+                exams,
+                alt,
+                alt_max,
+                alp,
+                alp_max,
+                flags,
+                process_from_files,
+                output,
+            ],
         )
+        clear_button.click(lambda: "", outputs=output)
 
     return demo
 
 
+###############################################################################
 def launch_interface() -> None:
     create_interface().queue(max_size=32).launch(
         server_name="127.0.0.1",
@@ -107,3 +135,5 @@ def launch_interface() -> None:
 
 if __name__ == "__main__":
     launch_interface()
+
+
