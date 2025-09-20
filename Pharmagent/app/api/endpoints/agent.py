@@ -8,7 +8,12 @@ from typing import Any
 from fastapi import APIRouter, Body, HTTPException, status
 from pydantic import ValidationError
 
-from Pharmagent.app.utils.services.parser import PatientCase, DiseasesParser, BloodTestParser
+from Pharmagent.app.utils.services.parser import (
+    PatientCase,
+    DiseasesParser,
+    BloodTestParser,
+    DrugsParser,
+)
 from Pharmagent.app.api.schemas.clinical import PatientData
 from Pharmagent.app.api.schemas.regex import CUTOFF_IN_PAREN_RE, NUMERIC_RE
 from Pharmagent.app.constants import TASKS_PATH
@@ -19,6 +24,7 @@ router = APIRouter(tags=["agent"])
 patient_case = PatientCase()
 disease_parser = DiseasesParser()
 lab_parser = BloodTestParser()
+drugs_parser = DrugsParser()
 
 ALT_LABELS = {"ALT", "ALAT"}
 ALP_LABELS = {"ALP"}
@@ -28,7 +34,8 @@ ALP_LABELS = {"ALP"}
 ###############################################################################
 async def process_single_patient(payload: PatientData) -> dict[str, Any]:
     logger.info(
-        f"Starting Drug-Induced Liver Injury (DILI) analysis for patient: {payload.name}" or "Unknown"
+        f"Starting Drug-Induced Liver Injury (DILI) analysis for patient: {payload.name}"
+        or "Unknown"
     )
 
     start_time = time.perf_counter()
@@ -36,18 +43,21 @@ async def process_single_patient(payload: PatientData) -> dict[str, Any]:
     elapsed = time.perf_counter() - start_time
     logger.info(f"Disease extraction required {elapsed:.4f} seconds")
 
+    drug_data = drugs_parser.parse_drug_list(payload.drugs)
 
     # Placeholder for LLM-driven workflow. Will be replaced with concrete logic.
     return {
         "name": payload.name or "Unknown",
         "anamnesis": payload.anamnesis,
-        "drugs": payload.drugs,
+        "diseases": diseases,
+        "drugs": drug_data.model_dump(),
+        "raw_drugs": payload.drugs,
         "exams": payload.exams,
         "alt": payload.alt,
         "alt_max": payload.alt_max,
         "alp": payload.alp,
         "alp_max": payload.alp_max,
-        "symptoms": payload.symptoms,       
+        "symptoms": payload.symptoms,
     }
 
 
@@ -103,18 +113,18 @@ async def start_batch_clinical_agent() -> dict[str, Any]:
     for path in txt_files:
         try:
             text = path.read_text(encoding="utf-8")
-        except Exception as exc:  
+        except Exception as exc:
             logger.error(f"Failed reading {path}: {exc}")
             continue
 
         cleaned_text = patient_case.clean_patient_info(text)
-        sections =  patient_case.split_text_by_tags(cleaned_text, path.stem) 
+        sections = patient_case.split_text_by_tags(cleaned_text, path.stem)
 
         anamnesis_section = sections.get("anamnesis")
         drugs_section = sections.get("drugs")
         exams_section = sections.get("additional_tests")
 
-        hepatic_markers = lab_parser.parse_hepatic_markers(sections.get("blood_tests"))        
+        hepatic_markers = lab_parser.parse_hepatic_markers(sections.get("blood_tests"))
 
         try:
             patient_payload = PatientData(

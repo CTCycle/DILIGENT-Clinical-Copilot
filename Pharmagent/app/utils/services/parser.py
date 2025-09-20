@@ -13,8 +13,10 @@ from Pharmagent.app.api.models.prompts import DISEASE_EXTRACTION_PROMPT
 from Pharmagent.app.api.models.providers import OllamaClient
 from Pharmagent.app.api.schemas.clinical import (
     BloodTest,
+    DrugEntry,
     PatientBloodTests,
     PatientDiseases,
+    PatientDrugs,
 )
 from Pharmagent.app.api.schemas.regex import (
     CUTOFF_IN_PAREN_RE,
@@ -27,6 +29,7 @@ from Pharmagent.app.constants import PARSER_MODEL
 
 ALT_LABELS = {"ALT", "ALAT"}
 ALP_LABELS = {"ALP"}
+
 
 ###############################################################################
 class PatientCase:
@@ -196,6 +199,7 @@ class BloodTestParser:
         return s2 or None
 
     # -------------------------------------------------------------------------
+    # -------------------------------------------------------------------------
     def clean_text(self, text: str) -> str:
         t = unicodedata.normalize("NFKC", text or "")
         t = t.replace("\r\n", "\n").replace("\r", "\n")
@@ -321,14 +325,14 @@ class BloodTestParser:
         text = re.sub(r"[ \t]+", " ", text)  # compact spaces
         text = re.sub(r"\s*\)\s*,", "),", text)  # tidy '),'
         return text
-    
+
     # -----------------------------------------------------------------------------
     def _format_marker_value(self, value: str | None, unit: str | None) -> str | None:
         if not value:
             return None
         unit_part = unit.strip() if unit else ""
         return f"{value} {unit_part}".strip()
-    
+
     # -----------------------------------------------------------------------------
     def parse_hepatic_markers(self, section: str | None) -> dict[str, Any]:
         markers: dict[str, Any] = {
@@ -379,7 +383,7 @@ class BloodTestParser:
                 except ValueError:
                     return s
         return None
-    
+
     # -------------------------------------------------------------------------
     def _extract_cutoff(self, text: str | None) -> str | None:
         if not text:
@@ -541,3 +545,253 @@ class BloodTestParser:
             }
 
         return out
+
+
+###############################################################################
+class DrugsParser:
+    FORM_TOKENS = {
+        "cpr",
+        "compresse",
+        "compressa",
+        "caps",
+        "capsule",
+        "capsula",
+        "sir",
+        "scir",
+        "sciroppo",
+        "gtt",
+        "gocce",
+        "fiale",
+        "fiala",
+        "spray",
+        "gel",
+        "crema",
+        "granulato",
+        "bustine",
+        "supp",
+        "supposta",
+        "supposte",
+        "unguento",
+        "pomata",
+        "sol",
+        "soluzione",
+        "sospensione",
+        "collirio",
+        "aerosol",
+        "tbl",
+        "cp",
+        "drg",
+    }
+    FORM_DESCRIPTORS = {
+        "rivestite",
+        "retard",
+        "oro",
+        "sublinguale",
+        "sublinguali",
+        "prolungato",
+        "prolungata",
+        "rilascio",
+        "modificato",
+        "masticabile",
+        "depot",
+        "lp",
+    }
+    UNIT_TOKENS = {
+        "mg",
+        "mcg",
+        "ug",
+        "g",
+        "kg",
+        "ml",
+        "l",
+        "ui",
+        "u",
+        "dose",
+        "dosi",
+        "puff",
+        "puffs",
+    }
+
+    SCHEDULE_RE = re.compile(
+        r"(?P<schedule>\d+(?:[.,]\d+)?(?:\s*-\s*\d+(?:[.,]\d+)?){1,3})"
+    )
+    BULLET_RE = re.compile(r"^[\-\u2022\u2023\u2043\*]+\s*")
+    BRACKET_TRAIL_RE = re.compile(r"\[(?P<content>[^\]]+)\]\s*$")
+    SUSPENSION_RE = re.compile(r"\bsospes[oa]\b", re.IGNORECASE)
+    SUSPENSION_DATE_RE = re.compile(
+        r"\bsospes[oa](?:\s+(?:dal|dall'))?\s*(?P<date>\d{1,2}[./]\d{1,2}(?:[./]\d{2,4})?)",
+        re.IGNORECASE,
+    )
+
+    # -------------------------------------------------------------------------
+    def clean_text(self, text: str | None) -> str:
+        if not text:
+            return ""
+        normalized = unicodedata.normalize("NFKC", text)
+        normalized = normalized.replace("\r\n", "\n").replace("\r", "\n")
+        lines: list[str] = []
+        for raw_line in normalized.split("\n"):
+            stripped = raw_line.strip()
+            if not stripped:
+                continue
+            stripped = self.BULLET_RE.sub("", stripped)
+            lines.append(stripped)
+        return "\n".join(lines)
+
+    # -------------------------------------------------------------------------
+    def parse_drug_list(self, text: str | None) -> PatientDrugs:
+        cleaned = self.clean_text(text)
+        if not cleaned:
+            return PatientDrugs(source_text="", entries=[])
+        entries: list[DrugEntry] = []
+        for raw_line in cleaned.split("\n"):
+            entry = self._parse_line(raw_line)
+            if entry is not None:
+                entries.append(entry)
+        return PatientDrugs(source_text=cleaned, entries=entries)
+
+    # -------------------------------------------------------------------------
+    def _parse_line(self, line: str) -> DrugEntry | None:
+        schedule_match = self.SCHEDULE_RE.search(line)
+        if not schedule_match:
+            return None
+        schedule_text = schedule_match.group("schedule")
+        schedule_values = self._parse_schedule(schedule_text)
+        before = line[: schedule_match.start()].strip(" ,;:\t")
+        tail = line[schedule_match.end() :].strip()
+        bracket_match = self.BRACKET_TRAIL_RE.search(before)
+        if bracket_match:
+            before = before[: bracket_match.start()].strip()
+        name, dosage, administration_mode = self._split_heading(before)
+        if not name:
+            name = before or line.strip()
+        suspension_status, suspension_date = self._detect_suspension(line, tail)
+        return DrugEntry(
+            name=name,
+            dosage=dosage,
+            administration_mode=administration_mode,
+            daytime_administration=schedule_values,
+            suspension_status=suspension_status,
+            suspension_date=suspension_date,
+        )
+
+    # -------------------------------------------------------------------------
+    def _parse_schedule(self, text: str) -> list[float]:
+        slots: list[float] = []
+        for token in re.split(r"[-\s]+", text):
+            normalized = token.strip()
+            if not normalized:
+                continue
+            normalized = normalized.replace(",", ".")
+            try:
+                value = float(normalized)
+            except ValueError:
+                continue
+            if value.is_integer():
+                slots.append(int(value))
+            else:
+                slots.append(value)
+        if len(slots) == 4:
+            return slots
+        if len(slots) > 4:
+            return slots[:4]
+        return []
+
+    # -------------------------------------------------------------------------
+    def _split_heading(self, text: str) -> tuple[str | None, str | None, str | None]:
+        if not text:
+            return None, None, None
+        tokens = text.split()
+        if not tokens:
+            return None, None, None
+        first_numeric = None
+        for idx, token in enumerate(tokens):
+            if self._token_has_numeric(token):
+                first_numeric = idx
+                break
+        if first_numeric is None:
+            return " ".join(tokens).strip() or None, None, None
+        name_tokens = tokens[:first_numeric]
+        remainder = tokens[first_numeric:]
+        mode_tokens: list[str] = []
+        self._extract_mode_from_prefix(name_tokens, mode_tokens)
+        dosage_tokens: list[str] = []
+        for token in remainder:
+            normalized = self._normalize_token(token)
+            if normalized in self.FORM_TOKENS:
+                mode_tokens.append(token)
+                continue
+            if mode_tokens and (
+                normalized in self.FORM_DESCRIPTORS
+                or not self._token_has_numeric(token)
+            ):
+                mode_tokens.append(token)
+                continue
+            if (
+                self._token_has_numeric(token)
+                or normalized in self.UNIT_TOKENS
+                or "/" in token
+            ):
+                dosage_tokens.append(token)
+                continue
+            if dosage_tokens:
+                dosage_tokens.append(token)
+            else:
+                name_tokens.append(token)
+        if not dosage_tokens and remainder:
+            dosage_tokens = remainder
+        name = " ".join(name_tokens).strip() or None
+        dosage = " ".join(dosage_tokens).strip() or None
+        administration_mode = " ".join(mode_tokens).strip() or None
+        return name, dosage, administration_mode
+
+    # -------------------------------------------------------------------------
+    def _extract_mode_from_prefix(
+        self, name_tokens: list[str], mode_tokens: list[str]
+    ) -> None:
+        while name_tokens:
+            normalized = self._normalize_token(name_tokens[-1])
+            if normalized in self.FORM_TOKENS:
+                mode_tokens.insert(0, name_tokens.pop())
+                continue
+            if mode_tokens and normalized in self.FORM_DESCRIPTORS:
+                mode_tokens.insert(0, name_tokens.pop())
+                continue
+            break
+
+    # -------------------------------------------------------------------------
+    def _token_has_numeric(self, token: str) -> bool:
+        return any(ch.isdigit() for ch in token)
+
+    # -------------------------------------------------------------------------
+    def _normalize_token(self, token: str) -> str:
+        return re.sub(r"[.,;:]+$", "", token.lower())
+
+    # -------------------------------------------------------------------------
+    def _detect_suspension(
+        self, full_line: str, tail: str
+    ) -> tuple[bool | None, str | None]:
+        status = True if self.SUSPENSION_RE.search(full_line) else None
+        date_match = self.SUSPENSION_DATE_RE.search(
+            tail
+        ) or self.SUSPENSION_DATE_RE.search(full_line)
+        date_value = (
+            self._normalize_date_token(date_match.group("date")) if date_match else None
+        )
+        return status, date_value
+
+    # -------------------------------------------------------------------------
+    def _normalize_date_token(self, token: str | None) -> str | None:
+        if not token:
+            return None
+        stripped = token.strip(" .,:;")
+        match = re.fullmatch(r"(\d{1,2})[./](\d{1,2})(?:[./](\d{4}))?", stripped)
+        if not match:
+            return stripped or None
+        day, month, year = match.groups()
+        if year:
+            try:
+                return date(int(year), int(month), int(day)).isoformat()
+            except ValueError:
+                return stripped
+        return f"{day.zfill(2)}.{month.zfill(2)}"

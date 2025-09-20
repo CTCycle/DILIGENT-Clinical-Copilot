@@ -250,3 +250,39 @@ class PatientBloodTests(BaseModel):
     source_text: str = Field(..., description="Original text used for parsing.")
 
     entries: list[BloodTest] = Field(default_factory=list)
+
+
+###############################################################################
+class DrugEntry(BaseModel):
+    """A single drug prescription extracted from text."""
+
+    name: str = Field(..., description="Drug name as found in the source text.")
+    dosage: str | None = Field(None, description="Dosage or concentration details.")
+    administration_mode: str | None = Field(
+        None, description="Pharmaceutical form or administration mode (e.g., cpr, sir)."
+    )
+    daytime_administration: list[float] = Field(
+        default_factory=list,
+        description="Administration schedule across the day (four slots).",
+    )
+    suspension_status: bool | None = Field(
+        None, description="True if the drug is suspended, False if explicitly active."
+    )
+    suspension_date: str | None = Field(
+        None, description="Suspension date in the original format, if captured."
+    )
+
+    @field_validator("daytime_administration")
+    @classmethod
+    def _validate_schedule(cls, value: list[float]) -> list[float]:
+        if value and len(value) != 4:
+            raise ValueError("daytime_administration must contain exactly four values.")
+        return value
+
+
+# -----------------------------------------------------------------------------
+class PatientDrugs(BaseModel):
+    """Container with original drug text and parsed entries."""
+
+    source_text: str = Field(..., description="Original text used for parsing.")
+    entries: list[DrugEntry] = Field(default_factory=list)
