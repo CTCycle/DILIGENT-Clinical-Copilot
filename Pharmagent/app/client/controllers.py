@@ -5,7 +5,11 @@ from typing import Any
 
 import httpx
 
-from Pharmagent.app.constants import AGENT_API_URL, API_BASE_URL
+from Pharmagent.app.constants import (
+    AGENT_API_URL,
+    API_BASE_URL,
+    BATCH_AGENT_API_URL,
+)
 
 
 ###############################################################################
@@ -28,28 +32,32 @@ def _sanitize_field(value: str | None) -> str | None:
     return stripped or None
 
 
-async def _trigger_agent(payload: dict[str, Any]) -> str:
-    url = f"{API_BASE_URL}{AGENT_API_URL}"
-
+async def _trigger_agent(url: str, payload: dict[str, Any] | None = None) -> str:
     try:
         async with httpx.AsyncClient(timeout=120) as client:
-            resp = await client.post(url, json=payload)
+            if payload is None:
+                resp = await client.post(url)
+            else:
+                resp = await client.post(url, json=payload)
             resp.raise_for_status()
             try:
                 return _extract_text(resp.json())
             except ValueError:
                 return resp.text
 
-    except httpx.ConnectError as e:
-        return f"[ERROR] Could not connect to backend at {url}.\nDetails: {e}"
-    except httpx.HTTPStatusError as e:
-        body = e.response.text if e.response is not None else ""
-        code = e.response.status_code if e.response else "unknown"
-        return f"[ERROR] Backend returned status {code}.\nURL: {url}\nResponse body:\n{body}"
+    except httpx.ConnectError as exc:
+        return f"[ERROR] Could not connect to backend at {url}.\nDetails: {exc}"
+    except httpx.HTTPStatusError as exc:
+        body = exc.response.text if exc.response is not None else ""
+        code = exc.response.status_code if exc.response else "unknown"
+        return (
+            f"[ERROR] Backend returned status {code}."
+            f"\nURL: {url}\nResponse body:\n{body}"
+        )
     except httpx.TimeoutException:
         return f"[ERROR] Request timed out after {120} seconds."
-    except Exception as e:  # noqa: BLE001
-        return f"[ERROR] Unexpected error: {e}"
+    except Exception as exc:  # noqa: BLE001
+        return f"[ERROR] Unexpected error: {exc}"
 
 
 async def run_agent(
@@ -58,30 +66,46 @@ async def run_agent(
     drugs: str,
     exams: str,
     alt: str,
+    alt_max: str,
     alp: str,
+    alp_max: str,
     flags: list[str],
+    process_from_files: bool,
 ) -> str:
+    if process_from_files:
+        url = f"{API_BASE_URL}{BATCH_AGENT_API_URL}"
+        return await _trigger_agent(url)
+
     cleaned_payload = {
         "name": _sanitize_field(patient_name),
         "anamnesis": _sanitize_field(anamnesis),
         "drugs": _sanitize_field(drugs),
         "exams": _sanitize_field(exams),
         "alt": _sanitize_field(alt),
+        "alt_max": _sanitize_field(alt_max),
         "alp": _sanitize_field(alp),
+        "alp_max": _sanitize_field(alp_max),
         "flags": flags or [],
-        "from_files": False,
     }
 
     if not any(cleaned_payload[key] for key in ("anamnesis", "drugs", "exams")):
         return "[ERROR] Please provide at least one clinical section."
 
-    return await _trigger_agent(cleaned_payload)
+    url = f"{API_BASE_URL}{AGENT_API_URL}"
+    return await _trigger_agent(url, cleaned_payload)
 
 
-async def run_agent_from_files(flags: list[str]) -> str:
-    payload = {"from_files": True, "flags": flags or []}
-    return await _trigger_agent(payload)
-
-
-def reset_agent_fields() -> tuple[str, str, str, str, str, str, list[str], str]:
-    return "", "", "", "", "", "", [], ""
+def reset_agent_fields() -> tuple[
+    str,
+    str,
+    str,
+    str,
+    str,
+    str,
+    str,
+    str,
+    list[str],
+    bool,
+    str,
+]:
+    return "", "", "", "", "", "", "", "", [], False, ""
