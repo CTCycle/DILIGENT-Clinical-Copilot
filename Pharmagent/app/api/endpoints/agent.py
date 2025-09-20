@@ -3,7 +3,7 @@ from __future__ import annotations
 import time
 from typing import Any
 import os
-from os.path import isfile, join, splitext, basename
+from os.path import isfile, join
 from pathlib import Path
 
 from fastapi import APIRouter, status
@@ -29,15 +29,23 @@ test_parser = BloodTestParser()
 
 
 # ----------------------------------------------------------------------------
-async def process_single_patient(single_payload: PatientData) -> dict[str, Any]:    
-    # 1) Extract each section and save patient info
+async def process_single_patient(single_payload: PatientData) -> dict[str, Any]:
+    structured_text = single_payload.compose_structured_text()
+    if structured_text is None:
+        raise ValueError("No clinical data provided to process.")
+
+    working_payload = (
+        single_payload
+        if structured_text == single_payload.info
+        else single_payload.model_copy(update={"info": structured_text})
+    )
+
     logger.info("Processing data save new patient to database")
     sections, patient_table = await run_in_threadpool(
-        patient.extract_sections_from_text, single_payload
+        patient.extract_sections_from_text, working_payload
     )
     await run_in_threadpool(serializer.save_patients_info, patient_table)
 
-    # 2) Extract blood tests and hepatic inputs
     logger.info(
         f"Extracting blood tests analysis from lab results using {test_parser.model}"
     )
@@ -49,12 +57,16 @@ async def process_single_patient(single_payload: PatientData) -> dict[str, Any]:
     logger.info(f"Time elapsed for blood tests extraction: {bt_elapsed:.2f} seconds.")
 
     hepatic_inputs: dict[str, Any] = test_parser.extract_hepatic_markers(blood_test_results)
-    is_valid_patient = ("ALAT" in hepatic_inputs) and ("ANA" in hepatic_inputs)
-    logger.info('Current patient data is valid, proceeding with disease extraction')
+    manual_markers = single_payload.manual_hepatic_markers()
+    for marker, data in manual_markers.items():
+        existing = hepatic_inputs.get(marker, {})
+        merged: dict[str, Any] = {**existing}
+        for key, value in data.items():
+            if value is not None:
+                merged[key] = value
+        hepatic_inputs[marker] = merged
 
-    # 3) Only then, extract diseases if hepatic inputs are present
-    diseases: dict[str, Any] | None = None 
-    dis_elapsed = 0.0   
+    is_valid_patient = ("ALAT" in hepatic_inputs) and ("ALP" in hepatic_inputs)
     if is_valid_patient:
         logger.info(
             f"Extracting diseases from patient anamnesis using {disease_parser.model}"
@@ -64,10 +76,15 @@ async def process_single_patient(single_payload: PatientData) -> dict[str, Any]:
         dis_elapsed = time.time() - start_time
         logger.info(f"Time elapsed for diseases extraction: {dis_elapsed:.2f} seconds.")
     else:
-        logger.info("Hepatic inputs not available (ALAT and/or ANA missing). Skipping disease extraction.")
+        diseases = None
+        dis_elapsed = 0.0
+        logger.info(
+            "Hepatic inputs not available (ALAT and/or ALP missing). Skipping disease extraction."
+        )
 
     return {
         "name": single_payload.name or "Unknown",
+        "flags": single_payload.flags,
         "is_valid": is_valid_patient,
         "diseases": diseases or {},
         "blood_tests": blood_test_results.model_dump()
@@ -76,7 +93,6 @@ async def process_single_patient(single_payload: PatientData) -> dict[str, Any]:
         "hepatic_inputs": hepatic_inputs,
         "timings": {"diseases_s": dis_elapsed, "blood_tests_s": bt_elapsed},
     }
-
 
 ###############################################################################
 @router.post("", response_model=None, status_code=status.HTTP_202_ACCEPTED)
@@ -119,11 +135,11 @@ async def start_clinical_agent(
 
     # Fallback: process the provided single payload
     single_result = await process_single_patient(payload)
-    if not single_result.get("ready_for_hepatic", False):
+    if not single_result.get("is_valid", False):
         return {
             "status": "unsuccess",
             "processed": 0,
-            "reason": "Required hepatic inputs (ALAT, ANA) not found",
+            "reason": "Required hepatic inputs (ALAT and ALP) not found",
             "patients": [single_result],
         }
     return {"status": "success", "processed": 1, "patients": [single_result]}

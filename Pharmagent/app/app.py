@@ -7,10 +7,12 @@ EV = EnvironmentVariables()
 import os
 
 from fastapi import FastAPI
+import gradio as gr
 
 from Pharmagent.app.api.endpoints.agent import router as report_router
 from Pharmagent.app.api.endpoints.ollama import router as models_router
 from Pharmagent.app.api.endpoints.pharmacology import router as pharma_router
+from Pharmagent.app.client.main import create_interface
 from Pharmagent.app.logger import logger
 from Pharmagent.app.utils.database.sqlite import database
 
@@ -40,3 +42,6 @@ app = FastAPI(
 app.include_router(report_router)
 app.include_router(models_router)
 app.include_router(pharma_router)
+
+ui_app = create_interface()
+app = gr.mount_gradio_app(app, ui_app, path="/ui")
