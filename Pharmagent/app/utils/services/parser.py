@@ -466,6 +466,7 @@ class BloodTestParser:
         """
         entries = getattr(blood_tests, "entries", []) or []
         latest_alat = self.get_latest_by_name(entries, "ALAT")
+        latest_alp = self.get_latest_by_name(entries, "ALP")
         latest_ana = self.get_latest_by_name(entries, "ANA")
 
         out: dict[str, Any] = {}
@@ -475,6 +476,13 @@ class BloodTestParser:
                 "value_text": latest_alat.value_text,
                 "unit": latest_alat.unit,
                 "date": latest_alat.context_date,
+            }
+        if latest_alp is not None:
+            out["ALP"] = {
+                "value": latest_alp.value,
+                "value_text": latest_alp.value_text,
+                "unit": latest_alp.unit,
+                "date": latest_alp.context_date,
             }
         if latest_ana is not None:
             out["ANA"] = {
