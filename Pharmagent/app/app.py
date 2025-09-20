@@ -44,4 +44,4 @@ app.include_router(models_router)
 app.include_router(pharma_router)
 
 ui_app = create_interface()
-app = gr.mount_gradio_app(app, ui_app, path="/ui")
+app = gr.mount_gradio_app(app, ui_app, path="/ui", root_path="/ui")
