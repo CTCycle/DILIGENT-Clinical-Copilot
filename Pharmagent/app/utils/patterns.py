@@ -5,7 +5,9 @@ import re
 # -----------------------------------------------------------------------------
 # Patient section parsing
 # -----------------------------------------------------------------------------
-PATIENT_SECTION_HEADER_RE = re.compile(r"^[ 	]*#{1,6}[ 	]+(.+?)\s*$", re.MULTILINE)
+PATIENT_SECTION_HEADER_RE = re.compile(
+    r"^[ 	]*#{1,6}[ 	]+(.+?)\s*$", re.MULTILINE
+)
 
 # -----------------------------------------------------------------------------
 # Drug parsing patterns
@@ -65,77 +67,78 @@ NUMERIC_RE = re.compile(
     re.VERBOSE,
 )
 
-CUTOFF_IN_PAREN_RE = re.compile(r"cut[\s\-]?off[: ]*\s*(\d+(?:[.,]\d+)?)", re.IGNORECASE)
-
+CUTOFF_IN_PAREN_RE = re.compile(
+    r"cut[\s\-]?off[: ]*\s*(\d+(?:[.,]\d+)?)", re.IGNORECASE
+)
 
 
 # -----------------------------------------------------------------------------
 # Drugs names and info parsing patterns
 # -----------------------------------------------------------------------------
 FORM_TOKENS = {
-        "cpr",
-        "compresse",
-        "compressa",
-        "caps",
-        "capsule",
-        "capsula",
-        "sir",
-        "scir",
-        "sciroppo",
-        "gtt",
-        "gocce",
-        "fiale",
-        "fiala",
-        "spray",
-        "gel",
-        "crema",
-        "granulato",
-        "bustine",
-        "supp",
-        "supposta",
-        "supposte",
-        "unguento",
-        "pomata",
-        "sol",
-        "soluzione",
-        "sospensione",
-        "collirio",
-        "aerosol",
-        "tbl",
-        "cp",
-        "drg",
-    }
+    "cpr",
+    "compresse",
+    "compressa",
+    "caps",
+    "capsule",
+    "capsula",
+    "sir",
+    "scir",
+    "sciroppo",
+    "gtt",
+    "gocce",
+    "fiale",
+    "fiala",
+    "spray",
+    "gel",
+    "crema",
+    "granulato",
+    "bustine",
+    "supp",
+    "supposta",
+    "supposte",
+    "unguento",
+    "pomata",
+    "sol",
+    "soluzione",
+    "sospensione",
+    "collirio",
+    "aerosol",
+    "tbl",
+    "cp",
+    "drg",
+}
+
 FORM_DESCRIPTORS = {
-        "rivestite",
-        "retard",
-        "oro",
-        "sublinguale",
-        "sublinguali",
-        "prolungato",
-        "prolungata",
-        "rilascio",
-        "modificato",
-        "masticabile",
-        "depot",
-        "lp",
-    }
+    "rivestite",
+    "retard",
+    "oro",
+    "sublinguale",
+    "sublinguali",
+    "prolungato",
+    "prolungata",
+    "rilascio",
+    "modificato",
+    "masticabile",
+    "depot",
+    "lp",
+}
+
 UNIT_TOKENS = {
-        "mg",
-        "mcg",
-        "ug",
-        "g",
-        "kg",
-        "ml",
-        "l",
-        "ui",
-        "u",
-        "dose",
-        "dosi",
-        "puff",
-        "puffs",
-    }
-
-
+    "mg",
+    "mcg",
+    "ug",
+    "g",
+    "kg",
+    "ml",
+    "l",
+    "ui",
+    "u",
+    "dose",
+    "dosi",
+    "puff",
+    "puffs",
+}
 
 __all__ = [
     "PATIENT_SECTION_HEADER_RE",

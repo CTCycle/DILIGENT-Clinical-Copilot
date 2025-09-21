@@ -46,7 +46,6 @@ async def process_single_patient(payload: PatientData) -> dict[str, Any]:
     elapsed = time.perf_counter() - start_time
     logger.info(f"Drugs extraction required {elapsed:.4f} seconds")
 
-   
     return {
         "name": payload.name or "Unknown",
         "anamnesis": payload.anamnesis,
@@ -74,7 +73,7 @@ async def start_single_clinical_agent(
     alp: str | None = Body(default=None),
     alp_max: str | None = Body(default=None),
     symptoms: list[str] | None = Body(default=None),
-) -> dict[str, Any]:    
+) -> dict[str, Any]:
     try:
         payload = PatientData(
             name=name,
@@ -143,4 +142,3 @@ async def start_batch_clinical_agent() -> dict[str, Any]:
         results.append(case)
 
     return {"status": "success", "processed": len(results), "patients": results}
-

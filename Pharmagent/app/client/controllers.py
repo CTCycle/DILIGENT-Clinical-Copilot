@@ -3,8 +3,11 @@ from __future__ import annotations
 import json
 from typing import Any
 
+import gradio as gr
+from gradio import update as gr_update
 import httpx
 
+from Pharmagent.app.configurations import ClientRuntimeConfig
 from Pharmagent.app.constants import (
     AGENT_API_URL,
     API_BASE_URL,
@@ -35,6 +38,27 @@ def _sanitize_field(value: str | None) -> str | None:
 
 
 # -----------------------------------------------------------------------------
+def toggle_cloud_services(enabled: bool) -> dict[str, Any]:
+    ClientRuntimeConfig.set_use_cloud_services(enabled)
+    return gr_update(interactive=enabled)
+
+
+# -----------------------------------------------------------------------------
+def set_llm_provider(provider: str) -> str:
+    return ClientRuntimeConfig.set_llm_provider(provider)
+
+
+# -----------------------------------------------------------------------------
+def set_parsing_model(model: str) -> str:
+    return ClientRuntimeConfig.set_parsing_model(model)
+
+
+# -----------------------------------------------------------------------------
+def set_agent_model(model: str) -> str:
+    return ClientRuntimeConfig.set_agent_model(model)
+
+
+# -----------------------------------------------------------------------------
 def reset_agent_fields() -> tuple[
     str,
     str,
@@ -47,8 +71,33 @@ def reset_agent_fields() -> tuple[
     list[str],
     bool,
     str,
+    bool,
+    dict[str, Any],
+    str,
+    str,
 ]:
-    return "", "", "", "", "", "", "", "", [], False, ""
+    ClientRuntimeConfig.reset_defaults()
+    provider_update = gr_update(
+        value=ClientRuntimeConfig.get_llm_provider(),
+        interactive=ClientRuntimeConfig.is_cloud_enabled(),
+    )
+    return (
+        "",
+        "",
+        "",
+        "",
+        "",
+        "",
+        "",
+        "",
+        [],
+        False,
+        "",
+        ClientRuntimeConfig.is_cloud_enabled(),
+        provider_update,
+        ClientRuntimeConfig.get_parsing_model(),
+        ClientRuntimeConfig.get_agent_model(),
+    )
 
 
 # trigger function to start the agent on button click. Payload is optional depending
@@ -117,3 +166,5 @@ async def run_agent(
 
     url = f"{API_BASE_URL}{AGENT_API_URL}"
     return await _trigger_agent(url, cleaned_payload)
+
+

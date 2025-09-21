@@ -9,7 +9,8 @@ from typing import Any
 import pandas as pd
 
 from Pharmagent.app.api.models.prompts import DISEASE_EXTRACTION_PROMPT
-from Pharmagent.app.api.models.providers import OllamaClient
+from Pharmagent.app.configurations import ClientRuntimeConfig
+from Pharmagent.app.api.models.providers import get_runtime_llm_client
 from Pharmagent.app.api.schemas.clinical import (
     BloodTest,
     DrugEntry,
@@ -17,7 +18,6 @@ from Pharmagent.app.api.schemas.clinical import (
     PatientDiseases,
     PatientDrugs,
 )
-from Pharmagent.app.constants import PARSER_MODEL
 from Pharmagent.app.utils.patterns import (
     CUTOFF_IN_PAREN_RE,
     DATE_PATS,
@@ -32,7 +32,7 @@ from Pharmagent.app.utils.patterns import (
     TITER_RE,
     FORM_DESCRIPTORS,
     FORM_TOKENS,
-    UNIT_TOKENS
+    UNIT_TOKENS,
 )
 
 ALT_LABELS = {"ALT", "ALAT"}
@@ -116,9 +116,9 @@ class PatientCase:
 class DiseasesParser:
     def __init__(self, timeout_s: float = 300.0, temperature: float = 0.0) -> None:
         self.temperature = float(temperature)
-        self.client = OllamaClient(base_url=None, timeout_s=timeout_s)
+        self.client = get_runtime_llm_client(purpose="parser", timeout_s=timeout_s)
         self.JSON_schema = {"diseases": list[str], "hepatic_diseases": list[str]}
-        self.model = PARSER_MODEL
+        self.model = ClientRuntimeConfig.get_parsing_model()
 
     # -------------------------------------------------------------------------
     def normalize_unique(self, lst: list[str]) -> list[str]:
@@ -195,9 +195,9 @@ class BloodTestParser:
         temperature: float = 0.0,
         timeout_s: float = 300.0,
     ) -> None:
-        self.model = (model or PARSER_MODEL).strip()
+        self.model = (model or ClientRuntimeConfig.get_parsing_model()).strip()
         self.temperature = float(temperature)
-        self.client = OllamaClient(base_url=None, timeout_s=timeout_s)
+        self.client = get_runtime_llm_client(purpose="parser", timeout_s=timeout_s)
 
     # -------------------------------------------------------------------------
     def normalize_strings(self, s: str | None) -> str | None:
@@ -456,7 +456,7 @@ class BloodTestParser:
         if not u:
             return None
         s = u.strip()
-        s = re.split(r"[,;]|(?=\s[A-Za-z�-�])", s)[0]  # stop at delimiter or new word
+        s = re.split(r"[,;]|(?=\s[A-Za-zÀ-ÿ])", s)[0]  # stop at delimiter or new word
         return s.rstrip(".")
 
     # -------------------------------------------------------------------------
@@ -557,7 +557,6 @@ class BloodTestParser:
 
 ###############################################################################
 class DrugsParser:
-    
     SCHEDULE_RE = DRUG_SCHEDULE_RE
     BULLET_RE = DRUG_BULLET_RE
     BRACKET_TRAIL_RE = DRUG_BRACKET_TRAIL_RE
@@ -663,8 +662,7 @@ class DrugsParser:
                 mode_tokens.append(token)
                 continue
             if mode_tokens and (
-                normalized in FORM_DESCRIPTORS
-                or not self._token_has_numeric(token)
+                normalized in FORM_DESCRIPTORS or not self._token_has_numeric(token)
             ):
                 mode_tokens.append(token)
                 continue

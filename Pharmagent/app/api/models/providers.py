@@ -17,6 +17,7 @@ from Pharmagent.app.constants import (
     OPENAI_API_BASE,
     GEMINI_API_BASE,
 )
+from Pharmagent.app.configurations import ClientRuntimeConfig
 
 OPENAI_API_KEY = os.getenv("OPENAI_API_KEY")
 GEMINI_API_KEY = os.getenv("GEMINI_API_KEY")
@@ -25,6 +26,7 @@ GEMINI_API_KEY = os.getenv("GEMINI_API_KEY")
 T = TypeVar("T", bound=BaseModel)
 
 ProviderName = Literal["openai", "azure-openai", "anthropic", "gemini"]
+RuntimePurpose = Literal["agent", "parser"]
 
 
 ###############################################################################
@@ -41,6 +43,7 @@ ProgressCb: TypeAlias = Callable[[dict[str, Any]], None | Awaitable[None]]
 
 ###############################################################################
 class OllamaClient:
+
     """
     Async wrapper around the Ollama REST API.
       - list_models()
@@ -50,7 +53,6 @@ class OllamaClient:
       - check_model_availability()
 
     Usage:
-
         async with AsyncOllamaClient() as client:
             await client.check_model_availability("llama3.1:8b")
             out = await client.chat(
@@ -59,7 +61,6 @@ class OllamaClient:
                 format="json")
 
     """
-
     def __init__(
         self,
         base_url: str | None = None,
@@ -136,7 +137,6 @@ class OllamaClient:
 
         """
         payload = {"name": name, "stream": bool(stream)}
-
         try:
             if stream:
                 async with self._client.stream("POST", "/api/pull", json=payload) as r:
@@ -225,6 +225,7 @@ class OllamaClient:
         """
         Streamed chat. Yields each event (already JSON-decoded).
         Caller can aggregate tokens or forward server-sent chunks to a client.
+
         """
         body: dict[str, Any] = {"model": model, "messages": messages, "stream": True}
         if format:
@@ -372,39 +373,8 @@ class OllamaClient:
 class LLMError(RuntimeError):
     pass
 
-
 class LLMTimeout(LLMError):
     """Raised when requests exceed the configured timeout."""
-
-
-###############################################################################
-def get_llm_client(
-    provider: str = "ollama",
-    **kwargs: Any,
-) -> Any:
-    """Factory returning an LLM client with a unified interface.
-
-    provider: "ollama" | "openai" | "gemini" (others raise a clear error).
-    kwargs are forwarded to the underlying client constructors.
-    """
-    p = provider.strip().lower()
-    if p == "ollama":
-        return OllamaClient(
-            base_url=kwargs.get("base_url"),
-            timeout_s=kwargs.get("timeout_s", 120.0),
-            keepalive_connections=kwargs.get("keepalive_connections", 10),
-            keepalive_max=kwargs.get("keepalive_max", 20),
-        )
-    if p in ("openai", "gemini"):
-        return CloudLLMClient(
-            provider=p,  # type: ignore[arg-type]
-            base_url=kwargs.get("base_url"),
-            timeout_s=kwargs.get("timeout_s", 120.0),
-            keepalive_connections=kwargs.get("keepalive_connections", 10),
-            keepalive_max=kwargs.get("keepalive_max", 20),
-            default_model=kwargs.get("default_model"),
-        )
-    raise LLMError(f"Unknown or unsupported provider: {provider}")
 
 
 ###############################################################################
@@ -412,8 +382,8 @@ class CloudLLMClient:
     """
     Async client for hosted/proprietary LLMs (OpenAI, Gemini, etc.) with a
     compatible interface to `OllamaClient` for easy swapping.
-    """
 
+    """
     def __init__(
         self,
         *,
@@ -691,3 +661,55 @@ class CloudLLMClient:
             return loaded if isinstance(loaded, dict) else None
         except json.JSONDecodeError:
             return None
+
+
+###############################################################################
+def get_llm_client(
+    provider: str = "ollama",
+    **kwargs: Any,
+) -> OllamaClient | CloudLLMClient:
+    """Factory returning an LLM client with a unified interface.
+    provider: "ollama" | "openai" | "gemini" (others raise a clear error).
+    kwargs are forwarded to the underlying client constructors.
+
+    """
+    p = provider.strip().lower()
+    if p == "ollama":
+        return OllamaClient(
+            base_url=kwargs.get("base_url"),
+            timeout_s=kwargs.get("timeout_s", 120.0),
+            keepalive_connections=kwargs.get("keepalive_connections", 10),
+            keepalive_max=kwargs.get("keepalive_max", 20),
+        )
+    if p in ("openai", "gemini"):
+        return CloudLLMClient(
+            provider=p,  # type: ignore[arg-type]
+            base_url=kwargs.get("base_url"),
+            timeout_s=kwargs.get("timeout_s", 120.0),
+            keepalive_connections=kwargs.get("keepalive_connections", 10),
+            keepalive_max=kwargs.get("keepalive_max", 20),
+            default_model=kwargs.get("default_model"),
+        )
+    raise LLMError(f"Unknown or unsupported provider: {provider}")
+
+
+###############################################################################
+def get_runtime_llm_client(
+    *, purpose: RuntimePurpose = "agent", **kwargs: Any
+) -> OllamaClient | CloudLLMClient:
+    provider = (
+        ClientRuntimeConfig.get_llm_provider()
+        if ClientRuntimeConfig.is_cloud_enabled()
+        else "ollama"
+    )
+    default_model = (
+        ClientRuntimeConfig.get_parsing_model()
+        if purpose == "parser"
+        else ClientRuntimeConfig.get_agent_model()
+    )
+    selected_model = kwargs.pop("default_model", default_model)
+    return get_llm_client(
+        provider=provider,
+        default_model=selected_model,
+        **kwargs,
+    )
