@@ -29,16 +29,6 @@ app = FastAPI(
     description="Minimal FastAPI bootstrap with chat, embeddings, and a placeholder endpoint.",
 )
 
-# Enable CORS later if you need a browser-based frontend
-# from fastapi.middleware.cors import CORSMiddleware
-# app.add_middleware(
-#     CORSMiddleware,
-#     allow_origins=["http://localhost:5173", "http://localhost:3000"],
-#     allow_credentials=True,
-#     allow_methods=["*"],
-#     allow_headers=["*"],
-# )
-
 app.include_router(report_router)
 app.include_router(models_router)
 app.include_router(pharma_router)

@@ -10,7 +10,7 @@ import pandas as pd
 
 from Pharmagent.app.api.models.prompts import DISEASE_EXTRACTION_PROMPT
 from Pharmagent.app.configurations import ClientRuntimeConfig
-from Pharmagent.app.api.models.providers import get_runtime_llm_client
+from Pharmagent.app.api.models.providers import initialize_llm_client
 from Pharmagent.app.api.schemas.clinical import (
     BloodTest,
     DrugEntry,
@@ -116,7 +116,7 @@ class PatientCase:
 class DiseasesParser:
     def __init__(self, timeout_s: float = 300.0, temperature: float = 0.0) -> None:
         self.temperature = float(temperature)
-        self.client = get_runtime_llm_client(purpose="parser", timeout_s=timeout_s)
+        self.client = initialize_llm_client(purpose="parser", timeout_s=timeout_s)
         self.JSON_schema = {"diseases": list[str], "hepatic_diseases": list[str]}
         self.model = ClientRuntimeConfig.get_parsing_model()
 
@@ -197,7 +197,7 @@ class BloodTestParser:
     ) -> None:
         self.model = (model or ClientRuntimeConfig.get_parsing_model()).strip()
         self.temperature = float(temperature)
-        self.client = get_runtime_llm_client(purpose="parser", timeout_s=timeout_s)
+        self.client = initialize_llm_client(purpose="parser", timeout_s=timeout_s)
 
     # -------------------------------------------------------------------------
     def normalize_strings(self, s: str | None) -> str | None:
