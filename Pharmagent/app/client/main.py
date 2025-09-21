@@ -32,8 +32,8 @@ def create_interface() -> gr.Blocks:
                 anamnesis = gr.Textbox(
                     label="Anamnesis",
                     placeholder="Enter anamnesis details...",
-                    lines=8,
-                    max_lines=16,
+                    lines=10,
+                    max_lines=100,
                 )
                 has_diseases = gr.Checkbox(
                     label="Has hepatic diseases",
@@ -46,14 +46,14 @@ def create_interface() -> gr.Blocks:
                 drugs = gr.Textbox(
                     label="Current Drugs",
                     placeholder="List current therapies, dosage and schedule...",
-                    lines=8,
-                    max_lines=16,
+                    lines=10,
+                    max_lines=100,
                 )
                 exams = gr.Textbox(
                     label="Additional Exams",
                     placeholder="Provide lab or imaging exam notes...",
-                    lines=8,
-                    max_lines=16,
+                    lines=10,
+                    max_lines=100,
                 )
                 with gr.Row():
                     alt = gr.Textbox(
@@ -94,11 +94,11 @@ def create_interface() -> gr.Blocks:
                 )
                 with gr.Column():
                     run_button = gr.Button("Run Workflow", variant="primary")
-                    reset_button = gr.Button("Reset Form", variant="secondary")
-                    clear_button = gr.Button("Clear Output")
+                    rag_button = gr.Button("Load RAG documents", variant="secondary")
+                    clear_button = gr.Button("Clear all")
                 output = gr.Textbox(
                     label="Agent Output",
-                    lines=18,
+                    lines=30,
                     show_copy_button=True,
                     interactive=False,
                 )
@@ -171,7 +171,7 @@ def create_interface() -> gr.Blocks:
             outputs=output,
             api_name="run_agent",
         )
-        reset_button.click(
+        clear_button.click(
             fn=reset_agent_fields,
             outputs=[
                 patient_name,
@@ -203,7 +203,6 @@ def launch_interface() -> None:
         server_port=7861,
         inbrowser=True,
     )
-
 
 if __name__ == "__main__":
     launch_interface()

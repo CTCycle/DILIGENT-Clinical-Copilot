@@ -664,7 +664,7 @@ class CloudLLMClient:
 
 
 ###############################################################################
-def get_llm_client(
+def select_llm_provider(
     provider: str = "ollama",
     **kwargs: Any,
 ) -> OllamaClient | CloudLLMClient:
@@ -694,7 +694,7 @@ def get_llm_client(
 
 
 ###############################################################################
-def get_runtime_llm_client(
+def initialize_llm_client(
     *, purpose: RuntimePurpose = "agent", **kwargs: Any
 ) -> OllamaClient | CloudLLMClient:
     provider = (
@@ -708,7 +708,7 @@ def get_runtime_llm_client(
         else ClientRuntimeConfig.get_agent_model()
     )
     selected_model = kwargs.pop("default_model", default_model)
-    return get_llm_client(
+    return select_llm_provider(
         provider=provider,
         default_model=selected_model,
         **kwargs,

@@ -7,6 +7,7 @@ from typing import Any
 from fastapi import APIRouter, Body, HTTPException, status
 from pydantic import ValidationError
 
+from Pharmagent.app.utils.services.clinical import DrugToxicityEssay
 from Pharmagent.app.utils.services.parser import (
     PatientCase,
     DiseasesParser,
@@ -19,11 +20,6 @@ from Pharmagent.app.logger import logger
 
 router = APIRouter(tags=["agent"])
 
-patient_case = PatientCase()
-disease_parser = DiseasesParser()
-lab_parser = BloodTestParser()
-drugs_parser = DrugsParser()
-
 ALT_LABELS = {"ALT", "ALAT"}
 ALP_LABELS = {"ALP"}
 
@@ -35,23 +31,30 @@ async def process_single_patient(payload: PatientData) -> dict[str, Any]:
         f"Starting Drug-Induced Liver Injury (DILI) analysis for patient: {payload.name}"
         or "Unknown"
     )
-
-    start_time = time.perf_counter()
-    diseases = await disease_parser.extract_diseases(payload.anamnesis)
-    elapsed = time.perf_counter() - start_time
-    logger.info(f"Disease extraction required {elapsed:.4f} seconds")
+    
+    disease_parser = DiseasesParser()   
+    drugs_parser = DrugsParser()    
 
     start_time = time.perf_counter()
     drug_data = drugs_parser.parse_drug_list(payload.drugs)
     elapsed = time.perf_counter() - start_time
     logger.info(f"Drugs extraction required {elapsed:.4f} seconds")
+    logger.info(f"Detected {len(drug_data.entries)} drugs")
+
+    start_time = time.perf_counter()
+    diseases = await disease_parser.extract_diseases(payload.anamnesis)
+    elapsed = time.perf_counter() - start_time
+    logger.info(f"Disease extraction required {elapsed:.4f} seconds")  
+    logger.info(f"Detected {len(diseases["diseases"])} diseases for this patient")
+    logger.info(f"Subset of hepatic diseases includes {len(diseases["hepatic_disease"])} entries")
+
+    pharmacology = DrugToxicityEssay(drug_data)  
 
     return {
         "name": payload.name or "Unknown",
         "anamnesis": payload.anamnesis,
         "diseases": diseases,
-        "drugs": drug_data.model_dump(),
-        "raw_drugs": payload.drugs,
+        "drugs": drug_data.model_dump(),       
         "exams": payload.exams,
         "alt": payload.alt,
         "alt_max": payload.alt_max,
@@ -98,6 +101,10 @@ async def start_single_clinical_agent(
 # -----------------------------------------------------------------------------
 @router.post("/batch-agent", response_model=None, status_code=status.HTTP_202_ACCEPTED)
 async def start_batch_clinical_agent() -> dict[str, Any]:
+
+    patient_case = PatientCase()
+    lab_parser = BloodTestParser()
+
     txt_files = [path for path in Path(TASKS_PATH).glob("*.txt") if path.is_file()]
     if not txt_files:
         logger.info(
