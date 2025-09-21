@@ -18,7 +18,6 @@ LOGS_PATH = join(RSC_PATH, "logs")
 API_BASE_URL = "http://127.0.0.1:8000"
 AGENT_API_URL = "/agent"
 BATCH_AGENT_API_URL = "/batch-agent"
-PARSER_MODEL = "qwen3:14b"
 
 # [LLM / PROVIDERS]
 ###############################################################################
@@ -28,6 +27,14 @@ OLLAMA_HOST_DEFAULT = "http://localhost:11434"
 # Cloud provider API bases
 OPENAI_API_BASE = "https://api.openai.com/v1"
 GEMINI_API_BASE = "https://generativelanguage.googleapis.com/v1beta"
+
+# Runtime selection defaults
+CLOUD_PROVIDERS = ["openai", "gemini"]
+PARSING_MODEL_CHOICES = ["qwen3:14b", "phi3:mini"]
+AGENT_MODEL_CHOICES = ["gpt-oss", "llama3.1:8b"]
+DEFAULT_PARSING_MODEL = PARSING_MODEL_CHOICES[0]
+DEFAULT_AGENT_MODEL = AGENT_MODEL_CHOICES[0]
+DEFAULT_CLOUD_PROVIDER = CLOUD_PROVIDERS[0]
 
 # [EXTERNAL DATA SOURCES]
 ###############################################################################

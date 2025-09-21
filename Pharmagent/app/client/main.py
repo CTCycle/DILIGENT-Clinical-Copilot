@@ -2,7 +2,20 @@ from __future__ import annotations
 
 import gradio as gr
 
-from Pharmagent.app.client.controllers import reset_agent_fields, run_agent
+from Pharmagent.app.configurations import ClientRuntimeConfig
+from Pharmagent.app.constants import (
+    AGENT_MODEL_CHOICES,
+    CLOUD_PROVIDERS,
+    PARSING_MODEL_CHOICES,
+)
+from Pharmagent.app.client.controllers import (
+    reset_agent_fields,
+    run_agent,
+    set_agent_model,
+    set_llm_provider,
+    set_parsing_model,
+    toggle_cloud_services,
+)
 
 
 ###############################################################################
@@ -90,6 +103,57 @@ def create_interface() -> gr.Blocks:
                     interactive=False,
                 )
 
+        with gr.Accordion("Runtime Configuration", open=False):
+            with gr.Row():
+                with gr.Column(scale=1):
+                    use_cloud_services = gr.Checkbox(
+                        label="Use Cloud Services",
+                        value=ClientRuntimeConfig.is_cloud_enabled(),
+                    )
+                    llm_provider_dropdown = gr.Dropdown(
+                        label="LLM Provider",
+                        choices=CLOUD_PROVIDERS,
+                        value=ClientRuntimeConfig.get_llm_provider(),
+                        interactive=ClientRuntimeConfig.is_cloud_enabled(),
+                    )
+                with gr.Column(scale=1):
+                    parsing_model_dropdown = gr.Dropdown(
+                        label="Parsing Model",
+                        choices=PARSING_MODEL_CHOICES,
+                        value=ClientRuntimeConfig.get_parsing_model(),
+                    )
+                    agent_model_dropdown = gr.Dropdown(
+                        label="Agent Model",
+                        choices=AGENT_MODEL_CHOICES,
+                        value=ClientRuntimeConfig.get_agent_model(),
+                    )
+                with gr.Column(scale=1):
+                    placeholder_button = gr.Button(
+                        "Configure Provider",
+                        variant="secondary",
+                    )
+
+        use_cloud_services.change(
+            fn=toggle_cloud_services,
+            inputs=use_cloud_services,
+            outputs=llm_provider_dropdown,
+        )
+        llm_provider_dropdown.change(
+            fn=set_llm_provider,
+            inputs=llm_provider_dropdown,
+            outputs=llm_provider_dropdown,
+        )
+        parsing_model_dropdown.change(
+            fn=set_parsing_model,
+            inputs=parsing_model_dropdown,
+            outputs=parsing_model_dropdown,
+        )
+        agent_model_dropdown.change(
+            fn=set_agent_model,
+            inputs=agent_model_dropdown,
+            outputs=agent_model_dropdown,
+        )
+
         run_button.click(
             fn=run_agent,
             inputs=[
@@ -121,6 +185,10 @@ def create_interface() -> gr.Blocks:
                 symptoms,
                 process_from_files,
                 output,
+                use_cloud_services,
+                llm_provider_dropdown,
+                parsing_model_dropdown,
+                agent_model_dropdown,
             ],
         )
         clear_button.click(lambda: "", outputs=output)
