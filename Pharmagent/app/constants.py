@@ -7,6 +7,7 @@ from os.path import abspath, join
 ROOT_DIR = abspath(join(__file__, "../../.."))
 PROJECT_DIR = join(ROOT_DIR, "Pharmagent")
 RSC_PATH = join(PROJECT_DIR, "resources")
+MODELS_PATH = join(RSC_PATH, "models")
 DATA_PATH = join(RSC_PATH, "database")
 DOCS_PATH = join(DATA_PATH, "documents")
 SOURCES_PATH = join(DATA_PATH, "sources")
