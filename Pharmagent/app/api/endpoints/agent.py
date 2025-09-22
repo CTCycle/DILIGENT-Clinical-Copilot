@@ -17,7 +17,7 @@ from Pharmagent.app.utils.services.parser import (
     DrugsParser,
 )
 from Pharmagent.app.api.schemas.clinical import PatientData
-from Pharmagent.app.constants import TASKS_PATH
+from Pharmagent.app.constants import TASKS_PATH, TRANSLATION_CONFIDENCE_THRESHOLD
 from Pharmagent.app.logger import logger
 
 serializer = DataSerializer()
@@ -31,26 +31,32 @@ ALP_LABELS = {"ALP"}
 
 # [ENPOINTS]
 ###############################################################################
-async def process_single_patient(payload: PatientData) -> dict[str, Any]:
+async def process_single_patient(payload: PatientData, translate_to_eng: bool = False) -> dict[str, Any]:
     logger.info(
         f"Starting Drug-Induced Liver Injury (DILI) analysis for patient: {payload.name}"
     )
-
-    # 1. Translate anamnesis, drugs, and exams to English if needed
-    logger.info(f"Translating text to English")
-    translation_map = await svc.translate_payload(payload)   
+   
+    updated_payload = payload.model_copy()
+    if translate_to_eng:
+        # Translate anamnesis, drugs, and exams to English if requested
+        logger.info(f"Translating text to English")
+        translation_stats, updated_payload = await svc.translate_payload(
+            payload, 
+            certainty_threshold=TRANSLATION_CONFIDENCE_THRESHOLD,
+            max_attempts=5)   
 
     disease_parser = DiseasesParser()
     drugs_parser = DrugsParser()
 
+    # parse drugs and related info from given text
     start_time = time.perf_counter()
-    drug_data = drugs_parser.parse_drug_list(translation_map["drugs"])
+    drug_data = drugs_parser.parse_drug_list(updated_payload.drugs or "")
     elapsed = time.perf_counter() - start_time
     logger.info(f"Drugs extraction required {elapsed:.4f} seconds")
     logger.info(f"Detected {len(drug_data.entries)} drugs")
-
+    # parse diseases and subset of hepatic diseases from patient anamnesis
     start_time = time.perf_counter()
-    diseases = await disease_parser.extract_diseases(translation_map["anamnesis"])
+    diseases = await disease_parser.extract_diseases(updated_payload.anamnesis or "")
     elapsed = time.perf_counter() - start_time
     logger.info(f"Disease extraction required {elapsed:.4f} seconds")
     logger.info(f"Detected {len(diseases["diseases"])} diseases for this patient")
@@ -58,7 +64,7 @@ async def process_single_patient(payload: PatientData) -> dict[str, Any]:
 
     patient_info = {
         "name": payload.name or "Unknown",
-        "anamnesis": translation_map["anamnesis"],
+        "anamnesis": payload.anamnesis,
         "alt": payload.alt,
         "alt_max": payload.alt_max,
         "alp": payload.alp,
@@ -69,7 +75,6 @@ async def process_single_patient(payload: PatientData) -> dict[str, Any]:
     }
 
     serializer.save_patients_info(patient_info)
-
     pharmacology = DrugToxicityEssay(drug_data)
 
     return patient_info
@@ -86,6 +91,7 @@ async def start_single_clinical_agent(
     alp: str | None = Body(default=None),
     alp_max: str | None = Body(default=None),
     symptoms: list[str] | None = Body(default=None),
+    translate_to_eng: bool = Body(default=False)
 ) -> dict[str, Any]:
     try:
         payload = PatientData(
@@ -104,7 +110,7 @@ async def start_single_clinical_agent(
             status_code=status.HTTP_422_UNPROCESSABLE_ENTITY, detail=exc.errors()
         ) from exc
 
-    single_result = await process_single_patient(payload)
+    single_result = await process_single_patient(payload, translate_to_eng)
     return {"status": "success", "processed": 1, "patients": [single_result]}
 
 

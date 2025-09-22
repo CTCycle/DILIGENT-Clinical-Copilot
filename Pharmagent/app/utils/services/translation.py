@@ -22,23 +22,17 @@ from transformers import (
 
 
 from Pharmagent.app.api.schemas.clinical import PatientData
-from Pharmagent.app.constants import (  
+from Pharmagent.app.constants import (
     LANGUAGE_DETECTION_MODEL,
-    TRANSLATION_MODEL,   
-    MODELS_PATH    
+    TRANSLATION_MODEL,
+    MODELS_PATH,
 )
 from Pharmagent.app.logger import logger
-from Pharmagent.app.api.models.providers import initialize_llm_client  
-
-
-
-
+from Pharmagent.app.api.models.providers import initialize_llm_client
 
 
 # ###############################################################################
 class TranslationService:
-    
-
     def __init__(
         self,
         model_name: str = TRANSLATION_MODEL,
@@ -59,7 +53,9 @@ class TranslationService:
         if torch_dtype is None:
             if torch.cuda.is_available():
                 # Prefer bfloat16 when available; else float16.
-                torch_dtype = torch.bfloat16 if torch.cuda.is_bf16_supported() else torch.float16
+                torch_dtype = (
+                    torch.bfloat16 if torch.cuda.is_bf16_supported() else torch.float16
+                )
             else:
                 torch_dtype = torch.float32
         self.torch_dtype = torch_dtype
@@ -81,13 +77,12 @@ class TranslationService:
             return
 
         self.tokenizer = AutoTokenizer.from_pretrained(self.model_name, use_fast=True)
-
         loaded = AutoModelForSeq2SeqLM.from_pretrained(
             self.model_name,
-            torch_dtype=self.torch_dtype,
+            dtype=self.torch_dtype,
         )
-        self.model = cast(PreTrainedModel, loaded)   
-        self.model.to(self.device) # type: ignore
+        self.model = cast(PreTrainedModel, loaded)
+        self.model.to(self.device)  # type: ignore
         self.model.eval()
         self._loaded = True
 
@@ -110,7 +105,7 @@ class TranslationService:
 
     # -------------------------------------------------------------------------
     def _count_words(self, s: str) -> int:
-        return len(re.findall(r"\b\w+\b", s, flags=re.UNICODE))    
+        return len(re.findall(r"\b\w+\b", s, flags=re.UNICODE))
 
     # ---------------------------------------------------------------------------
     def translate_text(
@@ -133,7 +128,9 @@ class TranslationService:
         self._ensure_model_loaded()
         n_words = self._count_words(text)
         if n_words < min_words or n_words > max_words:
-            raise ValueError(f"text word count out of bounds ({n_words} not in [{min_words}, {max_words}])")
+            raise ValueError(
+                f"text word count out of bounds ({n_words} not in [{min_words}, {max_words}])"
+            )
 
         start = time.perf_counter()
         attempts = 0
@@ -145,7 +142,9 @@ class TranslationService:
             beams = self.beam_size_retry if use_retry else self.beam_size_initial
             temp = self.temperature_retry if use_retry else self.temperature_initial
 
-            translation, certainty = self._translate_large(text, num_beams=beams, temperature=temp)
+            translation, certainty = self._translate_large(
+                text, num_beams=beams, temperature=temp
+            )
 
             if best is None or certainty > best["certainty"]:
                 best = {
@@ -198,14 +197,19 @@ class TranslationService:
     # ---------------------------------------------------------------------------
     async def translate_payload(
         self,
-        payload: PatientData,        
+        payload: PatientData,
         min_words: int = 10,
         max_words: int = 5000,
         certainty_threshold: float = 0.90,
         max_attempts: int = 3,
-    ) -> dict[str, Any]:
-        items = []
-        for text in (payload.anamnesis, payload.drugs, payload.exams):            
+    ) -> tuple[dict[str, Any], PatientData]:
+        items = {}
+        updates = {}
+        updated_payload = payload.model_copy()
+        for name, text in zip(
+            ("anamnesis", "drugs", "exams"),
+            (payload.anamnesis, payload.drugs, payload.exams),
+        ):
             if text is None or not text.strip():
                 continue
             res = self.translate_text(
@@ -214,14 +218,25 @@ class TranslationService:
                 max_words=max_words,
                 certainty_threshold=certainty_threshold,
                 max_attempts=max_attempts,
-            )            
-            items.append(
-                {"translation": res["translation"], "certainty": res["certainty"], "attempts": res["attempts"]}
             )
+            items[name] = {                    
+                    "translation": res["translation"],
+                    "certainty": res["certainty"],
+                    "attempts": res["attempts"],
+                }
+            
+            updates[name] = res["translation"]
+            updated_payload = payload.model_copy(update=updates)           
+            
 
-        avg_certainty = float(sum(d["certainty"] for d in items) / len(items)) if items else math.nan
+        avg_certainty = (
+            float(sum(items[k]["certainty"] for k in items.keys()) / len(items))
+            if items
+            else math.nan
+        )
         report = {"items": items, "avg_certainty": avg_certainty}
-        return report
+
+        return report, updated_payload
 
     # ---------------------------------------------------------------------------
     def _translate_large(
@@ -232,7 +247,7 @@ class TranslationService:
     ) -> tuple[str, float]:
         if self.tokenizer is None or self.model is None:
             return "", 0.0
-        
+
         max_src_len = int(self.tokenizer.model_max_length * 0.85)
         chunks = self._chunk_text_by_tokens(text, max_src_len)
 
@@ -240,8 +255,12 @@ class TranslationService:
         probs: list[tuple[float, int]] = []  # (mean_prob, token_count)
 
         for batch in self._batched(chunks, self.batch_size):
-            batch_out = self._translate_batch(batch, num_beams=num_beams, temperature=temperature)
-            for s, (seq_prob, tok_count) in zip(batch_out["texts"], batch_out["stats"], strict=True):
+            batch_out = self._translate_batch(
+                batch, num_beams=num_beams, temperature=temperature
+            )
+            for s, (seq_prob, tok_count) in zip(
+                batch_out["texts"], batch_out["stats"], strict=True
+            ):
                 translations.append(s)
                 probs.append((seq_prob, tok_count))
 
@@ -277,36 +296,26 @@ class TranslationService:
                 return_dict_in_generate=True,
                 output_scores=True,
                 length_penalty=1.0,
-            ) # type: ignore
+            )  # type: ignore
 
         texts = self.tokenizer.batch_decode(gen.sequences, skip_special_tokens=True)
 
-        # Confidence: mean of chosen-token probabilities across sequence.
+        # Confidence: mean of chosen-token probabilities across the generated sequence.
         stats: list[tuple[float, int]] = []
         if gen.scores is not None:
-            # Align chosen token ids for generated portion
-            # sequences shape: [batch, seq_len]; we need the generated tail
             seqs = gen.sequences
-            # Determine how many tokens are newly generated for each sample:
-            # len(generated) = len(seqs[i]) - input_length[i]
-            input_lengths = enc["input_ids"].ne(self.tokenizer.pad_token_id).sum(dim=1)
-            offset_per_sample = input_lengths.tolist()
-
-            # gen.scores is a list[timestep] of logits over vocab for each batch.
-            # Collect per-sample chosen token probs.
+            # Map scores + beam path to the final sequences
+            transition_scores = self.model.compute_transition_scores(  # type: ignore[attr-defined]
+                sequences=seqs,
+                scores=gen.scores,
+                beam_indices=getattr(gen, "beam_indices", None),
+                normalize_logits=True,
+            )
+            # transition_scores[i] are log-probs of each generated token in seqs[i]
             for i in range(seqs.size(0)):
-                chosen_probs: list[float] = []
-                for t, logits in enumerate(gen.scores):
-                    # token chosen at this step is seqs[i, offset + t]
-                    offset = offset_per_sample[i]
-                    idx_in_seq = offset + t
-                    if idx_in_seq >= seqs.size(1):
-                        break
-                    token_id = int(seqs[i, idx_in_seq].item())
-                    step_logprobs = logits[i].float().log_softmax(dim=-1)
-                    chosen_probs.append(float(step_logprobs[token_id].exp().item()))
-                tok_count = len(chosen_probs)
-                mean_prob = float(sum(chosen_probs) / tok_count) if tok_count else 0.0
+                step_probs = transition_scores[i].exp().tolist()
+                tok_count = len(step_probs)
+                mean_prob = float(sum(step_probs) / tok_count) if tok_count else 0.0
                 stats.append((mean_prob, tok_count))
         else:
             # Fallback when scores are not returned
@@ -318,8 +327,10 @@ class TranslationService:
     def _chunk_text_by_tokens(self, text: str, max_src_len: int) -> list[str]:
         if self.tokenizer is None:
             return [text]
-        token_ids = self.tokenizer(text, return_tensors=None, add_special_tokens=False)["input_ids"]
-        if len(token_ids) <= max_src_len: # type: ignore
+        token_ids = self.tokenizer(text, return_tensors=None, add_special_tokens=False)[
+            "input_ids"
+        ]
+        if len(token_ids) <= max_src_len:  # type: ignore
             return [text]
 
         # Heuristic sentence segmentation to preserve semantics.
@@ -332,18 +343,20 @@ class TranslationService:
             s = s.strip()
             if not s:
                 continue
-            s_ids = self.tokenizer(s, return_tensors=None, add_special_tokens=False)["input_ids"]
-            s_len = len(s_ids) # type: ignore
+            s_ids = self.tokenizer(s, return_tensors=None, add_special_tokens=False)[
+                "input_ids"
+            ]
+            s_len = len(s_ids)  # type: ignore
             if s_len > max_src_len:
                 # Hard split on overly long sentences.
                 words = s.split()
                 buf: list[str] = []
                 for w in words:
                     buf.append(w)
-                    ids = self.tokenizer(" ".join(buf), return_tensors=None, add_special_tokens=False)[
-                        "input_ids"
-                    ]
-                    if len(ids) >= max_src_len: # type: ignore
+                    ids = self.tokenizer(
+                        " ".join(buf), return_tensors=None, add_special_tokens=False
+                    )["input_ids"]
+                    if len(ids) >= max_src_len:  # type: ignore
                         chunks.append(" ".join(buf))
                         buf = []
                 if buf:
