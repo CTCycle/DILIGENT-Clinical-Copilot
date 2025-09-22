@@ -24,7 +24,3 @@ class ModelListResponse(BaseModel):
     status: Literal["success"] = "success"
     models: list[str] = Field(..., description="List of available LLMs")
     count: int
-
-
-
-

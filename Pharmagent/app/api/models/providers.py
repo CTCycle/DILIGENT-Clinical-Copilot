@@ -43,7 +43,6 @@ ProgressCb: TypeAlias = Callable[[dict[str, Any]], None | Awaitable[None]]
 
 ###############################################################################
 class OllamaClient:
-
     """
     Async wrapper around the Ollama REST API.
       - list_models()
@@ -61,6 +60,7 @@ class OllamaClient:
                 format="json")
 
     """
+
     def __init__(
         self,
         base_url: str | None = None,
@@ -373,6 +373,7 @@ class OllamaClient:
 class LLMError(RuntimeError):
     pass
 
+
 class LLMTimeout(LLMError):
     """Raised when requests exceed the configured timeout."""
 
@@ -384,6 +385,7 @@ class CloudLLMClient:
     compatible interface to `OllamaClient` for easy swapping.
 
     """
+
     def __init__(
         self,
         *,

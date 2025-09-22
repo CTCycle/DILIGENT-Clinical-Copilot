@@ -92,6 +92,10 @@ def create_interface() -> gr.Blocks:
                     label="Process patients from files",
                     value=False,
                 )
+                translate_to_eng = gr.Checkbox(
+                    label="Always translate to English",
+                    value=False,
+                )
                 with gr.Column():
                     run_button = gr.Button("Run Workflow", variant="primary")
                     rag_button = gr.Button("Load RAG documents", variant="secondary")
@@ -167,6 +171,7 @@ def create_interface() -> gr.Blocks:
                 alp_max,
                 symptoms,
                 process_from_files,
+                translate_to_eng,
             ],
             outputs=output,
             api_name="run_agent",
@@ -203,6 +208,7 @@ def launch_interface() -> None:
         server_port=7861,
         inbrowser=True,
     )
+
 
 if __name__ == "__main__":
     launch_interface()

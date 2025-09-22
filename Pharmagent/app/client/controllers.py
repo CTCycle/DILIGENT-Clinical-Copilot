@@ -106,10 +106,10 @@ def reset_agent_fields() -> tuple[
 async def _trigger_agent(url: str, payload: dict[str, Any] | None = None) -> str:
     try:
         async with httpx.AsyncClient(timeout=120) as client:
-            if payload is None:
-                resp = await client.post(url)
-            else:
-                resp = await client.post(url, json=payload)
+            resp = await client.post(
+                url,
+                json=payload
+            )
             resp.raise_for_status()
             try:
                 return _extract_text(resp.json())
@@ -144,6 +144,7 @@ async def run_agent(
     alp_max: str,
     symptoms: list[str],
     process_from_files: bool,
+    translate_to_eng: bool,
 ) -> str:
     if process_from_files:
         url = f"{API_BASE_URL}{BATCH_AGENT_API_URL}"
@@ -159,6 +160,7 @@ async def run_agent(
         "alp": _sanitize_field(alp),
         "alp_max": _sanitize_field(alp_max),
         "symptoms": symptoms or [],
+        "translate_to_eng": translate_to_eng,
     }
 
     if not any(cleaned_payload[key] for key in ("anamnesis", "drugs", "exams")):
@@ -166,5 +168,3 @@ async def run_agent(
 
     url = f"{API_BASE_URL}{AGENT_API_URL}"
     return await _trigger_agent(url, cleaned_payload)
-
-

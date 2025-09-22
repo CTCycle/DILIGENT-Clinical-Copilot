@@ -47,8 +47,8 @@ LIVERTOX_ARCHIVE = "livertox_NBK547852.tar.gz"
 ###############################################################################
 LANGUAGE_DETECTION_MODEL = "papluca/xlm-roberta-base-language-detection"
 TRANSLATION_MODEL = "Helsinki-NLP/opus-mt-mul-en"
-TRANSLATION_CONFIDENCE_THRESHOLD = 0.78
-TRANSLATION_MAX_ATTEMPTS = 3
+TRANSLATION_CONFIDENCE_THRESHOLD = 0.90
+TRANSLATION_MAX_ATTEMPTS = 5
 LANGUAGE_DETECTION_CONFIDENCE = 0.90
 LANGUAGE_DETECTION_SAMPLE_LENGTH = 500
 
@@ -102,5 +102,3 @@ NLLB_LANGUAGE_CODES: dict[str, str] = {
     "uk": "ukr_Cyrl",
     "zh": "zho_Hans",
 }
-
-

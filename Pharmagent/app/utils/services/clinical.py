@@ -25,9 +25,6 @@ class HepatoPatterns:
 
 ###############################################################################
 class DrugToxicityEssay:
-    def __init__(
-        self,
-        drugs: PatientDrugs        
-    ) -> None:
+    def __init__(self, drugs: PatientDrugs) -> None:
         for drug in drugs.entries:
             pass
