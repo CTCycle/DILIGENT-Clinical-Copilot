@@ -7,6 +7,7 @@ from typing import Any
 from fastapi import APIRouter, Body, HTTPException, status
 from pydantic import ValidationError
 
+from Pharmagent.app.utils.serializer import DataSerializer
 from Pharmagent.app.utils.services.clinical import DrugToxicityEssay
 from Pharmagent.app.utils.services.parser import (
     PatientCase,
@@ -18,6 +19,8 @@ from Pharmagent.app.api.schemas.clinical import PatientData
 from Pharmagent.app.constants import TASKS_PATH
 from Pharmagent.app.logger import logger
 
+serializer = DataSerializer()
+
 router = APIRouter(tags=["agent"])
 
 ALT_LABELS = {"ALT", "ALAT"}
@@ -28,9 +31,7 @@ ALP_LABELS = {"ALP"}
 ###############################################################################
 async def process_single_patient(payload: PatientData) -> dict[str, Any]:
     logger.info(
-        f"Starting Drug-Induced Liver Injury (DILI) analysis for patient: {payload.name}"
-        or "Unknown"
-    )
+        f"Starting Drug-Induced Liver Injury (DILI) analysis for patient: {payload.name}")
     
     disease_parser = DiseasesParser()   
     drugs_parser = DrugsParser()    
@@ -48,21 +49,23 @@ async def process_single_patient(payload: PatientData) -> dict[str, Any]:
     logger.info(f"Detected {len(diseases["diseases"])} diseases for this patient")
     logger.info(f"Subset of hepatic diseases includes {len(diseases["hepatic_disease"])} entries")
 
-    pharmacology = DrugToxicityEssay(drug_data)  
-
-    return {
+    patient_info = {
         "name": payload.name or "Unknown",
         "anamnesis": payload.anamnesis,
-        "diseases": diseases,
-        "drugs": drug_data.model_dump(),       
-        "exams": payload.exams,
         "alt": payload.alt,
         "alt_max": payload.alt_max,
         "alp": payload.alp,
         "alp_max": payload.alp_max,
-        "symptoms": payload.symptoms,
+        "additional_tests": payload.exams,
+        "drugs": drug_data.model_dump(),
+        "symptoms": ", ".join(payload.symptoms),
     }
 
+    serializer.save_patients_info(patient_info)    
+
+    pharmacology = DrugToxicityEssay(drug_data)  
+    
+    return patient_info
 
 # -----------------------------------------------------------------------------
 @router.post("/agent", response_model=None, status_code=status.HTTP_202_ACCEPTED)

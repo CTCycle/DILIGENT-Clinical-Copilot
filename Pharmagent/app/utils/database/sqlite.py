@@ -1,9 +1,11 @@
 from __future__ import annotations
 
 import os
+from typing import Any
 
 import pandas as pd
-from sqlalchemy import Column, String, UniqueConstraint, create_engine
+from sqlalchemy import Column, Float, String, UniqueConstraint, create_engine
+import sqlalchemy
 from sqlalchemy.dialects.sqlite import insert
 from sqlalchemy.orm import declarative_base, sessionmaker
 
@@ -26,7 +28,11 @@ class Patients(Base):
     __tablename__ = "PATIENTS"
     name = Column(String, primary_key=True)
     anamnesis = Column(String)
-    blood_tests = Column(String)
+    symptoms = Column(String)
+    ALT = Column(Float)
+    ALT_max = Column(Float)
+    ALP = Column(Float)
+    ALP_max = Column(Float)
     additional_tests = Column(String)
     drugs = Column(String)
     __table_args__ = (UniqueConstraint("name"),)
@@ -49,7 +55,14 @@ class PharmagentDatabase:
         Base.metadata.create_all(self.engine)
 
     # -------------------------------------------------------------------------
-    def upsert_dataframe(self, df: pd.DataFrame, table_cls) -> None:
+    def get_table_class(self, table_name: str) -> Any:
+        for cls in Base.__subclasses__():
+            if hasattr(cls, "__tablename__") and cls.__tablename__ == table_name:
+                return cls
+        raise ValueError(f"No table class found for name {table_name}")
+
+    # -------------------------------------------------------------------------
+    def _upsert_dataframe(self, df: pd.DataFrame, table_cls) -> None:
         table = table_cls.__table__
         session = self.Session()
         try:
@@ -76,18 +89,20 @@ class PharmagentDatabase:
                     index_elements=unique_cols, set_=update_cols
                 )
                 session.execute(stmt)
-                session.commit()
             session.commit()
         finally:
             session.close()
 
     # -------------------------------------------------------------------------
-    def save_documents(self, documents: pd.DataFrame) -> None:
-        self.upsert_dataframe(documents, Documents)
+    def save_into_database(self, df: pd.DataFrame, table_name: str) -> None:
+        with self.engine.begin() as conn:
+            conn.execute(sqlalchemy.text(f'DELETE FROM "{table_name}"'))
+            df.to_sql(table_name, conn, if_exists="append", index=False)
 
     # -------------------------------------------------------------------------
-    def save_patients_info(self, patients: pd.DataFrame) -> None:
-        self.upsert_dataframe(patients, Patients)
+    def upsert_into_database(self, df: pd.DataFrame, table_name: str) -> None:
+        table_cls = self.get_table_class(table_name)
+        self._upsert_dataframe(df, table_cls)
 
 
 # -----------------------------------------------------------------------------
