@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import pandas as pd
+from typing import Any
 
 from Pharmagent.app.utils.database.sqlite import database
 
@@ -12,5 +13,6 @@ class DataSerializer:
         pass
 
     # -------------------------------------------------------------------------
-    def save_patients_info(self, patients: pd.DataFrame) -> None:
-        database.save_patients_info(patients)
+    def save_patients_info(self, patients: dict[str, Any]) -> None:
+        data = pd.DataFrame([patients])
+        database.upsert_into_database(data, "PATIENTS")
