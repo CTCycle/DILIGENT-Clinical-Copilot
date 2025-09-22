@@ -1,8 +1,10 @@
 from __future__ import annotations
 
-from typing import Literal
+from dataclasses import dataclass
+from typing import Literal, Any
 
 from pydantic import BaseModel, Field
+from transformers import AutoModelForSeq2SeqLM
 
 
 ###############################################################################
@@ -22,3 +24,7 @@ class ModelListResponse(BaseModel):
     status: Literal["success"] = "success"
     models: list[str] = Field(..., description="List of available LLMs")
     count: int
+
+
+
+
