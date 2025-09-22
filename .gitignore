@@ -1,5 +1,6 @@
 Pharmagent/setup/python/*
 Pharmagent/setup/.env
+Pharmagent/resources/models/*
 
 __pycache__
 *.vscode

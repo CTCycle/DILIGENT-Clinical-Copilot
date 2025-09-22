@@ -9,6 +9,7 @@ from pydantic import ValidationError
 
 from Pharmagent.app.utils.serializer import DataSerializer
 from Pharmagent.app.utils.services.clinical import DrugToxicityEssay
+from Pharmagent.app.utils.services.translation import TranslationService
 from Pharmagent.app.utils.services.parser import (
     PatientCase,
     DiseasesParser,
@@ -20,6 +21,7 @@ from Pharmagent.app.constants import TASKS_PATH
 from Pharmagent.app.logger import logger
 
 serializer = DataSerializer()
+svc = TranslationService()
 
 router = APIRouter(tags=["agent"])
 
@@ -31,40 +33,45 @@ ALP_LABELS = {"ALP"}
 ###############################################################################
 async def process_single_patient(payload: PatientData) -> dict[str, Any]:
     logger.info(
-        f"Starting Drug-Induced Liver Injury (DILI) analysis for patient: {payload.name}")
-    
-    disease_parser = DiseasesParser()   
-    drugs_parser = DrugsParser()    
+        f"Starting Drug-Induced Liver Injury (DILI) analysis for patient: {payload.name}"
+    )
+
+    # 1. Translate anamnesis, drugs, and exams to English if needed
+    logger.info(f"Translating text to English")
+    translation_map = await svc.translate_payload(payload)   
+
+    disease_parser = DiseasesParser()
+    drugs_parser = DrugsParser()
 
     start_time = time.perf_counter()
-    drug_data = drugs_parser.parse_drug_list(payload.drugs)
+    drug_data = drugs_parser.parse_drug_list(translation_map["drugs"])
     elapsed = time.perf_counter() - start_time
     logger.info(f"Drugs extraction required {elapsed:.4f} seconds")
     logger.info(f"Detected {len(drug_data.entries)} drugs")
 
     start_time = time.perf_counter()
-    diseases = await disease_parser.extract_diseases(payload.anamnesis)
+    diseases = await disease_parser.extract_diseases(translation_map["anamnesis"])
     elapsed = time.perf_counter() - start_time
-    logger.info(f"Disease extraction required {elapsed:.4f} seconds")  
+    logger.info(f"Disease extraction required {elapsed:.4f} seconds")
     logger.info(f"Detected {len(diseases["diseases"])} diseases for this patient")
     logger.info(f"Subset of hepatic diseases includes {len(diseases["hepatic_disease"])} entries")
 
     patient_info = {
         "name": payload.name or "Unknown",
-        "anamnesis": payload.anamnesis,
+        "anamnesis": translation_map["anamnesis"],
         "alt": payload.alt,
         "alt_max": payload.alt_max,
         "alp": payload.alp,
         "alp_max": payload.alp_max,
-        "additional_tests": payload.exams,
+        "additional_tests": None,
         "drugs": drug_data.model_dump(),
         "symptoms": ", ".join(payload.symptoms),
     }
 
-    serializer.save_patients_info(patient_info)    
+    serializer.save_patients_info(patient_info)
 
-    pharmacology = DrugToxicityEssay(drug_data)  
-    
+    pharmacology = DrugToxicityEssay(drug_data)
+
     return patient_info
 
 # -----------------------------------------------------------------------------
