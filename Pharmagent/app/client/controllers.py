@@ -3,14 +3,19 @@ from __future__ import annotations
 import json
 from typing import Any
 
-from gradio import update as gr_update
 import httpx
+from gradio import update as gr_update
 
 from Pharmagent.app.configurations import ClientRuntimeConfig
 from Pharmagent.app.constants import (
     AGENT_API_URL,
     API_BASE_URL,
     BATCH_AGENT_API_URL,
+)
+from Pharmagent.app.api.models.providers import (
+    OllamaClient,
+    OllamaError,
+    OllamaTimeout,
 )
 
 
@@ -55,6 +60,34 @@ def set_parsing_model(model: str) -> str:
 # -----------------------------------------------------------------------------
 def set_agent_model(model: str) -> str:
     return ClientRuntimeConfig.set_agent_model(model)
+
+
+# -----------------------------------------------------------------------------
+async def pull_selected_models(parsing_model: str, agent_model: str) -> str:
+    models: list[str] = []
+    for name in (parsing_model, agent_model):
+        if not name:
+            continue
+        normalized = name.strip()
+        if normalized and normalized not in models:
+            models.append(normalized)
+
+    if not models:
+        return "[ERROR] No models selected to pull."
+
+    try:
+        async with OllamaClient() as client:
+            for model in models:
+                await client.pull(model, stream=False)
+    except OllamaTimeout as exc:
+        return f"[ERROR] Timed out pulling models: {exc}"
+    except OllamaError as exc:
+        return f"[ERROR] Failed to pull models: {exc}"
+    except Exception as exc:  # noqa: BLE001
+        return f"[ERROR] Unexpected error while pulling models: {exc}"
+
+    pulled = ", ".join(models)
+    return f"[INFO] Models available locally: {pulled}."
 
 
 # -----------------------------------------------------------------------------
