@@ -39,7 +39,7 @@ async def process_single_patient(payload: PatientData, translate_to_eng: bool = 
     updated_payload = payload.model_copy()
     if translate_to_eng:
         # Translate anamnesis, drugs, and exams to English if requested
-        logger.info(f"Translating text to English")
+        logger.info("Translating text to English")
         translation_stats, updated_payload = await svc.translate_payload(
             payload, 
             certainty_threshold=TRANSLATION_CONFIDENCE_THRESHOLD,
