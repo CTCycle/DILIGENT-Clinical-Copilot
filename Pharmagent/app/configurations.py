@@ -4,7 +4,9 @@ from dataclasses import dataclass
 from typing import Any
 
 from Pharmagent.app.constants import (
+    CLOUD_MODEL_CHOICES,
     DEFAULT_AGENT_MODEL,
+    DEFAULT_CLOUD_MODEL,
     DEFAULT_CLOUD_PROVIDER,
     DEFAULT_PARSING_MODEL,
 )
@@ -28,6 +30,7 @@ class ClientRuntimeConfig:
     parsing_model: str = DEFAULT_PARSING_MODEL
     agent_model: str = DEFAULT_AGENT_MODEL
     llm_provider: str = DEFAULT_CLOUD_PROVIDER
+    cloud_model: str = DEFAULT_CLOUD_MODEL
     use_cloud_services: bool = False
 
     # ---------------------------------------------------------------------
@@ -52,7 +55,25 @@ class ClientRuntimeConfig:
         value = provider.strip()
         if value:
             cls.llm_provider = value
+            models = CLOUD_MODEL_CHOICES.get(cls.llm_provider, [])
+            if cls.cloud_model not in models:
+                cls.cloud_model = models[0] if models else ""
         return cls.llm_provider
+
+    # ---------------------------------------------------------------------
+    @classmethod
+    def set_cloud_model(cls, model: str) -> str:
+        value = model.strip()
+        if not value:
+            cls.cloud_model = ""
+            return cls.cloud_model
+        models = CLOUD_MODEL_CHOICES.get(cls.llm_provider, [])
+        if value not in models:
+            if models:
+                cls.cloud_model = models[0]
+            return cls.cloud_model
+        cls.cloud_model = value
+        return cls.cloud_model
 
     # ---------------------------------------------------------------------
     @classmethod
@@ -77,6 +98,11 @@ class ClientRuntimeConfig:
 
     # ---------------------------------------------------------------------
     @classmethod
+    def get_cloud_model(cls) -> str:
+        return cls.cloud_model
+
+    # ---------------------------------------------------------------------
+    @classmethod
     def is_cloud_enabled(cls) -> bool:
         return cls.use_cloud_services
 
@@ -86,4 +112,5 @@ class ClientRuntimeConfig:
         cls.parsing_model = DEFAULT_PARSING_MODEL
         cls.agent_model = DEFAULT_AGENT_MODEL
         cls.llm_provider = DEFAULT_CLOUD_PROVIDER
+        cls.cloud_model = DEFAULT_CLOUD_MODEL
         cls.use_cloud_services = False

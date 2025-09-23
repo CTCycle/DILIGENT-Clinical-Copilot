@@ -949,16 +949,22 @@ def select_llm_provider(
 def initialize_llm_client(
     *, purpose: RuntimePurpose = "agent", **kwargs: Any
 ) -> OllamaClient | CloudLLMClient:
-    provider = (
-        ClientRuntimeConfig.get_llm_provider()
-        if ClientRuntimeConfig.is_cloud_enabled()
-        else "ollama"
-    )
-    default_model = (
-        ClientRuntimeConfig.get_parsing_model()
-        if purpose == "parser"
-        else ClientRuntimeConfig.get_agent_model()
-    )
+    if ClientRuntimeConfig.is_cloud_enabled():
+        provider = ClientRuntimeConfig.get_llm_provider()
+        default_model = ClientRuntimeConfig.get_cloud_model()
+        if not default_model:
+            default_model = (
+                ClientRuntimeConfig.get_parsing_model()
+                if purpose == "parser"
+                else ClientRuntimeConfig.get_agent_model()
+            )
+    else:
+        provider = "ollama"
+        default_model = (
+            ClientRuntimeConfig.get_parsing_model()
+            if purpose == "parser"
+            else ClientRuntimeConfig.get_agent_model()
+        )
     selected_model = kwargs.pop("default_model", default_model)
     return select_llm_provider(
         provider=provider,
