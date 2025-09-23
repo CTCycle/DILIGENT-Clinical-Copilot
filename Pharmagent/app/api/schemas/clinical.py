@@ -283,3 +283,76 @@ class PatientDrugs(BaseModel):
     """Container for parsed drug entries."""
 
     entries: list[DrugEntry] = Field(default_factory=list)
+
+
+###############################################################################
+class HepatotoxicityPatternScore(BaseModel):
+    alt_multiple: float | None = Field(
+        None,
+        description="ALT value divided by its upper reference limit.",
+    )
+    alp_multiple: float | None = Field(
+        None,
+        description="ALP value divided by its upper reference limit.",
+    )
+    r_score: float | None = Field(
+        None,
+        description="R ratio computed as (ALT multiple) / (ALP multiple).",
+    )
+    classification: Literal[
+        "hepatocellular",
+        "cholestatic",
+        "mixed",
+        "indeterminate",
+    ] = Field(
+        "indeterminate",
+        description="DILI pattern classification derived from the R ratio.",
+    )
+
+
+###############################################################################
+class DrugToxicityFindings(BaseModel):
+    pattern: list[str] = Field(default_factory=list)
+    adverse_reactions: list[str] = Field(default_factory=list)
+
+    @field_validator("pattern", "adverse_reactions")
+    @classmethod
+    def _normalize_unique(cls, value: list[str]) -> list[str]:
+        unique: dict[str, str] = {}
+        for item in value:
+            if not item:
+                continue
+            normalized = item.strip()
+            if not normalized:
+                continue
+            key = normalized.lower()
+            if key not in unique:
+                unique[key] = normalized
+        return list(unique.values())
+
+
+###############################################################################
+class DrugHepatotoxicityAnalysis(BaseModel):
+    drug_name: str = Field(..., min_length=1, max_length=200)
+    source_text: str | None = Field(
+        None,
+        description="Excerpt from LiverTox or related knowledge base used for the analysis.",
+    )
+    analysis: DrugToxicityFindings | None = Field(
+        None, description="Structured LLM findings for the drug."
+    )
+    error: str | None = Field(
+        None,
+        description="Optional error message if the analysis could not be completed.",
+    )
+
+    @model_validator(mode="after")
+    def _require_result_or_error(self) -> "DrugHepatotoxicityAnalysis":
+        if self.analysis is None and not self.error:
+            raise ValueError("Either analysis or error must be provided for each drug.")
+        return self
+
+
+###############################################################################
+class PatientDrugToxicityBundle(BaseModel):
+    entries: list[DrugHepatotoxicityAnalysis] = Field(default_factory=list)
