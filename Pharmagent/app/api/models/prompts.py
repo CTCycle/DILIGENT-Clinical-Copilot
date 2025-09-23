@@ -68,9 +68,10 @@ You are reviewing the LiverTox information for the following medication:
 Drug: {drug_name}
 
 LiverTox excerpt:
-"""
+
 {source_text}
-"""
+
+End of excerpt
 
 Carefully read the excerpt and extract:
 1. All hepatotoxicity patterns explicitly associated with the drug.
