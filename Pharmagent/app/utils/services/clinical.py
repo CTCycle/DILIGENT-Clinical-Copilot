@@ -125,7 +125,11 @@ class DrugToxicityEssay:
         self.drugs = drugs
         self.timeout_s = float(timeout_s)
         self.client = initialize_llm_client(purpose="agent", timeout_s=self.timeout_s)
-        self.model = ClientRuntimeConfig.get_agent_model()
+        self.model = (
+            ClientRuntimeConfig.get_cloud_model()
+            if ClientRuntimeConfig.is_cloud_enabled()
+            else ClientRuntimeConfig.get_agent_model()
+        )
         self.max_prompt_chars = 6000
         self.http_timeout = httpx.Timeout(30.0)
         self._search_url = "https://eutils.ncbi.nlm.nih.gov/entrez/eutils/esearch.fcgi"

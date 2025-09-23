@@ -5,6 +5,7 @@ import gradio as gr
 from Pharmagent.app.configurations import ClientRuntimeConfig
 from Pharmagent.app.constants import (
     AGENT_MODEL_CHOICES,
+    CLOUD_MODEL_CHOICES,
     CLOUD_PROVIDERS,
     PARSING_MODEL_CHOICES,
 )
@@ -14,6 +15,7 @@ from Pharmagent.app.client.controllers import (
     pull_selected_models,
     run_agent,
     set_agent_model,
+    set_cloud_model,
     set_llm_provider,
     set_parsing_model,
     start_ollama_client,
@@ -23,6 +25,12 @@ from Pharmagent.app.client.controllers import (
 
 ###############################################################################
 def create_interface() -> gr.Blocks:
+    provider = ClientRuntimeConfig.get_llm_provider()
+    cloud_models = CLOUD_MODEL_CHOICES.get(provider, [])
+    selected_cloud_model = ClientRuntimeConfig.get_cloud_model()
+    if selected_cloud_model not in cloud_models:
+        selected_cloud_model = cloud_models[0] if cloud_models else ""
+        ClientRuntimeConfig.set_cloud_model(selected_cloud_model)
     with gr.Blocks(
         title="Pharmagent Clinical Copilot",
         analytics_enabled=False,
@@ -113,49 +121,57 @@ def create_interface() -> gr.Blocks:
                     )
                     clear_button = gr.Button("Clear all")
                     ollama_status = gr.Markdown(value="", visible=True)
-                output = gr.Textbox(
-                    label="Agent Output",
-                    lines=30,
-                    show_copy_button=True,
-                    interactive=False,
-                )
+                with gr.Accordion("Runtime Configuration", open=False):
+                    with gr.Column():
+                        with gr.Row():
+                            with gr.Column(scale=1):
+                                use_cloud_services = gr.Checkbox(
+                                    label="Use Cloud Services",
+                                    value=ClientRuntimeConfig.is_cloud_enabled(),
+                                )
+                                llm_provider_dropdown = gr.Dropdown(
+                                    label="Cloud Service",
+                                    choices=CLOUD_PROVIDERS,
+                                    value=provider,
+                                    interactive=ClientRuntimeConfig.is_cloud_enabled(),
+                                )
+                            cloud_model_dropdown = gr.Dropdown(
+                                label="Cloud Model",
+                                choices=cloud_models,
+                                value=selected_cloud_model,
+                                interactive=ClientRuntimeConfig.is_cloud_enabled(),
+                            )
+                        with gr.Row():
+                            with gr.Column(scale=1):
+                                parsing_model_dropdown = gr.Dropdown(
+                                    label="Parsing Model",
+                                    choices=PARSING_MODEL_CHOICES,
+                                    value=ClientRuntimeConfig.get_parsing_model(),
+                                )
+                                agent_model_dropdown = gr.Dropdown(
+                                    label="Agent Model",
+                                    choices=AGENT_MODEL_CHOICES,
+                                    value=ClientRuntimeConfig.get_agent_model(),
+                                )
+                                pull_models_button = gr.Button(
+                                    "Pull models",
+                                    variant="secondary",
+                                )
+                            pull_status = gr.Markdown(value="", visible=True)
 
-        with gr.Accordion("Runtime Configuration", open=False):
-            with gr.Row():
-                with gr.Column(scale=1):
-                    use_cloud_services = gr.Checkbox(
-                        label="Use Cloud Services",
-                        value=ClientRuntimeConfig.is_cloud_enabled(),
-                    )
-                    llm_provider_dropdown = gr.Dropdown(
-                        label="LLM Provider",
-                        choices=CLOUD_PROVIDERS,
-                        value=ClientRuntimeConfig.get_llm_provider(),
-                        interactive=ClientRuntimeConfig.is_cloud_enabled(),
-                    )
-                with gr.Column(scale=1):
-                    parsing_model_dropdown = gr.Dropdown(
-                        label="Parsing Model",
-                        choices=PARSING_MODEL_CHOICES,
-                        value=ClientRuntimeConfig.get_parsing_model(),
-                    )
-                    agent_model_dropdown = gr.Dropdown(
-                        label="Agent Model",
-                        choices=AGENT_MODEL_CHOICES,
-                        value=ClientRuntimeConfig.get_agent_model(),
-                    )
-                with gr.Column(scale=1):
-                    pull_models_button = gr.Button(
-                        "Pull models",
-                        variant="secondary",
-                    )
-                    pull_status = gr.Markdown(value="", visible=True)
+        output = gr.Textbox(
+            label="Agent Output",
+            lines=30,
+            show_copy_button=True,
+            interactive=False,
+        )
 
         use_cloud_services.change(
             fn=toggle_cloud_services,
             inputs=use_cloud_services,
             outputs=[
                 llm_provider_dropdown,
+                cloud_model_dropdown,
                 start_ollama_button,
                 preload_button,
             ],
@@ -163,7 +179,12 @@ def create_interface() -> gr.Blocks:
         llm_provider_dropdown.change(
             fn=set_llm_provider,
             inputs=llm_provider_dropdown,
-            outputs=llm_provider_dropdown,
+            outputs=[llm_provider_dropdown, cloud_model_dropdown],
+        )
+        cloud_model_dropdown.change(
+            fn=set_cloud_model,
+            inputs=cloud_model_dropdown,
+            outputs=cloud_model_dropdown,
         )
         parsing_model_dropdown.change(
             fn=set_parsing_model,
