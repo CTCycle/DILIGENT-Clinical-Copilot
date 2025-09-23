@@ -19,6 +19,9 @@ from Pharmagent.app.api.models.providers import (
 )
 
 
+_PRELOADED_MODELS: set[str] = set()
+
+
 # [HELPERS]
 ###############################################################################
 def _extract_text(result: Any) -> str:
@@ -42,9 +45,47 @@ def _sanitize_field(value: str | None) -> str | None:
 
 
 # -----------------------------------------------------------------------------
-def toggle_cloud_services(enabled: bool) -> dict[str, Any]:
+async def _release_preloaded_models() -> str:
+    if not _PRELOADED_MODELS:
+        return ""
+
+    try:
+        async with OllamaClient() as client:
+            if not await client.is_server_online():
+                return "[WARN] Ollama server is not reachable. Unable to free models."
+            models = sorted(_PRELOADED_MODELS)
+            released, failures = await client.unload_models(models)
+    except OllamaTimeout as exc:
+        return f"[ERROR] Timed out while releasing models: {exc}"
+    except OllamaError as exc:
+        return f"[ERROR] Failed to release models: {exc}"
+    except Exception as exc:  # noqa: BLE001
+        return f"[ERROR] Unexpected error while releasing models: {exc}"
+
+    for name in released:
+        _PRELOADED_MODELS.discard(name)
+
+    if not released and not failures:
+        return ""
+
+    parts: list[str] = []
+    if released:
+        parts.append(f"[INFO] Released models from memory: {', '.join(released)}.")
+    if failures:
+        details = ", ".join(f"{name}: {error}" for name, error in failures.items())
+        parts.append(f"[WARN] Some models could not be released ({details}).")
+    return " ".join(parts)
+
+
+# -----------------------------------------------------------------------------
+def toggle_cloud_services(enabled: bool) -> tuple[dict[str, Any], dict[str, Any], dict[str, Any]]:
     ClientRuntimeConfig.set_use_cloud_services(enabled)
-    return gr_update(interactive=enabled)
+    provider_update = gr_update(
+        value=ClientRuntimeConfig.get_llm_provider(),
+        interactive=enabled,
+    )
+    button_update = gr_update(interactive=not enabled)
+    return provider_update, button_update, button_update
 
 
 # -----------------------------------------------------------------------------
@@ -91,7 +132,63 @@ async def pull_selected_models(parsing_model: str, agent_model: str) -> str:
 
 
 # -----------------------------------------------------------------------------
-def reset_agent_fields() -> tuple[
+async def start_ollama_client() -> str:
+    if ClientRuntimeConfig.is_cloud_enabled():
+        return "[INFO] Cloud provider enabled; Ollama client is disabled."
+
+    try:
+        async with OllamaClient() as client:
+            status = await client.start_server()
+    except OllamaTimeout as exc:
+        return f"[ERROR] Timed out starting Ollama server: {exc}"
+    except OllamaError as exc:
+        return f"[ERROR] Failed to start Ollama server: {exc}"
+    except Exception as exc:  # noqa: BLE001
+        return f"[ERROR] Unexpected error while starting Ollama server: {exc}"
+
+    if status == "already_running":
+        return "[INFO] Ollama server is already running."
+
+    return "[INFO] Ollama server started successfully."
+
+
+# -----------------------------------------------------------------------------
+async def preload_selected_models(parsing_model: str, agent_model: str) -> str:
+    if ClientRuntimeConfig.is_cloud_enabled():
+        return "[INFO] Cloud provider enabled; skipping Ollama preload."
+
+    parser = parsing_model.strip() if parsing_model else ""
+    agent = agent_model.strip() if agent_model else ""
+    requested = [name for name in (parser, agent) if name]
+
+    if not requested:
+        return "[ERROR] No models selected to preload."
+
+    try:
+        async with OllamaClient() as client:
+            if not await client.is_server_online():
+                return "[ERROR] Ollama server is not reachable. Start the Ollama client first."
+            loaded, skipped = await client.preload_models(parser, agent)
+    except OllamaTimeout as exc:
+        return f"[ERROR] Timed out while preloading models: {exc}"
+    except OllamaError as exc:
+        return f"[ERROR] Failed to preload models: {exc}"
+    except Exception as exc:  # noqa: BLE001
+        return f"[ERROR] Unexpected error while preloading models: {exc}"
+
+    if not loaded:
+        return "[ERROR] No models were preloaded."
+
+    _PRELOADED_MODELS.update(loaded)
+
+    message = f"[INFO] Preloaded models: {', '.join(loaded)}."
+    if skipped:
+        message += f" [WARN] Skipped due to limited memory: {', '.join(skipped)}."
+    return message
+
+
+# -----------------------------------------------------------------------------
+async def clear_agent_fields() -> tuple[
     str,
     str,
     str,
@@ -102,17 +199,13 @@ def reset_agent_fields() -> tuple[
     str,
     list[str],
     bool,
-    str,
     bool,
-    dict[str, Any],
+    bool,
     str,
     str,
 ]:
-    ClientRuntimeConfig.reset_defaults()
-    provider_update = gr_update(
-        value=ClientRuntimeConfig.get_llm_provider(),
-        interactive=ClientRuntimeConfig.is_cloud_enabled(),
-    )
+    status = await _release_preloaded_models()
+
     return (
         "",
         "",
@@ -124,11 +217,9 @@ def reset_agent_fields() -> tuple[
         "",
         [],
         False,
-        "",
-        ClientRuntimeConfig.is_cloud_enabled(),
-        provider_update,
-        ClientRuntimeConfig.get_parsing_model(),
-        ClientRuntimeConfig.get_agent_model(),
+        False,
+        False,
+        status,
     )
 
 
