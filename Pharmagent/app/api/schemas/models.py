@@ -1,10 +1,8 @@
 from __future__ import annotations
 
-from dataclasses import dataclass
-from typing import Literal, Any
+from typing import Literal
 
 from pydantic import BaseModel, Field
-from transformers import AutoModelForSeq2SeqLM
 
 
 ###############################################################################

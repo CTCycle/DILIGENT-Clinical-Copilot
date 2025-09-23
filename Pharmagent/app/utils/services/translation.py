@@ -1,16 +1,10 @@
 from __future__ import annotations
 
-import asyncio
-import copy
 import math
-import os
 import re
-from dataclasses import dataclass
-from threading import Lock
 import time
 from typing import Any, cast
 
-from collections.abc import Callable
 
 import torch
 from transformers import (
@@ -23,12 +17,8 @@ from transformers import (
 
 from Pharmagent.app.api.schemas.clinical import PatientData
 from Pharmagent.app.constants import (
-    LANGUAGE_DETECTION_MODEL,
     TRANSLATION_MODEL,
-    MODELS_PATH,
 )
-from Pharmagent.app.logger import logger
-from Pharmagent.app.api.models.providers import initialize_llm_client
 
 
 # ###############################################################################

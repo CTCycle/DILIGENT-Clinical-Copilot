@@ -3,7 +3,6 @@ from __future__ import annotations
 import json
 from typing import Any
 
-import gradio as gr
 from gradio import update as gr_update
 import httpx
 
