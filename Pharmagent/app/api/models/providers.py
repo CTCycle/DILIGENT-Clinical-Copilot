@@ -1,10 +1,14 @@
 from __future__ import annotations
 
 import asyncio
+import contextlib
+import ctypes
 import inspect
 import json
 import os
 import re
+import shutil
+import sys
 from collections.abc import AsyncGenerator, Awaitable, Callable
 from typing import Any, Literal, TypeAlias, TypeVar, cast
 import httpx
@@ -161,6 +165,252 @@ class OllamaClient:
                 return
         except httpx.TimeoutException as e:
             raise OllamaTimeout(f"Timed out pulling model '{name}'") from e
+
+    # -------------------------------------------------------------------------
+    async def show_model(self, name: str) -> dict[str, Any]:
+        payload = {"name": name}
+        try:
+            resp = await self._client.post("/api/show", json=payload)
+        except httpx.TimeoutException as e:
+            raise OllamaTimeout(f"Timed out retrieving metadata for '{name}'") from e
+        except httpx.RequestError as e:  # noqa: PERF203 - convert to domain error
+            raise OllamaError(f"Failed to query model '{name}': {e}") from e
+
+        self._raise_for_status(resp)
+
+        try:
+            data = resp.json()
+        except json.JSONDecodeError as e:
+            raise OllamaError(f"Invalid JSON received for model '{name}'") from e
+
+        if not isinstance(data, dict):
+            raise OllamaError(f"Unexpected payload for model '{name}'")
+
+        return data
+
+    # -------------------------------------------------------------------------
+    async def is_server_online(self) -> bool:
+        try:
+            resp = await self._client.get("/api/tags")
+            resp.raise_for_status()
+        except (httpx.RequestError, httpx.HTTPStatusError):
+            return False
+        return True
+
+    # -------------------------------------------------------------------------
+    async def start_server(
+        self,
+        *,
+        wait_timeout_s: float = 15.0,
+        poll_interval_s: float = 0.5,
+    ) -> Literal["started", "already_running"]:
+        if await self.is_server_online():
+            return "already_running"
+
+        if shutil.which("ollama") is None:
+            raise OllamaError("Ollama executable not found in PATH.")
+
+        try:
+            process = await asyncio.create_subprocess_exec(
+                "ollama",
+                "serve",
+                stdout=asyncio.subprocess.DEVNULL,
+                stderr=asyncio.subprocess.DEVNULL,
+                stdin=asyncio.subprocess.DEVNULL,
+                start_new_session=True,
+            )
+        except FileNotFoundError as e:
+            raise OllamaError("Ollama executable not found.") from e
+        except Exception as e:  # noqa: BLE001
+            raise OllamaError(f"Failed to launch Ollama server: {e}") from e
+
+        loop = asyncio.get_running_loop()
+        deadline = loop.time() + wait_timeout_s
+
+        while loop.time() < deadline:
+            if await self.is_server_online():
+                return "started"
+
+            if process.returncode not in (None, 0):
+                code = process.returncode
+                raise OllamaError(f"Ollama server exited unexpectedly with code {code}")
+
+            await asyncio.sleep(poll_interval_s)
+
+        with contextlib.suppress(ProcessLookupError):
+            process.terminate()
+        with contextlib.suppress(Exception):
+            await process.wait()
+
+        raise OllamaTimeout("Timed out waiting for Ollama server to start")
+
+    # -------------------------------------------------------------------------
+    @staticmethod
+    def _parse_size_to_bytes(value: Any) -> int:
+        if isinstance(value, (int, float)):
+            return int(value)
+        if isinstance(value, str):
+            cleaned = value.strip()
+            if not cleaned:
+                return 0
+            match = re.match(r"(?P<num>\d+(?:\.\d+)?)\s*(?P<unit>[kKmMgGtTpP]?i?[bB])?", cleaned)
+            if not match:
+                return 0
+            number = float(match.group("num"))
+            unit = (match.group("unit") or "b").lower()
+            factors = {
+                "b": 1,
+                "kb": 1_000,
+                "kib": 1_024,
+                "mb": 1_000_000,
+                "mib": 1_048_576,
+                "gb": 1_000_000_000,
+                "gib": 1_073_741_824,
+                "tb": 1_000_000_000_000,
+                "tib": 1_099_511_627_776,
+                "pb": 1_000_000_000_000_000,
+                "pib": 1_125_899_906_842_624,
+            }
+            factor = factors.get(unit, 1)
+            return int(number * factor)
+        return 0
+
+    # -------------------------------------------------------------------------
+    @staticmethod
+    def _get_available_memory_bytes() -> int:
+        if sys.platform == "win32":
+            class MemoryStatus(ctypes.Structure):
+                _fields_ = [
+                    ("dwLength", ctypes.c_ulong),
+                    ("dwMemoryLoad", ctypes.c_ulong),
+                    ("ullTotalPhys", ctypes.c_ulonglong),
+                    ("ullAvailPhys", ctypes.c_ulonglong),
+                    ("ullTotalPageFile", ctypes.c_ulonglong),
+                    ("ullAvailPageFile", ctypes.c_ulonglong),
+                    ("ullTotalVirtual", ctypes.c_ulonglong),
+                    ("ullAvailVirtual", ctypes.c_ulonglong),
+                    ("ullAvailExtendedVirtual", ctypes.c_ulonglong),
+                ]
+
+            status = MemoryStatus()
+            status.dwLength = ctypes.sizeof(MemoryStatus)
+            if ctypes.windll.kernel32.GlobalMemoryStatusEx(ctypes.byref(status)):
+                return int(status.ullAvailPhys)
+            return 0
+
+        if hasattr(os, "sysconf"):
+            try:
+                page_size = os.sysconf("SC_PAGE_SIZE")
+                if "SC_AVPHYS_PAGES" in os.sysconf_names:
+                    pages = os.sysconf("SC_AVPHYS_PAGES")
+                else:
+                    pages = os.sysconf("SC_PHYS_PAGES")
+                if isinstance(page_size, int) and isinstance(pages, int):
+                    return page_size * pages
+            except (ValueError, OSError, AttributeError):
+                pass
+
+        try:
+            with open("/proc/meminfo", "r", encoding="utf-8") as handle:
+                for line in handle:
+                    if line.startswith("MemAvailable:"):
+                        parts = line.split()
+                        if len(parts) >= 2:
+                            value = int(parts[1])
+                            unit = parts[2].lower() if len(parts) >= 3 else "kb"
+                            if unit in {"kb", "kib"}:
+                                return value * 1_024
+                            if unit in {"mb", "mib"}:
+                                return value * 1_048_576
+                            if unit in {"gb", "gib"}:
+                                return value * 1_073_741_824
+                            return value
+        except (FileNotFoundError, PermissionError, ValueError):
+            pass
+
+        return 0
+
+    # -------------------------------------------------------------------------
+    async def _warm_model(self, name: str, *, keep_alive: str) -> None:
+        messages = [
+            {"role": "system", "content": "You are a background warmup assistant."},
+            {"role": "user", "content": "Warmup."},
+        ]
+        await self.chat(
+            model=name,
+            messages=messages,
+            format=None,
+            options={"temperature": 0.0},
+            keep_alive=keep_alive,
+        )
+
+    # -------------------------------------------------------------------------
+    async def preload_models(
+        self,
+        parsing_model: str | None,
+        agent_model: str | None,
+        *,
+        keep_alive: str = "30m",
+    ) -> tuple[list[str], list[str]]:
+        requested: list[str] = []
+        for name in (parsing_model, agent_model):
+            if not name:
+                continue
+            normalized = name.strip()
+            if normalized and normalized not in requested:
+                requested.append(normalized)
+
+        if not requested:
+            return [], []
+
+        for name in requested:
+            await self.check_model_availability(name, auto_pull=True)
+
+        memory_budget = self._get_available_memory_bytes()
+        sizes: dict[str, int] = {}
+        for name in requested:
+            try:
+                details = await self.show_model(name)
+            except OllamaError:
+                sizes[name] = 0
+                continue
+            size = self._parse_size_to_bytes(details.get("size"))
+            if size == 0:
+                detail_info = details.get("details", {})
+                if isinstance(detail_info, dict):
+                    size = self._parse_size_to_bytes(detail_info.get("size"))
+                if size == 0:
+                    size = self._parse_size_to_bytes(
+                        details.get("model_info", {}).get("size")
+                        if isinstance(details.get("model_info"), dict)
+                        else None
+                    )
+            sizes[name] = size
+
+        to_load = list(requested)
+
+        if memory_budget > 0 and any(sizes.get(name, 0) > 0 for name in requested):
+            total_required = sum(sizes.get(name, 0) for name in requested)
+            if total_required > memory_budget:
+                parser_name = (parsing_model or "").strip()
+                parser_size = sizes.get(parser_name, 0)
+                if parser_name and parser_size and parser_size <= memory_budget:
+                    to_load = [parser_name]
+                elif parser_name and parser_size == 0:
+                    to_load = [parser_name]
+                else:
+                    return [], list(requested)
+
+        loaded: list[str] = []
+        for name in to_load:
+            try:
+                await self._warm_model(name, keep_alive=keep_alive)
+            except OllamaError as e:
+                raise OllamaError(f"Failed to warm model '{name}': {e}") from e
+            loaded.append(name)
+
+        skipped = [name for name in requested if name not in loaded]
+        return loaded, skipped
 
     # -------------------------------------------------------------------------
     async def check_model_availability(

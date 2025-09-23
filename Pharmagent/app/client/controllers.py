@@ -42,9 +42,14 @@ def _sanitize_field(value: str | None) -> str | None:
 
 
 # -----------------------------------------------------------------------------
-def toggle_cloud_services(enabled: bool) -> dict[str, Any]:
+def toggle_cloud_services(enabled: bool) -> tuple[dict[str, Any], dict[str, Any], dict[str, Any]]:
     ClientRuntimeConfig.set_use_cloud_services(enabled)
-    return gr_update(interactive=enabled)
+    provider_update = gr_update(
+        value=ClientRuntimeConfig.get_llm_provider(),
+        interactive=enabled,
+    )
+    button_update = gr_update(interactive=not enabled)
+    return provider_update, button_update, button_update
 
 
 # -----------------------------------------------------------------------------
@@ -91,7 +96,61 @@ async def pull_selected_models(parsing_model: str, agent_model: str) -> str:
 
 
 # -----------------------------------------------------------------------------
-def reset_agent_fields() -> tuple[
+async def start_ollama_client() -> str:
+    if ClientRuntimeConfig.is_cloud_enabled():
+        return "[INFO] Cloud provider enabled; Ollama client is disabled."
+
+    try:
+        async with OllamaClient() as client:
+            status = await client.start_server()
+    except OllamaTimeout as exc:
+        return f"[ERROR] Timed out starting Ollama server: {exc}"
+    except OllamaError as exc:
+        return f"[ERROR] Failed to start Ollama server: {exc}"
+    except Exception as exc:  # noqa: BLE001
+        return f"[ERROR] Unexpected error while starting Ollama server: {exc}"
+
+    if status == "already_running":
+        return "[INFO] Ollama server is already running."
+
+    return "[INFO] Ollama server started successfully."
+
+
+# -----------------------------------------------------------------------------
+async def preload_selected_models(parsing_model: str, agent_model: str) -> str:
+    if ClientRuntimeConfig.is_cloud_enabled():
+        return "[INFO] Cloud provider enabled; skipping Ollama preload."
+
+    parser = parsing_model.strip() if parsing_model else ""
+    agent = agent_model.strip() if agent_model else ""
+    requested = [name for name in (parser, agent) if name]
+
+    if not requested:
+        return "[ERROR] No models selected to preload."
+
+    try:
+        async with OllamaClient() as client:
+            if not await client.is_server_online():
+                return "[ERROR] Ollama server is not reachable. Start the Ollama client first."
+            loaded, skipped = await client.preload_models(parser, agent)
+    except OllamaTimeout as exc:
+        return f"[ERROR] Timed out while preloading models: {exc}"
+    except OllamaError as exc:
+        return f"[ERROR] Failed to preload models: {exc}"
+    except Exception as exc:  # noqa: BLE001
+        return f"[ERROR] Unexpected error while preloading models: {exc}"
+
+    if not loaded:
+        return "[ERROR] No models were preloaded."
+
+    message = f"[INFO] Preloaded models: {', '.join(loaded)}."
+    if skipped:
+        message += f" [WARN] Skipped due to limited memory: {', '.join(skipped)}."
+    return message
+
+
+# -----------------------------------------------------------------------------
+def clear_agent_fields() -> tuple[
     str,
     str,
     str,
@@ -102,17 +161,11 @@ def reset_agent_fields() -> tuple[
     str,
     list[str],
     bool,
-    str,
     bool,
-    dict[str, Any],
+    bool,
     str,
     str,
 ]:
-    ClientRuntimeConfig.reset_defaults()
-    provider_update = gr_update(
-        value=ClientRuntimeConfig.get_llm_provider(),
-        interactive=ClientRuntimeConfig.is_cloud_enabled(),
-    )
     return (
         "",
         "",
@@ -124,11 +177,10 @@ def reset_agent_fields() -> tuple[
         "",
         [],
         False,
+        False,
+        False,
         "",
-        ClientRuntimeConfig.is_cloud_enabled(),
-        provider_update,
-        ClientRuntimeConfig.get_parsing_model(),
-        ClientRuntimeConfig.get_agent_model(),
+        "",
     )
 
 
