@@ -118,7 +118,11 @@ class DiseasesParser:
         self.temperature = float(temperature)
         self.client = initialize_llm_client(purpose="parser", timeout_s=timeout_s)
         self.JSON_schema = {"diseases": list[str], "hepatic_diseases": list[str]}
-        self.model = ClientRuntimeConfig.get_parsing_model()
+        self.model = (
+            ClientRuntimeConfig.get_cloud_model()
+            if ClientRuntimeConfig.is_cloud_enabled()
+            else ClientRuntimeConfig.get_parsing_model()
+        )
 
     # -------------------------------------------------------------------------
     def normalize_unique(self, lst: list[str]) -> list[str]:
@@ -195,7 +199,12 @@ class BloodTestParser:
         temperature: float = 0.0,
         timeout_s: float = 300.0,
     ) -> None:
-        self.model = (model or ClientRuntimeConfig.get_parsing_model()).strip()
+        default_model = (
+            ClientRuntimeConfig.get_cloud_model()
+            if ClientRuntimeConfig.is_cloud_enabled()
+            else ClientRuntimeConfig.get_parsing_model()
+        )
+        self.model = (model or default_model).strip()
         self.temperature = float(temperature)
         self.client = initialize_llm_client(purpose="parser", timeout_s=timeout_s)
 
