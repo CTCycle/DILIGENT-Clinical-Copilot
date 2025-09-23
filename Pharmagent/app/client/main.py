@@ -11,6 +11,7 @@ from Pharmagent.app.constants import (
 from Pharmagent.app.client.controllers import (
     reset_agent_fields,
     run_agent,
+    pull_selected_models,
     set_agent_model,
     set_llm_provider,
     set_parsing_model,
@@ -132,10 +133,11 @@ def create_interface() -> gr.Blocks:
                         value=ClientRuntimeConfig.get_agent_model(),
                     )
                 with gr.Column(scale=1):
-                    placeholder_button = gr.Button(
-                        "Configure Provider",
+                    pull_models_button = gr.Button(
+                        "Pull models",
                         variant="secondary",
                     )
+                    pull_status = gr.Markdown(value="", visible=True)
 
         use_cloud_services.change(
             fn=toggle_cloud_services,
@@ -156,6 +158,12 @@ def create_interface() -> gr.Blocks:
             fn=set_agent_model,
             inputs=agent_model_dropdown,
             outputs=agent_model_dropdown,
+        )
+
+        pull_models_button.click(
+            fn=pull_selected_models,
+            inputs=[parsing_model_dropdown, agent_model_dropdown],
+            outputs=pull_status,
         )
 
         run_button.click(
