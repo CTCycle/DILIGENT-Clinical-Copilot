@@ -286,6 +286,14 @@ class PatientDrugs(BaseModel):
 
 
 ###############################################################################
+class LiverToxMatchInfo(BaseModel):
+    nbk_id: str = Field(..., min_length=1, max_length=50)
+    matched_name: str = Field(..., min_length=1, max_length=200)
+    confidence: float = Field(..., ge=0.0, le=1.0)
+    reason: str = Field(..., min_length=1, max_length=50)
+
+
+###############################################################################
 class HepatotoxicityPatternScore(BaseModel):
     alt_multiple: float | None = Field(
         None,
@@ -344,6 +352,10 @@ class DrugHepatotoxicityAnalysis(BaseModel):
     error: str | None = Field(
         None,
         description="Optional error message if the analysis could not be completed.",
+    )
+    livertox_match: LiverToxMatchInfo | None = Field(
+        None,
+        description="Metadata about the LiverTox monograph matched for this drug.",
     )
 
     @model_validator(mode="after")
