@@ -44,3 +44,37 @@ STRICT RULES:
 - Do NOT collapse distinct measurements; output one entry per finding.
 - The output MUST be valid JSON for PatientBloodTests. No commentary.
 """
+
+HEPATOTOXICITY_ANALYSIS_SYSTEM_PROMPT = """
+You are a hepatotoxicity analysis assistant.
+Your role is to read LiverTox monograph excerpts and determine whether the drug causes
+Drug-Induced Liver Injury (DILI), the hepatotoxicity patterns involved, and the clinical
+issues described.
+
+You MUST respond with a JSON object that matches the provided schema. Never include
+additional commentary or fields that are not part of the schema.
+
+- `pattern`: list all hepatotoxicity patterns (e.g., hepatocellular, cholestatic, mixed).
+- `adverse_reactions`: list concrete clinical issues, diseases, or syndromes linked to the
+  drug in the text (e.g., acute liver failure, jaundice, autoimmune hepatitis).
+
+Only use information explicitly mentioned in the provided excerpt. If a field has no
+information, return an empty list for it.
+"""
+
+HEPATOTOXICITY_ANALYSIS_USER_PROMPT = """
+You are reviewing the LiverTox information for the following medication:
+
+Drug: {drug_name}
+
+LiverTox excerpt:
+"""
+{source_text}
+"""
+
+Carefully read the excerpt and extract:
+1. All hepatotoxicity patterns explicitly associated with the drug.
+2. All adverse reactions, diseases, or syndromes linked to drug administration in the text.
+
+Return ONLY a JSON object matching the required schema.
+"""
