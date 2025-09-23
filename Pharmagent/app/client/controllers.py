@@ -11,6 +11,7 @@ from Pharmagent.app.constants import (
     AGENT_API_URL,
     API_BASE_URL,
     BATCH_AGENT_API_URL,
+    CLOUD_MODEL_CHOICES,
 )
 from Pharmagent.app.api.models.providers import (
     OllamaClient,
@@ -42,19 +43,43 @@ def _sanitize_field(value: str | None) -> str | None:
 
 
 # -----------------------------------------------------------------------------
-def toggle_cloud_services(enabled: bool) -> tuple[dict[str, Any], dict[str, Any], dict[str, Any]]:
+def toggle_cloud_services(
+    enabled: bool,
+) -> tuple[dict[str, Any], dict[str, Any], dict[str, Any], dict[str, Any]]:
     ClientRuntimeConfig.set_use_cloud_services(enabled)
-    provider_update = gr_update(
-        value=ClientRuntimeConfig.get_llm_provider(),
+    provider = ClientRuntimeConfig.get_llm_provider()
+    provider_update = gr_update(value=provider, interactive=enabled)
+    models = CLOUD_MODEL_CHOICES.get(provider, [])
+    selected_model = ClientRuntimeConfig.get_cloud_model()
+    if selected_model not in models:
+        selected_model = ClientRuntimeConfig.set_cloud_model(models[0] if models else "")
+    model_update = gr_update(
+        value=selected_model,
+        choices=models,
         interactive=enabled,
     )
     button_update = gr_update(interactive=not enabled)
-    return provider_update, button_update, button_update
+    return provider_update, model_update, button_update, button_update
 
 
 # -----------------------------------------------------------------------------
-def set_llm_provider(provider: str) -> str:
-    return ClientRuntimeConfig.set_llm_provider(provider)
+def set_llm_provider(provider: str) -> tuple[str, dict[str, Any]]:
+    selected = ClientRuntimeConfig.set_llm_provider(provider)
+    models = CLOUD_MODEL_CHOICES.get(selected, [])
+    current_model = ClientRuntimeConfig.get_cloud_model()
+    if current_model not in models:
+        current_model = ClientRuntimeConfig.set_cloud_model(models[0] if models else "")
+    model_update = gr_update(
+        value=current_model,
+        choices=models,
+        interactive=ClientRuntimeConfig.is_cloud_enabled(),
+    )
+    return selected, model_update
+
+
+# -----------------------------------------------------------------------------
+def set_cloud_model(model: str) -> str:
+    return ClientRuntimeConfig.set_cloud_model(model)
 
 
 # -----------------------------------------------------------------------------
