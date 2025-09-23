@@ -23,6 +23,8 @@ from Pharmagent.app.api.schemas.clinical import (
 )
 from Pharmagent.app.configurations import ClientRuntimeConfig
 from Pharmagent.app.logger import logger
+
+
 ###############################################################################
 @dataclass(slots=True)
 class LiverToxMatch:
