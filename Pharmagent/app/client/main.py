@@ -9,12 +9,14 @@ from Pharmagent.app.constants import (
     PARSING_MODEL_CHOICES,
 )
 from Pharmagent.app.client.controllers import (
-    reset_agent_fields,
-    run_agent,
+    clear_agent_fields,
+    preload_selected_models,
     pull_selected_models,
+    run_agent,
     set_agent_model,
     set_llm_provider,
     set_parsing_model,
+    start_ollama_client,
     toggle_cloud_services,
 )
 
@@ -99,8 +101,18 @@ def create_interface() -> gr.Blocks:
                 )
                 with gr.Column():
                     run_button = gr.Button("Run Workflow", variant="primary")
-                    rag_button = gr.Button("Load RAG documents", variant="secondary")
+                    start_ollama_button = gr.Button(
+                        "Start Ollama client",
+                        variant="secondary",
+                        interactive=not ClientRuntimeConfig.is_cloud_enabled(),
+                    )
+                    preload_button = gr.Button(
+                        "Preload models",
+                        variant="secondary",
+                        interactive=not ClientRuntimeConfig.is_cloud_enabled(),
+                    )
                     clear_button = gr.Button("Clear all")
+                    ollama_status = gr.Markdown(value="", visible=True)
                 output = gr.Textbox(
                     label="Agent Output",
                     lines=30,
@@ -142,7 +154,11 @@ def create_interface() -> gr.Blocks:
         use_cloud_services.change(
             fn=toggle_cloud_services,
             inputs=use_cloud_services,
-            outputs=llm_provider_dropdown,
+            outputs=[
+                llm_provider_dropdown,
+                start_ollama_button,
+                preload_button,
+            ],
         )
         llm_provider_dropdown.change(
             fn=set_llm_provider,
@@ -184,8 +200,17 @@ def create_interface() -> gr.Blocks:
             outputs=output,
             api_name="run_agent",
         )
+        start_ollama_button.click(
+            fn=start_ollama_client,
+            outputs=ollama_status,
+        )
+        preload_button.click(
+            fn=preload_selected_models,
+            inputs=[parsing_model_dropdown, agent_model_dropdown],
+            outputs=ollama_status,
+        )
         clear_button.click(
-            fn=reset_agent_fields,
+            fn=clear_agent_fields,
             outputs=[
                 patient_name,
                 anamnesis,
@@ -197,14 +222,12 @@ def create_interface() -> gr.Blocks:
                 alp_max,
                 symptoms,
                 process_from_files,
+                translate_to_eng,
+                has_diseases,
                 output,
-                use_cloud_services,
-                llm_provider_dropdown,
-                parsing_model_dropdown,
-                agent_model_dropdown,
+                ollama_status,
             ],
         )
-        clear_button.click(lambda: "", outputs=output)
 
     return demo
 
