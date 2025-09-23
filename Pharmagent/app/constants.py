@@ -33,9 +33,36 @@ GEMINI_API_BASE = "https://generativelanguage.googleapis.com/v1beta"
 CLOUD_PROVIDERS = ["openai", "gemini"]
 PARSING_MODEL_CHOICES = ["qwen3:14b", "phi3:mini"]
 AGENT_MODEL_CHOICES = ["gpt-oss", "llama3.1:8b"]
+OPENAI_CLOUD_MODELS = [
+    "gpt-4.1-mini",
+    "gpt-4.1",
+    "gpt-4o-mini",
+    "gpt-4o",
+    "gpt-4o-audio-preview",
+    "gpt-4o-mini-tts",
+    "gpt-4o-mini-transcribe",
+    "gpt-4o-mini-translation",
+    "gpt-4o-realtime-preview",
+    "gpt-4o-realtime-preview-2024-12-17",
+    "gpt-4o-realtime-preview-2024-04-09",
+]
+GEMINI_CLOUD_MODELS = [
+    "gemini-1.5-flash",
+    "gemini-1.5-flash-latest",
+    "gemini-1.5-flash-8b",
+    "gemini-1.5-pro",
+    "gemini-1.5-pro-latest",
+    "gemini-1.0-pro",
+    "gemini-1.0-pro-vision",
+]
+CLOUD_MODEL_CHOICES: dict[str, list[str]] = {
+    "openai": OPENAI_CLOUD_MODELS,
+    "gemini": GEMINI_CLOUD_MODELS,
+}
 DEFAULT_PARSING_MODEL = PARSING_MODEL_CHOICES[0]
 DEFAULT_AGENT_MODEL = AGENT_MODEL_CHOICES[0]
 DEFAULT_CLOUD_PROVIDER = CLOUD_PROVIDERS[0]
+DEFAULT_CLOUD_MODEL = CLOUD_MODEL_CHOICES[DEFAULT_CLOUD_PROVIDER][0]
 
 # [EXTERNAL DATA SOURCES]
 ###############################################################################
