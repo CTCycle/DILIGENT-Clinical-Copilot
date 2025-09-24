@@ -1,9 +1,10 @@
-from __future__ import annotations
-
 import asyncio
+import io
 import os
 import sys
+import tarfile
 import types
+from pathlib import Path
 
 import pytest
 
@@ -42,59 +43,6 @@ if "pydantic" not in sys.modules:
     pydantic_stub.model_validator = model_validator
     sys.modules["pydantic"] = pydantic_stub
 
-if "httpx" not in sys.modules:
-    httpx_stub = types.ModuleType("httpx")
-
-    class Timeout:  # type: ignore[override]
-        def __init__(self, *args, **kwargs):
-            self.args = args
-            self.kwargs = kwargs
-
-    class AsyncClient:  # type: ignore[override]
-        def __init__(self, *args, **kwargs):
-            self.args = args
-            self.kwargs = kwargs
-
-        async def __aenter__(self):
-            return self
-
-        async def __aexit__(self, exc_type, exc, tb):
-            return False
-
-        async def get(self, *args, **kwargs):
-            raise RuntimeError("httpx stub cannot perform network operations")
-
-        async def aclose(self):  # compatibility with real client
-            return None
-
-    class Response:  # type: ignore[override]
-        def __init__(self, status_code=200, text=""):
-            self.status_code = status_code
-            self.text = text
-
-        def raise_for_status(self):
-            return None
-
-        def json(self):
-            return {}
-
-    class RequestError(Exception):
-        pass
-
-    class HTTPStatusError(Exception):
-        pass
-
-    class TimeoutException(Exception):
-        pass
-
-    httpx_stub.AsyncClient = AsyncClient
-    httpx_stub.Timeout = Timeout
-    httpx_stub.Response = Response
-    httpx_stub.RequestError = RequestError
-    httpx_stub.HTTPStatusError = HTTPStatusError
-    httpx_stub.TimeoutException = TimeoutException
-    sys.modules["httpx"] = httpx_stub
-
 if "Pharmagent.app.api.models.providers" not in sys.modules:
     providers_stub = types.ModuleType("Pharmagent.app.api.models.providers")
 
@@ -127,12 +75,9 @@ if "Pharmagent.app.logger" not in sys.modules:
     logger_stub.logger = _StubLogger()
     sys.modules["Pharmagent.app.logger"] = logger_stub
 
-from Pharmagent.app.api.schemas.clinical import PatientDrugs
-from Pharmagent.app.utils.services.clinical import (
-    CandidateSummary,
-    DrugToxicityEssay,
-    NameCandidate,
-)
+from Pharmagent.app.api.schemas.clinical import DrugEntry, PatientDrugs
+from Pharmagent.app.utils.services.clinical import DrugToxicityEssay
+from Pharmagent.app.constants import LIVERTOX_ARCHIVE
 
 
 ###############################################################################
@@ -153,148 +98,99 @@ def _patch_llm_client(monkeypatch):
 
 
 # -----------------------------------------------------------------------------
-@pytest.fixture(autouse=True)
-def _reset_caches():
-    DrugToxicityEssay._match_cache.clear()
-    DrugToxicityEssay._rxnorm_term_cache.clear()
-    DrugToxicityEssay._rxnorm_concept_cache.clear()
-    yield
-    DrugToxicityEssay._match_cache.clear()
-    DrugToxicityEssay._rxnorm_term_cache.clear()
-    DrugToxicityEssay._rxnorm_concept_cache.clear()
+@pytest.fixture()
+def sample_archive(tmp_path: Path) -> Path:
+    archive_path = tmp_path / LIVERTOX_ARCHIVE
+    html_one = """
+<html><head><title>Acetaminophen (Tylenol)</title></head>
+<body>
+<p>Synonyms: Tylenol, Paracetamol.</p>
+<h2>Hepatotoxicity</h2>
+<p>High doses cause liver injury.</p>
+<h2>Mechanism of Injury</h2>
+<p>Metabolites form reactive intermediates.</p>
+<h2>Outcome and Management</h2>
+<p>Supportive care is recommended.</p>
+</body></html>
+"""
+    html_two = """
+<html><head><title>Amoxicillin</title></head>
+<body>
+<p>Synonyms: Amoxil.</p>
+<h2>Hepatotoxicity</h2>
+<p>Rare hypersensitivity reactions.</p>
+<h2>Mechanism</h2>
+<p>Likely immune mediated.</p>
+</body></html>
+"""
+    with tarfile.open(archive_path, "w:gz") as tar:
+        for name, html_text in {
+            "NBK100.html": html_one,
+            "NBK200.html": html_two,
+        }.items():
+            data = html_text.encode("utf-8")
+            info = tarfile.TarInfo(name=name)
+            info.size = len(data)
+            tar.addfile(info, io.BytesIO(data))
+    return archive_path
 
 
 # -----------------------------------------------------------------------------
-def test_direct_match_case_sensitive(monkeypatch):
-    essay = DrugToxicityEssay(PatientDrugs(entries=[]))
-
-    async def fake_esearch(client, term, *, title_only):
-        if title_only:
-            return ["NBK100"] if "Acetaminophen" in term else []
-        return []
-
-    async def fake_summary(client, ids):
-        return [CandidateSummary(nbk_id="NBK100", title="Acetaminophen", synonyms=set())]
-
-    monkeypatch.setattr(essay, "_query_esearch", fake_esearch)
-    monkeypatch.setattr(essay, "_fetch_candidate_summaries", fake_summary)
-
-    match = asyncio.run(essay._search_livertox_id(object(), "Acetaminophen"))
+def test_search_direct_match(sample_archive: Path):
+    essay = DrugToxicityEssay(PatientDrugs(entries=[]), archive_path=str(sample_archive))
+    match = asyncio.run(essay._search_livertox_id("Acetaminophen"))
     assert match is not None
     assert match.nbk_id == "NBK100"
     assert match.reason == "direct_match"
-    assert match.matched_name == "Acetaminophen"
-    assert match.confidence == 1.0
+    assert match.confidence == pytest.approx(1.0)
 
 
 # -----------------------------------------------------------------------------
-def test_direct_match_case_insensitive(monkeypatch):
-    essay = DrugToxicityEssay(PatientDrugs(entries=[]))
-
-    async def fake_esearch(client, term, *, title_only):
-        if title_only:
-            return ["NBK101"] if "Acetaminophen" in term else []
-        return []
-
-    async def fake_summary(client, ids):
-        return [CandidateSummary(nbk_id="NBK101", title="Acetaminophen", synonyms=set())]
-
-    monkeypatch.setattr(essay, "_query_esearch", fake_esearch)
-    monkeypatch.setattr(essay, "_fetch_candidate_summaries", fake_summary)
-
-    match = asyncio.run(essay._search_livertox_id(object(), "acetaminophen"))
+def test_search_alias_match(sample_archive: Path):
+    essay = DrugToxicityEssay(PatientDrugs(entries=[]), archive_path=str(sample_archive))
+    match = asyncio.run(essay._search_livertox_id("Tylenol"))
     assert match is not None
-    assert match.nbk_id == "NBK101"
-    assert match.reason == "direct_match"
-    assert match.matched_name == "Acetaminophen"
-    assert match.confidence == 1.0
+    assert match.nbk_id == "NBK100"
+    assert match.reason in {"alias_match", "fuzzy_match"}
+    assert match.confidence >= 0.90
 
 
 # -----------------------------------------------------------------------------
-def test_brand_name_resolves_to_active(monkeypatch):
-    essay = DrugToxicityEssay(PatientDrugs(entries=[]))
+def test_fetch_content_sections(sample_archive: Path):
+    essay = DrugToxicityEssay(PatientDrugs(entries=[]), archive_path=str(sample_archive))
+    sections = asyncio.run(essay._fetch_livertox_content("NBK100"))
+    assert sections["summary"]
+    assert "High doses" in sections["hepatotoxicity"]
+    assert "Supportive care" in sections["outcome"]
+    assert sections["title"] == "Acetaminophen (Tylenol)"
 
-    async def fake_esearch(client, term, *, title_only):
-        if title_only:
-            if "Acetaminophen" in term:
-                return ["NBK200"]
-            return []
-        return []
 
-    async def fake_summary(client, ids):
-        return [CandidateSummary(nbk_id="NBK200", title="Acetaminophen", synonyms={"Tylenol"})]
+# -----------------------------------------------------------------------------
+def test_run_analysis_reports_no_match(sample_archive: Path):
+    drugs = PatientDrugs(entries=[DrugEntry(name="ImaginaryDrug")])
+    essay = DrugToxicityEssay(drugs, archive_path=str(sample_archive))
+    result = asyncio.run(essay.run_analysis())
+    assert result.entries[0].analysis is None
+    assert "No LiverTox" in (result.entries[0].error or "")
 
-    async def fake_lookup(client, drug_name):
-        candidate = NameCandidate(origin="rxnorm_brand", name="Acetaminophen", priority=0)
-        return [candidate], {"acetaminophen"}
 
-    monkeypatch.setattr(essay, "_query_esearch", fake_esearch)
-    monkeypatch.setattr(essay, "_fetch_candidate_summaries", fake_summary)
-    monkeypatch.setattr(essay, "_lookup_rxnorm_candidates", fake_lookup)
+# -----------------------------------------------------------------------------
+def test_archive_download_trigger(sample_archive: Path, tmp_path: Path, monkeypatch):
+    target_path = tmp_path / LIVERTOX_ARCHIVE
 
-    match = asyncio.run(essay._search_livertox_id(object(), "Tylenol"))
+    async def fake_download(dest_path):
+        dest_dir = Path(dest_path)
+        dest_dir.mkdir(parents=True, exist_ok=True)
+        copied = dest_dir / LIVERTOX_ARCHIVE
+        copied.write_bytes(sample_archive.read_bytes())
+        return {"file_path": str(copied), "size": copied.stat().st_size, "last_modified": None}
+
+    monkeypatch.setattr(
+        "Pharmagent.app.utils.services.scraper.LiverToxClient.download_bulk_data",
+        fake_download,
+    )
+
+    essay = DrugToxicityEssay(PatientDrugs(entries=[]), archive_path=str(target_path))
+    match = asyncio.run(essay._search_livertox_id("Amoxicillin"))
     assert match is not None
     assert match.nbk_id == "NBK200"
-    assert match.matched_name == "Acetaminophen"
-    assert match.reason == "brand_resolved"
-    assert match.confidence >= 0.9
-
-
-# -----------------------------------------------------------------------------
-def test_fuzzy_match_with_misspelling(monkeypatch):
-    essay = DrugToxicityEssay(PatientDrugs(entries=[]))
-
-    async def fake_esearch(client, term, *, title_only):
-        if title_only:
-            return []
-        return ["NBK300", "NBK301"]
-
-    async def fake_summary(client, ids):
-        return [
-            CandidateSummary(
-                nbk_id="NBK300",
-                title="Acetaminophen",
-                synonyms={"Paracetamol"},
-            )
-        ]
-
-    async def fake_lookup(client, drug_name):
-        return [], set()
-
-    monkeypatch.setattr(essay, "_query_esearch", fake_esearch)
-    monkeypatch.setattr(essay, "_fetch_candidate_summaries", fake_summary)
-    monkeypatch.setattr(essay, "_lookup_rxnorm_candidates", fake_lookup)
-
-    match = asyncio.run(essay._search_livertox_id(object(), "Acetaminophein"))
-    assert match is not None
-    assert match.nbk_id == "NBK300"
-    assert match.matched_name == "Acetaminophen"
-    assert match.reason == "fuzzy_match"
-    assert match.confidence == 0.89
-
-
-# -----------------------------------------------------------------------------
-def test_list_first_fallback(monkeypatch):
-    essay = DrugToxicityEssay(PatientDrugs(entries=[]))
-
-    async def fake_esearch(client, term, *, title_only):
-        if title_only:
-            return []
-        return ["NBK400", "NBK401"]
-
-    async def fake_summary(client, ids):
-        return [CandidateSummary(nbk_id="NBK400", title="Unrelated", synonyms=set())]
-
-    async def fake_lookup(client, drug_name):
-        return [], set()
-
-    monkeypatch.setattr(essay, "_query_esearch", fake_esearch)
-    monkeypatch.setattr(essay, "_fetch_candidate_summaries", fake_summary)
-    monkeypatch.setattr(essay, "_lookup_rxnorm_candidates", fake_lookup)
-
-    match = asyncio.run(essay._search_livertox_id(object(), "MysteryDrug"))
-    assert match is not None
-    assert match.nbk_id == "NBK400"
-    assert match.matched_name == "Unrelated"
-    assert match.reason == "list_first"
-    assert match.confidence == 0.40
