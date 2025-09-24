@@ -109,17 +109,7 @@ def create_interface() -> gr.Blocks:
                     value=False,
                 )
                 with gr.Column():
-                    run_button = gr.Button("Run Workflow", variant="primary")
-                    start_ollama_button = gr.Button(
-                        "Start Ollama client",
-                        variant="secondary",
-                        interactive=not ClientRuntimeConfig.is_cloud_enabled(),
-                    )
-                    preload_button = gr.Button(
-                        "Preload models",
-                        variant="secondary",
-                        interactive=not ClientRuntimeConfig.is_cloud_enabled(),
-                    )
+                    run_button = gr.Button("Run Workflow", variant="primary")                    
                     get_clinical_data_button = gr.Button(
                         "Get Clinical Data",
                         variant="secondary",
@@ -161,6 +151,16 @@ def create_interface() -> gr.Blocks:
                                 pull_models_button = gr.Button(
                                     "Pull models",
                                     variant="secondary",
+                                )
+                                start_ollama_button = gr.Button(
+                                    "Start Ollama client",
+                                    variant="secondary",
+                                    interactive=not ClientRuntimeConfig.is_cloud_enabled(),
+                                )
+                                preload_button = gr.Button(
+                                    "Preload models",
+                                    variant="secondary",
+                                    interactive=not ClientRuntimeConfig.is_cloud_enabled(),
                                 )
                             pull_status = gr.Markdown(value="", visible=True)
 
