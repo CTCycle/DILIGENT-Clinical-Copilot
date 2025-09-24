@@ -1,7 +1,9 @@
 from __future__ import annotations
 
+import asyncio
 import re
 import unicodedata
+from collections.abc import Iterable
 from dataclasses import dataclass
 from difflib import SequenceMatcher
 from xml.etree import ElementTree as ET
@@ -132,6 +134,8 @@ class DrugToxicityEssay:
         )
         self.max_prompt_chars = 6000
         self.http_timeout = httpx.Timeout(30.0)
+        self.max_request_attempts = 3
+        self.retry_backoff_s = 1.0
         self._search_url = "https://eutils.ncbi.nlm.nih.gov/entrez/eutils/esearch.fcgi"
         self._summary_url = "https://eutils.ncbi.nlm.nih.gov/entrez/eutils/esummary.fcgi"
         self._fetch_url = "https://eutils.ncbi.nlm.nih.gov/entrez/eutils/efetch.fcgi"
@@ -139,6 +143,20 @@ class DrugToxicityEssay:
         self._rxnorm_approx_url = f"{self._rxnorm_base}/approximateTerm.json"
         self._rxnorm_property_url = f"{self._rxnorm_base}/rxcui"
         self._rxnorm_headers = {"User-Agent": "PharmagentClinicalCopilot/1.0"}
+        self._eutils_headers = {"User-Agent": "PharmagentClinicalCopilot/1.0"}
+        self._section_keywords = [
+            "title",
+            "summary",
+            "introduction",
+            "background",
+            "hepatotoxicity",
+            "likelihood score",
+            "mechanism",
+            "outcome",
+            "case reports",
+            "drug class",
+            "product names",
+        ]
 
     # -----------------------------------------------------------------------------
     async def run(self) -> PatientDrugToxicityBundle:
@@ -396,14 +414,15 @@ class DrugToxicityEssay:
     ) -> str | None:
         params = {"db": "books", "id": nbk_id, "retmode": "xml"}
 
-        try:
-            response = await client.get(self._fetch_url, params=params)
-            response.raise_for_status()
-        except Exception as exc:  # noqa: BLE001
-            logger.error("Failed to fetch LiverTox entry '%s': %s", nbk_id, exc)
-            return None
-
-        return response.text
+        payload = await self._get_text_with_retry(
+            client,
+            self._fetch_url,
+            params=params,
+            headers=self._eutils_headers,
+        )
+        if payload is None:
+            logger.error("Failed to fetch LiverTox entry '%s' after retries", nbk_id)
+        return payload
 
     # -----------------------------------------------------------------------------
     async def _query_esearch(
@@ -417,25 +436,33 @@ class DrugToxicityEssay:
         if not formatted:
             return []
 
-        quoted_term = f'"{formatted}"[title]' if title_only else formatted
-        query = f"LiverTox[book] AND {quoted_term}"
-        params = {
-            "db": "books",
-            "term": query,
-            "retmode": "json",
-            "retmax": "1" if title_only else "10",
-        }
+        search_terms: list[str] = []
+        if title_only:
+            search_terms.append(f'"{formatted}"[Title] AND livertox[All Fields]')
+        search_terms.append(f'"{formatted}"[All Fields] AND livertox[All Fields]')
+        search_terms.append(f"{formatted} livertox")
 
-        try:
-            response = await client.get(self._search_url, params=params)
-            response.raise_for_status()
-            payload = response.json()
-        except Exception as exc:  # noqa: BLE001
-            logger.error("Failed to query LiverTox esearch for '%s': %s", formatted, exc)
-            return []
-
-        id_list = payload.get("esearchresult", {}).get("idlist", [])
-        return [str(value) for value in id_list if value]
+        for index, query in enumerate(search_terms):
+            params = {
+                "db": "books",
+                "term": query,
+                "retmode": "json",
+                "retmax": "5" if title_only and index == 0 else "20",
+            }
+            payload = await self._get_json_with_retry(
+                client,
+                self._search_url,
+                params=params,
+                headers=self._eutils_headers,
+            )
+            if not isinstance(payload, dict):
+                continue
+            id_list = payload.get("esearchresult", {}).get("idlist", [])
+            values = [str(value) for value in id_list if value]
+            if values:
+                return values
+        logger.info("LiverTox esearch returned no identifiers for '%s'", formatted)
+        return []
 
     # -----------------------------------------------------------------------------
     async def _fetch_candidate_summaries(
@@ -447,12 +474,14 @@ class DrugToxicityEssay:
             return []
 
         params = {"db": "books", "id": ",".join(ids), "retmode": "json"}
-        try:
-            response = await client.get(self._summary_url, params=params)
-            response.raise_for_status()
-            payload = response.json()
-        except Exception as exc:  # noqa: BLE001
-            logger.error("Failed to query LiverTox esummary for '%s': %s", ids, exc)
+        payload = await self._get_json_with_retry(
+            client,
+            self._summary_url,
+            params=params,
+            headers=self._eutils_headers,
+        )
+        if not isinstance(payload, dict):
+            logger.error("Failed to query LiverTox esummary for '%s'", ids)
             return []
 
         result = payload.get("result", {})
@@ -687,17 +716,16 @@ class DrugToxicityEssay:
         *,
         params: dict[str, str] | None = None,
     ) -> dict[str, object] | None:
-        try:
-            response = await client.get(
-                url,
-                params=params,
-                headers=self._rxnorm_headers,
-            )
-            response.raise_for_status()
-            return response.json()
-        except Exception as exc:  # noqa: BLE001
-            logger.warning("RxNorm request failed for '%s': %s", url, exc)
+        payload = await self._get_json_with_retry(
+            client,
+            url,
+            params=params,
+            headers=self._rxnorm_headers,
+        )
+        if not isinstance(payload, dict):
+            logger.warning("RxNorm request failed for '%s'", url)
             return None
+        return payload
 
     # -----------------------------------------------------------------------------
     def _format_name_for_query(self, name: str) -> str:
@@ -767,31 +795,127 @@ class DrugToxicityEssay:
             return None
 
         sections: list[str] = []
-        excluded_titles = {"References"}
+        title_candidates = [
+            root.findtext(".//book-title"),
+            root.findtext(".//book-title-group/book-title"),
+            root.findtext(".//article-title"),
+        ]
+        for candidate in title_candidates:
+            cleaned = self._collapse_whitespace(candidate or "")
+            if cleaned:
+                sections.append(f"Title: {cleaned}")
+                break
+
+        abstract_paragraphs = self._gather_paragraphs(root.findall(".//abstract//p"))
+        if abstract_paragraphs:
+            sections.append(f"Summary: {' '.join(abstract_paragraphs)}")
+
+        important_sections: list[tuple[int, str]] = []
+        fallback_sections: list[str] = []
+        excluded_titles = {"references", "see also"}
 
         for sect in root.findall(".//sect1"):
-            title = (sect.findtext("title") or "").strip()
-            if title in excluded_titles:
+            title = self._collapse_whitespace(sect.findtext("title") or "")
+            normalized_title = title.lower()
+            if normalized_title in excluded_titles:
                 continue
-
-            paragraphs: list[str] = []
-            for para in sect.findall("p"):
-                text = "".join(para.itertext()).strip()
-                if text:
-                    paragraphs.append(text)
-
+            paragraphs = self._gather_paragraphs(sect.findall("p"))
             if not paragraphs:
                 continue
+            body = " ".join(paragraphs)
+            content = f"{title}: {body}" if title else body
+            priority = self._section_priority(normalized_title)
+            if priority < 1_000_000:
+                important_sections.append((priority, content))
+            elif len(fallback_sections) < 5:
+                fallback_sections.append(content)
 
-            if title:
-                sections.append(f"{title}: {' '.join(paragraphs)}")
-            else:
-                sections.append(" ".join(paragraphs))
+        important_sections.sort(key=lambda item: item[0])
+        for _, text in important_sections:
+            sections.append(text)
+        sections.extend(fallback_sections)
 
         if not sections:
             return None
 
-        return "\n\n".join(sections)
+        return "\n\n".join(dict.fromkeys(sections))
+
+    # -----------------------------------------------------------------------------
+    async def _get_json_with_retry(
+        self,
+        client: httpx.AsyncClient,
+        url: str,
+        *,
+        params: dict[str, str] | None = None,
+        headers: dict[str, str] | None = None,
+    ) -> dict[str, object] | None:
+        last_error: Exception | None = None
+        for attempt in range(1, self.max_request_attempts + 1):
+            try:
+                response = await client.get(url, params=params, headers=headers)
+                response.raise_for_status()
+                payload = response.json()
+                if isinstance(payload, dict):
+                    return payload
+                last_error = ValueError("Unexpected JSON payload type")
+            except Exception as exc:  # noqa: BLE001
+                last_error = exc
+                logger.warning(
+                    "Attempt %d failed for '%s': %s", attempt, url, exc
+                )
+            if attempt < self.max_request_attempts:
+                await asyncio.sleep(self.retry_backoff_s * attempt)
+        if last_error is not None:
+            logger.error("All attempts failed for '%s': %s", url, last_error)
+        return None
+
+    # -----------------------------------------------------------------------------
+    async def _get_text_with_retry(
+        self,
+        client: httpx.AsyncClient,
+        url: str,
+        *,
+        params: dict[str, str] | None = None,
+        headers: dict[str, str] | None = None,
+    ) -> str | None:
+        last_error: Exception | None = None
+        for attempt in range(1, self.max_request_attempts + 1):
+            try:
+                response = await client.get(url, params=params, headers=headers)
+                response.raise_for_status()
+                return response.text
+            except Exception as exc:  # noqa: BLE001
+                last_error = exc
+                logger.warning(
+                    "Attempt %d failed for '%s': %s", attempt, url, exc
+                )
+            if attempt < self.max_request_attempts:
+                await asyncio.sleep(self.retry_backoff_s * attempt)
+        if last_error is not None:
+            logger.error("All attempts failed for '%s': %s", url, last_error)
+        return None
+
+    # -----------------------------------------------------------------------------
+    def _section_priority(self, title: str) -> int:
+        for index, keyword in enumerate(self._section_keywords):
+            if keyword and keyword in title:
+                return index
+        return 1_000_000
+
+    # -----------------------------------------------------------------------------
+    def _gather_paragraphs(self, elements: Iterable[ET.Element]) -> list[str]:
+        paragraphs: list[str] = []
+        for element in elements:
+            text = "".join(element.itertext())
+            cleaned = self._collapse_whitespace(text)
+            if cleaned:
+                paragraphs.append(cleaned)
+        return paragraphs
+
+    # -----------------------------------------------------------------------------
+    @staticmethod
+    def _collapse_whitespace(text: str) -> str:
+        return re.sub(r"\s+", " ", text or "").strip()
 
     # -----------------------------------------------------------------------------
     def _prepare_prompt_text(self, text: str) -> str:
