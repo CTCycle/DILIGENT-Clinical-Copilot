@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import html
+import io
 import os
 import re
 import tarfile
@@ -9,6 +10,8 @@ from typing import Any
 
 import httpx
 import pandas as pd
+from pdfminer.high_level import extract_text as pdfminer_extract_text
+from pypdf import PdfReader
 from tqdm import tqdm
 
 from Pharmagent.app.constants import (
@@ -30,6 +33,8 @@ class LiverToxClient:
             ".htm",
             ".xhtml",
             ".xml",
+            ".nxml",
+            ".pdf",
         )
         self.image_extensions = (
             ".png",
@@ -39,6 +44,14 @@ class LiverToxClient:
             ".bmp",
             ".tiff",
         )
+        self.extension_priority = {
+            ".nxml": 0,
+            ".xml": 1,
+            ".html": 2,
+            ".htm": 2,
+            ".xhtml": 2,
+            ".pdf": 3,
+        }
 
     # -------------------------------------------------------------------------
     async def download_bulk_data(self, dest_path: str) -> dict[str, Any]:
@@ -109,35 +122,117 @@ class LiverToxClient:
             raise RuntimeError(f"Invalid LiverTox archive at {normalized_path}")
 
         collected: dict[str, dict[str, str]] = {}
+        priorities: dict[str, int] = {}
         with tarfile.open(normalized_path, "r:gz") as archive:
             for member in archive.getmembers():
-                # if not self._should_process_member(member):
-                #     continue
-                content = self._read_member_content(archive, member)
-                if not content:
+                if not self._should_process_member(member):
                     continue
-                plain_text = self._html_to_text(content)
-                nbk_id = self._extract_nbk(member.name, content)
-                record_id = nbk_id or self._derive_identifier(member.name)
-                title = self._extract_title(content, plain_text, record_id)
-                if not title:
+                payload = self._read_member_payload(archive, member)
+                if payload is None:
                     continue
-                collected[title] = {
-                    "nbk_id": record_id,                    
-                    "excerpt": plain_text,
+                plain_text, markup_text = payload
+                if not plain_text:
+                    continue
+                nbk_id = self._extract_nbk(member.name, markup_text or plain_text)
+                record_key = nbk_id or self._derive_identifier(member.name)
+                if not record_key:
+                    continue
+                priority = self.extension_priority.get(
+                    os.path.splitext(member.name.lower())[1],
+                    len(self.extension_priority) + 1,
+                )
+                existing_priority = priorities.get(record_key)
+                if existing_priority is not None and existing_priority < priority:
+                    continue
+                if existing_priority is not None and existing_priority == priority:
+                    current_excerpt = collected[record_key]["excerpt"]
+                    if len(current_excerpt) >= len(plain_text):
+                        continue
+                record_nbk = nbk_id or record_key
+                drug_name = self._extract_title(markup_text or "", plain_text, record_nbk)
+                cleaned_text = plain_text.strip()
+                if not drug_name or not cleaned_text:
+                    continue
+                record = {
+                    "nbk_id": record_nbk,
+                    "drug_name": drug_name,
+                    "excerpt": cleaned_text,
+                    "text": cleaned_text,
                 }
-        return list(collected.values())    
+                collected[record_key] = record
+                priorities[record_key] = priority
+        return list(collected.values())
 
     # -----------------------------------------------------------------------------
-    def _read_member_content(
+    def _should_process_member(self, member: tarfile.TarInfo) -> bool:
+        if not member.isfile():
+            return False
+        if member.size == 0:
+            return False
+        lower_name = member.name.lower()
+        if lower_name.endswith(self.image_extensions):
+            return False
+        _, ext = os.path.splitext(lower_name)
+        if ext not in self.supported_extensions:
+            return False
+        return True
+
+    # -----------------------------------------------------------------------------
+    def _read_member_payload(
         self, archive: tarfile.TarFile, member: tarfile.TarInfo
-    ) -> str | None:
+    ) -> tuple[str, str | None] | None:
         extracted = archive.extractfile(member)
         if extracted is None:
             return None
         data = extracted.read()
         if not data:
             return None
+        return self._convert_member_bytes(member.name, data)
+
+    # -----------------------------------------------------------------------------
+    def _convert_member_bytes(
+        self, member_name: str, data: bytes
+    ) -> tuple[str, str | None] | None:
+        lower_name = member_name.lower()
+        if lower_name.endswith(".pdf"):
+            text = self._pdf_to_text(data)
+            if text.strip():
+                return text, None
+            decoded = self._decode_markup(data)
+            return decoded, decoded
+        markup = self._decode_markup(data)
+        text = self._html_to_text(markup)
+        return text, markup
+
+    # -----------------------------------------------------------------------------
+    def _decode_markup(self, data: bytes) -> str:
+        try:
+            return data.decode("utf-8")
+        except UnicodeDecodeError:
+            return data.decode("latin-1", errors="ignore")
+
+    # -----------------------------------------------------------------------------
+    def _pdf_to_text(self, data: bytes) -> str:
+        buffer = io.BytesIO(data)
+        try:
+            buffer.seek(0)
+            text = pdfminer_extract_text(buffer)
+            if text:
+                return text
+        except Exception:
+            buffer.seek(0)
+        try:
+            buffer.seek(0)
+            reader = PdfReader(buffer)
+            collected: list[str] = []
+            for page in reader.pages:
+                page_text = page.extract_text()
+                if page_text:
+                    collected.append(page_text)
+            if collected:
+                return "\n".join(collected)
+        except Exception:
+            buffer.seek(0)
         try:
             return data.decode("utf-8")
         except UnicodeDecodeError:
@@ -164,6 +259,7 @@ class LiverToxClient:
     def _extract_title(self, html_text: str, plain_text: str, default: str) -> str:
         patterns = (
             r"<title[^>]*>(.*?)</title>",
+            r"<article-title[^>]*>(.*?)</article-title>",
             r"<h1[^>]*>(.*?)</h1>",
         )
         for pattern in patterns:

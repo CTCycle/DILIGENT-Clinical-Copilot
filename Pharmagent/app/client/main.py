@@ -109,7 +109,11 @@ def create_interface() -> gr.Blocks:
                     value=False,
                 )
                 with gr.Column():
-                    run_button = gr.Button("Run Workflow", variant="primary")                    
+                    run_button = gr.Button("Run Workflow", variant="primary")
+                    skip_download_checkbox = gr.Checkbox(
+                        label="Skip clinical data download",
+                        value=False,
+                    )
                     get_clinical_data_button = gr.Button(
                         "Get Clinical Data",
                         variant="secondary",
@@ -237,6 +241,7 @@ def create_interface() -> gr.Blocks:
         )
         get_clinical_data_button.click(
             fn=fetch_clinical_data,
+            inputs=skip_download_checkbox,
             outputs=ollama_status,
         )
         clear_button.click(
@@ -253,6 +258,7 @@ def create_interface() -> gr.Blocks:
                 symptoms,
                 process_from_files,
                 translate_to_eng,
+                skip_download_checkbox,
                 has_diseases,
                 output,
                 ollama_status,
