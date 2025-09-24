@@ -11,6 +11,7 @@ from Pharmagent.app.constants import (
 )
 from Pharmagent.app.client.controllers import (
     clear_agent_fields,
+    fetch_clinical_data,
     preload_selected_models,
     pull_selected_models,
     run_agent,
@@ -118,6 +119,10 @@ def create_interface() -> gr.Blocks:
                         "Preload models",
                         variant="secondary",
                         interactive=not ClientRuntimeConfig.is_cloud_enabled(),
+                    )
+                    get_clinical_data_button = gr.Button(
+                        "Get Clinical Data",
+                        variant="secondary",
                     )
                     clear_button = gr.Button("Clear all")
                     ollama_status = gr.Markdown(value="", visible=True)
@@ -228,6 +233,10 @@ def create_interface() -> gr.Blocks:
         preload_button.click(
             fn=preload_selected_models,
             inputs=[parsing_model_dropdown, agent_model_dropdown],
+            outputs=ollama_status,
+        )
+        get_clinical_data_button.click(
+            fn=fetch_clinical_data,
             outputs=ollama_status,
         )
         clear_button.click(
