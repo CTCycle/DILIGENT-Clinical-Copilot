@@ -6,6 +6,9 @@ from typing import Any
 from Pharmagent.app.utils.database.sqlite import database
 
 
+LIVERTOX_UPSERT_BATCH_SIZE = 500
+
+
 # [DATA SERIALIZATION]
 ###############################################################################
 class DataSerializer:
@@ -20,6 +23,7 @@ class DataSerializer:
     # -----------------------------------------------------------------------------
     def save_livertox_records(self, records: list[dict[str, Any]]) -> None:
         prepared: list[dict[str, Any]] = []
+        batch_size = max(1, LIVERTOX_UPSERT_BATCH_SIZE)
         for record in records:
             nbk_id = record.get("nbk_id")
             drug_name = record.get("drug_name")
@@ -33,6 +37,13 @@ class DataSerializer:
                     "excerpt": str(excerpt) if excerpt is not None else None,
                 }
             )
-            
-        data = pd.DataFrame(prepared)
-        database.upsert_into_database(data, "LIVERTOX_MONOGRAPHS")
+            if len(prepared) >= batch_size:
+                data = pd.DataFrame(prepared)
+                if not data.empty:
+                    database.upsert_into_database(data, "LIVERTOX_MONOGRAPHS")
+                prepared.clear()
+
+        if prepared:
+            data = pd.DataFrame(prepared)
+            if not data.empty:
+                database.upsert_into_database(data, "LIVERTOX_MONOGRAPHS")
