@@ -501,10 +501,23 @@ class DrugToxicityEssay:
     async def _resolve_candidate_names(
         self, client: httpx.AsyncClient, drug_name: str
     ) -> tuple[list[tuple[str, str]], set[str]]:
-        candidates, ingredient_hints = await self._lookup_rxnorm_candidates(
+        normalized = self._normalize_for_lookup(drug_name)
+        candidates: dict[str, NameCandidate] = {}
+        ingredient_hints: set[str] = set()
+
+        rxnorm_candidates, rxnorm_hints = await self._lookup_rxnorm_candidates(
             client, drug_name
         )
-        ordered = sorted(candidates, key=lambda item: item.priority)
+        for candidate in rxnorm_candidates:
+            normalized_candidate = self._normalize_for_lookup(candidate.name)
+            if not normalized_candidate:
+                continue
+            existing = candidates.get(normalized_candidate)
+            if existing is None or candidate.priority < existing.priority:
+                candidates[normalized_candidate] = candidate
+        ingredient_hints.update(rxnorm_hints)
+
+        ordered = sorted(candidates.values(), key=lambda item: item.priority)
         return [(item.origin, item.name) for item in ordered], ingredient_hints
 
     # -----------------------------------------------------------------------------
