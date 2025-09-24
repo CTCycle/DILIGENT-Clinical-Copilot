@@ -2,8 +2,8 @@ from __future__ import annotations
 
 from fastapi import APIRouter, HTTPException, Query
 
-from Pharmagent.app.constants import LIVERTOX_TABLE_NAME, SOURCES_PATH
-from Pharmagent.app.utils.database.sqlite import database
+from Pharmagent.app.constants import SOURCES_PATH
+from Pharmagent.app.utils.database.sqlite import Any, database
 from Pharmagent.app.utils.services.scraper import LiverToxClient
 from Pharmagent.app.utils.serializer import DataSerializer
 
@@ -24,7 +24,7 @@ async def fetch_bulk_livertox(
         False,
         description="Extract data from the downloaded file and save it into database",
     ),
-):
+) -> dict[str, Any]:
     try:
         download_info = await LT_client.download_bulk_data(SOURCES_PATH)
     except Exception as exc:
@@ -47,7 +47,7 @@ async def fetch_bulk_livertox(
         raise HTTPException(status_code=500, detail=f"Failed to persist data: {exc}")
 
     try:
-        stored_count = database.count_rows(LIVERTOX_TABLE_NAME)
+        stored_count = database.count_rows("LIVERTOX_MONOGRAPHS")
     except Exception as exc:
         raise HTTPException(status_code=500, detail=f"Failed to verify import: {exc}")
 
