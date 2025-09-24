@@ -1,13 +1,13 @@
 from __future__ import annotations
 
 import html
+import os
 import re
 import tarfile
 import unicodedata
 from collections.abc import Iterable
 from dataclasses import dataclass
 from difflib import SequenceMatcher
-from pathlib import Path
 from Pharmagent.app.api.models.prompts import (
     HEPATOTOXICITY_ANALYSIS_SYSTEM_PROMPT,
     HEPATOTOXICITY_ANALYSIS_USER_PROMPT,
@@ -130,15 +130,12 @@ class DrugToxicityEssay:
     def __init__(
         self,
         drugs: PatientDrugs,
-        *,
-        archive_path: str | None = None,
+        *,        
         ensure_download: bool = True,
         timeout_s: float = 300.0,
     ) -> None:
         self.drugs = drugs
-        self._archive_path = (
-            Path(archive_path) if archive_path is not None else Path(SOURCES_PATH) / LIVERTOX_ARCHIVE
-        )
+        self._archive_path = os.path.join(SOURCES_PATH, LIVERTOX_ARCHIVE)      
         self._auto_download = ensure_download
         self._llm_client = initialize_llm_client(purpose="agent", timeout_s=timeout_s)
         self._match_cache: dict[str, LiverToxMatch] = {}
@@ -273,12 +270,15 @@ class DrugToxicityEssay:
         if self._archive_ready:
             return
         archive_path = self._archive_path
-        archive_path.parent.mkdir(parents=True, exist_ok=True)
-        if not archive_path.exists():
+        archive_dir = os.path.dirname(archive_path) or os.curdir
+        os.makedirs(archive_dir, exist_ok=True)
+        if not os.path.isfile(archive_path):
             if not self._auto_download:
                 raise FileNotFoundError(f"LiverTox archive missing at {archive_path}")
             client = LiverToxClient()
-            await client.download_bulk_data(archive_path.parent)
+            await client.download_bulk_data(archive_dir)
+        if not tarfile.is_tarfile(archive_path):
+            raise RuntimeError(f"Invalid LiverTox archive at {archive_path}")
         self._archive_ready = True
 
     # -----------------------------------------------------------------------------
@@ -388,15 +388,7 @@ class DrugToxicityEssay:
         if entry is None:
             raise KeyError(f"No entry for NBK id {nbk_id}")
 
-        with tarfile.open(self._archive_path, "r:gz") as tar:
-            try:
-                member = tar.getmember(entry.member_name)
-            except KeyError as exc:
-                raise KeyError(f"Archive member for {nbk_id} not found") from exc
-            fileobj = tar.extractfile(member)
-            if fileobj is None:
-                raise ValueError(f"Unable to read archive member {entry.member_name}")
-            raw = fileobj.read()
+        raw = self._read_archive_member(entry.member_name)
 
         try:
             html_text = raw.decode("utf-8")
@@ -463,9 +455,13 @@ class DrugToxicityEssay:
         return None
 
     # -----------------------------------------------------------------------------
-    def _build_index(self, archive_path: Path) -> list[ArchiveEntry]:
+    def _build_index(self, archive_path: str) -> list[ArchiveEntry]:
         entries: list[ArchiveEntry] = []
-        with tarfile.open(archive_path, "r:gz") as tar:
+        try:
+            tar = tarfile.open(archive_path, "r:gz")
+        except tarfile.ReadError as exc:
+            raise RuntimeError(f"Failed to open LiverTox archive {archive_path}") from exc
+        with tar:
             for member in tar.getmembers():
                 if not member.isfile():
                     continue
@@ -516,6 +512,21 @@ class DrugToxicityEssay:
         if not entries:
             logger.warning("No LiverTox entries found in archive %s", archive_path)
         return entries
+
+    # -----------------------------------------------------------------------------
+    def _read_archive_member(self, member_name: str) -> bytes:
+        try:
+            with tarfile.open(self._archive_path, "r:gz") as tar:
+                try:
+                    member = tar.getmember(member_name)
+                except KeyError as exc:
+                    raise KeyError(f"Archive member for {member_name} not found") from exc
+                fileobj = tar.extractfile(member)
+                if fileobj is None:
+                    raise ValueError(f"Unable to read archive member {member_name}")
+                return fileobj.read()
+        except tarfile.ReadError as exc:
+            raise RuntimeError(f"Failed to read LiverTox archive {self._archive_path}") from exc
 
     # -----------------------------------------------------------------------------
     def _extract_nbk(self, member_name: str, html_text: str) -> str | None:
