@@ -1,8 +1,11 @@
 from __future__ import annotations
 
+import os
+from datetime import UTC, datetime
+
 from fastapi import APIRouter, HTTPException, Query
 
-from Pharmagent.app.constants import SOURCES_PATH
+from Pharmagent.app.constants import LIVERTOX_ARCHIVE, SOURCES_PATH
 from Pharmagent.app.utils.database.sqlite import Any, database
 from Pharmagent.app.utils.services.scraper import LiverToxClient
 from Pharmagent.app.utils.serializer import DataSerializer
@@ -24,15 +27,41 @@ async def fetch_bulk_livertox(
         False,
         description="Extract data from the downloaded file and save it into database",
     ),
+    skip_download: bool = Query(
+        False,
+        description="Skip downloading the LiverTox archive if a local copy is available",
+    ),
 ) -> dict[str, Any]:
-    try:
-        download_info = await LT_client.download_bulk_data(SOURCES_PATH)
-    except Exception as exc:
-        raise HTTPException(status_code=502, detail=f"Bulk download failed: {exc}")
+    if skip_download:
+        archive_path = os.path.join(SOURCES_PATH, LIVERTOX_ARCHIVE)
+        normalized_path = os.path.abspath(archive_path)
+        if not os.path.isfile(normalized_path):
+            raise HTTPException(
+                status_code=404,
+                detail="LiverTox archive not found; download is required before processing.",
+            )
+        file_size = os.path.getsize(normalized_path)
+        modified = datetime.fromtimestamp(os.path.getmtime(normalized_path), UTC).isoformat()
+        download_info = {
+            "file_path": normalized_path,
+            "size": file_size,
+            "last_modified": modified,
+        }
+    else:
+        try:
+            download_info = await LT_client.download_bulk_data(SOURCES_PATH)
+        except Exception as exc:
+            raise HTTPException(status_code=502, detail=f"Bulk download failed: {exc}")
 
-    archive_path = download_info.get("file_path")
+        archive_path = download_info.get("file_path")
+
+    if not isinstance(archive_path, str) or not archive_path:
+        raise HTTPException(status_code=500, detail="LiverTox archive path missing.")
+
+    normalized_archive_path = os.path.abspath(archive_path)
+    download_info["file_path"] = normalized_archive_path
     try:
-        entries = LT_client.collect_monographs(archive_path)
+        entries = LT_client.collect_monographs(normalized_archive_path)
     except Exception as exc:
         raise HTTPException(status_code=500, detail=f"Failed to process archive: {exc}")
 

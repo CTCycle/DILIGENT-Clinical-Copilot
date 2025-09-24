@@ -12,6 +12,8 @@ dependencies = [
     "scikit-learn==1.7.1",    
     "matplotlib==3.10.1",
     "numpy==2.3.2",
+    "pdfminer.six==20240706",
+    "pypdf==5.1.0",
     "pandas==2.2.3",
     "tqdm==4.67.1",
     "SQLAlchemy==2.0.41",     
