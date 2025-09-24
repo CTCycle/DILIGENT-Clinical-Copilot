@@ -75,6 +75,7 @@ class ArchiveEntry:
 
 ###############################################################################
 class HepatotoxicityPatternAnalyzer:
+    
     # -----------------------------------------------------------------------------
     def analyze(self, payload: PatientData) -> HepatotoxicityPatternScore:
         alt_value = self._parse_marker_value(payload.alt)

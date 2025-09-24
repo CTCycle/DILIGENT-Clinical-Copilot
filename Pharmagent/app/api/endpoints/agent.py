@@ -66,8 +66,11 @@ async def process_single_patient(payload: PatientData, translate_to_eng: bool = 
         pattern_score.r_score if pattern_score.r_score is not None else float("nan"),
     )
 
+    start_time = time.perf_counter()
     toxicity_runner = DrugToxicityEssay(drug_data)
     drug_assessment = await toxicity_runner.run_analysis()
+    elapsed = time.perf_counter() - start_time
+    logger.info("Drugs toxicity essay required %.4f seconds", elapsed)
 
     start_time = time.perf_counter()
     diseases = await diseases_parser.extract_diseases(updated_payload.anamnesis or "")
