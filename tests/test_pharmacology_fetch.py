@@ -219,8 +219,11 @@ if "tqdm" not in sys.modules:
 from fastapi import HTTPException
 
 from Pharmagent.app.constants import LIVERTOX_ARCHIVE
-from Pharmagent.app.utils.jobs import JobManager, JobStatus
-from Pharmagent.app.client.livertox_jobs import _await_livertox_job
+from Pharmagent.app.utils.jobs import (
+    JobManager,
+    JobStatus,
+    _await_livertox_job,
+)
 
 
 ###############################################################################

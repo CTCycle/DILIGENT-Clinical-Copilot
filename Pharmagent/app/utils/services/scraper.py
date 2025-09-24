@@ -10,9 +10,17 @@ from typing import Any
 
 import httpx
 import pandas as pd
-from pdfminer.high_level import extract_text as pdfminer_extract_text
-from pypdf import PdfReader
 from tqdm import tqdm
+
+try:
+    from pdfminer.high_level import extract_text as pdfminer_extract_text
+except ModuleNotFoundError:
+    pdfminer_extract_text = None
+
+try:
+    from pypdf import PdfReader
+except ModuleNotFoundError:
+    PdfReader = None
 
 from Pharmagent.app.constants import (
     SOURCES_PATH,
@@ -215,25 +223,27 @@ class LiverToxClient:
     # -----------------------------------------------------------------------------
     def _pdf_to_text(self, data: bytes) -> str:
         buffer = io.BytesIO(data)
-        try:
-            buffer.seek(0)
-            text = pdfminer_extract_text(buffer)
-            if text:
-                return text
-        except Exception:
-            buffer.seek(0)
-        try:
-            buffer.seek(0)
-            reader = PdfReader(buffer)
-            collected: list[str] = []
-            for page in reader.pages:
-                page_text = page.extract_text()
-                if page_text:
-                    collected.append(page_text)
-            if collected:
-                return "\n".join(collected)
-        except Exception:
-            buffer.seek(0)
+        if pdfminer_extract_text is not None:
+            try:
+                buffer.seek(0)
+                text = pdfminer_extract_text(buffer)
+                if text:
+                    return text
+            except Exception:
+                buffer.seek(0)
+        if PdfReader is not None:
+            try:
+                buffer.seek(0)
+                reader = PdfReader(buffer)
+                collected: list[str] = []
+                for page in reader.pages:
+                    page_text = page.extract_text()
+                    if page_text:
+                        collected.append(page_text)
+                if collected:
+                    return "\n".join(collected)
+            except Exception:
+                buffer.seek(0)
         try:
             return data.decode("utf-8")
         except UnicodeDecodeError:
