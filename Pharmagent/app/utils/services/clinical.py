@@ -1,6 +1,8 @@
 from __future__ import annotations
 
 import html
+import importlib
+import io
 import os
 import re
 import tarfile
@@ -27,6 +29,25 @@ from Pharmagent.app.constants import LIVERTOX_ARCHIVE, SOURCES_PATH
 from Pharmagent.app.configurations import ClientRuntimeConfig
 from Pharmagent.app.logger import logger
 from Pharmagent.app.utils.services.scraper import LiverToxClient
+
+_pdfminer_extract_text = None
+_pdfminer_package_spec = importlib.util.find_spec("pdfminer")
+if _pdfminer_package_spec is not None:
+    _pdfminer_spec = importlib.util.find_spec("pdfminer.high_level")
+    if _pdfminer_spec is not None:
+        _pdfminer_module = importlib.import_module("pdfminer.high_level")
+        _pdfminer_extract_text = getattr(_pdfminer_module, "extract_text", None)
+
+_pdf_reader_cls = None
+_pypdf_spec = importlib.util.find_spec("pypdf")
+if _pypdf_spec is not None:
+    _pypdf_module = importlib.import_module("pypdf")
+    _pdf_reader_cls = getattr(_pypdf_module, "PdfReader", None)
+else:
+    _pypdf2_spec = importlib.util.find_spec("PyPDF2")
+    if _pypdf2_spec is not None:
+        _pypdf2_module = importlib.import_module("PyPDF2")
+        _pdf_reader_cls = getattr(_pypdf2_module, "PdfReader", None)
 
 
 ###############################################################################
@@ -111,6 +132,22 @@ class DrugToxicityEssay:
     _DIRECT_CONFIDENCE = 1.0
     _ALIAS_CONFIDENCE = 0.95
     _MIN_CONFIDENCE = 0.40
+    _SUPPORTED_EXTENSIONS: tuple[str, ...] = (
+        ".html",
+        ".htm",
+        ".xml",
+        ".xhtml",
+        ".nxml",
+        ".pdf",
+    )
+    _IMAGE_EXTENSIONS: tuple[str, ...] = (
+        ".png",
+        ".jpg",
+        ".jpeg",
+        ".gif",
+        ".tiff",
+        ".bmp",
+    )
     _SECTION_ALIASES: dict[str, set[str]] = {
         "summary": {"summary", "introduction", "overview"},
         "hepatotoxicity": {"hepatotoxicity", "liver injury"},
@@ -395,12 +432,7 @@ class DrugToxicityEssay:
         if entry is None:
             raise KeyError(f"No entry for NBK id {nbk_id}")
 
-        raw = self._read_archive_member(entry.member_name)
-
-        try:
-            html_text = raw.decode("utf-8")
-        except UnicodeDecodeError:
-            html_text = raw.decode("latin-1", errors="ignore")
+        html_text = self._read_archive_member(entry.member_name)
 
         sections = self._extract_sections(html_text)
         sections.setdefault("title", entry.title)
@@ -473,21 +505,18 @@ class DrugToxicityEssay:
                 if not member.isfile():
                     continue
                 name_lower = member.name.lower()
-                if not name_lower.endswith((".html", ".htm", ".xml", ".xhtml")):
+                if any(name_lower.endswith(ext) for ext in self._IMAGE_EXTENSIONS):
                     continue
-                fileobj = tar.extractfile(member)
-                if fileobj is None:
+                if not any(name_lower.endswith(ext) for ext in self._SUPPORTED_EXTENSIONS):
                     continue
-                raw = fileobj.read()
-                try:
-                    html_text = raw.decode("utf-8")
-                except UnicodeDecodeError:
-                    html_text = raw.decode("latin-1", errors="ignore")
-                plain_text = self._html_to_text(html_text)
-                nbk_id = self._extract_nbk(member.name, html_text)
+                document_text = self._read_text_from_tar_member(tar, member)
+                if document_text is None:
+                    continue
+                plain_text = self._html_to_text(document_text)
+                nbk_id = self._extract_nbk(member.name, document_text)
                 if nbk_id is None:
                     continue
-                title = self._extract_title(html_text, plain_text, nbk_id)
+                title = self._extract_title(document_text, plain_text, nbk_id)
                 aliases = self._extract_aliases(title, plain_text)
                 normalized_title = self._normalize_name(title)
                 primary_normalized = self._normalize_name(title.split("(")[0])
@@ -521,7 +550,7 @@ class DrugToxicityEssay:
         return entries
 
     # -----------------------------------------------------------------------------
-    def _read_archive_member(self, member_name: str) -> bytes:
+    def _read_archive_member(self, member_name: str) -> str:
         try:
             with tarfile.open(self._archive_path, "r:gz") as tar:
                 try:
@@ -531,9 +560,67 @@ class DrugToxicityEssay:
                 fileobj = tar.extractfile(member)
                 if fileobj is None:
                     raise ValueError(f"Unable to read archive member {member_name}")
-                return fileobj.read()
+                raw = fileobj.read()
+                return self._convert_member_bytes(member.name, raw)
         except tarfile.ReadError as exc:
             raise RuntimeError(f"Failed to read LiverTox archive {self._archive_path}") from exc
+
+    # -----------------------------------------------------------------------------
+    def _read_text_from_tar_member(
+        self, tar: tarfile.TarFile, member: tarfile.TarInfo
+    ) -> str | None:
+        fileobj = tar.extractfile(member)
+        if fileobj is None:
+            return None
+        raw = fileobj.read()
+        return self._convert_member_bytes(member.name, raw)
+
+    # -----------------------------------------------------------------------------
+    def _convert_member_bytes(self, member_name: str, data: bytes) -> str:
+        lower_name = member_name.lower()
+        if lower_name.endswith(".pdf"):
+            return self._pdf_to_text(data)
+        return self._decode_markup(data)
+
+    # -----------------------------------------------------------------------------
+    def _decode_markup(self, data: bytes) -> str:
+        try:
+            return data.decode("utf-8")
+        except UnicodeDecodeError:
+            return data.decode("latin-1", errors="ignore")
+
+    # -----------------------------------------------------------------------------
+    def _pdf_to_text(self, data: bytes) -> str:
+        buffer = io.BytesIO(data)
+        if _pdfminer_extract_text is not None:
+            try:
+                buffer.seek(0)
+                text = _pdfminer_extract_text(buffer)
+                if text:
+                    return text
+            except Exception:
+                buffer.seek(0)
+        if _pdf_reader_cls is not None:
+            try:
+                buffer.seek(0)
+                reader = _pdf_reader_cls(buffer)
+                pages = getattr(reader, "pages", [])
+                collected: list[str] = []
+                for page in pages:
+                    extractor = getattr(page, "extract_text", None)
+                    if extractor is None:
+                        continue
+                    page_text = extractor()
+                    if page_text:
+                        collected.append(page_text)
+                if collected:
+                    return "\n".join(collected)
+            except Exception:
+                buffer.seek(0)
+        try:
+            return data.decode("utf-8")
+        except UnicodeDecodeError:
+            return data.decode("latin-1", errors="ignore")
 
     # -----------------------------------------------------------------------------
     def _extract_nbk(self, member_name: str, html_text: str) -> str | None:
