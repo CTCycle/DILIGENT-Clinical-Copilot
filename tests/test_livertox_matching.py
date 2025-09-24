@@ -43,6 +43,94 @@ if "pydantic" not in sys.modules:
     pydantic_stub.model_validator = model_validator
     sys.modules["pydantic"] = pydantic_stub
 
+if "httpx" not in sys.modules:
+    httpx_stub = types.ModuleType("httpx")
+
+    class _StubResponse:
+        def __init__(self) -> None:
+            self.headers: dict[str, str] = {}
+
+        def raise_for_status(self) -> None:
+            return None
+
+        def json(self) -> dict[str, str]:
+            return {}
+
+        @property
+        def text(self) -> str:
+            return ""
+
+    class _StubStream:
+        async def __aenter__(self) -> "_StubStream":
+            return self
+
+        async def __aexit__(self, exc_type, exc, tb) -> None:
+            return None
+
+        def raise_for_status(self) -> None:
+            return None
+
+        async def aiter_bytes(self, chunk_size: int = 8192):
+            if False:
+                yield b""
+            return
+
+        async def aiter_lines(self):
+            if False:
+                yield ""
+            return
+
+    class _StubAsyncClient:
+        def __init__(self, *args, **kwargs) -> None:
+            return None
+
+        async def __aenter__(self) -> "_StubAsyncClient":
+            return self
+
+        async def __aexit__(self, exc_type, exc, tb) -> None:
+            return None
+
+        async def head(self, *args, **kwargs) -> _StubResponse:
+            return _StubResponse()
+
+        async def get(self, *args, **kwargs) -> _StubResponse:
+            return _StubResponse()
+
+        async def post(self, *args, **kwargs) -> _StubResponse:
+            return _StubResponse()
+
+        def stream(self, *args, **kwargs) -> _StubStream:
+            return _StubStream()
+
+        async def aclose(self) -> None:
+            return None
+
+    class _StubLimits:
+        def __init__(self, *args, **kwargs) -> None:
+            return None
+
+    class _StubTimeout:
+        def __init__(self, *args, **kwargs) -> None:
+            return None
+
+    class TimeoutException(Exception):
+        pass
+
+    class HTTPStatusError(Exception):
+        pass
+
+    class RequestError(Exception):
+        pass
+
+    httpx_stub.AsyncClient = _StubAsyncClient
+    httpx_stub.Limits = _StubLimits
+    httpx_stub.Timeout = _StubTimeout
+    httpx_stub.TimeoutException = TimeoutException
+    httpx_stub.HTTPStatusError = HTTPStatusError
+    httpx_stub.RequestError = RequestError
+
+    sys.modules["httpx"] = httpx_stub
+
 if "Pharmagent.app.api.models.providers" not in sys.modules:
     providers_stub = types.ModuleType("Pharmagent.app.api.models.providers")
 
