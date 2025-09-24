@@ -19,8 +19,18 @@ class DataSerializer:
 
     # -----------------------------------------------------------------------------
     def save_livertox_records(self, records: list[dict[str, Any]]) -> None:
-        if not records:            
-            return
-        columns = ["nbk_id", "drug_name", "excerpt"]
-        data = pd.DataFrame(records)        
-        database.save_into_database(data[columns], "LIVERTOX_MONOGRAPHS")
+        prepared: list[dict[str, Any]] = []
+        for record in records:
+            nbk_id = record.get("nbk_id")
+            drug_name = record.get("drug_name")
+            if nbk_id is None or drug_name is None:
+                continue
+            excerpt = record.get("excerpt")
+            prepared.append(
+                {
+                    "nbk_id": str(nbk_id),
+                    "drug_name": str(drug_name),
+                    "excerpt": str(excerpt) if excerpt is not None else None,
+                }
+            )
+        database.replace_rows("LIVERTOX_MONOGRAPHS", prepared)
