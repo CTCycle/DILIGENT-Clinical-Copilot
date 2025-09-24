@@ -33,13 +33,9 @@ async def _await_livertox_job(
     client: httpx.AsyncClient,
     initial_status: dict[str, Any],
     *,
-    poll_interval: float = 2.0,
+    poll_interval: float = 60.0,
     timeout: float | None = None,
 ) -> tuple[dict[str, Any], list[str]] | str:
-    job_id = initial_status.get("job_id")
-    if not isinstance(job_id, str) or not job_id:
-        return "[ERROR] Backend response did not include a job ID."
-
     progress_log: list[str] = []
     status = initial_status.get("status")
     detail = initial_status.get("detail")
@@ -47,6 +43,7 @@ async def _await_livertox_job(
 
     normalized_status = status.lower() if isinstance(status, str) else ""
     result = initial_status.get("result")
+    job_id = initial_status.get("job_id")
     if normalized_status == "failed":
         failure = detail if isinstance(detail, str) and detail else "Backend reported job failure."
         status_code = initial_status.get("status_code")
@@ -57,6 +54,14 @@ async def _await_livertox_job(
         if isinstance(result, dict):
             return result, progress_log
         return "[ERROR] Backend did not provide job result on completion." + _format_progress_log(progress_log)
+
+    if not isinstance(job_id, str) or not job_id:
+        if isinstance(result, dict):
+            return result, progress_log
+        expected_keys = ("file_path", "records", "processed_entries")
+        if any(key in initial_status for key in expected_keys):
+            return initial_status, progress_log
+        return "[ERROR] Backend response did not include a job ID." + _format_progress_log(progress_log)
 
     status_url = f"{API_BASE_URL}{PHARMACOLOGY_LIVERTOX_STATUS_ENDPOINT}/{job_id}"
     loop = asyncio.get_running_loop()
