@@ -211,6 +211,8 @@ async def fetch_clinical_data() -> str:
     file_path = payload.get("file_path")
     reported_size = payload.get("size")
     last_modified = payload.get("last_modified")
+    processed_entries = payload.get("processed_entries")
+    stored_records = payload.get("records")
 
     if not isinstance(file_path, str) or not file_path:
         return "[ERROR] Backend response did not include a valid file path."
@@ -246,13 +248,22 @@ async def fetch_clinical_data() -> str:
     except (tarfile.TarError, OSError) as exc:
         return f"[ERROR] Downloaded file appears corrupted: {exc}"
 
+    if not isinstance(stored_records, int) or stored_records <= 0:
+        return "[ERROR] Backend did not report stored LiverTox records."
+
     message = (
-        "[INFO] Clinical data downloaded successfully."       
+        "[INFO] Clinical data downloaded successfully."
         f"\nSize: {actual_size} bytes"
     )
 
     if isinstance(last_modified, str) and last_modified:
         message += f"\nLast-Modified: {last_modified}"
+
+    if isinstance(processed_entries, int) and processed_entries >= 0:
+        message += f"\nProcessed monographs: {processed_entries}"
+
+    if isinstance(stored_records, int) and stored_records >= 0:
+        message += f"\nStored monographs: {stored_records}"
 
     return message
 
