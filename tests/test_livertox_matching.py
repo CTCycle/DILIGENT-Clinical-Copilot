@@ -165,6 +165,7 @@ if "Pharmagent.app.logger" not in sys.modules:
 
 from Pharmagent.app.api.schemas.clinical import DrugEntry, PatientDrugs
 from Pharmagent.app.utils.services.clinical import DrugToxicityEssay
+from Pharmagent.app.utils.services.scraper import LiverToxClient
 from Pharmagent.app.constants import LIVERTOX_ARCHIVE
 
 
@@ -221,6 +222,19 @@ def sample_archive(tmp_path: Path) -> Path:
             info.size = len(data)
             tar.addfile(info, io.BytesIO(data))
     return archive_path
+
+
+# -----------------------------------------------------------------------------
+def test_collect_monographs_from_archive(sample_archive: Path):
+    client = LiverToxClient()
+    entries = client.collect_monographs(str(sample_archive))
+    assert len(entries) == 2
+    nbk_ids = {entry["nbk_id"] for entry in entries}
+    assert nbk_ids == {"NBK100", "NBK200"}
+    names = {entry["drug_name"] for entry in entries}
+    assert "Acetaminophen (Tylenol)" in names
+    assert "Amoxicillin" in names
+    assert all(entry.get("excerpt") for entry in entries)
 
 
 # -----------------------------------------------------------------------------
