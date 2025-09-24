@@ -20,6 +20,7 @@ API_BASE_URL = "http://127.0.0.1:8000"
 AGENT_API_URL = "/agent"
 BATCH_AGENT_API_URL = "/batch-agent"
 PHARMACOLOGY_LIVERTOX_FETCH_ENDPOINT = "/pharmacology/livertox/fetch"
+PHARMACOLOGY_LIVERTOX_STATUS_ENDPOINT = "/pharmacology/livertox/status"
 
 # [LLM / PROVIDERS]
 ###############################################################################
