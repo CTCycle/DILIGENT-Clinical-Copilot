@@ -78,13 +78,13 @@ class OllamaClient:
             max_connections=keepalive_max,
         )
         timeout = httpx.Timeout(timeout_s)
-        self._client = httpx.AsyncClient(
+        self.client = httpx.AsyncClient(
             base_url=self.base_url, timeout=timeout, limits=limits
         )
 
     # -------------------------------------------------------------------------
     async def close(self) -> None:
-        await self._client.aclose()
+        await self.client.aclose()
 
     # -------------------------------------------------------------------------
     async def __aenter__(self) -> OllamaClient:
@@ -119,7 +119,7 @@ class OllamaClient:
     # -------------------------------------------------------------------------
     async def list_models(self) -> list[str]:
         try:
-            resp = await self._client.get("/api/tags")
+            resp = await self.client.get("/api/tags")
         except httpx.TimeoutException as e:
             raise OllamaTimeout("Timed out listing Ollama models") from e
         self._raise_for_status(resp)
@@ -143,7 +143,7 @@ class OllamaClient:
         payload = {"name": name, "stream": bool(stream)}
         try:
             if stream:
-                async with self._client.stream("POST", "/api/pull", json=payload) as r:
+                async with self.client.stream("POST", "/api/pull", json=payload) as r:
                     self._raise_for_status(r)
                     async for line in r.aiter_lines():
                         if not line:
@@ -160,7 +160,7 @@ class OllamaClient:
                         await asyncio.sleep(poll_sleep_s)
                 return
             else:
-                resp = await self._client.post("/api/pull", json=payload)
+                resp = await self.client.post("/api/pull", json=payload)
                 self._raise_for_status(resp)
                 return
         except httpx.TimeoutException as e:
@@ -170,7 +170,7 @@ class OllamaClient:
     async def show_model(self, name: str) -> dict[str, Any]:
         payload = {"name": name}
         try:
-            resp = await self._client.post("/api/show", json=payload)
+            resp = await self.client.post("/api/show", json=payload)
         except httpx.TimeoutException as e:
             raise OllamaTimeout(f"Timed out retrieving metadata for '{name}'") from e
         except httpx.RequestError as e:  # noqa: PERF203 - convert to domain error
@@ -191,7 +191,7 @@ class OllamaClient:
     # -------------------------------------------------------------------------
     async def is_server_online(self) -> bool:
         try:
-            resp = await self._client.get("/api/tags")
+            resp = await self.client.get("/api/tags")
             resp.raise_for_status()
         except (httpx.RequestError, httpx.HTTPStatusError):
             return False
@@ -445,7 +445,7 @@ class OllamaClient:
             body["keep_alive"] = keep_alive
 
         try:
-            resp = await self._client.post("/api/chat", json=body)
+            resp = await self.client.post("/api/chat", json=body)
         except httpx.TimeoutException as e:
             raise OllamaTimeout("Timed out waiting for Ollama chat response") from e
         self._raise_for_status(resp)
@@ -486,7 +486,7 @@ class OllamaClient:
             body["keep_alive"] = keep_alive
 
         try:
-            async with self._client.stream("POST", "/api/chat", json=body) as r:
+            async with self.client.stream("POST", "/api/chat", json=body) as r:
                 self._raise_for_status(r)
                 async for line in r.aiter_lines():
                     if not line:
@@ -674,13 +674,13 @@ class CloudLLMClient:
             max_connections=keepalive_max,
         )
         timeout = httpx.Timeout(timeout_s)
-        self._client = httpx.AsyncClient(
+        self.client = httpx.AsyncClient(
             base_url=self.base_url, timeout=timeout, limits=limits, headers=headers
         )
 
     # ---------------------------------------------------------------------
     async def close(self) -> None:
-        await self._client.aclose()
+        await self.client.aclose()
 
     # ---------------------------------------------------------------------
     async def __aenter__(self) -> "CloudLLMClient":
@@ -694,7 +694,7 @@ class CloudLLMClient:
     async def list_models(self) -> list[str]:
         if self.provider == "openai":
             try:
-                resp = await self._client.get("/models")
+                resp = await self.client.get("/models")
             except httpx.TimeoutException as e:
                 raise LLMTimeout("Timed out listing OpenAI models") from e
             self._raise_for_status(resp)
@@ -760,7 +760,7 @@ class CloudLLMClient:
             body["response_format"] = {"type": "json_object"}
 
         try:
-            resp = await self._client.post("/chat/completions", json=body)
+            resp = await self.client.post("/chat/completions", json=body)
         except httpx.TimeoutException as e:
             raise LLMTimeout("Timed out waiting for OpenAI chat response") from e
         self._raise_for_status(resp)
@@ -812,7 +812,7 @@ class CloudLLMClient:
             body["system_instruction"] = {"parts": [{"text": system_text}]}
 
         try:
-            resp = await self._client.post(path, json=body)
+            resp = await self.client.post(path, json=body)
         except httpx.TimeoutException as e:
             raise LLMTimeout("Timed out waiting for Gemini chat response") from e
         self._raise_for_status(resp)
