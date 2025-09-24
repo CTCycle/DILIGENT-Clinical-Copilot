@@ -38,9 +38,186 @@ if "fastapi" not in sys.modules:
     fastapi_stub.APIRouter = APIRouter
     sys.modules["fastapi"] = fastapi_stub
 
+if "pandas" not in sys.modules:
+    pandas_stub = types.ModuleType("pandas")
+
+    class _StubDataFrame:  # type: ignore[override]
+        def __init__(self, *args, **kwargs) -> None:
+            raise AssertionError("DataFrame should not be instantiated in tests")
+
+    def _stub_concat(*args, **kwargs):  # type: ignore[override]
+        raise AssertionError("pandas.concat should not be called in tests")
+
+    pandas_stub.DataFrame = _StubDataFrame  # type: ignore[attr-defined]
+    pandas_stub.concat = _stub_concat  # type: ignore[attr-defined]
+    sys.modules["pandas"] = pandas_stub
+
+if "sqlalchemy" not in sys.modules:
+    sqlalchemy_stub = types.ModuleType("sqlalchemy")
+
+    class _UniqueConstraint:
+        def __init__(self, *columns) -> None:
+            self.columns = types.SimpleNamespace(keys=lambda: list(columns))
+
+    class _Result:
+        def scalar(self) -> int:
+            return 0
+
+    class _Connection:
+        def execute(self, *args, **kwargs):  # type: ignore[override]
+            return _Result()
+
+        def __enter__(self):  # type: ignore[override]
+            return self
+
+        def __exit__(self, exc_type, exc, tb):  # type: ignore[override]
+            return False
+
+    class _BeginContext:
+        def __enter__(self) -> _Connection:  # type: ignore[override]
+            return _Connection()
+
+        def __exit__(self, exc_type, exc, tb) -> bool:  # type: ignore[override]
+            return False
+
+    def _create_engine(*args, **kwargs):  # type: ignore[override]
+        return types.SimpleNamespace(begin=lambda: _BeginContext(), connect=lambda: _Connection())
+
+    def _text(query):  # type: ignore[override]
+        return query
+
+    sqlalchemy_stub.Column = lambda *args, **kwargs: None  # type: ignore[attr-defined]
+    sqlalchemy_stub.Float = float  # type: ignore[attr-defined]
+    sqlalchemy_stub.String = str  # type: ignore[attr-defined]
+    sqlalchemy_stub.Text = str  # type: ignore[attr-defined]
+    sqlalchemy_stub.UniqueConstraint = _UniqueConstraint  # type: ignore[attr-defined]
+    sqlalchemy_stub.create_engine = _create_engine  # type: ignore[attr-defined]
+    sqlalchemy_stub.text = _text  # type: ignore[attr-defined]
+    sys.modules["sqlalchemy"] = sqlalchemy_stub
+
+    orm_stub = types.ModuleType("sqlalchemy.orm")
+
+    class _Session:
+        def execute(self, *args, **kwargs):  # type: ignore[override]
+            return None
+
+        def commit(self) -> None:
+            return None
+
+        def close(self) -> None:
+            return None
+
+    class _SessionFactory:
+        def __call__(self, *args, **kwargs):  # type: ignore[override]
+            return _Session()
+
+    def _sessionmaker(*args, **kwargs):  # type: ignore[override]
+        return _SessionFactory()
+
+    def _declarative_base():  # type: ignore[override]
+        class _Base:
+            metadata = types.SimpleNamespace(create_all=lambda *a, **k: None)
+            _registry: list[type] = []
+
+            def __init_subclass__(cls, **kwargs):  # type: ignore[override]
+                super().__init_subclass__(**kwargs)
+                if cls is not _Base:
+                    _Base._registry.append(cls)
+
+            @classmethod
+            def __subclasses__(cls):  # type: ignore[override]
+                return list(_Base._registry)
+
+        return _Base
+
+    orm_stub.declarative_base = _declarative_base  # type: ignore[attr-defined]
+    orm_stub.sessionmaker = _sessionmaker  # type: ignore[attr-defined]
+    sys.modules["sqlalchemy.orm"] = orm_stub
+
+    dialects_stub = types.ModuleType("sqlalchemy.dialects")
+    sqlite_stub = types.ModuleType("sqlalchemy.dialects.sqlite")
+
+    class _Insert:
+        def values(self, *args, **kwargs):  # type: ignore[override]
+            return self
+
+        def on_conflict_do_update(self, **kwargs):  # type: ignore[override]
+            return self
+
+        def __getattr__(self, name):  # type: ignore[override]
+            return self
+
+    def _insert(table):  # type: ignore[override]
+        return _Insert()
+
+    sqlite_stub.insert = _insert  # type: ignore[attr-defined]
+    dialects_stub.sqlite = sqlite_stub  # type: ignore[attr-defined]
+    sys.modules["sqlalchemy.dialects"] = dialects_stub
+    sys.modules["sqlalchemy.dialects.sqlite"] = sqlite_stub
+
+if "httpx" not in sys.modules:
+    httpx_stub = types.ModuleType("httpx")
+
+    class _AsyncClient:
+        def __init__(self, *args, **kwargs) -> None:
+            return None
+
+        async def __aenter__(self):  # type: ignore[override]
+            raise AssertionError("httpx.AsyncClient should not be used in tests")
+
+        async def __aexit__(self, exc_type, exc, tb):  # type: ignore[override]
+            return False
+
+    httpx_stub.AsyncClient = _AsyncClient  # type: ignore[attr-defined]
+    sys.modules["httpx"] = httpx_stub
+
+if "pdfminer" not in sys.modules:
+    pdfminer_stub = types.ModuleType("pdfminer")
+    pdfminer_high_level = types.ModuleType("pdfminer.high_level")
+
+    def _extract_text(*args, **kwargs):  # type: ignore[override]
+        raise AssertionError("pdfminer should not be used in tests")
+
+    pdfminer_high_level.extract_text = _extract_text  # type: ignore[attr-defined]
+    sys.modules["pdfminer"] = pdfminer_stub
+    sys.modules["pdfminer.high_level"] = pdfminer_high_level
+
+if "pypdf" not in sys.modules:
+    pypdf_stub = types.ModuleType("pypdf")
+
+    class _PdfReader:  # type: ignore[override]
+        def __init__(self, *args, **kwargs) -> None:
+            raise AssertionError("PdfReader should not be instantiated in tests")
+
+    pypdf_stub.PdfReader = _PdfReader  # type: ignore[attr-defined]
+    sys.modules["pypdf"] = pypdf_stub
+
+if "tqdm" not in sys.modules:
+    tqdm_stub = types.ModuleType("tqdm")
+
+    class _Tqdm:
+        def __init__(self, *args, **kwargs) -> None:
+            return None
+
+        def __enter__(self):  # type: ignore[override]
+            return self
+
+        def __exit__(self, exc_type, exc, tb):  # type: ignore[override]
+            return False
+
+        def update(self, *args, **kwargs):  # type: ignore[override]
+            return None
+
+    def _tqdm(*args, **kwargs):  # type: ignore[override]
+        return _Tqdm()
+
+    tqdm_stub.tqdm = _tqdm  # type: ignore[attr-defined]
+    sys.modules["tqdm"] = tqdm_stub
+
 from fastapi import HTTPException
 
 from Pharmagent.app.constants import LIVERTOX_ARCHIVE
+from Pharmagent.app.utils.jobs import JobManager, JobStatus
 
 
 ###############################################################################
@@ -99,6 +276,14 @@ class _StubDatabase:
 
 
 # -----------------------------------------------------------------------------
+async def _run_fetch(module, convert_to_dataframe: bool, skip_download: bool):
+    initial_status = await module.fetch_bulk_livertox(convert_to_dataframe, skip_download)
+    job_id = initial_status["job_id"]
+    final_status = await module.job_manager.wait_for_completion(job_id)
+    return initial_status, final_status
+
+
+# -----------------------------------------------------------------------------
 def _write_tar_archive(path: str) -> None:
     os.makedirs(os.path.dirname(path), exist_ok=True)
     with tarfile.open(path, "w:gz") as tar:
@@ -123,13 +308,23 @@ def test_fetch_bulk_livertox_skip_download(monkeypatch, tmp_path) -> None:
     monkeypatch.setattr(module, "serializer", serializer)
     monkeypatch.setattr(module, "database", database)
     monkeypatch.setattr(module, "SOURCES_PATH", str(tmp_path))
+    monkeypatch.setattr(module, "job_manager", JobManager())
 
-    result = asyncio.run(module.fetch_bulk_livertox(False, True))
+    initial, final = asyncio.run(_run_fetch(module, False, True))
 
-    assert client.download_called is False
-    assert client.collected_paths == [str(archive_path)]
+    assert initial["status"] in {
+        JobStatus.QUEUED.value,
+        JobStatus.RUNNING.value,
+    }
+    assert final is not None
+    assert final["status"] == JobStatus.COMPLETED.value
+    result = final["result"]
+    assert isinstance(result, dict)
     assert result["file_path"] == str(archive_path)
     assert result["processed_entries"] == 1
+    assert result["records"] == 1
+    assert client.download_called is False
+    assert client.collected_paths == [str(archive_path)]
     assert serializer.saved_records is not None
 
 
@@ -147,13 +342,22 @@ def test_fetch_bulk_livertox_triggers_download(monkeypatch, tmp_path) -> None:
     monkeypatch.setattr(module, "serializer", serializer)
     monkeypatch.setattr(module, "database", database)
     monkeypatch.setattr(module, "SOURCES_PATH", str(tmp_path))
+    monkeypatch.setattr(module, "job_manager", JobManager())
 
-    result = asyncio.run(module.fetch_bulk_livertox(False, False))
+    initial, final = asyncio.run(_run_fetch(module, False, False))
 
-    assert client.download_called is True
-    assert client.collected_paths == [str(archive_path)]
+    assert initial["status"] in {
+        JobStatus.QUEUED.value,
+        JobStatus.RUNNING.value,
+    }
+    assert final is not None
+    assert final["status"] == JobStatus.COMPLETED.value
+    result = final["result"]
+    assert isinstance(result, dict)
     assert os.path.isfile(result["file_path"])
     assert result["processed_entries"] == 1
+    assert result["records"] == 1
+    assert client.download_called is True
     assert serializer.saved_records is not None
 
 
@@ -169,6 +373,7 @@ def test_fetch_bulk_livertox_skip_without_archive(monkeypatch, tmp_path) -> None
     monkeypatch.setattr(module, "serializer", serializer)
     monkeypatch.setattr(module, "database", database)
     monkeypatch.setattr(module, "SOURCES_PATH", str(tmp_path))
+    monkeypatch.setattr(module, "job_manager", JobManager())
 
     with pytest.raises(HTTPException) as exc:
         asyncio.run(module.fetch_bulk_livertox(False, True))
