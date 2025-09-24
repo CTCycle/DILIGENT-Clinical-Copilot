@@ -33,4 +33,6 @@ class DataSerializer:
                     "excerpt": str(excerpt) if excerpt is not None else None,
                 }
             )
-        database.replace_rows("LIVERTOX_MONOGRAPHS", prepared)
+            
+        data = pd.DataFrame(prepared)
+        database.upsert_into_database(data, "LIVERTOX_MONOGRAPHS")
