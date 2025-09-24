@@ -158,11 +158,11 @@ if exist "%DOTENV%" (
 )
 
 echo [INFO] FASTAPI_HOST=!FASTAPI_HOST! FASTAPI_PORT=!FASTAPI_PORT! RELOAD=!RELOAD!
-set "DOCS_URL=http://!FASTAPI_HOST!:!FASTAPI_PORT!/docs"
+set "UI_URL=http://!FASTAPI_HOST!:!FASTAPI_PORT!/ui"
 set "RELOAD_FLAG="
 if /i "!RELOAD!"=="true" set "RELOAD_FLAG=--reload"
 
-start "" "!DOCS_URL!"
+start "" "!UI_URL!"
 
 echo [RUN] Launching application via uvicorn (!UVICORN_MODULE!)
 pushd "%root_folder%" >nul

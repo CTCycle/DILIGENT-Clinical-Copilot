@@ -1,9 +1,10 @@
 Pharmagent/setup/python/*
-Pharmagent/setup/.env
+Pharmagent/setup/*
 Pharmagent/resources/models/*
 
 __pycache__
 *.vscode
+*.venv
 *.db
 *.log
 *.docx
@@ -11,6 +12,8 @@ __pycache__
 *.csv   
 *.txt
 *.npy
+*.lock
+*.exe
 *.egg-info
 *.gz
 !.gitkeep
