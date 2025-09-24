@@ -1,6 +1,8 @@
 from __future__ import annotations
 
 import json
+import os
+import tarfile
 from typing import Any
 
 import httpx
@@ -12,6 +14,9 @@ from Pharmagent.app.constants import (
     API_BASE_URL,
     BATCH_AGENT_API_URL,
     CLOUD_MODEL_CHOICES,
+    LIVERTOX_ARCHIVE,
+    PHARMACOLOGY_LIVERTOX_FETCH_ENDPOINT,
+    SOURCES_PATH,
 )
 from Pharmagent.app.api.models.providers import (
     OllamaClient,
@@ -171,6 +176,85 @@ async def preload_selected_models(parsing_model: str, agent_model: str) -> str:
     message = f"[INFO] Preloaded models: {', '.join(loaded)}."
     if skipped:
         message += f" [WARN] Skipped due to limited memory: {', '.join(skipped)}."
+    return message
+
+
+# -----------------------------------------------------------------------------
+async def fetch_clinical_data() -> str:
+    url = f"{API_BASE_URL}{PHARMACOLOGY_LIVERTOX_FETCH_ENDPOINT}"
+
+    try:
+        async with httpx.AsyncClient(timeout=120) as client:
+            response = await client.get(url)
+            response.raise_for_status()
+            try:
+                payload = response.json()
+            except ValueError:
+                return "[ERROR] Backend response was not valid JSON."
+    except httpx.ConnectError as exc:
+        return f"[ERROR] Could not connect to backend at {url}.\nDetails: {exc}"
+    except httpx.HTTPStatusError as exc:
+        body = exc.response.text if exc.response is not None else ""
+        code = exc.response.status_code if exc.response else "unknown"
+        return (
+            f"[ERROR] Backend returned status {code}."
+            f"\nURL: {url}\nResponse body:\n{body}"
+        )
+    except httpx.TimeoutException:
+        return f"[ERROR] Request timed out after {120} seconds."
+    except Exception as exc:  # noqa: BLE001
+        return f"[ERROR] Unexpected error: {exc}"
+
+    if not isinstance(payload, dict):
+        return "[ERROR] Unexpected response format from backend."
+
+    file_path = payload.get("file_path")
+    reported_size = payload.get("size")
+    last_modified = payload.get("last_modified")
+
+    if not isinstance(file_path, str) or not file_path:
+        return "[ERROR] Backend response did not include a valid file path."
+
+    absolute_file_path = os.path.abspath(file_path)
+    sources_dir = os.path.abspath(SOURCES_PATH)
+
+    if not absolute_file_path.startswith(sources_dir):
+        return (
+            "[ERROR] Downloaded file is located outside the expected sources directory."
+        )
+
+    if os.path.basename(absolute_file_path) != LIVERTOX_ARCHIVE:
+        return "[ERROR] Unexpected file downloaded from backend."
+
+    if not os.path.isfile(absolute_file_path):
+        return "[ERROR] Download failed: file not found after fetch."
+
+    actual_size = os.path.getsize(absolute_file_path)
+    if actual_size <= 0:
+        return "[ERROR] Downloaded file is empty."
+
+    if isinstance(reported_size, int) and reported_size > 0 and actual_size < reported_size:
+        return (
+            "[ERROR] Downloaded file size is smaller than expected; download may be incomplete."
+        )
+
+    try:
+        with tarfile.open(absolute_file_path, "r:gz") as archive:
+            member = archive.next()
+            if member is None:
+                return "[ERROR] Downloaded archive contains no data."
+    except (tarfile.TarError, OSError) as exc:
+        return f"[ERROR] Downloaded file appears corrupted: {exc}"
+
+    message = (
+        "[INFO] Clinical data downloaded successfully."
+        f"\nPath: {absolute_file_path}"
+        f"\nSize: {actual_size} bytes"
+    )
+
+    if isinstance(last_modified, str) and last_modified:
+        message += f"\nLast-Modified: {last_modified}"
+
     return message
 
 
