@@ -124,7 +124,7 @@ class LiverToxClient:
         collected: dict[str, dict[str, str]] = {}
         priorities: dict[str, int] = {}
         with tarfile.open(normalized_path, "r:gz") as archive:
-            for member in archive.getmembers():
+            for member in tqdm(archive.getmembers(), desc="Extracting LiverTox files"):
                 if not self._should_process_member(member):
                     continue
                 payload = self._read_member_payload(archive, member)
