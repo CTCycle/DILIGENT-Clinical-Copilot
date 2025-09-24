@@ -43,8 +43,6 @@ class LiverToxClient:
     # -------------------------------------------------------------------------
     async def download_bulk_data(self, dest_path: str) -> dict[str, Any]:
         url = self.base_url + self.file_name
-        print(f"Downloading file {self.file_name}")
-
         async with httpx.AsyncClient(timeout=30.0) as client:
             # HEAD request for size and last-modified
             head_response = await client.head(url)
@@ -113,8 +111,8 @@ class LiverToxClient:
         collected: dict[str, dict[str, str]] = {}
         with tarfile.open(normalized_path, "r:gz") as archive:
             for member in archive.getmembers():
-                if not self._should_process_member(member):
-                    continue
+                # if not self._should_process_member(member):
+                #     continue
                 content = self._read_member_content(archive, member)
                 if not content:
                     continue
@@ -124,21 +122,11 @@ class LiverToxClient:
                 title = self._extract_title(content, plain_text, record_id)
                 if not title:
                     continue
-                collected[record_id] = {
-                    "nbk_id": record_id,
-                    "drug_name": title,
+                collected[title] = {
+                    "nbk_id": record_id,                    
                     "excerpt": plain_text,
                 }
-        return list(collected.values())
-
-    # -----------------------------------------------------------------------------
-    def _should_process_member(self, member: tarfile.TarInfo) -> bool:
-        if not member.isfile():
-            return False
-        lower_name = member.name.lower()
-        if any(lower_name.endswith(ext) for ext in self.image_extensions):
-            return False
-        return any(lower_name.endswith(ext) for ext in self.supported_extensions)
+        return list(collected.values())    
 
     # -----------------------------------------------------------------------------
     def _read_member_content(
