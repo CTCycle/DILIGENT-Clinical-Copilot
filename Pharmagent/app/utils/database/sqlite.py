@@ -42,8 +42,9 @@ class Patients(Base):
 class LiverToxMonographs(Base):
     __tablename__ = "LIVERTOX_MONOGRAPHS"
     nbk_id = Column(String, primary_key=True)
-    drug_name = Column(String, nullable=False)
+    drug_name = Column(String, primary_key=True)
     excerpt = Column(Text)
+    __table_args__ = (UniqueConstraint("nbk_id","drug_name"),)
 
 
 # [DATABASE]
@@ -105,19 +106,7 @@ class PharmagentDatabase:
     def save_into_database(self, df: pd.DataFrame, table_name: str) -> None:
         with self.engine.begin() as conn:
             conn.execute(sqlalchemy.text(f'DELETE FROM "{table_name}"'))
-            df.to_sql(table_name, conn, if_exists="append", index=False)
-
-    # -------------------------------------------------------------------------
-    def replace_rows(self, table_name: str, rows: list[dict[str, Any]]) -> None:
-        table_cls = self.get_table_class(table_name)
-        table = table_cls.__table__
-        with self.engine.begin() as conn:
-            conn.execute(sqlalchemy.text(f'DELETE FROM "{table_name}"'))
-            if not rows:
-                return
-            for i in range(0, len(rows), self.insert_batch_size):
-                batch = rows[i : i + self.insert_batch_size]
-                conn.execute(table.insert(), batch)
+            df.to_sql(table_name, conn, if_exists="append", index=False)  
 
     # -------------------------------------------------------------------------
     def upsert_into_database(self, df: pd.DataFrame, table_name: str) -> None:
