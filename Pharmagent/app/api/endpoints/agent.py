@@ -59,16 +59,6 @@ async def process_single_patient(payload: PatientData, translate_to_eng: bool = 
     logger.info("Drugs extraction required %.4f seconds", elapsed)
     logger.info("Detected %s drugs", len(drug_data.entries))
 
-    start_time = time.perf_counter()
-    diseases = await diseases_parser.extract_diseases(updated_payload.anamnesis or "")
-    elapsed = time.perf_counter() - start_time
-    logger.info("Disease extraction required %.4f seconds", elapsed)
-    logger.info("Detected %s diseases for this patient", len(diseases["diseases"]))
-    logger.info(
-        "Subset of hepatic diseases includes %s entries",
-        len(diseases["hepatic_diseases"]),
-    )
-
     pattern_score = pattern_analyzer.analyze(updated_payload)
     logger.info(
         "Patient hepatotoxicity pattern classified as %s (R=%.3f)",
@@ -78,6 +68,16 @@ async def process_single_patient(payload: PatientData, translate_to_eng: bool = 
 
     toxicity_runner = DrugToxicityEssay(drug_data)
     drug_assessment = await toxicity_runner.run_analysis()
+
+    start_time = time.perf_counter()
+    diseases = await diseases_parser.extract_diseases(updated_payload.anamnesis or "")
+    elapsed = time.perf_counter() - start_time
+    logger.info("Disease extraction required %.4f seconds", elapsed)
+    logger.info("Detected %s diseases for this patient", len(diseases["diseases"]))
+    logger.info(
+        "Subset of hepatic diseases includes %s entries",
+        len(diseases["hepatic_diseases"]),
+    )
 
     patient_info: dict[str, Any] = {
         "name": payload.name or "Unknown",

@@ -130,16 +130,12 @@ class DrugToxicityEssay:
     def __init__(
         self,
         drugs: PatientDrugs,
-        *,
-        archive_path: str | None = None,
+        *,        
         ensure_download: bool = True,
         timeout_s: float = 300.0,
     ) -> None:
         self.drugs = drugs
-        archive_candidate = (
-            archive_path if archive_path is not None else os.path.join(SOURCES_PATH, LIVERTOX_ARCHIVE)
-        )
-        self._archive_path = os.fspath(archive_candidate)
+        self._archive_path = os.path.join(SOURCES_PATH, LIVERTOX_ARCHIVE)      
         self._auto_download = ensure_download
         self._llm_client = initialize_llm_client(purpose="agent", timeout_s=timeout_s)
         self._match_cache: dict[str, LiverToxMatch] = {}
