@@ -77,7 +77,7 @@ async def process_single_patient(payload: PatientData, translate_to_eng: bool = 
     )
 
     toxicity_runner = DrugToxicityEssay(drug_data)
-    drug_assessment = await toxicity_runner.run()
+    drug_assessment = await toxicity_runner.run_analysis()
 
     patient_info: dict[str, Any] = {
         "name": payload.name or "Unknown",
