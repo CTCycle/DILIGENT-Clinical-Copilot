@@ -247,8 +247,7 @@ async def fetch_clinical_data() -> str:
         return f"[ERROR] Downloaded file appears corrupted: {exc}"
 
     message = (
-        "[INFO] Clinical data downloaded successfully."
-        f"\nPath: {absolute_file_path}"
+        "[INFO] Clinical data downloaded successfully."       
         f"\nSize: {actual_size} bytes"
     )
 
