@@ -1,18 +1,13 @@
 from __future__ import annotations
 
-import asyncio
-import random
+import html
 import re
-import time
+import tarfile
 import unicodedata
-from collections.abc import Callable, Iterable, Sequence
+from collections.abc import Iterable
 from dataclasses import dataclass
 from difflib import SequenceMatcher
-from xml.etree import ElementTree as ET
-
-import httpx
-from httpx import Timeout
-from typing import Any
+from pathlib import Path
 from Pharmagent.app.api.models.prompts import (
     HEPATOTOXICITY_ANALYSIS_SYSTEM_PROMPT,
     HEPATOTOXICITY_ANALYSIS_USER_PROMPT,
@@ -28,8 +23,10 @@ from Pharmagent.app.api.schemas.clinical import (
     PatientDrugToxicityBundle,
     PatientDrugs,
 )
+from Pharmagent.app.constants import LIVERTOX_ARCHIVE, SOURCES_PATH
 from Pharmagent.app.configurations import ClientRuntimeConfig
 from Pharmagent.app.logger import logger
+from Pharmagent.app.utils.services.scraper import LiverToxClient
 
 
 ###############################################################################
@@ -44,28 +41,15 @@ class LiverToxMatch:
 
 ###############################################################################
 @dataclass(slots=True)
-class CandidateSummary:
+class ArchiveEntry:
     nbk_id: str
     title: str
-    synonyms: set[str]
-
-
-###############################################################################
-@dataclass(slots=True)
-class RxNormConcept:
-    rxcui: str
-    preferred_name: str | None
-    synonyms: set[str]
-    ingredients: set[str]
-    tty: str | None
-
-
-###############################################################################
-@dataclass(slots=True)
-class NameCandidate:
-    origin: str
-    name: str
-    priority: int
+    aliases: set[str]
+    member_name: str
+    normalized_title: str
+    primary_normalized_title: str
+    normalized_aliases: set[str]
+    keyword_tokens: set[str]
 
 
 ###############################################################################
@@ -124,72 +108,61 @@ class HepatotoxicityPatternAnalyzer:
 
 ###############################################################################
 class DrugToxicityEssay:
-    """NCBI LiverTox ingestion orchestrator.
-
-    Brief and clear description:
-        Resolves drug names to LiverTox chapters via ESearch/ESummary scoped by
-        NBK547852[BACI], applies retry/backoff with caching layers, extracts
-        key sections, and logs normalized queries plus ranking scores.
-    Keyword arguments:
-        None.
-    Return value:
-        Not applicable. Class provides async workflow utilities.
-
-    Tests:
-        - Cover common inputs (Aspirin, Xarelto/rivaroxaban, Pantozol/pantoprazole).
-        - Include ambiguous or misspelled queries to exercise fuzzy matching.
-    """
-
-    _EUTILS_BASE = "https://eutils.ncbi.nlm.nih.gov/entrez/eutils"
-    _RXNORM_BASE = "https://rxnav.nlm.nih.gov/REST"
-    _LIVERTOX_SCOPE = "NBK547852[BACI]"
-    _CACHE_TTL = 60 * 60 * 6
-    _CONTENT_TTL = 60 * 60 * 24
-    _MAX_RETRIES = 4
-    _BACKOFF_BASE = 0.5
-    _BACKOFF_MAX = 8.0
-    _MIN_REQUEST_INTERVAL = 0.12
-    _CONFIDENCE_FUZZY_PENALTY = 0.07
-
-    _match_cache: dict[str, tuple[float, LiverToxMatch]] = {}
-    _rxnorm_term_cache: dict[str, tuple[float, tuple[list[NameCandidate], set[str]]]] = {}
-    _rxnorm_concept_cache: dict[str, tuple[float, RxNormConcept]] = {}
-    _esearch_cache: dict[str, tuple[float, list[str]]] = {}
-    _esummary_cache: dict[str, tuple[float, list[CandidateSummary]]] = {}
-    _content_cache: dict[str, tuple[float, dict[str, str]]] = {}
+    _DIRECT_CONFIDENCE = 1.0
+    _ALIAS_CONFIDENCE = 0.95
+    _MIN_CONFIDENCE = 0.40
+    _SECTION_ALIASES: dict[str, set[str]] = {
+        "summary": {"summary", "introduction", "overview"},
+        "hepatotoxicity": {"hepatotoxicity", "liver injury"},
+        "mechanism": {"mechanism", "mechanism of injury"},
+        "latency_pattern_severity": {
+            "latency, pattern, and severity",
+            "latency pattern and severity",
+            "latency and pattern",
+            "latency",
+        },
+        "clinical_course": {"clinical course"},
+        "outcome": {"outcome", "management", "outcome and management"},
+        "references": {"references", "bibliography", "further reading"},
+    }
 
     # -----------------------------------------------------------------------------
-    def __init__(self, drugs: PatientDrugs, *, timeout_s: float = 300.0) -> None:
+    def __init__(
+        self,
+        drugs: PatientDrugs,
+        *,
+        archive_path: str | None = None,
+        ensure_download: bool = True,
+        timeout_s: float = 300.0,
+    ) -> None:
         self.drugs = drugs
-        self._timeout = Timeout(timeout_s)
+        self._archive_path = (
+            Path(archive_path) if archive_path is not None else Path(SOURCES_PATH) / LIVERTOX_ARCHIVE
+        )
+        self._auto_download = ensure_download
         self._llm_client = initialize_llm_client(purpose="agent", timeout_s=timeout_s)
-        self._tool_params = {"tool": "pharmagent_clinical", "email": "support@example.com"}
-        self._last_request_ts = 0.0
-        self._debug_records: list[dict[str, Any]] = []
+        self._match_cache: dict[str, LiverToxMatch] = {}
+        self._content_cache: dict[str, dict[str, str]] = {}
+        self._entries: list[ArchiveEntry] = []
+        self._entry_by_nbk: dict[str, ArchiveEntry] = {}
+        self._archive_ready = False
 
     # -----------------------------------------------------------------------------
     async def run_analysis(self) -> PatientDrugToxicityBundle:
-        async with httpx.AsyncClient(timeout=self._timeout, trust_env=False) as client:
-            client.headers.update({
-                "User-Agent": "PharmagentClinical/1.0 (+https://github.com/pharmagent)",
-                "Accept": "application/json, text/plain;q=0.8",
-            })
-
-            tasks: list[DrugHepatotoxicityAnalysis] = []
-            for entry in self.drugs.entries:
-                result = await self._process_single_drug(client, entry)
-                tasks.append(result)
-        return PatientDrugToxicityBundle(entries=tasks)
+        await self._ensure_index_loaded()
+        results: list[DrugHepatotoxicityAnalysis] = []
+        for entry in self.drugs.entries:
+            result = await self._process_single_drug(entry)
+            results.append(result)
+        return PatientDrugToxicityBundle(entries=results)
 
     # -----------------------------------------------------------------------------
-    async def _process_single_drug(
-        self, client: httpx.AsyncClient, entry: DrugEntry
-    ) -> DrugHepatotoxicityAnalysis:
+    async def _process_single_drug(self, entry: DrugEntry) -> DrugHepatotoxicityAnalysis:
         match_notes: list[str] = []
         try:
-            match = await self._search_livertox_id(client, entry.name, notes=match_notes)
-        except Exception as exc:  # Defensive safety net, surfaced as error payload.
-            logger.error("Failed LiverTox matching for %s: %s", entry.name, exc)
+            match = await self._search_livertox_id(entry.name, notes=match_notes)
+        except Exception as exc:
+            logger.error("Failed LiverTox lookup for %s: %s", entry.name, exc)
             return DrugHepatotoxicityAnalysis(
                 drug_name=entry.name,
                 analysis=None,
@@ -209,9 +182,14 @@ class DrugToxicityEssay:
             )
 
         try:
-            content = await self._fetch_livertox_content(client, match.nbk_id)
+            content = await self._fetch_livertox_content(match.nbk_id)
         except Exception as exc:
-            logger.error("Failed retrieving content for %s (%s): %s", entry.name, match.nbk_id, exc)
+            logger.error(
+                "Failed retrieving local LiverTox content for %s (%s): %s",
+                entry.name,
+                match.nbk_id,
+                exc,
+            )
             return DrugHepatotoxicityAnalysis(
                 drug_name=entry.name,
                 analysis=None,
@@ -225,7 +203,6 @@ class DrugToxicityEssay:
                 ),
             )
 
-        llm_payload = None
         try:
             llm_payload = await self._invoke_llm(entry.name, content)
         except Exception as exc:
@@ -292,482 +269,327 @@ class DrugToxicityEssay:
         )
 
     # -----------------------------------------------------------------------------
+    async def _ensure_archive_ready(self) -> None:
+        if self._archive_ready:
+            return
+        archive_path = self._archive_path
+        archive_path.parent.mkdir(parents=True, exist_ok=True)
+        if not archive_path.exists():
+            if not self._auto_download:
+                raise FileNotFoundError(f"LiverTox archive missing at {archive_path}")
+            client = LiverToxClient()
+            await client.download_bulk_data(archive_path.parent)
+        self._archive_ready = True
+
+    # -----------------------------------------------------------------------------
+    async def _ensure_index_loaded(self) -> None:
+        if self._entries:
+            return
+        await self._ensure_archive_ready()
+        self._entries = self._build_index(self._archive_path)
+        self._entry_by_nbk = {entry.nbk_id: entry for entry in self._entries}
+        if not self._entries:
+            raise RuntimeError("Local LiverTox archive is empty")
+
+    # -----------------------------------------------------------------------------
     async def _search_livertox_id(
-        self, client: httpx.AsyncClient, drug_name: str, *, notes: list[str] | None = None
+        self, drug_name: str, *, notes: list[str] | None = None
     ) -> LiverToxMatch | None:
+        await self._ensure_index_loaded()
+        holder = notes if notes is not None else []
         normalized_query = self._normalize_name(drug_name)
-        holder: list[str] = notes if notes is not None else []
-        cached = self._read_cache(self._match_cache, normalized_query, self._CONTENT_TTL)
+        if not normalized_query:
+            holder.append("Drug name is empty after normalization")
+            return None
+        cached = self._match_cache.get(normalized_query)
         if cached is not None:
             return cached
 
-        candidates = self._build_name_candidates(drug_name)
-        rx_candidates, rx_synonyms = await self._lookup_rxnorm_candidates(client, drug_name)
-        if rx_candidates:
-            candidates.extend(rx_candidates)
-        candidates = self._deduplicate_candidates(candidates)
+        best: tuple[float, ArchiveEntry, str, str | None] | None = None
+        for entry in self._entries:
+            score, reason, detail = self._score_entry(normalized_query, entry)
+            if best is None or score > best[0]:
+                best = (score, entry, reason, detail)
 
-        synonym_pool: set[str] = set(rx_synonyms)
+        if best is None or best[0] < self._MIN_CONFIDENCE:
+            holder.append("No matching entry found in local LiverTox archive")
+            return None
 
-        match = await self._search_candidates(
-            client,
-            normalized_query,
-            candidates,
-            synonym_pool,
-            holder,
+        score, entry, reason, detail = best
+        notes_payload: list[str] = []
+        if reason == "alias_match" and detail:
+            notes_payload.append(f"Matched alias '{detail}'")
+        elif reason == "fuzzy_match":
+            notes_payload.append("Fuzzy matched against archive content")
+            if detail:
+                notes_payload.append(f"Closest alias '{detail}'")
+
+        if notes is not None and notes_payload:
+            notes.extend(notes_payload)
+
+        match = LiverToxMatch(
+            nbk_id=entry.nbk_id,
+            matched_name=entry.title,
+            confidence=round(min(max(score, self._MIN_CONFIDENCE), 1.0), 2),
+            reason=reason,
+            notes=list(dict.fromkeys(notes_payload)),
         )
-        if match is not None:
-            self._match_cache[normalized_query] = (self._now(), match)
+        self._match_cache[normalized_query] = match
         return match
 
     # -----------------------------------------------------------------------------
-    async def _search_candidates(
-        self,
-        client: httpx.AsyncClient,
-        normalized_query: str,
-        candidates: Sequence[NameCandidate],
-        synonym_pool: set[str],
-        notes: list[str],
-    ) -> LiverToxMatch | None:
-        # First attempt exact title matches.
-        for candidate in sorted(candidates, key=lambda item: item.priority):
-            direct_term = self._title_case(candidate.name)
-            uids = await self._query_esearch(client, direct_term, title_only=True)
-            if not uids:
-                continue
-            summaries = await self._fetch_candidate_summaries(client, uids)
-            match = self._rank_candidates(
-                normalized_query,
-                summaries,
-                synonym_pool,
-                notes,
-                source_candidate=candidate,
+    def _score_entry(
+        self, normalized_query: str, entry: ArchiveEntry
+    ) -> tuple[float, str, str | None]:
+        if normalized_query in (
+            entry.normalized_title,
+            entry.primary_normalized_title,
+        ):
+            return self._DIRECT_CONFIDENCE, "direct_match", entry.title
+        if normalized_query in entry.normalized_aliases:
+            alias = next(
+                (alias for alias in entry.aliases if self._normalize_name(alias) == normalized_query),
+                entry.title,
             )
-            if match and match.reason != "list_first":
-                return match
+            return self._ALIAS_CONFIDENCE, "alias_match", alias
 
-        # General search across all query variants.
-        aggregated: set[str] = set()
-        for candidate in sorted(candidates, key=lambda item: item.priority):
-            ids = await self._query_esearch(client, candidate.name, title_only=False)
-            aggregated.update(ids)
-
-        if not aggregated:
-            notes.append("NCBI ESearch returned no results")
-            return None
-
-        summaries = await self._fetch_candidate_summaries(client, list(aggregated))
-        if not summaries:
-            notes.append("ESummary yielded no LiverTox candidates")
-            return None
-
-        match = self._rank_candidates(
-            normalized_query,
-            summaries,
-            synonym_pool,
-            notes,
-            source_candidate=None,
-        )
-        if match:
-            return match
-
-        fallback = summaries[0]
-        fallback_notes = list(dict.fromkeys(notes + ["defaulted to first search result"]))
-        return LiverToxMatch(
-            nbk_id=fallback.nbk_id,
-            matched_name=fallback.title,
-            confidence=0.40,
-            reason="list_first",
-            notes=fallback_notes,
-        )
-
-    # -----------------------------------------------------------------------------
-    def _rank_candidates(
-        self,
-        normalized_query: str,
-        summaries: Sequence[CandidateSummary],
-        synonym_pool: set[str],
-        notes: list[str],
-        *,
-        source_candidate: NameCandidate | None,
-    ) -> LiverToxMatch | None:
-        rankings: list[tuple[float, str, CandidateSummary]] = []
-        for summary in summaries:
-            normalized_title = self._normalize_name(summary.title)
-            summary_synonyms = {self._normalize_name(item) for item in summary.synonyms}
-            combined_synonyms = synonym_pool | summary_synonyms
-            score, reason = self._score_candidate(
-                normalized_query,
-                normalized_title,
-                combined_synonyms,
-            )
-            if reason == "brand_resolved" and source_candidate is not None:
-                notes.append(
-                    f"Brand '{source_candidate.name}' mapped to '{summary.title}'"
-                )
-            elif reason == "direct_match" and source_candidate is not None:
-                if source_candidate.origin != "input_raw":
-                    notes.append(
-                        f"Matched after {source_candidate.origin.replace('_', ' ')} normalization"
-                    )
-            rankings.append((score, reason, summary))
-
-        if not rankings:
-            return None
-
-        rankings.sort(key=lambda item: item[0], reverse=True)
-        best_score, best_reason, best_summary = rankings[0]
-
-        if len(rankings) > 1 and rankings[1][0] >= best_score - 0.05:
-            alternates = [
-                f"{entry[2].title} ({entry[2].nbk_id})"
-                for entry in rankings[1:3]
-            ]
-            if alternates:
-                notes.append("Ambiguous matches: " + ", ".join(alternates))
-
-        normalized_notes = list(dict.fromkeys(notes))
-        return LiverToxMatch(
-            nbk_id=best_summary.nbk_id,
-            matched_name=best_summary.title,
-            confidence=best_score,
-            reason=best_reason,
-            notes=normalized_notes,
-        )
-
-    # -----------------------------------------------------------------------------
-    def _score_candidate(
-        self,
-        normalized_query: str,
-        normalized_title: str,
-        synonyms: set[str],
-    ) -> tuple[float, str]:
-        if normalized_query and normalized_query == normalized_title:
-            return 1.0, "direct_match"
-        if normalized_query in synonyms:
-            return 0.95, "brand_resolved"
-
-        query_tokens = {token for token in normalized_query.split() if token}
-        title_tokens = {token for token in normalized_title.split() if token}
-        overlap = 0.0
-        if query_tokens:
-            overlap = len(query_tokens & title_tokens) / len(query_tokens)
-
-        ratio = SequenceMatcher(None, normalized_query, normalized_title).ratio()
-        if ratio >= 0.70 or overlap >= 0.50:
-            penalty = self._CONFIDENCE_FUZZY_PENALTY if ratio < 0.99 else 0.0
-            score = max(ratio - penalty, overlap)
-            score = round(max(0.4, min(score, 0.95)), 2)
-            return score, "fuzzy_match"
-
-        return 0.40, "list_first"
-
-    # -----------------------------------------------------------------------------
-    async def _query_esearch(
-        self, client: httpx.AsyncClient, term: str, *, title_only: bool
-    ) -> list[str]:
-        normalized = term.strip()
-        if not normalized:
-            return []
-        collapsed = re.sub(r"\s+", " ", normalized)
-        if title_only:
-            title_case = " ".join(token.capitalize() for token in collapsed.split())
-            field = f'"{title_case}"[Title]'
-        else:
-            field = collapsed
-        scoped_term = f"{field} AND {self._LIVERTOX_SCOPE}"
-        cache_key = f"esearch::{scoped_term}"
-        cached = self._read_cache(self._esearch_cache, cache_key, self._CACHE_TTL)
-        if cached is not None:
-            return cached
-        params = {
-            "db": "books",
-            "retmode": "json",
-            "term": scoped_term,
-            **self._tool_params,
-        }
-        data = await self._request(
-            client,
-            f"{self._EUTILS_BASE}/esearch.fcgi",
-            params=params,
-            expect_json=True,
-        )
-        idlist = data.get("esearchresult", {}).get("idlist", [])
-        ids = [uid for uid in idlist if isinstance(uid, str) and uid]
-        self._esearch_cache[cache_key] = (self._now(), ids)
-        self._record_debug({"action": "esearch", "term": scoped_term, "uids": ids})
-        return ids
-
-    # -----------------------------------------------------------------------------
-    async def _fetch_candidate_summaries(
-        self, client: httpx.AsyncClient, ids: Sequence[str]
-    ) -> list[CandidateSummary]:
-        unique_ids = sorted({uid for uid in ids if uid})
-        if not unique_ids:
-            return []
-        cache_key = "esummary::" + ",".join(unique_ids)
-        cached = self._read_cache(self._esummary_cache, cache_key, self._CACHE_TTL)
-        if cached is not None:
-            return cached
-        params = {
-            "db": "books",
-            "retmode": "json",
-            "id": ",".join(unique_ids),
-            **self._tool_params,
-        }
-        data = await self._request(
-            client,
-            f"{self._EUTILS_BASE}/esummary.fcgi",
-            params=params,
-            expect_json=True,
-        )
-        summaries: list[CandidateSummary] = []
-        result = data.get("result", {})
-        for uid in result.get("uids", []):
-            record = result.get(uid) or {}
-            booktitle = str(record.get("booktitle") or "")
-            if "livertox" not in booktitle.lower():
+        best_alias = None
+        best_alias_score = 0.0
+        for alias in entry.aliases:
+            normalized_alias = self._normalize_name(alias)
+            if not normalized_alias:
                 continue
-            nbk = self._extract_nbk(record)
-            if not nbk:
-                continue
-            title = str(record.get("title") or record.get("sorttitle") or nbk)
-            synonyms = self._extract_summary_synonyms(record)
-            summaries.append(CandidateSummary(nbk_id=nbk, title=title, synonyms=synonyms))
+            alias_score = SequenceMatcher(None, normalized_query, normalized_alias).ratio()
+            if alias_score > best_alias_score:
+                best_alias_score = alias_score
+                best_alias = alias
 
-        self._esummary_cache[cache_key] = (self._now(), summaries)
-        self._record_debug({"action": "esummary", "ids": unique_ids, "count": len(summaries)})
-        return summaries
+        ratio = SequenceMatcher(None, normalized_query, entry.normalized_title).ratio()
+        token_overlap = self._token_overlap(normalized_query, entry.keyword_tokens)
+        score = max(ratio, token_overlap, best_alias_score)
+        detail = best_alias if best_alias_score >= ratio and best_alias_score >= token_overlap else None
+        return score, "fuzzy_match", detail
 
     # -----------------------------------------------------------------------------
-    async def _lookup_rxnorm_candidates(
-        self, client: httpx.AsyncClient, drug_name: str
-    ) -> tuple[list[NameCandidate], set[str]]:
-        normalized = self._normalize_name(drug_name)
-        cached = self._read_cache(self._rxnorm_term_cache, normalized, self._CACHE_TTL)
+    def _token_overlap(self, normalized_query: str, tokens: set[str]) -> float:
+        query_tokens = [token for token in normalized_query.split() if token]
+        if not query_tokens:
+            return 0.0
+        hits = sum(1 for token in query_tokens if token in tokens)
+        return hits / len(query_tokens)
+
+    # -----------------------------------------------------------------------------
+    async def _fetch_livertox_content(self, nbk_id: str) -> dict[str, str]:
+        cached = self._content_cache.get(nbk_id)
         if cached is not None:
             return cached
-        params = {
-            "term": drug_name,
-            "maxEntries": 5,
-        }
+        await self._ensure_index_loaded()
+        entry = self._entry_by_nbk.get(nbk_id)
+        if entry is None:
+            raise KeyError(f"No entry for NBK id {nbk_id}")
+
+        with tarfile.open(self._archive_path, "r:gz") as tar:
+            try:
+                member = tar.getmember(entry.member_name)
+            except KeyError as exc:
+                raise KeyError(f"Archive member for {nbk_id} not found") from exc
+            fileobj = tar.extractfile(member)
+            if fileobj is None:
+                raise ValueError(f"Unable to read archive member {entry.member_name}")
+            raw = fileobj.read()
+
         try:
-            data = await self._request(
-                client,
-                f"{self._RXNORM_BASE}/approximateTerm.json",
-                params=params,
-                expect_json=True,
-            )
-        except Exception as exc:
-            logger.warning("RxNorm lookup failed for %s: %s", drug_name, exc)
-            return [], set()
+            html_text = raw.decode("utf-8")
+        except UnicodeDecodeError:
+            html_text = raw.decode("latin-1", errors="ignore")
 
-        entries = data.get("approximateGroup", {}).get("candidate") or []
-        if isinstance(entries, dict):
-            entries = [entries]
-
-        candidates: list[NameCandidate] = []
-        synonyms: set[str] = set()
-        seen: set[str] = set()
-        for entry in entries:
-            if not isinstance(entry, dict):
-                continue
-            name = entry.get("name") or entry.get("term")
-            rxcui = entry.get("rxcui")
-            if not name or not rxcui:
-                continue
-            normalized_name = self._normalize_name(name)
-            if normalized_name in seen:
-                continue
-            seen.add(normalized_name)
-            rank = entry.get("rank")
-            priority = int(rank) if isinstance(rank, str) and rank.isdigit() else len(candidates)
-            candidates.append(
-                NameCandidate(origin="rxnorm_brand", name=name, priority=priority)
-            )
-            synonyms.add(normalized_name)
-
-        candidates = self._deduplicate_candidates(candidates)
-        normalized_synonyms = {syn for syn in synonyms if syn}
-        payload = (candidates, normalized_synonyms)
-        self._rxnorm_term_cache[normalized] = (self._now(), payload)
-        if normalized_synonyms:
-            self._record_debug(
-                {"action": "rxnorm", "query": drug_name, "synonyms": sorted(normalized_synonyms)}
-            )
-        return payload
-
-    # -----------------------------------------------------------------------------
-    async def _fetch_livertox_content(
-        self, client: httpx.AsyncClient, nbk_id: str
-    ) -> dict[str, str]:
-        cached = self._read_cache(self._content_cache, nbk_id, self._CONTENT_TTL)
-        if cached is not None:
-            return cached
-        url = f"https://www.ncbi.nlm.nih.gov/books/{nbk_id}/?report=xml"
-        xml_text = await self._request(client, url, params=None, expect_json=False)
-        sections = self._extract_sections_from_xml(xml_text)
-        sections["raw_html"] = xml_text
-        self._content_cache[nbk_id] = (self._now(), sections)
+        sections = self._extract_sections(html_text)
+        sections.setdefault("title", entry.title)
+        sections.setdefault("nbk_id", entry.nbk_id)
+        self._content_cache[nbk_id] = sections
         return sections
 
     # -----------------------------------------------------------------------------
-    def _extract_sections_from_xml(self, xml_text: str) -> dict[str, str]:
-        sections: dict[str, str] = {
-            "summary": "",
-            "hepatotoxicity": "",
-            "mechanism": "",
-            "latency_pattern_severity": "",
-            "clinical_course": "",
-            "outcome": "",
-            "references": "",
-        }
-        try:
-            root = ET.fromstring(xml_text)
-        except ET.ParseError:
-            cleaned = self._normalize_whitespace(re.sub(r"<[^>]+>", " ", xml_text))
-            if cleaned:
-                sections["summary"] = cleaned[:2000]
-            return sections
+    def _extract_sections(self, html_text: str) -> dict[str, str]:
+        sections = {key: "" for key in self._SECTION_ALIASES}
+        sections["raw_html"] = html_text
+        blocks = self._iter_heading_blocks(html_text)
+        if blocks:
+            first_block = blocks[0]
+            sections["summary"] = self._html_to_text(html_text[: first_block[1]]).strip()
+        else:
+            sections["summary"] = self._html_to_text(html_text).strip()
 
-        heading_map = {
-            "introduction": "summary",
-            "summary": "summary",
-            "hepatotoxicity": "hepatotoxicity",
-            "mechanism of injury": "mechanism",
-            "mechanism": "mechanism",
-            "latency to onset, pattern and severity": "latency_pattern_severity",
-            "latency to onset, pattern, and severity": "latency_pattern_severity",
-            "latency, pattern and severity": "latency_pattern_severity",
-            "outcome and management": "clinical_course",
-            "clinical course": "clinical_course",
-            "outcome": "outcome",
-        }
-
-        references: list[str] = []
-
-        for section in root.iter():
-            if self._strip_namespace(section.tag) != "section":
+        for heading_text, _heading_start, content_start, content_end in blocks:
+            body_html = html_text[content_start:content_end]
+            body_text = self._html_to_text(body_html).strip()
+            if not body_text:
                 continue
-            heading: str | None = None
-            paragraphs: list[str] = []
-            for child in section:
-                tag = self._strip_namespace(child.tag)
-                if tag == "title" and heading is None:
-                    heading = (child.text or "").strip()
-                elif tag in {"p", "para"}:
-                    paragraphs.append(self._flatten_xml(child))
-                elif tag in {"list", "ul", "ol"}:
-                    paragraphs.append(self._flatten_xml(child))
-            if not heading:
-                continue
-            normalized_heading = heading.lower()
-            key = heading_map.get(normalized_heading)
+            key = self._map_heading_to_key(heading_text)
             if key is None:
                 continue
-            content = "\n".join(part for part in paragraphs if part)
-            sections[key] = content.strip()
-
-        for ref in root.iter():
-            if self._strip_namespace(ref.tag) not in {"ref", "reference"}:
-                continue
-            text = self._flatten_xml(ref)
-            if text:
-                references.append(text)
-            if len(references) >= 10:
-                break
-
-        if references:
-            sections["references"] = "\n".join(references)
+            if sections[key]:
+                sections[key] = f"{sections[key]}\n\n{body_text}".strip()
+            else:
+                sections[key] = body_text
 
         if not sections["summary"]:
-            first_section = next(
-                (
-                    self._flatten_xml(child)
-                    for child in root.iter()
-                    if self._strip_namespace(child.tag) == "p"
-                ),
-                "",
-            )
-            sections["summary"] = first_section.strip()
-
+            sections["summary"] = self._html_to_text(html_text).strip()
         return sections
 
     # -----------------------------------------------------------------------------
-    def _extract_nbk(self, record: dict[str, Any]) -> str | None:
-        article_ids = record.get("articleids") or []
-        for item in article_ids:
-            if not isinstance(item, dict):
-                continue
-            value = item.get("value")
-            if isinstance(value, str) and value.startswith("NBK"):
-                return value
-        for key in ("elocationid", "source", "bookaccession"):
-            value = record.get(key)
-            if isinstance(value, str) and "NBK" in value:
-                match = re.search(r"NBK\d+", value)
-                if match:
-                    return match.group(0)
+    def _iter_heading_blocks(self, html_text: str) -> list[tuple[str, int, int, int]]:
+        pattern = re.compile(r"<h([1-6])[^>]*>(.*?)</h\1>", re.IGNORECASE | re.DOTALL)
+        matches = list(pattern.finditer(html_text))
+        blocks: list[tuple[str, int, int, int]] = []
+        for index, match in enumerate(matches):
+            heading_text = self._clean_fragment(match.group(2))
+            heading_start = match.start()
+            content_start = match.end()
+            content_end = matches[index + 1].start() if index + 1 < len(matches) else len(html_text)
+            blocks.append((heading_text, heading_start, content_start, content_end))
+        return blocks
+
+    # -----------------------------------------------------------------------------
+    def _map_heading_to_key(self, heading: str) -> str | None:
+        normalized = self._normalize_name(heading)
+        if not normalized:
+            return None
+        for key, aliases in self._SECTION_ALIASES.items():
+            for alias in aliases:
+                alias_normalized = self._normalize_name(alias)
+                if normalized.startswith(alias_normalized) or alias_normalized in normalized:
+                    return key
         return None
 
     # -----------------------------------------------------------------------------
-    def _extract_summary_synonyms(self, record: dict[str, Any]) -> set[str]:
-        synonyms: set[str] = set()
-        for key in ("othername", "otherterm"):
-            entry = record.get(key)
-            if isinstance(entry, list):
-                synonyms.update(str(item) for item in entry if item)
-            elif isinstance(entry, str):
-                synonyms.add(entry)
-        mesh = record.get("meshheadinglist")
-        if isinstance(mesh, list):
-            synonyms.update(str(item) for item in mesh if item)
-        return {syn.strip() for syn in synonyms if syn}
+    def _build_index(self, archive_path: Path) -> list[ArchiveEntry]:
+        entries: list[ArchiveEntry] = []
+        with tarfile.open(archive_path, "r:gz") as tar:
+            for member in tar.getmembers():
+                if not member.isfile():
+                    continue
+                name_lower = member.name.lower()
+                if not name_lower.endswith((".html", ".htm", ".xml", ".xhtml")):
+                    continue
+                fileobj = tar.extractfile(member)
+                if fileobj is None:
+                    continue
+                raw = fileobj.read()
+                try:
+                    html_text = raw.decode("utf-8")
+                except UnicodeDecodeError:
+                    html_text = raw.decode("latin-1", errors="ignore")
+                plain_text = self._html_to_text(html_text)
+                nbk_id = self._extract_nbk(member.name, html_text)
+                if nbk_id is None:
+                    continue
+                title = self._extract_title(html_text, plain_text, nbk_id)
+                aliases = self._extract_aliases(title, plain_text)
+                normalized_title = self._normalize_name(title)
+                primary_normalized = self._normalize_name(title.split("(")[0])
+                normalized_aliases = set()
+                for alias in aliases:
+                    normalized_alias = self._normalize_name(alias)
+                    if normalized_alias:
+                        normalized_aliases.add(normalized_alias)
+                keyword_tokens = self._tokens_from_values(
+                    [
+                        normalized_title,
+                        primary_normalized,
+                        *normalized_aliases,
+                        self._normalize_name(nbk_id),
+                    ]
+                )
+                entries.append(
+                    ArchiveEntry(
+                        nbk_id=nbk_id,
+                        title=title,
+                        aliases=aliases,
+                        member_name=member.name,
+                        normalized_title=normalized_title,
+                        primary_normalized_title=primary_normalized,
+                        normalized_aliases=normalized_aliases,
+                        keyword_tokens=keyword_tokens,
+                    )
+                )
+        if not entries:
+            logger.warning("No LiverTox entries found in archive %s", archive_path)
+        return entries
 
     # -----------------------------------------------------------------------------
-    def _build_name_candidates(self, drug_name: str) -> list[NameCandidate]:
-        candidates: list[NameCandidate] = []
-        stripped = drug_name.strip()
-        if stripped:
-            candidates.append(NameCandidate(origin="input_raw", name=stripped, priority=0))
-        normalized = self._normalize_name(drug_name)
-        if normalized and normalized != stripped.lower():
-            candidates.append(NameCandidate(origin="normalized", name=normalized, priority=1))
-        ascii_variant = self._ascii_fold(drug_name)
-        if ascii_variant and ascii_variant.lower() != normalized:
-            candidates.append(NameCandidate(origin="ascii", name=ascii_variant, priority=2))
-        for typo in self._generate_typo_variants(normalized):
-            candidates.append(NameCandidate(origin="typo", name=typo, priority=3))
-        return self._deduplicate_candidates(candidates)
+    def _extract_nbk(self, member_name: str, html_text: str) -> str | None:
+        match = re.search(r"NBK\d+", member_name, re.IGNORECASE)
+        if match:
+            return match.group(0).upper()
+        match = re.search(r"NBK\d+", html_text, re.IGNORECASE)
+        if match:
+            return match.group(0).upper()
+        return None
 
     # -----------------------------------------------------------------------------
-    def _deduplicate_candidates(self, items: Sequence[NameCandidate]) -> list[NameCandidate]:
-        seen: set[str] = set()
-        unique: list[NameCandidate] = []
-        for item in sorted(items, key=lambda entry: entry.priority):
-            key = self._normalize_name(item.name)
-            if not key or key in seen:
+    def _extract_title(self, html_text: str, plain_text: str, default: str) -> str:
+        for pattern in (r"<title[^>]*>(.*?)</title>", r"<h1[^>]*>(.*?)</h1>"):
+            match = re.search(pattern, html_text, flags=re.IGNORECASE | re.DOTALL)
+            if match:
+                cleaned = self._clean_fragment(match.group(1))
+                if cleaned:
+                    return cleaned
+        for line in plain_text.splitlines():
+            stripped = line.strip()
+            if stripped:
+                return stripped
+        return default
+
+    # -----------------------------------------------------------------------------
+    def _extract_aliases(self, title: str, plain_text: str) -> set[str]:
+        aliases: set[str] = set()
+        for fragment in re.findall(r"\(([^)]+)\)", title):
+            for part in re.split(r"[,;/]|\bor\b", fragment):
+                cleaned = part.strip()
+                if cleaned:
+                    aliases.add(cleaned)
+        patterns = [
+            r"^synonyms?[:\s-]+(.+)$",
+            r"^other names?[:\s-]+(.+)$",
+            r"^brand names?[:\s-]+(.+)$",
+            r"^trade names?[:\s-]+(.+)$",
+            r"^also known as[:\s-]+(.+)$",
+        ]
+        for line in plain_text.splitlines():
+            stripped = line.strip()
+            if not stripped:
                 continue
-            seen.add(key)
-            unique.append(item)
-        return unique
+            for pattern in patterns:
+                match = re.match(pattern, stripped, flags=re.IGNORECASE)
+                if not match:
+                    continue
+                chunk = re.split(r"[.;]", match.group(1), maxsplit=1)[0]
+                for part in re.split(r"[,/]|\bor\b", chunk):
+                    cleaned = part.strip()
+                    if cleaned:
+                        aliases.add(cleaned)
+        return aliases
 
     # -----------------------------------------------------------------------------
-    def _generate_typo_variants(self, normalized: str) -> set[str]:
-        variants: set[str] = set()
-        if not normalized or len(normalized) < 4:
-            return variants
-        # Single deletion variants (limit to first three positions to contain growth).
-        for index in range(min(len(normalized), 6)):
-            candidate = normalized[:index] + normalized[index + 1 :]
-            if len(candidate) >= 4:
-                variants.add(candidate)
-        swaps = normalized.replace("ph", "f")
-        if swaps != normalized:
-            variants.add(swaps)
-        if "y" in normalized:
-            variants.add(normalized.replace("y", "i"))
-        return variants
+    def _clean_fragment(self, fragment: str) -> str:
+        return self._html_to_text(fragment)
+
+    # -----------------------------------------------------------------------------
+    def _html_to_text(self, html_text: str) -> str:
+        stripped = re.sub(r"(?is)<(script|style)[^>]*>.*?</\1>", " ", html_text)
+        stripped = re.sub(r"<[^>]+>", " ", stripped)
+        unescaped = html.unescape(stripped)
+        return self._normalize_whitespace(unescaped)
+
+    # -----------------------------------------------------------------------------
+    def _tokens_from_values(self, values: Iterable[str]) -> set[str]:
+        tokens: set[str] = set()
+        for value in values:
+            for token in value.split():
+                if token:
+                    tokens.add(token)
+        return tokens
 
     # -----------------------------------------------------------------------------
     def _normalize_name(self, value: str) -> str:
@@ -781,85 +603,9 @@ class DrugToxicityEssay:
         return "".join(char for char in normalized if not unicodedata.combining(char))
 
     # -----------------------------------------------------------------------------
-    def _title_case(self, value: str) -> str:
-        return " ".join(token.capitalize() for token in value.split())
-
-    # -----------------------------------------------------------------------------
     def _strip_punctuation(self, value: str) -> str:
-        return re.sub(r"[\-_,.;:()\[\]{}\/\\]", " ", value)
-
-    # -----------------------------------------------------------------------------
-    def _flatten_xml(self, node: ET.Element) -> str:
-        text = "".join(node.itertext())
-        return self._normalize_whitespace(text)
-
-    # -----------------------------------------------------------------------------
-    def _strip_namespace(self, tag: str) -> str:
-        if "}" in tag:
-            return tag.split("}", 1)[1]
-        return tag
+        return re.sub(r"[-_,.;:()\[\]{}\/\\]", " ", value)
 
     # -----------------------------------------------------------------------------
     def _normalize_whitespace(self, value: str) -> str:
         return re.sub(r"\s+", " ", value).strip()
-
-    # -----------------------------------------------------------------------------
-    def _record_debug(self, payload: dict[str, Any]) -> None:
-        self._debug_records.append(payload)
-        logger.debug("LiverTox debug event: %s", payload)
-
-    # -----------------------------------------------------------------------------
-    async def _request(
-        self,
-        client: httpx.AsyncClient,
-        url: str,
-        *,
-        params: dict[str, Any] | None,
-        expect_json: bool,
-    ) -> Any:
-        delay = self._BACKOFF_BASE
-        for attempt in range(self._MAX_RETRIES):
-            try:
-                await self._respect_rate_limit()
-                response = await client.get(url, params=params)
-                response.raise_for_status()
-                self._last_request_ts = self._now()
-                if expect_json:
-                    return response.json()
-                return response.text
-            except (httpx.RequestError, httpx.HTTPStatusError) as exc:
-                logger.warning("HTTP request failed (%s): %s", url, exc)
-                if attempt + 1 >= self._MAX_RETRIES:
-                    raise
-                jitter = random.uniform(0.0, delay * 0.25)
-                await asyncio.sleep(min(self._BACKOFF_MAX, delay) + jitter)
-                delay *= 2
-
-        raise RuntimeError("HTTP request retries exceeded")
-
-    # -----------------------------------------------------------------------------
-    async def _respect_rate_limit(self) -> None:
-        elapsed = self._now() - self._last_request_ts
-        if elapsed < self._MIN_REQUEST_INTERVAL:
-            await asyncio.sleep(self._MIN_REQUEST_INTERVAL - elapsed)
-
-    # -----------------------------------------------------------------------------
-    def _read_cache(
-        self,
-        cache: dict[str, tuple[float, Any]],
-        key: str,
-        ttl: float,
-    ) -> Any | None:
-        entry = cache.get(key)
-        if not entry:
-            return None
-        timestamp, payload = entry
-        if self._now() - timestamp > ttl:
-            cache.pop(key, None)
-            return None
-        return payload
-
-    # -----------------------------------------------------------------------------
-    def _now(self) -> float:
-        return time.monotonic()
-        
