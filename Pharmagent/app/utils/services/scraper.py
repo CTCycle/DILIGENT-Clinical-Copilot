@@ -159,8 +159,9 @@ class LiverToxClient:
                     "excerpt": cleaned_text,
                     "text": cleaned_text,
                 }
-                collected[record_key] = record
-                priorities[record_key] = priority
+                collected[drug_name] = record
+                priorities[drug_name] = priority
+                
         return list(collected.values())
 
     # -----------------------------------------------------------------------------
