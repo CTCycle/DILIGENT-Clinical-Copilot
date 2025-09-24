@@ -130,12 +130,20 @@ class DrugToxicityEssay:
     def __init__(
         self,
         drugs: PatientDrugs,
-        *,        
+        *,
         ensure_download: bool = True,
         timeout_s: float = 300.0,
+        archive_path: str | None = None,
     ) -> None:
         self.drugs = drugs
-        self._archive_path = os.path.join(SOURCES_PATH, LIVERTOX_ARCHIVE)      
+        normalized_archive_path = archive_path or os.path.join(
+            SOURCES_PATH, LIVERTOX_ARCHIVE
+        )
+        if os.path.isdir(normalized_archive_path):
+            normalized_archive_path = os.path.join(
+                normalized_archive_path, LIVERTOX_ARCHIVE
+            )
+        self._archive_path = os.path.abspath(normalized_archive_path)
         self._auto_download = ensure_download
         self._llm_client = initialize_llm_client(purpose="agent", timeout_s=timeout_s)
         self._match_cache: dict[str, LiverToxMatch] = {}
@@ -143,7 +151,6 @@ class DrugToxicityEssay:
         self._entries: list[ArchiveEntry] = []
         self._entry_by_nbk: dict[str, ArchiveEntry] = {}
         self._archive_ready = False
-
     # -----------------------------------------------------------------------------
     async def run_analysis(self) -> PatientDrugToxicityBundle:
         await self._ensure_index_loaded()
