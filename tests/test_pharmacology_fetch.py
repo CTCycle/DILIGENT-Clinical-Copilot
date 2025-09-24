@@ -4,6 +4,7 @@ import os
 import sys
 import tarfile
 import types
+from typing import Any
 
 import pytest
 
@@ -171,6 +172,7 @@ if "httpx" not in sys.modules:
     httpx_stub.AsyncClient = _AsyncClient  # type: ignore[attr-defined]
     sys.modules["httpx"] = httpx_stub
 
+
 if "pdfminer" not in sys.modules:
     pdfminer_stub = types.ModuleType("pdfminer")
     pdfminer_high_level = types.ModuleType("pdfminer.high_level")
@@ -218,6 +220,7 @@ from fastapi import HTTPException
 
 from Pharmagent.app.constants import LIVERTOX_ARCHIVE
 from Pharmagent.app.utils.jobs import JobManager, JobStatus
+from Pharmagent.app.client.livertox_jobs import _await_livertox_job
 
 
 ###############################################################################
@@ -381,3 +384,90 @@ def test_fetch_bulk_livertox_skip_without_archive(monkeypatch, tmp_path) -> None
     assert exc.value.status_code == 404
     assert client.download_called is False
     assert serializer.saved_records is None
+
+
+###############################################################################
+class _StubStatusResponse:
+    def __init__(self, payload: dict[str, Any]):
+        self.payload = payload
+        self.text = ""
+
+    def raise_for_status(self) -> None:
+        return None
+
+    def json(self) -> dict[str, Any]:
+        return self.payload
+
+
+###############################################################################
+class _StubPollingClient:
+    def __init__(self, payloads: list[dict[str, Any]]):
+        self.payloads = payloads
+        self.calls = 0
+
+    async def get(self, url: str) -> _StubStatusResponse:
+        idx = self.calls if self.calls < len(self.payloads) else len(self.payloads) - 1
+        self.calls += 1
+        await asyncio.sleep(0)
+        return _StubStatusResponse(self.payloads[idx])
+
+
+# -----------------------------------------------------------------------------
+def test_await_livertox_job_handles_timeout() -> None:
+    initial_status = {
+        "job_id": "abc",
+        "status": "running",
+        "detail": "Job started",
+        "result": None,
+    }
+    client = _StubPollingClient([
+        {"status": "running", "detail": "Still working"},
+    ])
+
+    message = asyncio.run(
+        _await_livertox_job(
+            client,
+            initial_status,
+            poll_interval=0.01,
+            timeout=0.05,
+        )
+    )
+
+    assert isinstance(message, str)
+    assert "[INFO]" in message
+    assert "Job ID: abc" in message
+    assert "Still working" in message
+
+
+# -----------------------------------------------------------------------------
+def test_await_livertox_job_completes() -> None:
+    initial_status = {
+        "job_id": "xyz",
+        "status": "running",
+        "detail": "Downloading",
+        "result": None,
+    }
+    client = _StubPollingClient(
+        [
+            {"status": "running", "detail": "Extracting"},
+            {
+                "status": "completed",
+                "detail": "Done",
+                "result": {"file_path": "/tmp/archive.tar.gz"},
+            },
+        ]
+    )
+
+    result = asyncio.run(
+        _await_livertox_job(
+            client,
+            initial_status,
+            poll_interval=0.01,
+            timeout=1.0,
+        )
+    )
+
+    assert isinstance(result, tuple)
+    payload, progress_log = result
+    assert payload["file_path"] == "/tmp/archive.tar.gz"
+    assert any("Extracting" in entry for entry in progress_log)
