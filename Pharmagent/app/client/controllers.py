@@ -23,7 +23,7 @@ from Pharmagent.app.api.models.providers import (
     OllamaError,
     OllamaTimeout,
 )
-from Pharmagent.app.client.livertox_jobs import (
+from Pharmagent.app.utils.jobs import (
     _await_livertox_job,
     _format_progress_log,
 )
