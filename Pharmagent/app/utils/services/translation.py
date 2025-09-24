@@ -52,7 +52,7 @@ class TranslationService:
 
         self.tokenizer: PreTrainedTokenizerBase | None = None
         self.model: PreTrainedModel | None = None
-        self._loaded: bool = False
+        self.loaded: bool = False
 
         self.max_new_tokens = max_new_tokens
         self.batch_size = max(1, batch_size)
@@ -63,7 +63,7 @@ class TranslationService:
 
     # -------------------------------------------------------------------------
     def _ensure_model_loaded(self) -> None:
-        if self._loaded:
+        if self.loaded:
             return
 
         self.tokenizer = AutoTokenizer.from_pretrained(self.model_name, use_fast=True)
@@ -74,7 +74,7 @@ class TranslationService:
         self.model = cast(PreTrainedModel, loaded)
         self.model.to(self.device)  # type: ignore
         self.model.eval()
-        self._loaded = True
+        self.loaded = True
 
     # -------------------------------------------------------------------------
     def free_model(self) -> None:
@@ -86,7 +86,7 @@ class TranslationService:
                 pass
         self.model = None
         self.tokenizer = None
-        self._loaded = False
+        self.loaded = False
         if torch.cuda.is_available():
             try:
                 torch.cuda.empty_cache()

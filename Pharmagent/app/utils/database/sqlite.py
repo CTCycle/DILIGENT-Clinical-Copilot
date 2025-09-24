@@ -4,7 +4,7 @@ import os
 from typing import Any
 
 import pandas as pd
-from sqlalchemy import Column, Float, String, UniqueConstraint, create_engine
+from sqlalchemy import Column, Float, String, Text, UniqueConstraint, create_engine
 import sqlalchemy
 from sqlalchemy.dialects.sqlite import insert
 from sqlalchemy.orm import declarative_base, sessionmaker
@@ -36,6 +36,14 @@ class Patients(Base):
     additional_tests = Column(String)
     drugs = Column(String)
     __table_args__ = (UniqueConstraint("name"),)
+
+
+###############################################################################
+class LiverToxMonographs(Base):
+    __tablename__ = "LIVERTOX_MONOGRAPHS"
+    nbk_id = Column(String, primary_key=True)
+    drug_name = Column(String, nullable=False)
+    excerpt = Column(Text)
 
 
 # [DATABASE]
@@ -103,6 +111,13 @@ class PharmagentDatabase:
     def upsert_into_database(self, df: pd.DataFrame, table_name: str) -> None:
         table_cls = self.get_table_class(table_name)
         self._upsert_dataframe(df, table_cls)
+
+    # -----------------------------------------------------------------------------
+    def count_rows(self, table_name: str) -> int:
+        with self.engine.connect() as conn:
+            result = conn.execute(sqlalchemy.text(f'SELECT COUNT(*) FROM "{table_name}"'))
+            value = result.scalar() or 0
+        return int(value)
 
 
 # -----------------------------------------------------------------------------

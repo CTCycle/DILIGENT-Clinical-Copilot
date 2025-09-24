@@ -70,6 +70,7 @@ DEFAULT_CLOUD_MODEL = CLOUD_MODEL_CHOICES[DEFAULT_CLOUD_PROVIDER][0]
 ATC_BASE_URL = "https://atcddd.fhi.no/atc_ddd_index/"
 LIVERTOX_BASE_URL = "https://ftp.ncbi.nlm.nih.gov/pub/litarch/29/31/"
 LIVERTOX_ARCHIVE = "livertox_NBK547852.tar.gz"
+LIVERTOX_TABLE_NAME = "LIVERTOX_MONOGRAPHS"
 
 # [NLP / TRANSLATION]
 ###############################################################################

@@ -130,10 +130,10 @@ class HepatotoxicityPatternAnalyzer:
 
 ###############################################################################
 class DrugToxicityEssay:
-    _DIRECT_CONFIDENCE = 1.0
-    _ALIAS_CONFIDENCE = 0.95
-    _MIN_CONFIDENCE = 0.40
-    _SUPPORTED_EXTENSIONS: tuple[str, ...] = (
+    DIRECT_CONFIDENCE = 1.0
+    ALIAS_CONFIDENCE = 0.95
+    MIN_CONFIDENCE = 0.40
+    SUPPORTED_EXTENSIONS: tuple[str, ...] = (
         ".html",
         ".htm",
         ".xml",
@@ -141,7 +141,7 @@ class DrugToxicityEssay:
         ".nxml",
         ".pdf",
     )
-    _IMAGE_EXTENSIONS: tuple[str, ...] = (
+    IMAGE_EXTENSIONS: tuple[str, ...] = (
         ".png",
         ".jpg",
         ".jpeg",
@@ -149,7 +149,7 @@ class DrugToxicityEssay:
         ".tiff",
         ".bmp",
     )
-    _SECTION_ALIASES: dict[str, set[str]] = {
+    SECTION_ALIASES: dict[str, set[str]] = {
         "summary": {"summary", "introduction", "overview"},
         "hepatotoxicity": {"hepatotoxicity", "liver injury"},
         "mechanism": {"mechanism", "mechanism of injury"},
@@ -181,14 +181,14 @@ class DrugToxicityEssay:
             normalized_archive_path = os.path.join(
                 normalized_archive_path, LIVERTOX_ARCHIVE
             )
-        self._archive_path = os.path.abspath(normalized_archive_path)
-        self._auto_download = ensure_download
-        self._llm_client = initialize_llm_client(purpose="agent", timeout_s=timeout_s)
-        self._match_cache: dict[str, LiverToxMatch] = {}
-        self._content_cache: dict[str, dict[str, str]] = {}
-        self._entries: list[ArchiveEntry] = []
-        self._entry_by_nbk: dict[str, ArchiveEntry] = {}
-        self._archive_ready = False
+        self.archive_path = os.path.abspath(normalized_archive_path)
+        self.auto_download = ensure_download
+        self.llm_client = initialize_llm_client(purpose="agent", timeout_s=timeout_s)
+        self.match_cache: dict[str, LiverToxMatch] = {}
+        self.content_cache: dict[str, dict[str, str]] = {}
+        self.entries: list[ArchiveEntry] = []
+        self.entry_by_nbk: dict[str, ArchiveEntry] = {}
+        self.archive_ready = False
     # -----------------------------------------------------------------------------
     async def run_analysis(self) -> PatientDrugToxicityBundle:
         await self._ensure_index_loaded()
@@ -302,7 +302,7 @@ class DrugToxicityEssay:
             source_text=excerpt or (content.get("raw_html") or ""),
         )
         model_name = ClientRuntimeConfig.get_agent_model()
-        return await self._llm_client.llm_structured_call(
+        return await self.llm_client.llm_structured_call(
             model=model_name,
             system_prompt=HEPATOTOXICITY_ANALYSIS_SYSTEM_PROMPT,
             user_prompt=prompt,
@@ -312,28 +312,28 @@ class DrugToxicityEssay:
 
     # -----------------------------------------------------------------------------
     async def _ensure_archive_ready(self) -> None:
-        if self._archive_ready:
+        if self.archive_ready:
             return
-        archive_path = self._archive_path
+        archive_path = self.archive_path
         archive_dir = os.path.dirname(archive_path) or os.curdir
         os.makedirs(archive_dir, exist_ok=True)
         if not os.path.isfile(archive_path):
-            if not self._auto_download:
+            if not self.auto_download:
                 raise FileNotFoundError(f"LiverTox archive missing at {archive_path}")
             client = LiverToxClient()
             await client.download_bulk_data(archive_dir)
         if not tarfile.is_tarfile(archive_path):
             raise RuntimeError(f"Invalid LiverTox archive at {archive_path}")
-        self._archive_ready = True
+        self.archive_ready = True
 
     # -----------------------------------------------------------------------------
     async def _ensure_index_loaded(self) -> None:
-        if self._entries:
+        if self.entries:
             return
         await self._ensure_archive_ready()
-        self._entries = self._build_index(self._archive_path)
-        self._entry_by_nbk = {entry.nbk_id: entry for entry in self._entries}
-        if not self._entries:
+        self.entries = self._build_index(self.archive_path)
+        self.entry_by_nbk = {entry.nbk_id: entry for entry in self.entries}
+        if not self.entries:
             raise RuntimeError("Local LiverTox archive is empty")
 
     # -----------------------------------------------------------------------------
@@ -346,17 +346,17 @@ class DrugToxicityEssay:
         if not normalized_query:
             holder.append("Drug name is empty after normalization")
             return None
-        cached = self._match_cache.get(normalized_query)
+        cached = self.match_cache.get(normalized_query)
         if cached is not None:
             return cached
 
         best: tuple[float, ArchiveEntry, str, str | None] | None = None
-        for entry in self._entries:
+        for entry in self.entries:
             score, reason, detail = self._score_entry(normalized_query, entry)
             if best is None or score > best[0]:
                 best = (score, entry, reason, detail)
 
-        if best is None or best[0] < self._MIN_CONFIDENCE:
+        if best is None or best[0] < self.MIN_CONFIDENCE:
             holder.append("No matching entry found in local LiverTox archive")
             return None
 
@@ -375,11 +375,11 @@ class DrugToxicityEssay:
         match = LiverToxMatch(
             nbk_id=entry.nbk_id,
             matched_name=entry.title,
-            confidence=round(min(max(score, self._MIN_CONFIDENCE), 1.0), 2),
+            confidence=round(min(max(score, self.MIN_CONFIDENCE), 1.0), 2),
             reason=reason,
             notes=list(dict.fromkeys(notes_payload)),
         )
-        self._match_cache[normalized_query] = match
+        self.match_cache[normalized_query] = match
         return match
 
     # -----------------------------------------------------------------------------
@@ -390,13 +390,13 @@ class DrugToxicityEssay:
             entry.normalized_title,
             entry.primary_normalized_title,
         ):
-            return self._DIRECT_CONFIDENCE, "direct_match", entry.title
+            return self.DIRECT_CONFIDENCE, "direct_match", entry.title
         if normalized_query in entry.normalized_aliases:
             alias = next(
                 (alias for alias in entry.aliases if self._normalize_name(alias) == normalized_query),
                 entry.title,
             )
-            return self._ALIAS_CONFIDENCE, "alias_match", alias
+            return self.ALIAS_CONFIDENCE, "alias_match", alias
 
         best_alias = None
         best_alias_score = 0.0
@@ -425,11 +425,11 @@ class DrugToxicityEssay:
 
     # -----------------------------------------------------------------------------
     async def _fetch_livertox_content(self, nbk_id: str) -> dict[str, str]:
-        cached = self._content_cache.get(nbk_id)
+        cached = self.content_cache.get(nbk_id)
         if cached is not None:
             return cached
         await self._ensure_index_loaded()
-        entry = self._entry_by_nbk.get(nbk_id)
+        entry = self.entry_by_nbk.get(nbk_id)
         if entry is None:
             raise KeyError(f"No entry for NBK id {nbk_id}")
 
@@ -438,12 +438,12 @@ class DrugToxicityEssay:
         sections = self._extract_sections(html_text)
         sections.setdefault("title", entry.title)
         sections.setdefault("nbk_id", entry.nbk_id)
-        self._content_cache[nbk_id] = sections
+        self.content_cache[nbk_id] = sections
         return sections
 
     # -----------------------------------------------------------------------------
     def _extract_sections(self, html_text: str) -> dict[str, str]:
-        sections = {key: "" for key in self._SECTION_ALIASES}
+        sections = {key: "" for key in self.SECTION_ALIASES}
         sections["raw_html"] = html_text
         blocks = self._iter_heading_blocks(html_text)
         if blocks:
@@ -487,7 +487,7 @@ class DrugToxicityEssay:
         normalized = self._normalize_name(heading)
         if not normalized:
             return None
-        for key, aliases in self._SECTION_ALIASES.items():
+        for key, aliases in self.SECTION_ALIASES.items():
             for alias in aliases:
                 alias_normalized = self._normalize_name(alias)
                 if normalized.startswith(alias_normalized) or alias_normalized in normalized:
@@ -506,9 +506,9 @@ class DrugToxicityEssay:
                 if not member.isfile():
                     continue
                 name_lower = member.name.lower()
-                if any(name_lower.endswith(ext) for ext in self._IMAGE_EXTENSIONS):
+                if any(name_lower.endswith(ext) for ext in self.IMAGE_EXTENSIONS):
                     continue
-                if not any(name_lower.endswith(ext) for ext in self._SUPPORTED_EXTENSIONS):
+                if not any(name_lower.endswith(ext) for ext in self.SUPPORTED_EXTENSIONS):
                     continue
                 document_text = self._read_text_from_tar_member(tar, member)
                 if document_text is None:
@@ -553,7 +553,7 @@ class DrugToxicityEssay:
     # -----------------------------------------------------------------------------
     def _read_archive_member(self, member_name: str) -> str:
         try:
-            with tarfile.open(self._archive_path, "r:gz") as tar:
+            with tarfile.open(self.archive_path, "r:gz") as tar:
                 try:
                     member = tar.getmember(member_name)
                 except KeyError as exc:
@@ -564,7 +564,7 @@ class DrugToxicityEssay:
                 raw = fileobj.read()
                 return self._convert_member_bytes(member.name, raw)
         except tarfile.ReadError as exc:
-            raise RuntimeError(f"Failed to read LiverTox archive {self._archive_path}") from exc
+            raise RuntimeError(f"Failed to read LiverTox archive {self.archive_path}") from exc
 
     # -----------------------------------------------------------------------------
     def _read_text_from_tar_member(
