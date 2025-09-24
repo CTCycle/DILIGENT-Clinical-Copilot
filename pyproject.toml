@@ -16,6 +16,8 @@ dependencies = [
     "pypdf==5.1.0",
     "pandas==2.2.3",
     "tqdm==4.67.1",
+    "pdfminer.six==20250506",
+    "pypdf==6.1.0",
     "SQLAlchemy==2.0.41",     
     "python-dotenv==1.1.0",
     "langchain==0.3.7",        
