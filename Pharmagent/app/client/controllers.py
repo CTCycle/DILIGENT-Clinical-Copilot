@@ -180,12 +180,13 @@ async def preload_selected_models(parsing_model: str, agent_model: str) -> str:
 
 
 # -----------------------------------------------------------------------------
-async def fetch_clinical_data() -> str:
+async def fetch_clinical_data(skip_download: bool) -> str:
     url = f"{API_BASE_URL}{PHARMACOLOGY_LIVERTOX_FETCH_ENDPOINT}"
+    params = {"skip_download": "true"} if skip_download else None
 
     try:
         async with httpx.AsyncClient(timeout=120) as client:
-            response = await client.get(url)
+            response = await client.get(url, params=params)
             response.raise_for_status()
             try:
                 payload = response.json()
@@ -282,6 +283,7 @@ def clear_agent_fields() -> tuple[
     bool,
     bool,
     bool,
+    bool,
     str,
     str,
 ]:
@@ -295,6 +297,7 @@ def clear_agent_fields() -> tuple[
         "",
         "",
         [],
+        False,
         False,
         False,
         False,
