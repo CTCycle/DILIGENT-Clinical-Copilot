@@ -8,7 +8,7 @@ from typing import Any
 import pandas as pd
 
 from Pharmagent.app.api.models.prompts import (
-    LIVERTOX_BATCH_MATCH_USER_PROMPT,
+    LIVERTOX_MATCH_USER_PROMPT,
     LIVERTOX_MATCH_SYSTEM_PROMPT,
 )
 from Pharmagent.app.api.models.providers import initialize_llm_client
@@ -198,7 +198,7 @@ class LiverToxMatcher:
             nbk_id = str(row.get("nbk_id") or "").strip()
             if not nbk_id:
                 continue
-            index[nbk_id] = row
+            index[nbk_id] = row # type: ignore
         self.rows_by_nbk = index
         return self.rows_by_nbk
 
@@ -311,7 +311,7 @@ class LiverToxMatcher:
             f"- {name}" if name else "-"
             for name in patient_drugs
         )
-        prompt = LIVERTOX_BATCH_MATCH_USER_PROMPT.format(
+        prompt = LIVERTOX_MATCH_USER_PROMPT.format(
             patient_drugs=drugs_block,
             candidates=candidate_block,
         )
@@ -390,4 +390,4 @@ class LiverToxMatcher:
         normalized = re.sub(r"\s+", " ", normalized).strip()
         return normalized
 
-    # -------------------------------------------------------------------------
+
