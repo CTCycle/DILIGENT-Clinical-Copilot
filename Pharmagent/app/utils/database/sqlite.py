@@ -120,6 +120,5 @@ class PharmagentDatabase:
             value = result.scalar() or 0
         return int(value)
 
-
 # -----------------------------------------------------------------------------
 database = PharmagentDatabase()
