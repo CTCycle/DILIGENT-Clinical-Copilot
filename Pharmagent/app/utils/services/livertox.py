@@ -19,6 +19,10 @@ from Pharmagent.app.api.models.providers import initialize_llm_client
 from Pharmagent.app.api.schemas.clinical import LiverToxBatchMatchSuggestion
 from Pharmagent.app.configurations import ClientRuntimeConfig
 from Pharmagent.app.logger import logger
+from Pharmagent.app.utils.services.retrieval import (
+    RXNORM_EXPANSION_ENABLED,
+    RxNormRetriever,
+)
 
 try:
     from langsmith import traceable as langsmith_traceable
@@ -100,6 +104,7 @@ class LiverToxMatcher:
         livertox_df: pd.DataFrame,
         *,
         llm_client: Any | None = None,
+        retriever: RxNormRetriever | None = None,
     ) -> None:
         self.livertox_df = livertox_df
         self.llm_client = llm_client or initialize_llm_client(
@@ -112,6 +117,7 @@ class LiverToxMatcher:
         self.candidate_prompt_block: str | None = None
         self.langsmith_batch_lookup: Callable[..., Awaitable[Any]] | None = None
         self.langsmith_llm_call: Callable[..., Awaitable[Any]] | None = None
+        self.rxnorm_retriever = retriever or RxNormRetriever()
         if LANGSMITH_TRACING_ENABLED and langsmith_traceable is None:
             global _LANGSMITH_WARNING_EMITTED
             if not _LANGSMITH_WARNING_EMITTED:
@@ -142,32 +148,76 @@ class LiverToxMatcher:
         results: list[LiverToxMatch | None] = [None] * total
         if not self.records:
             return results
-        # Normalize all queries once so both deterministic and LLM stages share inputs.
-        normalized_queries = [self._normalize_name(name) for name in patient_drugs]
+        # Expand each query via RxNorm before deterministic matching to broaden coverage.
+        normalized_queries: list[str] = []
+        expanded_candidates: list[dict[str, str]] = []
+        for name in patient_drugs:
+            normalized_name = self._normalize_name(name)
+            normalized_queries.append(normalized_name)
+            candidate_map: dict[str, str] = {}
+            expanded: set[str] = set()
+            if RXNORM_EXPANSION_ENABLED:
+                expanded = self.rxnorm_retriever.expand(name)
+                metadata: dict[str, str] = {}
+                for candidate in expanded:
+                    kind = self.rxnorm_retriever.get_candidate_kind(name, candidate)
+                    metadata[candidate] = kind
+                for candidate in sorted(expanded):
+                    normalized_candidate = self._normalize_name(candidate)
+                    if not normalized_candidate:
+                        continue
+                    candidate_map[normalized_candidate] = metadata.get(
+                        candidate,
+                        "unknown",
+                    )
+            if normalized_name and normalized_name not in candidate_map:
+                candidate_map[normalized_name] = "original"
+            expanded_candidates.append({k: v for k, v in candidate_map.items() if k})
         eligible_total = sum(1 for value in normalized_queries if value)
         unresolved_indices: list[int] = []
         deterministic_matches = 0
-        for idx, normalized in enumerate(normalized_queries):
+        for idx, candidate_map in enumerate(expanded_candidates):
             if idx and idx % self.YIELD_INTERVAL == 0:
                 await asyncio.sleep(0)
-            if not normalized:
+            normalized_original = normalized_queries[idx]
+            if not normalized_original:
                 continue
-            if normalized in self.match_cache:
-                cached = self.match_cache[normalized]
-                results[idx] = cached
-                if cached is not None and cached.reason != "llm_fallback":
-                    deterministic_matches += 1
+            candidate_matches: list[tuple[tuple[int, float, float], str, LiverToxMatch]] = []
+            candidate_keys = {
+                key: value
+                for key, value in (candidate_map or {normalized_original: "original"}).items()
+                if key
+            }
+            if not candidate_keys:
                 continue
-            deterministic = self._deterministic_lookup(normalized)
-            if deterministic is not None:
+            for normalized_candidate, kind in candidate_keys.items():
+                cached = self.match_cache.get(normalized_candidate)
+                if cached is not None:
+                    if cached is not None:
+                        priority = self._candidate_priority(cached, kind)
+                        candidate_matches.append((priority, normalized_candidate, cached))
+                    continue
+                deterministic = self._deterministic_lookup(normalized_candidate)
+                if deterministic is None:
+                    self.match_cache.setdefault(normalized_candidate, None)
+                    continue
                 record, confidence, reason, notes = deterministic
                 match = self._create_match(record, confidence, reason, notes)
-                self.match_cache[normalized] = match
-                results[idx] = match
-                deterministic_matches += 1
+                self.match_cache[normalized_candidate] = match
+                priority = self._candidate_priority(match, kind)
+                candidate_matches.append((priority, normalized_candidate, match))
+            if not candidate_matches:
+                self.match_cache.setdefault(normalized_original, None)
+                unresolved_indices.append(idx)
                 continue
-            self.match_cache[normalized] = None
-            unresolved_indices.append(idx)
+            candidate_matches.sort(key=lambda item: item[0])
+            best_match = candidate_matches[0][2]
+            results[idx] = best_match
+            self.match_cache[normalized_original] = best_match
+            if best_match.reason != "llm_fallback":
+                deterministic_matches += 1
+            else:
+                unresolved_indices.append(idx)
         if not unresolved_indices:
             return results
         match_pool = eligible_total or 1
@@ -197,6 +247,27 @@ class LiverToxMatcher:
             self.match_cache[normalized] = match
             results[idx] = match
         return results
+
+    # -------------------------------------------------------------------------
+    def _candidate_priority(self, match: LiverToxMatch, kind: str) -> tuple[int, float, float]:
+        reason = match.reason
+        confidence = match.confidence
+        if reason == "direct_match":
+            if kind == "ingredient":
+                return (0, -confidence, 0.0)
+            if kind == "brand":
+                return (1, -confidence, 0.0)
+            return (2, -confidence, 0.0)
+        if reason != "llm_fallback":
+            kind_rank = {
+                "ingredient": 0,
+                "ingredient_combo": 1,
+                "psn": 2,
+                "brand": 3,
+                "original": 4,
+            }.get(kind, 5)
+            return (3, -confidence, float(kind_rank))
+        return (4, -confidence, 0.0)
 
     # -------------------------------------------------------------------------
     def build_patient_mapping(
