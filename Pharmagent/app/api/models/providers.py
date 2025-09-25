@@ -21,6 +21,7 @@ from Pharmagent.app.constants import (
     OLLAMA_HOST_DEFAULT,
     OPENAI_API_BASE,
     GEMINI_API_BASE,
+    PARSING_MODEL_CHOICES,
 )
 from Pharmagent.app.configurations import ClientRuntimeConfig
 
@@ -527,6 +528,29 @@ class OllamaClient:
             raise OllamaTimeout("Timed out during streamed chat response") from e
 
     # -------------------------------------------------------------------------
+    async def _collect_structured_fallbacks(
+        self, preferred: list[str]
+    ) -> list[str]:
+        available: set[str] = set()
+        try:
+            available = set(await self.list_models())
+        except (OllamaError, OllamaTimeout) as exc:
+            logger.debug("Failed to list Ollama models for fallback: %s", exc)
+            available = set()
+
+        fallbacks: list[str] = []
+        if available:
+            for name in PARSING_MODEL_CHOICES:
+                if name in available and name not in preferred and name not in fallbacks:
+                    fallbacks.append(name)
+        else:
+            for name in PARSING_MODEL_CHOICES:
+                if name not in preferred and name not in fallbacks:
+                    fallbacks.append(name)
+
+        return fallbacks
+
+    # -------------------------------------------------------------------------
     @traceable(run_type="chain", name="Ollama.structured_call")
     async def llm_structured_call(
         self,
@@ -562,68 +586,108 @@ class OllamaClient:
             {"role": "user", "content": user_prompt},
         ]
 
-        _append_trace_metadata(
-            {
-                "provider": "ollama",
-                "model": model,
-                "schema": schema.__name__,
-                "use_json_mode": use_json_mode,
-            },
-            ["ollama", "structured"],
-        )
+        preferred: list[str] = []
+        for candidate in (
+            (model or "").strip(),
+            (self.default_model or "").strip(),
+            (ClientRuntimeConfig.get_parsing_model() or "").strip(),
+        ):
+            if candidate and candidate not in preferred:
+                preferred.append(candidate)
 
-        try:
-            raw = await self.chat(
-                model=model,
-                messages=messages,
-                format="json" if use_json_mode else None,
-                options={"temperature": temperature},
+        if not preferred:
+            preferred = await self._collect_structured_fallbacks([])
+
+        queue = preferred.copy()
+        tried: set[str] = set()
+        missing: list[str] = []
+        last_missing_error: Exception | None = None
+        fallbacks: list[str] | None = None
+
+        while queue:
+            active_model = queue.pop(0)
+            if not active_model or active_model in tried:
+                continue
+            tried.add(active_model)
+
+            _append_trace_metadata(
+                {
+                    "provider": "ollama",
+                    "model": active_model,
+                    "schema": schema.__name__,
+                    "use_json_mode": use_json_mode,
+                },
+                ["ollama", "structured"],
             )
 
-        except OllamaError as e:
-            raise RuntimeError(f"LLM call failed: {e}") from e
-
-        text = json.dumps(raw) if isinstance(raw, dict) else str(raw)
-
-        for attempt in range(max_repair_attempts + 1):
             try:
-                return cast(T, parser.parse(text))
-            except Exception as err:
-                if attempt >= max_repair_attempts:
-                    # Surface original model output in logs for debugging
-                    logger.error(
-                        "Structured parse failed after retries. Last text: %s", text
-                    )
-                    raise RuntimeError(f"Structured parsing failed: {err}") from err
+                raw = await self.chat(
+                    model=active_model,
+                    messages=messages,
+                    format="json" if use_json_mode else None,
+                    options={"temperature": temperature},
+                )
+            except OllamaError as e:
+                message = str(e).lower()
+                if "not found" in message or "404" in message:
+                    missing.append(active_model)
+                    last_missing_error = e
+                    if fallbacks is None:
+                        fallbacks = await self._collect_structured_fallbacks(preferred)
+                        preferred.extend(fallbacks)
+                    for candidate in fallbacks:
+                        if candidate not in tried and candidate not in queue:
+                            queue.append(candidate)
+                    continue
+                raise RuntimeError(f"LLM call failed: {e}") from e
 
-                # Ask the model to repair to valid JSON that matches the schema.
-                repair_messages = [
-                    {"role": "system", "content": system_prompt.strip()},
-                    {
-                        "role": "user",
-                        "content": (
-                            "The previous reply did not match the required JSON schema.\n"
-                            "Follow these format instructions exactly and return ONLY a valid JSON object:\n"
-                            f"{format_instructions}\n\n"
-                            f"Previous reply:\n{text}"
-                        ),
-                    },
-                ]
+            text = json.dumps(raw) if isinstance(raw, dict) else str(raw)
+
+            for attempt in range(max_repair_attempts + 1):
                 try:
-                    raw = await self.chat(
-                        model=model,
-                        messages=repair_messages,
-                        format="json" if use_json_mode else None,
-                        options={"temperature": 0.0},
-                    )
-                    text = json.dumps(raw) if isinstance(raw, dict) else str(raw)
+                    return cast(T, parser.parse(text))
+                except Exception as err:
+                    if attempt >= max_repair_attempts:
+                        logger.error(
+                            "Structured parse failed after retries. Last text: %s",
+                            text,
+                        )
+                        raise RuntimeError(
+                            f"Structured parsing failed: {err}"
+                        ) from err
 
-                except OllamaError as e:
-                    raise RuntimeError(f"Repair attempt failed: {e}") from e
+                    repair_messages = [
+                        {"role": "system", "content": system_prompt.strip()},
+                        {
+                            "role": "user",
+                            "content": (
+                                "The previous reply did not match the required JSON schema.\n"
+                                "Follow these format instructions exactly and return ONLY a valid JSON object:\n"
+                                f"{format_instructions}\n\n"
+                                f"Previous reply:\n{text}"
+                            ),
+                        },
+                    ]
+                    try:
+                        raw = await self.chat(
+                            model=active_model,
+                            messages=repair_messages,
+                            format="json" if use_json_mode else None,
+                            options={"temperature": 0.0},
+                        )
+                        text = json.dumps(raw) if isinstance(raw, dict) else str(raw)
 
-        # If execution reaches here, no valid model could be parsed and no
-        # exception was raised within the loop (should be unreachable).
-        raise RuntimeError("No structured output produced by the model")
+                    except OllamaError as e:
+                        raise RuntimeError(f"Repair attempt failed: {e}") from e
+
+        if last_missing_error:
+            attempted = ", ".join(missing)
+            raise RuntimeError(
+                "LLM call failed: no local parsing models were found. "
+                f"Tried: {attempted}"
+            ) from last_missing_error
+
+        raise RuntimeError("LLM call failed: no parsing model candidates available")
 
     # -------------------------------------------------------------------------
     @staticmethod
