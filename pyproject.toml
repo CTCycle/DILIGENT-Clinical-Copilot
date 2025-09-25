@@ -7,7 +7,9 @@ name = "Pharmagent"
 version = "1.2"
 requires-python = ">=3.12,<3.13"
 
-dependencies = [        
+dependencies = [     
+    "fastapi==0.117.1",
+    "gradio==5.47.0",   
     "transformers==4.56.2",
     "scikit-learn==1.7.1",    
     "matplotlib==3.10.1",
