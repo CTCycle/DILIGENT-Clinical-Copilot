@@ -94,7 +94,7 @@ async def process_single_patient(payload: PatientData, translate_to_eng: bool = 
         "symptoms": ", ".join(payload.symptoms),
         "diseases": diseases,
         "hepatotoxicity_pattern": pattern_score.model_dump(),
-        "drug_toxicity_assessment": drug_assessment.model_dump(),
+        "drug_toxicity_assessment": drug_assessment,
     }
 
     if payload.exams:

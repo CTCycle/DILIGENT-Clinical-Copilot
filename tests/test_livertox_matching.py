@@ -166,6 +166,7 @@ if "Pharmagent.app.logger" not in sys.modules:
 
 from Pharmagent.app.api.schemas.clinical import DrugEntry, PatientDrugs
 from Pharmagent.app.utils.services.clinical import DrugToxicityEssay
+from Pharmagent.app.utils.services.livertox import LiverToxMatcher
 from Pharmagent.app.utils.services.scraper import LiverToxClient
 from Pharmagent.app.constants import LIVERTOX_ARCHIVE
 
@@ -266,61 +267,73 @@ def test_collect_monographs_from_archive(sample_archive: Path):
 
 
 # -----------------------------------------------------------------------------
-def test_search_direct_match(sample_archive: Path):
-    essay = DrugToxicityEssay(PatientDrugs(entries=[]), archive_path=str(sample_archive))
-    match = asyncio.run(essay._search_livertox_id("Acetaminophen"))
+def test_matcher_direct_match():
+    df = pd.DataFrame(
+        [
+            {
+                "nbk_id": "NBK100",
+                "drug_name": "Acetaminophen (Tylenol)",
+                "excerpt": "High doses cause liver injury.",
+            },
+            {
+                "nbk_id": "NBK200",
+                "drug_name": "Amoxicillin",
+                "excerpt": "Rare hypersensitivity reactions.",
+            },
+        ]
+    )
+    matcher = LiverToxMatcher(df, llm_client=_DummyLLMClient())
+    matches = asyncio.run(matcher.match_drug_names(["Acetaminophen"]))
+    match = matches["Acetaminophen"]
     assert match is not None
     assert match.nbk_id == "NBK100"
     assert match.reason == "direct_match"
-    assert match.confidence == pytest.approx(1.0)
 
 
 # -----------------------------------------------------------------------------
-def test_search_alias_match(sample_archive: Path):
-    essay = DrugToxicityEssay(PatientDrugs(entries=[]), archive_path=str(sample_archive))
-    match = asyncio.run(essay._search_livertox_id("Tylenol"))
+def test_matcher_alias_match():
+    df = pd.DataFrame(
+        [
+            {
+                "nbk_id": "NBK100",
+                "drug_name": "Acetaminophen (Tylenol)",
+                "excerpt": "High doses cause liver injury.",
+            }
+        ]
+    )
+    matcher = LiverToxMatcher(df, llm_client=_DummyLLMClient())
+    matches = asyncio.run(matcher.match_drug_names(["Tylenol"]))
+    match = matches["Tylenol"]
     assert match is not None
     assert match.nbk_id == "NBK100"
-    assert match.reason in {"alias_match", "fuzzy_match"}
-    assert match.confidence >= 0.90
+    assert match.reason in {"alias_match", "direct_match", "fuzzy_match"}
 
 
 # -----------------------------------------------------------------------------
-def test_fetch_content_sections(sample_archive: Path):
-    essay = DrugToxicityEssay(PatientDrugs(entries=[]), archive_path=str(sample_archive))
-    sections = asyncio.run(essay._fetch_livertox_content("NBK100"))
-    assert sections["summary"]
-    assert "High doses" in sections["hepatotoxicity"]
-    assert "Supportive care" in sections["outcome"]
-    assert sections["title"] == "Acetaminophen (Tylenol)"
-
-
-# -----------------------------------------------------------------------------
-def test_run_analysis_reports_no_match(sample_archive: Path):
-    drugs = PatientDrugs(entries=[DrugEntry(name="ImaginaryDrug")])
-    essay = DrugToxicityEssay(drugs, archive_path=str(sample_archive))
+def test_essay_returns_mapping():
+    drugs = PatientDrugs(entries=[DrugEntry(name="Acetaminophen"), DrugEntry(name="Unknown")])
+    essay = DrugToxicityEssay(drugs)
     result = asyncio.run(essay.run_analysis())
-    assert result.entries[0].analysis is None
-    assert "No LiverTox" in (result.entries[0].error or "")
+    assert set(result) == {"Acetaminophen", "Unknown"}
+    acetaminophen_row = result["Acetaminophen"]["matched_livertox_row"]
+    assert acetaminophen_row is not None
+    assert acetaminophen_row["nbk_id"] == "NBK100"
+    assert result["Unknown"]["matched_livertox_row"] is None
+    assert result["Unknown"]["extracted_excerpts"] == []
 
 
 # -----------------------------------------------------------------------------
-def test_archive_download_trigger(sample_archive: Path, tmp_path: Path, monkeypatch):
-    target_path = tmp_path / LIVERTOX_ARCHIVE
-
-    async def fake_download(dest_path):
-        dest_dir = Path(dest_path)
-        dest_dir.mkdir(parents=True, exist_ok=True)
-        copied = dest_dir / LIVERTOX_ARCHIVE
-        copied.write_bytes(sample_archive.read_bytes())
-        return {"file_path": str(copied), "size": copied.stat().st_size, "last_modified": None}
+def test_essay_handles_empty_database(monkeypatch):
+    class _EmptySerializer:
+        def get_livertox_records(self):
+            return pd.DataFrame()
 
     monkeypatch.setattr(
-        "Pharmagent.app.utils.services.scraper.LiverToxClient.download_bulk_data",
-        fake_download,
+        "Pharmagent.app.utils.services.clinical.DataSerializer",
+        lambda: _EmptySerializer(),
     )
 
-    essay = DrugToxicityEssay(PatientDrugs(entries=[]), archive_path=str(target_path))
-    match = asyncio.run(essay._search_livertox_id("Amoxicillin"))
-    assert match is not None
-    assert match.nbk_id == "NBK200"
+    drugs = PatientDrugs(entries=[DrugEntry(name="Acetaminophen")])
+    essay = DrugToxicityEssay(drugs)
+    result = asyncio.run(essay.run_analysis())
+    assert result["Acetaminophen"]["matched_livertox_row"] is None
