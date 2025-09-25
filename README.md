@@ -54,7 +54,19 @@ Ollama or cloud chat request. To enable tracing:
    # Optional: point to a self-hosted deployment
    LANGSMITH_ENDPOINT="https://api.smith.langchain.com"
    ```
+2. Export the following environment variables before starting Pharmagent (the
+   exact syntax differs per shell/OS):
 
+   ```bash
+   export LANGSMITH_API_KEY="sk-..."
+   export LANGSMITH_TRACING_V2="true"
+   export LANGSMITH_PROJECT="Pharmagent"
+   # Optional: point to a self-hosted deployment
+   # export LANGSMITH_ENDPOINT="https://api.smith.langchain.com"
+   ```
+
+   On Windows Command Prompt use `set`, and on PowerShell use `$Env:` instead of
+   `export`.
 3. Run the Pharmagent application or execute any workflow that calls the LLMs.
 4. Open the LangSmith web UI and choose the project named in
    `LANGSMITH_PROJECT` to inspect traces. You can follow the hierarchical view
