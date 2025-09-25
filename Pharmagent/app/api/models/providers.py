@@ -13,6 +13,7 @@ from collections.abc import AsyncGenerator, Awaitable, Callable
 from typing import Any, Literal, TypeAlias, TypeVar, cast
 import httpx
 from pydantic import BaseModel
+from langchain_core.output_parsers import PydanticOutputParser
 
 from Pharmagent.app.logger import logger
 from Pharmagent.app.constants import (
@@ -522,7 +523,8 @@ class OllamaClient:
         across parsers by supplying different prompts/schemas.
 
         """
-        format_instructions = self._format_instructions(schema)
+        parser = PydanticOutputParser(pydantic_object=schema)
+        format_instructions = parser.get_format_instructions()
 
         messages = [
             {
@@ -543,13 +545,11 @@ class OllamaClient:
         except OllamaError as e:
             raise RuntimeError(f"LLM call failed: {e}") from e
 
-        # Unify to text for structured parsing
         text = json.dumps(raw) if isinstance(raw, dict) else str(raw)
 
-        # First parse attempt + bounded auto-repair loop
         for attempt in range(max_repair_attempts + 1):
             try:
-                return self._parse_schema_response(schema, text)
+                return cast(T, parser.parse(text))
             except Exception as err:
                 if attempt >= max_repair_attempts:
                     # Surface original model output in logs for debugging
@@ -586,24 +586,6 @@ class OllamaClient:
         # If execution reaches here, no valid model could be parsed and no
         # exception was raised within the loop (should be unreachable).
         raise RuntimeError("No structured output produced by the model")
-
-    # -------------------------------------------------------------------------
-    @staticmethod
-    def _format_instructions(schema: type[T]) -> str:
-        schema_json = json.dumps(schema.model_json_schema(), indent=2, sort_keys=True)
-        return (
-            "You must respond with a JSON object that strictly matches the following "
-            "Pydantic schema. Do not include extra commentary or keys.\n"
-            f"{schema_json}"
-        )
-
-    # -------------------------------------------------------------------------
-    @staticmethod
-    def _parse_schema_response(schema: type[T], text: str) -> T:
-        parsed = OllamaClient.parse_json(text)
-        if parsed is None:
-            raise ValueError("Model response did not contain a JSON object")
-        return cast(T, schema.model_validate(parsed))
 
     # -------------------------------------------------------------------------
     @staticmethod
