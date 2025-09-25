@@ -43,6 +43,17 @@ Ollama or cloud chat request. To enable tracing:
 
 1. Create a free LangSmith account at [https://smith.langchain.com](https://smith.langchain.com)
    and generate an API key from **Settings → API Keys**.
+2. Copy `Pharmagent/resources/templates/.env` to your active `.env` file (for
+   example `Pharmagent/setup/.env`) if you have not already done so, then add or
+   update the following keys:
+
+   ```text
+   LANGSMITH_API_KEY="sk-..."
+   LANGSMITH_TRACING_V2="true"
+   LANGSMITH_PROJECT="Pharmagent"
+   # Optional: point to a self-hosted deployment
+   LANGSMITH_ENDPOINT="https://api.smith.langchain.com"
+   ```
 2. Export the following environment variables before starting Pharmagent (the
    exact syntax differs per shell/OS):
 
