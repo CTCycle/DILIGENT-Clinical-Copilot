@@ -13,6 +13,8 @@ from difflib import SequenceMatcher
 from Pharmagent.app.api.models.prompts import (
     HEPATOTOXICITY_ANALYSIS_SYSTEM_PROMPT,
     HEPATOTOXICITY_ANALYSIS_USER_PROMPT,
+    LIVERTOX_MATCH_SYSTEM_PROMPT,
+    LIVERTOX_MATCH_USER_PROMPT,
 )
 from Pharmagent.app.api.models.providers import initialize_llm_client
 from Pharmagent.app.api.schemas.clinical import (
@@ -21,6 +23,7 @@ from Pharmagent.app.api.schemas.clinical import (
     DrugToxicityFindings,
     HepatotoxicityPatternScore,
     LiverToxMatchInfo,
+    LiverToxMatchSuggestion,
     PatientData,
     PatientDrugToxicityBundle,
     PatientDrugs,
@@ -28,6 +31,7 @@ from Pharmagent.app.api.schemas.clinical import (
 from Pharmagent.app.constants import LIVERTOX_ARCHIVE, SOURCES_PATH
 from Pharmagent.app.configurations import ClientRuntimeConfig
 from Pharmagent.app.logger import logger
+from Pharmagent.app.utils.serializer import DataSerializer
 from Pharmagent.app.utils.services.scraper import LiverToxClient
 
 _pdfminer_extract_text = None
@@ -52,12 +56,23 @@ else:
 
 ###############################################################################
 @dataclass(slots=True)
+class MonographRecord:
+    nbk_id: str
+    drug_name: str
+    normalized_name: str
+    tokens: set[str]
+    excerpt: str | None
+
+
+###############################################################################
+@dataclass(slots=True)
 class LiverToxMatch:
     nbk_id: str
     matched_name: str
     confidence: float
     reason: str
     notes: list[str]
+    record: MonographRecord | None = None
 
 
 ###############################################################################
@@ -133,6 +148,8 @@ class DrugToxicityEssay:
     DIRECT_CONFIDENCE = 1.0
     ALIAS_CONFIDENCE = 0.95
     MIN_CONFIDENCE = 0.40
+    DETERMINISTIC_THRESHOLD = 0.86
+    LLM_DEFAULT_CONFIDENCE = 0.65
     SUPPORTED_EXTENSIONS: tuple[str, ...] = (
         ".html",
         ".htm",
@@ -186,12 +203,17 @@ class DrugToxicityEssay:
         self.llm_client = initialize_llm_client(purpose="agent", timeout_s=timeout_s)
         self.match_cache: dict[str, LiverToxMatch] = {}
         self.content_cache: dict[str, dict[str, str]] = {}
+        self.serializer = DataSerializer()
+        self.monograph_records: list[MonographRecord] = []
+        self.records_by_normalized: dict[str, MonographRecord] = {}
+        self._candidate_prompt_block: str | None = None
         self.entries: list[ArchiveEntry] = []
         self.entry_by_nbk: dict[str, ArchiveEntry] = {}
         self.archive_ready = False
     # -----------------------------------------------------------------------------
     async def run_analysis(self) -> PatientDrugToxicityBundle:
         await self._ensure_index_loaded()
+        self._ensure_livertox_records()
         results: list[DrugHepatotoxicityAnalysis] = []
         for entry in self.drugs.entries:
             result = await self._process_single_drug(entry)
@@ -207,6 +229,7 @@ class DrugToxicityEssay:
             logger.error("Failed LiverTox lookup for %s: %s", entry.name, exc)
             return DrugHepatotoxicityAnalysis(
                 drug_name=entry.name,
+                source_text=None,
                 analysis=None,
                 error=f"LiverTox search failed: {exc}",
                 livertox_match=None,
@@ -218,11 +241,15 @@ class DrugToxicityEssay:
                 explanation = f"{explanation}: {'; '.join(match_notes)}"
             return DrugHepatotoxicityAnalysis(
                 drug_name=entry.name,
+                source_text=None,
                 analysis=None,
                 error=explanation,
                 livertox_match=None,
             )
 
+        record = match.record
+        info_notes = list(match.notes)
+        content: dict[str, str] = {}
         try:
             content = await self._fetch_livertox_content(match.nbk_id)
         except Exception as exc:
@@ -232,47 +259,74 @@ class DrugToxicityEssay:
                 match.nbk_id,
                 exc,
             )
-            return DrugHepatotoxicityAnalysis(
-                drug_name=entry.name,
-                analysis=None,
-                error=f"Failed retrieving LiverTox content: {exc}",
-                livertox_match=LiverToxMatchInfo(
-                    nbk_id=match.nbk_id,
-                    matched_name=match.matched_name,
-                    confidence=match.confidence,
-                    reason=match.reason,
-                    notes=match.notes,
-                ),
-            )
+            if record and record.excerpt:
+                content = {
+                    "summary": record.excerpt,
+                    "hepatotoxicity": record.excerpt,
+                    "raw_html": record.excerpt,
+                }
+                info_notes.append("Used stored LiverTox excerpt from database")
+            else:
+                notes_payload = list(dict.fromkeys(info_notes))
+                return DrugHepatotoxicityAnalysis(
+                    drug_name=entry.name,
+                    source_text=None,
+                    analysis=None,
+                    error=f"Failed retrieving LiverTox content: {exc}",
+                    livertox_match=LiverToxMatchInfo(
+                        nbk_id=match.nbk_id,
+                        matched_name=match.matched_name,
+                        confidence=match.confidence,
+                        reason=match.reason,
+                        notes=notes_payload,
+                    ),
+                )
+
+        if record and record.excerpt:
+            content.setdefault("summary", record.excerpt)
+            content.setdefault("hepatotoxicity", record.excerpt)
 
         try:
             llm_payload = await self._invoke_llm(entry.name, content)
         except Exception as exc:
             logger.error("LLM hepatotoxicity analysis failed for %s: %s", entry.name, exc)
+            source_text = (
+                content.get("hepatotoxicity")
+                or content.get("summary")
+                or (record.excerpt if record else None)
+            )
+            notes_payload = list(dict.fromkeys(info_notes))
             return DrugHepatotoxicityAnalysis(
                 drug_name=entry.name,
                 analysis=None,
                 error=f"LLM analysis failed: {exc}",
-                source_text=content.get("summary"),
+                source_text=source_text,
                 livertox_match=LiverToxMatchInfo(
                     nbk_id=match.nbk_id,
                     matched_name=match.matched_name,
                     confidence=match.confidence,
                     reason=match.reason,
-                    notes=match.notes,
+                    notes=notes_payload,
                 ),
             )
 
+        source_text = (
+            content.get("hepatotoxicity")
+            or content.get("summary")
+            or (record.excerpt if record else None)
+        )
+        notes_payload = list(dict.fromkeys(info_notes))
         return DrugHepatotoxicityAnalysis(
             drug_name=entry.name,
-            source_text=content.get("hepatotoxicity") or content.get("summary"),
+            source_text=source_text,
             analysis=llm_payload,
+            error=None,
             livertox_match=LiverToxMatchInfo(
                 nbk_id=match.nbk_id,
                 matched_name=match.matched_name,
                 confidence=match.confidence,
                 reason=match.reason,
-                notes=match.notes,
+                notes=notes_payload,
             ),
         )
 
@@ -337,91 +391,274 @@ class DrugToxicityEssay:
             raise RuntimeError("Local LiverTox archive is empty")
 
     # -----------------------------------------------------------------------------
+    def _ensure_livertox_records(self) -> None:
+        if self.monograph_records:
+            return
+        try:
+            dataset = self.serializer.get_livertox_records()
+        except Exception as exc:
+            logger.error("Failed loading LiverTox monographs from database: %s", exc)
+            return
+
+        processed: list[MonographRecord] = []
+        normalized_map: dict[str, MonographRecord] = {}
+        if dataset is None or dataset.empty:
+            return
+
+        for row in dataset.itertuples(index=False):
+            raw_name = str(getattr(row, "drug_name", "") or "").strip()
+            if not raw_name:
+                continue
+            normalized_name = self._normalize_name(raw_name)
+            if not normalized_name:
+                continue
+            nbk_raw = getattr(row, "nbk_id", None)
+            nbk_id = str(nbk_raw).strip() if nbk_raw is not None else ""
+            excerpt_raw = getattr(row, "excerpt", None)
+            excerpt = str(excerpt_raw) if excerpt_raw not in (None, "") else None
+            tokens = {token for token in normalized_name.split() if token}
+            monograph = MonographRecord(
+                nbk_id=nbk_id,
+                drug_name=raw_name,
+                normalized_name=normalized_name,
+                tokens=tokens,
+                excerpt=excerpt,
+            )
+            processed.append(monograph)
+            if normalized_name not in normalized_map:
+                normalized_map[normalized_name] = monograph
+            primary_name = self._normalize_name(raw_name.split("(")[0])
+            if primary_name and primary_name not in normalized_map:
+                normalized_map[primary_name] = monograph
+
+        if not processed:
+            return
+
+        processed.sort(key=lambda item: item.drug_name.lower())
+        self.monograph_records = processed
+        self.records_by_normalized = normalized_map
+        self._candidate_prompt_block = "\n".join(
+            f"- {record.drug_name}" for record in self.monograph_records
+        )
+
+    # -----------------------------------------------------------------------------
     async def _search_livertox_id(
         self, drug_name: str, *, notes: list[str] | None = None
     ) -> LiverToxMatch | None:
         await self._ensure_index_loaded()
-        holder = notes if notes is not None else []
+        self._ensure_livertox_records()
         normalized_query = self._normalize_name(drug_name)
         if not normalized_query:
-            holder.append("Drug name is empty after normalization")
+            if notes is not None:
+                notes.append("Drug name is empty after normalization")
+            return None
+        if not self.monograph_records:
+            if notes is not None:
+                notes.append("LiverTox database is empty")
             return None
         cached = self.match_cache.get(normalized_query)
         if cached is not None:
             return cached
 
-        best: tuple[float, ArchiveEntry, str, str | None] | None = None
-        for entry in self.entries:
-            score, reason, detail = self._score_entry(normalized_query, entry)
-            if best is None or score > best[0]:
-                best = (score, entry, reason, detail)
+        deterministic = self._deterministic_lookup(normalized_query)
+        if deterministic is not None:
+            record, confidence, reason, extra_notes = deterministic
+            if extra_notes and notes is not None:
+                notes.extend(extra_notes)
+            match = self._create_match(record, confidence, reason, extra_notes)
+            self.match_cache[normalized_query] = match
+            return match
 
-        if best is None or best[0] < self.MIN_CONFIDENCE:
-            holder.append("No matching entry found in local LiverTox archive")
+        if notes is not None:
+            notes.append("Deterministic match failed; invoking LLM fallback")
+
+        try:
+            fallback = await self._llm_match_lookup(drug_name)
+        except Exception as exc:
+            if notes is not None:
+                notes.append(f"LLM fallback failed: {exc}")
+            logger.error("LLM fallback match failed for %s: %s", drug_name, exc)
+            return None
+        if fallback is None:
+            if notes is not None:
+                notes.append("No matching entry found in LiverTox database")
             return None
 
-        score, entry, reason, detail = best
-        notes_payload: list[str] = []
-        if reason == "alias_match" and detail:
-            notes_payload.append(f"Matched alias '{detail}'")
-        elif reason == "fuzzy_match":
-            notes_payload.append("Fuzzy matched against archive content")
-            if detail:
-                notes_payload.append(f"Closest alias '{detail}'")
-
-        if notes is not None and notes_payload:
-            notes.extend(notes_payload)
-
-        match = LiverToxMatch(
-            nbk_id=entry.nbk_id,
-            matched_name=entry.title,
-            confidence=round(min(max(score, self.MIN_CONFIDENCE), 1.0), 2),
-            reason=reason,
-            notes=list(dict.fromkeys(notes_payload)),
-        )
+        record, confidence, reason, extra_notes = fallback
+        if extra_notes and notes is not None:
+            notes.extend(extra_notes)
+        match = self._create_match(record, confidence, reason, extra_notes)
         self.match_cache[normalized_query] = match
         return match
 
     # -----------------------------------------------------------------------------
-    def _score_entry(
-        self, normalized_query: str, entry: ArchiveEntry
-    ) -> tuple[float, str, str | None]:
-        if normalized_query in (
-            entry.normalized_title,
-            entry.primary_normalized_title,
-        ):
-            return self.DIRECT_CONFIDENCE, "direct_match", entry.title
-        if normalized_query in entry.normalized_aliases:
-            alias = next(
-                (alias for alias in entry.aliases if self._normalize_name(alias) == normalized_query),
-                entry.title,
-            )
-            return self.ALIAS_CONFIDENCE, "alias_match", alias
-
-        best_alias = None
-        best_alias_score = 0.0
-        for alias in entry.aliases:
-            normalized_alias = self._normalize_name(alias)
-            if not normalized_alias:
-                continue
-            alias_score = SequenceMatcher(None, normalized_query, normalized_alias).ratio()
-            if alias_score > best_alias_score:
-                best_alias_score = alias_score
-                best_alias = alias
-
-        ratio = SequenceMatcher(None, normalized_query, entry.normalized_title).ratio()
-        token_overlap = self._token_overlap(normalized_query, entry.keyword_tokens)
-        score = max(ratio, token_overlap, best_alias_score)
-        detail = best_alias if best_alias_score >= ratio and best_alias_score >= token_overlap else None
-        return score, "fuzzy_match", detail
+    def _create_match(
+        self,
+        record: MonographRecord,
+        confidence: float,
+        reason: str,
+        notes: list[str] | None,
+    ) -> LiverToxMatch:
+        normalized_confidence = round(
+            min(max(confidence, self.MIN_CONFIDENCE), 1.0), 2
+        )
+        cleaned_notes = list(
+            dict.fromkeys(note for note in (notes or []) if note)
+        )
+        return LiverToxMatch(
+            nbk_id=record.nbk_id,
+            matched_name=record.drug_name,
+            confidence=normalized_confidence,
+            reason=reason,
+            notes=cleaned_notes,
+            record=record,
+        )
 
     # -----------------------------------------------------------------------------
-    def _token_overlap(self, normalized_query: str, tokens: set[str]) -> float:
-        query_tokens = [token for token in normalized_query.split() if token]
+    def _deterministic_lookup(
+        self, normalized_query: str
+    ) -> tuple[MonographRecord, float, str, list[str]] | None:
+        record = self.records_by_normalized.get(normalized_query)
+        if record is not None:
+            return record, self.DIRECT_CONFIDENCE, "direct_match", []
+
+        query_tokens = {token for token in normalized_query.split() if token}
+        token_match = self._match_via_tokens(query_tokens)
+        if token_match is not None:
+            record, subset_score = token_match
+            notes = [f"Matched token subset within '{record.drug_name}'"]
+            confidence = max(self.ALIAS_CONFIDENCE, subset_score)
+            return record, confidence, "alias_match", notes
+
+        best = self._find_best_record(normalized_query)
+        if best is None:
+            return None
+        record, score = best
+        if score < self.DETERMINISTIC_THRESHOLD:
+            return None
+        notes = [f"Closest database name '{record.drug_name}' (score={score:.2f})"]
+        return record, score, "fuzzy_match", notes
+
+    # -----------------------------------------------------------------------------
+    def _match_via_tokens(
+        self, query_tokens: set[str]
+    ) -> tuple[MonographRecord, float] | None:
         if not query_tokens:
+            return None
+        best: tuple[MonographRecord, float] | None = None
+        for record in self.monograph_records:
+            if not record.tokens:
+                continue
+            if query_tokens.issubset(record.tokens):
+                subset_score = len(query_tokens) / len(record.tokens)
+                if best is None or subset_score > best[1]:
+                    best = (record, subset_score)
+        return best
+
+    # -----------------------------------------------------------------------------
+    def _find_best_record(
+        self, normalized_query: str
+    ) -> tuple[MonographRecord, float] | None:
+        best: tuple[MonographRecord, float] | None = None
+        for record in self.monograph_records:
+            score = self._compute_similarity(normalized_query, record)
+            if best is None or score > best[1]:
+                best = (record, score)
+        return best
+
+    # -----------------------------------------------------------------------------
+    def _compute_similarity(
+        self, normalized_query: str, record: MonographRecord
+    ) -> float:
+        candidate = record.normalized_name
+        if not candidate:
             return 0.0
-        hits = sum(1 for token in query_tokens if token in tokens)
-        return hits / len(query_tokens)
+        seq_score = SequenceMatcher(None, normalized_query, candidate).ratio()
+        query_tokens = {token for token in normalized_query.split() if token}
+        token_score = 0.0
+        if query_tokens and record.tokens:
+            intersection = len(query_tokens & record.tokens)
+            union = len(query_tokens | record.tokens)
+            if union:
+                token_score = intersection / union
+        lev_distance = self._levenshtein_distance(normalized_query, candidate)
+        max_len = max(len(normalized_query), len(candidate))
+        levenshtein_score = 1.0 - (lev_distance / max_len) if max_len else 1.0
+        return max(seq_score, (seq_score + token_score + levenshtein_score) / 3)
+
+    # -----------------------------------------------------------------------------
+    def _levenshtein_distance(self, left: str, right: str) -> int:
+        if left == right:
+            return 0
+        if not left:
+            return len(right)
+        if not right:
+            return len(left)
+        previous = list(range(len(right) + 1))
+        for i, left_char in enumerate(left, start=1):
+            current = [i]
+            for j, right_char in enumerate(right, start=1):
+                insert_cost = previous[j] + 1
+                delete_cost = current[j - 1] + 1
+                replace_cost = previous[j - 1] + (0 if left_char == right_char else 1)
+                current.append(min(insert_cost, delete_cost, replace_cost))
+            previous = current
+        return previous[-1]
+
+    # -----------------------------------------------------------------------------
+    async def _llm_match_lookup(
+        self, drug_name: str
+    ) -> tuple[MonographRecord, float, str, list[str]] | None:
+        if not self.monograph_records:
+            return None
+        candidate_block = self._candidate_prompt_block or ""
+        if not candidate_block:
+            candidate_block = "\n".join(
+                f"- {record.drug_name}" for record in self.monograph_records
+            )
+            self._candidate_prompt_block = candidate_block
+        if not candidate_block:
+            return None
+
+        prompt = LIVERTOX_MATCH_USER_PROMPT.format(
+            drug_name=drug_name,
+            candidates=candidate_block,
+        )
+        model_name = ClientRuntimeConfig.get_agent_model()
+        suggestion = await self.llm_client.llm_structured_call(
+            model=model_name,
+            system_prompt=LIVERTOX_MATCH_SYSTEM_PROMPT,
+            user_prompt=prompt,
+            schema=LiverToxMatchSuggestion,
+            temperature=0.0,
+        )
+
+        match_name = (suggestion.match_name or "").strip()
+        if not match_name:
+            return None
+        normalized_match = self._normalize_name(match_name)
+        record = self.records_by_normalized.get(normalized_match)
+
+        confidence = (
+            suggestion.confidence
+            if suggestion.confidence is not None
+            else self.LLM_DEFAULT_CONFIDENCE
+        )
+        notes: list[str] = [f"LLM selected '{match_name}'"]
+        if suggestion.rationale:
+            notes.append(suggestion.rationale.strip())
+
+        if record is None:
+            best = self._find_best_record(normalized_match)
+            if best is None:
+                return None
+            record, score = best
+            notes.append(
+                f"Mapped suggestion to '{record.drug_name}' (score={score:.2f})"
+            )
+            confidence = min(max(confidence, score), 1.0)
+
+        return record, confidence, "llm_fallback", notes
 
     # -----------------------------------------------------------------------------
     async def _fetch_livertox_content(self, nbk_id: str) -> dict[str, str]:

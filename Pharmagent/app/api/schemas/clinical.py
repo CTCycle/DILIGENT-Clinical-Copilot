@@ -295,6 +295,13 @@ class LiverToxMatchInfo(BaseModel):
 
 
 ###############################################################################
+class LiverToxMatchSuggestion(BaseModel):
+    match_name: str | None = Field(default=None, max_length=200)
+    confidence: float | None = Field(default=None, ge=0.0, le=1.0)
+    rationale: str | None = Field(default=None, max_length=500)
+
+
+###############################################################################
 class HepatotoxicityPatternScore(BaseModel):
     alt_multiple: float | None = Field(
         None,
