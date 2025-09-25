@@ -5,6 +5,7 @@ import sys
 import tarfile
 import types
 from pathlib import Path
+from typing import Any
 
 import pandas as pd
 import pytest
@@ -50,6 +51,7 @@ if "httpx" not in sys.modules:
     class _StubResponse:
         def __init__(self) -> None:
             self.headers: dict[str, str] = {}
+            self.status_code = 200
 
         def raise_for_status(self) -> None:
             return None
@@ -129,6 +131,7 @@ if "httpx" not in sys.modules:
     httpx_stub.TimeoutException = TimeoutException
     httpx_stub.HTTPStatusError = HTTPStatusError
     httpx_stub.RequestError = RequestError
+    httpx_stub.get = lambda *args, **kwargs: _StubResponse()
 
     sys.modules["httpx"] = httpx_stub
 
@@ -164,7 +167,12 @@ if "Pharmagent.app.logger" not in sys.modules:
     logger_stub.logger = _StubLogger()
     sys.modules["Pharmagent.app.logger"] = logger_stub
 
-from Pharmagent.app.api.schemas.clinical import DrugEntry, PatientDrugs
+from Pharmagent.app.api.schemas.clinical import (
+    DrugEntry,
+    LiverToxBatchMatchItem,
+    LiverToxBatchMatchSuggestion,
+    PatientDrugs,
+)
 from Pharmagent.app.utils.services.clinical import DrugToxicityEssay
 from Pharmagent.app.utils.services.livertox import LiverToxMatcher
 from Pharmagent.app.utils.services.scraper import LiverToxClient
@@ -178,6 +186,40 @@ class _DummyLLMClient:
         raise RuntimeError("LLM call not expected in tests")
 
 
+###############################################################################
+class _LLMBatchStub:
+    def __init__(self, suggestion: LiverToxBatchMatchSuggestion) -> None:
+        self.suggestion = suggestion
+        self.calls: list[dict[str, Any]] = []
+
+    # -------------------------------------------------------------------------
+    async def llm_structured_call(self, *args, **kwargs):
+        self.calls.append({"args": args, "kwargs": kwargs})
+        return self.suggestion
+
+
+# -----------------------------------------------------------------------------
+class _RxNormStub:
+    def __init__(self, mapping: dict[str, dict[str, str]] | None = None) -> None:
+        self.mapping = mapping or {}
+
+    # -------------------------------------------------------------------------
+    def expand(self, raw_name: str) -> set[str]:
+        key = raw_name.lower()
+        entries = self.mapping.get(key)
+        if entries is None:
+            return {key}
+        return set(entries)
+
+    # -------------------------------------------------------------------------
+    def get_candidate_kind(self, original: str, candidate: str) -> str:
+        key = original.lower()
+        entries = self.mapping.get(key)
+        if not entries:
+            return "unknown"
+        return entries.get(candidate, "unknown")
+
+
 # -----------------------------------------------------------------------------
 @pytest.fixture(autouse=True)
 def _patch_llm_client(monkeypatch):
@@ -189,6 +231,16 @@ def _patch_llm_client(monkeypatch):
 
 
 # -----------------------------------------------------------------------------
+@pytest.fixture(autouse=True)
+def _disable_rxnorm(monkeypatch):
+    monkeypatch.setattr(
+        "Pharmagent.app.utils.services.retrieval.RXNORM_EXPANSION_ENABLED",
+        False,
+    )
+    yield
+
+
+ # -----------------------------------------------------------------------------
 @pytest.fixture(autouse=True)
 def _patch_serializer(monkeypatch):
     records = [
@@ -339,6 +391,75 @@ def test_matcher_preserves_order_and_length():
 
 
 # -----------------------------------------------------------------------------
+def test_matcher_uses_rxnorm_brand_to_match(monkeypatch):
+    monkeypatch.setattr(
+        "Pharmagent.app.utils.services.retrieval.RXNORM_EXPANSION_ENABLED",
+        True,
+    )
+    df = pd.DataFrame(
+        [
+            {
+                "nbk_id": "NBK300",
+                "drug_name": "Duloxetine",
+                "excerpt": "SNRI",
+            }
+        ]
+    )
+    retriever = _RxNormStub(
+        {
+            "cymbalta": {"cymbalta": "brand", "duloxetine": "ingredient"},
+            "duloxetine": {"duloxetine": "ingredient", "cymbalta": "brand"},
+        }
+    )
+    matcher = LiverToxMatcher(df, llm_client=_DummyLLMClient(), retriever=retriever)
+    matches = asyncio.run(matcher.match_drug_names(["Cymbalta", "Duloxetine"]))
+    assert [match.nbk_id if match else None for match in matches] == [
+        "NBK300",
+        "NBK300",
+    ]
+
+
+# -----------------------------------------------------------------------------
+def test_matcher_prefers_single_ingredient_over_combo(monkeypatch):
+    monkeypatch.setattr(
+        "Pharmagent.app.utils.services.retrieval.RXNORM_EXPANSION_ENABLED",
+        True,
+    )
+    df = pd.DataFrame(
+        [
+            {
+                "nbk_id": "NBK400",
+                "drug_name": "Amlodipine",
+                "excerpt": "Calcium channel blocker",
+            },
+            {
+                "nbk_id": "NBK401",
+                "drug_name": "Atorvastatin",
+                "excerpt": "Statin",
+            },
+            {
+                "nbk_id": "NBK402",
+                "drug_name": "Amlodipine Atorvastatin",
+                "excerpt": "Combo",
+            },
+        ]
+    )
+    retriever = _RxNormStub(
+        {
+            "caduet": {
+                "amlodipine": "ingredient",
+                "atorvastatin": "ingredient",
+                "amlodipine / atorvastatin": "ingredient_combo",
+            }
+        }
+    )
+    matcher = LiverToxMatcher(df, llm_client=_DummyLLMClient(), retriever=retriever)
+    matches = asyncio.run(matcher.match_drug_names(["Caduet"]))
+    assert matches[0] is not None
+    assert matches[0].nbk_id in {"NBK400", "NBK401"}
+    assert matches[0].reason == "direct_match"
+
+# -----------------------------------------------------------------------------
 def test_essay_returns_mapping():
     drugs = PatientDrugs(entries=[DrugEntry(name="Acetaminophen"), DrugEntry(name="Unknown")])
     essay = DrugToxicityEssay(drugs)
@@ -366,3 +487,99 @@ def test_essay_handles_empty_database(monkeypatch):
     essay = DrugToxicityEssay(drugs)
     result = asyncio.run(essay.run_analysis())
     assert result[0]["matched_livertox_row"] is None
+
+
+# -----------------------------------------------------------------------------
+def test_llm_fallback_handles_reordered_matches():
+    df = pd.DataFrame(
+        [
+            {
+                "nbk_id": "NBK001",
+                "drug_name": "Acetylsalicylic Acid",
+                "excerpt": "Classic analgesic.",
+            },
+            {
+                "nbk_id": "NBK002",
+                "drug_name": "Rivaroxaban",
+                "excerpt": "Anticoagulant.",
+            },
+            {
+                "nbk_id": "NBK003",
+                "drug_name": "Pregabalin",
+                "excerpt": "Neuropathic pain treatment.",
+            },
+        ]
+    )
+    suggestion = LiverToxBatchMatchSuggestion(
+        matches=[
+            LiverToxBatchMatchItem(
+                drug_name="Lyrica",
+                match_name="Pregabalin",
+                confidence=0.61,
+                rationale="Brand matched to generic.",
+            ),
+            LiverToxBatchMatchItem(
+                drug_name="Aspirin",
+                match_name="Acetylsalicylic Acid",
+                confidence=0.72,
+            ),
+            LiverToxBatchMatchItem(
+                drug_name="Xarelto",
+                match_name="Rivaroxaban",
+                confidence=0.68,
+            ),
+        ]
+    )
+    llm_stub = _LLMBatchStub(suggestion)
+    matcher = LiverToxMatcher(df, llm_client=llm_stub)
+    inputs = ["aspirin", "xarelto", "lyrica"]
+    results = asyncio.run(matcher.match_drug_names(inputs))
+    assert [match.nbk_id if match else None for match in results] == [
+        "NBK001",
+        "NBK002",
+        "NBK003",
+    ]
+    assert all(match and match.reason == "llm_fallback" for match in results if match)
+    assert len(llm_stub.calls) == 1
+
+
+# -----------------------------------------------------------------------------
+def test_llm_fallback_ignores_no_match_entries():
+    df = pd.DataFrame(
+        [
+            {
+                "nbk_id": "NBK010",
+                "drug_name": "Acetylsalicylic Acid",
+                "excerpt": "Classic analgesic.",
+            },
+            {
+                "nbk_id": "NBK020",
+                "drug_name": "Rivaroxaban",
+                "excerpt": "Anticoagulant.",
+            },
+        ]
+    )
+    suggestion = LiverToxBatchMatchSuggestion(
+        matches=[
+            LiverToxBatchMatchItem(
+                drug_name="Aspirin",
+                match_name="Acetylsalicylic Acid",
+                confidence=0.7,
+            ),
+            LiverToxBatchMatchItem(
+                drug_name="Lyrica",
+                match_name="No match",
+                confidence=0.1,
+            ),
+        ]
+    )
+    llm_stub = _LLMBatchStub(suggestion)
+    matcher = LiverToxMatcher(df, llm_client=llm_stub)
+    inputs = ["aspirin", "lyrica", "xarelto"]
+    results = asyncio.run(matcher.match_drug_names(inputs))
+    assert [match.nbk_id if match else None for match in results] == [
+        "NBK010",
+        None,
+        None,
+    ]
+    assert len(llm_stub.calls) == 1

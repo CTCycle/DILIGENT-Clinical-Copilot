@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import asyncio
 import os
 import re
 import time
@@ -18,6 +19,10 @@ from Pharmagent.app.api.models.providers import initialize_llm_client
 from Pharmagent.app.api.schemas.clinical import LiverToxBatchMatchSuggestion
 from Pharmagent.app.configurations import ClientRuntimeConfig
 from Pharmagent.app.logger import logger
+from Pharmagent.app.utils.services.retrieval import (
+    RXNORM_EXPANSION_ENABLED,
+    RxNormRetriever,
+)
 
 try:
     from langsmith import traceable as langsmith_traceable
@@ -50,6 +55,17 @@ LANGSMITH_TRACING_ENABLED = any(
 )
 _LANGSMITH_WARNING_EMITTED = False
 
+NULL_LLM_MATCH_NAMES = {
+    "",
+    "none",
+    "no match",
+    "no matches",
+    "not found",
+    "unknown",
+    "not applicable",
+    "n a",
+}
+
 
 ###############################################################################
 @dataclass(slots=True)
@@ -79,6 +95,8 @@ class LiverToxMatcher:
     MIN_CONFIDENCE = 0.40
     DETERMINISTIC_THRESHOLD = 0.86
     LLM_DEFAULT_CONFIDENCE = 0.65
+    LLM_TIMEOUT_SECONDS = 240.0
+    YIELD_INTERVAL = 25
 
     # -------------------------------------------------------------------------
     def __init__(
@@ -86,6 +104,7 @@ class LiverToxMatcher:
         livertox_df: pd.DataFrame,
         *,
         llm_client: Any | None = None,
+        retriever: RxNormRetriever | None = None,
     ) -> None:
         self.livertox_df = livertox_df
         self.llm_client = llm_client or initialize_llm_client(
@@ -98,6 +117,7 @@ class LiverToxMatcher:
         self.candidate_prompt_block: str | None = None
         self.langsmith_batch_lookup: Callable[..., Awaitable[Any]] | None = None
         self.langsmith_llm_call: Callable[..., Awaitable[Any]] | None = None
+        self.rxnorm_retriever = retriever or RxNormRetriever()
         if LANGSMITH_TRACING_ENABLED and langsmith_traceable is None:
             global _LANGSMITH_WARNING_EMITTED
             if not _LANGSMITH_WARNING_EMITTED:
@@ -109,7 +129,7 @@ class LiverToxMatcher:
             self.langsmith_batch_lookup = self._wrap_with_langsmith(
                 name="livertox_batch_match_lookup",
                 run_type="chain",
-                target=self._llm_batch_match_lookup_impl,
+                target=self._llm_batch_match_lookup,
             )
             self.langsmith_llm_call = self._wrap_with_langsmith(
                 name="livertox_batch_llm_structured_call",
@@ -128,43 +148,126 @@ class LiverToxMatcher:
         results: list[LiverToxMatch | None] = [None] * total
         if not self.records:
             return results
-        normalized_queries = [self._normalize_name(name) for name in patient_drugs]
+        # Expand each query via RxNorm before deterministic matching to broaden coverage.
+        normalized_queries: list[str] = []
+        expanded_candidates: list[dict[str, str]] = []
+        for name in patient_drugs:
+            normalized_name = self._normalize_name(name)
+            normalized_queries.append(normalized_name)
+            candidate_map: dict[str, str] = {}
+            expanded: set[str] = set()
+            if RXNORM_EXPANSION_ENABLED:
+                expanded = self.rxnorm_retriever.expand(name)
+                metadata: dict[str, str] = {}
+                for candidate in expanded:
+                    kind = self.rxnorm_retriever.get_candidate_kind(name, candidate)
+                    metadata[candidate] = kind
+                for candidate in sorted(expanded):
+                    normalized_candidate = self._normalize_name(candidate)
+                    if not normalized_candidate:
+                        continue
+                    candidate_map[normalized_candidate] = metadata.get(
+                        candidate,
+                        "unknown",
+                    )
+            if normalized_name and normalized_name not in candidate_map:
+                candidate_map[normalized_name] = "original"
+            expanded_candidates.append({k: v for k, v in candidate_map.items() if k})
+        eligible_total = sum(1 for value in normalized_queries if value)
         unresolved_indices: list[int] = []
-        for idx, (original, normalized) in enumerate(
-            zip(patient_drugs, normalized_queries, strict=False)
-        ):
+        deterministic_matches = 0
+        for idx, candidate_map in enumerate(expanded_candidates):
+            if idx and idx % self.YIELD_INTERVAL == 0:
+                await asyncio.sleep(0)
+            normalized_original = normalized_queries[idx]
+            if not normalized_original:
+                continue
+            candidate_matches: list[tuple[tuple[int, float, float], str, LiverToxMatch]] = []
+            candidate_keys = {
+                key: value
+                for key, value in (candidate_map or {normalized_original: "original"}).items()
+                if key
+            }
+            if not candidate_keys:
+                continue
+            for normalized_candidate, kind in candidate_keys.items():
+                cached = self.match_cache.get(normalized_candidate)
+                if cached is not None:
+                    if cached is not None:
+                        priority = self._candidate_priority(cached, kind)
+                        candidate_matches.append((priority, normalized_candidate, cached))
+                    continue
+                deterministic = self._deterministic_lookup(normalized_candidate)
+                if deterministic is None:
+                    self.match_cache.setdefault(normalized_candidate, None)
+                    continue
+                record, confidence, reason, notes = deterministic
+                match = self._create_match(record, confidence, reason, notes)
+                self.match_cache[normalized_candidate] = match
+                priority = self._candidate_priority(match, kind)
+                candidate_matches.append((priority, normalized_candidate, match))
+            if not candidate_matches:
+                self.match_cache.setdefault(normalized_original, None)
+                unresolved_indices.append(idx)
+                continue
+            candidate_matches.sort(key=lambda item: item[0])
+            best_match = candidate_matches[0][2]
+            results[idx] = best_match
+            self.match_cache[normalized_original] = best_match
+            if best_match.reason != "llm_fallback":
+                deterministic_matches += 1
+            else:
+                unresolved_indices.append(idx)
+        if not unresolved_indices:
+            return results
+        match_pool = eligible_total or 1
+        deterministic_ratio = deterministic_matches / match_pool
+        # Skip the LLM if deterministic coverage is high enough for this patient batch.
+        if deterministic_ratio >= 0.80:
+            return results
+        lookup = (
+            self.langsmith_batch_lookup
+            if self.langsmith_batch_lookup is not None
+            else self._llm_batch_match_lookup
+        )
+        fallback_matches = await lookup(
+            patient_drugs,
+            normalized_queries=normalized_queries,
+        )
+        for idx in unresolved_indices:
+            normalized = normalized_queries[idx]
             if not normalized:
                 continue
-            cached = self.match_cache.get(normalized)
-            if cached is not None or normalized in self.match_cache:
-                results[idx] = cached
+            fallback = fallback_matches[idx] if idx < len(fallback_matches) else None
+            if fallback is None:
+                self.match_cache[normalized] = None
                 continue
-            deterministic = self._deterministic_lookup(normalized)
-            if deterministic is not None:
-                record, confidence, reason, extra_notes = deterministic
-                match = self._create_match(record, confidence, reason, extra_notes)
-                self.match_cache[normalized] = match
-                results[idx] = match
-                continue
-            unresolved_indices.append(idx)
-        if unresolved_indices:
-            fallback_matches = await self._llm_batch_match_lookup(
-                patient_drugs,
-                normalized_queries=normalized_queries,
-            )
-            for idx in unresolved_indices:
-                normalized = normalized_queries[idx]
-                if not normalized:
-                    continue
-                fallback = fallback_matches[idx] if idx < len(fallback_matches) else None
-                if fallback is None:
-                    self.match_cache[normalized] = None
-                    continue
-                record, confidence, reason, extra_notes = fallback
-                match = self._create_match(record, confidence, reason, extra_notes)
-                self.match_cache[normalized] = match
-                results[idx] = match
+            record, confidence, reason, notes = fallback
+            match = self._create_match(record, confidence, reason, notes)
+            self.match_cache[normalized] = match
+            results[idx] = match
         return results
+
+    # -------------------------------------------------------------------------
+    def _candidate_priority(self, match: LiverToxMatch, kind: str) -> tuple[int, float, float]:
+        reason = match.reason
+        confidence = match.confidence
+        if reason == "direct_match":
+            if kind == "ingredient":
+                return (0, -confidence, 0.0)
+            if kind == "brand":
+                return (1, -confidence, 0.0)
+            return (2, -confidence, 0.0)
+        if reason != "llm_fallback":
+            kind_rank = {
+                "ingredient": 0,
+                "ingredient_combo": 1,
+                "psn": 2,
+                "brand": 3,
+                "original": 4,
+            }.get(kind, 5)
+            return (3, -confidence, float(kind_rank))
+        return (4, -confidence, 0.0)
 
     # -------------------------------------------------------------------------
     def build_patient_mapping(
@@ -225,6 +328,7 @@ class LiverToxMatcher:
             primary_name = self._normalize_name(raw_name.split("(")[0])
             if primary_name and primary_name not in normalized_map:
                 normalized_map[primary_name] = record
+            # Capture aliases included in parentheses so common alternates resolve quickly.
             alias_section = None
             if "(" in raw_name and ")" in raw_name:
                 alias_section = raw_name.split("(", 1)[1].split(")", 1)[0]
@@ -356,26 +460,10 @@ class LiverToxMatcher:
         *,
         normalized_queries: list[str],
     ) -> list[tuple[MonographRecord, float, str, list[str]] | None]:
-        if self.langsmith_batch_lookup is not None:
-            return await self.langsmith_batch_lookup(
-                patient_drugs,
-                normalized_queries=normalized_queries,
-            )
-        return await self._llm_batch_match_lookup_impl(
-            patient_drugs,
-            normalized_queries=normalized_queries,
-        )
-
-    # -------------------------------------------------------------------------
-    async def _llm_batch_match_lookup_impl(
-        self,
-        patient_drugs: list[str],
-        *,
-        normalized_queries: list[str],
-    ) -> list[tuple[MonographRecord, float, str, list[str]] | None]:
         total = len(patient_drugs)
         if total == 0 or not self.records:
             return []
+        # The prompt block is cached so repeated calls do not rebuild the monograph list.
         candidate_block = self.candidate_prompt_block or ""
         if not candidate_block:
             return [None] * total
@@ -401,13 +489,24 @@ class LiverToxMatcher:
         )
         start_time = time.perf_counter()
         try:
-            suggestion = await llm_call(
-                model=model_name,
-                system_prompt=LIVERTOX_MATCH_SYSTEM_PROMPT,
-                user_prompt=prompt,
-                schema=LiverToxBatchMatchSuggestion,
-                temperature=0.0,
+            suggestion = await asyncio.wait_for(
+                llm_call(
+                    model=model_name,
+                    system_prompt=LIVERTOX_MATCH_SYSTEM_PROMPT,
+                    user_prompt=prompt,
+                    schema=LiverToxBatchMatchSuggestion,
+                    temperature=0.0,
+                ),
+                timeout=self.LLM_TIMEOUT_SECONDS,
             )
+        except asyncio.TimeoutError:
+            duration = time.perf_counter() - start_time
+            logger.error(
+                "LLM batch match timed out after %.2fs using model '%s'",
+                duration,
+                model_name,
+            )
+            return [None] * total
         except Exception as exc:  # noqa: BLE001
             duration = time.perf_counter() - start_time
             logger.error(
@@ -423,53 +522,97 @@ class LiverToxMatcher:
             model_name,
         )
         matches = suggestion.matches if suggestion else []
+        if not matches:
+            logger.warning(
+                "LLM returned no matches for %s patient drugs",
+                total,
+            )
+            return [None] * total
         if len(matches) != total:
             logger.warning(
                 "LLM returned %s matches for %s patient drugs",
                 len(matches),
                 total,
             )
-            return [None] * total
-        results: list[tuple[MonographRecord, float, str, list[str]] | None] = [
-            None
-        ] * total
-        for idx, (item, original, normalized_query) in enumerate(
-            zip(matches, patient_drugs, normalized_queries, strict=False)
-        ):
+        normalized_to_items: dict[str, list[Any]] = {}
+        for item in matches:
+            normalized_drug = self._normalize_name(getattr(item, "drug_name", "") or "")
+            if not normalized_drug:
+                continue
+            bucket = normalized_to_items.setdefault(normalized_drug, [])
+            bucket.append(item)
+        results: list[tuple[MonographRecord, float, str, list[str]] | None] = [None] * total
+        for idx, original in enumerate(patient_drugs):
+            normalized_query = (
+                normalized_queries[idx]
+                if idx < len(normalized_queries)
+                else ""
+            )
             if not normalized_query:
                 continue
-            llm_drug_name = (item.drug_name or "").strip()
-            if llm_drug_name and llm_drug_name != original:
+            item: Any | None = None
+            if idx < len(matches):
+                candidate = matches[idx]
+                candidate_normalized = self._normalize_name(
+                    getattr(candidate, "drug_name", "") or ""
+                )
+                if candidate_normalized == normalized_query:
+                    item = candidate
+                    bucket = normalized_to_items.get(normalized_query)
+                    if bucket:
+                        try:
+                            bucket.remove(candidate)
+                        except ValueError:
+                            pass
+            if item is None:
+                bucket = normalized_to_items.get(normalized_query)
+                if bucket:
+                    item = bucket.pop(0)
+            if item is None:
                 logger.debug(
-                    "LLM drug name mismatch at index %s: '%s' vs '%s'",
-                    idx,
-                    llm_drug_name,
+                    "LLM did not return a usable match for '%s'",
                     original,
                 )
-            match_name = (item.match_name or "").strip()
-            if not match_name:
                 continue
+            match_name = (getattr(item, "match_name", "") or "").strip()
             normalized_match = self._normalize_name(match_name)
+            if normalized_match in NULL_LLM_MATCH_NAMES:
+                logger.debug(
+                    "LLM explicitly reported no match for '%s'",
+                    original,
+                )
+                continue
+            if not normalized_match:
+                continue
             record = self.records_by_normalized.get(normalized_match)
+            confidence_raw = getattr(item, "confidence", None)
             confidence = (
-                item.confidence
-                if item.confidence is not None
+                float(confidence_raw)
+                if confidence_raw is not None
                 else self.LLM_DEFAULT_CONFIDENCE
             )
             notes: list[str] = [
                 f"LLM selected '{match_name}' for '{original}'"
             ]
-            if item.rationale:
-                notes.append(item.rationale.strip())
+            rationale = (getattr(item, "rationale", "") or "").strip()
+            if rationale:
+                notes.append(rationale)
             if record is None:
                 best = self._find_best_record(normalized_match)
+                if best is None and normalized_match != normalized_query:
+                    best = self._find_best_record(normalized_query)
                 if best is None:
+                    logger.debug(
+                        "Unable to map LLM suggestion '%s' for '%s' to a monograph",
+                        match_name,
+                        original,
+                    )
                     continue
                 record, score = best
                 notes.append(
                     f"Mapped suggestion to '{record.drug_name}' (score={score:.2f})"
                 )
-                confidence = min(max(confidence, score), 1.0)
+                confidence = max(confidence, score)
             results[idx] = (record, confidence, "llm_fallback", notes)
         return results
 
