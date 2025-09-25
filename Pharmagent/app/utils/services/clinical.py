@@ -211,8 +211,7 @@ class DrugToxicityEssay:
         self.entry_by_nbk: dict[str, ArchiveEntry] = {}
         self.archive_ready = False
     # -----------------------------------------------------------------------------
-    async def run_analysis(self) -> PatientDrugToxicityBundle:
-        await self._ensure_index_loaded()
+    async def run_analysis(self) -> PatientDrugToxicityBundle:        
         self._ensure_livertox_records()
         results: list[DrugHepatotoxicityAnalysis] = []
         for entry in self.drugs.entries:
@@ -445,8 +444,6 @@ class DrugToxicityEssay:
     async def _search_livertox_id(
         self, drug_name: str, *, notes: list[str] | None = None
     ) -> LiverToxMatch | None:
-        await self._ensure_index_loaded()
-        self._ensure_livertox_records()
         normalized_query = self._normalize_name(drug_name)
         if not normalized_query:
             if notes is not None:
@@ -624,7 +621,7 @@ class DrugToxicityEssay:
             drug_name=drug_name,
             candidates=candidate_block,
         )
-        model_name = ClientRuntimeConfig.get_agent_model()
+        model_name = ClientRuntimeConfig.get_parsing_model()
         suggestion = await self.llm_client.llm_structured_call(
             model=model_name,
             system_prompt=LIVERTOX_MATCH_SYSTEM_PROMPT,
@@ -664,8 +661,7 @@ class DrugToxicityEssay:
     async def _fetch_livertox_content(self, nbk_id: str) -> dict[str, str]:
         cached = self.content_cache.get(nbk_id)
         if cached is not None:
-            return cached
-        await self._ensure_index_loaded()
+            return cached        
         entry = self.entry_by_nbk.get(nbk_id)
         if entry is None:
             raise KeyError(f"No entry for NBK id {nbk_id}")
