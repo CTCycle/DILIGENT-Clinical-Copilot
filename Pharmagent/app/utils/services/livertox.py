@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import asyncio
 import os
 import re
 import time
@@ -79,6 +80,8 @@ class LiverToxMatcher:
     MIN_CONFIDENCE = 0.40
     DETERMINISTIC_THRESHOLD = 0.86
     LLM_DEFAULT_CONFIDENCE = 0.65
+    LLM_TIMEOUT_SECONDS = 240.0
+    YIELD_INTERVAL = 25
 
     # -------------------------------------------------------------------------
     def __init__(
@@ -128,42 +131,55 @@ class LiverToxMatcher:
         results: list[LiverToxMatch | None] = [None] * total
         if not self.records:
             return results
+        # Normalize all queries once so both deterministic and LLM stages share inputs.
         normalized_queries = [self._normalize_name(name) for name in patient_drugs]
+        eligible_total = sum(1 for value in normalized_queries if value)
         unresolved_indices: list[int] = []
-        for idx, (original, normalized) in enumerate(
-            zip(patient_drugs, normalized_queries, strict=False)
-        ):
+        deterministic_matches = 0
+        for idx, normalized in enumerate(normalized_queries):
+            if idx and idx % self.YIELD_INTERVAL == 0:
+                await asyncio.sleep(0)
             if not normalized:
                 continue
-            cached = self.match_cache.get(normalized)
-            if cached is not None or normalized in self.match_cache:
+            if normalized in self.match_cache:
+                cached = self.match_cache[normalized]
                 results[idx] = cached
+                if cached is not None and cached.reason != "llm_fallback":
+                    deterministic_matches += 1
                 continue
             deterministic = self._deterministic_lookup(normalized)
             if deterministic is not None:
-                record, confidence, reason, extra_notes = deterministic
-                match = self._create_match(record, confidence, reason, extra_notes)
+                record, confidence, reason, notes = deterministic
+                match = self._create_match(record, confidence, reason, notes)
                 self.match_cache[normalized] = match
                 results[idx] = match
+                deterministic_matches += 1
                 continue
+            self.match_cache[normalized] = None
             unresolved_indices.append(idx)
-        if unresolved_indices:
-            fallback_matches = await self._llm_batch_match_lookup(
-                patient_drugs,
-                normalized_queries=normalized_queries,
-            )
-            for idx in unresolved_indices:
-                normalized = normalized_queries[idx]
-                if not normalized:
-                    continue
-                fallback = fallback_matches[idx] if idx < len(fallback_matches) else None
-                if fallback is None:
-                    self.match_cache[normalized] = None
-                    continue
-                record, confidence, reason, extra_notes = fallback
-                match = self._create_match(record, confidence, reason, extra_notes)
-                self.match_cache[normalized] = match
-                results[idx] = match
+        if not unresolved_indices:
+            return results
+        match_pool = eligible_total or 1
+        deterministic_ratio = deterministic_matches / match_pool
+        # Skip the LLM if deterministic coverage is high enough for this patient batch.
+        if deterministic_ratio >= 0.80:
+            return results
+        fallback_matches = await self._llm_batch_match_lookup(
+            patient_drugs,
+            normalized_queries=normalized_queries,
+        )
+        for idx in unresolved_indices:
+            normalized = normalized_queries[idx]
+            if not normalized:
+                continue
+            fallback = fallback_matches[idx] if idx < len(fallback_matches) else None
+            if fallback is None:
+                self.match_cache[normalized] = None
+                continue
+            record, confidence, reason, notes = fallback
+            match = self._create_match(record, confidence, reason, notes)
+            self.match_cache[normalized] = match
+            results[idx] = match
         return results
 
     # -------------------------------------------------------------------------
@@ -225,6 +241,7 @@ class LiverToxMatcher:
             primary_name = self._normalize_name(raw_name.split("(")[0])
             if primary_name and primary_name not in normalized_map:
                 normalized_map[primary_name] = record
+            # Capture aliases included in parentheses so common alternates resolve quickly.
             alias_section = None
             if "(" in raw_name and ")" in raw_name:
                 alias_section = raw_name.split("(", 1)[1].split(")", 1)[0]
@@ -376,6 +393,7 @@ class LiverToxMatcher:
         total = len(patient_drugs)
         if total == 0 or not self.records:
             return []
+        # The prompt block is cached so repeated calls do not rebuild the monograph list.
         candidate_block = self.candidate_prompt_block or ""
         if not candidate_block:
             return [None] * total
@@ -401,12 +419,15 @@ class LiverToxMatcher:
         )
         start_time = time.perf_counter()
         try:
-            suggestion = await llm_call(
-                model=model_name,
-                system_prompt=LIVERTOX_MATCH_SYSTEM_PROMPT,
-                user_prompt=prompt,
-                schema=LiverToxBatchMatchSuggestion,
-                temperature=0.0,
+            suggestion = await asyncio.wait_for(
+                llm_call(
+                    model=model_name,
+                    system_prompt=LIVERTOX_MATCH_SYSTEM_PROMPT,
+                    user_prompt=prompt,
+                    schema=LiverToxBatchMatchSuggestion,
+                    temperature=0.0,
+                ),
+                timeout=self.LLM_TIMEOUT_SECONDS,
             )
         except Exception as exc:  # noqa: BLE001
             duration = time.perf_counter() - start_time
