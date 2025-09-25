@@ -79,3 +79,25 @@ Carefully read the excerpt and extract:
 
 Return ONLY a JSON object matching the required schema.
 """
+
+LIVERTOX_MATCH_SYSTEM_PROMPT = """
+You are a medical terminology expert tasked with aligning drug names to the naming
+conventions used in the LiverTox database. Always pick the best matching entry from the
+provided candidate list. Never guess names that are not present in that list.
+
+Return a valid JSON object with the keys:
+- "match_name": the exact candidate string that best matches the requested drug, or null
+  if none apply.
+- "confidence": number between 0 and 1 representing how certain you are.
+- "rationale": short explanation (one sentence) describing the match.
+"""
+
+LIVERTOX_MATCH_USER_PROMPT = """
+Drug requiring alignment: {drug_name}
+
+Candidate LiverTox monograph names:
+{candidates}
+
+Think carefully about synonyms, brand names, and spelling variants before selecting the
+closest candidate. Respond ONLY with the JSON object described earlier.
+"""

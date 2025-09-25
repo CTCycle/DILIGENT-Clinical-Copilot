@@ -6,6 +6,7 @@ import tarfile
 import types
 from pathlib import Path
 
+import pandas as pd
 import pytest
 
 ROOT_DIR = os.path.abspath(os.path.join(os.path.dirname(__file__), ".."))
@@ -182,6 +183,33 @@ def _patch_llm_client(monkeypatch):
     monkeypatch.setattr(
         "Pharmagent.app.utils.services.clinical.initialize_llm_client",
         lambda *args, **kwargs: _DummyLLMClient(),
+    )
+    yield
+
+
+# -----------------------------------------------------------------------------
+@pytest.fixture(autouse=True)
+def _patch_serializer(monkeypatch):
+    records = [
+        {
+            "nbk_id": "NBK100",
+            "drug_name": "Acetaminophen (Tylenol)",
+            "excerpt": "High doses cause liver injury.",
+        },
+        {
+            "nbk_id": "NBK200",
+            "drug_name": "Amoxicillin",
+            "excerpt": "Rare hypersensitivity reactions.",
+        },
+    ]
+
+    class _SerializerStub:
+        def get_livertox_records(self):
+            return pd.DataFrame(records)
+
+    monkeypatch.setattr(
+        "Pharmagent.app.utils.services.clinical.DataSerializer",
+        lambda: _SerializerStub(),
     )
     yield
 
