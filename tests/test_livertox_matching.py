@@ -51,6 +51,7 @@ if "httpx" not in sys.modules:
     class _StubResponse:
         def __init__(self) -> None:
             self.headers: dict[str, str] = {}
+            self.status_code = 200
 
         def raise_for_status(self) -> None:
             return None
@@ -130,6 +131,7 @@ if "httpx" not in sys.modules:
     httpx_stub.TimeoutException = TimeoutException
     httpx_stub.HTTPStatusError = HTTPStatusError
     httpx_stub.RequestError = RequestError
+    httpx_stub.get = lambda *args, **kwargs: _StubResponse()
 
     sys.modules["httpx"] = httpx_stub
 
@@ -197,6 +199,28 @@ class _LLMBatchStub:
 
 
 # -----------------------------------------------------------------------------
+class _RxNormStub:
+    def __init__(self, mapping: dict[str, dict[str, str]] | None = None) -> None:
+        self.mapping = mapping or {}
+
+    # -------------------------------------------------------------------------
+    def expand(self, raw_name: str) -> set[str]:
+        key = raw_name.lower()
+        entries = self.mapping.get(key)
+        if entries is None:
+            return {key}
+        return set(entries)
+
+    # -------------------------------------------------------------------------
+    def get_candidate_kind(self, original: str, candidate: str) -> str:
+        key = original.lower()
+        entries = self.mapping.get(key)
+        if not entries:
+            return "unknown"
+        return entries.get(candidate, "unknown")
+
+
+# -----------------------------------------------------------------------------
 @pytest.fixture(autouse=True)
 def _patch_llm_client(monkeypatch):
     monkeypatch.setattr(
@@ -207,6 +231,16 @@ def _patch_llm_client(monkeypatch):
 
 
 # -----------------------------------------------------------------------------
+@pytest.fixture(autouse=True)
+def _disable_rxnorm(monkeypatch):
+    monkeypatch.setattr(
+        "Pharmagent.app.utils.services.retrieval.RXNORM_EXPANSION_ENABLED",
+        False,
+    )
+    yield
+
+
+ # -----------------------------------------------------------------------------
 @pytest.fixture(autouse=True)
 def _patch_serializer(monkeypatch):
     records = [
@@ -355,6 +389,75 @@ def test_matcher_preserves_order_and_length():
         "NBK200",
     ]
 
+
+# -----------------------------------------------------------------------------
+def test_matcher_uses_rxnorm_brand_to_match(monkeypatch):
+    monkeypatch.setattr(
+        "Pharmagent.app.utils.services.retrieval.RXNORM_EXPANSION_ENABLED",
+        True,
+    )
+    df = pd.DataFrame(
+        [
+            {
+                "nbk_id": "NBK300",
+                "drug_name": "Duloxetine",
+                "excerpt": "SNRI",
+            }
+        ]
+    )
+    retriever = _RxNormStub(
+        {
+            "cymbalta": {"cymbalta": "brand", "duloxetine": "ingredient"},
+            "duloxetine": {"duloxetine": "ingredient", "cymbalta": "brand"},
+        }
+    )
+    matcher = LiverToxMatcher(df, llm_client=_DummyLLMClient(), retriever=retriever)
+    matches = asyncio.run(matcher.match_drug_names(["Cymbalta", "Duloxetine"]))
+    assert [match.nbk_id if match else None for match in matches] == [
+        "NBK300",
+        "NBK300",
+    ]
+
+
+# -----------------------------------------------------------------------------
+def test_matcher_prefers_single_ingredient_over_combo(monkeypatch):
+    monkeypatch.setattr(
+        "Pharmagent.app.utils.services.retrieval.RXNORM_EXPANSION_ENABLED",
+        True,
+    )
+    df = pd.DataFrame(
+        [
+            {
+                "nbk_id": "NBK400",
+                "drug_name": "Amlodipine",
+                "excerpt": "Calcium channel blocker",
+            },
+            {
+                "nbk_id": "NBK401",
+                "drug_name": "Atorvastatin",
+                "excerpt": "Statin",
+            },
+            {
+                "nbk_id": "NBK402",
+                "drug_name": "Amlodipine Atorvastatin",
+                "excerpt": "Combo",
+            },
+        ]
+    )
+    retriever = _RxNormStub(
+        {
+            "caduet": {
+                "amlodipine": "ingredient",
+                "atorvastatin": "ingredient",
+                "amlodipine / atorvastatin": "ingredient_combo",
+            }
+        }
+    )
+    matcher = LiverToxMatcher(df, llm_client=_DummyLLMClient(), retriever=retriever)
+    matches = asyncio.run(matcher.match_drug_names(["Caduet"]))
+    assert matches[0] is not None
+    assert matches[0].nbk_id in {"NBK400", "NBK401"}
+    assert matches[0].reason == "direct_match"
 
 # -----------------------------------------------------------------------------
 def test_essay_returns_mapping():
