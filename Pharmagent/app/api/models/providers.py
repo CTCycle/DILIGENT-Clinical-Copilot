@@ -428,7 +428,7 @@ class OllamaClient:
         *,
         model: str,
         messages: list[dict[str, str]],
-        format: str | None = "json",
+        format: str | None = None,
         options: dict[str, Any] | None = None,
         keep_alive: str | None = None,
     ) -> dict[str, Any] | str:
@@ -723,7 +723,7 @@ class CloudLLMClient:
         *,
         model: str,
         messages: list[dict[str, str]],
-        format: str | None = "json",
+        format: str | None = None,
         options: dict[str, Any] | None = None,
         keep_alive: str | None = None,  # unused but kept for compatibility
     ) -> dict[str, Any] | str:
