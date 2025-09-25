@@ -47,3 +47,13 @@ class DataSerializer:
             data = pd.DataFrame(prepared)
             if not data.empty:
                 database.upsert_into_database(data, "LIVERTOX_MONOGRAPHS")
+
+    # -----------------------------------------------------------------------------
+    def load_from_database(self, table_name: str) -> pd.DataFrame:
+        query = f'SELECT * FROM "{table_name}"'
+        with database.engine.connect() as connection:
+            return pd.read_sql_query(query, connection)
+
+    # -----------------------------------------------------------------------------
+    def get_livertox_records(self) -> pd.DataFrame:
+        return self.load_from_database("LIVERTOX_MONOGRAPHS")
