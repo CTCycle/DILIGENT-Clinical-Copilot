@@ -82,15 +82,15 @@ class DrugToxicityEssay:
         self.matcher: LiverToxMatcher | None = None
 
     # -------------------------------------------------------------------------
-    async def run_analysis(self) -> dict[str, dict[str, Any]]:
+    async def run_analysis(self) -> list[dict[str, Any]]:
         patient_drugs = [entry.name for entry in self.drugs.entries if entry.name]
         if not patient_drugs:
-            return {}
+            return []
         self._ensure_livertox_loaded()
         if self.matcher is None:
             return self._empty_result(patient_drugs)
         matches = await self.matcher.match_drug_names(patient_drugs)
-        return self.matcher.build_patient_mapping(matches)
+        return self.matcher.build_patient_mapping(patient_drugs, matches)
 
     # -------------------------------------------------------------------------
     def _ensure_livertox_loaded(self) -> None:
@@ -110,12 +110,13 @@ class DrugToxicityEssay:
         self.matcher = LiverToxMatcher(dataset, llm_client=self.llm_client)
 
     # -------------------------------------------------------------------------
-    def _empty_result(self, patient_drugs: list[str]) -> dict[str, dict[str, Any]]:
-        return {
-            name: {
+    def _empty_result(self, patient_drugs: list[str]) -> list[dict[str, Any]]:
+        return [
+            {
+                "drug_name": name,
                 "matched_livertox_row": None,
                 "extracted_excerpts": [],
             }
             for name in patient_drugs
-        }
+        ]
 
