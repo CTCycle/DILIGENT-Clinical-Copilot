@@ -13,6 +13,8 @@ from collections.abc import AsyncGenerator, Awaitable, Callable
 from typing import Any, Literal, TypeAlias, TypeVar, cast
 import httpx
 from pydantic import BaseModel
+from langchain_core.output_parsers import PydanticOutputParser
+from langsmith.run_helpers import get_current_run_tree, traceable
 
 from Pharmagent.app.logger import logger
 from Pharmagent.app.constants import (
@@ -44,6 +46,26 @@ class OllamaTimeout(OllamaError):
 ProgressCb: TypeAlias = Callable[[dict[str, Any]], None | Awaitable[None]]
 
 
+# -------------------------------------------------------------------------
+def _append_trace_metadata(
+    metadata: dict[str, Any] | None = None, tags: list[str] | None = None
+) -> None:
+    run = get_current_run_tree()
+    if not run:
+        return
+    if metadata:
+        try:
+            run.add_metadata(metadata)
+        except Exception:  # noqa: BLE001 - tracing should never break runtime
+            logger.debug("Failed to append LangSmith metadata", exc_info=True)
+    if not tags:
+        return
+    try:
+        run.add_tags(tags)
+    except Exception:
+        logger.debug("Failed to append LangSmith tags", exc_info=True)
+
+
 ###############################################################################
 class OllamaClient:
     """
@@ -67,7 +89,7 @@ class OllamaClient:
     def __init__(
         self,
         base_url: str | None = None,
-        timeout_s: float = 120.0,
+        timeout_s: float = 1_800.0,
         keepalive_connections: int = 10,
         keepalive_max: int = 20,
     ) -> None:
@@ -422,12 +444,13 @@ class OllamaClient:
             raise OllamaError(f"Model '{name}' not found and auto_pull=False")
 
     # -------------------------------------------------------------------------
+    @traceable(run_type="llm", name="Ollama.chat")
     async def chat(
         self,
         *,
         model: str,
         messages: list[dict[str, str]],
-        format: str | None = "json",
+        format: str | None = None,
         options: dict[str, Any] | None = None,
         keep_alive: str | None = None,
     ) -> dict[str, Any] | str:
@@ -442,6 +465,11 @@ class OllamaClient:
             body["options"] = options
         if keep_alive:
             body["keep_alive"] = keep_alive
+
+        _append_trace_metadata(
+            {"provider": "ollama", "model": model, "format": format or "text"},
+            ["ollama", "chat"],
+        )
 
         try:
             resp = await self.client.post("/api/chat", json=body)
@@ -499,6 +527,7 @@ class OllamaClient:
             raise OllamaTimeout("Timed out during streamed chat response") from e
 
     # -------------------------------------------------------------------------
+    @traceable(run_type="chain", name="Ollama.structured_call")
     async def llm_structured_call(
         self,
         *,
@@ -522,7 +551,8 @@ class OllamaClient:
         across parsers by supplying different prompts/schemas.
 
         """
-        format_instructions = self._format_instructions(schema)
+        parser = PydanticOutputParser(pydantic_object=schema)
+        format_instructions = parser.get_format_instructions()
 
         messages = [
             {
@@ -531,6 +561,16 @@ class OllamaClient:
             },
             {"role": "user", "content": user_prompt},
         ]
+
+        _append_trace_metadata(
+            {
+                "provider": "ollama",
+                "model": model,
+                "schema": schema.__name__,
+                "use_json_mode": use_json_mode,
+            },
+            ["ollama", "structured"],
+        )
 
         try:
             raw = await self.chat(
@@ -543,13 +583,11 @@ class OllamaClient:
         except OllamaError as e:
             raise RuntimeError(f"LLM call failed: {e}") from e
 
-        # Unify to text for structured parsing
         text = json.dumps(raw) if isinstance(raw, dict) else str(raw)
 
-        # First parse attempt + bounded auto-repair loop
         for attempt in range(max_repair_attempts + 1):
             try:
-                return self._parse_schema_response(schema, text)
+                return cast(T, parser.parse(text))
             except Exception as err:
                 if attempt >= max_repair_attempts:
                     # Surface original model output in logs for debugging
@@ -586,24 +624,6 @@ class OllamaClient:
         # If execution reaches here, no valid model could be parsed and no
         # exception was raised within the loop (should be unreachable).
         raise RuntimeError("No structured output produced by the model")
-
-    # -------------------------------------------------------------------------
-    @staticmethod
-    def _format_instructions(schema: type[T]) -> str:
-        schema_json = json.dumps(schema.model_json_schema(), indent=2, sort_keys=True)
-        return (
-            "You must respond with a JSON object that strictly matches the following "
-            "Pydantic schema. Do not include extra commentary or keys.\n"
-            f"{schema_json}"
-        )
-
-    # -------------------------------------------------------------------------
-    @staticmethod
-    def _parse_schema_response(schema: type[T], text: str) -> T:
-        parsed = OllamaClient.parse_json(text)
-        if parsed is None:
-            raise ValueError("Model response did not contain a JSON object")
-        return cast(T, schema.model_validate(parsed))
 
     # -------------------------------------------------------------------------
     @staticmethod
@@ -736,24 +756,42 @@ class CloudLLMClient:
             raise LLMError(f"HTTP {resp.status_code}: {detail}") from e
 
     # ---------------------------------------------------------------------
+    @traceable(run_type="chain", name="CloudLLM.chat")
     async def chat(
         self,
         *,
         model: str,
         messages: list[dict[str, str]],
-        format: str | None = "json",
+        format: str | None = None,
         options: dict[str, Any] | None = None,
         keep_alive: str | None = None,  # unused but kept for compatibility
     ) -> dict[str, Any] | str:
         if self.provider == "openai":
+            _append_trace_metadata(
+                {
+                    "provider": "openai",
+                    "model": model or (self.default_model or ""),
+                    "format": format or "text",
+                },
+                ["cloud", "openai"],
+            )
             return await self._chat_openai(
                 model=model, messages=messages, format=format, options=options
             )
         if self.provider == "gemini":
+            _append_trace_metadata(
+                {
+                    "provider": "gemini",
+                    "model": model or (self.default_model or ""),
+                    "format": format or "text",
+                },
+                ["cloud", "gemini"],
+            )
             return await self._chat_gemini(model=model, messages=messages)
         raise LLMError(f"Provider '{self.provider}' does not support chat yet")
 
     # ---------------------------------------------------------------------
+    @traceable(run_type="llm", name="CloudLLM.chat_openai")
     async def _chat_openai(
         self,
         *,
@@ -816,6 +854,7 @@ class CloudLLMClient:
         return contents, system_text
 
     # ---------------------------------------------------------------------
+    @traceable(run_type="llm", name="CloudLLM.chat_gemini")
     async def _chat_gemini(
         self, *, model: str, messages: list[dict[str, str]]
     ) -> dict[str, Any] | str:
@@ -853,6 +892,7 @@ class CloudLLMClient:
         return str(content)
 
     # ---------------------------------------------------------------------
+    @traceable(run_type="chain", name="CloudLLM.structured_call")
     async def llm_structured_call(
         self,
         *,
@@ -874,6 +914,16 @@ class CloudLLMClient:
             },
             {"role": "user", "content": user_prompt},
         ]
+
+        _append_trace_metadata(
+            {
+                "provider": self.provider,
+                "model": model or (self.default_model or ""),
+                "schema": schema.__name__,
+                "use_json_mode": use_json_mode,
+            },
+            ["cloud", "structured"],
+        )
 
         raw = await self.chat(
             model=model or (self.default_model or ""),
