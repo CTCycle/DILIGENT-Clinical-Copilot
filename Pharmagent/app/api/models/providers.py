@@ -68,7 +68,7 @@ class OllamaClient:
     def __init__(
         self,
         base_url: str | None = None,
-        timeout_s: float = 120.0,
+        timeout_s: float = 1_800.0,
         keepalive_connections: int = 10,
         keepalive_max: int = 20,
     ) -> None:
