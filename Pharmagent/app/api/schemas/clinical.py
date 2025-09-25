@@ -295,6 +295,29 @@ class LiverToxMatchInfo(BaseModel):
 
 
 ###############################################################################
+class LiverToxBatchMatchItem(BaseModel):
+    drug_name: str = Field(..., min_length=1, max_length=200)
+    match_name: str | None = Field(default=None, max_length=200)
+    confidence: float | None = Field(default=None, ge=0.0, le=1.0)
+    rationale: str | None = Field(default=None, max_length=500)
+
+    @field_validator("drug_name", mode="before")
+    @classmethod
+    def _strip_drug_name(cls, value: str | None) -> str:
+        if value is None:
+            raise ValueError("drug_name cannot be null")
+        cleaned = str(value).strip()
+        if not cleaned:
+            raise ValueError("drug_name cannot be empty")
+        return cleaned
+
+
+###############################################################################
+class LiverToxBatchMatchSuggestion(BaseModel):
+    matches: list[LiverToxBatchMatchItem] = Field(default_factory=list)
+
+
+###############################################################################
 class LiverToxMatchSuggestion(BaseModel):
     match_name: str | None = Field(default=None, max_length=200)
     confidence: float | None = Field(default=None, ge=0.0, le=1.0)

@@ -101,3 +101,21 @@ Candidate LiverTox monograph names:
 Think carefully about synonyms, brand names, and spelling variants before selecting the
 closest candidate. Respond ONLY with the JSON object described earlier.
 """
+
+LIVERTOX_BATCH_MATCH_USER_PROMPT = """
+Patient drugs requiring alignment (preserve order):
+{patient_drugs}
+
+Candidate LiverTox monograph names:
+{candidates}
+
+For each patient drug above, respond with one JSON object in the same order containing:
+- "drug_name": copy the patient drug text exactly as provided.
+- "match_name": the exact candidate string that best matches the drug, or null if none
+  apply.
+- "confidence": number between 0 and 1 representing certainty.
+- "rationale": short explanation (one sentence) describing the match.
+
+Return ONLY a JSON object with a top-level key "matches" containing the array of match
+objects.
+"""

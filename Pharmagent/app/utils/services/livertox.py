@@ -8,11 +8,11 @@ from typing import Any
 import pandas as pd
 
 from Pharmagent.app.api.models.prompts import (
+    LIVERTOX_BATCH_MATCH_USER_PROMPT,
     LIVERTOX_MATCH_SYSTEM_PROMPT,
-    LIVERTOX_MATCH_USER_PROMPT,
 )
 from Pharmagent.app.api.models.providers import initialize_llm_client
-from Pharmagent.app.api.schemas.clinical import LiverToxMatchSuggestion
+from Pharmagent.app.api.schemas.clinical import LiverToxBatchMatchSuggestion
 from Pharmagent.app.configurations import ClientRuntimeConfig
 from Pharmagent.app.logger import logger
 
@@ -57,7 +57,7 @@ class LiverToxMatcher:
         self.llm_client = llm_client or initialize_llm_client(
             purpose="agent", timeout_s=300.0
         )
-        self.match_cache: dict[str, LiverToxMatch] = {}
+        self.match_cache: dict[str, LiverToxMatch | None] = {}
         self.records: list[MonographRecord] = []
         self.records_by_normalized: dict[str, MonographRecord] = {}
         self.rows_by_nbk: dict[str, dict[str, Any]] = {}
@@ -69,9 +69,51 @@ class LiverToxMatcher:
         self, patient_drugs: list[str]
     ) -> dict[str, LiverToxMatch | None]:
         results: dict[str, LiverToxMatch | None] = {}
-        for original in patient_drugs:
-            match = await self._search_single(original)
-            results[original] = match
+        if not patient_drugs:
+            return results
+        if not self.records:
+            for original in patient_drugs:
+                results[original] = None
+            return results
+        normalized_queries = [self._normalize_name(name) for name in patient_drugs]
+        unresolved_indices: list[int] = []
+        for idx, (original, normalized) in enumerate(
+            zip(patient_drugs, normalized_queries, strict=False)
+        ):
+            if not normalized:
+                results[original] = None
+                continue
+            if normalized in self.match_cache:
+                results[original] = self.match_cache[normalized]
+                continue
+            deterministic = self._deterministic_lookup(normalized)
+            if deterministic is not None:
+                record, confidence, reason, extra_notes = deterministic
+                match = self._create_match(record, confidence, reason, extra_notes)
+                self.match_cache[normalized] = match
+                results[original] = match
+                continue
+            results[original] = None
+            unresolved_indices.append(idx)
+        if unresolved_indices:
+            fallback_matches = await self._llm_batch_match_lookup(
+                patient_drugs,
+                normalized_queries=normalized_queries,
+            )
+            for idx in unresolved_indices:
+                original = patient_drugs[idx]
+                normalized = normalized_queries[idx]
+                if not normalized:
+                    continue
+                fallback = fallback_matches[idx] if idx < len(fallback_matches) else None
+                if fallback is None:
+                    self.match_cache[normalized] = None
+                    results[original] = None
+                    continue
+                record, confidence, reason, extra_notes = fallback
+                match = self._create_match(record, confidence, reason, extra_notes)
+                self.match_cache[normalized] = match
+                results[original] = match
         return results
 
     # -------------------------------------------------------------------------
@@ -159,34 +201,6 @@ class LiverToxMatcher:
             index[nbk_id] = row
         self.rows_by_nbk = index
         return self.rows_by_nbk
-
-    # -------------------------------------------------------------------------
-    async def _search_single(self, drug_name: str) -> LiverToxMatch | None:
-        normalized_query = self._normalize_name(drug_name)
-        if not normalized_query:
-            return None
-        if not self.records:
-            return None
-        cached = self.match_cache.get(normalized_query)
-        if cached is not None:
-            return cached
-        deterministic = self._deterministic_lookup(normalized_query)
-        if deterministic is not None:
-            record, confidence, reason, extra_notes = deterministic
-            match = self._create_match(record, confidence, reason, extra_notes)
-            self.match_cache[normalized_query] = match
-            return match
-        try:
-            fallback = await self._llm_match_lookup(drug_name)
-        except Exception as exc:  # noqa: BLE001
-            logger.error("LLM fallback match failed for %s: %s", drug_name, exc)
-            return None
-        if fallback is None:
-            return None
-        record, confidence, reason, extra_notes = fallback
-        match = self._create_match(record, confidence, reason, extra_notes)
-        self.match_cache[normalized_query] = match
-        return match
 
     # -------------------------------------------------------------------------
     def _create_match(
@@ -281,49 +295,88 @@ class LiverToxMatcher:
         return overlap / union
 
     # -------------------------------------------------------------------------
-    async def _llm_match_lookup(
-        self, drug_name: str
-    ) -> tuple[MonographRecord, float, str, list[str]] | None:
-        if not self.records:
-            return None
+    async def _llm_batch_match_lookup(
+        self,
+        patient_drugs: list[str],
+        *,
+        normalized_queries: list[str],
+    ) -> list[tuple[MonographRecord, float, str, list[str]] | None]:
+        total = len(patient_drugs)
+        if total == 0 or not self.records:
+            return []
         candidate_block = self.candidate_prompt_block or ""
         if not candidate_block:
-            return None
-        prompt = LIVERTOX_MATCH_USER_PROMPT.format(
-            drug_name=drug_name,
+            return [None] * total
+        drugs_block = "\n".join(
+            f"- {name}" if name else "-"
+            for name in patient_drugs
+        )
+        prompt = LIVERTOX_BATCH_MATCH_USER_PROMPT.format(
+            patient_drugs=drugs_block,
             candidates=candidate_block,
         )
         model_name = ClientRuntimeConfig.get_parsing_model()
-        suggestion = await self.llm_client.llm_structured_call(
-            model=model_name,
-            system_prompt=LIVERTOX_MATCH_SYSTEM_PROMPT,
-            user_prompt=prompt,
-            schema=LiverToxMatchSuggestion,
-            temperature=0.0,
-        )
-        match_name = (suggestion.match_name or "").strip()
-        if not match_name:
-            return None
-        normalized_match = self._normalize_name(match_name)
-        record = self.records_by_normalized.get(normalized_match)
-        confidence = (
-            suggestion.confidence
-            if suggestion.confidence is not None
-            else self.LLM_DEFAULT_CONFIDENCE
-        )
-        notes: list[str] = [f"LLM selected '{match_name}'"]
-        if suggestion.rationale:
-            notes.append(suggestion.rationale.strip())
-        if record is None:
-            best = self._find_best_record(normalized_match)
-            if best is None:
-                return None
-            record, score = best
-            notes.append(
-                f"Mapped suggestion to '{record.drug_name}' (score={score:.2f})"
+        try:
+            suggestion = await self.llm_client.llm_structured_call(
+                model=model_name,
+                system_prompt=LIVERTOX_MATCH_SYSTEM_PROMPT,
+                user_prompt=prompt,
+                schema=LiverToxBatchMatchSuggestion,
+                temperature=0.0,
             )
-            confidence = min(max(confidence, score), 1.0)
-        return record, confidence, "llm_fallback", notes
+        except Exception as exc:  # noqa: BLE001
+            logger.error("LLM batch match failed: %s", exc)
+            return [None] * total
+        matches = suggestion.matches if suggestion else []
+        if len(matches) != total:
+            logger.warning(
+                "LLM returned %s matches for %s patient drugs",
+                len(matches),
+                total,
+            )
+            return [None] * total
+        results: list[tuple[MonographRecord, float, str, list[str]] | None] = [
+            None
+        ] * total
+        for idx, (item, original, normalized_query) in enumerate(
+            zip(matches, patient_drugs, normalized_queries, strict=False)
+        ):
+            if not normalized_query:
+                continue
+            llm_drug_name = (item.drug_name or "").strip()
+            if llm_drug_name and llm_drug_name != original:
+                logger.debug(
+                    "LLM drug name mismatch at index %s: '%s' vs '%s'",
+                    idx,
+                    llm_drug_name,
+                    original,
+                )
+            match_name = (item.match_name or "").strip()
+            if not match_name:
+                continue
+            normalized_match = self._normalize_name(match_name)
+            record = self.records_by_normalized.get(normalized_match)
+            confidence = (
+                item.confidence
+                if item.confidence is not None
+                else self.LLM_DEFAULT_CONFIDENCE
+            )
+            notes: list[str] = [
+                f"LLM selected '{match_name}' for '{original}'"
+            ]
+            if item.rationale:
+                notes.append(item.rationale.strip())
+            if record is None:
+                best = self._find_best_record(normalized_match)
+                if best is None:
+                    continue
+                record, score = best
+                notes.append(
+                    f"Mapped suggestion to '{record.drug_name}' (score={score:.2f})"
+                )
+                confidence = min(max(confidence, score), 1.0)
+            results[idx] = (record, confidence, "llm_fallback", notes)
+        return results
 
     # -------------------------------------------------------------------------
     def _normalize_name(self, name: str) -> str:
