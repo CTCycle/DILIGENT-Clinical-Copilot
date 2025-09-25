@@ -284,7 +284,8 @@ def test_matcher_direct_match():
     )
     matcher = LiverToxMatcher(df, llm_client=_DummyLLMClient())
     matches = asyncio.run(matcher.match_drug_names(["Acetaminophen"]))
-    match = matches["Acetaminophen"]
+    assert len(matches) == 1
+    match = matches[0]
     assert match is not None
     assert match.nbk_id == "NBK100"
     assert match.reason == "direct_match"
@@ -303,10 +304,38 @@ def test_matcher_alias_match():
     )
     matcher = LiverToxMatcher(df, llm_client=_DummyLLMClient())
     matches = asyncio.run(matcher.match_drug_names(["Tylenol"]))
-    match = matches["Tylenol"]
+    assert len(matches) == 1
+    match = matches[0]
     assert match is not None
     assert match.nbk_id == "NBK100"
     assert match.reason in {"alias_match", "direct_match", "fuzzy_match"}
+
+
+# -----------------------------------------------------------------------------
+def test_matcher_preserves_order_and_length():
+    df = pd.DataFrame(
+        [
+            {
+                "nbk_id": "NBK100",
+                "drug_name": "Acetaminophen (Tylenol)",
+                "excerpt": "High doses cause liver injury.",
+            },
+            {
+                "nbk_id": "NBK200",
+                "drug_name": "Amoxicillin",
+                "excerpt": "Rare hypersensitivity reactions.",
+            },
+        ]
+    )
+    matcher = LiverToxMatcher(df, llm_client=_DummyLLMClient())
+    inputs = ["Tylenol", "Tylenol", "Amoxicillin"]
+    matches = asyncio.run(matcher.match_drug_names(inputs))
+    assert len(matches) == len(inputs)
+    assert [match.nbk_id if match else None for match in matches] == [
+        "NBK100",
+        "NBK100",
+        "NBK200",
+    ]
 
 
 # -----------------------------------------------------------------------------
@@ -314,12 +343,12 @@ def test_essay_returns_mapping():
     drugs = PatientDrugs(entries=[DrugEntry(name="Acetaminophen"), DrugEntry(name="Unknown")])
     essay = DrugToxicityEssay(drugs)
     result = asyncio.run(essay.run_analysis())
-    assert set(result) == {"Acetaminophen", "Unknown"}
-    acetaminophen_row = result["Acetaminophen"]["matched_livertox_row"]
+    assert [entry["drug_name"] for entry in result] == ["Acetaminophen", "Unknown"]
+    acetaminophen_row = result[0]["matched_livertox_row"]
     assert acetaminophen_row is not None
     assert acetaminophen_row["nbk_id"] == "NBK100"
-    assert result["Unknown"]["matched_livertox_row"] is None
-    assert result["Unknown"]["extracted_excerpts"] == []
+    assert result[1]["matched_livertox_row"] is None
+    assert result[1]["extracted_excerpts"] == []
 
 
 # -----------------------------------------------------------------------------
@@ -336,4 +365,4 @@ def test_essay_handles_empty_database(monkeypatch):
     drugs = PatientDrugs(entries=[DrugEntry(name="Acetaminophen")])
     essay = DrugToxicityEssay(drugs)
     result = asyncio.run(essay.run_analysis())
-    assert result["Acetaminophen"]["matched_livertox_row"] is None
+    assert result[0]["matched_livertox_row"] is None
