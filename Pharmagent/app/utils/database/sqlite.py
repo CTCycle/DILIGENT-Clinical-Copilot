@@ -4,8 +4,8 @@ import os
 from typing import Any
 
 import pandas as pd
-from sqlalchemy import Column, Float, String, Text, UniqueConstraint, create_engine
 import sqlalchemy
+from sqlalchemy import Column, Float, String, Text, UniqueConstraint, create_engine
 from sqlalchemy.dialects.sqlite import insert
 from sqlalchemy.orm import declarative_base, sessionmaker
 

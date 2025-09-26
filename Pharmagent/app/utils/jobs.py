@@ -15,7 +15,6 @@ from Pharmagent.app.constants import (
     PHARMACOLOGY_LIVERTOX_STATUS_ENDPOINT,
 )
 
-
 type JobPayload = dict[str, Any]
 type JobCoroutine = Callable[..., Awaitable[JobPayload]]
 

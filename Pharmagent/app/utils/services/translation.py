@@ -5,7 +5,6 @@ import re
 import time
 from typing import Any, cast
 
-
 import torch
 from transformers import (
     AutoModelForSeq2SeqLM,
@@ -13,7 +12,6 @@ from transformers import (
     PreTrainedModel,
     PreTrainedTokenizerBase,
 )
-
 
 from Pharmagent.app.api.schemas.clinical import PatientData
 from Pharmagent.app.constants import (
