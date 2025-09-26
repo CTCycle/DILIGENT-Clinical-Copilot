@@ -147,46 +147,33 @@ class LiverToxUpdater:
 
     # -----------------------------------------------------------------------------
     def run(self) -> dict[str, Any]:
-        logger.info("Starting LiverTox update")
-        self._ensure_sources_dir()
-        archive_path = self._normalize_archive_path()
+        logger.info("Starting LiverTox update")       
+        archive_path = os.path.join(self.sources_path, LIVERTOX_ARCHIVE)
         if self.redownload:
             logger.info("Redownload flag enabled; fetching latest LiverTox archive")
-            download_info = self._download_archive()
+            download_info = self.download_archive()
             archive_path = os.path.abspath(str(download_info.get("file_path", archive_path)))
         else:
             logger.info("Using existing LiverTox archive")
-            download_info = self._collect_local_archive_info(archive_path)
+            download_info = self.collect_local_archive_info(archive_path)
         logger.info("Extracting LiverTox monographs from %s", archive_path)
-        extracted = self._extract_monographs(archive_path)
+        extracted = self.extract_monographs(archive_path)
         logger.info("Sanitizing %d extracted entries", len(extracted))
-        records = self._sanitize_records(extracted)
+        records = self.sanitize_records(extracted)
         logger.info("Enriching %d sanitized entries with RxNav terms", len(records))
-        enriched = self._enrich_records(records)
+        enriched = self.enrich_records(records)
         logger.info("Persisting enriched records to database")
-        self._persist_records(enriched)
-        logger.info("Verifying persisted records")
-        stored_count = self._verify_persistence(enriched)
-        if self.convert_to_dataframe:
-            logger.info("Converting archive to DataFrame representation")
-            self._maybe_convert_dataframe()
+        self.serializer.save_livertox_records(enriched)
+             
         payload = dict(download_info)
         payload["file_path"] = archive_path
         payload["processed_entries"] = len(enriched)
-        payload["records"] = stored_count
+        payload["records"] = len(enriched)
         logger.info("LiverTox update completed successfully")
         return payload
-
-    # -----------------------------------------------------------------------------
-    def _ensure_sources_dir(self) -> None:
-        os.makedirs(self.sources_path, exist_ok=True)
-
-    # -----------------------------------------------------------------------------
-    def _normalize_archive_path(self) -> str:
-        return os.path.join(self.sources_path, LIVERTOX_ARCHIVE)
-
-    # -----------------------------------------------------------------------------
-    def _collect_local_archive_info(self, archive_path: str) -> dict[str, Any]:
+    
+    # -------------------------------------------------------------------------
+    def collect_local_archive_info(self, archive_path: str) -> dict[str, Any]:
         if not os.path.isfile(archive_path):
             raise RuntimeError(
                 "LiverTox archive not found; enable REDOWNLOAD to fetch a fresh copy."
@@ -195,15 +182,15 @@ class LiverToxUpdater:
         modified = datetime.fromtimestamp(os.path.getmtime(archive_path), UTC).isoformat()
         return {"file_path": archive_path, "size": size, "last_modified": modified}
 
-    # -----------------------------------------------------------------------------
-    def _download_archive(self) -> dict[str, Any]:
+    # -------------------------------------------------------------------------
+    def download_archive(self) -> dict[str, Any]:
         try:
             return asyncio.run(self.livertox_client.download_bulk_data(self.sources_path))
         except Exception as exc:  # noqa: BLE001
             raise RuntimeError(f"Failed to download LiverTox archive: {exc}") from exc
 
-    # -----------------------------------------------------------------------------
-    def _extract_monographs(self, archive_path: str) -> list[dict[str, Any]]:
+    # -------------------------------------------------------------------------
+    def extract_monographs(self, archive_path: str) -> list[dict[str, Any]]:
         try:
             entries = self.livertox_client.collect_monographs(archive_path)
         except Exception as exc:  # noqa: BLE001
@@ -212,15 +199,15 @@ class LiverToxUpdater:
             raise RuntimeError("No LiverTox monographs were extracted from the archive.")
         return entries
 
-    # -----------------------------------------------------------------------------
-    def _sanitize_records(self, entries: list[dict[str, Any]]) -> list[dict[str, Any]]:
+    # -------------------------------------------------------------------------
+    def sanitize_records(self, entries: list[dict[str, Any]]) -> list[dict[str, Any]]:
         sanitized = self.serializer.sanitize_livertox_records(entries)
         if sanitized.empty:
             raise RuntimeError("No valid LiverTox monographs were available after sanitization.")
         return sanitized.to_dict(orient="records")
 
-    # -----------------------------------------------------------------------------
-    def _enrich_records(self, records: list[dict[str, Any]]) -> list[dict[str, Any]]:
+    # -------------------------------------------------------------------------
+    def enrich_records(self, records: list[dict[str, Any]]) -> list[dict[str, Any]]:
         for entry in records:
             drug_name = entry.get("drug_name")
             if not isinstance(drug_name, str) or not drug_name.strip():
@@ -238,32 +225,8 @@ class LiverToxUpdater:
             entry["synonyms"] = ", ".join(synonyms) if synonyms else None
         return records
 
-    # -----------------------------------------------------------------------------
-    def _persist_records(self, records: list[dict[str, Any]]) -> None:
-        try:
-            self.serializer.save_livertox_records(records)
-        except Exception as exc:  # noqa: BLE001
-            raise RuntimeError(f"Failed to persist LiverTox records: {exc}") from exc
 
-    # -----------------------------------------------------------------------------
-    def _verify_persistence(self, records: list[dict[str, Any]]) -> int:
-        try:
-            stored_count = self.database.count_rows("LIVERTOX_MONOGRAPHS")
-        except Exception as exc:  # noqa: BLE001
-            raise RuntimeError(f"Failed to verify stored LiverTox records: {exc}") from exc
-        if stored_count != len(records):
-            raise RuntimeError(
-                "Mismatch between processed entries and stored rows; import verification failed."
-            )
-        return stored_count
-
-    # -----------------------------------------------------------------------------
-    def _maybe_convert_dataframe(self) -> None:
-        try:
-            self.livertox_client.convert_file_to_dataframe()
-        except Exception as exc:  # noqa: BLE001
-            raise RuntimeError(f"Failed to convert archive to DataFrame: {exc}") from exc
-
+  
 
 ###############################################################################
 class LiverToxMatcher:
