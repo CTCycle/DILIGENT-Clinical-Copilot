@@ -10,12 +10,14 @@ from fastapi import APIRouter, HTTPException, Query
 from Pharmagent.app.constants import LIVERTOX_ARCHIVE, SOURCES_PATH
 from Pharmagent.app.utils.database.sqlite import database
 from Pharmagent.app.utils.jobs import JobManager
+from Pharmagent.app.utils.services.retrieval import RxNavClient
 from Pharmagent.app.utils.services.scraper import LiverToxClient
 from Pharmagent.app.utils.serializer import DataSerializer
 
 router = APIRouter(prefix="/pharmacology", tags=["pharmacology"])
 
 LT_client = LiverToxClient()
+rx_client = RxNavClient()
 serializer = DataSerializer()
 job_manager = JobManager()
 
@@ -74,6 +76,39 @@ async def _run_livertox_job(
             status_code=500,
             detail="No LiverTox monographs were extracted from archive.",
         )
+
+    await job_manager.set_progress(job_id, 0.45, "Enriching LiverTox records")
+    tasks = []
+    for entry in entries:
+        drug_name = entry.get("drug_name")
+        if not isinstance(drug_name, str) or not drug_name.strip():
+            entry["additional_names"] = None
+            entry["synonyms"] = None
+            continue
+        tasks.append(asyncio.to_thread(rx_client.fetch_drug_terms, drug_name))
+    if tasks:
+        results = await asyncio.gather(*tasks, return_exceptions=True)
+        index = 0
+        for entry in entries:
+            if "additional_names" in entry and "synonyms" in entry:
+                continue
+            if index >= len(results):
+                entry["additional_names"] = None
+                entry["synonyms"] = None
+                continue
+            result = results[index]
+            index += 1
+            if isinstance(result, Exception):
+                entry["additional_names"] = None
+                entry["synonyms"] = None
+                continue
+            names, synonyms = result
+            entry["additional_names"] = ", ".join(names) if names else None
+            entry["synonyms"] = ", ".join(synonyms) if synonyms else None
+    else:
+        for entry in entries:
+            entry["additional_names"] = None
+            entry["synonyms"] = None
 
     await job_manager.set_progress(job_id, 0.6, "Persisting LiverTox records")
     try:
