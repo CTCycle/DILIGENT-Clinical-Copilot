@@ -13,8 +13,7 @@ CONVERT_TO_DATAFRAME = False
 if __name__ == "__main__":
     updater = LiverToxUpdater(
         SOURCES_PATH,
-        redownload=REDOWNLOAD,
-        convert_to_dataframe=CONVERT_TO_DATAFRAME,
+        redownload=REDOWNLOAD        
     )
     try:
         result = updater.run()
