@@ -12,7 +12,6 @@ from Pharmagent.app.api.schemas.clinical import (
 from Pharmagent.app.logger import logger
 from Pharmagent.app.utils.serializer import DataSerializer
 from Pharmagent.app.utils.services.livertox import LiverToxMatcher, LiverToxMatch
-from Pharmagent.app.utils.services.retrieval import RxNavClient
 from Pharmagent.app.constants import DEFAULT_LLM_TIMEOUT_SECONDS
 
 
@@ -82,11 +81,10 @@ class DrugToxicityEssay:
         self.llm_client = initialize_llm_client(purpose="parser", timeout_s=timeout_s)
         self.livertox_df = None
         self.matcher: LiverToxMatcher | None = None
-        self.rxnav_client = RxNavClient()
 
     # -------------------------------------------------------------------------
     async def run_analysis(self) -> list[dict[str, Any]] | None:
-        logger.info("Toxicity analysis stage 1/4: validating inputs")
+        logger.info("Toxicity analysis stage 1/3: validating inputs")
         patient_drugs = self._collect_patient_drugs()
         if not patient_drugs:
             logger.info("No drugs detected for toxicity analysis")
@@ -94,13 +92,10 @@ class DrugToxicityEssay:
         if not self._ensure_livertox_loaded():
             return None
 
-        logger.info("Toxicity analysis stage 2/4: expanding drug information via RxNav")
-        candidate_maps = self._expand_drug_information(patient_drugs)
+        logger.info("Toxicity analysis stage 2/3: matching drugs to LiverTox records")
+        matches = await self._match_livertox_entries(patient_drugs)
 
-        logger.info("Toxicity analysis stage 3/4: matching drugs to LiverTox records")
-        matches = await self._match_livertox_entries(patient_drugs, candidate_maps)
-
-        logger.info("Toxicity analysis stage 4/4: compiling matched LiverTox excerpts")
+        logger.info("Toxicity analysis stage 3/3: compiling matched LiverTox excerpts")
         return self._resolve_matches(patient_drugs, matches)
 
     # -------------------------------------------------------------------------
@@ -128,28 +123,15 @@ class DrugToxicityEssay:
         return [entry.name for entry in self.drugs.entries if entry.name]
 
     # -------------------------------------------------------------------------
-    def _expand_drug_information(
-        self, patient_drugs: list[str]
-    ) -> list[dict[str, str]]:
-        expansions: list[dict[str, str]] = []
-        for name in patient_drugs:
-            if not name:
-                expansions.append({})
-                continue
-            expansions.append(dict(self.rxnav_client.expand(name)))
-        return expansions
-
-    # -------------------------------------------------------------------------
     async def _match_livertox_entries(
         self,
         patient_drugs: list[str],
-        candidate_maps: list[dict[str, str]],
     ) -> list[LiverToxMatch | None]:
         if self.matcher is None:
             return []
         return await self.matcher.match_drug_names(
             patient_drugs,
-            candidate_maps=candidate_maps,
+            livertox_drugs=self.matcher.lookup_entries,
         )
 
     # -------------------------------------------------------------------------
