@@ -387,7 +387,7 @@ class LiverToxUpdater:
 
         download_info = self.collect_local_archive_info(archive_path)
         logger.info("Extracting LiverTox monographs from %s", archive_path)
-        extracted = self.extract_monographs(archive_path)
+        extracted = self.collect_monographs(archive_path)
         logger.info("Sanitizing %d extracted entries", len(extracted))
         records = self.sanitize_records(extracted)
         logger.info("Enriching %d sanitized entries with RxNav terms", len(records))
@@ -400,7 +400,7 @@ class LiverToxUpdater:
         payload["processed_entries"] = len(enriched)
         payload["records"] = len(enriched)
         logger.info("LiverTox update completed successfully")
-        
+
         return payload
     
     # -------------------------------------------------------------------------
@@ -489,17 +489,6 @@ class LiverToxUpdater:
                 priorities[drug_name] = priority
 
         return list(collected.values())
-
-
-    # -------------------------------------------------------------------------
-    def extract_monographs(self, archive_path: str) -> list[dict[str, Any]]:
-        try:
-            entries = self.livertox_client.collect_monographs(archive_path)
-        except Exception as exc:  # noqa: BLE001
-            raise RuntimeError(f"Failed to extract LiverTox monographs: {exc}") from exc
-        if not entries:
-            raise RuntimeError("No LiverTox monographs were extracted from the archive.")
-        return entries
 
     # -------------------------------------------------------------------------
     def sanitize_records(self, entries: list[dict[str, Any]]) -> list[dict[str, Any]]:
