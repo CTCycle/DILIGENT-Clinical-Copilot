@@ -70,6 +70,7 @@ class OllamaClient:
 
     _pull_locks: dict[str, asyncio.Lock] = {}
     _pull_locks_guard: asyncio.Lock | None = None
+    _MODEL_CACHE_TTL = 30.0
 
     def __init__(
         self,
@@ -90,6 +91,10 @@ class OllamaClient:
             base_url=self.base_url, timeout=timeout, limits=limits
         )
         self._legacy_generate = False
+        self._model_cache: set[str] = set()
+        self._model_cache_list: list[str] = []
+        self._model_cache_expiry = 0.0
+        self._model_cache_lock = asyncio.Lock()
 
     # -------------------------------------------------------------------------
     async def close(self) -> None:
@@ -130,6 +135,39 @@ class OllamaClient:
             return lock
 
     # -------------------------------------------------------------------------
+    async def _refresh_model_cache(self) -> set[str]:
+        try:
+            resp = await self.client.get("/api/tags")
+        except httpx.TimeoutException as e:
+            raise OllamaTimeout("Timed out listing Ollama models") from e
+        except httpx.RequestError as e:  # noqa: PERF203 - convert to domain error
+            raise OllamaError(f"Failed to list Ollama models: {e}") from e
+
+        self._raise_for_status(resp)
+
+        payload = resp.json()
+        names: list[str] = [m["name"] for m in payload.get("models", []) if "name" in m]
+        loop = asyncio.get_running_loop()
+        async with self._model_cache_lock:
+            self._model_cache = set(names)
+            self._model_cache_list = names
+            self._model_cache_expiry = loop.time() + self._MODEL_CACHE_TTL
+        return set(names)
+
+    # -------------------------------------------------------------------------
+    async def _get_cached_models(self, *, force_refresh: bool = False) -> set[str]:
+        loop = asyncio.get_running_loop()
+        async with self._model_cache_lock:
+            cache_valid = (
+                bool(self._model_cache)
+                and loop.time() < self._model_cache_expiry
+                and not force_refresh
+            )
+            if cache_valid:
+                return set(self._model_cache)
+        return await self._refresh_model_cache()
+
+    # -------------------------------------------------------------------------
     def _prepare_generation_parameters(
         self,
         *,
@@ -163,22 +201,78 @@ class OllamaClient:
         return round(temp_value, 2), think_value, options_payload
 
     # -------------------------------------------------------------------------
+    def _build_chat_payload(
+        self,
+        *,
+        model: str,
+        messages: list[dict[str, str]],
+        stream: bool,
+        format: str | None,
+        temperature: float,
+        think: bool,
+        options: dict[str, Any] | None,
+        keep_alive: str | None,
+    ) -> dict[str, Any]:
+        payload: dict[str, Any] = {
+            "model": model,
+            "messages": messages,
+            "stream": stream,
+            "temperature": temperature,
+            "think": think,
+        }
+        if format:
+            payload["format"] = format
+        if options:
+            payload["options"] = options
+        if keep_alive:
+            payload["keep_alive"] = keep_alive
+        return payload
+
+    # -------------------------------------------------------------------------
+    def _build_generate_payload(
+        self,
+        *,
+        model: str,
+        prompt: str,
+        stream: bool,
+        format: str | None,
+        temperature: float,
+        think: bool,
+        options: dict[str, Any] | None,
+        keep_alive: str | None,
+    ) -> dict[str, Any]:
+        payload: dict[str, Any] = {
+            "model": model,
+            "prompt": prompt,
+            "stream": stream,
+            "temperature": temperature,
+            "think": think,
+        }
+        if format:
+            payload["format"] = format
+        if options:
+            payload["options"] = options
+        if keep_alive:
+            payload["keep_alive"] = keep_alive
+        return payload
+
+    # -------------------------------------------------------------------------
     async def ensure_model_ready(self, name: str) -> None:
         model = self._resolve_model_name(name)
-        logger.info("Checking local availability for Ollama model '%s'", model)
-        available = set(await self.list_models())
+        logger.debug("Verifying cached availability for Ollama model '%s'", model)
+        available = await self._get_cached_models()
         if model in available:
             return
 
         lock = await self._get_model_lock(model)
         async with lock:
-            available = set(await self.list_models())
+            available = await self._get_cached_models(force_refresh=True)
             if model in available:
                 return
             logger.info("Pulling Ollama model '%s'", model)
             await self.pull(model, stream=False)
             logger.info("Completed pull for Ollama model '%s'", model)
-            available = set(await self.list_models())
+            available = await self._get_cached_models(force_refresh=True)
             if model not in available:
                 raise OllamaError(
                     f"Model '{model}' was not found after pull completed"
@@ -207,13 +301,9 @@ class OllamaClient:
 
     # -------------------------------------------------------------------------
     async def list_models(self) -> list[str]:
-        try:
-            resp = await self.client.get("/api/tags")
-        except httpx.TimeoutException as e:
-            raise OllamaTimeout("Timed out listing Ollama models") from e
-        self._raise_for_status(resp)
-        payload = resp.json()
-        return [m["name"] for m in payload.get("models", []) if "name" in m]
+        await self._get_cached_models(force_refresh=True)
+        async with self._model_cache_lock:
+            return list(self._model_cache_list)
 
     # -----------------------------------------------------------------------------
     @staticmethod
@@ -240,7 +330,7 @@ class OllamaClient:
         *,
         stream: bool = False,
         progress_callback: ProgressCb | None = None,
-        poll_sleep_s: float = 0.05,
+        poll_sleep_s: float = 0.0,
     ) -> None:
         """
         Pull a model by name. If stream=True, will iterate server events and optionally
@@ -248,6 +338,7 @@ class OllamaClient:
 
         """
         payload = {"name": name, "stream": bool(stream)}
+        completed = False
         try:
             if stream:
                 async with self.client.stream("POST", "/api/pull", json=payload) as r:
@@ -260,18 +351,24 @@ class OllamaClient:
                         except json.JSONDecodeError:
                             continue
                         await self._maybe_await(progress_callback, evt)
-                        # Ollama sends {"status":"success", ...} at completion
                         if str(evt.get("status", "")).lower() == "success":
-                            return
-                        # small cooperative pause
-                        await asyncio.sleep(poll_sleep_s)
-                return
+                            completed = True
+                            break
+                        if poll_sleep_s > 0:
+                            await asyncio.sleep(poll_sleep_s)
             else:
                 resp = await self.client.post("/api/pull", json=payload)
                 self._raise_for_status(resp)
-                return
+                completed = True
         except httpx.TimeoutException as e:
             raise OllamaTimeout(f"Timed out pulling model '{name}'") from e
+        if completed:
+            try:
+                await self._refresh_model_cache()
+            except (OllamaError, OllamaTimeout) as exc:
+                logger.debug(
+                    "Failed to refresh Ollama model cache after pull: %s", exc
+                )
 
     # -------------------------------------------------------------------------
     async def show_model(self, name: str) -> dict[str, Any]:
@@ -530,7 +627,7 @@ class OllamaClient:
         if auto_pull:
             await self.ensure_model_ready(model)
             return
-        names = set(await self.list_models())
+        names = await self._get_cached_models(force_refresh=True)
         if model not in names:
             raise OllamaError(f"Model '{model}' not found and auto_pull=False")
 
@@ -569,19 +666,16 @@ class OllamaClient:
                 keep_alive=keep_alive,
             )
 
-        body: dict[str, Any] = {
-            "model": resolved_model,
-            "messages": messages,
-            "stream": False,
-            "temperature": temp_value,
-            "think": think_value,
-        }
-        if format:
-            body["format"] = format
-        if options_payload:
-            body["options"] = options_payload
-        if keep_alive:
-            body["keep_alive"] = keep_alive
+        body = self._build_chat_payload(
+            model=resolved_model,
+            messages=messages,
+            stream=False,
+            format=format,
+            temperature=temp_value,
+            think=think_value,
+            options=options_payload,
+            keep_alive=keep_alive,
+        )
 
         try:
             resp = await self.client.post("/api/chat", json=body)
@@ -653,19 +747,16 @@ class OllamaClient:
                 yield evt
             return
 
-        body: dict[str, Any] = {
-            "model": resolved_model,
-            "messages": messages,
-            "stream": True,
-            "temperature": temp_value,
-            "think": think_value,
-        }
-        if format:
-            body["format"] = format
-        if options_payload:
-            body["options"] = options_payload
-        if keep_alive:
-            body["keep_alive"] = keep_alive
+        body = self._build_chat_payload(
+            model=resolved_model,
+            messages=messages,
+            stream=True,
+            format=format,
+            temperature=temp_value,
+            think=think_value,
+            options=options_payload,
+            keep_alive=keep_alive,
+        )
 
         use_fallback = False
 
@@ -707,31 +798,23 @@ class OllamaClient:
         model: str,
         messages: list[dict[str, str]],
         format: str | None,
-        temperature: float | None,
-        think: bool | None,
+        temperature: float,
+        think: bool,
         options: dict[str, Any] | None,
         keep_alive: str | None,
     ) -> dict[str, Any] | str:
         prompt = self._messages_to_prompt(messages)
         resolved_model = self._resolve_model_name(model)
-        temp_value, think_value, options_payload = self._prepare_generation_parameters(
+        payload = self._build_generate_payload(
+            model=resolved_model,
+            prompt=prompt,
+            stream=False,
+            format=format,
             temperature=temperature,
             think=think,
             options=options,
+            keep_alive=keep_alive,
         )
-        payload: dict[str, Any] = {
-            "model": resolved_model,
-            "prompt": prompt,
-            "stream": False,
-            "temperature": temp_value,
-            "think": think_value,
-        }
-        if format:
-            payload["format"] = format
-        if options_payload:
-            payload["options"] = options_payload
-        if keep_alive:
-            payload["keep_alive"] = keep_alive
 
         try:
             resp = await self.client.post("/api/generate", json=payload)
@@ -758,31 +841,23 @@ class OllamaClient:
         model: str,
         messages: list[dict[str, str]],
         format: str | None,
-        temperature: float | None,
-        think: bool | None,
+        temperature: float,
+        think: bool,
         options: dict[str, Any] | None,
         keep_alive: str | None,
     ) -> AsyncGenerator[dict[str, Any], None]:
         prompt = self._messages_to_prompt(messages)
         resolved_model = self._resolve_model_name(model)
-        temp_value, think_value, options_payload = self._prepare_generation_parameters(
+        payload = self._build_generate_payload(
+            model=resolved_model,
+            prompt=prompt,
+            stream=True,
+            format=format,
             temperature=temperature,
             think=think,
             options=options,
+            keep_alive=keep_alive,
         )
-        payload: dict[str, Any] = {
-            "model": resolved_model,
-            "prompt": prompt,
-            "stream": True,
-            "temperature": temp_value,
-            "think": think_value,
-        }
-        if format:
-            payload["format"] = format
-        if options_payload:
-            payload["options"] = options_payload
-        if keep_alive:
-            payload["keep_alive"] = keep_alive
 
         try:
             async with self.client.stream("POST", "/api/generate", json=payload) as r:
@@ -802,7 +877,7 @@ class OllamaClient:
     async def _collect_structured_fallbacks(self, preferred: list[str]) -> list[str]:
         available: set[str] = set()
         try:
-            available = set(await self.list_models())
+            available = await self._get_cached_models()
         except (OllamaError, OllamaTimeout) as exc:
             logger.debug("Failed to list Ollama models for fallback: %s", exc)
             available = set()
