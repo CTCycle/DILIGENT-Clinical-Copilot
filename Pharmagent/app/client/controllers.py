@@ -14,6 +14,7 @@ from Pharmagent.app.constants import (
     API_BASE_URL,
     BATCH_AGENT_API_URL,
     CLOUD_MODEL_CHOICES,
+    DEFAULT_LLM_TIMEOUT_SECONDS,
     LIVERTOX_ARCHIVE,
     PHARMACOLOGY_LIVERTOX_FETCH_ENDPOINT,
     SOURCES_PATH,
@@ -26,6 +27,14 @@ from Pharmagent.app.api.models.providers import (
 from Pharmagent.app.utils.jobs import (
     _await_livertox_job,
     _format_progress_log,
+)
+
+
+LLM_REQUEST_TIMEOUT_SECONDS = DEFAULT_LLM_TIMEOUT_SECONDS
+LLM_REQUEST_TIMEOUT_DISPLAY = (
+    int(LLM_REQUEST_TIMEOUT_SECONDS)
+    if float(LLM_REQUEST_TIMEOUT_SECONDS).is_integer()
+    else LLM_REQUEST_TIMEOUT_SECONDS
 )
 
 
@@ -189,7 +198,7 @@ async def fetch_clinical_data(skip_download: bool) -> str:
     params = {"skip_download": "true"} if skip_download else None
 
     try:
-        async with httpx.AsyncClient(timeout=120) as client:
+        async with httpx.AsyncClient(timeout=LLM_REQUEST_TIMEOUT_SECONDS) as client:
             response = await client.get(url, params=params)
             response.raise_for_status()
             try:
@@ -211,7 +220,9 @@ async def fetch_clinical_data(skip_download: bool) -> str:
             f"\nURL: {url}\nResponse body:\n{body}"
         )
     except httpx.TimeoutException:
-        return f"[ERROR] Request timed out after {120} seconds."
+        return (
+            f"[ERROR] Request timed out after {LLM_REQUEST_TIMEOUT_DISPLAY} seconds."
+        )
     except Exception as exc:  # noqa: BLE001
         return f"[ERROR] Unexpected error: {exc}"
 
@@ -328,7 +339,7 @@ def clear_agent_fields() -> tuple[
 # -----------------------------------------------------------------------------
 async def _trigger_agent(url: str, payload: dict[str, Any] | None = None) -> str:
     try:
-        async with httpx.AsyncClient(timeout=120) as client:
+        async with httpx.AsyncClient(timeout=LLM_REQUEST_TIMEOUT_SECONDS) as client:
             resp = await client.post(
                 url,
                 json=payload
@@ -349,7 +360,9 @@ async def _trigger_agent(url: str, payload: dict[str, Any] | None = None) -> str
             f"\nURL: {url}\nResponse body:\n{body}"
         )
     except httpx.TimeoutException:
-        return f"[ERROR] Request timed out after {120} seconds."
+        return (
+            f"[ERROR] Request timed out after {LLM_REQUEST_TIMEOUT_DISPLAY} seconds."
+        )
     except Exception as exc:  # noqa: BLE001
         return f"[ERROR] Unexpected error: {exc}"
 

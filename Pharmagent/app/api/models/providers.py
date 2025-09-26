@@ -22,6 +22,7 @@ from Pharmagent.app.constants import (
     OPENAI_API_BASE,
     GEMINI_API_BASE,
     PARSING_MODEL_CHOICES,
+    DEFAULT_LLM_TIMEOUT_SECONDS,
 )
 from Pharmagent.app.configurations import ClientRuntimeConfig
 
@@ -70,7 +71,7 @@ class OllamaClient:
     def __init__(
         self,
         base_url: str | None = None,
-        timeout_s: float = 1_800.0,
+        timeout_s: float = DEFAULT_LLM_TIMEOUT_SECONDS,
         keepalive_connections: int = 10,
         keepalive_max: int = 20,
         default_model: str | None = None,
@@ -85,6 +86,7 @@ class OllamaClient:
         self.client = httpx.AsyncClient(
             base_url=self.base_url, timeout=timeout, limits=limits
         )
+        self._legacy_generate = False
 
     # -------------------------------------------------------------------------
     async def close(self) -> None:
@@ -129,6 +131,24 @@ class OllamaClient:
         self._raise_for_status(resp)
         payload = resp.json()
         return [m["name"] for m in payload.get("models", []) if "name" in m]
+
+# -----------------------------------------------------------------------------
+    @staticmethod
+    def _messages_to_prompt(messages: list[dict[str, str]]) -> str:
+        role_map = {
+            "system": "System",
+            "user": "User",
+            "assistant": "Assistant",
+        }
+        parts: list[str] = []
+        for message in messages:
+            role = str(message.get("role", "user")).strip().lower()
+            label = role_map.get(role, role.title() if role else "User")
+            content = str(message.get("content", ""))
+            if content:
+                parts.append(f"{label}: {content}")
+        parts.append("Assistant:")
+        return "\n".join(parts)
 
     # -------------------------------------------------------------------------
     async def pull(
@@ -440,6 +460,15 @@ class OllamaClient:
         Non-streaming chat. Returns parsed JSON (dict) if possible, else raw string.
 
         """
+        if self._legacy_generate:
+            return await self._chat_via_generate(
+                model=model,
+                messages=messages,
+                format=format,
+                options=options,
+                keep_alive=keep_alive,
+            )
+
         body: dict[str, Any] = {"model": model, "messages": messages, "stream": False}
         if format:
             body["format"] = format
@@ -452,6 +481,18 @@ class OllamaClient:
             resp = await self.client.post("/api/chat", json=body)
         except httpx.TimeoutException as e:
             raise OllamaTimeout("Timed out waiting for Ollama chat response") from e
+
+        if resp.status_code == 404:
+            await resp.aread()
+            self._legacy_generate = True
+            return await self._chat_via_generate(
+                model=model,
+                messages=messages,
+                format=format,
+                options=options,
+                keep_alive=keep_alive,
+            )
+
         self._raise_for_status(resp)
 
         data = resp.json()
@@ -481,6 +522,17 @@ class OllamaClient:
         Caller can aggregate tokens or forward server-sent chunks to a client.
 
         """
+        if self._legacy_generate:
+            async for evt in self._chat_stream_via_generate(
+                model=model,
+                messages=messages,
+                format=format,
+                options=options,
+                keep_alive=keep_alive,
+            ):
+                yield evt
+            return
+
         body: dict[str, Any] = {"model": model, "messages": messages, "stream": True}
         if format:
             body["format"] = format
@@ -489,8 +541,103 @@ class OllamaClient:
         if keep_alive:
             body["keep_alive"] = keep_alive
 
+        use_fallback = False
+
         try:
             async with self.client.stream("POST", "/api/chat", json=body) as r:
+                if r.status_code == 404:
+                    use_fallback = True
+                    await r.aread()
+                else:
+                    self._raise_for_status(r)
+                    async for line in r.aiter_lines():
+                        if not line:
+                            continue
+                        try:
+                            evt = json.loads(line)
+                        except json.JSONDecodeError:
+                            continue
+                        yield evt
+        except httpx.TimeoutException as e:
+            raise OllamaTimeout("Timed out during streamed chat response") from e
+
+        if use_fallback:
+            self._legacy_generate = True
+            async for evt in self._chat_stream_via_generate(
+                model=model,
+                messages=messages,
+                format=format,
+                options=options,
+                keep_alive=keep_alive,
+            ):
+                yield evt
+
+# -----------------------------------------------------------------------------
+    async def _chat_via_generate(
+        self,
+        *,
+        model: str,
+        messages: list[dict[str, str]],
+        format: str | None,
+        options: dict[str, Any] | None,
+        keep_alive: str | None,
+    ) -> dict[str, Any] | str:
+        prompt = self._messages_to_prompt(messages)
+        payload: dict[str, Any] = {
+            "model": model,
+            "prompt": prompt,
+            "stream": False,
+        }
+        if format:
+            payload["format"] = format
+        if options:
+            payload["options"] = options
+        if keep_alive:
+            payload["keep_alive"] = keep_alive
+
+        try:
+            resp = await self.client.post("/api/generate", json=payload)
+        except httpx.TimeoutException as e:
+            raise OllamaTimeout("Timed out waiting for Ollama generate response") from e
+
+        self._raise_for_status(resp)
+        data = resp.json()
+        content = data.get("response", "")
+
+        if isinstance(content, dict):
+            return content
+        if isinstance(content, str):
+            try:
+                return json.loads(content)
+            except json.JSONDecodeError:
+                return content
+        return str(content)
+
+# -----------------------------------------------------------------------------
+    async def _chat_stream_via_generate(
+        self,
+        *,
+        model: str,
+        messages: list[dict[str, str]],
+        format: str | None,
+        options: dict[str, Any] | None,
+        keep_alive: str | None,
+    ) -> AsyncGenerator[dict[str, Any], None]:
+        prompt = self._messages_to_prompt(messages)
+        payload: dict[str, Any] = {
+            "model": model,
+            "prompt": prompt,
+            "stream": True,
+        }
+        if format:
+            payload["format"] = format
+        if options:
+            payload["options"] = options
+        if keep_alive:
+            payload["keep_alive"] = keep_alive
+
+        try:
+            async with self.client.stream("POST", "/api/generate", json=payload) as r:
                 self._raise_for_status(r)
                 async for line in r.aiter_lines():
                     if not line:
@@ -501,7 +648,7 @@ class OllamaClient:
                         continue
                     yield evt
         except httpx.TimeoutException as e:
-            raise OllamaTimeout("Timed out during streamed chat response") from e
+            raise OllamaTimeout("Timed out during streamed generate response") from e
 
     # -------------------------------------------------------------------------
     async def _collect_structured_fallbacks(
@@ -706,7 +853,7 @@ class CloudLLMClient:
         *,
         provider: ProviderName = "openai",
         base_url: str | None = None,
-        timeout_s: float = 120.0,
+        timeout_s: float = DEFAULT_LLM_TIMEOUT_SECONDS,
         keepalive_connections: int = 10,
         keepalive_max: int = 20,
         default_model: str | None = None,
@@ -994,7 +1141,7 @@ def select_llm_provider(
     if p == "ollama":
         return OllamaClient(
             base_url=kwargs.get("base_url"),
-            timeout_s=kwargs.get("timeout_s", 120.0),
+            timeout_s=kwargs.get("timeout_s", DEFAULT_LLM_TIMEOUT_SECONDS),
             keepalive_connections=kwargs.get("keepalive_connections", 10),
             keepalive_max=kwargs.get("keepalive_max", 20),
             default_model=kwargs.get("default_model"),
@@ -1003,7 +1150,7 @@ def select_llm_provider(
         return CloudLLMClient(
             provider=p,  # type: ignore[arg-type]
             base_url=kwargs.get("base_url"),
-            timeout_s=kwargs.get("timeout_s", 120.0),
+            timeout_s=kwargs.get("timeout_s", DEFAULT_LLM_TIMEOUT_SECONDS),
             keepalive_connections=kwargs.get("keepalive_connections", 10),
             keepalive_max=kwargs.get("keepalive_max", 20),
             default_model=kwargs.get("default_model"),
@@ -1015,6 +1162,7 @@ def select_llm_provider(
 def initialize_llm_client(
     *, purpose: RuntimePurpose = "agent", **kwargs: Any
 ) -> OllamaClient | CloudLLMClient:
+    kwargs.setdefault("timeout_s", DEFAULT_LLM_TIMEOUT_SECONDS)
     if ClientRuntimeConfig.is_cloud_enabled():
         provider = ClientRuntimeConfig.get_llm_provider()
         default_model = ClientRuntimeConfig.get_cloud_model()

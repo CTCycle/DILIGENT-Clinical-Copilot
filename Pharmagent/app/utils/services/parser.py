@@ -11,6 +11,7 @@ import pandas as pd
 from Pharmagent.app.api.models.prompts import DISEASE_EXTRACTION_PROMPT
 from Pharmagent.app.configurations import ClientRuntimeConfig
 from Pharmagent.app.api.models.providers import initialize_llm_client
+from Pharmagent.app.constants import DEFAULT_LLM_TIMEOUT_SECONDS
 from Pharmagent.app.api.schemas.clinical import (
     BloodTest,
     DrugEntry,
@@ -114,7 +115,9 @@ class PatientCase:
 
 ###############################################################################
 class DiseasesParser:
-    def __init__(self, timeout_s: float = 300.0, temperature: float = 0.0) -> None:
+    def __init__(
+        self, timeout_s: float = DEFAULT_LLM_TIMEOUT_SECONDS, temperature: float = 0.0
+    ) -> None:
         self.temperature = float(temperature)
         self.client = initialize_llm_client(purpose="parser", timeout_s=timeout_s)
         self.JSON_schema = {"diseases": list[str], "hepatic_diseases": list[str]}
@@ -197,7 +200,7 @@ class BloodTestParser:
         *,
         model: str | None = None,
         temperature: float = 0.0,
-        timeout_s: float = 300.0,
+        timeout_s: float = DEFAULT_LLM_TIMEOUT_SECONDS,
     ) -> None:
         default_model = (
             ClientRuntimeConfig.get_cloud_model()
