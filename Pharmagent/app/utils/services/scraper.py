@@ -23,9 +23,9 @@ except ModuleNotFoundError:
     PdfReader = None
 
 from Pharmagent.app.constants import (
-    SOURCES_PATH,
     LIVERTOX_ARCHIVE,
     LIVERTOX_BASE_URL,
+    SOURCES_PATH,
 )
 
 

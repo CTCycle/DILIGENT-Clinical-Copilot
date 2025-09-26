@@ -173,10 +173,10 @@ from Pharmagent.app.api.schemas.clinical import (
     LiverToxBatchMatchSuggestion,
     PatientDrugs,
 )
+from Pharmagent.app.constants import LIVERTOX_ARCHIVE
 from Pharmagent.app.utils.services.clinical import LiverToxConsultation
 from Pharmagent.app.utils.services.livertox import LiverToxMatcher
 from Pharmagent.app.utils.services.scraper import LiverToxClient
-from Pharmagent.app.constants import LIVERTOX_ARCHIVE
 
 
 ###############################################################################

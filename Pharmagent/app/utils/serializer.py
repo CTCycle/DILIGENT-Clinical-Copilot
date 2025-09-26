@@ -7,6 +7,7 @@ import pandas as pd
 
 from Pharmagent.app.utils.database.sqlite import database
 
+
 # [DATA SERIALIZATION]
 ###############################################################################
 class DataSerializer:

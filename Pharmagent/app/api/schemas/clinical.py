@@ -1,10 +1,9 @@
 from __future__ import annotations
 
 import re
-from typing import Literal, Any
+from typing import Any, Literal
 
 from pydantic import BaseModel, Field, field_validator, model_validator
-
 
 Comparator = Literal["<=", "<", ">=", ">"]
 
