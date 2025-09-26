@@ -18,6 +18,8 @@ from Pharmagent.app.client.controllers import (
     set_agent_model,
     set_cloud_model,
     set_llm_provider,
+    set_ollama_reasoning,
+    set_ollama_temperature,
     set_parsing_model,
     start_ollama_client,
     toggle_cloud_services,
@@ -153,6 +155,19 @@ def create_interface() -> gr.Blocks:
                                     choices=AGENT_MODEL_CHOICES,
                                     value=ClientRuntimeConfig.get_agent_model(),
                                 )
+                                temperature_input = gr.Number(
+                                    label="Temperature",
+                                    value=ClientRuntimeConfig.get_ollama_temperature(),
+                                    minimum=0.0,
+                                    maximum=2.0,
+                                    step=0.1,
+                                    interactive=not ClientRuntimeConfig.is_cloud_enabled(),
+                                )
+                                reasoning_checkbox = gr.Checkbox(
+                                    label="Enable reasoning (think)",
+                                    value=ClientRuntimeConfig.is_ollama_reasoning_enabled(),
+                                    interactive=not ClientRuntimeConfig.is_cloud_enabled(),
+                                )
                                 pull_models_button = gr.Button(
                                     "Pull models",
                                     variant="secondary",
@@ -183,6 +198,8 @@ def create_interface() -> gr.Blocks:
                 cloud_model_dropdown,
                 start_ollama_button,
                 preload_button,
+                temperature_input,
+                reasoning_checkbox,
             ],
         )
         llm_provider_dropdown.change(
@@ -204,6 +221,16 @@ def create_interface() -> gr.Blocks:
             fn=set_agent_model,
             inputs=agent_model_dropdown,
             outputs=agent_model_dropdown,
+        )
+        temperature_input.change(
+            fn=set_ollama_temperature,
+            inputs=temperature_input,
+            outputs=temperature_input,
+        )
+        reasoning_checkbox.change(
+            fn=set_ollama_reasoning,
+            inputs=reasoning_checkbox,
+            outputs=reasoning_checkbox,
         )
 
         pull_models_button.click(
