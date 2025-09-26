@@ -92,8 +92,14 @@ class LiverToxConsultation:
         if not self._ensure_livertox_loaded():
             return None
 
+        if self.matcher is None:
+            return []
+        
         logger.info("Toxicity analysis stage 2/3: matching drugs to LiverTox records")
-        matches = await self._match_livertox_entries(patient_drugs)
+        matches = await self.matcher.match_drug_names(
+            patient_drugs,
+            livertox_drugs=self.matcher.lookup_entries,
+        )
 
         logger.info("Toxicity analysis stage 3/3: compiling matched LiverTox excerpts")
         return self._resolve_matches(patient_drugs, matches)
@@ -121,18 +127,6 @@ class LiverToxConsultation:
     # -------------------------------------------------------------------------
     def _collect_patient_drugs(self) -> list[str]:
         return [entry.name for entry in self.drugs.entries if entry.name]
-
-    # -------------------------------------------------------------------------
-    async def _match_livertox_entries(
-        self,
-        patient_drugs: list[str],
-    ) -> list[LiverToxMatch | None]:
-        if self.matcher is None:
-            return []
-        return await self.matcher.match_drug_names(
-            patient_drugs,
-            livertox_drugs=self.matcher.lookup_entries,
-        )
 
     # -------------------------------------------------------------------------
     def _resolve_matches(
