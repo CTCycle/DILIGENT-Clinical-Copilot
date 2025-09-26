@@ -2,15 +2,6 @@ from __future__ import annotations
 
 from os.path import abspath, join
 
-# [LANGSMITH / TELEMETRY]
-###############################################################################
-LANGSMITH_ENV_KEYS = (
-    "LANGSMITH_API_KEY",
-    "LANGCHAIN_TRACING_V2",
-    "LANGSMITH_TRACE",
-    "PHARMAGENT_LANGSMITH_TRACE",
-)
-
 # [PATHS]
 ###############################################################################
 ROOT_DIR = abspath(join(__file__, "../../.."))
