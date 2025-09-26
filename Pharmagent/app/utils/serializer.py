@@ -7,10 +7,6 @@ import pandas as pd
 
 from Pharmagent.app.utils.database.sqlite import database
 
-
-LIVERTOX_UPSERT_BATCH_SIZE = 500
-
-
 # [DATA SERIALIZATION]
 ###############################################################################
 class DataSerializer:
@@ -24,19 +20,15 @@ class DataSerializer:
 
     # -----------------------------------------------------------------------------
     def save_livertox_records(self, records: list[dict[str, Any]]) -> None:
-        sanitized = self.sanitize(records)
-        if sanitized.empty:
-            return
+        sanitized = self.sanitize_livertox_records(records)
         sanitized = sanitized.where(pd.notnull(sanitized), None)
-        batch_size = max(1, LIVERTOX_UPSERT_BATCH_SIZE)
-        total_rows = len(sanitized)
-        for start in range(0, total_rows, batch_size):
-            batch = sanitized.iloc[start : start + batch_size]
-            if not batch.empty:
-                database.upsert_into_database(batch, "LIVERTOX_MONOGRAPHS")
+        if sanitized.empty:
+            database.save_into_database(sanitized, "LIVERTOX_MONOGRAPHS")
+            return
+        database.save_into_database(sanitized, "LIVERTOX_MONOGRAPHS")
 
     # -----------------------------------------------------------------------------
-    def sanitize(self, records: list[dict[str, Any]]) -> pd.DataFrame:
+    def sanitize_livertox_records(self, records: list[dict[str, Any]]) -> pd.DataFrame:
         df = pd.DataFrame(records)
         required_columns = [
             "nbk_id",
