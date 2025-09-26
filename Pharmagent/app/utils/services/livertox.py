@@ -21,6 +21,7 @@ from Pharmagent.app.constants import (
     LIVERTOX_SKIP_DETERMINISTIC_RATIO,
     LIVERTOX_YIELD_INTERVAL,
     LLM_NULL_MATCH_NAMES,
+    DEFAULT_LLM_TIMEOUT_SECONDS,
 )
 from Pharmagent.app.logger import logger
 
@@ -65,7 +66,7 @@ class LiverToxMatcher:
     ) -> None:
         self.livertox_df = livertox_df
         self.llm_client = llm_client or initialize_llm_client(
-            purpose="agent", timeout_s=300.0
+            purpose="agent", timeout_s=DEFAULT_LLM_TIMEOUT_SECONDS
         )
         self.match_cache: dict[str, LiverToxMatch | None] = {}
         self.records: list[MonographRecord] = []
