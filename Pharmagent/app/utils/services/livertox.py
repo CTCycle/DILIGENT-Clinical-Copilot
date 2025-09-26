@@ -18,6 +18,13 @@ from Pharmagent.app.api.models.prompts import (
 from Pharmagent.app.api.models.providers import initialize_llm_client
 from Pharmagent.app.api.schemas.clinical import LiverToxBatchMatchSuggestion
 from Pharmagent.app.configurations import ClientRuntimeConfig
+from Pharmagent.app.constants import (
+    LANGSMITH_ENV_KEYS,
+    LIVERTOX_LLM_TIMEOUT_SECONDS,
+    LIVERTOX_SKIP_DETERMINISTIC_RATIO,
+    LIVERTOX_YIELD_INTERVAL,
+    LLM_NULL_MATCH_NAMES,
+)
 from Pharmagent.app.logger import logger
 from Pharmagent.app.utils.services.retrieval import (
     RXNORM_EXPANSION_ENABLED,
@@ -32,40 +39,18 @@ except Exception:  # noqa: BLE001
     langsmith_traceable = None  # type: ignore[assignment]
 
 
-LANGSMITH_ENV_KEYS = (
-    "LANGSMITH_API_KEY",
-    "LANGCHAIN_TRACING_V2",
-    "LANGSMITH_TRACE",
-    "PHARMAGENT_LANGSMITH_TRACE",
-)
-
-
 # -------------------------------------------------------------------------
 def _is_truthy(value: str | None) -> bool:
-    if value is None:
-        return False
-    return value.strip().lower() in {"1", "true", "yes", "on"}
+    return bool(value and value.strip().lower() in {"1", "true", "yes", "on"})
 
 
 LANGSMITH_TRACING_ENABLED = any(
-    bool(os.getenv("LANGSMITH_API_KEY"))
+    bool((os.getenv("LANGSMITH_API_KEY") or "").strip())
     if key == "LANGSMITH_API_KEY"
     else _is_truthy(os.getenv(key))
     for key in LANGSMITH_ENV_KEYS
 )
 _LANGSMITH_WARNING_EMITTED = False
-
-NULL_LLM_MATCH_NAMES = {
-    "",
-    "none",
-    "no match",
-    "no matches",
-    "not found",
-    "unknown",
-    "not applicable",
-    "n a",
-}
-
 
 ###############################################################################
 @dataclass(slots=True)
@@ -95,8 +80,9 @@ class LiverToxMatcher:
     MIN_CONFIDENCE = 0.40
     DETERMINISTIC_THRESHOLD = 0.86
     LLM_DEFAULT_CONFIDENCE = 0.65
-    LLM_TIMEOUT_SECONDS = 240.0
-    YIELD_INTERVAL = 25
+    LLM_TIMEOUT_SECONDS = LIVERTOX_LLM_TIMEOUT_SECONDS
+    YIELD_INTERVAL = LIVERTOX_YIELD_INTERVAL
+    DETERMINISTIC_SKIP_RATIO = LIVERTOX_SKIP_DETERMINISTIC_RATIO
 
     # -------------------------------------------------------------------------
     def __init__(
@@ -149,30 +135,9 @@ class LiverToxMatcher:
         if not self.records:
             return results
         # Expand each query via RxNorm before deterministic matching to broaden coverage.
-        normalized_queries: list[str] = []
-        expanded_candidates: list[dict[str, str]] = []
-        for name in patient_drugs:
-            normalized_name = self._normalize_name(name)
-            normalized_queries.append(normalized_name)
-            candidate_map: dict[str, str] = {}
-            expanded: set[str] = set()
-            if RXNORM_EXPANSION_ENABLED:
-                expanded = self.rxnorm_retriever.expand(name)
-                metadata: dict[str, str] = {}
-                for candidate in expanded:
-                    kind = self.rxnorm_retriever.get_candidate_kind(name, candidate)
-                    metadata[candidate] = kind
-                for candidate in sorted(expanded):
-                    normalized_candidate = self._normalize_name(candidate)
-                    if not normalized_candidate:
-                        continue
-                    candidate_map[normalized_candidate] = metadata.get(
-                        candidate,
-                        "unknown",
-                    )
-            if normalized_name and normalized_name not in candidate_map:
-                candidate_map[normalized_name] = "original"
-            expanded_candidates.append({k: v for k, v in candidate_map.items() if k})
+        expanded_info = [self._prepare_candidates(name) for name in patient_drugs]
+        normalized_queries = [item[0] for item in expanded_info]
+        expanded_candidates = [item[1] for item in expanded_info]
         eligible_total = sum(1 for value in normalized_queries if value)
         unresolved_indices: list[int] = []
         deterministic_matches = 0
@@ -183,11 +148,9 @@ class LiverToxMatcher:
             if not normalized_original:
                 continue
             candidate_matches: list[tuple[tuple[int, float, float], str, LiverToxMatch]] = []
-            candidate_keys = {
-                key: value
-                for key, value in (candidate_map or {normalized_original: "original"}).items()
-                if key
-            }
+            candidate_keys = candidate_map or (
+                {normalized_original: "original"} if normalized_original else {}
+            )
             if not candidate_keys:
                 continue
             for normalized_candidate, kind in candidate_keys.items():
@@ -220,16 +183,11 @@ class LiverToxMatcher:
                 unresolved_indices.append(idx)
         if not unresolved_indices:
             return results
-        match_pool = eligible_total or 1
-        deterministic_ratio = deterministic_matches / match_pool
+        deterministic_ratio = deterministic_matches / max(eligible_total, 1)
         # Skip the LLM if deterministic coverage is high enough for this patient batch.
-        if deterministic_ratio >= 0.80:
+        if deterministic_ratio >= self.DETERMINISTIC_SKIP_RATIO:
             return results
-        lookup = (
-            self.langsmith_batch_lookup
-            if self.langsmith_batch_lookup is not None
-            else self._llm_batch_match_lookup
-        )
+        lookup = self.langsmith_batch_lookup or self._llm_batch_match_lookup
         fallback_matches = await lookup(
             patient_drugs,
             normalized_queries=normalized_queries,
@@ -576,7 +534,7 @@ class LiverToxMatcher:
                 continue
             match_name = (getattr(item, "match_name", "") or "").strip()
             normalized_match = self._normalize_name(match_name)
-            if normalized_match in NULL_LLM_MATCH_NAMES:
+            if normalized_match in LLM_NULL_MATCH_NAMES:
                 logger.debug(
                     "LLM explicitly reported no match for '%s'",
                     original,
@@ -658,3 +616,17 @@ class LiverToxMatcher:
         return normalized
 
     # -------------------------------------------------------------------------
+    def _prepare_candidates(self, name: str) -> tuple[str, dict[str, str]]:
+        # Expand the provided name via RxNorm and normalize all candidates.
+        normalized = self._normalize_name(name)
+        candidate_map: dict[str, str] = {}
+        if RXNORM_EXPANSION_ENABLED and name.strip():
+            for candidate in sorted(self.rxnorm_retriever.expand(name)):
+                normalized_candidate = self._normalize_name(candidate)
+                if not normalized_candidate or normalized_candidate in candidate_map:
+                    continue
+                kind = self.rxnorm_retriever.get_candidate_kind(name, candidate)
+                candidate_map[normalized_candidate] = kind or "unknown"
+        if normalized and normalized not in candidate_map:
+            candidate_map[normalized] = "original"
+        return normalized, candidate_map
