@@ -268,6 +268,23 @@ class _StubSerializer:
     def __init__(self) -> None:
         self.saved_records: list[dict[str, str]] | None = None
 
+    class _Frame:
+        def __init__(self, rows: list[dict[str, str]]) -> None:
+            self._rows = rows
+
+        @property
+        def empty(self) -> bool:
+            return not self._rows
+
+        def to_dict(self, orient: str = "records") -> list[dict[str, str]]:
+            assert orient == "records"
+            return list(self._rows)
+
+    def sanitize_livertox_records(
+        self, records: list[dict[str, str]]
+    ) -> "_StubSerializer._Frame":
+        return self._Frame(records)
+
     def save_livertox_records(self, records: list[dict[str, str]]) -> None:
         self.saved_records = records
 
