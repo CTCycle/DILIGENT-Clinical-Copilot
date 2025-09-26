@@ -1,8 +1,6 @@
 from __future__ import annotations
 
 import json
-import os
-import tarfile
 from typing import Any
 
 import httpx
@@ -11,22 +9,14 @@ from gradio import update as gr_update
 from Pharmagent.app.configurations import ClientRuntimeConfig
 from Pharmagent.app.constants import (
     AGENT_API_URL,
-    API_BASE_URL,
     BATCH_AGENT_API_URL,
     CLOUD_MODEL_CHOICES,
     DEFAULT_LLM_TIMEOUT_SECONDS,
-    LIVERTOX_ARCHIVE,
-    PHARMACOLOGY_LIVERTOX_FETCH_ENDPOINT,
-    SOURCES_PATH,
 )
 from Pharmagent.app.api.models.providers import (
     OllamaClient,
     OllamaError,
     OllamaTimeout,
-)
-from Pharmagent.app.utils.jobs import (
-    _await_livertox_job,
-    _format_progress_log,
 )
 
 
@@ -227,117 +217,6 @@ async def preload_selected_models(parsing_model: str, agent_model: str) -> str:
 
 
 # -----------------------------------------------------------------------------
-async def fetch_clinical_data(skip_download: bool) -> str:
-    url = f"{API_BASE_URL}{PHARMACOLOGY_LIVERTOX_FETCH_ENDPOINT}"
-    params = {"skip_download": "true"} if skip_download else None
-
-    try:
-        async with httpx.AsyncClient(timeout=LLM_REQUEST_TIMEOUT_SECONDS) as client:
-            response = await client.get(url, params=params)
-            response.raise_for_status()
-            try:
-                initial_status = response.json()
-            except ValueError:
-                return "[ERROR] Backend response was not valid JSON."
-
-            if not isinstance(initial_status, dict):
-                return "[ERROR] Unexpected response format from backend."
-
-            job_result = await _await_livertox_job(client, initial_status)
-    except httpx.ConnectError as exc:
-        return f"[ERROR] Could not connect to backend at {url}.\nDetails: {exc}"
-    except httpx.HTTPStatusError as exc:
-        body = exc.response.text if exc.response is not None else ""
-        code = exc.response.status_code if exc.response else "unknown"
-        return (
-            f"[ERROR] Backend returned status {code}."
-            f"\nURL: {url}\nResponse body:\n{body}"
-        )
-    except httpx.TimeoutException:
-        return f"[ERROR] Request timed out after {LLM_REQUEST_TIMEOUT_DISPLAY} seconds."
-    except Exception as exc:  # noqa: BLE001
-        return f"[ERROR] Unexpected error: {exc}"
-
-    if isinstance(job_result, str):
-        return job_result
-
-    payload, progress_log = job_result
-    progress_suffix = _format_progress_log(progress_log)
-
-    file_path = payload.get("file_path")
-    reported_size = payload.get("size")
-    last_modified = payload.get("last_modified")
-    processed_entries = payload.get("processed_entries")
-    stored_records = payload.get("records")
-
-    if not isinstance(file_path, str) or not file_path:
-        return (
-            "[ERROR] Backend response did not include a valid file path."
-            + progress_suffix
-        )
-
-    absolute_file_path = os.path.abspath(file_path)
-    sources_dir = os.path.abspath(SOURCES_PATH)
-
-    if not absolute_file_path.startswith(sources_dir):
-        return (
-            "[ERROR] Downloaded file is located outside the expected sources directory."
-            + progress_suffix
-        )
-
-    if os.path.basename(absolute_file_path) != LIVERTOX_ARCHIVE:
-        return "[ERROR] Unexpected file downloaded from backend." + progress_suffix
-
-    if not os.path.isfile(absolute_file_path):
-        return "[ERROR] Download failed: file not found after fetch." + progress_suffix
-
-    actual_size = os.path.getsize(absolute_file_path)
-    if actual_size <= 0:
-        return "[ERROR] Downloaded file is empty." + progress_suffix
-
-    if (
-        isinstance(reported_size, int)
-        and reported_size > 0
-        and actual_size < reported_size
-    ):
-        return (
-            "[ERROR] Downloaded file size is smaller than expected; download may be incomplete."
-            + progress_suffix
-        )
-
-    try:
-        with tarfile.open(absolute_file_path, "r:gz") as archive:
-            member = archive.next()
-            if member is None:
-                return "[ERROR] Downloaded archive contains no data." + progress_suffix
-    except (tarfile.TarError, OSError) as exc:
-        return f"[ERROR] Downloaded file appears corrupted: {exc}" + progress_suffix
-
-    if not isinstance(stored_records, int) or stored_records <= 0:
-        return (
-            "[ERROR] Backend did not report stored LiverTox records." + progress_suffix
-        )
-
-    message = (
-        f"[INFO] Clinical data downloaded successfully.\nSize: {actual_size} bytes"
-    )
-
-    if isinstance(last_modified, str) and last_modified:
-        message += f"\nLast-Modified: {last_modified}"
-
-    if isinstance(processed_entries, int) and processed_entries >= 0:
-        message += f"\nProcessed monographs: {processed_entries}"
-
-    if isinstance(stored_records, int) and stored_records >= 0:
-        message += f"\nStored monographs: {stored_records}"
-
-    if progress_suffix:
-        message += progress_suffix
-
-    return message
-
-
-# -----------------------------------------------------------------------------
 def clear_agent_fields() -> tuple[
     str,
     str,
@@ -348,7 +227,6 @@ def clear_agent_fields() -> tuple[
     str,
     str,
     list[str],
-    bool,
     bool,
     bool,
     bool,
@@ -364,7 +242,6 @@ def clear_agent_fields() -> tuple[
         "",
         "",
         [],
-        False,
         False,
         False,
         False,

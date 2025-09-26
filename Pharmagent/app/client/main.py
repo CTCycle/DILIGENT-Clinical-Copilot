@@ -11,7 +11,6 @@ from Pharmagent.app.constants import (
 )
 from Pharmagent.app.client.controllers import (
     clear_agent_fields,
-    fetch_clinical_data,
     preload_selected_models,
     pull_selected_models,
     run_agent,
@@ -113,16 +112,6 @@ def create_interface() -> gr.Blocks:
                 with gr.Column():
                     run_button = gr.Button("Run Workflow", variant="primary")
                     clear_button = gr.Button("Clear all")
-                with gr.Accordion("Livertox Data", open=False):
-                    with gr.Column():
-                        skip_download_checkbox = gr.Checkbox(
-                            label="Skip clinical data download",
-                            value=False,
-                        )
-                        get_livertox_data_button = gr.Button(
-                            "Get Livertox Data",
-                            variant="secondary",
-                        )
                 with gr.Accordion("Runtime Configuration", open=False):
                     with gr.Column():
                         with gr.Row():
@@ -266,11 +255,6 @@ def create_interface() -> gr.Blocks:
             inputs=[parsing_model_dropdown, agent_model_dropdown],
             outputs=output,
         )
-        get_livertox_data_button.click(
-            fn=fetch_clinical_data,
-            inputs=skip_download_checkbox,
-            outputs=output,
-        )
         clear_button.click(
             fn=clear_agent_fields,
             outputs=[
@@ -285,7 +269,6 @@ def create_interface() -> gr.Blocks:
                 symptoms,
                 process_from_files,
                 translate_to_eng,
-                skip_download_checkbox,
                 has_diseases,
                 output,
             ],
