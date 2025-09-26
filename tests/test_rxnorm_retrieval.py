@@ -16,7 +16,7 @@ ROOT_DIR = os.path.abspath(os.path.join(os.path.dirname(__file__), ".."))
 if ROOT_DIR not in sys.path:
     sys.path.append(ROOT_DIR)
 
-from Pharmagent.app.utils.services.retrieval import RxNormRetriever
+from Pharmagent.app.utils.services.retrieval import RxNavClient
 
 
 ###############################################################################
@@ -63,8 +63,8 @@ def test_rxnorm_expansion_includes_brand_and_ingredient(monkeypatch):
         "Pharmagent.app.utils.services.retrieval.httpx.get",
         _fake_get,
     )
-    retriever = RxNormRetriever()
-    candidates = retriever.expand("Cymbalta")
+    client = RxNavClient()
+    candidates = client.expand("Cymbalta")
     assert "cymbalta" in candidates
     assert "duloxetine" in candidates
 
@@ -88,8 +88,8 @@ def test_rxnorm_expansion_handles_multi_ingredient(monkeypatch):
         "Pharmagent.app.utils.services.retrieval.httpx.get",
         _fake_get,
     )
-    retriever = RxNormRetriever()
-    candidates = retriever.expand("Caduet")
+    client = RxNavClient()
+    candidates = client.expand("Caduet")
     assert "amlodipine" in candidates
     assert "atorvastatin" in candidates
     assert "amlodipine / atorvastatin" in candidates
@@ -109,9 +109,9 @@ def test_rxnorm_handles_failures(monkeypatch):
         "Pharmagent.app.utils.services.retrieval.httpx.get",
         _raise,
     )
-    retriever = RxNormRetriever()
-    candidates = retriever.expand("Unknown")
-    assert candidates == {"unknown"}
+    client = RxNavClient()
+    candidates = client.expand("Unknown")
+    assert candidates == {"unknown": "original"}
 
 
 # -----------------------------------------------------------------------------
@@ -135,9 +135,9 @@ def test_rxnorm_caches_responses(monkeypatch):
         "Pharmagent.app.utils.services.retrieval.httpx.get",
         _fake_get,
     )
-    retriever = RxNormRetriever()
-    first = retriever.expand("Aspirin")
-    second = retriever.expand("Aspirin")
+    client = RxNavClient()
+    first = client.expand("Aspirin")
+    second = client.expand("Aspirin")
     assert first == second
     assert len(calls) == 1
     assert "aspirin" in first

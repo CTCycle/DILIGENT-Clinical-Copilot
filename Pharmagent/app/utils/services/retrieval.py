@@ -31,7 +31,7 @@ RXNORM_EXPANSION_ENABLED = _is_truthy(os.getenv("PHARMAGENT_RXNORM_EXPANSION", "
 
 
 ###############################################################################
-class RxNormRetriever:
+class RxNavClient:
     BASE_URL = "https://rxnav.nlm.nih.gov/REST/drugs.json"
     MAX_RETRIES = 3
     BACKOFF_SECONDS = (0.6, 1.2, 2.4)
@@ -138,15 +138,15 @@ class RxNormRetriever:
         self.cache: dict[str, dict[str, RxNormCandidate]] = {}
 
     # -------------------------------------------------------------------------
-    def expand(self, raw_name: str) -> set[str]:
+    def expand(self, raw_name: str) -> dict[str, str]:
         normalized_key = self._normalize_value(raw_name)
         if not normalized_key:
-            return set()
+            return {}
         if not self.enabled:
-            return {normalized_key}
+            return {normalized_key: "original"}
         cached = self.cache.get(normalized_key)
         if cached is not None:
-            return set(cached)
+            return {key: info.kind for key, info in cached.items()}
         candidates = self._collect_candidates(raw_name)
         if normalized_key not in candidates:
             candidates[normalized_key] = RxNormCandidate(
@@ -160,7 +160,7 @@ class RxNormRetriever:
                 "RxNorm expansion returned no alternates for '%s'", raw_name
             )
         self.cache[normalized_key] = candidates
-        return set(candidates)
+        return {key: info.kind for key, info in candidates.items()}
 
     # -------------------------------------------------------------------------
     def get_candidate_kind(self, original: str, candidate: str) -> str:

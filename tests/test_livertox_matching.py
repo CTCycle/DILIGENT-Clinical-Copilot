@@ -199,28 +199,6 @@ class _LLMBatchStub:
 
 
 # -----------------------------------------------------------------------------
-class _RxNormStub:
-    def __init__(self, mapping: dict[str, dict[str, str]] | None = None) -> None:
-        self.mapping = mapping or {}
-
-    # -------------------------------------------------------------------------
-    def expand(self, raw_name: str) -> set[str]:
-        key = raw_name.lower()
-        entries = self.mapping.get(key)
-        if entries is None:
-            return {key}
-        return set(entries)
-
-    # -------------------------------------------------------------------------
-    def get_candidate_kind(self, original: str, candidate: str) -> str:
-        key = original.lower()
-        entries = self.mapping.get(key)
-        if not entries:
-            return "unknown"
-        return entries.get(candidate, "unknown")
-
-
-# -----------------------------------------------------------------------------
 @pytest.fixture(autouse=True)
 def _patch_llm_client(monkeypatch):
     monkeypatch.setattr(
@@ -405,14 +383,17 @@ def test_matcher_uses_rxnorm_brand_to_match(monkeypatch):
             }
         ]
     )
-    retriever = _RxNormStub(
-        {
-            "cymbalta": {"cymbalta": "brand", "duloxetine": "ingredient"},
-            "duloxetine": {"duloxetine": "ingredient", "cymbalta": "brand"},
-        }
+    matcher = LiverToxMatcher(df, llm_client=_DummyLLMClient())
+    candidate_maps = [
+        {"cymbalta": "brand", "duloxetine": "ingredient"},
+        {"duloxetine": "ingredient", "cymbalta": "brand"},
+    ]
+    matches = asyncio.run(
+        matcher.match_drug_names(
+            ["Cymbalta", "Duloxetine"],
+            candidate_maps=candidate_maps,
+        )
     )
-    matcher = LiverToxMatcher(df, llm_client=_DummyLLMClient(), retriever=retriever)
-    matches = asyncio.run(matcher.match_drug_names(["Cymbalta", "Duloxetine"]))
     assert [match.nbk_id if match else None for match in matches] == [
         "NBK300",
         "NBK300",
@@ -444,17 +425,17 @@ def test_matcher_prefers_single_ingredient_over_combo(monkeypatch):
             },
         ]
     )
-    retriever = _RxNormStub(
+    matcher = LiverToxMatcher(df, llm_client=_DummyLLMClient())
+    candidate_maps = [
         {
-            "caduet": {
-                "amlodipine": "ingredient",
-                "atorvastatin": "ingredient",
-                "amlodipine / atorvastatin": "ingredient_combo",
-            }
+            "amlodipine": "ingredient",
+            "atorvastatin": "ingredient",
+            "amlodipine / atorvastatin": "ingredient_combo",
         }
+    ]
+    matches = asyncio.run(
+        matcher.match_drug_names(["Caduet"], candidate_maps=candidate_maps)
     )
-    matcher = LiverToxMatcher(df, llm_client=_DummyLLMClient(), retriever=retriever)
-    matches = asyncio.run(matcher.match_drug_names(["Caduet"]))
     assert matches[0] is not None
     assert matches[0].nbk_id in {"NBK400", "NBK401"}
     assert matches[0].reason == "direct_match"
@@ -464,6 +445,7 @@ def test_essay_returns_mapping():
     drugs = PatientDrugs(entries=[DrugEntry(name="Acetaminophen"), DrugEntry(name="Unknown")])
     essay = DrugToxicityEssay(drugs)
     result = asyncio.run(essay.run_analysis())
+    assert result is not None
     assert [entry["drug_name"] for entry in result] == ["Acetaminophen", "Unknown"]
     acetaminophen_row = result[0]["matched_livertox_row"]
     assert acetaminophen_row is not None
@@ -486,7 +468,7 @@ def test_essay_handles_empty_database(monkeypatch):
     drugs = PatientDrugs(entries=[DrugEntry(name="Acetaminophen")])
     essay = DrugToxicityEssay(drugs)
     result = asyncio.run(essay.run_analysis())
-    assert result[0]["matched_livertox_row"] is None
+    assert result is None
 
 
 # -----------------------------------------------------------------------------
