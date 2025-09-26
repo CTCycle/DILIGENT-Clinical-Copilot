@@ -6,7 +6,7 @@ from Pharmagent.app.constants import SOURCES_PATH
 from Pharmagent.app.logger import logger
 from Pharmagent.app.utils.services.livertox import LiverToxUpdater
 
-REDOWNLOAD = True
+REDOWNLOAD = False
 CONVERT_TO_DATAFRAME = False
 
 ###############################################################################
