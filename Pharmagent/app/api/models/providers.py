@@ -11,10 +11,10 @@ import shutil
 import sys
 from collections.abc import AsyncGenerator, Awaitable, Callable
 from typing import Any, Literal, TypeAlias, TypeVar, cast
+
 import httpx
 from pydantic import BaseModel
 from langchain_core.output_parsers import PydanticOutputParser
-from langsmith.run_helpers import get_current_run_tree, traceable
 
 from Pharmagent.app.logger import logger
 from Pharmagent.app.constants import (
@@ -45,26 +45,6 @@ class OllamaTimeout(OllamaError):
 
 
 ProgressCb: TypeAlias = Callable[[dict[str, Any]], None | Awaitable[None]]
-
-
-# -------------------------------------------------------------------------
-def _append_trace_metadata(
-    metadata: dict[str, Any] | None = None, tags: list[str] | None = None
-) -> None:
-    run = get_current_run_tree()
-    if not run:
-        return
-    if metadata:
-        try:
-            run.add_metadata(metadata)
-        except Exception:  # noqa: BLE001 - tracing should never break runtime
-            logger.debug("Failed to append LangSmith metadata", exc_info=True)
-    if not tags:
-        return
-    try:
-        run.add_tags(tags)
-    except Exception:
-        logger.debug("Failed to append LangSmith tags", exc_info=True)
 
 
 ###############################################################################
@@ -447,7 +427,6 @@ class OllamaClient:
             raise OllamaError(f"Model '{name}' not found and auto_pull=False")
 
     # -------------------------------------------------------------------------
-    @traceable(run_type="llm", name="Ollama.chat")
     async def chat(
         self,
         *,
@@ -468,11 +447,6 @@ class OllamaClient:
             body["options"] = options
         if keep_alive:
             body["keep_alive"] = keep_alive
-
-        _append_trace_metadata(
-            {"provider": "ollama", "model": model, "format": format or "text"},
-            ["ollama", "chat"],
-        )
 
         try:
             resp = await self.client.post("/api/chat", json=body)
@@ -553,7 +527,6 @@ class OllamaClient:
         return fallbacks
 
     # -------------------------------------------------------------------------
-    @traceable(run_type="chain", name="Ollama.structured_call")
     async def llm_structured_call(
         self,
         *,
@@ -611,16 +584,6 @@ class OllamaClient:
             if not active_model or active_model in tried:
                 continue
             tried.add(active_model)
-
-            _append_trace_metadata(
-                {
-                    "provider": "ollama",
-                    "model": active_model,
-                    "schema": schema.__name__,
-                    "use_json_mode": use_json_mode,
-                },
-                ["ollama", "structured"],
-            )
 
             try:
                 raw = await self.chat(
@@ -822,7 +785,6 @@ class CloudLLMClient:
             raise LLMError(f"HTTP {resp.status_code}: {detail}") from e
 
     # ---------------------------------------------------------------------
-    @traceable(run_type="chain", name="CloudLLM.chat")
     async def chat(
         self,
         *,
@@ -833,31 +795,14 @@ class CloudLLMClient:
         keep_alive: str | None = None,  # unused but kept for compatibility
     ) -> dict[str, Any] | str:
         if self.provider == "openai":
-            _append_trace_metadata(
-                {
-                    "provider": "openai",
-                    "model": model or (self.default_model or ""),
-                    "format": format or "text",
-                },
-                ["cloud", "openai"],
-            )
             return await self._chat_openai(
                 model=model, messages=messages, format=format, options=options
             )
         if self.provider == "gemini":
-            _append_trace_metadata(
-                {
-                    "provider": "gemini",
-                    "model": model or (self.default_model or ""),
-                    "format": format or "text",
-                },
-                ["cloud", "gemini"],
-            )
             return await self._chat_gemini(model=model, messages=messages)
         raise LLMError(f"Provider '{self.provider}' does not support chat yet")
 
     # ---------------------------------------------------------------------
-    @traceable(run_type="llm", name="CloudLLM.chat_openai")
     async def _chat_openai(
         self,
         *,
@@ -920,7 +865,6 @@ class CloudLLMClient:
         return contents, system_text
 
     # ---------------------------------------------------------------------
-    @traceable(run_type="llm", name="CloudLLM.chat_gemini")
     async def _chat_gemini(
         self, *, model: str, messages: list[dict[str, str]]
     ) -> dict[str, Any] | str:
@@ -958,7 +902,6 @@ class CloudLLMClient:
         return str(content)
 
     # ---------------------------------------------------------------------
-    @traceable(run_type="chain", name="CloudLLM.structured_call")
     async def llm_structured_call(
         self,
         *,
@@ -980,16 +923,6 @@ class CloudLLMClient:
             },
             {"role": "user", "content": user_prompt},
         ]
-
-        _append_trace_metadata(
-            {
-                "provider": self.provider,
-                "model": model or (self.default_model or ""),
-                "schema": schema.__name__,
-                "use_json_mode": use_json_mode,
-            },
-            ["cloud", "structured"],
-        )
 
         raw = await self.chat(
             model=model or (self.default_model or ""),
