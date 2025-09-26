@@ -96,10 +96,7 @@ class LiverToxConsultation:
             return []
         
         logger.info("Toxicity analysis stage 2/3: matching drugs to LiverTox records")
-        matches = await self.matcher.match_drug_names(
-            patient_drugs,
-            livertox_drugs=self.matcher.lookup_entries,
-        )
+        matches = await self.matcher.match_drug_names(patient_drugs)
 
         logger.info("Toxicity analysis stage 3/3: compiling matched LiverTox excerpts")
         return self._resolve_matches(patient_drugs, matches)
