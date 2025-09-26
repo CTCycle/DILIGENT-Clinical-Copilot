@@ -33,8 +33,9 @@ GEMINI_API_BASE = "https://generativelanguage.googleapis.com/v1beta"
 
 # Runtime selection defaults
 CLOUD_PROVIDERS = ["openai", "gemini"]
-PARSING_MODEL_CHOICES = [    
-    "qwen3:7b",
+PARSING_MODEL_CHOICES = [
+    "qwen3:1.7b",    
+    "qwen3:8b",
     "qwen3:14b",
     "qwen2.5-coder:7b",
     "llama3.1:8b",
