@@ -6,8 +6,8 @@ EV = EnvironmentVariables()
 
 import os
 
-from fastapi import FastAPI
 import gradio as gr
+from fastapi import FastAPI
 
 from Pharmagent.app.api.endpoints.agent import router as report_router
 from Pharmagent.app.api.endpoints.ollama import router as models_router

@@ -6,6 +6,11 @@ from typing import Any
 import httpx
 from gradio import update as gr_update
 
+from Pharmagent.app.api.models.providers import (
+    OllamaClient,
+    OllamaError,
+    OllamaTimeout,
+)
 from Pharmagent.app.configurations import ClientRuntimeConfig
 from Pharmagent.app.constants import (
     AGENT_API_URL,
@@ -13,12 +18,6 @@ from Pharmagent.app.constants import (
     CLOUD_MODEL_CHOICES,
     DEFAULT_LLM_TIMEOUT_SECONDS,
 )
-from Pharmagent.app.api.models.providers import (
-    OllamaClient,
-    OllamaError,
-    OllamaTimeout,
-)
-
 
 LLM_REQUEST_TIMEOUT_SECONDS = DEFAULT_LLM_TIMEOUT_SECONDS
 LLM_REQUEST_TIMEOUT_DISPLAY = (
