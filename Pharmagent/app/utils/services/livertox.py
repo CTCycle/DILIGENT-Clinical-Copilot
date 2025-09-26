@@ -26,7 +26,75 @@ from Pharmagent.app.constants import (
 from Pharmagent.app.logger import logger
 
 
-ALIAS_STOPWORDS = {"and", "or", "with", "plus", "the", "of"}
+MATCHING_STOPWORDS = {
+    "and",
+    "apply",
+    "caps",
+    "capsule",
+    "capsules",
+    "chewable",
+    "cream",
+    "dose",
+    "doses",
+    "drink",
+    "drops",
+    "elixir",
+    "enteric",
+    "extended",
+    "foam",
+    "for",
+    "free",
+    "gel",
+    "granules",
+    "im",
+    "inj",
+    "injection",
+    "intramuscular",
+    "intravenous",
+    "iv",
+    "kit",
+    "liquid",
+    "lotion",
+    "mg",
+    "ml",
+    "nasal",
+    "ointment",
+    "ophthalmic",
+    "oral",
+    "plus",
+    "pack",
+    "packet",
+    "packets",
+    "combo",
+    "combination",
+    "of",
+    "or",
+    "patch",
+    "po",
+    "powder",
+    "prefilled",
+    "release",
+    "sc",
+    "sol",
+    "solution",
+    "soln",
+    "spray",
+    "sterile",
+    "subcutaneous",
+    "suppository",
+    "susp",
+    "suspension",
+    "sustained",
+    "syringe",
+    "syrup",
+    "tablet",
+    "tablets",
+    "the",
+    "topical",
+    "vial",
+    "with",
+    "without",
+}
 
 
 ###############################################################################
@@ -35,17 +103,8 @@ class MonographRecord:
     nbk_id: str
     drug_name: str
     normalized_name: str
-    tokens: set[str]
     excerpt: str | None
-    aliases: dict[str, str]
-
-
-###############################################################################
-@dataclass(slots=True)
-class LiverToxLookupEntry:
-    record: MonographRecord
-    primary: str
-    aliases: dict[str, str]
+    matching_pool: set[str]
 
 
 ###############################################################################
@@ -64,7 +123,6 @@ class LiverToxMatcher:
     DIRECT_CONFIDENCE = 1.0
     ALIAS_CONFIDENCE = 0.95
     MIN_CONFIDENCE = 0.40
-    DETERMINISTIC_THRESHOLD = 0.86
     LLM_DEFAULT_CONFIDENCE = 0.65
     LLM_TIMEOUT_SECONDS = LIVERTOX_LLM_TIMEOUT_SECONDS
     YIELD_INTERVAL = LIVERTOX_YIELD_INTERVAL
@@ -84,21 +142,14 @@ class LiverToxMatcher:
         self.match_cache: dict[str, LiverToxMatch | None] = {}
         self.records: list[MonographRecord] = []
         self.records_by_normalized: dict[str, MonographRecord] = {}
-        self.lookup_entries: list[LiverToxLookupEntry] = []
-        self.primary_lookup: dict[str, LiverToxLookupEntry] = {}
-        self.alias_records_by_normalized: dict[
-            str, tuple[LiverToxLookupEntry, str]
-        ] = {}
+        self.matching_pool_index: dict[str, list[MonographRecord]] = {}
         self.rows_by_nbk: dict[str, dict[str, Any]] = {}
         self.candidate_prompt_block: str | None = None
         self._build_records()
 
     # -------------------------------------------------------------------------
     async def match_drug_names(
-        self,
-        patient_drugs: list[str],
-        *,
-        livertox_drugs: list[LiverToxLookupEntry] | None = None,
+        self, patient_drugs: list[str]
     ) -> list[LiverToxMatch | None]:
         total = len(patient_drugs)
         if total == 0:
@@ -109,7 +160,6 @@ class LiverToxMatcher:
 
         # Step 1: normalize input names once and reuse throughout the flow.
         normalized_queries = [self._normalize_name(name) for name in patient_drugs]
-        lookup_entries = livertox_drugs or self.lookup_entries
         unresolved_indices: list[int] = []
         deterministic_matches = 0
         eligible_total = 0
@@ -128,10 +178,7 @@ class LiverToxMatcher:
                 else:
                     unresolved_indices.append(idx)
                 continue
-            deterministic = self._deterministic_lookup(
-                normalized,
-                lookup_entries=lookup_entries,
-            )
+            deterministic = self._deterministic_lookup(normalized)
             if deterministic is None:
                 self.match_cache.setdefault(normalized, None)
                 unresolved_indices.append(idx)
@@ -207,10 +254,7 @@ class LiverToxMatcher:
             return
         processed: list[MonographRecord] = []
         normalized_map: dict[str, MonographRecord] = {}
-        lookup_entries: list[LiverToxLookupEntry] = []
-        primary_lookup: dict[str, LiverToxLookupEntry] = {}
-        alias_lookup: dict[str, tuple[LiverToxLookupEntry, str]] = {}
-        # Step A: flatten aliases coming from the dataset columns.
+        pool_index: dict[str, list[MonographRecord]] = {}
         for row in self.livertox_df.itertuples(index=False):
             raw_name = str(getattr(row, "drug_name", "") or "").strip()
             if not raw_name:
@@ -218,46 +262,30 @@ class LiverToxMatcher:
             normalized_name = self._normalize_name(raw_name)
             if not normalized_name:
                 continue
-            nbk_raw = getattr(row, "nbk_id", None)
-            nbk_id = str(nbk_raw).strip() if nbk_raw is not None else ""
-            excerpt_raw = getattr(row, "excerpt", None)
-            excerpt = str(excerpt_raw) if excerpt_raw not in (None, "") else None
             primary_variant = self._normalize_name(raw_name.split("(")[0])
-            alias_values = self._collect_aliases(raw_name, row)
-            alias_map: dict[str, str] = {}
-            tokens = {token for token in normalized_name.split() if token}
-            if primary_variant and primary_variant != normalized_name:
-                tokens.update(token for token in primary_variant.split() if token)
-            for alias in alias_values:
-                normalized_alias = self._normalize_name(alias)
-                if not normalized_alias or normalized_alias == normalized_name:
-                    continue
-                alias_map.setdefault(normalized_alias, alias)
-                tokens.update(token for token in normalized_alias.split() if token)
+            nbk_raw = getattr(row, "nbk_id", None)
+            nbk_id = str(nbk_raw).strip() if nbk_raw not in (None, "") else ""
+            excerpt_value = self._coerce_text(getattr(row, "excerpt", None))
+            matching_pool = self._extract_matching_pool(
+                getattr(row, "additional_names", None),
+                getattr(row, "synonyms", None),
+            )
+            matching_pool.update(self._extract_parenthetical_tokens(raw_name))
             record = MonographRecord(
                 nbk_id=nbk_id,
                 drug_name=raw_name,
                 normalized_name=normalized_name,
-                tokens=tokens,
-                excerpt=excerpt,
-                aliases=alias_map,
+                excerpt=excerpt_value,
+                matching_pool=matching_pool,
             )
             processed.append(record)
             normalized_map.setdefault(normalized_name, record)
-            if primary_variant:
+            if primary_variant and primary_variant != normalized_name:
                 normalized_map.setdefault(primary_variant, record)
-            lookup_entry = LiverToxLookupEntry(
-                record=record,
-                primary=normalized_name,
-                aliases=alias_map,
-            )
-            lookup_entries.append(lookup_entry)
-            if normalized_name not in primary_lookup:
-                primary_lookup[normalized_name] = lookup_entry
-            if primary_variant and primary_variant not in primary_lookup:
-                primary_lookup[primary_variant] = lookup_entry
-            for normalized_alias, original_alias in alias_map.items():
-                alias_lookup.setdefault(normalized_alias, (lookup_entry, original_alias))
+            for token in matching_pool:
+                bucket = pool_index.setdefault(token, [])
+                if record not in bucket:
+                    bucket.append(record)
         if not processed:
             return
         processed.sort(key=lambda item: item.drug_name.lower())
@@ -265,67 +293,70 @@ class LiverToxMatcher:
         self.records_by_normalized = {
             key: value for key, value in normalized_map.items() if value is not None
         }
-        self.lookup_entries = lookup_entries
-        self.primary_lookup = primary_lookup
-        self.alias_records_by_normalized = alias_lookup
+        self.matching_pool_index = pool_index
         self.candidate_prompt_block = "\n".join(
             f"- {record.drug_name}" for record in self.records
         )
 
     # -------------------------------------------------------------------------
-    def _collect_aliases(self, raw_name: str, row: Any) -> set[str]:
-        aliases: set[str] = set()
-        if "(" in raw_name and ")" in raw_name:
-            alias_section = raw_name.split("(", 1)[1].split(")", 1)[0]
-            aliases.update(self._extract_aliases(alias_section))
-        for column in ("additional_names", "synonyms"):
-            value = getattr(row, column, None)
-            aliases.update(self._extract_aliases(value))
-        expanded: set[str] = set()
-        for alias in aliases:
-            expanded.update(self._expand_alias(alias))
-        return {alias for alias in expanded if alias}
-
-    # -------------------------------------------------------------------------
-    def _extract_aliases(self, value: Any) -> set[str]:
+    def _coerce_text(self, value: Any) -> str | None:
         if value in (None, ""):
-            return set()
+            return None
         if isinstance(value, float) and pd.isna(value):
-            return set()
+            return None
         text = str(value).strip()
-        if not text or text.lower() == "nan":
-            return set()
-        cleaned = re.sub(r"[\n;|]+", ",", text)
-        parts = [part.strip() for part in cleaned.split(",") if part.strip()]
-        return set(parts)
+        return text or None
 
     # -------------------------------------------------------------------------
-    def _expand_alias(self, alias: str) -> set[str]:
-        alias = alias.strip()
-        if not alias:
-            return set()
-        variants: set[str] = {alias}
-        normalized = re.sub(r"[\\/]+", ",", alias)
-        normalized = re.sub(r"\bwith\b|\band\b|\bor\b", ",", normalized, flags=re.I)
-        for chunk in normalized.split(","):
-            cleaned = chunk.strip(" -")
-            if cleaned:
-                variants.add(cleaned)
-        tokens = [
-            token.strip()
-            for token in re.split(r"[\s\-+/]+", alias)
-            if token.strip()
-        ]
-        filtered_tokens = [
-            token
-            for token in tokens
-            if token.lower() not in ALIAS_STOPWORDS and len(token) > 2
-        ]
-        variants.update(filtered_tokens)
-        if len(filtered_tokens) > 1:
-            variants.add(" ".join(filtered_tokens))
-            variants.add("".join(filtered_tokens))
-        return variants
+    def _extract_matching_pool(self, *values: Any) -> set[str]:
+        tokens: set[str] = set()
+        for value in values:
+            text = self._coerce_text(value)
+            if text is None:
+                continue
+            bracket_segments = re.findall(r"\[([^\]]+)\]", text)
+            for segment in bracket_segments:
+                tokens.update(self._tokenize_text(segment))
+            tokens.update(self._tokenize_text(text))
+        return tokens
+
+    # -------------------------------------------------------------------------
+    def _extract_parenthetical_tokens(self, text: str) -> set[str]:
+        segments = re.findall(r"\(([^)]+)\)", text)
+        tokens: set[str] = set()
+        for segment in segments:
+            tokens.update(self._tokenize_text(segment))
+        return tokens
+
+    # -------------------------------------------------------------------------
+    def _tokenize_text(self, text: str) -> set[str]:
+        ascii_text = (
+            unicodedata.normalize("NFKD", text)
+            .encode("ascii", "ignore")
+            .decode("ascii")
+        )
+        raw_tokens = re.findall(r"[A-Za-z]+", ascii_text)
+        tokens: set[str] = set()
+        for raw in raw_tokens:
+            normalized = raw.lower()
+            normalized = re.sub(r"[^a-z]", "", normalized)
+            if len(normalized) < 3:
+                continue
+            if normalized in MATCHING_STOPWORDS:
+                continue
+            tokens.add(normalized)
+        return tokens
+
+    # -------------------------------------------------------------------------
+    def _match_from_pool(
+        self, normalized_value: str
+    ) -> tuple[MonographRecord, str] | None:
+        for token in self._tokenize_text(normalized_value):
+            candidates = self.matching_pool_index.get(token)
+            if not candidates:
+                continue
+            return candidates[0], token
+        return None
 
     # -------------------------------------------------------------------------
     def _ensure_row_index(self) -> dict[str, dict[str, Any]]:
@@ -363,79 +394,19 @@ class LiverToxMatcher:
 
     # -------------------------------------------------------------------------
     def _deterministic_lookup(
-        self,
-        normalized_query: str,
-        *,
-        lookup_entries: list[LiverToxLookupEntry],
+        self, normalized_query: str
     ) -> tuple[MonographRecord, float, str, list[str]] | None:
         if not normalized_query:
             return None
-        primary_entry = self.primary_lookup.get(normalized_query)
-        if primary_entry is not None:
-            return primary_entry.record, self.DIRECT_CONFIDENCE, "direct_match", []
-        alias_entry = self.alias_records_by_normalized.get(normalized_query)
-        if alias_entry is not None:
-            entry, alias_original = alias_entry
-            alias_note = None
-            if alias_original and alias_original.lower() != entry.record.drug_name.lower():
-                alias_note = f"alias='{alias_original}'"
-            notes = [alias_note] if alias_note else []
-            return entry.record, self.ALIAS_CONFIDENCE, "alias_match", notes
-        return self._fuzzy_lookup(normalized_query, lookup_entries)
-
-    # -------------------------------------------------------------------------
-    def _find_best_record(
-        self, normalized_value: str
-    ) -> tuple[MonographRecord, float] | None:
-        best_entry = self._find_best_entry(normalized_value)
-        if best_entry is None:
-            return None
-        entry, score = best_entry
-        return entry.record, score
-
-    # -------------------------------------------------------------------------
-    def _fuzzy_lookup(
-        self,
-        normalized_query: str,
-        lookup_entries: list[LiverToxLookupEntry],
-    ) -> tuple[MonographRecord, float, str, list[str]] | None:
-        best_entry = self._find_best_entry(normalized_query, lookup_entries)
-        if best_entry is None:
-            return None
-        entry, score = best_entry
-        if score < self.DETERMINISTIC_THRESHOLD:
-            return None
-        notes = [f"fuzzy_score={score:.2f}"]
-        return entry.record, score, "fuzzy_match", notes
-
-    # -------------------------------------------------------------------------
-    def _find_best_entry(
-        self,
-        normalized_value: str,
-        lookup_entries: list[LiverToxLookupEntry] | None = None,
-    ) -> tuple[LiverToxLookupEntry, float] | None:
-        entries = lookup_entries or self.lookup_entries
-        best_score = 0.0
-        best_entry: LiverToxLookupEntry | None = None
-        value_tokens = {token for token in normalized_value.split() if token}
-        for entry in entries:
-            score = self._score_match(value_tokens, entry.record.tokens)
-            if score > best_score:
-                best_score = score
-                best_entry = entry
-        if best_entry is None:
-            return None
-        return best_entry, best_score
-
-    # -------------------------------------------------------------------------
-    def _score_match(self, left: set[str], right: set[str]) -> float:
-        if not left or not right:
-            return 0.0
-        overlap = len(left & right)
-        union = len(left | right)
-        if union == 0:
-            return 0.0
-        return overlap / union
+        direct = self.records_by_normalized.get(normalized_query)
+        if direct is not None:
+            return direct, self.DIRECT_CONFIDENCE, "direct_match", []
+        pool_match = self._match_from_pool(normalized_query)
+        if pool_match is not None:
+            record, token = pool_match
+            note = f"token='{token}'"
+            return record, self.ALIAS_CONFIDENCE, "alias_match", [note]
+        return None
 
     # -------------------------------------------------------------------------
     async def _llm_batch_match_lookup(
@@ -560,9 +531,8 @@ class LiverToxMatcher:
                 continue
             if not normalized_match:
                 continue
-            record_entry = self.primary_lookup.get(normalized_match)
-            record: MonographRecord | None = (
-                record_entry.record if record_entry is not None else None
+            record: MonographRecord | None = self.records_by_normalized.get(
+                normalized_match
             )
             confidence_raw = getattr(item, "confidence", None)
             confidence = (
@@ -575,28 +545,22 @@ class LiverToxMatcher:
             if rationale:
                 notes.append(rationale)
             if record is None:
-                alias_entry = self.alias_records_by_normalized.get(normalized_match)
-                if alias_entry is not None:
-                    entry, alias_original = alias_entry
-                    record = entry.record
-                    if alias_original:
-                        notes.append(f"alias='{alias_original}'")
+                pool_match = self._match_from_pool(normalized_match)
+                if pool_match is None and normalized_match != normalized_query:
+                    pool_match = self._match_from_pool(normalized_query)
+                if pool_match is not None:
+                    record, token = pool_match
+                    notes.append(f"token='{token}'")
+                    confidence = max(confidence, self.ALIAS_CONFIDENCE)
+            if record is None and normalized_match != normalized_query:
+                record = self.records_by_normalized.get(normalized_query)
             if record is None:
-                best = self._find_best_record(normalized_match)
-                if best is None and normalized_match != normalized_query:
-                    best = self._find_best_record(normalized_query)
-                if best is None:
-                    logger.debug(
-                        "Unable to map LLM suggestion '%s' for '%s' to a monograph",
-                        match_name,
-                        original,
-                    )
-                    continue
-                record, score = best
-                notes.append(
-                    f"Mapped suggestion to '{record.drug_name}' (score={score:.2f})"
+                logger.debug(
+                    "Unable to map LLM suggestion '%s' for '%s' to a monograph",
+                    match_name,
+                    original,
                 )
-                confidence = max(confidence, score)
+                continue
             results[idx] = (record, confidence, "llm_fallback", notes)
         return results
 
