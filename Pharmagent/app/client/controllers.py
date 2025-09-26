@@ -63,7 +63,14 @@ def _sanitize_field(value: str | None) -> str | None:
 # -----------------------------------------------------------------------------
 def toggle_cloud_services(
     enabled: bool,
-) -> tuple[dict[str, Any], dict[str, Any], dict[str, Any], dict[str, Any]]:
+) -> tuple[
+    dict[str, Any],
+    dict[str, Any],
+    dict[str, Any],
+    dict[str, Any],
+    dict[str, Any],
+    dict[str, Any],
+]:
     ClientRuntimeConfig.set_use_cloud_services(enabled)
     provider = ClientRuntimeConfig.get_llm_provider()
     provider_update = gr_update(value=provider, interactive=enabled)
@@ -79,7 +86,22 @@ def toggle_cloud_services(
         interactive=enabled,
     )
     button_update = gr_update(interactive=not enabled)
-    return provider_update, model_update, button_update, button_update
+    temperature_update = gr_update(
+        value=ClientRuntimeConfig.get_ollama_temperature(),
+        interactive=not enabled,
+    )
+    reasoning_update = gr_update(
+        value=ClientRuntimeConfig.is_ollama_reasoning_enabled(),
+        interactive=not enabled,
+    )
+    return (
+        provider_update,
+        model_update,
+        button_update,
+        button_update,
+        temperature_update,
+        reasoning_update,
+    )
 
 
 # -----------------------------------------------------------------------------
@@ -110,6 +132,16 @@ def set_parsing_model(model: str) -> str:
 # -----------------------------------------------------------------------------
 def set_agent_model(model: str) -> str:
     return ClientRuntimeConfig.set_agent_model(model)
+
+
+# -----------------------------------------------------------------------------
+def set_ollama_temperature(value: float | None) -> float:
+    return ClientRuntimeConfig.set_ollama_temperature(value)
+
+
+# -----------------------------------------------------------------------------
+def set_ollama_reasoning(enabled: bool) -> bool:
+    return ClientRuntimeConfig.set_ollama_reasoning(enabled)
 
 
 # -----------------------------------------------------------------------------
