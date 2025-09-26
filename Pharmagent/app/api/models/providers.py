@@ -22,6 +22,7 @@ from Pharmagent.app.constants import (
     OPENAI_API_BASE,
     GEMINI_API_BASE,
     PARSING_MODEL_CHOICES,
+    DEFAULT_LLM_TIMEOUT_SECONDS,
 )
 from Pharmagent.app.configurations import ClientRuntimeConfig
 
@@ -706,7 +707,7 @@ class CloudLLMClient:
         *,
         provider: ProviderName = "openai",
         base_url: str | None = None,
-        timeout_s: float = 120.0,
+        timeout_s: float = DEFAULT_LLM_TIMEOUT_SECONDS,
         keepalive_connections: int = 10,
         keepalive_max: int = 20,
         default_model: str | None = None,
@@ -994,7 +995,7 @@ def select_llm_provider(
     if p == "ollama":
         return OllamaClient(
             base_url=kwargs.get("base_url"),
-            timeout_s=kwargs.get("timeout_s", 120.0),
+            timeout_s=kwargs.get("timeout_s", DEFAULT_LLM_TIMEOUT_SECONDS),
             keepalive_connections=kwargs.get("keepalive_connections", 10),
             keepalive_max=kwargs.get("keepalive_max", 20),
             default_model=kwargs.get("default_model"),
@@ -1003,7 +1004,7 @@ def select_llm_provider(
         return CloudLLMClient(
             provider=p,  # type: ignore[arg-type]
             base_url=kwargs.get("base_url"),
-            timeout_s=kwargs.get("timeout_s", 120.0),
+            timeout_s=kwargs.get("timeout_s", DEFAULT_LLM_TIMEOUT_SECONDS),
             keepalive_connections=kwargs.get("keepalive_connections", 10),
             keepalive_max=kwargs.get("keepalive_max", 20),
             default_model=kwargs.get("default_model"),
@@ -1015,6 +1016,7 @@ def select_llm_provider(
 def initialize_llm_client(
     *, purpose: RuntimePurpose = "agent", **kwargs: Any
 ) -> OllamaClient | CloudLLMClient:
+    kwargs.setdefault("timeout_s", DEFAULT_LLM_TIMEOUT_SECONDS)
     if ClientRuntimeConfig.is_cloud_enabled():
         provider = ClientRuntimeConfig.get_llm_provider()
         default_model = ClientRuntimeConfig.get_cloud_model()
