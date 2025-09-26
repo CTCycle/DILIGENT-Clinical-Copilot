@@ -79,7 +79,7 @@ class DrugToxicityEssay:
         self.drugs = drugs
         self.timeout_s = timeout_s
         self.serializer = DataSerializer()
-        self.llm_client = initialize_llm_client(purpose="agent", timeout_s=timeout_s)
+        self.llm_client = initialize_llm_client(purpose="parser", timeout_s=timeout_s)
         self.livertox_df = None
         self.matcher: LiverToxMatcher | None = None
         self.rxnav_client = RxNavClient()

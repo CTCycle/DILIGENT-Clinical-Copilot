@@ -66,7 +66,7 @@ class LiverToxMatcher:
     ) -> None:
         self.livertox_df = livertox_df
         self.llm_client = llm_client or initialize_llm_client(
-            purpose="agent", timeout_s=DEFAULT_LLM_TIMEOUT_SECONDS
+            purpose="parser", timeout_s=DEFAULT_LLM_TIMEOUT_SECONDS
         )
         self.match_cache: dict[str, LiverToxMatch | None] = {}
         self.records: list[MonographRecord] = []
