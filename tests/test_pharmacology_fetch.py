@@ -82,7 +82,9 @@ if "sqlalchemy" not in sys.modules:
             return False
 
     def _create_engine(*args, **kwargs):  # type: ignore[override]
-        return types.SimpleNamespace(begin=lambda: _BeginContext(), connect=lambda: _Connection())
+        return types.SimpleNamespace(
+            begin=lambda: _BeginContext(), connect=lambda: _Connection()
+        )
 
     def _text(query):  # type: ignore[override]
         return query
@@ -293,7 +295,9 @@ class _StubDatabase:
 
 # -----------------------------------------------------------------------------
 async def _run_fetch(module, convert_to_dataframe: bool, skip_download: bool):
-    initial_status = await module.fetch_bulk_livertox(convert_to_dataframe, skip_download)
+    initial_status = await module.fetch_bulk_livertox(
+        convert_to_dataframe, skip_download
+    )
     job_id = initial_status["job_id"]
     final_status = await module.job_manager.wait_for_completion(job_id)
     return initial_status, final_status
@@ -383,7 +387,9 @@ def test_fetch_bulk_livertox_triggers_download(monkeypatch, tmp_path) -> None:
 def test_fetch_bulk_livertox_skip_without_archive(monkeypatch, tmp_path) -> None:
     from Pharmagent.app.api.endpoints import pharmacology as module
 
-    client = _StubLiverToxClient(os.path.join(str(tmp_path), LIVERTOX_ARCHIVE), create_on_download=False)
+    client = _StubLiverToxClient(
+        os.path.join(str(tmp_path), LIVERTOX_ARCHIVE), create_on_download=False
+    )
     serializer = _StubSerializer()
     database = _StubDatabase(expected_count=0)
 
@@ -436,9 +442,11 @@ def test_await_livertox_job_handles_timeout() -> None:
         "detail": "Job started",
         "result": None,
     }
-    client = _StubPollingClient([
-        {"status": "running", "detail": "Still working"},
-    ])
+    client = _StubPollingClient(
+        [
+            {"status": "running", "detail": "Still working"},
+        ]
+    )
 
     message = asyncio.run(
         _await_livertox_job(

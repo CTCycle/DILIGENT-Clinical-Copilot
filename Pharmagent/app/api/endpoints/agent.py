@@ -37,7 +37,9 @@ router = APIRouter(tags=["agent"])
 
 # [ENPOINTS]
 ###############################################################################
-async def process_single_patient(payload: PatientData, translate_to_eng: bool = False) -> dict[str, Any]:
+async def process_single_patient(
+    payload: PatientData, translate_to_eng: bool = False
+) -> dict[str, Any]:
     logger.info(
         "Starting Drug-Induced Liver Injury (DILI) analysis for patient: %s",
         payload.name,
@@ -47,7 +49,10 @@ async def process_single_patient(payload: PatientData, translate_to_eng: bool = 
     updated_payload = payload.model_copy()
     if translate_to_eng:
         logger.info("Translating text to English")
-        translation_stats, updated_payload = await translation_service.translate_payload(
+        (
+            translation_stats,
+            updated_payload,
+        ) = await translation_service.translate_payload(
             payload,
             certainty_threshold=TRANSLATION_CONFIDENCE_THRESHOLD,
             max_attempts=MAX_TRANSLATION_ATTEMPTS,
@@ -106,6 +111,7 @@ async def process_single_patient(payload: PatientData, translate_to_eng: bool = 
     serializer.save_patients_info(patient_info)
     return patient_info
 
+
 # -----------------------------------------------------------------------------
 @router.post("/agent", response_model=None, status_code=status.HTTP_202_ACCEPTED)
 async def start_single_clinical_agent(
@@ -118,7 +124,7 @@ async def start_single_clinical_agent(
     alp: str | None = Body(default=None),
     alp_max: str | None = Body(default=None),
     symptoms: list[str] | None = Body(default=None),
-    translate_to_eng: bool = Body(default=False)
+    translate_to_eng: bool = Body(default=False),
 ) -> dict[str, Any]:
     try:
         payload = PatientData(
@@ -144,7 +150,6 @@ async def start_single_clinical_agent(
 # -----------------------------------------------------------------------------
 @router.post("/batch-agent", response_model=None, status_code=status.HTTP_202_ACCEPTED)
 async def start_batch_clinical_agent() -> dict[str, Any]:
-
     patient_case = PatientCase()
     lab_parser = BloodTestParser()
 

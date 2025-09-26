@@ -189,9 +189,7 @@ class RxNavClient:
         else:
             candidates[normalized_key].kind = "original"
         if len(candidates) == 1:
-            logger.debug(
-                "RxNorm expansion returned no alternates for '%s'", raw_name
-            )
+            logger.debug("RxNorm expansion returned no alternates for '%s'", raw_name)
         self.cache[normalized_key] = candidates
         return {key: info.kind for key, info in candidates.items()}
 
@@ -261,27 +259,33 @@ class RxNavClient:
                 if attempt + 1 == self.MAX_RETRIES:
                     logger.debug("RxNorm request failed for '%s': %s", raw_name, exc)
                     return None
-                time.sleep(self.BACKOFF_SECONDS[min(attempt, len(self.BACKOFF_SECONDS) - 1)])
+                time.sleep(
+                    self.BACKOFF_SECONDS[min(attempt, len(self.BACKOFF_SECONDS) - 1)]
+                )
                 continue
             if response.status_code in self.RETRY_STATUS:
                 if attempt + 1 == self.MAX_RETRIES:
                     logger.debug(
-                        "RxNorm service returned %s for '%s'", response.status_code, raw_name
+                        "RxNorm service returned %s for '%s'",
+                        response.status_code,
+                        raw_name,
                     )
                     return None
-                time.sleep(self.BACKOFF_SECONDS[min(attempt, len(self.BACKOFF_SECONDS) - 1)])
+                time.sleep(
+                    self.BACKOFF_SECONDS[min(attempt, len(self.BACKOFF_SECONDS) - 1)]
+                )
                 continue
             if response.status_code >= 400:
                 logger.debug(
-                    "RxNorm service returned %s for '%s'", response.status_code, raw_name
+                    "RxNorm service returned %s for '%s'",
+                    response.status_code,
+                    raw_name,
                 )
                 return None
             try:
                 return response.json()
             except json.JSONDecodeError as exc:
-                logger.debug(
-                    "RxNorm JSON decode failed for '%s': %s", raw_name, exc
-                )
+                logger.debug("RxNorm JSON decode failed for '%s': %s", raw_name, exc)
                 return None
         return None
 
@@ -428,4 +432,3 @@ class RxNavClient:
     def _is_bracketed(self, value: str) -> bool:
         stripped = value.strip()
         return stripped.startswith("[") and stripped.endswith("]")
-

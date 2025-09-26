@@ -218,7 +218,7 @@ def _disable_rxnorm(monkeypatch):
     yield
 
 
- # -----------------------------------------------------------------------------
+# -----------------------------------------------------------------------------
 @pytest.fixture(autouse=True)
 def _patch_serializer(monkeypatch):
     records = [
@@ -440,9 +440,12 @@ def test_matcher_prefers_single_ingredient_over_combo(monkeypatch):
     assert matches[0].nbk_id in {"NBK400", "NBK401"}
     assert matches[0].reason == "direct_match"
 
+
 # -----------------------------------------------------------------------------
 def test_essay_returns_mapping():
-    drugs = PatientDrugs(entries=[DrugEntry(name="Acetaminophen"), DrugEntry(name="Unknown")])
+    drugs = PatientDrugs(
+        entries=[DrugEntry(name="Acetaminophen"), DrugEntry(name="Unknown")]
+    )
     essay = DrugToxicityEssay(drugs)
     result = asyncio.run(essay.run_analysis())
     assert result is not None

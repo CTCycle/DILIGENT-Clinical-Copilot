@@ -132,7 +132,7 @@ class OllamaClient:
         payload = resp.json()
         return [m["name"] for m in payload.get("models", []) if "name" in m]
 
-# -----------------------------------------------------------------------------
+    # -----------------------------------------------------------------------------
     @staticmethod
     def _messages_to_prompt(messages: list[dict[str, str]]) -> str:
         role_map = {
@@ -277,7 +277,9 @@ class OllamaClient:
             cleaned = value.strip()
             if not cleaned:
                 return 0
-            match = re.match(r"(?P<num>\d+(?:\.\d+)?)\s*(?P<unit>[kKmMgGtTpP]?i?[bB])?", cleaned)
+            match = re.match(
+                r"(?P<num>\d+(?:\.\d+)?)\s*(?P<unit>[kKmMgGtTpP]?i?[bB])?", cleaned
+            )
             if not match:
                 return 0
             number = float(match.group("num"))
@@ -303,6 +305,7 @@ class OllamaClient:
     @staticmethod
     def _get_available_memory_bytes() -> int:
         if sys.platform == "win32":
+
             class MemoryStatus(ctypes.Structure):
                 _fields_ = [
                     ("dwLength", ctypes.c_ulong),
@@ -572,7 +575,7 @@ class OllamaClient:
             ):
                 yield evt
 
-# -----------------------------------------------------------------------------
+    # -----------------------------------------------------------------------------
     async def _chat_via_generate(
         self,
         *,
@@ -613,7 +616,7 @@ class OllamaClient:
                 return content
         return str(content)
 
-# -----------------------------------------------------------------------------
+    # -----------------------------------------------------------------------------
     async def _chat_stream_via_generate(
         self,
         *,
@@ -651,9 +654,7 @@ class OllamaClient:
             raise OllamaTimeout("Timed out during streamed generate response") from e
 
     # -------------------------------------------------------------------------
-    async def _collect_structured_fallbacks(
-        self, preferred: list[str]
-    ) -> list[str]:
+    async def _collect_structured_fallbacks(self, preferred: list[str]) -> list[str]:
         available: set[str] = set()
         try:
             available = set(await self.list_models())
@@ -664,7 +665,11 @@ class OllamaClient:
         fallbacks: list[str] = []
         if available:
             for name in PARSING_MODEL_CHOICES:
-                if name in available and name not in preferred and name not in fallbacks:
+                if (
+                    name in available
+                    and name not in preferred
+                    and name not in fallbacks
+                ):
                     fallbacks.append(name)
         else:
             for name in PARSING_MODEL_CHOICES:
@@ -764,9 +769,7 @@ class OllamaClient:
                             "Structured parse failed after retries. Last text: %s",
                             text,
                         )
-                        raise RuntimeError(
-                            f"Structured parsing failed: {err}"
-                        ) from err
+                        raise RuntimeError(f"Structured parsing failed: {err}") from err
 
                     repair_messages = [
                         {"role": "system", "content": system_prompt.strip()},

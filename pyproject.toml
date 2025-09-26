@@ -11,6 +11,7 @@ dependencies = [
     "fastapi==0.117.1",
     "gradio==5.47.0",   
     "transformers==4.56.2",
+    "torch==2.8.0+cu128",  
     "numpy==2.3.2",     
     "pandas==2.2.3",
     "tqdm==4.67.1",
@@ -25,3 +26,13 @@ dependencies = [
 
 [tool.hatch.build.targets.wheel]
 packages = ["pharmagent"] 
+
+[[tool.uv.index]]
+name = "pytorch-cu128"
+url = "https://download.pytorch.org/whl/cu128"
+explicit = true 
+
+[tool.uv.sources]
+torch = { index = "pytorch-cu128" }
+# torchvision = { index = "pytorch-cu128" }
+# torchaudio  = { index = "pytorch-cu128" }
