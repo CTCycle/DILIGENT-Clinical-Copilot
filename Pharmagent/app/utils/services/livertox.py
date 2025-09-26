@@ -1,6 +1,8 @@
 from __future__ import annotations
 
 import asyncio
+import html
+import io
 import os
 import re
 import tarfile
@@ -8,33 +10,14 @@ import time
 import unicodedata
 from dataclasses import dataclass
 from datetime import UTC, datetime
-from typing import Any
-
-import html
-import io
-import os
-import re
-import tarfile
-import unicodedata
+from tempfile import TemporaryDirectory
 from typing import Any
 
 import httpx
 import pandas as pd
-from tqdm import tqdm
-
 from pdfminer.high_level import extract_text as pdfminer_extract_text
 from pypdf import PdfReader
-
-
-from Pharmagent.app.constants import (
-    LIVERTOX_ARCHIVE,
-    LIVERTOX_BASE_URL,
-    SOURCES_PATH,
-)
-
-
-
-import pandas as pd
+from tqdm import tqdm
 
 from Pharmagent.app.api.models.prompts import (
     LIVERTOX_MATCH_LIST_USER_PROMPT,
@@ -46,10 +29,12 @@ from Pharmagent.app.configurations import ClientRuntimeConfig
 from Pharmagent.app.constants import (
     DEFAULT_LLM_TIMEOUT_SECONDS,
     LIVERTOX_ARCHIVE,
+    LIVERTOX_BASE_URL,
     LIVERTOX_LLM_TIMEOUT_SECONDS,
     LIVERTOX_SKIP_DETERMINISTIC_RATIO,
     LIVERTOX_YIELD_INTERVAL,
     LLM_NULL_MATCH_NAMES,
+    SOURCES_PATH,
 )
 from Pharmagent.app.logger import logger
 from Pharmagent.app.utils.database.sqlite import database
@@ -178,14 +163,6 @@ class LiverToxUpdater:
             ".nxml",
             ".pdf",
         )
-        self.image_extensions = (
-            ".png",
-            ".jpg",
-            ".jpeg",
-            ".gif",
-            ".bmp",
-            ".tiff",
-        )
         self.extension_priority = {
             ".nxml": 0,
             ".xml": 1,
@@ -254,19 +231,6 @@ class LiverToxUpdater:
 
         return pd.concat(records, ignore_index=True)    
 
-    # -----------------------------------------------------------------------------
-    def _read_member_payload(
-        self, archive: tarfile.TarFile, member: tarfile.TarInfo
-    ) -> tuple[str, str | None] | None:
-        extracted = archive.extractfile(member)
-        if extracted is None:
-            return None
-        data = extracted.read()
-        if not data:
-            return None
-        return self._convert_member_bytes(member.name, data)
-
-    # -----------------------------------------------------------------------------
     def _convert_member_bytes(
         self, member_name: str, data: bytes
     ) -> tuple[str, str | None] | None:
@@ -376,16 +340,17 @@ class LiverToxUpdater:
 
     # -----------------------------------------------------------------------------
     def run(self) -> dict[str, Any]:
-        logger.info("Starting LiverTox update")       
+        logger.info("Starting LiverTox update")
         archive_path = os.path.join(self.sources_path, LIVERTOX_ARCHIVE)
 
+        download_info: dict[str, Any] = {}
         if self.redownload:
             logger.info("Redownload flag enabled; fetching latest LiverTox archive")
-            download_info = self.download_archive()            
+            download_info = self.download_archive()
         else:
             logger.info("Using existing LiverTox archive")
 
-        download_info = self.collect_local_archive_info(archive_path)
+        local_info = self.collect_local_archive_info(archive_path)
         logger.info("Extracting LiverTox monographs from %s", archive_path)
         extracted = self.collect_monographs(archive_path)
         logger.info("Sanitizing %d extracted entries", len(extracted))
@@ -395,8 +360,7 @@ class LiverToxUpdater:
         logger.info("Persisting enriched records to database")
         self.serializer.save_livertox_records(enriched)
              
-        payload = dict(download_info)
-        payload["file_path"] = archive_path
+        payload = {**download_info, **local_info}
         payload["processed_entries"] = len(enriched)
         payload["records"] = len(enriched)
         logger.info("LiverTox update completed successfully")
@@ -415,25 +379,8 @@ class LiverToxUpdater:
 
     # -------------------------------------------------------------------------
     def download_archive(self) -> dict[str, Any]:
-        try:
-            return asyncio.run(self.download_bulk_data(self.sources_path))
-        except Exception as exc:  # noqa: BLE001
-            raise RuntimeError(f"Failed to download LiverTox archive: {exc}") from exc
-        
-    # -----------------------------------------------------------------------------
-    def _should_process_member(self, member: tarfile.TarInfo) -> bool:
-        if not member.isfile():
-            return False
-        if member.size == 0:
-            return False
-        lower_name = member.name.lower()
-        if lower_name.endswith(self.image_extensions):
-            return False
-        _, ext = os.path.splitext(lower_name)
-        if ext not in self.supported_extensions:
-            return False
-        return True
-        
+        return asyncio.run(self.download_bulk_data(self.sources_path))
+
     # -----------------------------------------------------------------------------
     def collect_monographs(
         self, archive_path: str | None = None
@@ -447,22 +394,48 @@ class LiverToxUpdater:
 
         collected: dict[str, dict[str, str]] = {}
         priorities: dict[str, int] = {}
-        with tarfile.open(normalized_path, "r:gz") as archive:
-            for member in tqdm(archive.getmembers(), desc="Extracting LiverTox files"):
-                if not self._should_process_member(member):
-                    continue
-                payload = self._read_member_payload(archive, member)
+        with TemporaryDirectory() as temp_dir:
+            with tarfile.open(normalized_path, "r:gz") as archive:
+                members = archive.getmembers()
+                base_dir = os.path.abspath(temp_dir)
+                safe_members: list[tarfile.TarInfo] = []
+                for member in members:
+                    member_path = os.path.abspath(os.path.join(base_dir, member.name))
+                    if os.path.commonpath([base_dir, member_path]) != base_dir:
+                        logger.warning("Skipping unsafe archive member: %s", member.name)
+                        continue
+                    safe_members.append(member)
+                archive.extractall(base_dir, members=safe_members)
+                file_entries = {
+                    os.path.abspath(os.path.join(base_dir, member.name)): member.name
+                    for member in safe_members
+                    if member.isfile()
+                }
+
+            allowed_entries = [
+                (path, original)
+                for path, original in file_entries.items()
+                if os.path.splitext(original.lower())[1] in self.supported_extensions
+            ]
+
+            for file_path, member_name in tqdm(
+                allowed_entries,
+                desc="Processing LiverTox files",
+            ):
+                with open(file_path, "rb") as handle:
+                    data = handle.read()
+                payload = self._convert_member_bytes(member_name, data)
                 if payload is None:
                     continue
                 plain_text, markup_text = payload
                 if not plain_text:
                     continue
-                nbk_id = self._extract_nbk(member.name, markup_text or plain_text)
-                record_key = nbk_id or self._derive_identifier(member.name)
+                nbk_id = self._extract_nbk(member_name, markup_text or plain_text)
+                record_key = nbk_id or self._derive_identifier(member_name)
                 if not record_key:
                     continue
                 priority = self.extension_priority.get(
-                    os.path.splitext(member.name.lower())[1],
+                    os.path.splitext(member_name.lower())[1],
                     len(self.extension_priority) + 1,
                 )
                 existing_priority = priorities.get(record_key)
@@ -485,8 +458,8 @@ class LiverToxUpdater:
                     "excerpt": cleaned_text,
                     "text": cleaned_text,
                 }
-                collected[drug_name] = record
-                priorities[drug_name] = priority
+                collected[record_key] = record
+                priorities[record_key] = priority
 
         return list(collected.values())
 
