@@ -11,7 +11,8 @@ from Pharmagent.app.api.schemas.clinical import (
 )
 from Pharmagent.app.logger import logger
 from Pharmagent.app.utils.serializer import DataSerializer
-from Pharmagent.app.utils.services.livertox import LiverToxMatcher
+from Pharmagent.app.utils.services.livertox import LiverToxMatcher, LiverToxMatch
+from Pharmagent.app.utils.services.retrieval import RxNavClient
 
 
 ###############################################################################
@@ -80,43 +81,79 @@ class DrugToxicityEssay:
         self.llm_client = initialize_llm_client(purpose="agent", timeout_s=timeout_s)
         self.livertox_df = None
         self.matcher: LiverToxMatcher | None = None
+        self.rxnav_client = RxNavClient()
 
     # -------------------------------------------------------------------------
-    async def run_analysis(self) -> list[dict[str, Any]]:
-        patient_drugs = [entry.name for entry in self.drugs.entries if entry.name]
+    async def run_analysis(self) -> list[dict[str, Any]] | None:
+        logger.info("Toxicity analysis stage 1/4: validating inputs")
+        patient_drugs = self._collect_patient_drugs()
         if not patient_drugs:
-            return []
-        self._ensure_livertox_loaded()
-        if self.matcher is None:
-            return self._empty_result(patient_drugs)
-        matches = await self.matcher.match_drug_names(patient_drugs)
-        return self.matcher.build_patient_mapping(patient_drugs, matches)
+            logger.info("No drugs detected for toxicity analysis")
+            return None
+        if not self._ensure_livertox_loaded():
+            return None
+
+        logger.info("Toxicity analysis stage 2/4: expanding drug information via RxNav")
+        candidate_maps = self._expand_drug_information(patient_drugs)
+
+        logger.info("Toxicity analysis stage 3/4: matching drugs to LiverTox records")
+        matches = await self._match_livertox_entries(patient_drugs, candidate_maps)
+
+        logger.info("Toxicity analysis stage 4/4: compiling matched LiverTox excerpts")
+        return self._resolve_matches(patient_drugs, matches)
 
     # -------------------------------------------------------------------------
-    def _ensure_livertox_loaded(self) -> None:
+    def _ensure_livertox_loaded(self) -> bool:
         if self.matcher is not None:
-            return
+            return True
         try:
             dataset = self.serializer.get_livertox_records()
         except Exception as exc:  # noqa: BLE001
             logger.error("Failed loading LiverTox monographs from database: %s", exc)
             self.matcher = None
-            return
+            return False
         if dataset is None or dataset.empty:
             logger.warning("LiverTox monograph table is empty; toxicity essay cannot run")
             self.matcher = None
-            return
+            return False
         self.livertox_df = dataset
         self.matcher = LiverToxMatcher(dataset, llm_client=self.llm_client)
+        return True
 
     # -------------------------------------------------------------------------
-    def _empty_result(self, patient_drugs: list[str]) -> list[dict[str, Any]]:
-        return [
-            {
-                "drug_name": name,
-                "matched_livertox_row": None,
-                "extracted_excerpts": [],
-            }
-            for name in patient_drugs
-        ]
+    def _collect_patient_drugs(self) -> list[str]:
+        return [entry.name for entry in self.drugs.entries if entry.name]
+
+    # -------------------------------------------------------------------------
+    def _expand_drug_information(self, patient_drugs: list[str]) -> list[dict[str, str]]:
+        expansions: list[dict[str, str]] = []
+        for name in patient_drugs:
+            if not name:
+                expansions.append({})
+                continue
+            expansions.append(dict(self.rxnav_client.expand(name)))
+        return expansions
+
+    # -------------------------------------------------------------------------
+    async def _match_livertox_entries(
+        self,
+        patient_drugs: list[str],
+        candidate_maps: list[dict[str, str]],
+    ) -> list[LiverToxMatch | None]:
+        if self.matcher is None:
+            return []
+        return await self.matcher.match_drug_names(
+            patient_drugs,
+            candidate_maps=candidate_maps,
+        )
+
+    # -------------------------------------------------------------------------
+    def _resolve_matches(
+        self,
+        patient_drugs: list[str],
+        matches: list[LiverToxMatch | None],
+    ) -> list[dict[str, Any]]:
+        if self.matcher is None:
+            return []
+        return self.matcher.build_patient_mapping(patient_drugs, matches)
 
