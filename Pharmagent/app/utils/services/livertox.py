@@ -115,9 +115,7 @@ class LiverToxMatcher:
         eligible_total = 0
 
         # Step 2: attempt cache hits and deterministic matches before any LLM call.
-        for idx, normalized in enumerate(normalized_queries):
-            if idx and idx % self.YIELD_INTERVAL == 0:
-                await asyncio.sleep(0)
+        for idx, normalized in enumerate(normalized_queries):            
             if not normalized:
                 unresolved_indices.append(idx)
                 continue
