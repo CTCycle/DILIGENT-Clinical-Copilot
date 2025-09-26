@@ -32,6 +32,8 @@ class ClientRuntimeConfig:
     llm_provider: str = DEFAULT_CLOUD_PROVIDER
     cloud_model: str = DEFAULT_CLOUD_MODEL
     use_cloud_services: bool = False
+    ollama_temperature: float = 0.7
+    ollama_reasoning: bool = False
 
     # ---------------------------------------------------------------------
     @classmethod
@@ -83,6 +85,23 @@ class ClientRuntimeConfig:
 
     # ---------------------------------------------------------------------
     @classmethod
+    def set_ollama_temperature(cls, value: float | None) -> float:
+        try:
+            parsed = float(value) if value is not None else cls.ollama_temperature
+        except (TypeError, ValueError):
+            parsed = cls.ollama_temperature
+        parsed = max(0.0, min(2.0, parsed))
+        cls.ollama_temperature = round(parsed, 2)
+        return cls.ollama_temperature
+
+    # ---------------------------------------------------------------------
+    @classmethod
+    def set_ollama_reasoning(cls, enabled: bool) -> bool:
+        cls.ollama_reasoning = bool(enabled)
+        return cls.ollama_reasoning
+
+    # ---------------------------------------------------------------------
+    @classmethod
     def get_parsing_model(cls) -> str:
         return cls.parsing_model
 
@@ -108,9 +127,21 @@ class ClientRuntimeConfig:
 
     # ---------------------------------------------------------------------
     @classmethod
+    def get_ollama_temperature(cls) -> float:
+        return cls.ollama_temperature
+
+    # ---------------------------------------------------------------------
+    @classmethod
+    def is_ollama_reasoning_enabled(cls) -> bool:
+        return cls.ollama_reasoning
+
+    # ---------------------------------------------------------------------
+    @classmethod
     def reset_defaults(cls) -> None:
         cls.parsing_model = DEFAULT_PARSING_MODEL
         cls.agent_model = DEFAULT_AGENT_MODEL
         cls.llm_provider = DEFAULT_CLOUD_PROVIDER
         cls.cloud_model = DEFAULT_CLOUD_MODEL
         cls.use_cloud_services = False
+        cls.ollama_temperature = 0.7
+        cls.ollama_reasoning = False
