@@ -13,6 +13,7 @@ from Pharmagent.app.logger import logger
 from Pharmagent.app.utils.serializer import DataSerializer
 from Pharmagent.app.utils.services.livertox import LiverToxMatcher, LiverToxMatch
 from Pharmagent.app.utils.services.retrieval import RxNavClient
+from Pharmagent.app.constants import DEFAULT_LLM_TIMEOUT_SECONDS
 
 
 ###############################################################################
@@ -74,11 +75,11 @@ class HepatotoxicityPatternAnalyzer:
 class DrugToxicityEssay:
 
     # -------------------------------------------------------------------------
-    def __init__(self, drugs: PatientDrugs, *, timeout_s: float = 300.0) -> None:
+    def __init__(self, drugs: PatientDrugs, *, timeout_s: float = DEFAULT_LLM_TIMEOUT_SECONDS) -> None:
         self.drugs = drugs
         self.timeout_s = timeout_s
         self.serializer = DataSerializer()
-        self.llm_client = initialize_llm_client(purpose="agent", timeout_s=timeout_s)
+        self.llm_client = initialize_llm_client(purpose="parser", timeout_s=timeout_s)
         self.livertox_df = None
         self.matcher: LiverToxMatcher | None = None
         self.rxnav_client = RxNavClient()
