@@ -104,6 +104,12 @@ class PharmagentDatabase:
         finally:
             session.close()
 
+    # -----------------------------------------------------------------------------
+    def load_from_database(self, table_name: str) -> pd.DataFrame:
+        query = f'SELECT * FROM "{table_name}"'
+        with database.engine.connect() as connection:
+            return pd.read_sql_query(query, connection)
+
     # -------------------------------------------------------------------------
     def save_into_database(self, df: pd.DataFrame, table_name: str) -> None:
         with self.engine.begin() as conn:

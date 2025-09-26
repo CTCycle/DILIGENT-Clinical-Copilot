@@ -73,14 +73,8 @@ class DataSerializer:
             return False
         if not re.fullmatch(r"[A-Za-z0-9\s\-/(),'+\.]+", normalized):
             return False
-        return True
-
-    # -----------------------------------------------------------------------------
-    def load_from_database(self, table_name: str) -> pd.DataFrame:
-        query = f'SELECT * FROM "{table_name}"'
-        with database.engine.connect() as connection:
-            return pd.read_sql_query(query, connection)
+        return True    
 
     # -----------------------------------------------------------------------------
     def get_livertox_records(self) -> pd.DataFrame:
-        return self.load_from_database("LIVERTOX_MONOGRAPHS")
+        return database.load_from_database("LIVERTOX_MONOGRAPHS")
