@@ -7,7 +7,6 @@ from typing import Any
 from fastapi import APIRouter, Body, HTTPException, status
 from pydantic import ValidationError
 
-from Pharmagent.app.utils.serializer import DataSerializer
 from Pharmagent.app.utils.services.clinical import (
     DrugToxicityEssay,
     HepatotoxicityPatternAnalyzer,
@@ -25,7 +24,6 @@ from Pharmagent.app.api.schemas.clinical import (
 from Pharmagent.app.constants import TASKS_PATH, TRANSLATION_CONFIDENCE_THRESHOLD
 from Pharmagent.app.logger import logger
 
-serializer = DataSerializer()
 translation_service = TranslationService()
 drugs_parser = DrugsParser()
 diseases_parser = DiseasesParser()
@@ -87,29 +85,15 @@ async def process_single_patient(
         len(diseases["hepatic_diseases"]),
     )
 
-    patient_info: dict[str, Any] = {
-        "name": payload.name or "Unknown",
-        "anamnesis": payload.anamnesis,
-        "alt": payload.alt,
-        "alt_max": payload.alt_max,
-        "alp": payload.alp,
-        "alp_max": payload.alp_max,
-        "additional_tests": None,
-        "drugs": drug_data.model_dump(),
-        "symptoms": ", ".join(payload.symptoms),
-        "diseases": diseases,
-        "hepatotoxicity_pattern": pattern_score.model_dump(),
-        "drug_toxicity_assessment": drug_assessment,
+    result: dict[str, Any] = {
+        "status": "success",
+        "code": "DISEASES_EXTRACTION_COMPLETE",
     }
 
-    if payload.exams:
-        patient_info["additional_tests"] = payload.exams
-
     if translation_stats:
-        patient_info["translation"] = translation_stats
+        result["translation"] = translation_stats
 
-    serializer.save_patients_info(patient_info)
-    return patient_info
+    return result
 
 
 # -----------------------------------------------------------------------------
