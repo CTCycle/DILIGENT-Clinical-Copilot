@@ -271,6 +271,16 @@ class _StubSerializer:
 
 
 ###############################################################################
+class _StubRxNavClient:
+    def __init__(self) -> None:
+        self.queries: list[str] = []
+
+    def fetch_drug_terms(self, raw_name: str) -> tuple[list[str], list[str]]:
+        self.queries.append(raw_name)
+        return [f"{raw_name} name"], [f"{raw_name} synonym"]
+
+
+###############################################################################
 class _StubDatabase:
     def __init__(self, expected_count: int) -> None:
         self.expected_count = expected_count
@@ -312,6 +322,7 @@ def test_fetch_bulk_livertox_skip_download(monkeypatch, tmp_path) -> None:
 
     monkeypatch.setattr(module, "LT_client", client)
     monkeypatch.setattr(module, "serializer", serializer)
+    monkeypatch.setattr(module, "rx_client", _StubRxNavClient())
     monkeypatch.setattr(module, "database", database)
     monkeypatch.setattr(module, "SOURCES_PATH", str(tmp_path))
     monkeypatch.setattr(module, "job_manager", JobManager())
@@ -346,6 +357,7 @@ def test_fetch_bulk_livertox_triggers_download(monkeypatch, tmp_path) -> None:
 
     monkeypatch.setattr(module, "LT_client", client)
     monkeypatch.setattr(module, "serializer", serializer)
+    monkeypatch.setattr(module, "rx_client", _StubRxNavClient())
     monkeypatch.setattr(module, "database", database)
     monkeypatch.setattr(module, "SOURCES_PATH", str(tmp_path))
     monkeypatch.setattr(module, "job_manager", JobManager())
@@ -377,6 +389,7 @@ def test_fetch_bulk_livertox_skip_without_archive(monkeypatch, tmp_path) -> None
 
     monkeypatch.setattr(module, "LT_client", client)
     monkeypatch.setattr(module, "serializer", serializer)
+    monkeypatch.setattr(module, "rx_client", _StubRxNavClient())
     monkeypatch.setattr(module, "database", database)
     monkeypatch.setattr(module, "SOURCES_PATH", str(tmp_path))
     monkeypatch.setattr(module, "job_manager", JobManager())
