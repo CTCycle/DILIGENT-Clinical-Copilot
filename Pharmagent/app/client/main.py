@@ -110,16 +110,17 @@ def create_interface() -> gr.Blocks:
                 )
                 with gr.Column():
                     run_button = gr.Button("Run Workflow", variant="primary")
-                    skip_download_checkbox = gr.Checkbox(
-                        label="Skip clinical data download",
-                        value=False,
-                    )
-                    get_clinical_data_button = gr.Button(
-                        "Get Clinical Data",
-                        variant="secondary",
-                    )
                     clear_button = gr.Button("Clear all")
-                    ollama_status = gr.Markdown(value="", visible=True)
+                with gr.Accordion("Livertox Data", open=False):
+                    with gr.Column():
+                        skip_download_checkbox = gr.Checkbox(
+                            label="Skip clinical data download",
+                            value=False,
+                        )
+                        get_livertox_data_button = gr.Button(
+                            "Get Livertox Data",
+                            variant="secondary",
+                        )
                 with gr.Accordion("Runtime Configuration", open=False):
                     with gr.Column():
                         with gr.Row():
@@ -166,7 +167,6 @@ def create_interface() -> gr.Blocks:
                                     variant="secondary",
                                     interactive=not ClientRuntimeConfig.is_cloud_enabled(),
                                 )
-                            pull_status = gr.Markdown(value="", visible=True)
 
         output = gr.Textbox(
             label="Agent Output",
@@ -209,7 +209,7 @@ def create_interface() -> gr.Blocks:
         pull_models_button.click(
             fn=pull_selected_models,
             inputs=[parsing_model_dropdown, agent_model_dropdown],
-            outputs=pull_status,
+            outputs=output,
         )
 
         run_button.click(
@@ -232,17 +232,17 @@ def create_interface() -> gr.Blocks:
         )
         start_ollama_button.click(
             fn=start_ollama_client,
-            outputs=ollama_status,
+            outputs=output,
         )
         preload_button.click(
             fn=preload_selected_models,
             inputs=[parsing_model_dropdown, agent_model_dropdown],
-            outputs=ollama_status,
+            outputs=output,
         )
-        get_clinical_data_button.click(
+        get_livertox_data_button.click(
             fn=fetch_clinical_data,
             inputs=skip_download_checkbox,
-            outputs=ollama_status,
+            outputs=output,
         )
         clear_button.click(
             fn=clear_agent_fields,
@@ -261,7 +261,6 @@ def create_interface() -> gr.Blocks:
                 skip_download_checkbox,
                 has_diseases,
                 output,
-                ollama_status,
             ],
         )
 
