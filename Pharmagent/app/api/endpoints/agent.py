@@ -33,6 +33,44 @@ MAX_TRANSLATION_ATTEMPTS = 5
 router = APIRouter(tags=["agent"])
 
 
+# -----------------------------------------------------------------------------
+def _format_drug_assessment(
+    detected_count: int,
+    assessment: list[dict[str, Any]] | None,
+) -> dict[str, Any]:
+    entries: list[dict[str, Any]] = []
+    matched_count = 0
+    if assessment:
+        for item in assessment:
+            if not isinstance(item, dict):
+                continue
+            raw_match = item.get("matched_livertox_row")
+            match_details = raw_match if isinstance(raw_match, dict) else {}
+            match_found = bool(match_details)
+            if match_found:
+                matched_count += 1
+            entries.append(
+                {
+                    "drug_name": item.get("drug_name"),
+                    "match": {
+                        "found": match_found,
+                        "nbk_id": match_details.get("nbk_id") if match_found else None,
+                        "livertox_name": match_details.get("drug_name")
+                        if match_found
+                        else None,
+                    },
+                    "excerpts": item.get("extracted_excerpts") or [],
+                }
+            )
+    return {
+        "summary": {
+            "detected_drugs": detected_count,
+            "matched_monographs": matched_count,
+        },
+        "entries": entries,
+    }
+
+
 # [ENPOINTS]
 ###############################################################################
 async def process_single_patient(
@@ -91,6 +129,16 @@ async def process_single_patient(
     result: dict[str, Any] = {
         "status": "success",
         "code": "DISEASES_EXTRACTION_COMPLETE",
+        "analysis": {
+            "diseases": {
+                "all": diseases.get("diseases", []),
+                "hepatic": diseases.get("hepatic_diseases", []),
+            },
+            "drug_assessment": _format_drug_assessment(
+                len(drug_data.entries),
+                drug_assessment,
+            ),
+        },
     }
 
     if translation_stats:
