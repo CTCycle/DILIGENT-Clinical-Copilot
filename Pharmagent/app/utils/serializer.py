@@ -64,7 +64,9 @@ class DataSerializer:
         for column in ("additional_names", "synonyms"):
             df[column] = df[column].apply(
                 lambda value: (
-                    str(value).strip() if pd.notna(value) and str(value).strip() else None
+                    str(value).strip()
+                    if pd.notna(value) and str(value).strip()
+                    else None
                 )
             )
         df = df.drop_duplicates(subset=["nbk_id", "drug_name"], keep="first")

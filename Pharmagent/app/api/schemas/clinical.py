@@ -130,7 +130,6 @@ class PatientData(BaseModel):
             markers["ALP"] = entry
         return markers
 
-    
     def compose_structured_text(self) -> str | None:
         sections: list[str] = []
         if self.anamnesis:

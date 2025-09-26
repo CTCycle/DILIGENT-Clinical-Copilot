@@ -70,7 +70,9 @@ def toggle_cloud_services(
     models = CLOUD_MODEL_CHOICES.get(provider, [])
     selected_model = ClientRuntimeConfig.get_cloud_model()
     if selected_model not in models:
-        selected_model = ClientRuntimeConfig.set_cloud_model(models[0] if models else "")
+        selected_model = ClientRuntimeConfig.set_cloud_model(
+            models[0] if models else ""
+        )
     model_update = gr_update(
         value=selected_model,
         choices=models,
@@ -220,9 +222,7 @@ async def fetch_clinical_data(skip_download: bool) -> str:
             f"\nURL: {url}\nResponse body:\n{body}"
         )
     except httpx.TimeoutException:
-        return (
-            f"[ERROR] Request timed out after {LLM_REQUEST_TIMEOUT_DISPLAY} seconds."
-        )
+        return f"[ERROR] Request timed out after {LLM_REQUEST_TIMEOUT_DISPLAY} seconds."
     except Exception as exc:  # noqa: BLE001
         return f"[ERROR] Unexpected error: {exc}"
 
@@ -239,7 +239,10 @@ async def fetch_clinical_data(skip_download: bool) -> str:
     stored_records = payload.get("records")
 
     if not isinstance(file_path, str) or not file_path:
-        return "[ERROR] Backend response did not include a valid file path." + progress_suffix
+        return (
+            "[ERROR] Backend response did not include a valid file path."
+            + progress_suffix
+        )
 
     absolute_file_path = os.path.abspath(file_path)
     sources_dir = os.path.abspath(SOURCES_PATH)
@@ -260,7 +263,11 @@ async def fetch_clinical_data(skip_download: bool) -> str:
     if actual_size <= 0:
         return "[ERROR] Downloaded file is empty." + progress_suffix
 
-    if isinstance(reported_size, int) and reported_size > 0 and actual_size < reported_size:
+    if (
+        isinstance(reported_size, int)
+        and reported_size > 0
+        and actual_size < reported_size
+    ):
         return (
             "[ERROR] Downloaded file size is smaller than expected; download may be incomplete."
             + progress_suffix
@@ -275,11 +282,12 @@ async def fetch_clinical_data(skip_download: bool) -> str:
         return f"[ERROR] Downloaded file appears corrupted: {exc}" + progress_suffix
 
     if not isinstance(stored_records, int) or stored_records <= 0:
-        return "[ERROR] Backend did not report stored LiverTox records." + progress_suffix
+        return (
+            "[ERROR] Backend did not report stored LiverTox records." + progress_suffix
+        )
 
     message = (
-        "[INFO] Clinical data downloaded successfully."
-        f"\nSize: {actual_size} bytes"
+        f"[INFO] Clinical data downloaded successfully.\nSize: {actual_size} bytes"
     )
 
     if isinstance(last_modified, str) and last_modified:
@@ -340,10 +348,7 @@ def clear_agent_fields() -> tuple[
 async def _trigger_agent(url: str, payload: dict[str, Any] | None = None) -> str:
     try:
         async with httpx.AsyncClient(timeout=LLM_REQUEST_TIMEOUT_SECONDS) as client:
-            resp = await client.post(
-                url,
-                json=payload
-            )
+            resp = await client.post(url, json=payload)
             resp.raise_for_status()
             try:
                 return _extract_text(resp.json())
@@ -360,9 +365,7 @@ async def _trigger_agent(url: str, payload: dict[str, Any] | None = None) -> str
             f"\nURL: {url}\nResponse body:\n{body}"
         )
     except httpx.TimeoutException:
-        return (
-            f"[ERROR] Request timed out after {LLM_REQUEST_TIMEOUT_DISPLAY} seconds."
-        )
+        return f"[ERROR] Request timed out after {LLM_REQUEST_TIMEOUT_DISPLAY} seconds."
     except Exception as exc:  # noqa: BLE001
         return f"[ERROR] Unexpected error: {exc}"
 

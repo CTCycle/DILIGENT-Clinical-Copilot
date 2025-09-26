@@ -209,15 +209,14 @@ class TranslationService:
                 certainty_threshold=certainty_threshold,
                 max_attempts=max_attempts,
             )
-            items[name] = {                    
-                    "translation": res["translation"],
-                    "certainty": res["certainty"],
-                    "attempts": res["attempts"],
-                }
-            
+            items[name] = {
+                "translation": res["translation"],
+                "certainty": res["certainty"],
+                "attempts": res["attempts"],
+            }
+
             updates[name] = res["translation"]
-            updated_payload = payload.model_copy(update=updates)           
-            
+            updated_payload = payload.model_copy(update=updates)
 
         avg_certainty = (
             float(sum(items[k]["certainty"] for k in items.keys()) / len(items))

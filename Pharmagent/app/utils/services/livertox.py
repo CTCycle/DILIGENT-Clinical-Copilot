@@ -25,6 +25,7 @@ from Pharmagent.app.constants import (
 )
 from Pharmagent.app.logger import logger
 
+
 ###############################################################################
 @dataclass(slots=True)
 class MonographRecord:
@@ -102,7 +103,9 @@ class LiverToxMatcher:
             if normalized_original and normalized_original not in candidate_map:
                 candidate_map.setdefault(normalized_original, "original")
             normalized_queries.append(normalized_original)
-            candidate_matches: list[tuple[tuple[int, float, float], str, LiverToxMatch]] = []
+            candidate_matches: list[
+                tuple[tuple[int, float, float], str, LiverToxMatch]
+            ] = []
             candidate_keys = candidate_map or (
                 {normalized_original: "original"} if normalized_original else {}
             )
@@ -165,7 +168,9 @@ class LiverToxMatcher:
         return results
 
     # -------------------------------------------------------------------------
-    def _candidate_priority(self, match: LiverToxMatch, kind: str) -> tuple[int, float, float]:
+    def _candidate_priority(
+        self, match: LiverToxMatch, kind: str
+    ) -> tuple[int, float, float]:
         reason = match.reason
         confidence = match.confidence
         if reason == "direct_match":
@@ -285,12 +290,8 @@ class LiverToxMatcher:
         reason: str,
         notes: list[str] | None,
     ) -> LiverToxMatch:
-        normalized_confidence = round(
-            min(max(confidence, self.MIN_CONFIDENCE), 1.0), 2
-        )
-        cleaned_notes = list(
-            dict.fromkeys(note for note in (notes or []) if note)
-        )
+        normalized_confidence = round(min(max(confidence, self.MIN_CONFIDENCE), 1.0), 2)
+        cleaned_notes = list(dict.fromkeys(note for note in (notes or []) if note))
         return LiverToxMatch(
             nbk_id=record.nbk_id,
             matched_name=record.drug_name,
@@ -383,10 +384,7 @@ class LiverToxMatcher:
         candidate_block = self.candidate_prompt_block or ""
         if not candidate_block:
             return [None] * total
-        drugs_block = "\n".join(
-            f"- {name}" if name else "-"
-            for name in patient_drugs
-        )
+        drugs_block = "\n".join(f"- {name}" if name else "-" for name in patient_drugs)
         prompt = LIVERTOX_MATCH_LIST_USER_PROMPT.format(
             patient_drugs=drugs_block,
             candidates=candidate_block,
@@ -452,12 +450,12 @@ class LiverToxMatcher:
                 continue
             bucket = normalized_to_items.setdefault(normalized_drug, [])
             bucket.append(item)
-        results: list[tuple[MonographRecord, float, str, list[str]] | None] = [None] * total
+        results: list[tuple[MonographRecord, float, str, list[str]] | None] = [
+            None
+        ] * total
         for idx, original in enumerate(patient_drugs):
             normalized_query = (
-                normalized_queries[idx]
-                if idx < len(normalized_queries)
-                else ""
+                normalized_queries[idx] if idx < len(normalized_queries) else ""
             )
             if not normalized_query:
                 continue
@@ -502,9 +500,7 @@ class LiverToxMatcher:
                 if confidence_raw is not None
                 else self.LLM_DEFAULT_CONFIDENCE
             )
-            notes: list[str] = [
-                f"LLM selected '{match_name}' for '{original}'"
-            ]
+            notes: list[str] = [f"LLM selected '{match_name}' for '{original}'"]
             rationale = (getattr(item, "rationale", "") or "").strip()
             if rationale:
                 notes.append(rationale)
@@ -539,5 +535,5 @@ class LiverToxMatcher:
         normalized = re.sub(r"\s+", " ", normalized).strip()
         return normalized
 
-    # -------------------------------------------------------------------------
+        # -------------------------------------------------------------------------
         return results

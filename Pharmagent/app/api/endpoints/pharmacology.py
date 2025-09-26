@@ -52,17 +52,25 @@ async def _run_livertox_job(
     archive_path = _normalize_archive_path(sources_path)
 
     if skip_download:
-        await job_manager.set_progress(job_id, 0.05, "Validating existing LiverTox archive")
-        download_info = await asyncio.to_thread(_collect_local_archive_info, archive_path)
+        await job_manager.set_progress(
+            job_id, 0.05, "Validating existing LiverTox archive"
+        )
+        download_info = await asyncio.to_thread(
+            _collect_local_archive_info, archive_path
+        )
     else:
-        await job_manager.set_progress(job_id, 0.1, "Downloading latest LiverTox archive")
+        await job_manager.set_progress(
+            job_id, 0.1, "Downloading latest LiverTox archive"
+        )
         try:
             download_info = await LT_client.download_bulk_data(sources_path)
         except Exception as exc:  # noqa: BLE001
             raise HTTPException(status_code=502, detail=f"Bulk download failed: {exc}")
         archive_file = download_info.get("file_path")
         if not isinstance(archive_file, str) or not archive_file:
-            raise HTTPException(status_code=500, detail="LiverTox archive path missing.")
+            raise HTTPException(
+                status_code=500, detail="LiverTox archive path missing."
+            )
         archive_path = os.path.abspath(archive_file)
         download_info["file_path"] = archive_path
 
@@ -118,7 +126,9 @@ async def _run_livertox_job(
 
     await job_manager.set_progress(job_id, 0.75, "Verifying stored LiverTox records")
     try:
-        stored_count = await asyncio.to_thread(database.count_rows, "LIVERTOX_MONOGRAPHS")
+        stored_count = await asyncio.to_thread(
+            database.count_rows, "LIVERTOX_MONOGRAPHS"
+        )
     except Exception as exc:  # noqa: BLE001
         raise HTTPException(status_code=500, detail=f"Failed to verify import: {exc}")
 

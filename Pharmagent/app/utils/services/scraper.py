@@ -121,7 +121,9 @@ class LiverToxClient:
         return pd.concat(records, ignore_index=True)
 
     # -----------------------------------------------------------------------------
-    def collect_monographs(self, archive_path: str | None = None) -> list[dict[str, str]]:
+    def collect_monographs(
+        self, archive_path: str | None = None
+    ) -> list[dict[str, str]]:
         tar_path = archive_path or self.tar_file_path
         normalized_path = os.path.abspath(tar_path)
         if not os.path.isfile(normalized_path):
@@ -157,7 +159,9 @@ class LiverToxClient:
                     if len(current_excerpt) >= len(plain_text):
                         continue
                 record_nbk = nbk_id or record_key
-                drug_name = self._extract_title(markup_text or "", plain_text, record_nbk)
+                drug_name = self._extract_title(
+                    markup_text or "", plain_text, record_nbk
+                )
                 cleaned_text = plain_text.strip()
                 if not drug_name or not cleaned_text:
                     continue
@@ -169,7 +173,7 @@ class LiverToxClient:
                 }
                 collected[drug_name] = record
                 priorities[drug_name] = priority
-                
+
         return list(collected.values())
 
     # -----------------------------------------------------------------------------

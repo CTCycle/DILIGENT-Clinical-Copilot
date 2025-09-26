@@ -18,7 +18,6 @@ from Pharmagent.app.constants import DEFAULT_LLM_TIMEOUT_SECONDS
 
 ###############################################################################
 class HepatotoxicityPatternAnalyzer:
-
     # -------------------------------------------------------------------------
     def analyze(self, payload: PatientData) -> HepatotoxicityPatternScore:
         alt_value = self._parse_marker_value(payload.alt)
@@ -73,9 +72,10 @@ class HepatotoxicityPatternAnalyzer:
 
 ###############################################################################
 class DrugToxicityEssay:
-
     # -------------------------------------------------------------------------
-    def __init__(self, drugs: PatientDrugs, *, timeout_s: float = DEFAULT_LLM_TIMEOUT_SECONDS) -> None:
+    def __init__(
+        self, drugs: PatientDrugs, *, timeout_s: float = DEFAULT_LLM_TIMEOUT_SECONDS
+    ) -> None:
         self.drugs = drugs
         self.timeout_s = timeout_s
         self.serializer = DataSerializer()
@@ -114,7 +114,9 @@ class DrugToxicityEssay:
             self.matcher = None
             return False
         if dataset is None or dataset.empty:
-            logger.warning("LiverTox monograph table is empty; toxicity essay cannot run")
+            logger.warning(
+                "LiverTox monograph table is empty; toxicity essay cannot run"
+            )
             self.matcher = None
             return False
         self.livertox_df = dataset
@@ -126,7 +128,9 @@ class DrugToxicityEssay:
         return [entry.name for entry in self.drugs.entries if entry.name]
 
     # -------------------------------------------------------------------------
-    def _expand_drug_information(self, patient_drugs: list[str]) -> list[dict[str, str]]:
+    def _expand_drug_information(
+        self, patient_drugs: list[str]
+    ) -> list[dict[str, str]]:
         expansions: list[dict[str, str]] = []
         for name in patient_drugs:
             if not name:
@@ -157,4 +161,3 @@ class DrugToxicityEssay:
         if self.matcher is None:
             return []
         return self.matcher.build_patient_mapping(patient_drugs, matches)
-

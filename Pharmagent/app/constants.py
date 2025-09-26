@@ -41,7 +41,7 @@ PARSING_MODEL_CHOICES = [
     "phi3:mini",
     "phi3:medium",
     "phi3.5:mini",
-    "phi3.5:moe",    
+    "phi3.5:moe",
     "llama3.1:8b",
     "llama3.1:70b",
     "mistral-nemo:12b",

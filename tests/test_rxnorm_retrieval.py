@@ -97,10 +97,9 @@ def test_rxnorm_expansion_handles_multi_ingredient(monkeypatch):
 
 # -----------------------------------------------------------------------------
 def test_rxnorm_handles_failures(monkeypatch):
-    request_error = (
-        __import__("Pharmagent.app.utils.services.retrieval", fromlist=["httpx"])
-        .httpx.RequestError
-    )
+    request_error = __import__(
+        "Pharmagent.app.utils.services.retrieval", fromlist=["httpx"]
+    ).httpx.RequestError
 
     def _raise(*args, **kwargs):
         raise request_error("boom")
