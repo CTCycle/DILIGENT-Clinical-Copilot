@@ -26,6 +26,9 @@ from Pharmagent.app.constants import (
 from Pharmagent.app.logger import logger
 
 
+ALIAS_STOPWORDS = {"and", "or", "with", "plus", "the", "of"}
+
+
 ###############################################################################
 @dataclass(slots=True)
 class MonographRecord:
@@ -43,7 +46,6 @@ class LiverToxLookupEntry:
     record: MonographRecord
     primary: str
     aliases: dict[str, str]
-    pool: set[str]
 
 
 ###############################################################################
@@ -104,21 +106,23 @@ class LiverToxMatcher:
         results: list[LiverToxMatch | None] = [None] * total
         if not self.records:
             return results
+
+        # Step 1: normalize input names once and reuse throughout the flow.
+        normalized_queries = [self._normalize_name(name) for name in patient_drugs]
         lookup_entries = livertox_drugs or self.lookup_entries
-        normalized_queries: list[str] = []
-        eligible_total = 0
         unresolved_indices: list[int] = []
         deterministic_matches = 0
-        for idx, original in enumerate(patient_drugs):
+        eligible_total = 0
+
+        # Step 2: attempt cache hits and deterministic matches before any LLM call.
+        for idx, normalized in enumerate(normalized_queries):
             if idx and idx % self.YIELD_INTERVAL == 0:
                 await asyncio.sleep(0)
-            normalized_original = self._normalize_name(original)
-            normalized_queries.append(normalized_original)
-            if not normalized_original:
+            if not normalized:
                 unresolved_indices.append(idx)
                 continue
             eligible_total += 1
-            cached = self.match_cache.get(normalized_original)
+            cached = self.match_cache.get(normalized)
             if cached is not None:
                 results[idx] = cached
                 if cached.reason != "llm_fallback":
@@ -127,31 +131,36 @@ class LiverToxMatcher:
                     unresolved_indices.append(idx)
                 continue
             deterministic = self._deterministic_lookup(
-                normalized_original,
+                normalized,
                 lookup_entries=lookup_entries,
             )
             if deterministic is None:
-                self.match_cache.setdefault(normalized_original, None)
+                self.match_cache.setdefault(normalized, None)
                 unresolved_indices.append(idx)
                 continue
             record, confidence, reason, notes = deterministic
             match = self._create_match(record, confidence, reason, notes)
-            self.match_cache[normalized_original] = match
+            self.match_cache[normalized] = match
             results[idx] = match
             if reason != "llm_fallback":
                 deterministic_matches += 1
             else:
                 unresolved_indices.append(idx)
+
         if not unresolved_indices:
             return results
+
+        # Step 3: fall back to the language model only when deterministic coverage is low.
         deterministic_ratio = deterministic_matches / max(eligible_total, 1)
-        # Skip the LLM if deterministic coverage is high enough for this patient batch.
         if deterministic_ratio >= self.DETERMINISTIC_SKIP_RATIO:
             return results
+
         fallback_matches = await self._llm_batch_match_lookup(
             patient_drugs,
             normalized_queries=normalized_queries,
         )
+
+        # Step 4: merge LLM suggestions back into the response cache.
         for idx in unresolved_indices:
             normalized = normalized_queries[idx]
             if not normalized:
@@ -203,6 +212,7 @@ class LiverToxMatcher:
         lookup_entries: list[LiverToxLookupEntry] = []
         primary_lookup: dict[str, LiverToxLookupEntry] = {}
         alias_lookup: dict[str, tuple[LiverToxLookupEntry, str]] = {}
+        # Step A: flatten aliases coming from the dataset columns.
         for row in self.livertox_df.itertuples(index=False):
             raw_name = str(getattr(row, "drug_name", "") or "").strip()
             if not raw_name:
@@ -238,15 +248,10 @@ class LiverToxMatcher:
             normalized_map.setdefault(normalized_name, record)
             if primary_variant:
                 normalized_map.setdefault(primary_variant, record)
-            entry_pool = {normalized_name}
-            if primary_variant:
-                entry_pool.add(primary_variant)
-            entry_pool.update(alias_map.keys())
             lookup_entry = LiverToxLookupEntry(
                 record=record,
                 primary=normalized_name,
                 aliases=alias_map,
-                pool=entry_pool,
             )
             lookup_entries.append(lookup_entry)
             if normalized_name not in primary_lookup:
@@ -278,7 +283,10 @@ class LiverToxMatcher:
         for column in ("additional_names", "synonyms"):
             value = getattr(row, column, None)
             aliases.update(self._extract_aliases(value))
-        return {alias for alias in aliases if alias}
+        expanded: set[str] = set()
+        for alias in aliases:
+            expanded.update(self._expand_alias(alias))
+        return {alias for alias in expanded if alias}
 
     # -------------------------------------------------------------------------
     def _extract_aliases(self, value: Any) -> set[str]:
@@ -292,6 +300,34 @@ class LiverToxMatcher:
         cleaned = re.sub(r"[\n;|]+", ",", text)
         parts = [part.strip() for part in cleaned.split(",") if part.strip()]
         return set(parts)
+
+    # -------------------------------------------------------------------------
+    def _expand_alias(self, alias: str) -> set[str]:
+        alias = alias.strip()
+        if not alias:
+            return set()
+        variants: set[str] = {alias}
+        normalized = re.sub(r"[\\/]+", ",", alias)
+        normalized = re.sub(r"\bwith\b|\band\b|\bor\b", ",", normalized, flags=re.I)
+        for chunk in normalized.split(","):
+            cleaned = chunk.strip(" -")
+            if cleaned:
+                variants.add(cleaned)
+        tokens = [
+            token.strip()
+            for token in re.split(r"[\s\-+/]+", alias)
+            if token.strip()
+        ]
+        filtered_tokens = [
+            token
+            for token in tokens
+            if token.lower() not in ALIAS_STOPWORDS and len(token) > 2
+        ]
+        variants.update(filtered_tokens)
+        if len(filtered_tokens) > 1:
+            variants.add(" ".join(filtered_tokens))
+            variants.add("".join(filtered_tokens))
+        return variants
 
     # -------------------------------------------------------------------------
     def _ensure_row_index(self) -> dict[str, dict[str, Any]]:
@@ -573,6 +609,7 @@ class LiverToxMatcher:
             .encode("ascii", "ignore")
             .decode("ascii")
         )
+        # Always lowercase before stripping punctuation to keep matching case-insensitive.
         normalized = normalized.lower()
         normalized = re.sub(r"[^a-z0-9\s]", " ", normalized)
         normalized = re.sub(r"\s+", " ", normalized).strip()
