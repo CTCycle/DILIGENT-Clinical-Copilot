@@ -93,8 +93,10 @@ class OllamaClient:
         timeout_s: float = 1_800.0,
         keepalive_connections: int = 10,
         keepalive_max: int = 20,
+        default_model: str | None = None,
     ) -> None:
         self.base_url = (base_url or OLLAMA_HOST_DEFAULT).rstrip("/")
+        self.default_model = (default_model or "").strip() or None
         limits = httpx.Limits(
             max_keepalive_connections=keepalive_connections,
             max_connections=keepalive_max,
@@ -1062,6 +1064,7 @@ def select_llm_provider(
             timeout_s=kwargs.get("timeout_s", 120.0),
             keepalive_connections=kwargs.get("keepalive_connections", 10),
             keepalive_max=kwargs.get("keepalive_max", 20),
+            default_model=kwargs.get("default_model"),
         )
     if p in ("openai", "gemini"):
         return CloudLLMClient(
