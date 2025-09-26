@@ -2,6 +2,15 @@ from __future__ import annotations
 
 from os.path import abspath, join
 
+# [LANGSMITH / TELEMETRY]
+###############################################################################
+LANGSMITH_ENV_KEYS = (
+    "LANGSMITH_API_KEY",
+    "LANGCHAIN_TRACING_V2",
+    "LANGSMITH_TRACE",
+    "PHARMAGENT_LANGSMITH_TRACE",
+)
+
 # [PATHS]
 ###############################################################################
 ROOT_DIR = abspath(join(__file__, "../../.."))
@@ -105,6 +114,19 @@ DEFAULT_CLOUD_MODEL = CLOUD_MODEL_CHOICES[DEFAULT_CLOUD_PROVIDER][0]
 ATC_BASE_URL = "https://atcddd.fhi.no/atc_ddd_index/"
 LIVERTOX_BASE_URL = "https://ftp.ncbi.nlm.nih.gov/pub/litarch/29/31/"
 LIVERTOX_ARCHIVE = "livertox_NBK547852.tar.gz"
+LIVERTOX_LLM_TIMEOUT_SECONDS = 240.0
+LIVERTOX_YIELD_INTERVAL = 25
+LIVERTOX_SKIP_DETERMINISTIC_RATIO = 0.80
+LLM_NULL_MATCH_NAMES = {
+    "",
+    "none",
+    "no match",
+    "no matches",
+    "not found",
+    "unknown",
+    "not applicable",
+    "n a",
+}
 
 
 # [NLP / TRANSLATION]
