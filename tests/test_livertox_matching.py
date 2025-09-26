@@ -173,7 +173,7 @@ from Pharmagent.app.api.schemas.clinical import (
     LiverToxBatchMatchSuggestion,
     PatientDrugs,
 )
-from Pharmagent.app.utils.services.clinical import DrugToxicityEssay
+from Pharmagent.app.utils.services.clinical import LiverToxConsultation
 from Pharmagent.app.utils.services.livertox import LiverToxMatcher
 from Pharmagent.app.utils.services.scraper import LiverToxClient
 from Pharmagent.app.constants import LIVERTOX_ARCHIVE
@@ -424,7 +424,7 @@ def test_essay_returns_mapping():
     drugs = PatientDrugs(
         entries=[DrugEntry(name="Acetaminophen"), DrugEntry(name="Unknown")]
     )
-    essay = DrugToxicityEssay(drugs)
+    essay = LiverToxConsultation(drugs)
     result = asyncio.run(essay.run_analysis())
     assert result is not None
     assert [entry["drug_name"] for entry in result] == ["Acetaminophen", "Unknown"]
@@ -447,7 +447,7 @@ def test_essay_handles_empty_database(monkeypatch):
     )
 
     drugs = PatientDrugs(entries=[DrugEntry(name="Acetaminophen")])
-    essay = DrugToxicityEssay(drugs)
+    essay = LiverToxConsultation(drugs)
     result = asyncio.run(essay.run_analysis())
     assert result is None
 

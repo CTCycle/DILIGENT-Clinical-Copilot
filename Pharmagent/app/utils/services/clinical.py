@@ -70,7 +70,7 @@ class HepatotoxicityPatternAnalyzer:
 
 
 ###############################################################################
-class DrugToxicityEssay:
+class LiverToxConsultation:
     # -------------------------------------------------------------------------
     def __init__(
         self, drugs: PatientDrugs, *, timeout_s: float = DEFAULT_LLM_TIMEOUT_SECONDS

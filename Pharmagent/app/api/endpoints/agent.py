@@ -8,7 +8,7 @@ from fastapi import APIRouter, Body, HTTPException, status
 from pydantic import ValidationError
 
 from Pharmagent.app.utils.services.clinical import (
-    DrugToxicityEssay,
+    LiverToxConsultation,
     HepatotoxicityPatternAnalyzer,
 )
 from Pharmagent.app.utils.services.translation import TranslationService
@@ -56,12 +56,7 @@ async def process_single_patient(
             max_attempts=MAX_TRANSLATION_ATTEMPTS,
         )
 
-    start_time = time.perf_counter()
-    drug_data = drugs_parser.parse_drug_list(updated_payload.drugs or "")
-    elapsed = time.perf_counter() - start_time
-    logger.info("Drugs extraction required %.4f seconds", elapsed)
-    logger.info("Detected %s drugs", len(drug_data.entries))
-
+    # 1. Calculate hepatic pattern score using ALT/ALP values
     pattern_score = pattern_analyzer.analyze(updated_payload)
     logger.info(
         "Patient hepatotoxicity pattern classified as %s (R=%.3f)",
@@ -69,9 +64,17 @@ async def process_single_patient(
         pattern_score.r_score if pattern_score.r_score is not None else float("nan"),
     )
 
+    # 2. Parse drugs names and info from raw text
     start_time = time.perf_counter()
-    toxicity_runner = DrugToxicityEssay(drug_data)
-    drug_assessment = await toxicity_runner.run_analysis()
+    drug_data = drugs_parser.parse_drug_list(updated_payload.drugs or "")
+    elapsed = time.perf_counter() - start_time
+    logger.info("Drugs extraction required %.4f seconds", elapsed)
+    logger.info("Detected %s drugs", len(drug_data.entries))
+    
+    # 3. Consult LiverTox database for hepatotoxicity info
+    start_time = time.perf_counter()
+    livertox_broker = LiverToxConsultation(drug_data)
+    drug_assessment = await livertox_broker.run_analysis()
     elapsed = time.perf_counter() - start_time
     logger.info("Drugs toxicity essay required %.4f seconds", elapsed)
 
