@@ -23,10 +23,6 @@ from Pharmagent.app.constants import (
     LLM_NULL_MATCH_NAMES,
 )
 from Pharmagent.app.logger import logger
-from Pharmagent.app.utils.services.retrieval import (
-    RXNORM_EXPANSION_ENABLED,
-    RxNormRetriever,
-)
 
 ###############################################################################
 @dataclass(slots=True)
@@ -66,7 +62,6 @@ class LiverToxMatcher:
         livertox_df: pd.DataFrame,
         *,
         llm_client: Any | None = None,
-        retriever: RxNormRetriever | None = None,
     ) -> None:
         self.livertox_df = livertox_df
         self.llm_client = llm_client or initialize_llm_client(
@@ -77,12 +72,14 @@ class LiverToxMatcher:
         self.records_by_normalized: dict[str, MonographRecord] = {}
         self.rows_by_nbk: dict[str, dict[str, Any]] = {}
         self.candidate_prompt_block: str | None = None
-        self.rxnorm_retriever = retriever or RxNormRetriever()
         self._build_records()
 
     # -------------------------------------------------------------------------
     async def match_drug_names(
-        self, patient_drugs: list[str]
+        self,
+        patient_drugs: list[str],
+        *,
+        candidate_maps: list[dict[str, str]] | None = None,
     ) -> list[LiverToxMatch | None]:
         total = len(patient_drugs)
         if total == 0:
@@ -90,31 +87,34 @@ class LiverToxMatcher:
         results: list[LiverToxMatch | None] = [None] * total
         if not self.records:
             return results
-        # Expand each query via RxNorm before deterministic matching to broaden coverage.
-        expanded_info = [self._prepare_candidates(name) for name in patient_drugs]
-        normalized_queries = [item[0] for item in expanded_info]
-        expanded_candidates = [item[1] for item in expanded_info]
-        eligible_total = sum(1 for value in normalized_queries if value)
+        normalized_queries: list[str] = []
+        eligible_total = 0
         unresolved_indices: list[int] = []
         deterministic_matches = 0
-        for idx, candidate_map in enumerate(expanded_candidates):
+        for idx, original in enumerate(patient_drugs):
             if idx and idx % self.YIELD_INTERVAL == 0:
                 await asyncio.sleep(0)
-            normalized_original = normalized_queries[idx]
-            if not normalized_original:
-                continue
+            normalized_original = self._normalize_name(original)
+            candidate_map: dict[str, str] = {}
+            if candidate_maps is not None and idx < len(candidate_maps):
+                candidate_map = dict(candidate_maps[idx])
+            if normalized_original and normalized_original not in candidate_map:
+                candidate_map.setdefault(normalized_original, "original")
+            normalized_queries.append(normalized_original)
             candidate_matches: list[tuple[tuple[int, float, float], str, LiverToxMatch]] = []
             candidate_keys = candidate_map or (
                 {normalized_original: "original"} if normalized_original else {}
             )
             if not candidate_keys:
                 continue
+            eligible_total += 1
             for normalized_candidate, kind in candidate_keys.items():
-                cached = self.match_cache.get(normalized_candidate)
-                if cached is not None:
-                    if cached is not None:
-                        priority = self._candidate_priority(cached, kind)
-                        candidate_matches.append((priority, normalized_candidate, cached))
+                if normalized_candidate in self.match_cache:
+                    cached = self.match_cache[normalized_candidate]
+                    if cached is None:
+                        continue
+                    priority = self._candidate_priority(cached, kind)
+                    candidate_matches.append((priority, normalized_candidate, cached))
                     continue
                 deterministic = self._deterministic_lookup(normalized_candidate)
                 if deterministic is None:
@@ -126,13 +126,15 @@ class LiverToxMatcher:
                 priority = self._candidate_priority(match, kind)
                 candidate_matches.append((priority, normalized_candidate, match))
             if not candidate_matches:
-                self.match_cache.setdefault(normalized_original, None)
+                if normalized_original:
+                    self.match_cache.setdefault(normalized_original, None)
                 unresolved_indices.append(idx)
                 continue
             candidate_matches.sort(key=lambda item: item[0])
             best_match = candidate_matches[0][2]
             results[idx] = best_match
-            self.match_cache[normalized_original] = best_match
+            if normalized_original:
+                self.match_cache[normalized_original] = best_match
             if best_match.reason != "llm_fallback":
                 deterministic_matches += 1
             else:
@@ -537,17 +539,4 @@ class LiverToxMatcher:
         return normalized
 
     # -------------------------------------------------------------------------
-    def _prepare_candidates(self, name: str) -> tuple[str, dict[str, str]]:
-        # Expand the provided name via RxNorm and normalize all candidates.
-        normalized = self._normalize_name(name)
-        candidate_map: dict[str, str] = {}
-        if RXNORM_EXPANSION_ENABLED and name.strip():
-            for candidate in sorted(self.rxnorm_retriever.expand(name)):
-                normalized_candidate = self._normalize_name(candidate)
-                if not normalized_candidate or normalized_candidate in candidate_map:
-                    continue
-                kind = self.rxnorm_retriever.get_candidate_kind(name, candidate)
-                candidate_map[normalized_candidate] = kind or "unknown"
-        if normalized and normalized not in candidate_map:
-            candidate_map[normalized] = "original"
-        return normalized, candidate_map
+        return results
