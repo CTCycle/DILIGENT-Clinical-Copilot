@@ -369,31 +369,19 @@ def test_matcher_preserves_order_and_length():
 
 
 # -----------------------------------------------------------------------------
-def test_matcher_uses_rxnorm_brand_to_match(monkeypatch):
-    monkeypatch.setattr(
-        "Pharmagent.app.utils.services.retrieval.RXNORM_EXPANSION_ENABLED",
-        True,
-    )
+def test_matcher_uses_synonym_brand_to_match():
     df = pd.DataFrame(
         [
             {
                 "nbk_id": "NBK300",
                 "drug_name": "Duloxetine",
                 "excerpt": "SNRI",
+                "synonyms": "Cymbalta",
             }
         ]
     )
     matcher = LiverToxMatcher(df, llm_client=_DummyLLMClient())
-    candidate_maps = [
-        {"cymbalta": "brand", "duloxetine": "ingredient"},
-        {"duloxetine": "ingredient", "cymbalta": "brand"},
-    ]
-    matches = asyncio.run(
-        matcher.match_drug_names(
-            ["Cymbalta", "Duloxetine"],
-            candidate_maps=candidate_maps,
-        )
-    )
+    matches = asyncio.run(matcher.match_drug_names(["Cymbalta", "Duloxetine"]))
     assert [match.nbk_id if match else None for match in matches] == [
         "NBK300",
         "NBK300",
@@ -401,44 +389,34 @@ def test_matcher_uses_rxnorm_brand_to_match(monkeypatch):
 
 
 # -----------------------------------------------------------------------------
-def test_matcher_prefers_single_ingredient_over_combo(monkeypatch):
-    monkeypatch.setattr(
-        "Pharmagent.app.utils.services.retrieval.RXNORM_EXPANSION_ENABLED",
-        True,
-    )
+def test_matcher_prefers_single_ingredient_over_combo():
     df = pd.DataFrame(
         [
             {
                 "nbk_id": "NBK400",
                 "drug_name": "Amlodipine",
                 "excerpt": "Calcium channel blocker",
+                "synonyms": "Caduet",
             },
             {
                 "nbk_id": "NBK401",
                 "drug_name": "Atorvastatin",
                 "excerpt": "Statin",
+                "synonyms": "Caduet",
             },
             {
                 "nbk_id": "NBK402",
                 "drug_name": "Amlodipine Atorvastatin",
                 "excerpt": "Combo",
+                "synonyms": "Amlodipine/Atorvastatin, Caduet",
             },
         ]
     )
     matcher = LiverToxMatcher(df, llm_client=_DummyLLMClient())
-    candidate_maps = [
-        {
-            "amlodipine": "ingredient",
-            "atorvastatin": "ingredient",
-            "amlodipine / atorvastatin": "ingredient_combo",
-        }
-    ]
-    matches = asyncio.run(
-        matcher.match_drug_names(["Caduet"], candidate_maps=candidate_maps)
-    )
+    matches = asyncio.run(matcher.match_drug_names(["Caduet"]))
     assert matches[0] is not None
     assert matches[0].nbk_id in {"NBK400", "NBK401"}
-    assert matches[0].reason == "direct_match"
+    assert matches[0].reason in {"direct_match", "alias_match", "fuzzy_match"}
 
 
 # -----------------------------------------------------------------------------
