@@ -138,6 +138,39 @@ class RxNavClient:
         self.cache: dict[str, dict[str, RxNormCandidate]] = {}
 
     # -------------------------------------------------------------------------
+    def fetch_drug_terms(self, raw_name: str) -> tuple[list[str], list[str]]:
+        payload = self._request(raw_name)
+        if payload is None:
+            return [], []
+        drug_group = payload.get("drugGroup")
+        if not isinstance(drug_group, dict):
+            return [], []
+        groups = drug_group.get("conceptGroup")
+        if not isinstance(groups, list):
+            return [], []
+        collected_names: set[str] = set()
+        collected_synonyms: set[str] = set()
+        for group in groups:
+            if not isinstance(group, dict):
+                continue
+            props = group.get("conceptProperties")
+            if not isinstance(props, list):
+                continue
+            for prop in props:
+                if not isinstance(prop, dict):
+                    continue
+                name = prop.get("name")
+                if isinstance(name, str) and name.strip():
+                    collected_names.add(name.strip())
+                for key in ("synonym", "prescribableName", "psn"):
+                    value = prop.get(key)
+                    if isinstance(value, str) and value.strip():
+                        collected_synonyms.add(value.strip())
+        if raw_name.strip():
+            collected_names.add(raw_name.strip())
+        return sorted(collected_names), sorted(collected_synonyms)
+
+    # -------------------------------------------------------------------------
     def expand(self, raw_name: str) -> dict[str, str]:
         normalized_key = self._normalize_value(raw_name)
         if not normalized_key:
