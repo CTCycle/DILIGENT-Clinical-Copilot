@@ -321,7 +321,6 @@ def clear_agent_fields() -> tuple[
     bool,
     bool,
     str,
-    str,
 ]:
     return (
         "",
@@ -337,7 +336,6 @@ def clear_agent_fields() -> tuple[
         False,
         False,
         False,
-        "",
         "",
     )
 

@@ -85,27 +85,22 @@ async def _run_livertox_job(
             detail="No LiverTox monographs were extracted from archive.",
         )
 
+    sanitized = await asyncio.to_thread(serializer.sanitize_livertox_records, entries)
+    if sanitized.empty:
+        raise HTTPException(
+            status_code=500,
+            detail="No valid LiverTox monographs were available after sanitization.",
+        )
+    entries = sanitized.to_dict(orient="records")
+
     await job_manager.set_progress(job_id, 0.45, "Enriching LiverTox records")
-    tasks = []
-    for entry in entries:
-        drug_name = entry.get("drug_name")
-        if not isinstance(drug_name, str) or not drug_name.strip():
-            entry["additional_names"] = None
-            entry["synonyms"] = None
-            continue
-        tasks.append(asyncio.to_thread(rx_client.fetch_drug_terms, drug_name))
+    tasks = [
+        asyncio.to_thread(rx_client.fetch_drug_terms, entry["drug_name"])
+        for entry in entries
+    ]
     if tasks:
         results = await asyncio.gather(*tasks, return_exceptions=True)
-        index = 0
-        for entry in entries:
-            if "additional_names" in entry and "synonyms" in entry:
-                continue
-            if index >= len(results):
-                entry["additional_names"] = None
-                entry["synonyms"] = None
-                continue
-            result = results[index]
-            index += 1
+        for entry, result in zip(entries, results, strict=False):
             if isinstance(result, Exception):
                 entry["additional_names"] = None
                 entry["synonyms"] = None
