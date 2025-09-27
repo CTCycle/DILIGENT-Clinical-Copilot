@@ -49,6 +49,23 @@ class LiverToxMonographs(Base):
     __table_args__ = (UniqueConstraint("nbk_id", "drug_name"),)
 
 
+###############################################################################
+class LiverToxMasterList(Base):
+    __tablename__ = "LIVERTOX_MASTER_LIST"
+    ingredient = Column(String, primary_key=True)
+    brand_name = Column(Text)
+    likelihood_score = Column(String)
+    chapter_title = Column(Text)
+    last_update = Column(String)
+    reference_count = Column(String)
+    year_approved = Column(String)
+    agent_classification = Column(String)
+    include_in_livertox = Column(String)
+    source_url = Column(String)
+    source_last_modified = Column(String)
+    __table_args__ = (UniqueConstraint("ingredient"),)
+
+
 # [DATABASE]
 ###############################################################################
 @singleton
