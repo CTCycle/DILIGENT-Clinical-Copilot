@@ -134,36 +134,12 @@ class LiverToxMatch:
     notes: list[str]
     record: MonographRecord | None = None
 
-###############################################################################
-class LiverToxUpdater:
-    
-    def __init__(
-        self,
-        sources_path: str,
-        *,
-        redownload: bool,         
-        rx_client: RxNavClient | None = None,
-        serializer: DataSerializer | None = None,
-        database_client=database,
-    ) -> None:
-        self.sources_path = os.path.abspath(sources_path)
-        self.redownload = redownload  
-        self.rx_client = rx_client or RxNavClient()
-        self.serializer = serializer or DataSerializer()
-        self.database = database_client
 
-        self.base_url = LIVERTOX_BASE_URL
-        self.file_name = LIVERTOX_ARCHIVE
-        self.tar_file_path = os.path.join(SOURCES_PATH, self.file_name)
-        self.master_list_path = os.path.join(
-            SOURCES_PATH, "LiverTox_Master_List.xlsx"
-        )
-        self.master_list_metadata_path = os.path.join(
-            SOURCES_PATH, "livertox_master_list.metadata.json"
-        )
-        self.archive_metadata_path = os.path.join(
-            SOURCES_PATH, "livertox_archive.metadata.json"
-        )
+###############################################################################
+class LiverToxToolkit:
+
+    # -------------------------------------------------------------------------
+    def __init__(self) -> None:
         self.chunk_size = 8192
         self.supported_extensions = (
             ".html",
@@ -189,108 +165,7 @@ class LiverToxUpdater:
         }
         self.politeness_delay = 0.5
 
-     # -------------------------------------------------------------------------
-    async def download_bulk_data(self, dest_path: str) -> dict[str, Any]:
-        url = self.base_url + self.file_name
-        async with httpx.AsyncClient(
-            timeout=30.0, headers=self.http_headers, follow_redirects=True
-        ) as client:
-            metadata = await self._get_remote_metadata(client, url)
-            dest_dir = os.path.abspath(dest_path)
-            os.makedirs(dest_dir, exist_ok=True)
-            file_path = os.path.join(dest_dir, self.file_name)
-            stored_metadata = self._load_metadata(self.archive_metadata_path)
-            if (
-                stored_metadata
-                and os.path.isfile(file_path)
-                and self._metadata_matches(stored_metadata, metadata)
-            ):
-                logger.info("LiverTox archive unchanged; skipping download")
-                return {
-                    "file_path": file_path,
-                    "size": metadata.get("size", 0),
-                    "last_modified": metadata.get("last_modified"),
-                    "downloaded": False,
-                    "source_url": metadata["source_url"],
-                }
-
-            await asyncio.sleep(self.politeness_delay)
-            await self._stream_download_file(
-                client, url, file_path, metadata.get("size", 0), self.file_name
-            )
-            self._save_metadata(self.archive_metadata_path, metadata)
-
-        return {
-            "file_path": file_path,
-            "size": metadata.get("size", 0),
-            "last_modified": metadata.get("last_modified"),
-            "downloaded": True,
-            "source_url": metadata["source_url"],
-        }
-
     # -------------------------------------------------------------------------
-    def refresh_master_list(self) -> dict[str, Any]:
-        logger.info("Refreshing LiverTox master list")
-        metadata = self.download_master_list()
-        frame = pd.read_excel(metadata["file_path"], engine="openpyxl") 
-        sanitized = self.sanitize_livertox_master_list(frame)    
-        
-        self.serializer.save_livertox_master_list(
-            sanitized,
-            source_url=metadata["source_url"],
-            last_modified=metadata.get("last_modified"),
-        )
-        metadata["records"] = len(frame.index)
-        return metadata
-
-    # -------------------------------------------------------------------------
-    def download_master_list(self) -> dict[str, Any]:
-        return asyncio.run(self._download_master_list())
-
-    # -------------------------------------------------------------------------
-    async def _download_master_list(self) -> dict[str, Any]:
-        async with httpx.AsyncClient(
-            timeout=30.0, headers=self.http_headers, follow_redirects=True
-        ) as client:
-            master_url = await self._resolve_master_list_url(client)
-            metadata = await self._get_remote_metadata(client, master_url)
-            os.makedirs(os.path.dirname(self.master_list_path), exist_ok=True)
-            stored_metadata = self._load_metadata(self.master_list_metadata_path)
-            if (
-                stored_metadata
-                and os.path.isfile(self.master_list_path)
-                and self._metadata_matches(stored_metadata, metadata)
-            ):
-                logger.info("Master list unchanged; skipping download")
-                return {
-                    "file_path": self.master_list_path,
-                    "size": metadata.get("size", 0),
-                    "last_modified": metadata.get("last_modified"),
-                    "downloaded": False,
-                    "source_url": metadata["source_url"],
-                }
-
-            await asyncio.sleep(self.politeness_delay)
-            await self._stream_download_file(
-                client,
-                master_url,
-                self.master_list_path,
-                metadata.get("size", 0),
-                os.path.basename(self.master_list_path),
-            )
-            self._save_metadata(self.master_list_metadata_path, metadata)
-
-        return {
-            "file_path": self.master_list_path,
-            "size": metadata.get("size", 0),
-            "last_modified": metadata.get("last_modified"),
-            "downloaded": True,
-            "source_url": metadata["source_url"],
-        }
-    
-
-    
-    # -----------------------------------------------------------------------------
     def sanitize_livertox_master_list(self, frame: pd.DataFrame) -> pd.DataFrame:
         required_columns = [
             "ingredient",
@@ -305,6 +180,7 @@ class LiverToxUpdater:
         ]
         if frame.empty:
             return pd.DataFrame(columns=required_columns)
+
         normalized_map = {
             self._normalize_master_list_column(name): name for name in frame.columns
         }
@@ -319,14 +195,10 @@ class LiverToxUpdater:
             "agent_classification": ("agenttype", "agentclass", "classification"),
             "include_in_livertox": ("include", "inclusion", "included"),
         }
+
         data: dict[str, Any] = {}
         for column, aliases in column_aliases.items():
-            source = None
-            for alias in aliases:
-                normalized_alias = self._normalize_master_list_column(alias)
-                if normalized_alias in normalized_map:
-                    source = normalized_map[normalized_alias]
-                    break
+            source = self._resolve_master_list_source(aliases, normalized_map)
             if source is None:
                 data[column] = [None] * len(frame.index)
                 continue
@@ -376,10 +248,359 @@ class LiverToxUpdater:
         ]
 
     # -----------------------------------------------------------------------------
+    def _resolve_master_list_source(
+        self,
+        aliases: tuple[str, ...],
+        normalized_map: dict[str, str],
+    ) -> str | None:
+        if not normalized_map:
+            return None
+        direct_lookup = {
+            self._normalize_master_list_column(alias): alias for alias in aliases
+        }
+        for normalized_alias in direct_lookup:
+            if normalized_alias in normalized_map:
+                return normalized_map[normalized_alias]
+        for normalized_alias in direct_lookup:
+            for candidate, original in normalized_map.items():
+                if normalized_alias and normalized_alias in candidate:
+                    return original
+                if candidate and candidate in normalized_alias:
+                    return original
+        for normalized_alias in direct_lookup:
+            if not normalized_alias:
+                continue
+            fragments = re.findall(r"[a-z0-9]+", normalized_alias)
+            for fragment in fragments:
+                for candidate, original in normalized_map.items():
+                    if fragment and fragment in candidate:
+                        return original
+        return None
+
+    # -----------------------------------------------------------------------------
     def _normalize_master_list_column(self, value: str) -> str:
         return re.sub(r"[^a-z0-9]", "", value.lower())
 
+    # -------------------------------------------------------------------------
+    async def _get_remote_metadata(
+        self, client: httpx.AsyncClient, url: str
+    ) -> dict[str, Any]:
+        head = await client.head(url)
+        head.raise_for_status()
+        size = int(head.headers.get("Content-Length", 0))
+        last_modified = head.headers.get("Last-Modified")
+        metadata = {
+            "size": size,
+            "last_modified": last_modified,
+            "source_url": str(head.url),
+        }
+        return metadata
 
+    # -------------------------------------------------------------------------
+    async def _stream_download_file(
+        self,
+        client: httpx.AsyncClient,
+        url: str,
+        file_path: str,
+        file_size: int,
+        label: str,
+    ) -> None:
+        async with client.stream("GET", url) as response:
+            response.raise_for_status()
+            with (
+                open(file_path, "wb") as destination,
+                tqdm(
+                    total=file_size,
+                    unit="B",
+                    unit_scale=True,
+                    desc=label,
+                    ncols=80,
+                ) as progress,
+            ):
+                async for chunk in response.aiter_bytes(chunk_size=self.chunk_size):
+                    if chunk:
+                        destination.write(chunk)
+                        progress.update(len(chunk))
+
+    # -------------------------------------------------------------------------
+    def _metadata_matches(
+        self, stored: dict[str, Any], remote: dict[str, Any]
+    ) -> bool:
+        return (
+            stored.get("last_modified") == remote.get("last_modified")
+            and int(stored.get("size", 0)) == int(remote.get("size", 0))
+        )
+
+    # -------------------------------------------------------------------------
+    def _load_metadata(self, path: str) -> dict[str, Any] | None:
+        if not os.path.isfile(path):
+            return None
+        try:
+            with open(path, "r", encoding="utf-8") as handle:
+                return json.load(handle)
+        except (json.JSONDecodeError, OSError):
+            return None
+
+    # -------------------------------------------------------------------------
+    def _save_metadata(self, path: str, metadata: dict[str, Any]) -> None:
+        with open(path, "w", encoding="utf-8") as handle:
+            json.dump(metadata, handle)
+
+    # -------------------------------------------------------------------------
+    def convert_file_to_dataframe(self) -> pd.DataFrame:
+        records = []
+        with tarfile.open(self.tar_file_path, "r:gz") as tar:
+            for member in tar.getmembers():
+                if not member.isfile():
+                    continue
+                name = member.name.lower()
+                if name.endswith(".csv") or name.endswith(".tsv"):
+                    fileobj = tar.extractfile(member)
+                    if fileobj is None:
+                        continue
+                    df = pd.read_csv(
+                        fileobj, sep="\t" if name.endswith(".tsv") else ","
+                    )
+                    records.append(df)
+
+        if not records:
+            raise ValueError("No supported tabular files found in archive.")
+
+        return pd.concat(records, ignore_index=True)
+
+    def _convert_member_bytes(
+        self, member_name: str, data: bytes
+    ) -> tuple[str, str | None] | None:
+        lower_name = member_name.lower()
+        if lower_name.endswith(".pdf"):
+            text = self._pdf_to_text(data)
+            if text.strip():
+                return text, None
+            decoded = self._decode_markup(data)
+            return decoded, decoded
+        markup = self._decode_markup(data)
+        text = self._html_to_text(markup)
+        return text, markup
+
+    # -----------------------------------------------------------------------------
+    def _decode_markup(self, data: bytes) -> str:
+        try:
+            return data.decode("utf-8")
+        except UnicodeDecodeError:
+            return data.decode("latin-1", errors="ignore")
+
+    # -----------------------------------------------------------------------------
+    def _pdf_to_text(self, data: bytes) -> str:
+        buffer = io.BytesIO(data)
+        if pdfminer_extract_text is not None:
+            try:
+                buffer.seek(0)
+                text = pdfminer_extract_text(buffer)
+                if text:
+                    return text
+            except Exception:
+                buffer.seek(0)
+        if PdfReader is not None:
+            try:
+                buffer.seek(0)
+                reader = PdfReader(buffer)
+                collected: list[str] = []
+                for page in reader.pages:
+                    page_text = page.extract_text()
+                    if page_text:
+                        collected.append(page_text)
+                if collected:
+                    return "\n".join(collected)
+            except Exception:
+                buffer.seek(0)
+        try:
+            return data.decode("utf-8")
+        except UnicodeDecodeError:
+            return data.decode("latin-1", errors="ignore")
+
+    # -----------------------------------------------------------------------------
+    def _extract_nbk(self, member_name: str, content: str) -> str | None:
+        match = re.search(r"NBK\d+", member_name, re.IGNORECASE)
+        if match:
+            return match.group(0).upper()
+        match = re.search(r"NBK\d+", content, re.IGNORECASE)
+        if match:
+            return match.group(0).upper()
+        return None
+
+    # -----------------------------------------------------------------------------
+    def _derive_identifier(self, member_name: str) -> str:
+        base = os.path.basename(member_name)
+        stem = os.path.splitext(base)[0]
+        cleaned = self._normalize_whitespace(self._strip_punctuation(stem))
+        return cleaned or base
+
+    # -----------------------------------------------------------------------------
+    def _extract_title(self, html_text: str, plain_text: str, default: str) -> str:
+        patterns = (
+            r"<title[^>]*>(.*?)</title>",
+            r"<article-title[^>]*>(.*?)</article-title>",
+            r"<h1[^>]*>(.*?)</h1>",
+        )
+        for pattern in patterns:
+            match = re.search(pattern, html_text, flags=re.IGNORECASE | re.DOTALL)
+            if match:
+                fragment = self._clean_fragment(match.group(1))
+                if fragment:
+                    return fragment
+        for line in plain_text.splitlines():
+            stripped = line.strip()
+            if stripped:
+                return stripped
+        return default
+
+    # -----------------------------------------------------------------------------
+    def _clean_fragment(self, fragment: str) -> str:
+        return self._html_to_text(fragment)
+
+    # -----------------------------------------------------------------------------
+    def _html_to_text(self, html_text: str) -> str:
+        stripped = re.sub(r"(?is)<(script|style)[^>]*>.*?</\1>", " ", html_text)
+        stripped = re.sub(r"<[^>]+>", " ", stripped)
+        unescaped = html.unescape(stripped)
+        return self._normalize_whitespace(unescaped)
+
+    # -----------------------------------------------------------------------------
+    def _normalize_whitespace(self, value: str) -> str:
+        return re.sub(r"\s+", " ", value).strip()
+
+    # -----------------------------------------------------------------------------
+    def _strip_punctuation(self, value: str) -> str:
+        normalized = unicodedata.normalize("NFKD", value)
+        folded = "".join(char for char in normalized if not unicodedata.combining(char))
+        return re.sub(r"[-_,.;:()\[\]{}\/\\]", " ", folded)
+
+###############################################################################
+class LiverToxUpdater(LiverToxToolkit):
+
+    def __init__(
+        self,
+        sources_path: str,
+        *,
+        redownload: bool,         
+        rx_client: RxNavClient | None = None,
+        serializer: DataSerializer | None = None,
+        database_client=database,
+    ) -> None:
+        super().__init__()
+        self.sources_path = os.path.abspath(sources_path)
+        self.redownload = redownload
+        self.rx_client = rx_client or RxNavClient()
+        self.serializer = serializer or DataSerializer()
+        self.database = database_client
+
+        self.base_url = LIVERTOX_BASE_URL
+        self.file_name = LIVERTOX_ARCHIVE
+        self.tar_file_path = os.path.join(SOURCES_PATH, self.file_name)
+        self.master_list_path = os.path.join(
+            SOURCES_PATH, "LiverTox_Master_List.xlsx"
+        )
+        self.master_list_metadata_path = os.path.join(
+            SOURCES_PATH, "livertox_master_list.metadata.json"
+        )
+        self.archive_metadata_path = os.path.join(
+            SOURCES_PATH, "livertox_archive.metadata.json"
+        )
+
+     # -------------------------------------------------------------------------
+    async def download_bulk_data(self, dest_path: str) -> dict[str, Any]:
+        url = self.base_url + self.file_name
+        async with httpx.AsyncClient(
+            timeout=30.0, headers=self.http_headers, follow_redirects=True
+        ) as client:
+            metadata = await self._get_remote_metadata(client, url)
+            dest_dir = os.path.abspath(dest_path)
+            os.makedirs(dest_dir, exist_ok=True)
+            file_path = os.path.join(dest_dir, self.file_name)
+            stored_metadata = self._load_metadata(self.archive_metadata_path)
+            if (
+                stored_metadata
+                and os.path.isfile(file_path)
+                and self._metadata_matches(stored_metadata, metadata)
+            ):
+                logger.info("LiverTox archive unchanged; skipping download")
+                return {
+                    "file_path": file_path,
+                    "size": metadata.get("size", 0),
+                    "last_modified": metadata.get("last_modified"),
+                    "downloaded": False,
+                    "source_url": metadata["source_url"],
+                }
+
+            await asyncio.sleep(self.politeness_delay)
+            await self._stream_download_file(
+                client, url, file_path, metadata.get("size", 0), self.file_name
+            )
+            self._save_metadata(self.archive_metadata_path, metadata)
+
+        return {
+            "file_path": file_path,
+            "size": metadata.get("size", 0),
+            "last_modified": metadata.get("last_modified"),
+            "downloaded": True,
+            "source_url": metadata["source_url"],
+        }
+
+    # -------------------------------------------------------------------------
+    def refresh_master_list(self) -> dict[str, Any]:
+        logger.info("Refreshing LiverTox master list")
+        metadata = asyncio.run(self._download_master_list())
+        frame = pd.read_excel(metadata["file_path"], engine="openpyxl")
+        sanitized = self.sanitize_livertox_master_list(frame)
+
+        self.serializer.save_livertox_master_list(
+            sanitized,
+            source_url=metadata["source_url"],
+            last_modified=metadata.get("last_modified"),
+        )
+        metadata["records"] = len(frame.index)
+        return metadata
+
+    # -------------------------------------------------------------------------
+    async def _download_master_list(self) -> dict[str, Any]:
+        async with httpx.AsyncClient(
+            timeout=30.0, headers=self.http_headers, follow_redirects=True
+        ) as client:
+            master_url = await self._resolve_master_list_url(client)
+            metadata = await self._get_remote_metadata(client, master_url)
+            os.makedirs(os.path.dirname(self.master_list_path), exist_ok=True)
+            stored_metadata = self._load_metadata(self.master_list_metadata_path)
+            if (
+                stored_metadata
+                and os.path.isfile(self.master_list_path)
+                and self._metadata_matches(stored_metadata, metadata)
+            ):
+                logger.info("Master list unchanged; skipping download")
+                return {
+                    "file_path": self.master_list_path,
+                    "size": metadata.get("size", 0),
+                    "last_modified": metadata.get("last_modified"),
+                    "downloaded": False,
+                    "source_url": metadata["source_url"],
+                }
+
+            await asyncio.sleep(self.politeness_delay)
+            await self._stream_download_file(
+                client,
+                master_url,
+                self.master_list_path,
+                metadata.get("size", 0),
+                os.path.basename(self.master_list_path),
+            )
+            self._save_metadata(self.master_list_metadata_path, metadata)
+
+        return {
+            "file_path": self.master_list_path,
+            "size": metadata.get("size", 0),
+            "last_modified": metadata.get("last_modified"),
+            "downloaded": True,
+            "source_url": metadata["source_url"],
+        }
     # -------------------------------------------------------------------------
     async def _resolve_master_list_url(self, client: httpx.AsyncClient) -> str:
         try:
@@ -661,200 +882,6 @@ class LiverToxUpdater:
                 raise RuntimeError("Master list candidate returned HTTP error") from exc
         return response
 
-    # -------------------------------------------------------------------------
-    async def _get_remote_metadata(
-        self, client: httpx.AsyncClient, url: str
-    ) -> dict[str, Any]:
-        head = await client.head(url)
-        head.raise_for_status()
-        size = int(head.headers.get("Content-Length", 0))
-        last_modified = head.headers.get("Last-Modified")
-        metadata = {
-            "size": size,
-            "last_modified": last_modified,
-            "source_url": str(head.url),
-        }
-        return metadata
-
-    # -------------------------------------------------------------------------
-    async def _stream_download_file(
-        self,
-        client: httpx.AsyncClient,
-        url: str,
-        file_path: str,
-        file_size: int,
-        label: str,
-    ) -> None:
-        async with client.stream("GET", url) as response:
-            response.raise_for_status()
-            with (
-                open(file_path, "wb") as destination,
-                tqdm(
-                    total=file_size,
-                    unit="B",
-                    unit_scale=True,
-                    desc=label,
-                    ncols=80,
-                ) as progress,
-            ):
-                async for chunk in response.aiter_bytes(chunk_size=self.chunk_size):
-                    if chunk:
-                        destination.write(chunk)
-                        progress.update(len(chunk))
-
-    # -------------------------------------------------------------------------
-    def _metadata_matches(
-        self, stored: dict[str, Any], remote: dict[str, Any]
-    ) -> bool:
-        return (
-            stored.get("last_modified") == remote.get("last_modified")
-            and int(stored.get("size", 0)) == int(remote.get("size", 0))
-        )
-
-    # -------------------------------------------------------------------------
-    def _load_metadata(self, path: str) -> dict[str, Any] | None:
-        if not os.path.isfile(path):
-            return None
-        try:
-            with open(path, "r", encoding="utf-8") as handle:
-                return json.load(handle)
-        except (json.JSONDecodeError, OSError):
-            return None
-
-    # -------------------------------------------------------------------------
-    def _save_metadata(self, path: str, metadata: dict[str, Any]) -> None:
-        with open(path, "w", encoding="utf-8") as handle:
-            json.dump(metadata, handle)
-
-    # -------------------------------------------------------------------------
-    def convert_file_to_dataframe(self) -> pd.DataFrame:
-        records = []
-        with tarfile.open(self.tar_file_path, "r:gz") as tar:
-            for member in tar.getmembers():
-                if not member.isfile():
-                    continue
-                name = member.name.lower()
-                if name.endswith(".csv") or name.endswith(".tsv"):
-                    fileobj = tar.extractfile(member)
-                    if fileobj is None:
-                        continue
-                    df = pd.read_csv(
-                        fileobj, sep="\t" if name.endswith(".tsv") else ","
-                    )
-                    records.append(df)
-
-        if not records:
-            raise ValueError("No supported tabular files found in archive.")
-
-        return pd.concat(records, ignore_index=True)    
-
-    def _convert_member_bytes(
-        self, member_name: str, data: bytes
-    ) -> tuple[str, str | None] | None:
-        lower_name = member_name.lower()
-        if lower_name.endswith(".pdf"):
-            text = self._pdf_to_text(data)
-            if text.strip():
-                return text, None
-            decoded = self._decode_markup(data)
-            return decoded, decoded
-        markup = self._decode_markup(data)
-        text = self._html_to_text(markup)
-        return text, markup
-
-    # -----------------------------------------------------------------------------
-    def _decode_markup(self, data: bytes) -> str:
-        try:
-            return data.decode("utf-8")
-        except UnicodeDecodeError:
-            return data.decode("latin-1", errors="ignore")
-
-    # -----------------------------------------------------------------------------
-    def _pdf_to_text(self, data: bytes) -> str:
-        buffer = io.BytesIO(data)
-        if pdfminer_extract_text is not None:
-            try:
-                buffer.seek(0)
-                text = pdfminer_extract_text(buffer)
-                if text:
-                    return text
-            except Exception:
-                buffer.seek(0)
-        if PdfReader is not None:
-            try:
-                buffer.seek(0)
-                reader = PdfReader(buffer)
-                collected: list[str] = []
-                for page in reader.pages:
-                    page_text = page.extract_text()
-                    if page_text:
-                        collected.append(page_text)
-                if collected:
-                    return "\n".join(collected)
-            except Exception:
-                buffer.seek(0)
-        try:
-            return data.decode("utf-8")
-        except UnicodeDecodeError:
-            return data.decode("latin-1", errors="ignore")
-
-    # -----------------------------------------------------------------------------
-    def _extract_nbk(self, member_name: str, content: str) -> str | None:
-        match = re.search(r"NBK\d+", member_name, re.IGNORECASE)
-        if match:
-            return match.group(0).upper()
-        match = re.search(r"NBK\d+", content, re.IGNORECASE)
-        if match:
-            return match.group(0).upper()
-        return None
-
-    # -----------------------------------------------------------------------------
-    def _derive_identifier(self, member_name: str) -> str:
-        base = os.path.basename(member_name)
-        stem = os.path.splitext(base)[0]
-        cleaned = self._normalize_whitespace(self._strip_punctuation(stem))
-        return cleaned or base
-
-    # -----------------------------------------------------------------------------
-    def _extract_title(self, html_text: str, plain_text: str, default: str) -> str:
-        patterns = (
-            r"<title[^>]*>(.*?)</title>",
-            r"<article-title[^>]*>(.*?)</article-title>",
-            r"<h1[^>]*>(.*?)</h1>",
-        )
-        for pattern in patterns:
-            match = re.search(pattern, html_text, flags=re.IGNORECASE | re.DOTALL)
-            if match:
-                fragment = self._clean_fragment(match.group(1))
-                if fragment:
-                    return fragment
-        for line in plain_text.splitlines():
-            stripped = line.strip()
-            if stripped:
-                return stripped
-        return default
-
-    # -----------------------------------------------------------------------------
-    def _clean_fragment(self, fragment: str) -> str:
-        return self._html_to_text(fragment)
-
-    # -----------------------------------------------------------------------------
-    def _html_to_text(self, html_text: str) -> str:
-        stripped = re.sub(r"(?is)<(script|style)[^>]*>.*?</\1>", " ", html_text)
-        stripped = re.sub(r"<[^>]+>", " ", stripped)
-        unescaped = html.unescape(stripped)
-        return self._normalize_whitespace(unescaped)
-
-    # -----------------------------------------------------------------------------
-    def _normalize_whitespace(self, value: str) -> str:
-        return re.sub(r"\s+", " ", value).strip()
-
-    # -----------------------------------------------------------------------------
-    def _strip_punctuation(self, value: str) -> str:
-        normalized = unicodedata.normalize("NFKD", value)
-        folded = "".join(char for char in normalized if not unicodedata.combining(char))
-        return re.sub(r"[-_,.;:()\[\]{}\/\\]", " ", folded)
-
     # -----------------------------------------------------------------------------
     def run(self) -> dict[str, Any]:
         logger.info("Starting LiverTox update")
@@ -865,7 +892,7 @@ class LiverToxUpdater:
         download_info: dict[str, Any] = {}
         if self.redownload:
             logger.info("Redownload flag enabled; fetching latest LiverTox archive")
-            download_info = self.download_archive()
+            download_info = asyncio.run(self.download_bulk_data(self.sources_path))
         else:
             logger.info("Using existing LiverTox archive")
 
@@ -895,10 +922,6 @@ class LiverToxUpdater:
         size = os.path.getsize(archive_path)
         modified = datetime.fromtimestamp(os.path.getmtime(archive_path), UTC).isoformat()
         return {"file_path": archive_path, "size": size, "last_modified": modified}
-
-    # -------------------------------------------------------------------------
-    def download_archive(self) -> dict[str, Any]:
-        return asyncio.run(self.download_bulk_data(self.sources_path))
 
     # -----------------------------------------------------------------------------
     def collect_monographs(
