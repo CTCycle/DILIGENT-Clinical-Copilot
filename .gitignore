@@ -8,6 +8,8 @@ __pycache__
 *.db
 *.log
 *.docx
+*.json
+*.xlsx
 *.pdf
 *.csv   
 *.txt
