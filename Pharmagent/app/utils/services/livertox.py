@@ -299,7 +299,7 @@ class LiverToxUpdater:
     async def _resolve_master_list_from_bin(
         self, client: httpx.AsyncClient, base_url: str
     ) -> str:
-        bin_url = httpx.URL(base_url).join("bin/").human_repr()
+        bin_url = str(httpx.URL(base_url).join("bin/"))
         response = await client.get(bin_url)
         response.raise_for_status()
         content = response.text
@@ -317,7 +317,7 @@ class LiverToxUpdater:
             if "master" not in normalized_label and "excel" not in normalized_label:
                 continue
             url = httpx.URL(bin_url).join(href)
-            human_url = url.human_repr()
+            human_url = str(url)
             if (
                 not human_url.lower().startswith("https://www.ncbi.nlm.nih.gov/")
                 and not human_url.startswith(base_url)
@@ -335,7 +335,7 @@ class LiverToxUpdater:
                 if "ipmcbook" in href.lower():
                     continue
                 url = httpx.URL(bin_url).join(href)
-                human_url = url.human_repr()
+                human_url = str(url)
                 if (
                     not human_url.lower().startswith("https://www.ncbi.nlm.nih.gov/")
                     and not human_url.startswith(base_url)
@@ -381,7 +381,7 @@ class LiverToxUpdater:
         metadata = {
             "size": size,
             "last_modified": last_modified,
-            "source_url": head.url.human_repr(),
+            "source_url": str(head.url),
         }
         return metadata
 
