@@ -3,6 +3,7 @@ from __future__ import annotations
 import asyncio
 import html
 import io
+import json
 import os
 import re
 import tarfile
@@ -154,6 +155,15 @@ class LiverToxUpdater:
         self.base_url = LIVERTOX_BASE_URL
         self.file_name = LIVERTOX_ARCHIVE
         self.tar_file_path = os.path.join(SOURCES_PATH, self.file_name)
+        self.master_list_path = os.path.join(
+            SOURCES_PATH, "LiverTox_Master_List.xlsx"
+        )
+        self.master_list_metadata_path = os.path.join(
+            SOURCES_PATH, "livertox_master_list.metadata.json"
+        )
+        self.archive_metadata_path = os.path.join(
+            SOURCES_PATH, "livertox_archive.metadata.json"
+        )
         self.chunk_size = 8192
         self.supported_extensions = (
             ".html",
@@ -171,43 +181,268 @@ class LiverToxUpdater:
             ".xhtml": 2,
             ".pdf": 3,
         }
+        self.http_headers = {
+            "User-Agent": (
+                "PharmagentClinicalCopilot/1.0 "
+                "(contact=clinical-copilot@pharmagent.local)"
+            )
+        }
+        self.politeness_delay = 0.5
 
      # -------------------------------------------------------------------------
     async def download_bulk_data(self, dest_path: str) -> dict[str, Any]:
         url = self.base_url + self.file_name
-        async with httpx.AsyncClient(timeout=30.0) as client:
-            # HEAD request for size and last-modified
-            head_response = await client.head(url)
-            head_response.raise_for_status()
-            file_size = int(head_response.headers.get("Content-Length", 0))
-            last_modified = head_response.headers.get("Last-Modified", None)
-
+        async with httpx.AsyncClient(
+            timeout=30.0, headers=self.http_headers, follow_redirects=True
+        ) as client:
+            metadata = await self._get_remote_metadata(client, url)
             dest_dir = os.path.abspath(dest_path)
             os.makedirs(dest_dir, exist_ok=True)
             file_path = os.path.join(dest_dir, self.file_name)
+            stored_metadata = self._load_metadata(self.archive_metadata_path)
+            if (
+                stored_metadata
+                and os.path.isfile(file_path)
+                and self._metadata_matches(stored_metadata, metadata)
+            ):
+                logger.info("LiverTox archive unchanged; skipping download")
+                return {
+                    "file_path": file_path,
+                    "size": metadata.get("size", 0),
+                    "last_modified": metadata.get("last_modified"),
+                    "downloaded": False,
+                    "source_url": metadata["source_url"],
+                }
 
-            async with client.stream("GET", url) as response:
-                response.raise_for_status()
-                with (
-                    open(file_path, "wb") as f,
-                    tqdm(
-                        total=file_size,
-                        unit="B",
-                        unit_scale=True,
-                        desc=self.file_name,
-                        ncols=80,
-                    ) as pbar,
-                ):
-                    async for chunk in response.aiter_bytes(chunk_size=self.chunk_size):
-                        if chunk:
-                            f.write(chunk)
-                            pbar.update(len(chunk))
+            await asyncio.sleep(self.politeness_delay)
+            await self._stream_download_file(
+                client, url, file_path, metadata.get("size", 0), self.file_name
+            )
+            self._save_metadata(self.archive_metadata_path, metadata)
 
         return {
             "file_path": file_path,
-            "size": file_size,
-            "last_modified": last_modified,
+            "size": metadata.get("size", 0),
+            "last_modified": metadata.get("last_modified"),
+            "downloaded": True,
+            "source_url": metadata["source_url"],
         }
+
+    # -------------------------------------------------------------------------
+    def refresh_master_list(self) -> dict[str, Any]:
+        logger.info("Refreshing LiverTox master list")
+        metadata = self.download_master_list()
+        frame = self._load_master_list_dataframe(metadata["file_path"])
+        self.serializer.save_livertox_master_list(
+            frame,
+            source_url=metadata["source_url"],
+            last_modified=metadata.get("last_modified"),
+        )
+        metadata["records"] = len(frame.index)
+        return metadata
+
+    # -------------------------------------------------------------------------
+    def download_master_list(self) -> dict[str, Any]:
+        return asyncio.run(self._download_master_list())
+
+    # -------------------------------------------------------------------------
+    async def _download_master_list(self) -> dict[str, Any]:
+        async with httpx.AsyncClient(
+            timeout=30.0, headers=self.http_headers, follow_redirects=True
+        ) as client:
+            master_url = await self._resolve_master_list_url(client)
+            metadata = await self._get_remote_metadata(client, master_url)
+            os.makedirs(os.path.dirname(self.master_list_path), exist_ok=True)
+            stored_metadata = self._load_metadata(self.master_list_metadata_path)
+            if (
+                stored_metadata
+                and os.path.isfile(self.master_list_path)
+                and self._metadata_matches(stored_metadata, metadata)
+            ):
+                logger.info("Master list unchanged; skipping download")
+                return {
+                    "file_path": self.master_list_path,
+                    "size": metadata.get("size", 0),
+                    "last_modified": metadata.get("last_modified"),
+                    "downloaded": False,
+                    "source_url": metadata["source_url"],
+                }
+
+            await asyncio.sleep(self.politeness_delay)
+            await self._stream_download_file(
+                client,
+                master_url,
+                self.master_list_path,
+                metadata.get("size", 0),
+                os.path.basename(self.master_list_path),
+            )
+            self._save_metadata(self.master_list_metadata_path, metadata)
+
+        return {
+            "file_path": self.master_list_path,
+            "size": metadata.get("size", 0),
+            "last_modified": metadata.get("last_modified"),
+            "downloaded": True,
+            "source_url": metadata["source_url"],
+        }
+
+    # -------------------------------------------------------------------------
+    async def _resolve_master_list_url(self, client: httpx.AsyncClient) -> str:
+        try:
+            return await self._resolve_master_list_from_bin(client, self.base_url)
+        except Exception as exc:
+            logger.warning("Primary FTP lookup failed: %s", exc)
+            fallback_url = await self._resolve_master_list_via_datagov(client)
+            return fallback_url
+
+    # -------------------------------------------------------------------------
+    async def _resolve_master_list_from_bin(
+        self, client: httpx.AsyncClient, base_url: str
+    ) -> str:
+        bin_url = httpx.URL(base_url).join("bin/").human_repr()
+        response = await client.get(bin_url)
+        response.raise_for_status()
+        content = response.text
+        matches = re.finditer(
+            r"<a[^>]+href=\"([^\"]+\.xlsx)\"[^>]*>(.*?)</a>",
+            content,
+            flags=re.IGNORECASE | re.DOTALL,
+        )
+        candidates: list[tuple[str, str]] = []
+        for match in matches:
+            href, label = match.groups()
+            if "ipmcbook" in href.lower():
+                continue
+            normalized_label = re.sub(r"\s+", " ", label.lower())
+            if "master" not in normalized_label and "excel" not in normalized_label:
+                continue
+            url = httpx.URL(bin_url).join(href)
+            human_url = url.human_repr()
+            if (
+                not human_url.lower().startswith("https://www.ncbi.nlm.nih.gov/")
+                and not human_url.startswith(base_url)
+            ):
+                continue
+            candidates.append((human_url, label.strip()))
+        if not candidates:
+            href_matches = re.finditer(
+                r"href=\"([^\"]+\.xlsx)\"",
+                content,
+                flags=re.IGNORECASE,
+            )
+            for match in href_matches:
+                href = match.group(1)
+                if "ipmcbook" in href.lower():
+                    continue
+                url = httpx.URL(bin_url).join(href)
+                human_url = url.human_repr()
+                if (
+                    not human_url.lower().startswith("https://www.ncbi.nlm.nih.gov/")
+                    and not human_url.startswith(base_url)
+                ):
+                    continue
+                if "master" in os.path.basename(human_url).lower():
+                    candidates.append((human_url, os.path.basename(human_url)))
+        if not candidates:
+            raise RuntimeError("Unable to locate LiverTox master list link on FTP bin page")
+        candidates.sort(key=lambda item: item[0])
+        chosen_url = candidates[0][0]
+        return chosen_url
+
+    # -------------------------------------------------------------------------
+    async def _resolve_master_list_via_datagov(
+        self, client: httpx.AsyncClient
+    ) -> str:
+        catalog_url = "https://catalog.data.gov/dataset/livertox"
+        response = await client.get(catalog_url)
+        response.raise_for_status()
+        text = response.text
+        match = re.search(
+            r"href=\"(https://ftp\.ncbi\.nlm\.nih\.gov/pub/litarch/[^\"]+/)\"[^>]*>Download LiverTox Data",
+            text,
+            flags=re.IGNORECASE,
+        )
+        if not match:
+            raise RuntimeError("Unable to resolve FTP folder from Data.gov entry")
+        new_base = match.group(1)
+        if not new_base.endswith("/"):
+            new_base = f"{new_base}/"
+        self.base_url = new_base
+        return await self._resolve_master_list_from_bin(client, self.base_url)
+
+    # -------------------------------------------------------------------------
+    async def _get_remote_metadata(
+        self, client: httpx.AsyncClient, url: str
+    ) -> dict[str, Any]:
+        head = await client.head(url)
+        head.raise_for_status()
+        size = int(head.headers.get("Content-Length", 0))
+        last_modified = head.headers.get("Last-Modified")
+        metadata = {
+            "size": size,
+            "last_modified": last_modified,
+            "source_url": head.url.human_repr(),
+        }
+        return metadata
+
+    # -------------------------------------------------------------------------
+    async def _stream_download_file(
+        self,
+        client: httpx.AsyncClient,
+        url: str,
+        file_path: str,
+        file_size: int,
+        label: str,
+    ) -> None:
+        async with client.stream("GET", url) as response:
+            response.raise_for_status()
+            with (
+                open(file_path, "wb") as destination,
+                tqdm(
+                    total=file_size,
+                    unit="B",
+                    unit_scale=True,
+                    desc=label,
+                    ncols=80,
+                ) as progress,
+            ):
+                async for chunk in response.aiter_bytes(chunk_size=self.chunk_size):
+                    if chunk:
+                        destination.write(chunk)
+                        progress.update(len(chunk))
+
+    # -------------------------------------------------------------------------
+    def _metadata_matches(
+        self, stored: dict[str, Any], remote: dict[str, Any]
+    ) -> bool:
+        return (
+            stored.get("last_modified") == remote.get("last_modified")
+            and int(stored.get("size", 0)) == int(remote.get("size", 0))
+        )
+
+    # -------------------------------------------------------------------------
+    def _load_metadata(self, path: str) -> dict[str, Any] | None:
+        if not os.path.isfile(path):
+            return None
+        try:
+            with open(path, "r", encoding="utf-8") as handle:
+                return json.load(handle)
+        except (json.JSONDecodeError, OSError):
+            return None
+
+    # -------------------------------------------------------------------------
+    def _save_metadata(self, path: str, metadata: dict[str, Any]) -> None:
+        with open(path, "w", encoding="utf-8") as handle:
+            json.dump(metadata, handle)
+
+    # -------------------------------------------------------------------------
+    def _load_master_list_dataframe(self, file_path: str) -> pd.DataFrame:
+        if not os.path.isfile(file_path):
+            raise FileNotFoundError(
+                f"LiverTox master list missing at {file_path}"
+            )
+        frame = pd.read_excel(file_path)
+        return frame
 
     # -------------------------------------------------------------------------
     def convert_file_to_dataframe(self) -> pd.DataFrame:
@@ -341,6 +576,7 @@ class LiverToxUpdater:
     # -----------------------------------------------------------------------------
     def run(self) -> dict[str, Any]:
         logger.info("Starting LiverTox update")
+        master_info = self.refresh_master_list()
         archive_path = os.path.join(self.sources_path, LIVERTOX_ARCHIVE)
 
         download_info: dict[str, Any] = {}
@@ -360,7 +596,7 @@ class LiverToxUpdater:
         logger.info("Persisting enriched records to database")
         self.serializer.save_livertox_records(enriched)
              
-        payload = {**download_info, **local_info}
+        payload = {**master_info, **download_info, **local_info}
         payload["processed_entries"] = len(enriched)
         payload["records"] = len(enriched)
         logger.info("LiverTox update completed successfully")
