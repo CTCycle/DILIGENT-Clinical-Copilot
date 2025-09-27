@@ -14,6 +14,7 @@ if __name__ == "__main__":
         redownload=REDOWNLOAD,
     )
     logger.info("Running LiverTox updater")
-    updater.run()
+    result = updater.run()
+    logger.info("LiverTox updater summary: %s", result)
     
 
