@@ -455,8 +455,7 @@ class LiverToxUpdater:
                 record = {
                     "nbk_id": record_nbk,
                     "drug_name": drug_name,
-                    "excerpt": cleaned_text,
-                    "text": cleaned_text,
+                    "excerpt": cleaned_text                    
                 }
                 collected[record_key] = record
                 priorities[record_key] = priority
