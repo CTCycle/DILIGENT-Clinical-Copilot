@@ -289,11 +289,83 @@ class LiverToxUpdater:
     # -------------------------------------------------------------------------
     async def _resolve_master_list_url(self, client: httpx.AsyncClient) -> str:
         try:
+            return await self._resolve_master_list_from_bookshelf(client)
+        except Exception as exc:
+            logger.warning("Bookshelf Excel lookup failed: %s", exc)
+        try:
             return await self._resolve_master_list_from_bin(client, self.base_url)
         except Exception as exc:
             logger.warning("Primary FTP lookup failed: %s", exc)
             fallback_url = await self._resolve_master_list_via_datagov(client)
             return fallback_url
+
+    # -------------------------------------------------------------------------
+    async def _resolve_master_list_from_bookshelf(
+        self, client: httpx.AsyncClient
+    ) -> str:
+        report_url = "https://www.ncbi.nlm.nih.gov/books/NBK571102/?report=excel"
+        head_response: httpx.Response | None = None
+        try:
+            head_response = await client.head(report_url, follow_redirects=False)
+            head_response.raise_for_status()
+        except httpx.HTTPStatusError as exc:
+            if exc.response.status_code not in (301, 302, 303, 307, 308):
+                head_response = None
+            else:
+                head_response = exc.response
+        except httpx.HTTPError:
+            head_response = None
+
+        redirect_statuses = {301, 302, 303, 307, 308}
+        if head_response is not None:
+            if (
+                head_response.status_code in redirect_statuses
+                and head_response.headers.get("Location")
+            ):
+                candidate = httpx.URL(report_url).join(
+                    head_response.headers["Location"]
+                )
+                return await self._probe_master_list_candidate(client, str(candidate))
+            content_type = (head_response.headers.get("Content-Type") or "").lower()
+            disposition = (
+                head_response.headers.get("Content-Disposition") or ""
+            ).lower()
+            if "excel" in content_type or ".xlsx" in disposition:
+                return await self._probe_master_list_candidate(
+                    client, str(head_response.url)
+                )
+
+        get_response = await client.get(report_url, follow_redirects=False)
+        if get_response.status_code in redirect_statuses and get_response.headers.get(
+            "Location"
+        ):
+            candidate = httpx.URL(report_url).join(get_response.headers["Location"])
+            return await self._probe_master_list_candidate(client, str(candidate))
+
+        content_type = (get_response.headers.get("Content-Type") or "").lower()
+        disposition = (get_response.headers.get("Content-Disposition") or "").lower()
+        if "excel" in content_type or ".xlsx" in disposition:
+            return await self._probe_master_list_candidate(client, str(get_response.url))
+
+        html_content = get_response.text
+        for pattern in (
+            r"url=([^\"'>]+\.xlsx)",
+            r"['\"]([^'\"]+\.xlsx)['\"]",
+        ):
+            for match in re.finditer(pattern, html_content, flags=re.IGNORECASE):
+                candidate_url = match.group(1)
+                candidate = httpx.URL(report_url).join(candidate_url)
+                try:
+                    return await self._probe_master_list_candidate(
+                        client, str(candidate)
+                    )
+                except Exception as exc:  # pragma: no cover - network dependent
+                    logger.debug(
+                        "Bookshelf candidate %s failed: %s", str(candidate), exc
+                    )
+                    continue
+
+        raise RuntimeError("Unable to resolve master list via Bookshelf report page")
 
     # -------------------------------------------------------------------------
     async def _resolve_master_list_from_bin(
