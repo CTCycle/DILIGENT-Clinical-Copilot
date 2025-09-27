@@ -289,6 +289,10 @@ class LiverToxUpdater:
     # -------------------------------------------------------------------------
     async def _resolve_master_list_url(self, client: httpx.AsyncClient) -> str:
         try:
+            return await self._resolve_master_list_from_bookshelf(client)
+        except Exception as exc:
+            logger.warning("Bookshelf Excel lookup failed: %s", exc)
+        try:
             return await self._resolve_master_list_from_bin(client, self.base_url)
         except Exception as exc:
             logger.warning("Primary FTP lookup failed: %s", exc)
@@ -296,10 +300,78 @@ class LiverToxUpdater:
             return fallback_url
 
     # -------------------------------------------------------------------------
+    async def _resolve_master_list_from_bookshelf(
+        self, client: httpx.AsyncClient
+    ) -> str:
+        report_url = "https://www.ncbi.nlm.nih.gov/books/NBK571102/?report=excel"
+        head_response: httpx.Response | None = None
+        try:
+            head_response = await client.head(report_url, follow_redirects=False)
+            head_response.raise_for_status()
+        except httpx.HTTPStatusError as exc:
+            if exc.response.status_code not in (301, 302, 303, 307, 308):
+                head_response = None
+            else:
+                head_response = exc.response
+        except httpx.HTTPError:
+            head_response = None
+
+        redirect_statuses = {301, 302, 303, 307, 308}
+        if head_response is not None:
+            if (
+                head_response.status_code in redirect_statuses
+                and head_response.headers.get("Location")
+            ):
+                candidate = httpx.URL(report_url).join(
+                    head_response.headers["Location"]
+                )
+                return await self._probe_master_list_candidate(client, str(candidate))
+            content_type = (head_response.headers.get("Content-Type") or "").lower()
+            disposition = (
+                head_response.headers.get("Content-Disposition") or ""
+            ).lower()
+            if "excel" in content_type or ".xlsx" in disposition:
+                return await self._probe_master_list_candidate(
+                    client, str(head_response.url)
+                )
+
+        get_response = await client.get(report_url, follow_redirects=False)
+        if get_response.status_code in redirect_statuses and get_response.headers.get(
+            "Location"
+        ):
+            candidate = httpx.URL(report_url).join(get_response.headers["Location"])
+            return await self._probe_master_list_candidate(client, str(candidate))
+
+        content_type = (get_response.headers.get("Content-Type") or "").lower()
+        disposition = (get_response.headers.get("Content-Disposition") or "").lower()
+        if "excel" in content_type or ".xlsx" in disposition:
+            return await self._probe_master_list_candidate(client, str(get_response.url))
+
+        html_content = get_response.text
+        for pattern in (
+            r"url=([^\"'>]+\.xlsx)",
+            r"['\"]([^'\"]+\.xlsx)['\"]",
+        ):
+            for match in re.finditer(pattern, html_content, flags=re.IGNORECASE):
+                candidate_url = match.group(1)
+                candidate = httpx.URL(report_url).join(candidate_url)
+                try:
+                    return await self._probe_master_list_candidate(
+                        client, str(candidate)
+                    )
+                except Exception as exc:  # pragma: no cover - network dependent
+                    logger.debug(
+                        "Bookshelf candidate %s failed: %s", str(candidate), exc
+                    )
+                    continue
+
+        raise RuntimeError("Unable to resolve master list via Bookshelf report page")
+
+    # -------------------------------------------------------------------------
     async def _resolve_master_list_from_bin(
         self, client: httpx.AsyncClient, base_url: str
     ) -> str:
-        bin_url = httpx.URL(base_url).join("bin/").human_repr()
+        bin_url = str(httpx.URL(base_url).join("bin/"))
         response = await client.get(bin_url)
         response.raise_for_status()
         content = response.text
@@ -317,7 +389,7 @@ class LiverToxUpdater:
             if "master" not in normalized_label and "excel" not in normalized_label:
                 continue
             url = httpx.URL(bin_url).join(href)
-            human_url = url.human_repr()
+            human_url = str(url)
             if (
                 not human_url.lower().startswith("https://www.ncbi.nlm.nih.gov/")
                 and not human_url.startswith(base_url)
@@ -335,7 +407,7 @@ class LiverToxUpdater:
                 if "ipmcbook" in href.lower():
                     continue
                 url = httpx.URL(bin_url).join(href)
-                human_url = url.human_repr()
+                human_url = str(url)
                 if (
                     not human_url.lower().startswith("https://www.ncbi.nlm.nih.gov/")
                     and not human_url.startswith(base_url)
@@ -353,22 +425,147 @@ class LiverToxUpdater:
     async def _resolve_master_list_via_datagov(
         self, client: httpx.AsyncClient
     ) -> str:
-        catalog_url = "https://catalog.data.gov/dataset/livertox"
-        response = await client.get(catalog_url)
+        api_url = "https://catalog.data.gov/api/3/action/package_show"
+        response = await client.get(api_url, params={"id": "livertox"})
         response.raise_for_status()
-        text = response.text
-        match = re.search(
-            r"href=\"(https://ftp\.ncbi\.nlm\.nih\.gov/pub/litarch/[^\"]+/)\"[^>]*>Download LiverTox Data",
-            text,
-            flags=re.IGNORECASE,
-        )
-        if not match:
+        try:
+            payload = response.json()
+        except ValueError as exc:
+            raise RuntimeError("Unable to resolve FTP folder from Data.gov entry") from exc
+        result = payload.get("result", {}) if isinstance(payload, dict) else {}
+        resources = result.get("resources") if isinstance(result, dict) else None
+        if not isinstance(resources, list):
             raise RuntimeError("Unable to resolve FTP folder from Data.gov entry")
-        new_base = match.group(1)
-        if not new_base.endswith("/"):
-            new_base = f"{new_base}/"
-        self.base_url = new_base
-        return await self._resolve_master_list_from_bin(client, self.base_url)
+
+        direct_candidates: list[str] = []
+        direct_seen: set[str] = set()
+        folder_candidates: list[str] = []
+        folder_seen: set[str] = set()
+        for resource in resources:
+            if not isinstance(resource, dict):
+                continue
+            raw_url = str(resource.get("url") or "").strip()
+            if not raw_url:
+                continue
+            normalized_url = self._normalize_datagov_resource_url(raw_url)
+            if not normalized_url:
+                continue
+            lowered = normalized_url.lower()
+            if ".xlsx" in lowered:
+                if normalized_url not in direct_seen:
+                    direct_seen.add(normalized_url)
+                    direct_candidates.append(normalized_url)
+                continue
+            nbk_match = re.search(r"/(nbk\d+)(?:/|$)", lowered)
+            if nbk_match:
+                nbk_id = nbk_match.group(1).upper()
+                for template in (
+                    f"https://www.ncbi.nlm.nih.gov/books/{nbk_id}/?report=excel",
+                    f"https://www.ncbi.nlm.nih.gov/books/{nbk_id}/bin/{nbk_id}.xlsx",
+                ):
+                    if template not in direct_seen:
+                        direct_seen.add(template)
+                        direct_candidates.append(template)
+            if "ftp.ncbi.nlm.nih.gov" in lowered:
+                if normalized_url.endswith("/"):
+                    base_candidate = normalized_url
+                else:
+                    base_candidate = f"{normalized_url.rsplit('/', 1)[0]}/"
+                if base_candidate not in folder_seen:
+                    folder_seen.add(base_candidate)
+                    folder_candidates.append(base_candidate)
+
+        last_error: Exception | None = None
+        for candidate in direct_candidates:
+            try:
+                resolved_direct = await self._probe_master_list_candidate(
+                    client, candidate
+                )
+            except Exception as exc:  # pragma: no cover - network dependent
+                last_error = exc
+                logger.debug(
+                    "Candidate Data.gov direct %s failed: %s", candidate, exc
+                )
+                continue
+            return resolved_direct
+
+        if not folder_candidates:
+            raise RuntimeError("Unable to resolve FTP folder from Data.gov entry")
+
+        original_base = self.base_url
+        for base_candidate in folder_candidates:
+            try:
+                resolved = await self._resolve_master_list_from_bin(client, base_candidate)
+            except Exception as exc:  # pragma: no cover - network dependent
+                last_error = exc
+                logger.debug(
+                    "Candidate Data.gov base %s failed: %s", base_candidate, exc
+                )
+                continue
+            self.base_url = base_candidate
+            return resolved
+
+        self.base_url = original_base
+        if last_error is not None:
+            raise RuntimeError("Unable to resolve FTP folder from Data.gov entry") from last_error
+        raise RuntimeError("Unable to resolve FTP folder from Data.gov entry")
+
+    # -------------------------------------------------------------------------
+    def _normalize_datagov_resource_url(self, url: str) -> str | None:
+        normalized = url.strip()
+        if not normalized:
+            return None
+        if normalized.startswith("ftp://"):
+            normalized = "https://" + normalized[len("ftp://") :]
+        if normalized.startswith("http"):
+            return normalized
+        if normalized.startswith("//"):
+            return f"https:{normalized}"
+        return None
+
+    # -------------------------------------------------------------------------
+    async def _probe_master_list_candidate(
+        self, client: httpx.AsyncClient, candidate: str
+    ) -> str:
+        try:
+            response = await client.head(candidate)
+            response.raise_for_status()
+        except httpx.HTTPStatusError:  # pragma: no cover - network dependent
+            response = await self._fetch_candidate_with_get(client, candidate)
+        except httpx.HTTPError:  # pragma: no cover - network dependent
+            response = await self._fetch_candidate_with_get(client, candidate)
+        content_type = (response.headers.get("Content-Type") or "").lower()
+        if ".xlsx" not in candidate.lower() and "excel" not in content_type:
+            disposition = (response.headers.get("Content-Disposition") or "").lower()
+            if ".xlsx" in disposition:
+                return str(response.url)
+            raise RuntimeError("Candidate does not appear to be an Excel file")
+        return str(response.url)
+
+    # -------------------------------------------------------------------------
+    async def _fetch_candidate_with_get(
+        self, client: httpx.AsyncClient, candidate: str
+    ) -> httpx.Response:
+        probe_headers = dict(self.http_headers)
+        probe_headers.setdefault("Range", "bytes=0-0")
+        response = await client.get(
+            candidate,
+            headers=probe_headers,
+            follow_redirects=True,
+        )
+        try:
+            response.raise_for_status()
+        except httpx.HTTPStatusError as exc:  # pragma: no cover - network dependent
+            if exc.response.status_code == 416:
+                response = await client.get(
+                    candidate,
+                    headers=self.http_headers,
+                    follow_redirects=True,
+                )
+                response.raise_for_status()
+            else:
+                raise RuntimeError("Master list candidate returned HTTP error") from exc
+        return response
 
     # -------------------------------------------------------------------------
     async def _get_remote_metadata(
@@ -381,7 +578,7 @@ class LiverToxUpdater:
         metadata = {
             "size": size,
             "last_modified": last_modified,
-            "source_url": head.url.human_repr(),
+            "source_url": str(head.url),
         }
         return metadata
 
@@ -441,7 +638,7 @@ class LiverToxUpdater:
             raise FileNotFoundError(
                 f"LiverTox master list missing at {file_path}"
             )
-        frame = pd.read_excel(file_path)
+        frame = pd.read_excel(file_path, engine="openpyxl")
         return frame
 
     # -------------------------------------------------------------------------
