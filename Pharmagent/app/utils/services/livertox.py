@@ -353,22 +353,63 @@ class LiverToxUpdater:
     async def _resolve_master_list_via_datagov(
         self, client: httpx.AsyncClient
     ) -> str:
-        catalog_url = "https://catalog.data.gov/dataset/livertox"
-        response = await client.get(catalog_url)
+        api_url = "https://catalog.data.gov/api/3/action/package_show"
+        response = await client.get(api_url, params={"id": "livertox"})
         response.raise_for_status()
-        text = response.text
-        match = re.search(
-            r"href=\"(https://ftp\.ncbi\.nlm\.nih\.gov/pub/litarch/[^\"]+/)\"[^>]*>Download LiverTox Data",
-            text,
-            flags=re.IGNORECASE,
-        )
-        if not match:
+        try:
+            payload = response.json()
+        except ValueError as exc:
+            raise RuntimeError("Unable to resolve FTP folder from Data.gov entry") from exc
+        result = payload.get("result", {}) if isinstance(payload, dict) else {}
+        resources = result.get("resources") if isinstance(result, dict) else None
+        if not isinstance(resources, list):
             raise RuntimeError("Unable to resolve FTP folder from Data.gov entry")
-        new_base = match.group(1)
-        if not new_base.endswith("/"):
-            new_base = f"{new_base}/"
-        self.base_url = new_base
-        return await self._resolve_master_list_from_bin(client, self.base_url)
+
+        candidates: list[str] = []
+        seen: set[str] = set()
+        for resource in resources:
+            if not isinstance(resource, dict):
+                continue
+            raw_url = str(resource.get("url") or "").strip()
+            if not raw_url:
+                continue
+            lowered = raw_url.lower()
+            if "ftp.ncbi.nlm.nih.gov" not in lowered:
+                continue
+            ftp_url = raw_url
+            if ftp_url.startswith("ftp://"):
+                ftp_url = "https://" + ftp_url[len("ftp://") :]
+            if not ftp_url.startswith("http"):
+                continue
+            if ftp_url.endswith("/"):
+                base_candidate = ftp_url
+            else:
+                base_candidate = f"{ftp_url.rsplit('/', 1)[0]}/"
+            if base_candidate not in seen:
+                seen.add(base_candidate)
+                candidates.append(base_candidate)
+
+        if not candidates:
+            raise RuntimeError("Unable to resolve FTP folder from Data.gov entry")
+
+        original_base = self.base_url
+        last_error: Exception | None = None
+        for base_candidate in candidates:
+            try:
+                resolved = await self._resolve_master_list_from_bin(client, base_candidate)
+            except Exception as exc:  # pragma: no cover - network dependent
+                last_error = exc
+                logger.debug(
+                    "Candidate Data.gov base %s failed: %s", base_candidate, exc
+                )
+                continue
+            self.base_url = base_candidate
+            return resolved
+
+        self.base_url = original_base
+        if last_error is not None:
+            raise RuntimeError("Unable to resolve FTP folder from Data.gov entry") from last_error
+        raise RuntimeError("Unable to resolve FTP folder from Data.gov entry")
 
     # -------------------------------------------------------------------------
     async def _get_remote_metadata(
