@@ -530,30 +530,10 @@ class LiverToxUpdater:
         try:
             response = await client.head(candidate)
             response.raise_for_status()
-        except httpx.HTTPStatusError as exc:  # pragma: no cover - network dependent
-            raise RuntimeError("Master list candidate returned HTTP error") from exc
+        except httpx.HTTPStatusError:  # pragma: no cover - network dependent
+            response = await self._fetch_candidate_with_get(client, candidate)
         except httpx.HTTPError:  # pragma: no cover - network dependent
-            probe_headers = dict(self.http_headers)
-            probe_headers.setdefault("Range", "bytes=0-0")
-            response = await client.get(
-                candidate,
-                headers=probe_headers,
-                follow_redirects=True,
-            )
-            try:
-                response.raise_for_status()
-            except httpx.HTTPStatusError as exc:  # pragma: no cover - network dependent
-                if exc.response.status_code == 416:
-                    response = await client.get(
-                        candidate,
-                        headers=self.http_headers,
-                        follow_redirects=True,
-                    )
-                    response.raise_for_status()
-                else:
-                    raise RuntimeError(
-                        "Master list candidate returned HTTP error"
-                    ) from exc
+            response = await self._fetch_candidate_with_get(client, candidate)
         content_type = (response.headers.get("Content-Type") or "").lower()
         if ".xlsx" not in candidate.lower() and "excel" not in content_type:
             disposition = (response.headers.get("Content-Disposition") or "").lower()
@@ -561,6 +541,31 @@ class LiverToxUpdater:
                 return str(response.url)
             raise RuntimeError("Candidate does not appear to be an Excel file")
         return str(response.url)
+
+    # -------------------------------------------------------------------------
+    async def _fetch_candidate_with_get(
+        self, client: httpx.AsyncClient, candidate: str
+    ) -> httpx.Response:
+        probe_headers = dict(self.http_headers)
+        probe_headers.setdefault("Range", "bytes=0-0")
+        response = await client.get(
+            candidate,
+            headers=probe_headers,
+            follow_redirects=True,
+        )
+        try:
+            response.raise_for_status()
+        except httpx.HTTPStatusError as exc:  # pragma: no cover - network dependent
+            if exc.response.status_code == 416:
+                response = await client.get(
+                    candidate,
+                    headers=self.http_headers,
+                    follow_redirects=True,
+                )
+                response.raise_for_status()
+            else:
+                raise RuntimeError("Master list candidate returned HTTP error") from exc
+        return response
 
     # -------------------------------------------------------------------------
     async def _get_remote_metadata(
@@ -633,7 +638,7 @@ class LiverToxUpdater:
             raise FileNotFoundError(
                 f"LiverTox master list missing at {file_path}"
             )
-        frame = pd.read_excel(file_path)
+        frame = pd.read_excel(file_path, engine="openpyxl")
         return frame
 
     # -------------------------------------------------------------------------
