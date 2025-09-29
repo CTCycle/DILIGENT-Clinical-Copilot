@@ -187,7 +187,7 @@ def _load_json(path: str) -> dict[str, Any] | None:
         return None
 
 
-def _save_json(path: str, payload: dict[str, Any]) -> None:
+def save_masterlist_metadata(path: str, payload: dict[str, Any]) -> None:
     with open(path, "w", encoding="utf-8") as handle:
         json.dump(payload, handle)
 
@@ -212,27 +212,8 @@ def _build_normalized_map(values: pd.Series) -> dict[str, str]:
             mapping[normalized] = text
     return mapping
 
-
-def _detect_master_list_header_row(raw_frame: pd.DataFrame) -> int:
-    best_row = raw_frame.index[0] if len(raw_frame.index) else 0
-    best_score = -1
-    for row in raw_frame.index:
-        normalized_map = _build_normalized_map(raw_frame.loc[row])
-        if not normalized_map:
-            continue
-        score = 0
-        for aliases in MASTER_LIST_COLUMNS.values():
-            if _match_master_list_column(aliases, normalized_map) is not None:
-                score += 1
-        if score > best_score:
-            best_row = row
-            best_score = score
-            if score == len(MASTER_LIST_COLUMNS):
-                break
-    return int(best_row)
-
-
-async def _download_file(
+###############################################################################
+async def download_file(
     client: httpx.AsyncClient,
     url: str,
     destination: str,
@@ -316,8 +297,7 @@ class LiverToxToolkit:
 
 ###############################################################################
 class LiverToxUpdater:
-
-    ###########################################################################
+    
     def __init__(
         self,
         sources_path: str,
@@ -340,6 +320,7 @@ class LiverToxUpdater:
         self.rx_client = rx_client or RxNavClient()
         self.serializer = serializer or DataSerializer()
         self.database = database_client
+        self.header_row = 1
 
         self.base_url = LIVERTOX_BASE_URL
         self.file_name = LIVERTOX_ARCHIVE
@@ -386,7 +367,7 @@ class LiverToxUpdater:
                 }
 
             await asyncio.sleep(self.delay)
-            await _download_file(
+            await download_file(
                 client,
                 url,
                 file_path,
@@ -394,7 +375,7 @@ class LiverToxUpdater:
                 self.file_name,
                 chunk_size=self.chunk_size,
             )
-            _save_json(self.archive_metadata_path, metadata)
+            save_masterlist_metadata(self.archive_metadata_path, metadata)
 
         return {
             "file_path": file_path,
@@ -408,14 +389,12 @@ class LiverToxUpdater:
     def refresh_master_list(self) -> dict[str, Any]:
         logger.info("Refreshing LiverTox master list")
         metadata = asyncio.run(self._download_master_list())
-        raw_frame = pd.read_excel(metadata["file_path"], engine="openpyxl", header=None)
-        header_row = _detect_master_list_header_row(raw_frame)
-        skiprows = range(header_row) if header_row > 0 else None
+        
         frame = pd.read_excel(
             metadata["file_path"],
             engine="openpyxl",
-            header=0,
-            skiprows=skiprows,
+            header=self.header_row,
+            skiprows=0,
         )
         sanitized = self.toolkit.sanitize_livertox_master_list(frame)
 
@@ -456,7 +435,7 @@ class LiverToxUpdater:
                 }
 
             await asyncio.sleep(self.delay)
-            await _download_file(
+            await download_file(
                 client,
                 master_url,
                 self.master_list_path,
@@ -464,7 +443,7 @@ class LiverToxUpdater:
                 os.path.basename(self.master_list_path),
                 chunk_size=self.chunk_size,
             )
-            _save_json(self.master_list_metadata_path, metadata)
+            save_masterlist_metadata(self.master_list_metadata_path, metadata)
 
         return {
             "file_path": self.master_list_path,
@@ -473,6 +452,7 @@ class LiverToxUpdater:
             "downloaded": True,
             "source_url": metadata["source_url"],
         }
+    
     # -------------------------------------------------------------------------
     async def _resolve_master_list_url(self, client: httpx.AsyncClient) -> str:
         try:
@@ -876,7 +856,7 @@ class LiverToxUpdater:
 
         return list(collected.values())
 
-    ###########################################################################
+    # -------------------------------------------------------------------------
     def _convert_member_bytes(
         self, member_name: str, data: bytes
     ) -> tuple[str, str | None] | None:
@@ -891,14 +871,14 @@ class LiverToxUpdater:
         text = self._html_to_text(markup)
         return text, markup
 
-    ###########################################################################
+    # -------------------------------------------------------------------------
     def _decode_markup(self, data: bytes) -> str:
         try:
             return data.decode("utf-8")
         except UnicodeDecodeError:
             return data.decode("latin-1", errors="ignore")
 
-    ###########################################################################
+    # -------------------------------------------------------------------------
     def _pdf_to_text(self, data: bytes) -> str:
         buffer = io.BytesIO(data)
         if pdfminer_extract_text is not None:
@@ -927,7 +907,7 @@ class LiverToxUpdater:
         except UnicodeDecodeError:
             return data.decode("latin-1", errors="ignore")
 
-    ###########################################################################
+    # -------------------------------------------------------------------------
     def _extract_nbk(self, member_name: str, content: str) -> str | None:
         match = re.search(r"NBK\d+", member_name, re.IGNORECASE)
         if match:
@@ -937,14 +917,14 @@ class LiverToxUpdater:
             return match.group(0).upper()
         return None
 
-    ###########################################################################
+    # -------------------------------------------------------------------------
     def _derive_identifier(self, member_name: str) -> str:
         base = os.path.basename(member_name)
         stem = os.path.splitext(base)[0]
         cleaned = self._normalize_whitespace(self._strip_punctuation(stem))
         return cleaned or base
 
-    ###########################################################################
+    # -------------------------------------------------------------------------
     def _extract_title(self, html_text: str, plain_text: str, default: str) -> str:
         patterns = (
             r"<title[^>]*>(.*?)</title>",
@@ -963,22 +943,22 @@ class LiverToxUpdater:
                 return stripped
         return default
 
-    ###########################################################################
+    # -------------------------------------------------------------------------
     def _clean_fragment(self, fragment: str) -> str:
         return self._html_to_text(fragment)
 
-    ###########################################################################
+    # -------------------------------------------------------------------------
     def _html_to_text(self, html_text: str) -> str:
         stripped = re.sub(r"(?is)<(script|style)[^>]*>.*?</\1>", " ", html_text)
         stripped = re.sub(r"<[^>]+>", " ", stripped)
         unescaped = html.unescape(stripped)
         return self._normalize_whitespace(unescaped)
 
-    ###########################################################################
+    # -------------------------------------------------------------------------
     def _normalize_whitespace(self, value: str) -> str:
         return re.sub(r"\s+", " ", value).strip()
 
-    ###########################################################################
+    # -------------------------------------------------------------------------
     def _strip_punctuation(self, value: str) -> str:
         normalized = unicodedata.normalize("NFKD", value)
         folded = "".join(char for char in normalized if not unicodedata.combining(char))
