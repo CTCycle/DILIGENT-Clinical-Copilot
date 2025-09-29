@@ -127,15 +127,6 @@ MASTER_LIST_COLUMNS: dict[str, tuple[str, ...]] = {
 
 SUPPORTED_MONOGRAPH_EXTENSIONS = (".html", ".htm", ".xhtml", ".xml", ".nxml", ".pdf")
 
-MONOGRAPH_EXTENSION_PRIORITY = {
-    ".nxml": 0,
-    ".xml": 1,
-    ".html": 2,
-    ".htm": 2,
-    ".xhtml": 2,
-    ".pdf": 3,
-}
-
 DEFAULT_HTTP_HEADERS = {
     "User-Agent": (
         "PharmagentClinicalCopilot/1.0 (contact=clinical-copilot@pharmagent.local)"
@@ -310,7 +301,6 @@ class LiverToxUpdater:
     ) -> None:
         self.toolkit = toolkit or LiverToxToolkit()
         self.supported_extensions = SUPPORTED_MONOGRAPH_EXTENSIONS
-        self.extension_priority = MONOGRAPH_EXTENSION_PRIORITY
         self.http_headers = dict(DEFAULT_HTTP_HEADERS)
         self.delay = 0.5
         self.chunk_size = DOWNLOAD_CHUNK_SIZE
@@ -787,7 +777,7 @@ class LiverToxUpdater:
             raise RuntimeError(f"Invalid LiverTox archive at {normalized_path}")
 
         collected: dict[str, dict[str, str]] = {}
-        priorities: dict[str, int] = {}
+        processed_files: set[str] = set()
         with TemporaryDirectory() as temp_dir:
             with tarfile.open(normalized_path, "r:gz") as archive:
                 members = archive.getmembers()
@@ -824,21 +814,15 @@ class LiverToxUpdater:
                 plain_text, markup_text = payload
                 if not plain_text:
                     continue
+                base_name = os.path.basename(member_name).lower()
+                if base_name in processed_files:
+                    continue
                 nbk_id = self._extract_nbk(member_name, markup_text or plain_text)
                 record_key = nbk_id or self._derive_identifier(member_name)
                 if not record_key:
                     continue
-                priority = self.extension_priority.get(
-                    os.path.splitext(member_name.lower())[1],
-                    len(self.extension_priority) + 1,
-                )
-                existing_priority = priorities.get(record_key)
-                if existing_priority is not None and existing_priority < priority:
+                if record_key in collected:
                     continue
-                if existing_priority is not None and existing_priority == priority:
-                    current_excerpt = collected[record_key]["excerpt"]
-                    if len(current_excerpt) >= len(plain_text):
-                        continue
                 record_nbk = nbk_id or record_key
                 drug_name = self._extract_title(
                     markup_text or "", plain_text, record_nbk
@@ -849,10 +833,10 @@ class LiverToxUpdater:
                 record = {
                     "nbk_id": record_nbk,
                     "drug_name": drug_name,
-                    "excerpt": cleaned_text                    
+                    "excerpt": cleaned_text
                 }
                 collected[record_key] = record
-                priorities[record_key] = priority
+                processed_files.add(base_name)
 
         return list(collected.values())
 
