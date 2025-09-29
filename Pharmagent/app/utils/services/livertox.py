@@ -139,8 +139,7 @@ class LiverToxMatch:
 class LiverToxToolkit:
 
     # -------------------------------------------------------------------------
-    def __init__(self) -> None:
-        self.chunk_size = 8192
+    def __init__(self) -> None:        
         self.supported_extensions = (
             ".html",
             ".htm",
@@ -163,7 +162,7 @@ class LiverToxToolkit:
                 "(contact=clinical-copilot@pharmagent.local)"
             )
         }
-        self.politeness_delay = 0.5
+        self.delay = 0.5
 
     # -------------------------------------------------------------------------
     def sanitize_livertox_master_list(self, frame: pd.DataFrame) -> pd.DataFrame:
@@ -368,6 +367,7 @@ class LiverToxToolkit:
 
         return pd.concat(records, ignore_index=True)
 
+    # -------------------------------------------------------------------------
     def _convert_member_bytes(
         self, member_name: str, data: bytes
     ) -> tuple[str, str | None] | None:
@@ -532,7 +532,7 @@ class LiverToxUpdater(LiverToxToolkit):
                     "source_url": metadata["source_url"],
                 }
 
-            await asyncio.sleep(self.politeness_delay)
+            await asyncio.sleep(self.delay)
             await self._stream_download_file(
                 client, url, file_path, metadata.get("size", 0), self.file_name
             )
@@ -550,7 +550,8 @@ class LiverToxUpdater(LiverToxToolkit):
     def refresh_master_list(self) -> dict[str, Any]:
         logger.info("Refreshing LiverTox master list")
         metadata = asyncio.run(self._download_master_list())
-        frame = pd.read_excel(metadata["file_path"], engine="openpyxl")
+        frame = pd.read_excel(metadata["file_path"], engine="openpyxl", header=None)
+        print(frame.head(5))  
         sanitized = self.sanitize_livertox_master_list(frame)
 
         self.serializer.save_livertox_master_list(
@@ -567,8 +568,7 @@ class LiverToxUpdater(LiverToxToolkit):
             timeout=30.0, headers=self.http_headers, follow_redirects=True
         ) as client:
             master_url = await self._resolve_master_list_url(client)
-            metadata = await self._get_remote_metadata(client, master_url)
-            os.makedirs(os.path.dirname(self.master_list_path), exist_ok=True)
+            metadata = await self._get_remote_metadata(client, master_url)            
             stored_metadata = self._load_metadata(self.master_list_metadata_path)
             if (
                 stored_metadata
@@ -584,7 +584,7 @@ class LiverToxUpdater(LiverToxToolkit):
                     "source_url": metadata["source_url"],
                 }
 
-            await asyncio.sleep(self.politeness_delay)
+            await asyncio.sleep(self.delay)
             await self._stream_download_file(
                 client,
                 master_url,
