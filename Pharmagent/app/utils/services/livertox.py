@@ -736,7 +736,7 @@ class LiverToxUpdater:
         if not tarfile.is_tarfile(normalized_path):
             raise RuntimeError(f"Invalid LiverTox archive at {normalized_path}")
 
-        collected: dict[str, dict[str, str]] = {}
+        collected: list[dict[str, str]] = []
         processed_files: set[str] = set()
         with tarfile.open(normalized_path, "r:gz") as archive:
             members = [member for member in archive.getmembers() if member.isfile()]
@@ -775,12 +775,9 @@ class LiverToxUpdater:
                 if not plain_text:
                     continue
                 nbk_id = self._extract_nbk(member.name, markup_text or plain_text)
-                record_key = nbk_id or self._derive_identifier(member.name)
-                if not record_key:
+                record_nbk = nbk_id or self._derive_identifier(member.name)
+                if not record_nbk:
                     continue
-                if record_key in collected:
-                    continue
-                record_nbk = nbk_id or record_key
                 drug_name = self._extract_title(
                     markup_text or "", plain_text, record_nbk
                 )
@@ -792,10 +789,10 @@ class LiverToxUpdater:
                     "drug_name": drug_name,
                     "excerpt": cleaned_text
                 }
-                collected[record_key] = record
+                collected.append(record)
                 processed_files.add(base_name)
 
-        return list(collected.values())
+        return collected
 
     # -------------------------------------------------------------------------
     def _convert_member_bytes(
