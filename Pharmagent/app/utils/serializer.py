@@ -35,7 +35,6 @@ class DataSerializer:
             "nbk_id",
             "drug_name",
             "excerpt",
-            "additional_names",
             "synonyms",
         ]
         if df.empty:
@@ -44,7 +43,7 @@ class DataSerializer:
             if column not in df.columns:
                 df[column] = None
         df = df[required_columns]
-        allowed_missing = {"nbk_id", "additional_names", "synonyms"}
+        allowed_missing = {"nbk_id", "synonyms"}
         drop_columns = [col for col in required_columns if col not in allowed_missing]
         df = df.dropna(subset=drop_columns)
         df["drug_name"] = df["drug_name"].astype(str).str.strip()
@@ -54,14 +53,13 @@ class DataSerializer:
         df["nbk_id"] = df["nbk_id"].apply(
             lambda value: str(value).strip() if pd.notna(value) else None
         )
-        for column in ("additional_names", "synonyms"):
-            df[column] = df[column].apply(
-                lambda value: (
-                    str(value).strip()
-                    if pd.notna(value) and str(value).strip()
-                    else None
-                )
+        df["synonyms"] = df["synonyms"].apply(
+            lambda value: (
+                str(value).strip()
+                if pd.notna(value) and str(value).strip()
+                else None
             )
+        )
         df = df.drop_duplicates(subset=["nbk_id", "drug_name"], keep="first")
         return df.reset_index(drop=True)
 
@@ -86,7 +84,10 @@ class DataSerializer:
     ) -> None:        
         frame["source_url"] = source_url
         frame["source_last_modified"] = last_modified
-        sanitized = frame.where(pd.notnull(frame), None)
-        database.save_into_database(sanitized, "LIVERTOX_MASTER_LIST")
+        frame = frame.copy()
+        frame = frame[pd.notnull(frame["brand_name"])].copy()
+        frame["brand_name"] = frame["brand_name"].astype(str).str.strip()
+        frame = frame[frame["brand_name"] != ""]
+        database.save_into_database(frame, "LIVERTOX_MASTER_LIST")
 
     

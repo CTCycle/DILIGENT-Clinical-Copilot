@@ -233,6 +233,7 @@ class LiverToxToolkit:
         sanitized = sanitized[sanitized["ingredient"] != ""].copy()
         for column in ("brand_name", "likelihood_score", "chapter_title"):
             sanitized[column] = sanitized[column].map(_clean_optional_string)
+        sanitized = sanitized[pd.notnull(sanitized["brand_name"])].copy()
         sanitized["last_update"] = pd.to_datetime(
             sanitized["last_update"], errors="coerce"
         ).dt.date
@@ -914,17 +915,14 @@ class LiverToxUpdater:
         for entry in records:
             drug_name = entry.get("drug_name")
             if not isinstance(drug_name, str) or not drug_name.strip():
-                entry["additional_names"] = None
                 entry["synonyms"] = None
                 continue
             try:
-                names, synonyms = self.rx_client.fetch_drug_terms(drug_name)
+                synonyms = self.rx_client.fetch_drug_terms(drug_name)
             except Exception as exc:  # noqa: BLE001
                 logger.warning("Failed to enrich '%s': %s", drug_name, exc)
-                entry["additional_names"] = None
                 entry["synonyms"] = None
                 continue
-            entry["additional_names"] = ", ".join(names) if names else None
             entry["synonyms"] = ", ".join(synonyms) if synonyms else None
         return records
 
@@ -1080,7 +1078,6 @@ class LiverToxMatcher:
             nbk_id = str(nbk_raw).strip() if nbk_raw not in (None, "") else ""
             excerpt_value = self._coerce_text(getattr(row, "excerpt", None))
             matching_pool = self._extract_matching_pool(
-                getattr(row, "additional_names", None),
                 getattr(row, "synonyms", None),
             )
             matching_pool.update(self._extract_parenthetical_tokens(raw_name))
