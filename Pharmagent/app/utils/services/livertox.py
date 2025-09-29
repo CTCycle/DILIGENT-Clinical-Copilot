@@ -112,17 +112,17 @@ MATCHING_STOPWORDS = {
     "without",
 }
 
-MASTER_LIST_COLUMNS: dict[str, tuple[str, ...]] = {
-    "ingredient": ("ingredient", "generic", "drug", "agent"),
-    "brand_name": ("brand", "trade", "brandname"),
-    "likelihood_score": ("likelihood", "score"),
-    "chapter_title": ("chapter", "title"),
-    "last_update": ("lastupdate", "lastupdated", "revision"),
-    "reference_count": ("references", "referencecount"),
-    "year_approved": ("yearapproved", "approvalyear"),
-    "agent_classification": ("agenttype", "agentclass", "classification"),
-    "include_in_livertox": ("include", "inclusion", "included"),
-}
+MASTER_LIST_COLUMNS: tuple[str, ...] = (
+    "ingredient",
+    "brand_name",
+    "likelihood_score",
+    "chapter_title",
+    "last_update",
+    "reference_count",
+    "year_approved",
+    "agent_classification",
+    "include_in_livertox",
+)
 
 SUPPORTED_MONOGRAPH_EXTENSIONS = (".html", ".htm", ".xhtml", ".xml", ".nxml", ".pdf")
 
@@ -133,31 +133,6 @@ DEFAULT_HTTP_HEADERS = {
 }
 
 DOWNLOAD_CHUNK_SIZE = 262_144
-
-
-def _normalize_column_name(value: str) -> str:
-    return re.sub(r"[^a-z0-9]", "", value.lower())
-
-
-def _match_master_list_column(
-    aliases: tuple[str, ...], normalized_map: dict[str, str]
-) -> str | None:
-    for alias in aliases:
-        normalized_alias = _normalize_column_name(alias)
-        if not normalized_alias:
-            continue
-        for candidate, original in normalized_map.items():
-            if candidate == normalized_alias:
-                return original
-            if normalized_alias in candidate or candidate in normalized_alias:
-                return original
-    for alias in aliases:
-        fragments = re.findall(r"[a-z0-9]+", _normalize_column_name(alias))
-        for fragment in fragments:
-            for candidate, original in normalized_map.items():
-                if fragment and fragment in candidate:
-                    return original
-    return None
 
 
 def _clean_optional_string(value: Any) -> str | None:
@@ -188,19 +163,6 @@ def _metadata_matches(stored: dict[str, Any], remote: dict[str, Any]) -> bool:
         and int(stored.get("size", 0)) == int(remote.get("size", 0))
     )
 
-
-def _build_normalized_map(values: pd.Series) -> dict[str, str]:
-    mapping: dict[str, str] = {}
-    for value in values:
-        if pd.isna(value):
-            continue
-        text = str(value).strip()
-        if not text:
-            continue
-        normalized = _normalize_column_name(text)
-        if normalized and normalized not in mapping:
-            mapping[normalized] = text
-    return mapping
 
 ###############################################################################
 async def download_file(
@@ -259,13 +221,12 @@ class LiverToxToolkit:
         if frame.empty:
             return pd.DataFrame(columns=list(MASTER_LIST_COLUMNS))
 
-        normalized_map = {
-            _normalize_column_name(column): column for column in frame.columns
-        }
         data: dict[str, Any] = {}
-        for column, aliases in MASTER_LIST_COLUMNS.items():
-            source = _match_master_list_column(aliases, normalized_map)
-            data[column] = frame[source] if source is not None else [None] * len(frame.index)
+        for column in MASTER_LIST_COLUMNS:
+            if column in frame.columns:
+                data[column] = frame[column]
+                continue
+            data[column] = [None] * len(frame.index)
 
         sanitized = pd.DataFrame(data)
         sanitized["ingredient"] = sanitized["ingredient"].astype(str).str.strip()
