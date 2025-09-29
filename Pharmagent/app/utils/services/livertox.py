@@ -11,7 +11,6 @@ import time
 import unicodedata
 from dataclasses import dataclass
 from datetime import UTC, datetime
-from tempfile import TemporaryDirectory
 from typing import Any
 
 import httpx
@@ -778,47 +777,44 @@ class LiverToxUpdater:
 
         collected: dict[str, dict[str, str]] = {}
         processed_files: set[str] = set()
-        with TemporaryDirectory() as temp_dir:
-            with tarfile.open(normalized_path, "r:gz") as archive:
-                members = archive.getmembers()
-                base_dir = os.path.abspath(temp_dir)
-                safe_members: list[tarfile.TarInfo] = []
-                for member in members:
-                    member_path = os.path.abspath(os.path.join(base_dir, member.name))
-                    if os.path.commonpath([base_dir, member_path]) != base_dir:
-                        logger.warning("Skipping unsafe archive member: %s", member.name)
-                        continue
-                    safe_members.append(member)
-                archive.extractall(base_dir, members=safe_members)
-                file_entries = {
-                    os.path.abspath(os.path.join(base_dir, member.name)): member.name
-                    for member in safe_members
-                    if member.isfile()
-                }
+        with tarfile.open(normalized_path, "r:gz") as archive:
+            members = [member for member in archive.getmembers() if member.isfile()]
+            allowed_members: list[tarfile.TarInfo] = []
+            for member in members:
+                normalized_name = os.path.normpath(member.name)
+                if os.path.isabs(normalized_name) or normalized_name.startswith(".."):
+                    logger.warning("Skipping unsafe archive member: %s", member.name)
+                    continue
+                extension = os.path.splitext(normalized_name.lower())[1]
+                if extension not in self.supported_extensions:
+                    continue
+                allowed_members.append(member)
 
-            allowed_entries = [
-                (path, original)
-                for path, original in file_entries.items()
-                if os.path.splitext(original.lower())[1] in self.supported_extensions
-            ]
-
-            for file_path, member_name in tqdm(
-                allowed_entries,
+            for member in tqdm(
+                allowed_members,
                 desc="Processing LiverTox files",
+                total=len(allowed_members),
             ):
-                with open(file_path, "rb") as handle:
-                    data = handle.read()
-                payload = self._convert_member_bytes(member_name, data)
+                base_name = os.path.basename(member.name).lower()
+                if base_name in processed_files:
+                    continue
+                extracted = archive.extractfile(member)
+                if extracted is None:
+                    continue
+                try:
+                    data = extracted.read()
+                finally:
+                    extracted.close()
+                if not data:
+                    continue
+                payload = self._convert_member_bytes(member.name, data)
                 if payload is None:
                     continue
                 plain_text, markup_text = payload
                 if not plain_text:
                     continue
-                base_name = os.path.basename(member_name).lower()
-                if base_name in processed_files:
-                    continue
-                nbk_id = self._extract_nbk(member_name, markup_text or plain_text)
-                record_key = nbk_id or self._derive_identifier(member_name)
+                nbk_id = self._extract_nbk(member.name, markup_text or plain_text)
+                record_key = nbk_id or self._derive_identifier(member.name)
                 if not record_key:
                     continue
                 if record_key in collected:
