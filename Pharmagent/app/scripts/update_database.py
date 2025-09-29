@@ -6,7 +6,6 @@ from Pharmagent.app.utils.services.livertox import LiverToxUpdater
 from Pharmagent.app.utils.database.sqlite import database
 
 REDOWNLOAD = False
-CONVERT_TO_DATAFRAME = False
 
 ###############################################################################
 if __name__ == "__main__":
