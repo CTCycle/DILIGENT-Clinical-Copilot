@@ -115,6 +115,16 @@ class RxNavClient:
         "concentrate",
         "reconstituted",
         "resin",
+        "prefilled",
+        "prefill",
+        "pre-filled",
+        "auto",
+        "injector",
+        "autoinjector",
+        "pen",
+        "device",
+        "syringe",
+        "syringes",
     }
     UNIT_STOPWORDS = {
         "mg",
@@ -131,6 +141,17 @@ class RxNavClient:
         "meq",
         "mmol",
     }
+    NAME_STOPWORDS = (
+        SALT_STOPWORDS
+        | FORM_STOPWORDS
+        | UNIT_STOPWORDS
+        | {
+            "solution",
+            "suspensions",
+        }
+    )
+    TERM_PATTERN = re.compile(r"[A-Za-z0-9]+(?:[-'][A-Za-z0-9]+)*")
+    BRACKET_PATTERN = re.compile(r"\[([^\]]+)\]")
 
     # -------------------------------------------------------------------------
     def __init__(self, *, enabled: bool | None = None) -> None:
@@ -138,37 +159,113 @@ class RxNavClient:
         self.cache: dict[str, dict[str, RxNormCandidate]] = {}
 
     # -------------------------------------------------------------------------
-    def fetch_drug_terms(self, raw_name: str) -> tuple[list[str], list[str]]:
+    def fetch_drug_terms(self, raw_name: str) -> list[str]:
         payload = self._request(raw_name)
-        if payload is None:
-            return [], []
-        drug_group = payload.get("drugGroup")
-        if not isinstance(drug_group, dict):
-            return [], []
-        groups = drug_group.get("conceptGroup")
-        if not isinstance(groups, list):
-            return [], []
-        collected_names: set[str] = set()
-        collected_synonyms: set[str] = set()
-        for group in groups:
-            if not isinstance(group, dict):
+        collected: dict[str, str] = {}
+
+        def _store(term: str) -> None:
+            normalized = self._standardize_term(term)
+            if not normalized:
+                return
+            key = normalized.casefold()
+            if key not in collected:
+                collected[key] = normalized
+
+        if payload is not None:
+            drug_group = payload.get("drugGroup")
+            if isinstance(drug_group, dict):
+                groups = drug_group.get("conceptGroup")
+                if isinstance(groups, list):
+                    for group in groups:
+                        if not isinstance(group, dict):
+                            continue
+                        props = group.get("conceptProperties")
+                        if not isinstance(props, list):
+                            continue
+                        for prop in props:
+                            if not isinstance(prop, dict):
+                                continue
+                            for value in self._gather_property_values(prop):
+                                for term in self._extract_core_names(value):
+                                    _store(term)
+
+        for term in self._extract_core_names(raw_name):
+            _store(term)
+        _store(raw_name)
+        return sorted(collected.values(), key=str.casefold)
+
+    # -------------------------------------------------------------------------
+    def _gather_property_values(self, prop: dict[str, Any]) -> list[str]:
+        values: list[str] = []
+        for key in ("name", "synonym", "prescribableName", "psn"):
+            value = prop.get(key)
+            if isinstance(value, str) and value.strip():
+                values.append(value)
+        return values
+
+    # -------------------------------------------------------------------------
+    def _extract_core_names(self, raw_value: str | None) -> set[str]:
+        if not isinstance(raw_value, str):
+            return set()
+        text = unicodedata.normalize("NFKC", raw_value)
+        segments: list[str] = []
+        segments.extend(self.BRACKET_PATTERN.findall(text))
+        text = self.BRACKET_PATTERN.sub(" ", text)
+        segments.extend(part.strip() for part in text.split(","))
+        extracted: set[str] = set()
+
+        for segment in segments:
+            cleaned = segment.strip()
+            if not cleaned:
                 continue
-            props = group.get("conceptProperties")
-            if not isinstance(props, list):
-                continue
-            for prop in props:
-                if not isinstance(prop, dict):
+            tokens: list[str] = []
+
+            def _flush() -> None:
+                if not tokens:
+                    return
+                term = " ".join(tokens).strip()
+                if term:
+                    extracted.add(term)
+                tokens.clear()
+
+            for match in self.TERM_PATTERN.finditer(cleaned):
+                token = match.group(0)
+                if not any(char.isalpha() for char in token):
+                    _flush()
                     continue
-                name = prop.get("name")
-                if isinstance(name, str) and name.strip():
-                    collected_names.add(name.strip())
-                for key in ("synonym", "prescribableName", "psn"):
-                    value = prop.get(key)
-                    if isinstance(value, str) and value.strip():
-                        collected_synonyms.add(value.strip())
-        if raw_name.strip():
-            collected_names.add(raw_name.strip())
-        return sorted(collected_names), sorted(collected_synonyms)
+                normalized = token.lower().strip("-'")
+                base = re.sub(r"[^a-z0-9]", "", normalized)
+                if not base:
+                    _flush()
+                    continue
+                if base in self.NAME_STOPWORDS or base.rstrip("s") in self.NAME_STOPWORDS:
+                    _flush()
+                    continue
+                tokens.append(token.strip("-'").strip())
+            _flush()
+
+        standardized = {
+            self._standardize_term(term) for term in extracted if term.strip()
+        }
+        return {term for term in standardized if term}
+
+    # -------------------------------------------------------------------------
+    def _standardize_term(self, term: str) -> str:
+        normalized = unicodedata.normalize("NFKC", term).strip()
+        if not normalized:
+            return ""
+        normalized = re.sub(r"\s+", " ", normalized)
+        words = normalized.split()
+        formatted: list[str] = []
+        for word in words:
+            simplified = re.sub(r"[-'\s]", "", word)
+            if simplified.isupper() and len(simplified) > 1:
+                formatted.append(word)
+            elif simplified.islower():
+                formatted.append(word.capitalize())
+            else:
+                formatted.append(word)
+        return " ".join(formatted)
 
     # -------------------------------------------------------------------------
     def expand(self, raw_name: str) -> dict[str, str]:
