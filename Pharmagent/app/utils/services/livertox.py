@@ -11,7 +11,6 @@ import time
 import unicodedata
 from dataclasses import dataclass
 from datetime import UTC, datetime
-from tempfile import TemporaryDirectory
 from typing import Any
 
 import httpx
@@ -113,28 +112,19 @@ MATCHING_STOPWORDS = {
     "without",
 }
 
-MASTER_LIST_COLUMNS: dict[str, tuple[str, ...]] = {
-    "ingredient": ("ingredient", "generic", "drug", "agent"),
-    "brand_name": ("brand", "trade", "brandname"),
-    "likelihood_score": ("likelihood", "score"),
-    "chapter_title": ("chapter", "title"),
-    "last_update": ("lastupdate", "lastupdated", "revision"),
-    "reference_count": ("references", "referencecount"),
-    "year_approved": ("yearapproved", "approvalyear"),
-    "agent_classification": ("agenttype", "agentclass", "classification"),
-    "include_in_livertox": ("include", "inclusion", "included"),
-}
+MASTER_LIST_COLUMNS: tuple[str, ...] = (
+    "ingredient",
+    "brand_name",
+    "likelihood_score",
+    "chapter_title",
+    "last_update",
+    "reference_count",
+    "year_approved",
+    "agent_classification",
+    "include_in_livertox",
+)
 
 SUPPORTED_MONOGRAPH_EXTENSIONS = (".html", ".htm", ".xhtml", ".xml", ".nxml", ".pdf")
-
-MONOGRAPH_EXTENSION_PRIORITY = {
-    ".nxml": 0,
-    ".xml": 1,
-    ".html": 2,
-    ".htm": 2,
-    ".xhtml": 2,
-    ".pdf": 3,
-}
 
 DEFAULT_HTTP_HEADERS = {
     "User-Agent": (
@@ -143,31 +133,6 @@ DEFAULT_HTTP_HEADERS = {
 }
 
 DOWNLOAD_CHUNK_SIZE = 262_144
-
-
-def _normalize_column_name(value: str) -> str:
-    return re.sub(r"[^a-z0-9]", "", value.lower())
-
-
-def _match_master_list_column(
-    aliases: tuple[str, ...], normalized_map: dict[str, str]
-) -> str | None:
-    for alias in aliases:
-        normalized_alias = _normalize_column_name(alias)
-        if not normalized_alias:
-            continue
-        for candidate, original in normalized_map.items():
-            if candidate == normalized_alias:
-                return original
-            if normalized_alias in candidate or candidate in normalized_alias:
-                return original
-    for alias in aliases:
-        fragments = re.findall(r"[a-z0-9]+", _normalize_column_name(alias))
-        for fragment in fragments:
-            for candidate, original in normalized_map.items():
-                if fragment and fragment in candidate:
-                    return original
-    return None
 
 
 def _clean_optional_string(value: Any) -> str | None:
@@ -198,19 +163,6 @@ def _metadata_matches(stored: dict[str, Any], remote: dict[str, Any]) -> bool:
         and int(stored.get("size", 0)) == int(remote.get("size", 0))
     )
 
-
-def _build_normalized_map(values: pd.Series) -> dict[str, str]:
-    mapping: dict[str, str] = {}
-    for value in values:
-        if pd.isna(value):
-            continue
-        text = str(value).strip()
-        if not text:
-            continue
-        normalized = _normalize_column_name(text)
-        if normalized and normalized not in mapping:
-            mapping[normalized] = text
-    return mapping
 
 ###############################################################################
 async def download_file(
@@ -269,19 +221,19 @@ class LiverToxToolkit:
         if frame.empty:
             return pd.DataFrame(columns=list(MASTER_LIST_COLUMNS))
 
-        normalized_map = {
-            _normalize_column_name(column): column for column in frame.columns
-        }
         data: dict[str, Any] = {}
-        for column, aliases in MASTER_LIST_COLUMNS.items():
-            source = _match_master_list_column(aliases, normalized_map)
-            data[column] = frame[source] if source is not None else [None] * len(frame.index)
+        for column in MASTER_LIST_COLUMNS:
+            if column in frame.columns:
+                data[column] = frame[column]
+                continue
+            data[column] = [None] * len(frame.index)
 
         sanitized = pd.DataFrame(data)
         sanitized["ingredient"] = sanitized["ingredient"].astype(str).str.strip()
         sanitized = sanitized[sanitized["ingredient"] != ""].copy()
         for column in ("brand_name", "likelihood_score", "chapter_title"):
             sanitized[column] = sanitized[column].map(_clean_optional_string)
+        sanitized = sanitized[pd.notnull(sanitized["brand_name"])].copy()
         sanitized["last_update"] = pd.to_datetime(
             sanitized["last_update"], errors="coerce"
         ).dt.date
@@ -310,7 +262,6 @@ class LiverToxUpdater:
     ) -> None:
         self.toolkit = toolkit or LiverToxToolkit()
         self.supported_extensions = SUPPORTED_MONOGRAPH_EXTENSIONS
-        self.extension_priority = MONOGRAPH_EXTENSION_PRIORITY
         self.http_headers = dict(DEFAULT_HTTP_HEADERS)
         self.delay = 0.5
         self.chunk_size = DOWNLOAD_CHUNK_SIZE
@@ -786,60 +737,48 @@ class LiverToxUpdater:
         if not tarfile.is_tarfile(normalized_path):
             raise RuntimeError(f"Invalid LiverTox archive at {normalized_path}")
 
-        collected: dict[str, dict[str, str]] = {}
-        priorities: dict[str, int] = {}
-        with TemporaryDirectory() as temp_dir:
-            with tarfile.open(normalized_path, "r:gz") as archive:
-                members = archive.getmembers()
-                base_dir = os.path.abspath(temp_dir)
-                safe_members: list[tarfile.TarInfo] = []
-                for member in members:
-                    member_path = os.path.abspath(os.path.join(base_dir, member.name))
-                    if os.path.commonpath([base_dir, member_path]) != base_dir:
-                        logger.warning("Skipping unsafe archive member: %s", member.name)
-                        continue
-                    safe_members.append(member)
-                archive.extractall(base_dir, members=safe_members)
-                file_entries = {
-                    os.path.abspath(os.path.join(base_dir, member.name)): member.name
-                    for member in safe_members
-                    if member.isfile()
-                }
+        collected: list[dict[str, str]] = []
+        processed_files: set[str] = set()
+        with tarfile.open(normalized_path, "r:gz") as archive:
+            members = [member for member in archive.getmembers() if member.isfile()]
+            allowed_members: list[tarfile.TarInfo] = []
+            for member in members:
+                normalized_name = os.path.normpath(member.name)
+                if os.path.isabs(normalized_name) or normalized_name.startswith(".."):
+                    logger.warning("Skipping unsafe archive member: %s", member.name)
+                    continue
+                extension = os.path.splitext(normalized_name.lower())[1]
+                if extension not in self.supported_extensions:
+                    continue
+                allowed_members.append(member)
 
-            allowed_entries = [
-                (path, original)
-                for path, original in file_entries.items()
-                if os.path.splitext(original.lower())[1] in self.supported_extensions
-            ]
-
-            for file_path, member_name in tqdm(
-                allowed_entries,
+            for member in tqdm(
+                allowed_members,
                 desc="Processing LiverTox files",
+                total=len(allowed_members),
             ):
-                with open(file_path, "rb") as handle:
-                    data = handle.read()
-                payload = self._convert_member_bytes(member_name, data)
+                base_name = os.path.basename(member.name).lower()
+                if base_name in processed_files:
+                    continue
+                extracted = archive.extractfile(member)
+                if extracted is None:
+                    continue
+                try:
+                    data = extracted.read()
+                finally:
+                    extracted.close()
+                if not data:
+                    continue
+                payload = self._convert_member_bytes(member.name, data)
                 if payload is None:
                     continue
                 plain_text, markup_text = payload
                 if not plain_text:
                     continue
-                nbk_id = self._extract_nbk(member_name, markup_text or plain_text)
-                record_key = nbk_id or self._derive_identifier(member_name)
-                if not record_key:
+                nbk_id = self._extract_nbk(member.name, markup_text or plain_text)
+                record_nbk = nbk_id or self._derive_identifier(member.name)
+                if not record_nbk:
                     continue
-                priority = self.extension_priority.get(
-                    os.path.splitext(member_name.lower())[1],
-                    len(self.extension_priority) + 1,
-                )
-                existing_priority = priorities.get(record_key)
-                if existing_priority is not None and existing_priority < priority:
-                    continue
-                if existing_priority is not None and existing_priority == priority:
-                    current_excerpt = collected[record_key]["excerpt"]
-                    if len(current_excerpt) >= len(plain_text):
-                        continue
-                record_nbk = nbk_id or record_key
                 drug_name = self._extract_title(
                     markup_text or "", plain_text, record_nbk
                 )
@@ -849,12 +788,12 @@ class LiverToxUpdater:
                 record = {
                     "nbk_id": record_nbk,
                     "drug_name": drug_name,
-                    "excerpt": cleaned_text                    
+                    "excerpt": cleaned_text
                 }
-                collected[record_key] = record
-                priorities[record_key] = priority
+                collected.append(record)
+                processed_files.add(base_name)
 
-        return list(collected.values())
+        return collected
 
     # -------------------------------------------------------------------------
     def _convert_member_bytes(
@@ -976,17 +915,14 @@ class LiverToxUpdater:
         for entry in records:
             drug_name = entry.get("drug_name")
             if not isinstance(drug_name, str) or not drug_name.strip():
-                entry["additional_names"] = None
                 entry["synonyms"] = None
                 continue
             try:
-                names, synonyms = self.rx_client.fetch_drug_terms(drug_name)
+                synonyms = self.rx_client.fetch_drug_terms(drug_name)
             except Exception as exc:  # noqa: BLE001
                 logger.warning("Failed to enrich '%s': %s", drug_name, exc)
-                entry["additional_names"] = None
                 entry["synonyms"] = None
                 continue
-            entry["additional_names"] = ", ".join(names) if names else None
             entry["synonyms"] = ", ".join(synonyms) if synonyms else None
         return records
 
@@ -1142,7 +1078,6 @@ class LiverToxMatcher:
             nbk_id = str(nbk_raw).strip() if nbk_raw not in (None, "") else ""
             excerpt_value = self._coerce_text(getattr(row, "excerpt", None))
             matching_pool = self._extract_matching_pool(
-                getattr(row, "additional_names", None),
                 getattr(row, "synonyms", None),
             )
             matching_pool.update(self._extract_parenthetical_tokens(raw_name))
