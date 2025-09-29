@@ -44,7 +44,6 @@ class LiverToxMonographs(Base):
     nbk_id = Column(String, primary_key=True)
     drug_name = Column(String, primary_key=True)
     excerpt = Column(Text)
-    additional_names = Column(Text)
     synonyms = Column(Text)
     __table_args__ = (UniqueConstraint("nbk_id", "drug_name"),)
 
