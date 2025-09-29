@@ -47,6 +47,10 @@ if "pypdf" not in sys.modules:
     pypdf_stub.PdfReader = _PdfReader
     sys.modules["pypdf"] = pypdf_stub
 
+REPO_ROOT = os.path.abspath(os.path.join(os.path.dirname(__file__), ".."))
+if REPO_ROOT not in sys.path:
+    sys.path.insert(0, REPO_ROOT)
+
 providers_module_name = "Pharmagent.app.api.models.providers"
 if providers_module_name not in sys.modules:
     providers_stub = types.ModuleType(providers_module_name)
@@ -76,9 +80,12 @@ if clinical_module_name not in sys.modules:
     sys.modules[clinical_module_name] = clinical_stub
 
 import pandas as pd
+from sqlalchemy import create_engine
+from sqlalchemy.orm import sessionmaker
 
 from Pharmagent.app.utils.serializer import DataSerializer
 from Pharmagent.app.utils.services.livertox import LiverToxToolkit, LiverToxUpdater
+from Pharmagent.app.utils.database import sqlite as sqlite_module
 
 
 ###############################################################################
@@ -139,15 +146,16 @@ class LiverToxMasterListTests(unittest.TestCase):
         toolkit = LiverToxToolkit()
         frame = pd.DataFrame(
             {
-                "Ingredient Name": ["Drug A", "Drug B"],
-                "Brand": ["BrandA", "BrandB"],
-                "Likelihood Score": ["A", "B"],
-                "Chapter Title": ["Chapter A", "Chapter B"],
-                "Last Update": ["2024-01-01", "2024-02-01"],
-                "Reference Count": [5, 10],
-                "Year Approved": [2001, 2002],
-                "Agent Classification": ["Class A", "Class B"],
-                "Include in LiverTox": ["Yes", "Yes"],
+                "ingredient": ["Drug A", "Drug B"],
+                "brand_name": ["BrandA", "BrandB"],
+                "likelihood_score": ["A", "B"],
+                "chapter_title": ["Chapter A", "Chapter B"],
+                "last_update": ["2024-01-01", "2024-02-01"],
+                "reference_count": [5, 10],
+                "year_approved": [2001, 2002],
+                "agent_classification": ["Class A", "Class B"],
+                "include_in_livertox": ["Yes", "Yes"],
+                "extra_column": ["value1", "value2"],
             }
         )
 
@@ -160,15 +168,15 @@ class LiverToxMasterListTests(unittest.TestCase):
     def test_refresh_master_list_saves_multiple_rows(self) -> None:
         frame = pd.DataFrame(
             {
-                "Ingredient Name": ["Drug C", "Drug D"],
-                "Brand Name": ["BrandC", "BrandD"],
-                "Likelihood Score": ["C", "D"],
-                "Chapter Title": ["Chapter C", "Chapter D"],
-                "Last Update": ["2024-03-01", "2024-04-01"],
-                "Reference Count": [12, 8],
-                "Year Approved": [2003, 2004],
-                "Agent Classification": ["Class C", "Class D"],
-                "Include in LiverTox": ["Yes", "Yes"],
+                "ingredient": ["Drug C", "Drug D"],
+                "brand_name": ["BrandC", "BrandD"],
+                "likelihood_score": ["C", "D"],
+                "chapter_title": ["Chapter C", "Chapter D"],
+                "last_update": ["2024-03-01", "2024-04-01"],
+                "reference_count": [12, 8],
+                "year_approved": [2003, 2004],
+                "agent_classification": ["Class C", "Class D"],
+                "include_in_livertox": ["Yes", "Yes"],
             }
         )
 
@@ -197,6 +205,73 @@ class LiverToxMasterListTests(unittest.TestCase):
         self.assertEqual(2, len(serializer.saved_frame.index))
         self.assertEqual(2, result.get("records"))
         self.assertEqual("https://example.test/master.xlsx", result.get("source_url"))
+
+    ###########################################################################
+    def test_refresh_master_list_populates_database_table(self) -> None:
+        frame = pd.DataFrame(
+            {
+                "ingredient": ["Drug E", "Drug F"],
+                "brand_name": ["BrandE", "BrandF"],
+                "likelihood_score": ["E", "F"],
+                "chapter_title": ["Chapter E", "Chapter F"],
+                "last_update": ["2024-05-01", "2024-06-01"],
+                "reference_count": [7, 3],
+                "year_approved": [2005, 2006],
+                "agent_classification": ["Class E", "Class F"],
+                "include_in_livertox": ["Yes", "Yes"],
+            }
+        )
+
+        with tempfile.TemporaryDirectory() as temp_dir:
+            excel_path = os.path.join(temp_dir, "master.xlsx")
+            metadata = {
+                "file_path": excel_path,
+                "size": 0,
+                "last_modified": "Wed, 02 Jan 2025 00:00:00 GMT",
+                "downloaded": True,
+                "source_url": "https://example.test/master.xlsx",
+            }
+
+            db_path = os.path.join(temp_dir, "test.db")
+            engine = create_engine(f"sqlite:///{db_path}", future=True)
+            session_factory = sessionmaker(bind=engine, future=True)
+
+            original_engine = sqlite_module.database.engine
+            original_session_factory = sqlite_module.database.Session
+            original_db_path = sqlite_module.database.db_path
+
+            sqlite_module.Base.metadata.create_all(engine)
+            sqlite_module.database.engine = engine
+            sqlite_module.database.Session = session_factory
+            sqlite_module.database.db_path = db_path
+
+            try:
+                serializer = DataSerializer()
+                updater = _TestUpdater(
+                    metadata,
+                    sources_path=temp_dir,
+                    serializer=serializer,
+                )
+
+                with patch("pandas.read_excel", return_value=frame.copy()):
+                    result = updater.refresh_master_list()
+
+                saved = sqlite_module.database.load_from_database(
+                    "LIVERTOX_MASTER_LIST"
+                )
+            finally:
+                sqlite_module.database.engine = original_engine
+                sqlite_module.database.Session = original_session_factory
+                sqlite_module.database.db_path = original_db_path
+                engine.dispose()
+
+        assert saved is not None
+        self.assertEqual(2, len(saved.index))
+        self.assertSetEqual({"Drug E", "Drug F"}, set(saved["ingredient"].tolist()))
+        self.assertSetEqual(
+            {"https://example.test/master.xlsx"}, set(saved["source_url"].tolist())
+        )
+        self.assertEqual(2, result.get("records"))
 
 
 if __name__ == "__main__":
