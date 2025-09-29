@@ -111,8 +111,8 @@ class _RecordingSerializer(DataSerializer):
 ###############################################################################
 class _StubRxClient:
     ###########################################################################
-    def fetch_drug_terms(self, drug_name: str) -> tuple[list[str], list[str]]:
-        return [], []
+    def fetch_drug_terms(self, drug_name: str) -> list[str]:
+        return []
 
 
 ###############################################################################
@@ -165,18 +165,40 @@ class LiverToxMasterListTests(unittest.TestCase):
         self.assertListEqual(["Drug A", "Drug B"], sanitized["ingredient"].tolist())
 
     ###########################################################################
+    def test_sanitize_master_list_requires_brand_name(self) -> None:
+        toolkit = LiverToxToolkit()
+        frame = pd.DataFrame(
+            {
+                "ingredient": ["Drug X", "Drug Y"],
+                "brand_name": ["BrandX", None],
+                "likelihood_score": ["X", "Y"],
+                "chapter_title": ["Chapter X", "Chapter Y"],
+                "last_update": ["2024-07-01", "2024-08-01"],
+                "reference_count": [2, 4],
+                "year_approved": [2010, 2011],
+                "agent_classification": ["Class X", "Class Y"],
+                "include_in_livertox": ["Yes", "No"],
+            }
+        )
+
+        sanitized = toolkit.sanitize_livertox_master_list(frame)
+
+        self.assertEqual(1, len(sanitized.index))
+        self.assertListEqual(["Drug X"], sanitized["ingredient"].tolist())
+
+    ###########################################################################
     def test_refresh_master_list_saves_multiple_rows(self) -> None:
         frame = pd.DataFrame(
             {
-                "ingredient": ["Drug C", "Drug D"],
-                "brand_name": ["BrandC", "BrandD"],
-                "likelihood_score": ["C", "D"],
-                "chapter_title": ["Chapter C", "Chapter D"],
-                "last_update": ["2024-03-01", "2024-04-01"],
-                "reference_count": [12, 8],
-                "year_approved": [2003, 2004],
-                "agent_classification": ["Class C", "Class D"],
-                "include_in_livertox": ["Yes", "Yes"],
+                "ingredient": ["Drug C", "Drug D", "Drug E"],
+                "brand_name": ["BrandC", "BrandD", None],
+                "likelihood_score": ["C", "D", "E"],
+                "chapter_title": ["Chapter C", "Chapter D", "Chapter E"],
+                "last_update": ["2024-03-01", "2024-04-01", "2024-05-01"],
+                "reference_count": [12, 8, 5],
+                "year_approved": [2003, 2004, 2005],
+                "agent_classification": ["Class C", "Class D", "Class E"],
+                "include_in_livertox": ["Yes", "Yes", "No"],
             }
         )
 
@@ -210,15 +232,15 @@ class LiverToxMasterListTests(unittest.TestCase):
     def test_refresh_master_list_populates_database_table(self) -> None:
         frame = pd.DataFrame(
             {
-                "ingredient": ["Drug E", "Drug F"],
-                "brand_name": ["BrandE", "BrandF"],
-                "likelihood_score": ["E", "F"],
-                "chapter_title": ["Chapter E", "Chapter F"],
-                "last_update": ["2024-05-01", "2024-06-01"],
-                "reference_count": [7, 3],
-                "year_approved": [2005, 2006],
-                "agent_classification": ["Class E", "Class F"],
-                "include_in_livertox": ["Yes", "Yes"],
+                "ingredient": ["Drug F", "Drug G", "Drug H"],
+                "brand_name": ["BrandF", "BrandG", None],
+                "likelihood_score": ["F", "G", "H"],
+                "chapter_title": ["Chapter F", "Chapter G", "Chapter H"],
+                "last_update": ["2024-05-01", "2024-06-01", "2024-07-01"],
+                "reference_count": [7, 3, 9],
+                "year_approved": [2005, 2006, 2007],
+                "agent_classification": ["Class F", "Class G", "Class H"],
+                "include_in_livertox": ["Yes", "Yes", "No"],
             }
         )
 
@@ -267,7 +289,7 @@ class LiverToxMasterListTests(unittest.TestCase):
 
         assert saved is not None
         self.assertEqual(2, len(saved.index))
-        self.assertSetEqual({"Drug E", "Drug F"}, set(saved["ingredient"].tolist()))
+        self.assertSetEqual({"Drug F", "Drug G"}, set(saved["ingredient"].tolist()))
         self.assertSetEqual(
             {"https://example.test/master.xlsx"}, set(saved["source_url"].tolist())
         )
