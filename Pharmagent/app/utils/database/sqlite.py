@@ -52,17 +52,19 @@ class LiverToxMonographs(Base):
 class LiverToxMasterList(Base):
     __tablename__ = "LIVERTOX_MASTER_LIST"
     ingredient = Column(String, primary_key=True)
-    brand_name = Column(Text)
+    brand_name = Column(String, primary_key=True)
     likelihood_score = Column(String)
-    chapter_title = Column(Text)
+    chapter_title = Column(String)
     last_update = Column(String)
     reference_count = Column(String)
     year_approved = Column(String)
     agent_classification = Column(String)
+    primary_classification = Column(String)
+    secondary_classification = Column(String)
     include_in_livertox = Column(String)
     source_url = Column(String)
     source_last_modified = Column(String)
-    __table_args__ = (UniqueConstraint("ingredient"),)
+    __table_args__ = (UniqueConstraint("ingredient", "brand_name"),)
 
 
 # [DATABASE]
