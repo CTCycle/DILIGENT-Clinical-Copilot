@@ -5,7 +5,7 @@ from Pharmagent.app.logger import logger
 from Pharmagent.app.utils.services.livertox import LiverToxUpdater
 from Pharmagent.app.utils.database.sqlite import database
 
-REDOWNLOAD = False
+REDOWNLOAD = True
 
 ###############################################################################
 if __name__ == "__main__":
