@@ -250,15 +250,10 @@ class LiverToxUpdater:
             "Secondary Classification": "secondary_classification",
         }
 
-        data = data.rename(columns=column_mapping)
-        if "brand_name" not in data.columns:
-            return
-
+        data = data.rename(columns=lambda s: re.sub(r'\s+', ' ', s).strip())
+        data = data.rename(columns=column_mapping)        
         data = data.dropna(subset=["brand_name"])
-        if "last_update" in data.columns:
-            data["last_update"] = pd.to_datetime(
-                data["last_update"], errors="coerce"
-            )
+        data["last_update"] = pd.to_datetime(data["last_update"], errors="coerce")
 
         return data.reset_index(drop=True)
 
@@ -324,6 +319,9 @@ class LiverToxUpdater:
             skiprows=0,
         )
         sanitized = self.sanitize_livertox_master_list(frame)
+        if sanitized is None or sanitized.empty:
+            return {}
+        
         self.serializer.save_livertox_master_list(
             sanitized,
             source_url=metadata["source_url"],
