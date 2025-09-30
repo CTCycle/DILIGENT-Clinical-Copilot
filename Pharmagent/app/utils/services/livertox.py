@@ -251,11 +251,58 @@ class LiverToxUpdater:
         }
 
         data = data.rename(columns=lambda s: re.sub(r'\s+', ' ', s).strip())
-        data = data.rename(columns=column_mapping)        
-        data = data.dropna(subset=["brand_name"])
+        data = data.rename(columns=column_mapping)
+
+        required_columns = list(column_mapping.values())
+        for column in required_columns:
+            if column not in data.columns:
+                data[column] = pd.NA
+
+        data = data[required_columns]
+
+        text_columns = [
+            "ingredient",
+            "brand_name",
+            "likelihood_score",
+            "chapter_title",
+            "agent_classification",
+            "primary_classification",
+            "secondary_classification",
+        ]
+        for column in text_columns:
+            data[column] = self._clean_master_list_column(data[column])
+
+        data = data.dropna(subset=["ingredient", "brand_name"])
+
+        invalid_headers = {
+            "ingredient": {"ingredient", "count"},
+            "brand_name": {"brand name"},
+        }
+        for column, values in invalid_headers.items():
+            data = data[
+                ~data[column]
+                .fillna("")
+                .str.lower()
+                .isin(values)
+            ]
+
         data["last_update"] = pd.to_datetime(data["last_update"], errors="coerce")
+        data["reference_count"] = pd.to_numeric(
+            data["reference_count"], errors="coerce"
+        )
+        data["year_approved"] = pd.to_numeric(
+            data["year_approved"], errors="coerce"
+        )
+
+        data = data.drop_duplicates(subset=["ingredient", "brand_name"], keep="last")
 
         return data.reset_index(drop=True)
+
+    # -------------------------------------------------------------------------
+    def _clean_master_list_column(self, series: pd.Series) -> pd.Series:
+        cleaned = series.fillna("").astype(str).str.strip()
+        cleaned = cleaned.replace("", pd.NA)
+        return cleaned
 
     # -------------------------------------------------------------------------
     async def download_bulk_data(self, dest_path: str) -> dict[str, Any]:
