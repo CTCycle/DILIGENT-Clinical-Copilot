@@ -83,13 +83,27 @@ class DataSerializer:
         self, frame: pd.DataFrame, *, source_url: str, last_modified: str | None
     ) -> None:        
         frame["source_url"] = source_url
-        frame["source_last_modified"] = last_modified        
+        frame["source_last_modified"] = last_modified
         if "brand_name" not in frame.columns:
             return
 
+        frame = frame.copy()
         frame = frame[pd.notnull(frame["brand_name"])]
+        if "ingredient" in frame.columns:
+            frame["ingredient"] = frame["ingredient"].where(
+                pd.notnull(frame["ingredient"]), ""
+            )
+            frame["ingredient"] = frame["ingredient"].astype(str).str.strip()
+            frame.loc[frame["ingredient"] == "", "ingredient"] = None
         frame["brand_name"] = frame["brand_name"].astype(str).str.strip()
         frame = frame[frame["brand_name"] != ""]
+        if "ingredient" in frame.columns:
+            frame = frame[pd.notnull(frame["ingredient"])]
+            frame = frame[frame["ingredient"] != ""]
+            frame = frame.drop_duplicates(
+                subset=["ingredient", "brand_name"], keep="last"
+            )
+
         database.save_into_database(frame, "LIVERTOX_MASTER_LIST")
 
     
