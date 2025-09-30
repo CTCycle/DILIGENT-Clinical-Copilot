@@ -112,18 +112,6 @@ MATCHING_STOPWORDS = {
     "without",
 }
 
-MASTER_LIST_COLUMNS: tuple[str, ...] = (
-    "ingredient",
-    "brand_name",
-    "likelihood_score",
-    "chapter_title",
-    "last_update",
-    "reference_count",
-    "year_approved",
-    "agent_classification",
-    "include_in_livertox",
-)
-
 SUPPORTED_MONOGRAPH_EXTENSIONS = (".html", ".htm", ".xhtml", ".xml", ".nxml", ".pdf")
 
 DEFAULT_HTTP_HEADERS = {
@@ -134,14 +122,7 @@ DEFAULT_HTTP_HEADERS = {
 
 DOWNLOAD_CHUNK_SIZE = 262_144
 
-
-def _clean_optional_string(value: Any) -> str | None:
-    if pd.isna(value):
-        return None
-    text = str(value).strip()
-    return text or None
-
-
+# -----------------------------------------------------------------------------
 def _load_json(path: str) -> dict[str, Any] | None:
     if not os.path.isfile(path):
         return None
@@ -151,12 +132,12 @@ def _load_json(path: str) -> dict[str, Any] | None:
     except (json.JSONDecodeError, OSError):
         return None
 
-
+# -----------------------------------------------------------------------------
 def save_masterlist_metadata(path: str, payload: dict[str, Any]) -> None:
     with open(path, "w", encoding="utf-8") as handle:
         json.dump(payload, handle)
 
-
+# -----------------------------------------------------------------------------
 def _metadata_matches(stored: dict[str, Any], remote: dict[str, Any]) -> bool:
     return (
         stored.get("last_modified") == remote.get("last_modified")
@@ -214,40 +195,6 @@ class LiverToxMatch:
 
 
 ###############################################################################
-class LiverToxToolkit:
-
-    ###########################################################################
-    def sanitize_livertox_master_list(self, frame: pd.DataFrame) -> pd.DataFrame:
-        if frame.empty:
-            return pd.DataFrame(columns=list(MASTER_LIST_COLUMNS))
-
-        data: dict[str, Any] = {}
-        for column in MASTER_LIST_COLUMNS:
-            if column in frame.columns:
-                data[column] = frame[column]
-                continue
-            data[column] = [None] * len(frame.index)
-
-        sanitized = pd.DataFrame(data)
-        sanitized["ingredient"] = sanitized["ingredient"].astype(str).str.strip()
-        sanitized = sanitized[sanitized["ingredient"] != ""].copy()
-        for column in ("brand_name", "likelihood_score", "chapter_title"):
-            sanitized[column] = sanitized[column].map(_clean_optional_string)
-        sanitized = sanitized[pd.notnull(sanitized["brand_name"])].copy()
-        sanitized["last_update"] = pd.to_datetime(
-            sanitized["last_update"], errors="coerce"
-        ).dt.date
-        for column in ("reference_count", "year_approved"):
-            values = pd.to_numeric(sanitized[column], errors="coerce")
-            sanitized[column] = values.astype("float32")
-        for column in ("agent_classification", "include_in_livertox"):
-            sanitized[column] = sanitized[column].map(_clean_optional_string)
-        sanitized = sanitized.drop_duplicates(subset=["ingredient"], keep="first")
-        sanitized = sanitized.reset_index(drop=True)
-        return sanitized[list(MASTER_LIST_COLUMNS)]
-
-
-###############################################################################
 class LiverToxUpdater:
     
     def __init__(
@@ -257,10 +204,8 @@ class LiverToxUpdater:
         redownload: bool,
         rx_client: RxNavClient | None = None,
         serializer: DataSerializer | None = None,
-        database_client=database,
-        toolkit: LiverToxToolkit | None = None,
-    ) -> None:
-        self.toolkit = toolkit or LiverToxToolkit()
+        database_client=database,        
+    ) -> None:        
         self.supported_extensions = SUPPORTED_MONOGRAPH_EXTENSIONS
         self.http_headers = dict(DEFAULT_HTTP_HEADERS)
         self.delay = 0.5
@@ -285,8 +230,21 @@ class LiverToxUpdater:
         self.archive_metadata_path = os.path.join(
             SOURCES_PATH, "livertox_archive.metadata.json"
         )
+        
+    # -------------------------------------------------------------------------
+    def sanitize_livertox_master_list(self, data: pd.DataFrame) -> pd.DataFrame | None:
+        if data.empty:
+            return 
+        
+        for x in data.columns:
+            print(x)
 
-     # -------------------------------------------------------------------------
+        data = data.dropna(subset=["Brand Name"])
+        data["Last Update"] = pd.to_datetime(data["Last Update"], errors="coerce")
+
+        return data.reset_index(drop=True)
+
+    # -------------------------------------------------------------------------
     async def download_bulk_data(self, dest_path: str) -> dict[str, Any]:
         url = self.base_url + self.file_name
         async with httpx.AsyncClient(
@@ -347,8 +305,7 @@ class LiverToxUpdater:
             header=self.header_row,
             skiprows=0,
         )
-        sanitized = self.toolkit.sanitize_livertox_master_list(frame)
-
+        sanitized = self.sanitize_livertox_master_list(frame)
         self.serializer.save_livertox_master_list(
             sanitized,
             source_url=metadata["source_url"],
