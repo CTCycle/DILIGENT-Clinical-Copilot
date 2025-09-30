@@ -236,11 +236,29 @@ class LiverToxUpdater:
         if data.empty:
             return 
         
-        for x in data.columns:
-            print(x)
+        column_mapping = {
+            "Count": "reference_count",
+            "Ingredient": "ingredient",
+            "Brand Name": "brand_name",
+            "Likelihood Score": "likelihood_score",
+            "Chapter Title": "chapter_title",
+            "Last Update": "last_update",
+            "Year Approved": "year_approved",
+            "Type of Agent": "agent_classification",
+            "In LiverTox": "include_in_livertox",
+            "Primary Classification": "primary_classification",
+            "Secondary Classification": "secondary_classification",
+        }
 
-        data = data.dropna(subset=["Brand Name"])
-        data["Last Update"] = pd.to_datetime(data["Last Update"], errors="coerce")
+        data = data.rename(columns=column_mapping)
+        if "brand_name" not in data.columns:
+            return
+
+        data = data.dropna(subset=["brand_name"])
+        if "last_update" in data.columns:
+            data["last_update"] = pd.to_datetime(
+                data["last_update"], errors="coerce"
+            )
 
         return data.reset_index(drop=True)
 
