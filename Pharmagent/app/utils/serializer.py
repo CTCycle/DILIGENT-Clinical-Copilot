@@ -85,7 +85,7 @@ class DataSerializer:
         frame["source_url"] = source_url
         frame["source_last_modified"] = last_modified
         frame = frame.copy()
-        frame = frame[pd.notnull(frame["brand_name"])].copy()
+        frame = frame[pd.notnull(frame["Brand Name"])].copy()
         frame["brand_name"] = frame["brand_name"].astype(str).str.strip()
         frame = frame[frame["brand_name"] != ""]
         database.save_into_database(frame, "LIVERTOX_MASTER_LIST")
