@@ -84,7 +84,7 @@ from sqlalchemy import create_engine
 from sqlalchemy.orm import sessionmaker
 
 from Pharmagent.app.utils.serializer import DataSerializer
-from Pharmagent.app.utils.services.livertox import LiverToxToolkit, LiverToxUpdater
+from Pharmagent.app.utils.services.livertox import LiverToxUpdater
 from Pharmagent.app.utils.database import sqlite as sqlite_module
 
 
@@ -142,8 +142,18 @@ class _TestUpdater(LiverToxUpdater):
 ###############################################################################
 class LiverToxMasterListTests(unittest.TestCase):
     ###########################################################################
+    def _create_updater(self) -> LiverToxUpdater:
+        return LiverToxUpdater(
+            ".",
+            redownload=False,
+            rx_client=_StubRxClient(),
+            serializer=_RecordingSerializer(),
+            database_client=sqlite_module.database,
+        )
+
+    ###########################################################################
     def test_sanitize_master_list_handles_extended_headers(self) -> None:
-        toolkit = LiverToxToolkit()
+        updater = self._create_updater()
         frame = pd.DataFrame(
             {
                 "ingredient": ["Drug A", "Drug B"],
@@ -159,14 +169,14 @@ class LiverToxMasterListTests(unittest.TestCase):
             }
         )
 
-        sanitized = toolkit.sanitize_livertox_master_list(frame)
+        sanitized = updater.sanitize_livertox_master_list(frame)
 
         self.assertEqual(2, len(sanitized.index))
         self.assertListEqual(["Drug A", "Drug B"], sanitized["ingredient"].tolist())
 
     ###########################################################################
     def test_sanitize_master_list_requires_brand_name(self) -> None:
-        toolkit = LiverToxToolkit()
+        updater = self._create_updater()
         frame = pd.DataFrame(
             {
                 "ingredient": ["Drug X", "Drug Y"],
@@ -181,7 +191,7 @@ class LiverToxMasterListTests(unittest.TestCase):
             }
         )
 
-        sanitized = toolkit.sanitize_livertox_master_list(frame)
+        sanitized = updater.sanitize_livertox_master_list(frame)
 
         self.assertEqual(1, len(sanitized.index))
         self.assertListEqual(["Drug X"], sanitized["ingredient"].tolist())
