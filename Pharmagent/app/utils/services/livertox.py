@@ -32,6 +32,7 @@ from Pharmagent.app.utils.services.retrieval import RxNavClient
 
 MATCHING_STOPWORDS = {
     "and",
+    "any",
     "apply",
     "caps",
     "capsule",
@@ -89,12 +90,21 @@ MATCHING_STOPWORDS = {
     "susp",
     "suspension",
     "sustained",
-    "syringe",
-    "syrup",
     "tablet",
     "tablets",
+    "syringe",
+    "syrup",
     "the",
+    "that",
+    "these",
+    "this",
+    "treat",
+    "treated",
+    "treating",
+    "treatment",
     "topical",
+    "used",
+    "using",
     "vial",
     "with",
     "without",
@@ -1103,7 +1113,7 @@ class LiverToxMatcher:
     def _register_alias(
         self, value: str, alias_type: str, record: MonographRecord
     ) -> None:
-        normalized = self._normalize_name(value)
+        normalized = self._normalize_alias_value(value, alias_type)
         if not normalized:
             return
         entry = AliasEntry(record=record, alias_type=alias_type, display_name=value)
@@ -1146,6 +1156,31 @@ class LiverToxMatcher:
         return text or None
 
     # -------------------------------------------------------------------------
+    def _normalize_alias_value(self, value: str, alias_type: str) -> str | None:
+        normalized = self._normalize_name(value)
+        if not normalized:
+            return None
+        tokens = normalized.split()
+        if not tokens:
+            return None
+        if alias_type == "synonym" and len(tokens) > 6:
+            return None
+        meaningful_tokens = [
+            token
+            for token in tokens
+            if len(token) >= 3 and token not in MATCHING_STOPWORDS
+        ]
+        if not meaningful_tokens:
+            return None
+        if alias_type == "synonym":
+            if len(tokens) == 1 and len(tokens[0]) < 3:
+                return None
+            ratio = len(meaningful_tokens) / len(tokens)
+            if ratio < 0.5:
+                return None
+        return normalized
+
+    # -------------------------------------------------------------------------
     def _parse_synonyms(self, value: Any) -> list[str]:
         text = self._coerce_text(value)
         if text is None:
@@ -1171,6 +1206,8 @@ class LiverToxMatcher:
             if lowered in seen:
                 continue
             seen.add(lowered)
+            if self._normalize_alias_value(cleaned, "synonym") is None:
+                continue
             synonyms.append(cleaned)
         return synonyms
 
@@ -1218,12 +1255,43 @@ class LiverToxMatcher:
     def _match_from_pool(
         self, normalized_value: str
     ) -> tuple[MonographRecord, str] | None:
-        for token in self._tokenize_text(normalized_value):
-            candidates = self.matching_pool_index.get(token)
-            if not candidates:
+        query_tokens = self._tokenize_text(normalized_value)
+        if not query_tokens:
+            return None
+        candidate_tokens: dict[MonographRecord, set[str]] = {}
+        for token in query_tokens:
+            for record in self.matching_pool_index.get(token, []):
+                bucket = candidate_tokens.setdefault(record, set())
+                bucket.add(token)
+        if not candidate_tokens:
+            return None
+        best_record: MonographRecord | None = None
+        best_tokens: set[str] = set()
+        best_similarity = 0.0
+        for record, matched_tokens in candidate_tokens.items():
+            similarity = difflib.SequenceMatcher(
+                None, normalized_value, record.normalized_name
+            ).ratio()
+            if best_record is None:
+                best_record = record
+                best_tokens = matched_tokens
+                best_similarity = similarity
                 continue
-            return candidates[0], token
-        return None
+            if len(matched_tokens) > len(best_tokens):
+                best_record = record
+                best_tokens = matched_tokens
+                best_similarity = similarity
+                continue
+            if len(matched_tokens) == len(best_tokens) and similarity > best_similarity:
+                best_record = record
+                best_tokens = matched_tokens
+                best_similarity = similarity
+        if best_record is None:
+            return None
+        if len(best_tokens) == 1 and best_similarity < 0.75:
+            return None
+        token_note = ", ".join(sorted(best_tokens))
+        return best_record, token_note
 
     # -------------------------------------------------------------------------
     def _find_fuzzy_monogram(
@@ -1401,7 +1469,8 @@ class LiverToxMatcher:
         pool_match = self._match_from_pool(normalized_query)
         if pool_match is not None:
             record, token = pool_match
-            note = f"token='{token}'"
+            label = "tokens" if "," in token or " " in token else "token"
+            note = f"{label}='{token}'"
             return self._create_match(record, self.ALIAS_CONFIDENCE, "alias_match", [note])
         alias_fuzzy = self._match_alias(
             normalized_query,
