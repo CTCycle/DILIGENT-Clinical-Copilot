@@ -1,13 +1,13 @@
 from __future__ import annotations
 
 import asyncio
+import difflib
 import html
 import io
 import json
 import os
 import re
 import tarfile
-import time
 import unicodedata
 from dataclasses import dataclass
 from datetime import UTC, datetime
@@ -19,21 +19,9 @@ from pdfminer.high_level import extract_text as pdfminer_extract_text
 from pypdf import PdfReader
 from tqdm import tqdm
 
-from Pharmagent.app.api.models.prompts import (
-    LIVERTOX_MATCH_LIST_USER_PROMPT,
-    LIVERTOX_MATCH_SYSTEM_PROMPT,
-)
-from Pharmagent.app.api.models.providers import initialize_llm_client
-from Pharmagent.app.api.schemas.clinical import LiverToxBatchMatchSuggestion
-from Pharmagent.app.configurations import ClientRuntimeConfig
 from Pharmagent.app.constants import (
-    DEFAULT_LLM_TIMEOUT_SECONDS,
     LIVERTOX_ARCHIVE,
     LIVERTOX_BASE_URL,
-    LIVERTOX_LLM_TIMEOUT_SECONDS,
-    LIVERTOX_SKIP_DETERMINISTIC_RATIO,
-    LIVERTOX_YIELD_INTERVAL,
-    LLM_NULL_MATCH_NAMES,
     SOURCES_PATH,
 )
 from Pharmagent.app.logger import logger
@@ -950,105 +938,63 @@ class LiverToxUpdater:
   
 
 ###############################################################################
+@dataclass(slots=True)
+class AliasEntry:
+    record: MonographRecord
+    alias_type: str
+    display_name: str
+
+
+###############################################################################
 class LiverToxMatcher:
     DIRECT_CONFIDENCE = 1.0
     ALIAS_CONFIDENCE = 0.95
+    MASTER_ALIAS_CONFIDENCE = 0.9
+    FUZZY_MONOGRAPH_CONFIDENCE = 0.88
+    FUZZY_ALIAS_CONFIDENCE = 0.85
     MIN_CONFIDENCE = 0.40
-    LLM_DEFAULT_CONFIDENCE = 0.65
-    LLM_TIMEOUT_SECONDS = LIVERTOX_LLM_TIMEOUT_SECONDS
-    YIELD_INTERVAL = LIVERTOX_YIELD_INTERVAL
-    DETERMINISTIC_SKIP_RATIO = LIVERTOX_SKIP_DETERMINISTIC_RATIO
+    FUZZY_CUTOFF = 0.88
+    ALIAS_FUZZY_CUTOFF = 0.86
 
     # -------------------------------------------------------------------------
     def __init__(
         self,
         livertox_df: pd.DataFrame,
         *,
-        llm_client: Any | None = None,
+        master_list_df: pd.DataFrame | None = None,
     ) -> None:
         self.livertox_df = livertox_df
-        self.llm_client = llm_client or initialize_llm_client(
-            purpose="parser", timeout_s=DEFAULT_LLM_TIMEOUT_SECONDS
-        )
+        self.master_list_df = master_list_df
         self.match_cache: dict[str, LiverToxMatch | None] = {}
         self.records: list[MonographRecord] = []
         self.records_by_normalized: dict[str, MonographRecord] = {}
         self.matching_pool_index: dict[str, list[MonographRecord]] = {}
         self.rows_by_nbk: dict[str, dict[str, Any]] = {}
-        self.candidate_prompt_block: str | None = None
+        self.alias_index: dict[str, AliasEntry] = {}
+        self.alias_keys: list[str] = []
         self._build_records()
+        self._build_master_list_aliases()
 
     # -------------------------------------------------------------------------
     async def match_drug_names(
         self, patient_drugs: list[str]
     ) -> list[LiverToxMatch | None]:
-        total = len(patient_drugs)
-        if total == 0:
+        if not patient_drugs:
             return []
-        results: list[LiverToxMatch | None] = [None] * total
         if not self.records:
-            return results
-
-        # Step 1: normalize input names once and reuse throughout the flow.
-        normalized_queries = [self._normalize_name(name) for name in patient_drugs]
-        unresolved_indices: list[int] = []
-        deterministic_matches = 0
-        eligible_total = 0
-
-        # Step 2: attempt cache hits and deterministic matches before any LLM call.
-        for idx, normalized in enumerate(normalized_queries):            
+            return [None] * len(patient_drugs)
+        results: list[LiverToxMatch | None] = []
+        for name in patient_drugs:
+            normalized = self._normalize_name(name) if name else ""
             if not normalized:
-                unresolved_indices.append(idx)
+                results.append(None)
                 continue
-            eligible_total += 1
-            cached = self.match_cache.get(normalized)
-            if cached is not None:
-                results[idx] = cached
-                if cached.reason != "llm_fallback":
-                    deterministic_matches += 1
-                else:
-                    unresolved_indices.append(idx)
+            if normalized in self.match_cache:
+                results.append(self.match_cache[normalized])
                 continue
-            deterministic = self._deterministic_lookup(normalized)
-            if deterministic is None:
-                self.match_cache.setdefault(normalized, None)
-                unresolved_indices.append(idx)
-                continue
-            record, confidence, reason, notes = deterministic
-            match = self._create_match(record, confidence, reason, notes)
+            match = self._deterministic_lookup(normalized)
             self.match_cache[normalized] = match
-            results[idx] = match
-            if reason != "llm_fallback":
-                deterministic_matches += 1
-            else:
-                unresolved_indices.append(idx)
-
-        if not unresolved_indices:
-            return results
-
-        # Step 3: fall back to the language model only when deterministic coverage is low.
-        deterministic_ratio = deterministic_matches / max(eligible_total, 1)
-        if deterministic_ratio >= self.DETERMINISTIC_SKIP_RATIO:
-            return results
-
-        fallback_matches = await self._llm_batch_match_lookup(
-            patient_drugs,
-            normalized_queries=normalized_queries,
-        )
-
-        # Step 4: merge LLM suggestions back into the response cache.
-        for idx in unresolved_indices:
-            normalized = normalized_queries[idx]
-            if not normalized:
-                continue
-            fallback = fallback_matches[idx] if idx < len(fallback_matches) else None
-            if fallback is None:
-                self.match_cache[normalized] = None
-                continue
-            record, confidence, reason, notes = fallback
-            match = self._create_match(record, confidence, reason, notes)
-            self.match_cache[normalized] = match
-            results[idx] = match
+            results.append(match)
         return results
 
     # -------------------------------------------------------------------------
@@ -1097,8 +1043,10 @@ class LiverToxMatcher:
             nbk_raw = getattr(row, "nbk_id", None)
             nbk_id = str(nbk_raw).strip() if nbk_raw not in (None, "") else ""
             excerpt_value = self._coerce_text(getattr(row, "excerpt", None))
+            synonyms = self._parse_synonyms(getattr(row, "synonyms", None))
             matching_pool = self._extract_matching_pool(
                 getattr(row, "synonyms", None),
+                *synonyms,
             )
             matching_pool.update(self._extract_parenthetical_tokens(raw_name))
             record = MonographRecord(
@@ -1112,6 +1060,12 @@ class LiverToxMatcher:
             normalized_map.setdefault(normalized_name, record)
             if primary_variant and primary_variant != normalized_name:
                 normalized_map.setdefault(primary_variant, record)
+            for synonym in synonyms:
+                normalized_synonym = self._normalize_name(synonym)
+                if not normalized_synonym or normalized_synonym == normalized_name:
+                    continue
+                normalized_map.setdefault(normalized_synonym, record)
+                self._register_alias(synonym, "synonym", record)
             for token in matching_pool:
                 bucket = pool_index.setdefault(token, [])
                 if record not in bucket:
@@ -1124,9 +1078,55 @@ class LiverToxMatcher:
             key: value for key, value in normalized_map.items() if value is not None
         }
         self.matching_pool_index = pool_index
-        self.candidate_prompt_block = "\n".join(
-            f"- {record.drug_name}" for record in self.records
-        )
+
+    # -------------------------------------------------------------------------
+    def _build_master_list_aliases(self) -> None:
+        if self.master_list_df is None or self.master_list_df.empty:
+            return
+        for row in self.master_list_df.itertuples(index=False):
+            chapter = self._coerce_text(getattr(row, "chapter_title", None))
+            record = self._resolve_chapter_record(chapter)
+            if record is None:
+                continue
+            if chapter:
+                self._register_alias(chapter, "chapter", record)
+            brand = self._coerce_text(getattr(row, "brand_name", None))
+            if brand:
+                self._register_alias(brand, "brand", record)
+            ingredient = self._coerce_text(getattr(row, "ingredient", None))
+            if ingredient:
+                self._register_alias(ingredient, "ingredient", record)
+
+    # -------------------------------------------------------------------------
+    def _register_alias(
+        self, value: str, alias_type: str, record: MonographRecord
+    ) -> None:
+        normalized = self._normalize_name(value)
+        if not normalized:
+            return
+        if normalized in self.alias_index:
+            return
+        entry = AliasEntry(record=record, alias_type=alias_type, display_name=value)
+        self.alias_index[normalized] = entry
+        self.alias_keys.append(normalized)
+
+    # -------------------------------------------------------------------------
+    def _resolve_chapter_record(
+        self, chapter_title: str | None
+    ) -> MonographRecord | None:
+        if not chapter_title:
+            return None
+        normalized = self._normalize_name(chapter_title)
+        if not normalized:
+            return None
+        direct = self.records_by_normalized.get(normalized)
+        if direct is not None:
+            return direct
+        fuzzy = self._find_fuzzy_monogram(normalized, cutoff=self.FUZZY_CUTOFF)
+        if fuzzy is None:
+            return None
+        record, _ = fuzzy
+        return record
 
     # -------------------------------------------------------------------------
     def _coerce_text(self, value: Any) -> str | None:
@@ -1136,6 +1136,35 @@ class LiverToxMatcher:
             return None
         text = str(value).strip()
         return text or None
+
+    # -------------------------------------------------------------------------
+    def _parse_synonyms(self, value: Any) -> list[str]:
+        text = self._coerce_text(value)
+        if text is None:
+            return []
+        sanitized = text.replace(";", ",").replace("/", ",").replace("\n", ",")
+        sanitized = re.sub(r"\b(?:and|or)\b", ",", sanitized, flags=re.IGNORECASE)
+        candidates = [segment.strip() for segment in sanitized.split(",")]
+        candidates.extend(
+            segment.strip() for segment in re.findall(r"\(([^)]+)\)", text)
+        )
+        candidates.extend(
+            segment.strip() for segment in re.findall(r"\[([^\]]+)\]", text)
+        )
+        synonyms: list[str] = []
+        seen: set[str] = set()
+        for candidate in candidates:
+            cleaned = re.sub(r"^[\[{(]+", "", candidate)
+            cleaned = re.sub(r"[\]})]+$", "", cleaned)
+            cleaned = re.sub(r"\s+", " ", cleaned).strip()
+            if len(cleaned) < 3:
+                continue
+            lowered = cleaned.lower()
+            if lowered in seen:
+                continue
+            seen.add(lowered)
+            synonyms.append(cleaned)
+        return synonyms
 
     # -------------------------------------------------------------------------
     def _extract_matching_pool(self, *values: Any) -> set[str]:
@@ -1189,6 +1218,75 @@ class LiverToxMatcher:
         return None
 
     # -------------------------------------------------------------------------
+    def _find_fuzzy_monogram(
+        self, normalized_query: str, *, cutoff: float | None = None
+    ) -> tuple[MonographRecord, str] | None:
+        if not normalized_query or not self.records_by_normalized:
+            return None
+        keys = list(self.records_by_normalized.keys())
+        threshold = cutoff if cutoff is not None else self.FUZZY_CUTOFF
+        matches = difflib.get_close_matches(
+            normalized_query, keys, n=1, cutoff=threshold
+        )
+        if not matches:
+            return None
+        key = matches[0]
+        record = self.records_by_normalized.get(key)
+        if record is None:
+            return None
+        return record, key
+
+    # -------------------------------------------------------------------------
+    def _find_fuzzy_alias(self, normalized_query: str) -> str | None:
+        if not normalized_query or not self.alias_keys:
+            return None
+        matches = difflib.get_close_matches(
+            normalized_query, self.alias_keys, n=1, cutoff=self.ALIAS_FUZZY_CUTOFF
+        )
+        if matches:
+            return matches[0]
+        return None
+
+    # -------------------------------------------------------------------------
+    def _alias_metadata(
+        self, alias_type: str, *, fuzzy: bool
+    ) -> tuple[float, str]:
+        if alias_type in {"brand", "ingredient", "chapter"}:
+            confidence = (
+                self.FUZZY_ALIAS_CONFIDENCE if fuzzy else self.MASTER_ALIAS_CONFIDENCE
+            )
+        else:
+            confidence = self.FUZZY_ALIAS_CONFIDENCE if fuzzy else self.ALIAS_CONFIDENCE
+        suffix = "fuzzy" if fuzzy else "alias"
+        reason = f"{alias_type}_{suffix}"
+        return confidence, reason
+
+    # -------------------------------------------------------------------------
+    def _alias_note(self, entry: AliasEntry) -> str:
+        return f"{entry.alias_type}='{entry.display_name}'"
+
+    # -------------------------------------------------------------------------
+    def _match_alias(
+        self, normalized_query: str, *, allow_fuzzy: bool
+    ) -> tuple[MonographRecord, float, str, list[str]] | None:
+        if not normalized_query or not self.alias_index:
+            return None
+        entry = self.alias_index.get(normalized_query)
+        if entry is not None:
+            confidence, reason = self._alias_metadata(entry.alias_type, fuzzy=False)
+            note = self._alias_note(entry)
+            return entry.record, confidence, reason, [note]
+        if not allow_fuzzy:
+            return None
+        fuzzy_key = self._find_fuzzy_alias(normalized_query)
+        if fuzzy_key is None:
+            return None
+        entry = self.alias_index[fuzzy_key]
+        confidence, reason = self._alias_metadata(entry.alias_type, fuzzy=True)
+        note = self._alias_note(entry)
+        return entry.record, confidence, reason, [note]
+
+    # -------------------------------------------------------------------------
     def _ensure_row_index(self) -> dict[str, dict[str, Any]]:
         if self.rows_by_nbk:
             return self.rows_by_nbk
@@ -1223,176 +1321,36 @@ class LiverToxMatcher:
         )
 
     # -------------------------------------------------------------------------
-    def _deterministic_lookup(
-        self, normalized_query: str
-    ) -> tuple[MonographRecord, float, str, list[str]] | None:
+    def _deterministic_lookup(self, normalized_query: str) -> LiverToxMatch | None:
         if not normalized_query:
             return None
+        alias_match = self._match_alias(normalized_query, allow_fuzzy=False)
+        if alias_match is not None:
+            record, confidence, reason, notes = alias_match
+            return self._create_match(record, confidence, reason, notes)
         direct = self.records_by_normalized.get(normalized_query)
         if direct is not None:
-            return direct, self.DIRECT_CONFIDENCE, "direct_match", []
+            return self._create_match(direct, self.DIRECT_CONFIDENCE, "direct_match", [])
         pool_match = self._match_from_pool(normalized_query)
         if pool_match is not None:
             record, token = pool_match
             note = f"token='{token}'"
-            return record, self.ALIAS_CONFIDENCE, "alias_match", [note]
+            return self._create_match(record, self.ALIAS_CONFIDENCE, "alias_match", [note])
+        fuzzy = self._find_fuzzy_monogram(normalized_query)
+        if fuzzy is not None:
+            record, _ = fuzzy
+            note = f"matched='{record.drug_name}'"
+            return self._create_match(
+                record,
+                self.FUZZY_MONOGRAPH_CONFIDENCE,
+                "fuzzy_match",
+                [note],
+            )
+        alias_fuzzy = self._match_alias(normalized_query, allow_fuzzy=True)
+        if alias_fuzzy is not None:
+            record, confidence, reason, notes = alias_fuzzy
+            return self._create_match(record, confidence, reason, notes)
         return None
-
-    # -------------------------------------------------------------------------
-    async def _llm_batch_match_lookup(
-        self,
-        patient_drugs: list[str],
-        *,
-        normalized_queries: list[str],
-    ) -> list[tuple[MonographRecord, float, str, list[str]] | None]:
-        total = len(patient_drugs)
-        if total == 0 or not self.records:
-            return []
-        # The prompt block is cached so repeated calls do not rebuild the monograph list.
-        candidate_block = self.candidate_prompt_block or ""
-        if not candidate_block:
-            return [None] * total
-        drugs_block = "\n".join(f"- {name}" if name else "-" for name in patient_drugs)
-        prompt = LIVERTOX_MATCH_LIST_USER_PROMPT.format(
-            patient_drugs=drugs_block,
-            candidates=candidate_block,
-        )
-        model_name = ClientRuntimeConfig.get_parsing_model()
-        logger.debug(
-            "Dispatching batch LLM match for %s drugs against %s candidates (prompt length=%s chars)",
-            total,
-            len(self.records),
-            len(prompt),
-        )
-        start_time = time.perf_counter()
-        try:
-            suggestion = await asyncio.wait_for(
-                self.llm_client.llm_structured_call(
-                    model=model_name,
-                    system_prompt=LIVERTOX_MATCH_SYSTEM_PROMPT,
-                    user_prompt=prompt,
-                    schema=LiverToxBatchMatchSuggestion,
-                    temperature=0.0,
-                ),
-                timeout=self.LLM_TIMEOUT_SECONDS,
-            )
-        except asyncio.TimeoutError:
-            duration = time.perf_counter() - start_time
-            logger.error(
-                "LLM batch match timed out after %.2fs using model '%s'",
-                duration,
-                model_name,
-            )
-            return [None] * total
-        except Exception as exc:  # noqa: BLE001
-            duration = time.perf_counter() - start_time
-            logger.error(
-                "LLM batch match failed after %.2fs: %s",
-                duration,
-                exc,
-            )
-            return [None] * total
-        duration = time.perf_counter() - start_time
-        logger.debug(
-            "Batch LLM matching completed in %.2fs using model '%s'",
-            duration,
-            model_name,
-        )
-        matches = suggestion.matches if suggestion else []
-        if not matches:
-            logger.warning(
-                "LLM returned no matches for %s patient drugs",
-                total,
-            )
-            return [None] * total
-        if len(matches) != total:
-            logger.warning(
-                "LLM returned %s matches for %s patient drugs",
-                len(matches),
-                total,
-            )
-        normalized_to_items: dict[str, list[Any]] = {}
-        for item in matches:
-            normalized_drug = self._normalize_name(getattr(item, "drug_name", "") or "")
-            if not normalized_drug:
-                continue
-            bucket = normalized_to_items.setdefault(normalized_drug, [])
-            bucket.append(item)
-        results: list[tuple[MonographRecord, float, str, list[str]] | None] = [
-            None
-        ] * total
-        for idx, original in enumerate(patient_drugs):
-            normalized_query = (
-                normalized_queries[idx] if idx < len(normalized_queries) else ""
-            )
-            if not normalized_query:
-                continue
-            item: Any | None = None
-            if idx < len(matches):
-                candidate = matches[idx]
-                candidate_normalized = self._normalize_name(
-                    getattr(candidate, "drug_name", "") or ""
-                )
-                if candidate_normalized == normalized_query:
-                    item = candidate
-                    bucket = normalized_to_items.get(normalized_query)
-                    if bucket:
-                        try:
-                            bucket.remove(candidate)
-                        except ValueError:
-                            pass
-            if item is None:
-                bucket = normalized_to_items.get(normalized_query)
-                if bucket:
-                    item = bucket.pop(0)
-            if item is None:
-                logger.debug(
-                    "LLM did not return a usable match for '%s'",
-                    original,
-                )
-                continue
-            match_name = (getattr(item, "match_name", "") or "").strip()
-            normalized_match = self._normalize_name(match_name)
-            if normalized_match in LLM_NULL_MATCH_NAMES:
-                logger.debug(
-                    "LLM explicitly reported no match for '%s'",
-                    original,
-                )
-                continue
-            if not normalized_match:
-                continue
-            record: MonographRecord | None = self.records_by_normalized.get(
-                normalized_match
-            )
-            confidence_raw = getattr(item, "confidence", None)
-            confidence = (
-                float(confidence_raw)
-                if confidence_raw is not None
-                else self.LLM_DEFAULT_CONFIDENCE
-            )
-            notes: list[str] = [f"LLM selected '{match_name}' for '{original}'"]
-            rationale = (getattr(item, "rationale", "") or "").strip()
-            if rationale:
-                notes.append(rationale)
-            if record is None:
-                pool_match = self._match_from_pool(normalized_match)
-                if pool_match is None and normalized_match != normalized_query:
-                    pool_match = self._match_from_pool(normalized_query)
-                if pool_match is not None:
-                    record, token = pool_match
-                    notes.append(f"token='{token}'")
-                    confidence = max(confidence, self.ALIAS_CONFIDENCE)
-            if record is None and normalized_match != normalized_query:
-                record = self.records_by_normalized.get(normalized_query)
-            if record is None:
-                logger.debug(
-                    "Unable to map LLM suggestion '%s' for '%s' to a monograph",
-                    match_name,
-                    original,
-                )
-                continue
-            results[idx] = (record, confidence, "llm_fallback", notes)
-        return results
 
     # -------------------------------------------------------------------------
     def _normalize_name(self, name: str) -> str:
@@ -1401,7 +1359,6 @@ class LiverToxMatcher:
             .encode("ascii", "ignore")
             .decode("ascii")
         )
-        # Always lowercase before stripping punctuation to keep matching case-insensitive.
         normalized = normalized.lower()
         normalized = re.sub(r"[^a-z0-9\s]", " ", normalized)
         normalized = re.sub(r"\s+", " ", normalized).strip()
