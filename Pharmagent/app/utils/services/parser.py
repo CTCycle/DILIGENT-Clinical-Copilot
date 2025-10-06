@@ -596,10 +596,41 @@ class DrugsParser:
         if not cleaned:
             return PatientDrugs(entries=[])
         entries: list[DrugEntry] = []
+        raw_entries: list[str] = []
+        pending_parts: list[str] = []
         for raw_line in cleaned.split("\n"):
-            entry = self._parse_line(raw_line)
+            line = raw_line.strip()
+            if not line:
+                continue
+            schedule_hit = self.SCHEDULE_RE.search(line)
+            if schedule_hit:
+                combined_parts = [part for part in pending_parts if part] + [line]
+                combined = " ".join(combined_parts).strip()
+                entry = self._parse_line(combined)
+                if entry is not None:
+                    entries.append(entry)
+                    raw_entries.append(combined)
+                    pending_parts.clear()
+                else:
+                    pending_parts = combined_parts
+                continue
+            if entries and (
+                self.SUSPENSION_RE.search(line)
+                or self.SUSPENSION_DATE_RE.search(line)
+            ):
+                combined = f"{raw_entries[-1]} {line}".strip()
+                entry = self._parse_line(combined)
+                if entry is not None:
+                    entries[-1] = entry
+                    raw_entries[-1] = combined
+                    continue
+            pending_parts.append(line)
+        if pending_parts:
+            combined = " ".join(part for part in pending_parts if part).strip()
+            entry = self._parse_line(combined)
             if entry is not None:
                 entries.append(entry)
+                raw_entries.append(combined)
         return PatientDrugs(entries=entries)
 
     # -------------------------------------------------------------------------
@@ -673,17 +704,18 @@ class DrugsParser:
             if normalized in FORM_TOKENS:
                 mode_tokens.append(token)
                 continue
-            if mode_tokens and (
-                normalized in FORM_DESCRIPTORS or not self._token_has_numeric(token)
-            ):
-                mode_tokens.append(token)
-                continue
             if (
                 self._token_has_numeric(token)
                 or normalized in UNIT_TOKENS
                 or "/" in token
             ):
                 dosage_tokens.append(token)
+                continue
+            if mode_tokens and normalized in FORM_DESCRIPTORS:
+                mode_tokens.append(token)
+                continue
+            if mode_tokens and not self._token_has_numeric(token) and not dosage_tokens:
+                mode_tokens.append(token)
                 continue
             if dosage_tokens:
                 dosage_tokens.append(token)
@@ -705,9 +737,15 @@ class DrugsParser:
             if normalized in FORM_TOKENS:
                 mode_tokens.insert(0, name_tokens.pop())
                 continue
-            if mode_tokens and normalized in FORM_DESCRIPTORS:
-                mode_tokens.insert(0, name_tokens.pop())
-                continue
+            if normalized in FORM_DESCRIPTORS:
+                if mode_tokens:
+                    mode_tokens.insert(0, name_tokens.pop())
+                    continue
+                if len(name_tokens) >= 2 and self._normalize_token(
+                    name_tokens[-2]
+                ) in FORM_TOKENS:
+                    mode_tokens.insert(0, name_tokens.pop())
+                    continue
             break
 
     # -------------------------------------------------------------------------
