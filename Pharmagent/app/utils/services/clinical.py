@@ -3,13 +3,13 @@ from __future__ import annotations
 import re
 from typing import Any
 
-from Pharmagent.app.api.models.providers import initialize_llm_client
+import pandas as pd
+
 from Pharmagent.app.api.schemas.clinical import (
     HepatotoxicityPatternScore,
     PatientData,
     PatientDrugs,
 )
-from Pharmagent.app.constants import DEFAULT_LLM_TIMEOUT_SECONDS
 from Pharmagent.app.logger import logger
 from Pharmagent.app.utils.serializer import DataSerializer
 from Pharmagent.app.utils.services.livertox import LiverToxMatch, LiverToxMatcher
@@ -72,14 +72,11 @@ class HepatotoxicityPatternAnalyzer:
 ###############################################################################
 class LiverToxConsultation:
     # -------------------------------------------------------------------------
-    def __init__(
-        self, drugs: PatientDrugs, *, timeout_s: float = DEFAULT_LLM_TIMEOUT_SECONDS
-    ) -> None:
+    def __init__(self, drugs: PatientDrugs) -> None:
         self.drugs = drugs
-        self.timeout_s = timeout_s
         self.serializer = DataSerializer()
-        self.llm_client = initialize_llm_client(purpose="parser", timeout_s=timeout_s)
-        self.livertox_df = None
+        self.livertox_df: pd.DataFrame | None = None
+        self.master_list_df: pd.DataFrame | None = None
         self.matcher: LiverToxMatcher | None = None
 
     # -------------------------------------------------------------------------
@@ -94,7 +91,7 @@ class LiverToxConsultation:
 
         if self.matcher is None:
             return []
-        
+
         logger.info("Toxicity analysis stage 2/3: matching drugs to LiverTox records")
         matches = await self.matcher.match_drug_names(patient_drugs)
 
@@ -106,19 +103,25 @@ class LiverToxConsultation:
         if self.matcher is not None:
             return True
         try:
-            dataset = self.serializer.get_livertox_records()
+            monographs = self.serializer.get_livertox_records()
         except Exception as exc:  # noqa: BLE001
             logger.error("Failed loading LiverTox monographs from database: %s", exc)
             self.matcher = None
             return False
-        if dataset is None or dataset.empty:
+        if monographs is None or monographs.empty:
             logger.warning(
                 "LiverTox monograph table is empty; toxicity essay cannot run"
             )
             self.matcher = None
             return False
-        self.livertox_df = dataset
-        self.matcher = LiverToxMatcher(dataset, llm_client=self.llm_client)
+        try:
+            master_list = self.serializer.get_livertox_master_list()
+        except Exception as exc:  # noqa: BLE001
+            logger.error("Failed loading LiverTox master list from database: %s", exc)
+            master_list = None
+        self.livertox_df = monographs
+        self.master_list_df = master_list
+        self.matcher = LiverToxMatcher(monographs, master_list_df=master_list)
         return True
 
     # -------------------------------------------------------------------------
