@@ -89,7 +89,7 @@ MATCHING_STOPWORDS = {
     "without",
 }
 ###############################################################################
-@dataclass(slots=True)
+@dataclass(slots=True, eq=False)
 class MonographRecord:
     nbk_id: str
     drug_name: str
