@@ -95,7 +95,6 @@ class MonographRecord:
     drug_name: str
     normalized_name: str
     excerpt: str | None
-    matching_pool: set[str]
 
 
 ###############################################################################
@@ -126,8 +125,8 @@ class LiverToxMatcher:
     FUZZY_MONOGRAPH_CONFIDENCE = 0.88
     FUZZY_ALIAS_CONFIDENCE = 0.85
     MIN_CONFIDENCE = 0.40
-    FUZZY_CUTOFF = 0.88
-    ALIAS_FUZZY_CUTOFF = 0.86
+    FUZZY_CUTOFF = 0.84
+    ALIAS_FUZZY_CUTOFF = 0.82
 
     # -------------------------------------------------------------------------
     def __init__(
@@ -141,11 +140,10 @@ class LiverToxMatcher:
         self.match_cache: dict[str, LiverToxMatch | None] = {}
         self.records: list[MonographRecord] = []
         self.records_by_normalized: dict[str, MonographRecord] = {}
-        self.matching_pool_index: dict[str, list[MonographRecord]] = {}
         self.rows_by_nbk: dict[str, dict[str, Any]] = {}
-        self.alias_index: dict[str, AliasEntry] = {}
+        self.alias_index: dict[str, list[AliasEntry]] = {}
         self.alias_keys: list[str] = []
-        self.master_alias_index: dict[str, AliasEntry] = {}
+        self.master_alias_index: dict[str, list[AliasEntry]] = {}
         self.master_alias_keys: list[str] = []
         self._build_records()
         self._build_master_list_aliases()
@@ -206,7 +204,6 @@ class LiverToxMatcher:
             return
         processed: list[MonographRecord] = []
         normalized_map: dict[str, MonographRecord] = {}
-        pool_index: dict[str, list[MonographRecord]] = {}
         for row in self.livertox_df.itertuples(index=False):
             raw_name = str(getattr(row, "drug_name", "") or "").strip()
             if not raw_name:
@@ -219,17 +216,11 @@ class LiverToxMatcher:
             nbk_id = str(nbk_raw).strip() if nbk_raw not in (None, "") else ""
             excerpt_value = self._coerce_text(getattr(row, "excerpt", None))
             synonyms = self._parse_synonyms(getattr(row, "synonyms", None))
-            matching_pool = self._extract_matching_pool(
-                getattr(row, "synonyms", None),
-                *synonyms,
-            )
-            matching_pool.update(self._extract_parenthetical_tokens(raw_name))
             record = MonographRecord(
                 nbk_id=nbk_id,
                 drug_name=raw_name,
                 normalized_name=normalized_name,
                 excerpt=excerpt_value,
-                matching_pool=matching_pool,
             )
             processed.append(record)
             normalized_map.setdefault(normalized_name, record)
@@ -241,10 +232,6 @@ class LiverToxMatcher:
                     continue
                 normalized_map.setdefault(normalized_synonym, record)
                 self._register_alias(synonym, "synonym", record)
-            for token in matching_pool:
-                bucket = pool_index.setdefault(token, [])
-                if record not in bucket:
-                    bucket.append(record)
         if not processed:
             return
         processed.sort(key=lambda item: item.drug_name.lower())
@@ -252,7 +239,6 @@ class LiverToxMatcher:
         self.records_by_normalized = {
             key: value for key, value in normalized_map.items() if value is not None
         }
-        self.matching_pool_index = pool_index
 
     # -------------------------------------------------------------------------
     def _build_master_list_aliases(self) -> None:
@@ -280,16 +266,18 @@ class LiverToxMatcher:
         if not normalized:
             return
         entry = AliasEntry(record=record, alias_type=alias_type, display_name=value)
-        existing = self.alias_index.get(normalized)
+        bucket = self.alias_index.setdefault(normalized, [])
         is_master_alias = alias_type in {"brand", "ingredient", "chapter"}
-        if existing is None or (is_master_alias and existing.alias_type == "synonym"):
-            self.alias_index[normalized] = entry
+        if entry not in bucket:
+            bucket.append(entry)
             if normalized not in self.alias_keys:
                 self.alias_keys.append(normalized)
         if is_master_alias:
-            self.master_alias_index[normalized] = entry
-            if normalized not in self.master_alias_keys:
-                self.master_alias_keys.append(normalized)
+            master_bucket = self.master_alias_index.setdefault(normalized, [])
+            if entry not in master_bucket:
+                master_bucket.append(entry)
+                if normalized not in self.master_alias_keys:
+                    self.master_alias_keys.append(normalized)
 
     # -------------------------------------------------------------------------
     def _resolve_chapter_record(
@@ -326,8 +314,6 @@ class LiverToxMatcher:
         tokens = normalized.split()
         if not tokens:
             return None
-        if alias_type == "synonym" and len(tokens) > 6:
-            return None
         meaningful_tokens = [
             token
             for token in tokens
@@ -335,12 +321,6 @@ class LiverToxMatcher:
         ]
         if not meaningful_tokens:
             return None
-        if alias_type == "synonym":
-            if len(tokens) == 1 and len(tokens[0]) < 3:
-                return None
-            ratio = len(meaningful_tokens) / len(tokens)
-            if ratio < 0.5:
-                return None
         return normalized
 
     # -------------------------------------------------------------------------
@@ -375,88 +355,6 @@ class LiverToxMatcher:
         return synonyms
 
     # -------------------------------------------------------------------------
-    def _extract_matching_pool(self, *values: Any) -> set[str]:
-        tokens: set[str] = set()
-        for value in values:
-            text = self._coerce_text(value)
-            if text is None:
-                continue
-            bracket_segments = re.findall(r"\[([^\]]+)\]", text)
-            for segment in bracket_segments:
-                tokens.update(self._tokenize_text(segment))
-            tokens.update(self._tokenize_text(text))
-        return tokens
-
-    # -------------------------------------------------------------------------
-    def _extract_parenthetical_tokens(self, text: str) -> set[str]:
-        segments = re.findall(r"\(([^)]+)\)", text)
-        tokens: set[str] = set()
-        for segment in segments:
-            tokens.update(self._tokenize_text(segment))
-        return tokens
-
-    # -------------------------------------------------------------------------
-    def _tokenize_text(self, text: str) -> set[str]:
-        ascii_text = (
-            unicodedata.normalize("NFKD", text)
-            .encode("ascii", "ignore")
-            .decode("ascii")
-        )
-        raw_tokens = re.findall(r"[A-Za-z]+", ascii_text)
-        tokens: set[str] = set()
-        for raw in raw_tokens:
-            normalized = raw.lower()
-            normalized = re.sub(r"[^a-z]", "", normalized)
-            if len(normalized) < 3:
-                continue
-            if normalized in MATCHING_STOPWORDS:
-                continue
-            tokens.add(normalized)
-        return tokens
-
-    # -------------------------------------------------------------------------
-    def _match_from_pool(
-        self, normalized_value: str
-    ) -> tuple[MonographRecord, str] | None:
-        query_tokens = self._tokenize_text(normalized_value)
-        if not query_tokens:
-            return None
-        candidate_tokens: dict[MonographRecord, set[str]] = {}
-        for token in query_tokens:
-            for record in self.matching_pool_index.get(token, []):
-                bucket = candidate_tokens.setdefault(record, set())
-                bucket.add(token)
-        if not candidate_tokens:
-            return None
-        best_record: MonographRecord | None = None
-        best_tokens: set[str] = set()
-        best_similarity = 0.0
-        for record, matched_tokens in candidate_tokens.items():
-            similarity = difflib.SequenceMatcher(
-                None, normalized_value, record.normalized_name
-            ).ratio()
-            if best_record is None:
-                best_record = record
-                best_tokens = matched_tokens
-                best_similarity = similarity
-                continue
-            if len(matched_tokens) > len(best_tokens):
-                best_record = record
-                best_tokens = matched_tokens
-                best_similarity = similarity
-                continue
-            if len(matched_tokens) == len(best_tokens) and similarity > best_similarity:
-                best_record = record
-                best_tokens = matched_tokens
-                best_similarity = similarity
-        if best_record is None:
-            return None
-        if len(best_tokens) == 1 and best_similarity < 0.75:
-            return None
-        token_note = ", ".join(sorted(best_tokens))
-        return best_record, token_note
-
-    # -------------------------------------------------------------------------
     def _find_fuzzy_monogram(
         self, normalized_query: str, *, cutoff: float | None = None
     ) -> tuple[MonographRecord, str] | None:
@@ -464,12 +362,10 @@ class LiverToxMatcher:
             return None
         keys = list(self.records_by_normalized.keys())
         threshold = cutoff if cutoff is not None else self.FUZZY_CUTOFF
-        matches = difflib.get_close_matches(
-            normalized_query, keys, n=1, cutoff=threshold
-        )
-        if not matches:
+        match = self._best_fuzzy_key(normalized_query, keys, threshold)
+        if match is None:
             return None
-        key = matches[0]
+        key = match
         record = self.records_by_normalized.get(key)
         if record is None:
             return None
@@ -481,22 +377,79 @@ class LiverToxMatcher:
         normalized_query: str,
         *,
         keys: list[str],
-        alias_index: dict[str, AliasEntry],
+        alias_index: dict[str, list[AliasEntry]],
         allowed_types: set[str] | None,
     ) -> str | None:
         if not normalized_query or not keys:
             return None
-        matches = difflib.get_close_matches(
-            normalized_query, keys, n=5, cutoff=self.ALIAS_FUZZY_CUTOFF
+        match = self._best_fuzzy_key(
+            normalized_query, keys, self.ALIAS_FUZZY_CUTOFF
         )
-        for candidate in matches:
-            entry = alias_index.get(candidate)
-            if entry is None:
+        if match is None:
+            return None
+        entries = alias_index.get(match)
+        if not entries:
+            return None
+        candidate = self._select_alias(entries, allowed_types)
+        if candidate is None:
+            return None
+        return match
+
+    # -------------------------------------------------------------------------
+    def _best_fuzzy_key(
+        self,
+        normalized_query: str,
+        keys: list[str],
+        cutoff: float,
+    ) -> str | None:
+        if not normalized_query or not keys:
+            return None
+        best_key: str | None = None
+        best_ratio = 0.0
+        first_char = normalized_query[0]
+        enforce_first_char = first_char.isalpha()
+        for key in keys:
+            if abs(len(key) - len(normalized_query)) > 3:
                 continue
+            if (
+                enforce_first_char
+                and key
+                and key[0].isalpha()
+                and key[0] != first_char
+            ):
+                continue
+            ratio = difflib.SequenceMatcher(None, normalized_query, key).ratio()
+            if ratio < cutoff:
+                continue
+            if ratio > best_ratio:
+                best_ratio = ratio
+                best_key = key
+        return best_key
+
+    # -------------------------------------------------------------------------
+    def _select_alias(
+        self,
+        entries: list[AliasEntry] | None,
+        allowed_types: set[str] | None,
+    ) -> AliasEntry | None:
+        if not entries:
+            return None
+        alias_priority = {
+            "chapter": 0,
+            "brand": 1,
+            "ingredient": 2,
+            "synonym": 3,
+        }
+        best_entry: AliasEntry | None = None
+        best_priority = 10
+        for entry in entries:
             if allowed_types is not None and entry.alias_type not in allowed_types:
                 continue
-            return candidate
-        return None
+            priority = alias_priority.get(entry.alias_type, 99)
+            if best_entry is None or priority < best_priority:
+                best_entry = entry
+                best_priority = priority
+        return best_entry
 
     # -------------------------------------------------------------------------
     def _alias_metadata(
@@ -522,7 +475,7 @@ class LiverToxMatcher:
         normalized_query: str,
         *,
         allow_fuzzy: bool,
-        index: dict[str, AliasEntry] | None = None,
+        index: dict[str, list[AliasEntry]] | None = None,
         keys: list[str] | None = None,
         allowed_types: set[str] | None = None,
     ) -> tuple[MonographRecord, float, str, list[str]] | None:
@@ -530,10 +483,9 @@ class LiverToxMatcher:
         alias_keys = keys if keys is not None else self.alias_keys
         if not normalized_query or not alias_index:
             return None
-        entry = alias_index.get(normalized_query)
-        if entry is not None and (
-            allowed_types is None or entry.alias_type in allowed_types
-        ):
+        entries = alias_index.get(normalized_query)
+        entry = self._select_alias(entries, allowed_types)
+        if entry is not None:
             confidence, reason = self._alias_metadata(entry.alias_type, fuzzy=False)
             note = self._alias_note(entry)
             return entry.record, confidence, reason, [note]
@@ -547,7 +499,9 @@ class LiverToxMatcher:
         )
         if fuzzy_key is None:
             return None
-        entry = alias_index[fuzzy_key]
+        entry = self._select_alias(alias_index.get(fuzzy_key), allowed_types)
+        if entry is None:
+            return None
         confidence, reason = self._alias_metadata(entry.alias_type, fuzzy=True)
         note = self._alias_note(entry)
         return entry.record, confidence, reason, [note]
@@ -629,12 +583,6 @@ class LiverToxMatcher:
         if alias_match is not None:
             record, confidence, reason, notes = alias_match
             return self._create_match(record, confidence, reason, notes)
-        pool_match = self._match_from_pool(normalized_query)
-        if pool_match is not None:
-            record, token = pool_match
-            label = "tokens" if "," in token or " " in token else "token"
-            note = f"{label}='{token}'"
-            return self._create_match(record, self.ALIAS_CONFIDENCE, "alias_match", [note])
         alias_fuzzy = self._match_alias(
             normalized_query,
             allow_fuzzy=True,
