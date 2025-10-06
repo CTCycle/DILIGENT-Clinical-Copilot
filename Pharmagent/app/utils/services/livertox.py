@@ -972,6 +972,8 @@ class LiverToxMatcher:
         self.rows_by_nbk: dict[str, dict[str, Any]] = {}
         self.alias_index: dict[str, AliasEntry] = {}
         self.alias_keys: list[str] = []
+        self.master_alias_index: dict[str, AliasEntry] = {}
+        self.master_alias_keys: list[str] = []
         self._build_records()
         self._build_master_list_aliases()
 
@@ -1104,11 +1106,17 @@ class LiverToxMatcher:
         normalized = self._normalize_name(value)
         if not normalized:
             return
-        if normalized in self.alias_index:
-            return
         entry = AliasEntry(record=record, alias_type=alias_type, display_name=value)
-        self.alias_index[normalized] = entry
-        self.alias_keys.append(normalized)
+        existing = self.alias_index.get(normalized)
+        is_master_alias = alias_type in {"brand", "ingredient", "chapter"}
+        if existing is None or (is_master_alias and existing.alias_type == "synonym"):
+            self.alias_index[normalized] = entry
+            if normalized not in self.alias_keys:
+                self.alias_keys.append(normalized)
+        if is_master_alias:
+            self.master_alias_index[normalized] = entry
+            if normalized not in self.master_alias_keys:
+                self.master_alias_keys.append(normalized)
 
     # -------------------------------------------------------------------------
     def _resolve_chapter_record(
@@ -1237,14 +1245,26 @@ class LiverToxMatcher:
         return record, key
 
     # -------------------------------------------------------------------------
-    def _find_fuzzy_alias(self, normalized_query: str) -> str | None:
-        if not normalized_query or not self.alias_keys:
+    def _find_fuzzy_alias_key(
+        self,
+        normalized_query: str,
+        *,
+        keys: list[str],
+        alias_index: dict[str, AliasEntry],
+        allowed_types: set[str] | None,
+    ) -> str | None:
+        if not normalized_query or not keys:
             return None
         matches = difflib.get_close_matches(
-            normalized_query, self.alias_keys, n=1, cutoff=self.ALIAS_FUZZY_CUTOFF
+            normalized_query, keys, n=5, cutoff=self.ALIAS_FUZZY_CUTOFF
         )
-        if matches:
-            return matches[0]
+        for candidate in matches:
+            entry = alias_index.get(candidate)
+            if entry is None:
+                continue
+            if allowed_types is not None and entry.alias_type not in allowed_types:
+                continue
+            return candidate
         return None
 
     # -------------------------------------------------------------------------
@@ -1267,21 +1287,36 @@ class LiverToxMatcher:
 
     # -------------------------------------------------------------------------
     def _match_alias(
-        self, normalized_query: str, *, allow_fuzzy: bool
+        self,
+        normalized_query: str,
+        *,
+        allow_fuzzy: bool,
+        index: dict[str, AliasEntry] | None = None,
+        keys: list[str] | None = None,
+        allowed_types: set[str] | None = None,
     ) -> tuple[MonographRecord, float, str, list[str]] | None:
-        if not normalized_query or not self.alias_index:
+        alias_index = index if index is not None else self.alias_index
+        alias_keys = keys if keys is not None else self.alias_keys
+        if not normalized_query or not alias_index:
             return None
-        entry = self.alias_index.get(normalized_query)
-        if entry is not None:
+        entry = alias_index.get(normalized_query)
+        if entry is not None and (
+            allowed_types is None or entry.alias_type in allowed_types
+        ):
             confidence, reason = self._alias_metadata(entry.alias_type, fuzzy=False)
             note = self._alias_note(entry)
             return entry.record, confidence, reason, [note]
-        if not allow_fuzzy:
+        if not allow_fuzzy or not alias_keys:
             return None
-        fuzzy_key = self._find_fuzzy_alias(normalized_query)
+        fuzzy_key = self._find_fuzzy_alias_key(
+            normalized_query,
+            keys=alias_keys,
+            alias_index=alias_index,
+            allowed_types=allowed_types,
+        )
         if fuzzy_key is None:
             return None
-        entry = self.alias_index[fuzzy_key]
+        entry = alias_index[fuzzy_key]
         confidence, reason = self._alias_metadata(entry.alias_type, fuzzy=True)
         note = self._alias_note(entry)
         return entry.record, confidence, reason, [note]
@@ -1324,18 +1359,9 @@ class LiverToxMatcher:
     def _deterministic_lookup(self, normalized_query: str) -> LiverToxMatch | None:
         if not normalized_query:
             return None
-        alias_match = self._match_alias(normalized_query, allow_fuzzy=False)
-        if alias_match is not None:
-            record, confidence, reason, notes = alias_match
-            return self._create_match(record, confidence, reason, notes)
         direct = self.records_by_normalized.get(normalized_query)
         if direct is not None:
             return self._create_match(direct, self.DIRECT_CONFIDENCE, "direct_match", [])
-        pool_match = self._match_from_pool(normalized_query)
-        if pool_match is not None:
-            record, token = pool_match
-            note = f"token='{token}'"
-            return self._create_match(record, self.ALIAS_CONFIDENCE, "alias_match", [note])
         fuzzy = self._find_fuzzy_monogram(normalized_query)
         if fuzzy is not None:
             record, _ = fuzzy
@@ -1346,7 +1372,42 @@ class LiverToxMatcher:
                 "fuzzy_match",
                 [note],
             )
-        alias_fuzzy = self._match_alias(normalized_query, allow_fuzzy=True)
+        master_alias = self._match_alias(
+            normalized_query,
+            allow_fuzzy=False,
+            index=self.master_alias_index,
+            keys=self.master_alias_keys,
+        )
+        if master_alias is not None:
+            record, confidence, reason, notes = master_alias
+            return self._create_match(record, confidence, reason, notes)
+        master_alias_fuzzy = self._match_alias(
+            normalized_query,
+            allow_fuzzy=True,
+            index=self.master_alias_index,
+            keys=self.master_alias_keys,
+        )
+        if master_alias_fuzzy is not None:
+            record, confidence, reason, notes = master_alias_fuzzy
+            return self._create_match(record, confidence, reason, notes)
+        alias_match = self._match_alias(
+            normalized_query,
+            allow_fuzzy=False,
+            allowed_types={"synonym"},
+        )
+        if alias_match is not None:
+            record, confidence, reason, notes = alias_match
+            return self._create_match(record, confidence, reason, notes)
+        pool_match = self._match_from_pool(normalized_query)
+        if pool_match is not None:
+            record, token = pool_match
+            note = f"token='{token}'"
+            return self._create_match(record, self.ALIAS_CONFIDENCE, "alias_match", [note])
+        alias_fuzzy = self._match_alias(
+            normalized_query,
+            allow_fuzzy=True,
+            allowed_types={"synonym"},
+        )
         if alias_fuzzy is not None:
             record, confidence, reason, notes = alias_fuzzy
             return self._create_match(record, confidence, reason, notes)
