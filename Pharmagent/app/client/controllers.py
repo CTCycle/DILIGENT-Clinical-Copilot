@@ -14,6 +14,7 @@ from Pharmagent.app.api.models.providers import (
 from Pharmagent.app.configurations import ClientRuntimeConfig
 from Pharmagent.app.constants import (
     AGENT_API_URL,
+    API_BASE_URL,
     BATCH_AGENT_API_URL,
     CLOUD_MODEL_CHOICES,
     DEFAULT_LLM_TIMEOUT_SECONDS,
