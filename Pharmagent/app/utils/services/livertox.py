@@ -172,8 +172,8 @@ class MonographRecord:
     drug_name: str
     normalized_name: str
     excerpt: str | None
-    matching_pool: set[str]
-    aliases: dict[str, tuple[str, str]]
+    synonyms: dict[str, str]
+    tokens: set[str]
 
 
 ###############################################################################
@@ -945,13 +945,12 @@ class LiverToxUpdater:
 ###############################################################################
 class LiverToxMatcher:
     DIRECT_CONFIDENCE = 1.0
-    ALIAS_CONFIDENCE = 0.95
-    SYNONYM_CONFIDENCE = 0.97
-    PRIMARY_VARIANT_CONFIDENCE = 0.99
-    TOKEN_BASE_CONFIDENCE = 0.90
-    TOKEN_MATCH_BONUS = 0.03
-    FUZZY_CONFIDENCE = 0.88
-    FUZZY_THRESHOLD = 0.92
+    MASTER_CONFIDENCE = 0.92
+    SYNONYM_CONFIDENCE = 0.90
+    PARTIAL_CONFIDENCE = 0.86
+    FUZZY_CONFIDENCE = 0.84
+    FUZZY_THRESHOLD = 0.85
+    TOKEN_MAX_FREQUENCY = 3
     MIN_CONFIDENCE = 0.40
 
     # -------------------------------------------------------------------------
@@ -964,17 +963,17 @@ class LiverToxMatcher:
         self.master_list_df = master_list_df
         self.match_cache: dict[str, LiverToxMatch | None] = {}
         self.records: list[MonographRecord] = []
-        self.records_by_normalized: dict[str, MonographRecord] = {}
-        self.normalized_variant_sources: dict[str, tuple[MonographRecord, str, str]] = {}
-        self.variant_catalog: list[str] = []
-        self.matching_pool_index: dict[str, list[MonographRecord]] = {}
-        self.token_frequencies: dict[str, int] = {}
-        self.token_frequency_threshold = 0
+        self.primary_index: dict[str, MonographRecord] = {}
+        self.synonym_index: dict[str, tuple[MonographRecord, str]] = {}
+        self.variant_catalog: list[tuple[str, MonographRecord, str, bool]] = []
+        self.token_occurrences: dict[str, list[MonographRecord]] = {}
+        self.token_index: dict[str, list[MonographRecord]] = {}
+        self.brand_index: dict[str, list[tuple[str, str]]] = {}
+        self.ingredient_index: dict[str, list[tuple[str, str]]] = {}
         self.rows_by_nbk: dict[str, dict[str, Any]] = {}
-        self.brand_alias_index: dict[str, list[tuple[str, str]]] = {}
-        self.ingredient_alias_index: dict[str, list[tuple[str, str]]] = {}
         self._build_records()
         self._build_master_list_aliases()
+        self._finalize_token_index()
 
     # -------------------------------------------------------------------------
     async def match_drug_names(
@@ -986,22 +985,19 @@ class LiverToxMatcher:
         results: list[LiverToxMatch | None] = [None] * total
         if not self.records:
             return results
-
-        # Step 1: normalize input names once and reuse throughout the flow.
         normalized_queries = [self._normalize_name(name) for name in patient_drugs]
         for idx, normalized in enumerate(normalized_queries):
             if not normalized:
                 continue
-            if normalized in self.match_cache:
-                results[idx] = self.match_cache[normalized]
+            cached = self.match_cache.get(normalized)
+            if cached is not None or normalized in self.match_cache:
+                results[idx] = cached
                 continue
-            deterministic = self._deterministic_lookup(normalized)
-            if deterministic is None:
-                deterministic = self._alias_lookup(normalized)
-            if deterministic is None:
+            lookup = self._match_query(normalized)
+            if lookup is None:
                 self.match_cache[normalized] = None
                 continue
-            record, confidence, reason, notes = deterministic
+            record, confidence, reason, notes = lookup
             match = self._create_match(record, confidence, reason, notes)
             self.match_cache[normalized] = match
             results[idx] = match
@@ -1036,144 +1032,244 @@ class LiverToxMatcher:
         return entries
 
     # -------------------------------------------------------------------------
+    def _match_query(
+        self, normalized_query: str
+    ) -> tuple[MonographRecord, float, str, list[str]] | None:
+        if not normalized_query:
+            return None
+        direct = self._match_primary(normalized_query)
+        if direct is not None:
+            return direct
+        master = self._match_master_list(normalized_query)
+        if master is not None:
+            return master
+        synonym = self._match_synonym(normalized_query)
+        if synonym is not None:
+            return synonym
+        partial = self._match_partial(normalized_query)
+        if partial is not None:
+            return partial
+        return self._match_fuzzy(normalized_query)
+
+    # -------------------------------------------------------------------------
+    def _match_primary(
+        self, normalized_query: str
+    ) -> tuple[MonographRecord, float, str, list[str]] | None:
+        record = self.primary_index.get(normalized_query)
+        if record is None:
+            return None
+        return record, self.DIRECT_CONFIDENCE, "monograph_name", []
+
+    # -------------------------------------------------------------------------
+    def _match_master_list(
+        self, normalized_query: str
+    ) -> tuple[MonographRecord, float, str, list[str]] | None:
+        alias_sources = (
+            ("brand", self.brand_index),
+            ("ingredient", self.ingredient_index),
+        )
+        for alias_type, index in alias_sources:
+            entries = index.get(normalized_query)
+            if not entries:
+                continue
+            for alias_value, chapter_title in entries:
+                resolved = self._match_chapter_title(chapter_title)
+                if resolved is None:
+                    continue
+                record, base_confidence, chapter_reason, chapter_notes = resolved
+                notes = [
+                    f"{alias_type}='{alias_value}'",
+                    f"chapter='{chapter_title}'",
+                ]
+                notes.extend(chapter_notes)
+                reason = f"{alias_type}_{chapter_reason}"
+                confidence = min(self.MASTER_CONFIDENCE, base_confidence)
+                return record, confidence, reason, notes
+        return None
+
+    # -------------------------------------------------------------------------
+    def _match_synonym(
+        self, normalized_query: str
+    ) -> tuple[MonographRecord, float, str, list[str]] | None:
+        alias = self.synonym_index.get(normalized_query)
+        if alias is None:
+            return None
+        record, original = alias
+        notes = [f"synonym='{original}'"]
+        return record, self.SYNONYM_CONFIDENCE, "synonym_match", notes
+
+    # -------------------------------------------------------------------------
+    def _match_partial(
+        self, normalized_query: str
+    ) -> tuple[MonographRecord, float, str, list[str]] | None:
+        tokens = [token for token in normalized_query.split() if self._is_token_valid(token)]
+        if not tokens:
+            return None
+        candidate_scores: dict[str, int] = {}
+        record_lookup: dict[str, MonographRecord] = {}
+        for token in tokens:
+            for record in self.token_index.get(token, []):
+                key = record.nbk_id or record.normalized_name or record.drug_name.lower()
+                record_lookup[key] = record
+                candidate_scores[key] = candidate_scores.get(key, 0) + 1
+        if not candidate_scores:
+            return None
+        best_key = max(candidate_scores, key=candidate_scores.get)
+        best_score = candidate_scores[best_key]
+        tied = [key for key, score in candidate_scores.items() if score == best_score]
+        if len(tied) != 1:
+            return None
+        best_record = record_lookup[best_key]
+        matched_tokens: list[str] = []
+        for token in tokens:
+            for candidate in self.token_index.get(token, []):
+                key = candidate.nbk_id or candidate.normalized_name or candidate.drug_name.lower()
+                if key == best_key:
+                    matched_tokens.append(token)
+                    break
+        notes = [f"token='{token}'" for token in sorted(set(matched_tokens))]
+        return best_record, self.PARTIAL_CONFIDENCE, "partial_synonym", notes
+
+    # -------------------------------------------------------------------------
+    def _match_fuzzy(
+        self, normalized_query: str
+    ) -> tuple[MonographRecord, float, str, list[str]] | None:
+        if len(normalized_query) < 4:
+            return None
+        variant = self._find_best_variant(normalized_query)
+        if variant is None:
+            return None
+        record, original, is_primary, score = variant
+        reason = "fuzzy_primary" if is_primary else "fuzzy_synonym"
+        notes: list[str] = [f"score={score:.2f}"]
+        if not is_primary:
+            notes.insert(0, f"variant='{original}'")
+        return record, max(self.FUZZY_CONFIDENCE, score), reason, notes
+
+    # -------------------------------------------------------------------------
+    def _match_chapter_title(
+        self, chapter_title: str
+    ) -> tuple[MonographRecord, float, str, list[str]] | None:
+        normalized_chapter = self._normalize_name(chapter_title)
+        if not normalized_chapter:
+            return None
+        direct = self._match_primary(normalized_chapter)
+        if direct is not None:
+            record, confidence, _, _ = direct
+            return record, confidence, "chapter_title", []
+        synonym = self._match_synonym(normalized_chapter)
+        if synonym is not None:
+            record, confidence, _, notes = synonym
+            return record, confidence, "chapter_synonym", notes
+        variant = self._find_best_variant(normalized_chapter)
+        if variant is None:
+            return None
+        record, original, is_primary, score = variant
+        reason = "chapter_fuzzy_primary" if is_primary else "chapter_fuzzy_synonym"
+        notes: list[str] = [f"score={score:.2f}"]
+        if not is_primary:
+            notes.insert(0, f"variant='{original}'")
+        return record, max(self.FUZZY_CONFIDENCE, score), reason, notes
+
+    # -------------------------------------------------------------------------
+    def _find_best_variant(
+        self, normalized_query: str
+    ) -> tuple[MonographRecord, str, bool, float] | None:
+        best: tuple[MonographRecord, str, bool, float] | None = None
+        best_ratio = 0.0
+        for candidate, record, original, is_primary in self.variant_catalog:
+            ratio = SequenceMatcher(None, normalized_query, candidate).ratio()
+            if ratio > best_ratio:
+                best_ratio = ratio
+                best = (record, original, is_primary, ratio)
+        if best is None or best_ratio < self.FUZZY_THRESHOLD:
+            return None
+        return best
+
+    # -------------------------------------------------------------------------
     def _build_records(self) -> None:
         if self.livertox_df is None or self.livertox_df.empty:
             return
-        prepared: list[dict[str, Any]] = []
-        token_frequency: dict[str, int] = {}
+        token_occurrences: dict[str, list[MonographRecord]] = {}
         for row in self.livertox_df.itertuples(index=False):
-            raw_name = str(getattr(row, "drug_name", "") or "").strip()
-            if not raw_name:
+            raw_name = self._coerce_text(getattr(row, "drug_name", None))
+            if raw_name is None:
                 continue
             normalized_name = self._normalize_name(raw_name)
             if not normalized_name:
                 continue
-            primary_variant = self._normalize_name(raw_name.split("(")[0])
             nbk_raw = getattr(row, "nbk_id", None)
             nbk_id = str(nbk_raw).strip() if nbk_raw not in (None, "") else ""
-            excerpt_value = self._coerce_text(getattr(row, "excerpt", None))
+            if not nbk_id:
+                continue
+            excerpt = self._coerce_text(getattr(row, "excerpt", None))
             synonyms_value = getattr(row, "synonyms", None)
-            alias_entries = {}
-            alias_entries.update(self._alias_variants_from_text(synonyms_value, "synonym"))
-            alias_entries.update(self._parenthetical_aliases(raw_name))
-            matching_pool = self._extract_matching_pool(synonyms_value, raw_name)
-            for _, original in alias_entries.values():
-                matching_pool.update(self._tokenize_text(original))
-            matching_pool.update(self._tokenize_text(raw_name))
-            for token in matching_pool:
-                token_frequency[token] = token_frequency.get(token, 0) + 1
-            prepared.append(
-                {
-                    "nbk_id": nbk_id,
-                    "drug_name": raw_name,
-                    "normalized_name": normalized_name,
-                    "primary_variant": primary_variant,
-                    "excerpt": excerpt_value,
-                    "matching_pool": matching_pool,
-                    "alias_entries": alias_entries,
-                }
-            )
-        if not prepared:
-            return
-        threshold = self._compute_frequency_threshold(len(prepared))
-        filtered_frequency = {
-            token: count
-            for token, count in token_frequency.items()
-            if count <= threshold
-        }
-        processed: list[MonographRecord] = []
-        normalized_map: dict[str, MonographRecord] = {}
-        variant_sources: dict[str, tuple[MonographRecord, str, str]] = {}
-        variant_catalog: set[str] = set()
-        pool_index: dict[str, list[MonographRecord]] = {}
-        for entry in prepared:
-            filtered_pool = {
-                token
-                for token in entry["matching_pool"]
-                if token in filtered_frequency
-            }
+            synonyms = self._parse_synonyms(synonyms_value)
+            tokens = self._collect_tokens(raw_name, list(synonyms.values()))
             record = MonographRecord(
-                nbk_id=entry["nbk_id"],
-                drug_name=entry["drug_name"],
-                normalized_name=entry["normalized_name"],
-                excerpt=entry["excerpt"],
-                matching_pool=filtered_pool,
-                aliases=entry["alias_entries"],
+                nbk_id=nbk_id,
+                drug_name=raw_name,
+                normalized_name=normalized_name,
+                excerpt=excerpt,
+                synonyms=synonyms,
+                tokens=tokens,
             )
-            processed.append(record)
-            self._register_variant(
-                entry["normalized_name"],
-                record,
-                "primary",
-                record.drug_name,
-                normalized_map,
-                variant_sources,
-                variant_catalog,
-            )
-            primary_variant = entry["primary_variant"]
-            if primary_variant and primary_variant != entry["normalized_name"]:
-                self._register_variant(
-                    primary_variant,
-                    record,
-                    "primary_variant",
-                    record.drug_name,
-                    normalized_map,
-                    variant_sources,
-                    variant_catalog,
+            self.records.append(record)
+            if normalized_name not in self.primary_index:
+                self.primary_index[normalized_name] = record
+            self.variant_catalog.append((normalized_name, record, record.drug_name, True))
+            for normalized_synonym, original in synonyms.items():
+                if normalized_synonym not in self.synonym_index:
+                    self.synonym_index[normalized_synonym] = (record, original)
+                self.variant_catalog.append(
+                    (normalized_synonym, record, original, False)
                 )
-            for normalized_alias, (source, original) in entry["alias_entries"].items():
-                self._register_variant(
-                    normalized_alias,
-                    record,
-                    source,
-                    original,
-                    normalized_map,
-                    variant_sources,
-                    variant_catalog,
-                )
-            for token in filtered_pool:
-                bucket = pool_index.setdefault(token, [])
+            for token in tokens:
+                bucket = token_occurrences.setdefault(token, [])
                 if record not in bucket:
                     bucket.append(record)
-        processed.sort(key=lambda item: item.drug_name.lower())
-        self.records = processed
-        self.records_by_normalized = normalized_map
-        self.normalized_variant_sources = variant_sources
-        self.variant_catalog = sorted(variant_catalog)
-        self.matching_pool_index = pool_index
-        self.token_frequencies = filtered_frequency
-        self.token_frequency_threshold = threshold
+        self.records.sort(key=lambda record: record.drug_name.lower())
+        self.variant_catalog.sort(key=lambda item: item[0])
+        self.token_occurrences = token_occurrences
 
     # -------------------------------------------------------------------------
     def _build_master_list_aliases(self) -> None:
-        self.brand_alias_index = {}
-        self.ingredient_alias_index = {}
+        self.brand_index = {}
+        self.ingredient_index = {}
         if self.master_list_df is None or self.master_list_df.empty:
             return
         for row in self.master_list_df.itertuples(index=False):
-            chapter_value = self._coerce_text(getattr(row, "chapter_title", None))
-            if chapter_value is None:
+            chapter_title = self._coerce_text(getattr(row, "chapter_title", None))
+            if chapter_title is None:
                 continue
-            alias_values = {
-                "brand": self._coerce_text(getattr(row, "brand_name", None)),
-                "ingredient": self._coerce_text(getattr(row, "ingredient", None)),
-            }
-            for alias_type, raw_value in alias_values.items():
-                if raw_value is None:
+            brand = self._coerce_text(getattr(row, "brand_name", None))
+            ingredient = self._coerce_text(getattr(row, "ingredient", None))
+            for alias_type, value in ("brand", brand), ("ingredient", ingredient):
+                if value is None:
                     continue
-                for variant in self._iter_alias_values(raw_value):
+                for variant in self._iter_alias_variants(value):
                     normalized_variant = self._normalize_name(variant)
                     if not normalized_variant:
                         continue
                     index = (
-                        self.brand_alias_index
-                        if alias_type == "brand"
-                        else self.ingredient_alias_index
+                        self.brand_index if alias_type == "brand" else self.ingredient_index
                     )
                     bucket = index.setdefault(normalized_variant, [])
-                    entry = (variant, chapter_value)
+                    entry = (variant, chapter_title)
                     if entry not in bucket:
                         bucket.append(entry)
+
+    # -------------------------------------------------------------------------
+    def _finalize_token_index(self) -> None:
+        if not self.token_occurrences:
+            self.token_index = {}
+            return
+        filtered: dict[str, list[MonographRecord]] = {}
+        for token, records in self.token_occurrences.items():
+            if len(records) > self.TOKEN_MAX_FREQUENCY:
+                continue
+            filtered[token] = sorted(records, key=lambda record: record.drug_name.lower())
+        self.token_index = filtered
 
     # -------------------------------------------------------------------------
     def _coerce_text(self, value: Any) -> str | None:
@@ -1185,202 +1281,78 @@ class LiverToxMatcher:
         return text or None
 
     # -------------------------------------------------------------------------
-    def _iter_alias_values(self, value: str) -> list[str]:
-        sanitized = value.strip()
-        if not sanitized:
+    def _iter_alias_variants(self, value: str) -> list[str]:
+        normalized_value = self._normalize_whitespace(value)
+        if not normalized_value:
             return []
-        variants: list[str] = [sanitized]
-        normalized_source = re.sub(r"[®™]", " ", sanitized)
-        for segment in re.split(r"[;,/\+\n]", normalized_source):
-            candidate = segment.strip()
-            if candidate and candidate not in variants:
-                variants.append(candidate)
-        return variants
+        variants: set[str] = {normalized_value}
+        for segment in re.split(r"[;,/\n]+", value):
+            candidate = self._normalize_whitespace(segment)
+            if candidate:
+                variants.add(candidate)
+        return list(variants)
 
     # -------------------------------------------------------------------------
-    def _extract_matching_pool(self, *values: Any) -> set[str]:
-        tokens: set[str] = set()
-        for value in values:
-            text = self._coerce_text(value)
-            if text is None:
-                continue
-            bracket_segments = re.findall(r"\[([^\]]+)\]", text)
-            for segment in bracket_segments:
-                tokens.update(self._tokenize_text(segment))
-            tokens.update(self._tokenize_text(text))
-        return tokens
-
-    # -------------------------------------------------------------------------
-    def _tokenize_text(self, text: str) -> set[str]:
-        ascii_text = (
-            unicodedata.normalize("NFKD", text)
-            .encode("ascii", "ignore")
-            .decode("ascii")
-        )
-        raw_tokens = re.findall(r"[A-Za-z]+", ascii_text)
-        tokens: set[str] = set()
-        for raw in raw_tokens:
-            normalized = raw.lower()
-            normalized = re.sub(r"[^a-z]", "", normalized)
-            if len(normalized) < 3:
-                continue
-            if normalized in MATCHING_STOPWORDS:
-                continue
-            tokens.add(normalized)
-        return tokens
-
-    # -------------------------------------------------------------------------
-    def _match_from_pool(
-        self, normalized_value: str
-    ) -> tuple[MonographRecord, set[str], float] | None:
-        query_tokens = self._tokenize_text(normalized_value)
-        if not query_tokens:
-            return None
-        candidate_hits: dict[str, set[str]] = {}
-        candidate_scores: dict[str, float] = {}
-        candidate_records: dict[str, MonographRecord] = {}
-        for token in query_tokens:
-            candidates = self.matching_pool_index.get(token)
-            if not candidates:
-                continue
-            frequency = self.token_frequencies.get(token, 1)
-            rarity = 1.0 / (1 + frequency)
-            for record in candidates:
-                key = record.nbk_id or record.normalized_name
-                candidate_records[key] = record
-                hits = candidate_hits.setdefault(key, set())
-                hits.add(token)
-                candidate_scores[key] = candidate_scores.get(key, 0.0) + rarity
-        if not candidate_hits:
-            return None
-        def _score(key: str) -> tuple[int, float]:
-            return (len(candidate_hits[key]), candidate_scores.get(key, 0.0))
-        best_key = max(candidate_hits.keys(), key=_score)
-        matched_tokens = candidate_hits[best_key]
-        record = candidate_records[best_key]
-        if len(matched_tokens) == 1:
-            single_token = next(iter(matched_tokens))
-            frequency = self.token_frequencies.get(single_token, 0)
-            limit = max(2, self.token_frequency_threshold // 4)
-            if frequency > limit:
-                return None
-        base_confidence = self.TOKEN_BASE_CONFIDENCE + (
-            (len(matched_tokens) - 1) * self.TOKEN_MATCH_BONUS
-        )
-        return record, matched_tokens, min(base_confidence, self.DIRECT_CONFIDENCE)
-
-    # -------------------------------------------------------------------------
-    def _compute_frequency_threshold(self, record_count: int) -> int:
-        if record_count <= 0:
-            return 0
-        threshold = int(record_count * 0.03)
-        threshold = max(2, threshold)
-        return min(threshold, 35)
-
-    # -------------------------------------------------------------------------
-    def _register_variant(
-        self,
-        normalized: str,
-        record: MonographRecord,
-        source: str,
-        original_value: str,
-        normalized_map: dict[str, MonographRecord],
-        variant_sources: dict[str, tuple[MonographRecord, str, str]],
-        variant_catalog: set[str],
-    ) -> None:
-        if not normalized:
-            return
-        normalized_map.setdefault(normalized, record)
-        if normalized not in variant_sources:
-            variant_sources[normalized] = (record, source, original_value)
-            variant_catalog.add(normalized)
-
-    # -------------------------------------------------------------------------
-    def _alias_variants_from_text(
-        self, value: Any, source: str
-    ) -> dict[str, tuple[str, str]]:
+    def _parse_synonyms(self, value: Any) -> dict[str, str]:
         text = self._coerce_text(value)
         if text is None:
             return {}
-        entries: dict[str, tuple[str, str]] = {}
-        for variant in self._iter_alias_values(text):
-            cleaned = re.sub(r"\s+", " ", variant).strip(" '\"-_")
-            if not cleaned:
-                continue
-            normalized = self._normalize_name(cleaned)
-            if not self._is_meaningful_alias(normalized):
-                continue
-            entries.setdefault(normalized, (source, cleaned))
-        return entries
-
-    # -------------------------------------------------------------------------
-    def _parenthetical_aliases(self, text: str) -> dict[str, tuple[str, str]]:
-        entries: dict[str, tuple[str, str]] = {}
-        for segment in re.findall(r"\(([^)]+)\)", text):
-            for alias in self._iter_alias_values(segment):
-                cleaned = re.sub(r"\s+", " ", alias).strip(" '\"-_")
-                if not cleaned:
+        synonyms: dict[str, str] = {}
+        candidates = re.split(r"[;,/\n]+", text)
+        for candidate in candidates:
+            for variant in self._expand_variant(candidate):
+                normalized = self._normalize_name(variant)
+                if not normalized:
                     continue
-                normalized = self._normalize_name(cleaned)
-                if not self._is_meaningful_alias(normalized):
+                if normalized in MATCHING_STOPWORDS:
                     continue
-                entries.setdefault(normalized, ("parenthetical", cleaned))
-        return entries
+                if len(normalized) < 4 and " " not in normalized:
+                    continue
+                if normalized not in synonyms:
+                    synonyms[normalized] = variant
+        return synonyms
 
     # -------------------------------------------------------------------------
-    def _is_meaningful_alias(self, normalized: str) -> bool:
-        if not normalized or len(normalized) < 3:
+    def _expand_variant(self, value: str) -> list[str]:
+        normalized = self._normalize_whitespace(value)
+        if not normalized:
+            return []
+        variants = {normalized}
+        for segment in re.split(r"[()]", normalized):
+            candidate = segment.strip(" -")
+            if candidate:
+                variants.add(candidate)
+        return list(variants)
+
+    # -------------------------------------------------------------------------
+    def _collect_tokens(self, primary: str, synonyms: list[str]) -> set[str]:
+        tokens: set[str] = set()
+        for source in [primary, *synonyms]:
+            tokens.update(self._tokenize(source))
+        return tokens
+
+    # -------------------------------------------------------------------------
+    def _tokenize(self, value: str) -> set[str]:
+        normalized = self._normalize_name(value)
+        if not normalized:
+            return set()
+        return {
+            token
+            for token in normalized.split()
+            if self._is_token_valid(token)
+        }
+
+    # -------------------------------------------------------------------------
+    def _is_token_valid(self, token: str) -> bool:
+        if len(token) < 4:
             return False
-        words = [token for token in normalized.split() if token]
-        if not words or len(words) > 6:
+        if token in MATCHING_STOPWORDS:
             return False
-        informative = [word for word in words if word not in MATCHING_STOPWORDS]
-        return bool(informative)
+        return not token.isdigit()
 
     # -------------------------------------------------------------------------
-    def _lookup_normalized_variant(
-        self, normalized_query: str
-    ) -> tuple[MonographRecord, float, str, list[str]] | None:
-        meta = self.normalized_variant_sources.get(normalized_query)
-        if meta is None:
-            return None
-        record, source, original = meta
-        if source == "primary":
-            return record, self.DIRECT_CONFIDENCE, "direct_match", []
-        if source == "primary_variant":
-            notes = [f"variant='{original}'"]
-            return record, self.PRIMARY_VARIANT_CONFIDENCE, "primary_variant", notes
-        reason = source if source.endswith("alias") else f"{source}_alias"
-        notes = [f"{source}='{original}'"]
-        return record, self.SYNONYM_CONFIDENCE, reason, notes
-
-    # -------------------------------------------------------------------------
-    def _fuzzy_lookup(
-        self, normalized_query: str
-    ) -> tuple[MonographRecord, float, str, list[str]] | None:
-        if len(normalized_query) < 4 or not self.variant_catalog:
-            return None
-        best_key: str | None = None
-        best_ratio = 0.0
-        for candidate in self.variant_catalog:
-            ratio = SequenceMatcher(None, normalized_query, candidate).ratio()
-            if ratio > best_ratio:
-                best_ratio = ratio
-                best_key = candidate
-        if best_key is None or best_ratio < self.FUZZY_THRESHOLD:
-            return None
-        record = self.records_by_normalized.get(best_key)
-        if record is None:
-            return None
-        notes: list[str] = []
-        meta = self.normalized_variant_sources.get(best_key)
-        if meta is not None:
-            _, source, original = meta
-            if source != "primary":
-                notes.append(f"{source}='{original}'")
-        notes.append(f"score={best_ratio:.2f}")
-        confidence = max(self.FUZZY_CONFIDENCE, best_ratio)
-        return record, confidence, "fuzzy_match", notes
+    def _normalize_whitespace(self, value: str) -> str:
+        return re.sub(r"\s+", " ", value).strip()
 
     # -------------------------------------------------------------------------
     def _ensure_row_index(self) -> dict[str, dict[str, Any]]:
@@ -1417,88 +1389,14 @@ class LiverToxMatcher:
         )
 
     # -------------------------------------------------------------------------
-    def _deterministic_lookup(
-        self, normalized_query: str
-    ) -> tuple[MonographRecord, float, str, list[str]] | None:
-        if not normalized_query:
-            return None
-        direct = self._lookup_normalized_variant(normalized_query)
-        if direct is not None:
-            return direct
-        pool_match = self._match_from_pool(normalized_query)
-        if pool_match is not None:
-            record, tokens, confidence = pool_match
-            notes = [f"token='{token}'" for token in sorted(tokens)]
-            return record, confidence, "token_overlap", notes
-        fuzzy = self._fuzzy_lookup(normalized_query)
-        if fuzzy is not None:
-            return fuzzy
-        return None
-
-    # -------------------------------------------------------------------------
-    def _alias_lookup(
-        self, normalized_query: str
-    ) -> tuple[MonographRecord, float, str, list[str]] | None:
-        if not normalized_query:
-            return None
-        alias_sources = (
-            ("brand_alias", self.brand_alias_index),
-            ("ingredient_alias", self.ingredient_alias_index),
-        )
-        for reason, index in alias_sources:
-            entries = index.get(normalized_query)
-            if not entries:
-                continue
-            for alias_value, chapter_title in entries:
-                resolved = self._resolve_chapter_title(chapter_title)
-                if resolved is None:
-                    continue
-                record, chapter_reason, chapter_notes, base_confidence = resolved
-                notes = [
-                    f"{reason}='{alias_value}'",
-                    f"chapter='{chapter_title}'",
-                ]
-                notes.extend(chapter_notes)
-                combined_reason = (
-                    reason
-                    if chapter_reason == "direct_match"
-                    else f"{reason}_{chapter_reason}"
-                )
-                confidence = min(self.ALIAS_CONFIDENCE, base_confidence)
-                return record, confidence, combined_reason, notes
-        return None
-
-    # -------------------------------------------------------------------------
-    def _resolve_chapter_title(
-        self, chapter_title: str
-    ) -> tuple[MonographRecord, str, list[str], float] | None:
-        normalized_chapter = self._normalize_name(chapter_title)
-        if not normalized_chapter:
-            return None
-        direct = self._lookup_normalized_variant(normalized_chapter)
-        if direct is not None:
-            record, confidence, reason, notes = direct
-            return record, reason, notes, confidence
-        pool_match = self._match_from_pool(normalized_chapter)
-        if pool_match is not None:
-            record, tokens, confidence = pool_match
-            notes = [f"token='{token}'" for token in sorted(tokens)]
-            return record, "chapter_token_overlap", notes, confidence
-        fuzzy = self._fuzzy_lookup(normalized_chapter)
-        if fuzzy is None:
-            return None
-        record, confidence, reason, notes = fuzzy
-        return record, reason, notes, confidence
-
-    # -------------------------------------------------------------------------
     def _normalize_name(self, name: str) -> str:
         normalized = (
             unicodedata.normalize("NFKD", name)
             .encode("ascii", "ignore")
             .decode("ascii")
         )
-        # Always lowercase before stripping punctuation to keep matching case-insensitive.
         normalized = normalized.lower()
         normalized = re.sub(r"[^a-z0-9\s]", " ", normalized)
         normalized = re.sub(r"\s+", " ", normalized).strip()
         return normalized
+
