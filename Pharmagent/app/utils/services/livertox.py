@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import json
 import re
 import unicodedata
 from dataclasses import dataclass
@@ -206,8 +207,6 @@ class LiverToxMatcher:
     def _match_query(
         self, normalized_query: str
     ) -> tuple[MonographRecord, float, str, list[str]] | None:
-        if not normalized_query:
-            return None
         direct = self._match_primary(normalized_query)
         if direct is not None:
             return direct
@@ -463,23 +462,62 @@ class LiverToxMatcher:
 
     # -------------------------------------------------------------------------
     def _parse_synonyms(self, value: Any) -> dict[str, str]:
+        synonyms: dict[str, str] = {}
+        raw_values = self._extract_synonym_strings(value)
+        if not raw_values:
+            text = self._coerce_text(value)
+            if text is None:
+                return {}
+            raw_values = [text]
+        for raw in raw_values:
+            text = self._coerce_text(raw)
+            if text is None:
+                continue
+            for candidate in re.split(r"[;,/\n]+", text):
+                for variant in self._expand_variant(candidate):
+                    normalized = self._normalize_name(variant)
+                    if not normalized:
+                        continue
+                    if normalized in MATCHING_STOPWORDS:
+                        continue
+                    if len(normalized) < 4 and " " not in normalized:
+                        continue
+                    if normalized not in synonyms:
+                        synonyms[normalized] = variant
+        return synonyms
+
+    # -------------------------------------------------------------------------
+    def _extract_synonym_strings(self, value: Any) -> list[str]:
+        if value is None:
+            return []
+        if isinstance(value, dict):
+            collected: list[str] = []
+            for entry in value.values():
+                collected.extend(self._extract_synonym_strings(entry))
+            return collected
+        if isinstance(value, (list, tuple, set)):
+            collected: list[str] = []
+            for entry in value:
+                collected.extend(self._extract_synonym_strings(entry))
+            return collected
+        if isinstance(value, str):
+            parsed = self._try_parse_json(value)
+            if isinstance(parsed, dict) or isinstance(parsed, list):
+                return self._extract_synonym_strings(parsed)
+            return [value]
         text = self._coerce_text(value)
         if text is None:
-            return {}
-        synonyms: dict[str, str] = {}
-        candidates = re.split(r"[;,/\n]+", text)
-        for candidate in candidates:
-            for variant in self._expand_variant(candidate):
-                normalized = self._normalize_name(variant)
-                if not normalized:
-                    continue
-                if normalized in MATCHING_STOPWORDS:
-                    continue
-                if len(normalized) < 4 and " " not in normalized:
-                    continue
-                if normalized not in synonyms:
-                    synonyms[normalized] = variant
-        return synonyms
+            return []
+        return self._extract_synonym_strings(text)
+
+    # -------------------------------------------------------------------------
+    def _try_parse_json(self, value: str) -> Any:
+        if not value:
+            return None
+        try:
+            return json.loads(value)
+        except (ValueError, TypeError):
+            return None
 
     # -------------------------------------------------------------------------
     def _expand_variant(self, value: str) -> list[str]:
