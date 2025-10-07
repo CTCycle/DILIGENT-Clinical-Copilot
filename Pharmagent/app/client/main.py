@@ -172,10 +172,6 @@ def create_interface() -> gr.Blocks:
                     label="Process patients from files",
                     value=False,
                 )
-                translate_to_eng = gr.Checkbox(
-                    label="Always translate to English",
-                    value=False,
-                )
                 with gr.Column():
                     run_button = gr.Button("Run Workflow", variant="primary")
                     clear_button = gr.Button("Clear all")
@@ -310,7 +306,6 @@ def create_interface() -> gr.Blocks:
                 alp_max,
                 symptoms,
                 process_from_files,
-                translate_to_eng,
             ],
             outputs=output,
             api_name="run_agent",
@@ -338,7 +333,6 @@ def create_interface() -> gr.Blocks:
                 alp_max,
                 symptoms,
                 process_from_files,
-                translate_to_eng,
                 has_diseases,
                 output,
             ],

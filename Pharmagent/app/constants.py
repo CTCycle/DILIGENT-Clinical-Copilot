@@ -120,6 +120,11 @@ LLM_NULL_MATCH_NAMES = {
 }
 
 
+# [CLINICAL ANALYSIS]
+###############################################################################
+DRUG_SUSPENSION_EXCLUSION_DAYS = 14
+
+
 # [NLP / TRANSLATION]
 ###############################################################################
 LANGUAGE_DETECTION_MODEL = "papluca/xlm-roberta-base-language-detection"
