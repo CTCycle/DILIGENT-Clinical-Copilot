@@ -1,7 +1,7 @@
-# Pharmagent
+# DILIGENT
 
 ## 1. Introduction
-Pharmagent is a LLM-powered solution to perform Drug induced liver injury (DILI) analysis without human assistance. The app is developed using a FASTAPI for the backend and gradio to create a nice and intuitive UI.
+DILIGENT is a LLM-powered solution to perform Drug induced liver injury (DILI) analysis without human assistance. The app is developed using a FASTAPI for the backend and gradio to create a nice and intuitive UI.
 
 It makes use of Ollama to interact with local models and keep the entire process compliant with high privacy standard and completely free, even though it is optionally possible to use online LLM services such as ChatGPT and Gemini as well.
 
@@ -11,7 +11,7 @@ The installation process for Windows is fully automated. Simply run the script *
 ## 3. How to use
 On Windows, run *start_on_windows.bat* to launch the application. Please note that some antivirus software, such as Avast, may flag or quarantine python.exe when called by the .bat file. If you encounter unusual behavior, consider adding an exception in your antivirus settings.
 
-The intuitive interface facilitates easy interactions with the Pharmagent core functionalities.
+The intuitive interface facilitates easy interactions with the DILIGENT core functionalities.
 
 ## 3.1 Setup and Maintenance
 You can run *setup_and_maintenance.bat* to start the external tools for maintenance with the following options:
@@ -38,36 +38,36 @@ This folder organizes dataset and tokenizers benchmark results. By default, all 
 
 
 ## 3.2 LangSmith observability
-Pharmagent now emits LangSmith traces for every structured LLM call and for each
+DILIGENT now emits LangSmith traces for every structured LLM call and for each
 Ollama or cloud chat request. To enable tracing:
 
 1. Create a free LangSmith account at [https://smith.langchain.com](https://smith.langchain.com)
    and generate an API key from **Settings → API Keys**.
-2. Copy `Pharmagent/resources/templates/.env` to your active `.env` file (for
-   example `Pharmagent/setup/.env`) if you have not already done so, then add or
+2. Copy `DILIGENT/resources/templates/.env` to your active `.env` file (for
+   example `DILIGENT/setup/.env`) if you have not already done so, then add or
    update the following keys:
 
    ```text
    LANGSMITH_API_KEY="sk-..."
    LANGSMITH_TRACING_V2="true"
-   LANGSMITH_PROJECT="Pharmagent"
+   LANGSMITH_PROJECT="DILIGENT"
    # Optional: point to a self-hosted deployment
    LANGSMITH_ENDPOINT="https://api.smith.langchain.com"
    ```
-2. Export the following environment variables before starting Pharmagent (the
+2. Export the following environment variables before starting DILIGENT (the
    exact syntax differs per shell/OS):
 
    ```bash
    export LANGSMITH_API_KEY="sk-..."
    export LANGSMITH_TRACING_V2="true"
-   export LANGSMITH_PROJECT="Pharmagent"
+   export LANGSMITH_PROJECT="DILIGENT"
    # Optional: point to a self-hosted deployment
    # export LANGSMITH_ENDPOINT="https://api.smith.langchain.com"
    ```
 
    On Windows Command Prompt use `set`, and on PowerShell use `$Env:` instead of
    `export`.
-3. Run the Pharmagent application or execute any workflow that calls the LLMs.
+3. Run the DILIGENT application or execute any workflow that calls the LLMs.
 4. Open the LangSmith web UI and choose the project named in
    `LANGSMITH_PROJECT` to inspect traces. You can follow the hierarchical view
    to observe every prompt, the model selected, retries, and any structured

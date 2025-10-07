@@ -13,8 +13,8 @@ from transformers import (
     PreTrainedTokenizerBase,
 )
 
-from Pharmagent.app.api.schemas.clinical import PatientData
-from Pharmagent.app.constants import (
+from DILIGENT.app.api.schemas.clinical import PatientData
+from DILIGENT.app.constants import (
     TRANSLATION_MODEL,
 )
 

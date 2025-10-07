@@ -10,7 +10,7 @@ from typing import Any
 
 import httpx
 
-from Pharmagent.app.logger import logger
+from DILIGENT.app.logger import logger
 
 
 ###############################################################################

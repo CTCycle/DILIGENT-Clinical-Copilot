@@ -4,7 +4,7 @@ from typing import Final
 
 import gradio as gr
 
-from Pharmagent.app.client.controllers import (
+from DILIGENT.app.client.controllers import (
     clear_agent_fields,
     normalize_visit_date_component,
     preload_selected_models,
@@ -19,8 +19,8 @@ from Pharmagent.app.client.controllers import (
     start_ollama_client,
     toggle_cloud_services,
 )
-from Pharmagent.app.configurations import ClientRuntimeConfig
-from Pharmagent.app.constants import (
+from DILIGENT.app.configurations import ClientRuntimeConfig
+from DILIGENT.app.constants import (
     AGENT_MODEL_CHOICES,
     CLOUD_MODEL_CHOICES,
     CLOUD_PROVIDERS,
@@ -88,12 +88,12 @@ def create_interface() -> gr.Blocks:
         selected_cloud_model = cloud_models[0] if cloud_models else ""
         ClientRuntimeConfig.set_cloud_model(selected_cloud_model)
     with gr.Blocks(
-        title="Pharmagent Clinical Copilot",
+        title="DILIGENT Clinical Copilot",
         analytics_enabled=False,
         theme="soft",
         css=VISIT_DATE_CSS,
     ) as demo:
-        gr.Markdown("## Pharmagent Clinical Copilot")
+        gr.Markdown("## DILIGENT Clinical Copilot")
 
         with gr.Row():
             with gr.Column(scale=3):

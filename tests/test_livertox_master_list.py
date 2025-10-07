@@ -51,7 +51,7 @@ REPO_ROOT = os.path.abspath(os.path.join(os.path.dirname(__file__), ".."))
 if REPO_ROOT not in sys.path:
     sys.path.insert(0, REPO_ROOT)
 
-providers_module_name = "Pharmagent.app.api.models.providers"
+providers_module_name = "DILIGENT.app.api.models.providers"
 if providers_module_name not in sys.modules:
     providers_stub = types.ModuleType(providers_module_name)
 
@@ -68,7 +68,7 @@ if providers_module_name not in sys.modules:
     providers_stub.initialize_llm_client = initialize_llm_client
     sys.modules[providers_module_name] = providers_stub
 
-clinical_module_name = "Pharmagent.app.api.schemas.clinical"
+clinical_module_name = "DILIGENT.app.api.schemas.clinical"
 if clinical_module_name not in sys.modules:
     clinical_stub = types.ModuleType(clinical_module_name)
 
@@ -83,9 +83,9 @@ import pandas as pd
 from sqlalchemy import create_engine
 from sqlalchemy.orm import sessionmaker
 
-from Pharmagent.app.utils.serializer import DataSerializer
-from Pharmagent.app.utils.services.updater import LiverToxUpdater
-from Pharmagent.app.utils.database import sqlite as sqlite_module
+from DILIGENT.app.utils.serializer import DataSerializer
+from DILIGENT.app.utils.services.updater import LiverToxUpdater
+from DILIGENT.app.utils.database import sqlite as sqlite_module
 
 
 ###############################################################################

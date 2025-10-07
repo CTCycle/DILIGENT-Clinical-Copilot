@@ -5,7 +5,7 @@ from typing import Any
 
 import pandas as pd
 
-from Pharmagent.app.utils.database.sqlite import database
+from DILIGENT.app.utils.database.sqlite import database
 
 
 # [DATA SERIALIZATION]
