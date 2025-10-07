@@ -501,9 +501,11 @@ class LiverToxMatcher:
                 collected.extend(self._extract_synonym_strings(entry))
             return collected
         if isinstance(value, str):
-            parsed = self._try_parse_json(value)
-            if isinstance(parsed, dict) or isinstance(parsed, list):
-                return self._extract_synonym_strings(parsed)
+            stripped = value.strip()
+            if stripped.startswith(("{", "[")) and stripped.endswith(("}", "]")):
+                parsed = self._try_parse_json(stripped)
+                if isinstance(parsed, dict) or isinstance(parsed, list):
+                    return self._extract_synonym_strings(parsed)
             return [value]
         text = self._coerce_text(value)
         if text is None:
