@@ -3,7 +3,7 @@ from __future__ import annotations
 from dataclasses import dataclass
 from typing import Any, Literal
 
-from Pharmagent.app.constants import (
+from DILIGENT.app.constants import (
     CLOUD_MODEL_CHOICES,
     DEFAULT_AGENT_MODEL,
     DEFAULT_CLOUD_MODEL,

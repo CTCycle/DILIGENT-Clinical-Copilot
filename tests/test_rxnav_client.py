@@ -3,7 +3,7 @@ from __future__ import annotations
 import unittest
 from unittest.mock import patch
 
-from Pharmagent.app.utils.services.retrieval import RxNavClient
+from DILIGENT.app.utils.services.retrieval import RxNavClient
 
 
 ###############################################################################

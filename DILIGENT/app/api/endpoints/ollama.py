@@ -2,9 +2,9 @@ from __future__ import annotations
 
 from fastapi import APIRouter, HTTPException, Query, status
 
-from Pharmagent.app.api.models.providers import OllamaClient, OllamaError, OllamaTimeout
-from Pharmagent.app.api.schemas.models import ModelListResponse, ModelPullResponse
-from Pharmagent.app.logger import logger
+from DILIGENT.app.api.models.providers import OllamaClient, OllamaError, OllamaTimeout
+from DILIGENT.app.api.schemas.models import ModelListResponse, ModelPullResponse
+from DILIGENT.app.logger import logger
 
 router = APIRouter(prefix="/models", tags=["models"])
 
@@ -34,7 +34,7 @@ async def pull_model(
             return ModelPullResponse(status="success", pulled=(not already), model=name)
 
     except Exception as exc:
-        from Pharmagent.app.api.models.providers import OllamaError, OllamaTimeout
+        from DILIGENT.app.api.models.providers import OllamaError, OllamaTimeout
 
         if isinstance(exc, OllamaTimeout):
             raise HTTPException(status_code=504, detail=str(exc))

@@ -4,4 +4,4 @@ __all__ = [
     "LiverToxUpdater",
 ]
 
-from Pharmagent.app.scripts.update_database import LiverToxUpdater
+from DILIGENT.app.scripts.update_database import LiverToxUpdater

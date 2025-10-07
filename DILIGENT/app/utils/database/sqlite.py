@@ -9,8 +9,8 @@ from sqlalchemy import Column, Float, String, Text, UniqueConstraint, create_eng
 from sqlalchemy.dialects.sqlite import insert
 from sqlalchemy.orm import declarative_base, sessionmaker
 
-from Pharmagent.app.constants import DATA_PATH
-from Pharmagent.app.utils.singleton import singleton
+from DILIGENT.app.constants import DATA_PATH
+from DILIGENT.app.utils.singleton import singleton
 
 Base = declarative_base()
 
@@ -70,9 +70,9 @@ class LiverToxMasterList(Base):
 # [DATABASE]
 ###############################################################################
 @singleton
-class PharmagentDatabase:
+class DILIGENTDatabase:
     def __init__(self) -> None:
-        self.db_path = os.path.join(DATA_PATH, "Pharmagent_database.db")
+        self.db_path = os.path.join(DATA_PATH, "DILIGENT_database.db")
         self.engine = create_engine(
             f"sqlite:///{self.db_path}", echo=False, future=True
         )
@@ -150,4 +150,4 @@ class PharmagentDatabase:
 
 
 # -----------------------------------------------------------------------------
-database = PharmagentDatabase()
+database = DILIGENTDatabase()

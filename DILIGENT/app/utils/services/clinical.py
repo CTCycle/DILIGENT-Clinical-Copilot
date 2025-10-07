@@ -7,12 +7,12 @@ import re
 from datetime import date, datetime
 from typing import Any
 
-from Pharmagent.app.api.models.prompts import (
+from DILIGENT.app.api.models.prompts import (
     LIVERTOX_CLINICAL_SYSTEM_PROMPT,
     LIVERTOX_CLINICAL_USER_PROMPT,
 )
-from Pharmagent.app.api.models.providers import initialize_llm_client
-from Pharmagent.app.api.schemas.clinical import (
+from DILIGENT.app.api.models.providers import initialize_llm_client
+from DILIGENT.app.api.schemas.clinical import (
     DrugEntry,
     DrugClinicalAssessment,
     DrugSuspensionContext,
@@ -21,14 +21,14 @@ from Pharmagent.app.api.schemas.clinical import (
     PatientDrugClinicalReport,
     PatientDrugs,
 )
-from Pharmagent.app.configurations import ClientRuntimeConfig
-from Pharmagent.app.constants import (
+from DILIGENT.app.configurations import ClientRuntimeConfig
+from DILIGENT.app.constants import (
     DEFAULT_LLM_TIMEOUT_SECONDS,
     DRUG_SUSPENSION_EXCLUSION_DAYS,
 )
-from Pharmagent.app.logger import logger
-from Pharmagent.app.utils.serializer import DataSerializer
-from Pharmagent.app.utils.services.livertox import LiverToxMatch, LiverToxMatcher
+from DILIGENT.app.logger import logger
+from DILIGENT.app.utils.serializer import DataSerializer
+from DILIGENT.app.utils.services.livertox import LiverToxMatch, LiverToxMatcher
 
 
 ###############################################################################

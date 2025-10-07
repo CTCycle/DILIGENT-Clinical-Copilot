@@ -1,9 +1,9 @@
 from __future__ import annotations
 
-from Pharmagent.app.constants import SOURCES_PATH
-from Pharmagent.app.logger import logger
-from Pharmagent.app.utils.database.sqlite import database
-from Pharmagent.app.utils.services.updater import LiverToxUpdater
+from DILIGENT.app.constants import SOURCES_PATH
+from DILIGENT.app.logger import logger
+from DILIGENT.app.utils.database.sqlite import database
+from DILIGENT.app.utils.services.updater import LiverToxUpdater
 
 REDOWNLOAD = True
 

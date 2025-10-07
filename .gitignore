@@ -1,6 +1,6 @@
-Pharmagent/setup/python/*
-Pharmagent/setup/*
-Pharmagent/resources/models/*
+DILIGENT/setup/python/*
+DILIGENT/setup/*
+DILIGENT/resources/models/*
 
 __pycache__
 *.vscode

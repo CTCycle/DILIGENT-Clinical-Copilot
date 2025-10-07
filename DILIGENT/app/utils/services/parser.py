@@ -10,18 +10,18 @@ from typing import Any
 
 import pandas as pd
 
-from Pharmagent.app.api.models.prompts import DISEASE_EXTRACTION_PROMPT
-from Pharmagent.app.api.models.providers import initialize_llm_client
-from Pharmagent.app.api.schemas.clinical import (
+from DILIGENT.app.api.models.prompts import DISEASE_EXTRACTION_PROMPT
+from DILIGENT.app.api.models.providers import initialize_llm_client
+from DILIGENT.app.api.schemas.clinical import (
     BloodTest,
     DrugEntry,
     PatientBloodTests,
     PatientDiseases,
     PatientDrugs,
 )
-from Pharmagent.app.configurations import ClientRuntimeConfig
-from Pharmagent.app.constants import DEFAULT_LLM_TIMEOUT_SECONDS
-from Pharmagent.app.utils.patterns import (
+from DILIGENT.app.configurations import ClientRuntimeConfig
+from DILIGENT.app.constants import DEFAULT_LLM_TIMEOUT_SECONDS
+from DILIGENT.app.utils.patterns import (
     CUTOFF_IN_PAREN_RE,
     DATE_PATS,
     DRUG_BRACKET_TRAIL_RE,

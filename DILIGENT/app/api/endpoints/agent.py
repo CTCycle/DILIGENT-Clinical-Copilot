@@ -8,16 +8,16 @@ from typing import Any
 from fastapi import APIRouter, Body, HTTPException, status
 from pydantic import ValidationError
 
-from Pharmagent.app.api.schemas.clinical import (
+from DILIGENT.app.api.schemas.clinical import (
     PatientData,
 )
-from Pharmagent.app.constants import TASKS_PATH
-from Pharmagent.app.logger import logger
-from Pharmagent.app.utils.services.clinical import (
+from DILIGENT.app.constants import TASKS_PATH
+from DILIGENT.app.logger import logger
+from DILIGENT.app.utils.services.clinical import (
     HepatotoxicityPatternAnalyzer,
     LiverToxConsultation,
 )
-from Pharmagent.app.utils.services.parser import (
+from DILIGENT.app.utils.services.parser import (
     BloodTestParser,
     DiseasesParser,
     DrugsParser,

@@ -5,12 +5,12 @@ import logging.config
 import os
 from datetime import datetime
 
-from Pharmagent.app.constants import LOGS_PATH
+from DILIGENT.app.constants import LOGS_PATH
 
 # Generate timestamp for the log filename
 ###############################################################################
 current_timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
-log_filename = os.path.join(LOGS_PATH, f"Pharmagent_{current_timestamp}.log")
+log_filename = os.path.join(LOGS_PATH, f"DILIGENT_{current_timestamp}.log")
 
 # Define logger configuration
 ###############################################################################

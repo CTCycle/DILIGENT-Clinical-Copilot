@@ -17,15 +17,15 @@ from pdfminer.high_level import extract_text as pdfminer_extract_text
 from pypdf import PdfReader
 from tqdm import tqdm
 
-from Pharmagent.app.constants import (
+from DILIGENT.app.constants import (
     LIVERTOX_ARCHIVE,
     LIVERTOX_BASE_URL,
     SOURCES_PATH,
 )
-from Pharmagent.app.logger import logger
-from Pharmagent.app.utils.database.sqlite import database
-from Pharmagent.app.utils.serializer import DataSerializer
-from Pharmagent.app.utils.services.retrieval import RxNavClient
+from DILIGENT.app.logger import logger
+from DILIGENT.app.utils.database.sqlite import database
+from DILIGENT.app.utils.serializer import DataSerializer
+from DILIGENT.app.utils.services.retrieval import RxNavClient
 
 __all__ = ["LiverToxUpdater"]
 
@@ -33,7 +33,7 @@ SUPPORTED_MONOGRAPH_EXTENSIONS = (".html", ".htm", ".xhtml", ".xml", ".nxml", ".
 
 DEFAULT_HTTP_HEADERS = {
     "User-Agent": (
-        "PharmagentClinicalCopilot/1.0 (contact=clinical-copilot@pharmagent.local)"
+        "DILIGENTClinicalCopilot/1.0 (contact=clinical-copilot@pharmagent.local)"
     )
 }
 
