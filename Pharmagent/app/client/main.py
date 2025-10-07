@@ -233,6 +233,7 @@ def create_interface() -> gr.Blocks:
             inputs=[
                 patient_name,
                 anamnesis,
+                has_diseases,
                 drugs,
                 exams,
                 alt,
