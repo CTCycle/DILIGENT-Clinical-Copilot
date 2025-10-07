@@ -140,7 +140,7 @@ class LiverToxConsultation:
             "Toxicity analysis stage 3/3: performing clinical assessment for matched drugs"
         )
         resolved = self._resolve_matches(patient_drugs, matches)
-        report = await self._compile_clinical_assessment(
+        report = await self.compile_clinical_assessment(
             resolved,
             anamnesis=anamnesis,
             visit_date=visit_date,
@@ -190,7 +190,7 @@ class LiverToxConsultation:
         return self.matcher.build_patient_mapping(patient_drugs, matches)
 
     # -------------------------------------------------------------------------
-    async def _compile_clinical_assessment(
+    async def compile_clinical_assessment(
         self,
         resolved_entries: list[dict[str, Any]],
         *,
