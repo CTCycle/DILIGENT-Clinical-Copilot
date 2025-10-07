@@ -84,7 +84,7 @@ from sqlalchemy import create_engine
 from sqlalchemy.orm import sessionmaker
 
 from Pharmagent.app.utils.serializer import DataSerializer
-from Pharmagent.app.utils.services.livertox import LiverToxUpdater
+from Pharmagent.app.utils.services.updater import LiverToxUpdater
 from Pharmagent.app.utils.database import sqlite as sqlite_module
 
 
