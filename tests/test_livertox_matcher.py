@@ -151,3 +151,35 @@ def test_partial_match_with_duplicate_nbk_ids():
     match = matches[0]
     assert match is not None
     assert match.matched_name == "Alpha Drug"
+
+
+def test_build_patient_mapping_uses_monograph_rows():
+    matcher = build_matcher()
+    matches = run_match(matcher, ["Xarelto"])
+    mapping = matcher.build_patient_mapping(["Xarelto"], matches)
+    assert mapping[0]["matched_livertox_row"]["drug_name"] == "Rivaroxaban"
+    assert mapping[0]["matched_livertox_row"]["excerpt"] == "Example excerpt"
+
+
+def test_build_patient_mapping_with_duplicate_nbk_ids():
+    monographs = pd.DataFrame(
+        [
+            {
+                "nbk_id": "NBK_DUP",
+                "drug_name": "Alpha Drug",
+                "excerpt": "Alpha excerpt",
+            },
+            {
+                "nbk_id": "NBK_DUP",
+                "drug_name": "Beta Drug",
+                "excerpt": "Beta excerpt",
+            },
+        ]
+    )
+    matcher = LiverToxMatcher(monographs)
+    matches = run_match(matcher, ["Alpha Drug", "Beta Drug"])
+    mapping = matcher.build_patient_mapping(["Alpha Drug", "Beta Drug"], matches)
+    assert mapping[0]["matched_livertox_row"]["excerpt"] == "Alpha excerpt"
+    assert mapping[1]["matched_livertox_row"]["excerpt"] == "Beta excerpt"
+    assert mapping[0]["matched_livertox_row"]["drug_name"] == "Alpha Drug"
+    assert mapping[1]["matched_livertox_row"]["drug_name"] == "Beta Drug"
