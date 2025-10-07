@@ -18,7 +18,7 @@ def build_matcher() -> LiverToxMatcher:
                 "nbk_id": "NBK1",
                 "drug_name": "Rivaroxaban",
                 "excerpt": "Example excerpt",
-                "synonyms": "Xarelto; Rivaroxaban tablets",
+                "synonyms": "Xarelto, Rivaroxaban tablets",
             },
             {
                 "nbk_id": "NBK2",
@@ -73,6 +73,34 @@ def test_master_list_brand_lookup():
     assert match.reason == "brand_chapter_title"
 
 
+def test_synonym_lookup_from_delimited_string():
+    matcher = build_matcher()
+    matches = run_match(matcher, ["Rivaroxaban tablets"])
+    match = matches[0]
+    assert match is not None
+    assert match.nbk_id == "NBK1"
+    assert match.reason == "synonym_match"
+
+
+def test_dictionary_synonym_lookup():
+    monographs = pd.DataFrame(
+        [
+            {
+                "nbk_id": "NBK_DICT",
+                "drug_name": "Sample Drug",
+                "excerpt": "Sample excerpt",
+                "synonyms": '{"other": ["Sample Alias"]}',
+            }
+        ]
+    )
+    matcher = LiverToxMatcher(monographs)
+    matches = run_match(matcher, ["Sample Alias"])
+    match = matches[0]
+    assert match is not None
+    assert match.nbk_id == "NBK_DICT"
+    assert match.reason == "synonym_match"
+
+
 def test_master_list_chapter_synonym_resolution():
     matcher = build_matcher()
     matches = run_match(matcher, ["Pradaxa"])
@@ -99,3 +127,59 @@ def test_fuzzy_typo_resolution():
     assert match is not None
     assert match.nbk_id == "NBK1"
     assert match.reason == "fuzzy_synonym"
+
+
+def test_partial_match_with_duplicate_nbk_ids():
+    monographs = pd.DataFrame(
+        [
+            {
+                "nbk_id": "NBK_DUP",
+                "drug_name": "Alpha Drug",
+                "excerpt": "Alpha excerpt",
+                "synonyms": "Alpha Tablet",
+            },
+            {
+                "nbk_id": "NBK_DUP",
+                "drug_name": "Beta Drug",
+                "excerpt": "Beta excerpt",
+                "synonyms": "Beta Tablet",
+            },
+        ]
+    )
+    matcher = LiverToxMatcher(monographs)
+    matches = run_match(matcher, ["Alpha Tablet"])
+    match = matches[0]
+    assert match is not None
+    assert match.matched_name == "Alpha Drug"
+
+
+def test_build_patient_mapping_uses_monograph_rows():
+    matcher = build_matcher()
+    matches = run_match(matcher, ["Xarelto"])
+    mapping = matcher.build_patient_mapping(["Xarelto"], matches)
+    assert mapping[0]["matched_livertox_row"]["drug_name"] == "Rivaroxaban"
+    assert mapping[0]["matched_livertox_row"]["excerpt"] == "Example excerpt"
+
+
+def test_build_patient_mapping_with_duplicate_nbk_ids():
+    monographs = pd.DataFrame(
+        [
+            {
+                "nbk_id": "NBK_DUP",
+                "drug_name": "Alpha Drug",
+                "excerpt": "Alpha excerpt",
+            },
+            {
+                "nbk_id": "NBK_DUP",
+                "drug_name": "Beta Drug",
+                "excerpt": "Beta excerpt",
+            },
+        ]
+    )
+    matcher = LiverToxMatcher(monographs)
+    matches = run_match(matcher, ["Alpha Drug", "Beta Drug"])
+    mapping = matcher.build_patient_mapping(["Alpha Drug", "Beta Drug"], matches)
+    assert mapping[0]["matched_livertox_row"]["excerpt"] == "Alpha excerpt"
+    assert mapping[1]["matched_livertox_row"]["excerpt"] == "Beta excerpt"
+    assert mapping[0]["matched_livertox_row"]["drug_name"] == "Alpha Drug"
+    assert mapping[1]["matched_livertox_row"]["drug_name"] == "Beta Drug"

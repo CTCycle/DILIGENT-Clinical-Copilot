@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import json
 import re
 import unicodedata
 from dataclasses import dataclass
@@ -141,7 +142,7 @@ class LiverToxMatcher:
         self.token_index: dict[str, list[MonographRecord]] = {}
         self.brand_index: dict[str, list[tuple[str, str]]] = {}
         self.ingredient_index: dict[str, list[tuple[str, str]]] = {}
-        self.rows_by_nbk: dict[str, dict[str, Any]] = {}
+        self.rows_by_name: dict[str, dict[str, Any]] = {}
         self._build_records()
         self._build_master_list_aliases()
         self._finalize_token_index()
@@ -181,12 +182,22 @@ class LiverToxMatcher:
         matches: list[LiverToxMatch | None],
     ) -> list[dict[str, Any]]:
         entries: list[dict[str, Any]] = []
-        nbk_to_row = self._ensure_row_index()
+        row_index = self._ensure_row_index()
         for original, match in zip(patient_drugs, matches, strict=False):
             row_data: dict[str, Any] | None = None
             excerpts: list[str] = []
             if match is not None:
-                row_data = dict(nbk_to_row.get(match.nbk_id, {})) or None
+                normalized_key: str | None = None
+                if match.record is not None:
+                    normalized_key = match.record.normalized_name or self._normalize_name(
+                        match.record.drug_name
+                    )
+                if not normalized_key:
+                    normalized_key = self._normalize_name(match.matched_name)
+                if normalized_key:
+                    row = row_index.get(normalized_key)
+                    if row:
+                        row_data = dict(row)
                 excerpt_value = row_data.get("excerpt") if row_data else None
                 if match.record and match.record.excerpt:
                     excerpts.append(match.record.excerpt)
@@ -206,17 +217,20 @@ class LiverToxMatcher:
     def _match_query(
         self, normalized_query: str
     ) -> tuple[MonographRecord, float, str, list[str]] | None:
-        if not normalized_query:
-            return None
         direct = self._match_primary(normalized_query)
         if direct is not None:
             return direct
-        master = self._match_master_list(normalized_query)
-        if master is not None:
-            return master
         synonym = self._match_synonym(normalized_query)
+        master = self._match_master_list(normalized_query)
+        if synonym is not None and master is not None:
+            syn_record, *_ = synonym
+            master_record, *_ = master
+            if syn_record.nbk_id == master_record.nbk_id:
+                return master
         if synonym is not None:
             return synonym
+        if master is not None:
+            return master
         partial = self._match_partial(normalized_query)
         if partial is not None:
             return partial
@@ -280,7 +294,7 @@ class LiverToxMatcher:
         record_lookup: dict[str, MonographRecord] = {}
         for token in tokens:
             for record in self.token_index.get(token, []):
-                key = record.nbk_id or record.normalized_name or record.drug_name.lower()
+                key = record.normalized_name or record.drug_name.lower()
                 record_lookup[key] = record
                 candidate_scores[key] = candidate_scores.get(key, 0) + 1
         if not candidate_scores:
@@ -294,7 +308,7 @@ class LiverToxMatcher:
         matched_tokens: list[str] = []
         for token in tokens:
             for candidate in self.token_index.get(token, []):
-                key = candidate.nbk_id or candidate.normalized_name or candidate.drug_name.lower()
+                key = candidate.normalized_name or candidate.drug_name.lower()
                 if key == best_key:
                     matched_tokens.append(token)
                     break
@@ -328,19 +342,12 @@ class LiverToxMatcher:
         if direct is not None:
             record, confidence, _, _ = direct
             return record, confidence, "chapter_title", []
-        synonym = self._match_synonym(normalized_chapter)
-        if synonym is not None:
-            record, confidence, _, notes = synonym
-            return record, confidence, "chapter_synonym", notes
-        variant = self._find_best_variant(normalized_chapter)
-        if variant is None:
+        alias = self.synonym_index.get(normalized_chapter)
+        if alias is None:
             return None
-        record, original, is_primary, score = variant
-        reason = "chapter_fuzzy_primary" if is_primary else "chapter_fuzzy_synonym"
-        notes: list[str] = [f"score={score:.2f}"]
-        if not is_primary:
-            notes.insert(0, f"variant='{original}'")
-        return record, max(self.FUZZY_CONFIDENCE, score), reason, notes
+        record, original = alias
+        notes = [f"synonym='{original}'"]
+        return record, self.SYNONYM_CONFIDENCE, "chapter_synonym", notes
 
     # -------------------------------------------------------------------------
     def _find_best_variant(
@@ -465,23 +472,64 @@ class LiverToxMatcher:
 
     # -------------------------------------------------------------------------
     def _parse_synonyms(self, value: Any) -> dict[str, str]:
+        synonyms: dict[str, str] = {}
+        raw_values = self._extract_synonym_strings(value)
+        if not raw_values:
+            text = self._coerce_text(value)
+            if text is None:
+                return {}
+            raw_values = [text]
+        for raw in raw_values:
+            text = self._coerce_text(raw)
+            if text is None:
+                continue
+            for candidate in re.split(r"[;,/\n]+", text):
+                for variant in self._expand_variant(candidate):
+                    normalized = self._normalize_name(variant)
+                    if not normalized:
+                        continue
+                    if normalized in MATCHING_STOPWORDS:
+                        continue
+                    if len(normalized) < 4 and " " not in normalized:
+                        continue
+                    if normalized not in synonyms:
+                        synonyms[normalized] = variant
+        return synonyms
+
+    # -------------------------------------------------------------------------
+    def _extract_synonym_strings(self, value: Any) -> list[str]:
+        if value is None:
+            return []
+        if isinstance(value, dict):
+            collected: list[str] = []
+            for entry in value.values():
+                collected.extend(self._extract_synonym_strings(entry))
+            return collected
+        if isinstance(value, (list, tuple, set)):
+            collected: list[str] = []
+            for entry in value:
+                collected.extend(self._extract_synonym_strings(entry))
+            return collected
+        if isinstance(value, str):
+            stripped = value.strip()
+            if stripped.startswith(("{", "[")) and stripped.endswith(("}", "]")):
+                parsed = self._try_parse_json(stripped)
+                if isinstance(parsed, dict) or isinstance(parsed, list):
+                    return self._extract_synonym_strings(parsed)
+            return [value]
         text = self._coerce_text(value)
         if text is None:
-            return {}
-        synonyms: dict[str, str] = {}
-        candidates = re.split(r"[;,/\n]+", text)
-        for candidate in candidates:
-            for variant in self._expand_variant(candidate):
-                normalized = self._normalize_name(variant)
-                if not normalized:
-                    continue
-                if normalized in MATCHING_STOPWORDS:
-                    continue
-                if len(normalized) < 4 and " " not in normalized:
-                    continue
-                if normalized not in synonyms:
-                    synonyms[normalized] = variant
-        return synonyms
+            return []
+        return self._extract_synonym_strings(text)
+
+    # -------------------------------------------------------------------------
+    def _try_parse_json(self, value: str) -> Any:
+        if not value:
+            return None
+        try:
+            return json.loads(value)
+        except (ValueError, TypeError):
+            return None
 
     # -------------------------------------------------------------------------
     def _expand_variant(self, value: str) -> list[str]:
@@ -527,18 +575,21 @@ class LiverToxMatcher:
 
     # -------------------------------------------------------------------------
     def _ensure_row_index(self) -> dict[str, dict[str, Any]]:
-        if self.rows_by_nbk:
-            return self.rows_by_nbk
+        if self.rows_by_name:
+            return self.rows_by_name
         if self.livertox_df is None or self.livertox_df.empty:
             return {}
         index: dict[str, dict[str, Any]] = {}
         for row in self.livertox_df.to_dict(orient="records"):
-            nbk_id = str(row.get("nbk_id") or "").strip()
-            if not nbk_id:
+            drug_name = self._coerce_text(row.get("drug_name"))
+            if drug_name is None:
                 continue
-            index[nbk_id] = row
-        self.rows_by_nbk = index
-        return self.rows_by_nbk
+            normalized = self._normalize_name(drug_name)
+            if not normalized:
+                continue
+            index[normalized] = row
+        self.rows_by_name = index
+        return self.rows_by_name
 
     # -------------------------------------------------------------------------
     def _create_match(
