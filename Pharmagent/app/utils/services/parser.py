@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+import asyncio
+import contextlib
 import re
 import unicodedata
 from collections.abc import Iterable, Iterator
@@ -119,13 +121,36 @@ class DiseasesParser:
         self, timeout_s: float = DEFAULT_LLM_TIMEOUT_SECONDS, temperature: float = 0.0
     ) -> None:
         self.temperature = float(temperature)
-        self.client = initialize_llm_client(purpose="parser", timeout_s=timeout_s)
+        self.timeout_s = float(timeout_s)
+        self.client: Any | None = None
+        self.client_provider: str | None = None
+        self.model: str = ""
+        self.runtime_revision = -1
+        self._client_lock = asyncio.Lock()
         self.JSON_schema = {"diseases": list[str], "hepatic_diseases": list[str]}
-        self.model = (
-            ClientRuntimeConfig.get_cloud_model()
-            if ClientRuntimeConfig.is_cloud_enabled()
-            else ClientRuntimeConfig.get_parsing_model()
-        )
+
+    # -------------------------------------------------------------------------
+    async def _ensure_client(self) -> None:
+        async with self._client_lock:
+            revision = ClientRuntimeConfig.get_revision()
+            provider, model = ClientRuntimeConfig.resolve_provider_and_model("parser")
+            needs_refresh = (
+                self.client is None
+                or self.client_provider != provider
+                or self.runtime_revision != revision
+            )
+            if needs_refresh:
+                if self.client is not None:
+                    with contextlib.suppress(Exception):
+                        await self.client.close()
+                self.client = initialize_llm_client(
+                    purpose="parser", timeout_s=self.timeout_s
+                )
+                self.client_provider = provider
+            self.runtime_revision = revision
+            self.model = model
+            if self.client is not None and model and hasattr(self.client, "default_model"):
+                self.client.default_model = model  # type: ignore[attr-defined]
 
     # -------------------------------------------------------------------------
     def normalize_unique(self, lst: list[str]) -> list[str]:
@@ -144,6 +169,9 @@ class DiseasesParser:
     async def extract_diseases(self, text: str | None) -> dict[str, Any]:
         if text is None:
             return {"diseases": [], "hepatic_diseases": []}
+        await self._ensure_client()
+        if self.client is None:
+            raise RuntimeError("LLM client is not initialized for disease extraction")
         try:
             parsed: Any = await self.client.llm_structured_call(
                 model=self.model,

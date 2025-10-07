@@ -1388,22 +1388,7 @@ def initialize_llm_client(
     *, purpose: RuntimePurpose = "agent", **kwargs: Any
 ) -> OllamaClient | CloudLLMClient:
     kwargs.setdefault("timeout_s", DEFAULT_LLM_TIMEOUT_SECONDS)
-    if ClientRuntimeConfig.is_cloud_enabled():
-        provider = ClientRuntimeConfig.get_llm_provider()
-        default_model = ClientRuntimeConfig.get_cloud_model()
-        if not default_model:
-            default_model = (
-                ClientRuntimeConfig.get_parsing_model()
-                if purpose == "parser"
-                else ClientRuntimeConfig.get_agent_model()
-            )
-    else:
-        provider = "ollama"
-        default_model = (
-            ClientRuntimeConfig.get_parsing_model()
-            if purpose == "parser"
-            else ClientRuntimeConfig.get_agent_model()
-        )
+    provider, default_model = ClientRuntimeConfig.resolve_provider_and_model(purpose)
     selected_model = kwargs.pop("default_model", default_model)
     return select_llm_provider(
         provider=provider,
