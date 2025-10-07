@@ -281,6 +281,7 @@ async def _trigger_agent(url: str, payload: dict[str, Any] | None = None) -> str
 async def run_agent(
     patient_name: str | None,
     anamnesis: str,
+    has_hepatic_diseases: bool,
     drugs: str,
     exams: str,
     alt: str,
@@ -298,6 +299,7 @@ async def run_agent(
     cleaned_payload = {
         "name": _sanitize_field(patient_name),
         "anamnesis": _sanitize_field(anamnesis),
+        "has_hepatic_diseases": bool(has_hepatic_diseases),
         "drugs": _sanitize_field(drugs),
         "exams": _sanitize_field(exams),
         "alt": _sanitize_field(alt),
