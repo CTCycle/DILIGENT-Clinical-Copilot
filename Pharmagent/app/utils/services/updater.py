@@ -146,7 +146,7 @@ class LiverToxUpdater:
             "Secondary Classification": "secondary_classification",
         }
 
-        data = data.rename(columns=lambda s: re.sub(r'\s+', ' ', s).strip())
+        data = data.rename(columns=lambda s: re.sub(r"\s+", " ", s).strip())
         data = data.rename(columns=column_mapping)
 
         required_columns = list(column_mapping.values())
@@ -168,6 +168,7 @@ class LiverToxUpdater:
         for column in text_columns:
             data[column] = self._clean_master_list_column(data[column])
 
+        data = data.dropna(subset=["chapter_title"])
         data = data.dropna(subset=["ingredient", "brand_name"])
 
         invalid_headers = {
@@ -622,12 +623,14 @@ class LiverToxUpdater:
         records = self.sanitize_records(extracted)
         logger.info("Enriching %d sanitized entries with RxNav terms", len(records))
         enriched = self.enrich_records(records)
+        logger.info("Applying final sanitization to enriched records")
+        final_records = self.sanitize_records(enriched)
         logger.info("Persisting enriched records to database")
-        self.serializer.save_livertox_records(enriched)
-             
+        self.serializer.save_livertox_records(final_records)
+
         payload = {**master_info, **download_info, **local_info}
-        payload["processed_entries"] = len(enriched)
-        payload["records"] = len(enriched)
+        payload["processed_entries"] = len(final_records)
+        payload["records"] = len(final_records)
         logger.info("LiverTox update completed successfully")
 
         return payload
@@ -820,10 +823,57 @@ class LiverToxUpdater:
         return re.sub(r"[-_,.;:()\[\]{}\/\\]", " ", folded)
 
     # -------------------------------------------------------------------------
+    def _sanitize_synonyms_value(self, raw_value: Any) -> str | None:
+        if not isinstance(raw_value, str):
+            return None
+
+        candidates: list[str] = []
+        seen: set[str] = set()
+        for fragment in raw_value.split(","):
+            candidate = fragment.strip()
+            if not candidate:
+                continue
+            if re.search(r"[^A-Za-z0-9\s'-]", candidate):
+                continue
+            base = re.split(r"\d", candidate, maxsplit=1)[0].strip()
+            base = base.replace("_", " ")
+            base = re.sub(r"[^\w\s'-]", " ", base)
+            base = self._normalize_whitespace(base)
+            if not base:
+                continue
+            if len(base) < 4:
+                continue
+            if re.search(r"\d", base):
+                continue
+            if not re.fullmatch(r"[A-Za-z][A-Za-z\s'-]*", base):
+                continue
+            key = base.lower()
+            if key in seen:
+                continue
+            seen.add(key)
+            candidates.append(base)
+
+        if not candidates:
+            return None
+
+        return ", ".join(candidates)
+
+    # -------------------------------------------------------------------------
     def sanitize_records(self, entries: list[dict[str, Any]]) -> list[dict[str, Any]]:
         sanitized = self.serializer.sanitize_livertox_records(entries)
         if sanitized.empty:
             raise RuntimeError("No valid LiverTox monographs were available after sanitization.")
+        sanitized["drug_name"] = sanitized["drug_name"].astype(str).str.strip()
+        numeric_mask = sanitized["drug_name"].str.fullmatch(r"\d+")
+        sanitized = sanitized[~numeric_mask]
+
+        sanitized["synonyms"] = sanitized["synonyms"].apply(
+            self._sanitize_synonyms_value
+        )
+
+        if sanitized.empty:
+            raise RuntimeError("No valid LiverTox monographs were available after sanitization.")
+
         return sanitized.to_dict(orient="records")
 
     # -------------------------------------------------------------------------
