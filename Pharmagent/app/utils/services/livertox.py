@@ -284,7 +284,7 @@ class LiverToxMatcher:
         record_lookup: dict[str, MonographRecord] = {}
         for token in tokens:
             for record in self.token_index.get(token, []):
-                key = record.nbk_id or record.normalized_name or record.drug_name.lower()
+                key = record.normalized_name or record.drug_name.lower()
                 record_lookup[key] = record
                 candidate_scores[key] = candidate_scores.get(key, 0) + 1
         if not candidate_scores:
@@ -298,7 +298,7 @@ class LiverToxMatcher:
         matched_tokens: list[str] = []
         for token in tokens:
             for candidate in self.token_index.get(token, []):
-                key = candidate.nbk_id or candidate.normalized_name or candidate.drug_name.lower()
+                key = candidate.normalized_name or candidate.drug_name.lower()
                 if key == best_key:
                     matched_tokens.append(token)
                     break

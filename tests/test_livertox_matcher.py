@@ -108,3 +108,27 @@ def test_fuzzy_typo_resolution():
     assert match is not None
     assert match.nbk_id == "NBK1"
     assert match.reason == "fuzzy_synonym"
+
+
+def test_partial_match_with_duplicate_nbk_ids():
+    monographs = pd.DataFrame(
+        [
+            {
+                "nbk_id": "NBK_DUP",
+                "drug_name": "Alpha Drug",
+                "excerpt": "Alpha excerpt",
+                "synonyms": "Alpha Tablet",
+            },
+            {
+                "nbk_id": "NBK_DUP",
+                "drug_name": "Beta Drug",
+                "excerpt": "Beta excerpt",
+                "synonyms": "Beta Tablet",
+            },
+        ]
+    )
+    matcher = LiverToxMatcher(monographs)
+    matches = run_match(matcher, ["Alpha Tablet"])
+    match = matches[0]
+    assert match is not None
+    assert match.matched_name == "Alpha Drug"
