@@ -80,45 +80,32 @@ Carefully read the excerpt and extract:
 Return ONLY a JSON object matching the required schema.
 """
 
-LIVERTOX_MATCH_SYSTEM_PROMPT = """
-You are a medical terminology expert tasked with aligning drug names to the naming
-conventions used in the LiverTox database. Always pick the best matching entry from the
-provided candidate list. Never guess names that are not present in that list.
-
-Return a valid JSON object with the keys:
-- "match_name": the exact candidate string that best matches the requested drug, or null
-  if none apply.
-- "confidence": number between 0 and 1 representing how certain you are.
-- "rationale": short explanation (one sentence) describing the match.
+LIVERTOX_CLINICAL_SYSTEM_PROMPT = """
+You are a clinical hepatologist specializing in drug-induced liver injury (DILI).
+Base every judgement strictly on the supplied LiverTox excerpt and the patient's
+clinical context. Avoid speculation or information that is not present in the excerpt
+or anamnesis. When forming conclusions, weigh how well the reported reactions match the
+patient's documented diseases and hepatic findings. If a therapy was recently
+suspended, comment on whether residual exposure could still be relevant. Provide
+succinct, evidence-based reasoning.
 """
 
-LIVERTOX_MATCH_USER_PROMPT = """
-Drug requiring alignment: {drug_name}
+LIVERTOX_CLINICAL_USER_PROMPT = """
+Drug: {drug_name}
 
-Candidate LiverTox monograph names:
-{candidates}
+LiverTox excerpt:
+{excerpt}
 
-Think carefully about synonyms, brand names, and spelling variants before selecting the
-closest candidate. Respond ONLY with the JSON object described earlier.
-"""
+Patient anamnesis:
+{anamnesis}
 
-LIVERTOX_MATCH_LIST_USER_PROMPT = """
-Patient drugs requiring alignment (preserve order):
-{patient_drugs}
+Known diseases: {diseases}
+Hepatic diseases: {hepatic_diseases}
 
-Candidate LiverTox monograph names:
-{candidates}
+Suspension details: {suspension_details}
 
-For each patient drug above, respond with one JSON object in the same order containing:
-- "drug_name": copy the patient drug text exactly as provided.
-- "match_name": the exact candidate string that best matches the drug, or null if none
-  apply.
-- "confidence": number between 0 and 1 representing certainty.
-- "rationale": short explanation (one sentence) describing the match.
-
-The number of match objects MUST equal the number of patient drugs listed above.
-Never reorder, merge, or drop entries.
-
-Return ONLY a JSON object with a top-level key "matches" containing the array of match
-objects.
+Task: In 2-3 sentences, explain whether this drug could account for the patient's liver
+problems. Cite concrete mechanisms or reactions from the excerpt when applicable. If
+the therapy was suspended but still considered, make this explicit. Conclude clearly on
+the likelihood of the drug contributing to the liver findings.
 """

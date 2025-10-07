@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
-from typing import Any
+from typing import Any, Literal
 
 from Pharmagent.app.constants import (
     CLOUD_MODEL_CHOICES,
@@ -34,32 +34,41 @@ class ClientRuntimeConfig:
     use_cloud_services: bool = False
     ollama_temperature: float = 0.7
     ollama_reasoning: bool = False
+    revision: int = 0
+
+    # ---------------------------------------------------------------------
+    @classmethod
+    def _touch_revision(cls) -> None:
+        cls.revision += 1
 
     # ---------------------------------------------------------------------
     @classmethod
     def set_parsing_model(cls, model: str) -> str:
         value = model.strip()
-        if value:
+        if value and value != cls.parsing_model:
             cls.parsing_model = value
+            cls._touch_revision()
         return cls.parsing_model
 
     # ---------------------------------------------------------------------
     @classmethod
     def set_agent_model(cls, model: str) -> str:
         value = model.strip()
-        if value:
+        if value and value != cls.agent_model:
             cls.agent_model = value
+            cls._touch_revision()
         return cls.agent_model
 
     # ---------------------------------------------------------------------
     @classmethod
     def set_llm_provider(cls, provider: str) -> str:
         value = provider.strip()
-        if value:
+        if value and value != cls.llm_provider:
             cls.llm_provider = value
             models = CLOUD_MODEL_CHOICES.get(cls.llm_provider, [])
             if cls.cloud_model not in models:
                 cls.cloud_model = models[0] if models else ""
+            cls._touch_revision()
         return cls.llm_provider
 
     # ---------------------------------------------------------------------
@@ -67,20 +76,29 @@ class ClientRuntimeConfig:
     def set_cloud_model(cls, model: str) -> str:
         value = model.strip()
         if not value:
-            cls.cloud_model = ""
+            if cls.cloud_model:
+                cls.cloud_model = ""
+                cls._touch_revision()
             return cls.cloud_model
         models = CLOUD_MODEL_CHOICES.get(cls.llm_provider, [])
         if value not in models:
             if models:
-                cls.cloud_model = models[0]
+                if cls.cloud_model != models[0]:
+                    cls.cloud_model = models[0]
+                    cls._touch_revision()
             return cls.cloud_model
-        cls.cloud_model = value
+        if cls.cloud_model != value:
+            cls.cloud_model = value
+            cls._touch_revision()
         return cls.cloud_model
 
     # ---------------------------------------------------------------------
     @classmethod
     def set_use_cloud_services(cls, enabled: bool) -> bool:
-        cls.use_cloud_services = bool(enabled)
+        normalized = bool(enabled)
+        if cls.use_cloud_services != normalized:
+            cls.use_cloud_services = normalized
+            cls._touch_revision()
         return cls.use_cloud_services
 
     # ---------------------------------------------------------------------
@@ -91,13 +109,19 @@ class ClientRuntimeConfig:
         except (TypeError, ValueError):
             parsed = cls.ollama_temperature
         parsed = max(0.0, min(2.0, parsed))
-        cls.ollama_temperature = round(parsed, 2)
+        rounded = round(parsed, 2)
+        if cls.ollama_temperature != rounded:
+            cls.ollama_temperature = rounded
+            cls._touch_revision()
         return cls.ollama_temperature
 
     # ---------------------------------------------------------------------
     @classmethod
     def set_ollama_reasoning(cls, enabled: bool) -> bool:
-        cls.ollama_reasoning = bool(enabled)
+        normalized = bool(enabled)
+        if cls.ollama_reasoning != normalized:
+            cls.ollama_reasoning = normalized
+            cls._touch_revision()
         return cls.ollama_reasoning
 
     # ---------------------------------------------------------------------
@@ -145,3 +169,32 @@ class ClientRuntimeConfig:
         cls.use_cloud_services = False
         cls.ollama_temperature = 0.7
         cls.ollama_reasoning = False
+        cls.revision = 0
+
+    # ---------------------------------------------------------------------
+    @classmethod
+    def get_revision(cls) -> int:
+        return cls.revision
+
+    # ---------------------------------------------------------------------
+    @classmethod
+    def resolve_provider_and_model(
+        cls, purpose: Literal["agent", "parser"]
+    ) -> tuple[str, str]:
+        if cls.is_cloud_enabled():
+            provider = cls.get_llm_provider()
+            model = cls.get_cloud_model().strip()
+            if not model:
+                model = (
+                    cls.get_parsing_model()
+                    if purpose == "parser"
+                    else cls.get_agent_model()
+                )
+        else:
+            provider = "ollama"
+            model = (
+                cls.get_parsing_model()
+                if purpose == "parser"
+                else cls.get_agent_model()
+            )
+        return provider, model.strip()
