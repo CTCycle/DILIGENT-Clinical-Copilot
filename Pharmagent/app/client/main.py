@@ -4,6 +4,7 @@ import gradio as gr
 
 from Pharmagent.app.client.controllers import (
     clear_agent_fields,
+    normalize_visit_date_component,
     preload_selected_models,
     pull_selected_models,
     run_agent,
@@ -100,6 +101,17 @@ def create_interface() -> gr.Blocks:
                     label="Patient Name",
                     placeholder="e.g., Marco Rossi",
                     lines=1,
+                )
+                visit_date = gr.DateTime(
+                    label="Visit Date",
+                    include_time=False,
+                    type="datetime",
+                    value=None,
+                )
+                visit_date.change(
+                    fn=normalize_visit_date_component,
+                    inputs=visit_date,
+                    outputs=visit_date,
                 )
                 process_from_files = gr.Checkbox(
                     label="Process patients from files",
@@ -232,6 +244,7 @@ def create_interface() -> gr.Blocks:
             fn=run_agent,
             inputs=[
                 patient_name,
+                visit_date,
                 anamnesis,
                 has_diseases,
                 drugs,
@@ -260,6 +273,7 @@ def create_interface() -> gr.Blocks:
             fn=clear_agent_fields,
             outputs=[
                 patient_name,
+                visit_date,
                 anamnesis,
                 drugs,
                 exams,

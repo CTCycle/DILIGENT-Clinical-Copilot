@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import re
+from datetime import date
 from typing import Any, Literal
 
 from pydantic import BaseModel, Field, field_validator, model_validator
@@ -22,6 +23,11 @@ class PatientData(BaseModel):
         max_length=200,
         description="Name of the patient (optional).",
         examples=["Marco Rossi"],
+    )
+    visit_date: date | None = Field(
+        None,
+        description="Date of the patient evaluation.",
+        examples=["2024-01-15"],
     )
     anamnesis: str | None = Field(
         None,
@@ -83,6 +89,16 @@ class PatientData(BaseModel):
             return None
         stripped = str(value).strip()
         return stripped or None
+
+    @field_validator("visit_date")
+    @classmethod
+    def _validate_visit_date(cls, value: date | None) -> date | None:
+        if value is None:
+            return None
+        today = date.today()
+        if value > today:
+            return today
+        return value
 
     @model_validator(mode="after")
     def _require_sections(self) -> "PatientData":
