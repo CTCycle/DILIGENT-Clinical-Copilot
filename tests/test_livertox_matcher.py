@@ -18,7 +18,7 @@ def build_matcher() -> LiverToxMatcher:
                 "nbk_id": "NBK1",
                 "drug_name": "Rivaroxaban",
                 "excerpt": "Example excerpt",
-                "synonyms": '{"other": ["Xarelto", "Rivaroxaban tablets"]}',
+                "synonyms": "Xarelto, Rivaroxaban tablets",
             },
             {
                 "nbk_id": "NBK2",
@@ -73,12 +73,31 @@ def test_master_list_brand_lookup():
     assert match.reason == "brand_chapter_title"
 
 
-def test_dictionary_synonym_lookup():
+def test_synonym_lookup_from_delimited_string():
     matcher = build_matcher()
     matches = run_match(matcher, ["Rivaroxaban tablets"])
     match = matches[0]
     assert match is not None
     assert match.nbk_id == "NBK1"
+    assert match.reason == "synonym_match"
+
+
+def test_dictionary_synonym_lookup():
+    monographs = pd.DataFrame(
+        [
+            {
+                "nbk_id": "NBK_DICT",
+                "drug_name": "Sample Drug",
+                "excerpt": "Sample excerpt",
+                "synonyms": '{"other": ["Sample Alias"]}',
+            }
+        ]
+    )
+    matcher = LiverToxMatcher(monographs)
+    matches = run_match(matcher, ["Sample Alias"])
+    match = matches[0]
+    assert match is not None
+    assert match.nbk_id == "NBK_DICT"
     assert match.reason == "synonym_match"
 
 
