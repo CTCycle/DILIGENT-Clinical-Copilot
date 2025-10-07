@@ -53,11 +53,22 @@ def _sanitize_field(value: str | None) -> str | None:
 
 # -----------------------------------------------------------------------------
 def _normalize_visit_date(
-    value: datetime | date | str | None,
+    value: datetime | date | dict[str, Any] | str | None,
 ) -> date | None:
     if value is None:
         return None
-    if isinstance(value, datetime):
+    if isinstance(value, dict):
+        try:
+            day = int(value.get("day"))
+            month = int(value.get("month"))
+            year = int(value.get("year"))
+        except (TypeError, ValueError):
+            return None
+        try:
+            normalized = date(year, month, day)
+        except ValueError:
+            return None
+    elif isinstance(value, datetime):
         normalized = value.date()
     elif isinstance(value, date):
         normalized = value
@@ -85,7 +96,7 @@ def _normalize_visit_date(
 
 # -----------------------------------------------------------------------------
 def normalize_visit_date_component(
-    value: datetime | date | str | None,
+    value: datetime | date | dict[str, Any] | str | None,
 ) -> datetime | None:
     normalized = _normalize_visit_date(value)
     if normalized is None:
@@ -326,7 +337,7 @@ async def _trigger_agent(url: str, payload: dict[str, Any] | None = None) -> str
 ###############################################################################
 async def run_agent(
     patient_name: str | None,
-    visit_date: datetime | date | str | None,
+    visit_date: datetime | date | dict[str, Any] | str | None,
     anamnesis: str,
     has_hepatic_diseases: bool,
     drugs: str,
@@ -347,9 +358,15 @@ async def run_agent(
 
     cleaned_payload = {
         "name": _sanitize_field(patient_name),
-        "visit_date": normalized_visit_date.isoformat()
-        if normalized_visit_date
-        else None,
+        "visit_date": (
+            {
+                "day": normalized_visit_date.day,
+                "month": normalized_visit_date.month,
+                "year": normalized_visit_date.year,
+            }
+            if normalized_visit_date
+            else None
+        ),
         "anamnesis": _sanitize_field(anamnesis),
         "has_hepatic_diseases": bool(has_hepatic_diseases),
         "drugs": _sanitize_field(drugs),
