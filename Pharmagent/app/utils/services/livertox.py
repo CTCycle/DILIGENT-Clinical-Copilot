@@ -142,7 +142,7 @@ class LiverToxMatcher:
         self.token_index: dict[str, list[MonographRecord]] = {}
         self.brand_index: dict[str, list[tuple[str, str]]] = {}
         self.ingredient_index: dict[str, list[tuple[str, str]]] = {}
-        self.rows_by_nbk: dict[str, dict[str, Any]] = {}
+        self.rows_by_name: dict[str, dict[str, Any]] = {}
         self._build_records()
         self._build_master_list_aliases()
         self._finalize_token_index()
@@ -182,12 +182,22 @@ class LiverToxMatcher:
         matches: list[LiverToxMatch | None],
     ) -> list[dict[str, Any]]:
         entries: list[dict[str, Any]] = []
-        nbk_to_row = self._ensure_row_index()
+        row_index = self._ensure_row_index()
         for original, match in zip(patient_drugs, matches, strict=False):
             row_data: dict[str, Any] | None = None
             excerpts: list[str] = []
             if match is not None:
-                row_data = dict(nbk_to_row.get(match.nbk_id, {})) or None
+                normalized_key: str | None = None
+                if match.record is not None:
+                    normalized_key = match.record.normalized_name or self._normalize_name(
+                        match.record.drug_name
+                    )
+                if not normalized_key:
+                    normalized_key = self._normalize_name(match.matched_name)
+                if normalized_key:
+                    row = row_index.get(normalized_key)
+                    if row:
+                        row_data = dict(row)
                 excerpt_value = row_data.get("excerpt") if row_data else None
                 if match.record and match.record.excerpt:
                     excerpts.append(match.record.excerpt)
@@ -565,18 +575,21 @@ class LiverToxMatcher:
 
     # -------------------------------------------------------------------------
     def _ensure_row_index(self) -> dict[str, dict[str, Any]]:
-        if self.rows_by_nbk:
-            return self.rows_by_nbk
+        if self.rows_by_name:
+            return self.rows_by_name
         if self.livertox_df is None or self.livertox_df.empty:
             return {}
         index: dict[str, dict[str, Any]] = {}
         for row in self.livertox_df.to_dict(orient="records"):
-            nbk_id = str(row.get("nbk_id") or "").strip()
-            if not nbk_id:
+            drug_name = self._coerce_text(row.get("drug_name"))
+            if drug_name is None:
                 continue
-            index[nbk_id] = row
-        self.rows_by_nbk = index
-        return self.rows_by_nbk
+            normalized = self._normalize_name(drug_name)
+            if not normalized:
+                continue
+            index[normalized] = row
+        self.rows_by_name = index
+        return self.rows_by_name
 
     # -------------------------------------------------------------------------
     def _create_match(
