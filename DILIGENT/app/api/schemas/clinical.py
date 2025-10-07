@@ -461,6 +461,12 @@ class DrugSuspensionContext(BaseModel):
     suspension_date: date | None = Field(default=None)
     excluded: bool = Field(False)
     note: str | None = Field(default=None)
+    interval_days: int | None = Field(
+        default=None,
+        description=(
+            "Difference in days between the clinical visit and suspension date (visit - suspension)."
+        ),
+    )
 
 
 ###############################################################################
