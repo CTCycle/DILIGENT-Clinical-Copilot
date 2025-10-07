@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 import re
-from datetime import date
+from datetime import date, datetime
 from typing import Any, Literal
 
 from pydantic import BaseModel, Field, field_validator, model_validator
@@ -27,7 +27,7 @@ class PatientData(BaseModel):
     visit_date: date | None = Field(
         None,
         description="Date of the patient evaluation.",
-        examples=["2024-01-15"],
+        examples=[{"day": 15, "month": 1, "year": 2024}],
     )
     anamnesis: str | None = Field(
         None,
@@ -89,6 +89,41 @@ class PatientData(BaseModel):
             return None
         stripped = str(value).strip()
         return stripped or None
+
+    @field_validator("visit_date", mode="before")
+    @classmethod
+    def _coerce_visit_date(cls, value: Any) -> date | None:
+        if value is None:
+            return None
+        if isinstance(value, date):
+            return value
+        if isinstance(value, datetime):
+            return value.date()
+        if isinstance(value, dict):
+            try:
+                day = int(value.get("day"))
+                month = int(value.get("month"))
+                year = int(value.get("year"))
+            except (TypeError, ValueError):
+                return None
+            try:
+                return date(year, month, day)
+            except ValueError:
+                return None
+        if isinstance(value, str):
+            stripped = value.strip()
+            if not stripped:
+                return None
+            try:
+                parsed_datetime = datetime.fromisoformat(stripped)
+            except ValueError:
+                try:
+                    return date.fromisoformat(stripped)
+                except ValueError:
+                    return None
+            else:
+                return parsed_datetime.date()
+        return None
 
     @field_validator("visit_date")
     @classmethod
@@ -412,6 +447,7 @@ class DrugHepatotoxicityAnalysis(BaseModel):
         if self.analysis is None and not self.error:
             raise ValueError("Either analysis or error must be provided for each drug.")
         return self
+
 
 
 ###############################################################################
