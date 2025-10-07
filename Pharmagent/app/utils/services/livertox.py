@@ -211,12 +211,17 @@ class LiverToxMatcher:
         direct = self._match_primary(normalized_query)
         if direct is not None:
             return direct
-        master = self._match_master_list(normalized_query)
-        if master is not None:
-            return master
         synonym = self._match_synonym(normalized_query)
+        master = self._match_master_list(normalized_query)
+        if synonym is not None and master is not None:
+            syn_record, *_ = synonym
+            master_record, *_ = master
+            if syn_record.nbk_id == master_record.nbk_id:
+                return master
         if synonym is not None:
             return synonym
+        if master is not None:
+            return master
         partial = self._match_partial(normalized_query)
         if partial is not None:
             return partial
@@ -328,19 +333,12 @@ class LiverToxMatcher:
         if direct is not None:
             record, confidence, _, _ = direct
             return record, confidence, "chapter_title", []
-        synonym = self._match_synonym(normalized_chapter)
-        if synonym is not None:
-            record, confidence, _, notes = synonym
-            return record, confidence, "chapter_synonym", notes
-        variant = self._find_best_variant(normalized_chapter)
-        if variant is None:
+        alias = self.synonym_index.get(normalized_chapter)
+        if alias is None:
             return None
-        record, original, is_primary, score = variant
-        reason = "chapter_fuzzy_primary" if is_primary else "chapter_fuzzy_synonym"
-        notes: list[str] = [f"score={score:.2f}"]
-        if not is_primary:
-            notes.insert(0, f"variant='{original}'")
-        return record, max(self.FUZZY_CONFIDENCE, score), reason, notes
+        record, original = alias
+        notes = [f"synonym='{original}'"]
+        return record, self.SYNONYM_CONFIDENCE, "chapter_synonym", notes
 
     # -------------------------------------------------------------------------
     def _find_best_variant(
