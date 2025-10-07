@@ -78,6 +78,7 @@ async def process_single_patient(payload: PatientData) -> dict[str, Any]:
         visit_date=updated_payload.visit_date,
         diseases=diseases.get("diseases", []),
         hepatic_diseases=diseases.get("hepatic_diseases", []),
+        pattern_score=pattern_score,
     )
     elapsed = time.perf_counter() - start_time
     logger.info("Drugs toxicity essay required %.4f seconds", elapsed)
