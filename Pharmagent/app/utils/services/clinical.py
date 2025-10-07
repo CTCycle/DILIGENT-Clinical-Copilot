@@ -3,7 +3,6 @@ from __future__ import annotations
 import re
 from typing import Any
 
-from Pharmagent.app.api.models.providers import initialize_llm_client
 from Pharmagent.app.api.schemas.clinical import (
     HepatotoxicityPatternScore,
     PatientData,
@@ -78,8 +77,8 @@ class LiverToxConsultation:
         self.drugs = drugs
         self.timeout_s = timeout_s
         self.serializer = DataSerializer()
-        self.llm_client = initialize_llm_client(purpose="parser", timeout_s=timeout_s)
         self.livertox_df = None
+        self.master_list_df = None
         self.matcher: LiverToxMatcher | None = None
 
     # -------------------------------------------------------------------------
@@ -94,9 +93,9 @@ class LiverToxConsultation:
 
         if self.matcher is None:
             return []
-        
+
         logger.info("Toxicity analysis stage 2/3: matching drugs to LiverTox records")
-        matches = await self.matcher.match_drug_names(patient_drugs)
+        matches = await self._match_patient_drugs(patient_drugs)
 
         logger.info("Toxicity analysis stage 3/3: compiling matched LiverTox excerpts")
         return self._resolve_matches(patient_drugs, matches)
@@ -118,12 +117,26 @@ class LiverToxConsultation:
             self.matcher = None
             return False
         self.livertox_df = dataset
-        self.matcher = LiverToxMatcher(dataset, llm_client=self.llm_client)
+        try:
+            master_list = self.serializer.get_livertox_master_list()
+        except Exception as exc:  # noqa: BLE001
+            logger.error("Failed loading LiverTox master list from database: %s", exc)
+            master_list = None
+        self.master_list_df = master_list
+        self.matcher = LiverToxMatcher(dataset, master_list)
         return True
 
     # -------------------------------------------------------------------------
     def _collect_patient_drugs(self) -> list[str]:
         return [entry.name for entry in self.drugs.entries if entry.name]
+
+    # -------------------------------------------------------------------------
+    async def _match_patient_drugs(
+        self, patient_drugs: list[str]
+    ) -> list[LiverToxMatch | None]:
+        if self.matcher is None:
+            return []
+        return await self.matcher.match_drug_names(patient_drugs)
 
     # -------------------------------------------------------------------------
     def _resolve_matches(

@@ -79,9 +79,13 @@ class DataSerializer:
         return database.load_from_database("LIVERTOX_MONOGRAPHS")
 
     # -----------------------------------------------------------------------------
+    def get_livertox_master_list(self) -> pd.DataFrame:
+        return database.load_from_database("LIVERTOX_MASTER_LIST")
+
+    # -----------------------------------------------------------------------------
     def save_livertox_master_list(
         self, frame: pd.DataFrame, *, source_url: str, last_modified: str | None
-    ) -> None:        
+    ) -> None:
         frame["source_url"] = source_url
         frame["source_last_modified"] = last_modified
         if "brand_name" not in frame.columns:
