@@ -80,10 +80,6 @@ async def process_single_patient(
         "Starting Drug-Induced Liver Injury (DILI) analysis for patient: %s",
         payload.name,
     )
-    logger.info(
-        "Patient hepatic disease history flag is set to %s",
-        payload.has_hepatic_diseases,
-    )
 
     translation_stats: dict[str, Any] | None = None
     updated_payload = payload.model_copy()
