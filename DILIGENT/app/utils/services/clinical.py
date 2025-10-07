@@ -22,10 +22,7 @@ from DILIGENT.app.api.schemas.clinical import (
     PatientDrugs,
 )
 from DILIGENT.app.configurations import ClientRuntimeConfig
-from DILIGENT.app.constants import (
-    DEFAULT_LLM_TIMEOUT_SECONDS,
-    DRUG_SUSPENSION_EXCLUSION_DAYS,
-)
+from DILIGENT.app.constants import DEFAULT_LLM_TIMEOUT_SECONDS
 from DILIGENT.app.logger import logger
 from DILIGENT.app.utils.serializer import DataSerializer
 from DILIGENT.app.utils.services.livertox import LiverToxMatch, LiverToxMatcher
@@ -121,6 +118,7 @@ class LiverToxConsultation:
         visit_date: date | None = None,
         diseases: list[str] | None = None,
         hepatic_diseases: list[str] | None = None,
+        pattern_score: HepatotoxicityPatternScore | None = None,
     ) -> dict[str, Any] | None:
         logger.info("Toxicity analysis stage 1/3: validating inputs")
         patient_drugs = self._collect_patient_drugs()
@@ -146,6 +144,7 @@ class LiverToxConsultation:
             visit_date=visit_date,
             diseases=diseases or [],
             hepatic_diseases=hepatic_diseases or [],
+            pattern_score=pattern_score,
         )
         return report.model_dump()
 
@@ -198,6 +197,7 @@ class LiverToxConsultation:
         visit_date: date | None,
         diseases: list[str],
         hepatic_diseases: list[str],
+        pattern_score: HepatotoxicityPatternScore | None,
     ) -> PatientDrugClinicalReport:
         normalized_anamnesis = (anamnesis or "").strip()
         if not normalized_anamnesis:
@@ -208,6 +208,7 @@ class LiverToxConsultation:
         hepatic_summary = (
             ", ".join(normalized_hepatic) if normalized_hepatic else "None reported"
         )
+        pattern_prompt = self._format_pattern_prompt(pattern_score)
 
         entries: list[DrugClinicalAssessment] = []
         llm_tasks: list[Any] = []
@@ -262,6 +263,7 @@ class LiverToxConsultation:
                     diseases=disease_summary,
                     hepatic_diseases=hepatic_summary,
                     suspension=suspension,
+                    pattern_summary=pattern_prompt,
                 )
             )
 
@@ -303,14 +305,15 @@ class LiverToxConsultation:
     ) -> DrugSuspensionContext:
         suspended = bool(entry.suspension_status)
         parsed_date = self._parse_suspension_date(entry.suspension_date, visit_date)
-        excluded = False
         note: str | None = None
+        interval_days: int | None = None
         if not suspended:
             return DrugSuspensionContext(
                 suspended=False,
                 suspension_date=None,
                 excluded=False,
                 note=None,
+                interval_days=None,
             )
         if parsed_date is None:
             note = "Suspension reported without a reliable date; drug kept in analysis."
@@ -320,24 +323,25 @@ class LiverToxConsultation:
             )
         else:
             delta = (visit_date - parsed_date).days
-            if delta >= DRUG_SUSPENSION_EXCLUSION_DAYS:
-                excluded = True
+            interval_days = delta
+            if delta < 0:
                 note = (
-                    f"Suspended on {parsed_date.isoformat()} (≥{DRUG_SUSPENSION_EXCLUSION_DAYS} days before the visit)."
+                    f"Suspended on {parsed_date.isoformat()} ({-delta} days after the visit); treat as ongoing exposure."
                 )
-            elif delta < 0:
+            elif delta == 0:
                 note = (
-                    f"Suspension date {parsed_date.isoformat()} is after the visit; treat as ongoing exposure."
+                    f"Suspended on {parsed_date.isoformat()} (same day as the visit); residual exposure is expected."
                 )
             else:
                 note = (
-                    f"Suspended on {parsed_date.isoformat()} ({delta} days before the visit); still clinically relevant."
+                    f"Suspended on {parsed_date.isoformat()} ({delta} days before the visit); compare this latency with LiverTox guidance."
                 )
         return DrugSuspensionContext(
             suspended=suspended,
             suspension_date=parsed_date,
-            excluded=excluded,
+            excluded=False,
             note=note,
+            interval_days=interval_days,
         )
 
     # -------------------------------------------------------------------------
@@ -398,14 +402,52 @@ class LiverToxConsultation:
             return "Active therapy; no suspension reported."
         if suspension.suspension_date is None:
             return (
-                "Reported as suspended without a reliable date; residual exposure must be considered."
+                "Reported as suspended without a reliable date; evaluate latency with the LiverTox excerpt."
             )
         base = f"Suspended on {suspension.suspension_date.isoformat()}."
-        if suspension.excluded:
+        if suspension.interval_days is None:
             return (
-                f"{base} This occurred well before the visit (≥{DRUG_SUSPENSION_EXCLUSION_DAYS} days)."
+                f"{base} The interval relative to the visit is unclear; rely on LiverTox latency guidance."
             )
-        return f"{base} Suspension was close to the visit, so lingering effects are possible."
+        if suspension.interval_days < 0:
+            days = abs(suspension.interval_days)
+            return (
+                f"{base} This was {days} days after the visit, so exposure likely persisted at presentation."
+            )
+        if suspension.interval_days == 0:
+            return (
+                f"{base} The visit occurred the same day, so residual exposure is expected."
+            )
+        return (
+            f"{base} Approximately {suspension.interval_days} days elapsed before the visit; decide compatibility using LiverTox latency data."
+        )
+
+    # -------------------------------------------------------------------------
+    def _format_pattern_prompt(
+        self, pattern_score: HepatotoxicityPatternScore | None
+    ) -> str:
+        if pattern_score is None:
+            return (
+                "Hepatotoxicity pattern classification was unavailable; weigh pattern matches qualitatively."
+            )
+        classification = pattern_score.classification.replace("_", " ")
+        segments: list[str] = [
+            f"Observed liver injury pattern: {classification.capitalize()}.",
+        ]
+        if pattern_score.r_score is not None:
+            segments.append(f"R ratio ≈ {pattern_score.r_score:.2f}.")
+        if pattern_score.alt_multiple is not None:
+            segments.append(
+                f"ALT is about {pattern_score.alt_multiple:.2f} × the upper reference limit."
+            )
+        if pattern_score.alp_multiple is not None:
+            segments.append(
+                f"ALP is about {pattern_score.alp_multiple:.2f} × the upper reference limit."
+            )
+        segments.append(
+            "Treat drugs whose known hepatotoxicity pattern matches this classification as stronger causal candidates, and downgrade mismatches."
+        )
+        return " ".join(segments)
 
     # -------------------------------------------------------------------------
     async def _request_drug_analysis(
@@ -417,6 +459,7 @@ class LiverToxConsultation:
         diseases: str,
         hepatic_diseases: str,
         suspension: DrugSuspensionContext,
+        pattern_summary: str,
     ) -> str:
         suspension_details = self._format_suspension_prompt(suspension)
         user_prompt = LIVERTOX_CLINICAL_USER_PROMPT.format(
@@ -426,6 +469,7 @@ class LiverToxConsultation:
             diseases=self._escape_braces(diseases),
             hepatic_diseases=self._escape_braces(hepatic_diseases),
             suspension_details=self._escape_braces(suspension_details),
+            pattern_summary=self._escape_braces(pattern_summary),
         )
         messages = [
             {"role": "system", "content": LIVERTOX_CLINICAL_SYSTEM_PROMPT.strip()},
@@ -482,8 +526,7 @@ class LiverToxConsultation:
     ) -> str:
         if suspension.suspension_date is not None:
             return (
-                f"The therapy was suspended on {suspension.suspension_date.isoformat()}, "
-                f"at least {DRUG_SUSPENSION_EXCLUSION_DAYS} days before the visit; the drug was excluded from this DILI assessment."
+                f"The therapy was suspended on {suspension.suspension_date.isoformat()} well before the visit; the drug was excluded from this DILI assessment."
             )
         return (
             "The therapy was reported as suspended well before the visit and was excluded from the current DILI assessment."
