@@ -46,7 +46,7 @@ PARSING_MODEL_CHOICES = [
     "phi3:medium",
 ]
 AGENT_MODEL_CHOICES = [
-    "gpt-oss",
+    "gpt-oss:20b",
     "llama3.1:8b",
     "llama3.1:70b",
     "llama3.1:405b",
