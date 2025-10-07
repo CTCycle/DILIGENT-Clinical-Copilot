@@ -10,7 +10,7 @@ from typing import Any
 
 import httpx
 
-from Pharmagent.app.constants import (
+from DILIGENT.app.constants import (
     API_BASE_URL,
     PHARMACOLOGY_LIVERTOX_STATUS_ENDPOINT,
 )

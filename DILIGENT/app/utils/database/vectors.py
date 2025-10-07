@@ -4,7 +4,7 @@ import os
 
 import lancedb
 
-from Pharmagent.app.constants import RSC_PATH
+from DILIGENT.app.constants import RSC_PATH
 
 
 ###############################################################################

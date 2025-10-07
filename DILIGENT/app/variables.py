@@ -4,8 +4,8 @@ import os
 
 from dotenv import load_dotenv
 
-from Pharmagent.app.constants import PROJECT_DIR
-from Pharmagent.app.logger import logger
+from DILIGENT.app.constants import PROJECT_DIR
+from DILIGENT.app.logger import logger
 
 
 # [IMPORT CUSTOM MODULES]

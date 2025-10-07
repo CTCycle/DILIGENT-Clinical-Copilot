@@ -7,13 +7,13 @@ from typing import Any
 import httpx
 from gradio import update as gr_update
 
-from Pharmagent.app.api.models.providers import (
+from DILIGENT.app.api.models.providers import (
     OllamaClient,
     OllamaError,
     OllamaTimeout,
 )
-from Pharmagent.app.configurations import ClientRuntimeConfig
-from Pharmagent.app.constants import (
+from DILIGENT.app.configurations import ClientRuntimeConfig
+from DILIGENT.app.constants import (
     AGENT_API_URL,
     BATCH_AGENT_API_URL,
     CLOUD_MODEL_CHOICES,

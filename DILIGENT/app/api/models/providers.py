@@ -16,15 +16,15 @@ import httpx
 from langchain_core.output_parsers import PydanticOutputParser
 from pydantic import BaseModel
 
-from Pharmagent.app.configurations import ClientRuntimeConfig
-from Pharmagent.app.constants import (
+from DILIGENT.app.configurations import ClientRuntimeConfig
+from DILIGENT.app.constants import (
     DEFAULT_LLM_TIMEOUT_SECONDS,
     GEMINI_API_BASE,
     OLLAMA_HOST_DEFAULT,
     OPENAI_API_BASE,
     PARSING_MODEL_CHOICES,
 )
-from Pharmagent.app.logger import logger
+from DILIGENT.app.logger import logger
 
 OPENAI_API_KEY = os.getenv("OPENAI_API_KEY")
 GEMINI_API_KEY = os.getenv("GEMINI_API_KEY")

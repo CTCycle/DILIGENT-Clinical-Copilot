@@ -3,8 +3,8 @@ from __future__ import annotations
 import requests
 from bs4 import BeautifulSoup
 
-from Pharmagent.app.constants import ATC_BASE_URL
-from Pharmagent.app.logger import logger
+from DILIGENT.app.constants import ATC_BASE_URL
+from DILIGENT.app.logger import logger
 
 
 # [SCRAPER]
