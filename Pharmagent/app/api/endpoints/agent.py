@@ -82,7 +82,10 @@ async def process_single_patient(
         payload.name,
     )
     if payload.visit_date:
-        logger.info("Clinical visit date: %s", payload.visit_date.isoformat())
+        logger.info(
+            "Clinical visit date: %s",
+            payload.visit_date.strftime("%d-%m-%Y"),
+        )
 
     translation_stats: dict[str, Any] | None = None
     updated_payload = payload.model_copy()
@@ -154,7 +157,7 @@ async def process_single_patient(
 @router.post("/agent", response_model=None, status_code=status.HTTP_202_ACCEPTED)
 async def start_single_clinical_agent(
     name: str | None = Body(default=None),
-    visit_date: date | None = Body(default=None),
+    visit_date: date | dict[str, int] | str | None = Body(default=None),
     anamnesis: str | None = Body(default=None),
     has_hepatic_diseases: bool = Body(default=False),
     drugs: str | None = Body(default=None),
