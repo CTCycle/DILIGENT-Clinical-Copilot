@@ -152,6 +152,7 @@ async def process_single_patient(
 async def start_single_clinical_agent(
     name: str | None = Body(default=None),
     anamnesis: str | None = Body(default=None),
+    has_hepatic_diseases: bool = Body(default=False),
     drugs: str | None = Body(default=None),
     exams: str | None = Body(default=None),
     alt: str | None = Body(default=None),
@@ -165,6 +166,7 @@ async def start_single_clinical_agent(
         payload = PatientData(
             name=name,
             anamnesis=anamnesis,
+            has_hepatic_diseases=has_hepatic_diseases,
             drugs=drugs,
             exams=exams,
             alt=alt,
