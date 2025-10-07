@@ -453,3 +453,44 @@ class DrugHepatotoxicityAnalysis(BaseModel):
 ###############################################################################
 class PatientDrugToxicityBundle(BaseModel):
     entries: list[DrugHepatotoxicityAnalysis] = Field(default_factory=list)
+
+
+###############################################################################
+class DrugSuspensionContext(BaseModel):
+    suspended: bool = Field(False)
+    suspension_date: date | None = Field(default=None)
+    excluded: bool = Field(False)
+    note: str | None = Field(default=None)
+
+
+###############################################################################
+class DrugClinicalAssessment(BaseModel):
+    drug_name: str = Field(..., min_length=1, max_length=200)
+    matched_livertox_row: dict[str, Any] | None = Field(default=None)
+    extracted_excerpts: list[str] = Field(default_factory=list)
+    suspension: DrugSuspensionContext = Field(
+        default_factory=DrugSuspensionContext,
+    )
+    paragraph: str | None = Field(default=None)
+
+    @field_validator("paragraph", mode="before")
+    @classmethod
+    def _strip_paragraph(cls, value: str | None) -> str | None:
+        if value is None:
+            return None
+        stripped = str(value).strip()
+        return stripped or None
+
+
+###############################################################################
+class PatientDrugClinicalReport(BaseModel):
+    entries: list[DrugClinicalAssessment] = Field(default_factory=list)
+    final_report: str | None = Field(default=None)
+
+    @field_validator("final_report", mode="before")
+    @classmethod
+    def _strip_final_report(cls, value: str | None) -> str | None:
+        if value is None:
+            return None
+        stripped = str(value).strip()
+        return stripped or None

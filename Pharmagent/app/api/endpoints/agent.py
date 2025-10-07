@@ -11,7 +11,7 @@ from pydantic import ValidationError
 from Pharmagent.app.api.schemas.clinical import (
     PatientData,
 )
-from Pharmagent.app.constants import TASKS_PATH, TRANSLATION_CONFIDENCE_THRESHOLD
+from Pharmagent.app.constants import TASKS_PATH
 from Pharmagent.app.logger import logger
 from Pharmagent.app.utils.services.clinical import (
     HepatotoxicityPatternAnalyzer,
@@ -23,60 +23,15 @@ from Pharmagent.app.utils.services.parser import (
     DrugsParser,
     PatientCase,
 )
-from Pharmagent.app.utils.services.translation import TranslationService
-
-translation_service = TranslationService()
+ 
 drugs_parser = DrugsParser()
 diseases_parser = DiseasesParser()
 pattern_analyzer = HepatotoxicityPatternAnalyzer()
-MAX_TRANSLATION_ATTEMPTS = 5
-
 router = APIRouter(tags=["agent"])
-
-
-# -----------------------------------------------------------------------------
-def _format_drug_assessment(
-    detected_count: int,
-    assessment: list[dict[str, Any]] | None,
-) -> dict[str, Any]:
-    entries: list[dict[str, Any]] = []
-    matched_count = 0
-    if assessment:
-        for item in assessment:
-            if not isinstance(item, dict):
-                continue
-            raw_match = item.get("matched_livertox_row")
-            match_details = raw_match if isinstance(raw_match, dict) else {}
-            match_found = bool(match_details)
-            if match_found:
-                matched_count += 1
-            entries.append(
-                {
-                    "drug_name": item.get("drug_name"),
-                    "match": {
-                        "found": match_found,
-                        "nbk_id": match_details.get("nbk_id") if match_found else None,
-                        "livertox_name": match_details.get("drug_name")
-                        if match_found
-                        else None,
-                    },
-                    "excerpts": item.get("extracted_excerpts") or [],
-                }
-            )
-    return {
-        "summary": {
-            "detected_drugs": detected_count,
-            "matched_monographs": matched_count,
-        },
-        "entries": entries,
-    }
-
 
 # [ENPOINTS]
 ###############################################################################
-async def process_single_patient(
-    payload: PatientData, translate_to_eng: bool = False
-) -> dict[str, Any]:
+async def process_single_patient(payload: PatientData) -> dict[str, Any]:
     logger.info(
         "Starting Drug-Induced Liver Injury (DILI) analysis for patient: %s",
         payload.name,
@@ -87,18 +42,7 @@ async def process_single_patient(
             payload.visit_date.strftime("%d-%m-%Y"),
         )
 
-    translation_stats: dict[str, Any] | None = None
-    updated_payload = payload.model_copy()
-    if translate_to_eng:
-        logger.info("Translating text to English")
-        (
-            translation_stats,
-            updated_payload,
-        ) = await translation_service.translate_payload(
-            payload,
-            certainty_threshold=TRANSLATION_CONFIDENCE_THRESHOLD,
-            max_attempts=MAX_TRANSLATION_ATTEMPTS,
-        )
+    updated_payload = payload
 
     # 1. Calculate hepatic pattern score using ALT/ALP values
     pattern_score = pattern_analyzer.analyze(updated_payload)
@@ -115,13 +59,7 @@ async def process_single_patient(
     logger.info("Drugs extraction required %.4f seconds", elapsed)
     logger.info("Detected %s drugs", len(drug_data.entries))
     
-    # 3. Consult LiverTox database for hepatotoxicity info
-    start_time = time.perf_counter()
-    livertox_broker = LiverToxConsultation(drug_data)
-    drug_assessment = await livertox_broker.run_analysis()
-    elapsed = time.perf_counter() - start_time
-    logger.info("Drugs toxicity essay required %.4f seconds", elapsed)
-
+    # 3. Extract diseases from anamnesis for contextual analysis
     start_time = time.perf_counter()
     diseases = await diseases_parser.extract_diseases(updated_payload.anamnesis or "")
     elapsed = time.perf_counter() - start_time
@@ -132,23 +70,31 @@ async def process_single_patient(
         len(diseases["hepatic_diseases"]),
     )
 
+    # 4. Consult LiverTox database for hepatotoxicity info
+    start_time = time.perf_counter()
+    livertox_broker = LiverToxConsultation(drug_data)
+    drug_assessment = await livertox_broker.run_analysis(
+        anamnesis=updated_payload.anamnesis,
+        visit_date=updated_payload.visit_date,
+        diseases=diseases.get("diseases", []),
+        hepatic_diseases=diseases.get("hepatic_diseases", []),
+    )
+    elapsed = time.perf_counter() - start_time
+    logger.info("Drugs toxicity essay required %.4f seconds", elapsed)
+
+    final_report: str | None = None
+    if isinstance(drug_assessment, dict):
+        candidate = drug_assessment.get("final_report")
+        if isinstance(candidate, str) and candidate.strip():
+            final_report = candidate.strip()
+    elif isinstance(drug_assessment, str) and drug_assessment.strip():
+        final_report = drug_assessment.strip()
+
     result: dict[str, Any] = {
         "status": "success",
-        "code": "DISEASES_EXTRACTION_COMPLETE",
-        "analysis": {
-            "diseases": {
-                "all": diseases.get("diseases", []),
-                "hepatic": diseases.get("hepatic_diseases", []),
-            },
-            "drug_assessment": _format_drug_assessment(
-                len(drug_data.entries),
-                drug_assessment,
-            ),
-        },
+        "code": "DILI_FINAL_REPORT",
+        "final_report": final_report,
     }
-
-    if translation_stats:
-        result["translation"] = translation_stats
 
     return result
 
@@ -167,7 +113,6 @@ async def start_single_clinical_agent(
     alp: str | None = Body(default=None),
     alp_max: str | None = Body(default=None),
     symptoms: list[str] | None = Body(default=None),
-    translate_to_eng: bool = Body(default=False),
 ) -> dict[str, Any]:
     try:
         payload = PatientData(
@@ -188,7 +133,7 @@ async def start_single_clinical_agent(
             status_code=status.HTTP_422_UNPROCESSABLE_ENTITY, detail=exc.errors()
         ) from exc
 
-    single_result = await process_single_patient(payload, translate_to_eng)
+    single_result = await process_single_patient(payload)
     return {"status": "success", "processed": 1, "patients": [single_result]}
 
 
