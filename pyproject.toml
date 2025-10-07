@@ -26,7 +26,7 @@ dependencies = [
 ]
 
 [tool.hatch.build.targets.wheel]
-packages = ["pharmagent"] 
+packages = ["diligent"] 
 
 [[tool.uv.index]]
 name = "pytorch-cu128"
