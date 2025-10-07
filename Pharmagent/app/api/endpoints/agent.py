@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import time
+from datetime import date
 from pathlib import Path
 from typing import Any
 
@@ -80,6 +81,11 @@ async def process_single_patient(
         "Starting Drug-Induced Liver Injury (DILI) analysis for patient: %s",
         payload.name,
     )
+    if payload.visit_date:
+        logger.info(
+            "Clinical visit date: %s",
+            payload.visit_date.strftime("%d-%m-%Y"),
+        )
 
     translation_stats: dict[str, Any] | None = None
     updated_payload = payload.model_copy()
@@ -151,6 +157,7 @@ async def process_single_patient(
 @router.post("/agent", response_model=None, status_code=status.HTTP_202_ACCEPTED)
 async def start_single_clinical_agent(
     name: str | None = Body(default=None),
+    visit_date: date | dict[str, int] | str | None = Body(default=None),
     anamnesis: str | None = Body(default=None),
     has_hepatic_diseases: bool = Body(default=False),
     drugs: str | None = Body(default=None),
@@ -165,6 +172,7 @@ async def start_single_clinical_agent(
     try:
         payload = PatientData(
             name=name,
+            visit_date=visit_date,
             anamnesis=anamnesis,
             has_hepatic_diseases=has_hepatic_diseases,
             drugs=drugs,

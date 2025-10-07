@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import json
+from datetime import date, datetime
 from typing import Any
 
 import httpx
@@ -48,6 +49,59 @@ def _sanitize_field(value: str | None) -> str | None:
         return None
     stripped = value.strip()
     return stripped or None
+
+
+# -----------------------------------------------------------------------------
+def _normalize_visit_date(
+    value: datetime | date | dict[str, Any] | str | None,
+) -> date | None:
+    if value is None:
+        return None
+    if isinstance(value, dict):
+        try:
+            day = int(value.get("day"))
+            month = int(value.get("month"))
+            year = int(value.get("year"))
+        except (TypeError, ValueError):
+            return None
+        try:
+            normalized = date(year, month, day)
+        except ValueError:
+            return None
+    elif isinstance(value, datetime):
+        normalized = value.date()
+    elif isinstance(value, date):
+        normalized = value
+    elif isinstance(value, str):
+        stripped = value.strip()
+        if not stripped:
+            return None
+        try:
+            parsed_datetime = datetime.fromisoformat(stripped)
+        except ValueError:
+            try:
+                normalized = date.fromisoformat(stripped)
+            except ValueError:
+                return None
+        else:
+            normalized = parsed_datetime.date()
+    else:
+        return None
+
+    today = date.today()
+    if normalized > today:
+        return today
+    return normalized
+
+
+# -----------------------------------------------------------------------------
+def normalize_visit_date_component(
+    value: datetime | date | dict[str, Any] | str | None,
+) -> datetime | None:
+    normalized = _normalize_visit_date(value)
+    if normalized is None:
+        return None
+    return datetime.combine(normalized, datetime.min.time())
 
 
 # -----------------------------------------------------------------------------
@@ -219,6 +273,7 @@ async def preload_selected_models(parsing_model: str, agent_model: str) -> str:
 # -----------------------------------------------------------------------------
 def clear_agent_fields() -> tuple[
     str,
+    datetime | None,
     str,
     str,
     str,
@@ -234,6 +289,7 @@ def clear_agent_fields() -> tuple[
 ]:
     return (
         "",
+        None,
         "",
         "",
         "",
@@ -281,6 +337,7 @@ async def _trigger_agent(url: str, payload: dict[str, Any] | None = None) -> str
 ###############################################################################
 async def run_agent(
     patient_name: str | None,
+    visit_date: datetime | date | dict[str, Any] | str | None,
     anamnesis: str,
     has_hepatic_diseases: bool,
     drugs: str,
@@ -297,8 +354,19 @@ async def run_agent(
         url = f"{API_BASE_URL}{BATCH_AGENT_API_URL}"
         return await _trigger_agent(url)
 
+    normalized_visit_date = _normalize_visit_date(visit_date)
+
     cleaned_payload = {
         "name": _sanitize_field(patient_name),
+        "visit_date": (
+            {
+                "day": normalized_visit_date.day,
+                "month": normalized_visit_date.month,
+                "year": normalized_visit_date.year,
+            }
+            if normalized_visit_date
+            else None
+        ),
         "anamnesis": _sanitize_field(anamnesis),
         "has_hepatic_diseases": bool(has_hepatic_diseases),
         "drugs": _sanitize_field(drugs),
