@@ -985,6 +985,24 @@ class LiverToxUpdater:
     def enrich_records(self, records: pd.DataFrame) -> pd.DataFrame:
         if records.empty:
             return records.copy()
+
+        subset = [
+            column
+            for column in ("drug_name", "ingredient", "brand_name")
+            if column in records.columns
+        ]
+        if subset:
+            duplicate_mask = records.duplicated(subset=subset, keep=False)
+            if duplicate_mask.any():
+                duplicate_count = int(duplicate_mask.sum())
+                logger.warning(
+                    "Detected %d duplicate LiverTox record(s); removing before enrichment",
+                    duplicate_count,
+                )
+                records = records.loc[
+                    ~records.duplicated(subset=subset, keep="first")
+                ].reset_index(drop=True)
+
         enriched = records.copy()
         enriched["synonyms"] = pd.NA
         unit_stopwords = getattr(self.rx_client, "UNIT_STOPWORDS", set())
