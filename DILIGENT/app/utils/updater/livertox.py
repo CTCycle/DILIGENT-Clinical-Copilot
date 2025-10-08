@@ -4,11 +4,12 @@ import asyncio
 import html
 import io
 import json
+import multiprocessing
 import os
 import re
 import tarfile
 import unicodedata
-from concurrent.futures import ThreadPoolExecutor, as_completed
+from concurrent.futures import ProcessPoolExecutor, ThreadPoolExecutor, as_completed
 from datetime import UTC, datetime
 from typing import Any
 
@@ -21,6 +22,7 @@ from tqdm import tqdm
 from DILIGENT.app.constants import (
     LIVERTOX_ARCHIVE,
     LIVERTOX_BASE_URL,
+    LIVERTOX_MONOGRAPH_MAX_WORKERS,
     SOURCES_PATH,
 )
 from DILIGENT.app.logger import logger
@@ -800,6 +802,7 @@ class LiverToxUpdater:
 
         collected: list[dict[str, str]] = []
         processed_files: set[str] = set()
+        max_workers = max(1, LIVERTOX_MONOGRAPH_MAX_WORKERS)
         with tarfile.open(normalized_path, "r:gz") as archive:
             members = [member for member in archive.getmembers() if member.isfile()]
             allowed_members: list[tarfile.TarInfo] = []
@@ -813,14 +816,11 @@ class LiverToxUpdater:
                     continue
                 allowed_members.append(member)
 
-            for member in tqdm(
-                allowed_members,
-                desc="Processing LiverTox files",
-                total=len(allowed_members),
-            ):
-                base_name = os.path.basename(member.name).lower()
-                if base_name in processed_files:
-                    continue
+            if not allowed_members:
+                return collected
+
+            payloads: list[tuple[str, bytes]] = []
+            for member in allowed_members:
                 extracted = archive.extractfile(member)
                 if extracted is None:
                     continue
@@ -830,56 +830,114 @@ class LiverToxUpdater:
                     extracted.close()
                 if not data:
                     continue
-                payload = self._convert_member_bytes(member.name, data)
-                if payload is None:
+                payloads.append((member.name, data))
+
+        if not payloads:
+            return collected
+
+        worker_budget = min(max_workers, len(payloads)) or 1
+        if worker_budget == 1:
+            for member_name, data in tqdm(
+                payloads,
+                desc="Processing LiverTox files",
+                total=len(payloads),
+            ):
+                base_name = os.path.basename(member_name).lower()
+                if base_name in processed_files:
                     continue
-                plain_text, markup_text = payload
-                if not plain_text:
+                record = LiverToxUpdater._process_monograph_member(member_name, data)
+                if not record:
                     continue
-                nbk_id = self._extract_nbk(member.name, markup_text or plain_text)
-                record_nbk = nbk_id or self._derive_identifier(member.name)
-                if not record_nbk:
+                collected.append(record)
+                processed_files.add(base_name)
+            return collected
+
+        ctx = multiprocessing.get_context("spawn")
+        with ProcessPoolExecutor(max_workers=worker_budget, mp_context=ctx) as executor:
+            futures = {
+                executor.submit(_process_monograph_payload, member_name, data): member_name
+                for member_name, data in payloads
+            }
+            for future in tqdm(
+                as_completed(futures),
+                desc="Processing LiverTox files",
+                total=len(futures),
+            ):
+                member_name = futures[future]
+                base_name = os.path.basename(member_name).lower()
+                try:
+                    record = future.result()
+                except Exception as exc:  # noqa: BLE001
+                    logger.warning(
+                        "Failed to process LiverTox monograph '%s': %s",
+                        base_name,
+                        exc,
+                    )
                     continue
-                drug_name = self._extract_title(
-                    markup_text or "", plain_text, record_nbk
-                )
-                cleaned_text = plain_text.strip()
-                if not drug_name or not cleaned_text:
+                if not record or base_name in processed_files:
                     continue
-                record = {
-                    "nbk_id": record_nbk,
-                    "drug_name": drug_name,
-                    "excerpt": cleaned_text
-                }
                 collected.append(record)
                 processed_files.add(base_name)
 
         return collected
 
     # -------------------------------------------------------------------------
+    @staticmethod
+    def _process_monograph_member(
+        member_name: str,
+        data: bytes,
+    ) -> dict[str, str] | None:
+        payload = LiverToxUpdater._convert_member_bytes(member_name, data)
+        if payload is None:
+            return None
+        plain_text, markup_text = payload
+        if not plain_text:
+            return None
+        nbk_id = LiverToxUpdater._extract_nbk(member_name, markup_text or plain_text)
+        record_nbk = nbk_id or LiverToxUpdater._derive_identifier(member_name)
+        if not record_nbk:
+            return None
+        drug_name = LiverToxUpdater._extract_title(
+            markup_text or "",
+            plain_text,
+            record_nbk,
+        )
+        cleaned_text = plain_text.strip()
+        if not drug_name or not cleaned_text:
+            return None
+        return {
+            "nbk_id": record_nbk,
+            "drug_name": drug_name,
+            "excerpt": cleaned_text,
+        }
+
+    # -------------------------------------------------------------------------
+    @staticmethod
     def _convert_member_bytes(
-        self, member_name: str, data: bytes
+        member_name: str, data: bytes
     ) -> tuple[str, str | None] | None:
         lower_name = member_name.lower()
         if lower_name.endswith(".pdf"):
-            text = self._pdf_to_text(data)
+            text = LiverToxUpdater._pdf_to_text(data)
             if text.strip():
                 return text, None
-            decoded = self._decode_markup(data)
+            decoded = LiverToxUpdater._decode_markup(data)
             return decoded, decoded
-        markup = self._decode_markup(data)
-        text = self._html_to_text(markup)
+        markup = LiverToxUpdater._decode_markup(data)
+        text = LiverToxUpdater._html_to_text(markup)
         return text, markup
 
     # -------------------------------------------------------------------------
-    def _decode_markup(self, data: bytes) -> str:
+    @staticmethod
+    def _decode_markup(data: bytes) -> str:
         try:
             return data.decode("utf-8")
         except UnicodeDecodeError:
             return data.decode("latin-1", errors="ignore")
 
     # -------------------------------------------------------------------------
-    def _pdf_to_text(self, data: bytes) -> str:
+    @staticmethod
+    def _pdf_to_text(data: bytes) -> str:
         buffer = io.BytesIO(data)
         if pdfminer_extract_text is not None:
             try:
@@ -908,7 +966,8 @@ class LiverToxUpdater:
             return data.decode("latin-1", errors="ignore")
 
     # -------------------------------------------------------------------------
-    def _extract_nbk(self, member_name: str, content: str) -> str | None:
+    @staticmethod
+    def _extract_nbk(member_name: str, content: str) -> str | None:
         match = re.search(r"NBK\d+", member_name, re.IGNORECASE)
         if match:
             return match.group(0).upper()
@@ -918,14 +977,18 @@ class LiverToxUpdater:
         return None
 
     # -------------------------------------------------------------------------
-    def _derive_identifier(self, member_name: str) -> str:
+    @staticmethod
+    def _derive_identifier(member_name: str) -> str:
         base = os.path.basename(member_name)
         stem = os.path.splitext(base)[0]
-        cleaned = self._normalize_whitespace(self._strip_punctuation(stem))
+        cleaned = LiverToxUpdater._normalize_whitespace(
+            LiverToxUpdater._strip_punctuation(stem)
+        )
         return cleaned or base
 
     # -------------------------------------------------------------------------
-    def _extract_title(self, html_text: str, plain_text: str, default: str) -> str:
+    @staticmethod
+    def _extract_title(html_text: str, plain_text: str, default: str) -> str:
         patterns = (
             r"<title[^>]*>(.*?)</title>",
             r"<article-title[^>]*>(.*?)</article-title>",
@@ -934,7 +997,7 @@ class LiverToxUpdater:
         for pattern in patterns:
             match = re.search(pattern, html_text, flags=re.IGNORECASE | re.DOTALL)
             if match:
-                fragment = self._clean_fragment(match.group(1))
+                fragment = LiverToxUpdater._clean_fragment(match.group(1))
                 if fragment:
                     return fragment
         for line in plain_text.splitlines():
@@ -944,22 +1007,26 @@ class LiverToxUpdater:
         return default
 
     # -------------------------------------------------------------------------
-    def _clean_fragment(self, fragment: str) -> str:
-        return self._html_to_text(fragment)
+    @staticmethod
+    def _clean_fragment(fragment: str) -> str:
+        return LiverToxUpdater._html_to_text(fragment)
 
     # -------------------------------------------------------------------------
-    def _html_to_text(self, html_text: str) -> str:
+    @staticmethod
+    def _html_to_text(html_text: str) -> str:
         stripped = re.sub(r"(?is)<(script|style)[^>]*>.*?</\1>", " ", html_text)
         stripped = re.sub(r"<[^>]+>", " ", stripped)
         unescaped = html.unescape(stripped)
-        return self._normalize_whitespace(unescaped)
+        return LiverToxUpdater._normalize_whitespace(unescaped)
 
     # -------------------------------------------------------------------------
-    def _normalize_whitespace(self, value: str) -> str:
+    @staticmethod
+    def _normalize_whitespace(value: str) -> str:
         return re.sub(r"\s+", " ", value).strip()
 
     # -------------------------------------------------------------------------
-    def _strip_punctuation(self, value: str) -> str:
+    @staticmethod
+    def _strip_punctuation(value: str) -> str:
         normalized = unicodedata.normalize("NFKD", value)
         folded = "".join(char for char in normalized if not unicodedata.combining(char))
         return re.sub(r"[-_,.;:()\[\]{}\/\\]", " ", folded)
@@ -1158,6 +1225,14 @@ class LiverToxUpdater:
         return finalized.reset_index(drop=True)
 
 
-  
+
+
+###############################################################################
+def _process_monograph_payload(
+    member_name: str,
+    data: bytes,
+) -> dict[str, str] | None:
+    return LiverToxUpdater._process_monograph_member(member_name, data)
+
 
 ###############################################################################
