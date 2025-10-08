@@ -696,12 +696,16 @@ class LiverToxUpdater:
             if master.empty and master_metadata.get("source_url"):
                 master = pd.DataFrame(columns=base_columns)
             else:
-                master["source_url"] = master["source_url"].fillna(
-                    master_metadata.get("source_url")
-                )
-                master["source_last_modified"] = master["source_last_modified"].fillna(
-                    master_metadata.get("last_modified")
-                )
+                metadata_source_url = master_metadata.get("source_url")
+                metadata_last_modified = master_metadata.get("last_modified")
+                if metadata_source_url is not None:
+                    master["source_url"] = master["source_url"].fillna(
+                        metadata_source_url
+                    )
+                if metadata_last_modified is not None:
+                    master["source_last_modified"] = master[
+                        "source_last_modified"
+                    ].fillna(metadata_last_modified)
             master = master[base_columns]
 
         if monographs.empty:
