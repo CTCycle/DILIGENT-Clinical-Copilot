@@ -165,13 +165,8 @@ class LiverToxConsultation:
             self.matcher = None
             return False
         self.livertox_df = dataset
-        try:
-            master_list = self.serializer.get_livertox_master_list()
-        except Exception as exc:  # noqa: BLE001
-            logger.error("Failed loading LiverTox master list from database: %s", exc)
-            master_list = None
-        self.master_list_df = master_list
-        self.matcher = LiverToxMatcher(dataset, master_list)
+        self.master_list_df = None
+        self.matcher = LiverToxMatcher(dataset)
         return True
 
     # -------------------------------------------------------------------------

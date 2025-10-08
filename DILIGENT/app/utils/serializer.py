@@ -10,6 +10,27 @@ from DILIGENT.app.utils.database.sqlite import database
 
 # [DATA SERIALIZATION]
 ###############################################################################
+LIVERTOX_COLUMNS = [
+    "drug_name",
+    "ingredient",
+    "brand_name",
+    "nbk_id",
+    "excerpt",
+    "synonyms",
+    "likelihood_score",
+    "last_update",
+    "reference_count",
+    "year_approved",
+    "agent_classification",
+    "primary_classification",
+    "secondary_classification",
+    "include_in_livertox",
+    "source_url",
+    "source_last_modified",
+]
+
+
+###############################################################################
 class DataSerializer:
     def __init__(self) -> None:
         pass
@@ -20,13 +41,11 @@ class DataSerializer:
         database.upsert_into_database(data, "PATIENTS")
 
     # -----------------------------------------------------------------------------
-    def save_livertox_records(self, records: list[dict[str, Any]]) -> None:
-        sanitized = self.sanitize_livertox_records(records)
-        sanitized = sanitized.where(pd.notnull(sanitized), None)
-        if sanitized.empty:
-            database.save_into_database(sanitized, "LIVERTOX_MONOGRAPHS")
-            return
-        database.save_into_database(sanitized, "LIVERTOX_MONOGRAPHS")
+    def save_livertox_records(self, records: pd.DataFrame) -> None:
+        frame = records.copy()
+        frame = frame.reindex(columns=LIVERTOX_COLUMNS)
+        frame = frame.where(pd.notnull(frame), None)
+        database.save_into_database(frame, "LIVERTOX_DATA")
 
     # -----------------------------------------------------------------------------
     def sanitize_livertox_records(self, records: list[dict[str, Any]]) -> pd.DataFrame:
@@ -76,38 +95,49 @@ class DataSerializer:
 
     # -----------------------------------------------------------------------------
     def get_livertox_records(self) -> pd.DataFrame:
-        return database.load_from_database("LIVERTOX_MONOGRAPHS")
+        frame = database.load_from_database("LIVERTOX_DATA")
+        if frame.empty:
+            return pd.DataFrame(columns=LIVERTOX_COLUMNS)
+        return frame.reindex(columns=LIVERTOX_COLUMNS)
 
     # -----------------------------------------------------------------------------
     def get_livertox_master_list(self) -> pd.DataFrame:
-        return database.load_from_database("LIVERTOX_MASTER_LIST")
-
-    # -----------------------------------------------------------------------------
-    def save_livertox_master_list(
-        self, frame: pd.DataFrame, *, source_url: str, last_modified: str | None
-    ) -> None:
-        frame["source_url"] = source_url
-        frame["source_last_modified"] = last_modified
-        if "brand_name" not in frame.columns:
-            return
-
-        frame = frame.copy()
-        frame = frame[pd.notnull(frame["brand_name"])]
-        if "ingredient" in frame.columns:
-            frame["ingredient"] = frame["ingredient"].where(
-                pd.notnull(frame["ingredient"]), ""
+        frame = database.load_from_database("LIVERTOX_DATA")
+        if frame.empty:
+            return pd.DataFrame(
+                columns=[
+                    "drug_name",
+                    "ingredient",
+                    "brand_name",
+                    "likelihood_score",
+                    "last_update",
+                    "reference_count",
+                    "year_approved",
+                    "agent_classification",
+                    "primary_classification",
+                    "secondary_classification",
+                    "include_in_livertox",
+                    "source_url",
+                    "source_last_modified",
+                ]
             )
-            frame["ingredient"] = frame["ingredient"].astype(str).str.strip()
-            frame.loc[frame["ingredient"] == "", "ingredient"] = None
-        frame["brand_name"] = frame["brand_name"].astype(str).str.strip()
-        frame = frame[frame["brand_name"] != ""]
-        if "ingredient" in frame.columns:
-            frame = frame[pd.notnull(frame["ingredient"])]
-            frame = frame[frame["ingredient"] != ""]
-            frame = frame.drop_duplicates(
-                subset=["ingredient", "brand_name"], keep="last"
-            )
-
-        database.save_into_database(frame, "LIVERTOX_MASTER_LIST")
+        alias_columns = [
+            "drug_name",
+            "ingredient",
+            "brand_name",
+            "likelihood_score",
+            "last_update",
+            "reference_count",
+            "year_approved",
+            "agent_classification",
+            "primary_classification",
+            "secondary_classification",
+            "include_in_livertox",
+            "source_url",
+            "source_last_modified",
+        ]
+        return frame.reindex(columns=alias_columns).dropna(subset=["drug_name"]).reset_index(
+            drop=True
+        )
 
     

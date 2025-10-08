@@ -169,7 +169,6 @@ class LiverToxUpdater:
             data[column] = self._clean_master_list_column(data[column])
 
         data = data.dropna(subset=["chapter_title"])
-        data = data.dropna(subset=["ingredient", "brand_name"])
 
         invalid_headers = {
             "ingredient": {"ingredient", "count"},
@@ -217,7 +216,9 @@ class LiverToxUpdater:
             dest_dir = os.path.abspath(dest_path)
             os.makedirs(dest_dir, exist_ok=True)
             file_path = os.path.join(dest_dir, self.file_name)
-            stored_metadata = _load_json(self.archive_metadata_path)
+        stored_metadata = _load_json(self.archive_metadata_path)
+        if self.redownload:
+            stored_metadata = None
             if (
                 stored_metadata
                 and os.path.isfile(file_path)
@@ -252,10 +253,10 @@ class LiverToxUpdater:
         }
 
     # -------------------------------------------------------------------------
-    def refresh_master_list(self) -> dict[str, Any]:
+    def refresh_master_list(self) -> tuple[dict[str, Any], pd.DataFrame]:
         logger.info("Refreshing LiverTox master list")
         metadata = asyncio.run(self._download_master_list())
-        
+
         frame = pd.read_excel(
             metadata["file_path"],
             engine="openpyxl",
@@ -263,16 +264,18 @@ class LiverToxUpdater:
             skiprows=0,
         )
         sanitized = self.sanitize_livertox_master_list(frame)
-        if sanitized is None or sanitized.empty:
-            return {}
-        
-        self.serializer.save_livertox_master_list(
-            sanitized,
-            source_url=metadata["source_url"],
-            last_modified=metadata.get("last_modified"),
-        )
+        if sanitized is None:
+            sanitized = pd.DataFrame()
+        else:
+            sanitized = sanitized.copy()
+            sanitized["source_url"] = metadata.get("source_url")
+            sanitized["source_last_modified"] = metadata.get("last_modified")
+            if "last_update" in sanitized.columns and pd.api.types.is_datetime64_any_dtype(
+                sanitized["last_update"]
+            ):
+                sanitized["last_update"] = sanitized["last_update"].dt.strftime("%Y-%m-%d")
         metadata["records"] = len(sanitized.index)
-        return metadata
+        return metadata, sanitized
 
     # -------------------------------------------------------------------------
     async def _download_master_list(self) -> dict[str, Any]:
@@ -288,6 +291,8 @@ class LiverToxUpdater:
                 "source_url": str(head.url),
             }
             stored_metadata = _load_json(self.master_list_metadata_path)
+            if self.redownload:
+                stored_metadata = None
             if (
                 stored_metadata
                 and os.path.isfile(self.master_list_path)
@@ -603,34 +608,37 @@ class LiverToxUpdater:
         return response
 
     # -----------------------------------------------------------------------------
-    def run(self) -> dict[str, Any]:
+    def update_from_livertox(self) -> dict[str, Any]:
         logger.info("Starting LiverTox update")
-        master_info = self.refresh_master_list()
-        
-        archive_path = os.path.join(self.sources_path, LIVERTOX_ARCHIVE)
+        master_metadata, master_frame = self.refresh_master_list()
 
-        download_info: dict[str, Any] = {}
-        if self.redownload:
-            logger.info("Redownload flag enabled; fetching latest LiverTox archive")
-            download_info = asyncio.run(self.download_bulk_data(self.sources_path))
-        else:
-            logger.info("Using existing LiverTox archive")
+        logger.info("Checking LiverTox archive metadata")
+        archive_metadata = asyncio.run(self.download_bulk_data(self.sources_path))
+        archive_path = archive_metadata.get("file_path") or os.path.join(
+            self.sources_path, LIVERTOX_ARCHIVE
+        )
 
         local_info = self.collect_local_archive_info(archive_path)
         logger.info("Extracting LiverTox monographs from %s", archive_path)
         extracted = self.collect_monographs(archive_path)
         logger.info("Sanitizing %d extracted entries", len(extracted))
-        records = self.sanitize_records(extracted)
-        logger.info("Enriching %d sanitized entries with RxNav terms", len(records))
-        enriched = self.enrich_records(records)
-        logger.info("Applying final sanitization to enriched records")
-        final_records = self.sanitize_records(enriched)
+        monograph_df = self.sanitize_records(extracted)
+        logger.info("Combining LiverTox datasets")
+        unified = self._build_unified_dataset(
+            monograph_df,
+            master_frame,
+            master_metadata,
+        )
+        logger.info("Enriching %d unified records with RxNav terms", len(unified.index))
+        enriched = self.enrich_records(unified)
+        logger.info("Finalizing sanitized dataset")
+        final_dataset = self._finalize_dataset(enriched)
         logger.info("Persisting enriched records to database")
-        self.serializer.save_livertox_records(final_records)
+        self.serializer.save_livertox_records(final_dataset)
 
-        payload = {**master_info, **download_info, **local_info}
-        payload["processed_entries"] = len(final_records)
-        payload["records"] = len(final_records)
+        payload = {**master_metadata, **archive_metadata, **local_info}
+        payload["processed_entries"] = len(final_dataset.index)
+        payload["records"] = len(final_dataset.index)
         logger.info("LiverTox update completed successfully")
 
         return payload
@@ -644,6 +652,131 @@ class LiverToxUpdater:
         size = os.path.getsize(archive_path)
         modified = datetime.fromtimestamp(os.path.getmtime(archive_path), UTC).isoformat()
         return {"file_path": archive_path, "size": size, "last_modified": modified}
+
+    # -----------------------------------------------------------------------------
+    def _build_unified_dataset(
+        self,
+        monographs: pd.DataFrame,
+        master_frame: pd.DataFrame,
+        master_metadata: dict[str, Any],
+    ) -> pd.DataFrame:
+        base_columns = [
+            "drug_name",
+            "ingredient",
+            "brand_name",
+            "likelihood_score",
+            "last_update",
+            "reference_count",
+            "year_approved",
+            "agent_classification",
+            "primary_classification",
+            "secondary_classification",
+            "include_in_livertox",
+            "source_url",
+            "source_last_modified",
+        ]
+        monograph_columns = ["drug_name", "nbk_id", "excerpt", "synonyms"]
+        final_columns = base_columns + ["nbk_id", "excerpt", "synonyms"]
+
+        if master_frame is None or master_frame.empty:
+            master = pd.DataFrame(columns=base_columns)
+        else:
+            master = master_frame.copy()
+            if "chapter_title" in master.columns:
+                master = master.rename(columns={"chapter_title": "drug_name"})
+            if "drug_name" not in master.columns:
+                master["drug_name"] = pd.NA
+            master["drug_name"] = master["drug_name"].astype(str).str.strip()
+            master = master[master["drug_name"] != ""]
+            for column in base_columns:
+                if column not in master.columns:
+                    master[column] = pd.NA
+            if master.empty and master_metadata.get("source_url"):
+                master = pd.DataFrame(columns=base_columns)
+            else:
+                master["source_url"] = master["source_url"].fillna(
+                    master_metadata.get("source_url")
+                )
+                master["source_last_modified"] = master["source_last_modified"].fillna(
+                    master_metadata.get("last_modified")
+                )
+            master = master[base_columns]
+
+        if monographs.empty:
+            monograph_df = pd.DataFrame(columns=monograph_columns)
+        else:
+            monograph_df = monographs.copy()
+        for column in monograph_columns:
+            if column not in monograph_df.columns:
+                monograph_df[column] = pd.NA
+        monograph_df = monograph_df[monograph_columns]
+
+        if master.empty:
+            dataset = monograph_df.copy()
+            for column in base_columns:
+                if column not in dataset.columns:
+                    dataset[column] = pd.NA
+            dataset = dataset[final_columns]
+            return self._sanitize_unified_dataset(dataset)
+
+        dataset = master.merge(monograph_df, on="drug_name", how="left")
+        if not monograph_df.empty:
+            matched = dataset["drug_name"].unique().tolist()
+            unmatched = monograph_df[~monograph_df["drug_name"].isin(matched)]
+            if not unmatched.empty:
+                filler = unmatched.copy()
+                for column in base_columns:
+                    if column not in filler.columns:
+                        filler[column] = pd.NA
+                filler = filler[dataset.columns]
+                dataset = pd.concat([dataset, filler], ignore_index=True)
+        dataset = dataset[final_columns]
+        return self._sanitize_unified_dataset(dataset)
+
+    # -------------------------------------------------------------------------
+    def _contains_symbol(self, value: str) -> bool:
+        if not isinstance(value, str):
+            return False
+        return bool(re.search(r"[^A-Za-z0-9\s\-/(),'.+]", value))
+
+    # -------------------------------------------------------------------------
+    def _sanitize_unified_dataset(self, frame: pd.DataFrame) -> pd.DataFrame:
+        if frame.empty:
+            return frame.copy()
+        sanitized = frame.copy()
+        sanitized["drug_name"] = sanitized["drug_name"].astype(str).str.strip()
+        sanitized = sanitized[sanitized["drug_name"] != ""]
+        numeric_mask = sanitized["drug_name"].str.fullmatch(r"\d+")
+        sanitized = sanitized[~numeric_mask]
+        symbol_mask = sanitized["drug_name"].apply(self._contains_symbol)
+        sanitized = sanitized[~symbol_mask]
+
+        for column in ("ingredient", "brand_name"):
+            if column not in sanitized.columns:
+                sanitized[column] = pd.NA
+            sanitized[column] = sanitized[column].where(
+                pd.notnull(sanitized[column]), pd.NA
+            )
+            sanitized[column] = sanitized[column].astype(str).str.strip()
+            sanitized.loc[
+                sanitized[column].isin(["", "nan", "None", "<NA>"]), column
+            ] = pd.NA
+            invalid_mask = sanitized[column].notna() & sanitized[column].apply(
+                self._contains_symbol
+            )
+            invalid_mask = invalid_mask.fillna(False)
+            sanitized = sanitized[~invalid_mask]
+
+        sanitized["excerpt"] = sanitized["excerpt"].astype(str).str.strip()
+        sanitized.loc[
+            sanitized["excerpt"].isin(["", "nan", "None", "NaT"]), "excerpt"
+        ] = "Not available"
+        sanitized.loc[sanitized["excerpt"].isna(), "excerpt"] = "Not available"
+
+        sanitized = sanitized.drop_duplicates(
+            subset=["drug_name", "ingredient", "brand_name"], keep="first"
+        )
+        return sanitized.reset_index(drop=True)
 
     # -----------------------------------------------------------------------------
     def collect_monographs(
@@ -823,74 +956,132 @@ class LiverToxUpdater:
         return re.sub(r"[-_,.;:()\[\]{}\/\\]", " ", folded)
 
     # -------------------------------------------------------------------------
-    def _sanitize_synonyms_value(self, raw_value: Any) -> str | None:
-        if not isinstance(raw_value, str):
-            return None
+    def sanitize_records(self, entries: list[dict[str, Any]]) -> pd.DataFrame:
+        sanitized = self.serializer.sanitize_livertox_records(entries)
+        if sanitized.empty:
+            sanitized = pd.DataFrame(columns=["nbk_id", "drug_name", "excerpt", "synonyms"])
+        sanitized = sanitized.copy()
+        sanitized["drug_name"] = sanitized["drug_name"].astype(str).str.strip()
+        sanitized = sanitized[sanitized["drug_name"] != ""]
+        numeric_mask = sanitized["drug_name"].str.fullmatch(r"\d+")
+        sanitized = sanitized[~numeric_mask]
+        sanitized["excerpt"] = sanitized["excerpt"].astype(str).str.strip()
+        sanitized.loc[sanitized["excerpt"] == "", "excerpt"] = pd.NA
+        if "synonyms" not in sanitized.columns:
+            sanitized["synonyms"] = pd.NA
+        sanitized["synonyms"] = sanitized["synonyms"].where(pd.notnull(sanitized["synonyms"]), pd.NA)
+        return sanitized.reset_index(drop=True)
 
-        candidates: list[str] = []
+    # -------------------------------------------------------------------------
+    def enrich_records(self, records: pd.DataFrame) -> pd.DataFrame:
+        if records.empty:
+            return records.copy()
+        enriched = records.copy()
+        enriched["synonyms"] = pd.NA
+        unit_stopwords = getattr(self.rx_client, "UNIT_STOPWORDS", set())
+        synonyms_values: list[str | pd.NA] = []
+        for row in enriched.itertuples(index=False):
+            aliases = set()
+            for attr in ("drug_name", "ingredient", "brand_name"):
+                value = getattr(row, attr, None)
+                if not isinstance(value, str):
+                    continue
+                normalized = value.strip()
+                if not normalized or normalized.lower() == "not available":
+                    continue
+                aliases.add(normalized)
+            collected: set[str] = set()
+            for alias in aliases:
+                try:
+                    synonyms = self.rx_client.fetch_drug_terms(alias)
+                except Exception as exc:  # noqa: BLE001
+                    logger.warning("Failed to enrich '%s': %s", alias, exc)
+                    continue
+                collected.update(synonyms)
+            sanitized = self._sanitize_synonym_list(collected, unit_stopwords)
+            if sanitized:
+                synonyms_values.append(
+                    ", ".join(sorted(sanitized, key=str.casefold))
+                )
+            else:
+                synonyms_values.append(pd.NA)
+        enriched["synonyms"] = synonyms_values
+        return enriched
+
+    # -------------------------------------------------------------------------
+    def _sanitize_synonym_list(
+        self, candidates: set[str], unit_stopwords: set[str]
+    ) -> list[str]:
+        sanitized: list[str] = []
         seen: set[str] = set()
-        for fragment in raw_value.split(","):
-            candidate = fragment.strip()
-            if not candidate:
+        for candidate in candidates:
+            if not isinstance(candidate, str):
                 continue
-            if re.search(r"[^A-Za-z0-9\s'-]", candidate):
+            normalized = self._normalize_whitespace(candidate)
+            if not normalized:
                 continue
-            base = re.split(r"\d", candidate, maxsplit=1)[0].strip()
-            base = base.replace("_", " ")
-            base = re.sub(r"[^\w\s'-]", " ", base)
-            base = self._normalize_whitespace(base)
-            if not base:
+            if len(normalized) < 4:
                 continue
-            if len(base) < 4:
+            if normalized.isnumeric():
                 continue
-            if re.search(r"\d", base):
+            if self._contains_symbol(normalized):
                 continue
-            if not re.fullmatch(r"[A-Za-z][A-Za-z\s'-]*", base):
+            tokens = normalized.split()
+            filtered: list[str] = []
+            for token in tokens:
+                cleaned = re.sub(r"[^A-Za-z0-9'-]", "", token)
+                if not cleaned:
+                    continue
+                if cleaned.lower() in unit_stopwords:
+                    continue
+                if cleaned.isnumeric():
+                    continue
+                if len(cleaned) < 2:
+                    continue
+                filtered.append(cleaned)
+            refined = " ".join(filtered)
+            refined = refined.strip()
+            if len(refined) < 4:
                 continue
-            key = base.lower()
+            if self._contains_symbol(refined):
+                continue
+            key = refined.casefold()
             if key in seen:
                 continue
             seen.add(key)
-            candidates.append(base)
-
-        if not candidates:
-            return None
-
-        return ", ".join(candidates)
+            sanitized.append(refined)
+        return sanitized
 
     # -------------------------------------------------------------------------
-    def sanitize_records(self, entries: list[dict[str, Any]]) -> list[dict[str, Any]]:
-        sanitized = self.serializer.sanitize_livertox_records(entries)
-        if sanitized.empty:
-            raise RuntimeError("No valid LiverTox monographs were available after sanitization.")
-        sanitized["drug_name"] = sanitized["drug_name"].astype(str).str.strip()
-        numeric_mask = sanitized["drug_name"].str.fullmatch(r"\d+")
-        sanitized = sanitized[~numeric_mask]
-
-        sanitized["synonyms"] = sanitized["synonyms"].apply(
-            self._sanitize_synonyms_value
+    def _finalize_dataset(self, frame: pd.DataFrame) -> pd.DataFrame:
+        if frame.empty:
+            return frame.copy()
+        finalized = self._sanitize_unified_dataset(frame)
+        fill_value = "Not available"
+        for column in finalized.columns:
+            if column == "drug_name":
+                continue
+            finalized[column] = finalized[column].where(
+                pd.notnull(finalized[column]), fill_value
+            )
+            finalized[column] = finalized[column].astype(str).str.strip()
+            finalized.loc[
+                finalized[column].isin(["", "nan", "NaT", "None", "<NA>"]), column
+            ] = fill_value
+        finalized["synonyms"] = finalized["synonyms"].apply(
+            lambda value: (
+                value.strip()
+                if isinstance(value, str)
+                and value.strip()
+                and value.strip().lower() not in {"<na>", "nan", "nat", "none"}
+                else fill_value
+            )
         )
-
-        if sanitized.empty:
-            raise RuntimeError("No valid LiverTox monographs were available after sanitization.")
-
-        return sanitized.to_dict(orient="records")
-
-    # -------------------------------------------------------------------------
-    def enrich_records(self, records: list[dict[str, Any]]) -> list[dict[str, Any]]:
-        for entry in records:
-            drug_name = entry.get("drug_name")
-            if not isinstance(drug_name, str) or not drug_name.strip():
-                entry["synonyms"] = None
-                continue
-            try:
-                synonyms = self.rx_client.fetch_drug_terms(drug_name)
-            except Exception as exc:  # noqa: BLE001
-                logger.warning("Failed to enrich '%s': %s", drug_name, exc)
-                entry["synonyms"] = None
-                continue
-            entry["synonyms"] = ", ".join(synonyms) if synonyms else None
-        return records
+        finalized["excerpt"] = finalized["excerpt"].astype(str).str.strip()
+        finalized.loc[
+            finalized["excerpt"].isin(["", "nan", "NaT", "None", "<NA>"]), "excerpt"
+        ] = fill_value
+        return finalized.reset_index(drop=True)
 
 
   
