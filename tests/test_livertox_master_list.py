@@ -84,7 +84,7 @@ from sqlalchemy import create_engine
 from sqlalchemy.orm import sessionmaker
 
 from DILIGENT.app.utils.serializer import DataSerializer
-from DILIGENT.app.utils.services.updater import LiverToxUpdater
+from DILIGENT.app.utils.updater.livertox import LiverToxUpdater
 from DILIGENT.app.utils.database import sqlite as sqlite_module
 
 

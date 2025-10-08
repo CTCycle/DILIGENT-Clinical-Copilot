@@ -8,7 +8,7 @@ REPO_ROOT = os.path.abspath(os.path.join(os.path.dirname(__file__), ".."))
 if REPO_ROOT not in sys.path:
     sys.path.insert(0, REPO_ROOT)
 
-from DILIGENT.app.utils.services.livertox import LiverToxMatcher
+from DILIGENT.app.utils.services.essay import LiverToxMatcher
 
 
 def build_matcher() -> LiverToxMatcher:

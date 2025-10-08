@@ -25,7 +25,7 @@ from DILIGENT.app.configurations import ClientRuntimeConfig
 from DILIGENT.app.constants import DEFAULT_LLM_TIMEOUT_SECONDS
 from DILIGENT.app.logger import logger
 from DILIGENT.app.utils.serializer import DataSerializer
-from DILIGENT.app.utils.services.livertox import LiverToxMatch, LiverToxMatcher
+from DILIGENT.app.utils.services.essay import LiverToxMatch, LiverToxMatcher
 
 
 ###############################################################################
