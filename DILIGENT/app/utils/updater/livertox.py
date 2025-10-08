@@ -1,6 +1,5 @@
 from __future__ import annotations
 
-import asyncio
 import html
 import io
 import json
@@ -8,9 +7,10 @@ import os
 import re
 import tarfile
 import unicodedata
-from concurrent.futures import ThreadPoolExecutor, as_completed
+from concurrent.futures import Future, ThreadPoolExecutor, as_completed
 from datetime import UTC, datetime
 from typing import Any
+from threading import BoundedSemaphore
 
 import httpx
 import pandas as pd
@@ -21,6 +21,7 @@ from tqdm import tqdm
 from DILIGENT.app.constants import (
     LIVERTOX_ARCHIVE,
     LIVERTOX_BASE_URL,
+    LIVERTOX_MONOGRAPH_MAX_WORKERS,
     SOURCES_PATH,
 )
 from DILIGENT.app.logger import logger
@@ -800,6 +801,13 @@ class LiverToxUpdater:
 
         collected: list[dict[str, str]] = []
         processed_files: set[str] = set()
+        try:
+            max_workers = int(LIVERTOX_MONOGRAPH_MAX_WORKERS)
+        except (TypeError, ValueError):
+            max_workers = 1
+        if max_workers < 1:
+            max_workers = 1
+        semaphore = BoundedSemaphore(max_workers)
         with tarfile.open(normalized_path, "r:gz") as archive:
             members = [member for member in archive.getmembers() if member.isfile()]
             allowed_members: list[tarfile.TarInfo] = []
@@ -813,48 +821,75 @@ class LiverToxUpdater:
                     continue
                 allowed_members.append(member)
 
-            for member in tqdm(
-                allowed_members,
-                desc="Processing LiverTox files",
-                total=len(allowed_members),
-            ):
-                base_name = os.path.basename(member.name).lower()
-                if base_name in processed_files:
-                    continue
-                extracted = archive.extractfile(member)
-                if extracted is None:
-                    continue
-                try:
-                    data = extracted.read()
-                finally:
-                    extracted.close()
-                if not data:
-                    continue
-                payload = self._convert_member_bytes(member.name, data)
-                if payload is None:
-                    continue
-                plain_text, markup_text = payload
-                if not plain_text:
-                    continue
-                nbk_id = self._extract_nbk(member.name, markup_text or plain_text)
-                record_nbk = nbk_id or self._derive_identifier(member.name)
-                if not record_nbk:
-                    continue
-                drug_name = self._extract_title(
-                    markup_text or "", plain_text, record_nbk
-                )
-                cleaned_text = plain_text.strip()
-                if not drug_name or not cleaned_text:
-                    continue
-                record = {
-                    "nbk_id": record_nbk,
-                    "drug_name": drug_name,
-                    "excerpt": cleaned_text
-                }
-                collected.append(record)
-                processed_files.add(base_name)
+            futures: dict[Future[dict[str, str] | None], str] = {}
+            with ThreadPoolExecutor(max_workers=max_workers) as executor:
+                for member in allowed_members:
+                    extracted = archive.extractfile(member)
+                    if extracted is None:
+                        continue
+                    try:
+                        data = extracted.read()
+                    finally:
+                        extracted.close()
+                    if not data:
+                        continue
+                    future = executor.submit(
+                        self._process_monograph_member,
+                        semaphore,
+                        member.name,
+                        data,
+                    )
+                    futures[future] = os.path.basename(member.name).lower()
+
+                for future in tqdm(
+                    as_completed(futures),
+                    desc="Processing LiverTox files",
+                    total=len(futures),
+                ):
+                    base_name = futures[future]
+                    try:
+                        record = future.result()
+                    except Exception as exc:  # noqa: BLE001
+                        logger.warning(
+                            "Failed to process LiverTox monograph '%s': %s",
+                            base_name,
+                            exc,
+                        )
+                        continue
+                    if not record or base_name in processed_files:
+                        continue
+                    collected.append(record)
+                    processed_files.add(base_name)
 
         return collected
+
+    # -------------------------------------------------------------------------
+    def _process_monograph_member(
+        self,
+        semaphore: BoundedSemaphore,
+        member_name: str,
+        data: bytes,
+    ) -> dict[str, str] | None:
+        with semaphore:
+            payload = self._convert_member_bytes(member_name, data)
+        if payload is None:
+            return None
+        plain_text, markup_text = payload
+        if not plain_text:
+            return None
+        nbk_id = self._extract_nbk(member_name, markup_text or plain_text)
+        record_nbk = nbk_id or self._derive_identifier(member_name)
+        if not record_nbk:
+            return None
+        drug_name = self._extract_title(markup_text or "", plain_text, record_nbk)
+        cleaned_text = plain_text.strip()
+        if not drug_name or not cleaned_text:
+            return None
+        return {
+            "nbk_id": record_nbk,
+            "drug_name": drug_name,
+            "excerpt": cleaned_text,
+        }
 
     # -------------------------------------------------------------------------
     def _convert_member_bytes(
