@@ -39,12 +39,12 @@ def build_matcher() -> LiverToxMatcher:
             {
                 "ingredient": "Rivaroxaban",
                 "brand_name": "Xarelto",
-                "chapter_title": "Rivaroxaban",
+                "drug_name": "Rivaroxaban",
             },
             {
                 "ingredient": "Dabigatran Etexilate",
                 "brand_name": "Pradaxa",
-                "chapter_title": "Dabigatran Etexilate",
+                "drug_name": "Dabigatran Etexilate",
             },
         ]
     )
@@ -70,7 +70,7 @@ def test_master_list_brand_lookup():
     match = matches[0]
     assert match is not None
     assert match.nbk_id == "NBK1"
-    assert match.reason == "brand_chapter_title"
+    assert match.reason == "brand_drug_name"
 
 
 def test_synonym_lookup_from_delimited_string():
@@ -101,13 +101,13 @@ def test_dictionary_synonym_lookup():
     assert match.reason == "synonym_match"
 
 
-def test_master_list_chapter_synonym_resolution():
+def test_master_list_drug_synonym_resolution():
     matcher = build_matcher()
     matches = run_match(matcher, ["Pradaxa"])
     match = matches[0]
     assert match is not None
     assert match.nbk_id == "NBK3"
-    assert match.reason == "brand_chapter_synonym"
+    assert match.reason == "brand_drug_synonym"
 
 
 def test_synonym_partial_and_stopword_filter():
@@ -183,3 +183,24 @@ def test_build_patient_mapping_with_duplicate_nbk_ids():
     assert mapping[1]["matched_livertox_row"]["excerpt"] == "Beta excerpt"
     assert mapping[0]["matched_livertox_row"]["drug_name"] == "Alpha Drug"
     assert mapping[1]["matched_livertox_row"]["drug_name"] == "Beta Drug"
+
+
+def test_unified_dataset_brand_lookup_without_explicit_master_list():
+    dataset = pd.DataFrame(
+        [
+            {
+                "nbk_id": "NBK100",
+                "drug_name": "Unified Drug",
+                "excerpt": "Example excerpt",
+                "synonyms": "",
+                "ingredient": "Unified Ingredient",
+                "brand_name": "UnifiedBrand",
+            }
+        ]
+    )
+    matcher = LiverToxMatcher(dataset)
+    matches = run_match(matcher, ["UnifiedBrand"])
+    match = matches[0]
+    assert match is not None
+    assert match.nbk_id == "NBK100"
+    assert match.reason.startswith("brand_")
