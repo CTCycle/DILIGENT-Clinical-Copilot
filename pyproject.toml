@@ -8,19 +8,19 @@ version = "1.5"
 requires-python = ">=3.12,<3.13"
 
 dependencies = [     
-    "fastapi==0.117.1",
-    "gradio==5.47.0",   
+    "fastapi==0.118.0",
+    "gradio==5.47.2",
     "transformers==4.56.2",
     "torch==2.8.0+cu128",  
     "numpy==2.3.2",     
-    "pandas==2.2.3",
+    "pandas==2.3.3",
     "tqdm==4.67.1",
     "pdfminer.six==20250506",
-    "pypdf==6.1.0",
-    "SQLAlchemy==2.0.41",     
+    "pypdf==6.1.1",
+    "SQLAlchemy==2.0.43",
     "python-dotenv==1.1.0",
     "langchain==0.3.27",
-    "lancedb==0.25.1",
+    "lancedb==0.24.1",
     "openpyxl==3.1.5",
 
 ]
