@@ -9,7 +9,7 @@ from typing import Any
 
 import pandas as pd
 
-from DILIGENT.app.utils.services.updater import LiverToxUpdater
+from DILIGENT.app.utils.updater.livertox import LiverToxUpdater
 
 __all__ = [
     "LiverToxUpdater",

@@ -25,7 +25,7 @@ from DILIGENT.app.constants import (
 from DILIGENT.app.logger import logger
 from DILIGENT.app.utils.database.sqlite import database
 from DILIGENT.app.utils.serializer import DataSerializer
-from DILIGENT.app.utils.services.retrieval import RxNavClient
+from DILIGENT.app.utils.updater.rxnav import RxNavClient
 
 __all__ = ["LiverToxUpdater"]
 
