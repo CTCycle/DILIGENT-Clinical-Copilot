@@ -3,7 +3,7 @@ from __future__ import annotations
 import unittest
 from unittest.mock import patch
 
-from DILIGENT.app.utils.services.retrieval import RxNavClient
+from DILIGENT.app.utils.updater.rxnav import RxNavClient
 
 
 ###############################################################################
