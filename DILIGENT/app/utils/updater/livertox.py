@@ -8,7 +8,7 @@ import os
 import re
 import tarfile
 import unicodedata
-from concurrent.futures import ThreadPoolExecutor
+from concurrent.futures import ThreadPoolExecutor, as_completed
 from datetime import UTC, datetime
 from typing import Any
 
@@ -1049,20 +1049,15 @@ class LiverToxUpdater:
                 per_request_budget,
             )
 
-        synonyms_values: list[str | pd.NA] = []
-        with ThreadPoolExecutor(max_workers=max_workers) as executor:
-            for aliases in alias_sets:
-                if not aliases:
-                    synonyms_values.append(pd.NA)
-                    continue
-
-                pending = {
-                    alias: executor.submit(self.rx_client.fetch_drug_terms, alias)
-                    for alias in aliases
-                    if alias not in cache
+        aliases_to_fetch = [alias for alias in unique_aliases if alias not in cache]
+        if aliases_to_fetch:
+            with ThreadPoolExecutor(max_workers=max_workers) as executor:
+                futures = {
+                    executor.submit(self.rx_client.fetch_drug_terms, alias): alias
+                    for alias in aliases_to_fetch
                 }
-
-                for alias, future in pending.items():
+                for future in as_completed(futures):
+                    alias = futures[future]
                     try:
                         terms = future.result()
                     except Exception as exc:  # noqa: BLE001
@@ -1073,55 +1068,61 @@ class LiverToxUpdater:
                         term for term in terms if isinstance(term, str)
                     }
 
-                collected: set[str] = set()
-                for alias in aliases:
-                    collected.update(cache.get(alias, set()))
+        synonyms_values: list[str | pd.NA] = []
+        for aliases in alias_sets:
+            if not aliases:
+                synonyms_values.append(pd.NA)
+                continue
 
-                sanitized: list[str] = []
-                seen_terms: set[str] = set()
-                for candidate in collected:
-                    if not isinstance(candidate, str):
-                        continue
-                    normalized = self._normalize_whitespace(candidate)
+            collected: set[str] = set()
+            for alias in aliases:
+                collected.update(cache.get(alias, set()))
+
+            sanitized: list[str] = []
+            seen_terms: set[str] = set()
+            for candidate in collected:
+                if not isinstance(candidate, str):
+                    continue
+                normalized = self._normalize_whitespace(candidate)
+                if (
+                    not normalized
+                    or len(normalized) < 4
+                    or normalized.isnumeric()
+                    or self._contains_symbol(normalized)
+                ):
+                    continue
+
+                tokens: list[str] = []
+                for token in normalized.split():
+                    cleaned = re.sub(r"[^A-Za-z0-9'-]", "", token)
                     if (
-                        not normalized
-                        or len(normalized) < 4
-                        or normalized.isnumeric()
-                        or self._contains_symbol(normalized)
+                        not cleaned
+                        or cleaned.lower() in unit_stopwords
+                        or cleaned.isnumeric()
+                        or len(cleaned) < 2
                     ):
                         continue
+                    tokens.append(cleaned)
 
-                    tokens: list[str] = []
-                    for token in normalized.split():
-                        cleaned = re.sub(r"[^A-Za-z0-9'-]", "", token)
-                        if (
-                            not cleaned
-                            or cleaned.lower() in unit_stopwords
-                            or cleaned.isnumeric()
-                            or len(cleaned) < 2
-                        ):
-                            continue
-                        tokens.append(cleaned)
+                refined = " ".join(tokens).strip()
+                if (
+                    len(refined) < 4
+                    or self._contains_symbol(refined)
+                ):
+                    continue
 
-                    refined = " ".join(tokens).strip()
-                    if (
-                        len(refined) < 4
-                        or self._contains_symbol(refined)
-                    ):
-                        continue
+                key = refined.casefold()
+                if key in seen_terms:
+                    continue
+                seen_terms.add(key)
+                sanitized.append(refined)
 
-                    key = refined.casefold()
-                    if key in seen_terms:
-                        continue
-                    seen_terms.add(key)
-                    sanitized.append(refined)
-
-                if sanitized:
-                    synonyms_values.append(
-                        ", ".join(sorted(sanitized, key=str.casefold))
-                    )
-                else:
-                    synonyms_values.append(pd.NA)
+            if sanitized:
+                synonyms_values.append(
+                    ", ".join(sorted(sanitized, key=str.casefold))
+                )
+            else:
+                synonyms_values.append(pd.NA)
         enriched["synonyms"] = synonyms_values
         return enriched
 
