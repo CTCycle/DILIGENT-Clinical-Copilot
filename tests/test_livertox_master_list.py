@@ -1,5 +1,7 @@
 import os
 import sys
+import threading
+import time
 from unittest.mock import patch
 
 import pandas as pd
@@ -23,6 +25,33 @@ class _StubRxClient:
     ###########################################################################
     def fetch_drug_terms(self, name: str) -> list[str]:
         return self.mapping.get(name, [])
+
+
+###############################################################################
+class _RateCheckingRxClient:
+    UNIT_STOPWORDS = _StubRxClient.UNIT_STOPWORDS
+
+    def __init__(self, mapping: dict[str, list[str]], delay: float = 0.01) -> None:
+        self.mapping = mapping
+        self.delay = delay
+        self._lock = threading.Lock()
+        self._active = 0
+        self.max_active = 0
+        self.call_count = 0
+
+    ###########################################################################
+    def fetch_drug_terms(self, name: str) -> list[str]:
+        with self._lock:
+            self._active += 1
+            self.call_count += 1
+            if self._active > self.max_active:
+                self.max_active = self._active
+        try:
+            time.sleep(self.delay)
+            return self.mapping.get(name, [])
+        finally:
+            with self._lock:
+                self._active -= 1
 
 
 ###############################################################################
@@ -152,6 +181,44 @@ def test_enrichment_uses_all_aliases() -> None:
     assert "mg" not in synonyms
     assert "Invalid@Term" not in synonyms
     assert "Abc" not in synonyms
+
+
+###############################################################################
+def test_enrichment_respects_max_workers() -> None:
+    mapping: dict[str, list[str]] = {}
+    rows: list[dict[str, str | pd.NA]] = []
+    for index in range(12):
+        drug = f"Drug {index}"
+        ingredient = f"Ingredient {index}"
+        brand = f"Brand {index}"
+        mapping[drug] = [f"{drug} Alias"]
+        mapping[ingredient] = [f"{ingredient} Alias"]
+        mapping[brand] = [f"{brand} Alias"]
+        rows.append(
+            {
+                "drug_name": drug,
+                "ingredient": ingredient,
+                "brand_name": brand,
+                "synonyms": pd.NA,
+            }
+        )
+
+    rx_client = _RateCheckingRxClient(mapping, delay=0.01)
+    updater = LiverToxUpdater(
+        ".",
+        redownload=False,
+        rx_client=rx_client,
+        serializer=DataSerializer(),
+        database_client=None,
+    )
+    updater.RXNAV_MAX_WORKERS = 4
+
+    dataset = pd.DataFrame(rows)
+    enriched = updater.enrich_records(dataset)
+
+    assert rx_client.call_count == len(mapping)
+    assert rx_client.max_active <= updater.RXNAV_MAX_WORKERS
+    assert enriched["synonyms"].notna().all()
 
 
 ###############################################################################
