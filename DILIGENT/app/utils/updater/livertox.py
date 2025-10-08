@@ -992,16 +992,14 @@ class LiverToxUpdater:
             if column in records.columns
         ]
         if subset:
-            duplicate_mask = records.duplicated(subset=subset, keep=False)
-            if duplicate_mask.any():
-                duplicate_count = int(duplicate_mask.sum())
+            deduped = records.drop_duplicates(subset=subset, keep="first")
+            removed = len(records) - len(deduped)
+            if removed:
                 logger.warning(
                     "Detected %d duplicate LiverTox record(s); removing before enrichment",
-                    duplicate_count,
+                    removed,
                 )
-                records = records.loc[
-                    ~records.duplicated(subset=subset, keep="first")
-                ].reset_index(drop=True)
+            records = deduped.reset_index(drop=True)
 
         enriched = records.copy()
         enriched["synonyms"] = pd.NA
@@ -1017,23 +1015,86 @@ class LiverToxUpdater:
             max_workers = 1
         with ThreadPoolExecutor(max_workers=max_workers) as executor:
             for row in enriched.itertuples(index=False):
-                aliases = self._collect_aliases_from_row(row)
+                aliases: list[str] = []
+                seen_aliases: set[str] = set()
+                for attr in ("drug_name", "ingredient", "brand_name"):
+                    value = getattr(row, attr, None)
+                    if not isinstance(value, str):
+                        continue
+                    normalized_alias = value.strip()
+                    if (
+                        not normalized_alias
+                        or normalized_alias.lower() == "not available"
+                        or normalized_alias in seen_aliases
+                    ):
+                        continue
+                    seen_aliases.add(normalized_alias)
+                    aliases.append(normalized_alias)
+
                 if not aliases:
                     synonyms_values.append(pd.NA)
                     continue
-                pending: dict[str, Any] = {}
-                for alias in aliases:
-                    if alias in cache:
-                        continue
-                    pending[alias] = executor.submit(
-                        self._fetch_alias_synonyms, alias
-                    )
+
+                pending = {
+                    alias: executor.submit(self.rx_client.fetch_drug_terms, alias)
+                    for alias in aliases
+                    if alias not in cache
+                }
+
                 for alias, future in pending.items():
-                    cache[alias] = future.result()
+                    try:
+                        terms = future.result()
+                    except Exception as exc:  # noqa: BLE001
+                        logger.warning("Failed to enrich '%s': %s", alias, exc)
+                        cache[alias] = set()
+                        continue
+                    cache[alias] = {
+                        term for term in terms if isinstance(term, str)
+                    }
+
                 collected: set[str] = set()
                 for alias in aliases:
                     collected.update(cache.get(alias, set()))
-                sanitized = self._sanitize_synonym_list(collected, unit_stopwords)
+
+                sanitized: list[str] = []
+                seen_terms: set[str] = set()
+                for candidate in collected:
+                    if not isinstance(candidate, str):
+                        continue
+                    normalized = self._normalize_whitespace(candidate)
+                    if (
+                        not normalized
+                        or len(normalized) < 4
+                        or normalized.isnumeric()
+                        or self._contains_symbol(normalized)
+                    ):
+                        continue
+
+                    tokens: list[str] = []
+                    for token in normalized.split():
+                        cleaned = re.sub(r"[^A-Za-z0-9'-]", "", token)
+                        if (
+                            not cleaned
+                            or cleaned.lower() in unit_stopwords
+                            or cleaned.isnumeric()
+                            or len(cleaned) < 2
+                        ):
+                            continue
+                        tokens.append(cleaned)
+
+                    refined = " ".join(tokens).strip()
+                    if (
+                        len(refined) < 4
+                        or self._contains_symbol(refined)
+                    ):
+                        continue
+
+                    key = refined.casefold()
+                    if key in seen_terms:
+                        continue
+                    seen_terms.add(key)
+                    sanitized.append(refined)
+
                 if sanitized:
                     synonyms_values.append(
                         ", ".join(sorted(sanitized, key=str.casefold))
@@ -1042,75 +1103,6 @@ class LiverToxUpdater:
                     synonyms_values.append(pd.NA)
         enriched["synonyms"] = synonyms_values
         return enriched
-
-    # -------------------------------------------------------------------------
-    def _collect_aliases_from_row(self, row: Any) -> list[str]:
-        aliases: list[str] = []
-        seen: set[str] = set()
-        for attr in ("drug_name", "ingredient", "brand_name"):
-            value = getattr(row, attr, None)
-            if not isinstance(value, str):
-                continue
-            normalized = value.strip()
-            if not normalized or normalized.lower() == "not available":
-                continue
-            if normalized not in seen:
-                seen.add(normalized)
-                aliases.append(normalized)
-        return aliases
-
-    # -------------------------------------------------------------------------
-    def _fetch_alias_synonyms(self, alias: str) -> set[str]:
-        try:
-            terms = self.rx_client.fetch_drug_terms(alias)
-        except Exception as exc:  # noqa: BLE001
-            logger.warning("Failed to enrich '%s': %s", alias, exc)
-            return set()
-        return {term for term in terms if isinstance(term, str)}
-
-    # -------------------------------------------------------------------------
-    def _sanitize_synonym_list(
-        self, candidates: set[str], unit_stopwords: set[str]
-    ) -> list[str]:
-        sanitized: list[str] = []
-        seen: set[str] = set()
-        for candidate in candidates:
-            if not isinstance(candidate, str):
-                continue
-            normalized = self._normalize_whitespace(candidate)
-            if not normalized:
-                continue
-            if len(normalized) < 4:
-                continue
-            if normalized.isnumeric():
-                continue
-            if self._contains_symbol(normalized):
-                continue
-            tokens = normalized.split()
-            filtered: list[str] = []
-            for token in tokens:
-                cleaned = re.sub(r"[^A-Za-z0-9'-]", "", token)
-                if not cleaned:
-                    continue
-                if cleaned.lower() in unit_stopwords:
-                    continue
-                if cleaned.isnumeric():
-                    continue
-                if len(cleaned) < 2:
-                    continue
-                filtered.append(cleaned)
-            refined = " ".join(filtered)
-            refined = refined.strip()
-            if len(refined) < 4:
-                continue
-            if self._contains_symbol(refined):
-                continue
-            key = refined.casefold()
-            if key in seen:
-                continue
-            seen.add(key)
-            sanitized.append(refined)
-        return sanitized
 
     # -------------------------------------------------------------------------
     def _finalize_dataset(self, frame: pd.DataFrame) -> pd.DataFrame:
