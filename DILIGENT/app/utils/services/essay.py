@@ -456,10 +456,16 @@ class LiverToxMatcher:
 
     # -------------------------------------------------------------------------
     def _coerce_text(self, value: Any) -> str | None:
-        if value in (None, ""):
+        if value is None:
             return None
-        if isinstance(value, float) and pd.isna(value):
-            return None
+        try:
+            if pd.isna(value):
+                return None
+        except TypeError:
+            pass
+        if isinstance(value, str):
+            text = value.strip()
+            return text or None
         text = str(value).strip()
         return text or None
 
