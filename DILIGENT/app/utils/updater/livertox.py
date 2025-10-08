@@ -216,9 +216,11 @@ class LiverToxUpdater:
             dest_dir = os.path.abspath(dest_path)
             os.makedirs(dest_dir, exist_ok=True)
             file_path = os.path.join(dest_dir, self.file_name)
-        stored_metadata = _load_json(self.archive_metadata_path)
-        if self.redownload:
-            stored_metadata = None
+
+            stored_metadata = _load_json(self.archive_metadata_path)
+            if self.redownload:
+                stored_metadata = None
+
             if (
                 stored_metadata
                 and os.path.isfile(file_path)
