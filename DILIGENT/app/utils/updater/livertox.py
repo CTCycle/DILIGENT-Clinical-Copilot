@@ -8,6 +8,7 @@ import os
 import re
 import tarfile
 import unicodedata
+from concurrent.futures import ThreadPoolExecutor
 from datetime import UTC, datetime
 from typing import Any
 
@@ -92,6 +93,8 @@ async def download_file(
 
 ###############################################################################
 class LiverToxUpdater:
+
+    RXNAV_MAX_WORKERS = 6
     
     def __init__(
         self,
@@ -986,33 +989,66 @@ class LiverToxUpdater:
         enriched["synonyms"] = pd.NA
         unit_stopwords = getattr(self.rx_client, "UNIT_STOPWORDS", set())
         synonyms_values: list[str | pd.NA] = []
-        for row in enriched.itertuples(index=False):
-            aliases = set()
-            for attr in ("drug_name", "ingredient", "brand_name"):
-                value = getattr(row, attr, None)
-                if not isinstance(value, str):
+        cache: dict[str, set[str]] = {}
+        raw_workers = getattr(self, "RXNAV_MAX_WORKERS", 6)
+        try:
+            max_workers = int(raw_workers)
+        except (TypeError, ValueError):
+            max_workers = 6
+        if max_workers < 1:
+            max_workers = 1
+        with ThreadPoolExecutor(max_workers=max_workers) as executor:
+            for row in enriched.itertuples(index=False):
+                aliases = self._collect_aliases_from_row(row)
+                if not aliases:
+                    synonyms_values.append(pd.NA)
                     continue
-                normalized = value.strip()
-                if not normalized or normalized.lower() == "not available":
-                    continue
-                aliases.add(normalized)
-            collected: set[str] = set()
-            for alias in aliases:
-                try:
-                    synonyms = self.rx_client.fetch_drug_terms(alias)
-                except Exception as exc:  # noqa: BLE001
-                    logger.warning("Failed to enrich '%s': %s", alias, exc)
-                    continue
-                collected.update(synonyms)
-            sanitized = self._sanitize_synonym_list(collected, unit_stopwords)
-            if sanitized:
-                synonyms_values.append(
-                    ", ".join(sorted(sanitized, key=str.casefold))
-                )
-            else:
-                synonyms_values.append(pd.NA)
+                pending: dict[str, Any] = {}
+                for alias in aliases:
+                    if alias in cache:
+                        continue
+                    pending[alias] = executor.submit(
+                        self._fetch_alias_synonyms, alias
+                    )
+                for alias, future in pending.items():
+                    cache[alias] = future.result()
+                collected: set[str] = set()
+                for alias in aliases:
+                    collected.update(cache.get(alias, set()))
+                sanitized = self._sanitize_synonym_list(collected, unit_stopwords)
+                if sanitized:
+                    synonyms_values.append(
+                        ", ".join(sorted(sanitized, key=str.casefold))
+                    )
+                else:
+                    synonyms_values.append(pd.NA)
         enriched["synonyms"] = synonyms_values
         return enriched
+
+    # -------------------------------------------------------------------------
+    def _collect_aliases_from_row(self, row: Any) -> list[str]:
+        aliases: list[str] = []
+        seen: set[str] = set()
+        for attr in ("drug_name", "ingredient", "brand_name"):
+            value = getattr(row, attr, None)
+            if not isinstance(value, str):
+                continue
+            normalized = value.strip()
+            if not normalized or normalized.lower() == "not available":
+                continue
+            if normalized not in seen:
+                seen.add(normalized)
+                aliases.append(normalized)
+        return aliases
+
+    # -------------------------------------------------------------------------
+    def _fetch_alias_synonyms(self, alias: str) -> set[str]:
+        try:
+            terms = self.rx_client.fetch_drug_terms(alias)
+        except Exception as exc:  # noqa: BLE001
+            logger.warning("Failed to enrich '%s': %s", alias, exc)
+            return set()
+        return {term for term in terms if isinstance(term, str)}
 
     # -------------------------------------------------------------------------
     def _sanitize_synonym_list(
