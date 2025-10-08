@@ -802,13 +802,7 @@ class LiverToxUpdater:
 
         collected: list[dict[str, str]] = []
         processed_files: set[str] = set()
-        try:
-            max_workers = int(LIVERTOX_MONOGRAPH_MAX_WORKERS)
-        except (TypeError, ValueError):
-            max_workers = 1
-        if max_workers < 1:
-            max_workers = 1
-        semaphore = BoundedSemaphore(max_workers)
+        max_workers = max(1, LIVERTOX_MONOGRAPH_MAX_WORKERS)
         with tarfile.open(normalized_path, "r:gz") as archive:
             members = [member for member in archive.getmembers() if member.isfile()]
             allowed_members: list[tarfile.TarInfo] = []
@@ -822,8 +816,13 @@ class LiverToxUpdater:
                     continue
                 allowed_members.append(member)
 
+            if not allowed_members:
+                return collected
+
+            worker_budget = min(max_workers, len(allowed_members)) or 1
+            semaphore = BoundedSemaphore(worker_budget)
             futures: dict[Future[dict[str, str] | None], str] = {}
-            with ThreadPoolExecutor(max_workers=max_workers) as executor:
+            with ThreadPoolExecutor(max_workers=worker_budget) as executor:
                 for member in allowed_members:
                     extracted = archive.extractfile(member)
                     if extracted is None:
@@ -834,13 +833,14 @@ class LiverToxUpdater:
                         extracted.close()
                     if not data:
                         continue
+                    base_name = os.path.basename(member.name).lower()
                     future = executor.submit(
                         self._process_monograph_member,
                         semaphore,
                         member.name,
                         data,
                     )
-                    futures[future] = os.path.basename(member.name).lower()
+                    futures[future] = base_name
 
                 for future in tqdm(
                     as_completed(futures),
@@ -873,24 +873,24 @@ class LiverToxUpdater:
     ) -> dict[str, str] | None:
         with semaphore:
             payload = self._convert_member_bytes(member_name, data)
-        if payload is None:
-            return None
-        plain_text, markup_text = payload
-        if not plain_text:
-            return None
-        nbk_id = self._extract_nbk(member_name, markup_text or plain_text)
-        record_nbk = nbk_id or self._derive_identifier(member_name)
-        if not record_nbk:
-            return None
-        drug_name = self._extract_title(markup_text or "", plain_text, record_nbk)
-        cleaned_text = plain_text.strip()
-        if not drug_name or not cleaned_text:
-            return None
-        return {
-            "nbk_id": record_nbk,
-            "drug_name": drug_name,
-            "excerpt": cleaned_text,
-        }
+            if payload is None:
+                return None
+            plain_text, markup_text = payload
+            if not plain_text:
+                return None
+            nbk_id = self._extract_nbk(member_name, markup_text or plain_text)
+            record_nbk = nbk_id or self._derive_identifier(member_name)
+            if not record_nbk:
+                return None
+            drug_name = self._extract_title(markup_text or "", plain_text, record_nbk)
+            cleaned_text = plain_text.strip()
+            if not drug_name or not cleaned_text:
+                return None
+            return {
+                "nbk_id": record_nbk,
+                "drug_name": drug_name,
+                "excerpt": cleaned_text,
+            }
 
     # -------------------------------------------------------------------------
     def _convert_member_bytes(
