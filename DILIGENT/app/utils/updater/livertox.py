@@ -1004,7 +1004,6 @@ class LiverToxUpdater:
         enriched = records.copy()
         enriched["synonyms"] = pd.NA
         unit_stopwords = getattr(self.rx_client, "UNIT_STOPWORDS", set())
-        synonyms_values: list[str | pd.NA] = []
         cache: dict[str, set[str]] = {}
         raw_workers = getattr(self, "RXNAV_MAX_WORKERS", 6)
         try:
@@ -1013,24 +1012,46 @@ class LiverToxUpdater:
             max_workers = 6
         if max_workers < 1:
             max_workers = 1
-        with ThreadPoolExecutor(max_workers=max_workers) as executor:
-            for row in enriched.itertuples(index=False):
-                aliases: list[str] = []
-                seen_aliases: set[str] = set()
-                for attr in ("drug_name", "ingredient", "brand_name"):
-                    value = getattr(row, attr, None)
-                    if not isinstance(value, str):
-                        continue
-                    normalized_alias = value.strip()
-                    if (
-                        not normalized_alias
-                        or normalized_alias.lower() == "not available"
-                        or normalized_alias in seen_aliases
-                    ):
-                        continue
-                    seen_aliases.add(normalized_alias)
-                    aliases.append(normalized_alias)
 
+        alias_sets: list[list[str]] = []
+        unique_aliases: set[str] = set()
+        for row in enriched.itertuples(index=False):
+            aliases: list[str] = []
+            seen_aliases: set[str] = set()
+            for attr in ("drug_name", "ingredient", "brand_name"):
+                value = getattr(row, attr, None)
+                if not isinstance(value, str):
+                    continue
+                normalized_alias = value.strip()
+                if (
+                    not normalized_alias
+                    or normalized_alias.lower() == "not available"
+                    or normalized_alias in seen_aliases
+                ):
+                    continue
+                seen_aliases.add(normalized_alias)
+                aliases.append(normalized_alias)
+            if aliases:
+                unique_aliases.update(aliases)
+            alias_sets.append(aliases)
+
+        expected_calls = len(unique_aliases)
+        per_request_budget = float(getattr(self.rx_client, "TIMEOUT", 10.0) or 10.0)
+        estimated_seconds = (expected_calls * per_request_budget) / max_workers
+        if expected_calls:
+            logger.info(
+                "Preparing RxNav enrichment for %d unique lookup(s) across %d worker(s); "
+                "worst-case duration %.1fs (%.1f min) with %.1fs request budget",
+                expected_calls,
+                max_workers,
+                estimated_seconds,
+                estimated_seconds / 60,
+                per_request_budget,
+            )
+
+        synonyms_values: list[str | pd.NA] = []
+        with ThreadPoolExecutor(max_workers=max_workers) as executor:
+            for aliases in alias_sets:
                 if not aliases:
                     synonyms_values.append(pd.NA)
                     continue
