@@ -39,22 +39,15 @@ class Patients(Base):
 
 
 ###############################################################################
-class LiverToxMonographs(Base):
-    __tablename__ = "LIVERTOX_MONOGRAPHS"
-    nbk_id = Column(String, primary_key=True)
+class LiverToxData(Base):
+    __tablename__ = "LIVERTOX_DATA"
     drug_name = Column(String, primary_key=True)
-    excerpt = Column(Text)
-    synonyms = Column(Text)
-    __table_args__ = (UniqueConstraint("nbk_id", "drug_name"),)
-
-
-###############################################################################
-class LiverToxMasterList(Base):
-    __tablename__ = "LIVERTOX_MASTER_LIST"
     ingredient = Column(String, primary_key=True)
     brand_name = Column(String, primary_key=True)
+    nbk_id = Column(String)
+    excerpt = Column(Text)
+    synonyms = Column(Text)
     likelihood_score = Column(String)
-    chapter_title = Column(String)
     last_update = Column(String)
     reference_count = Column(String)
     year_approved = Column(String)
@@ -64,7 +57,9 @@ class LiverToxMasterList(Base):
     include_in_livertox = Column(String)
     source_url = Column(String)
     source_last_modified = Column(String)
-    __table_args__ = (UniqueConstraint("ingredient", "brand_name"),)
+    __table_args__ = (
+        UniqueConstraint("drug_name", "ingredient", "brand_name"),
+    )
 
 
 # [DATABASE]

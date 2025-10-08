@@ -132,7 +132,10 @@ class LiverToxMatcher:
         master_list_df: pd.DataFrame | None = None,
     ) -> None:
         self.livertox_df = livertox_df
-        self.master_list_df = master_list_df
+        if master_list_df is not None and not master_list_df.empty:
+            self.master_list_df = master_list_df.copy()
+        else:
+            self.master_list_df = self._derive_master_alias_source(livertox_df)
         self.match_cache: dict[str, LiverToxMatch | None] = {}
         self.records: list[MonographRecord] = []
         self.primary_index: dict[str, MonographRecord] = {}
@@ -257,17 +260,17 @@ class LiverToxMatcher:
             entries = index.get(normalized_query)
             if not entries:
                 continue
-            for alias_value, chapter_title in entries:
-                resolved = self._match_chapter_title(chapter_title)
+            for alias_value, primary_name in entries:
+                resolved = self._match_primary_name(primary_name)
                 if resolved is None:
                     continue
-                record, base_confidence, chapter_reason, chapter_notes = resolved
+                record, base_confidence, primary_reason, primary_notes = resolved
                 notes = [
                     f"{alias_type}='{alias_value}'",
-                    f"chapter='{chapter_title}'",
+                    f"drug='{primary_name}'",
                 ]
-                notes.extend(chapter_notes)
-                reason = f"{alias_type}_{chapter_reason}"
+                notes.extend(primary_notes)
+                reason = f"{alias_type}_{primary_reason}"
                 confidence = min(self.MASTER_CONFIDENCE, base_confidence)
                 return record, confidence, reason, notes
         return None
@@ -332,22 +335,22 @@ class LiverToxMatcher:
         return record, max(self.FUZZY_CONFIDENCE, score), reason, notes
 
     # -------------------------------------------------------------------------
-    def _match_chapter_title(
-        self, chapter_title: str
+    def _match_primary_name(
+        self, drug_name: str
     ) -> tuple[MonographRecord, float, str, list[str]] | None:
-        normalized_chapter = self._normalize_name(chapter_title)
-        if not normalized_chapter:
+        normalized_name = self._normalize_name(drug_name)
+        if not normalized_name:
             return None
-        direct = self._match_primary(normalized_chapter)
+        direct = self._match_primary(normalized_name)
         if direct is not None:
             record, confidence, _, _ = direct
-            return record, confidence, "chapter_title", []
-        alias = self.synonym_index.get(normalized_chapter)
+            return record, confidence, "drug_name", []
+        alias = self.synonym_index.get(normalized_name)
         if alias is None:
             return None
         record, original = alias
         notes = [f"synonym='{original}'"]
-        return record, self.SYNONYM_CONFIDENCE, "chapter_synonym", notes
+        return record, self.SYNONYM_CONFIDENCE, "drug_synonym", notes
 
     # -------------------------------------------------------------------------
     def _find_best_variant(
@@ -417,13 +420,15 @@ class LiverToxMatcher:
         if self.master_list_df is None or self.master_list_df.empty:
             return
         for row in self.master_list_df.itertuples(index=False):
-            chapter_title = self._coerce_text(getattr(row, "chapter_title", None))
-            if chapter_title is None:
+            drug_name = self._coerce_text(getattr(row, "drug_name", None))
+            if drug_name is None:
                 continue
             brand = self._coerce_text(getattr(row, "brand_name", None))
             ingredient = self._coerce_text(getattr(row, "ingredient", None))
             for alias_type, value in ("brand", brand), ("ingredient", ingredient):
                 if value is None:
+                    continue
+                if value.lower() == "not available":
                     continue
                 for variant in self._iter_alias_variants(value):
                     normalized_variant = self._normalize_name(variant)
@@ -433,7 +438,7 @@ class LiverToxMatcher:
                         self.brand_index if alias_type == "brand" else self.ingredient_index
                     )
                     bucket = index.setdefault(normalized_variant, [])
-                    entry = (variant, chapter_title)
+                    entry = (variant, drug_name)
                     if entry not in bucket:
                         bucket.append(entry)
 
@@ -469,6 +474,21 @@ class LiverToxMatcher:
             if candidate:
                 variants.add(candidate)
         return list(variants)
+
+    # -------------------------------------------------------------------------
+    def _derive_master_alias_source(
+        self, dataset: pd.DataFrame | None
+    ) -> pd.DataFrame | None:
+        if dataset is None or dataset.empty:
+            return None
+        required = {"drug_name", "ingredient", "brand_name"}
+        if not required.issubset(dataset.columns):
+            return None
+        alias = dataset[list(required)].copy()
+        alias = alias.dropna(subset=["drug_name"])
+        alias = alias.replace("Not available", pd.NA)
+        alias = alias.dropna(how="all", subset=["ingredient", "brand_name"])
+        return alias.reset_index(drop=True)
 
     # -------------------------------------------------------------------------
     def _parse_synonyms(self, value: Any) -> dict[str, str]:

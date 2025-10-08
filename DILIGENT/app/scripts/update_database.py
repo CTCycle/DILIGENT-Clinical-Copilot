@@ -15,7 +15,7 @@ if __name__ == "__main__":
     )
     database.initialize_database()
     logger.info("Running LiverTox updater")
-    result = updater.run()
+    result = updater.update_from_livertox()
     logger.info("LiverTox updater summary: %s", result)
     
 
