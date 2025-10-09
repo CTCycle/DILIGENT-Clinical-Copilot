@@ -4,6 +4,8 @@ import asyncio
 import inspect
 from typing import Any
 
+import httpx
+
 from DILIGENT.app.api.models.prompts import (
     CLINICAL_ENHANCER_SYSTEM_PROMPT,
     CLINICAL_ENHANCER_USER_PROMPT,
@@ -69,6 +71,8 @@ class ClinicalTextEnhancer:
         self._chat_supports_think = "think" in parameters
         self._chat_supports_options = "options" in parameters
         self._chat_supports_keep_alive = "keep_alive" in parameters
+        self._retry_attempts = 3
+        self._retry_base_delay = 1.5
 
     # -------------------------------------------------------------------------
     async def enhance(self, payload: PatientData) -> PatientData:
@@ -138,8 +142,51 @@ class ClinicalTextEnhancer:
             },
         ]
         chat_kwargs = self._build_chat_kwargs(messages)
-        raw = await self.client.chat(**chat_kwargs)
+        raw = await self._invoke_with_retries(
+            chat_kwargs,
+            section_name=section_name,
+        )
         return self._coerce_chat_text(raw) or text
+
+    # -------------------------------------------------------------------------
+    async def _invoke_with_retries(
+        self, chat_kwargs: dict[str, Any], *, section_name: str
+    ) -> Any:
+        attempt = 1
+        while True:
+            try:
+                return await self.client.chat(**chat_kwargs)
+            except Exception as exc:  # noqa: BLE001
+                if attempt >= self._retry_attempts or not self._is_retryable_error(exc):
+                    raise
+                delay = self._retry_base_delay * attempt
+                logger.info(
+                    (
+                        "Retrying clinical text enhancement for %s "
+                        "(attempt %s/%s) in %.1fs due to %s"
+                    ),
+                    section_name,
+                    attempt + 1,
+                    self._retry_attempts,
+                    delay,
+                    exc,
+                )
+                await asyncio.sleep(delay)
+                attempt += 1
+
+    # -------------------------------------------------------------------------
+    def _is_retryable_error(self, exc: Exception) -> bool:
+        if isinstance(exc, httpx.RequestError):
+            return True
+        current = exc.__cause__
+        while current:
+            if isinstance(current, httpx.RequestError):
+                return True
+            current = current.__cause__
+        message = str(exc).lower()
+        if "disconnect" in message or "temporarily" in message or "timeout" in message:
+            return True
+        return False
 
     # -------------------------------------------------------------------------
     @staticmethod
