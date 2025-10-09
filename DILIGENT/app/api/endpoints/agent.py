@@ -75,8 +75,8 @@ async def process_single_patient(payload: PatientData) -> dict[str, Any]:
         logger.info("No therapy start information detected for the parsed drugs")
 
     # 4. Optionally extract diseases from anamnesis for contextual analysis
-    diseases_pre_extracted = bool(payload.pre_extract_diseases)
-    if diseases_pre_extracted:
+    should_extract_diseases = bool(payload.pre_extract_diseases)
+    if should_extract_diseases:
         start_time = time.perf_counter()
         diseases = await diseases_parser.extract_diseases(payload.anamnesis or "")
         elapsed = time.perf_counter() - start_time
@@ -98,7 +98,7 @@ async def process_single_patient(payload: PatientData) -> dict[str, Any]:
         visit_date=payload.visit_date,
         diseases=diseases.get("diseases", []),
         hepatic_diseases=diseases.get("hepatic_diseases", []),
-        diseases_pre_extracted=diseases_pre_extracted,
+        diseases_pre_extracted=should_extract_diseases,
         pattern_score=pattern_score,
     )
     elapsed = time.perf_counter() - start_time
