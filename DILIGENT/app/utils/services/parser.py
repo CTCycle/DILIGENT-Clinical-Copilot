@@ -669,9 +669,11 @@ class DrugsParser:
                     prefix_buffer.append(line)
                     continue
 
-            if re.match(r"^\d", line) and grouped and not metadata_buffer and not prefix_buffer:
-                grouped[-1] = f"{grouped[-1]} {line}".strip()
-                continue
+            if grouped and has_schedule and not metadata_buffer and not prefix_buffer:
+                leftover = self.SCHEDULE_RE.sub("", line).strip(" ,.;:-/")
+                if not leftover:
+                    grouped[-1] = f"{grouped[-1]} {line}".strip()
+                    continue
 
             combined_parts = metadata_buffer + prefix_buffer + [line]
             combined = " ".join(part for part in combined_parts if part).strip()
