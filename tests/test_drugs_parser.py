@@ -92,3 +92,20 @@ def test_drug_entry_trims_long_daytime_schedule():
         daytime_administration=[1.0, 0.0, 2.0, 1.0, 3.0],
     )
     assert entry.daytime_administration == [1.0, 0.0, 2.0, 1.0]
+
+
+def test_multiline_suspension_and_start_metadata():
+    parser = build_parser()
+    text = (
+        "Seresta 15 mg cpr [cpr] 1-1-0-2 per os\n"
+        "dal 07.08\n"
+        "Quviviq 50 mg cpr [cpr] 0-0-0-1 per os\n"
+        "sospeso dal 04.08"
+    )
+    result = parser.parse_drug_list(text)
+    assert len(result.entries) == 2
+    seresta, quviviq = result.entries
+    assert seresta.therapy_start_status is True
+    assert seresta.therapy_start_date == "07.08"
+    assert quviviq.suspension_status is True
+    assert quviviq.suspension_date == "04.08"
