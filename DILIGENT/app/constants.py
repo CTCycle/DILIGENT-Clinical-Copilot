@@ -76,7 +76,6 @@ OPENAI_CLOUD_MODELS = [
     "gpt-4o-audio-preview",
     "gpt-4o-mini-tts",
     "gpt-4o-mini-transcribe",
-    "gpt-4o-mini-translation",
     "gpt-4o-realtime-preview",
     "gpt-4o-realtime-preview-2024-12-17",
     "gpt-4o-realtime-preview-2024-04-09",
@@ -94,7 +93,7 @@ CLOUD_MODEL_CHOICES: dict[str, list[str]] = {
     "openai": OPENAI_CLOUD_MODELS,
     "gemini": GEMINI_CLOUD_MODELS,
 }
-DEFAULT_PARSING_MODEL = PARSING_MODEL_CHOICES[0]
+DEFAULT_PARSING_MODEL = "qwen3:8b"
 DEFAULT_AGENT_MODEL = AGENT_MODEL_CHOICES[0]
 DEFAULT_CLOUD_PROVIDER = CLOUD_PROVIDERS[0]
 DEFAULT_CLOUD_MODEL = CLOUD_MODEL_CHOICES[DEFAULT_CLOUD_PROVIDER][0]
@@ -125,63 +124,3 @@ LLM_NULL_MATCH_NAMES = {
 ###############################################################################
 DRUG_SUSPENSION_EXCLUSION_DAYS = 14
 
-
-# [NLP / TRANSLATION]
-###############################################################################
-LANGUAGE_DETECTION_MODEL = "papluca/xlm-roberta-base-language-detection"
-TRANSLATION_MODEL = "Helsinki-NLP/opus-mt-mul-en"
-TRANSLATION_CONFIDENCE_THRESHOLD = 0.90
-TRANSLATION_MAX_ATTEMPTS = 5
-LANGUAGE_DETECTION_CONFIDENCE = 0.90
-LANGUAGE_DETECTION_SAMPLE_LENGTH = 500
-
-# Enable/disable the LLM translator fallback (Ollama or cloud as configured).
-TRANSLATION_LLM_ENABLED = True
-# Default LLM model to use if enabled and available via providers.initialize_llm_client()
-# For local: "llama3.1:8b" (Ollama). For cloud, supply a provider-default in ClientRuntimeConfig.
-TRANSLATION_LLM_MODEL = "llama3.1:8b"
-
-# Confidence handling
-# Minimum self-reported quality from the LLM (0..1) to accept without further retries.
-TRANSLATION_LLM_CONFIDENCE_THRESHOLD = 0.80
-
-# Penalize outputs with repeated sentences/tokens. If the repetition ratio exceeds this,
-# we scale confidence by (1 - REPETITION_PENALTY_SCALE).
-REPETITION_RATIO_THRESHOLD = 0.20
-REPETITION_PENALTY_SCALE = 0.25
-
-NLLB_LANGUAGE_CODES: dict[str, str] = {
-    "ar": "arb_Arab",
-    "bg": "bul_Cyrl",
-    "cs": "ces_Latn",
-    "da": "dan_Latn",
-    "de": "deu_Latn",
-    "el": "ell_Grek",
-    "en": "eng_Latn",
-    "es": "spa_Latn",
-    "et": "est_Latn",
-    "fi": "fin_Latn",
-    "fr": "fra_Latn",
-    "he": "heb_Hebr",
-    "hi": "hin_Deva",
-    "hr": "hrv_Latn",
-    "hu": "hun_Latn",
-    "it": "ita_Latn",
-    "ja": "jpn_Jpan",
-    "ko": "kor_Hang",
-    "lt": "lit_Latn",
-    "lv": "lvs_Latn",
-    "nl": "nld_Latn",
-    "no": "nob_Latn",
-    "pl": "pol_Latn",
-    "pt": "por_Latn",
-    "ro": "ron_Latn",
-    "ru": "rus_Cyrl",
-    "sk": "slk_Latn",
-    "sl": "slv_Latn",
-    "sr": "srp_Cyrl",
-    "sv": "swe_Latn",
-    "tr": "tur_Latn",
-    "uk": "ukr_Cyrl",
-    "zh": "zho_Hans",
-}
