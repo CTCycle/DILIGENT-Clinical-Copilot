@@ -348,7 +348,7 @@ async def run_agent(
     alp_max: str,
     symptoms: list[str],
     process_from_files: bool,
-    pre_extract_diseases: bool,
+    enhance_clinical_text: bool,
 ) -> str:
     if process_from_files:
         url = f"{API_BASE_URL}{BATCH_AGENT_API_URL}"
@@ -376,7 +376,7 @@ async def run_agent(
         "alp": _sanitize_field(alp),
         "alp_max": _sanitize_field(alp_max),
         "symptoms": symptoms or [],
-        "pre_extract_diseases": bool(pre_extract_diseases),
+        "enhance_clinical_text": bool(enhance_clinical_text),
     }
 
     if not any(cleaned_payload[key] for key in ("anamnesis", "drugs", "exams")):
