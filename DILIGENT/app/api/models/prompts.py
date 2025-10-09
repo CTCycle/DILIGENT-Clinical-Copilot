@@ -52,6 +52,7 @@ Disease guidance: {disease_guidance}
 Patient liver injury pattern:
 {pattern_summary}
 
+Therapy start details: {therapy_start_details}
 Suspension details: {suspension_details}
 
 Task: In a concise paragraph of a few sentences (≤500 words), explain whether this drug
