@@ -49,7 +49,11 @@ class ClinicalTextEnhancer:
         )
         self.using_ollama = provider == "ollama"
         enhancer_model = ClientRuntimeConfig.get_enhancer_model()
-        self.model = model_candidate or enhancer_model or ClientRuntimeConfig.get_agent_model()
+        self.model = (
+            model_candidate
+            or enhancer_model
+            or ClientRuntimeConfig.get_clinical_model()
+        )
         self.temperature = 0.2
         self.keep_alive = "5m" if self.using_ollama else None
         try:
