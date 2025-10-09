@@ -47,6 +47,7 @@ Patient anamnesis:
 
 Known diseases: {diseases}
 Hepatic diseases: {hepatic_diseases}
+Disease guidance: {disease_guidance}
 
 Patient liver injury pattern:
 {pattern_summary}
