@@ -43,12 +43,13 @@ class ClinicalTextEnhancer:
 
     def __init__(self, *, timeout_s: float = DEFAULT_LLM_TIMEOUT_SECONDS) -> None:
         self.timeout_s = float(timeout_s)
-        self.client = initialize_llm_client(purpose="agent", timeout_s=self.timeout_s)
+        self.client = initialize_llm_client(purpose="enhancer", timeout_s=self.timeout_s)
         provider, model_candidate = ClientRuntimeConfig.resolve_provider_and_model(
-            "agent"
+            "enhancer"
         )
         self.using_ollama = provider == "ollama"
-        self.model = model_candidate or ClientRuntimeConfig.get_agent_model()
+        enhancer_model = ClientRuntimeConfig.get_enhancer_model()
+        self.model = model_candidate or enhancer_model or ClientRuntimeConfig.get_agent_model()
         self.temperature = 0.2
         self.keep_alive = "5m" if self.using_ollama else None
         try:
