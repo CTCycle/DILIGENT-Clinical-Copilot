@@ -42,10 +42,8 @@ async def process_single_patient(payload: PatientData) -> dict[str, Any]:
             payload.visit_date.strftime("%d-%m-%Y"),
         )
 
-    updated_payload = payload
-
     # 1. Calculate hepatic pattern score using ALT/ALP values
-    pattern_score = pattern_analyzer.analyze(updated_payload)
+    pattern_score = pattern_analyzer.analyze(payload)
     logger.info(
         "Patient hepatotoxicity pattern classified as %s (R=%.3f)",
         pattern_score.classification,
@@ -54,34 +52,28 @@ async def process_single_patient(payload: PatientData) -> dict[str, Any]:
 
     # 2. Parse drugs names and info from raw text
     start_time = time.perf_counter()
-    drug_data = drugs_parser.parse_drug_list(updated_payload.drugs or "")
+    drug_data = drugs_parser.parse_drug_list(payload.drugs or "")
     elapsed = time.perf_counter() - start_time
     logger.info("Drugs extraction required %.4f seconds", elapsed)
     logger.info("Detected %s drugs", len(drug_data.entries))
     
-    diseases: dict[str, list[str]] = {"diseases": [], "hepatic_diseases": []}
-    diseases_pre_extracted = False
-    if updated_payload.pre_extract_diseases:
-        logger.info("Disease extraction enabled; parsing anamnesis")
-        start_time = time.perf_counter()
-        diseases = await diseases_parser.extract_diseases(updated_payload.anamnesis or "")
-        elapsed = time.perf_counter() - start_time
-        logger.info("Disease extraction required %.4f seconds", elapsed)
-        logger.info("Detected %s diseases for this patient", len(diseases["diseases"]))
-        logger.info(
-            "Subset of hepatic diseases includes %s entries",
-            len(diseases["hepatic_diseases"]),
-        )
-        diseases_pre_extracted = True
-    else:
-        logger.info("Disease extraction skipped by configuration")
+    # 3. Extract diseases from anamnesis for contextual analysis
+    start_time = time.perf_counter()
+    diseases = await diseases_parser.extract_diseases(payload.anamnesis or "")
+    elapsed = time.perf_counter() - start_time
+    logger.info("Disease extraction required %.4f seconds", elapsed)
+    logger.info("Detected %s diseases for this patient", len(diseases["diseases"]))
+    logger.info(
+        "Subset of hepatic diseases includes %s entries",
+        len(diseases["hepatic_diseases"]),
+    )
 
     # 4. Consult LiverTox database for hepatotoxicity info
     start_time = time.perf_counter()
     doctor = HepatoxConsultation(drug_data)
     drug_assessment = await doctor.run_analysis(
-        anamnesis=updated_payload.anamnesis,
-        visit_date=updated_payload.visit_date,
+        anamnesis=payload.anamnesis,
+        visit_date=payload.visit_date,
         diseases=diseases.get("diseases", []),
         hepatic_diseases=diseases.get("hepatic_diseases", []),
         diseases_pre_extracted=diseases_pre_extracted,
