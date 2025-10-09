@@ -57,11 +57,8 @@ async def process_single_patient(payload: PatientData) -> dict[str, Any]:
 
     # 3. Optional clinical text enhancement (no disease pre-extraction)
     use_text_enhancement = bool(payload.enhance_clinical_text)
-    if use_text_enhancement:
-        logger.info("Clinical text enhancement requested before LLM analysis")
-    else:
-        logger.info("Clinical text enhancement skipped based on request")
-
+    logger.info(f"Clinical text enhancement: {use_text_enhancement} before LLM analysis")
+   
     # 4. Consult LiverTox database for hepatotoxicity info
     start_time = time.perf_counter()
     doctor = HepatoxConsultation(drug_data)
