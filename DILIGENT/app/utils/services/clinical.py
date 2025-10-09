@@ -241,22 +241,17 @@ class HepatoxConsultation:
                 matched_row = None
             raw_excerpts = resolved.get("extracted_excerpts")
             if isinstance(raw_excerpts, str):
-                raw_list = [raw_excerpts]
+                excerpts_list = [raw_excerpts]
             elif isinstance(raw_excerpts, list):
-                raw_list = [item for item in raw_excerpts if isinstance(item, str)]
+                excerpts_list = [item for item in raw_excerpts if isinstance(item, str)]
             else:
-                raw_list = []
-
-            cleaned_excerpts = [
-                sanitized
-                for sanitized in (self._sanitize_excerpt(text) for text in raw_list)
-                if sanitized
-            ]
+                excerpts_list = []
+            
             suspension = self._evaluate_suspension(drug_entry, visit_date)
             entry = DrugClinicalAssessment(
                 drug_name=drug_entry.name,
                 matched_livertox_row=matched_row if isinstance(matched_row, dict) else None,
-                extracted_excerpts=cleaned_excerpts,
+                extracted_excerpts=excerpts_list,
                 suspension=suspension,
             )
             entries.append(entry)
@@ -265,7 +260,7 @@ class HepatoxConsultation:
                 entry.paragraph = self._build_excluded_paragraph(drug_entry.name, suspension)
                 continue
 
-            excerpt = self._select_excerpt(cleaned_excerpts)
+            excerpt = self._select_excerpt(excerpts_list)
             if excerpt is None:
                 entry.paragraph = self._build_missing_excerpt_paragraph(drug_entry.name)
                 continue
@@ -690,11 +685,4 @@ class HepatoxConsultation:
                 unique[cleaned.lower()] = cleaned
         return list(unique.values())
 
-    # -------------------------------------------------------------------------
-    def _sanitize_excerpt(self, excerpt: str) -> str:
-        cleaned = excerpt.strip()
-        if not cleaned:
-            return ""
-        sanitized = LIVERTOX_HEADER_RE.sub("", cleaned)
-        sanitized = LIVERTOX_FOOTER_RE.sub("", sanitized)
-        return sanitized.strip()
+  
