@@ -696,15 +696,34 @@ class DrugsParser:
     async def _llm_extract_drugs(self, text: str) -> PatientDrugs:
         if self.client is None:
             raise RuntimeError("LLM client is not initialized for drug extraction")
-        return await self.client.llm_structured_call(
-            model=self.model,
-            system_prompt=DRUG_EXTRACTION_PROMPT,
-            user_prompt=text,
-            schema=PatientDrugs,
-            temperature=self.temperature,
-            use_json_mode=True,
-            max_repair_attempts=2,
+
+        lines = [line for line in (segment.strip() for segment in text.split("\n")) if line]
+        if not lines:
+            return PatientDrugs(entries=[])
+
+        single_entry_prompt = (
+            f"{DRUG_EXTRACTION_PROMPT.strip()}\n\n"
+            "For this task, return a PatientDrugs object whose `entries` array contains "
+            "exactly one DrugEntry describing the drug provided in the user prompt."
         )
+
+        entries: list[DrugEntry] = []
+        for line in lines:
+            parsed = await self.client.llm_structured_call(
+                model=self.model,
+                system_prompt=single_entry_prompt,
+                user_prompt=(
+                    "Extract the structured representation for the following drug entry:\n"
+                    f"{line}"
+                ),
+                schema=PatientDrugs,
+                temperature=self.temperature,
+                use_json_mode=True,
+                max_repair_attempts=2,
+            )
+            entries.extend(parsed.entries)
+
+        return PatientDrugs(entries=entries)
 
     def _parse_line(self, line: str) -> DrugEntry | None:
         schedule_match = self.SCHEDULE_RE.search(line)
