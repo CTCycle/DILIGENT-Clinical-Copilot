@@ -620,8 +620,10 @@ class DrugsParser:
             "exactly one DrugEntry describing the drug provided in the user prompt."
         )
 
+        grouped_lines = self.group_lines_for_llm(lines)
+
         entries: list[DrugEntry] = []
-        for line in lines:
+        for line in grouped_lines:
             parsed = await self.client.llm_structured_call(
                 model=self.model,
                 system_prompt=single_entry_prompt,
@@ -637,6 +639,54 @@ class DrugsParser:
             entries.extend(parsed.entries)
 
         return PatientDrugs(entries=entries)
+
+    # -------------------------------------------------------------------------
+    def group_lines_for_llm(self, lines: list[str]) -> list[str]:
+        grouped: list[str] = []
+        metadata_buffer: list[str] = []
+        prefix_buffer: list[str] = []
+        for index, line in enumerate(lines):
+            has_schedule = bool(self.SCHEDULE_RE.search(line))
+            has_metadata = bool(
+                self.SUSPENSION_RE.search(line)
+                or self.SUSPENSION_DATE_RE.search(line)
+                or self.START_DATE_RE.search(line)
+            )
+            if has_metadata and not has_schedule:
+                metadata_buffer.append(line)
+                continue
+
+            has_numeric = bool(re.search(r"\d", line))
+            if not has_numeric and not has_schedule:
+                next_line = lines[index + 1] if index + 1 < len(lines) else ""
+                next_has_schedule = (
+                    bool(self.SCHEDULE_RE.search(next_line)) if next_line else False
+                )
+                next_has_numeric = (
+                    bool(re.search(r"\d", next_line)) if next_line else False
+                )
+                if next_has_numeric or next_has_schedule:
+                    prefix_buffer.append(line)
+                    continue
+
+            if re.match(r"^\d", line) and grouped and not metadata_buffer and not prefix_buffer:
+                grouped[-1] = f"{grouped[-1]} {line}".strip()
+                continue
+
+            combined_parts = metadata_buffer + prefix_buffer + [line]
+            combined = " ".join(part for part in combined_parts if part).strip()
+            if combined:
+                grouped.append(combined)
+            else:
+                grouped.append(line)
+            metadata_buffer.clear()
+            prefix_buffer.clear()
+
+        leftover_parts = metadata_buffer + prefix_buffer
+        if leftover_parts and grouped:
+            grouped[-1] = f"{grouped[-1]} {' '.join(leftover_parts)}".strip()
+
+        return grouped if grouped else lines
 
     def parse_line(self, line: str) -> DrugEntry | None:
         schedule_match = self.SCHEDULE_RE.search(line)
