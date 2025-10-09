@@ -15,7 +15,7 @@ from DILIGENT.app.constants import TASKS_PATH
 from DILIGENT.app.logger import logger
 from DILIGENT.app.utils.services.clinical import (
     HepatotoxicityPatternAnalyzer,
-    LiverToxConsultation,
+    HepatoxConsultation,
 )
 from DILIGENT.app.utils.services.parser import (
     BloodTestParser,
@@ -72,8 +72,8 @@ async def process_single_patient(payload: PatientData) -> dict[str, Any]:
 
     # 4. Consult LiverTox database for hepatotoxicity info
     start_time = time.perf_counter()
-    livertox_broker = LiverToxConsultation(drug_data)
-    drug_assessment = await livertox_broker.run_analysis(
+    doctor = HepatoxConsultation(drug_data)
+    drug_assessment = await doctor.run_analysis(
         anamnesis=updated_payload.anamnesis,
         visit_date=updated_payload.visit_date,
         diseases=diseases.get("diseases", []),
