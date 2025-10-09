@@ -71,6 +71,10 @@ class PatientData(BaseModel):
         default=False,
         description="Indicates whether the patient has a history of hepatic diseases.",
     )
+    pre_extract_diseases: bool = Field(
+        default=True,
+        description="Whether to extract diseases from anamnesis before running the agent.",
+    )
 
     @field_validator("name", mode="before")
     @classmethod
