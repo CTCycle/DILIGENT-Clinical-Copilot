@@ -96,12 +96,12 @@ class HepatoxConsultation:
         self.livertox_df = None
         self.master_list_df = None
         self.matcher: LiverToxMatcher | None = None        
-        self.llm_client = initialize_llm_client(purpose="agent", timeout_s=timeout_s)
+        self.llm_client = initialize_llm_client(purpose="clinical", timeout_s=timeout_s)
         self.MAX_EXCERPT_LENGTH = MAX_EXCERPT_LENGTH
         _provider, model_candidate = ClientRuntimeConfig.resolve_provider_and_model(
-            "agent"
+            "clinical"
         )
-        self.llm_model = model_candidate or ClientRuntimeConfig.get_agent_model()
+        self.llm_model = model_candidate or ClientRuntimeConfig.get_clinical_model()
         try:
             chat_signature = inspect.signature(self.llm_client.chat)
         except (TypeError, ValueError):

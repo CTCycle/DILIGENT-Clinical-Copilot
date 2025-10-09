@@ -5,9 +5,10 @@ from typing import Any, Literal
 
 from DILIGENT.app.constants import (
     CLOUD_MODEL_CHOICES,
-    DEFAULT_AGENT_MODEL,
+    DEFAULT_CLINICAL_MODEL,
     DEFAULT_CLOUD_MODEL,
     DEFAULT_CLOUD_PROVIDER,
+    DEFAULT_ENHANCER_MODEL,
     DEFAULT_PARSING_MODEL,
 )
 
@@ -28,7 +29,8 @@ class Configuration:
 @dataclass
 class ClientRuntimeConfig:
     parsing_model: str = DEFAULT_PARSING_MODEL
-    agent_model: str = DEFAULT_AGENT_MODEL
+    clinical_model: str = DEFAULT_CLINICAL_MODEL
+    enhancer_model: str = DEFAULT_ENHANCER_MODEL
     llm_provider: str = DEFAULT_CLOUD_PROVIDER
     cloud_model: str = DEFAULT_CLOUD_MODEL
     use_cloud_services: bool = False
@@ -52,12 +54,21 @@ class ClientRuntimeConfig:
 
     # ---------------------------------------------------------------------
     @classmethod
-    def set_agent_model(cls, model: str) -> str:
+    def set_clinical_model(cls, model: str) -> str:
         value = model.strip()
-        if value and value != cls.agent_model:
-            cls.agent_model = value
+        if value and value != cls.clinical_model:
+            cls.clinical_model = value
             cls._touch_revision()
-        return cls.agent_model
+        return cls.clinical_model
+
+    # ---------------------------------------------------------------------
+    @classmethod
+    def set_enhancer_model(cls, model: str) -> str:
+        value = model.strip()
+        if value and value != cls.enhancer_model:
+            cls.enhancer_model = value
+            cls._touch_revision()
+        return cls.enhancer_model
 
     # ---------------------------------------------------------------------
     @classmethod
@@ -131,8 +142,13 @@ class ClientRuntimeConfig:
 
     # ---------------------------------------------------------------------
     @classmethod
-    def get_agent_model(cls) -> str:
-        return cls.agent_model
+    def get_clinical_model(cls) -> str:
+        return cls.clinical_model
+
+    # ---------------------------------------------------------------------
+    @classmethod
+    def get_enhancer_model(cls) -> str:
+        return cls.enhancer_model
 
     # ---------------------------------------------------------------------
     @classmethod
@@ -163,7 +179,8 @@ class ClientRuntimeConfig:
     @classmethod
     def reset_defaults(cls) -> None:
         cls.parsing_model = DEFAULT_PARSING_MODEL
-        cls.agent_model = DEFAULT_AGENT_MODEL
+        cls.clinical_model = DEFAULT_CLINICAL_MODEL
+        cls.enhancer_model = DEFAULT_ENHANCER_MODEL
         cls.llm_provider = DEFAULT_CLOUD_PROVIDER
         cls.cloud_model = DEFAULT_CLOUD_MODEL
         cls.use_cloud_services = False
@@ -179,22 +196,24 @@ class ClientRuntimeConfig:
     # ---------------------------------------------------------------------
     @classmethod
     def resolve_provider_and_model(
-        cls, purpose: Literal["agent", "parser"]
+        cls, purpose: Literal["clinical", "parser", "enhancer"]
     ) -> tuple[str, str]:
         if cls.is_cloud_enabled():
             provider = cls.get_llm_provider()
             model = cls.get_cloud_model().strip()
             if not model:
-                model = (
-                    cls.get_parsing_model()
-                    if purpose == "parser"
-                    else cls.get_agent_model()
-                )
+                if purpose == "parser":
+                    model = cls.get_parsing_model()
+                elif purpose == "enhancer":
+                    model = cls.get_enhancer_model()
+                else:
+                    model = cls.get_clinical_model()
         else:
             provider = "ollama"
-            model = (
-                cls.get_parsing_model()
-                if purpose == "parser"
-                else cls.get_agent_model()
-            )
+            if purpose == "parser":
+                model = cls.get_parsing_model()
+            elif purpose == "enhancer":
+                model = cls.get_enhancer_model()
+            else:
+                model = cls.get_clinical_model()
         return provider, model.strip()
