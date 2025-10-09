@@ -29,7 +29,7 @@ drugs_parser = DrugsParser()
 pattern_analyzer = HepatotoxicityPatternAnalyzer()
 router = APIRouter(tags=["agent"])
 text_enhancer: ClinicalTextEnhancer | None = None
-text_enhancer_revision = -1
+text_enhancer_revision = -1  # refresh cached enhancer when runtime config changes
 
 # [ENPOINTS]
 ###############################################################################
