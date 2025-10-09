@@ -168,14 +168,20 @@ def create_interface() -> gr.Blocks:
                     inputs=visit_date,
                     outputs=visit_date,
                 )
-                process_from_files = gr.Checkbox(
-                    label="Process patients from files",
-                    value=False,
-                )
                 with gr.Column():
                     run_button = gr.Button("Run Workflow", variant="primary")
                     clear_button = gr.Button("Clear all")
-                with gr.Accordion("Runtime Configuration", open=False):
+                with gr.Accordion("Analysis Config", open=False):
+                    with gr.Column():
+                        pre_extract_diseases = gr.Checkbox(
+                            label="Pre-extract diseases from anamnesis",
+                            value=True,
+                        )
+                        process_from_files = gr.Checkbox(
+                            label="Process patients from files",
+                            value=False,
+                        )
+                with gr.Accordion("Model Config", open=False):
                     with gr.Column():
                         with gr.Row():
                             with gr.Column(scale=1):
@@ -306,6 +312,7 @@ def create_interface() -> gr.Blocks:
                 alp_max,
                 symptoms,
                 process_from_files,
+                pre_extract_diseases,
             ],
             outputs=output,
             api_name="run_agent",
@@ -332,6 +339,7 @@ def create_interface() -> gr.Blocks:
                 alp,
                 alp_max,
                 symptoms,
+                pre_extract_diseases,
                 process_from_files,
                 has_diseases,
                 output,

@@ -59,16 +59,22 @@ async def process_single_patient(payload: PatientData) -> dict[str, Any]:
     logger.info("Drugs extraction required %.4f seconds", elapsed)
     logger.info("Detected %s drugs", len(drug_data.entries))
     
-    # 3. Extract diseases from anamnesis for contextual analysis
-    start_time = time.perf_counter()
-    diseases = await diseases_parser.extract_diseases(updated_payload.anamnesis or "")
-    elapsed = time.perf_counter() - start_time
-    logger.info("Disease extraction required %.4f seconds", elapsed)
-    logger.info("Detected %s diseases for this patient", len(diseases["diseases"]))
-    logger.info(
-        "Subset of hepatic diseases includes %s entries",
-        len(diseases["hepatic_diseases"]),
-    )
+    diseases: dict[str, list[str]] = {"diseases": [], "hepatic_diseases": []}
+    diseases_pre_extracted = False
+    if updated_payload.pre_extract_diseases:
+        logger.info("Disease extraction enabled; parsing anamnesis")
+        start_time = time.perf_counter()
+        diseases = await diseases_parser.extract_diseases(updated_payload.anamnesis or "")
+        elapsed = time.perf_counter() - start_time
+        logger.info("Disease extraction required %.4f seconds", elapsed)
+        logger.info("Detected %s diseases for this patient", len(diseases["diseases"]))
+        logger.info(
+            "Subset of hepatic diseases includes %s entries",
+            len(diseases["hepatic_diseases"]),
+        )
+        diseases_pre_extracted = True
+    else:
+        logger.info("Disease extraction skipped by configuration")
 
     # 4. Consult LiverTox database for hepatotoxicity info
     start_time = time.perf_counter()
@@ -78,6 +84,7 @@ async def process_single_patient(payload: PatientData) -> dict[str, Any]:
         visit_date=updated_payload.visit_date,
         diseases=diseases.get("diseases", []),
         hepatic_diseases=diseases.get("hepatic_diseases", []),
+        diseases_pre_extracted=diseases_pre_extracted,
         pattern_score=pattern_score,
     )
     elapsed = time.perf_counter() - start_time
@@ -114,21 +121,24 @@ async def start_single_clinical_agent(
     alp: str | None = Body(default=None),
     alp_max: str | None = Body(default=None),
     symptoms: list[str] | None = Body(default=None),
+    pre_extract_diseases: bool = Body(default=True),
 ) -> dict[str, Any]:
     try:
-        payload = PatientData(
-            name=name,
-            visit_date=visit_date,
-            anamnesis=anamnesis,
-            has_hepatic_diseases=has_hepatic_diseases,
-            drugs=drugs,
-            exams=exams,
-            alt=alt,
-            alt_max=alt_max,
-            alp=alp,
-            alp_max=alp_max,
-            symptoms=symptoms or [],
-        )
+        payload_data: dict[str, Any] = {
+            "name": name,
+            "visit_date": visit_date,
+            "anamnesis": anamnesis,
+            "has_hepatic_diseases": has_hepatic_diseases,
+            "drugs": drugs,
+            "exams": exams,
+            "alt": alt,
+            "alt_max": alt_max,
+            "alp": alp,
+            "alp_max": alp_max,
+            "symptoms": symptoms or [],
+            "pre_extract_diseases": pre_extract_diseases,
+        }
+        payload = PatientData.model_validate(payload_data)
     except ValidationError as exc:
         raise HTTPException(
             status_code=status.HTTP_422_UNPROCESSABLE_ENTITY, detail=exc.errors()
