@@ -168,72 +168,81 @@ def create_interface() -> gr.Blocks:
                     inputs=visit_date,
                     outputs=visit_date,
                 )
-                process_from_files = gr.Checkbox(
-                    label="Process patients from files",
-                    value=False,
-                )
                 with gr.Column():
                     run_button = gr.Button("Run Workflow", variant="primary")
                     clear_button = gr.Button("Clear all")
-                with gr.Accordion("Runtime Configuration", open=False):
+                with gr.Accordion("Analysis Config", open=False):
                     with gr.Column():
+                        pre_extract_diseases = gr.Checkbox(
+                            label="Pre-extract diseases from anamnesis",
+                            value=True,
+                        )
+                        process_from_files = gr.Checkbox(
+                            label="Process patients from files",
+                            value=False,
+                        )
+                with gr.Accordion("Model Config", open=False):
+                    with gr.Column():
+                        use_cloud_services = gr.Checkbox(
+                            label="Use Cloud Services",
+                            value=ClientRuntimeConfig.is_cloud_enabled(),
+                        )
                         with gr.Row():
                             with gr.Column(scale=1):
-                                use_cloud_services = gr.Checkbox(
-                                    label="Use Cloud Services",
-                                    value=ClientRuntimeConfig.is_cloud_enabled(),
-                                )
-                                llm_provider_dropdown = gr.Dropdown(
-                                    label="Cloud Service",
-                                    choices=CLOUD_PROVIDERS,
-                                    value=provider,
-                                    interactive=ClientRuntimeConfig.is_cloud_enabled(),
-                                )
-                            cloud_model_dropdown = gr.Dropdown(
-                                label="Cloud Model",
-                                choices=cloud_models,
-                                value=selected_cloud_model,
-                                interactive=ClientRuntimeConfig.is_cloud_enabled(),
-                            )
-                        with gr.Row():
+                                with gr.Group():
+                                    gr.Markdown("**Cloud Configuration**")
+                                    llm_provider_dropdown = gr.Dropdown(
+                                        label="Cloud Service",
+                                        choices=CLOUD_PROVIDERS,
+                                        value=provider,
+                                        interactive=ClientRuntimeConfig.is_cloud_enabled(),
+                                    )
+                                    cloud_model_dropdown = gr.Dropdown(
+                                        label="Cloud Model",
+                                        choices=cloud_models,
+                                        value=selected_cloud_model,
+                                        interactive=ClientRuntimeConfig.is_cloud_enabled(),
+                                    )
                             with gr.Column(scale=1):
-                                parsing_model_dropdown = gr.Dropdown(
-                                    label="Parsing Model",
-                                    choices=PARSING_MODEL_CHOICES,
-                                    value=ClientRuntimeConfig.get_parsing_model(),
-                                )
-                                agent_model_dropdown = gr.Dropdown(
-                                    label="Agent Model",
-                                    choices=AGENT_MODEL_CHOICES,
-                                    value=ClientRuntimeConfig.get_agent_model(),
-                                )
-                                temperature_input = gr.Number(
-                                    label="Temperature",
-                                    value=ClientRuntimeConfig.get_ollama_temperature(),
-                                    minimum=0.0,
-                                    maximum=2.0,
-                                    step=0.1,
-                                    interactive=not ClientRuntimeConfig.is_cloud_enabled(),
-                                )
-                                reasoning_checkbox = gr.Checkbox(
-                                    label="Enable reasoning (think)",
-                                    value=ClientRuntimeConfig.is_ollama_reasoning_enabled(),
-                                    interactive=not ClientRuntimeConfig.is_cloud_enabled(),
-                                )
-                                pull_models_button = gr.Button(
-                                    "Pull models",
-                                    variant="secondary",
-                                )
-                                start_ollama_button = gr.Button(
-                                    "Start Ollama client",
-                                    variant="secondary",
-                                    interactive=not ClientRuntimeConfig.is_cloud_enabled(),
-                                )
-                                preload_button = gr.Button(
-                                    "Preload models",
-                                    variant="secondary",
-                                    interactive=not ClientRuntimeConfig.is_cloud_enabled(),
-                                )
+                                with gr.Group():
+                                    gr.Markdown("**Ollama Configuration**")
+                                    parsing_model_dropdown = gr.Dropdown(
+                                        label="Parsing Model",
+                                        choices=PARSING_MODEL_CHOICES,
+                                        value=ClientRuntimeConfig.get_parsing_model(),
+                                    )
+                                    agent_model_dropdown = gr.Dropdown(
+                                        label="Agent Model",
+                                        choices=AGENT_MODEL_CHOICES,
+                                        value=ClientRuntimeConfig.get_agent_model(),
+                                    )
+                                    temperature_input = gr.Number(
+                                        label="Temperature",
+                                        value=ClientRuntimeConfig.get_ollama_temperature(),
+                                        minimum=0.0,
+                                        maximum=2.0,
+                                        step=0.1,
+                                        interactive=not ClientRuntimeConfig.is_cloud_enabled(),
+                                    )
+                                    reasoning_checkbox = gr.Checkbox(
+                                        label="Enable reasoning (think)",
+                                        value=ClientRuntimeConfig.is_ollama_reasoning_enabled(),
+                                        interactive=not ClientRuntimeConfig.is_cloud_enabled(),
+                                    )
+                                    pull_models_button = gr.Button(
+                                        "Pull models",
+                                        variant="secondary",
+                                    )
+                                    start_ollama_button = gr.Button(
+                                        "Start Ollama client",
+                                        variant="secondary",
+                                        interactive=not ClientRuntimeConfig.is_cloud_enabled(),
+                                    )
+                                    preload_button = gr.Button(
+                                        "Preload models",
+                                        variant="secondary",
+                                        interactive=not ClientRuntimeConfig.is_cloud_enabled(),
+                                    )
 
         output = gr.Textbox(
             label="Agent Output",
@@ -306,6 +315,7 @@ def create_interface() -> gr.Blocks:
                 alp_max,
                 symptoms,
                 process_from_files,
+                pre_extract_diseases,
             ],
             outputs=output,
             api_name="run_agent",
@@ -332,6 +342,7 @@ def create_interface() -> gr.Blocks:
                 alp,
                 alp_max,
                 symptoms,
+                pre_extract_diseases,
                 process_from_files,
                 has_diseases,
                 output,
