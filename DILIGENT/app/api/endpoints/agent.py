@@ -52,7 +52,7 @@ async def process_single_patient(payload: PatientData) -> dict[str, Any]:
 
     # 2. Parse drugs names and info from raw text
     start_time = time.perf_counter()
-    drug_data = drugs_parser.parse_drug_list(payload.drugs or "")
+    drug_data = await drugs_parser.extract_drug_list(payload.drugs or "")
     elapsed = time.perf_counter() - start_time
     logger.info("Drugs extraction required %.4f seconds", elapsed)
     logger.info("Detected %s drugs", len(drug_data.entries))
