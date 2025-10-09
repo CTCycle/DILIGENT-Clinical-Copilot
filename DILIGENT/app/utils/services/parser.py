@@ -23,7 +23,7 @@ from DILIGENT.app.api.schemas.clinical import (
     PatientDrugs,
 )
 from DILIGENT.app.configurations import ClientRuntimeConfig
-from DILIGENT.app.constants import DEFAULT_LLM_TIMEOUT_SECONDS
+from DILIGENT.app.constants import ALT_LABELS, ALP_LABELS, DEFAULT_LLM_TIMEOUT_SECONDS
 from DILIGENT.app.utils.patterns import (
     CUTOFF_IN_PAREN_RE,
     DATE_PATS,
@@ -41,10 +41,6 @@ from DILIGENT.app.utils.patterns import (
     TITER_RE,
     UNIT_TOKENS,
 )
-
-ALT_LABELS = {"ALT", "ALAT"}
-ALP_LABELS = {"ALP"}
-
 
 ###############################################################################
 class PatientCase:
@@ -130,12 +126,12 @@ class DiseasesParser:
         self.client_provider: str | None = None
         self.model: str = ""
         self.runtime_revision = -1
-        self._client_lock = asyncio.Lock()
+        self.client_lock = asyncio.Lock()
         self.JSON_schema = {"diseases": list[str], "hepatic_diseases": list[str]}
 
     # -------------------------------------------------------------------------
-    async def _ensure_client(self) -> None:
-        async with self._client_lock:
+    async def ensure_client(self) -> None:
+        async with self.client_lock:
             revision = ClientRuntimeConfig.get_revision()
             provider, model = ClientRuntimeConfig.resolve_provider_and_model("parser")
             needs_refresh = (
@@ -173,7 +169,7 @@ class DiseasesParser:
     async def extract_diseases(self, text: str | None) -> dict[str, Any]:
         if text is None:
             return {"diseases": [], "hepatic_diseases": []}
-        await self._ensure_client()
+        await self.ensure_client()
         if self.client is None:
             raise RuntimeError("LLM client is not initialized for disease extraction")
         try:
@@ -372,14 +368,14 @@ class BloodTestParser:
                     )
 
     # -------------------------------------------------------------------------
-    def _normalize_text(self, text: str) -> str:
+    def normalize_text(self, text: str) -> str:
         text = text.replace("\u00b5", "μ")
         text = re.sub(r"[ \t]+", " ", text)  # compact spaces
         text = re.sub(r"\s*\)\s*,", "),", text)  # tidy '),'
         return text
 
     # -----------------------------------------------------------------------------
-    def _format_marker_value(self, value: str | None, unit: str | None) -> str | None:
+    def format_marker_value(self, value: str | None, unit: str | None) -> str | None:
         if not value:
             return None
         unit_part = unit.strip() if unit else ""
@@ -399,10 +395,10 @@ class BloodTestParser:
         for match in NUMERIC_RE.finditer(section):
             raw_name = (match.group("name") or "").replace(":", "").strip().upper()
             normalized = raw_name.replace(" ", "")
-            formatted_value = self._format_marker_value(
+            formatted_value = self.format_marker_value(
                 match.group("value"), match.group("unit")
             )
-            cutoff_value = self._extract_cutoff(match.group("paren"))
+            cutoff_value = self.extract_cutoff(match.group("paren"))
             if normalized in ALT_LABELS:
                 markers["alt"] = formatted_value
                 markers["alt_max"] = cutoff_value
@@ -437,7 +433,7 @@ class BloodTestParser:
         return None
 
     # -------------------------------------------------------------------------
-    def _extract_cutoff(self, text: str | None) -> str | None:
+    def extract_cutoff(self, text: str | None) -> str | None:
         if not text:
             return None
         cutoff_match = CUTOFF_IN_PAREN_RE.search(text)
@@ -450,7 +446,7 @@ class BloodTestParser:
 
     # -------------------------------------------------------------------------
     def iterate_date_segments(self, text: str) -> Iterator[tuple[str | None, str]]:
-        text = self._normalize_text(text)
+        text = self.normalize_text(text)
 
         markers: list[tuple[int, int, str]] = []
         for pat in DATE_PATS:
@@ -619,7 +615,7 @@ class DrugsParser:
         self.timeout_s = float(timeout_s)
         self.client: Any | None = client
         self.model: str = ""
-        self._client_lock = asyncio.Lock()
+        self.client_lock = asyncio.Lock()
         if client is None:
             self.client_provider: str | None = None
             self.runtime_revision = -1
@@ -627,8 +623,8 @@ class DrugsParser:
             self.client_provider = "injected"
             self.runtime_revision = ClientRuntimeConfig.get_revision()
 
-    async def _ensure_client(self) -> None:
-        async with self._client_lock:
+    async def ensure_client(self) -> None:
+        async with self.client_lock:
             revision = ClientRuntimeConfig.get_revision()
             provider, model = ClientRuntimeConfig.resolve_provider_and_model("parser")
             if self.client_provider == "injected" and self.client is not None:
@@ -667,18 +663,23 @@ class DrugsParser:
             stripped = self.BULLET_RE.sub("", stripped)
             if not stripped:
                 continue
-            if lines:
-                if self.SCHEDULE_RE.search(stripped):
-                    lines.append(stripped)
-                    continue
-                if (
-                    self.SUSPENSION_RE.search(stripped)
-                    or self.SUSPENSION_DATE_RE.search(stripped)
-                    or self.START_DATE_RE.search(stripped)
-                ):
-                    lines[-1] = f"{lines[-1]} {stripped}"
-                    continue
-            lines.append(stripped)
+            if not lines:
+                lines.append(stripped)
+                continue
+
+            has_schedule = bool(self.SCHEDULE_RE.search(stripped))
+            has_metadata = bool(
+                self.SUSPENSION_RE.search(stripped)
+                or self.SUSPENSION_DATE_RE.search(stripped)
+                or self.START_DATE_RE.search(stripped)
+            )
+
+            if has_schedule:
+                lines.append(stripped)
+            elif has_metadata:
+                lines[-1] = f"{lines[-1]} {stripped}"
+            else:
+                lines.append(stripped)
         return "\n".join(lines)
 
     # -------------------------------------------------------------------------
@@ -696,17 +697,17 @@ class DrugsParser:
         cleaned = self.clean_text(text)
         if not cleaned:
             return PatientDrugs(entries=[])
-        await self._ensure_client()
+        await self.ensure_client()
         if self.client is None:
             raise RuntimeError("LLM client is not initialized for drug extraction")
         try:
-            structured = await self._llm_extract_drugs(cleaned)
+            structured = await self.llm_extract_drugs(cleaned)
         except Exception as exc:  # pragma: no cover - passthrough for visibility
             raise RuntimeError("Failed to extract drugs via LLM") from exc
 
         return PatientDrugs(entries=list(structured.entries))
 
-    async def _llm_extract_drugs(self, text: str) -> PatientDrugs:
+    async def llm_extract_drugs(self, text: str) -> PatientDrugs:
         if self.client is None:
             raise RuntimeError("LLM client is not initialized for drug extraction")
 
@@ -738,22 +739,22 @@ class DrugsParser:
 
         return PatientDrugs(entries=entries)
 
-    def _parse_line(self, line: str) -> DrugEntry | None:
+    def parse_line(self, line: str) -> DrugEntry | None:
         schedule_match = self.SCHEDULE_RE.search(line)
         if not schedule_match:
             return None
         schedule_text = schedule_match.group("schedule")
-        schedule_values = self._parse_schedule(schedule_text)
+        schedule_values = self.parse_schedule(schedule_text)
         before = line[: schedule_match.start()].strip(" ,;:\t")
         tail = line[schedule_match.end() :].strip()
         bracket_match = self.BRACKET_TRAIL_RE.search(before)
         if bracket_match:
             before = before[: bracket_match.start()].strip()
-        name, dosage, administration_mode = self._split_heading(before)
+        name, dosage, administration_mode = self.split_heading(before)
         if not name:
             name = before or line.strip()
-        suspension_status, suspension_date = self._detect_suspension(line, tail)
-        start_status, start_date = self._detect_start(line, tail)
+        suspension_status, suspension_date = self.detect_suspension(line, tail)
+        start_status, start_date = self.detect_start(line, tail)
         return DrugEntry(
             name=name,
             dosage=dosage,
@@ -766,7 +767,7 @@ class DrugsParser:
         )
 
     # -------------------------------------------------------------------------
-    def _parse_schedule(self, text: str) -> list[float]:
+    def parse_schedule(self, text: str) -> list[float]:
         slots: list[float] = []
         for token in re.split(r"[-\s]+", text):
             normalized = token.strip()
@@ -781,14 +782,12 @@ class DrugsParser:
                 slots.append(int(value))
             else:
                 slots.append(value)
-        if len(slots) == 4:
-            return slots
-        if len(slots) > 4:
+        if len(slots) >= 4:
             return slots[:4]
         return []
 
     # -------------------------------------------------------------------------
-    def _split_heading(self, text: str) -> tuple[str | None, str | None, str | None]:
+    def split_heading(self, text: str) -> tuple[str | None, str | None, str | None]:
         if not text:
             return None, None, None
         tokens = text.split()
@@ -796,7 +795,7 @@ class DrugsParser:
             return None, None, None
         first_numeric = None
         for idx, token in enumerate(tokens):
-            if self._token_has_numeric(token):
+            if self.token_has_numeric(token):
                 first_numeric = idx
                 break
         if first_numeric is None:
@@ -804,20 +803,20 @@ class DrugsParser:
         name_tokens = tokens[:first_numeric]
         remainder = tokens[first_numeric:]
         mode_tokens: list[str] = []
-        self._extract_mode_from_prefix(name_tokens, mode_tokens)
+        self.extract_mode_from_prefix(name_tokens, mode_tokens)
         dosage_tokens: list[str] = []
         for token in remainder:
-            normalized = self._normalize_token(token)
+            normalized = self.normalize_token(token)
             if normalized in FORM_TOKENS:
                 mode_tokens.append(token)
                 continue
             if mode_tokens and (
-                normalized in FORM_DESCRIPTORS or not self._token_has_numeric(token)
+                normalized in FORM_DESCRIPTORS or not self.token_has_numeric(token)
             ):
                 mode_tokens.append(token)
                 continue
             if (
-                self._token_has_numeric(token)
+                self.token_has_numeric(token)
                 or normalized in UNIT_TOKENS
                 or "/" in token
             ):
@@ -835,11 +834,11 @@ class DrugsParser:
         return name, dosage, administration_mode
 
     # -------------------------------------------------------------------------
-    def _extract_mode_from_prefix(
+    def extract_mode_from_prefix(
         self, name_tokens: list[str], mode_tokens: list[str]
     ) -> None:
         while name_tokens:
-            normalized = self._normalize_token(name_tokens[-1])
+            normalized = self.normalize_token(name_tokens[-1])
             if normalized in FORM_TOKENS:
                 mode_tokens.insert(0, name_tokens.pop())
                 continue
@@ -849,15 +848,15 @@ class DrugsParser:
             break
 
     # -------------------------------------------------------------------------
-    def _token_has_numeric(self, token: str) -> bool:
+    def token_has_numeric(self, token: str) -> bool:
         return any(ch.isdigit() for ch in token)
 
     # -------------------------------------------------------------------------
-    def _normalize_token(self, token: str) -> str:
+    def normalize_token(self, token: str) -> str:
         return re.sub(r"[.,;:]+$", "", token.lower())
 
     # -------------------------------------------------------------------------
-    def _detect_suspension(
+    def detect_suspension(
         self, full_line: str, tail: str
     ) -> tuple[bool | None, str | None]:
         status = True if self.SUSPENSION_RE.search(full_line) else None
@@ -865,12 +864,12 @@ class DrugsParser:
             tail
         ) or self.SUSPENSION_DATE_RE.search(full_line)
         date_value = (
-            self._normalize_date_token(date_match.group("date")) if date_match else None
+            self.normalize_date_token(date_match.group("date")) if date_match else None
         )
         return status, date_value
 
     # -------------------------------------------------------------------------
-    def _detect_start(
+    def detect_start(
         self, full_line: str, tail: str
     ) -> tuple[bool | None, str | None]:
         for segment in (tail, full_line):
@@ -883,12 +882,12 @@ class DrugsParser:
                     if "sospes" in context:
                         continue
                 date_token = match.group("date")
-                normalized = self._normalize_date_token(date_token)
+                normalized = self.normalize_date_token(date_token)
                 return True, normalized
         return None, None
 
     # -------------------------------------------------------------------------
-    def _normalize_date_token(self, token: str | None) -> str | None:
+    def normalize_date_token(self, token: str | None) -> str | None:
         if not token:
             return None
         stripped = token.strip(" .,:;")
