@@ -173,8 +173,8 @@ def create_interface() -> gr.Blocks:
                     clear_button = gr.Button("Clear all")
                 with gr.Accordion("Analysis Config", open=False):
                     with gr.Column():
-                        pre_extract_diseases = gr.Checkbox(
-                            label="Pre-extract diseases from anamnesis",
+                        enhance_clinical_text = gr.Checkbox(
+                            label="Enable clinical text enhancement",
                             value=True,
                         )
                         process_from_files = gr.Checkbox(
@@ -315,7 +315,7 @@ def create_interface() -> gr.Blocks:
                 alp_max,
                 symptoms,
                 process_from_files,
-                pre_extract_diseases,
+                enhance_clinical_text,
             ],
             outputs=output,
             api_name="run_agent",
@@ -342,7 +342,7 @@ def create_interface() -> gr.Blocks:
                 alp,
                 alp_max,
                 symptoms,
-                pre_extract_diseases,
+                enhance_clinical_text,
                 process_from_files,
                 has_diseases,
                 output,
