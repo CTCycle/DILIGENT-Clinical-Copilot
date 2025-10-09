@@ -27,7 +27,7 @@ class FakeLLMClient:
         _ = (model, system_prompt, temperature, use_json_mode, max_repair_attempts)
         entries = []
         for line in user_prompt.split("\n"):
-            parsed = self.parser._parse_line(line)  # noqa: SLF001
+            parsed = self.parser.parse_line(line)
             if parsed is not None:
                 entries.append(parsed)
         return schema(entries=entries)
