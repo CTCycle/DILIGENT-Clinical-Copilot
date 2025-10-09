@@ -22,9 +22,8 @@ from DILIGENT.app.api.schemas.clinical import (
     PatientDrugs,
 )
 from DILIGENT.app.configurations import ClientRuntimeConfig
-from DILIGENT.app.constants import DEFAULT_LLM_TIMEOUT_SECONDS
+from DILIGENT.app.constants import DEFAULT_LLM_TIMEOUT_SECONDS, MAX_EXCERPT_LENGTH
 from DILIGENT.app.logger import logger
-from DILIGENT.app.utils.patterns import LIVERTOX_FOOTER_RE, LIVERTOX_HEADER_RE
 from DILIGENT.app.utils.serializer import DataSerializer
 from DILIGENT.app.utils.services.essay import LiverToxMatch, LiverToxMatcher
 
@@ -85,8 +84,9 @@ class HepatotoxicityPatternAnalyzer:
 
 ###############################################################################
 class HepatoxConsultation:
-    MAX_EXCERPT_LENGTH = 4000
-    # -------------------------------------------------------------------------
+
+    
+    
     def __init__(
         self, drugs: PatientDrugs, *, timeout_s: float = DEFAULT_LLM_TIMEOUT_SECONDS
     ) -> None:
@@ -95,8 +95,9 @@ class HepatoxConsultation:
         self.serializer = DataSerializer()
         self.livertox_df = None
         self.master_list_df = None
-        self.matcher: LiverToxMatcher | None = None
+        self.matcher: LiverToxMatcher | None = None        
         self.llm_client = initialize_llm_client(purpose="agent", timeout_s=timeout_s)
+        self.MAX_EXCERPT_LENGTH = MAX_EXCERPT_LENGTH
         _provider, model_candidate = ClientRuntimeConfig.resolve_provider_and_model(
             "agent"
         )
