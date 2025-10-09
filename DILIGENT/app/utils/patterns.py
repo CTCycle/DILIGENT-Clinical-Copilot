@@ -73,6 +73,23 @@ CUTOFF_IN_PAREN_RE = re.compile(
 
 
 # -----------------------------------------------------------------------------
+# LiverTox excerpt sanitation patterns
+# -----------------------------------------------------------------------------
+LIVERTOX_HEADER_RE = re.compile(
+    r"^\s*livertox\s+LiverTox[:\s-]+Clinical and Research Information on Drug-Induced"
+    r" Liver Injury\s+\d{4}\s+National Institute of Diabetes and Digestive and Kidney"
+    r" Diseases\s+Bethesda\s*\(MD\)\s+books-source-type\.??\s*",
+    re.IGNORECASE,
+)
+
+LIVERTOX_FOOTER_RE = re.compile(
+    r"OTHER REFERENCE LINKS\s+Recent References on\s+.+?:\s+from\s+PubMed\.gov\s+"
+    r"Trials on\s+.+?:\s+from\s+ClinicalTrials\.gov\.?\s*$",
+    re.IGNORECASE,
+)
+
+
+# -----------------------------------------------------------------------------
 # Drugs names and info parsing patterns
 # -----------------------------------------------------------------------------
 FORM_TOKENS = {
@@ -152,4 +169,6 @@ __all__ = [
     "TITER_RE",
     "NUMERIC_RE",
     "CUTOFF_IN_PAREN_RE",
+    "LIVERTOX_HEADER_RE",
+    "LIVERTOX_FOOTER_RE",
 ]
