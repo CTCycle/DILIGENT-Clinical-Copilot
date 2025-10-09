@@ -84,7 +84,7 @@ class HepatotoxicityPatternAnalyzer:
 
 
 ###############################################################################
-class LiverToxConsultation:
+class HepatoxConsultation:
     MAX_EXCERPT_LENGTH = 4000
     # -------------------------------------------------------------------------
     def __init__(
