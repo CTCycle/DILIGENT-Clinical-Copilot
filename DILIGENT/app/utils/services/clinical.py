@@ -329,31 +329,12 @@ class HepatoxConsultation:
         start_interval_days: int | None = None
         if start_reported and start_date is not None and visit_date is not None:
             start_interval_days = (visit_date - start_date).days
-        if start_reported:
-            if start_date is None:
-                start_note = (
-                    "Therapy start was reported but no reliable date could be parsed."
-                )
-            elif visit_date is None:
-                start_note = (
-                    f"Therapy started on {start_date.isoformat()}, but the visit date was unavailable for latency comparisons."
-                )
-            elif start_interval_days is not None and start_interval_days < 0:
-                start_note = (
-                    f"Therapy was documented to start on {start_date.isoformat()}, {abs(start_interval_days)} days after the visit; verify this discrepancy manually."
-                )
-            elif start_interval_days == 0:
-                start_note = (
-                    f"Therapy started on {start_date.isoformat()}, coinciding with the clinical visit."
-                )
-            else:
-                start_note = (
-                    f"Therapy started on {start_date.isoformat()}, approximately {start_interval_days} days before the visit."
-                )
-        else:
-            start_note = (
-                "Therapy start date was not documented; treat the exposure window as chronic unless clarified elsewhere."
-            )
+        start_note = self._format_start_note(
+            start_reported=start_reported,
+            start_date=start_date,
+            start_interval_days=start_interval_days,
+            visit_date=visit_date,
+        )
 
         suspended = bool(entry.suspension_status)
         parsed_date = self._parse_suspension_date(entry.suspension_date, visit_date)
@@ -462,6 +443,59 @@ class HepatoxConsultation:
         return self._parse_timeline_date(raw_date, visit_date)
 
     # -------------------------------------------------------------------------
+    def _format_start_note(
+        self,
+        *,
+        start_reported: bool,
+        start_date: date | None,
+        start_interval_days: int | None,
+        visit_date: date | None,
+    ) -> str:
+        if not start_reported:
+            return (
+                "Therapy start was not documented; assume chronic exposure unless another source clarifies the onset."
+            )
+        if start_date is None:
+            return (
+                "Therapy start was reported but no reliable date could be parsed from the notes."
+            )
+        if visit_date is None or start_interval_days is None:
+            return (
+                f"Therapy started on {start_date.isoformat()}, but the visit date was unavailable for latency comparisons."
+            )
+        if start_interval_days < 0:
+            humanized = self._humanize_interval(abs(start_interval_days))
+            return (
+                f"Therapy was documented to start on {start_date.isoformat()}, {humanized} after the visit; verify this discrepancy manually."
+            )
+        if start_interval_days == 0:
+            return (
+                f"Therapy started on {start_date.isoformat()}, coinciding with the clinical visit."
+            )
+        humanized = self._humanize_interval(start_interval_days)
+        return (
+            f"Therapy started on {start_date.isoformat()}, roughly {humanized} before the visit."
+        )
+
+    # -------------------------------------------------------------------------
+    def _humanize_interval(self, days: int) -> str:
+        if days <= 1:
+            return "1 day"
+        if days < 14:
+            return f"{days} days"
+        weeks = days / 7
+        if days < 60:
+            rounded_weeks = round(weeks, 1)
+            return f"{rounded_weeks:g} weeks"
+        months = days / 30.4375
+        if days < 365:
+            rounded_months = round(months, 1)
+            return f"{rounded_months:g} months"
+        years = days / 365.25
+        rounded_years = round(years, 1)
+        return f"{rounded_years:g} years"
+
+    # -------------------------------------------------------------------------
     @staticmethod
     def _try_parse_date(value: str) -> date | None:
         cleaned = value.strip()
@@ -482,17 +516,6 @@ class HepatoxConsultation:
     # -------------------------------------------------------------------------
     def _format_suspension_prompt(self, suspension: DrugSuspensionContext) -> str:
         segments: list[str] = []
-        if suspension.start_note:
-            segments.append(suspension.start_note)
-        elif suspension.start_reported:
-            segments.append(
-                "Therapy start was reported, but no reliable date was available."
-            )
-        else:
-            segments.append(
-                "No therapy start information was detected; assume chronic exposure unless contradicted."
-            )
-
         if not suspension.suspended:
             segments.append("Active therapy; no suspension reported.")
         elif suspension.suspension_date is None:
@@ -518,6 +541,16 @@ class HepatoxConsultation:
             )
 
         return " ".join(segment for segment in segments if segment)
+
+    # -------------------------------------------------------------------------
+    def _format_start_prompt(self, suspension: DrugSuspensionContext) -> str:
+        if suspension.start_note:
+            return suspension.start_note
+        if suspension.start_reported:
+            return "Therapy start was reported, but no reliable date was available."
+        return (
+            "No therapy start information was detected; treat the exposure window as chronic unless contradicted."
+        )
 
     # -------------------------------------------------------------------------
     def _format_pattern_prompt(
@@ -559,6 +592,7 @@ class HepatoxConsultation:
         suspension: DrugSuspensionContext,
         pattern_summary: str,
     ) -> str:
+        start_details = self._format_start_prompt(suspension)
         suspension_details = self._format_suspension_prompt(suspension)
         user_prompt = LIVERTOX_CLINICAL_USER_PROMPT.format(
             drug_name=self._escape_braces(drug_name.strip() or drug_name),
@@ -567,6 +601,7 @@ class HepatoxConsultation:
             diseases=self._escape_braces(diseases),
             hepatic_diseases=self._escape_braces(hepatic_diseases),
             disease_guidance=self._escape_braces(disease_guidance),
+            therapy_start_details=self._escape_braces(start_details),
             suspension_details=self._escape_braces(suspension_details),
             pattern_summary=self._escape_braces(pattern_summary),
         )
