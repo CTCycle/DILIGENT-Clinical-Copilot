@@ -5,7 +5,7 @@ REPO_ROOT = os.path.abspath(os.path.join(os.path.dirname(__file__), ".."))
 if REPO_ROOT not in sys.path:
     sys.path.insert(0, REPO_ROOT)
 
-from DILIGENT.app.api.schemas.clinical import PatientDrugs
+from DILIGENT.app.api.schemas.clinical import DrugEntry, PatientDrugs
 from DILIGENT.app.utils.services.parser import DrugsParser
 
 
@@ -72,3 +72,23 @@ def test_suspension_does_not_trigger_start_detection():
     assert entry.suspension_date == "2023-03-03"
     assert entry.therapy_start_status is None
     assert entry.therapy_start_date is None
+
+
+def test_drug_entry_drops_partial_daytime_schedule():
+    entry = DrugEntry(
+        name="Test",
+        dosage=None,
+        administration_mode=None,
+        daytime_administration=[1.0],
+    )
+    assert entry.daytime_administration == []
+
+
+def test_drug_entry_trims_long_daytime_schedule():
+    entry = DrugEntry(
+        name="Test",
+        dosage=None,
+        administration_mode=None,
+        daytime_administration=[1.0, 0.0, 2.0, 1.0, 3.0],
+    )
+    assert entry.daytime_administration == [1.0, 0.0, 2.0, 1.0]
