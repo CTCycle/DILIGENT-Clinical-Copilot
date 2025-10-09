@@ -4,6 +4,10 @@ import asyncio
 import inspect
 from typing import Any
 
+from DILIGENT.app.api.models.prompts import (
+    CLINICAL_ENHANCER_SYSTEM_PROMPT,
+    CLINICAL_ENHANCER_USER_PROMPT,
+)
 from DILIGENT.app.api.models.providers import initialize_llm_client
 from DILIGENT.app.api.schemas.clinical import PatientData
 from DILIGENT.app.configurations import ClientRuntimeConfig
@@ -123,30 +127,13 @@ class ClinicalTextEnhancer:
         self, *, section_name: str, text: str, instruction: str
     ) -> str:
         messages = [
-            {
-                "role": "system",
-                "content": (
-                    "You are an assistant that improves clinical documentation without "
-                    "changing its factual content. Follow these rules strictly:\n"
-                    "- Keep the original meaning and details.\n"
-                    "- Maintain the existing multiline structure; preserve blank lines "
-                    "and bulleting.\n"
-                    "- Fix spelling, spacing, and punctuation issues.\n"
-                    "- Convert Italian or mixed-language phrases to clear English "
-                    "equivalents.\n"
-                    "- Never add, remove, or infer information beyond minor formatting "
-                    "adjustments."
-                ),
-            },
+            {"role": "system", "content": CLINICAL_ENHANCER_SYSTEM_PROMPT},
             {
                 "role": "user",
-                "content": (
-                    f"Section: {section_name}\n"
-                    f"Task: {instruction}\n\n"
-                    "Rewrite the text below, returning only the improved section:\n"
-                    """```\n"""
-                    f"{text}\n"
-                    "```"
+                "content": CLINICAL_ENHANCER_USER_PROMPT.format(
+                    section_name=section_name,
+                    instruction=instruction,
+                    text=text,
                 ),
             },
         ]

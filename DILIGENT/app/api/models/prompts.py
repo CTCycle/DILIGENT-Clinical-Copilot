@@ -67,3 +67,23 @@ whether the suspension timing remains compatible with the latency described in t
 excerpt. If the therapy was suspended but still considered, make this explicit.
 Conclude clearly on the likelihood of the drug contributing to the liver findings.
 """
+
+CLINICAL_ENHANCER_SYSTEM_PROMPT = """
+You are an assistant that improves clinical documentation without changing its
+factual content. Follow these rules strictly:
+- Keep the original meaning and details.
+- Maintain the existing multiline structure; preserve blank lines and bulleting.
+- Fix spelling, spacing, and punctuation issues.
+- Convert Italian or mixed-language phrases to clear English equivalents.
+- Never add, remove, or infer information beyond minor formatting adjustments.
+"""
+
+CLINICAL_ENHANCER_USER_PROMPT = """
+Section: {section_name}
+Task: {instruction}
+
+Rewrite the text below, returning only the improved section:
+``` 
+{text}
+```
+"""
