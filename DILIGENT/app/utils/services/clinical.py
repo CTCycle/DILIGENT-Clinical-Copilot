@@ -322,49 +322,101 @@ class HepatoxConsultation:
     def _evaluate_suspension(
         self, entry: DrugEntry, visit_date: date | None
     ) -> DrugSuspensionContext:
+        start_reported = bool(entry.therapy_start_status) or bool(
+            entry.therapy_start_date
+        )
+        start_date = self._parse_start_date(entry.therapy_start_date, visit_date)
+        start_interval_days: int | None = None
+        if start_reported and start_date is not None and visit_date is not None:
+            start_interval_days = (visit_date - start_date).days
+        if start_reported:
+            if start_date is None:
+                start_note = (
+                    "Therapy start was reported but no reliable date could be parsed."
+                )
+            elif visit_date is None:
+                start_note = (
+                    f"Therapy started on {start_date.isoformat()}, but the visit date was unavailable for latency comparisons."
+                )
+            elif start_interval_days is not None and start_interval_days < 0:
+                start_note = (
+                    f"Therapy was documented to start on {start_date.isoformat()}, {abs(start_interval_days)} days after the visit; verify this discrepancy manually."
+                )
+            elif start_interval_days == 0:
+                start_note = (
+                    f"Therapy started on {start_date.isoformat()}, coinciding with the clinical visit."
+                )
+            else:
+                start_note = (
+                    f"Therapy started on {start_date.isoformat()}, approximately {start_interval_days} days before the visit."
+                )
+        else:
+            start_note = (
+                "Therapy start date was not documented; treat the exposure window as chronic unless clarified elsewhere."
+            )
+
         suspended = bool(entry.suspension_status)
         parsed_date = self._parse_suspension_date(entry.suspension_date, visit_date)
-        note: str | None = None
         interval_days: int | None = None
         if not suspended:
+            combined_note = " ".join(
+                part
+                for part in (
+                    start_note,
+                    "Active therapy; no suspension reported.",
+                )
+                if part
+            )
             return DrugSuspensionContext(
                 suspended=False,
                 suspension_date=None,
                 excluded=False,
-                note=None,
+                note=combined_note or None,
                 interval_days=None,
+                start_reported=start_reported,
+                start_date=start_date,
+                start_interval_days=start_interval_days,
+                start_note=start_note,
             )
+
         if parsed_date is None:
-            note = "Suspension reported without a reliable date; drug kept in analysis."
+            suspension_note = (
+                "Suspension reported without a reliable date; drug kept in analysis."
+            )
         elif visit_date is None:
-            note = (
+            suspension_note = (
                 f"Suspended on {parsed_date.isoformat()}, but visit date missing; drug kept in analysis."
             )
         else:
-            delta = (visit_date - parsed_date).days
-            interval_days = delta
-            if delta < 0:
-                note = (
-                    f"Suspended on {parsed_date.isoformat()} ({-delta} days after the visit); treat as ongoing exposure."
+            interval_days = (visit_date - parsed_date).days
+            if interval_days < 0:
+                suspension_note = (
+                    f"Suspended on {parsed_date.isoformat()} ({abs(interval_days)} days after the visit); treat as ongoing exposure."
                 )
-            elif delta == 0:
-                note = (
+            elif interval_days == 0:
+                suspension_note = (
                     f"Suspended on {parsed_date.isoformat()} (same day as the visit); residual exposure is expected."
                 )
             else:
-                note = (
-                    f"Suspended on {parsed_date.isoformat()} ({delta} days before the visit); compare this latency with LiverTox guidance."
+                suspension_note = (
+                    f"Suspended on {parsed_date.isoformat()} ({interval_days} days before the visit); compare this latency with LiverTox guidance."
                 )
+
+        combined_note = " ".join(part for part in (start_note, suspension_note) if part)
         return DrugSuspensionContext(
             suspended=suspended,
             suspension_date=parsed_date,
             excluded=False,
-            note=note,
+            note=combined_note or None,
             interval_days=interval_days,
+            start_reported=start_reported,
+            start_date=start_date,
+            start_interval_days=start_interval_days,
+            start_note=start_note,
         )
 
     # -------------------------------------------------------------------------
-    def _parse_suspension_date(
+    def _parse_timeline_date(
         self, raw_date: str | None, visit_date: date | None
     ) -> date | None:
         if raw_date is None:
@@ -398,6 +450,18 @@ class HepatoxConsultation:
         return None
 
     # -------------------------------------------------------------------------
+    def _parse_suspension_date(
+        self, raw_date: str | None, visit_date: date | None
+    ) -> date | None:
+        return self._parse_timeline_date(raw_date, visit_date)
+
+    # -------------------------------------------------------------------------
+    def _parse_start_date(
+        self, raw_date: str | None, visit_date: date | None
+    ) -> date | None:
+        return self._parse_timeline_date(raw_date, visit_date)
+
+    # -------------------------------------------------------------------------
     @staticmethod
     def _try_parse_date(value: str) -> date | None:
         cleaned = value.strip()
@@ -417,29 +481,43 @@ class HepatoxConsultation:
 
     # -------------------------------------------------------------------------
     def _format_suspension_prompt(self, suspension: DrugSuspensionContext) -> str:
+        segments: list[str] = []
+        if suspension.start_note:
+            segments.append(suspension.start_note)
+        elif suspension.start_reported:
+            segments.append(
+                "Therapy start was reported, but no reliable date was available."
+            )
+        else:
+            segments.append(
+                "No therapy start information was detected; assume chronic exposure unless contradicted."
+            )
+
         if not suspension.suspended:
-            return "Active therapy; no suspension reported."
-        if suspension.suspension_date is None:
-            return (
+            segments.append("Active therapy; no suspension reported.")
+        elif suspension.suspension_date is None:
+            segments.append(
                 "Reported as suspended without a reliable date; evaluate latency with the LiverTox excerpt."
             )
-        base = f"Suspended on {suspension.suspension_date.isoformat()}."
-        if suspension.interval_days is None:
-            return (
-                f"{base} The interval relative to the visit is unclear; rely on LiverTox latency guidance."
+        elif suspension.interval_days is None:
+            segments.append(
+                f"Suspended on {suspension.suspension_date.isoformat()}, but the interval relative to the visit is unclear; rely on LiverTox latency guidance."
             )
-        if suspension.interval_days < 0:
+        elif suspension.interval_days < 0:
             days = abs(suspension.interval_days)
-            return (
-                f"{base} This was {days} days after the visit, so exposure likely persisted at presentation."
+            segments.append(
+                f"Suspended on {suspension.suspension_date.isoformat()} ({days} days after the visit); treat as ongoing exposure."
             )
-        if suspension.interval_days == 0:
-            return (
-                f"{base} The visit occurred the same day, so residual exposure is expected."
+        elif suspension.interval_days == 0:
+            segments.append(
+                f"Suspended on {suspension.suspension_date.isoformat()} (same day as the visit); residual exposure is expected."
             )
-        return (
-            f"{base} Approximately {suspension.interval_days} days elapsed before the visit; decide compatibility using LiverTox latency data."
-        )
+        else:
+            segments.append(
+                f"Suspended on {suspension.suspension_date.isoformat()} ({suspension.interval_days} days before the visit); compare with LiverTox latency guidance."
+            )
+
+        return " ".join(segment for segment in segments if segment)
 
     # -------------------------------------------------------------------------
     def _format_pattern_prompt(

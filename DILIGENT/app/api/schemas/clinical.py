@@ -326,6 +326,15 @@ class DrugEntry(BaseModel):
     suspension_date: str | None = Field(
         None, description="Suspension date in the original format, if captured."
     )
+    therapy_start_status: bool | None = Field(
+        None,
+        description=(
+            "True if the therapy start was explicitly mentioned, False if reported as not started."
+        ),
+    )
+    therapy_start_date: str | None = Field(
+        None, description="Therapy start date in the original format, if captured."
+    )
 
     @field_validator("daytime_administration")
     @classmethod
@@ -470,6 +479,24 @@ class DrugSuspensionContext(BaseModel):
         description=(
             "Difference in days between the clinical visit and suspension date (visit - suspension)."
         ),
+    )
+    start_reported: bool = Field(
+        False,
+        description="Indicates whether a therapy start event was detected during parsing.",
+    )
+    start_date: date | None = Field(
+        default=None,
+        description="Therapy start date parsed from the clinical notes, if available.",
+    )
+    start_interval_days: int | None = Field(
+        default=None,
+        description=(
+            "Difference in days between the clinical visit and therapy start (visit - start)."
+        ),
+    )
+    start_note: str | None = Field(
+        default=None,
+        description="Human-readable summary of the therapy start timing.",
     )
 
 

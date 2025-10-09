@@ -56,19 +56,41 @@ async def process_single_patient(payload: PatientData) -> dict[str, Any]:
     elapsed = time.perf_counter() - start_time
     logger.info("Drugs extraction required %.4f seconds", elapsed)
     logger.info("Detected %s drugs", len(drug_data.entries))
-    
-    # 3. Extract diseases from anamnesis for contextual analysis
-    start_time = time.perf_counter()
-    diseases = await diseases_parser.extract_diseases(payload.anamnesis or "")
-    elapsed = time.perf_counter() - start_time
-    logger.info("Disease extraction required %.4f seconds", elapsed)
-    logger.info("Detected %s diseases for this patient", len(diseases["diseases"]))
-    logger.info(
-        "Subset of hepatic diseases includes %s entries",
-        len(diseases["hepatic_diseases"]),
-    )
 
-    # 4. Consult LiverTox database for hepatotoxicity info
+    # 3. Summarize therapy timeline information from parsed drugs
+    start_time = time.perf_counter()
+    start_info_count = sum(
+        1
+        for entry in drug_data.entries
+        if entry.therapy_start_status or entry.therapy_start_date
+    )
+    elapsed = time.perf_counter() - start_time
+    logger.info("Therapy window processing required %.4f seconds", elapsed)
+    if start_info_count:
+        logger.info(
+            "Therapy start information detected for %s drugs",
+            start_info_count,
+        )
+    else:
+        logger.info("No therapy start information detected for the parsed drugs")
+
+    # 4. Optionally extract diseases from anamnesis for contextual analysis
+    diseases_pre_extracted = bool(payload.pre_extract_diseases)
+    if diseases_pre_extracted:
+        start_time = time.perf_counter()
+        diseases = await diseases_parser.extract_diseases(payload.anamnesis or "")
+        elapsed = time.perf_counter() - start_time
+        logger.info("Disease extraction required %.4f seconds", elapsed)
+        logger.info("Detected %s diseases for this patient", len(diseases["diseases"]))
+        logger.info(
+            "Subset of hepatic diseases includes %s entries",
+            len(diseases["hepatic_diseases"]),
+        )
+    else:
+        diseases = {"diseases": [], "hepatic_diseases": []}
+        logger.info("Disease extraction skipped based on request")
+
+    # 5. Consult LiverTox database for hepatotoxicity info
     start_time = time.perf_counter()
     doctor = HepatoxConsultation(drug_data)
     drug_assessment = await doctor.run_analysis(
