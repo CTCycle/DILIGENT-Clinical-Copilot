@@ -339,9 +339,14 @@ class DrugEntry(BaseModel):
     @field_validator("daytime_administration")
     @classmethod
     def _validate_schedule(cls, value: list[float]) -> list[float]:
-        if value and len(value) != 4:
-            raise ValueError("daytime_administration must contain exactly four values.")
-        return value
+        if not value:
+            return []
+
+        cleaned = [float(slot) for slot in value if slot is not None]
+        if len(cleaned) >= 4:
+            return cleaned[:4]
+
+        return []
 
 
 # -----------------------------------------------------------------------------

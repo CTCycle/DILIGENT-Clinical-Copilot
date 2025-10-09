@@ -123,4 +123,6 @@ LLM_NULL_MATCH_NAMES = {
 # [CLINICAL ANALYSIS]
 ###############################################################################
 DRUG_SUSPENSION_EXCLUSION_DAYS = 14
+ALT_LABELS = {"ALT", "ALAT"}
+ALP_LABELS = {"ALP"}
 
