@@ -71,9 +71,9 @@ class PatientData(BaseModel):
         default=False,
         description="Indicates whether the patient has a history of hepatic diseases.",
     )
-    pre_extract_diseases: bool = Field(
+    enhance_clinical_text: bool = Field(
         default=True,
-        description="Whether to extract diseases from anamnesis before running the agent.",
+        description="Whether to run clinical text enhancement before the agent executes.",
     )
 
     @field_validator("name", mode="before")
@@ -236,35 +236,6 @@ class PatientOutputReport(BaseModel):
         if v is None:
             return v
         return str(v).strip()
-
-
-###############################################################################
-class PatientDiseases(BaseModel):
-    diseases: list[str] = Field(default_factory=list)
-    hepatic_diseases: list[str] = Field(default_factory=list)
-
-    @field_validator("diseases", "hepatic_diseases")
-    def strip_and_nonempty(cls, v) -> list[str]:
-        # Clean up each string, skip empty/None
-        return [str(item).strip() for item in v if item and str(item).strip()]
-
-    @field_validator("diseases", "hepatic_diseases")
-    def must_be_unique(cls, v):
-        if len(v) != len(set(map(str.lower, v))):
-            raise ValueError("List must contain unique items (case-insensitive)")
-        return v
-
-    @model_validator(mode="after")
-    def hepatic_subset_of_diseases(self):
-        disease_set = set(s.strip().lower() for s in self.diseases)
-        hepatic_set = set(s.strip().lower() for s in self.hepatic_diseases)
-        missing = hepatic_set - disease_set
-        if missing:
-            raise ValueError(
-                f"hepatic_diseases contains items not present in diseases: {sorted(missing)}"
-            )
-
-        return self
 
 
 ###############################################################################

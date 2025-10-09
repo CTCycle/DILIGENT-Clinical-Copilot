@@ -19,13 +19,11 @@ from DILIGENT.app.utils.services.clinical import (
 )
 from DILIGENT.app.utils.services.parser import (
     BloodTestParser,
-    DiseasesParser,
     DrugsParser,
     PatientCase,
 )
  
 drugs_parser = DrugsParser()
-diseases_parser = DiseasesParser()
 pattern_analyzer = HepatotoxicityPatternAnalyzer()
 router = APIRouter(tags=["agent"])
 
@@ -57,21 +55,12 @@ async def process_single_patient(payload: PatientData) -> dict[str, Any]:
     logger.info("Drugs extraction required %.4f seconds", elapsed)
     logger.info("Detected %s drugs", len(drug_data.entries))
 
-    # 3. Optionally extract diseases from anamnesis for contextual analysis
-    should_extract_diseases = bool(payload.pre_extract_diseases)
-    if should_extract_diseases:
-        start_time = time.perf_counter()
-        diseases = await diseases_parser.extract_diseases(payload.anamnesis or "")
-        elapsed = time.perf_counter() - start_time
-        logger.info("Disease extraction required %.4f seconds", elapsed)
-        logger.info("Detected %s diseases for this patient", len(diseases["diseases"]))
-        logger.info(
-            "Subset of hepatic diseases includes %s entries",
-            len(diseases["hepatic_diseases"]),
-        )
+    # 3. Optional clinical text enhancement (no disease pre-extraction)
+    use_text_enhancement = bool(payload.enhance_clinical_text)
+    if use_text_enhancement:
+        logger.info("Clinical text enhancement requested before LLM analysis")
     else:
-        diseases = {"diseases": [], "hepatic_diseases": []}
-        logger.info("Disease extraction skipped based on request")
+        logger.info("Clinical text enhancement skipped based on request")
 
     # 4. Consult LiverTox database for hepatotoxicity info
     start_time = time.perf_counter()
@@ -79,9 +68,6 @@ async def process_single_patient(payload: PatientData) -> dict[str, Any]:
     drug_assessment = await doctor.run_analysis(
         anamnesis=payload.anamnesis,
         visit_date=payload.visit_date,
-        diseases=diseases.get("diseases", []),
-        hepatic_diseases=diseases.get("hepatic_diseases", []),
-        diseases_pre_extracted=should_extract_diseases,
         pattern_score=pattern_score,
     )
     elapsed = time.perf_counter() - start_time
@@ -118,7 +104,7 @@ async def start_single_clinical_agent(
     alp: str | None = Body(default=None),
     alp_max: str | None = Body(default=None),
     symptoms: list[str] | None = Body(default=None),
-    pre_extract_diseases: bool = Body(default=True),
+    enhance_clinical_text: bool = Body(default=True),
 ) -> dict[str, Any]:
     try:
         payload_data: dict[str, Any] = {
@@ -133,7 +119,7 @@ async def start_single_clinical_agent(
             "alp": alp,
             "alp_max": alp_max,
             "symptoms": symptoms or [],
-            "pre_extract_diseases": pre_extract_diseases,
+            "enhance_clinical_text": enhance_clinical_text,
         }
         payload = PatientData.model_validate(payload_data)
     except ValidationError as exc:

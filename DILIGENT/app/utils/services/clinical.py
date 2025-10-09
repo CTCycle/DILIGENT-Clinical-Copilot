@@ -116,9 +116,6 @@ class HepatoxConsultation:
         *,
         anamnesis: str | None = None,
         visit_date: date | None = None,
-        diseases: list[str] | None = None,
-        hepatic_diseases: list[str] | None = None,
-        diseases_pre_extracted: bool = True,
         pattern_score: HepatotoxicityPatternScore | None = None,
     ) -> dict[str, Any] | None:
         logger.info("Toxicity analysis stage 1/3: validating inputs")
@@ -143,9 +140,6 @@ class HepatoxConsultation:
             resolved,
             anamnesis=anamnesis,
             visit_date=visit_date,
-            diseases=diseases or [],
-            hepatic_diseases=hepatic_diseases or [],
-            diseases_pre_extracted=diseases_pre_extracted,
             pattern_score=pattern_score,
         )
         return report.model_dump()
@@ -192,40 +186,11 @@ class HepatoxConsultation:
         *,
         anamnesis: str | None,
         visit_date: date | None,
-        diseases: list[str],
-        hepatic_diseases: list[str],
-        diseases_pre_extracted: bool,
         pattern_score: HepatotoxicityPatternScore | None,
     ) -> PatientDrugClinicalReport:
         normalized_anamnesis = (anamnesis or "").strip()
         if not normalized_anamnesis:
             normalized_anamnesis = "No anamnesis information was provided."
-        normalized_diseases = self._normalize_list(diseases)
-        normalized_hepatic = self._normalize_list(hepatic_diseases)
-        if diseases_pre_extracted:
-            disease_summary = (
-                ", ".join(normalized_diseases)
-                if normalized_diseases
-                else "None reported"
-            )
-            hepatic_summary = (
-                ", ".join(normalized_hepatic)
-                if normalized_hepatic
-                else "None reported"
-            )
-            disease_guidance = (
-                "Use the known diseases above when reasoning about causality."
-                if normalized_diseases or normalized_hepatic
-                else (
-                    "No diseases were identified during preprocessing; briefly cross-check the anamnesis for any conditions."
-                )
-            )
-        else:
-            disease_summary = "Not pre-extracted"
-            hepatic_summary = "Not pre-extracted"
-            disease_guidance = (
-                "Diseases were not pre-extracted. Review the anamnesis to identify relevant systemic and hepatic diseases before concluding."
-            )
         pattern_prompt = self._format_pattern_prompt(pattern_score)
 
         entries: list[DrugClinicalAssessment] = []
@@ -272,9 +237,6 @@ class HepatoxConsultation:
                         drug_name=drug_entry.name,
                         excerpt=excerpt,
                         anamnesis=normalized_anamnesis,
-                        diseases=disease_summary,
-                        hepatic_diseases=hepatic_summary,
-                        disease_guidance=disease_guidance,
                         suspension=suspension,
                         pattern_summary=pattern_prompt,
                     ),
@@ -581,9 +543,6 @@ class HepatoxConsultation:
         drug_name: str,
         excerpt: str,
         anamnesis: str,
-        diseases: str,
-        hepatic_diseases: str,
-        disease_guidance: str,
         suspension: DrugSuspensionContext,
         pattern_summary: str,
     ) -> str:
@@ -593,9 +552,6 @@ class HepatoxConsultation:
             drug_name=self._escape_braces(drug_name.strip() or drug_name),
             excerpt=self._escape_braces(excerpt),
             anamnesis=self._escape_braces(anamnesis),
-            diseases=self._escape_braces(diseases),
-            hepatic_diseases=self._escape_braces(hepatic_diseases),
-            disease_guidance=self._escape_braces(disease_guidance),
             therapy_start_details=self._escape_braces(start_details),
             suspension_details=self._escape_braces(suspension_details),
             pattern_summary=self._escape_braces(pattern_summary),
@@ -674,15 +630,3 @@ class HepatoxConsultation:
             "Automated analysis was unavailable due to a technical issue; manual review is recommended."
         )
 
-    # -------------------------------------------------------------------------
-    def _normalize_list(self, values: list[str]) -> list[str]:
-        unique: dict[str, str] = {}
-        for value in values:
-            if not value:
-                continue
-            cleaned = str(value).strip()
-            if cleaned and cleaned.lower() not in unique:
-                unique[cleaned.lower()] = cleaned
-        return list(unique.values())
-
-  
