@@ -57,24 +57,7 @@ async def process_single_patient(payload: PatientData) -> dict[str, Any]:
     logger.info("Drugs extraction required %.4f seconds", elapsed)
     logger.info("Detected %s drugs", len(drug_data.entries))
 
-    # 3. Summarize therapy timeline information from parsed drugs
-    start_time = time.perf_counter()
-    start_info_count = sum(
-        1
-        for entry in drug_data.entries
-        if entry.therapy_start_status or entry.therapy_start_date
-    )
-    elapsed = time.perf_counter() - start_time
-    logger.info("Therapy window processing required %.4f seconds", elapsed)
-    if start_info_count:
-        logger.info(
-            "Therapy start information detected for %s drugs",
-            start_info_count,
-        )
-    else:
-        logger.info("No therapy start information detected for the parsed drugs")
-
-    # 4. Optionally extract diseases from anamnesis for contextual analysis
+    # 3. Optionally extract diseases from anamnesis for contextual analysis
     should_extract_diseases = bool(payload.pre_extract_diseases)
     if should_extract_diseases:
         start_time = time.perf_counter()
@@ -90,7 +73,7 @@ async def process_single_patient(payload: PatientData) -> dict[str, Any]:
         diseases = {"diseases": [], "hepatic_diseases": []}
         logger.info("Disease extraction skipped based on request")
 
-    # 5. Consult LiverTox database for hepatotoxicity info
+    # 4. Consult LiverTox database for hepatotoxicity info
     start_time = time.perf_counter()
     doctor = HepatoxConsultation(drug_data)
     drug_assessment = await doctor.run_analysis(
