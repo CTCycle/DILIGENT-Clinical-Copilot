@@ -114,6 +114,8 @@ def toggle_cloud_services(
     dict[str, Any],
     dict[str, Any],
     dict[str, Any],
+    dict[str, Any],
+    dict[str, Any],
 ]:
     ClientRuntimeConfig.set_use_cloud_services(enabled)
     provider = ClientRuntimeConfig.get_llm_provider()
@@ -138,6 +140,14 @@ def toggle_cloud_services(
         value=ClientRuntimeConfig.is_ollama_reasoning_enabled(),
         interactive=not enabled,
     )
+    clinical_update = gr_update(
+        value=ClientRuntimeConfig.get_clinical_model(),
+        interactive=not enabled,
+    )
+    enhancer_update = gr_update(
+        value=ClientRuntimeConfig.get_enhancer_model(),
+        interactive=not enabled,
+    )
     return (
         provider_update,
         model_update,
@@ -145,6 +155,8 @@ def toggle_cloud_services(
         button_update,
         temperature_update,
         reasoning_update,
+        clinical_update,
+        enhancer_update,
     )
 
 
@@ -174,8 +186,13 @@ def set_parsing_model(model: str) -> str:
 
 
 # -----------------------------------------------------------------------------
-def set_agent_model(model: str) -> str:
-    return ClientRuntimeConfig.set_agent_model(model)
+def set_clinical_model(model: str) -> str:
+    return ClientRuntimeConfig.set_clinical_model(model)
+
+
+# -----------------------------------------------------------------------------
+def set_enhancer_model(model: str) -> str:
+    return ClientRuntimeConfig.set_enhancer_model(model)
 
 
 # -----------------------------------------------------------------------------
@@ -189,9 +206,11 @@ def set_ollama_reasoning(enabled: bool) -> bool:
 
 
 # -----------------------------------------------------------------------------
-async def pull_selected_models(parsing_model: str, agent_model: str) -> str:
+async def pull_selected_models(
+    parsing_model: str, clinical_model: str, enhancer_model: str
+) -> str:
     models: list[str] = []
-    for name in (parsing_model, agent_model):
+    for name in (parsing_model, clinical_model, enhancer_model):
         if not name:
             continue
         normalized = name.strip()
@@ -238,13 +257,16 @@ async def start_ollama_client() -> str:
 
 
 # -----------------------------------------------------------------------------
-async def preload_selected_models(parsing_model: str, agent_model: str) -> str:
+async def preload_selected_models(
+    parsing_model: str, clinical_model: str, enhancer_model: str
+) -> str:
     if ClientRuntimeConfig.is_cloud_enabled():
         return "[INFO] Cloud provider enabled; skipping Ollama preload."
 
     parser = parsing_model.strip() if parsing_model else ""
-    agent = agent_model.strip() if agent_model else ""
-    requested = [name for name in (parser, agent) if name]
+    clinical = clinical_model.strip() if clinical_model else ""
+    enhancer = enhancer_model.strip() if enhancer_model else ""
+    requested = [name for name in (parser, clinical, enhancer) if name]
 
     if not requested:
         return "[ERROR] No models selected to preload."
@@ -253,7 +275,7 @@ async def preload_selected_models(parsing_model: str, agent_model: str) -> str:
         async with OllamaClient() as client:
             if not await client.is_server_online():
                 return "[ERROR] Ollama server is not reachable. Start the Ollama client first."
-            loaded, skipped = await client.preload_models(parser, agent)
+            loaded, skipped = await client.preload_models(parser, clinical, enhancer)
     except OllamaTimeout as exc:
         return f"[ERROR] Timed out while preloading models: {exc}"
     except OllamaError as exc:

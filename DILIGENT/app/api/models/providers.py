@@ -33,7 +33,7 @@ GEMINI_API_KEY = os.getenv("GEMINI_API_KEY")
 T = TypeVar("T", bound=BaseModel)
 
 ProviderName = Literal["openai", "azure-openai", "anthropic", "gemini"]
-RuntimePurpose = Literal["agent", "parser"]
+RuntimePurpose = Literal["clinical", "parser", "enhancer"]
 
 
 ###############################################################################
@@ -555,12 +555,13 @@ class OllamaClient:
     async def preload_models(
         self,
         parsing_model: str | None,
-        agent_model: str | None,
+        clinical_model: str | None,
+        enhancer_model: str | None = None,
         *,
         keep_alive: str = "30m",
     ) -> tuple[list[str], list[str]]:
         requested: list[str] = []
-        for name in (parsing_model, agent_model):
+        for name in (parsing_model, clinical_model, enhancer_model):
             if not name:
                 continue
             normalized = name.strip()
@@ -1385,7 +1386,7 @@ def select_llm_provider(
 
 ###############################################################################
 def initialize_llm_client(
-    *, purpose: RuntimePurpose = "agent", **kwargs: Any
+    *, purpose: RuntimePurpose = "clinical", **kwargs: Any
 ) -> OllamaClient | CloudLLMClient:
     kwargs.setdefault("timeout_s", DEFAULT_LLM_TIMEOUT_SECONDS)
     provider, default_model = ClientRuntimeConfig.resolve_provider_and_model(purpose)

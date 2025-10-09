@@ -646,7 +646,8 @@ class DrugsParser:
         metadata_buffer: list[str] = []
         prefix_buffer: list[str] = []
         for index, line in enumerate(lines):
-            has_schedule = bool(self.SCHEDULE_RE.search(line))
+            schedule_match = self.SCHEDULE_RE.search(line)
+            has_schedule = bool(schedule_match)
             has_metadata = bool(
                 self.SUSPENSION_RE.search(line)
                 or self.SUSPENSION_DATE_RE.search(line)
@@ -669,9 +670,12 @@ class DrugsParser:
                     prefix_buffer.append(line)
                     continue
 
-            if re.match(r"^\d", line) and grouped and not metadata_buffer and not prefix_buffer:
-                grouped[-1] = f"{grouped[-1]} {line}".strip()
-                continue
+            if grouped and schedule_match and not metadata_buffer and not prefix_buffer:
+                prefix = line[: schedule_match.start()]
+                prefix = self.BULLET_RE.sub("", prefix).strip(" \t,.;:-/")
+                if not prefix:
+                    grouped[-1] = f"{grouped[-1]} {line}".strip()
+                    continue
 
             combined_parts = metadata_buffer + prefix_buffer + [line]
             combined = " ".join(part for part in combined_parts if part).strip()

@@ -12,11 +12,13 @@ from DILIGENT.app.api.schemas.clinical import (
     PatientData,
 )
 from DILIGENT.app.constants import TASKS_PATH
+from DILIGENT.app.configurations import ClientRuntimeConfig
 from DILIGENT.app.logger import logger
 from DILIGENT.app.utils.services.clinical import (
     HepatotoxicityPatternAnalyzer,
     HepatoxConsultation,
 )
+from DILIGENT.app.utils.services.enhancer import ClinicalTextEnhancer
 from DILIGENT.app.utils.services.parser import (
     BloodTestParser,
     DrugsParser,
@@ -26,6 +28,8 @@ from DILIGENT.app.utils.services.parser import (
 drugs_parser = DrugsParser()
 pattern_analyzer = HepatotoxicityPatternAnalyzer()
 router = APIRouter(tags=["agent"])
+text_enhancer: ClinicalTextEnhancer | None = None
+text_enhancer_revision = -1  # refresh cached enhancer when runtime config changes
 
 # [ENPOINTS]
 ###############################################################################
@@ -39,6 +43,19 @@ async def process_single_patient(payload: PatientData) -> dict[str, Any]:
             "Clinical visit date: %s",
             payload.visit_date.strftime("%d-%m-%Y"),
         )
+
+    use_text_enhancement = bool(payload.enhance_clinical_text)
+    logger.info("Clinical text enhancement enabled: %s", use_text_enhancement)
+    if use_text_enhancement:
+        global text_enhancer, text_enhancer_revision
+        current_revision = ClientRuntimeConfig.get_revision()
+        if text_enhancer is None or text_enhancer_revision != current_revision:
+            text_enhancer = ClinicalTextEnhancer()
+            text_enhancer_revision = current_revision
+        try:
+            payload = await text_enhancer.enhance(payload)
+        except Exception as exc:  # noqa: BLE001
+            logger.warning("Text enhancement failed; continuing with raw input: %s", exc)
 
     # 1. Calculate hepatic pattern score using ALT/ALP values
     pattern_score = pattern_analyzer.analyze(payload)
@@ -55,11 +72,7 @@ async def process_single_patient(payload: PatientData) -> dict[str, Any]:
     logger.info("Drugs extraction required %.4f seconds", elapsed)
     logger.info("Detected %s drugs", len(drug_data.entries))
 
-    # 3. Optional clinical text enhancement (no disease pre-extraction)
-    use_text_enhancement = bool(payload.enhance_clinical_text)
-    logger.info(f"Clinical text enhancement: {use_text_enhancement} before LLM analysis")
-   
-    # 4. Consult LiverTox database for hepatotoxicity info
+    # 3. Consult LiverTox database for hepatotoxicity info
     start_time = time.perf_counter()
     doctor = HepatoxConsultation(drug_data)
     drug_assessment = await doctor.run_analysis(
