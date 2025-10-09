@@ -22,6 +22,20 @@ DRUG_SUSPENSION_DATE_RE = re.compile(
     r"\bsospes[oa](?:\s+(?:dal|dall'))?\s*(?P<date>\d{1,2}[./]\d{1,2}(?:[./]\d{2,4})?)",
     re.IGNORECASE,
 )
+DRUG_START_DATE_RE = re.compile(
+    r"""
+    (?P<prefix>
+        \b(?:iniz(?:io|iat[oaie])|avviat[oaie]|ripres[oaie]|riprend[ei]re|
+        assunzion[ei]|in\s+terapia|in\s+trattamento|terapia|trattamento)
+        (?:\s+(?:dal|da|dall['’]|il))?
+        |
+        \b(?:dal|da|dall['’]|il)\b
+    )
+    \s*
+    (?P<date>\d{1,2}[./]\d{1,2}(?:[./]\d{2,4})?)
+    """,
+    re.IGNORECASE | re.VERBOSE,
+)
 
 # -----------------------------------------------------------------------------
 # Blood test and date parsing patterns
@@ -164,6 +178,7 @@ __all__ = [
     "DRUG_BRACKET_TRAIL_RE",
     "DRUG_SUSPENSION_RE",
     "DRUG_SUSPENSION_DATE_RE",
+    "DRUG_START_DATE_RE",
     "ITALIAN_MONTHS",
     "DATE_PATS",
     "TITER_RE",

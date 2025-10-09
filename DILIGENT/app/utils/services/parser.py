@@ -27,6 +27,7 @@ from DILIGENT.app.utils.patterns import (
     DRUG_BRACKET_TRAIL_RE,
     DRUG_BULLET_RE,
     DRUG_SCHEDULE_RE,
+    DRUG_START_DATE_RE,
     DRUG_SUSPENSION_DATE_RE,
     DRUG_SUSPENSION_RE,
     FORM_DESCRIPTORS,
@@ -602,6 +603,7 @@ class DrugsParser:
     BRACKET_TRAIL_RE = DRUG_BRACKET_TRAIL_RE
     SUSPENSION_RE = DRUG_SUSPENSION_RE
     SUSPENSION_DATE_RE = DRUG_SUSPENSION_DATE_RE
+    START_DATE_RE = DRUG_START_DATE_RE
 
     # -------------------------------------------------------------------------
     def clean_text(self, text: str | None) -> str:
@@ -646,6 +648,7 @@ class DrugsParser:
         if not name:
             name = before or line.strip()
         suspension_status, suspension_date = self._detect_suspension(line, tail)
+        start_status, start_date = self._detect_start(line, tail)
         return DrugEntry(
             name=name,
             dosage=dosage,
@@ -653,6 +656,8 @@ class DrugsParser:
             daytime_administration=schedule_values,
             suspension_status=suspension_status,
             suspension_date=suspension_date,
+            therapy_start_status=start_status,
+            therapy_start_date=start_date,
         )
 
     # -------------------------------------------------------------------------
@@ -758,6 +763,24 @@ class DrugsParser:
             self._normalize_date_token(date_match.group("date")) if date_match else None
         )
         return status, date_value
+
+    # -------------------------------------------------------------------------
+    def _detect_start(
+        self, full_line: str, tail: str
+    ) -> tuple[bool | None, str | None]:
+        for segment in (tail, full_line):
+            if not segment:
+                continue
+            for match in self.START_DATE_RE.finditer(segment):
+                prefix_end = match.start()
+                if prefix_end >= 0:
+                    context = segment[max(0, prefix_end - 15) : prefix_end].lower()
+                    if "sospes" in context:
+                        continue
+                date_token = match.group("date")
+                normalized = self._normalize_date_token(date_token)
+                return True, normalized
+        return None, None
 
     # -------------------------------------------------------------------------
     def _normalize_date_token(self, token: str | None) -> str | None:
