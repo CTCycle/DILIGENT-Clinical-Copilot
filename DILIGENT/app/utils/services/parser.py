@@ -665,6 +665,19 @@ class DrugsParser:
             if not stripped:
                 continue
             stripped = self.BULLET_RE.sub("", stripped)
+            if not stripped:
+                continue
+            if lines:
+                if self.SCHEDULE_RE.search(stripped):
+                    lines.append(stripped)
+                    continue
+                if (
+                    self.SUSPENSION_RE.search(stripped)
+                    or self.SUSPENSION_DATE_RE.search(stripped)
+                    or self.START_DATE_RE.search(stripped)
+                ):
+                    lines[-1] = f"{lines[-1]} {stripped}"
+                    continue
             lines.append(stripped)
         return "\n".join(lines)
 
