@@ -10,7 +10,7 @@ from DILIGENT.app.client.controllers import (
     preload_selected_models,
     pull_selected_models,
     run_agent,
-    set_agent_model,
+    set_clinical_model,
     set_enhancer_model,
     set_cloud_model,
     set_llm_provider,
@@ -22,7 +22,7 @@ from DILIGENT.app.client.controllers import (
 )
 from DILIGENT.app.configurations import ClientRuntimeConfig
 from DILIGENT.app.constants import (
-    AGENT_MODEL_CHOICES,
+    CLINICAL_MODEL_CHOICES,
     CLOUD_MODEL_CHOICES,
     CLOUD_PROVIDERS,
     PARSING_MODEL_CHOICES,
@@ -212,14 +212,15 @@ def create_interface() -> gr.Blocks:
                                         choices=PARSING_MODEL_CHOICES,
                                         value=ClientRuntimeConfig.get_parsing_model(),
                                     )
-                                    agent_model_dropdown = gr.Dropdown(
-                                        label="Agent Model",
-                                        choices=AGENT_MODEL_CHOICES,
-                                        value=ClientRuntimeConfig.get_agent_model(),
+                                    clinical_model_dropdown = gr.Dropdown(
+                                        label="Clinical Model",
+                                        choices=CLINICAL_MODEL_CHOICES,
+                                        value=ClientRuntimeConfig.get_clinical_model(),
+                                        interactive=not ClientRuntimeConfig.is_cloud_enabled(),
                                     )
                                     enhancer_model_dropdown = gr.Dropdown(
                                         label="Enhancer Model",
-                                        choices=AGENT_MODEL_CHOICES,
+                                        choices=CLINICAL_MODEL_CHOICES,
                                         value=ClientRuntimeConfig.get_enhancer_model(),
                                         interactive=not ClientRuntimeConfig.is_cloud_enabled(),
                                     )
@@ -268,6 +269,7 @@ def create_interface() -> gr.Blocks:
                 preload_button,
                 temperature_input,
                 reasoning_checkbox,
+                clinical_model_dropdown,
                 enhancer_model_dropdown,
             ],
         )
@@ -286,10 +288,10 @@ def create_interface() -> gr.Blocks:
             inputs=parsing_model_dropdown,
             outputs=parsing_model_dropdown,
         )
-        agent_model_dropdown.change(
-            fn=set_agent_model,
-            inputs=agent_model_dropdown,
-            outputs=agent_model_dropdown,
+        clinical_model_dropdown.change(
+            fn=set_clinical_model,
+            inputs=clinical_model_dropdown,
+            outputs=clinical_model_dropdown,
         )
         enhancer_model_dropdown.change(
             fn=set_enhancer_model,
@@ -311,7 +313,7 @@ def create_interface() -> gr.Blocks:
             fn=pull_selected_models,
             inputs=[
                 parsing_model_dropdown,
-                agent_model_dropdown,
+                clinical_model_dropdown,
                 enhancer_model_dropdown,
             ],
             outputs=output,
@@ -345,7 +347,7 @@ def create_interface() -> gr.Blocks:
             fn=preload_selected_models,
             inputs=[
                 parsing_model_dropdown,
-                agent_model_dropdown,
+                clinical_model_dropdown,
                 enhancer_model_dropdown,
             ],
             outputs=output,
