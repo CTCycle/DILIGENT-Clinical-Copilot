@@ -11,6 +11,7 @@ from DILIGENT.app.client.controllers import (
     pull_selected_models,
     run_agent,
     set_agent_model,
+    set_enhancer_model,
     set_cloud_model,
     set_llm_provider,
     set_ollama_reasoning,
@@ -216,6 +217,12 @@ def create_interface() -> gr.Blocks:
                                         choices=AGENT_MODEL_CHOICES,
                                         value=ClientRuntimeConfig.get_agent_model(),
                                     )
+                                    enhancer_model_dropdown = gr.Dropdown(
+                                        label="Enhancer Model",
+                                        choices=AGENT_MODEL_CHOICES,
+                                        value=ClientRuntimeConfig.get_enhancer_model(),
+                                        interactive=not ClientRuntimeConfig.is_cloud_enabled(),
+                                    )
                                     temperature_input = gr.Number(
                                         label="Temperature",
                                         value=ClientRuntimeConfig.get_ollama_temperature(),
@@ -261,6 +268,7 @@ def create_interface() -> gr.Blocks:
                 preload_button,
                 temperature_input,
                 reasoning_checkbox,
+                enhancer_model_dropdown,
             ],
         )
         llm_provider_dropdown.change(
@@ -283,6 +291,11 @@ def create_interface() -> gr.Blocks:
             inputs=agent_model_dropdown,
             outputs=agent_model_dropdown,
         )
+        enhancer_model_dropdown.change(
+            fn=set_enhancer_model,
+            inputs=enhancer_model_dropdown,
+            outputs=enhancer_model_dropdown,
+        )
         temperature_input.change(
             fn=set_ollama_temperature,
             inputs=temperature_input,
@@ -296,7 +309,11 @@ def create_interface() -> gr.Blocks:
 
         pull_models_button.click(
             fn=pull_selected_models,
-            inputs=[parsing_model_dropdown, agent_model_dropdown],
+            inputs=[
+                parsing_model_dropdown,
+                agent_model_dropdown,
+                enhancer_model_dropdown,
+            ],
             outputs=output,
         )
 
@@ -326,7 +343,11 @@ def create_interface() -> gr.Blocks:
         )
         preload_button.click(
             fn=preload_selected_models,
-            inputs=[parsing_model_dropdown, agent_model_dropdown],
+            inputs=[
+                parsing_model_dropdown,
+                agent_model_dropdown,
+                enhancer_model_dropdown,
+            ],
             outputs=output,
         )
         clear_button.click(
