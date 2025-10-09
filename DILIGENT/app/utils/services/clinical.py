@@ -24,6 +24,7 @@ from DILIGENT.app.api.schemas.clinical import (
 from DILIGENT.app.configurations import ClientRuntimeConfig
 from DILIGENT.app.constants import DEFAULT_LLM_TIMEOUT_SECONDS
 from DILIGENT.app.logger import logger
+from DILIGENT.app.utils.patterns import LIVERTOX_FOOTER_RE, LIVERTOX_HEADER_RE
 from DILIGENT.app.utils.serializer import DataSerializer
 from DILIGENT.app.utils.services.essay import LiverToxMatch, LiverToxMatcher
 
@@ -85,7 +86,6 @@ class HepatotoxicityPatternAnalyzer:
 ###############################################################################
 class LiverToxConsultation:
     MAX_EXCERPT_LENGTH = 4000
-
     # -------------------------------------------------------------------------
     def __init__(
         self, drugs: PatientDrugs, *, timeout_s: float = DEFAULT_LLM_TIMEOUT_SECONDS
@@ -206,30 +206,28 @@ class LiverToxConsultation:
         pattern_prompt = self._format_pattern_prompt(pattern_score)
 
         entries: list[DrugClinicalAssessment] = []
-        llm_tasks: list[Any] = []
-        llm_indices: list[int] = []
+        llm_jobs: list[tuple[int, Any]] = []
 
         for idx, drug_entry in enumerate(self.drugs.entries):
             resolved = resolved_entries[idx] if idx < len(resolved_entries) else {}
-            matched_row = (
-                resolved.get("matched_livertox_row")
-                if isinstance(resolved, dict)
-                else None
-            )
-            if isinstance(resolved, dict):
-                candidate_excerpts = resolved.get("extracted_excerpts", [])
-                if isinstance(candidate_excerpts, list):
-                    raw_excerpts = candidate_excerpts
-                elif candidate_excerpts is None:
-                    raw_excerpts = []
-                else:
-                    raw_excerpts = [str(candidate_excerpts)]
+            if not isinstance(resolved, dict):
+                resolved = {}
+
+            matched_row = resolved.get("matched_livertox_row")
+            if not isinstance(matched_row, dict):
+                matched_row = None
+            raw_excerpts = resolved.get("extracted_excerpts")
+            if isinstance(raw_excerpts, str):
+                raw_list = [raw_excerpts]
+            elif isinstance(raw_excerpts, list):
+                raw_list = [item for item in raw_excerpts if isinstance(item, str)]
             else:
-                raw_excerpts = []
+                raw_list = []
+
             cleaned_excerpts = [
-                str(excerpt).strip()
-                for excerpt in raw_excerpts
-                if isinstance(excerpt, str) and excerpt.strip()
+                sanitized
+                for sanitized in (self._sanitize_excerpt(text) for text in raw_list)
+                if sanitized
             ]
             suspension = self._evaluate_suspension(drug_entry, visit_date)
             entry = DrugClinicalAssessment(
@@ -249,22 +247,25 @@ class LiverToxConsultation:
                 entry.paragraph = self._build_missing_excerpt_paragraph(drug_entry.name)
                 continue
 
-            llm_indices.append(idx)
-            llm_tasks.append(
-                self._request_drug_analysis(
-                    drug_name=drug_entry.name,
-                    excerpt=excerpt,
-                    anamnesis=normalized_anamnesis,
-                    diseases=disease_summary,
-                    hepatic_diseases=hepatic_summary,
-                    suspension=suspension,
-                    pattern_summary=pattern_prompt,
+            llm_jobs.append(
+                (
+                    idx,
+                    self._request_drug_analysis(
+                        drug_name=drug_entry.name,
+                        excerpt=excerpt,
+                        anamnesis=normalized_anamnesis,
+                        diseases=disease_summary,
+                        hepatic_diseases=hepatic_summary,
+                        suspension=suspension,
+                        pattern_summary=pattern_prompt,
+                    ),
                 )
             )
 
-        if llm_tasks:
-            responses = await asyncio.gather(*llm_tasks, return_exceptions=True)
-            for idx, outcome in zip(llm_indices, responses):
+        if llm_jobs:
+            indices, tasks = zip(*llm_jobs)
+            responses = await asyncio.gather(*tasks, return_exceptions=True)
+            for idx, outcome in zip(indices, responses):
                 entry = entries[idx]
                 if isinstance(outcome, Exception):
                     logger.error(
@@ -281,11 +282,10 @@ class LiverToxConsultation:
 
     # -------------------------------------------------------------------------
     def _select_excerpt(self, excerpts: list[str]) -> str | None:
+        excerpts = [chunk.strip() for chunk in excerpts if chunk.strip()]
         if not excerpts:
             return None
-        combined = "\n\n".join(chunk.strip() for chunk in excerpts if chunk.strip())
-        if not combined:
-            return None
+        combined = "\n\n".join(excerpts)
         if len(combined) <= self.MAX_EXCERPT_LENGTH:
             return combined
         truncated = combined[: self.MAX_EXCERPT_LENGTH]
@@ -510,10 +510,11 @@ class LiverToxConsultation:
             return None
         blocks: list[str] = []
         for entry in entries:
-            summary = entry.paragraph or "No analysis available."
-            block = f"{entry.drug_name.strip()}\nConclusions: {summary.strip()}"
-            blocks.append(block.strip())
-        return "\n\n".join(blocks) if blocks else None
+            name = entry.drug_name.strip() or entry.drug_name
+            summary = (entry.paragraph or "No analysis available.").strip()
+            blocks.append(f"{name}\nConclusions: {summary}")
+        report = "\n\n".join(blocks).strip()
+        return report or None
 
     # -------------------------------------------------------------------------
     def _build_excluded_paragraph(
@@ -543,12 +544,18 @@ class LiverToxConsultation:
     def _normalize_list(self, values: list[str]) -> list[str]:
         unique: dict[str, str] = {}
         for value in values:
-            if value is None:
+            if not value:
                 continue
             cleaned = str(value).strip()
-            if not cleaned:
-                continue
-            key = cleaned.lower()
-            if key not in unique:
-                unique[key] = cleaned
+            if cleaned and cleaned.lower() not in unique:
+                unique[cleaned.lower()] = cleaned
         return list(unique.values())
+
+    # -------------------------------------------------------------------------
+    def _sanitize_excerpt(self, excerpt: str) -> str:
+        cleaned = excerpt.strip()
+        if not cleaned:
+            return ""
+        sanitized = LIVERTOX_HEADER_RE.sub("", cleaned)
+        sanitized = LIVERTOX_FOOTER_RE.sub("", sanitized)
+        return sanitized.strip()
