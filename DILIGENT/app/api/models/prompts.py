@@ -23,6 +23,36 @@ Given a piece of text (which may be in any language), identify and extract all t
 }
 """
 
+DRUG_EXTRACTION_PROMPT = """
+You are a clinical pharmacology assistant that extracts structured drug regimens
+from free-text medical notes. Always return data that can be validated against
+the provided JSON schema.
+
+Instructions:
+- Each entry must describe a single drug that appears in the input text.
+- Use the original drug name as written, trimming only leading/trailing spaces.
+- The field `daytime_administration` represents the daily schedule as four
+  numeric slots (morning, midday, afternoon, night). If fewer than four values
+  are provided in the text, fill the missing slots with 0. Use decimal values
+  when half doses are specified. If no schedule is mentioned, return an empty
+  list.
+- Preserve dosage and administration mode text exactly as written, except for
+  normalising whitespace.
+- When a therapy start or suspension is described, set the corresponding status
+  field to true and capture the mentioned date in ISO format when possible.
+  Dates already in ISO format should remain unchanged.
+- If the text explicitly states that a therapy has not started, set
+  `therapy_start_status` to false.
+- For missing information use null (or an empty list for schedules) rather than
+  inventing values.
+- Never fabricate additional drugs; omit entries that are not present in the
+  input.
+
+Return:
+- A JSON object matching the `PatientDrugs` schema with an `entries` array.
+- Ensure the output strictly adheres to the schema.
+"""
+
 LIVERTOX_CLINICAL_SYSTEM_PROMPT = """
 You are a clinical hepatologist specializing in drug-induced liver injury (DILI).
 Base every judgement strictly on the supplied LiverTox excerpt and the patient's

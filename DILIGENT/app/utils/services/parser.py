@@ -10,7 +10,10 @@ from typing import Any
 
 import pandas as pd
 
-from DILIGENT.app.api.models.prompts import DISEASE_EXTRACTION_PROMPT
+from DILIGENT.app.api.models.prompts import (
+    DISEASE_EXTRACTION_PROMPT,
+    DRUG_EXTRACTION_PROMPT,
+)
 from DILIGENT.app.api.models.providers import initialize_llm_client
 from DILIGENT.app.api.schemas.clinical import (
     BloodTest,
@@ -605,6 +608,51 @@ class DrugsParser:
     SUSPENSION_DATE_RE = DRUG_SUSPENSION_DATE_RE
     START_DATE_RE = DRUG_START_DATE_RE
 
+    def __init__(
+        self,
+        *,
+        client: Any | None = None,
+        temperature: float = 0.0,
+        timeout_s: float = DEFAULT_LLM_TIMEOUT_SECONDS,
+    ) -> None:
+        self.temperature = float(temperature)
+        self.timeout_s = float(timeout_s)
+        self.client: Any | None = client
+        self.model: str = ""
+        self._client_lock = asyncio.Lock()
+        if client is None:
+            self.client_provider: str | None = None
+            self.runtime_revision = -1
+        else:
+            self.client_provider = "injected"
+            self.runtime_revision = ClientRuntimeConfig.get_revision()
+
+    async def _ensure_client(self) -> None:
+        async with self._client_lock:
+            revision = ClientRuntimeConfig.get_revision()
+            provider, model = ClientRuntimeConfig.resolve_provider_and_model("parser")
+            if self.client_provider == "injected" and self.client is not None:
+                self.model = model
+                self.runtime_revision = revision
+                return
+            needs_refresh = (
+                self.client is None
+                or self.client_provider != provider
+                or self.runtime_revision != revision
+            )
+            if needs_refresh:
+                if self.client is not None:
+                    with contextlib.suppress(Exception):
+                        await self.client.close()
+                self.client = initialize_llm_client(
+                    purpose="parser", timeout_s=self.timeout_s
+                )
+                self.client_provider = provider
+            self.runtime_revision = revision
+            self.model = model
+            if self.client is not None and model and hasattr(self.client, "default_model"):
+                self.client.default_model = model  # type: ignore[attr-defined]
+
     # -------------------------------------------------------------------------
     def clean_text(self, text: str | None) -> str:
         if not text:
@@ -622,17 +670,42 @@ class DrugsParser:
 
     # -------------------------------------------------------------------------
     def parse_drug_list(self, text: str | None) -> PatientDrugs:
+        try:
+            asyncio.get_running_loop()
+        except RuntimeError:
+            return asyncio.run(self.extract_drug_list(text))
+        raise RuntimeError(
+            "parse_drug_list cannot be used inside a running event loop; use"
+            " 'await extract_drug_list(...)' instead."
+        )
+
+    async def extract_drug_list(self, text: str | None) -> PatientDrugs:
         cleaned = self.clean_text(text)
         if not cleaned:
             return PatientDrugs(entries=[])
-        entries: list[DrugEntry] = []
-        for raw_line in cleaned.split("\n"):
-            entry = self._parse_line(raw_line)
-            if entry is not None:
-                entries.append(entry)
-        return PatientDrugs(entries=entries)
+        await self._ensure_client()
+        if self.client is None:
+            raise RuntimeError("LLM client is not initialized for drug extraction")
+        try:
+            structured = await self._llm_extract_drugs(cleaned)
+        except Exception as exc:  # pragma: no cover - passthrough for visibility
+            raise RuntimeError("Failed to extract drugs via LLM") from exc
 
-    # -------------------------------------------------------------------------
+        return PatientDrugs(entries=list(structured.entries))
+
+    async def _llm_extract_drugs(self, text: str) -> PatientDrugs:
+        if self.client is None:
+            raise RuntimeError("LLM client is not initialized for drug extraction")
+        return await self.client.llm_structured_call(
+            model=self.model,
+            system_prompt=DRUG_EXTRACTION_PROMPT,
+            user_prompt=text,
+            schema=PatientDrugs,
+            temperature=self.temperature,
+            use_json_mode=True,
+            max_repair_attempts=2,
+        )
+
     def _parse_line(self, line: str) -> DrugEntry | None:
         schedule_match = self.SCHEDULE_RE.search(line)
         if not schedule_match:
