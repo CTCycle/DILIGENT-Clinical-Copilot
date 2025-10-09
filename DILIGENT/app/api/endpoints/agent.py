@@ -12,6 +12,7 @@ from DILIGENT.app.api.schemas.clinical import (
     PatientData,
 )
 from DILIGENT.app.constants import TASKS_PATH
+from DILIGENT.app.configurations import ClientRuntimeConfig
 from DILIGENT.app.logger import logger
 from DILIGENT.app.utils.services.clinical import (
     HepatotoxicityPatternAnalyzer,
@@ -27,6 +28,8 @@ from DILIGENT.app.utils.services.parser import (
 drugs_parser = DrugsParser()
 pattern_analyzer = HepatotoxicityPatternAnalyzer()
 router = APIRouter(tags=["agent"])
+text_enhancer: ClinicalTextEnhancer | None = None
+text_enhancer_revision = -1
 
 # [ENPOINTS]
 ###############################################################################
@@ -44,9 +47,13 @@ async def process_single_patient(payload: PatientData) -> dict[str, Any]:
     use_text_enhancement = bool(payload.enhance_clinical_text)
     logger.info("Clinical text enhancement enabled: %s", use_text_enhancement)
     if use_text_enhancement:
-        enhancer = ClinicalTextEnhancer()
+        global text_enhancer, text_enhancer_revision
+        current_revision = ClientRuntimeConfig.get_revision()
+        if text_enhancer is None or text_enhancer_revision != current_revision:
+            text_enhancer = ClinicalTextEnhancer()
+            text_enhancer_revision = current_revision
         try:
-            payload = await enhancer.enhance(payload)
+            payload = await text_enhancer.enhance(payload)
         except Exception as exc:  # noqa: BLE001
             logger.warning("Text enhancement failed; continuing with raw input: %s", exc)
 
