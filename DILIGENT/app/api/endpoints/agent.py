@@ -141,7 +141,7 @@ async def start_single_clinical_agent(
     alp: str | None = Body(default=None),
     alp_max: str | None = Body(default=None),
     symptoms: list[str] | None = Body(default=None),
-) -> dict[str, Any]:
+) -> str:
     try:
         payload_data: dict[str, Any] = {
             "name": name,
@@ -163,7 +163,7 @@ async def start_single_clinical_agent(
         ) from exc
 
     single_result = await process_single_patient(payload)
-    return {"status": "success", "processed": 1, "patients": [single_result]}
+    return single_result
 
 
 # -----------------------------------------------------------------------------
