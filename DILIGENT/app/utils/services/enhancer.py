@@ -137,7 +137,7 @@ class ClinicalTextEnhancer:
                 "content": CLINICAL_ENHANCER_USER_PROMPT.format(
                     section_name=section_name,
                     instruction=instruction,
-                    text=text,
+                    text=text.replace("{", "{{").replace("}", "}}"),
                 ),
             },
         ]
