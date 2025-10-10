@@ -5,7 +5,7 @@ from typing import Any
 
 import pandas as pd
 
-from DILIGENT.app.utils.database.sqlite import database
+from DILIGENT.app.utils.repository.sqlite import database
 
 
 # [DATA SERIALIZATION]
