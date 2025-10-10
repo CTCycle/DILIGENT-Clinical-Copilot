@@ -67,7 +67,7 @@ async def process_single_patient(payload: PatientData) -> str:
         pattern_score=pattern_score,
     )
     elapsed = time.perf_counter() - start_time
-    logger.info("Drugs toxicity essay required %.4f seconds", elapsed)
+    logger.info("Hepato-toxicity consultation required %.4f seconds", elapsed)
 
     final_report: str | None = None
     if isinstance(drug_assessment, dict):
