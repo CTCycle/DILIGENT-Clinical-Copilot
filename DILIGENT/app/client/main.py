@@ -11,7 +11,6 @@ from DILIGENT.app.client.controllers import (
     pull_selected_models,
     run_agent,
     set_clinical_model,
-    set_enhancer_model,
     set_cloud_model,
     set_llm_provider,
     set_ollama_reasoning,
@@ -174,10 +173,6 @@ def create_interface() -> gr.Blocks:
                     clear_button = gr.Button("Clear all")
                 with gr.Accordion("Analysis Config", open=False):
                     with gr.Column():
-                        enhance_clinical_text = gr.Checkbox(
-                            label="Enable clinical text enhancement",
-                            value=True,
-                        )
                         process_from_files = gr.Checkbox(
                             label="Process patients from files",
                             value=False,
@@ -216,12 +211,6 @@ def create_interface() -> gr.Blocks:
                                         label="Clinical Model",
                                         choices=CLINICAL_MODEL_CHOICES,
                                         value=ClientRuntimeConfig.get_clinical_model(),
-                                        interactive=not ClientRuntimeConfig.is_cloud_enabled(),
-                                    )
-                                    enhancer_model_dropdown = gr.Dropdown(
-                                        label="Enhancer Model",
-                                        choices=CLINICAL_MODEL_CHOICES,
-                                        value=ClientRuntimeConfig.get_enhancer_model(),
                                         interactive=not ClientRuntimeConfig.is_cloud_enabled(),
                                     )
                                     temperature_input = gr.Number(
@@ -270,7 +259,6 @@ def create_interface() -> gr.Blocks:
                 temperature_input,
                 reasoning_checkbox,
                 clinical_model_dropdown,
-                enhancer_model_dropdown,
             ],
         )
         llm_provider_dropdown.change(
@@ -293,11 +281,6 @@ def create_interface() -> gr.Blocks:
             inputs=clinical_model_dropdown,
             outputs=clinical_model_dropdown,
         )
-        enhancer_model_dropdown.change(
-            fn=set_enhancer_model,
-            inputs=enhancer_model_dropdown,
-            outputs=enhancer_model_dropdown,
-        )
         temperature_input.change(
             fn=set_ollama_temperature,
             inputs=temperature_input,
@@ -314,7 +297,6 @@ def create_interface() -> gr.Blocks:
             inputs=[
                 parsing_model_dropdown,
                 clinical_model_dropdown,
-                enhancer_model_dropdown,
             ],
             outputs=output,
         )
@@ -334,7 +316,6 @@ def create_interface() -> gr.Blocks:
                 alp_max,
                 symptoms,
                 process_from_files,
-                enhance_clinical_text,
             ],
             outputs=output,
             api_name="run_agent",
@@ -348,7 +329,6 @@ def create_interface() -> gr.Blocks:
             inputs=[
                 parsing_model_dropdown,
                 clinical_model_dropdown,
-                enhancer_model_dropdown,
             ],
             outputs=output,
         )
@@ -365,7 +345,6 @@ def create_interface() -> gr.Blocks:
                 alp,
                 alp_max,
                 symptoms,
-                enhance_clinical_text,
                 process_from_files,
                 has_diseases,
                 output,

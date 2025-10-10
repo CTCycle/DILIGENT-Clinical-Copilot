@@ -34,7 +34,7 @@ GEMINI_API_KEY = os.getenv("GEMINI_API_KEY")
 T = TypeVar("T", bound=BaseModel)
 
 ProviderName = Literal["openai", "azure-openai", "anthropic", "gemini"]
-RuntimePurpose = Literal["clinical", "parser", "enhancer"]
+RuntimePurpose = Literal["clinical", "parser"]
 
 
 ###############################################################################
@@ -621,12 +621,11 @@ class OllamaClient:
         self,
         parsing_model: str | None,
         clinical_model: str | None,
-        enhancer_model: str | None = None,
         *,
         keep_alive: str = "30m",
     ) -> tuple[list[str], list[str]]:
         requested: list[str] = []
-        for name in (parsing_model, clinical_model, enhancer_model):
+        for name in (parsing_model, clinical_model):
             if not name:
                 continue
             normalized = name.strip()
