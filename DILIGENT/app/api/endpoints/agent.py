@@ -77,7 +77,7 @@ async def process_single_patient(payload: PatientData) -> dict[str, Any]:
 
     # 3. Consult LiverTox database for hepatotoxicity info
     start_time = time.perf_counter()
-    doctor = HepatoxConsultation(drug_data)
+    doctor = HepatoxConsultation(drug_data, patient_name=payload.name)
     drug_assessment = await doctor.run_analysis(
         anamnesis=payload.anamnesis,
         visit_date=payload.visit_date,

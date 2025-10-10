@@ -8,6 +8,8 @@ from datetime import date, datetime
 from typing import Any
 
 from DILIGENT.app.api.models.prompts import (
+    CLINICAL_REPORT_REWRITE_SYSTEM_PROMPT,
+    CLINICAL_REPORT_REWRITE_USER_PROMPT,
     LIVERTOX_CLINICAL_SYSTEM_PROMPT,
     LIVERTOX_CLINICAL_USER_PROMPT,
 )
@@ -88,16 +90,21 @@ class HepatoxConsultation:
     
     
     def __init__(
-        self, drugs: PatientDrugs, *, timeout_s: float = DEFAULT_LLM_TIMEOUT_SECONDS
+        self,
+        drugs: PatientDrugs,
+        *,
+        patient_name: str | None = None,
+        timeout_s: float = DEFAULT_LLM_TIMEOUT_SECONDS,
     ) -> None:
         self.drugs = drugs
         self.timeout_s = timeout_s
         self.serializer = DataSerializer()
         self.livertox_df = None
         self.master_list_df = None
-        self.matcher: LiverToxMatcher | None = None        
+        self.matcher: LiverToxMatcher | None = None
         self.llm_client = initialize_llm_client(purpose="clinical", timeout_s=timeout_s)
         self.MAX_EXCERPT_LENGTH = MAX_EXCERPT_LENGTH
+        self.patient_name = (patient_name or "").strip() or None
         _provider, model_candidate = ClientRuntimeConfig.resolve_provider_and_model(
             "clinical"
         )
@@ -110,6 +117,7 @@ class HepatoxConsultation:
             chat_signature is not None and "temperature" in chat_signature.parameters
         )
         self.temperature = 0.2
+        self.report_temperature = 0.1
 
     # -------------------------------------------------------------------------
     async def run_analysis(
@@ -260,6 +268,15 @@ class HepatoxConsultation:
                     entry.paragraph = outcome
 
         final_report = self._compose_final_report(entries)
+        refined_report = await self._rewrite_patient_report(
+            entries,
+            final_report=final_report,
+            anamnesis=normalized_anamnesis,
+            visit_date=visit_date,
+            pattern_score=pattern_score,
+        )
+        if refined_report:
+            final_report = refined_report
         return PatientDrugClinicalReport(entries=entries, final_report=final_report)
 
     # -------------------------------------------------------------------------
@@ -606,6 +623,98 @@ class HepatoxConsultation:
             blocks.append(f"{name}\nConclusions: {summary}")
         report = "\n\n".join(blocks).strip()
         return report or None
+
+    # -------------------------------------------------------------------------
+    def _classify_entry_status(self, entry: DrugClinicalAssessment) -> str:
+        if entry.suspension.excluded:
+            return "excluded_from_analysis"
+        if not entry.extracted_excerpts:
+            return "not_evaluated_missing_livertox"
+        if entry.paragraph is None:
+            return "analysis_unavailable"
+        normalized = entry.paragraph.lower()
+        if "manual review is recommended" in normalized:
+            return "analysis_failed"
+        return "assessed"
+
+    # -------------------------------------------------------------------------
+    def _summarize_entries_for_prompt(
+        self, entries: list[DrugClinicalAssessment]
+    ) -> str:
+        blocks: list[str] = []
+        for entry in entries:
+            status = self._classify_entry_status(entry)
+            lines: list[str] = [f"- Drug: {entry.drug_name}", f"  status: {status}"]
+            suspension_note = entry.suspension.note or "No suspension details available."
+            lines.append(f"  therapy_timing: {suspension_note}")
+            if entry.suspension.interval_days is not None:
+                lines.append(
+                    f"  suspension_interval_days: {entry.suspension.interval_days}"
+                )
+            if entry.suspension.start_interval_days is not None:
+                lines.append(
+                    f"  start_interval_days: {entry.suspension.start_interval_days}"
+                )
+            summary = entry.paragraph or "No analysis was produced for this drug."
+            lines.append(f"  assessment: {summary}")
+            blocks.append("\n".join(lines))
+        return "\n".join(blocks)
+
+    # -------------------------------------------------------------------------
+    async def _rewrite_patient_report(
+        self,
+        entries: list[DrugClinicalAssessment],
+        *,
+        final_report: str | None,
+        anamnesis: str,
+        visit_date: date | None,
+        pattern_score: HepatotoxicityPatternScore | None,
+    ) -> str | None:
+        if not entries or not final_report:
+            return None
+        summary_payload = self._summarize_entries_for_prompt(entries)
+        if not summary_payload.strip():
+            return None
+        patient_label = self.patient_name or "Unnamed patient"
+        visit_label = visit_date.isoformat() if visit_date else "Unknown visit date"
+        anamnesis_payload = anamnesis.strip() or "No anamnesis information provided."
+        pattern_summary_raw = self._format_pattern_prompt(pattern_score)
+        instruction_clause = (
+            "Treat drugs whose known hepatotoxicity pattern matches this classification as stronger causal candidates, and downgrade mismatches."
+        )
+        pattern_summary = pattern_summary_raw.replace(instruction_clause, "").strip()
+        if not pattern_summary:
+            pattern_summary = pattern_summary_raw
+        user_prompt = CLINICAL_REPORT_REWRITE_USER_PROMPT.format(
+            patient_name=self._escape_braces(patient_label),
+            visit_date=self._escape_braces(visit_label),
+            pattern_summary=self._escape_braces(pattern_summary),
+            anamnesis=self._escape_braces(anamnesis_payload),
+            drug_summaries=self._escape_braces(summary_payload),
+            initial_report=self._escape_braces(final_report),
+        )
+        messages = [
+            {
+                "role": "system",
+                "content": CLINICAL_REPORT_REWRITE_SYSTEM_PROMPT.strip(),
+            },
+            {"role": "user", "content": user_prompt},
+        ]
+        chat_kwargs: dict[str, Any] = {
+            "model": self.llm_model,
+            "messages": messages,
+        }
+        if self._chat_supports_temperature:
+            chat_kwargs["temperature"] = self.report_temperature
+        else:
+            chat_kwargs["options"] = {"temperature": self.report_temperature}
+        try:
+            raw_response = await self.llm_client.chat(**chat_kwargs)
+        except Exception as exc:  # noqa: BLE001
+            logger.error("Holistic report rewrite failed: %s", exc)
+            return None
+        refined = self._coerce_chat_text(raw_response)
+        return refined or None
 
     # -------------------------------------------------------------------------
     def _build_excluded_paragraph(
