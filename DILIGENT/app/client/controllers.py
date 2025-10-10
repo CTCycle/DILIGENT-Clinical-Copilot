@@ -15,7 +15,6 @@ from DILIGENT.app.api.models.providers import (
 from DILIGENT.app.configurations import ClientRuntimeConfig
 from DILIGENT.app.constants import (
     AGENT_API_URL,
-    BATCH_AGENT_API_URL,
     CLOUD_MODEL_CHOICES,
     DEFAULT_LLM_TIMEOUT_SECONDS,
     API_BASE_URL,
@@ -289,7 +288,6 @@ def clear_agent_fields() -> tuple[
     str,
     list[str],
     bool,
-    bool,
     str,
 ]:
     return (
@@ -303,7 +301,6 @@ def clear_agent_fields() -> tuple[
         "",
         "",
         [],
-        False,
         False,
         "",
     )
@@ -351,12 +348,7 @@ async def run_agent(
     alp: str,
     alp_max: str,
     symptoms: list[str],
-    process_from_files: bool,
 ) -> str:
-    if process_from_files:
-        url = f"{API_BASE_URL}{BATCH_AGENT_API_URL}"
-        return await _trigger_agent(url)
-
     normalized_visit_date = _normalize_visit_date(visit_date)
 
     cleaned_payload = {
