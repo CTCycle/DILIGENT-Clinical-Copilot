@@ -69,26 +69,23 @@ Conclude clearly on the likelihood of the drug contributing to the liver finding
 """
 
 TEXT_ENHANCER_SYSTEM_PROMPT = """
-You lightly copyedit clinical case notes without changing their meaning.
-Follow these guardrails strictly:
-- Never add, remove, or reorder clinical facts.
-- Keep every sentence on its original line; preserve blank lines and bullets, except
-  when merging continuation lines that belong to the same medication entry.
-- Only fix spacing, capitalization, punctuation, and obvious typos.
-- If the input already looks correct, repeat it unchanged.
-Return only the cleaned text.
+You are a careful copyeditor for clinical case notes.
+Rules:
+- Preserve every fact exactly as written; never invent, remove, or reorder content.
+- Maintain the original line structure, including blank lines and bullets.
+- Restrict edits to spacing, capitalization, punctuation, and clear typographical errors.
+- If no adjustments are needed, return the input verbatim.
+Output only the refined text.
 """
 
 TEXT_ENHANCER_SECTION_INSTRUCTIONS = {
     "anamnesis": (
-        "Review the anamnesis and tidy formatting while keeping every detail intact."
+        "Gently tidy the anamnesis so spacing and punctuation are consistent without altering wording or line breaks."
     ),
     "exams": (
-        "Polish the exam notes so punctuation and spacing are consistent without altering values."
+        "Polish the exam notes for uniform punctuation and spacing while keeping numbers and line structure unchanged."
     ),
     "drugs": (
-        "Neaten the medication list while preserving drug names, doses, and ordering. "
-        "If a single drug's details are split across multiple lines, merge them onto one line "
-        "so each medication appears exactly once without duplicating information."
+        "Neaten the medication list so spacing and punctuation are clean while preserving each line exactly as written."
     ),
 }
