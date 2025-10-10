@@ -124,6 +124,7 @@ class HepatoxConsultation:
         self,
         *,
         anamnesis: str | None = None,
+        exams: str | None = None,
         visit_date: date | None = None,
         pattern_score: HepatotoxicityPatternScore | None = None,
     ) -> dict[str, Any] | None:
@@ -148,6 +149,7 @@ class HepatoxConsultation:
         report = await self.compile_clinical_assessment(
             resolved,
             anamnesis=anamnesis,
+            exams=exams,
             visit_date=visit_date,
             pattern_score=pattern_score,
         )
@@ -194,12 +196,16 @@ class HepatoxConsultation:
         resolved_entries: list[dict[str, Any]],
         *,
         anamnesis: str | None,
+        exams: str | None,
         visit_date: date | None,
         pattern_score: HepatotoxicityPatternScore | None,
     ) -> PatientDrugClinicalReport:
         normalized_anamnesis = (anamnesis or "").strip()
         if not normalized_anamnesis:
             normalized_anamnesis = "No anamnesis information was provided."
+        normalized_exams = (exams or "").strip()
+        if not normalized_exams:
+            normalized_exams = "No exam results were provided."
         pattern_prompt = self._format_pattern_prompt(pattern_score)
 
         entries: list[DrugClinicalAssessment] = []
@@ -246,6 +252,7 @@ class HepatoxConsultation:
                         drug_name=drug_entry.name,
                         excerpt=excerpt,
                         anamnesis=normalized_anamnesis,
+                        exams=normalized_exams,
                         suspension=suspension,
                         pattern_summary=pattern_prompt,
                     ),
@@ -561,6 +568,7 @@ class HepatoxConsultation:
         drug_name: str,
         excerpt: str,
         anamnesis: str,
+        exams: str,
         suspension: DrugSuspensionContext,
         pattern_summary: str,
     ) -> str:
@@ -570,6 +578,7 @@ class HepatoxConsultation:
             drug_name=self._escape_braces(drug_name.strip() or drug_name),
             excerpt=self._escape_braces(excerpt),
             anamnesis=self._escape_braces(anamnesis),
+            exams=self._escape_braces(exams),
             therapy_start_details=self._escape_braces(start_details),
             suspension_details=self._escape_braces(suspension_details),
             pattern_summary=self._escape_braces(pattern_summary),
