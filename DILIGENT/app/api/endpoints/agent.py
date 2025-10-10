@@ -40,6 +40,8 @@ async def process_single_patient(payload: PatientData) -> str:
             payload.visit_date.strftime("%d-%m-%Y"),
         )
 
+    global_start_time = time.perf_counter()
+
     # 1. Calculate hepatic pattern score using ALT/ALP values
     pattern_score = pattern_analyzer.analyze(payload)
     logger.info(
@@ -97,6 +99,9 @@ async def process_single_patient(payload: PatientData) -> str:
 
     detected_drugs = [entry.name for entry in drug_data.entries if entry.name]
     drug_summary = ", ".join(detected_drugs) if detected_drugs else "None detected"
+    
+    global_elapsed = time.perf_counter() - global_start_time
+    logger.info("Total time for Drug Induced Liver Injury (DILI) assessment is %.4f seconds", global_elapsed)
 
     narrative: list[str] = [
         "Patient Summary",
@@ -125,7 +130,6 @@ async def process_single_patient(payload: PatientData) -> str:
         ])
 
     return "\n".join(narrative)
-
 
 # -----------------------------------------------------------------------------
 @router.post("/agent", response_model=None, status_code=status.HTTP_202_ACCEPTED)
