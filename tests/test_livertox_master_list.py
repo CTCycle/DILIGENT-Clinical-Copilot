@@ -11,7 +11,7 @@ REPO_ROOT = os.path.abspath(os.path.join(os.path.dirname(__file__), ".."))
 if REPO_ROOT not in sys.path:
     sys.path.insert(0, REPO_ROOT)
 
-from DILIGENT.app.utils.serializer import DataSerializer, LIVERTOX_COLUMNS
+from DILIGENT.app.utils.repository.serializer import DataSerializer, LIVERTOX_COLUMNS
 from DILIGENT.app.utils.updater.livertox import LiverToxUpdater
 
 
@@ -269,7 +269,7 @@ def test_serializer_roundtrip_uses_unified_table() -> None:
     )
 
     with patch(
-        "DILIGENT.app.utils.serializer.database.save_into_database"
+        "DILIGENT.app.utils.repository.serializer.database.save_into_database"
     ) as save_mock:
         serializer.save_livertox_records(frame)
         assert save_mock.called
@@ -278,7 +278,7 @@ def test_serializer_roundtrip_uses_unified_table() -> None:
         assert "ingredient" in saved_frame.columns
 
     with patch(
-        "DILIGENT.app.utils.serializer.database.load_from_database",
+        "DILIGENT.app.utils.repository.serializer.database.load_from_database",
         return_value=frame,
     ):
         monographs = serializer.get_livertox_records()
