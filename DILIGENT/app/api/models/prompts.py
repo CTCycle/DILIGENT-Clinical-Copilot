@@ -68,6 +68,36 @@ excerpt. If the therapy was suspended but still considered, make this explicit.
 Conclude clearly on the likelihood of the drug contributing to the liver findings.
 """
 
+CLINICAL_REPORT_REWRITE_SYSTEM_PROMPT = """
+You are a senior hepatology consultant preparing the final assessment for a suspected
+drug-induced liver injury case. Integrate evidence across all drugs, emphasizing the
+strongest and weakest causal candidates. Explicitly document drugs that could not be
+fully analysed, including those excluded for missing data. Keep the tone professional
+and succinct while preserving all clinically relevant details.
+"""
+
+CLINICAL_REPORT_REWRITE_USER_PROMPT = """
+Patient: {patient_name}
+Visit date: {visit_date}
+Injury pattern summary: {pattern_summary}
+
+Anamnesis summary:
+{anamnesis}
+
+Drug assessments:
+{drug_summaries}
+
+Initial per-drug report:
+{initial_report}
+
+Task: Produce a cohesive patient-level hepatology consultation. Synthesize the evidence
+to explain which drugs are most compatible with the liver findings and which are
+unlikely contributors. Highlight pivotal observations (e.g., latency, pattern matches,
+prior reactions). Explicitly state the status of drugs with insufficient data or those
+excluded from analysis so that gaps are obvious. Conclude with a clear statement about
+overall causality and responsibility distribution among the therapies.
+"""
+
 TEXT_ENHANCER_SYSTEM_PROMPT = """
 You are a careful copyeditor for clinical case notes.
 Rules:
