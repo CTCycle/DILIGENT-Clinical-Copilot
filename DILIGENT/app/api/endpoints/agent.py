@@ -12,28 +12,24 @@ from DILIGENT.app.api.schemas.clinical import (
     PatientData,
 )
 from DILIGENT.app.constants import TASKS_PATH
-from DILIGENT.app.configurations import ClientRuntimeConfig
 from DILIGENT.app.logger import logger
 from DILIGENT.app.utils.services.clinical import (
     HepatotoxicityPatternAnalyzer,
     HepatoxConsultation,
 )
-from DILIGENT.app.utils.services.enhancer import ClinicalTextEnhancer
 from DILIGENT.app.utils.services.parser import (
     BloodTestParser,
     DrugsParser,
     PatientCase,
 )
- 
+
 drugs_parser = DrugsParser()
 pattern_analyzer = HepatotoxicityPatternAnalyzer()
 router = APIRouter(tags=["agent"])
-text_enhancer: ClinicalTextEnhancer | None = None
-text_enhancer_revision = -1  # refresh cached enhancer when runtime config changes
 
 # [ENPOINTS]
 ###############################################################################
-async def process_single_patient(payload: PatientData) -> dict[str, Any]:
+async def process_single_patient(payload: PatientData) -> str:
     logger.info(
         "Starting Drug-Induced Liver Injury (DILI) analysis for patient: %s",
         payload.name,
@@ -43,22 +39,6 @@ async def process_single_patient(payload: PatientData) -> dict[str, Any]:
             "Clinical visit date: %s",
             payload.visit_date.strftime("%d-%m-%Y"),
         )
-
-    use_text_enhancement = bool(payload.enhance_clinical_text)
-    logger.info("Clinical text enhancement enabled: %s", use_text_enhancement)
-    if use_text_enhancement:
-        global text_enhancer, text_enhancer_revision
-        current_revision = ClientRuntimeConfig.get_revision()
-        if text_enhancer is None or text_enhancer_revision != current_revision:
-            text_enhancer = ClinicalTextEnhancer()
-            text_enhancer_revision = current_revision
-        try:
-            start_time = time.perf_counter()
-            payload = await text_enhancer.enhance(payload)
-            elapsed = time.perf_counter() - start_time
-            logger.info("Text enhancement required %.4f seconds", elapsed)
-        except Exception as exc:  # noqa: BLE001
-            logger.warning("Text enhancement failed; continuing with raw input: %s", exc)
 
     # 1. Calculate hepatic pattern score using ALT/ALP values
     pattern_score = pattern_analyzer.analyze(payload)
@@ -94,13 +74,56 @@ async def process_single_patient(payload: PatientData) -> dict[str, Any]:
     elif isinstance(drug_assessment, str) and drug_assessment.strip():
         final_report = drug_assessment.strip()
 
-    result: dict[str, Any] = {
-        "status": "success",
-        "code": "DILI_FINAL_REPORT",
-        "final_report": final_report,
-    }
+    patient_label = payload.name or "Unknown patient"
+    visit_label = (
+        payload.visit_date.strftime("%d %B %Y")
+        if payload.visit_date
+        else "Not provided"
+    )
 
-    return result
+    if pattern_score.alt_multiple is not None:
+        alt_multiple = f"{pattern_score.alt_multiple:.2f}x ULN"
+    else:
+        alt_multiple = "Not available"
+    if pattern_score.alp_multiple is not None:
+        alp_multiple = f"{pattern_score.alp_multiple:.2f}x ULN"
+    else:
+        alp_multiple = "Not available"
+    if pattern_score.r_score is not None:
+        r_score_line = f"{pattern_score.r_score:.2f}"
+    else:
+        r_score_line = "Not available"
+
+    detected_drugs = [entry.name for entry in drug_data.entries if entry.name]
+    drug_summary = ", ".join(detected_drugs) if detected_drugs else "None detected"
+
+    narrative: list[str] = [
+        "Patient Summary",
+        "---------------",
+        f"Name: {patient_label}",
+        f"Visit date: {visit_label}",
+        "",
+        "Hepatotoxicity Pattern",
+        "-----------------------",
+        f"Classification: {pattern_score.classification}",
+        f"ALT multiple: {alt_multiple}",
+        f"ALP multiple: {alp_multiple}",
+        f"R-score: {r_score_line}",
+        "",
+        "Medications",
+        "-----------",
+        f"Detected drugs ({len(detected_drugs)}): {drug_summary}",
+    ]
+
+    if final_report:
+        narrative.extend([
+            "",
+            "Clinical Assessment",
+            "--------------------",
+            final_report,
+        ])
+
+    return "\n".join(narrative)
 
 
 # -----------------------------------------------------------------------------
@@ -117,7 +140,6 @@ async def start_single_clinical_agent(
     alp: str | None = Body(default=None),
     alp_max: str | None = Body(default=None),
     symptoms: list[str] | None = Body(default=None),
-    enhance_clinical_text: bool = Body(default=True),
 ) -> dict[str, Any]:
     try:
         payload_data: dict[str, Any] = {
@@ -132,7 +154,6 @@ async def start_single_clinical_agent(
             "alp": alp,
             "alp_max": alp_max,
             "symptoms": symptoms or [],
-            "enhance_clinical_text": enhance_clinical_text,
         }
         payload = PatientData.model_validate(payload_data)
     except ValidationError as exc:
@@ -157,7 +178,7 @@ async def start_batch_clinical_agent() -> dict[str, Any]:
         )
         return {"status": "success", "processed": 0, "patients": []}
 
-    results: list[dict[str, Any]] = []
+    results: list[str] = []
     for path in txt_files:
         try:
             text = path.read_text(encoding="utf-8")

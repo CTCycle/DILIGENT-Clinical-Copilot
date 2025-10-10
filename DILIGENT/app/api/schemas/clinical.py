@@ -71,11 +71,6 @@ class PatientData(BaseModel):
         default=False,
         description="Indicates whether the patient has a history of hepatic diseases.",
     )
-    enhance_clinical_text: bool = Field(
-        default=True,
-        description="Whether to run clinical text enhancement before the agent executes.",
-    )
-
     @field_validator("name", mode="before")
     @classmethod
     def _strip_name(cls, value: str | None) -> str | None:
