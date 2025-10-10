@@ -171,12 +171,6 @@ def create_interface() -> gr.Blocks:
                 with gr.Column():
                     run_button = gr.Button("Run Workflow", variant="primary")
                     clear_button = gr.Button("Clear all")
-                with gr.Accordion("Analysis Config", open=False):
-                    with gr.Column():
-                        process_from_files = gr.Checkbox(
-                            label="Process patients from files",
-                            value=False,
-                        )
                 with gr.Accordion("Model Config", open=False):
                     with gr.Column():
                         use_cloud_services = gr.Checkbox(
@@ -315,7 +309,6 @@ def create_interface() -> gr.Blocks:
                 alp,
                 alp_max,
                 symptoms,
-                process_from_files,
             ],
             outputs=output,
             api_name="run_agent",
@@ -345,7 +338,6 @@ def create_interface() -> gr.Blocks:
                 alp,
                 alp_max,
                 symptoms,
-                process_from_files,
                 has_diseases,
                 output,
             ],

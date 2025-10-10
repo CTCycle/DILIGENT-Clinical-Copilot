@@ -2,7 +2,6 @@ from __future__ import annotations
 
 import time
 from datetime import date
-from pathlib import Path
 from typing import Any
 
 from fastapi import APIRouter, Body, HTTPException, status
@@ -11,16 +10,13 @@ from pydantic import ValidationError
 from DILIGENT.app.api.schemas.clinical import (
     PatientData,
 )
-from DILIGENT.app.constants import TASKS_PATH
 from DILIGENT.app.logger import logger
 from DILIGENT.app.utils.services.clinical import (
     HepatotoxicityPatternAnalyzer,
     HepatoxConsultation,
 )
 from DILIGENT.app.utils.services.parser import (
-    BloodTestParser,
     DrugsParser,
-    PatientCase,
 )
 
 drugs_parser = DrugsParser()
@@ -171,52 +167,3 @@ async def start_single_clinical_agent(
 
 
 # -----------------------------------------------------------------------------
-@router.post("/batch-agent", response_model=None, status_code=status.HTTP_202_ACCEPTED)
-async def start_batch_clinical_agent() -> dict[str, Any]:
-    patient_case = PatientCase()
-    lab_parser = BloodTestParser()
-
-    txt_files = [path for path in Path(TASKS_PATH).glob("*.txt") if path.is_file()]
-    if not txt_files:
-        logger.info(
-            "No .txt files found in default path. Add new files and rerun the batch agent."
-        )
-        return {"status": "success", "processed": 0, "patients": []}
-
-    results: list[str] = []
-    for path in txt_files:
-        try:
-            text = path.read_text(encoding="utf-8")
-        except Exception as exc:
-            logger.error(f"Failed reading {path}: {exc}")
-            continue
-
-        cleaned_text = patient_case.clean_patient_info(text)
-        sections = patient_case.split_text_by_tags(cleaned_text, path.stem)
-
-        anamnesis_section = sections.get("anamnesis")
-        drugs_section = sections.get("drugs")
-        exams_section = sections.get("additional_tests")
-
-        hepatic_markers = lab_parser.parse_hepatic_markers(sections.get("blood_tests"))
-
-        try:
-            patient_payload = PatientData(
-                name=path.stem,
-                anamnesis=anamnesis_section,
-                drugs=drugs_section,
-                exams=exams_section,
-                alt=hepatic_markers["alt"],
-                alt_max=hepatic_markers["alt_max"],
-                alp=hepatic_markers["alp"],
-                alp_max=hepatic_markers["alp_max"],
-                symptoms=[],
-            )
-        except ValidationError as exc:
-            logger.error(f"Invalid data for patient {path.stem}: {exc}")
-            continue
-
-        case = await process_single_patient(patient_payload)
-        results.append(case)
-
-    return {"status": "success", "processed": len(results), "patients": results}
