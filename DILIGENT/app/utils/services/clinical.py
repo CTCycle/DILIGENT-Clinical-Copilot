@@ -85,9 +85,7 @@ class HepatotoxicityPatternAnalyzer:
 
 
 ###############################################################################
-class HepatoxConsultation:
-
-    
+class HepatoxConsultation:    
     
     def __init__(
         self,
@@ -212,6 +210,7 @@ class HepatoxConsultation:
         llm_jobs: list[tuple[int, Any]] = []
 
         for idx, drug_entry in enumerate(self.drugs.entries):
+            logger.info("Preparing clinical assessment for drug: %s", drug_entry.name)
             resolved = resolved_entries[idx] if idx < len(resolved_entries) else {}
             if not isinstance(resolved, dict):
                 resolved = {}
@@ -274,6 +273,7 @@ class HepatoxConsultation:
                 else:
                     entry.paragraph = outcome
 
+        logger.info("Composing final clinical report for current patient")
         final_report = self._compose_final_report(entries)
         refined_report = await self._rewrite_patient_report(
             entries,
@@ -284,6 +284,7 @@ class HepatoxConsultation:
         )
         if refined_report:
             final_report = refined_report
+            
         return PatientDrugClinicalReport(entries=entries, final_report=final_report)
 
     # -------------------------------------------------------------------------
