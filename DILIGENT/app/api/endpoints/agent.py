@@ -29,7 +29,7 @@ router = APIRouter(tags=["agent"])
 
 # [ENPOINTS]
 ###############################################################################
-async def process_single_patient(payload: PatientData) -> dict[str, Any]:
+async def process_single_patient(payload: PatientData) -> str:
     logger.info(
         "Starting Drug-Induced Liver Injury (DILI) analysis for patient: %s",
         payload.name,
@@ -74,13 +74,56 @@ async def process_single_patient(payload: PatientData) -> dict[str, Any]:
     elif isinstance(drug_assessment, str) and drug_assessment.strip():
         final_report = drug_assessment.strip()
 
-    result: dict[str, Any] = {
-        "status": "success",
-        "code": "DILI_FINAL_REPORT",
-        "final_report": final_report,
-    }
+    patient_label = payload.name or "Unknown patient"
+    visit_label = (
+        payload.visit_date.strftime("%d %B %Y")
+        if payload.visit_date
+        else "Not provided"
+    )
 
-    return result
+    if pattern_score.alt_multiple is not None:
+        alt_multiple = f"{pattern_score.alt_multiple:.2f}x ULN"
+    else:
+        alt_multiple = "Not available"
+    if pattern_score.alp_multiple is not None:
+        alp_multiple = f"{pattern_score.alp_multiple:.2f}x ULN"
+    else:
+        alp_multiple = "Not available"
+    if pattern_score.r_score is not None:
+        r_score_line = f"{pattern_score.r_score:.2f}"
+    else:
+        r_score_line = "Not available"
+
+    detected_drugs = [entry.name for entry in drug_data.entries if entry.name]
+    drug_summary = ", ".join(detected_drugs) if detected_drugs else "None detected"
+
+    narrative: list[str] = [
+        "Patient Summary",
+        "---------------",
+        f"Name: {patient_label}",
+        f"Visit date: {visit_label}",
+        "",
+        "Hepatotoxicity Pattern",
+        "-----------------------",
+        f"Classification: {pattern_score.classification}",
+        f"ALT multiple: {alt_multiple}",
+        f"ALP multiple: {alp_multiple}",
+        f"R-score: {r_score_line}",
+        "",
+        "Medications",
+        "-----------",
+        f"Detected drugs ({len(detected_drugs)}): {drug_summary}",
+    ]
+
+    if final_report:
+        narrative.extend([
+            "",
+            "Clinical Assessment",
+            "--------------------",
+            final_report,
+        ])
+
+    return "\n".join(narrative)
 
 
 # -----------------------------------------------------------------------------
@@ -135,7 +178,7 @@ async def start_batch_clinical_agent() -> dict[str, Any]:
         )
         return {"status": "success", "processed": 0, "patients": []}
 
-    results: list[dict[str, Any]] = []
+    results: list[str] = []
     for path in txt_files:
         try:
             text = path.read_text(encoding="utf-8")
