@@ -12,24 +12,20 @@ from DILIGENT.app.api.schemas.clinical import (
     PatientData,
 )
 from DILIGENT.app.constants import TASKS_PATH
-from DILIGENT.app.configurations import ClientRuntimeConfig
 from DILIGENT.app.logger import logger
 from DILIGENT.app.utils.services.clinical import (
     HepatotoxicityPatternAnalyzer,
     HepatoxConsultation,
 )
-from DILIGENT.app.utils.services.enhancer import ClinicalTextEnhancer
 from DILIGENT.app.utils.services.parser import (
     BloodTestParser,
     DrugsParser,
     PatientCase,
 )
- 
+
 drugs_parser = DrugsParser()
 pattern_analyzer = HepatotoxicityPatternAnalyzer()
 router = APIRouter(tags=["agent"])
-text_enhancer: ClinicalTextEnhancer | None = None
-text_enhancer_revision = -1  # refresh cached enhancer when runtime config changes
 
 # [ENPOINTS]
 ###############################################################################
@@ -43,22 +39,6 @@ async def process_single_patient(payload: PatientData) -> dict[str, Any]:
             "Clinical visit date: %s",
             payload.visit_date.strftime("%d-%m-%Y"),
         )
-
-    use_text_enhancement = bool(payload.enhance_clinical_text)
-    logger.info("Clinical text enhancement enabled: %s", use_text_enhancement)
-    if use_text_enhancement:
-        global text_enhancer, text_enhancer_revision
-        current_revision = ClientRuntimeConfig.get_revision()
-        if text_enhancer is None or text_enhancer_revision != current_revision:
-            text_enhancer = ClinicalTextEnhancer()
-            text_enhancer_revision = current_revision
-        try:
-            start_time = time.perf_counter()
-            payload = await text_enhancer.enhance(payload)
-            elapsed = time.perf_counter() - start_time
-            logger.info("Text enhancement required %.4f seconds", elapsed)
-        except Exception as exc:  # noqa: BLE001
-            logger.warning("Text enhancement failed; continuing with raw input: %s", exc)
 
     # 1. Calculate hepatic pattern score using ALT/ALP values
     pattern_score = pattern_analyzer.analyze(payload)
@@ -117,7 +97,6 @@ async def start_single_clinical_agent(
     alp: str | None = Body(default=None),
     alp_max: str | None = Body(default=None),
     symptoms: list[str] | None = Body(default=None),
-    enhance_clinical_text: bool = Body(default=True),
 ) -> dict[str, Any]:
     try:
         payload_data: dict[str, Any] = {
@@ -132,7 +111,6 @@ async def start_single_clinical_agent(
             "alp": alp,
             "alp_max": alp_max,
             "symptoms": symptoms or [],
-            "enhance_clinical_text": enhance_clinical_text,
         }
         payload = PatientData.model_validate(payload_data)
     except ValidationError as exc:
