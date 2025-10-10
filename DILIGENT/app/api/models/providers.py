@@ -5,6 +5,7 @@ import contextlib
 import ctypes
 import inspect
 import json
+import math
 import os
 import re
 import shutil
@@ -95,6 +96,7 @@ class OllamaClient:
         self._model_cache_list: list[str] = []
         self._model_cache_expiry = 0.0
         self._model_cache_lock = asyncio.Lock()
+        self._model_context_limits: dict[str, int] = {}
 
     # -------------------------------------------------------------------------
     async def close(self) -> None:
@@ -201,6 +203,23 @@ class OllamaClient:
         return round(temp_value, 2), think_value, options_payload
 
     # -------------------------------------------------------------------------
+    @staticmethod
+    def _compose_payload(
+        payload: dict[str, Any],
+        *,
+        format: str | None,
+        options: dict[str, Any] | None,
+        keep_alive: str | None,
+    ) -> dict[str, Any]:
+        if format:
+            payload["format"] = format
+        if options:
+            payload["options"] = options
+        if keep_alive:
+            payload["keep_alive"] = keep_alive
+        return payload
+
+    # -------------------------------------------------------------------------
     def _build_chat_payload(
         self,
         *,
@@ -213,20 +232,19 @@ class OllamaClient:
         options: dict[str, Any] | None,
         keep_alive: str | None,
     ) -> dict[str, Any]:
-        payload: dict[str, Any] = {
+        payload = {
             "model": model,
             "messages": messages,
             "stream": stream,
             "temperature": temperature,
             "think": think,
         }
-        if format:
-            payload["format"] = format
-        if options:
-            payload["options"] = options
-        if keep_alive:
-            payload["keep_alive"] = keep_alive
-        return payload
+        return self._compose_payload(
+            payload,
+            format=format,
+            options=options,
+            keep_alive=keep_alive,
+        )
 
     # -------------------------------------------------------------------------
     def _build_generate_payload(
@@ -241,20 +259,67 @@ class OllamaClient:
         options: dict[str, Any] | None,
         keep_alive: str | None,
     ) -> dict[str, Any]:
-        payload: dict[str, Any] = {
+        payload = {
             "model": model,
             "prompt": prompt,
             "stream": stream,
             "temperature": temperature,
             "think": think,
         }
-        if format:
-            payload["format"] = format
-        if options:
-            payload["options"] = options
-        if keep_alive:
-            payload["keep_alive"] = keep_alive
-        return payload
+        return self._compose_payload(
+            payload,
+            format=format,
+            options=options,
+            keep_alive=keep_alive,
+        )
+
+    # -------------------------------------------------------------------------
+    async def _ensure_context_option(
+        self,
+        *,
+        model: str,
+        messages: list[dict[str, str]] | None,
+        prompt: str | None,
+        options: dict[str, Any] | None,
+    ) -> dict[str, Any] | None:
+        if options and "num_ctx" in options:
+            return options
+        context_window = await self.calculate_context_window(
+            model=model,
+            messages=messages,
+            prompt=prompt,
+        )
+        if not context_window:
+            return options
+        merged = dict(options) if options else {}
+        merged.setdefault("num_ctx", context_window)
+        return merged
+
+    # -------------------------------------------------------------------------
+    async def _prepare_common_options(
+        self,
+        *,
+        model: str,
+        temperature: float | None,
+        think: bool | None,
+        options: dict[str, Any] | None,
+        messages: list[dict[str, str]] | None = None,
+        prompt: str | None = None,
+    ) -> tuple[str, float, bool, dict[str, Any] | None]:
+        resolved_model = self._resolve_model_name(model)
+        await self.ensure_model_ready(resolved_model)
+        temp_value, think_value, options_payload = self._prepare_generation_parameters(
+            temperature=temperature,
+            think=think,
+            options=options,
+        )
+        enriched = await self._ensure_context_option(
+            model=resolved_model,
+            messages=messages,
+            prompt=prompt,
+            options=options_payload,
+        )
+        return resolved_model, temp_value, think_value, enriched
 
     # -------------------------------------------------------------------------
     async def ensure_model_ready(self, name: str) -> None:
@@ -648,12 +713,17 @@ class OllamaClient:
         Non-streaming chat. Returns parsed JSON (dict) if possible, else raw string.
 
         """
-        resolved_model = self._resolve_model_name(model)
-        await self.ensure_model_ready(resolved_model)
-        temp_value, think_value, options_payload = self._prepare_generation_parameters(
+        (
+            resolved_model,
+            temp_value,
+            think_value,
+            options_payload,
+        ) = await self._prepare_common_options(
+            model=model,
             temperature=temperature,
             think=think,
             options=options,
+            messages=messages,
         )
 
         if self._legacy_generate:
@@ -727,12 +797,17 @@ class OllamaClient:
         Caller can aggregate tokens or forward server-sent chunks to a client.
 
         """
-        resolved_model = self._resolve_model_name(model)
-        await self.ensure_model_ready(resolved_model)
-        temp_value, think_value, options_payload = self._prepare_generation_parameters(
+        (
+            resolved_model,
+            temp_value,
+            think_value,
+            options_payload,
+        ) = await self._prepare_common_options(
+            model=model,
             temperature=temperature,
             think=think,
             options=options,
+            messages=messages,
         )
 
         if self._legacy_generate:
@@ -806,6 +881,12 @@ class OllamaClient:
     ) -> dict[str, Any] | str:
         prompt = self._messages_to_prompt(messages)
         resolved_model = self._resolve_model_name(model)
+        options = await self._ensure_context_option(
+            model=resolved_model,
+            messages=None,
+            prompt=prompt,
+            options=options,
+        )
         payload = self._build_generate_payload(
             model=resolved_model,
             prompt=prompt,
@@ -849,6 +930,12 @@ class OllamaClient:
     ) -> AsyncGenerator[dict[str, Any], None]:
         prompt = self._messages_to_prompt(messages)
         resolved_model = self._resolve_model_name(model)
+        options = await self._ensure_context_option(
+            model=resolved_model,
+            messages=None,
+            prompt=prompt,
+            options=options,
+        )
         payload = self._build_generate_payload(
             model=resolved_model,
             prompt=prompt,
@@ -873,6 +960,100 @@ class OllamaClient:
                     yield evt
         except httpx.TimeoutException as e:
             raise OllamaTimeout("Timed out during streamed generate response") from e
+
+    # -------------------------------------------------------------------------
+    @staticmethod
+    def _coerce_positive_int(value: Any) -> int | None:
+        if isinstance(value, bool):
+            return None
+        if isinstance(value, int):
+            return value if value > 0 else None
+        if isinstance(value, float):
+            candidate = int(value)
+            return candidate if candidate > 0 else None
+        if isinstance(value, str):
+            match = re.search(r"\d+", value)
+            if match:
+                candidate = int(match.group(0))
+                return candidate if candidate > 0 else None
+        return None
+
+    # -------------------------------------------------------------------------
+    @classmethod
+    def _extract_context_limit(cls, metadata: dict[str, Any]) -> int | None:
+        if not isinstance(metadata, dict):
+            return None
+        containers: list[dict[str, Any]] = [metadata]
+        for key in ("details", "model_info", "options"):
+            block = metadata.get(key)
+            if isinstance(block, dict):
+                containers.append(block)
+        for block in containers:
+            for field in ("context_length", "context", "num_ctx", "ctx"):
+                if field in block:
+                    candidate = cls._coerce_positive_int(block[field])
+                    if candidate:
+                        return candidate
+        return None
+
+    # -------------------------------------------------------------------------
+    async def _get_model_context_limit(self, name: str) -> int | None:
+        cached = self._model_context_limits.get(name)
+        if cached is not None:
+            return cached or None
+        try:
+            metadata = await self.show_model(name)
+        except OllamaError:
+            self._model_context_limits[name] = 0
+            return None
+        limit = self._extract_context_limit(metadata) or 0
+        self._model_context_limits[name] = limit
+        return limit or None
+
+    # -------------------------------------------------------------------------
+    @staticmethod
+    def _estimate_tokens(text: str) -> int:
+        if not text:
+            return 0
+        normalized = re.sub(r"\s+", " ", text).strip()
+        if not normalized:
+            return 0
+        pieces = re.findall(r"\w+|[^\w\s]", normalized)
+        approximate = max(len(pieces), math.ceil(len(normalized) / 4))
+        return max(approximate, 1)
+
+    # -------------------------------------------------------------------------
+    async def calculate_context_window(
+        self,
+        *,
+        model: str,
+        messages: list[dict[str, str]] | None = None,
+        prompt: str | None = None,
+        min_ctx: int = 512,
+        padding_tokens: int = 32,
+        slack_ratio: float = 0.2,
+    ) -> int | None:
+        contents: list[str] = []
+        if messages:
+            for message in messages:
+                content = message.get("content") if isinstance(message, dict) else None
+                if content:
+                    contents.append(str(content))
+        if prompt:
+            contents.append(prompt)
+        if not contents:
+            return None
+        total_tokens = sum(self._estimate_tokens(chunk) for chunk in contents)
+        if total_tokens <= 0:
+            return None
+        expanded = int(math.ceil(total_tokens * (1 + slack_ratio))) + padding_tokens
+        target = max(min_ctx, expanded)
+        limit = await self._get_model_context_limit(model)
+        if limit and limit > 0:
+            upper = min(limit, target)
+            floor = min(limit, min_ctx)
+            return max(upper, floor)
+        return target
 
     # -------------------------------------------------------------------------
     async def _collect_structured_fallbacks(self, preferred: list[str]) -> list[str]:
