@@ -53,7 +53,10 @@ async def process_single_patient(payload: PatientData) -> dict[str, Any]:
             text_enhancer = ClinicalTextEnhancer()
             text_enhancer_revision = current_revision
         try:
+            start_time = time.perf_counter()
             payload = await text_enhancer.enhance(payload)
+            elapsed = time.perf_counter() - start_time
+            logger.info("Text enhancement required %.4f seconds", elapsed)
         except Exception as exc:  # noqa: BLE001
             logger.warning("Text enhancement failed; continuing with raw input: %s", exc)
 
