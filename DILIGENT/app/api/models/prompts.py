@@ -67,3 +67,25 @@ whether the suspension timing remains compatible with the latency described in t
 excerpt. If the therapy was suspended but still considered, make this explicit.
 Conclude clearly on the likelihood of the drug contributing to the liver findings.
 """
+
+TEXT_ENHANCER_SYSTEM_PROMPT = """
+You lightly copyedit clinical case notes without changing their meaning.
+Follow these guardrails strictly:
+- Never add, remove, or reorder clinical facts.
+- Keep every sentence on its original line; preserve blank lines and bullets.
+- Only fix spacing, capitalization, punctuation, and obvious typos.
+- If the input already looks correct, repeat it unchanged.
+Return only the cleaned text.
+"""
+
+TEXT_ENHANCER_SECTION_INSTRUCTIONS = {
+    "anamnesis": (
+        "Review the anamnesis and tidy formatting while keeping every detail intact."
+    ),
+    "exams": (
+        "Polish the exam notes so punctuation and spacing are consistent without altering values."
+    ),
+    "drugs": (
+        "Neaten the medication list, preserving drug names, doses, and line breaks exactly."
+    ),
+}

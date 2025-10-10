@@ -4,6 +4,10 @@ import asyncio
 import inspect
 from typing import Any
 
+from DILIGENT.app.api.models.prompts import (
+    TEXT_ENHANCER_SECTION_INSTRUCTIONS,
+    TEXT_ENHANCER_SYSTEM_PROMPT,
+)
 from DILIGENT.app.api.models.providers import initialize_llm_client
 from DILIGENT.app.api.schemas.clinical import PatientData
 from DILIGENT.app.configurations import ClientRuntimeConfig
@@ -16,27 +20,23 @@ class ClinicalTextEnhancer:
     SECTION_TEMPLATES: dict[str, dict[str, str]] = {
         "anamnesis": {
             "title": "Anamnesis",
-            "instruction": (
-                "Polish the anamnesis while keeping every fact unchanged. "
-                "Normalize punctuation, spacing, and terminology so the prose reads "
-                "naturally in English. Maintain any list or multiline formatting from the "
-                "input."
+            "instruction": TEXT_ENHANCER_SECTION_INSTRUCTIONS.get(
+                "anamnesis",
+                "Keep the original anamnesis unchanged aside from minor spacing fixes.",
             ),
         },
         "exams": {
             "title": "Exams",
-            "instruction": (
-                "Rewrite the exam findings in fluent English, fixing typographical errors "
-                "and spacing. Preserve numeric values, dates, and the existing multiline "
-                "structure."
+            "instruction": TEXT_ENHANCER_SECTION_INSTRUCTIONS.get(
+                "exams",
+                "Keep the exam section unchanged aside from minor spacing fixes.",
             ),
         },
         "drugs": {
             "title": "Drugs",
-            "instruction": (
-                "Clean the medication list so it is consistent, readable, and in English. "
-                "Do not alter drug names, dosages, schedules, or suspension notes. Keep "
-                "the multiline layout and bulleting exactly as provided."
+            "instruction": TEXT_ENHANCER_SECTION_INSTRUCTIONS.get(
+                "drugs",
+                "Keep the drug list unchanged aside from minor spacing fixes.",
             ),
         },
     }
@@ -125,25 +125,14 @@ class ClinicalTextEnhancer:
         messages = [
             {
                 "role": "system",
-                "content": (
-                    "You are an assistant that improves clinical documentation without "
-                    "changing its factual content. Follow these rules strictly:\n"
-                    "- Keep the original meaning and details.\n"
-                    "- Maintain the existing multiline structure; preserve blank lines "
-                    "and bulleting.\n"
-                    "- Fix spelling, spacing, and punctuation issues.\n"
-                    "- Convert Italian or mixed-language phrases to clear English "
-                    "equivalents.\n"
-                    "- Never add, remove, or infer information beyond minor formatting "
-                    "adjustments."
-                ),
+                "content": TEXT_ENHANCER_SYSTEM_PROMPT,
             },
             {
                 "role": "user",
                 "content": (
                     f"Section: {section_name}\n"
                     f"Task: {instruction}\n\n"
-                    "Rewrite the text below, returning only the improved section:\n"
+                    "Lightly clean up the text below and return only the revised section:\n"
                     """```\n"""
                     f"{text}\n"
                     "```"
