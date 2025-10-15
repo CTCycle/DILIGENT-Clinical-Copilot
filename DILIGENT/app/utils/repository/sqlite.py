@@ -86,7 +86,7 @@ class DILIGENTDatabase:
         raise ValueError(f"No table class found for name {table_name}")
 
     # -------------------------------------------------------------------------
-    def _upsert_dataframe(self, df: pd.DataFrame, table_cls) -> None:
+    def upsert_dataframe(self, df: pd.DataFrame, table_cls) -> None:
         table = table_cls.__table__
         session = self.Session()
         try:
@@ -132,7 +132,7 @@ class DILIGENTDatabase:
     # -------------------------------------------------------------------------
     def upsert_into_database(self, df: pd.DataFrame, table_name: str) -> None:
         table_cls = self.get_table_class(table_name)
-        self._upsert_dataframe(df, table_cls)
+        self.upsert_dataframe(df, table_cls)
 
     # -----------------------------------------------------------------------------
     def count_rows(self, table_name: str) -> int:

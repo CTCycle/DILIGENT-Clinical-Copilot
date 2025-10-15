@@ -21,13 +21,13 @@ class RxNormCandidate:
 
 
 # -----------------------------------------------------------------------------
-def _is_truthy(value: str | None) -> bool:
+def is_truthy(value: str | None) -> bool:
     if value is None:
         return False
     return value.strip().lower() in {"1", "true", "yes", "on"}
 
 
-RXNORM_EXPANSION_ENABLED = _is_truthy(os.getenv("PHARMAGENT_RXNORM_EXPANSION", "1"))
+RXNORM_EXPANSION_ENABLED = is_truthy(os.getenv("PHARMAGENT_RXNORM_EXPANSION", "1"))
 
 
 ###############################################################################
@@ -160,11 +160,11 @@ class RxNavClient:
 
     # -------------------------------------------------------------------------
     def fetch_drug_terms(self, raw_name: str) -> list[str]:
-        payload = self._request(raw_name)
+        payload = self.request(raw_name)
         collected: dict[str, str] = {}
 
-        def _store(term: str) -> None:
-            normalized = self._standardize_term(term)
+        def store(term: str) -> None:
+            normalized = self.standardize_term(term)
             if not normalized:
                 return
             key = normalized.casefold()
@@ -185,17 +185,17 @@ class RxNavClient:
                         for prop in props:
                             if not isinstance(prop, dict):
                                 continue
-                            for value in self._gather_property_values(prop):
-                                for term in self._extract_core_names(value):
-                                    _store(term)
+                            for value in self.gather_property_values(prop):
+                                for term in self.extract_core_names(value):
+                                    store(term)
 
-        for term in self._extract_core_names(raw_name):
-            _store(term)
-        _store(raw_name)
+        for term in self.extract_core_names(raw_name):
+            store(term)
+        store(raw_name)
         return sorted(collected.values(), key=str.casefold)
 
     # -------------------------------------------------------------------------
-    def _gather_property_values(self, prop: dict[str, Any]) -> list[str]:
+    def gather_property_values(self, prop: dict[str, Any]) -> list[str]:
         values: list[str] = []
         for key in ("name", "synonym", "prescribableName", "psn"):
             value = prop.get(key)
@@ -204,7 +204,7 @@ class RxNavClient:
         return values
 
     # -------------------------------------------------------------------------
-    def _extract_core_names(self, raw_value: str | None) -> set[str]:
+    def extract_core_names(self, raw_value: str | None) -> set[str]:
         if not isinstance(raw_value, str):
             return set()
         text = unicodedata.normalize("NFKC", raw_value)
@@ -220,7 +220,7 @@ class RxNavClient:
                 continue
             tokens: list[str] = []
 
-            def _flush() -> None:
+            def flush() -> None:
                 if not tokens:
                     return
                 term = " ".join(tokens).strip()
@@ -231,26 +231,26 @@ class RxNavClient:
             for match in self.TERM_PATTERN.finditer(cleaned):
                 token = match.group(0)
                 if not any(char.isalpha() for char in token):
-                    _flush()
+                    flush()
                     continue
                 normalized = token.lower().strip("-'")
                 base = re.sub(r"[^a-z0-9]", "", normalized)
                 if not base:
-                    _flush()
+                    flush()
                     continue
                 if base in self.NAME_STOPWORDS or base.rstrip("s") in self.NAME_STOPWORDS:
-                    _flush()
+                    flush()
                     continue
                 tokens.append(token.strip("-'").strip())
-            _flush()
+            flush()
 
         standardized = {
-            self._standardize_term(term) for term in extracted if term.strip()
+            self.standardize_term(term) for term in extracted if term.strip()
         }
         return {term for term in standardized if term}
 
     # -------------------------------------------------------------------------
-    def _standardize_term(self, term: str) -> str:
+    def standardize_term(self, term: str) -> str:
         normalized = unicodedata.normalize("NFKC", term).strip()
         if not normalized:
             return ""
@@ -269,7 +269,7 @@ class RxNavClient:
 
     # -------------------------------------------------------------------------
     def expand(self, raw_name: str) -> dict[str, str]:
-        normalized_key = self._normalize_value(raw_name)
+        normalized_key = self.normalize_value(raw_name)
         if not normalized_key:
             return {}
         if not self.enabled:
@@ -277,7 +277,7 @@ class RxNavClient:
         cached = self.cache.get(normalized_key)
         if cached is not None:
             return {key: info.kind for key, info in cached.items()}
-        candidates = self._collect_candidates(raw_name)
+        candidates = self.collect_candidates(raw_name)
         if normalized_key not in candidates:
             candidates[normalized_key] = RxNormCandidate(
                 value=normalized_key,
@@ -292,7 +292,7 @@ class RxNavClient:
 
     # -------------------------------------------------------------------------
     def get_candidate_kind(self, original: str, candidate: str) -> str:
-        normalized_key = self._normalize_value(original)
+        normalized_key = self.normalize_value(original)
         if not normalized_key:
             return "unknown"
         cached = self.cache.get(normalized_key)
@@ -304,8 +304,8 @@ class RxNavClient:
         return info.kind
 
     # -------------------------------------------------------------------------
-    def _collect_candidates(self, raw_name: str) -> dict[str, RxNormCandidate]:
-        payload = self._request(raw_name)
+    def collect_candidates(self, raw_name: str) -> dict[str, RxNormCandidate]:
+        payload = self.request(raw_name)
         if payload is None:
             return {}
         drug_group = payload.get("drugGroup")
@@ -327,23 +327,23 @@ class RxNavClient:
                 suppress = prop.get("suppress")
                 if suppress and suppress != "N":
                     continue
-                for raw_value, source in self._extract_property_values(prop):
-                    normalized_value = self._normalize_value(raw_value)
+                for raw_value, source in self.extract_property_values(prop):
+                    normalized_value = self.normalize_value(raw_value)
                     if not normalized_value:
                         continue
-                    kind = self._classify_kind(raw_value, source)
-                    self._store_candidate(collected, normalized_value, kind)
-                    ingredient_variants = self._derive_ingredients(raw_value)
+                    kind = self.classify_kind(raw_value, source)
+                    self.store_candidate(collected, normalized_value, kind)
+                    ingredient_variants = self.derive_ingredients(raw_value)
                     if ingredient_variants:
                         if len(ingredient_variants) > 1:
                             combo = " / ".join(ingredient_variants)
-                            self._store_candidate(collected, combo, "ingredient_combo")
+                            self.store_candidate(collected, combo, "ingredient_combo")
                         for variant in ingredient_variants:
-                            self._store_candidate(collected, variant, "ingredient")
+                            self.store_candidate(collected, variant, "ingredient")
         return collected
 
     # -------------------------------------------------------------------------
-    def _request(self, raw_name: str) -> dict[str, Any] | None:
+    def request(self, raw_name: str) -> dict[str, Any] | None:
         params = {"name": raw_name, "expand": "psn"}
         for attempt in range(self.MAX_RETRIES):
             try:
@@ -387,7 +387,7 @@ class RxNavClient:
         return None
 
     # -------------------------------------------------------------------------
-    def _extract_property_values(self, prop: dict[str, Any]) -> list[tuple[str, str]]:
+    def extract_property_values(self, prop: dict[str, Any]) -> list[tuple[str, str]]:
         values: list[tuple[str, str]] = []
         for key in ("name", "synonym", "prescribableName", "psn"):
             value = prop.get(key)
@@ -398,23 +398,23 @@ class RxNavClient:
                 continue
             source = "psn" if key in {"prescribableName", "psn"} else key
             values.append((value, source))
-            for brand in self._extract_brands(value):
+            for brand in self.extract_brands(value):
                 values.append((brand, "brand"))
         return values
 
     # -------------------------------------------------------------------------
-    def _classify_kind(self, raw_value: str, source: str) -> str:
-        combo = self._normalize_combo(raw_value)
+    def classify_kind(self, raw_value: str, source: str) -> str:
+        combo = self.normalize_combo(raw_value)
         if " / " in combo or "+" in raw_value or "," in raw_value:
             return "ingredient_combo"
-        if source == "brand" or self._looks_like_brand(raw_value):
+        if source == "brand" or self.looks_like_brand(raw_value):
             return "brand"
         if source in {"prescribableName", "psn"}:
             return "psn"
         return "ingredient"
 
     # -------------------------------------------------------------------------
-    def _extract_brands(self, value: str) -> set[str]:
+    def extract_brands(self, value: str) -> set[str]:
         brands: set[str] = set()
         for match in re.findall(r"\[([^\]]+)\]", value):
             cleaned = match.strip()
@@ -428,23 +428,23 @@ class RxNavClient:
         return brands
 
     # -------------------------------------------------------------------------
-    def _derive_ingredients(self, raw_value: str) -> list[str]:
+    def derive_ingredients(self, raw_value: str) -> list[str]:
         stripped = re.sub(r"\[.*?\]", " ", raw_value)
         stripped = re.sub(r"\(.*?\)", " ", stripped)
         parts = re.split(r"\s*(?:/|\+|,)\s*", stripped)
         normalized_parts: list[str] = []
         for part in parts:
-            normalized = self._normalize_single_ingredient(part)
+            normalized = self.normalize_single_ingredient(part)
             if normalized and normalized not in normalized_parts:
                 normalized_parts.append(normalized)
         if not normalized_parts:
-            single = self._normalize_single_ingredient(stripped)
+            single = self.normalize_single_ingredient(stripped)
             if single:
                 normalized_parts.append(single)
         return normalized_parts
 
     # -------------------------------------------------------------------------
-    def _store_candidate(
+    def store_candidate(
         self,
         collected: dict[str, RxNormCandidate],
         normalized_value: str,
@@ -466,7 +466,7 @@ class RxNavClient:
             existing.kind = kind
 
     # -------------------------------------------------------------------------
-    def _normalize_value(self, value: str) -> str:
+    def normalize_value(self, value: str) -> str:
         normalized = (
             unicodedata.normalize("NFKD", value)
             .encode("ascii", "ignore")
@@ -480,7 +480,7 @@ class RxNavClient:
         return normalized
 
     # -------------------------------------------------------------------------
-    def _normalize_single_ingredient(self, value: str) -> str:
+    def normalize_single_ingredient(self, value: str) -> str:
         stripped = re.sub(r"\s+", " ", value).strip()
         if not stripped:
             return ""
@@ -500,17 +500,17 @@ class RxNavClient:
                 break
             kept.append(token_lower)
         normalized = " ".join(kept)
-        return self._normalize_value(normalized)
+        return self.normalize_value(normalized)
 
     # -------------------------------------------------------------------------
-    def _normalize_combo(self, value: str) -> str:
+    def normalize_combo(self, value: str) -> str:
         combo = value.replace("/", " / ")
         combo = re.sub(r"\s+/\s+", " / ", combo)
         combo = re.sub(r"\s+", " ", combo)
         return combo.strip()
 
     # -------------------------------------------------------------------------
-    def _looks_like_brand(self, value: str) -> bool:
+    def looks_like_brand(self, value: str) -> bool:
         stripped = value.strip()
         if not stripped:
             return False
@@ -526,6 +526,6 @@ class RxNavClient:
         return False
 
     # -------------------------------------------------------------------------
-    def _is_bracketed(self, value: str) -> bool:
+    def is_bracketed(self, value: str) -> bool:
         stripped = value.strip()
         return stripped.startswith("[") and stripped.endswith("]")

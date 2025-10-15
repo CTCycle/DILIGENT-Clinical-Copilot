@@ -43,7 +43,7 @@ DEFAULT_HTTP_HEADERS = {
 DOWNLOAD_CHUNK_SIZE = 262_144
 
 # -----------------------------------------------------------------------------
-def _load_json(path: str) -> dict[str, Any] | None:
+def load_json(path: str) -> dict[str, Any] | None:
     if not os.path.isfile(path):
         return None
     try:
@@ -58,7 +58,7 @@ def save_masterlist_metadata(path: str, payload: dict[str, Any]) -> None:
         json.dump(payload, handle)
 
 # -----------------------------------------------------------------------------
-def _metadata_matches(stored: dict[str, Any], remote: dict[str, Any]) -> bool:
+def metadata_matches(stored: dict[str, Any], remote: dict[str, Any]) -> bool:
     return (
         stored.get("last_modified") == remote.get("last_modified")
         and int(stored.get("size", 0)) == int(remote.get("size", 0))
@@ -171,7 +171,7 @@ class LiverToxUpdater:
             "secondary_classification",
         ]
         for column in text_columns:
-            data[column] = self._clean_master_list_column(data[column])
+            data[column] = self.clean_master_list_column(data[column])
 
         data = data.dropna(subset=["chapter_title"])
 
@@ -200,7 +200,7 @@ class LiverToxUpdater:
         return data.reset_index(drop=True)
 
     # -------------------------------------------------------------------------
-    def _clean_master_list_column(self, series: pd.Series) -> pd.Series:
+    def clean_master_list_column(self, series: pd.Series) -> pd.Series:
         cleaned = series.fillna("").astype(str).str.strip()
         cleaned = cleaned.replace("", pd.NA)
         return cleaned
@@ -222,14 +222,14 @@ class LiverToxUpdater:
             os.makedirs(dest_dir, exist_ok=True)
             file_path = os.path.join(dest_dir, self.file_name)
 
-            stored_metadata = _load_json(self.archive_metadata_path)
+            stored_metadata = load_json(self.archive_metadata_path)
             if self.redownload:
                 stored_metadata = None
 
             if (
                 stored_metadata
                 and os.path.isfile(file_path)
-                and _metadata_matches(stored_metadata, metadata)
+                and metadata_matches(stored_metadata, metadata)
             ):
                 logger.info("LiverTox archive unchanged; skipping download")
                 return {
@@ -262,7 +262,7 @@ class LiverToxUpdater:
     # -------------------------------------------------------------------------
     def refresh_master_list(self) -> tuple[dict[str, Any], pd.DataFrame]:
         logger.info("Refreshing LiverTox master list")
-        metadata = asyncio.run(self._download_master_list())
+        metadata = asyncio.run(self.download_master_list())
 
         frame = pd.read_excel(
             metadata["file_path"],
@@ -285,11 +285,11 @@ class LiverToxUpdater:
         return metadata, sanitized
 
     # -------------------------------------------------------------------------
-    async def _download_master_list(self) -> dict[str, Any]:
+    async def download_master_list(self) -> dict[str, Any]:
         async with httpx.AsyncClient(
             timeout=30.0, headers=self.http_headers, follow_redirects=True
         ) as client:
-            master_url = await self._resolve_master_list_url(client)
+            master_url = await self.resolve_master_list_url(client)
             head = await client.head(master_url)
             head.raise_for_status()
             metadata = {
@@ -297,13 +297,13 @@ class LiverToxUpdater:
                 "last_modified": head.headers.get("Last-Modified"),
                 "source_url": str(head.url),
             }
-            stored_metadata = _load_json(self.master_list_metadata_path)
+            stored_metadata = load_json(self.master_list_metadata_path)
             if self.redownload:
                 stored_metadata = None
             if (
                 stored_metadata
                 and os.path.isfile(self.master_list_path)
-                and _metadata_matches(stored_metadata, metadata)
+                and metadata_matches(stored_metadata, metadata)
             ):
                 logger.info("Master list unchanged; skipping download")
                 return {
@@ -334,20 +334,20 @@ class LiverToxUpdater:
         }
     
     # -------------------------------------------------------------------------
-    async def _resolve_master_list_url(self, client: httpx.AsyncClient) -> str:
+    async def resolve_master_list_url(self, client: httpx.AsyncClient) -> str:
         try:
-            return await self._resolve_master_list_from_bookshelf(client)
+            return await self.resolve_master_list_from_bookshelf(client)
         except Exception as exc:
             logger.warning("Bookshelf Excel lookup failed: %s", exc)
         try:
-            return await self._resolve_master_list_from_bin(client, self.base_url)
+            return await self.resolve_master_list_from_bin(client, self.base_url)
         except Exception as exc:
             logger.warning("Primary FTP lookup failed: %s", exc)
-            fallback_url = await self._resolve_master_list_via_datagov(client)
+            fallback_url = await self.resolve_master_list_via_datagov(client)
             return fallback_url
 
     # -------------------------------------------------------------------------
-    async def _resolve_master_list_from_bookshelf(
+    async def resolve_master_list_from_bookshelf(
         self, client: httpx.AsyncClient
     ) -> str:
         report_url = "https://www.ncbi.nlm.nih.gov/books/NBK571102/?report=excel"
@@ -372,13 +372,13 @@ class LiverToxUpdater:
                 candidate = httpx.URL(report_url).join(
                     head_response.headers["Location"]
                 )
-                return await self._probe_master_list_candidate(client, str(candidate))
+                return await self.probe_master_list_candidate(client, str(candidate))
             content_type = (head_response.headers.get("Content-Type") or "").lower()
             disposition = (
                 head_response.headers.get("Content-Disposition") or ""
             ).lower()
             if "excel" in content_type or ".xlsx" in disposition:
-                return await self._probe_master_list_candidate(
+                return await self.probe_master_list_candidate(
                     client, str(head_response.url)
                 )
 
@@ -387,12 +387,12 @@ class LiverToxUpdater:
             "Location"
         ):
             candidate = httpx.URL(report_url).join(get_response.headers["Location"])
-            return await self._probe_master_list_candidate(client, str(candidate))
+            return await self.probe_master_list_candidate(client, str(candidate))
 
         content_type = (get_response.headers.get("Content-Type") or "").lower()
         disposition = (get_response.headers.get("Content-Disposition") or "").lower()
         if "excel" in content_type or ".xlsx" in disposition:
-            return await self._probe_master_list_candidate(client, str(get_response.url))
+            return await self.probe_master_list_candidate(client, str(get_response.url))
 
         html_content = get_response.text
         for pattern in (
@@ -403,7 +403,7 @@ class LiverToxUpdater:
                 candidate_url = match.group(1)
                 candidate = httpx.URL(report_url).join(candidate_url)
                 try:
-                    return await self._probe_master_list_candidate(
+                    return await self.probe_master_list_candidate(
                         client, str(candidate)
                     )
                 except Exception as exc:  # pragma: no cover - network dependent
@@ -415,7 +415,7 @@ class LiverToxUpdater:
         raise RuntimeError("Unable to resolve master list via Bookshelf report page")
 
     # -------------------------------------------------------------------------
-    async def _resolve_master_list_from_bin(
+    async def resolve_master_list_from_bin(
         self, client: httpx.AsyncClient, base_url: str
     ) -> str:
         bin_url = str(httpx.URL(base_url).join("bin/"))
@@ -469,7 +469,7 @@ class LiverToxUpdater:
         return chosen_url
 
     # -------------------------------------------------------------------------
-    async def _resolve_master_list_via_datagov(
+    async def resolve_master_list_via_datagov(
         self, client: httpx.AsyncClient
     ) -> str:
         api_url = "https://catalog.data.gov/api/3/action/package_show"
@@ -494,7 +494,7 @@ class LiverToxUpdater:
             raw_url = str(resource.get("url") or "").strip()
             if not raw_url:
                 continue
-            normalized_url = self._normalize_datagov_resource_url(raw_url)
+            normalized_url = self.normalize_datagov_resource_url(raw_url)
             if not normalized_url:
                 continue
             lowered = normalized_url.lower()
@@ -525,7 +525,7 @@ class LiverToxUpdater:
         last_error: Exception | None = None
         for candidate in direct_candidates:
             try:
-                resolved_direct = await self._probe_master_list_candidate(
+                resolved_direct = await self.probe_master_list_candidate(
                     client, candidate
                 )
             except Exception as exc:  # pragma: no cover - network dependent
@@ -542,7 +542,7 @@ class LiverToxUpdater:
         original_base = self.base_url
         for base_candidate in folder_candidates:
             try:
-                resolved = await self._resolve_master_list_from_bin(client, base_candidate)
+                resolved = await self.resolve_master_list_from_bin(client, base_candidate)
             except Exception as exc:  # pragma: no cover - network dependent
                 last_error = exc
                 logger.debug(
@@ -558,7 +558,7 @@ class LiverToxUpdater:
         raise RuntimeError("Unable to resolve FTP folder from Data.gov entry")
 
     # -------------------------------------------------------------------------
-    def _normalize_datagov_resource_url(self, url: str) -> str | None:
+    def normalize_datagov_resource_url(self, url: str) -> str | None:
         normalized = url.strip()
         if not normalized:
             return None
@@ -571,16 +571,16 @@ class LiverToxUpdater:
         return None
 
     # -------------------------------------------------------------------------
-    async def _probe_master_list_candidate(
+    async def probe_master_list_candidate(
         self, client: httpx.AsyncClient, candidate: str
     ) -> str:
         try:
             response = await client.head(candidate)
             response.raise_for_status()
         except httpx.HTTPStatusError:  # pragma: no cover - network dependent
-            response = await self._fetch_candidate_with_get(client, candidate)
+            response = await self.fetch_candidate_with_get(client, candidate)
         except httpx.HTTPError:  # pragma: no cover - network dependent
-            response = await self._fetch_candidate_with_get(client, candidate)
+            response = await self.fetch_candidate_with_get(client, candidate)
         content_type = (response.headers.get("Content-Type") or "").lower()
         if ".xlsx" not in candidate.lower() and "excel" not in content_type:
             disposition = (response.headers.get("Content-Disposition") or "").lower()
@@ -590,7 +590,7 @@ class LiverToxUpdater:
         return str(response.url)
 
     # -------------------------------------------------------------------------
-    async def _fetch_candidate_with_get(
+    async def fetch_candidate_with_get(
         self, client: httpx.AsyncClient, candidate: str
     ) -> httpx.Response:
         probe_headers = dict(self.http_headers)
@@ -631,7 +631,7 @@ class LiverToxUpdater:
         logger.info("Sanitizing %d extracted entries", len(extracted))
         monograph_df = self.sanitize_records(extracted)
         logger.info("Combining LiverTox datasets")
-        unified = self._build_unified_dataset(
+        unified = self.build_unified_dataset(
             monograph_df,
             master_frame,
             master_metadata,
@@ -639,7 +639,7 @@ class LiverToxUpdater:
         logger.info("Enriching %d unified records with RxNav terms", len(unified.index))
         enriched = self.enrich_records(unified)
         logger.info("Finalizing sanitized dataset")
-        final_dataset = self._finalize_dataset(enriched)
+        final_dataset = self.finalize_dataset(enriched)
         logger.info("Persisting enriched records to database")
         self.serializer.save_livertox_records(final_dataset)
 
@@ -661,7 +661,7 @@ class LiverToxUpdater:
         return {"file_path": archive_path, "size": size, "last_modified": modified}
 
     # -----------------------------------------------------------------------------
-    def _build_unified_dataset(
+    def build_unified_dataset(
         self,
         monographs: pd.DataFrame,
         master_frame: pd.DataFrame,
@@ -728,7 +728,7 @@ class LiverToxUpdater:
                 if column not in dataset.columns:
                     dataset[column] = pd.NA
             dataset = dataset[final_columns]
-            return self._sanitize_unified_dataset(dataset)
+            return self.sanitize_unified_dataset(dataset)
 
         dataset = master.merge(monograph_df, on="drug_name", how="left")
         if not monograph_df.empty:
@@ -742,16 +742,16 @@ class LiverToxUpdater:
                 filler = filler[dataset.columns]
                 dataset = pd.concat([dataset, filler], ignore_index=True)
         dataset = dataset[final_columns]
-        return self._sanitize_unified_dataset(dataset)
+        return self.sanitize_unified_dataset(dataset)
 
     # -------------------------------------------------------------------------
-    def _contains_symbol(self, value: str) -> bool:
+    def contains_symbol(self, value: str) -> bool:
         if not isinstance(value, str):
             return False
         return bool(re.search(r"[^A-Za-z0-9\s\-/(),'.+]", value))
 
     # -------------------------------------------------------------------------
-    def _sanitize_unified_dataset(self, frame: pd.DataFrame) -> pd.DataFrame:
+    def sanitize_unified_dataset(self, frame: pd.DataFrame) -> pd.DataFrame:
         if frame.empty:
             return frame.copy()
         sanitized = frame.copy()
@@ -759,7 +759,7 @@ class LiverToxUpdater:
         sanitized = sanitized[sanitized["drug_name"] != ""]
         numeric_mask = sanitized["drug_name"].str.fullmatch(r"\d+")
         sanitized = sanitized[~numeric_mask]
-        symbol_mask = sanitized["drug_name"].apply(self._contains_symbol)
+        symbol_mask = sanitized["drug_name"].apply(self.contains_symbol)
         sanitized = sanitized[~symbol_mask]
 
         for column in ("ingredient", "brand_name"):
@@ -773,7 +773,7 @@ class LiverToxUpdater:
                 sanitized[column].isin(["", "nan", "None", "<NA>"]), column
             ] = pd.NA
             invalid_mask = sanitized[column].notna() & sanitized[column].apply(
-                self._contains_symbol
+                self.contains_symbol
             )
             invalid_mask = invalid_mask.fillna(False)
             sanitized = sanitized[~invalid_mask]
@@ -845,7 +845,7 @@ class LiverToxUpdater:
                 base_name = os.path.basename(member_name).lower()
                 if base_name in processed_files:
                     continue
-                record = LiverToxUpdater._process_monograph_member(member_name, data)
+                record = LiverToxUpdater.process_monograph_member(member_name, data)
                 if not record:
                     continue
                 collected.append(record)
@@ -883,21 +883,21 @@ class LiverToxUpdater:
 
     # -------------------------------------------------------------------------
     @staticmethod
-    def _process_monograph_member(
+    def process_monograph_member(
         member_name: str,
         data: bytes,
     ) -> dict[str, str] | None:
-        payload = LiverToxUpdater._convert_member_bytes(member_name, data)
+        payload = LiverToxUpdater.convert_member_bytes(member_name, data)
         if payload is None:
             return None
         plain_text, markup_text = payload
         if not plain_text:
             return None
-        nbk_id = LiverToxUpdater._extract_nbk(member_name, markup_text or plain_text)
-        record_nbk = nbk_id or LiverToxUpdater._derive_identifier(member_name)
+        nbk_id = LiverToxUpdater.extract_nbk(member_name, markup_text or plain_text)
+        record_nbk = nbk_id or LiverToxUpdater.derive_identifier(member_name)
         if not record_nbk:
             return None
-        drug_name = LiverToxUpdater._extract_title(
+        drug_name = LiverToxUpdater.extract_title(
             markup_text or "",
             plain_text,
             record_nbk,
@@ -913,23 +913,23 @@ class LiverToxUpdater:
 
     # -------------------------------------------------------------------------
     @staticmethod
-    def _convert_member_bytes(
+    def convert_member_bytes(
         member_name: str, data: bytes
     ) -> tuple[str, str | None] | None:
         lower_name = member_name.lower()
         if lower_name.endswith(".pdf"):
-            text = LiverToxUpdater._pdf_to_text(data)
+            text = LiverToxUpdater.pdf_to_text(data)
             if text.strip():
                 return text, None
-            decoded = LiverToxUpdater._decode_markup(data)
+            decoded = LiverToxUpdater.decode_markup(data)
             return decoded, decoded
-        markup = LiverToxUpdater._decode_markup(data)
-        text = LiverToxUpdater._html_to_text(markup)
+        markup = LiverToxUpdater.decode_markup(data)
+        text = LiverToxUpdater.html_to_text(markup)
         return text, markup
 
     # -------------------------------------------------------------------------
     @staticmethod
-    def _decode_markup(data: bytes) -> str:
+    def decode_markup(data: bytes) -> str:
         try:
             return data.decode("utf-8")
         except UnicodeDecodeError:
@@ -937,7 +937,7 @@ class LiverToxUpdater:
 
     # -------------------------------------------------------------------------
     @staticmethod
-    def _pdf_to_text(data: bytes) -> str:
+    def pdf_to_text(data: bytes) -> str:
         buffer = io.BytesIO(data)
         if pdfminer_extract_text is not None:
             try:
@@ -967,7 +967,7 @@ class LiverToxUpdater:
 
     # -------------------------------------------------------------------------
     @staticmethod
-    def _extract_nbk(member_name: str, content: str) -> str | None:
+    def extract_nbk(member_name: str, content: str) -> str | None:
         match = re.search(r"NBK\d+", member_name, re.IGNORECASE)
         if match:
             return match.group(0).upper()
@@ -978,17 +978,17 @@ class LiverToxUpdater:
 
     # -------------------------------------------------------------------------
     @staticmethod
-    def _derive_identifier(member_name: str) -> str:
+    def derive_identifier(member_name: str) -> str:
         base = os.path.basename(member_name)
         stem = os.path.splitext(base)[0]
-        cleaned = LiverToxUpdater._normalize_whitespace(
-            LiverToxUpdater._strip_punctuation(stem)
+        cleaned = LiverToxUpdater.normalize_whitespace(
+            LiverToxUpdater.strip_punctuation(stem)
         )
         return cleaned or base
 
     # -------------------------------------------------------------------------
     @staticmethod
-    def _extract_title(html_text: str, plain_text: str, default: str) -> str:
+    def extract_title(html_text: str, plain_text: str, default: str) -> str:
         patterns = (
             r"<title[^>]*>(.*?)</title>",
             r"<article-title[^>]*>(.*?)</article-title>",
@@ -997,7 +997,7 @@ class LiverToxUpdater:
         for pattern in patterns:
             match = re.search(pattern, html_text, flags=re.IGNORECASE | re.DOTALL)
             if match:
-                fragment = LiverToxUpdater._clean_fragment(match.group(1))
+                fragment = LiverToxUpdater.clean_fragment(match.group(1))
                 if fragment:
                     return fragment
         for line in plain_text.splitlines():
@@ -1008,25 +1008,25 @@ class LiverToxUpdater:
 
     # -------------------------------------------------------------------------
     @staticmethod
-    def _clean_fragment(fragment: str) -> str:
-        return LiverToxUpdater._html_to_text(fragment)
+    def clean_fragment(fragment: str) -> str:
+        return LiverToxUpdater.html_to_text(fragment)
 
     # -------------------------------------------------------------------------
     @staticmethod
-    def _html_to_text(html_text: str) -> str:
+    def html_to_text(html_text: str) -> str:
         stripped = re.sub(r"(?is)<(script|style)[^>]*>.*?</\1>", " ", html_text)
         stripped = re.sub(r"<[^>]+>", " ", stripped)
         unescaped = html.unescape(stripped)
-        return LiverToxUpdater._normalize_whitespace(unescaped)
+        return LiverToxUpdater.normalize_whitespace(unescaped)
 
     # -------------------------------------------------------------------------
     @staticmethod
-    def _normalize_whitespace(value: str) -> str:
+    def normalize_whitespace(value: str) -> str:
         return re.sub(r"\s+", " ", value).strip()
 
     # -------------------------------------------------------------------------
     @staticmethod
-    def _strip_punctuation(value: str) -> str:
+    def strip_punctuation(value: str) -> str:
         normalized = unicodedata.normalize("NFKD", value)
         folded = "".join(char for char in normalized if not unicodedata.combining(char))
         return re.sub(r"[-_,.;:()\[\]{}\/\\]", " ", folded)
@@ -1150,12 +1150,12 @@ class LiverToxUpdater:
             for candidate in collected:
                 if not isinstance(candidate, str):
                     continue
-                normalized = self._normalize_whitespace(candidate)
+                normalized = self.normalize_whitespace(candidate)
                 if (
                     not normalized
                     or len(normalized) < 4
                     or normalized.isnumeric()
-                    or self._contains_symbol(normalized)
+                    or self.contains_symbol(normalized)
                 ):
                     continue
 
@@ -1174,7 +1174,7 @@ class LiverToxUpdater:
                 refined = " ".join(tokens).strip()
                 if (
                     len(refined) < 4
-                    or self._contains_symbol(refined)
+                    or self.contains_symbol(refined)
                 ):
                     continue
 
@@ -1194,10 +1194,10 @@ class LiverToxUpdater:
         return enriched
 
     # -------------------------------------------------------------------------
-    def _finalize_dataset(self, frame: pd.DataFrame) -> pd.DataFrame:
+    def finalize_dataset(self, frame: pd.DataFrame) -> pd.DataFrame:
         if frame.empty:
             return frame.copy()
-        finalized = self._sanitize_unified_dataset(frame)
+        finalized = self.sanitize_unified_dataset(frame)
         fill_value = "Not available"
         for column in finalized.columns:
             if column == "drug_name":
@@ -1228,11 +1228,11 @@ class LiverToxUpdater:
 
 
 ###############################################################################
-def _process_monograph_payload(
+def process_monograph_payload(
     member_name: str,
     data: bytes,
 ) -> dict[str, str] | None:
-    return LiverToxUpdater._process_monograph_member(member_name, data)
+    return LiverToxUpdater.process_monograph_member(member_name, data)
 
 
 ###############################################################################

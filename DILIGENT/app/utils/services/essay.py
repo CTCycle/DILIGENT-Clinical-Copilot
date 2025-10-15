@@ -135,7 +135,7 @@ class LiverToxMatcher:
         if master_list_df is not None and not master_list_df.empty:
             self.master_list_df = master_list_df.copy()
         else:
-            self.master_list_df = self._derive_master_alias_source(livertox_df)
+            self.master_list_df = self.derive_master_alias_source(livertox_df)
         self.match_cache: dict[str, LiverToxMatch | None] = {}
         self.records: list[MonographRecord] = []
         self.primary_index: dict[str, MonographRecord] = {}
@@ -146,9 +146,9 @@ class LiverToxMatcher:
         self.brand_index: dict[str, list[tuple[str, str]]] = {}
         self.ingredient_index: dict[str, list[tuple[str, str]]] = {}
         self.rows_by_name: dict[str, dict[str, Any]] = {}
-        self._build_records()
-        self._build_master_list_aliases()
-        self._finalize_token_index()
+        self.build_records()
+        self.build_master_list_aliases()
+        self.finalize_token_index()
 
     # -------------------------------------------------------------------------
     async def match_drug_names(
@@ -160,7 +160,7 @@ class LiverToxMatcher:
         results: list[LiverToxMatch | None] = [None] * total
         if not self.records:
             return results
-        normalized_queries = [self._normalize_name(name) for name in patient_drugs]
+        normalized_queries = [self.normalize_name(name) for name in patient_drugs]
         for idx, normalized in enumerate(normalized_queries):
             if not normalized:
                 continue
@@ -168,12 +168,12 @@ class LiverToxMatcher:
             if cached is not None or normalized in self.match_cache:
                 results[idx] = cached
                 continue
-            lookup = self._match_query(normalized)
+            lookup = self.match_query(normalized)
             if lookup is None:
                 self.match_cache[normalized] = None
                 continue
             record, confidence, reason, notes = lookup
-            match = self._create_match(record, confidence, reason, notes)
+            match = self.create_match(record, confidence, reason, notes)
             self.match_cache[normalized] = match
             results[idx] = match
         return results
@@ -185,18 +185,18 @@ class LiverToxMatcher:
         matches: list[LiverToxMatch | None],
     ) -> list[dict[str, Any]]:
         entries: list[dict[str, Any]] = []
-        row_index = self._ensure_row_index()
+        row_index = self.ensure_row_index()
         for original, match in zip(patient_drugs, matches, strict=False):
             row_data: dict[str, Any] | None = None
             excerpts: list[str] = []
             if match is not None:
                 normalized_key: str | None = None
                 if match.record is not None:
-                    normalized_key = match.record.normalized_name or self._normalize_name(
+                    normalized_key = match.record.normalized_name or self.normalize_name(
                         match.record.drug_name
                     )
                 if not normalized_key:
-                    normalized_key = self._normalize_name(match.matched_name)
+                    normalized_key = self.normalize_name(match.matched_name)
                 if normalized_key:
                     row = row_index.get(normalized_key)
                     if row:
@@ -217,14 +217,14 @@ class LiverToxMatcher:
         return entries
 
     # -------------------------------------------------------------------------
-    def _match_query(
+    def match_query(
         self, normalized_query: str
     ) -> tuple[MonographRecord, float, str, list[str]] | None:
-        direct = self._match_primary(normalized_query)
+        direct = self.match_primary(normalized_query)
         if direct is not None:
             return direct
-        synonym = self._match_synonym(normalized_query)
-        master = self._match_master_list(normalized_query)
+        synonym = self.match_synonym(normalized_query)
+        master = self.match_master_list(normalized_query)
         if synonym is not None and master is not None:
             syn_record, *_ = synonym
             master_record, *_ = master
@@ -234,13 +234,13 @@ class LiverToxMatcher:
             return synonym
         if master is not None:
             return master
-        partial = self._match_partial(normalized_query)
+        partial = self.match_partial(normalized_query)
         if partial is not None:
             return partial
-        return self._match_fuzzy(normalized_query)
+        return self.match_fuzzy(normalized_query)
 
     # -------------------------------------------------------------------------
-    def _match_primary(
+    def match_primary(
         self, normalized_query: str
     ) -> tuple[MonographRecord, float, str, list[str]] | None:
         record = self.primary_index.get(normalized_query)
@@ -249,7 +249,7 @@ class LiverToxMatcher:
         return record, self.DIRECT_CONFIDENCE, "monograph_name", []
 
     # -------------------------------------------------------------------------
-    def _match_master_list(
+    def match_master_list(
         self, normalized_query: str
     ) -> tuple[MonographRecord, float, str, list[str]] | None:
         alias_sources = (
@@ -261,7 +261,7 @@ class LiverToxMatcher:
             if not entries:
                 continue
             for alias_value, primary_name in entries:
-                resolved = self._match_primary_name(primary_name)
+                resolved = self.match_primary_name(primary_name)
                 if resolved is None:
                     continue
                 record, base_confidence, primary_reason, primary_notes = resolved
@@ -276,7 +276,7 @@ class LiverToxMatcher:
         return None
 
     # -------------------------------------------------------------------------
-    def _match_synonym(
+    def match_synonym(
         self, normalized_query: str
     ) -> tuple[MonographRecord, float, str, list[str]] | None:
         alias = self.synonym_index.get(normalized_query)
@@ -287,10 +287,10 @@ class LiverToxMatcher:
         return record, self.SYNONYM_CONFIDENCE, "synonym_match", notes
 
     # -------------------------------------------------------------------------
-    def _match_partial(
+    def match_partial(
         self, normalized_query: str
     ) -> tuple[MonographRecord, float, str, list[str]] | None:
-        tokens = [token for token in normalized_query.split() if self._is_token_valid(token)]
+        tokens = [token for token in normalized_query.split() if self.is_token_valid(token)]
         if not tokens:
             return None
         candidate_scores: dict[str, int] = {}
@@ -319,12 +319,12 @@ class LiverToxMatcher:
         return best_record, self.PARTIAL_CONFIDENCE, "partial_synonym", notes
 
     # -------------------------------------------------------------------------
-    def _match_fuzzy(
+    def match_fuzzy(
         self, normalized_query: str
     ) -> tuple[MonographRecord, float, str, list[str]] | None:
         if len(normalized_query) < 4:
             return None
-        variant = self._find_best_variant(normalized_query)
+        variant = self.find_best_variant(normalized_query)
         if variant is None:
             return None
         record, original, is_primary, score = variant
@@ -335,13 +335,13 @@ class LiverToxMatcher:
         return record, max(self.FUZZY_CONFIDENCE, score), reason, notes
 
     # -------------------------------------------------------------------------
-    def _match_primary_name(
+    def match_primary_name(
         self, drug_name: str
     ) -> tuple[MonographRecord, float, str, list[str]] | None:
-        normalized_name = self._normalize_name(drug_name)
+        normalized_name = self.normalize_name(drug_name)
         if not normalized_name:
             return None
-        direct = self._match_primary(normalized_name)
+        direct = self.match_primary(normalized_name)
         if direct is not None:
             record, confidence, _, _ = direct
             return record, confidence, "drug_name", []
@@ -353,7 +353,7 @@ class LiverToxMatcher:
         return record, self.SYNONYM_CONFIDENCE, "drug_synonym", notes
 
     # -------------------------------------------------------------------------
-    def _find_best_variant(
+    def find_best_variant(
         self, normalized_query: str
     ) -> tuple[MonographRecord, str, bool, float] | None:
         best: tuple[MonographRecord, str, bool, float] | None = None
@@ -368,25 +368,25 @@ class LiverToxMatcher:
         return best
 
     # -------------------------------------------------------------------------
-    def _build_records(self) -> None:
+    def build_records(self) -> None:
         if self.livertox_df is None or self.livertox_df.empty:
             return
         token_occurrences: dict[str, list[MonographRecord]] = {}
         for row in self.livertox_df.itertuples(index=False):
-            raw_name = self._coerce_text(getattr(row, "drug_name", None))
+            raw_name = self.coerce_text(getattr(row, "drug_name", None))
             if raw_name is None:
                 continue
-            normalized_name = self._normalize_name(raw_name)
+            normalized_name = self.normalize_name(raw_name)
             if not normalized_name:
                 continue
             nbk_raw = getattr(row, "nbk_id", None)
             nbk_id = str(nbk_raw).strip() if nbk_raw not in (None, "") else ""
             if not nbk_id:
                 continue
-            excerpt = self._coerce_text(getattr(row, "excerpt", None))
+            excerpt = self.coerce_text(getattr(row, "excerpt", None))
             synonyms_value = getattr(row, "synonyms", None)
-            synonyms = self._parse_synonyms(synonyms_value)
-            tokens = self._collect_tokens(raw_name, list(synonyms.values()))
+            synonyms = self.parse_synonyms(synonyms_value)
+            tokens = self.collect_tokens(raw_name, list(synonyms.values()))
             record = MonographRecord(
                 nbk_id=nbk_id,
                 drug_name=raw_name,
@@ -414,24 +414,24 @@ class LiverToxMatcher:
         self.token_occurrences = token_occurrences
 
     # -------------------------------------------------------------------------
-    def _build_master_list_aliases(self) -> None:
+    def build_master_list_aliases(self) -> None:
         self.brand_index = {}
         self.ingredient_index = {}
         if self.master_list_df is None or self.master_list_df.empty:
             return
         for row in self.master_list_df.itertuples(index=False):
-            drug_name = self._coerce_text(getattr(row, "drug_name", None))
+            drug_name = self.coerce_text(getattr(row, "drug_name", None))
             if drug_name is None:
                 continue
-            brand = self._coerce_text(getattr(row, "brand_name", None))
-            ingredient = self._coerce_text(getattr(row, "ingredient", None))
+            brand = self.coerce_text(getattr(row, "brand_name", None))
+            ingredient = self.coerce_text(getattr(row, "ingredient", None))
             for alias_type, value in ("brand", brand), ("ingredient", ingredient):
                 if value is None:
                     continue
                 if value.lower() == "not available":
                     continue
-                for variant in self._iter_alias_variants(value):
-                    normalized_variant = self._normalize_name(variant)
+                for variant in self.iter_alias_variants(value):
+                    normalized_variant = self.normalize_name(variant)
                     if not normalized_variant:
                         continue
                     index = (
@@ -443,7 +443,7 @@ class LiverToxMatcher:
                         bucket.append(entry)
 
     # -------------------------------------------------------------------------
-    def _finalize_token_index(self) -> None:
+    def finalize_token_index(self) -> None:
         if not self.token_occurrences:
             self.token_index = {}
             return
@@ -455,7 +455,7 @@ class LiverToxMatcher:
         self.token_index = filtered
 
     # -------------------------------------------------------------------------
-    def _coerce_text(self, value: Any) -> str | None:
+    def coerce_text(self, value: Any) -> str | None:
         if value is None:
             return None
         try:
@@ -470,19 +470,19 @@ class LiverToxMatcher:
         return text or None
 
     # -------------------------------------------------------------------------
-    def _iter_alias_variants(self, value: str) -> list[str]:
-        normalized_value = self._normalize_whitespace(value)
+    def iter_alias_variants(self, value: str) -> list[str]:
+        normalized_value = self.normalize_whitespace(value)
         if not normalized_value:
             return []
         variants: set[str] = {normalized_value}
         for segment in re.split(r"[;,/\n]+", value):
-            candidate = self._normalize_whitespace(segment)
+            candidate = self.normalize_whitespace(segment)
             if candidate:
                 variants.add(candidate)
         return list(variants)
 
     # -------------------------------------------------------------------------
-    def _derive_master_alias_source(
+    def derive_master_alias_source(
         self, dataset: pd.DataFrame | None
     ) -> pd.DataFrame | None:
         if dataset is None or dataset.empty:
@@ -497,21 +497,21 @@ class LiverToxMatcher:
         return alias.reset_index(drop=True)
 
     # -------------------------------------------------------------------------
-    def _parse_synonyms(self, value: Any) -> dict[str, str]:
+    def parse_synonyms(self, value: Any) -> dict[str, str]:
         synonyms: dict[str, str] = {}
-        raw_values = self._extract_synonym_strings(value)
+        raw_values = self.extract_synonym_strings(value)
         if not raw_values:
-            text = self._coerce_text(value)
+            text = self.coerce_text(value)
             if text is None:
                 return {}
             raw_values = [text]
         for raw in raw_values:
-            text = self._coerce_text(raw)
+            text = self.coerce_text(raw)
             if text is None:
                 continue
             for candidate in re.split(r"[;,/\n]+", text):
-                for variant in self._expand_variant(candidate):
-                    normalized = self._normalize_name(variant)
+                for variant in self.expand_variant(candidate):
+                    normalized = self.normalize_name(variant)
                     if not normalized:
                         continue
                     if normalized in MATCHING_STOPWORDS:
@@ -523,33 +523,33 @@ class LiverToxMatcher:
         return synonyms
 
     # -------------------------------------------------------------------------
-    def _extract_synonym_strings(self, value: Any) -> list[str]:
+    def extract_synonym_strings(self, value: Any) -> list[str]:
         if value is None:
             return []
         if isinstance(value, dict):
             collected: list[str] = []
             for entry in value.values():
-                collected.extend(self._extract_synonym_strings(entry))
+                collected.extend(self.extract_synonym_strings(entry))
             return collected
         if isinstance(value, (list, tuple, set)):
             collected: list[str] = []
             for entry in value:
-                collected.extend(self._extract_synonym_strings(entry))
+                collected.extend(self.extract_synonym_strings(entry))
             return collected
         if isinstance(value, str):
             stripped = value.strip()
             if stripped.startswith(("{", "[")) and stripped.endswith(("}", "]")):
-                parsed = self._try_parse_json(stripped)
+                parsed = self.try_parse_json(stripped)
                 if isinstance(parsed, dict) or isinstance(parsed, list):
-                    return self._extract_synonym_strings(parsed)
+                    return self.extract_synonym_strings(parsed)
             return [value]
-        text = self._coerce_text(value)
+        text = self.coerce_text(value)
         if text is None:
             return []
-        return self._extract_synonym_strings(text)
+        return self.extract_synonym_strings(text)
 
     # -------------------------------------------------------------------------
-    def _try_parse_json(self, value: str) -> Any:
+    def try_parse_json(self, value: str) -> Any:
         if not value:
             return None
         try:
@@ -558,8 +558,8 @@ class LiverToxMatcher:
             return None
 
     # -------------------------------------------------------------------------
-    def _expand_variant(self, value: str) -> list[str]:
-        normalized = self._normalize_whitespace(value)
+    def expand_variant(self, value: str) -> list[str]:
+        normalized = self.normalize_whitespace(value)
         if not normalized:
             return []
         variants = {normalized}
@@ -570,25 +570,25 @@ class LiverToxMatcher:
         return list(variants)
 
     # -------------------------------------------------------------------------
-    def _collect_tokens(self, primary: str, synonyms: list[str]) -> set[str]:
+    def collect_tokens(self, primary: str, synonyms: list[str]) -> set[str]:
         tokens: set[str] = set()
         for source in [primary, *synonyms]:
-            tokens.update(self._tokenize(source))
+            tokens.update(self.tokenize(source))
         return tokens
 
     # -------------------------------------------------------------------------
-    def _tokenize(self, value: str) -> set[str]:
-        normalized = self._normalize_name(value)
+    def tokenize(self, value: str) -> set[str]:
+        normalized = self.normalize_name(value)
         if not normalized:
             return set()
         return {
             token
             for token in normalized.split()
-            if self._is_token_valid(token)
+            if self.is_token_valid(token)
         }
 
     # -------------------------------------------------------------------------
-    def _is_token_valid(self, token: str) -> bool:
+    def is_token_valid(self, token: str) -> bool:
         if len(token) < 4:
             return False
         if token in MATCHING_STOPWORDS:
@@ -596,21 +596,21 @@ class LiverToxMatcher:
         return not token.isdigit()
 
     # -------------------------------------------------------------------------
-    def _normalize_whitespace(self, value: str) -> str:
+    def normalize_whitespace(self, value: str) -> str:
         return re.sub(r"\s+", " ", value).strip()
 
     # -------------------------------------------------------------------------
-    def _ensure_row_index(self) -> dict[str, dict[str, Any]]:
+    def ensure_row_index(self) -> dict[str, dict[str, Any]]:
         if self.rows_by_name:
             return self.rows_by_name
         if self.livertox_df is None or self.livertox_df.empty:
             return {}
         index: dict[str, dict[str, Any]] = {}
         for row in self.livertox_df.to_dict(orient="records"):
-            drug_name = self._coerce_text(row.get("drug_name"))
+            drug_name = self.coerce_text(row.get("drug_name"))
             if drug_name is None:
                 continue
-            normalized = self._normalize_name(drug_name)
+            normalized = self.normalize_name(drug_name)
             if not normalized:
                 continue
             index[normalized] = row
@@ -618,7 +618,7 @@ class LiverToxMatcher:
         return self.rows_by_name
 
     # -------------------------------------------------------------------------
-    def _create_match(
+    def create_match(
         self,
         record: MonographRecord,
         confidence: float,
@@ -637,7 +637,7 @@ class LiverToxMatcher:
         )
 
     # -------------------------------------------------------------------------
-    def _normalize_name(self, name: str) -> str:
+    def normalize_name(self, name: str) -> str:
         normalized = (
             unicodedata.normalize("NFKD", name)
             .encode("ascii", "ignore")
