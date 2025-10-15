@@ -7,7 +7,6 @@ import gradio as gr
 from DILIGENT.app.client.controllers import (
     clear_agent_fields,
     normalize_visit_date_component,
-    preload_selected_models,
     pull_selected_models,
     run_agent,
     set_clinical_model,
@@ -16,7 +15,6 @@ from DILIGENT.app.client.controllers import (
     set_ollama_reasoning,
     set_ollama_temperature,
     set_parsing_model,
-    start_ollama_client,
     toggle_cloud_services,
 )
 from DILIGENT.app.configurations import ClientRuntimeConfig
@@ -223,15 +221,6 @@ def create_interface() -> gr.Blocks:
                                     pull_models_button = gr.Button(
                                         "Pull models",
                                         variant="secondary",
-                                    )
-                                    start_ollama_button = gr.Button(
-                                        "Start Ollama client",
-                                        variant="secondary",
-                                        interactive=not ClientRuntimeConfig.is_cloud_enabled(),
-                                    )
-                                    preload_button = gr.Button(
-                                        "Preload models",
-                                        variant="secondary",
                                         interactive=not ClientRuntimeConfig.is_cloud_enabled(),
                                     )
 
@@ -248,8 +237,7 @@ def create_interface() -> gr.Blocks:
             outputs=[
                 llm_provider_dropdown,
                 cloud_model_dropdown,
-                start_ollama_button,
-                preload_button,
+                pull_models_button,
                 temperature_input,
                 reasoning_checkbox,
                 clinical_model_dropdown,
@@ -312,18 +300,6 @@ def create_interface() -> gr.Blocks:
             ],
             outputs=output,
             api_name="run_agent",
-        )
-        start_ollama_button.click(
-            fn=start_ollama_client,
-            outputs=output,
-        )
-        preload_button.click(
-            fn=preload_selected_models,
-            inputs=[
-                parsing_model_dropdown,
-                clinical_model_dropdown,
-            ],
-            outputs=output,
         )
         clear_button.click(
             fn=clear_agent_fields,
