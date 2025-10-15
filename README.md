@@ -1,51 +1,102 @@
 # DILIGENT
 
 ## 1. Introduction
-DILIGENT is a LLM-powered solution to perform Drug induced liver injury (DILI) analysis without human assistance. The app is developed using a FASTAPI for the backend and gradio to create a nice and intuitive UI.
+DILIGENT Clinical Copilot is an LLM-powered assistant that guides clinicians through Drug-Induced Liver Injury (DILI) investigations. The service combines a FastAPI backend with a Gradio front-end to collect patient data, analyse hepatotoxicity patterns, and produce structured consultation notes. It can reason with fully local language models served by Ollama and, when configured, fall back to approved cloud providers for advanced reasoning or document parsing. All sessions are stored in a local SQLite database so that outcomes, model selections, and timing data remain auditable.
 
-It makes use of Ollama to interact with local models and keep the entire process compliant with high privacy standard and completely free, even though it is optionally possible to use online LLM services such as ChatGPT and Gemini as well.
+Core capabilities include:
 
-## 2. Installation 
-The installation process for Windows is fully automated. Simply run the script *start_on_windows.bat* to begin. During its initial execution, the script installs portable Python, necessary dependencies, minimizing user interaction and ensuring all components are ready for local use.  
+- Automated hepatotoxicity pattern classification using ALT/ALP inputs.
+- Drug name extraction and LiverTox-powered risk summaries from free-text notes.
+- Configurable LLM providers (local Ollama models or authorised cloud APIs).
+- A clinician-oriented user interface that captures anamnesis, symptoms, exams, and lab values.
+- REST endpoints for submitting patient sessions programmatically and querying the available Ollama models.
+
+## 2. Installation
+
+### Windows quick start
+The Windows onboarding flow is fully automated. Double-click `DILIGENT/start_on_windows.bat`; the script installs a portable Python runtime, sets up a virtual environment, and installs all dependencies before launching the application. Antivirus tools such as Avast may prompt when the script creates the embedded Python interpreter—add an exception if required.
+
+### Manual setup (macOS, Linux, or custom Windows environments)
+
+1. **Install prerequisites**
+   - Python 3.12
+   - [Ollama](https://ollama.com/) if you plan to run local models
+   - Optional: access tokens for any cloud LLM provider you intend to enable
+2. **Clone the repository**
+
+   ```bash
+   git clone https://github.com/<your-org>/DILIGENT-Clinical-Copilot.git
+   cd DILIGENT-Clinical-Copilot
+   ```
+
+3. **Create a virtual environment and install dependencies**
+
+   ```bash
+   python -m venv .venv
+   source .venv/bin/activate  # On Windows use .venv\Scripts\activate
+   pip install --upgrade pip
+   pip install -e .
+   ```
+
+4. **Configure environment variables**
+   - Copy `DILIGENT/resources/templates/.env` to `DILIGENT/setup/.env`.
+   - Adjust hosts, ports, and API keys to match your deployment.
+
+5. **Verify Ollama or cloud credentials**
+   - Ensure the Ollama service is running locally if you rely on on-premise models.
+   - Provide cloud keys (for example, OpenAI) only if you intend to enable remote inference.
+
+The database schema is created automatically the first time the application starts.
 
 ## 3. How to use
-On Windows, run *start_on_windows.bat* to launch the application. Please note that some antivirus software, such as Avast, may flag or quarantine python.exe when called by the .bat file. If you encounter unusual behavior, consider adding an exception in your antivirus settings.
 
-The intuitive interface facilitates easy interactions with the DILIGENT core functionalities.
+- **Windows**: run `DILIGENT/start_on_windows.bat` to launch both the FastAPI backend and the Gradio UI in a single step.
+- **macOS/Linux**: activate your virtual environment, then start the web stack:
+
+  ```bash
+  uvicorn DILIGENT.app.app:app --host 0.0.0.0 --port 8000
+  ```
+
+  The interactive UI will be available at `http://localhost:8000/ui`, while the API documentation can be viewed at `http://localhost:8000/docs`.
+
+Once the UI is open:
+
+1. Populate the anamnesis, symptom list, current medications, and lab values.
+2. Choose the preferred provider (Ollama or cloud) and model family via the side configuration panel.
+3. Trigger the analysis; the agent collates lab trends, parses medications, queries the LiverTox knowledge base, and returns a Markdown consultation summary.
+4. Download or copy the generated report for inclusion in the patient record. All submissions are logged to the SQLite database for later review.
+
+The REST API mirrors the UI workflow. Submit patient payloads to `POST /agent` to generate reports programmatically, or call `GET /models/list` and `GET /models/pull` to inspect or download Ollama models before selecting them in the UI.
 
 ## 3.1 Setup and Maintenance
-You can run *setup_and_maintenance.bat* to start the external tools for maintenance with the following options:
+Execute `DILIGENT/setup_and_maintenance.bat` to open the maintenance console. Available actions include:
 
-- **Update project:** check for updates from Github
-- **Remove logs:** remove all logs file from *resources/logs*
+- **Update project** – pull the latest revision from GitHub using the bundled Git client.
+- **Remove logs** – clear accumulated log files stored in `DILIGENT/resources/logs`.
 
 ### 3.1 Resources
-This folder organizes dataset and tokenizers benchmark results. By default, all data is stored within an SQLite database. To visualize and interact with the SQLite database, we recommend downloading and installing the DB Browser for SQLite, available at: https://sqlitebrowser.org/dl/. The directory structure includes the following folders:
+Clinical data, configuration templates, and assets live under `DILIGENT/resources/`:
 
-- **database:** tokenizers benchmark results will be stored centrally within the main database *TokenBenchy_database.db*. Graphical evaluation outputs for the performed benchmarks will be saved separately in *database/evaluation*. Moreover, this folder contains the downloaded datasets that are used to test the tokenizers performance (open access datasets are saved in *datasets/open* while the custom dataset is saved into *datasets/custom*). Last but not least, the downloaded tokenizers are saved in *database/tokenizers* following the same organisation of the datasets folder. 
+- **database/** – contains the SQLite database (`database.db`) with session histories plus any exported evaluation artefacts.
+- **logs/** – runtime logs produced by the FastAPI workers and background tasks.
+- **templates/** – reusable templates such as the `.env` scaffold and document layouts.
 
-- **logs:** log files are saved here
+Environment variables reside in `DILIGENT/setup/.env`. Create or edit this file after copying the template so sensitive credentials remain outside version control.
 
-- **templates:** reference template files can be found here
-
-**Environmental variables** are stored in the *app* folder (within the project folder). For security reasons, this file is typically not uploaded to GitHub. Instead, you must create this file manually by copying the template from *resources/templates/.env* and placing it in the *app* directory.
-
-| Variable              | Description                                              |
-|-----------------------|----------------------------------------------------------|
-| ACCESS_TOKEN          | HuggingFace access token (required for some tokenizers)  |
-| TF_CPP_MIN_LOG_LEVEL  | TensorFlow logging verbosity                             |
-| MPLBACKEND            | Matplotlib backend, keep default as Agg                  |
+| Variable             | Description                                                     |
+|----------------------|-----------------------------------------------------------------|
+| FASTAPI_HOST         | Address the FastAPI server binds to (default `127.0.0.1`).      |
+| FASTAPI_PORT         | Port for the FastAPI/Gradio service (default `8000`).           |
+| OLLAMA_HOST          | Base URL where the Ollama runtime is reachable.                 |
+| OPENAI_API_KEY       | API key for the configured cloud LLM provider (if applicable).  |
+| MPLBACKEND           | Matplotlib backend used by background plotting tasks.           |
 
 
 ## 3.2 LangSmith observability
-DILIGENT now emits LangSmith traces for every structured LLM call and for each
-Ollama or cloud chat request. To enable tracing:
+The LangChain components bundled with DILIGENT support LangSmith tracing. When the relevant environment variables are present, every structured LLM call—including Ollama and cloud chat requests—will emit trace data to LangSmith. To enable tracing:
 
-1. Create a free LangSmith account at [https://smith.langchain.com](https://smith.langchain.com)
-   and generate an API key from **Settings → API Keys**.
-2. Copy `DILIGENT/resources/templates/.env` to your active `.env` file (for
-   example `DILIGENT/setup/.env`) if you have not already done so, then add or
-   update the following keys:
+1. Create a free LangSmith account at [https://smith.langchain.com](https://smith.langchain.com) and generate an API key from **Settings → API Keys**.
+2. Add the following keys to your `.env` file (for example `DILIGENT/setup/.env`):
 
    ```text
    LANGSMITH_API_KEY="sk-..."
@@ -54,8 +105,8 @@ Ollama or cloud chat request. To enable tracing:
    # Optional: point to a self-hosted deployment
    LANGSMITH_ENDPOINT="https://api.smith.langchain.com"
    ```
-2. Export the following environment variables before starting DILIGENT (the
-   exact syntax differs per shell/OS):
+
+3. Export the same variables in your shell before starting the server:
 
    ```bash
    export LANGSMITH_API_KEY="sk-..."
@@ -65,18 +116,9 @@ Ollama or cloud chat request. To enable tracing:
    # export LANGSMITH_ENDPOINT="https://api.smith.langchain.com"
    ```
 
-   On Windows Command Prompt use `set`, and on PowerShell use `$Env:` instead of
-   `export`.
-3. Run the DILIGENT application or execute any workflow that calls the LLMs.
-4. Open the LangSmith web UI and choose the project named in
-   `LANGSMITH_PROJECT` to inspect traces. You can follow the hierarchical view
-   to observe every prompt, the model selected, retries, and any structured
-   parsing/repair attempts.
-
-Each trace includes tags indicating whether the interaction went through
-Ollama or a specific cloud provider, plus metadata about the schema used for
-structured responses. No additional code changes are required beyond setting
-the environment variables.
+   On Windows Command Prompt use `set`, and on PowerShell use `$Env:` instead of `export`.
+4. Launch the DILIGENT application and execute any workflow that calls the LLMs.
+5. Open the LangSmith web UI and select the project configured in `LANGSMITH_PROJECT` to inspect traces, prompts, model choices, and any retry/parsing attempts.
 
 ## 4. License
 This project is licensed under the terms of the MIT license. See the LICENSE file for details.
