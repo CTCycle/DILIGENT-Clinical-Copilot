@@ -16,7 +16,7 @@ from DILIGENT.app.utils.updater.livertox import LiverToxUpdater
 
 
 ###############################################################################
-class _StubRxClient:
+class StubRxClient:
     UNIT_STOPWORDS = {"mg", "ml", "ng"}
 
     def __init__(self, mapping: dict[str, list[str]]) -> None:
@@ -28,30 +28,30 @@ class _StubRxClient:
 
 
 ###############################################################################
-class _RateCheckingRxClient:
-    UNIT_STOPWORDS = _StubRxClient.UNIT_STOPWORDS
+class RateCheckingRxClient:
+    UNIT_STOPWORDS = StubRxClient.UNIT_STOPWORDS
 
     def __init__(self, mapping: dict[str, list[str]], delay: float = 0.01) -> None:
         self.mapping = mapping
         self.delay = delay
-        self._lock = threading.Lock()
-        self._active = 0
+        self.lock = threading.Lock()
+        self.active = 0
         self.max_active = 0
         self.call_count = 0
 
     ###########################################################################
     def fetch_drug_terms(self, name: str) -> list[str]:
-        with self._lock:
-            self._active += 1
+        with self.lock:
+            self.active += 1
             self.call_count += 1
-            if self._active > self.max_active:
-                self.max_active = self._active
+            if self.active > self.max_active:
+                self.max_active = self.active
         try:
             time.sleep(self.delay)
             return self.mapping.get(name, [])
         finally:
-            with self._lock:
-                self._active -= 1
+            with self.lock:
+                self.active -= 1
 
 
 ###############################################################################
@@ -60,7 +60,7 @@ def updater() -> LiverToxUpdater:
     return LiverToxUpdater(
         ".",
         redownload=False,
-        rx_client=_StubRxClient({}),
+        rx_client=StubRxClient({}),
         serializer=DataSerializer(),
         database_client=None,
     )
@@ -100,7 +100,7 @@ def test_build_unified_dataset_merges_sources(updater: LiverToxUpdater) -> None:
     )
     metadata = {"source_url": "http://example.com", "last_modified": "2024-01-01"}
 
-    unified = updater._build_unified_dataset(monographs, master_frame, metadata)
+    unified = updater.build_unified_dataset(monographs, master_frame, metadata)
 
     assert set(unified["drug_name"]) == {"Valid Drug", "Archive Only", "Master Only"}
     valid_row = unified[unified["drug_name"] == "Valid Drug"].iloc[0]
@@ -134,7 +134,7 @@ def test_sanitization_rules_drop_invalid_values(updater: LiverToxUpdater) -> Non
             },
         ]
     )
-    sanitized = updater._sanitize_unified_dataset(raw)
+    sanitized = updater.sanitize_unified_dataset(raw)
 
     assert list(sanitized["drug_name"]) == ["Another Valid"]
     assert sanitized.iloc[0]["excerpt"] == "Excerpt"
@@ -156,7 +156,7 @@ def test_enrichment_uses_all_aliases() -> None:
     updater = LiverToxUpdater(
         ".",
         redownload=False,
-        rx_client=_StubRxClient(mapping),
+        rx_client=StubRxClient(mapping),
         serializer=DataSerializer(),
         database_client=None,
     )
@@ -172,7 +172,7 @@ def test_enrichment_uses_all_aliases() -> None:
         ]
     )
 
-    enriched = updater.enrich_records(updater._sanitize_unified_dataset(dataset))
+    enriched = updater.enrich_records(updater.sanitize_unified_dataset(dataset))
     synonyms = enriched.iloc[0]["synonyms"]
 
     assert "Primary Synonym" in synonyms
@@ -203,7 +203,7 @@ def test_enrichment_respects_max_workers() -> None:
             }
         )
 
-    rx_client = _RateCheckingRxClient(mapping, delay=0.01)
+    rx_client = RateCheckingRxClient(mapping, delay=0.01)
     updater = LiverToxUpdater(
         ".",
         redownload=False,
@@ -235,7 +235,7 @@ def test_finalize_dataset_fills_missing_entries(updater: LiverToxUpdater) -> Non
             }
         ]
     )
-    finalized = updater._finalize_dataset(dataset)
+    finalized = updater.finalize_dataset(dataset)
     row = finalized.iloc[0]
     assert row["ingredient"] == "Not available"
     assert row["excerpt"] == "Not available"

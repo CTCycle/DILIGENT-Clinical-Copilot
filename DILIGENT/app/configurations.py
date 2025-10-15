@@ -38,7 +38,7 @@ class ClientRuntimeConfig:
 
     # -------------------------------------------------------------------------
     @classmethod
-    def _touch_revision(cls) -> None:
+    def touch_revision(cls) -> None:
         cls.revision += 1
 
     # -------------------------------------------------------------------------
@@ -47,7 +47,7 @@ class ClientRuntimeConfig:
         value = model.strip()
         if value and value != cls.parsing_model:
             cls.parsing_model = value
-            cls._touch_revision()
+            cls.touch_revision()
         return cls.parsing_model
 
     # -------------------------------------------------------------------------
@@ -56,7 +56,7 @@ class ClientRuntimeConfig:
         value = model.strip()
         if value and value != cls.clinical_model:
             cls.clinical_model = value
-            cls._touch_revision()
+            cls.touch_revision()
         return cls.clinical_model
 
     # -------------------------------------------------------------------------
@@ -68,7 +68,7 @@ class ClientRuntimeConfig:
             models = CLOUD_MODEL_CHOICES.get(cls.llm_provider, [])
             if cls.cloud_model not in models:
                 cls.cloud_model = models[0] if models else ""
-            cls._touch_revision()
+            cls.touch_revision()
         return cls.llm_provider
 
     # -------------------------------------------------------------------------
@@ -78,17 +78,17 @@ class ClientRuntimeConfig:
         if not value:
             if cls.cloud_model:
                 cls.cloud_model = ""
-                cls._touch_revision()
+                cls.touch_revision()
             return cls.cloud_model
         models = CLOUD_MODEL_CHOICES.get(cls.llm_provider, [])
         if value not in models:
             if models and cls.cloud_model != models[0]:
                 cls.cloud_model = models[0]
-                cls._touch_revision()
+                cls.touch_revision()
             return cls.cloud_model
         if cls.cloud_model != value:
             cls.cloud_model = value
-            cls._touch_revision()
+            cls.touch_revision()
         return cls.cloud_model
 
     # -------------------------------------------------------------------------
@@ -97,7 +97,7 @@ class ClientRuntimeConfig:
         normalized = bool(enabled)
         if cls.use_cloud_services != normalized:
             cls.use_cloud_services = normalized
-            cls._touch_revision()
+            cls.touch_revision()
         return cls.use_cloud_services
 
     # -------------------------------------------------------------------------
@@ -111,7 +111,7 @@ class ClientRuntimeConfig:
         rounded = round(parsed, 2)
         if cls.ollama_temperature != rounded:
             cls.ollama_temperature = rounded
-            cls._touch_revision()
+            cls.touch_revision()
         return cls.ollama_temperature
 
     # -------------------------------------------------------------------------
@@ -120,7 +120,7 @@ class ClientRuntimeConfig:
         normalized = bool(enabled)
         if cls.ollama_reasoning != normalized:
             cls.ollama_reasoning = normalized
-            cls._touch_revision()
+            cls.touch_revision()
         return cls.ollama_reasoning
 
     # -------------------------------------------------------------------------

@@ -60,14 +60,14 @@ class JobManager:
             self.jobs[job_id] = record
             self.events[job_id] = event
         loop = asyncio.get_running_loop()
-        loop.create_task(self._run_job(job_id, func, args, kwargs))
+        loop.create_task(self.run_job(job_id, func, args, kwargs))
         return job_id
 
     # -----------------------------------------------------------------------------
     async def set_progress(
         self, job_id: str, progress: float, detail: str | None = None
     ) -> None:
-        await self._update_job(job_id, progress=progress, detail=detail)
+        await self.update_job(job_id, progress=progress, detail=detail)
 
     # -----------------------------------------------------------------------------
     async def get_job(self, job_id: str) -> JobPayload | None:
@@ -75,7 +75,7 @@ class JobManager:
             record = self.jobs.get(job_id)
             if record is None:
                 return None
-            return self._serialize(record)
+            return self.serialize(record)
 
     # -----------------------------------------------------------------------------
     async def wait_for_completion(self, job_id: str) -> JobPayload | None:
@@ -87,30 +87,30 @@ class JobManager:
         return await self.get_job(job_id)
 
     # -----------------------------------------------------------------------------
-    async def _run_job(
+    async def run_job(
         self,
         job_id: str,
         func: JobCoroutine,
         args: tuple[Any, ...],
         kwargs: dict[str, Any],
     ) -> None:
-        await self._update_job(job_id, status=JobStatus.RUNNING, detail="Job started")
+        await self.update_job(job_id, status=JobStatus.RUNNING, detail="Job started")
         try:
             result = await func(job_id, *args, **kwargs)
         except Exception as exc:  # noqa: BLE001
-            await self._handle_failure(job_id, exc)
+            await self.handle_failure(job_id, exc)
         else:
-            await self._finalize_success(job_id, result)
+            await self.finalize_success(job_id, result)
 
     # -----------------------------------------------------------------------------
-    async def _handle_failure(self, job_id: str, exc: Exception) -> None:
+    async def handle_failure(self, job_id: str, exc: Exception) -> None:
         detail = getattr(exc, "detail", str(exc))
         status_code = getattr(exc, "status_code", 500)
         try:
             status_value = int(status_code)
         except Exception:  # noqa: BLE001
             status_value = 500
-        await self._update_job(
+        await self.update_job(
             job_id,
             status=JobStatus.FAILED,
             detail=str(detail),
@@ -118,11 +118,11 @@ class JobManager:
             result=None,
             status_code=status_value,
         )
-        await self._signal_completion(job_id)
+        await self.signal_completion(job_id)
 
     # -----------------------------------------------------------------------------
-    async def _finalize_success(self, job_id: str, result: JobPayload | None) -> None:
-        await self._update_job(
+    async def finalize_success(self, job_id: str, result: JobPayload | None) -> None:
+        await self.update_job(
             job_id,
             status=JobStatus.COMPLETED,
             detail="Job completed",
@@ -130,24 +130,24 @@ class JobManager:
             result=result or {},
             status_code=200,
         )
-        await self._signal_completion(job_id)
+        await self.signal_completion(job_id)
 
     # -----------------------------------------------------------------------------
-    async def _signal_completion(self, job_id: str) -> None:
+    async def signal_completion(self, job_id: str) -> None:
         async with self.lock:
             event = self.events.pop(job_id, None)
         if event is not None:
             event.set()
 
     # -----------------------------------------------------------------------------
-    async def _update_job(
+    async def update_job(
         self,
         job_id: str,
         *,
         status: JobStatus | None = None,
         progress: float | None = None,
         detail: str | None = None,
-        result: JobPayload | None | object = _RESULT_SENTINEL,
+        result: JobPayload | None | object = RESULT_SENTINEL,
         status_code: int | None = None,
     ) -> None:
         async with self.lock:
@@ -160,14 +160,14 @@ class JobManager:
                 record.progress = max(0.0, min(1.0, progress))
             if detail is not None:
                 record.detail = detail
-            if result is not _RESULT_SENTINEL:
+            if result is not RESULT_SENTINEL:
                 record.result = result  # type: ignore[assignment]
             if status_code is not None:
                 record.status_code = status_code
             record.updated_at = datetime.now(UTC)
 
     # -----------------------------------------------------------------------------
-    def _serialize(self, record: JobRecord) -> JobPayload:
+    def serialize(self, record: JobRecord) -> JobPayload:
         return {
             "job_id": record.job_id,
             "status": record.status.value,
@@ -181,7 +181,7 @@ class JobManager:
 
 
 # -----------------------------------------------------------------------------
-def _append_progress(progress_log: list[str], status: Any, detail: Any) -> None:
+def append_progress(progress_log: list[str], status: Any, detail: Any) -> None:
     if not isinstance(detail, str) or not detail:
         return
     label = status if isinstance(status, str) and status else "status"
@@ -191,14 +191,14 @@ def _append_progress(progress_log: list[str], status: Any, detail: Any) -> None:
 
 
 # -----------------------------------------------------------------------------
-def _format_progress_log(progress_log: list[str]) -> str:
+def format_progress_log(progress_log: list[str]) -> str:
     if not progress_log:
         return ""
     return "\nProgress log:\n" + "\n".join(progress_log)
 
 
 # -----------------------------------------------------------------------------
-async def _await_livertox_job(
+async def await_livertox_job(
     client: httpx.AsyncClient,
     initial_status: dict[str, Any],
     *,
@@ -208,7 +208,7 @@ async def _await_livertox_job(
     progress_log: list[str] = []
     status = initial_status.get("status")
     detail = initial_status.get("detail")
-    _append_progress(progress_log, status, detail)
+    append_progress(progress_log, status, detail)
 
     normalized_status = status.lower() if isinstance(status, str) else ""
     result = initial_status.get("result")
@@ -225,14 +225,14 @@ async def _await_livertox_job(
         return (
             "[ERROR] LiverTox import failed: "
             + failure
-            + _format_progress_log(progress_log)
+            + format_progress_log(progress_log)
         )
     if normalized_status == "completed":
         if isinstance(result, dict):
             return result, progress_log
         return (
             "[ERROR] Backend did not provide job result on completion."
-            + _format_progress_log(progress_log)
+            + format_progress_log(progress_log)
         )
 
     if not isinstance(job_id, str) or not job_id:
@@ -243,7 +243,7 @@ async def _await_livertox_job(
             return initial_status, progress_log
         return (
             "[ERROR] Backend response did not include a job ID."
-            + _format_progress_log(progress_log)
+            + format_progress_log(progress_log)
         )
 
     status_url = f"{API_BASE_URL}{PHARMACOLOGY_LIVERTOX_STATUS_ENDPOINT}/{job_id}"
@@ -252,7 +252,7 @@ async def _await_livertox_job(
 
     while True:
         if deadline is not None and loop.time() > deadline:
-            progress_suffix = _format_progress_log(progress_log)
+            progress_suffix = format_progress_log(progress_log)
             waited = max(1, int(round(timeout))) if timeout is not None else 0
             message = (
                 "[INFO] LiverTox import is still running after waiting "
@@ -270,7 +270,7 @@ async def _await_livertox_job(
             status_response = await client.get(status_url)
             status_response.raise_for_status()
         except httpx.TimeoutException:
-            return "[ERROR] Polling job status timed out." + _format_progress_log(
+            return "[ERROR] Polling job status timed out." + format_progress_log(
                 progress_log
             )
         except httpx.HTTPStatusError as exc:
@@ -280,12 +280,12 @@ async def _await_livertox_job(
                 "[ERROR] Backend returned an error while checking job status."
                 f"\nURL: {status_url}"
                 f"\nStatus: {code}"
-                f"\nResponse body:\n{body}" + _format_progress_log(progress_log)
+                f"\nResponse body:\n{body}" + format_progress_log(progress_log)
             )
         except Exception as exc:  # noqa: BLE001
             return (
                 f"[ERROR] Unexpected error while polling job status: {exc}"
-                + _format_progress_log(progress_log)
+                + format_progress_log(progress_log)
             )
 
         try:
@@ -293,18 +293,18 @@ async def _await_livertox_job(
         except ValueError:
             return (
                 "[ERROR] Backend status response was not valid JSON."
-                + _format_progress_log(progress_log)
+                + format_progress_log(progress_log)
             )
 
         if not isinstance(status_payload, dict):
             return (
                 "[ERROR] Unexpected status response format from backend."
-                + _format_progress_log(progress_log)
+                + format_progress_log(progress_log)
             )
 
         status = status_payload.get("status")
         detail = status_payload.get("detail")
-        _append_progress(progress_log, status, detail)
+        append_progress(progress_log, status, detail)
         normalized_status = status.lower() if isinstance(status, str) else ""
 
         if normalized_status == "failed":
@@ -319,7 +319,7 @@ async def _await_livertox_job(
             return (
                 "[ERROR] LiverTox import failed: "
                 + failure
-                + _format_progress_log(progress_log)
+                + format_progress_log(progress_log)
             )
 
         if normalized_status == "completed":
@@ -328,7 +328,7 @@ async def _await_livertox_job(
                 return result, progress_log
             return (
                 "[ERROR] Backend did not provide job result on completion."
-                + _format_progress_log(progress_log)
+                + format_progress_log(progress_log)
             )
 
         await asyncio.sleep(poll_interval)
