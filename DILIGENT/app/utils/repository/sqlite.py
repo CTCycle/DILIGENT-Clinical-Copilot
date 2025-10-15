@@ -5,7 +5,16 @@ from typing import Any
 
 import pandas as pd
 import sqlalchemy
-from sqlalchemy import Column, Float, String, Text, UniqueConstraint, create_engine
+from sqlalchemy import (
+    Column,
+    DateTime,
+    Float,
+    Integer,
+    String,
+    Text,
+    UniqueConstraint,
+    create_engine,
+)
 from sqlalchemy.dialects.sqlite import insert
 from sqlalchemy.orm import declarative_base, sessionmaker
 
@@ -24,18 +33,23 @@ class Documents(Base):
 
 
 ###############################################################################
-class Patients(Base):
-    __tablename__ = "PATIENTS"
-    name = Column(String, primary_key=True)
-    anamnesis = Column(String)
-    symptoms = Column(String)
-    ALT = Column(Float)
-    ALT_max = Column(Float)
-    ALP = Column(Float)
-    ALP_max = Column(Float)
-    additional_tests = Column(String)
-    drugs = Column(String)
-    __table_args__ = (UniqueConstraint("name"),)
+class ClinicalSession(Base):
+    __tablename__ = "CLINICAL_SESSIONS"
+    id = Column(Integer, primary_key=True, autoincrement=True)
+    patient_name = Column(String)
+    session_timestamp = Column(DateTime)
+    alt_value = Column(String)
+    alt_upper_limit = Column(String)
+    alp_value = Column(String)
+    alp_upper_limit = Column(String)
+    hepatic_pattern = Column(String)
+    anamnesis = Column(Text)
+    drugs = Column(Text)
+    exams = Column(Text)
+    parsing_model = Column(String)
+    clinical_model = Column(String)
+    total_duration = Column(Float)
+    final_report = Column(Text)
 
 
 ###############################################################################
