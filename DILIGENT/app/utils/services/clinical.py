@@ -32,8 +32,12 @@ from DILIGENT.app.utils.services.essay import LiverToxMatch, LiverToxMatcher
 
 ###############################################################################
 class HepatotoxicityPatternAnalyzer:
+
+    def __init__(self) -> None:
+        pass
+       
     # -------------------------------------------------------------------------
-    def analyze(self, payload: PatientData) -> HepatotoxicityPatternScore:
+    def calculate_hepatotoxicity_pattern(self, payload: PatientData) -> HepatotoxicityPatternScore:
         alt_value = self.parse_marker_value(payload.alt)
         alt_max_value = self.parse_marker_value(payload.alt_max)
         alp_value = self.parse_marker_value(payload.alp)
@@ -82,6 +86,24 @@ class HepatotoxicityPatternAnalyzer:
         if reference == 0:
             return None
         return value / reference
+
+    # -------------------------------------------------------------------------
+    def stringify_scores(
+        self, pattern_score: HepatotoxicityPatternScore | None
+        ) -> dict[str, str]:
+            if not pattern_score:
+                return {}
+
+            mapping = {
+                "alt_multiple": (pattern_score.alt_multiple, "{:.2f}x ULN"),
+                "alp_multiple": (pattern_score.alp_multiple, "{:.2f}x ULN"),
+                "r_score": (pattern_score.r_score, "{:.2f}"),
+            }
+
+            return {
+                key: fmt.format(val) if val is not None else "Not available"
+                for key, (val, fmt) in mapping.items()
+            }
 
 
 ###############################################################################
@@ -135,14 +157,10 @@ class HepatoxConsultation:
             return None
 
         if self.matcher is None:
-            return PatientDrugClinicalReport(entries=[], final_report=None).model_dump()
+            return PatientDrugClinicalReport(entries=[], final_report=None).model_dump()        
 
-        logger.info("Toxicity analysis stage 2/3: matching drugs to LiverTox records")
+        logger.info("Toxicity analysis: performing clinical assessment for matched drugs")
         matches = await self.matcher.match_drug_names(patient_drugs)
-
-        logger.info(
-            "Toxicity analysis stage 3/3: performing clinical assessment for matched drugs"
-        )
         resolved = self.resolve_matches(patient_drugs, matches)
         report = await self.compile_clinical_assessment(
             resolved,

@@ -9,9 +9,8 @@ import os
 import gradio as gr
 from fastapi import FastAPI
 
-from DILIGENT.app.api.endpoints.agent import router as report_router
+from DILIGENT.app.api.endpoints.session import router as report_router
 from DILIGENT.app.api.endpoints.ollama import router as models_router
-from DILIGENT.app.api.endpoints.pharmacology import router as pharma_router
 from DILIGENT.app.client.main import create_interface
 from DILIGENT.app.logger import logger
 from DILIGENT.app.utils.repository.sqlite import database
@@ -31,7 +30,6 @@ app = FastAPI(
 
 app.include_router(report_router)
 app.include_router(models_router)
-app.include_router(pharma_router)
 
 ui_app = create_interface()
 app = gr.mount_gradio_app(app, ui_app, path="/ui", root_path="/ui")
