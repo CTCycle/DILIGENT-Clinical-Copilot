@@ -7,7 +7,7 @@ from typing import Any
 import pandas as pd
 from sqlalchemy.exc import SQLAlchemyError
 
-from DILIGENT.app.utils.repository.sqlite import ClinicalSession, database
+from DILIGENT.app.utils.repository.database import ClinicalSession, database
 
 
 logger = logging.getLogger(__name__)

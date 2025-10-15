@@ -13,7 +13,7 @@ from DILIGENT.app.api.endpoints.session import router as report_router
 from DILIGENT.app.api.endpoints.ollama import router as models_router
 from DILIGENT.app.client.main import create_interface
 from DILIGENT.app.logger import logger
-from DILIGENT.app.utils.repository.sqlite import database
+from DILIGENT.app.utils.repository.database import database
 
 ###############################################################################
 # initialize the database if it has not been created

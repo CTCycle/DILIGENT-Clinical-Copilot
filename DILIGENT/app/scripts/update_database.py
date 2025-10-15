@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from DILIGENT.app.constants import SOURCES_PATH
 from DILIGENT.app.logger import logger
-from DILIGENT.app.utils.repository.sqlite import database
+from DILIGENT.app.utils.repository.database import database
 from DILIGENT.app.utils.updater.livertox import LiverToxUpdater
 
 REDOWNLOAD = True
