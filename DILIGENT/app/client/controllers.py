@@ -30,7 +30,7 @@ LLM_REQUEST_TIMEOUT_DISPLAY = (
 
 # [HELPERS]
 ###############################################################################
-def _extract_text(result: Any) -> str:
+def extract_text(result: Any) -> str:
     if isinstance(result, dict):
         for key in ("output", "result", "text", "message", "response"):
             val = result.get(key)
@@ -43,7 +43,7 @@ def _extract_text(result: Any) -> str:
 
 
 # -----------------------------------------------------------------------------
-def _sanitize_field(value: str | None) -> str | None:
+def sanitize_field(value: str | None) -> str | None:
     if value is None:
         return None
     stripped = value.strip()
@@ -51,7 +51,7 @@ def _sanitize_field(value: str | None) -> str | None:
 
 
 # -----------------------------------------------------------------------------
-def _normalize_visit_date(
+def normalize_visit_date(
     value: datetime | date | dict[str, Any] | str | None,
 ) -> date | None:
     if value is None:
@@ -97,7 +97,7 @@ def _normalize_visit_date(
 def normalize_visit_date_component(
     value: datetime | date | dict[str, Any] | str | None,
 ) -> datetime | None:
-    normalized = _normalize_visit_date(value)
+    normalized = normalize_visit_date(value)
     if normalized is None:
         return None
     return datetime.combine(normalized, datetime.min.time())
@@ -309,13 +309,13 @@ def clear_agent_fields() -> tuple[
 # trigger function to start the agent on button click. Payload is optional depending
 # on the requested endpoint URL (defined through run_agent function)
 # -----------------------------------------------------------------------------
-async def _trigger_agent(url: str, payload: dict[str, Any] | None = None) -> str:
+async def trigger_agent(url: str, payload: dict[str, Any] | None = None) -> str:
     try:
         async with httpx.AsyncClient(timeout=LLM_REQUEST_TIMEOUT_SECONDS) as client:
             resp = await client.post(url, json=payload)
             resp.raise_for_status()
             try:
-                return _extract_text(resp.json())
+                return extract_text(resp.json())
             except ValueError:
                 return resp.text
 
@@ -349,10 +349,10 @@ async def run_agent(
     alp_max: str,
     symptoms: list[str],
 ) -> str:
-    normalized_visit_date = _normalize_visit_date(visit_date)
+    normalized_visit_date = normalize_visit_date(visit_date)
 
     cleaned_payload = {
-        "name": _sanitize_field(patient_name),
+        "name": sanitize_field(patient_name),
         "visit_date": (
             {
                 "day": normalized_visit_date.day,
@@ -362,14 +362,14 @@ async def run_agent(
             if normalized_visit_date
             else None
         ),
-        "anamnesis": _sanitize_field(anamnesis),
+        "anamnesis": sanitize_field(anamnesis),
         "has_hepatic_diseases": bool(has_hepatic_diseases),
-        "drugs": _sanitize_field(drugs),
-        "exams": _sanitize_field(exams),
-        "alt": _sanitize_field(alt),
-        "alt_max": _sanitize_field(alt_max),
-        "alp": _sanitize_field(alp),
-        "alp_max": _sanitize_field(alp_max),
+        "drugs": sanitize_field(drugs),
+        "exams": sanitize_field(exams),
+        "alt": sanitize_field(alt),
+        "alt_max": sanitize_field(alt_max),
+        "alp": sanitize_field(alp),
+        "alp_max": sanitize_field(alp_max),
         "symptoms": symptoms or [],
     }
 
@@ -377,4 +377,4 @@ async def run_agent(
         return "[ERROR] Please provide at least one clinical section."
 
     url = f"{API_BASE_URL}{AGENT_API_URL}"
-    return await _trigger_agent(url, cleaned_payload)
+    return await trigger_agent(url, cleaned_payload)

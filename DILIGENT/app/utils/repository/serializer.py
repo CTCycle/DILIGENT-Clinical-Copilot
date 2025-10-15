@@ -66,7 +66,7 @@ class DataSerializer:
         drop_columns = [col for col in required_columns if col not in allowed_missing]
         df = df.dropna(subset=drop_columns)
         df["drug_name"] = df["drug_name"].astype(str).str.strip()
-        df = df[df["drug_name"].apply(self._is_valid_drug_name)]
+        df = df[df["drug_name"].apply(self.is_valid_drug_name)]
         df["excerpt"] = df["excerpt"].astype(str).str.strip()
         df = df[df["excerpt"] != ""]
         df["nbk_id"] = df["nbk_id"].apply(
@@ -83,7 +83,7 @@ class DataSerializer:
         return df.reset_index(drop=True)
 
     # -----------------------------------------------------------------------------
-    def _is_valid_drug_name(self, value: str) -> bool:
+    def is_valid_drug_name(self, value: str) -> bool:
         normalized = value.strip()
         if len(normalized) < 3 or len(normalized) > 200:
             return False

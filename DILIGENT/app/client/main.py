@@ -75,7 +75,7 @@ VISIT_DATE_LOCALE_JS: Final = f"""
 
 
 ###############################################################################
-def _noop() -> None:
+def noop() -> None:
     return None
 
 
@@ -344,7 +344,7 @@ def create_interface() -> gr.Blocks:
         )
 
         demo.load(
-            fn=_noop,
+            fn=noop,
             inputs=None,
             outputs=None,
             js=VISIT_DATE_LOCALE_JS,
