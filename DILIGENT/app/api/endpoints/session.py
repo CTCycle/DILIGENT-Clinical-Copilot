@@ -39,38 +39,44 @@ def build_patient_narrative(
     detected_drugs: list[str],
     final_report: str | None,
 ) -> str:
-    """Render a plain-text narrative for the patient summary."""
+    """Render a Markdown narrative for the patient summary."""
     drug_summary = ", ".join(detected_drugs) if detected_drugs else "None detected"
+    classification = getattr(pattern_score, "classification", "Not available")
+    alt_multiple = pattern_strings.get("alt_multiple", "Not available")
+    alp_multiple = pattern_strings.get("alp_multiple", "Not available")
+    r_score = pattern_strings.get("r_score", "Not available")
 
-    lines: list[str] = [
-        "Patient Summary",
-        "---------------",
-        f"Name: {patient_label}",
-        f"Visit date: {visit_label}",
+    sections: list[str] = []
+
+    summary_section = [
+        "## Patient Summary",
         "",
-        "Hepatotoxicity Pattern",
-        "-----------------------",
-        f"Classification: {pattern_score.classification}",
-        f"ALT multiple: {pattern_strings.get('alt_multiple', 'N/A')}",
-        f"ALP multiple: {pattern_strings.get('amp_multiple', 'N/A')}",
-        f"R-score: {pattern_strings.get('r_score', 'N/A')}",
-        "",
-        "Medications",
-        "-----------",
-        f"Detected drugs ({len(detected_drugs)}): {drug_summary}",
+        f"- **Name:** {patient_label}",
+        f"- **Visit date:** {visit_label}",
     ]
+    sections.append("\n".join(summary_section))
+
+    pattern_section = [
+        "## Hepatotoxicity Pattern",
+        "",
+        f"- **Classification:** {classification}",
+        f"- **ALT multiple:** {alt_multiple}",
+        f"- **ALP multiple:** {alp_multiple}",
+        f"- **R-score:** {r_score}",
+    ]
+    sections.append("\n".join(pattern_section))
+
+    drugs_section = [
+        "## Medications",
+        "",
+        f"- **Detected drugs ({len(detected_drugs)}):** {drug_summary}",
+    ]
+    sections.append("\n".join(drugs_section))
 
     if final_report:
-        lines.extend(
-            [
-                "",
-                "Clinical Assessment",
-                "--------------------",
-                final_report,
-            ]
-        )
+        sections.append("\n".join(["## Clinical Assessment", "", final_report.strip()]))
 
-    return "\n".join(lines)
+    return "\n\n".join(sections)
 
 
 # [ENPOINTS]
