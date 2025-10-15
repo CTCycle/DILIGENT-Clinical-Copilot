@@ -228,7 +228,6 @@ class HepatoxConsultation:
         llm_jobs: list[tuple[int, Any]] = []
 
         for idx, drug_entry in enumerate(self.drugs.entries):
-            logger.info("Preparing clinical assessment for drug: %s", drug_entry.name)
             resolved = resolved_entries[idx] if idx < len(resolved_entries) else {}
             if not isinstance(resolved, dict):
                 resolved = {}
