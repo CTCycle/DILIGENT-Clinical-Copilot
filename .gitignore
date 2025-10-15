@@ -1,5 +1,5 @@
 DILIGENT/setup/python/*
-DILIGENT/setup/*
+DILIGENT/setup/.env
 DILIGENT/resources/models/*
 
 __pycache__
