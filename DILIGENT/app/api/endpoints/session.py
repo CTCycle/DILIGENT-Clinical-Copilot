@@ -26,6 +26,53 @@ pattern_analyzer = HepatotoxicityPatternAnalyzer()
 router = APIRouter(tags=["agent"])
 serializer = DataSerializer()
 
+
+
+# [HELPERS]
+###############################################################################
+def build_patient_narrative(
+    *,
+    patient_label: str,
+    visit_label: str,
+    pattern_score,
+    pattern_strings: dict[str, str],
+    detected_drugs: list[str],
+    final_report: str | None,
+) -> str:
+    """Render a plain-text narrative for the patient summary."""
+    drug_summary = ", ".join(detected_drugs) if detected_drugs else "None detected"
+
+    lines: list[str] = [
+        "Patient Summary",
+        "---------------",
+        f"Name: {patient_label}",
+        f"Visit date: {visit_label}",
+        "",
+        "Hepatotoxicity Pattern",
+        "-----------------------",
+        f"Classification: {pattern_score.classification}",
+        f"ALT multiple: {pattern_strings.get('alt_multiple', 'N/A')}",
+        f"ALP multiple: {pattern_strings.get('amp_multiple', 'N/A')}",
+        f"R-score: {pattern_strings.get('r_score', 'N/A')}",
+        "",
+        "Medications",
+        "-----------",
+        f"Detected drugs ({len(detected_drugs)}): {drug_summary}",
+    ]
+
+    if final_report:
+        lines.extend(
+            [
+                "",
+                "Clinical Assessment",
+                "--------------------",
+                final_report,
+            ]
+        )
+
+    return "\n".join(lines)
+
+
 # [ENPOINTS]
 ###############################################################################
 async def process_single_patient(payload: PatientData) -> str:
@@ -33,21 +80,17 @@ async def process_single_patient(payload: PatientData) -> str:
         "Starting Drug-Induced Liver Injury (DILI) analysis for patient: %s",
         payload.name,
     )
-    if payload.visit_date:
-        logger.info(
-            "Clinical visit date: %s",
-            payload.visit_date.strftime("%d-%m-%Y"),
-        )
-
+    
     global_start_time = time.perf_counter()
 
     # 1. Calculate hepatic pattern score using ALT/ALP values
-    pattern_score = pattern_analyzer.analyze(payload)
+    pattern_score = pattern_analyzer.calculate_hepatotoxicity_pattern(payload)
     logger.info(
         "Patient hepatotoxicity pattern classified as %s (R=%.3f)",
         pattern_score.classification,
         pattern_score.r_score if pattern_score.r_score is not None else float("nan"),
     )
+    
 
     # 2. Parse drugs names and info from raw text
     start_time = time.perf_counter()
@@ -69,43 +112,30 @@ async def process_single_patient(payload: PatientData) -> str:
     logger.info("Hepato-toxicity consultation required %.4f seconds", elapsed)
 
     final_report: str | None = None
+    
     if isinstance(drug_assessment, dict):
-        candidate = drug_assessment.get("final_report")
-        if isinstance(candidate, str) and candidate.strip():
-            final_report = candidate.strip()
-    elif isinstance(drug_assessment, str) and drug_assessment.strip():
-        final_report = drug_assessment.strip()
+        candidate : str = drug_assessment.get("final_report", "")
+        final_report = candidate.strip()
+   
 
     patient_label = payload.name or "Unknown patient"
     visit_label = (
         payload.visit_date.strftime("%d %B %Y")
         if payload.visit_date
         else "Not provided"
-    )
-
-    if pattern_score.alt_multiple is not None:
-        alt_multiple = f"{pattern_score.alt_multiple:.2f}x ULN"
-    else:
-        alt_multiple = "Not available"
-    if pattern_score.alp_multiple is not None:
-        alp_multiple = f"{pattern_score.alp_multiple:.2f}x ULN"
-    else:
-        alp_multiple = "Not available"
-    if pattern_score.r_score is not None:
-        r_score_line = f"{pattern_score.r_score:.2f}"
-    else:
-        r_score_line = "Not available"
-
-    detected_drugs = [entry.name for entry in drug_data.entries if entry.name]
-    drug_summary = ", ".join(detected_drugs) if detected_drugs else "None detected"
+    )   
     
     global_elapsed = time.perf_counter() - global_start_time
     logger.info("Total time for Drug Induced Liver Injury (DILI) assessment is %.4f seconds", global_elapsed)
 
+    # 4. Serialize session data to the database
+    detected_drugs = [entry.name for entry in drug_data.entries if entry.name]
+    drug_summary = ", ".join(detected_drugs) if detected_drugs else "None detected"
+    pattern_strings = pattern_analyzer.stringify_scores(pattern_score)
     serializer.record_clinical_session(
         {
             "patient_name": payload.name,
-            "session_timestamp": datetime.utcnow(),
+            "session_timestamp": datetime.now(),
             "alt_value": payload.alt,
             "alt_upper_limit": payload.alt_max,
             "alp_value": payload.alp,
@@ -121,33 +151,16 @@ async def process_single_patient(payload: PatientData) -> str:
         }
     )
 
-    narrative: list[str] = [
-        "Patient Summary",
-        "---------------",
-        f"Name: {patient_label}",
-        f"Visit date: {visit_label}",
-        "",
-        "Hepatotoxicity Pattern",
-        "-----------------------",
-        f"Classification: {pattern_score.classification}",
-        f"ALT multiple: {alt_multiple}",
-        f"ALP multiple: {alp_multiple}",
-        f"R-score: {r_score_line}",
-        "",
-        "Medications",
-        "-----------",
-        f"Detected drugs ({len(detected_drugs)}): {drug_summary}",
-    ]
+    narrative = build_patient_narrative(
+        patient_label=patient_label,
+        visit_label=visit_label,
+        pattern_score=pattern_score,
+        pattern_strings=pattern_strings,
+        detected_drugs=detected_drugs,
+        final_report=final_report,
+    )
 
-    if final_report:
-        narrative.extend([
-            "",
-            "Clinical Assessment",
-            "--------------------",
-            final_report,
-        ])
-
-    return "\n".join(narrative)
+    return narrative
 
 # -----------------------------------------------------------------------------
 @router.post(
@@ -192,5 +205,3 @@ async def start_single_clinical_agent(
     single_result = await process_single_patient(payload)
     return PlainTextResponse(content=single_result)
 
-
-# -----------------------------------------------------------------------------
