@@ -235,12 +235,12 @@ def create_interface() -> gr.Blocks:
                                         interactive=not ClientRuntimeConfig.is_cloud_enabled(),
                                     )
 
-        output = gr.Textbox(
-            label="Agent Output",
-            lines=30,
-            show_copy_button=True,
-            interactive=False,
+        gr.Markdown("### Agent Output")
+        output = gr.Markdown(
+            value="",
+            render=False,
         )
+        output.render()
 
         use_cloud_services.change(
             fn=toggle_cloud_services,
