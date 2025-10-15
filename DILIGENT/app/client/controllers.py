@@ -36,10 +36,24 @@ def extract_text(result: Any) -> str:
             val = result.get(key)
             if isinstance(val, str) and val.strip():
                 return val
+        try:
+            formatted = json.dumps(result, ensure_ascii=False, indent=2)
+        except Exception:  # noqa: BLE001
+            return str(result)
+        return f"```json\n{formatted}\n```"
+    if isinstance(result, str):
+        return result
+    if isinstance(result, (list, tuple)):
+        try:
+            formatted = json.dumps(result, ensure_ascii=False, indent=2)
+        except Exception:  # noqa: BLE001
+            return str(result)
+        return f"```json\n{formatted}\n```"
     try:
-        return json.dumps(result, ensure_ascii=False, indent=2)
-    except Exception:
+        formatted = json.dumps(result, ensure_ascii=False, indent=2)
+    except Exception:  # noqa: BLE001
         return str(result)
+    return f"```json\n{formatted}\n```"
 
 
 # -----------------------------------------------------------------------------
