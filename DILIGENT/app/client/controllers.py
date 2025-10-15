@@ -127,7 +127,6 @@ def toggle_cloud_services(
     dict[str, Any],
     dict[str, Any],
     dict[str, Any],
-    dict[str, Any],
 ]:
     ClientRuntimeConfig.set_use_cloud_services(enabled)
     provider = ClientRuntimeConfig.get_llm_provider()
@@ -159,7 +158,6 @@ def toggle_cloud_services(
     return (
         provider_update,
         model_update,
-        button_update,
         button_update,
         temperature_update,
         reasoning_update,
@@ -233,60 +231,6 @@ async def pull_selected_models(parsing_model: str, clinical_model: str) -> str:
 
     pulled = ", ".join(models)
     return f"[INFO] Models available locally: {pulled}."
-
-
-# -----------------------------------------------------------------------------
-async def start_ollama_client() -> str:
-    if ClientRuntimeConfig.is_cloud_enabled():
-        return "[INFO] Cloud provider enabled; Ollama client is disabled."
-
-    try:
-        async with OllamaClient() as client:
-            status = await client.start_server()
-    except OllamaTimeout as exc:
-        return f"[ERROR] Timed out starting Ollama server: {exc}"
-    except OllamaError as exc:
-        return f"[ERROR] Failed to start Ollama server: {exc}"
-    except Exception as exc:  # noqa: BLE001
-        return f"[ERROR] Unexpected error while starting Ollama server: {exc}"
-
-    if status == "already_running":
-        return "[INFO] Ollama server is already running."
-
-    return "[INFO] Ollama server started successfully."
-
-
-# -----------------------------------------------------------------------------
-async def preload_selected_models(parsing_model: str, clinical_model: str) -> str:
-    if ClientRuntimeConfig.is_cloud_enabled():
-        return "[INFO] Cloud provider enabled; skipping Ollama preload."
-
-    parser = parsing_model.strip() if parsing_model else ""
-    clinical = clinical_model.strip() if clinical_model else ""
-    requested = [name for name in (parser, clinical) if name]
-
-    if not requested:
-        return "[ERROR] No models selected to preload."
-
-    try:
-        async with OllamaClient() as client:
-            if not await client.is_server_online():
-                return "[ERROR] Ollama server is not reachable. Start the Ollama client first."
-            loaded, skipped = await client.preload_models(parser, clinical)
-    except OllamaTimeout as exc:
-        return f"[ERROR] Timed out while preloading models: {exc}"
-    except OllamaError as exc:
-        return f"[ERROR] Failed to preload models: {exc}"
-    except Exception as exc:  # noqa: BLE001
-        return f"[ERROR] Unexpected error while preloading models: {exc}"
-
-    if not loaded:
-        return "[ERROR] No models were preloaded."
-
-    message = f"[INFO] Preloaded models: {', '.join(loaded)}."
-    if skipped:
-        message += f" [WARN] Skipped due to limited memory: {', '.join(skipped)}."
-    return message
 
 
 # -----------------------------------------------------------------------------
