@@ -5,7 +5,16 @@ from typing import Any
 
 import pandas as pd
 import sqlalchemy
-from sqlalchemy import Column, DateTime, Float, Integer, String, Text, UniqueConstraint, create_engine
+from sqlalchemy import (
+    Column,
+    DateTime,
+    Float,
+    Integer,
+    String,
+    Text,
+    UniqueConstraint,
+    create_engine,
+)
 from sqlalchemy.dialects.sqlite import insert
 from sqlalchemy.orm import declarative_base, sessionmaker
 
@@ -29,6 +38,11 @@ class ClinicalSession(Base):
     id = Column(Integer, primary_key=True, autoincrement=True)
     patient_name = Column(String)
     session_timestamp = Column(DateTime)
+    alt_value = Column(String)
+    alt_upper_limit = Column(String)
+    alp_value = Column(String)
+    alp_upper_limit = Column(String)
+    hepatic_pattern = Column(String)
     anamnesis = Column(Text)
     drugs = Column(Text)
     exams = Column(Text)

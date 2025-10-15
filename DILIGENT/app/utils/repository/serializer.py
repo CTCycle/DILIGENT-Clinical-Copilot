@@ -4,8 +4,9 @@ import re
 from typing import Any
 
 import pandas as pd
+from sqlalchemy.exc import SQLAlchemyError
 
-from DILIGENT.app.utils.repository.sqlite import database
+from DILIGENT.app.utils.repository.sqlite import ClinicalSession, database
 
 
 # [DATA SERIALIZATION]
@@ -36,9 +37,16 @@ class DataSerializer:
         pass
 
     # -------------------------------------------------------------------------
-    def save_patients_info(self, patients: dict[str, Any]) -> None:
-        data = pd.DataFrame([patients])
-        database.upsert_into_database(data, "PATIENTS")
+    def record_clinical_session(self, session_data: dict[str, Any]) -> None:
+        session = database.Session()
+        try:
+            session.add(ClinicalSession(**session_data))
+            session.commit()
+        except SQLAlchemyError as exc:
+            session.rollback()
+            raise exc
+        finally:
+            session.close()
 
     # -----------------------------------------------------------------------------
     def save_livertox_records(self, records: pd.DataFrame) -> None:

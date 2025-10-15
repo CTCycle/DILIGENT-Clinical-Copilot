@@ -11,7 +11,7 @@ from DILIGENT.app.api.schemas.clinical import (
     PatientData,
 )
 from DILIGENT.app.logger import logger
-from DILIGENT.app.utils.repository.sqlite import ClinicalSession, database
+from DILIGENT.app.utils.repository.serializer import DataSerializer
 from DILIGENT.app.utils.services.clinical import (
     HepatotoxicityPatternAnalyzer,
     HepatoxConsultation,
@@ -23,6 +23,7 @@ from DILIGENT.app.utils.services.parser import (
 drugs_parser = DrugsParser()
 pattern_analyzer = HepatotoxicityPatternAnalyzer()
 router = APIRouter(tags=["agent"])
+serializer = DataSerializer()
 
 # [ENPOINTS]
 ###############################################################################
@@ -100,27 +101,27 @@ async def process_single_patient(payload: PatientData) -> str:
     global_elapsed = time.perf_counter() - global_start_time
     logger.info("Total time for Drug Induced Liver Injury (DILI) assessment is %.4f seconds", global_elapsed)
 
-    session = database.Session()
     try:
-        session.add(
-            ClinicalSession(
-                patient_name=payload.name,
-                session_timestamp=datetime.utcnow(),
-                anamnesis=payload.anamnesis,
-                drugs=payload.drugs,
-                exams=payload.exams,
-                parsing_model=drugs_parser.model or None,
-                clinical_model=doctor.llm_model,
-                total_duration=global_elapsed,
-                final_report=final_report,
-            )
+        serializer.record_clinical_session(
+            {
+                "patient_name": payload.name,
+                "session_timestamp": datetime.utcnow(),
+                "alt_value": payload.alt,
+                "alt_upper_limit": payload.alt_max,
+                "alp_value": payload.alp,
+                "alp_upper_limit": payload.alp_max,
+                "hepatic_pattern": pattern_score.classification,
+                "anamnesis": payload.anamnesis,
+                "drugs": payload.drugs,
+                "exams": payload.exams,
+                "parsing_model": getattr(drugs_parser, "model", None),
+                "clinical_model": getattr(doctor, "llm_model", None),
+                "total_duration": global_elapsed,
+                "final_report": final_report,
+            }
         )
-        session.commit()
     except Exception as exc:  # noqa: BLE001
-        session.rollback()
         logger.error("Failed to record clinical session: %s", exc)
-    finally:
-        session.close()
 
     narrative: list[str] = [
         "Patient Summary",
