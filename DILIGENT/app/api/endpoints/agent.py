@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 import time
-from datetime import date
+from datetime import date, datetime
 from typing import Any
 
 from fastapi import APIRouter, Body, HTTPException, status
@@ -11,6 +11,7 @@ from DILIGENT.app.api.schemas.clinical import (
     PatientData,
 )
 from DILIGENT.app.logger import logger
+from DILIGENT.app.utils.repository.sqlite import ClinicalSession, database
 from DILIGENT.app.utils.services.clinical import (
     HepatotoxicityPatternAnalyzer,
     HepatoxConsultation,
@@ -98,6 +99,28 @@ async def process_single_patient(payload: PatientData) -> str:
     
     global_elapsed = time.perf_counter() - global_start_time
     logger.info("Total time for Drug Induced Liver Injury (DILI) assessment is %.4f seconds", global_elapsed)
+
+    session = database.Session()
+    try:
+        session.add(
+            ClinicalSession(
+                patient_name=payload.name,
+                session_timestamp=datetime.utcnow(),
+                anamnesis=payload.anamnesis,
+                drugs=payload.drugs,
+                exams=payload.exams,
+                parsing_model=drugs_parser.model or None,
+                clinical_model=doctor.llm_model,
+                total_duration=global_elapsed,
+                final_report=final_report,
+            )
+        )
+        session.commit()
+    except Exception as exc:  # noqa: BLE001
+        session.rollback()
+        logger.error("Failed to record clinical session: %s", exc)
+    finally:
+        session.close()
 
     narrative: list[str] = [
         "Patient Summary",
