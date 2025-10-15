@@ -1,16 +1,18 @@
 from __future__ import annotations
 
 import time
-from datetime import date
+from datetime import date, datetime
 from typing import Any
 
 from fastapi import APIRouter, Body, HTTPException, status
+from fastapi.responses import PlainTextResponse
 from pydantic import ValidationError
 
 from DILIGENT.app.api.schemas.clinical import (
     PatientData,
 )
 from DILIGENT.app.logger import logger
+from DILIGENT.app.utils.repository.serializer import DataSerializer
 from DILIGENT.app.utils.services.clinical import (
     HepatotoxicityPatternAnalyzer,
     HepatoxConsultation,
@@ -22,6 +24,7 @@ from DILIGENT.app.utils.services.parser import (
 drugs_parser = DrugsParser()
 pattern_analyzer = HepatotoxicityPatternAnalyzer()
 router = APIRouter(tags=["agent"])
+serializer = DataSerializer()
 
 # [ENPOINTS]
 ###############################################################################
@@ -99,6 +102,25 @@ async def process_single_patient(payload: PatientData) -> str:
     global_elapsed = time.perf_counter() - global_start_time
     logger.info("Total time for Drug Induced Liver Injury (DILI) assessment is %.4f seconds", global_elapsed)
 
+    serializer.record_clinical_session(
+        {
+            "patient_name": payload.name,
+            "session_timestamp": datetime.utcnow(),
+            "alt_value": payload.alt,
+            "alt_upper_limit": payload.alt_max,
+            "alp_value": payload.alp,
+            "alp_upper_limit": payload.alp_max,
+            "hepatic_pattern": pattern_score.classification,
+            "anamnesis": payload.anamnesis,
+            "drugs": payload.drugs,
+            "exams": payload.exams,
+            "parsing_model": getattr(drugs_parser, "model", None),
+            "clinical_model": getattr(doctor, "llm_model", None),
+            "total_duration": global_elapsed,
+            "final_report": final_report,
+        }
+    )
+
     narrative: list[str] = [
         "Patient Summary",
         "---------------",
@@ -128,7 +150,12 @@ async def process_single_patient(payload: PatientData) -> str:
     return "\n".join(narrative)
 
 # -----------------------------------------------------------------------------
-@router.post("/agent", response_model=None, status_code=status.HTTP_202_ACCEPTED)
+@router.post(
+    "/agent",
+    response_model=None,
+    status_code=status.HTTP_202_ACCEPTED,
+    response_class=PlainTextResponse,
+)
 async def start_single_clinical_agent(
     name: str | None = Body(default=None),
     visit_date: date | dict[str, int] | str | None = Body(default=None),
@@ -141,7 +168,7 @@ async def start_single_clinical_agent(
     alp: str | None = Body(default=None),
     alp_max: str | None = Body(default=None),
     symptoms: list[str] | None = Body(default=None),
-) -> str:
+) -> PlainTextResponse:
     try:
         payload_data: dict[str, Any] = {
             "name": name,
@@ -163,7 +190,7 @@ async def start_single_clinical_agent(
         ) from exc
 
     single_result = await process_single_patient(payload)
-    return single_result
+    return PlainTextResponse(content=single_result)
 
 
 # -----------------------------------------------------------------------------
