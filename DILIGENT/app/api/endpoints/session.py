@@ -14,6 +14,7 @@ from DILIGENT.app.api.schemas.clinical import (
 from DILIGENT.app.logger import logger
 from DILIGENT.app.utils.repository.serializer import DataSerializer
 from DILIGENT.app.utils.services.clinical import (
+    ClinicalContextBuilder,
     HepatotoxicityPatternAnalyzer,
     HepatoxConsultation,
 )
@@ -107,10 +108,17 @@ async def process_single_patient(payload: PatientData) -> str:
 
     # 3. Consult LiverTox database for hepatotoxicity info
     start_time = time.perf_counter()
-    doctor = HepatoxConsultation(drug_data, patient_name=payload.name)
-    drug_assessment = await doctor.run_analysis(
+    context_builder = ClinicalContextBuilder()
+    clinical_context = await context_builder.build_context(
         anamnesis=payload.anamnesis,
         exams=payload.exams,
+        visit_date=payload.visit_date,
+    )
+    logger.info("Generated clinical context summary for downstream analysis")
+
+    clinical_session = HepatoxConsultation(drug_data, patient_name=payload.name)
+    drug_assessment = await clinical_session.run_analysis(
+        clinical_context=clinical_context,
         visit_date=payload.visit_date,
         pattern_score=pattern_score,
     )
@@ -151,7 +159,7 @@ async def process_single_patient(payload: PatientData) -> str:
             "drugs": payload.drugs,
             "exams": payload.exams,
             "parsing_model": getattr(drugs_parser, "model", None),
-            "clinical_model": getattr(doctor, "llm_model", None),
+            "clinical_model": getattr(clinical_session, "llm_model", None),
             "total_duration": global_elapsed,
             "final_report": final_report,
         }
