@@ -14,7 +14,7 @@ from DILIGENT.app.api.models.providers import (
 )
 from DILIGENT.app.configurations import ClientRuntimeConfig
 from DILIGENT.app.constants import (
-    AGENT_API_URL,
+    CLINICAL_API_URL,
     CLOUD_MODEL_CHOICES,
     DEFAULT_LLM_TIMEOUT_SECONDS,
     API_BASE_URL,
@@ -376,5 +376,5 @@ async def run_agent(
     if not any(cleaned_payload[key] for key in ("anamnesis", "drugs", "exams")):
         return "[ERROR] Please provide at least one clinical section.", build_json_output(None)
 
-    url = f"{API_BASE_URL}{AGENT_API_URL}"
+    url = f"{API_BASE_URL}{CLINICAL_API_URL}"
     return await trigger_agent(url, cleaned_payload)
