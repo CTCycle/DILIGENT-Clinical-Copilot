@@ -33,9 +33,28 @@ from DILIGENT.app.utils.services.pharma import LiverToxMatch, LiverToxMatcher
 
 
 ###############################################################################
+def resolve_temperature(preferred: float | None, *, scale: float = 1.0) -> float:
+    base_value = ClientRuntimeConfig.get_ollama_temperature()
+    if preferred is not None:
+        try:
+            value = float(preferred)
+        except (TypeError, ValueError):
+            value = base_value * scale
+    else:
+        value = base_value * scale
+    value = max(0.0, min(2.0, value))
+    return round(value, 2)
+
+
+###############################################################################
 class ClinicalContextBuilder:
 
-    def __init__(self, *, timeout_s: float = DEFAULT_LLM_TIMEOUT_SECONDS) -> None:
+    def __init__(
+        self,
+        *,
+        timeout_s: float = DEFAULT_LLM_TIMEOUT_SECONDS,
+        temperature: float | None = None,
+    ) -> None:
         self.timeout_s = timeout_s
         self.llm_client = initialize_llm_client(purpose="clinical", timeout_s=timeout_s)
         provider, model_candidate = ClientRuntimeConfig.resolve_provider_and_model("clinical")
@@ -47,7 +66,7 @@ class ClinicalContextBuilder:
         self.chat_supports_temperature = (
             chat_signature is not None and "temperature" in chat_signature.parameters
         )
-        self.temperature = 0.15
+        self.temperature = resolve_temperature(temperature)
 
     # -------------------------------------------------------------------------
     async def build_context(
@@ -223,14 +242,16 @@ class HepatotoxicityPatternAnalyzer:
 
 
 ###############################################################################
-class HepatoxConsultation:    
-    
+class HepatoxConsultation:
+
     def __init__(
         self,
         drugs: PatientDrugs,
         *,
         patient_name: str | None = None,
         timeout_s: float = DEFAULT_LLM_TIMEOUT_SECONDS,
+        temperature: float | None = None,
+        report_temperature: float | None = None,
     ) -> None:
         self.drugs = drugs
         self.timeout_s = timeout_s
@@ -252,8 +273,8 @@ class HepatoxConsultation:
         self.chat_supports_temperature = (
             chat_signature is not None and "temperature" in chat_signature.parameters
         )
-        self.temperature = 0.2
-        self.report_temperature = 0.1
+        self.temperature = resolve_temperature(temperature)
+        self.report_temperature = resolve_temperature(report_temperature, scale=0.5)
 
     # -------------------------------------------------------------------------
     async def run_analysis(
