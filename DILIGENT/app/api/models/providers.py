@@ -10,6 +10,7 @@ import os
 import re
 import shutil
 import sys
+import threading
 from collections.abc import AsyncGenerator, Awaitable, Callable
 from typing import Any, Literal, TypeAlias, TypeVar, cast
 
@@ -69,8 +70,12 @@ class OllamaClient:
 
     """
 
-    pull_locks: dict[str, asyncio.Lock] = {}
-    pull_locks_guard: asyncio.Lock | None = None
+    pull_locks: dict[str, dict[int, asyncio.Lock]] = {}
+    pull_locks_guard = threading.Lock()
+    model_cache_registry: dict[str, dict[str, Any]] = {}
+    model_cache_registry_guard = threading.Lock()
+    model_context_registry: dict[tuple[str, str], int] = {}
+    model_context_guard = threading.Lock()
     MODEL_CACHE_TTL = 30.0
 
     def __init__(
@@ -92,11 +97,6 @@ class OllamaClient:
             base_url=self.base_url, timeout=timeout, limits=limits
         )
         self.legacy_generate = False
-        self.model_cache: set[str] = set()
-        self.model_cache_list: list[str] = []
-        self.model_cache_expiry = 0.0
-        self.model_cache_lock = asyncio.Lock()
-        self.model_context_limits: dict[str, int] = {}
 
     # -------------------------------------------------------------------------
     async def close(self) -> None:
@@ -121,23 +121,51 @@ class OllamaClient:
 
     # -------------------------------------------------------------------------
     @classmethod
-    def get_pull_guard(cls) -> asyncio.Lock:
-        if cls.pull_locks_guard is None:
-            cls.pull_locks_guard = asyncio.Lock()
+    def get_pull_guard(cls) -> threading.Lock:
         return cls.pull_locks_guard
 
     # -------------------------------------------------------------------------
     @classmethod
-    async def get_model_lock(cls, name: str) -> asyncio.Lock:
-        async with cls.get_pull_guard():
-            lock = cls.pull_locks.get(name)
+    async def get_model_cache_entry(
+        cls, base_url: str
+    ) -> tuple[dict[str, Any], asyncio.Lock]:
+        loop = asyncio.get_running_loop()
+        loop_id = id(loop)
+        with cls.model_cache_registry_guard:
+            entry = cls.model_cache_registry.get(base_url)
+            if entry is None:
+                entry = {
+                    "names": set(),
+                    "order": [],
+                    "expiry": 0.0,
+                    "locks": {},
+                    "locks_guard": threading.Lock(),
+                }
+                cls.model_cache_registry[base_url] = entry
+        locks_guard = entry["locks_guard"]
+        with locks_guard:
+            lock = entry["locks"].get(loop_id)
             if lock is None:
                 lock = asyncio.Lock()
-                cls.pull_locks[name] = lock
+                entry["locks"][loop_id] = lock
+        return entry, lock
+
+    # -------------------------------------------------------------------------
+    @classmethod
+    async def get_model_lock(cls, name: str) -> asyncio.Lock:
+        loop = asyncio.get_running_loop()
+        loop_id = id(loop)
+        with cls.get_pull_guard():
+            locks = cls.pull_locks.setdefault(name, {})
+            lock = locks.get(loop_id)
+            if lock is None:
+                lock = asyncio.Lock()
+                locks[loop_id] = lock
             return lock
 
     # -------------------------------------------------------------------------
     async def refresh_model_cache(self) -> set[str]:
+        entry, lock = await self.get_model_cache_entry(self.base_url)
         try:
             resp = await self.client.get("/api/tags")
         except httpx.TimeoutException as e:
@@ -150,153 +178,54 @@ class OllamaClient:
         payload = resp.json()
         names: list[str] = [m["name"] for m in payload.get("models", []) if "name" in m]
         loop = asyncio.get_running_loop()
-        async with self.model_cache_lock:
-            self.model_cache = set(names)
-            self.model_cache_list = names
-            self.model_cache_expiry = loop.time() + self.MODEL_CACHE_TTL
-        return set(names)
+        async with lock:
+            entry["names"] = set(names)
+            entry["order"] = list(names)
+            entry["expiry"] = loop.time() + self.MODEL_CACHE_TTL
+            return set(entry["names"])
 
     # -------------------------------------------------------------------------
     async def get_cached_models(self, *, force_refresh: bool = False) -> set[str]:
+        entry, lock = await self.get_model_cache_entry(self.base_url)
         loop = asyncio.get_running_loop()
-        async with self.model_cache_lock:
+        async with lock:
             cache_valid = (
-                bool(self.model_cache)
-                and loop.time() < self.model_cache_expiry
+                bool(entry["names"])
+                and loop.time() < entry["expiry"]
                 and not force_refresh
             )
             if cache_valid:
-                return set(self.model_cache)
+                return set(entry["names"])
         return await self.refresh_model_cache()
 
     # -------------------------------------------------------------------------
-    def prepare_generation_parameters(
+    def normalize_generation_settings(
         self,
         *,
         temperature: float | None,
         think: bool | None,
         options: dict[str, Any] | None,
     ) -> tuple[float, bool, dict[str, Any] | None]:
-        default_temp = ClientRuntimeConfig.get_ollama_temperature()
-        if temperature is None:
-            temp_value = default_temp
-        else:
-            try:
-                temp_value = float(temperature)
-            except (TypeError, ValueError):
-                temp_value = default_temp
-        options_payload = dict(options) if options else None
-        if options_payload and "temperature" in options_payload:
-            if temperature is None:
-                try:
-                    temp_value = float(options_payload["temperature"])
-                except (TypeError, ValueError):
-                    temp_value = default_temp
-            options_payload.pop("temperature", None)
-            if not options_payload:
-                options_payload = None
-        temp_value = max(0.0, min(2.0, float(temp_value)))
-        if think is None:
-            think_value = ClientRuntimeConfig.is_ollama_reasoning_enabled()
-        else:
-            think_value = bool(think)
-        return round(temp_value, 2), think_value, options_payload
-
-    # -------------------------------------------------------------------------
-    @staticmethod
-    def compose_payload(
-        payload: dict[str, Any],
-        *,
-        format: str | None,
-        options: dict[str, Any] | None,
-        keep_alive: str | None,
-    ) -> dict[str, Any]:
-        if format:
-            payload["format"] = format
-        if options:
-            payload["options"] = options
-        if keep_alive:
-            payload["keep_alive"] = keep_alive
-        return payload
-
-    # -------------------------------------------------------------------------
-    def build_chat_payload(
-        self,
-        *,
-        model: str,
-        messages: list[dict[str, str]],
-        stream: bool,
-        format: str | None,
-        temperature: float,
-        think: bool,
-        options: dict[str, Any] | None,
-        keep_alive: str | None,
-    ) -> dict[str, Any]:
-        payload = {
-            "model": model,
-            "messages": messages,
-            "stream": stream,
-            "temperature": temperature,
-            "think": think,
-        }
-        return self.compose_payload(
-            payload,
-            format=format,
-            options=options,
-            keep_alive=keep_alive,
+        opts = dict(options or {})
+        candidate_temp = temperature
+        if candidate_temp is None and "temperature" in opts:
+            candidate_temp = opts.pop("temperature")
+        try:
+            parsed_temp = float(candidate_temp) if candidate_temp is not None else None
+        except (TypeError, ValueError):
+            parsed_temp = None
+        if parsed_temp is None:
+            parsed_temp = ClientRuntimeConfig.get_ollama_temperature()
+        temp_value = round(max(0.0, min(2.0, parsed_temp)), 2)
+        think_value = (
+            ClientRuntimeConfig.is_ollama_reasoning_enabled()
+            if think is None
+            else bool(think)
         )
+        return temp_value, think_value, (opts or None)
 
     # -------------------------------------------------------------------------
-    def build_generate_payload(
-        self,
-        *,
-        model: str,
-        prompt: str,
-        stream: bool,
-        format: str | None,
-        temperature: float,
-        think: bool,
-        options: dict[str, Any] | None,
-        keep_alive: str | None,
-    ) -> dict[str, Any]:
-        payload = {
-            "model": model,
-            "prompt": prompt,
-            "stream": stream,
-            "temperature": temperature,
-            "think": think,
-        }
-        return self.compose_payload(
-            payload,
-            format=format,
-            options=options,
-            keep_alive=keep_alive,
-        )
-
-    # -------------------------------------------------------------------------
-    async def ensure_context_option(
-        self,
-        *,
-        model: str,
-        messages: list[dict[str, str]] | None,
-        prompt: str | None,
-        options: dict[str, Any] | None,
-    ) -> dict[str, Any] | None:
-        if options and "num_ctx" in options:
-            return options
-        context_window = await self.calculate_context_window(
-            model=model,
-            messages=messages,
-            prompt=prompt,
-        )
-        if not context_window:
-            return options
-        merged = dict(options) if options else {}
-        merged.setdefault("num_ctx", context_window)
-        return merged
-
-    # -------------------------------------------------------------------------
-    async def prepare_common_options(
+    async def prepare_request_settings(
         self,
         *,
         model: str,
@@ -308,18 +237,20 @@ class OllamaClient:
     ) -> tuple[str, float, bool, dict[str, Any] | None]:
         resolved_model = self.resolve_model_name(model)
         await self.ensure_model_ready(resolved_model)
-        temp_value, think_value, options_payload = self.prepare_generation_parameters(
+        temp_value, think_value, opts = self.normalize_generation_settings(
             temperature=temperature,
             think=think,
             options=options,
         )
-        enriched = await self.ensure_context_option(
+        context_window = await self.calculate_context_window(
             model=resolved_model,
             messages=messages,
             prompt=prompt,
-            options=options_payload,
         )
-        return resolved_model, temp_value, think_value, enriched
+        if context_window:
+            opts = opts or {}
+            opts.setdefault("num_ctx", context_window)
+        return resolved_model, temp_value, think_value, opts
 
     # -------------------------------------------------------------------------
     async def ensure_model_ready(self, name: str) -> None:
@@ -367,8 +298,9 @@ class OllamaClient:
     # -------------------------------------------------------------------------
     async def list_models(self) -> list[str]:
         await self.get_cached_models(force_refresh=True)
-        async with self.model_cache_lock:
-            return list(self.model_cache_list)
+        entry, lock = await self.get_model_cache_entry(self.base_url)
+        async with lock:
+            return list(entry["order"])
 
     # -----------------------------------------------------------------------------
     @staticmethod
@@ -387,6 +319,74 @@ class OllamaClient:
                 parts.append(f"{label}: {content}")
         parts.append("Assistant:")
         return "\n".join(parts)
+
+    # -------------------------------------------------------------------------
+    @staticmethod
+    def parse_content(content: Any) -> dict[str, Any] | str:
+        if isinstance(content, dict):
+            return content
+        if isinstance(content, str):
+            try:
+                return json.loads(content)
+            except json.JSONDecodeError:
+                return content
+        return str(content)
+
+    # -------------------------------------------------------------------------
+    @staticmethod
+    def build_chat_payload(
+        *,
+        model: str,
+        messages: list[dict[str, str]],
+        stream: bool,
+        temperature: float,
+        think: bool,
+        options: dict[str, Any] | None,
+        format: str | None,
+        keep_alive: str | None,
+    ) -> dict[str, Any]:
+        payload = {
+            "model": model,
+            "messages": messages,
+            "stream": stream,
+            "temperature": temperature,
+            "think": think,
+        }
+        if format:
+            payload["format"] = format
+        if options:
+            payload["options"] = options
+        if keep_alive:
+            payload["keep_alive"] = keep_alive
+        return payload
+
+    # -------------------------------------------------------------------------
+    @staticmethod
+    def build_generate_payload(
+        *,
+        model: str,
+        prompt: str,
+        stream: bool,
+        temperature: float,
+        think: bool,
+        options: dict[str, Any] | None,
+        format: str | None,
+        keep_alive: str | None,
+    ) -> dict[str, Any]:
+        payload = {
+            "model": model,
+            "prompt": prompt,
+            "stream": stream,
+            "temperature": temperature,
+            "think": think,
+        }
+        if format:
+            payload["format"] = format
+        if options:
+            payload["options"] = options
+        if keep_alive:
+            payload["keep_alive"] = keep_alive
+        return payload
 
     # -------------------------------------------------------------------------
     async def pull(
@@ -630,23 +630,25 @@ class OllamaClient:
         Non-streaming chat. Returns parsed JSON (dict) if possible, else raw string.
 
         """
+        prompt = self.messages_to_prompt(messages)
         (
             resolved_model,
             temp_value,
             think_value,
             options_payload,
-        ) = await self.prepare_common_options(
+        ) = await self.prepare_request_settings(
             model=model,
             temperature=temperature,
             think=think,
             options=options,
             messages=messages,
+            prompt=prompt,
         )
 
         if self.legacy_generate:
             return await self.chat_via_generate(
-                model=resolved_model,
-                messages=messages,
+                resolved_model=resolved_model,
+                prompt=prompt,
                 format=format,
                 temperature=temp_value,
                 think=think_value,
@@ -658,10 +660,10 @@ class OllamaClient:
             model=resolved_model,
             messages=messages,
             stream=False,
-            format=format,
             temperature=temp_value,
             think=think_value,
             options=options_payload,
+            format=format,
             keep_alive=keep_alive,
         )
 
@@ -674,8 +676,8 @@ class OllamaClient:
             await resp.aread()
             self.legacy_generate = True
             return await self.chat_via_generate(
-                model=resolved_model,
-                messages=messages,
+                resolved_model=resolved_model,
+                prompt=prompt,
                 format=format,
                 temperature=temp_value,
                 think=think_value,
@@ -687,15 +689,7 @@ class OllamaClient:
 
         data = resp.json()
         content = (data.get("message") or {}).get("content", "")
-
-        if isinstance(content, dict):
-            return content
-        if isinstance(content, str):
-            try:
-                return json.loads(content)
-            except json.JSONDecodeError:
-                return content
-        return str(content)
+        return self.parse_content(content)
 
     # -------------------------------------------------------------------------
     async def chat_stream(
@@ -714,23 +708,25 @@ class OllamaClient:
         Caller can aggregate tokens or forward server-sent chunks to a client.
 
         """
+        prompt = self.messages_to_prompt(messages)
         (
             resolved_model,
             temp_value,
             think_value,
             options_payload,
-        ) = await self.prepare_common_options(
+        ) = await self.prepare_request_settings(
             model=model,
             temperature=temperature,
             think=think,
             options=options,
             messages=messages,
+            prompt=prompt,
         )
 
         if self.legacy_generate:
             async for evt in self.chat_stream_via_generate(
-                model=resolved_model,
-                messages=messages,
+                resolved_model=resolved_model,
+                prompt=prompt,
                 format=format,
                 temperature=temp_value,
                 think=think_value,
@@ -744,10 +740,10 @@ class OllamaClient:
             model=resolved_model,
             messages=messages,
             stream=True,
-            format=format,
             temperature=temp_value,
             think=think_value,
             options=options_payload,
+            format=format,
             keep_alive=keep_alive,
         )
 
@@ -774,8 +770,8 @@ class OllamaClient:
         if use_fallback:
             self.legacy_generate = True
             async for evt in self.chat_stream_via_generate(
-                model=resolved_model,
-                messages=messages,
+                resolved_model=resolved_model,
+                prompt=prompt,
                 format=format,
                 temperature=temp_value,
                 think=think_value,
@@ -788,30 +784,22 @@ class OllamaClient:
     async def chat_via_generate(
         self,
         *,
-        model: str,
-        messages: list[dict[str, str]],
+        resolved_model: str,
+        prompt: str,
         format: str | None,
         temperature: float,
         think: bool,
         options: dict[str, Any] | None,
         keep_alive: str | None,
     ) -> dict[str, Any] | str:
-        prompt = self.messages_to_prompt(messages)
-        resolved_model = self.resolve_model_name(model)
-        options = await self.ensure_context_option(
-            model=resolved_model,
-            messages=None,
-            prompt=prompt,
-            options=options,
-        )
         payload = self.build_generate_payload(
             model=resolved_model,
             prompt=prompt,
             stream=False,
-            format=format,
             temperature=temperature,
             think=think,
             options=options,
+            format=format,
             keep_alive=keep_alive,
         )
 
@@ -823,44 +811,28 @@ class OllamaClient:
         self.raise_for_status(resp)
         data = resp.json()
         content = data.get("response", "")
-
-        if isinstance(content, dict):
-            return content
-        if isinstance(content, str):
-            try:
-                return json.loads(content)
-            except json.JSONDecodeError:
-                return content
-        return str(content)
+        return self.parse_content(content)
 
     # -----------------------------------------------------------------------------
     async def chat_stream_via_generate(
         self,
         *,
-        model: str,
-        messages: list[dict[str, str]],
+        resolved_model: str,
+        prompt: str,
         format: str | None,
         temperature: float,
         think: bool,
         options: dict[str, Any] | None,
         keep_alive: str | None,
     ) -> AsyncGenerator[dict[str, Any], None]:
-        prompt = self.messages_to_prompt(messages)
-        resolved_model = self.resolve_model_name(model)
-        options = await self.ensure_context_option(
-            model=resolved_model,
-            messages=None,
-            prompt=prompt,
-            options=options,
-        )
         payload = self.build_generate_payload(
             model=resolved_model,
             prompt=prompt,
             stream=True,
-            format=format,
             temperature=temperature,
             think=think,
             options=options,
+            format=format,
             keep_alive=keep_alive,
         )
 
@@ -915,16 +887,22 @@ class OllamaClient:
 
     # -------------------------------------------------------------------------
     async def get_model_context_limit(self, name: str) -> int | None:
-        cached = self.model_context_limits.get(name)
+        cache_key = (self.base_url, name)
+        registry = type(self).model_context_registry
+        guard = type(self).model_context_guard
+        with guard:
+            cached = registry.get(cache_key)
         if cached is not None:
             return cached or None
         try:
             metadata = await self.show_model(name)
         except OllamaError:
-            self.model_context_limits[name] = 0
+            with guard:
+                registry[cache_key] = 0
             return None
         limit = self.extract_context_limit(metadata) or 0
-        self.model_context_limits[name] = limit
+        with guard:
+            registry[cache_key] = limit
         return limit or None
 
     # -------------------------------------------------------------------------
@@ -974,27 +952,19 @@ class OllamaClient:
 
     # -------------------------------------------------------------------------
     async def collect_structured_fallbacks(self, preferred: list[str]) -> list[str]:
-        available: set[str] = set()
         try:
             available = await self.get_cached_models()
         except (OllamaError, OllamaTimeout) as exc:
             logger.debug("Failed to list Ollama models for fallback: %s", exc)
-            available = set()
+            available = None
 
         fallbacks: list[str] = []
-        if available:
-            for name in PARSING_MODEL_CHOICES:
-                if (
-                    name in available
-                    and name not in preferred
-                    and name not in fallbacks
-                ):
-                    fallbacks.append(name)
-        else:
-            for name in PARSING_MODEL_CHOICES:
-                if name not in preferred and name not in fallbacks:
-                    fallbacks.append(name)
-
+        for name in PARSING_MODEL_CHOICES:
+            if name in preferred or name in fallbacks:
+                continue
+            if available and name not in available:
+                continue
+            fallbacks.append(name)
         return fallbacks
 
     # -------------------------------------------------------------------------
