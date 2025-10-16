@@ -147,8 +147,7 @@ class HepatoxConsultation:
         exams: str | None = None,
         visit_date: date | None = None,
         pattern_score: HepatotoxicityPatternScore | None = None,
-    ) -> dict[str, Any] | None:
-        logger.info("Toxicity analysis stage 1/3: validating inputs")
+    ) -> dict[str, Any] | None:        
         patient_drugs = self.collect_patient_drugs()
         if not patient_drugs:
             logger.info("No drugs detected for toxicity analysis")
