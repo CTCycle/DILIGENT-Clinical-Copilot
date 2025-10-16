@@ -8,6 +8,8 @@ from datetime import date, datetime
 from typing import Any
 
 from DILIGENT.app.api.models.prompts import (
+    CLINICAL_CONTEXT_SYSTEM_PROMPT,
+    CLINICAL_CONTEXT_USER_PROMPT,
     CLINICAL_REPORT_REWRITE_SYSTEM_PROMPT,
     CLINICAL_REPORT_REWRITE_USER_PROMPT,
     LIVERTOX_CLINICAL_SYSTEM_PROMPT,
@@ -28,6 +30,84 @@ from DILIGENT.app.constants import DEFAULT_LLM_TIMEOUT_SECONDS, MAX_EXCERPT_LENG
 from DILIGENT.app.logger import logger
 from DILIGENT.app.utils.repository.serializer import DataSerializer
 from DILIGENT.app.utils.services.pharma import LiverToxMatch, LiverToxMatcher
+
+
+###############################################################################
+class ClinicalContextBuilder:
+
+    def __init__(self, *, timeout_s: float = DEFAULT_LLM_TIMEOUT_SECONDS) -> None:
+        self.timeout_s = timeout_s
+        self.llm_client = initialize_llm_client(purpose="clinical", timeout_s=timeout_s)
+        provider, model_candidate = ClientRuntimeConfig.resolve_provider_and_model("clinical")
+        self.llm_model = model_candidate or ClientRuntimeConfig.get_clinical_model()
+        try:
+            chat_signature = inspect.signature(self.llm_client.chat)
+        except (TypeError, ValueError):
+            chat_signature = None
+        self.chat_supports_temperature = (
+            chat_signature is not None and "temperature" in chat_signature.parameters
+        )
+        self.temperature = 0.15
+
+    # -------------------------------------------------------------------------
+    async def build_context(
+        self,
+        *,
+        anamnesis: str | None,
+        exams: str | None,
+        visit_date: date | None,
+    ) -> str:
+        normalized_anamnesis = (anamnesis or "").strip()
+        normalized_exams = (exams or "").strip()
+        if not normalized_anamnesis and not normalized_exams:
+            return (
+                "No anamnesis or exam information was provided; unable to generate "
+                "a clinical context summary."
+            )
+
+        visit_label = self.format_visit_label(visit_date)
+        anamnesis_block = normalized_anamnesis or "No anamnesis available."
+        exams_block = normalized_exams or "No exam findings available."
+        user_prompt = CLINICAL_CONTEXT_USER_PROMPT.format(
+            visit_date=HepatoxConsultation.escape_braces(visit_label),
+            anamnesis=HepatoxConsultation.escape_braces(anamnesis_block),
+            exams=HepatoxConsultation.escape_braces(exams_block),
+        )
+        messages = [
+            {"role": "system", "content": CLINICAL_CONTEXT_SYSTEM_PROMPT.strip()},
+            {"role": "user", "content": user_prompt},
+        ]
+        chat_kwargs: dict[str, Any] = {
+            "model": self.llm_model,
+            "messages": messages,
+        }
+        if self.chat_supports_temperature:
+            chat_kwargs["temperature"] = self.temperature
+        else:
+            chat_kwargs["options"] = {"temperature": self.temperature}
+        try:
+            raw_response = await self.llm_client.chat(**chat_kwargs)
+        except Exception as exc:  # noqa: BLE001
+            logger.error("Clinical context generation failed: %s", exc)
+            return (
+                "Clinical context generation failed due to a language model error; "
+                "proceed with the original anamnesis and exam data."
+            )
+        summary = HepatoxConsultation.coerce_chat_text(raw_response)
+        if not summary:
+            return (
+                "Clinical context generation returned an empty response; rely on "
+                "raw anamnesis and exam descriptions."
+            )
+        return summary
+
+    # -------------------------------------------------------------------------
+    def format_visit_label(self, visit_date: date | None) -> str:
+        if visit_date is None:
+            return "Visit date not provided."
+        if isinstance(visit_date, datetime):
+            return visit_date.date().isoformat()
+        return visit_date.isoformat()
 
 
 ###############################################################################
@@ -145,6 +225,7 @@ class HepatoxConsultation:
         *,
         anamnesis: str | None = None,
         exams: str | None = None,
+        clinical_context: str | None = None,
         visit_date: date | None = None,
         pattern_score: HepatotoxicityPatternScore | None = None,
     ) -> dict[str, Any] | None:
@@ -166,6 +247,7 @@ class HepatoxConsultation:
             resolved,
             anamnesis=anamnesis,
             exams=exams,
+            clinical_context=clinical_context,
             visit_date=visit_date,
             pattern_score=pattern_score,
         )
@@ -213,6 +295,7 @@ class HepatoxConsultation:
         *,
         anamnesis: str | None,
         exams: str | None,
+        clinical_context: str | None,
         visit_date: date | None,
         pattern_score: HepatotoxicityPatternScore | None,
     ) -> PatientDrugClinicalReport:
@@ -222,6 +305,9 @@ class HepatoxConsultation:
         normalized_exams = (exams or "").strip()
         if not normalized_exams:
             normalized_exams = "No exam results were provided."
+        normalized_context = (clinical_context or "").strip()
+        if not normalized_context:
+            normalized_context = "No synthesised clinical context was generated."
         pattern_prompt = self.format_pattern_prompt(pattern_score)
 
         entries: list[DrugClinicalAssessment] = []
@@ -269,6 +355,7 @@ class HepatoxConsultation:
                         excerpt=excerpt,
                         anamnesis=normalized_anamnesis,
                         exams=normalized_exams,
+                        clinical_context=normalized_context,
                         suspension=suspension,
                         pattern_summary=pattern_prompt,
                     ),
@@ -587,6 +674,7 @@ class HepatoxConsultation:
         excerpt: str,
         anamnesis: str,
         exams: str,
+        clinical_context: str,
         suspension: DrugSuspensionContext,
         pattern_summary: str,
     ) -> str:
@@ -597,6 +685,7 @@ class HepatoxConsultation:
             excerpt=self.escape_braces(excerpt),
             anamnesis=self.escape_braces(anamnesis),
             exams=self.escape_braces(exams),
+            clinical_context=self.escape_braces(clinical_context),
             therapy_start_details=self.escape_braces(start_details),
             suspension_details=self.escape_braces(suspension_details),
             pattern_summary=self.escape_braces(pattern_summary),
