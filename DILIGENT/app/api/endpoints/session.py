@@ -118,8 +118,6 @@ async def process_single_patient(payload: PatientData) -> str:
 
     doctor = HepatoxConsultation(drug_data, patient_name=payload.name)
     drug_assessment = await doctor.run_analysis(
-        anamnesis=payload.anamnesis,
-        exams=payload.exams,
         clinical_context=clinical_context,
         visit_date=payload.visit_date,
         pattern_score=pattern_score,
