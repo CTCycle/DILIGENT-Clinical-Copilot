@@ -168,6 +168,11 @@ def create_interface() -> gr.Blocks:
                 )
                 with gr.Column():
                     run_button = gr.Button("Run Workflow", variant="primary")
+                    export_button = gr.DownloadButton(
+                        "Download report",
+                        value=None,
+                        interactive=False,
+                    )
                     clear_button = gr.Button("Clear all")
                 with gr.Accordion("Model Config", open=False):
                     with gr.Column():
@@ -303,7 +308,7 @@ def create_interface() -> gr.Blocks:
                 alp_max,
                 symptoms,
             ],
-            outputs=[markdown_output, json_output],
+            outputs=[markdown_output, json_output, export_button],
             api_name="run_agent",
         )
         clear_button.click(
@@ -322,6 +327,7 @@ def create_interface() -> gr.Blocks:
                 has_diseases,
                 markdown_output,
                 json_output,
+                export_button,
             ],
         )
 
