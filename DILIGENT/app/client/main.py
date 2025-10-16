@@ -232,9 +232,8 @@ def create_interface() -> gr.Blocks:
         gr.Markdown("### Agent Output")
         markdown_output = gr.Markdown(
             value="",
-            render=False,
+            render=True,
         )
-        markdown_output.render()
 
         use_cloud_services.change(
             fn=toggle_cloud_services,

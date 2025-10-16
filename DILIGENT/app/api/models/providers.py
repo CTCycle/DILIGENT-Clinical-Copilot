@@ -323,6 +323,74 @@ class OllamaClient:
         return "\n".join(parts)
 
     # -------------------------------------------------------------------------
+    @staticmethod
+    def parse_content(content: Any) -> dict[str, Any] | str:
+        if isinstance(content, dict):
+            return content
+        if isinstance(content, str):
+            try:
+                return json.loads(content)
+            except json.JSONDecodeError:
+                return content
+        return str(content)
+
+    # -------------------------------------------------------------------------
+    @staticmethod
+    def build_chat_payload(
+        *,
+        model: str,
+        messages: list[dict[str, str]],
+        stream: bool,
+        temperature: float,
+        think: bool,
+        options: dict[str, Any] | None,
+        format: str | None,
+        keep_alive: str | None,
+    ) -> dict[str, Any]:
+        payload = {
+            "model": model,
+            "messages": messages,
+            "stream": stream,
+            "temperature": temperature,
+            "think": think,
+        }
+        if format:
+            payload["format"] = format
+        if options:
+            payload["options"] = options
+        if keep_alive:
+            payload["keep_alive"] = keep_alive
+        return payload
+
+    # -------------------------------------------------------------------------
+    @staticmethod
+    def build_generate_payload(
+        *,
+        model: str,
+        prompt: str,
+        stream: bool,
+        temperature: float,
+        think: bool,
+        options: dict[str, Any] | None,
+        format: str | None,
+        keep_alive: str | None,
+    ) -> dict[str, Any]:
+        payload = {
+            "model": model,
+            "prompt": prompt,
+            "stream": stream,
+            "temperature": temperature,
+            "think": think,
+        }
+        if format:
+            payload["format"] = format
+        if options:
+            payload["options"] = options
+        if keep_alive:
+            payload["keep_alive"] = keep_alive
+        return payload
+
+    # -------------------------------------------------------------------------
     async def pull(
         self,
         name: str,
@@ -564,6 +632,7 @@ class OllamaClient:
         Non-streaming chat. Returns parsed JSON (dict) if possible, else raw string.
 
         """
+        prompt = self.messages_to_prompt(messages)
         (
             resolved_model,
             temp_value,
@@ -575,12 +644,13 @@ class OllamaClient:
             think=think,
             options=options,
             messages=messages,
+            prompt=prompt,
         )
 
         if self.legacy_generate:
             return await self.chat_via_generate(
-                model=resolved_model,
-                messages=messages,
+                resolved_model=resolved_model,
+                prompt=prompt,
                 format=format,
                 temperature=temp_value,
                 think=think_value,
@@ -588,19 +658,16 @@ class OllamaClient:
                 keep_alive=keep_alive,
             )
 
-        body = {
-            "model": resolved_model,
-            "messages": messages,
-            "stream": False,
-            "temperature": temp_value,
-            "think": think_value,
-        }
-        if format:
-            body["format"] = format
-        if options_payload:
-            body["options"] = options_payload
-        if keep_alive:
-            body["keep_alive"] = keep_alive
+        body = self.build_chat_payload(
+            model=resolved_model,
+            messages=messages,
+            stream=False,
+            temperature=temp_value,
+            think=think_value,
+            options=options_payload,
+            format=format,
+            keep_alive=keep_alive,
+        )
 
         try:
             resp = await self.client.post("/api/chat", json=body)
@@ -611,8 +678,8 @@ class OllamaClient:
             await resp.aread()
             self.legacy_generate = True
             return await self.chat_via_generate(
-                model=resolved_model,
-                messages=messages,
+                resolved_model=resolved_model,
+                prompt=prompt,
                 format=format,
                 temperature=temp_value,
                 think=think_value,
@@ -624,15 +691,7 @@ class OllamaClient:
 
         data = resp.json()
         content = (data.get("message") or {}).get("content", "")
-
-        if isinstance(content, dict):
-            return content
-        if isinstance(content, str):
-            try:
-                return json.loads(content)
-            except json.JSONDecodeError:
-                return content
-        return str(content)
+        return self.parse_content(content)
 
     # -------------------------------------------------------------------------
     async def chat_stream(
@@ -651,6 +710,7 @@ class OllamaClient:
         Caller can aggregate tokens or forward server-sent chunks to a client.
 
         """
+        prompt = self.messages_to_prompt(messages)
         (
             resolved_model,
             temp_value,
@@ -662,12 +722,13 @@ class OllamaClient:
             think=think,
             options=options,
             messages=messages,
+            prompt=prompt,
         )
 
         if self.legacy_generate:
             async for evt in self.chat_stream_via_generate(
-                model=resolved_model,
-                messages=messages,
+                resolved_model=resolved_model,
+                prompt=prompt,
                 format=format,
                 temperature=temp_value,
                 think=think_value,
@@ -677,19 +738,16 @@ class OllamaClient:
                 yield evt
             return
 
-        body = {
-            "model": resolved_model,
-            "messages": messages,
-            "stream": True,
-            "temperature": temp_value,
-            "think": think_value,
-        }
-        if format:
-            body["format"] = format
-        if options_payload:
-            body["options"] = options_payload
-        if keep_alive:
-            body["keep_alive"] = keep_alive
+        body = self.build_chat_payload(
+            model=resolved_model,
+            messages=messages,
+            stream=True,
+            temperature=temp_value,
+            think=think_value,
+            options=options_payload,
+            format=format,
+            keep_alive=keep_alive,
+        )
 
         use_fallback = False
 
@@ -714,8 +772,8 @@ class OllamaClient:
         if use_fallback:
             self.legacy_generate = True
             async for evt in self.chat_stream_via_generate(
-                model=resolved_model,
-                messages=messages,
+                resolved_model=resolved_model,
+                prompt=prompt,
                 format=format,
                 temperature=temp_value,
                 think=think_value,
@@ -728,40 +786,24 @@ class OllamaClient:
     async def chat_via_generate(
         self,
         *,
-        model: str,
-        messages: list[dict[str, str]],
+        resolved_model: str,
+        prompt: str,
         format: str | None,
         temperature: float,
         think: bool,
         options: dict[str, Any] | None,
         keep_alive: str | None,
     ) -> dict[str, Any] | str:
-        prompt = self.messages_to_prompt(messages)
-        (
-            resolved_model,
-            temp_value,
-            think_value,
-            options_payload,
-        ) = await self.prepare_request_settings(
-            model=model,
+        payload = self.build_generate_payload(
+            model=resolved_model,
+            prompt=prompt,
+            stream=False,
             temperature=temperature,
             think=think,
             options=options,
-            prompt=prompt,
+            format=format,
+            keep_alive=keep_alive,
         )
-        payload = {
-            "model": resolved_model,
-            "prompt": prompt,
-            "stream": False,
-            "temperature": temp_value,
-            "think": think_value,
-        }
-        if format:
-            payload["format"] = format
-        if options_payload:
-            payload["options"] = options_payload
-        if keep_alive:
-            payload["keep_alive"] = keep_alive
 
         try:
             resp = await self.client.post("/api/generate", json=payload)
@@ -771,54 +813,30 @@ class OllamaClient:
         self.raise_for_status(resp)
         data = resp.json()
         content = data.get("response", "")
-
-        if isinstance(content, dict):
-            return content
-        if isinstance(content, str):
-            try:
-                return json.loads(content)
-            except json.JSONDecodeError:
-                return content
-        return str(content)
+        return self.parse_content(content)
 
     # -----------------------------------------------------------------------------
     async def chat_stream_via_generate(
         self,
         *,
-        model: str,
-        messages: list[dict[str, str]],
+        resolved_model: str,
+        prompt: str,
         format: str | None,
         temperature: float,
         think: bool,
         options: dict[str, Any] | None,
         keep_alive: str | None,
     ) -> AsyncGenerator[dict[str, Any], None]:
-        prompt = self.messages_to_prompt(messages)
-        (
-            resolved_model,
-            temp_value,
-            think_value,
-            options_payload,
-        ) = await self.prepare_request_settings(
-            model=model,
+        payload = self.build_generate_payload(
+            model=resolved_model,
+            prompt=prompt,
+            stream=True,
             temperature=temperature,
             think=think,
             options=options,
-            prompt=prompt,
+            format=format,
+            keep_alive=keep_alive,
         )
-        payload = {
-            "model": resolved_model,
-            "prompt": prompt,
-            "stream": True,
-            "temperature": temp_value,
-            "think": think_value,
-        }
-        if format:
-            payload["format"] = format
-        if options_payload:
-            payload["options"] = options_payload
-        if keep_alive:
-            payload["keep_alive"] = keep_alive
 
         try:
             async with self.client.stream("POST", "/api/generate", json=payload) as r:
