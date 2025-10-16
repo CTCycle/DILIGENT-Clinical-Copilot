@@ -43,12 +43,14 @@ class DrugsParser:
         client: Any | None = None,
         temperature: float = 0.0,
         timeout_s: float = DEFAULT_LLM_TIMEOUT_SECONDS,
+        max_concurrent_calls: int = 3,
     ) -> None:
         self.temperature = float(temperature)
         self.timeout_s = float(timeout_s)
         self.client: Any | None = client
         self.model: str = ""
         self.client_lock = asyncio.Lock()
+        self.max_concurrent_calls = max(1, int(max_concurrent_calls))
         if client is None:
             self.client_provider: str | None = None
             self.runtime_revision = -1
@@ -156,21 +158,36 @@ class DrugsParser:
 
         grouped_lines = self.group_lines_for_llm(lines)
 
-        entries: list[DrugEntry] = []
+        semaphore = asyncio.Semaphore(self.max_concurrent_calls)
+        tasks: list[asyncio.Task[list[DrugEntry]]] = []
+
+        async def invoke(prompt_line: str) -> list[DrugEntry]:
+            async with semaphore:
+                parsed = await self.client.llm_structured_call(
+                    model=self.model,
+                    system_prompt=single_entry_prompt,
+                    user_prompt=(
+                        "Extract the structured representation for the following drug entry:\n"
+                        f"{prompt_line}"
+                    ),
+                    schema=PatientDrugs,
+                    temperature=self.temperature,
+                    use_json_mode=True,
+                    max_repair_attempts=2,
+                )
+                return list(parsed.entries)
+
+        loop = asyncio.get_running_loop()
         for line in grouped_lines:
-            parsed = await self.client.llm_structured_call(
-                model=self.model,
-                system_prompt=single_entry_prompt,
-                user_prompt=(
-                    "Extract the structured representation for the following drug entry:\n"
-                    f"{line}"
-                ),
-                schema=PatientDrugs,
-                temperature=self.temperature,
-                use_json_mode=True,
-                max_repair_attempts=2,
-            )
-            entries.extend(parsed.entries)
+            tasks.append(loop.create_task(invoke(line)))
+
+        results = await asyncio.gather(*tasks, return_exceptions=True)
+
+        entries: list[DrugEntry] = []
+        for outcome in results:
+            if isinstance(outcome, Exception):
+                raise outcome
+            entries.extend(outcome)
 
         return PatientDrugs(entries=entries)
 
