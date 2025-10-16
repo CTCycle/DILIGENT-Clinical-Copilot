@@ -1,6 +1,8 @@
 from __future__ import annotations
 
 import json
+import os
+import tempfile
 from datetime import date, datetime
 from typing import Any
 
@@ -63,6 +65,23 @@ def build_json_output(
     if payload is None:
         return gr_update(value=None, visible=False)
     return gr_update(value=payload, visible=True)
+
+
+# -----------------------------------------------------------------------------
+def create_export_file(content: str) -> str:
+    directory = tempfile.mkdtemp(prefix="diligent_report_")
+    file_path = os.path.join(directory, "clinical_report.md")
+    with open(file_path, "w", encoding="utf-8") as handle:
+        handle.write(content)
+    return file_path
+
+
+# -----------------------------------------------------------------------------
+def build_export_update(content: str | None) -> dict[str, Any]:
+    if content:
+        file_path = create_export_file(content)
+        return gr_update(value=file_path, interactive=True)
+    return gr_update(value=None, interactive=False)
 
 
 # -----------------------------------------------------------------------------
@@ -259,6 +278,7 @@ def clear_agent_fields() -> tuple[
     bool,
     str,
     Any,
+    dict[str, Any],
 ]:
     return (
         "",
@@ -274,6 +294,7 @@ def clear_agent_fields() -> tuple[
         False,
         "",
         build_json_output(None),
+        build_export_update(None),
     )
 
 
@@ -348,7 +369,7 @@ async def run_agent(
     alp: str,
     alp_max: str,
     symptoms: list[str],
-) -> tuple[str, Any]:
+) -> tuple[str, Any, dict[str, Any]]:
     normalized_visit_date = normalize_visit_date(visit_date)
 
     cleaned_payload = {
@@ -374,7 +395,18 @@ async def run_agent(
     }
 
     if not any(cleaned_payload[key] for key in ("anamnesis", "drugs", "exams")):
-        return "[ERROR] Please provide at least one clinical section.", build_json_output(None)
+        return (
+            "[ERROR] Please provide at least one clinical section.",
+            build_json_output(None),
+            build_export_update(None),
+        )
 
     url = f"{API_BASE_URL}{CLINICAL_API_URL}"
-    return await trigger_agent(url, cleaned_payload)
+    message, json_update = await trigger_agent(url, cleaned_payload)
+    normalized_message = message.strip() if message else ""
+    exportable = (
+        message
+        if normalized_message and not normalized_message.startswith("[ERROR]")
+        else None
+    )
+    return message, json_update, build_export_update(exportable)
