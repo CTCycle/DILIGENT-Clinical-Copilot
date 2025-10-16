@@ -24,6 +24,7 @@ from DILIGENT.app.utils.services.parser import (
 
 drugs_parser = DrugsParser()
 pattern_analyzer = HepatotoxicityPatternAnalyzer()
+context_builder = ClinicalContextBuilder()
 router = APIRouter(tags=["agent"])
 serializer = DataSerializer()
 
@@ -108,7 +109,6 @@ async def process_single_patient(payload: PatientData) -> str:
 
     # 3. Consult LiverTox database for hepatotoxicity info
     start_time = time.perf_counter()
-    context_builder = ClinicalContextBuilder()
     clinical_context = await context_builder.build_context(
         anamnesis=payload.anamnesis,
         exams=payload.exams,

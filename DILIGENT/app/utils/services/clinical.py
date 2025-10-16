@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import asyncio
+import contextlib
 import inspect
 import json
 import re
@@ -47,6 +48,66 @@ def resolve_temperature(preferred: float | None, *, scale: float = 1.0) -> float
 
 
 ###############################################################################
+class ClinicalLLMClientCache:
+
+    def __init__(self) -> None:
+        self.client: Any | None = None
+        self.client_provider: str | None = None
+        self.llm_model: str = ""
+        self.chat_supports_temperature = False
+        self.runtime_revision = -1
+        self.lock = asyncio.Lock()
+
+    # -------------------------------------------------------------------------
+    async def ensure_client(
+        self,
+        *,
+        purpose: str,
+        timeout_s: float,
+    ) -> tuple[Any, str, bool]:
+        async with self.lock:
+            revision = ClientRuntimeConfig.get_revision()
+            provider, model_candidate = ClientRuntimeConfig.resolve_provider_and_model(
+                purpose
+            )
+            needs_refresh = (
+                self.client is None
+                or self.client_provider != provider
+                or self.runtime_revision != revision
+            )
+            if needs_refresh:
+                if self.client is not None and hasattr(self.client, "close"):
+                    with contextlib.suppress(Exception):
+                        await self.client.close()
+                self.client = initialize_llm_client(
+                    purpose=purpose,
+                    timeout_s=timeout_s,
+                )
+                self.client_provider = provider
+                self.runtime_revision = revision
+                self.chat_supports_temperature = self.detect_temperature_support()
+            model_name = model_candidate or ClientRuntimeConfig.get_clinical_model()
+            self.llm_model = model_name
+            if self.client is not None and model_name and hasattr(self.client, "default_model"):
+                self.client.default_model = model_name  # type: ignore[attr-defined]
+            return self.client, self.llm_model, self.chat_supports_temperature
+
+    # -------------------------------------------------------------------------
+    def detect_temperature_support(self) -> bool:
+        client = self.client
+        if client is None:
+            return False
+        try:
+            signature = inspect.signature(client.chat)
+        except (TypeError, ValueError):
+            return False
+        return "temperature" in signature.parameters
+
+
+clinical_llm_cache = ClinicalLLMClientCache()
+
+
+###############################################################################
 class ClinicalContextBuilder:
 
     def __init__(
@@ -56,17 +117,20 @@ class ClinicalContextBuilder:
         temperature: float | None = None,
     ) -> None:
         self.timeout_s = timeout_s
-        self.llm_client = initialize_llm_client(purpose="clinical", timeout_s=timeout_s)
-        provider, model_candidate = ClientRuntimeConfig.resolve_provider_and_model("clinical")
-        self.llm_model = model_candidate or ClientRuntimeConfig.get_clinical_model()
-        try:
-            chat_signature = inspect.signature(self.llm_client.chat)
-        except (TypeError, ValueError):
-            chat_signature = None
-        self.chat_supports_temperature = (
-            chat_signature is not None and "temperature" in chat_signature.parameters
-        )
+        self.llm_client: Any | None = None
+        self.llm_model: str = ""
+        self.chat_supports_temperature = False
         self.temperature = resolve_temperature(temperature)
+
+    # -------------------------------------------------------------------------
+    async def ensure_client(self) -> None:
+        client, model, supports_temperature = await clinical_llm_cache.ensure_client(
+            purpose="clinical",
+            timeout_s=self.timeout_s,
+        )
+        self.llm_client = client
+        self.llm_model = model
+        self.chat_supports_temperature = supports_temperature
 
     # -------------------------------------------------------------------------
     async def build_context(
@@ -76,6 +140,9 @@ class ClinicalContextBuilder:
         exams: str | None,
         visit_date: date | None,
     ) -> str:
+        await self.ensure_client()
+        if self.llm_client is None:
+            raise RuntimeError("LLM client is unavailable for clinical context generation")
         normalized_anamnesis = (anamnesis or "").strip()
         normalized_exams = (exams or "").strip()
         visit_label = self.format_visit_label(visit_date)
@@ -252,6 +319,7 @@ class HepatoxConsultation:
         timeout_s: float = DEFAULT_LLM_TIMEOUT_SECONDS,
         temperature: float | None = None,
         report_temperature: float | None = None,
+        max_concurrent_chats: int = 3,
     ) -> None:
         self.drugs = drugs
         self.timeout_s = timeout_s
@@ -259,22 +327,24 @@ class HepatoxConsultation:
         self.livertox_df = None
         self.master_list_df = None
         self.matcher: LiverToxMatcher | None = None
-        self.llm_client = initialize_llm_client(purpose="clinical", timeout_s=timeout_s)
+        self.llm_client: Any | None = None
         self.MAX_EXCERPT_LENGTH = MAX_EXCERPT_LENGTH
         self.patient_name = (patient_name or "").strip() or None
-        provider, model_candidate = ClientRuntimeConfig.resolve_provider_and_model(
-            "clinical"
-        )
-        self.llm_model = model_candidate or ClientRuntimeConfig.get_clinical_model()
-        try:
-            chat_signature = inspect.signature(self.llm_client.chat)
-        except (TypeError, ValueError):
-            chat_signature = None
-        self.chat_supports_temperature = (
-            chat_signature is not None and "temperature" in chat_signature.parameters
-        )
+        self.llm_model = ""
+        self.chat_supports_temperature = False
         self.temperature = resolve_temperature(temperature)
         self.report_temperature = resolve_temperature(report_temperature, scale=0.5)
+        self.concurrency_limit = max(1, int(max_concurrent_chats))
+
+    # -------------------------------------------------------------------------
+    async def ensure_client(self) -> None:
+        client, model, supports_temperature = await clinical_llm_cache.ensure_client(
+            purpose="clinical",
+            timeout_s=self.timeout_s,
+        )
+        self.llm_client = client
+        self.llm_model = model
+        self.chat_supports_temperature = supports_temperature
 
     # -------------------------------------------------------------------------
     async def run_analysis(
@@ -356,6 +426,7 @@ class HepatoxConsultation:
 
         entries: list[DrugClinicalAssessment] = []
         llm_jobs: list[tuple[int, Any]] = []
+        semaphore = asyncio.Semaphore(self.concurrency_limit)
 
         for idx, drug_entry in enumerate(self.drugs.entries):
             resolved = resolved_entries[idx] if idx < len(resolved_entries) else {}
@@ -394,7 +465,8 @@ class HepatoxConsultation:
             llm_jobs.append(
                 (
                     idx,
-                    self.request_drug_analysis(
+                    self.dispatch_drug_analysis(
+                        semaphore=semaphore,
                         drug_name=drug_entry.name,
                         excerpt=excerpt,
                         clinical_context=normalized_context,
@@ -718,6 +790,9 @@ class HepatoxConsultation:
         suspension: DrugSuspensionContext,
         pattern_summary: str,
     ) -> str:
+        await self.ensure_client()
+        if self.llm_client is None:
+            raise RuntimeError("LLM client is unavailable for clinical analysis")
         start_details = self.format_start_prompt(suspension)
         suspension_details = self.format_suspension_prompt(suspension)
         user_prompt = LIVERTOX_CLINICAL_USER_PROMPT.format(
@@ -826,6 +901,11 @@ class HepatoxConsultation:
     ) -> str | None:
         if not entries or not final_report:
             return None
+        if len(entries) <= 1:
+            return None
+        await self.ensure_client()
+        if self.llm_client is None:
+            raise RuntimeError("LLM client is unavailable for report rewrite")
         summary_payload = self.summarize_entries_for_prompt(entries)
         if not summary_payload.strip():
             return None
@@ -893,4 +973,23 @@ class HepatoxConsultation:
         return (
             "Automated analysis was unavailable due to a technical issue; manual review is recommended."
         )
+
+    async def dispatch_drug_analysis(
+        self,
+        *,
+        semaphore: asyncio.Semaphore,
+        drug_name: str,
+        excerpt: str,
+        clinical_context: str,
+        suspension: DrugSuspensionContext,
+        pattern_summary: str,
+    ) -> str:
+        async with semaphore:
+            return await self.request_drug_analysis(
+                drug_name=drug_name,
+                excerpt=excerpt,
+                clinical_context=clinical_context,
+                suspension=suspension,
+                pattern_summary=pattern_summary,
+            )
 
