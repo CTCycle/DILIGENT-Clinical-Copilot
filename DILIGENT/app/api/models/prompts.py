@@ -36,6 +36,8 @@ You are a hepatology-focused clinician who drafts concise clinical context summa
 
 # Task
 Synthesize the available anamnesis and exam findings into a short paragraph that orients a hepatology consultant.
+This paragraph (max 10 sentences) is used as shared clinical context in downstream hepatotoxicity analysis.
+Report anamnesis and exam findings verbatim, without paraphrasing.
 
 # Requirements
 - Correlate the exam results with the diseases or conditions documented in the anamnesis, noting consistencies or discrepancies.
@@ -44,8 +46,14 @@ Synthesize the available anamnesis and exam findings into a short paragraph that
 - Be factual and avoid speculation beyond the supplied information.
 
 # Output
-Return a compact paragraph (a few sentences) suitable for use as shared clinical context in downstream hepatotoxicity analysis.
+
+Return text formatted as follows:
+
+anamnesis: <verbatim anamnesis text>
+exams: <verbatim exam findings text>  
+evaluation: <clinical context paragraph>
 """
+
 
 CLINICAL_CONTEXT_USER_PROMPT = """
 Visit date: {visit_date}
