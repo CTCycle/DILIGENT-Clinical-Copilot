@@ -10,6 +10,7 @@ import os
 import re
 import shutil
 import sys
+import threading
 from collections.abc import AsyncGenerator, Awaitable, Callable
 from typing import Any, Literal, TypeAlias, TypeVar, cast
 
@@ -69,12 +70,12 @@ class OllamaClient:
 
     """
 
-    pull_locks: dict[str, asyncio.Lock] = {}
-    pull_locks_guard: asyncio.Lock | None = None
+    pull_locks: dict[str, dict[int, asyncio.Lock]] = {}
+    pull_locks_guard = threading.Lock()
     model_cache_registry: dict[str, dict[str, Any]] = {}
-    model_cache_registry_guard: asyncio.Lock | None = None
+    model_cache_registry_guard = threading.Lock()
     model_context_registry: dict[tuple[str, str], int] = {}
-    model_context_lock: asyncio.Lock | None = None
+    model_context_guard = threading.Lock()
     MODEL_CACHE_TTL = 30.0
 
     def __init__(
@@ -120,54 +121,51 @@ class OllamaClient:
 
     # -------------------------------------------------------------------------
     @classmethod
-    def get_pull_guard(cls) -> asyncio.Lock:
-        if cls.pull_locks_guard is None:
-            cls.pull_locks_guard = asyncio.Lock()
+    def get_pull_guard(cls) -> threading.Lock:
         return cls.pull_locks_guard
 
     # -------------------------------------------------------------------------
     @classmethod
-    def get_model_cache_guard(cls) -> asyncio.Lock:
-        if cls.model_cache_registry_guard is None:
-            cls.model_cache_registry_guard = asyncio.Lock()
-        return cls.model_cache_registry_guard
-
-    # -------------------------------------------------------------------------
-    @classmethod
-    async def get_model_cache_entry(cls, base_url: str) -> dict[str, Any]:
-        guard = cls.get_model_cache_guard()
-        async with guard:
+    async def get_model_cache_entry(
+        cls, base_url: str
+    ) -> tuple[dict[str, Any], asyncio.Lock]:
+        loop = asyncio.get_running_loop()
+        loop_id = id(loop)
+        with cls.model_cache_registry_guard:
             entry = cls.model_cache_registry.get(base_url)
             if entry is None:
                 entry = {
-                    "lock": asyncio.Lock(),
                     "names": set(),
                     "order": [],
                     "expiry": 0.0,
+                    "locks": {},
+                    "locks_guard": threading.Lock(),
                 }
                 cls.model_cache_registry[base_url] = entry
-            return entry
-
-    # -------------------------------------------------------------------------
-    @classmethod
-    def get_model_context_lock(cls) -> asyncio.Lock:
-        if cls.model_context_lock is None:
-            cls.model_context_lock = asyncio.Lock()
-        return cls.model_context_lock
+        locks_guard = entry["locks_guard"]
+        with locks_guard:
+            lock = entry["locks"].get(loop_id)
+            if lock is None:
+                lock = asyncio.Lock()
+                entry["locks"][loop_id] = lock
+        return entry, lock
 
     # -------------------------------------------------------------------------
     @classmethod
     async def get_model_lock(cls, name: str) -> asyncio.Lock:
-        async with cls.get_pull_guard():
-            lock = cls.pull_locks.get(name)
+        loop = asyncio.get_running_loop()
+        loop_id = id(loop)
+        with cls.get_pull_guard():
+            locks = cls.pull_locks.setdefault(name, {})
+            lock = locks.get(loop_id)
             if lock is None:
                 lock = asyncio.Lock()
-                cls.pull_locks[name] = lock
+                locks[loop_id] = lock
             return lock
 
     # -------------------------------------------------------------------------
     async def refresh_model_cache(self) -> set[str]:
-        entry = await self.get_model_cache_entry(self.base_url)
+        entry, lock = await self.get_model_cache_entry(self.base_url)
         try:
             resp = await self.client.get("/api/tags")
         except httpx.TimeoutException as e:
@@ -180,7 +178,7 @@ class OllamaClient:
         payload = resp.json()
         names: list[str] = [m["name"] for m in payload.get("models", []) if "name" in m]
         loop = asyncio.get_running_loop()
-        async with entry["lock"]:
+        async with lock:
             entry["names"] = set(names)
             entry["order"] = list(names)
             entry["expiry"] = loop.time() + self.MODEL_CACHE_TTL
@@ -188,9 +186,9 @@ class OllamaClient:
 
     # -------------------------------------------------------------------------
     async def get_cached_models(self, *, force_refresh: bool = False) -> set[str]:
-        entry = await self.get_model_cache_entry(self.base_url)
+        entry, lock = await self.get_model_cache_entry(self.base_url)
         loop = asyncio.get_running_loop()
-        async with entry["lock"]:
+        async with lock:
             cache_valid = (
                 bool(entry["names"])
                 and loop.time() < entry["expiry"]
@@ -300,8 +298,8 @@ class OllamaClient:
     # -------------------------------------------------------------------------
     async def list_models(self) -> list[str]:
         await self.get_cached_models(force_refresh=True)
-        entry = await self.get_model_cache_entry(self.base_url)
-        async with entry["lock"]:
+        entry, lock = await self.get_model_cache_entry(self.base_url)
+        async with lock:
             return list(entry["order"])
 
     # -----------------------------------------------------------------------------
@@ -890,20 +888,21 @@ class OllamaClient:
     # -------------------------------------------------------------------------
     async def get_model_context_limit(self, name: str) -> int | None:
         cache_key = (self.base_url, name)
-        lock = self.get_model_context_lock()
-        async with lock:
-            cached = self.model_context_registry.get(cache_key)
+        registry = type(self).model_context_registry
+        guard = type(self).model_context_guard
+        with guard:
+            cached = registry.get(cache_key)
         if cached is not None:
             return cached or None
         try:
             metadata = await self.show_model(name)
         except OllamaError:
-            async with lock:
-                self.model_context_registry[cache_key] = 0
+            with guard:
+                registry[cache_key] = 0
             return None
         limit = self.extract_context_limit(metadata) or 0
-        async with lock:
-            self.model_context_registry[cache_key] = limit
+        with guard:
+            registry[cache_key] = limit
         return limit or None
 
     # -------------------------------------------------------------------------
