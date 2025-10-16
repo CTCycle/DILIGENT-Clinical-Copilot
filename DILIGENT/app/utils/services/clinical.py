@@ -121,6 +121,7 @@ class ClinicalContextBuilder:
         self.llm_model: str = ""
         self.chat_supports_temperature = False
         self.temperature = resolve_temperature(temperature)
+        self.keep_alive = ClientRuntimeConfig.get_ollama_keep_alive()
 
     # -------------------------------------------------------------------------
     async def ensure_client(self) -> None:
@@ -178,6 +179,8 @@ class ClinicalContextBuilder:
             chat_kwargs["temperature"] = self.temperature
         else:
             chat_kwargs["options"] = {"temperature": self.temperature}
+        if self.keep_alive:
+            chat_kwargs["keep_alive"] = self.keep_alive
         try:
             raw_response = await self.llm_client.chat(**chat_kwargs)
             summary = HepatoxConsultation.coerce_chat_text(raw_response)
@@ -335,6 +338,7 @@ class HepatoxConsultation:
         self.temperature = resolve_temperature(temperature)
         self.report_temperature = resolve_temperature(report_temperature, scale=0.5)
         self.concurrency_limit = max(1, int(max_concurrent_chats))
+        self.keep_alive = ClientRuntimeConfig.get_ollama_keep_alive()
 
     # -------------------------------------------------------------------------
     async def ensure_client(self) -> None:
@@ -815,6 +819,8 @@ class HepatoxConsultation:
             chat_kwargs["temperature"] = self.temperature
         else:
             chat_kwargs["options"] = {"temperature": self.temperature}
+        if self.keep_alive:
+            chat_kwargs["keep_alive"] = self.keep_alive
         try:
             raw_response = await self.llm_client.chat(**chat_kwargs)
         except Exception as exc:  # noqa: BLE001
@@ -942,6 +948,8 @@ class HepatoxConsultation:
             chat_kwargs["temperature"] = self.report_temperature
         else:
             chat_kwargs["options"] = {"temperature": self.report_temperature}
+        if self.keep_alive:
+            chat_kwargs["keep_alive"] = self.keep_alive
         try:
             raw_response = await self.llm_client.chat(**chat_kwargs)
         except Exception as exc:  # noqa: BLE001

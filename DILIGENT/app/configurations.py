@@ -34,6 +34,7 @@ class ClientRuntimeConfig:
     use_cloud_services: bool = False
     ollama_temperature: float = 0.7
     ollama_reasoning: bool = False
+    ollama_keep_alive: str | None = "30m"
     revision: int = 0
 
     # -------------------------------------------------------------------------
@@ -125,6 +126,15 @@ class ClientRuntimeConfig:
 
     # -------------------------------------------------------------------------
     @classmethod
+    def set_ollama_keep_alive(cls, value: str | float | int | None) -> str | None:
+        normalized = cls.normalize_keep_alive(value)
+        if cls.ollama_keep_alive != normalized:
+            cls.ollama_keep_alive = normalized
+            cls.touch_revision()
+        return cls.ollama_keep_alive
+
+    # -------------------------------------------------------------------------
+    @classmethod
     def get_parsing_model(cls) -> str:
         return cls.parsing_model
 
@@ -160,6 +170,26 @@ class ClientRuntimeConfig:
 
     # -------------------------------------------------------------------------
     @classmethod
+    def get_ollama_keep_alive(cls) -> str | None:
+        return cls.ollama_keep_alive
+
+    # -------------------------------------------------------------------------
+    @classmethod
+    def normalize_keep_alive(cls, value: str | float | int | None) -> str | None:
+        if value is None:
+            return None
+        if isinstance(value, (int, float)):
+            if value <= 0:
+                return None
+            seconds = int(value)
+            return f"{seconds}s"
+        if isinstance(value, str):
+            trimmed = value.strip()
+            return trimmed or None
+        return cls.ollama_keep_alive
+
+    # -------------------------------------------------------------------------
+    @classmethod
     def reset_defaults(cls) -> None:
         cls.parsing_model = DEFAULT_PARSING_MODEL
         cls.clinical_model = DEFAULT_CLINICAL_MODEL
@@ -168,6 +198,7 @@ class ClientRuntimeConfig:
         cls.use_cloud_services = False
         cls.ollama_temperature = 0.7
         cls.ollama_reasoning = False
+        cls.ollama_keep_alive = "30m"
         cls.revision = 0
 
     # -------------------------------------------------------------------------
