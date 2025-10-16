@@ -1,21 +1,100 @@
-MIT License
+DILIGENT Clinical Copilot Shared Source License
 
-Copyright (c) 2023 Thomas Virdis
+Copyright (c) 2023-2024 Thomas Virdis
 
-Permission is hereby granted, free of charge, to any person obtaining a copy
-of this software and associated documentation files (the "Software"), to deal
-in the Software without restriction, including without limitation the rights
-to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
-copies of the Software, and to permit persons to whom the Software is
-furnished to do so, subject to the following conditions:
+1. Definitions
+   "Software" means the DILIGENT Clinical Copilot codebase and all accompanying
+   files in this repository.
+   "You" means any individual or legal entity exercising permissions granted
+   by this License.
 
-The above copyright notice and this permission notice shall be included in all
-copies or substantial portions of the Software.
+2. Grant of Non-Commercial License
+   Subject to the terms and conditions of this License, You are hereby granted
+   a worldwide, royalty-free, non-exclusive, non-transferable license to use,
+   reproduce, display, perform, modify, and distribute the Software and
+   derivative works of the Software solely for Non-Commercial purposes.
 
-THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
-IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
-FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
-AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
-LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
-OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
-SOFTWARE.
+3. Non-Commercial Purpose
+   "Non-Commercial" means any use that is not intended for or directed toward
+   commercial advantage, monetary compensation, or other forms of pecuniary
+   gain. Academic research, personal experimentation, teaching, or internal
+   evaluation are deemed Non-Commercial uses. All other uses require a separate
+   commercial license from the copyright holder.
+
+4. Redistribution Requirements
+   If You distribute or make the Software or derivative works available under
+   this License, You must:
+   a. Include a complete copy of this License in all copies or substantial
+      portions of the Software;
+   b. Prominently display the following notice in any documentation, readme,
+      or equivalent materials: "This project is licensed for Non-Commercial
+      use only under the DILIGENT Clinical Copilot Shared Source License";
+   c. Preserve all copyright, trademark, patent, and attribution notices in the
+      Software;
+   d. Clearly document any modifications You make to the Software.
+
+5. Commercial Use
+   Any commercial use of the Software, including but not limited to offering
+   services, products, or applications for a fee, providing consulting or
+   support services for the Software, or incorporating the Software into a
+   product intended for commercial advantage, requires a separate written
+   agreement with the copyright holder. Please contact
+   diligent-clinical@proton.me to discuss commercial licensing terms.
+
+6. Patents
+   No patent rights are granted under this License. To the extent that the
+   copyright holder owns or controls any patents that would be infringed by
+   your exercise of the license granted in Section 2, You are granted a
+   non-exclusive, worldwide, royalty-free license, solely for Non-Commercial
+   purposes, under such patent claims to make, use, sell, offer for sale, and
+   import the Software. Any commercial use requires a separate patent license.
+
+7. Disclaimer of Warranty
+   THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+   IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+   FITNESS FOR A PARTICULAR PURPOSE, TITLE, AND NON-INFRINGEMENT. IN NO EVENT
+   SHALL THE COPYRIGHT HOLDER OR CONTRIBUTORS BE LIABLE FOR ANY CLAIM, DAMAGES,
+   OR OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT, OR OTHERWISE,
+   ARISING FROM, OUT OF, OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
+   OTHER DEALINGS IN THE SOFTWARE.
+
+8. Limitation of Liability
+   TO THE MAXIMUM EXTENT PERMITTED BY APPLICABLE LAW, IN NO EVENT SHALL THE
+   COPYRIGHT HOLDER BE LIABLE FOR ANY INDIRECT, INCIDENTAL, SPECIAL,
+   CONSEQUENTIAL, OR EXEMPLARY DAMAGES (INCLUDING, BUT NOT LIMITED TO,
+   PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS OF USE, DATA, OR PROFITS;
+   OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND ON ANY THEORY OF LIABILITY,
+   WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR
+   OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF
+   ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
+
+9. Termination
+   This License and the rights granted hereunder will terminate automatically
+   if You fail to comply with any term of this License. Upon termination, You
+   must cease all use, reproduction, modification, and distribution of the
+   Software and destroy all copies. Termination does not affect the rights of
+   any party that has received copies under this License prior to termination,
+   provided such party remains in full compliance.
+
+10. Governing Law
+    This License shall be governed by and construed in accordance with the
+    laws of the jurisdiction in which the copyright holder resides, without
+    regard to its conflict of law principles.
+
+11. Severability
+    If any provision of this License is held to be unenforceable, that
+    provision will be reformed only to the extent necessary to make it
+    enforceable. The remaining provisions shall remain in full force and
+    effect.
+
+12. No Waiver
+    No failure or delay by the copyright holder in exercising any right,
+    power, or privilege under this License shall operate as a waiver thereof,
+    nor shall any single or partial exercise of any right, power, or privilege
+    preclude any other or further exercise thereof or the exercise of any
+    other right, power, or privilege.
+
+13. Entire Agreement
+    This License constitutes the entire agreement between the parties with
+    respect to the Software licensed herein and supersedes all prior or
+    contemporaneous agreements or understandings, whether oral or written.
