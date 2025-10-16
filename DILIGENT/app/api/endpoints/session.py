@@ -178,7 +178,7 @@ async def process_single_patient(payload: PatientData) -> str:
 
 # -----------------------------------------------------------------------------
 @router.post(
-    "/agent",
+    "/clinical",
     response_model=None,
     status_code=status.HTTP_202_ACCEPTED,
     response_class=PlainTextResponse,
