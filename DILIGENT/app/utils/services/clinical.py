@@ -59,15 +59,22 @@ class ClinicalContextBuilder:
     ) -> str:
         normalized_anamnesis = (anamnesis or "").strip()
         normalized_exams = (exams or "").strip()
-        if not normalized_anamnesis and not normalized_exams:
-            return (
-                "No anamnesis or exam information was provided; unable to generate "
-                "a clinical context summary."
-            )
-
         visit_label = self.format_visit_label(visit_date)
         anamnesis_block = normalized_anamnesis or "No anamnesis available."
         exams_block = normalized_exams or "No exam findings available."
+
+        if not normalized_anamnesis and not normalized_exams:
+            summary_text = (
+                "No anamnesis or exam information was provided; unable to generate "
+                "a clinical context summary."
+            )
+            return self.compose_context_payload(
+                visit_label=visit_label,
+                summary_text=summary_text,
+                anamnesis_block=anamnesis_block,
+                exams_block=exams_block,
+            )
+
         user_prompt = CLINICAL_CONTEXT_USER_PROMPT.format(
             visit_date=HepatoxConsultation.escape_braces(visit_label),
             anamnesis=HepatoxConsultation.escape_braces(anamnesis_block),
@@ -87,19 +94,25 @@ class ClinicalContextBuilder:
             chat_kwargs["options"] = {"temperature": self.temperature}
         try:
             raw_response = await self.llm_client.chat(**chat_kwargs)
+            summary = HepatoxConsultation.coerce_chat_text(raw_response)
         except Exception as exc:  # noqa: BLE001
             logger.error("Clinical context generation failed: %s", exc)
-            return (
+            summary = (
                 "Clinical context generation failed due to a language model error; "
-                "proceed with the original anamnesis and exam data."
+                "review the verbatim anamnesis and exam findings below."
             )
-        summary = HepatoxConsultation.coerce_chat_text(raw_response)
         if not summary:
-            return (
-                "Clinical context generation returned an empty response; rely on "
-                "raw anamnesis and exam descriptions."
+            summary = (
+                "Clinical context generation returned an empty response; review the "
+                "verbatim anamnesis and exam findings below."
             )
-        return summary
+
+        return self.compose_context_payload(
+            visit_label=visit_label,
+            summary_text=summary,
+            anamnesis_block=anamnesis_block,
+            exams_block=exams_block,
+        )
 
     # -------------------------------------------------------------------------
     def format_visit_label(self, visit_date: date | None) -> str:
@@ -108,6 +121,29 @@ class ClinicalContextBuilder:
         if isinstance(visit_date, datetime):
             return visit_date.date().isoformat()
         return visit_date.isoformat()
+
+    # -------------------------------------------------------------------------
+    def compose_context_payload(
+        self,
+        *,
+        visit_label: str,
+        summary_text: str,
+        anamnesis_block: str,
+        exams_block: str,
+    ) -> str:
+        sections = [
+            f"Visit date: {visit_label}",
+            "",
+            "Clinical context summary:",
+            summary_text.strip() or "No clinical summary available.",
+            "",
+            "Patient anamnesis (verbatim):",
+            anamnesis_block.strip() or "No anamnesis available.",
+            "",
+            "Exam findings (verbatim):",
+            exams_block.strip() or "No exam findings available.",
+        ]
+        return "\n".join(sections).strip()
 
 
 ###############################################################################
@@ -223,8 +259,6 @@ class HepatoxConsultation:
     async def run_analysis(
         self,
         *,
-        anamnesis: str | None = None,
-        exams: str | None = None,
         clinical_context: str | None = None,
         visit_date: date | None = None,
         pattern_score: HepatotoxicityPatternScore | None = None,
@@ -245,8 +279,6 @@ class HepatoxConsultation:
         resolved = self.resolve_matches(patient_drugs, matches)
         report = await self.compile_clinical_assessment(
             resolved,
-            anamnesis=anamnesis,
-            exams=exams,
             clinical_context=clinical_context,
             visit_date=visit_date,
             pattern_score=pattern_score,
@@ -293,18 +325,10 @@ class HepatoxConsultation:
         self,
         resolved_entries: list[dict[str, Any]],
         *,
-        anamnesis: str | None,
-        exams: str | None,
         clinical_context: str | None,
         visit_date: date | None,
         pattern_score: HepatotoxicityPatternScore | None,
     ) -> PatientDrugClinicalReport:
-        normalized_anamnesis = (anamnesis or "").strip()
-        if not normalized_anamnesis:
-            normalized_anamnesis = "No anamnesis information was provided."
-        normalized_exams = (exams or "").strip()
-        if not normalized_exams:
-            normalized_exams = "No exam results were provided."
         normalized_context = (clinical_context or "").strip()
         if not normalized_context:
             normalized_context = "No synthesised clinical context was generated."
@@ -353,8 +377,6 @@ class HepatoxConsultation:
                     self.request_drug_analysis(
                         drug_name=drug_entry.name,
                         excerpt=excerpt,
-                        anamnesis=normalized_anamnesis,
-                        exams=normalized_exams,
                         clinical_context=normalized_context,
                         suspension=suspension,
                         pattern_summary=pattern_prompt,
@@ -382,7 +404,7 @@ class HepatoxConsultation:
         refined_report = await self.rewrite_patient_report(
             entries,
             final_report=final_report,
-            anamnesis=normalized_anamnesis,
+            clinical_context=normalized_context,
             visit_date=visit_date,
             pattern_score=pattern_score,
         )
@@ -672,8 +694,6 @@ class HepatoxConsultation:
         *,
         drug_name: str,
         excerpt: str,
-        anamnesis: str,
-        exams: str,
         clinical_context: str,
         suspension: DrugSuspensionContext,
         pattern_summary: str,
@@ -683,8 +703,6 @@ class HepatoxConsultation:
         user_prompt = LIVERTOX_CLINICAL_USER_PROMPT.format(
             drug_name=self.escape_braces(drug_name.strip() or drug_name),
             excerpt=self.escape_braces(excerpt),
-            anamnesis=self.escape_braces(anamnesis),
-            exams=self.escape_braces(exams),
             clinical_context=self.escape_braces(clinical_context),
             therapy_start_details=self.escape_braces(start_details),
             suspension_details=self.escape_braces(suspension_details),
@@ -782,7 +800,7 @@ class HepatoxConsultation:
         entries: list[DrugClinicalAssessment],
         *,
         final_report: str | None,
-        anamnesis: str,
+        clinical_context: str,
         visit_date: date | None,
         pattern_score: HepatotoxicityPatternScore | None,
     ) -> str | None:
@@ -793,7 +811,7 @@ class HepatoxConsultation:
             return None
         patient_label = self.patient_name or "Unnamed patient"
         visit_label = visit_date.isoformat() if visit_date else "Unknown visit date"
-        anamnesis_payload = anamnesis.strip() or "No anamnesis information provided."
+        context_payload = clinical_context.strip() or "No clinical context provided."
         pattern_summary_raw = self.format_pattern_prompt(pattern_score)
         instruction_clause = (
             "Treat drugs whose known hepatotoxicity pattern matches this classification as stronger causal candidates, and downgrade mismatches."
@@ -805,7 +823,7 @@ class HepatoxConsultation:
             patient_name=self.escape_braces(patient_label),
             visit_date=self.escape_braces(visit_label),
             pattern_summary=self.escape_braces(pattern_summary),
-            anamnesis=self.escape_braces(anamnesis_payload),
+            clinical_context=self.escape_braces(context_payload),
             drug_summaries=self.escape_braces(summary_payload),
             initial_report=self.escape_braces(final_report),
         )

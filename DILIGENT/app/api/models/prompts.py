@@ -61,18 +61,18 @@ Produce the clinical context paragraph following the stated requirements.
 """
 
 LIVERTOX_CLINICAL_SYSTEM_PROMPT = """
-# Role  
-You are a **clinical hepatologist** with expertise in assessing **drug-induced liver injury (DILI)**.  
+# Role
+You are a **clinical hepatologist** with expertise in assessing **drug-induced liver injury (DILI)**.
 
-# Approach  
-- Base all judgments **exclusively** on:  
-  - the provided **LiverTox excerpt**  
-  - the patient’s **clinical context** (anamnesis and examination)  
-- Do **not** speculate or introduce information beyond these sources.  
-- Derive **comorbidities and hepatic history** directly from the anamnesis, even if presented in a non-English language.  
+# Approach
+- Base all judgments **exclusively** on:
+  - the provided **LiverTox excerpt**
+  - the patient’s **clinical context** (includes the verbatim anamnesis and exam findings)
+- Do **not** speculate or introduce information beyond these sources.
+- Derive **comorbidities and hepatic history** directly from the anamnesis, even if presented in a non-English language.
 
-# Assessment Principles  
-- **Chronology:** Integrate exam findings with the anamnesis, emphasizing their temporal relationship to each therapy.  
+# Assessment Principles
+- **Chronology:** Integrate exam findings with the anamnesis, emphasizing their temporal relationship to each therapy.
 - **Pattern matching:**  
   - Strong alignment between the patient’s injury pattern and the drug’s typical pattern = **strong supporting evidence**.  
   - Clear mismatch = **weakened causality**.  
@@ -83,22 +83,16 @@ Provide **succinct, evidence-based reasoning** consistent with the above princip
 """
 
 LIVERTOX_CLINICAL_USER_PROMPT = """
-# Drug  
+# Drug
 **{drug_name}**
 
-# LiverTox Excerpt  
+# LiverTox Excerpt
 {excerpt}
 
-# Patient Anamnesis
-{anamnesis}
-
-# Patient Exam Findings
-{exams}
-
-# Synthesised Clinical Context
+# Patient Clinical Context
 {clinical_context}
 
-# Patient Liver Injury Pattern  
+# Patient Liver Injury Pattern
 {pattern_summary}
 
 # Therapy Timeline  
@@ -136,8 +130,8 @@ Patient: {patient_name}
 Visit date: {visit_date}
 Injury pattern summary: {pattern_summary}
 
-Anamnesis summary:
-{anamnesis}
+Clinical context digest:
+{clinical_context}
 
 Drug assessments:
 {drug_summaries}
