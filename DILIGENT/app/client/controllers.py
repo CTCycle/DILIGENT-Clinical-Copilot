@@ -57,6 +57,15 @@ def extract_text(result: Any) -> str:
 
 
 # -----------------------------------------------------------------------------
+def build_json_output(
+    payload: dict[str, Any] | list[Any] | None
+) -> Any:
+    if payload is None:
+        return gr_update(value=None, visible=False)
+    return gr_update(value=payload, visible=True)
+
+
+# -----------------------------------------------------------------------------
 def sanitize_field(value: str | None) -> str | None:
     if value is None:
         return None
@@ -206,7 +215,9 @@ def set_ollama_reasoning(enabled: bool) -> bool:
 
 
 # -----------------------------------------------------------------------------
-async def pull_selected_models(parsing_model: str, clinical_model: str) -> str:
+async def pull_selected_models(
+    parsing_model: str, clinical_model: str
+) -> tuple[str, Any]:
     models: list[str] = []
     for name in (parsing_model, clinical_model):
         if not name:
@@ -216,21 +227,21 @@ async def pull_selected_models(parsing_model: str, clinical_model: str) -> str:
             models.append(normalized)
 
     if not models:
-        return "[ERROR] No models selected to pull."
+        return "[ERROR] No models selected to pull.", build_json_output(None)
 
     try:
         async with OllamaClient() as client:
             for model in models:
                 await client.pull(model, stream=False)
     except OllamaTimeout as exc:
-        return f"[ERROR] Timed out pulling models: {exc}"
+        return f"[ERROR] Timed out pulling models: {exc}", build_json_output(None)
     except OllamaError as exc:
-        return f"[ERROR] Failed to pull models: {exc}"
+        return f"[ERROR] Failed to pull models: {exc}", build_json_output(None)
     except Exception as exc:  # noqa: BLE001
-        return f"[ERROR] Unexpected error while pulling models: {exc}"
+        return f"[ERROR] Unexpected error while pulling models: {exc}", build_json_output(None)
 
     pulled = ", ".join(models)
-    return f"[INFO] Models available locally: {pulled}."
+    return f"[INFO] Models available locally: {pulled}.", build_json_output(None)
 
 
 # -----------------------------------------------------------------------------
@@ -247,6 +258,7 @@ def clear_agent_fields() -> tuple[
     list[str],
     bool,
     str,
+    Any,
 ]:
     return (
         "",
@@ -261,35 +273,65 @@ def clear_agent_fields() -> tuple[
         [],
         False,
         "",
+        build_json_output(None),
     )
 
 
 # trigger function to start the agent on button click. Payload is optional depending
 # on the requested endpoint URL (defined through run_agent function)
 # -----------------------------------------------------------------------------
-async def trigger_agent(url: str, payload: dict[str, Any] | None = None) -> str:
+async def trigger_agent(
+    url: str, payload: dict[str, Any] | None = None
+) -> tuple[str, Any]:
     try:
         async with httpx.AsyncClient(timeout=LLM_REQUEST_TIMEOUT_SECONDS) as client:
             resp = await client.post(url, json=payload)
             resp.raise_for_status()
+            json_payload: dict[str, Any] | list[Any] | None = None
             try:
-                return extract_text(resp.json())
+                parsed = resp.json()
             except ValueError:
-                return resp.text
+                message = resp.text
+            else:
+                message = extract_text(parsed)
+                if isinstance(parsed, (dict, list)):
+                    json_payload = parsed
+            return message, build_json_output(json_payload)
 
     except httpx.ConnectError as exc:
-        return f"[ERROR] Could not connect to backend at {url}.\nDetails: {exc}"
-    except httpx.HTTPStatusError as exc:
-        body = exc.response.text if exc.response is not None else ""
-        code = exc.response.status_code if exc.response else "unknown"
         return (
-            f"[ERROR] Backend returned status {code}."
-            f"\nURL: {url}\nResponse body:\n{body}"
+            f"[ERROR] Could not connect to backend at {url}.\nDetails: {exc}",
+            build_json_output(None),
         )
+    except httpx.HTTPStatusError as exc:
+        response = exc.response
+        code = response.status_code if response else "unknown"
+        json_payload: dict[str, Any] | list[Any] | None = None
+        body_content = ""
+        if response is not None:
+            try:
+                parsed = response.json()
+            except ValueError:
+                body_content = response.text or ""
+            else:
+                body_content = extract_text(parsed)
+                if isinstance(parsed, (dict, list)):
+                    json_payload = parsed
+        message = f"[ERROR] Backend returned status {code}."
+        if body_content:
+            message = f"{message}\n{body_content}"
+        elif response is not None and response.text:
+            message = (
+                f"{message}\nURL: {url}\nResponse body:\n{response.text}"
+            )
+        return message, build_json_output(json_payload)
     except httpx.TimeoutException:
-        return f"[ERROR] Request timed out after {LLM_REQUEST_TIMEOUT_DISPLAY} seconds."
+        return (
+            f"[ERROR] Request timed out after {LLM_REQUEST_TIMEOUT_DISPLAY} seconds.",
+            build_json_output(None),
+        )
     except Exception as exc:  # noqa: BLE001
-        return f"[ERROR] Unexpected error: {exc}"
+        return f"[ERROR] Unexpected error: {exc}", build_json_output(None)
 
 
 # [AGENT RUNNING LOGIC]
@@ -306,7 +348,7 @@ async def run_agent(
     alp: str,
     alp_max: str,
     symptoms: list[str],
-) -> str:
+) -> tuple[str, Any]:
     normalized_visit_date = normalize_visit_date(visit_date)
 
     cleaned_payload = {
@@ -332,7 +374,7 @@ async def run_agent(
     }
 
     if not any(cleaned_payload[key] for key in ("anamnesis", "drugs", "exams")):
-        return "[ERROR] Please provide at least one clinical section."
+        return "[ERROR] Please provide at least one clinical section.", build_json_output(None)
 
     url = f"{API_BASE_URL}{AGENT_API_URL}"
     return await trigger_agent(url, cleaned_payload)

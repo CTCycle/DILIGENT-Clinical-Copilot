@@ -223,13 +223,18 @@ def create_interface() -> gr.Blocks:
                                         variant="secondary",
                                         interactive=not ClientRuntimeConfig.is_cloud_enabled(),
                                     )
+                json_output = gr.JSON(
+                    label="Agent Output (JSON)",
+                    value=None,
+                    visible=False,
+                )
 
         gr.Markdown("### Agent Output")
-        output = gr.Markdown(
+        markdown_output = gr.Markdown(
             value="",
             render=False,
         )
-        output.render()
+        markdown_output.render()
 
         use_cloud_services.change(
             fn=toggle_cloud_services,
@@ -280,7 +285,7 @@ def create_interface() -> gr.Blocks:
                 parsing_model_dropdown,
                 clinical_model_dropdown,
             ],
-            outputs=output,
+            outputs=[markdown_output, json_output],
         )
 
         run_button.click(
@@ -298,7 +303,7 @@ def create_interface() -> gr.Blocks:
                 alp_max,
                 symptoms,
             ],
-            outputs=output,
+            outputs=[markdown_output, json_output],
             api_name="run_agent",
         )
         clear_button.click(
@@ -315,7 +320,8 @@ def create_interface() -> gr.Blocks:
                 alp_max,
                 symptoms,
                 has_diseases,
-                output,
+                markdown_output,
+                json_output,
             ],
         )
 
