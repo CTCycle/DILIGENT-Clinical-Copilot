@@ -40,13 +40,12 @@ class FdaUpdater:
         database_client=database,
         chunk_size: int = DOWNLOAD_CHUNK_SIZE,
     ) -> None:
-        self.sources_path = os.path.abspath(sources_path)
+        self.download_directory = os.path.abspath(sources_path)
         self.dataset_url = os.path.join(
             OPENFDA_DOWNLOAD_BASE_URL,
             OPENFDA_DRUGS_FDA_DATASET,
         )
-        self.index_url = os.path.join(self.dataset_url, OPENFDA_DRUGS_FDA_INDEX)
-        self.download_directory = os.path.join(self.sources_path, "fda")
+        self.index_url = os.path.join(self.dataset_url, OPENFDA_DRUGS_FDA_INDEX)        
         self.metadata_path = os.path.join(self.download_directory, METADATA_FILENAME)
         self.redownload = redownload
         self.serializer = serializer or DataSerializer()
