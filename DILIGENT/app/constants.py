@@ -18,8 +18,6 @@ LOGS_PATH = join(RSC_PATH, "logs")
 ###############################################################################
 API_BASE_URL = "http://127.0.0.1:8000"
 CLINICAL_API_URL = "/clinical"
-PHARMACOLOGY_LIVERTOX_FETCH_ENDPOINT = "/pharmacology/livertox/fetch"
-PHARMACOLOGY_LIVERTOX_STATUS_ENDPOINT = "/pharmacology/livertox/status"
 
 # [LLM / PROVIDERS]
 ###############################################################################
@@ -103,7 +101,6 @@ LLM_NULL_MATCH_NAMES = {
 
 # [CLINICAL ANALYSIS]
 ###############################################################################
-DRUG_SUSPENSION_EXCLUSION_DAYS = 14
 ALT_LABELS = {"ALT", "ALAT"}
 ALP_LABELS = {"ALP"}
 
