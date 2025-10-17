@@ -120,9 +120,17 @@ class FdaUpdater:
 
     # -------------------------------------------------------------------------
     def fetch_index(self, client: httpx.Client) -> dict[str, Any]:
-        response = client.get(self.index_url, follow_redirects=True)
-        response.raise_for_status()
-        payload = response.json()
+        try:
+            response = client.get(self.index_url, follow_redirects=True)
+            response.raise_for_status()
+        except httpx.HTTPError as exc:
+            logger.error("Failed to retrieve FDA index %s: %s", self.index_url, exc)
+            return {}
+        try:
+            payload = response.json()
+        except ValueError as exc:
+            logger.error("Failed to decode FDA index response %s: %s", self.index_url, exc)
+            return {}
         if not isinstance(payload, dict):
             return {}
         return payload
