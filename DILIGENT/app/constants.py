@@ -13,6 +13,7 @@ DOCS_PATH = join(DATA_PATH, "documents")
 SOURCES_PATH = join(DATA_PATH, "sources")
 TASKS_PATH = join(DATA_PATH, "tasks")
 LOGS_PATH = join(RSC_PATH, "logs")
+VECTOR_DB_PATH = join(DATA_PATH, "vector_store")
 
 # [ENDPOINS]
 ###############################################################################
@@ -72,6 +73,19 @@ DEFAULT_PARSING_MODEL = "qwen3:8b"
 DEFAULT_CLINICAL_MODEL = CLINICAL_MODEL_CHOICES[0]
 DEFAULT_CLOUD_PROVIDER = CLOUD_PROVIDERS[0]
 DEFAULT_CLOUD_MODEL = CLOUD_MODEL_CHOICES[DEFAULT_CLOUD_PROVIDER][0]
+
+# [RETRIEVAL AUGMENTED GENERATION]
+###############################################################################
+VECTOR_COLLECTION_NAME = "documents"
+RAG_CHUNK_SIZE = 1024
+RAG_CHUNK_OVERLAP = 128
+RAG_EMBEDDING_BACKEND = "ollama"
+RAG_OLLAMA_BASE_URL = OLLAMA_HOST_DEFAULT
+RAG_OLLAMA_EMBEDDING_MODEL = "nomic-embed-text"
+RAG_HF_EMBEDDING_MODEL = "sentence-transformers/all-MiniLM-L6-v2"
+RAG_VECTOR_INDEX_METRIC = "cosine"
+RAG_VECTOR_INDEX_TYPE = "IVF_FLAT"
+RAG_RESET_VECTOR_COLLECTION = True
 
 # [EXTERNAL DATA SOURCES]
 ###############################################################################
