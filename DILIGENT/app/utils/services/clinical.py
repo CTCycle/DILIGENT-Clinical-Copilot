@@ -34,6 +34,7 @@ from DILIGENT.app.utils.services.pharma import LiverToxMatch, LiverToxMatcher
 
 ###############################################################################
 def resolve_temperature(preferred: float | None, *, scale: float = 1.0) -> float:
+    # Respect runtime overrides while clamping to the provider-supported range
     base_value = ClientRuntimeConfig.get_ollama_temperature()
     if preferred is not None:
         try:
@@ -112,6 +113,7 @@ class ClinicalContextBuilder:
         else:
             chat_kwargs["options"] = {"temperature": self.temperature}
         try:
+            # Ask the LLM to summarise anamnesis and exams into a reusable context block
             raw_response = await self.llm_client.chat(**chat_kwargs)
             summary = HepatoxConsultation.coerce_chat_text(raw_response)
         except Exception as exc:  # noqa: BLE001
@@ -170,7 +172,7 @@ class HepatotoxicityPatternAnalyzer:
 
     def __init__(self) -> None:
         pass
-       
+
     # -------------------------------------------------------------------------
     def calculate_hepatotoxicity_pattern(self, payload: PatientData) -> HepatotoxicityPatternScore:
         alt_value = self.parse_marker_value(payload.alt)
@@ -292,9 +294,10 @@ class HepatoxConsultation:
             return None
 
         if self.matcher is None:
-            return PatientDrugClinicalReport(entries=[], final_report=None).model_dump()        
+            return PatientDrugClinicalReport(entries=[], final_report=None).model_dump()
 
         logger.info("Toxicity analysis: performing clinical assessment for matched drugs")
+        # Resolve free-text drug names against LiverTox to obtain structured data
         matches = await self.matcher.match_drug_names(patient_drugs)
         resolved = self.resolve_matches(patient_drugs, matches)
         report = await self.compile_clinical_assessment(
@@ -372,7 +375,7 @@ class HepatoxConsultation:
                 excerpts_list = [item for item in raw_excerpts if isinstance(item, str)]
             else:
                 excerpts_list = []
-            
+
             suspension = self.evaluate_suspension(drug_entry, visit_date)
             entry = DrugClinicalAssessment(
                 drug_name=drug_entry.name,
@@ -394,6 +397,7 @@ class HepatoxConsultation:
             llm_jobs.append(
                 (
                     idx,
+                    # Kick off the patient-specific assessment for each candidate drug
                     self.request_drug_analysis(
                         drug_name=drug_entry.name,
                         excerpt=excerpt,
@@ -430,7 +434,7 @@ class HepatoxConsultation:
         )
         if refined_report:
             final_report = refined_report
-            
+
         return PatientDrugClinicalReport(entries=entries, final_report=final_report)
 
     # -------------------------------------------------------------------------
@@ -441,6 +445,7 @@ class HepatoxConsultation:
         combined = "\n\n".join(excerpts)
         if len(combined) <= self.MAX_EXCERPT_LENGTH:
             return combined
+        # Keep the most informative text while respecting the token budget
         truncated = combined[: self.MAX_EXCERPT_LENGTH]
         cutoff = truncated.rfind("\n")
         if cutoff > 2000:
@@ -469,6 +474,7 @@ class HepatoxConsultation:
         parsed_date = self.parse_suspension_date(entry.suspension_date, visit_date)
         interval_days: int | None = None
         if not suspended:
+            # No suspension means we track exposure but keep contextual notes
             combined_note = " ".join(
                 part
                 for part in (
@@ -741,6 +747,7 @@ class HepatoxConsultation:
         else:
             chat_kwargs["options"] = {"temperature": self.temperature}
         try:
+            # Ask the clinical model to synthesise findings for this drug
             raw_response = await self.llm_client.chat(**chat_kwargs)
         except Exception as exc:  # noqa: BLE001
             raise RuntimeError(f"LLM analysis failed for {drug_name}: {exc}") from exc
@@ -775,6 +782,7 @@ class HepatoxConsultation:
             name = entry.drug_name.strip() or entry.drug_name
             summary = (entry.paragraph or "No analysis available.").strip()
             blocks.append(f"{name}\nConclusions: {summary}")
+        # Collate per-drug paragraphs into a clinician-friendly summary
         report = "\n\n".join(blocks).strip()
         return report or None
 
