@@ -70,6 +70,7 @@ class DrugsParser:
                 or self.runtime_revision != revision
             )
             if needs_refresh:
+                # Tear down stale clients so provider/model switches are honoured
                 if self.client is not None:
                     with contextlib.suppress(Exception):
                         await self.client.close()
@@ -110,6 +111,7 @@ class DrugsParser:
             if has_schedule:
                 lines.append(stripped)
             elif has_metadata:
+                # Attach metadata lines to the preceding drug entry
                 lines[-1] = f"{lines[-1]} {stripped}"
             else:
                 lines.append(stripped)
@@ -134,6 +136,7 @@ class DrugsParser:
         if self.client is None:
             raise RuntimeError("LLM client is not initialized for drug extraction")
         try:
+            # Ask the LLM for a structured list following the PatientDrugs schema
             structured = await self.llm_extract_drugs(cleaned)
         except Exception as exc:  # pragma: no cover - passthrough for visibility
             raise RuntimeError("Failed to extract drugs via LLM") from exc
@@ -158,6 +161,7 @@ class DrugsParser:
 
         entries: list[DrugEntry] = []
         for line in grouped_lines:
+            # Request a deterministic parse for each drug-sized chunk
             parsed = await self.client.llm_structured_call(
                 model=self.model,
                 system_prompt=single_entry_prompt,
@@ -212,6 +216,7 @@ class DrugsParser:
                     continue
 
             combined_parts = metadata_buffer + prefix_buffer + [line]
+            # Deliver dosage, schedule, and annotations to the model as a single chunk
             combined = " ".join(part for part in combined_parts if part).strip()
             if combined:
                 grouped.append(combined)
@@ -222,6 +227,7 @@ class DrugsParser:
 
         leftover_parts = metadata_buffer + prefix_buffer
         if leftover_parts and grouped:
+            # Append trailing metadata that never received its own schedule line
             grouped[-1] = f"{grouped[-1]} {' '.join(leftover_parts)}".strip()
 
         return grouped if grouped else lines
