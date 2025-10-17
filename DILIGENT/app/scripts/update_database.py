@@ -17,9 +17,9 @@ if __name__ == "__main__":
     )
     # Ensure the SQLite schema exists before attempting to write updates
     database.initialize_database()
-    logger.info("Running LiverTox updater")
-    result = updater.update_from_livertox()
-    logger.info("LiverTox updater summary: %s", result)
+    # logger.info("Running LiverTox updater")
+    # result = updater.update_from_livertox()
+    # logger.info("LiverTox updater summary: %s", result)
 
     fda_updater = FdaUpdater(
         SOURCES_PATH,
