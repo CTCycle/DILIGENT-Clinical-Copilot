@@ -38,21 +38,42 @@ LIVERTOX_COLUMNS = [
 ]
 
 FDA_COLUMNS = [
-    "application_number",
-    "product_number",
-    "sponsor_name",
-    "brand_name",
-    "active_ingredients",
-    "dosage_form",
-    "route",
-    "marketing_status",
-    "application_type",
-    "submission_number",
-    "submission_type",
-    "submission_status",
-    "submission_status_date",
-    "submission_action_date",
+    "report_id",
+    "case_version",
+    "receipt_date",
+    "occur_country",
+    "patient_age",
+    "patient_age_unit",
+    "patient_sex",
+    "reaction_terms",
+    "all_reactions",
+    "suspect_products",
+    "suspect_product_count",
+    "serious",
+    "seriousness_death",
+    "seriousness_lifethreatening",
+    "seriousness_hospitalization",
+    "seriousness_disabling",
+    "seriousness_congenital_anom",
+    "seriousness_other",
 ]
+
+HEPATOTOXIC_MEDDRA_TERMS = {
+    "hepatotoxicity",
+    "drug induced liver injury",
+    "drug-induced liver injury",
+    "liver injury",
+    "hepatic failure",
+    "acute hepatic failure",
+    "hepatitis cholestatic",
+    "cholestasis",
+    "liver disorder",
+    "liver function test increased",
+    "alanine aminotransferase increased",
+    "aspartate aminotransferase increased",
+    "alkaline phosphatase increased",
+    "blood bilirubin increased",
+}
 
 
 ###############################################################################
@@ -187,7 +208,7 @@ class DataSerializer:
         frame = records.copy()
         frame = frame.reindex(columns=FDA_COLUMNS)
         frame = frame.where(pd.notnull(frame), None)
-        database.save_into_database(frame, "FDA_APPROVALS")
+        database.save_into_database(frame, "FDA_ADVERSE_EVENTS")
 
     # -----------------------------------------------------------------------------
     def sanitize_livertox_records(self, records: list[dict[str, Any]]) -> pd.DataFrame:
@@ -230,77 +251,75 @@ class DataSerializer:
         for record in records:
             if not isinstance(record, dict):
                 continue
-            application_number = self.normalize_string(record.get("application_number"))
-            if not application_number:
+            hepatic_terms = self.extract_hepatic_reactions(record)
+            if not hepatic_terms:
                 continue
-            sponsor_name = self.normalize_string(record.get("sponsor_name"))
-            application_type = self.normalize_string(record.get("application_type"))
-            products = record.get("products")
-            if not isinstance(products, list):
+            report_id = self.normalize_string(
+                record.get("safetyreportid") or record.get("primaryid")
+            )
+            if not report_id:
                 continue
-            submission = self.get_latest_submission(record.get("submissions"))
-            for product in products:
-                if not isinstance(product, dict):
-                    continue
-                product_number = self.normalize_string(product.get("product_number"))
-                if not product_number:
-                    continue
-                brand_name = self.normalize_string(product.get("brand_name"))
-                dosage_form = self.normalize_string(product.get("dosage_form"))
-                route = self.join_string_values(product.get("route"))
-                marketing_status = self.join_string_values(
-                    product.get("marketing_status")
+            case_version = self.normalize_string(record.get("safetyreportversion"))
+            receipt_date = self.normalize_date(
+                record.get("receiptdate")
+                or record.get("receivedate")
+                or record.get("fulfillexpdate")
+            )
+            occur_country = self.normalize_string(
+                record.get("occurcountry") or record.get("primarysourcecountry")
+            )
+            patient_data = record.get("patient")
+            patient = patient_data if isinstance(patient_data, dict) else {}
+            patient_age = None
+            patient_age_unit = None
+            patient_sex = None
+            if patient:
+                patient_age = self.normalize_string(patient.get("patientonsetage"))
+                patient_age_unit = self.normalize_string(
+                    patient.get("patientonsetageunit")
                 )
-                active_ingredients = product.get("active_ingredients")
-                ingredients_value = None
-                if isinstance(active_ingredients, list):
-                    entries = []
-                    for item in active_ingredients:
-                        if not isinstance(item, dict):
-                            continue
-                        ingredient_name = self.normalize_string(item.get("name"))
-                        strength = self.normalize_string(item.get("strength"))
-                        if ingredient_name and strength:
-                            entries.append(f"{ingredient_name} ({strength})")
-                        elif ingredient_name:
-                            entries.append(ingredient_name)
-                    if entries:
-                        ingredients_value = "; ".join(entries)
-                else:
-                    ingredients_value = self.normalize_string(active_ingredients)
-                normalized.append(
-                    {
-                        "application_number": application_number,
-                        "product_number": product_number,
-                        "sponsor_name": sponsor_name,
-                        "brand_name": brand_name,
-                        "active_ingredients": ingredients_value,
-                        "dosage_form": dosage_form,
-                        "route": route,
-                        "marketing_status": marketing_status,
-                        "application_type": application_type,
-                        "submission_number": self.normalize_string(
-                            (submission or {}).get("submission_number")
-                        ),
-                        "submission_type": self.normalize_string(
-                            (submission or {}).get("submission_type")
-                        ),
-                        "submission_status": self.normalize_string(
-                            (submission or {}).get("submission_status")
-                        ),
-                        "submission_status_date": self.normalize_string(
-                            (submission or {}).get("submission_status_date")
-                        ),
-                        "submission_action_date": self.normalize_string(
-                            (submission or {}).get("submission_action_date")
-                        ),
-                    }
-                )
+                patient_sex = self.map_patient_sex(patient.get("patientsex"))
+            all_reactions = self.collect_all_reactions(record)
+            suspect_products = self.extract_suspect_products(record)
+            normalized.append(
+                {
+                    "report_id": report_id,
+                    "case_version": case_version or "1",
+                    "receipt_date": receipt_date,
+                    "occur_country": occur_country,
+                    "patient_age": patient_age,
+                    "patient_age_unit": patient_age_unit,
+                    "patient_sex": patient_sex,
+                    "reaction_terms": self.join_values(hepatic_terms),
+                    "all_reactions": self.join_values(all_reactions),
+                    "suspect_products": self.join_values(suspect_products),
+                    "suspect_product_count": len(suspect_products) if suspect_products else None,
+                    "serious": self.normalize_flag(record.get("serious")),
+                    "seriousness_death": self.normalize_flag(
+                        record.get("seriousnessdeath")
+                    ),
+                    "seriousness_lifethreatening": self.normalize_flag(
+                        record.get("seriousnesslifethreatening")
+                    ),
+                    "seriousness_hospitalization": self.normalize_flag(
+                        record.get("seriousnesshospitalization")
+                    ),
+                    "seriousness_disabling": self.normalize_flag(
+                        record.get("seriousnessdisabling")
+                    ),
+                    "seriousness_congenital_anom": self.normalize_flag(
+                        record.get("seriousnesscongenitalanomali")
+                    ),
+                    "seriousness_other": self.normalize_flag(
+                        record.get("seriousnessother")
+                    ),
+                }
+            )
         if not normalized:
             return pd.DataFrame(columns=FDA_COLUMNS)
         frame = pd.DataFrame(normalized)
         frame = frame.drop_duplicates(
-            subset=["application_number", "product_number"], keep="last"
+            subset=["report_id", "case_version"], keep="last"
         )
         return frame.reindex(columns=FDA_COLUMNS).reset_index(drop=True)
 
@@ -375,53 +394,137 @@ class DataSerializer:
         return normalized if normalized else None
 
     # -----------------------------------------------------------------------------
-    def join_string_values(self, value: Any) -> str | None:
-        if isinstance(value, list):
-            entries = [self.normalize_string(item) for item in value]
-            entries = [item for item in entries if item]
-            if entries:
-                return "; ".join(entries)
+    def normalize_flag(self, value: Any) -> int | None:
+        normalized = self.normalize_string(value)
+        if normalized is None:
             return None
-        return self.normalize_string(value)
+        lowered = normalized.lower()
+        if lowered in {"1", "y", "yes", "true"}:
+            return 1
+        if lowered in {"0", "n", "no", "false"}:
+            return 0
+        try:
+            numeric = int(normalized)
+        except (TypeError, ValueError):
+            return None
+        return 1 if numeric != 0 else 0
 
     # -----------------------------------------------------------------------------
-    def get_latest_submission(self, submissions: Any) -> dict[str, Any] | None:
-        if not isinstance(submissions, list):
+    def normalize_date(self, value: Any) -> str | None:
+        normalized = self.normalize_string(value)
+        if not normalized:
             return None
-        latest: dict[str, Any] | None = None
-        latest_date = None
-        for entry in submissions:
+        parsed = pd.to_datetime(normalized, errors="coerce", utc=True)
+        if pd.isna(parsed):
+            return normalized
+        return parsed.date().isoformat()
+
+    # -----------------------------------------------------------------------------
+    def join_values(self, values: set[str]) -> str | None:
+        if not values:
+            return None
+        return "; ".join(sorted(values))
+
+    # -----------------------------------------------------------------------------
+    def collect_all_reactions(self, record: dict[str, Any]) -> set[str]:
+        patient = record.get("patient")
+        if not isinstance(patient, dict):
+            return set()
+        reactions = patient.get("reaction")
+        if not isinstance(reactions, list):
+            return set()
+        collected: dict[str, str] = {}
+        for entry in reactions:
             if not isinstance(entry, dict):
                 continue
-            submission_date = self.parse_submission_date(entry)
-            if submission_date is None:
-                if latest is None:
-                    latest = entry
+            term = self.normalize_string(entry.get("reactionmeddrapt"))
+            if not term:
                 continue
-            if latest_date is None or submission_date > latest_date:
-                latest_date = submission_date
-                latest = entry
-        return latest
+            key = term.lower()
+            if key not in collected:
+                collected[key] = term
+        return set(collected.values())
 
     # -----------------------------------------------------------------------------
-    def parse_submission_date(self, entry: dict[str, Any]) -> pd.Timestamp | None:
-        date_fields = [
-            "submission_status_date",
-            "submission_action_date",
-            "submission_review_date",
-        ]
-        for field in date_fields:
-            raw_value = entry.get(field)
-            if not raw_value:
+    def extract_hepatic_reactions(self, record: dict[str, Any]) -> set[str]:
+        reactions = self.collect_all_reactions(record)
+        hepatic: dict[str, str] = {}
+        for term in reactions:
+            key = term.lower()
+            if key in HEPATOTOXIC_MEDDRA_TERMS and key not in hepatic:
+                hepatic[key] = term
+        return set(hepatic.values())
+
+    # -----------------------------------------------------------------------------
+    def extract_suspect_products(self, record: dict[str, Any]) -> set[str]:
+        patient = record.get("patient")
+        if not isinstance(patient, dict):
+            return set()
+        drugs = patient.get("drug")
+        if not isinstance(drugs, list):
+            return set()
+        products: dict[str, str] = {}
+        fallback: dict[str, str] = {}
+        for entry in drugs:
+            if not isinstance(entry, dict):
                 continue
-            parsed = pd.to_datetime(raw_value, errors="coerce", utc=True)
-            if pd.notna(parsed):
-                return parsed
-        return None
+            characterization = self.normalize_string(entry.get("drugcharacterization"))
+            is_suspect = False
+            if characterization:
+                if characterization == "1" or characterization.lower() == "suspect":
+                    is_suspect = True
+            target = products if is_suspect else fallback
+            names: dict[str, str] = {}
+            product_name = self.normalize_string(entry.get("medicinalproduct"))
+            if product_name:
+                names[product_name.lower()] = product_name
+            openfda = entry.get("openfda")
+            if isinstance(openfda, dict):
+                for key in (
+                    "substance_name",
+                    "generic_name",
+                    "brand_name",
+                ):
+                    value = openfda.get(key)
+                    if isinstance(value, list):
+                        for item in value:
+                            candidate = self.normalize_string(item)
+                            if candidate and candidate.lower() not in names:
+                                names[candidate.lower()] = candidate
+                    else:
+                        candidate = self.normalize_string(value)
+                        if candidate and candidate.lower() not in names:
+                            names[candidate.lower()] = candidate
+            if not names:
+                continue
+            for key, value in names.items():
+                if key not in target:
+                    target[key] = value
+        if products:
+            return set(products.values())
+        return set(fallback.values())
+
+    # -----------------------------------------------------------------------------
+    def map_patient_sex(self, value: Any) -> str | None:
+        normalized = self.normalize_string(value)
+        if not normalized:
+            return None
+        mapping = {
+            "0": "unknown",
+            "1": "male",
+            "2": "female",
+            "3": "unknown",
+            "4": "unknown",
+            "male": "male",
+            "female": "female",
+            "unknown": "unknown",
+        }
+        lowered = normalized.lower()
+        return mapping.get(lowered, normalized)
 
     # -----------------------------------------------------------------------------
     def get_fda_records(self) -> pd.DataFrame:
-        frame = database.load_from_database("FDA_APPROVALS")
+        frame = database.load_from_database("FDA_ADVERSE_EVENTS")
         if frame.empty:
             return pd.DataFrame(columns=FDA_COLUMNS)
         return frame.reindex(columns=FDA_COLUMNS)
