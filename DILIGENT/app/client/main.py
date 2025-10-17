@@ -174,7 +174,12 @@ def create_interface() -> gr.Blocks:
                         interactive=False,
                     )
                     clear_button = gr.Button("Clear all")
-                with gr.Accordion("Model Config", open=False):
+                with gr.Accordion("Session Configurations", open=False):
+                    use_rag_checkbox = gr.Checkbox(
+                        label="Use Retrieval Augmented Generation (RAG)",
+                        value=False,
+                    )
+                with gr.Accordion("Model Configurations", open=False):
                     with gr.Column():
                         use_cloud_services = gr.Checkbox(
                             label="Use Cloud Services",
@@ -307,6 +312,7 @@ def create_interface() -> gr.Blocks:
                 alp,
                 alp_max,
                 symptoms,
+                use_rag_checkbox,
             ],
             outputs=[markdown_output, json_output, export_button],
             api_name="run_agent",
@@ -325,6 +331,7 @@ def create_interface() -> gr.Blocks:
                 alp_max,
                 symptoms,
                 has_diseases,
+                use_rag_checkbox,
                 markdown_output,
                 json_output,
                 export_button,

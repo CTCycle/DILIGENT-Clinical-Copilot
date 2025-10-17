@@ -276,6 +276,7 @@ def clear_agent_fields() -> tuple[
     str,
     list[str],
     bool,
+    bool,
     str,
     Any,
     dict[str, Any],
@@ -291,6 +292,7 @@ def clear_agent_fields() -> tuple[
         "",
         "",
         [],
+        False,
         False,
         "",
         build_json_output(None),
@@ -369,6 +371,7 @@ async def run_agent(
     alp: str,
     alp_max: str,
     symptoms: list[str],
+    use_rag: bool,
 ) -> tuple[str, Any, dict[str, Any]]:
     normalized_visit_date = normalize_visit_date(visit_date)
 
@@ -392,6 +395,7 @@ async def run_agent(
         "alp": sanitize_field(alp),
         "alp_max": sanitize_field(alp_max),
         "symptoms": symptoms or [],
+        "use_rag": bool(use_rag),
     }
 
     if not any(cleaned_payload[key] for key in ("anamnesis", "drugs", "exams")):
