@@ -25,8 +25,8 @@ if __name__ == "__main__":
         SOURCES_PATH,
         redownload=REDOWNLOAD,
     )
-    logger.info("Running FDA updater")
+    logger.info("Running FDA adverse event updater")
     fda_result = fda_updater.update_from_fda_approvals()
-    logger.info("FDA updater summary: %s", fda_result)
+    logger.info("FDA adverse event updater summary: %s", fda_result)
     
 

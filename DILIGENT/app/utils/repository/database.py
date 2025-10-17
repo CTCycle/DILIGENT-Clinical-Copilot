@@ -77,24 +77,28 @@ class LiverToxData(Base):
 
 
 ###############################################################################
-class FdaApproval(Base):
-    __tablename__ = "FDA_APPROVALS"
-    application_number = Column(String, primary_key=True)
-    product_number = Column(String, primary_key=True)
-    sponsor_name = Column(String)
-    brand_name = Column(String)
-    active_ingredients = Column(Text)
-    dosage_form = Column(String)
-    route = Column(String)
-    marketing_status = Column(String)
-    application_type = Column(String)
-    submission_number = Column(String)
-    submission_type = Column(String)
-    submission_status = Column(String)
-    submission_status_date = Column(String)
-    submission_action_date = Column(String)
+class FdaAdverseEvent(Base):
+    __tablename__ = "FDA_ADVERSE_EVENTS"
+    report_id = Column(String, primary_key=True)
+    case_version = Column(String, primary_key=True)
+    receipt_date = Column(String)
+    occur_country = Column(String)
+    patient_age = Column(String)
+    patient_age_unit = Column(String)
+    patient_sex = Column(String)
+    reaction_terms = Column(Text)
+    all_reactions = Column(Text)
+    suspect_products = Column(Text)
+    suspect_product_count = Column(Integer)
+    serious = Column(Integer)
+    seriousness_death = Column(Integer)
+    seriousness_lifethreatening = Column(Integer)
+    seriousness_hospitalization = Column(Integer)
+    seriousness_disabling = Column(Integer)
+    seriousness_congenital_anom = Column(Integer)
+    seriousness_other = Column(Integer)
     __table_args__ = (
-        UniqueConstraint("application_number", "product_number"),
+        UniqueConstraint("report_id", "case_version"),
     )
 
 
