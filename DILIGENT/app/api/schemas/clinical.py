@@ -71,6 +71,10 @@ class PatientData(BaseModel):
         default=False,
         description="Indicates whether the patient has a history of hepatic diseases.",
     )
+    use_rag: bool = Field(
+        default=False,
+        description="Enables retrieval augmented generation during analysis.",
+    )
     @field_validator("name", mode="before")
     @classmethod
     def strip_name(cls, value: str | None) -> str | None:
