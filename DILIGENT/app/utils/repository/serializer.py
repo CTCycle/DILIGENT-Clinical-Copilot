@@ -34,6 +34,23 @@ LIVERTOX_COLUMNS = [
     "source_last_modified",
 ]
 
+FDA_COLUMNS = [
+    "application_number",
+    "product_number",
+    "sponsor_name",
+    "brand_name",
+    "active_ingredients",
+    "dosage_form",
+    "route",
+    "marketing_status",
+    "application_type",
+    "submission_number",
+    "submission_type",
+    "submission_status",
+    "submission_status_date",
+    "submission_action_date",
+]
+
 
 ###############################################################################
 class DataSerializer:
@@ -59,6 +76,13 @@ class DataSerializer:
         frame = frame.reindex(columns=LIVERTOX_COLUMNS)
         frame = frame.where(pd.notnull(frame), None)
         database.save_into_database(frame, "LIVERTOX_DATA")
+
+    # -----------------------------------------------------------------------------
+    def save_fda_records(self, records: pd.DataFrame) -> None:
+        frame = records.copy()
+        frame = frame.reindex(columns=FDA_COLUMNS)
+        frame = frame.where(pd.notnull(frame), None)
+        database.save_into_database(frame, "FDA_APPROVALS")
 
     # -----------------------------------------------------------------------------
     def sanitize_livertox_records(self, records: list[dict[str, Any]]) -> pd.DataFrame:
@@ -94,6 +118,86 @@ class DataSerializer:
         )
         df = df.drop_duplicates(subset=["nbk_id", "drug_name"], keep="first")
         return df.reset_index(drop=True)
+
+    # -----------------------------------------------------------------------------
+    def sanitize_fda_records(self, records: list[dict[str, Any]]) -> pd.DataFrame:
+        normalized: list[dict[str, Any]] = []
+        for record in records:
+            if not isinstance(record, dict):
+                continue
+            application_number = self.normalize_string(record.get("application_number"))
+            if not application_number:
+                continue
+            sponsor_name = self.normalize_string(record.get("sponsor_name"))
+            application_type = self.normalize_string(record.get("application_type"))
+            products = record.get("products")
+            if not isinstance(products, list):
+                continue
+            submission = self.get_latest_submission(record.get("submissions"))
+            for product in products:
+                if not isinstance(product, dict):
+                    continue
+                product_number = self.normalize_string(product.get("product_number"))
+                if not product_number:
+                    continue
+                brand_name = self.normalize_string(product.get("brand_name"))
+                dosage_form = self.normalize_string(product.get("dosage_form"))
+                route = self.join_string_values(product.get("route"))
+                marketing_status = self.join_string_values(
+                    product.get("marketing_status")
+                )
+                active_ingredients = product.get("active_ingredients")
+                ingredients_value = None
+                if isinstance(active_ingredients, list):
+                    entries = []
+                    for item in active_ingredients:
+                        if not isinstance(item, dict):
+                            continue
+                        ingredient_name = self.normalize_string(item.get("name"))
+                        strength = self.normalize_string(item.get("strength"))
+                        if ingredient_name and strength:
+                            entries.append(f"{ingredient_name} ({strength})")
+                        elif ingredient_name:
+                            entries.append(ingredient_name)
+                    if entries:
+                        ingredients_value = "; ".join(entries)
+                else:
+                    ingredients_value = self.normalize_string(active_ingredients)
+                normalized.append(
+                    {
+                        "application_number": application_number,
+                        "product_number": product_number,
+                        "sponsor_name": sponsor_name,
+                        "brand_name": brand_name,
+                        "active_ingredients": ingredients_value,
+                        "dosage_form": dosage_form,
+                        "route": route,
+                        "marketing_status": marketing_status,
+                        "application_type": application_type,
+                        "submission_number": self.normalize_string(
+                            (submission or {}).get("submission_number")
+                        ),
+                        "submission_type": self.normalize_string(
+                            (submission or {}).get("submission_type")
+                        ),
+                        "submission_status": self.normalize_string(
+                            (submission or {}).get("submission_status")
+                        ),
+                        "submission_status_date": self.normalize_string(
+                            (submission or {}).get("submission_status_date")
+                        ),
+                        "submission_action_date": self.normalize_string(
+                            (submission or {}).get("submission_action_date")
+                        ),
+                    }
+                )
+        if not normalized:
+            return pd.DataFrame(columns=FDA_COLUMNS)
+        frame = pd.DataFrame(normalized)
+        frame = frame.drop_duplicates(
+            subset=["application_number", "product_number"], keep="last"
+        )
+        return frame.reindex(columns=FDA_COLUMNS).reset_index(drop=True)
 
     # -----------------------------------------------------------------------------
     def is_valid_drug_name(self, value: str) -> bool:
@@ -152,5 +256,69 @@ class DataSerializer:
         return frame.reindex(columns=alias_columns).dropna(subset=["drug_name"]).reset_index(
             drop=True
         )
+
+    # -----------------------------------------------------------------------------
+    def normalize_string(self, value: Any) -> str | None:
+        if isinstance(value, str):
+            normalized = value.strip()
+            return normalized if normalized else None
+        if pd.isna(value):
+            return None
+        if value is None:
+            return None
+        normalized = str(value).strip()
+        return normalized if normalized else None
+
+    # -----------------------------------------------------------------------------
+    def join_string_values(self, value: Any) -> str | None:
+        if isinstance(value, list):
+            entries = [self.normalize_string(item) for item in value]
+            entries = [item for item in entries if item]
+            if entries:
+                return "; ".join(entries)
+            return None
+        return self.normalize_string(value)
+
+    # -----------------------------------------------------------------------------
+    def get_latest_submission(self, submissions: Any) -> dict[str, Any] | None:
+        if not isinstance(submissions, list):
+            return None
+        latest: dict[str, Any] | None = None
+        latest_date = None
+        for entry in submissions:
+            if not isinstance(entry, dict):
+                continue
+            submission_date = self.parse_submission_date(entry)
+            if submission_date is None:
+                if latest is None:
+                    latest = entry
+                continue
+            if latest_date is None or submission_date > latest_date:
+                latest_date = submission_date
+                latest = entry
+        return latest
+
+    # -----------------------------------------------------------------------------
+    def parse_submission_date(self, entry: dict[str, Any]) -> pd.Timestamp | None:
+        date_fields = [
+            "submission_status_date",
+            "submission_action_date",
+            "submission_review_date",
+        ]
+        for field in date_fields:
+            raw_value = entry.get(field)
+            if not raw_value:
+                continue
+            parsed = pd.to_datetime(raw_value, errors="coerce", utc=True)
+            if pd.notna(parsed):
+                return parsed
+        return None
+
+    # -----------------------------------------------------------------------------
+    def get_fda_records(self) -> pd.DataFrame:
+        frame = database.load_from_database("FDA_APPROVALS")
+        if frame.empty:
+            return pd.DataFrame(columns=FDA_COLUMNS)
+        return frame.reindex(columns=FDA_COLUMNS)
 
     
