@@ -14,8 +14,8 @@ from tqdm import tqdm
 from DILIGENT.app.constants import (
     OPENFDA_DOWNLOAD_BASE_URL,
     OPENFDA_DOWNLOAD_CATALOG_URL,
-    OPENFDA_DRUGS_FDA_DATASET,
-    OPENFDA_DRUGS_FDA_INDEX,
+    OPENFDA_DRUG_EVENT_DATASET,
+    OPENFDA_DRUG_EVENT_INDEX,
 )
 from DILIGENT.app.logger import logger
 from DILIGENT.app.utils.repository.database import database
@@ -28,7 +28,7 @@ DEFAULT_HTTP_HEADERS = {
 }
 
 DOWNLOAD_CHUNK_SIZE = 262_144
-METADATA_FILENAME = "drugsfda.metadata.json"
+METADATA_FILENAME = "fda-adverse-events.metadata.json"
 
 
 ###############################################################################
@@ -46,14 +46,14 @@ class FdaUpdater:
         self.download_directory = os.path.abspath(sources_path)
         self.download_base_url = OPENFDA_DOWNLOAD_BASE_URL
         self.catalog_url = OPENFDA_DOWNLOAD_CATALOG_URL
-        self.dataset_key = "drugsfda"
+        self.dataset_key = "event"
         self.dataset_category = "drug"
         self.dataset_url = os.path.join(
             OPENFDA_DOWNLOAD_BASE_URL,
-            OPENFDA_DRUGS_FDA_DATASET,
+            OPENFDA_DRUG_EVENT_DATASET,
         )
         self.dataset_base_url = f"{self.dataset_url.rstrip('/')}/"
-        self.index_url = os.path.join(self.dataset_url, OPENFDA_DRUGS_FDA_INDEX)
+        self.index_url = os.path.join(self.dataset_url, OPENFDA_DRUG_EVENT_INDEX)
         self.metadata_path = os.path.join(self.download_directory, METADATA_FILENAME)
         self.redownload = redownload
         self.serializer = serializer or DataSerializer()
@@ -132,7 +132,7 @@ class FdaUpdater:
                 partitions_metadata[file_name] = partition_metadata
 
         if not aggregated:
-            logger.warning("No FDA records retrieved from the bulk dataset")
+            logger.warning("No FDA adverse event records retrieved from the bulk dataset")
             sanitized = self.serializer.sanitize_fda_records([])
             self.serializer.save_fda_records(sanitized)
             updated_export_date = current_export_date
