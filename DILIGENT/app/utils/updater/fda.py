@@ -14,8 +14,8 @@ from tqdm import tqdm
 from DILIGENT.app.constants import (
     OPENFDA_DOWNLOAD_BASE_URL,
     OPENFDA_DOWNLOAD_CATALOG_URL,
-    OPENFDA_DRUGS_FDA_DATASET,
-    OPENFDA_DRUGS_FDA_INDEX,
+    OPENFDA_DRUG_EVENT_DATASET,
+    OPENFDA_DRUG_EVENT_INDEX,
 )
 from DILIGENT.app.logger import logger
 from DILIGENT.app.utils.repository.database import database
@@ -28,7 +28,7 @@ DEFAULT_HTTP_HEADERS = {
 }
 
 DOWNLOAD_CHUNK_SIZE = 262_144
-METADATA_FILENAME = "drugsfda.metadata.json"
+METADATA_FILENAME = "fda-adverse-events.metadata.json"
 
 
 ###############################################################################
@@ -46,14 +46,14 @@ class FdaUpdater:
         self.download_directory = os.path.abspath(sources_path)
         self.download_base_url = OPENFDA_DOWNLOAD_BASE_URL
         self.catalog_url = OPENFDA_DOWNLOAD_CATALOG_URL
-        self.dataset_key = "drugsfda"
+        self.dataset_key = "event"
         self.dataset_category = "drug"
         self.dataset_url = os.path.join(
             OPENFDA_DOWNLOAD_BASE_URL,
-            OPENFDA_DRUGS_FDA_DATASET,
+            OPENFDA_DRUG_EVENT_DATASET,
         )
         self.dataset_base_url = f"{self.dataset_url.rstrip('/')}/"
-        self.index_url = os.path.join(self.dataset_url, OPENFDA_DRUGS_FDA_INDEX)
+        self.index_url = os.path.join(self.dataset_url, OPENFDA_DRUG_EVENT_INDEX)
         self.metadata_path = os.path.join(self.download_directory, METADATA_FILENAME)
         self.redownload = redownload
         self.serializer = serializer or DataSerializer()
@@ -132,7 +132,7 @@ class FdaUpdater:
                 partitions_metadata[file_name] = partition_metadata
 
         if not aggregated:
-            logger.warning("No FDA records retrieved from the bulk dataset")
+            logger.warning("No FDA adverse event records retrieved from the bulk dataset")
             sanitized = self.serializer.sanitize_fda_records([])
             self.serializer.save_fda_records(sanitized)
             updated_export_date = current_export_date
@@ -407,6 +407,44 @@ class FdaUpdater:
         return None
 
     # -------------------------------------------------------------------------
+    def extract_records_from_payload(self, payload: Any) -> list[dict[str, Any]]:
+        records: list[dict[str, Any]] = []
+        if isinstance(payload, dict):
+            items = payload.get("results")
+            if isinstance(items, list):
+                records.extend([item for item in items if isinstance(item, dict)])
+            else:
+                records.append(payload)
+        elif isinstance(payload, list):
+            records.extend([item for item in payload if isinstance(item, dict)])
+        return records
+
+    # -------------------------------------------------------------------------
+    def parse_partition_content(self, content: str) -> list[dict[str, Any]]:
+        records: list[dict[str, Any]] = []
+        if not content:
+            return records
+        try:
+            payload = json.loads(content)
+        except json.JSONDecodeError:
+            for line in content.splitlines():
+                normalized = line.strip()
+                if not normalized:
+                    continue
+                try:
+                    payload = json.loads(normalized)
+                except json.JSONDecodeError:
+                    logger.debug(
+                        "Skipping invalid NDJSON line in FDA partition: %s",
+                        normalized[:100],
+                    )
+                    continue
+                records.extend(self.extract_records_from_payload(payload))
+        else:
+            records.extend(self.extract_records_from_payload(payload))
+        return records
+
+    # -------------------------------------------------------------------------
     def read_partition_records(self, path: str) -> list[dict[str, Any]]:
         if not os.path.isfile(path):
             return []
@@ -416,17 +454,8 @@ class FdaUpdater:
                 for member in archive.namelist():
                     with archive.open(member) as handle:
                         text_stream = io.TextIOWrapper(handle, encoding="utf-8")
-                        payload = json.load(text_stream)
-                        if isinstance(payload, dict):
-                            items = payload.get("results")
-                            if isinstance(items, list):
-                                records.extend(
-                                    [item for item in items if isinstance(item, dict)]
-                                )
-                        elif isinstance(payload, list):
-                            records.extend(
-                                [item for item in payload if isinstance(item, dict)]
-                            )
+                        content = text_stream.read()
+                    records.extend(self.parse_partition_content(content))
                 return records
         except (OSError, zipfile.BadZipFile, json.JSONDecodeError) as exc:
             logger.error("Failed to read FDA partition %s: %s", path, exc)
