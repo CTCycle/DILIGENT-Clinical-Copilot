@@ -74,6 +74,18 @@ Execute `DILIGENT/setup_and_maintenance.bat` to open the maintenance console. Av
 - **Update project** – pull the latest revision from GitHub using the bundled Git client.
 - **Remove logs** – clear accumulated log files stored in `DILIGENT/resources/logs`.
 
+### 3.1.1 Database updater
+The LiverTox database shipped with the application changes over time as new monographs are released. Run the updater script every week or two so the toxicity assessments stay aligned with the latest guidance.
+
+1. Activate the same virtual environment you use for the main app.
+2. From the project root execute:
+
+   ```bash
+   python -m DILIGENT.app.scripts.update_database
+   ```
+
+The script downloads the newest LiverTox content (set `REDOWNLOAD = False` inside `update_database.py` if you want to reuse existing archives), refreshes the SQLite tables, and writes a brief summary to the log. It can run independently from the FastAPI server, so schedule it with cron/Task Scheduler without taking the UI offline.
+
 ### 3.1 Resources
 Clinical data, configuration templates, and assets live under `DILIGENT/resources/`:
 

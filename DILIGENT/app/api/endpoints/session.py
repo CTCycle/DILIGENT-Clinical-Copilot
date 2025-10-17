@@ -40,7 +40,7 @@ def build_patient_narrative(
     detected_drugs: list[str],
     final_report: str | None,
 ) -> str:
-    """Render a Markdown narrative for the patient summary."""
+    # Assemble a compact Markdown report summarising the current visit
     drug_summary = ", ".join(detected_drugs) if detected_drugs else "None detected"
     classification = getattr(pattern_score, "classification", "Not available")
     alt_multiple = pattern_strings.get("alt_multiple", "Not available")
@@ -87,26 +87,26 @@ async def process_single_patient(payload: PatientData) -> str:
         "Starting Drug-Induced Liver Injury (DILI) analysis for patient: %s",
         payload.name,
     )
-    
+
     global_start_time = time.perf_counter()
 
-    # 1. Calculate hepatic pattern score using ALT/ALP values
+    # Step 1: Calculate hepatic pattern score using ALT/ALP values
     pattern_score = pattern_analyzer.calculate_hepatotoxicity_pattern(payload)
     logger.info(
         "Patient hepatotoxicity pattern classified as %s (R=%.3f)",
         pattern_score.classification,
         pattern_score.r_score if pattern_score.r_score is not None else float("nan"),
     )
-    
 
-    # 2. Parse drugs names and info from raw text
+
+    # Step 2: Parse drug names and metadata from the raw text list
     start_time = time.perf_counter()
     drug_data = await drugs_parser.extract_drug_list(payload.drugs or "")
     elapsed = time.perf_counter() - start_time
     logger.info("Drugs extraction required %.4f seconds", elapsed)
     logger.info("Detected %s drugs", len(drug_data.entries))
 
-    # 3. Consult LiverTox database for hepatotoxicity info
+    # Step 3: Build a clinical synopsis and request LiverTox-backed analysis
     start_time = time.perf_counter()
     context_builder = ClinicalContextBuilder()
     clinical_context = await context_builder.build_context(
@@ -142,7 +142,7 @@ async def process_single_patient(payload: PatientData) -> str:
     global_elapsed = time.perf_counter() - global_start_time
     logger.info("Total time for Drug Induced Liver Injury (DILI) assessment is %.4f seconds", global_elapsed)
 
-    # 4. Serialize session data to the database
+    # Step 4: Persist a structured representation of the session to SQLite
     detected_drugs = [entry.name for entry in drug_data.entries if entry.name]
     drug_summary = ", ".join(detected_drugs) if detected_drugs else "None detected"
     pattern_strings = pattern_analyzer.stringify_scores(pattern_score)
