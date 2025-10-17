@@ -63,7 +63,7 @@ class FdaUpdater:
         self.timeout = httpx.Timeout(120.0, connect=30.0)
 
     # -------------------------------------------------------------------------
-    def update_from_drugsfda(self) -> dict[str, Any]:
+    def update_from_fda_approvals(self) -> dict[str, Any]:
         os.makedirs(self.download_directory, exist_ok=True)
         metadata = {} if self.redownload else self.load_metadata()
         partitions_metadata = metadata.get("partitions", {})
@@ -463,24 +463,24 @@ class FdaUpdater:
         if remote_size is not None and stored_size != remote_size:
             return False
         stored_last_modified = (
-            stored.get("last_modified").strip()
+            stored.get("last_modified", "").strip()
             if isinstance(stored.get("last_modified"), str)
             else stored.get("last_modified")
         )
         remote_last_modified = (
-            remote.get("last_modified").strip()
+            remote.get("last_modified", "").strip()
             if isinstance(remote.get("last_modified"), str)
             else remote.get("last_modified")
         )
         if (stored_last_modified or remote_last_modified) and stored_last_modified != remote_last_modified:
             return False
         stored_checksum = (
-            stored.get("sha256").strip().lower()
+            stored.get("sha256", "").strip().lower()
             if isinstance(stored.get("sha256"), str)
             else None
         )
         remote_checksum = (
-            remote.get("sha256").strip().lower()
+            remote.get("sha256", "").strip().lower()
             if isinstance(remote.get("sha256"), str)
             else None
         )

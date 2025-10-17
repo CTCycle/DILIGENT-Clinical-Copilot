@@ -26,7 +26,7 @@ if __name__ == "__main__":
         redownload=REDOWNLOAD,
     )
     logger.info("Running FDA updater")
-    fda_result = fda_updater.update_from_drugsfda()
+    fda_result = fda_updater.update_from_fda_approvals()
     logger.info("FDA updater summary: %s", fda_result)
     
 
