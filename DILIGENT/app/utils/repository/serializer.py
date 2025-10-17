@@ -403,6 +403,8 @@ class DataSerializer:
             return 1
         if lowered in {"0", "n", "no", "false"}:
             return 0
+        if lowered == "2":
+            return 0
         try:
             numeric = int(normalized)
         except (TypeError, ValueError):

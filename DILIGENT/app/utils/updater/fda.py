@@ -407,6 +407,44 @@ class FdaUpdater:
         return None
 
     # -------------------------------------------------------------------------
+    def extract_records_from_payload(self, payload: Any) -> list[dict[str, Any]]:
+        records: list[dict[str, Any]] = []
+        if isinstance(payload, dict):
+            items = payload.get("results")
+            if isinstance(items, list):
+                records.extend([item for item in items if isinstance(item, dict)])
+            else:
+                records.append(payload)
+        elif isinstance(payload, list):
+            records.extend([item for item in payload if isinstance(item, dict)])
+        return records
+
+    # -------------------------------------------------------------------------
+    def parse_partition_content(self, content: str) -> list[dict[str, Any]]:
+        records: list[dict[str, Any]] = []
+        if not content:
+            return records
+        try:
+            payload = json.loads(content)
+        except json.JSONDecodeError:
+            for line in content.splitlines():
+                normalized = line.strip()
+                if not normalized:
+                    continue
+                try:
+                    payload = json.loads(normalized)
+                except json.JSONDecodeError:
+                    logger.debug(
+                        "Skipping invalid NDJSON line in FDA partition: %s",
+                        normalized[:100],
+                    )
+                    continue
+                records.extend(self.extract_records_from_payload(payload))
+        else:
+            records.extend(self.extract_records_from_payload(payload))
+        return records
+
+    # -------------------------------------------------------------------------
     def read_partition_records(self, path: str) -> list[dict[str, Any]]:
         if not os.path.isfile(path):
             return []
@@ -416,17 +454,8 @@ class FdaUpdater:
                 for member in archive.namelist():
                     with archive.open(member) as handle:
                         text_stream = io.TextIOWrapper(handle, encoding="utf-8")
-                        payload = json.load(text_stream)
-                        if isinstance(payload, dict):
-                            items = payload.get("results")
-                            if isinstance(items, list):
-                                records.extend(
-                                    [item for item in items if isinstance(item, dict)]
-                                )
-                        elif isinstance(payload, list):
-                            records.extend(
-                                [item for item in payload if isinstance(item, dict)]
-                            )
+                        content = text_stream.read()
+                    records.extend(self.parse_partition_content(content))
                 return records
         except (OSError, zipfile.BadZipFile, json.JSONDecodeError) as exc:
             logger.error("Failed to read FDA partition %s: %s", path, exc)
