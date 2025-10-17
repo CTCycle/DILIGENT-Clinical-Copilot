@@ -1,16 +1,19 @@
 from __future__ import annotations
 
+import hashlib
 import io
 import json
 import os
 import zipfile
 from typing import Any
+from urllib.parse import urljoin
 
 import httpx
 from tqdm import tqdm
 
 from DILIGENT.app.constants import (
     OPENFDA_DOWNLOAD_BASE_URL,
+    OPENFDA_DOWNLOAD_CATALOG_URL,
     OPENFDA_DRUGS_FDA_DATASET,
     OPENFDA_DRUGS_FDA_INDEX,
 )
@@ -41,11 +44,16 @@ class FdaUpdater:
         chunk_size: int = DOWNLOAD_CHUNK_SIZE,
     ) -> None:
         self.download_directory = os.path.abspath(sources_path)
+        self.download_base_url = OPENFDA_DOWNLOAD_BASE_URL
+        self.catalog_url = OPENFDA_DOWNLOAD_CATALOG_URL
+        self.dataset_key = "drugsfda"
+        self.dataset_category = "drug"
         self.dataset_url = os.path.join(
             OPENFDA_DOWNLOAD_BASE_URL,
             OPENFDA_DRUGS_FDA_DATASET,
         )
-        self.index_url = os.path.join(self.dataset_url, OPENFDA_DRUGS_FDA_INDEX)        
+        self.dataset_base_url = f"{self.dataset_url.rstrip('/')}/"
+        self.index_url = os.path.join(self.dataset_url, OPENFDA_DRUGS_FDA_INDEX)
         self.metadata_path = os.path.join(self.download_directory, METADATA_FILENAME)
         self.redownload = redownload
         self.serializer = serializer or DataSerializer()
@@ -62,44 +70,72 @@ class FdaUpdater:
         export_date = metadata.get("export_date")
         downloaded = 0
         aggregated: list[dict[str, Any]] = []
+        current_export_date = export_date
 
         with httpx.Client(headers=self.http_headers, timeout=self.timeout) as client:
-            index_payload = self.fetch_index(client)
-            index_results = index_payload.get("results") if isinstance(index_payload, dict) else None
-            latest_index = index_results[0] if index_results else {}
-            current_export_date = latest_index.get("export_date")
-            if current_export_date and current_export_date != export_date:
+            catalog_payload = self.fetch_download_catalog(client)
+            dataset_payload = self.resolve_dataset_entry(catalog_payload)
+            if not dataset_payload:
+                fallback_payload = self.fetch_index(client)
+                dataset_payload = self.parse_index_payload(fallback_payload)
+            partitions = self.get_partition_entries(dataset_payload)
+            dataset_export_date = None
+            if isinstance(dataset_payload, dict):
+                dataset_export_date = dataset_payload.get("export_date") or dataset_payload.get(
+                    "exportDate"
+                )
+            if dataset_export_date and dataset_export_date != export_date:
                 partitions_metadata = {}
-            partitions = latest_index.get("partitions") or []
-            cleaned_partitions = [
-                partition
-                for partition in partitions
-                if isinstance(partition, dict) and partition.get("file")
-            ]
-            for partition in cleaned_partitions:
-                file_name = partition.get("file")
+            if dataset_export_date:
+                current_export_date = dataset_export_date
+
+            if not partitions:
+                logger.warning(
+                    "FDA download index did not provide any partitions for dataset %s",
+                    self.dataset_key,
+                )
+
+            for partition in partitions:
+                file_reference = self.get_partition_reference(partition)
+                if not file_reference:
+                    continue
+                file_name = os.path.basename(file_reference)
                 destination = os.path.join(self.download_directory, file_name)
-                should_download = (
-                    self.redownload
-                    or not self.metadata_matches(partitions_metadata.get(file_name, {}), partition)
-                    or not os.path.isfile(destination)
+                partition_metadata = self.build_partition_metadata(partition)
+                should_download = self.should_download_partition(
+                    destination,
+                    partitions_metadata.get(file_name),
+                    partition_metadata,
                 )
                 if should_download:
+                    url = self.build_partition_url(partition)
+                    if not url:
+                        logger.warning(
+                            "Skipping FDA partition %s because the download URL is missing",
+                            file_name,
+                        )
+                        continue
                     logger.info("Downloading FDA partition %s", file_name)
-                    self.download_partition(client, partition, destination)
+                    success = self.download_partition(
+                        client,
+                        url,
+                        destination,
+                        partition_metadata.get("size"),
+                        partition_metadata.get("sha256"),
+                    )
+                    if not success:
+                        logger.error("Failed to download FDA partition %s", file_name)
+                        continue
                     downloaded += 1
                 records = self.read_partition_records(destination)
                 aggregated.extend(records)
-                partitions_metadata[file_name] = {
-                    "last_modified": partition.get("last_modified"),
-                    "size": partition.get("size"),
-                }
+                partitions_metadata[file_name] = partition_metadata
 
         if not aggregated:
             logger.warning("No FDA records retrieved from the bulk dataset")
             sanitized = self.serializer.sanitize_fda_records([])
             self.serializer.save_fda_records(sanitized)
-            updated_export_date = current_export_date or export_date
+            updated_export_date = current_export_date
         else:
             sanitized = self.serializer.sanitize_fda_records(aggregated)
             self.serializer.save_fda_records(sanitized)
@@ -119,6 +155,46 @@ class FdaUpdater:
         }
 
     # -------------------------------------------------------------------------
+    def fetch_download_catalog(self, client: httpx.Client) -> dict[str, Any]:
+        try:
+            response = client.get(self.catalog_url, follow_redirects=True)
+            response.raise_for_status()
+        except httpx.HTTPError as exc:
+            logger.error(
+                "Failed to retrieve FDA download catalog %s: %s",
+                self.catalog_url,
+                exc,
+            )
+            return {}
+        try:
+            payload = response.json()
+        except ValueError as exc:
+            logger.error(
+                "Failed to decode FDA download catalog %s: %s",
+                self.catalog_url,
+                exc,
+            )
+            return {}
+        if not isinstance(payload, dict):
+            return {}
+        return payload
+
+    # -------------------------------------------------------------------------
+    def resolve_dataset_entry(self, catalog_payload: dict[str, Any]) -> dict[str, Any]:
+        if not isinstance(catalog_payload, dict):
+            return {}
+        results = catalog_payload.get("results")
+        if not isinstance(results, dict):
+            return {}
+        category = results.get(self.dataset_category)
+        if not isinstance(category, dict):
+            return {}
+        dataset_entry = category.get(self.dataset_key)
+        if isinstance(dataset_entry, dict):
+            return dataset_entry
+        return {}
+
+    # -------------------------------------------------------------------------
     def fetch_index(self, client: httpx.Client) -> dict[str, Any]:
         try:
             response = client.get(self.index_url, follow_redirects=True)
@@ -136,33 +212,199 @@ class FdaUpdater:
         return payload
 
     # -------------------------------------------------------------------------
+    def parse_index_payload(self, index_payload: dict[str, Any]) -> dict[str, Any]:
+        if not isinstance(index_payload, dict):
+            return {}
+        results = index_payload.get("results")
+        if isinstance(results, list) and results:
+            first_entry = results[0]
+            if isinstance(first_entry, dict):
+                return first_entry
+        return {}
+
+    # -------------------------------------------------------------------------
+    def get_partition_entries(self, dataset_payload: dict[str, Any]) -> list[dict[str, Any]]:
+        if not isinstance(dataset_payload, dict):
+            return []
+        partitions = dataset_payload.get("partitions")
+        if isinstance(partitions, list):
+            return [
+                partition
+                for partition in partitions
+                if isinstance(partition, dict)
+            ]
+        return []
+
+    # -------------------------------------------------------------------------
+    def get_partition_reference(self, partition: dict[str, Any]) -> str | None:
+        for key in ("file", "path", "url"):
+            value = partition.get(key)
+            if isinstance(value, str):
+                normalized = value.strip()
+                if normalized:
+                    return normalized
+        return None
+
+    # -------------------------------------------------------------------------
+    def build_partition_metadata(self, partition: dict[str, Any]) -> dict[str, Any]:
+        size_value = self.convert_to_int(partition.get("size"))
+        records_value = self.convert_to_int(partition.get("records"))
+        metadata = {
+            "last_modified": partition.get("last_modified")
+            or partition.get("lastModified"),
+            "size": size_value,
+            "records": records_value,
+            "sha256": self.get_partition_checksum(partition),
+        }
+        return {key: value for key, value in metadata.items() if value is not None}
+
+    # -------------------------------------------------------------------------
+    def should_download_partition(
+        self,
+        destination: str,
+        stored_metadata: dict[str, Any] | None,
+        remote_metadata: dict[str, Any] | None,
+    ) -> bool:
+        if self.redownload:
+            return True
+        if not os.path.isfile(destination):
+            return True
+        if not remote_metadata:
+            return False
+        return not self.metadata_matches(stored_metadata, remote_metadata)
+
+    # -------------------------------------------------------------------------
+    def build_partition_url(self, partition: dict[str, Any]) -> str | None:
+        reference = self.get_partition_reference(partition)
+        if not reference:
+            return None
+        if reference.startswith("http://") or reference.startswith("https://"):
+            return reference
+        base_download = f"{self.download_base_url.rstrip('/')}/"
+        if "/" in reference:
+            return urljoin(base_download, reference)
+        return urljoin(self.dataset_base_url, reference)
+
+    # -------------------------------------------------------------------------
     def download_partition(
         self,
         client: httpx.Client,
-        partition: dict[str, Any],
+        url: str,
         destination: str,
-    ) -> None:
-        url = os.path.join(self.dataset_url, partition.get("file"))
-        total_size = int(partition.get("size") or 0)
-        with client.stream("GET", url, follow_redirects=True) as response:
-            response.raise_for_status()
-            with open(destination, "wb") as output:
-                if total_size > 0:
-                    with tqdm(
-                        total=total_size,
-                        unit="B",
-                        unit_scale=True,
-                        desc=f"FDA {partition.get('file')}",
-                        ncols=80,
-                    ) as progress:
-                        for chunk in response.iter_bytes(chunk_size=self.chunk_size):
-                            if chunk:
+        total_size: int | None,
+        expected_checksum: str | None,
+    ) -> bool:
+        temp_path = f"{destination}.download"
+        digest = hashlib.sha256() if expected_checksum else None
+        try:
+            with client.stream("GET", url, follow_redirects=True) as response:
+                response.raise_for_status()
+                with open(temp_path, "wb") as output:
+                    iterator = response.iter_bytes(chunk_size=self.chunk_size)
+                    if total_size and total_size > 0:
+                        with tqdm(
+                            total=total_size,
+                            unit="B",
+                            unit_scale=True,
+                            desc=f"FDA {os.path.basename(destination)}",
+                            ncols=80,
+                        ) as progress:
+                            for chunk in iterator:
+                                if not chunk:
+                                    continue
                                 output.write(chunk)
+                                if digest:
+                                    digest.update(chunk)
                                 progress.update(len(chunk))
-                else:
-                    for chunk in response.iter_bytes(chunk_size=self.chunk_size):
-                        if chunk:
+                    else:
+                        for chunk in iterator:
+                            if not chunk:
+                                continue
                             output.write(chunk)
+                            if digest:
+                                digest.update(chunk)
+        except httpx.HTTPError as exc:
+            logger.error("Failed to download FDA partition %s: %s", url, exc)
+            self.safe_remove(temp_path)
+            return False
+        except OSError as exc:
+            logger.error("Failed to write FDA partition %s: %s", destination, exc)
+            self.safe_remove(temp_path)
+            return False
+
+        if digest and not self.verify_checksum(digest, expected_checksum):
+            logger.error("Checksum mismatch for FDA partition %s", destination)
+            self.safe_remove(temp_path)
+            return False
+
+        try:
+            os.replace(temp_path, destination)
+        except OSError as exc:
+            logger.error("Failed to finalize FDA partition %s: %s", destination, exc)
+            self.safe_remove(temp_path)
+            return False
+        return True
+
+    # -------------------------------------------------------------------------
+    def verify_checksum(
+        self,
+        digest: Any,
+        expected_checksum: str | None,
+    ) -> bool:
+        if not expected_checksum:
+            return True
+        normalized_expected = expected_checksum.strip().lower()
+        if not normalized_expected:
+            return True
+        if normalized_expected.startswith("sha256:"):
+            normalized_expected = normalized_expected.split(":", 1)[1].strip()
+        computed = digest.hexdigest().lower()
+        return computed == normalized_expected
+
+    # -------------------------------------------------------------------------
+    def safe_remove(self, path: str) -> None:
+        if not path:
+            return
+        try:
+            os.remove(path)
+        except FileNotFoundError:
+            return
+        except OSError as exc:
+            logger.debug("Failed to remove temporary file %s: %s", path, exc)
+
+    # -------------------------------------------------------------------------
+    def convert_to_int(self, value: Any) -> int | None:
+        if value is None:
+            return None
+        if isinstance(value, bool):
+            return int(value)
+        try:
+            return int(value)
+        except (TypeError, ValueError):
+            return None
+
+    # -------------------------------------------------------------------------
+    def get_partition_checksum(self, partition: dict[str, Any]) -> str | None:
+        if not isinstance(partition, dict):
+            return None
+        candidates = [
+            partition.get("sha256"),
+            partition.get("sha_256"),
+            partition.get("checksum"),
+        ]
+        for candidate in candidates:
+            if isinstance(candidate, dict):
+                for key in ("sha256", "sha_256", "value"):
+                    value = candidate.get(key)
+                    if isinstance(value, str):
+                        normalized = value.strip()
+                        if normalized:
+                            return normalized
+            elif isinstance(candidate, str):
+                normalized = candidate.strip()
+                if normalized:
+                    return normalized
+        return None
 
     # -------------------------------------------------------------------------
     def read_partition_records(self, path: str) -> list[dict[str, Any]]:
@@ -212,12 +454,36 @@ class FdaUpdater:
     def metadata_matches(
         self,
         stored: dict[str, Any] | None,
-        remote: dict[str, Any],
+        remote: dict[str, Any] | None,
     ) -> bool:
-        if not stored:
+        if not stored or not remote:
             return False
-        stored_last_modified = stored.get("last_modified")
-        remote_last_modified = remote.get("last_modified")
-        stored_size = int(stored.get("size") or 0)
-        remote_size = int(remote.get("size") or 0)
-        return stored_last_modified == remote_last_modified and stored_size == remote_size
+        stored_size = self.convert_to_int(stored.get("size"))
+        remote_size = self.convert_to_int(remote.get("size"))
+        if remote_size is not None and stored_size != remote_size:
+            return False
+        stored_last_modified = (
+            stored.get("last_modified").strip()
+            if isinstance(stored.get("last_modified"), str)
+            else stored.get("last_modified")
+        )
+        remote_last_modified = (
+            remote.get("last_modified").strip()
+            if isinstance(remote.get("last_modified"), str)
+            else remote.get("last_modified")
+        )
+        if (stored_last_modified or remote_last_modified) and stored_last_modified != remote_last_modified:
+            return False
+        stored_checksum = (
+            stored.get("sha256").strip().lower()
+            if isinstance(stored.get("sha256"), str)
+            else None
+        )
+        remote_checksum = (
+            remote.get("sha256").strip().lower()
+            if isinstance(remote.get("sha256"), str)
+            else None
+        )
+        if remote_checksum and stored_checksum != remote_checksum:
+            return False
+        return True
