@@ -9,8 +9,8 @@ requires-python = ">=3.12,<3.13"
 
 dependencies = [
     "fastapi==0.118.0",
-    "gradio==5.47.2",    
-    "numpy==2.3.2",     
+    "gradio==5.47.2",
+    "numpy==2.3.2",
     "pandas==2.3.3",
     "tqdm==4.67.1",
     "pdfminer.six==20250506",
@@ -18,6 +18,10 @@ dependencies = [
     "SQLAlchemy==2.0.43",
     "python-dotenv==1.1.0",
     "langchain==0.3.27",
+    "langchain-community==0.3.27",
+    "langchain-text-splitters==0.3.11",
+    "langchain-ollama==0.3.10",
+    "langchain-huggingface==0.3.1",
     "lancedb==0.24.1",
     "openpyxl==3.1.5",
 
