@@ -29,6 +29,9 @@ DEFAULT_HTTP_HEADERS = {
 
 DOWNLOAD_CHUNK_SIZE = 262_144
 METADATA_FILENAME = "fda-adverse-events.metadata.json"
+LEGACY_METADATA_FILENAMES = (
+    "drugsfda.metadata.json",
+)
 
 
 ###############################################################################
@@ -463,19 +466,29 @@ class FdaUpdater:
 
     # -------------------------------------------------------------------------
     def load_metadata(self) -> dict[str, Any]:
-        if not os.path.isfile(self.metadata_path):
-            return {}
-        try:
-            with open(self.metadata_path, "r", encoding="utf-8") as handle:
-                payload = json.load(handle)
-                if isinstance(payload, dict):
-                    return payload
-        except (OSError, json.JSONDecodeError):
-            return {}
+        candidates = [self.metadata_path]
+        for legacy_name in LEGACY_METADATA_FILENAMES:
+            legacy_path = os.path.join(self.download_directory, legacy_name)
+            if legacy_path not in candidates:
+                candidates.append(legacy_path)
+
+        for path in candidates:
+            if not os.path.isfile(path):
+                continue
+            try:
+                with open(path, "r", encoding="utf-8") as handle:
+                    payload = json.load(handle)
+            except (OSError, json.JSONDecodeError):
+                continue
+            if isinstance(payload, dict):
+                return payload
         return {}
 
     # -------------------------------------------------------------------------
     def save_metadata(self, payload: dict[str, Any]) -> None:
+        directory = os.path.dirname(self.metadata_path)
+        if directory:
+            os.makedirs(directory, exist_ok=True)
         with open(self.metadata_path, "w", encoding="utf-8") as handle:
             json.dump(payload, handle)
 
