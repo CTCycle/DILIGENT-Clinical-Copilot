@@ -65,8 +65,11 @@ class FdaUpdater:
     # -------------------------------------------------------------------------
     def update_from_fda_approvals(self) -> dict[str, Any]:
         os.makedirs(self.download_directory, exist_ok=True)
-        metadata = {} if self.redownload else self.load_metadata()
-        partitions_metadata = metadata.get("partitions", {})
+        if self.redownload:
+            metadata = {"export_date": None, "partitions": {}}
+        else:
+            metadata = self.load_metadata()
+        partitions_metadata = dict(metadata.get("partitions", {}))
         export_date = metadata.get("export_date")
         downloaded = 0
         aggregated: list[dict[str, Any]] = []
@@ -88,6 +91,7 @@ class FdaUpdater:
                 partitions_metadata = {}
             if dataset_export_date:
                 current_export_date = dataset_export_date
+                self.persist_metadata_state(current_export_date, partitions_metadata)
 
             if not partitions:
                 logger.warning(
@@ -129,7 +133,12 @@ class FdaUpdater:
                     downloaded += 1
                 records = self.read_partition_records(destination)
                 aggregated.extend(records)
-                partitions_metadata[file_name] = partition_metadata
+                combined_metadata = self.combine_partition_metadata(
+                    destination,
+                    partition_metadata,
+                )
+                partitions_metadata[file_name] = combined_metadata
+                self.persist_metadata_state(current_export_date, partitions_metadata)
 
         if not aggregated:
             logger.warning("No FDA adverse event records retrieved from the bulk dataset")
@@ -494,21 +503,54 @@ class FdaUpdater:
 
     # -------------------------------------------------------------------------
     def load_metadata(self) -> dict[str, Any]:
+        default = {"export_date": None, "partitions": {}}
         if not os.path.isfile(self.metadata_path):
-            return {}
+            return default
         try:
             with open(self.metadata_path, "r", encoding="utf-8") as handle:
                 payload = json.load(handle)
-                if isinstance(payload, dict):
-                    return payload
-        except (OSError, json.JSONDecodeError):
-            return {}
-        return {}
+        except (OSError, json.JSONDecodeError) as exc:
+            logger.debug("Failed to load FDA metadata %s: %s", self.metadata_path, exc)
+            return default
+        if not isinstance(payload, dict):
+            return default
+        partitions = payload.get("partitions")
+        if not isinstance(partitions, dict):
+            partitions = {}
+        else:
+            partitions = {
+                key: value
+                for key, value in partitions.items()
+                if isinstance(key, str) and isinstance(value, dict)
+            }
+        return {
+            "export_date": payload.get("export_date"),
+            "partitions": partitions,
+        }
 
     # -------------------------------------------------------------------------
     def save_metadata(self, payload: dict[str, Any]) -> None:
-        with open(self.metadata_path, "w", encoding="utf-8") as handle:
-            json.dump(payload, handle)
+        partitions = payload.get("partitions")
+        if isinstance(partitions, dict):
+            sanitized_partitions = {
+                key: value
+                for key, value in partitions.items()
+                if isinstance(key, str) and isinstance(value, dict)
+            }
+        else:
+            sanitized_partitions = {}
+        serialized = {
+            "export_date": payload.get("export_date"),
+            "partitions": sanitized_partitions,
+        }
+        temp_path = f"{self.metadata_path}.tmp"
+        try:
+            with open(temp_path, "w", encoding="utf-8") as handle:
+                json.dump(serialized, handle)
+            os.replace(temp_path, self.metadata_path)
+        except OSError as exc:
+            logger.error("Failed to persist FDA metadata %s: %s", self.metadata_path, exc)
+            self.safe_remove(temp_path)
 
     # -------------------------------------------------------------------------
     def metadata_matches(
@@ -547,3 +589,47 @@ class FdaUpdater:
         if remote_checksum and stored_checksum != remote_checksum:
             return False
         return True
+
+    # -------------------------------------------------------------------------
+    def persist_metadata_state(
+        self,
+        export_date: str | None,
+        partitions_metadata: dict[str, Any],
+    ) -> None:
+        payload = {
+            "export_date": export_date,
+            "partitions": partitions_metadata,
+        }
+        self.save_metadata(payload)
+
+    # -------------------------------------------------------------------------
+    def combine_partition_metadata(
+        self,
+        path: str,
+        remote_metadata: dict[str, Any] | None,
+    ) -> dict[str, Any]:
+        metadata = dict(remote_metadata or {})
+        try:
+            stats = os.stat(path)
+        except OSError:
+            return metadata
+        metadata["size"] = stats.st_size
+        if "sha256" not in metadata:
+            checksum = self.compute_file_sha256(path)
+            if checksum:
+                metadata["sha256"] = checksum
+        return metadata
+
+    # -------------------------------------------------------------------------
+    def compute_file_sha256(self, path: str) -> str | None:
+        try:
+            with open(path, "rb") as handle:
+                digest = hashlib.sha256()
+                for chunk in iter(lambda: handle.read(self.chunk_size), b""):
+                    if not chunk:
+                        break
+                    digest.update(chunk)
+                return digest.hexdigest()
+        except OSError as exc:
+            logger.debug("Failed to compute checksum for %s: %s", path, exc)
+            return None
