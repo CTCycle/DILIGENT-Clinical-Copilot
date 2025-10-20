@@ -4,6 +4,7 @@ import hashlib
 import io
 import json
 import os
+import re
 import zipfile
 from typing import Any
 from urllib.parse import urljoin
@@ -29,6 +30,9 @@ DEFAULT_HTTP_HEADERS = {
 
 DOWNLOAD_CHUNK_SIZE = 262_144
 METADATA_FILENAME = "fda-adverse-events.metadata.json"
+RESULTS_PATTERN = re.compile(r'"results"\s*:\s*\[')
+FORMAT_DETECTION_LIMIT = 1_048_576
+STREAM_BUFFER_SIZE = 65_536
 
 
 ###############################################################################
@@ -460,33 +464,149 @@ class FdaUpdater:
     # -------------------------------------------------------------------------
     def parse_partition_stream(self, stream: io.TextIOBase) -> list[dict[str, Any]]:
         records: list[dict[str, Any]] = []
-        decoder = json.JSONDecoder()
-        buffer = ""
-        in_array = False
-        for chunk in iter(lambda: stream.read(8192), ""):
+        try:
+            buffer = stream.read(STREAM_BUFFER_SIZE)
+        except OSError as exc:
+            logger.error("Failed to stream FDA partition: %s", exc)
+            return records
+        if not buffer:
+            return records
+        total_read = len(buffer)
+        match = RESULTS_PATTERN.search(buffer)
+        while not match and total_read < FORMAT_DETECTION_LIMIT:
+            chunk = stream.read(STREAM_BUFFER_SIZE)
+            if not chunk:
+                break
             buffer += chunk
-            while True:
-                buffer = buffer.lstrip()
-                if not buffer:
-                    break
-                if in_array:
-                    if buffer[0] == "]":
-                        in_array = False
-                        buffer = buffer[1:]
-                        continue
-                    if buffer[0] == ",":
-                        buffer = buffer[1:]
-                        continue
-                elif buffer[0] == "[":
-                    in_array = True
-                    buffer = buffer[1:]
+            total_read += len(chunk)
+            match = RESULTS_PATTERN.search(buffer)
+        if match:
+            start = match.end()
+            remainder = buffer[start:]
+            records.extend(self.parse_results_array_stream(stream, remainder))
+            return records
+        records.extend(self.parse_ndjson_stream(stream, buffer))
+        return records
+
+    # -------------------------------------------------------------------------
+    def parse_results_array_stream(
+        self,
+        stream: io.TextIOBase,
+        initial_buffer: str,
+    ) -> list[dict[str, Any]]:
+        records: list[dict[str, Any]] = []
+        buffer = initial_buffer
+        capturing = False
+        capture_chars: list[str] = []
+        depth = 0
+        in_string = False
+        escape = False
+        while True:
+            index = 0
+            length = len(buffer)
+            while index < length:
+                char = buffer[index]
+                if capturing:
+                    capture_chars.append(char)
+                    if escape:
+                        escape = False
+                    elif char == "\\":
+                        escape = True
+                    elif char == '"':
+                        in_string = not in_string
+                    elif not in_string:
+                        if char == "{":
+                            depth += 1
+                        elif char == "}":
+                            depth -= 1
+                            if depth == 0:
+                                object_text = "".join(capture_chars)
+                                capture_chars = []
+                                capturing = False
+                                try:
+                                    payload = json.loads(object_text)
+                                except json.JSONDecodeError:
+                                    logger.debug(
+                                        "Skipping invalid JSON object in FDA partition results",
+                                    )
+                                else:
+                                    records.extend(
+                                        self.extract_records_from_payload(payload)
+                                    )
+                    index += 1
                     continue
-                try:
-                    payload, index = decoder.raw_decode(buffer)
-                except json.JSONDecodeError:
-                    break
+                if char == "{":
+                    capturing = True
+                    capture_chars = ["{"]
+                    depth = 1
+                    in_string = False
+                    escape = False
+                    index += 1
+                    continue
+                if char == "]":
+                    return records
+                index += 1
+            try:
+                buffer = stream.read(STREAM_BUFFER_SIZE)
+            except OSError as exc:
+                logger.error("Failed to continue streaming FDA partition: %s", exc)
+                return records
+            if not buffer:
+                if capturing:
+                    logger.debug(
+                        "Encountered truncated FDA partition results while streaming",
+                    )
+                return records
+
+    # -------------------------------------------------------------------------
+    def parse_ndjson_stream(
+        self,
+        stream: io.TextIOBase,
+        initial_buffer: str,
+    ) -> list[dict[str, Any]]:
+        records: list[dict[str, Any]] = []
+        pending = ""
+        buffer = initial_buffer
+        end_of_stream = False
+        while True:
+            combined = pending + buffer
+            lines = combined.splitlines(keepends=True)
+            pending = ""
+            for line in lines:
+                if line.endswith(("\n", "\r")):
+                    content = line.strip()
+                    if not content:
+                        continue
+                    try:
+                        payload = json.loads(content)
+                    except json.JSONDecodeError:
+                        logger.debug(
+                            "Skipping invalid NDJSON line in FDA partition: %s",
+                            content[:100],
+                        )
+                        continue
+                    records.extend(self.extract_records_from_payload(payload))
+                else:
+                    pending = line
+            if end_of_stream:
+                break
+            try:
+                buffer = stream.read(STREAM_BUFFER_SIZE)
+            except OSError as exc:
+                logger.error("Failed to stream NDJSON FDA partition: %s", exc)
+                break
+            if not buffer:
+                end_of_stream = True
+        if pending.strip():
+            try:
+                payload = json.loads(pending.strip())
+            except json.JSONDecodeError:
+                logger.debug(
+                    "Skipping invalid NDJSON line in FDA partition: %s",
+                    pending.strip()[:100],
+                )
+            else:
                 records.extend(self.extract_records_from_payload(payload))
-                buffer = buffer[index:]
         return records
 
     # -------------------------------------------------------------------------
@@ -498,8 +618,8 @@ class FdaUpdater:
                 records: list[dict[str, Any]] = []
                 for member in archive.namelist():
                     with archive.open(member) as handle:
-                        text_stream = io.TextIOWrapper(handle, encoding="utf-8")
-                        records.extend(self.parse_partition_stream(text_stream))
+                        with io.TextIOWrapper(handle, encoding="utf-8") as text_stream:
+                            records.extend(self.parse_partition_stream(text_stream))
                 return records
         except (OSError, zipfile.BadZipFile, json.JSONDecodeError) as exc:
             logger.error("Failed to read FDA partition %s: %s", path, exc)
