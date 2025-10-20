@@ -445,6 +445,38 @@ class FdaUpdater:
         return records
 
     # -------------------------------------------------------------------------
+    def parse_partition_stream(self, stream: io.TextIOBase) -> list[dict[str, Any]]:
+        records: list[dict[str, Any]] = []
+        decoder = json.JSONDecoder()
+        buffer = ""
+        in_array = False
+        for chunk in iter(lambda: stream.read(8192), ""):
+            buffer += chunk
+            while True:
+                buffer = buffer.lstrip()
+                if not buffer:
+                    break
+                if in_array:
+                    if buffer[0] == "]":
+                        in_array = False
+                        buffer = buffer[1:]
+                        continue
+                    if buffer[0] == ",":
+                        buffer = buffer[1:]
+                        continue
+                elif buffer[0] == "[":
+                    in_array = True
+                    buffer = buffer[1:]
+                    continue
+                try:
+                    payload, index = decoder.raw_decode(buffer)
+                except json.JSONDecodeError:
+                    break
+                records.extend(self.extract_records_from_payload(payload))
+                buffer = buffer[index:]
+        return records
+
+    # -------------------------------------------------------------------------
     def read_partition_records(self, path: str) -> list[dict[str, Any]]:
         if not os.path.isfile(path):
             return []
@@ -454,8 +486,7 @@ class FdaUpdater:
                 for member in archive.namelist():
                     with archive.open(member) as handle:
                         text_stream = io.TextIOWrapper(handle, encoding="utf-8")
-                        content = text_stream.read()
-                    records.extend(self.parse_partition_content(content))
+                        records.extend(self.parse_partition_stream(text_stream))
                 return records
         except (OSError, zipfile.BadZipFile, json.JSONDecodeError) as exc:
             logger.error("Failed to read FDA partition %s: %s", path, exc)
