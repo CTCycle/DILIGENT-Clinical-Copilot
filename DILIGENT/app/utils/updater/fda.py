@@ -64,7 +64,8 @@ class FdaUpdater:
 
     # -------------------------------------------------------------------------
     def update_from_fda_approvals(self) -> dict[str, Any]:
-        os.makedirs(self.download_directory, exist_ok=True)
+        fda_folder = os.path.join(self.download_directory, "fda")      
+        os.makedirs(fda_folder, exist_ok=True)
         metadata = {} if self.redownload else self.load_metadata()
         partitions_metadata = metadata.get("partitions", {})
         export_date = metadata.get("export_date")
