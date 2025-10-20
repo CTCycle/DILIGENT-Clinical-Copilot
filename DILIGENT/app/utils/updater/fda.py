@@ -280,7 +280,11 @@ class FdaUpdater:
             return True
         if not remote_metadata:
             return False
-        return not self.metadata_matches(stored_metadata, remote_metadata)
+        if stored_metadata:
+            return not self.metadata_matches(stored_metadata, remote_metadata)
+        if self.has_valid_local_copy(destination, remote_metadata):
+            return False
+        return True
 
     # -------------------------------------------------------------------------
     def build_partition_url(self, partition: dict[str, Any]) -> str | None:
@@ -576,19 +580,36 @@ class FdaUpdater:
         )
         if (stored_last_modified or remote_last_modified) and stored_last_modified != remote_last_modified:
             return False
-        stored_checksum = (
-            stored.get("sha256", "").strip().lower()
-            if isinstance(stored.get("sha256"), str)
-            else None
-        )
-        remote_checksum = (
-            remote.get("sha256", "").strip().lower()
-            if isinstance(remote.get("sha256"), str)
-            else None
-        )
+        stored_checksum = self.normalize_checksum_value(stored.get("sha256"))
+        remote_checksum = self.normalize_checksum_value(remote.get("sha256"))
         if remote_checksum and stored_checksum != remote_checksum:
             return False
         return True
+
+    # -------------------------------------------------------------------------
+    def has_valid_local_copy(
+        self,
+        path: str,
+        remote_metadata: dict[str, Any],
+    ) -> bool:
+        if not remote_metadata:
+            return False
+        remote_size = self.convert_to_int(remote_metadata.get("size"))
+        if remote_size is not None:
+            try:
+                local_size = os.path.getsize(path)
+            except OSError:
+                return False
+            if local_size != remote_size:
+                return False
+        remote_checksum = self.normalize_checksum_value(remote_metadata.get("sha256"))
+        if remote_checksum:
+            local_checksum = self.compute_file_sha256(path)
+            if not local_checksum:
+                return False
+            if local_checksum.lower() != remote_checksum:
+                return False
+        return remote_size is not None or remote_checksum is not None
 
     # -------------------------------------------------------------------------
     def persist_metadata_state(
@@ -619,6 +640,17 @@ class FdaUpdater:
             if checksum:
                 metadata["sha256"] = checksum
         return metadata
+
+    # -------------------------------------------------------------------------
+    def normalize_checksum_value(self, value: Any) -> str | None:
+        if not isinstance(value, str):
+            return None
+        normalized = value.strip().lower()
+        if not normalized:
+            return None
+        if normalized.startswith("sha256:"):
+            normalized = normalized.split(":", 1)[1].strip()
+        return normalized or None
 
     # -------------------------------------------------------------------------
     def compute_file_sha256(self, path: str) -> str | None:
