@@ -132,6 +132,12 @@ The LangChain components bundled with DILIGENT support LangSmith tracing. When t
 4. Launch the DILIGENT application and execute any workflow that calls the LLMs.
 5. Open the LangSmith web UI and select the project configured in `LANGSMITH_PROJECT` to inspect traces, prompts, model choices, and any retry/parsing attempts.
 
-## 4. License
-This project is licensed under the terms of the MIT license. See the LICENSE file for details.
+## License
+
+This project is provided under a **dual-license model**:
+
+- **Non-commercial use**: Licensed under the [Polyform Noncommercial License 1.0.0](https://polyformproject.org/licenses/noncommercial/1.0.0/).  
+- **Commercial use**: Requires a separate commercial license.  
+
+For commercial licensing inquiries, please contact the owner of this repository.
 
