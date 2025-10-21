@@ -211,6 +211,13 @@ class DataSerializer:
         database.save_into_database(frame, "FDA_ADVERSE_EVENTS")
 
     # -----------------------------------------------------------------------------
+    def upsert_fda_records(self, records: pd.DataFrame) -> None:
+        frame = records.copy()
+        frame = frame.reindex(columns=FDA_COLUMNS)
+        frame = frame.where(pd.notnull(frame), None)
+        database.upsert_into_database(frame, "FDA_ADVERSE_EVENTS")
+
+    # -----------------------------------------------------------------------------
     def sanitize_livertox_records(self, records: list[dict[str, Any]]) -> pd.DataFrame:
         df = pd.DataFrame(records)
         required_columns = [
