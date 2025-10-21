@@ -26,7 +26,7 @@ if __name__ == "__main__":
         redownload=REDOWNLOAD,
     )
     logger.info("Running FDA adverse event updater")
-    fda_result = fda_updater.update_from_fda_approvals()
+    fda_result = fda_updater.update_from_fda()
     logger.info("FDA adverse event updater summary: %s", fda_result)
     
 
