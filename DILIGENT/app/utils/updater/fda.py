@@ -5,6 +5,7 @@ import io
 import json
 import os
 import zipfile
+from collections.abc import Iterator
 from typing import Any
 from urllib.parse import urljoin
 
@@ -63,13 +64,14 @@ class FdaUpdater:
         self.timeout = httpx.Timeout(120.0, connect=30.0)
 
     # -------------------------------------------------------------------------
-    def update_from_fda_approvals(self) -> dict[str, Any]:        
+    def update_from_fda(self) -> dict[str, Any]:
         os.makedirs(self.download_directory, exist_ok=True)
         metadata = {} if self.redownload else self.load_metadata()
         partitions_metadata = metadata.get("partitions", {})
         export_date = metadata.get("export_date")
         downloaded = 0
-        aggregated: list[dict[str, Any]] = []
+        records_processed = 0
+        partitions_processed = 0
         current_export_date = export_date
 
         with httpx.Client(headers=self.http_headers, timeout=self.timeout) as client:
@@ -127,19 +129,17 @@ class FdaUpdater:
                         logger.error("Failed to download FDA partition %s", file_name)
                         continue
                     downloaded += 1
-                records = self.read_partition_records(destination)
-                aggregated.extend(records)
+                partition_count = self.process_partition(destination)
+                if partition_count is None:
+                    continue
+                records_processed += partition_count
+                partitions_processed += 1
                 partitions_metadata[file_name] = partition_metadata
 
-        if not aggregated:
-            logger.warning("No FDA adverse event records retrieved from the bulk dataset")
-            sanitized = self.serializer.sanitize_fda_records([])
-            self.serializer.save_fda_records(sanitized)
-            updated_export_date = current_export_date
-        else:
-            sanitized = self.serializer.sanitize_fda_records(aggregated)
-            self.serializer.save_fda_records(sanitized)
-            updated_export_date = current_export_date
+        if records_processed == 0:
+            logger.warning("No FDA adverse event records were processed during the update")
+
+        updated_export_date = current_export_date
 
         metadata_payload = {
             "export_date": updated_export_date,
@@ -148,11 +148,40 @@ class FdaUpdater:
         self.save_metadata(metadata_payload)
 
         return {
-            "records_processed": int(len(sanitized.index)),
-            "partitions_processed": len(partitions_metadata),
+            "records_processed": records_processed,
+            "partitions_processed": partitions_processed,
             "partitions_downloaded": downloaded,
             "export_date": updated_export_date,
         }
+
+    # -------------------------------------------------------------------------
+    def process_partition(self, path: str) -> int | None:
+        if not os.path.isfile(path):
+            logger.warning("FDA partition %s is missing; skipping", path)
+            return None
+        records_processed = 0
+        batch: list[dict[str, Any]] = []
+        batch_limit = max(1, getattr(self.database, "insert_batch_size", 1000))
+        try:
+            for record in self.stream_partition_records(path):
+                batch.append(record)
+                if len(batch) >= batch_limit:
+                    records_processed += self.persist_records(batch)
+                    batch = []
+            if batch:
+                records_processed += self.persist_records(batch)
+        except Exception as exc:  # noqa: BLE001
+            logger.error("Failed to process FDA partition %s: %s", path, exc)
+            return None
+        return records_processed
+
+    # -------------------------------------------------------------------------
+    def persist_records(self, records: list[dict[str, Any]]) -> int:
+        sanitized = self.serializer.sanitize_fda_records(records)
+        if sanitized.empty:
+            return 0
+        self.serializer.upsert_fda_records(sanitized)
+        return int(len(sanitized.index))
 
     # -------------------------------------------------------------------------
     def fetch_download_catalog(self, client: httpx.Client) -> dict[str, Any]:
@@ -420,46 +449,95 @@ class FdaUpdater:
         return records
 
     # -------------------------------------------------------------------------
-    def parse_partition_content(self, content: str) -> list[dict[str, Any]]:
-        records: list[dict[str, Any]] = []
-        if not content:
-            return records
-        try:
-            payload = json.loads(content)
-        except json.JSONDecodeError:
-            for line in content.splitlines():
-                normalized = line.strip()
-                if not normalized:
-                    continue
-                try:
-                    payload = json.loads(normalized)
-                except json.JSONDecodeError:
-                    logger.debug(
-                        "Skipping invalid NDJSON line in FDA partition: %s",
-                        normalized[:100],
-                    )
-                    continue
-                records.extend(self.extract_records_from_payload(payload))
-        else:
-            records.extend(self.extract_records_from_payload(payload))
-        return records
-
-    # -------------------------------------------------------------------------
-    def read_partition_records(self, path: str) -> list[dict[str, Any]]:
+    def stream_partition_records(self, path: str) -> Iterator[dict[str, Any]]:
         if not os.path.isfile(path):
-            return []
+            return
         try:
             with zipfile.ZipFile(path) as archive:
-                records: list[dict[str, Any]] = []
                 for member in archive.namelist():
+                    yielded = False
                     with archive.open(member) as handle:
-                        text_stream = io.TextIOWrapper(handle, encoding="utf-8")
-                        content = text_stream.read()
-                    records.extend(self.parse_partition_content(content))
-                return records
-        except (OSError, zipfile.BadZipFile, json.JSONDecodeError) as exc:
+                        with io.TextIOWrapper(handle, encoding="utf-8") as text_stream:
+                            for payload in self.iterate_results_stream(text_stream):
+                                yielded = True
+                                for record in self.extract_records_from_payload(payload):
+                                    yield record
+                    if yielded:
+                        continue
+                    with archive.open(member) as handle:
+                        with io.TextIOWrapper(handle, encoding="utf-8") as text_stream:
+                            for payload in self.iterate_ndjson_stream(text_stream):
+                                for record in self.extract_records_from_payload(payload):
+                                    yield record
+        except (OSError, zipfile.BadZipFile) as exc:
             logger.error("Failed to read FDA partition %s: %s", path, exc)
-            return []
+
+    # -------------------------------------------------------------------------
+    def iterate_results_stream(self, stream: io.TextIOWrapper) -> Iterator[Any]:
+        decoder = json.JSONDecoder()
+        buffer = ""
+        results_found = False
+        while True:
+            chunk = stream.read(self.chunk_size)
+            if not chunk:
+                break
+            buffer += chunk
+            if not results_found:
+                key_index = buffer.find('"results"')
+                if key_index == -1:
+                    if len(buffer) > 8192:
+                        buffer = buffer[-8192:]
+                    continue
+                bracket_index = buffer.find("[", key_index)
+                if bracket_index == -1:
+                    continue
+                buffer = buffer[bracket_index + 1 :]
+                results_found = True
+            while results_found:
+                buffer = buffer.lstrip()
+                if not buffer:
+                    break
+                if buffer.startswith("]"):
+                    buffer = buffer[1:]
+                    results_found = False
+                    break
+                try:
+                    payload, offset = decoder.raw_decode(buffer)
+                except json.JSONDecodeError:
+                    break
+                yield payload
+                buffer = buffer[offset:].lstrip()
+                if buffer.startswith(","):
+                    buffer = buffer[1:]
+        if not results_found:
+            return
+        buffer = buffer.lstrip()
+        while buffer:
+            if buffer.startswith("]"):
+                break
+            try:
+                payload, offset = decoder.raw_decode(buffer)
+            except json.JSONDecodeError:
+                logger.debug("Incomplete JSON data at end of FDA results stream")
+                break
+            yield payload
+            buffer = buffer[offset:].lstrip()
+            if buffer.startswith(","):
+                buffer = buffer[1:]
+
+    # -------------------------------------------------------------------------
+    def iterate_ndjson_stream(self, stream: io.TextIOWrapper) -> Iterator[Any]:
+        for line in stream:
+            normalized = line.strip()
+            if not normalized:
+                continue
+            try:
+                yield json.loads(normalized)
+            except json.JSONDecodeError:
+                logger.debug(
+                    "Skipping invalid NDJSON line in FDA partition: %s",
+                    normalized[:200],
+                )
 
     # -------------------------------------------------------------------------
     def load_metadata(self) -> dict[str, Any]:
