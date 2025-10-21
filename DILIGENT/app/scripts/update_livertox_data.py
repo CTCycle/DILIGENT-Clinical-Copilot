@@ -8,18 +8,9 @@ from DILIGENT.app.utils.updater.livertox import LiverToxUpdater
 REDOWNLOAD = True
 
 ###############################################################################
-def run(redownload: bool = REDOWNLOAD, initialize_db: bool = True) -> None:
-    updater = LiverToxUpdater(
-        SOURCES_PATH,
-        redownload=redownload,
-    )
-    if initialize_db:
-        database.initialize_database()
+if __name__ == "__main__":
+    database.initialize_database()
+    updater = LiverToxUpdater(SOURCES_PATH, redownload=REDOWNLOAD)    
     logger.info("Running LiverTox updater")
     result = updater.update_from_livertox()
     logger.info("LiverTox updater summary: %s", result)
-
-
-###############################################################################
-if __name__ == "__main__":
-    run()
