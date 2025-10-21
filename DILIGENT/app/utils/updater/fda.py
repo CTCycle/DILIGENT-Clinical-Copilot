@@ -43,7 +43,7 @@ class FdaUpdater:
         database_client=database,
         chunk_size: int = DOWNLOAD_CHUNK_SIZE,
     ) -> None:
-        self.download_directory = os.path.abspath(sources_path)
+        self.download_directory = os.path.join(sources_path, "fda")         
         self.download_base_url = OPENFDA_DOWNLOAD_BASE_URL
         self.catalog_url = OPENFDA_DOWNLOAD_CATALOG_URL
         self.dataset_key = "event"
@@ -63,9 +63,8 @@ class FdaUpdater:
         self.timeout = httpx.Timeout(120.0, connect=30.0)
 
     # -------------------------------------------------------------------------
-    def update_from_fda_approvals(self) -> dict[str, Any]:
-        fda_folder = os.path.join(self.download_directory, "fda")      
-        os.makedirs(fda_folder, exist_ok=True)
+    def update_from_fda_approvals(self) -> dict[str, Any]:        
+        os.makedirs(self.download_directory, exist_ok=True)
         metadata = {} if self.redownload else self.load_metadata()
         partitions_metadata = metadata.get("partitions", {})
         export_date = metadata.get("export_date")
