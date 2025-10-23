@@ -52,7 +52,7 @@ def create_interface() -> gr.Blocks:
             with gr.Column(scale=3):
                 anamnesis = gr.Textbox(
                     label="Anamnesis",
-                    placeholder="Enter anamnesis details...",
+                    placeholder="Describe the clinical picture, including exams and labs when relevant...",
                     lines=10,
                     max_lines=100,
                 )
@@ -67,12 +67,6 @@ def create_interface() -> gr.Blocks:
                 drugs = gr.Textbox(
                     label="Current Drugs",
                     placeholder="List current therapies, dosage and schedule...",
-                    lines=10,
-                    max_lines=100,
-                )
-                exams = gr.Textbox(
-                    label="Additional Exams",
-                    placeholder="Provide lab or imaging exam notes...",
                     lines=10,
                     max_lines=100,
                 )
@@ -261,7 +255,6 @@ def create_interface() -> gr.Blocks:
                 anamnesis,
                 has_diseases,
                 drugs,
-                exams,
                 alt,
                 alt_max,
                 alp,
@@ -279,7 +272,6 @@ def create_interface() -> gr.Blocks:
                 visit_date,
                 anamnesis,
                 drugs,
-                exams,
                 alt,
                 alt_max,
                 alp,
