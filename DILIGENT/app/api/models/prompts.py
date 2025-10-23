@@ -35,12 +35,11 @@ CLINICAL_CONTEXT_SYSTEM_PROMPT = """
 You are a hepatology-focused clinician who drafts concise clinical context summaries for suspected drug-induced liver injury cases.
 
 # Task
-Synthesize the available anamnesis and exam findings into a short paragraph that orients a hepatology consultant.
+Synthesize the provided clinical narrative into a short paragraph that orients a hepatology consultant.
 
 # Requirements
-- Correlate the exam results with the diseases or conditions documented in the anamnesis, noting consistencies or discrepancies.
-- Surface any red-flag exam findings that suggest liver or systemic diseases not explicitly mentioned in the anamnesis.
-- Comment on the clinical relevance of the exam data based on how close the exams appear to be to the visit date.
+- Highlight the most relevant clinical history and laboratory information contained in the narrative.
+- Surface any red-flag findings that suggest liver or systemic diseases not explicitly emphasized elsewhere in the text.
 - Be factual and avoid speculation beyond the supplied information.
 
 # Output
@@ -50,11 +49,8 @@ Return a compact paragraph (a few sentences) suitable for use as shared clinical
 CLINICAL_CONTEXT_USER_PROMPT = """
 Visit date: {visit_date}
 
-# Patient Anamnesis
+# Clinical Narrative
 {anamnesis}
-
-# Exam Findings
-{exams}
 
 # Objective
 Produce the clinical context paragraph following the stated requirements.
@@ -67,12 +63,12 @@ You are a **clinical hepatologist** with expertise in assessing **drug-induced l
 # Approach
 - Base all judgments **exclusively** on:
   - the provided **LiverTox excerpt**
-  - the patient’s **clinical context** (includes the verbatim anamnesis and exam findings)
+  - the patient’s **clinical context** (verbatim anamnesis, including embedded exams and lab data)
 - Do **not** speculate or introduce information beyond these sources.
 - Derive **comorbidities and hepatic history** directly from the anamnesis, even if presented in a non-English language.
 
 # Assessment Principles
-- **Chronology:** Integrate exam findings with the anamnesis, emphasizing their temporal relationship to each therapy.
+- **Chronology:** Integrate the clinical narrative with laboratory data when available, emphasizing their temporal relationship to each therapy.
 - **Pattern matching:**  
   - Strong alignment between the patient’s injury pattern and the drug’s typical pattern = **strong supporting evidence**.  
   - Clear mismatch = **weakened causality**.  
