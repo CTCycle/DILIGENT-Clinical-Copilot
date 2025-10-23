@@ -45,35 +45,6 @@ def resolve_temperature(preferred: float | None, *, scale: float = 1.0) -> float
     return round(value, 2)
 
 
-###############################################################################
-class ClinicalContextBuilder:
-
-    def __init__(self) -> None:
-        pass
-
-    ###########################################################################
-    async def build_context(
-        self,
-        *,
-        anamnesis: str | None,
-        visit_date: date | None,
-    ) -> str:
-        clinical_text = (anamnesis or "").strip()
-        if not clinical_text:
-            clinical_text = "No anamnesis available."
-        visit_label = self.format_visit_label(visit_date)
-        if visit_label is None:
-            return clinical_text
-        return f"{clinical_text}\n\nVisit date: {visit_label}".strip()
-
-    ###########################################################################
-    def format_visit_label(self, visit_date: date | None) -> str | None:
-        if visit_date is None:
-            return None
-        if isinstance(visit_date, datetime):
-            return visit_date.date().isoformat()
-        return visit_date.isoformat()
-
 
 ###############################################################################
 class HepatotoxicityPatternAnalyzer:
