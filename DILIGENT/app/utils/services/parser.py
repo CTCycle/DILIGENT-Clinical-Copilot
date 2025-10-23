@@ -80,7 +80,11 @@ class DrugsParser:
                 self.client_provider = provider
             self.runtime_revision = revision
             self.model = model
-            if self.client is not None and model and hasattr(self.client, "default_model"):
+            if (
+                self.client is not None
+                and model
+                and hasattr(self.client, "default_model")
+            ):
                 self.client.default_model = model  # type: ignore[attr-defined]
 
     # -------------------------------------------------------------------------
@@ -147,7 +151,9 @@ class DrugsParser:
         if self.client is None:
             raise RuntimeError("LLM client is not initialized for drug extraction")
 
-        lines = [line for line in (segment.strip() for segment in text.split("\n")) if line]
+        lines = [
+            line for line in (segment.strip() for segment in text.split("\n")) if line
+        ]
         if not lines:
             return PatientDrugs(entries=[])
 
@@ -362,9 +368,7 @@ class DrugsParser:
         return status, date_value
 
     # -------------------------------------------------------------------------
-    def detect_start(
-        self, full_line: str, tail: str
-    ) -> tuple[bool | None, str | None]:
+    def detect_start(self, full_line: str, tail: str) -> tuple[bool | None, str | None]:
         for segment in (tail, full_line):
             if not segment:
                 continue
@@ -394,4 +398,3 @@ class DrugsParser:
             except ValueError:
                 return stripped
         return f"{day.zfill(2)}.{month.zfill(2)}"
-

@@ -42,6 +42,7 @@ DEFAULT_HTTP_HEADERS = {
 
 DOWNLOAD_CHUNK_SIZE = 262_144
 
+
 # -----------------------------------------------------------------------------
 def load_json(path: str) -> dict[str, Any] | None:
     if not os.path.isfile(path):
@@ -52,17 +53,18 @@ def load_json(path: str) -> dict[str, Any] | None:
     except (json.JSONDecodeError, OSError):
         return None
 
+
 # -----------------------------------------------------------------------------
 def save_masterlist_metadata(path: str, payload: dict[str, Any]) -> None:
     with open(path, "w", encoding="utf-8") as handle:
         json.dump(payload, handle)
 
+
 # -----------------------------------------------------------------------------
 def metadata_matches(stored: dict[str, Any], remote: dict[str, Any]) -> bool:
-    return (
-        stored.get("last_modified") == remote.get("last_modified")
-        and int(stored.get("size", 0)) == int(remote.get("size", 0))
-    )
+    return stored.get("last_modified") == remote.get("last_modified") and int(
+        stored.get("size", 0)
+    ) == int(remote.get("size", 0))
 
 
 ###############################################################################
@@ -95,9 +97,8 @@ async def download_file(
 
 ###############################################################################
 class LiverToxUpdater:
-
     RXNAV_MAX_WORKERS = 6
-    
+
     def __init__(
         self,
         sources_path: str,
@@ -105,8 +106,8 @@ class LiverToxUpdater:
         redownload: bool,
         rx_client: RxNavClient | None = None,
         serializer: DataSerializer | None = None,
-        database_client=database,        
-    ) -> None:        
+        database_client=database,
+    ) -> None:
         self.supported_extensions = SUPPORTED_MONOGRAPH_EXTENSIONS
         self.http_headers = dict(DEFAULT_HTTP_HEADERS)
         self.delay = 0.5
@@ -122,21 +123,19 @@ class LiverToxUpdater:
         self.base_url = LIVERTOX_BASE_URL
         self.file_name = LIVERTOX_ARCHIVE
         self.tar_file_path = os.path.join(SOURCES_PATH, self.file_name)
-        self.master_list_path = os.path.join(
-            SOURCES_PATH, "LiverTox_Master_List.xlsx"
-        )
+        self.master_list_path = os.path.join(SOURCES_PATH, "LiverTox_Master_List.xlsx")
         self.master_list_metadata_path = os.path.join(
             SOURCES_PATH, "livertox_master_list.metadata.json"
         )
         self.archive_metadata_path = os.path.join(
             SOURCES_PATH, "livertox_archive.metadata.json"
         )
-        
+
     # -------------------------------------------------------------------------
     def sanitize_livertox_master_list(self, data: pd.DataFrame) -> pd.DataFrame | None:
         if data.empty:
-            return 
-        
+            return
+
         column_mapping = {
             "Count": "reference_count",
             "Ingredient": "ingredient",
@@ -180,20 +179,13 @@ class LiverToxUpdater:
             "brand_name": {"brand name"},
         }
         for column, values in invalid_headers.items():
-            data = data[
-                ~data[column]
-                .fillna("")
-                .str.lower()
-                .isin(values)
-            ]
+            data = data[~data[column].fillna("").str.lower().isin(values)]
 
         data["last_update"] = pd.to_datetime(data["last_update"], errors="coerce")
         data["reference_count"] = pd.to_numeric(
             data["reference_count"], errors="coerce"
         )
-        data["year_approved"] = pd.to_numeric(
-            data["year_approved"], errors="coerce"
-        )
+        data["year_approved"] = pd.to_numeric(data["year_approved"], errors="coerce")
 
         data = data.drop_duplicates(subset=["ingredient", "brand_name"], keep="last")
 
@@ -277,10 +269,13 @@ class LiverToxUpdater:
             sanitized = sanitized.copy()
             sanitized["source_url"] = metadata.get("source_url")
             sanitized["source_last_modified"] = metadata.get("last_modified")
-            if "last_update" in sanitized.columns and pd.api.types.is_datetime64_any_dtype(
-                sanitized["last_update"]
+            if (
+                "last_update" in sanitized.columns
+                and pd.api.types.is_datetime64_any_dtype(sanitized["last_update"])
             ):
-                sanitized["last_update"] = sanitized["last_update"].dt.strftime("%Y-%m-%d")
+                sanitized["last_update"] = sanitized["last_update"].dt.strftime(
+                    "%Y-%m-%d"
+                )
         metadata["records"] = len(sanitized.index)
         return metadata, sanitized
 
@@ -332,7 +327,7 @@ class LiverToxUpdater:
             "downloaded": True,
             "source_url": metadata["source_url"],
         }
-    
+
     # -------------------------------------------------------------------------
     async def resolve_master_list_url(self, client: httpx.AsyncClient) -> str:
         try:
@@ -437,10 +432,9 @@ class LiverToxUpdater:
                 continue
             url = httpx.URL(bin_url).join(href)
             human_url = str(url)
-            if (
-                not human_url.lower().startswith("https://www.ncbi.nlm.nih.gov/")
-                and not human_url.startswith(base_url)
-            ):
+            if not human_url.lower().startswith(
+                "https://www.ncbi.nlm.nih.gov/"
+            ) and not human_url.startswith(base_url):
                 continue
             candidates.append((human_url, label.strip()))
         if not candidates:
@@ -455,30 +449,31 @@ class LiverToxUpdater:
                     continue
                 url = httpx.URL(bin_url).join(href)
                 human_url = str(url)
-                if (
-                    not human_url.lower().startswith("https://www.ncbi.nlm.nih.gov/")
-                    and not human_url.startswith(base_url)
-                ):
+                if not human_url.lower().startswith(
+                    "https://www.ncbi.nlm.nih.gov/"
+                ) and not human_url.startswith(base_url):
                     continue
                 if "master" in os.path.basename(human_url).lower():
                     candidates.append((human_url, os.path.basename(human_url)))
         if not candidates:
-            raise RuntimeError("Unable to locate LiverTox master list link on FTP bin page")
+            raise RuntimeError(
+                "Unable to locate LiverTox master list link on FTP bin page"
+            )
         candidates.sort(key=lambda item: item[0])
         chosen_url = candidates[0][0]
         return chosen_url
 
     # -------------------------------------------------------------------------
-    async def resolve_master_list_via_datagov(
-        self, client: httpx.AsyncClient
-    ) -> str:
+    async def resolve_master_list_via_datagov(self, client: httpx.AsyncClient) -> str:
         api_url = "https://catalog.data.gov/api/3/action/package_show"
         response = await client.get(api_url, params={"id": "livertox"})
         response.raise_for_status()
         try:
             payload = response.json()
         except ValueError as exc:
-            raise RuntimeError("Unable to resolve FTP folder from Data.gov entry") from exc
+            raise RuntimeError(
+                "Unable to resolve FTP folder from Data.gov entry"
+            ) from exc
         result = payload.get("result", {}) if isinstance(payload, dict) else {}
         resources = result.get("resources") if isinstance(result, dict) else None
         if not isinstance(resources, list):
@@ -530,9 +525,7 @@ class LiverToxUpdater:
                 )
             except Exception as exc:  # pragma: no cover - network dependent
                 last_error = exc
-                logger.debug(
-                    "Candidate Data.gov direct %s failed: %s", candidate, exc
-                )
+                logger.debug("Candidate Data.gov direct %s failed: %s", candidate, exc)
                 continue
             return resolved_direct
 
@@ -542,7 +535,9 @@ class LiverToxUpdater:
         original_base = self.base_url
         for base_candidate in folder_candidates:
             try:
-                resolved = await self.resolve_master_list_from_bin(client, base_candidate)
+                resolved = await self.resolve_master_list_from_bin(
+                    client, base_candidate
+                )
             except Exception as exc:  # pragma: no cover - network dependent
                 last_error = exc
                 logger.debug(
@@ -554,7 +549,9 @@ class LiverToxUpdater:
 
         self.base_url = original_base
         if last_error is not None:
-            raise RuntimeError("Unable to resolve FTP folder from Data.gov entry") from last_error
+            raise RuntimeError(
+                "Unable to resolve FTP folder from Data.gov entry"
+            ) from last_error
         raise RuntimeError("Unable to resolve FTP folder from Data.gov entry")
 
     # -------------------------------------------------------------------------
@@ -649,7 +646,7 @@ class LiverToxUpdater:
         logger.info("LiverTox update completed successfully")
 
         return payload
-    
+
     # -------------------------------------------------------------------------
     def collect_local_archive_info(self, archive_path: str) -> dict[str, Any]:
         if not os.path.isfile(archive_path):
@@ -657,7 +654,9 @@ class LiverToxUpdater:
                 "LiverTox archive not found; enable REDOWNLOAD to fetch a fresh copy."
             )
         size = os.path.getsize(archive_path)
-        modified = datetime.fromtimestamp(os.path.getmtime(archive_path), UTC).isoformat()
+        modified = datetime.fromtimestamp(
+            os.path.getmtime(archive_path), UTC
+        ).isoformat()
         return {"file_path": archive_path, "size": size, "last_modified": modified}
 
     # -----------------------------------------------------------------------------
@@ -855,7 +854,9 @@ class LiverToxUpdater:
         ctx = multiprocessing.get_context("spawn")
         with ProcessPoolExecutor(max_workers=worker_budget, mp_context=ctx) as executor:
             futures = {
-                executor.submit(_process_monograph_payload, member_name, data): member_name
+                executor.submit(
+                    _process_monograph_payload, member_name, data
+                ): member_name
                 for member_name, data in payloads
             }
             for future in tqdm(
@@ -1035,7 +1036,9 @@ class LiverToxUpdater:
     def sanitize_records(self, entries: list[dict[str, Any]]) -> pd.DataFrame:
         sanitized = self.serializer.sanitize_livertox_records(entries)
         if sanitized.empty:
-            sanitized = pd.DataFrame(columns=["nbk_id", "drug_name", "excerpt", "synonyms"])
+            sanitized = pd.DataFrame(
+                columns=["nbk_id", "drug_name", "excerpt", "synonyms"]
+            )
         sanitized = sanitized.copy()
         sanitized["drug_name"] = sanitized["drug_name"].astype(str).str.strip()
         sanitized = sanitized[sanitized["drug_name"] != ""]
@@ -1045,7 +1048,9 @@ class LiverToxUpdater:
         sanitized.loc[sanitized["excerpt"] == "", "excerpt"] = pd.NA
         if "synonyms" not in sanitized.columns:
             sanitized["synonyms"] = pd.NA
-        sanitized["synonyms"] = sanitized["synonyms"].where(pd.notnull(sanitized["synonyms"]), pd.NA)
+        sanitized["synonyms"] = sanitized["synonyms"].where(
+            pd.notnull(sanitized["synonyms"]), pd.NA
+        )
         return sanitized.reset_index(drop=True)
 
     # -------------------------------------------------------------------------
@@ -1131,9 +1136,7 @@ class LiverToxUpdater:
                         logger.warning("Failed to enrich '%s': %s", alias, exc)
                         cache[alias] = set()
                         continue
-                    cache[alias] = {
-                        term for term in terms if isinstance(term, str)
-                    }
+                    cache[alias] = {term for term in terms if isinstance(term, str)}
 
         synonyms_values: list[str | pd.NA] = []
         for aliases in alias_sets:
@@ -1172,10 +1175,7 @@ class LiverToxUpdater:
                     tokens.append(cleaned)
 
                 refined = " ".join(tokens).strip()
-                if (
-                    len(refined) < 4
-                    or self.contains_symbol(refined)
-                ):
+                if len(refined) < 4 or self.contains_symbol(refined):
                     continue
 
                 key = refined.casefold()
@@ -1185,9 +1185,7 @@ class LiverToxUpdater:
                 sanitized.append(refined)
 
             if sanitized:
-                synonyms_values.append(
-                    ", ".join(sorted(sanitized, key=str.casefold))
-                )
+                synonyms_values.append(", ".join(sorted(sanitized, key=str.casefold)))
             else:
                 synonyms_values.append(pd.NA)
         enriched["synonyms"] = synonyms_values
@@ -1223,8 +1221,6 @@ class LiverToxUpdater:
             finalized["excerpt"].isin(["", "nan", "NaT", "None", "<NA>"]), "excerpt"
         ] = fill_value
         return finalized.reset_index(drop=True)
-
-
 
 
 ###############################################################################

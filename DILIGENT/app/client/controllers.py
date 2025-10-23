@@ -59,9 +59,7 @@ def extract_text(result: Any) -> str:
 
 
 # -----------------------------------------------------------------------------
-def build_json_output(
-    payload: dict[str, Any] | list[Any] | None
-) -> Any:
+def build_json_output(payload: dict[str, Any] | list[Any] | None) -> Any:
     if payload is None:
         return gr_update(value=None, visible=False)
     return gr_update(value=payload, visible=True)
@@ -269,7 +267,10 @@ async def pull_selected_models(
     except OllamaError as exc:
         return f"[ERROR] Failed to pull models: {exc}", build_json_output(None)
     except Exception as exc:  # noqa: BLE001
-        return f"[ERROR] Unexpected error while pulling models: {exc}", build_json_output(None)
+        return (
+            f"[ERROR] Unexpected error while pulling models: {exc}",
+            build_json_output(None),
+        )
 
     pulled = ", ".join(models)
     return f"[INFO] Models available locally: {pulled}.", build_json_output(None)
@@ -354,9 +355,7 @@ async def trigger_session(
         if body_content:
             message = f"{message}\n{body_content}"
         elif response is not None and response.text:
-            message = (
-                f"{message}\nURL: {url}\nResponse body:\n{response.text}"
-            )
+            message = f"{message}\nURL: {url}\nResponse body:\n{response.text}"
         return message, build_json_output(json_payload)
     except httpx.TimeoutException:
         return (

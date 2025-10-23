@@ -45,15 +45,15 @@ def resolve_temperature(preferred: float | None, *, scale: float = 1.0) -> float
     return round(value, 2)
 
 
-
 ###############################################################################
 class HepatotoxicityPatternAnalyzer:
-
     def __init__(self) -> None:
         pass
 
     # -------------------------------------------------------------------------
-    def calculate_hepatotoxicity_pattern(self, payload: PatientData) -> HepatotoxicityPatternScore:
+    def calculate_hepatotoxicity_pattern(
+        self, payload: PatientData
+    ) -> HepatotoxicityPatternScore:
         alt_value = self.parse_marker_value(payload.alt)
         alt_max_value = self.parse_marker_value(payload.alt_max)
         alp_value = self.parse_marker_value(payload.alp)
@@ -106,25 +106,24 @@ class HepatotoxicityPatternAnalyzer:
     # -------------------------------------------------------------------------
     def stringify_scores(
         self, pattern_score: HepatotoxicityPatternScore | None
-        ) -> dict[str, str]:
-            if not pattern_score:
-                return {}
+    ) -> dict[str, str]:
+        if not pattern_score:
+            return {}
 
-            mapping = {
-                "alt_multiple": (pattern_score.alt_multiple, "{:.2f}x ULN"),
-                "alp_multiple": (pattern_score.alp_multiple, "{:.2f}x ULN"),
-                "r_score": (pattern_score.r_score, "{:.2f}"),
-            }
+        mapping = {
+            "alt_multiple": (pattern_score.alt_multiple, "{:.2f}x ULN"),
+            "alp_multiple": (pattern_score.alp_multiple, "{:.2f}x ULN"),
+            "r_score": (pattern_score.r_score, "{:.2f}"),
+        }
 
-            return {
-                key: fmt.format(val) if val is not None else "Not available"
-                for key, (val, fmt) in mapping.items()
-            }
+        return {
+            key: fmt.format(val) if val is not None else "Not available"
+            for key, (val, fmt) in mapping.items()
+        }
 
 
 ###############################################################################
 class HepatoxConsultation:
-
     def __init__(
         self,
         drugs: PatientDrugs,
@@ -164,7 +163,7 @@ class HepatoxConsultation:
         clinical_context: str | None = None,
         visit_date: date | None = None,
         pattern_score: HepatotoxicityPatternScore | None = None,
-    ) -> dict[str, Any] | None:        
+    ) -> dict[str, Any] | None:
         patient_drugs = self.collect_patient_drugs()
         if not patient_drugs:
             logger.info("No drugs detected for toxicity analysis")
@@ -175,7 +174,9 @@ class HepatoxConsultation:
         if self.matcher is None:
             return PatientDrugClinicalReport(entries=[], final_report=None).model_dump()
 
-        logger.info("Toxicity analysis: performing clinical assessment for matched drugs")
+        logger.info(
+            "Toxicity analysis: performing clinical assessment for matched drugs"
+        )
         # Resolve free-text drug names against LiverTox to obtain structured data
         matches = await self.matcher.match_drug_names(patient_drugs)
         resolved = self.resolve_matches(patient_drugs, matches)
@@ -258,25 +259,29 @@ class HepatoxConsultation:
             suspension = self.evaluate_suspension(drug_entry, visit_date)
             entry = DrugClinicalAssessment(
                 drug_name=drug_entry.name,
-                matched_livertox_row=matched_row if isinstance(matched_row, dict) else None,
+                matched_livertox_row=matched_row
+                if isinstance(matched_row, dict)
+                else None,
                 extracted_excerpts=excerpts_list,
                 suspension=suspension,
             )
             entries.append(entry)
 
             if suspension.excluded:
-                entry.paragraph = self.build_excluded_paragraph(drug_entry.name, suspension)
+                entry.paragraph = self.build_excluded_paragraph(
+                    drug_entry.name, suspension
+                )
                 continue
 
             excerpt = self.select_excerpt(excerpts_list)
             if excerpt is None:
                 entry.paragraph = self.build_missing_excerpt_paragraph(drug_entry.name)
                 continue
-            
+
             # Kick off the patient-specific assessment for each candidate drug
             llm_jobs.append(
                 (
-                    idx,                    
+                    idx,
                     self.request_drug_analysis(
                         drug_name=drug_entry.name,
                         excerpt=excerpt,
@@ -302,13 +307,13 @@ class HepatoxConsultation:
                 else:
                     entry.paragraph = outcome
 
-        logger.info("Composing final clinical report for current patient")        
+        logger.info("Composing final clinical report for current patient")
         final_report = await self.finalize_patient_report(
-            entries,            
+            entries,
             clinical_context=normalized_context,
             visit_date=visit_date,
             pattern_score=pattern_score,
-        )        
+        )
 
         return PatientDrugClinicalReport(entries=entries, final_report=final_report)
 
@@ -375,23 +380,15 @@ class HepatoxConsultation:
                 "Suspension reported without a reliable date; drug kept in analysis."
             )
         elif visit_date is None:
-            suspension_note = (
-                f"Suspended on {parsed_date.isoformat()}, but visit date missing; drug kept in analysis."
-            )
+            suspension_note = f"Suspended on {parsed_date.isoformat()}, but visit date missing; drug kept in analysis."
         else:
             interval_days = (visit_date - parsed_date).days
             if interval_days < 0:
-                suspension_note = (
-                    f"Suspended on {parsed_date.isoformat()} ({abs(interval_days)} days after the visit); treat as ongoing exposure."
-                )
+                suspension_note = f"Suspended on {parsed_date.isoformat()} ({abs(interval_days)} days after the visit); treat as ongoing exposure."
             elif interval_days == 0:
-                suspension_note = (
-                    f"Suspended on {parsed_date.isoformat()} (same day as the visit); residual exposure is expected."
-                )
+                suspension_note = f"Suspended on {parsed_date.isoformat()} (same day as the visit); residual exposure is expected."
             else:
-                suspension_note = (
-                    f"Suspended on {parsed_date.isoformat()} ({interval_days} days before the visit); compare this latency with LiverTox guidance."
-                )
+                suspension_note = f"Suspended on {parsed_date.isoformat()} ({interval_days} days before the visit); compare this latency with LiverTox guidance."
 
         combined_note = " ".join(part for part in (start_note, suspension_note) if part)
         return DrugSuspensionContext(
@@ -462,30 +459,18 @@ class HepatoxConsultation:
         visit_date: date | None,
     ) -> str:
         if not start_reported:
-            return (
-                "Therapy start was not documented; assume chronic exposure unless another source clarifies the onset."
-            )
+            return "Therapy start was not documented; assume chronic exposure unless another source clarifies the onset."
         if start_date is None:
-            return (
-                "Therapy start was reported but no reliable date could be parsed from the notes."
-            )
+            return "Therapy start was reported but no reliable date could be parsed from the notes."
         if visit_date is None or start_interval_days is None:
-            return (
-                f"Therapy started on {start_date.isoformat()}, but the visit date was unavailable for latency comparisons."
-            )
+            return f"Therapy started on {start_date.isoformat()}, but the visit date was unavailable for latency comparisons."
         if start_interval_days < 0:
             humanized = self.humanize_interval(abs(start_interval_days))
-            return (
-                f"Therapy was documented to start on {start_date.isoformat()}, {humanized} after the visit; verify this discrepancy manually."
-            )
+            return f"Therapy was documented to start on {start_date.isoformat()}, {humanized} after the visit; verify this discrepancy manually."
         if start_interval_days == 0:
-            return (
-                f"Therapy started on {start_date.isoformat()}, coinciding with the clinical visit."
-            )
+            return f"Therapy started on {start_date.isoformat()}, coinciding with the clinical visit."
         humanized = self.humanize_interval(start_interval_days)
-        return (
-            f"Therapy started on {start_date.isoformat()}, roughly {humanized} before the visit."
-        )
+        return f"Therapy started on {start_date.isoformat()}, roughly {humanized} before the visit."
 
     # -------------------------------------------------------------------------
     def humanize_interval(self, days: int) -> str:
@@ -558,18 +543,14 @@ class HepatoxConsultation:
             return suspension.start_note
         if suspension.start_reported:
             return "Therapy start was reported, but no reliable date was available."
-        return (
-            "No therapy start information was detected; treat the exposure window as chronic unless contradicted."
-        )
+        return "No therapy start information was detected; treat the exposure window as chronic unless contradicted."
 
     # -------------------------------------------------------------------------
     def format_pattern_prompt(
         self, pattern_score: HepatotoxicityPatternScore | None
     ) -> str:
         if pattern_score is None:
-            return (
-                "Hepatotoxicity pattern classification was unavailable; weigh pattern matches qualitatively."
-            )
+            return "Hepatotoxicity pattern classification was unavailable; weigh pattern matches qualitatively."
         classification = pattern_score.classification.replace("_", " ")
         segments: list[str] = [
             f"Observed liver injury pattern: {classification.capitalize()}.",
@@ -644,7 +625,7 @@ class HepatoxConsultation:
                 if isinstance(value, str) and value.strip():
                     return value.strip()
             return json.dumps(raw_response, ensure_ascii=False)
-        return str(raw_response).strip()   
+        return str(raw_response).strip()
 
     # -------------------------------------------------------------------------
     def classify_entry_status(self, entry: DrugClinicalAssessment) -> str:
@@ -667,7 +648,9 @@ class HepatoxConsultation:
         for entry in entries:
             status = self.classify_entry_status(entry)
             lines: list[str] = [f"- Drug: {entry.drug_name}", f"  status: {status}"]
-            suspension_note = entry.suspension.note or "No suspension details available."
+            suspension_note = (
+                entry.suspension.note or "No suspension details available."
+            )
             lines.append(f"  therapy_timing: {suspension_note}")
             if entry.suspension.interval_days is not None:
                 lines.append(
@@ -686,14 +669,14 @@ class HepatoxConsultation:
     async def finalize_patient_report(
         self,
         entries: list[DrugClinicalAssessment],
-        *,        
+        *,
         clinical_context: str,
         visit_date: date | None,
         pattern_score: HepatotoxicityPatternScore | None,
     ) -> str | None:
         if not entries:
             return None
-        
+
         blocks: list[str] = []
         for entry in entries:
             name = entry.drug_name.strip() or entry.drug_name
@@ -703,7 +686,7 @@ class HepatoxConsultation:
         report = "\n\n".join(blocks).strip()
         if not report:
             return None
-        
+
         summary_payload = self.summarize_entries_for_prompt(entries)
         if not summary_payload.strip():
             return None
@@ -711,9 +694,7 @@ class HepatoxConsultation:
         visit_label = visit_date.isoformat() if visit_date else "Unknown visit date"
         context_payload = clinical_context.strip() or "No clinical context provided."
         pattern_summary_raw = self.format_pattern_prompt(pattern_score)
-        instruction_clause = (
-            "Treat drugs whose known hepatotoxicity pattern matches this classification as stronger causal candidates, and downgrade mismatches."
-        )
+        instruction_clause = "Treat drugs whose known hepatotoxicity pattern matches this classification as stronger causal candidates, and downgrade mismatches."
         pattern_summary = pattern_summary_raw.replace(instruction_clause, "").strip()
         if not pattern_summary:
             pattern_summary = pattern_summary_raw
@@ -753,22 +734,13 @@ class HepatoxConsultation:
         self, drug_name: str, suspension: DrugSuspensionContext
     ) -> str:
         if suspension.suspension_date is not None:
-            return (
-                f"The therapy was suspended on {suspension.suspension_date.isoformat()} well before the visit; the drug was excluded from this DILI assessment."
-            )
-        return (
-            "The therapy was reported as suspended well before the visit and was excluded from the current DILI assessment."
-        )
+            return f"The therapy was suspended on {suspension.suspension_date.isoformat()} well before the visit; the drug was excluded from this DILI assessment."
+        return "The therapy was reported as suspended well before the visit and was excluded from the current DILI assessment."
 
     # -------------------------------------------------------------------------
     def build_missing_excerpt_paragraph(self, drug_name: str) -> str:
-        return (
-            "No LiverTox excerpt was available for this drug, so hepatotoxic involvement could not be evaluated."
-        )
+        return "No LiverTox excerpt was available for this drug, so hepatotoxic involvement could not be evaluated."
 
     # -------------------------------------------------------------------------
     def build_error_paragraph(self, drug_name: str) -> str:
-        return (
-            "Automated analysis was unavailable due to a technical issue; manual review is recommended."
-        )
-
+        return "Automated analysis was unavailable due to a technical issue; manual review is recommended."

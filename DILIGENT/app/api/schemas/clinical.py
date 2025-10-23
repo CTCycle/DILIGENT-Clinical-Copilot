@@ -71,6 +71,7 @@ class PatientData(BaseModel):
         default=False,
         description="Enables retrieval augmented generation during analysis.",
     )
+
     @field_validator("name", mode="before")
     @classmethod
     def strip_name(cls, value: str | None) -> str | None:
@@ -211,9 +212,7 @@ class PatientData(BaseModel):
                 anamnesis_lines.append("Key laboratory markers:")
                 anamnesis_lines.extend(cleaned_markers)
         if anamnesis_lines:
-            anamnesis_body = "\n".join(
-                line for line in anamnesis_lines if line.strip()
-            )
+            anamnesis_body = "\n".join(line for line in anamnesis_lines if line.strip())
             if anamnesis_body:
                 sections.append(f"# ANAMNESIS\n{anamnesis_body}")
         if self.drugs:
@@ -439,7 +438,6 @@ class DrugHepatotoxicityAnalysis(BaseModel):
         if self.analysis is None and not self.error:
             raise ValueError("Either analysis or error must be provided for each drug.")
         return self
-
 
 
 ###############################################################################

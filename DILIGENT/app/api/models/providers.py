@@ -339,9 +339,7 @@ class OllamaClient:
             logger.info("Completed pull for Ollama model '%s'", model)
             available = await self.get_cached_models(force_refresh=True)
             if model not in available:
-                raise OllamaError(
-                    f"Model '{model}' was not found after pull completed"
-                )
+                raise OllamaError(f"Model '{model}' was not found after pull completed")
 
     @staticmethod
     def raise_for_status(resp: httpx.Response) -> None:
@@ -431,9 +429,7 @@ class OllamaClient:
             try:
                 await self.refresh_model_cache()
             except (OllamaError, OllamaTimeout) as exc:
-                logger.debug(
-                    "Failed to refresh Ollama model cache after pull: %s", exc
-                )
+                logger.debug("Failed to refresh Ollama model cache after pull: %s", exc)
 
     # -------------------------------------------------------------------------
     async def show_model(self, name: str) -> dict[str, Any]:
@@ -1109,9 +1105,7 @@ class OllamaClient:
                             format="json" if use_json_mode else None,
                             temperature=0.0,
                         )
-                        text = (
-                            json.dumps(raw) if isinstance(raw, dict) else str(raw)
-                        )
+                        text = json.dumps(raw) if isinstance(raw, dict) else str(raw)
 
                     except OllamaError as e:
                         raise RuntimeError(f"Repair attempt failed: {e}") from e

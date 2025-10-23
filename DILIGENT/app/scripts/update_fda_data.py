@@ -10,7 +10,7 @@ REDOWNLOAD = True
 ###############################################################################
 if __name__ == "__main__":
     database.initialize_database()
-    updater = FdaUpdater(SOURCES_PATH, redownload=REDOWNLOAD)    
+    updater = FdaUpdater(SOURCES_PATH, redownload=REDOWNLOAD)
     logger.info("Running FDA adverse event updater")
     result = updater.update_from_fda()
     logger.info("FDA adverse event updater summary: %s", result)

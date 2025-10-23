@@ -238,7 +238,10 @@ class RxNavClient:
                 if not base:
                     flush()
                     continue
-                if base in self.NAME_STOPWORDS or base.rstrip("s") in self.NAME_STOPWORDS:
+                if (
+                    base in self.NAME_STOPWORDS
+                    or base.rstrip("s") in self.NAME_STOPWORDS
+                ):
                     flush()
                     continue
                 tokens.append(token.strip("-'").strip())
