@@ -31,34 +31,51 @@ serializer = DataSerializer()
 
 # [HELPERS]
 ###############################################################################
+def build_bullet_list(content: str | None) -> list[str]:
+    lines: list[str] = []
+    if content:
+        for entry in content.splitlines():
+            stripped = entry.strip()
+            if stripped:
+                lines.append(f"- {stripped}")
+    if not lines:
+        lines.append("- No data provided.")
+    return lines
+
+
 def build_patient_narrative(
     *,
     patient_label: str,
     visit_label: str,
+    anamnesis: str | None,
+    exams: str | None,
+    drugs_text: str | None,
     pattern_score,
     pattern_strings: dict[str, str],
     detected_drugs: list[str],
     final_report: str | None,
 ) -> str:
-    # Assemble a compact Markdown report summarising the current visit
-    drug_summary = ", ".join(detected_drugs) if detected_drugs else "None detected"
     classification = getattr(pattern_score, "classification", "Not available")
     alt_multiple = pattern_strings.get("alt_multiple", "Not available")
     alp_multiple = pattern_strings.get("alp_multiple", "Not available")
     r_score = pattern_strings.get("r_score", "Not available")
+    drug_summary = ", ".join(detected_drugs) if detected_drugs else "None detected"
 
     sections: list[str] = []
 
-    summary_section = [
-        "## Patient Summary",
+    header_section = [
+        "# Clinical Visit Summary",
         "",
-        f"- **Name:** {patient_label}",
+        f"- **Patient:** {patient_label}",
         f"- **Visit date:** {visit_label}",
     ]
-    sections.append("\n".join(summary_section))
+    sections.append("\n".join(header_section))
+
+    anamnesis_content = anamnesis if anamnesis else "_No anamnesis provided._"
+    sections.append("\n".join(["## Anamnesis", "", anamnesis_content]))
 
     pattern_section = [
-        "## Hepatotoxicity Pattern",
+        "## Hepato-toxicity Pattern",
         "",
         f"- **Classification:** {classification}",
         f"- **ALT multiple:** {alt_multiple}",
@@ -67,15 +84,28 @@ def build_patient_narrative(
     ]
     sections.append("\n".join(pattern_section))
 
-    drugs_section = [
-        "## Medications",
-        "",
-        f"- **Detected drugs ({len(detected_drugs)}):** {drug_summary}",
-    ]
-    sections.append("\n".join(drugs_section))
+    exams_section = ["## Exams", ""]
+    exams_section.extend(build_bullet_list(exams))
+    sections.append("\n".join(exams_section))
 
-    if final_report:
-        sections.append("\n".join(["## Clinical Assessment", "", final_report.strip()]))
+    therapy_section = ["## Pharmacological Therapy", ""]
+    therapy_section.extend(build_bullet_list(drugs_text))
+    therapy_section.extend(
+        [
+            "",
+            f"**Detected drugs ({len(detected_drugs)}):** {drug_summary}",
+        ]
+    )
+    sections.append("\n".join(therapy_section))
+
+    clinical_report_section = ["## Clinical Report (LLM Output)", ""]
+    clinical_report_section.append(
+        final_report.strip() if final_report else "_No clinical report generated._"
+    )
+    sections.append("\n".join(clinical_report_section))
+
+    bibliography_section = ["## Bibliography", "", "- LiverTox"]
+    sections.append("\n".join(bibliography_section))
 
     return "\n\n".join(sections)
 
@@ -165,6 +195,9 @@ async def process_single_patient(payload: PatientData) -> str:
     narrative = build_patient_narrative(
         patient_label=patient_label,
         visit_label=visit_label,
+        anamnesis=payload.anamnesis,
+        exams=payload.exams,
+        drugs_text=payload.drugs,
         pattern_score=pattern_score,
         pattern_strings=pattern_strings,
         detected_drugs=detected_drugs,
