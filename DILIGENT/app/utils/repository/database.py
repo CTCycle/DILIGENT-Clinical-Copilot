@@ -45,7 +45,6 @@ class ClinicalSession(Base):
     hepatic_pattern = Column(String)
     anamnesis = Column(Text)
     drugs = Column(Text)
-    exams = Column(Text)
     parsing_model = Column(String)
     clinical_model = Column(String)
     total_duration = Column(Float)

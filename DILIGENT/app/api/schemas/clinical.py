@@ -184,26 +184,37 @@ class PatientData(BaseModel):
 
     def compose_structured_text(self) -> str | None:
         sections: list[str] = []
+        anamnesis_lines: list[str] = []
         if self.anamnesis:
-            sections.append(f"# ANAMNESIS\n{self.anamnesis}")
-        blood_lines: list[str] = []
+            anamnesis_lines.append(self.anamnesis)
+        marker_lines: list[str] = []
         if self.alt or self.alt_max:
             alt_tokens: list[str] = []
             if self.alt:
                 alt_tokens.append(str(self.alt))
             if self.alt_max:
                 alt_tokens.append(f"(max {self.alt_max})")
-            blood_lines.append(f"ALAT: {' '.join(alt_tokens).strip()}")
+            marker_lines.append(f"ALAT: {' '.join(alt_tokens).strip()}")
         if self.alp or self.alp_max:
             alp_tokens: list[str] = []
             if self.alp:
                 alp_tokens.append(str(self.alp))
             if self.alp_max:
                 alp_tokens.append(f"(max {self.alp_max})")
-            blood_lines.append(f"ALP: {' '.join(alp_tokens).strip()}")
-        blood_body = "\n".join(line for line in blood_lines if line)
-        if blood_body:
-            sections.append(f"# BLOOD TESTS\n{blood_body}")
+            marker_lines.append(f"ALP: {' '.join(alp_tokens).strip()}")
+        if marker_lines:
+            cleaned_markers = [line for line in marker_lines if line.strip()]
+            if cleaned_markers:
+                if anamnesis_lines:
+                    anamnesis_lines.append("")
+                anamnesis_lines.append("Key laboratory markers:")
+                anamnesis_lines.extend(cleaned_markers)
+        if anamnesis_lines:
+            anamnesis_body = "\n".join(
+                line for line in anamnesis_lines if line.strip()
+            )
+            if anamnesis_body:
+                sections.append(f"# ANAMNESIS\n{anamnesis_body}")
         if self.drugs:
             sections.append(f"# DRUGS\n{self.drugs}")
         if not sections:
