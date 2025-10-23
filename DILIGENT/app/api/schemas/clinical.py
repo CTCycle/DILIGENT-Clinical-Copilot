@@ -16,8 +16,8 @@ class PatientData(BaseModel):
     Input schema for submitting structured clinical data.
     - Accepts manual clinical sections captured in the GUI.
     - Normalizes whitespace and keeps compat with legacy single-text payloads.
-    """
 
+    """
     name: str | None = Field(
         None,
         min_length=1,
