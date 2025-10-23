@@ -244,9 +244,7 @@ class DataSerializer:
         )
         df["synonyms"] = df["synonyms"].apply(
             lambda value: (
-                str(value).strip()
-                if pd.notna(value) and str(value).strip()
-                else None
+                str(value).strip() if pd.notna(value) and str(value).strip() else None
             )
         )
         df = df.drop_duplicates(subset=["nbk_id", "drug_name"], keep="first")
@@ -300,7 +298,9 @@ class DataSerializer:
                     "reaction_terms": self.join_values(hepatic_terms),
                     "all_reactions": self.join_values(all_reactions),
                     "suspect_products": self.join_values(suspect_products),
-                    "suspect_product_count": len(suspect_products) if suspect_products else None,
+                    "suspect_product_count": len(suspect_products)
+                    if suspect_products
+                    else None,
                     "serious": self.normalize_flag(record.get("serious")),
                     "seriousness_death": self.normalize_flag(
                         record.get("seriousnessdeath")
@@ -325,9 +325,7 @@ class DataSerializer:
         if not normalized:
             return pd.DataFrame(columns=FDA_COLUMNS)
         frame = pd.DataFrame(normalized)
-        frame = frame.drop_duplicates(
-            subset=["report_id", "case_version"], keep="last"
-        )
+        frame = frame.drop_duplicates(subset=["report_id", "case_version"], keep="last")
         return frame.reindex(columns=FDA_COLUMNS).reset_index(drop=True)
 
     # -----------------------------------------------------------------------------
@@ -384,8 +382,10 @@ class DataSerializer:
             "source_url",
             "source_last_modified",
         ]
-        return frame.reindex(columns=alias_columns).dropna(subset=["drug_name"]).reset_index(
-            drop=True
+        return (
+            frame.reindex(columns=alias_columns)
+            .dropna(subset=["drug_name"])
+            .reset_index(drop=True)
         )
 
     # -----------------------------------------------------------------------------
@@ -537,5 +537,3 @@ class DataSerializer:
         if frame.empty:
             return pd.DataFrame(columns=FDA_COLUMNS)
         return frame.reindex(columns=FDA_COLUMNS)
-
-    

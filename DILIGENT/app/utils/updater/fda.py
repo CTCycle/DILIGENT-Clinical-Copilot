@@ -34,7 +34,6 @@ METADATA_FILENAME = "fda-adverse-events.metadata.json"
 
 ###############################################################################
 class FdaUpdater:
-
     def __init__(
         self,
         sources_path: str,
@@ -44,7 +43,7 @@ class FdaUpdater:
         database_client=database,
         chunk_size: int = DOWNLOAD_CHUNK_SIZE,
     ) -> None:
-        self.download_directory = os.path.join(sources_path, "fda")         
+        self.download_directory = os.path.join(sources_path, "fda")
         self.download_base_url = OPENFDA_DOWNLOAD_BASE_URL
         self.catalog_url = OPENFDA_DOWNLOAD_CATALOG_URL
         self.dataset_key = "event"
@@ -83,9 +82,9 @@ class FdaUpdater:
             partitions = self.get_partition_entries(dataset_payload)
             dataset_export_date = None
             if isinstance(dataset_payload, dict):
-                dataset_export_date = dataset_payload.get("export_date") or dataset_payload.get(
-                    "exportDate"
-                )
+                dataset_export_date = dataset_payload.get(
+                    "export_date"
+                ) or dataset_payload.get("exportDate")
             if dataset_export_date and dataset_export_date != export_date:
                 partitions_metadata = {}
             if dataset_export_date:
@@ -137,7 +136,9 @@ class FdaUpdater:
                 partitions_metadata[file_name] = partition_metadata
 
         if records_processed == 0:
-            logger.warning("No FDA adverse event records were processed during the update")
+            logger.warning(
+                "No FDA adverse event records were processed during the update"
+            )
 
         updated_export_date = current_export_date
 
@@ -234,7 +235,9 @@ class FdaUpdater:
         try:
             payload = response.json()
         except ValueError as exc:
-            logger.error("Failed to decode FDA index response %s: %s", self.index_url, exc)
+            logger.error(
+                "Failed to decode FDA index response %s: %s", self.index_url, exc
+            )
             return {}
         if not isinstance(payload, dict):
             return {}
@@ -252,15 +255,15 @@ class FdaUpdater:
         return {}
 
     # -------------------------------------------------------------------------
-    def get_partition_entries(self, dataset_payload: dict[str, Any]) -> list[dict[str, Any]]:
+    def get_partition_entries(
+        self, dataset_payload: dict[str, Any]
+    ) -> list[dict[str, Any]]:
         if not isinstance(dataset_payload, dict):
             return []
         partitions = dataset_payload.get("partitions")
         if isinstance(partitions, list):
             return [
-                partition
-                for partition in partitions
-                if isinstance(partition, dict)
+                partition for partition in partitions if isinstance(partition, dict)
             ]
         return []
 
@@ -460,14 +463,18 @@ class FdaUpdater:
                         with io.TextIOWrapper(handle, encoding="utf-8") as text_stream:
                             for payload in self.iterate_results_stream(text_stream):
                                 yielded = True
-                                for record in self.extract_records_from_payload(payload):
+                                for record in self.extract_records_from_payload(
+                                    payload
+                                ):
                                     yield record
                     if yielded:
                         continue
                     with archive.open(member) as handle:
                         with io.TextIOWrapper(handle, encoding="utf-8") as text_stream:
                             for payload in self.iterate_ndjson_stream(text_stream):
-                                for record in self.extract_records_from_payload(payload):
+                                for record in self.extract_records_from_payload(
+                                    payload
+                                ):
                                     yield record
         except (OSError, zipfile.BadZipFile) as exc:
             logger.error("Failed to read FDA partition %s: %s", path, exc)
@@ -579,7 +586,9 @@ class FdaUpdater:
             if isinstance(remote.get("last_modified"), str)
             else remote.get("last_modified")
         )
-        if (stored_last_modified or remote_last_modified) and stored_last_modified != remote_last_modified:
+        if (
+            stored_last_modified or remote_last_modified
+        ) and stored_last_modified != remote_last_modified:
             return False
         stored_checksum = (
             stored.get("sha256", "").strip().lower()

@@ -70,9 +70,7 @@ class LiverToxData(Base):
     include_in_livertox = Column(String)
     source_url = Column(String)
     source_last_modified = Column(String)
-    __table_args__ = (
-        UniqueConstraint("drug_name", "ingredient", "brand_name"),
-    )
+    __table_args__ = (UniqueConstraint("drug_name", "ingredient", "brand_name"),)
 
 
 ###############################################################################
@@ -96,9 +94,7 @@ class FdaAdverseEvent(Base):
     seriousness_disabling = Column(Integer)
     seriousness_congenital_anom = Column(Integer)
     seriousness_other = Column(Integer)
-    __table_args__ = (
-        UniqueConstraint("report_id", "case_version"),
-    )
+    __table_args__ = (UniqueConstraint("report_id", "case_version"),)
 
 
 # [DATABASE]

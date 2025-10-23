@@ -13,7 +13,7 @@ from DILIGENT.app.api.schemas.clinical import (
 )
 from DILIGENT.app.logger import logger
 from DILIGENT.app.utils.repository.serializer import DataSerializer
-from DILIGENT.app.utils.services.clinical import (    
+from DILIGENT.app.utils.services.clinical import (
     HepatotoxicityPatternAnalyzer,
     HepatoxConsultation,
 )
@@ -25,7 +25,6 @@ drugs_parser = DrugsParser()
 pattern_analyzer = HepatotoxicityPatternAnalyzer()
 router = APIRouter(tags=["session"])
 serializer = DataSerializer()
-
 
 
 # [HELPERS]
@@ -133,7 +132,7 @@ async def process_single_patient(payload: PatientData) -> str:
     drug_data = await drugs_parser.extract_drug_list(payload.drugs or "")
     elapsed = time.perf_counter() - start_time
     logger.info("Drugs extraction required %.4f seconds", elapsed)
-    logger.info("Detected %s drugs", len(drug_data.entries))    
+    logger.info("Detected %s drugs", len(drug_data.entries))
 
     clinical_session = HepatoxConsultation(drug_data, patient_name=payload.name)
     drug_assessment = await clinical_session.run_analysis(
@@ -143,23 +142,26 @@ async def process_single_patient(payload: PatientData) -> str:
     )
     elapsed = time.perf_counter() - start_time
     logger.info("Hepato-toxicity consultation required %.4f seconds", elapsed)
-  
+
     final_report: str | None = None
     if isinstance(drug_assessment, dict):
-        final_report : str | None = drug_assessment.get("final_report", "").strip()
+        final_report: str | None = drug_assessment.get("final_report", "").strip()
 
     patient_label = payload.name or "Unknown patient"
     visit_label = (
         payload.visit_date.strftime("%d %B %Y")
         if payload.visit_date
         else "Not provided"
-    )   
-    
+    )
+
     global_elapsed = time.perf_counter() - global_start_time
-    logger.info("Total time for Drug Induced Liver Injury (DILI) assessment is %.4f seconds", global_elapsed)
+    logger.info(
+        "Total time for Drug Induced Liver Injury (DILI) assessment is %.4f seconds",
+        global_elapsed,
+    )
 
     # Step 3: Persist a structured representation of the session to SQLite
-    detected_drugs = [entry.name for entry in drug_data.entries if entry.name]    
+    detected_drugs = [entry.name for entry in drug_data.entries if entry.name]
     pattern_strings = pattern_analyzer.stringify_scores(pattern_score)
     serializer.record_clinical_session(
         {
@@ -191,6 +193,7 @@ async def process_single_patient(payload: PatientData) -> str:
     )
 
     return narrative
+
 
 # -----------------------------------------------------------------------------
 @router.post(
@@ -234,4 +237,3 @@ async def start_clinical_session(
 
     single_result = await process_single_patient(payload)
     return PlainTextResponse(content=single_result)
-

@@ -26,9 +26,7 @@ from DILIGENT.app.utils.repository.serializer import VectorSerializer
 ###############################################################################
 class DocxDocumentLoader:
     DOCUMENT_XML = "word/document.xml"
-    WORD_NAMESPACE = (
-        "{http://schemas.openxmlformats.org/wordprocessingml/2006/main}"
-    )
+    WORD_NAMESPACE = "{http://schemas.openxmlformats.org/wordprocessingml/2006/main}"
 
     def __init__(self, path: str) -> None:
         self.path = path
@@ -46,9 +44,7 @@ class DocxDocumentLoader:
             with zipfile.ZipFile(self.path) as archive:
                 xml_bytes = archive.read(self.DOCUMENT_XML)
         except KeyError as exc:
-            raise ValueError(
-                "DOCX archive does not contain document.xml"
-            ) from exc
+            raise ValueError("DOCX archive does not contain document.xml") from exc
         except zipfile.BadZipFile as exc:
             raise ValueError("DOCX archive is corrupted") from exc
         try:
@@ -121,9 +117,7 @@ class VectorStoreUpdater:
     def run(self) -> None:
         documents = self.load_documents()
         if not documents:
-            logger.warning(
-                "No documents were discovered in %s", self.documents_path
-            )
+            logger.warning("No documents were discovered in %s", self.documents_path)
             return
         chunks = self.chunk_documents(documents)
         prepared = [chunk for chunk in chunks if chunk.page_content.strip()]
@@ -133,9 +127,7 @@ class VectorStoreUpdater:
         embedder = self.get_embedder()
         embedding_matrix = self.embed_chunks(embedder, prepared)
         self.persist_embeddings(prepared, embedding_matrix)
-        logger.info(
-            "Vector store update completed with %s chunks", len(prepared)
-        )
+        logger.info("Vector store update completed with %s chunks", len(prepared))
 
     ############################################################################
     def load_documents(self) -> list[Document]:
@@ -212,9 +204,7 @@ class VectorStoreUpdater:
         except OllamaError:
             raise
         except Exception as exc:  # noqa: BLE001 - convert to runtime error
-            raise RuntimeError(
-                f"Unable to verify Ollama model: {exc}"
-            ) from exc
+            raise RuntimeError(f"Unable to verify Ollama model: {exc}") from exc
         return OllamaEmbeddings(
             model=self.ollama_model,
             base_url=self.ollama_base_url,
@@ -233,20 +223,14 @@ class VectorStoreUpdater:
         return HuggingFaceEmbeddings(model_name=self.huggingface_model)
 
     ############################################################################
-    def embed_chunks(
-        self, embedder: Embeddings, chunks: list[Document]
-    ) -> np.ndarray:
+    def embed_chunks(self, embedder: Embeddings, chunks: list[Document]) -> np.ndarray:
         contents = [chunk.page_content for chunk in chunks]
         embeddings = embedder.embed_documents(contents)
         matrix = np.asarray(embeddings, dtype=np.float32)
         if matrix.ndim != 2:
-            raise RuntimeError(
-                "Embedding backend returned invalid shape"
-            )
+            raise RuntimeError("Embedding backend returned invalid shape")
         if matrix.shape[0] != len(chunks):
-            raise RuntimeError(
-                "Embedding count mismatch between chunks and vectors"
-            )
+            raise RuntimeError("Embedding count mismatch between chunks and vectors")
         return matrix
 
     ############################################################################
@@ -310,5 +294,6 @@ class VectorStoreUpdater:
             "contents": contents,
             "metadata": metadata_entries,
         }
+
 
 __all__ = ["DocxDocumentLoader", "VectorStoreUpdater"]
