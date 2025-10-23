@@ -5,10 +5,10 @@ from typing import Final
 import gradio as gr
 
 from DILIGENT.app.client.controllers import (
-    clear_agent_fields,
+    clear_session_fields,
     normalize_visit_date_component,
     pull_selected_models,
-    run_agent,
+    run_DILI_session,
     set_clinical_model,
     set_cloud_model,
     set_llm_provider,
@@ -254,7 +254,7 @@ def create_interface() -> gr.Blocks:
         )
 
         run_button.click(
-            fn=run_agent,
+            fn=run_DILI_session,
             inputs=[
                 patient_name,
                 visit_date,
@@ -270,10 +270,10 @@ def create_interface() -> gr.Blocks:
                 use_rag_checkbox,
             ],
             outputs=[markdown_output, json_output, export_button],
-            api_name="run_agent",
+            api_name="run_DILI_session",
         )
         clear_button.click(
-            fn=clear_agent_fields,
+            fn=clear_session_fields,
             outputs=[
                 patient_name,
                 visit_date,

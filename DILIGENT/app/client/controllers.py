@@ -98,21 +98,33 @@ def normalize_visit_date(
 ) -> date | None:
     if value is None:
         return None
+
     if isinstance(value, dict):
+        day_raw = value.get("day")
+        month_raw = value.get("month")
+        year_raw = value.get("year")
+
+        if not isinstance(day_raw, (str, int)):
+            return None
+        if not isinstance(month_raw, (str, int)):
+            return None
+        if not isinstance(year_raw, (str, int)):
+            return None
+
         try:
-            day = int(value.get("day"))
-            month = int(value.get("month"))
-            year = int(value.get("year"))
+            day = int(day_raw)
+            month = int(month_raw)
+            year = int(year_raw)
+            normalized = date(year, month, day)
         except (TypeError, ValueError):
             return None
-        try:
-            normalized = date(year, month, day)
-        except ValueError:
-            return None
+
     elif isinstance(value, datetime):
         normalized = value.date()
+
     elif isinstance(value, date):
         normalized = value
+
     elif isinstance(value, str):
         stripped = value.strip()
         if not stripped:
@@ -264,7 +276,7 @@ async def pull_selected_models(
 
 
 # -----------------------------------------------------------------------------
-def clear_agent_fields() -> tuple[
+def clear_session_fields() -> tuple[
     str,
     datetime | None,
     str,
@@ -301,9 +313,9 @@ def clear_agent_fields() -> tuple[
 
 
 # trigger function to start the agent on button click. Payload is optional depending
-# on the requested endpoint URL (defined through run_agent function)
+# on the requested endpoint URL (defined through run_DILI_session function)
 # -----------------------------------------------------------------------------
-async def trigger_agent(
+async def trigger_session(
     url: str, payload: dict[str, Any] | None = None
 ) -> tuple[str, Any]:
     try:
@@ -359,7 +371,7 @@ async def trigger_agent(
 
 # [AGENT RUNNING LOGIC]
 ###############################################################################
-async def run_agent(
+async def run_DILI_session(
     patient_name: str | None,
     visit_date: datetime | date | dict[str, Any] | str | None,
     anamnesis: str,
@@ -406,7 +418,7 @@ async def run_agent(
         )
 
     url = f"{API_BASE_URL}{CLINICAL_API_URL}"
-    message, json_update = await trigger_agent(url, cleaned_payload)
+    message, json_update = await trigger_session(url, cleaned_payload)
     normalized_message = message.strip() if message else ""
     exportable = (
         message

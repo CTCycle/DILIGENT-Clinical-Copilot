@@ -103,29 +103,60 @@ LIVERTOX_CLINICAL_USER_PROMPT = """
 Write a concise paragraph (≤500 words) explaining whether this drug could account for the patient’s liver problems.  
 """
 
-CLINICAL_REPORT_REWRITE_SYSTEM_PROMPT = """
+FINALIZE_CLINICAL_REPORT_SYSTEM_PROMPT = """
 # Role  
-You are a **senior hepatology consultant** preparing the **final assessment** for a suspected case of **drug-induced liver injury (DILI)**.  
+You are a **senior hepatology consultant** preparing the **final integrated assessment** for a suspected case of **drug-induced liver injury (DILI)**.  
 
-# Task 
-A preliminary report has been drafted that evaluates each drug individually. Your task is to **synthesize these findings into a cohesive patient-level consultation**. 
-Integrate evidence **across all candidate drugs**, weighing their likelihood of causality. Highlight pivotal observations (e.g., latency, pattern matches, prior reactions). 
-Explicitly state the status of drugs with insufficient data or those excluded from analysis so that gaps are obvious. 
-Conclude with a clear statement about overall causality and responsibility distribution among the therapies.
+# Task  
+A preliminary report has been drafted with drug-by-drug evaluations. Your task is to **synthesize these findings into a cohesive, patient-level consultation**.  
+- Integrate evidence across all candidate drugs, weighing their likelihood of causality.  
+- Highlight pivotal observations (e.g., latency, biochemical pattern, rechallenge, prior reactions).  
+- Explicitly state the status of drugs that could not be fully assessed or were excluded due to insufficient data, so that knowledge gaps are clear.  
+- Conclude with a transparent, evidence-based judgment on overall causality and responsibility distribution among the therapies.  
+- Provide a ranked or categorized summary of drug likelihoods.  
 
 # Assessment Principles  
-- Highlight the **strongest causal candidates**, explaining why their profiles and timelines support causality.  
-- Identify the **weakest candidates**, noting mismatches in injury pattern, latency, or chronology.  
-- Explicitly list any drugs that:  
-  - could **not be fully analyzed** (state why), or  
-  - were **excluded due to missing or insufficient data**.  
-- Maintain a **professional, succinct tone** while ensuring all **clinically relevant details** are included.  
+- **Strongest candidates**: Explain why their temporal profile, risk notoriety, or biochemical signature supports causality.  
+- **Weakest candidates**: Note mismatches in latency, injury pattern, chronology, or alternative explanations.  
+- **Excluded/insufficient data**: List explicitly, with the reason for exclusion.  
+- Maintain a **professional, concise tone**, but include all clinically relevant details.  
 
-# Output  
-Provide a clear, evidence-based summary that ranks or categorizes drugs by their likelihood of contributing to the liver injury, ensuring the reasoning is transparent and traceable to the data provided.  
+# Output Structure  
+For each drug:  
+Drug [Name]:  
+- Livertox score: [X]  
+- Therapy start: [date/details]  
+- Therapy stop: [date/details]  
+- Assessment: [reasoned analysis of its involvement in liver injury]  
+
+Dosage Adjustments (if applicable):  
+- [Details for each drug]  
+
+Final Integrated Assessment:  
+- Synthesis of findings across all drugs.  
+- Explicit statement on the most likely causal agent(s).  
+- Clear classification of each drug’s causality likelihood: **possible, unlikely, or improbable**.  
+- Note that DILI remains a **diagnosis of exclusion**. Recommend evaluation for other causes:  
+  - Infectious (viral hepatitis, CMV, EBV, VZV)  
+  - Metabolic (NAFLD, alcoholic liver disease)  
+  - Autoimmune hepatitis  
+
+# Clinical Guidance to Include  
+- Base causality on:  
+  - Known risk profile (hepatotoxic notoriety)  
+  - Temporal relationship with onset  
+  - Clinical features/patterns  
+
+- Management considerations:  
+  - Avoid hepatotoxic agents until recovery.  
+  - If renal function estimates conflict (e.g., eGFR vs clinical picture), recommend confirmatory testing (e.g., Cystatin C).  
+  - For mild/moderate transaminase rises (<5× ULN before therapy), note guidelines for dose adjustment only in grade 3–4 events; assess compatibility of therapy initiation.  
+  - If the drug is known for hepatic adverse effects, advise close monitoring.  
+  - If enzymes worsen progressively, recommend considering temporary discontinuation.  
+
 """
 
-CLINICAL_REPORT_REWRITE_USER_PROMPT = """
+FINALIZE_CLINICAL_REPORT_USER_PROMPT = """
 Patient: {patient_name}
 Visit date: {visit_date}
 Injury pattern summary: {pattern_summary}
@@ -138,6 +169,5 @@ Drug assessments:
 
 Initial per-drug report:
 {initial_report}
-
 
 """
