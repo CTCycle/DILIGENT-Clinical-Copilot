@@ -48,7 +48,6 @@ def build_patient_narrative(
     patient_label: str,
     visit_label: str,
     anamnesis: str | None,
-    exams: str | None,
     drugs_text: str | None,
     pattern_score,
     pattern_strings: dict[str, str],
@@ -72,7 +71,7 @@ def build_patient_narrative(
     sections.append("\n".join(header_section))
 
     anamnesis_content = anamnesis if anamnesis else "_No anamnesis provided._"
-    sections.append("\n".join(["## Anamnesis", "", anamnesis_content]))
+    sections.append("\n".join(["## Anamnesis and Exams", "", anamnesis_content]))
 
     pattern_section = [
         "## Hepato-toxicity Pattern",
@@ -83,10 +82,6 @@ def build_patient_narrative(
         f"- **R-score:** {r_score}",
     ]
     sections.append("\n".join(pattern_section))
-
-    exams_section = ["## Exams", ""]
-    exams_section.extend(build_bullet_list(exams))
-    sections.append("\n".join(exams_section))
 
     therapy_section = ["## Pharmacological Therapy", ""]
     therapy_section.extend(build_bullet_list(drugs_text))
@@ -140,7 +135,6 @@ async def process_single_patient(payload: PatientData) -> str:
     context_builder = ClinicalContextBuilder()
     clinical_context = await context_builder.build_context(
         anamnesis=payload.anamnesis,
-        exams=payload.exams,
         visit_date=payload.visit_date,
     )
     logger.info("Generated clinical context summary for downstream analysis")
@@ -184,7 +178,6 @@ async def process_single_patient(payload: PatientData) -> str:
             "hepatic_pattern": pattern_score.classification,
             "anamnesis": payload.anamnesis,
             "drugs": payload.drugs,
-            "exams": payload.exams,
             "parsing_model": getattr(drugs_parser, "model", None),
             "clinical_model": getattr(clinical_session, "llm_model", None),
             "total_duration": global_elapsed,
@@ -196,7 +189,6 @@ async def process_single_patient(payload: PatientData) -> str:
         patient_label=patient_label,
         visit_label=visit_label,
         anamnesis=payload.anamnesis,
-        exams=payload.exams,
         drugs_text=payload.drugs,
         pattern_score=pattern_score,
         pattern_strings=pattern_strings,
@@ -220,7 +212,6 @@ async def start_clinical_session(
     has_hepatic_diseases: bool = Body(default=False),
     use_rag: bool = Body(default=False),
     drugs: str | None = Body(default=None),
-    exams: str | None = Body(default=None),
     alt: str | None = Body(default=None),
     alt_max: str | None = Body(default=None),
     alp: str | None = Body(default=None),
@@ -235,7 +226,6 @@ async def start_clinical_session(
             "has_hepatic_diseases": has_hepatic_diseases,
             "use_rag": use_rag,
             "drugs": drugs,
-            "exams": exams,
             "alt": alt,
             "alt_max": alt_max,
             "alp": alp,
