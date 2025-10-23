@@ -93,6 +93,7 @@ MATCHING_STOPWORDS = {
     "without",
 }
 
+
 @dataclass(slots=True)
 class MonographRecord:
     nbk_id: str
@@ -192,8 +193,9 @@ class LiverToxMatcher:
             if match is not None:
                 normalized_key: str | None = None
                 if match.record is not None:
-                    normalized_key = match.record.normalized_name or self.normalize_name(
-                        match.record.drug_name
+                    normalized_key = (
+                        match.record.normalized_name
+                        or self.normalize_name(match.record.drug_name)
                     )
                 if not normalized_key:
                     normalized_key = self.normalize_name(match.matched_name)
@@ -290,7 +292,9 @@ class LiverToxMatcher:
     def match_partial(
         self, normalized_query: str
     ) -> tuple[MonographRecord, float, str, list[str]] | None:
-        tokens = [token for token in normalized_query.split() if self.is_token_valid(token)]
+        tokens = [
+            token for token in normalized_query.split() if self.is_token_valid(token)
+        ]
         if not tokens:
             return None
         candidate_scores: dict[str, int] = {}
@@ -398,7 +402,9 @@ class LiverToxMatcher:
             self.records.append(record)
             if normalized_name not in self.primary_index:
                 self.primary_index[normalized_name] = record
-            self.variant_catalog.append((normalized_name, record, record.drug_name, True))
+            self.variant_catalog.append(
+                (normalized_name, record, record.drug_name, True)
+            )
             for normalized_synonym, original in synonyms.items():
                 if normalized_synonym not in self.synonym_index:
                     self.synonym_index[normalized_synonym] = (record, original)
@@ -435,7 +441,9 @@ class LiverToxMatcher:
                     if not normalized_variant:
                         continue
                     index = (
-                        self.brand_index if alias_type == "brand" else self.ingredient_index
+                        self.brand_index
+                        if alias_type == "brand"
+                        else self.ingredient_index
                     )
                     bucket = index.setdefault(normalized_variant, [])
                     entry = (variant, drug_name)
@@ -451,7 +459,9 @@ class LiverToxMatcher:
         for token, records in self.token_occurrences.items():
             if len(records) > self.TOKEN_MAX_FREQUENCY:
                 continue
-            filtered[token] = sorted(records, key=lambda record: record.drug_name.lower())
+            filtered[token] = sorted(
+                records, key=lambda record: record.drug_name.lower()
+            )
         self.token_index = filtered
 
     # -------------------------------------------------------------------------
@@ -581,11 +591,7 @@ class LiverToxMatcher:
         normalized = self.normalize_name(value)
         if not normalized:
             return set()
-        return {
-            token
-            for token in normalized.split()
-            if self.is_token_valid(token)
-        }
+        return {token for token in normalized.split() if self.is_token_valid(token)}
 
     # -------------------------------------------------------------------------
     def is_token_valid(self, token: str) -> bool:
@@ -647,4 +653,3 @@ class LiverToxMatcher:
         normalized = re.sub(r"[^a-z0-9\s]", " ", normalized)
         normalized = re.sub(r"\s+", " ", normalized).strip()
         return normalized
-

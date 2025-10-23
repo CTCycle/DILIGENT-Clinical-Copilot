@@ -32,9 +32,9 @@ GEMINI_API_BASE = "https://generativelanguage.googleapis.com/v1beta"
 # Runtime selection defaults
 CLOUD_PROVIDERS = ["openai", "gemini"]
 PARSING_MODEL_CHOICES = [
-    "qwen3:1.7b",    
+    "qwen3:1.7b",
     "qwen3:8b",
-    "qwen3:14b",    
+    "qwen3:14b",
     "llama3.1:8b",
     "mistral-nemo:12b",
     "mixtral:8x7b-instruct",
@@ -45,21 +45,16 @@ PARSING_MODEL_CHOICES = [
 CLINICAL_MODEL_CHOICES = [
     "gpt-oss:20b",
     "llama3.1:8b",
-    "llama3.1:70b", 
+    "llama3.1:70b",
     "phi3.5:mini",
-    "phi3.5:moe",  
+    "phi3.5:moe",
     "gemma3:9b",
     "gemma3:27b",
 ]
-OPENAI_CLOUD_MODELS = [
-    "gpt-4.1-mini",
-    "gpt-4.1",
-    "gpt-4o-mini",
-    "gpt-4o"   
-]
+OPENAI_CLOUD_MODELS = ["gpt-4.1-mini", "gpt-4.1", "gpt-4o-mini", "gpt-4o"]
 GEMINI_CLOUD_MODELS = [
     "gemini-1.5-flash",
-    "gemini-1.5-flash-latest",    
+    "gemini-1.5-flash-latest",
     "gemini-1.5-pro",
     "gemini-1.5-pro-latest",
     "gemini-1.0-pro",
@@ -118,4 +113,3 @@ LLM_NULL_MATCH_NAMES = {
 ###############################################################################
 ALT_LABELS = {"ALT", "ALAT"}
 ALP_LABELS = {"ALP"}
-

@@ -3,7 +3,6 @@ from __future__ import annotations
 from typing import Final
 
 
-
 VISIT_DATE_ELEMENT_ID: Final = "visit-date-picker"
 VISIT_DATE_CSS: Final = """
 #visit-date-picker input[type="date"]::-webkit-datetime-edit {
@@ -48,5 +47,3 @@ VISIT_DATE_LOCALE_JS: Final = f"""
     input.setAttribute('lang', 'en-GB');
 }}
 """
-
-
