@@ -11,7 +11,7 @@ from fastapi import FastAPI
 
 from DILIGENT.app.api.endpoints.session import router as report_router
 from DILIGENT.app.api.endpoints.ollama import router as models_router
-from DILIGENT.app.client.main import create_interface
+from DILIGENT.app.client.interface import create_interface
 from DILIGENT.app.logger import logger
 from DILIGENT.app.utils.repository.database import database
 
