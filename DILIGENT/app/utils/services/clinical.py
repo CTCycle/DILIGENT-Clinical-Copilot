@@ -10,8 +10,8 @@ from typing import Any
 from DILIGENT.app.api.models.prompts import (
     CLINICAL_CONTEXT_SYSTEM_PROMPT,
     CLINICAL_CONTEXT_USER_PROMPT,
-    CLINICAL_REPORT_REWRITE_SYSTEM_PROMPT,
-    CLINICAL_REPORT_REWRITE_USER_PROMPT,
+    FINALIZE_CLINICAL_REPORT_SYSTEM_PROMPT,
+    FINALIZE_CLINICAL_REPORT_USER_PROMPT,
     LIVERTOX_CLINICAL_SYSTEM_PROMPT,
     LIVERTOX_CLINICAL_USER_PROMPT,
 )
@@ -393,11 +393,11 @@ class HepatoxConsultation:
             if excerpt is None:
                 entry.paragraph = self.build_missing_excerpt_paragraph(drug_entry.name)
                 continue
-
+            
+            # Kick off the patient-specific assessment for each candidate drug
             llm_jobs.append(
                 (
-                    idx,
-                    # Kick off the patient-specific assessment for each candidate drug
+                    idx,                    
                     self.request_drug_analysis(
                         drug_name=drug_entry.name,
                         excerpt=excerpt,
@@ -423,17 +423,13 @@ class HepatoxConsultation:
                 else:
                     entry.paragraph = outcome
 
-        logger.info("Composing final clinical report for current patient")
-        final_report = self.compose_final_report(entries)
-        refined_report = await self.rewrite_patient_report(
-            entries,
-            final_report=final_report,
+        logger.info("Composing final clinical report for current patient")        
+        final_report = await self.finalize_patient_report(
+            entries,            
             clinical_context=normalized_context,
             visit_date=visit_date,
             pattern_score=pattern_score,
-        )
-        if refined_report:
-            final_report = refined_report
+        )        
 
         return PatientDrugClinicalReport(entries=entries, final_report=final_report)
 
@@ -769,22 +765,7 @@ class HepatoxConsultation:
                 if isinstance(value, str) and value.strip():
                     return value.strip()
             return json.dumps(raw_response, ensure_ascii=False)
-        return str(raw_response).strip()
-
-    # -------------------------------------------------------------------------
-    def compose_final_report(
-        self, entries: list[DrugClinicalAssessment]
-    ) -> str | None:
-        if not entries:
-            return None
-        blocks: list[str] = []
-        for entry in entries:
-            name = entry.drug_name.strip() or entry.drug_name
-            summary = (entry.paragraph or "No analysis available.").strip()
-            blocks.append(f"{name}\nConclusions: {summary}")
-        # Collate per-drug paragraphs into a clinician-friendly summary
-        report = "\n\n".join(blocks).strip()
-        return report or None
+        return str(raw_response).strip()   
 
     # -------------------------------------------------------------------------
     def classify_entry_status(self, entry: DrugClinicalAssessment) -> str:
@@ -823,17 +804,27 @@ class HepatoxConsultation:
         return "\n".join(blocks)
 
     # -------------------------------------------------------------------------
-    async def rewrite_patient_report(
+    async def finalize_patient_report(
         self,
         entries: list[DrugClinicalAssessment],
-        *,
-        final_report: str | None,
+        *,        
         clinical_context: str,
         visit_date: date | None,
         pattern_score: HepatotoxicityPatternScore | None,
     ) -> str | None:
-        if not entries or not final_report:
+        if not entries:
             return None
+        
+        blocks: list[str] = []
+        for entry in entries:
+            name = entry.drug_name.strip() or entry.drug_name
+            summary = (entry.paragraph or "No analysis available.").strip()
+            blocks.append(f"{name}\nConclusions: {summary}")
+        # Collate per-drug paragraphs into a clinician-friendly summary
+        report = "\n\n".join(blocks).strip()
+        if not report:
+            return None
+        
         summary_payload = self.summarize_entries_for_prompt(entries)
         if not summary_payload.strip():
             return None
@@ -847,18 +838,18 @@ class HepatoxConsultation:
         pattern_summary = pattern_summary_raw.replace(instruction_clause, "").strip()
         if not pattern_summary:
             pattern_summary = pattern_summary_raw
-        user_prompt = CLINICAL_REPORT_REWRITE_USER_PROMPT.format(
+        user_prompt = FINALIZE_CLINICAL_REPORT_USER_PROMPT.format(
             patient_name=self.escape_braces(patient_label),
             visit_date=self.escape_braces(visit_label),
             pattern_summary=self.escape_braces(pattern_summary),
             clinical_context=self.escape_braces(context_payload),
             drug_summaries=self.escape_braces(summary_payload),
-            initial_report=self.escape_braces(final_report),
+            initial_report=self.escape_braces(report),
         )
         messages = [
             {
                 "role": "system",
-                "content": CLINICAL_REPORT_REWRITE_SYSTEM_PROMPT.strip(),
+                "content": FINALIZE_CLINICAL_REPORT_SYSTEM_PROMPT.strip(),
             },
             {"role": "user", "content": user_prompt},
         ]

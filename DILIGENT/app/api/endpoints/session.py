@@ -24,7 +24,7 @@ from DILIGENT.app.utils.services.parser import (
 
 drugs_parser = DrugsParser()
 pattern_analyzer = HepatotoxicityPatternAnalyzer()
-router = APIRouter(tags=["agent"])
+router = APIRouter(tags=["session"])
 serializer = DataSerializer()
 
 
@@ -98,7 +98,6 @@ async def process_single_patient(payload: PatientData) -> str:
         pattern_score.r_score if pattern_score.r_score is not None else float("nan"),
     )
 
-
     # Step 2: Parse drug names and metadata from the raw text list
     start_time = time.perf_counter()
     drug_data = await drugs_parser.extract_drug_list(payload.drugs or "")
@@ -129,8 +128,7 @@ async def process_single_patient(payload: PatientData) -> str:
     
     if isinstance(drug_assessment, dict):
         candidate : str = drug_assessment.get("final_report", "")
-        final_report = candidate.strip()
-   
+        final_report = candidate.strip()   
 
     patient_label = payload.name or "Unknown patient"
     visit_label = (
@@ -143,8 +141,7 @@ async def process_single_patient(payload: PatientData) -> str:
     logger.info("Total time for Drug Induced Liver Injury (DILI) assessment is %.4f seconds", global_elapsed)
 
     # Step 4: Persist a structured representation of the session to SQLite
-    detected_drugs = [entry.name for entry in drug_data.entries if entry.name]
-    drug_summary = ", ".join(detected_drugs) if detected_drugs else "None detected"
+    detected_drugs = [entry.name for entry in drug_data.entries if entry.name]    
     pattern_strings = pattern_analyzer.stringify_scores(pattern_score)
     serializer.record_clinical_session(
         {
@@ -183,7 +180,7 @@ async def process_single_patient(payload: PatientData) -> str:
     status_code=status.HTTP_202_ACCEPTED,
     response_class=PlainTextResponse,
 )
-async def start_single_clinical_agent(
+async def start_clinical_session(
     name: str | None = Body(default=None),
     visit_date: date | dict[str, int] | str | None = Body(default=None),
     anamnesis: str | None = Body(default=None),

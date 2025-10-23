@@ -66,7 +66,7 @@ Once the UI is open:
 3. Trigger the analysis; the agent collates lab trends, parses medications, queries the LiverTox knowledge base, and returns a Markdown consultation summary.
 4. Download or copy the generated report for inclusion in the patient record. All submissions are logged to the SQLite database for later review.
 
-The REST API mirrors the UI workflow. Submit patient payloads to `POST /agent` to generate reports programmatically, or call `GET /models/list` and `GET /models/pull` to inspect or download Ollama models before selecting them in the UI.
+The REST API mirrors the UI workflow. Submit patient payloads to `POST /session` to generate reports programmatically, or call `GET /models/list` and `GET /models/pull` to inspect or download Ollama models before selecting them in the UI.
 
 ## 3.1 Setup and Maintenance
 Execute `DILIGENT/setup_and_maintenance.bat` to open the maintenance console. Available actions include:
