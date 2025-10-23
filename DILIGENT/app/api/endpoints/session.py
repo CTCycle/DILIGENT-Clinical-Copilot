@@ -13,8 +13,7 @@ from DILIGENT.app.api.schemas.clinical import (
 )
 from DILIGENT.app.logger import logger
 from DILIGENT.app.utils.repository.serializer import DataSerializer
-from DILIGENT.app.utils.services.clinical import (
-    ClinicalContextBuilder,
+from DILIGENT.app.utils.services.clinical import (    
     HepatotoxicityPatternAnalyzer,
     HepatoxConsultation,
 )
@@ -108,6 +107,12 @@ def build_patient_narrative(
 # [ENPOINTS]
 ###############################################################################
 async def process_single_patient(payload: PatientData) -> str:
+    if payload.anamnesis is None or payload.drugs is None:
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+            detail="Both anamnesis and drugs fields are required.",
+        )
+
     logger.info(
         "Starting Drug-Induced Liver Injury (DILI) analysis for patient: %s",
         payload.name,
@@ -128,31 +133,20 @@ async def process_single_patient(payload: PatientData) -> str:
     drug_data = await drugs_parser.extract_drug_list(payload.drugs or "")
     elapsed = time.perf_counter() - start_time
     logger.info("Drugs extraction required %.4f seconds", elapsed)
-    logger.info("Detected %s drugs", len(drug_data.entries))
-
-    # Step 3: Build a clinical synopsis and request LiverTox-backed analysis
-    start_time = time.perf_counter()
-    context_builder = ClinicalContextBuilder()
-    clinical_context = await context_builder.build_context(
-        anamnesis=payload.anamnesis,
-        visit_date=payload.visit_date,
-    )
-    logger.info("Generated clinical context summary for downstream analysis")
+    logger.info("Detected %s drugs", len(drug_data.entries))    
 
     clinical_session = HepatoxConsultation(drug_data, patient_name=payload.name)
     drug_assessment = await clinical_session.run_analysis(
-        clinical_context=clinical_context,
+        clinical_context=payload.anamnesis,
         visit_date=payload.visit_date,
         pattern_score=pattern_score,
     )
     elapsed = time.perf_counter() - start_time
     logger.info("Hepato-toxicity consultation required %.4f seconds", elapsed)
-
+  
     final_report: str | None = None
-    
     if isinstance(drug_assessment, dict):
-        candidate : str = drug_assessment.get("final_report", "")
-        final_report = candidate.strip()   
+        final_report : str | None = drug_assessment.get("final_report", "").strip()
 
     patient_label = payload.name or "Unknown patient"
     visit_label = (
@@ -164,7 +158,7 @@ async def process_single_patient(payload: PatientData) -> str:
     global_elapsed = time.perf_counter() - global_start_time
     logger.info("Total time for Drug Induced Liver Injury (DILI) assessment is %.4f seconds", global_elapsed)
 
-    # Step 4: Persist a structured representation of the session to SQLite
+    # Step 3: Persist a structured representation of the session to SQLite
     detected_drugs = [entry.name for entry in drug_data.entries if entry.name]    
     pattern_strings = pattern_analyzer.stringify_scores(pattern_score)
     serializer.record_clinical_session(
