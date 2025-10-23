@@ -19,5 +19,5 @@ class EnvironmentVariables:
             logger.error(f".env file not found at: {self.env_path}")
 
     # -------------------------------------------------------------------------
-    def get_environment_variables(self) -> dict[str, str]:
-        return dict(os.environ)
+    def get(self, key: str, default: str | None = None) -> str | None:
+        return os.getenv(key, default)
