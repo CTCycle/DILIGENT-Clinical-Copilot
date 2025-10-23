@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from collections.abc import Mapping
 import re
 from datetime import date, datetime
 from typing import Any, Literal
@@ -97,11 +98,11 @@ class PatientData(BaseModel):
             return value
         if isinstance(value, datetime):
             return value.date()
-        if isinstance(value, dict):
+        if isinstance(value, Mapping):
             try:
-                day = int(value.get("day"))
-                month = int(value.get("month"))
-                year = int(value.get("year"))
+                day = int(str(value.get("day", "")).strip())
+                month = int(str(value.get("month", "")).strip())
+                year = int(str(value.get("year", "")).strip())
             except (TypeError, ValueError):
                 return None
             try:

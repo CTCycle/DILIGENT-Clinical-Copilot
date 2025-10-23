@@ -155,7 +155,7 @@ Patient: {patient_name}
 Visit date: {visit_date}
 Injury pattern summary: {pattern_summary}
 
-Clinical context digest:
+Clinical context:
 {clinical_context}
 
 Drug assessments:
