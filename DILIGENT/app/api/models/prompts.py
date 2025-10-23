@@ -122,7 +122,7 @@ A preliminary report has been drafted with drug-by-drug evaluations. Your task i
 - Maintain a **professional, concise tone**, but include all clinically relevant details.  
 
 # Output Structure  
-For each drug:  
+Evaluation (for each drug):  
 Drug [Name]:  
 - Livertox score: [X]  
 - Therapy start: [date/details]  
@@ -132,7 +132,7 @@ Drug [Name]:
 Dosage Adjustments (if applicable):  
 - [Details for each drug]  
 
-Final Integrated Assessment:  
+Conclusions:  
 - Synthesis of findings across all drugs.  
 - Explicit statement on the most likely causal agent(s).  
 - Clear classification of each drug’s causality likelihood: **possible, unlikely, or improbable**.  
