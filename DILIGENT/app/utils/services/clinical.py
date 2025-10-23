@@ -8,8 +8,6 @@ from datetime import date, datetime
 from typing import Any
 
 from DILIGENT.app.api.models.prompts import (
-    CLINICAL_CONTEXT_SYSTEM_PROMPT,
-    CLINICAL_CONTEXT_USER_PROMPT,
     FINALIZE_CLINICAL_REPORT_SYSTEM_PROMPT,
     FINALIZE_CLINICAL_REPORT_USER_PROMPT,
     LIVERTOX_CLINICAL_SYSTEM_PROMPT,
@@ -50,121 +48,31 @@ def resolve_temperature(preferred: float | None, *, scale: float = 1.0) -> float
 ###############################################################################
 class ClinicalContextBuilder:
 
-    def __init__(
-        self,
-        *,
-        timeout_s: float = DEFAULT_LLM_TIMEOUT_SECONDS,
-        temperature: float | None = None,
-    ) -> None:
-        self.timeout_s = timeout_s
-        self.llm_client = initialize_llm_client(purpose="clinical", timeout_s=timeout_s)
-        provider, model_candidate = ClientRuntimeConfig.resolve_provider_and_model("clinical")
-        self.llm_model = model_candidate or ClientRuntimeConfig.get_clinical_model()
-        try:
-            chat_signature = inspect.signature(self.llm_client.chat)
-        except (TypeError, ValueError):
-            chat_signature = None
-        self.chat_supports_temperature = (
-            chat_signature is not None and "temperature" in chat_signature.parameters
-        )
-        self.temperature = resolve_temperature(temperature)
+    def __init__(self) -> None:
+        pass
 
-    # -------------------------------------------------------------------------
+    ###########################################################################
     async def build_context(
         self,
         *,
         anamnesis: str | None,
-        exams: str | None,
         visit_date: date | None,
     ) -> str:
-        normalized_anamnesis = (anamnesis or "").strip()
-        normalized_exams = (exams or "").strip()
+        clinical_text = (anamnesis or "").strip()
+        if not clinical_text:
+            clinical_text = "No anamnesis available."
         visit_label = self.format_visit_label(visit_date)
-        anamnesis_block = normalized_anamnesis or "No anamnesis available."
-        exams_block = normalized_exams or "No exam findings available."
+        if visit_label is None:
+            return clinical_text
+        return f"{clinical_text}\n\nVisit date: {visit_label}".strip()
 
-        if not normalized_anamnesis and not normalized_exams:
-            summary_text = (
-                "No anamnesis or exam information was provided; unable to generate "
-                "a clinical context summary."
-            )
-            return self.compose_context_payload(
-                visit_label=visit_label,
-                summary_text=summary_text,
-                anamnesis_block=anamnesis_block,
-                exams_block=exams_block,
-            )
-
-        user_prompt = CLINICAL_CONTEXT_USER_PROMPT.format(
-            visit_date=HepatoxConsultation.escape_braces(visit_label),
-            anamnesis=HepatoxConsultation.escape_braces(anamnesis_block),
-            exams=HepatoxConsultation.escape_braces(exams_block),
-        )
-        messages = [
-            {"role": "system", "content": CLINICAL_CONTEXT_SYSTEM_PROMPT.strip()},
-            {"role": "user", "content": user_prompt},
-        ]
-        chat_kwargs: dict[str, Any] = {
-            "model": self.llm_model,
-            "messages": messages,
-        }
-        if self.chat_supports_temperature:
-            chat_kwargs["temperature"] = self.temperature
-        else:
-            chat_kwargs["options"] = {"temperature": self.temperature}
-        try:
-            # Ask the LLM to summarise anamnesis and exams into a reusable context block
-            raw_response = await self.llm_client.chat(**chat_kwargs)
-            summary = HepatoxConsultation.coerce_chat_text(raw_response)
-        except Exception as exc:  # noqa: BLE001
-            logger.error("Clinical context generation failed: %s", exc)
-            summary = (
-                "Clinical context generation failed due to a language model error; "
-                "review the verbatim anamnesis and exam findings below."
-            )
-        if not summary:
-            summary = (
-                "Clinical context generation returned an empty response; review the "
-                "verbatim anamnesis and exam findings below."
-            )
-
-        return self.compose_context_payload(
-            visit_label=visit_label,
-            summary_text=summary,
-            anamnesis_block=anamnesis_block,
-            exams_block=exams_block,
-        )
-
-    # -------------------------------------------------------------------------
-    def format_visit_label(self, visit_date: date | None) -> str:
+    ###########################################################################
+    def format_visit_label(self, visit_date: date | None) -> str | None:
         if visit_date is None:
-            return "Visit date not provided."
+            return None
         if isinstance(visit_date, datetime):
             return visit_date.date().isoformat()
         return visit_date.isoformat()
-
-    # -------------------------------------------------------------------------
-    def compose_context_payload(
-        self,
-        *,
-        visit_label: str,
-        summary_text: str,
-        anamnesis_block: str,
-        exams_block: str,
-    ) -> str:
-        sections = [
-            f"Visit date: {visit_label}",
-            "",
-            "Clinical context summary:",
-            summary_text.strip() or "No clinical summary available.",
-            "",
-            "Patient anamnesis (verbatim):",
-            anamnesis_block.strip() or "No anamnesis available.",
-            "",
-            "Exam findings (verbatim):",
-            exams_block.strip() or "No exam findings available.",
-        ]
-        return "\n".join(sections).strip()
 
 
 ###############################################################################
