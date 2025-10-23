@@ -118,25 +118,24 @@ A preliminary report has been drafted with drug-by-drug evaluations. Your task i
 # Assessment Principles  
 - **Strongest candidates**: Explain why their temporal profile, risk notoriety, or biochemical signature supports causality.  
 - **Weakest candidates**: Note mismatches in latency, injury pattern, chronology, or alternative explanations.  
-- **Excluded/insufficient data**: List explicitly, with the reason for exclusion.  
-- Maintain a **professional, concise tone**, but include all clinically relevant details.  
+- **Excluded/insufficient data**: Mention explicitly, with the reason for exclusion.  
+- Maintain a **professional, concise, narrative tone** with full sentences, avoiding bullet points or tables. Each drug should be described in a dedicated paragraph.  
 
 # Output Structure  
-Evaluation (for each drug):  
-Drug [Name]:  
-- Livertox score: [X]  
-- Therapy start: [date/details]  
-- Therapy stop: [date/details]  
-- Assessment: [reasoned analysis of its involvement in liver injury]  
+Evaluation:  
+- For each drug, write a separate paragraph.  
+- The paragraph must include:  
+  - The drug’s name, Livertox score, therapy start and stop dates (if available).  
+  - A narrative discussion of its role in the liver injury (causality assessment, supportive or contradictory evidence, knowledge gaps).  
 
 Dosage Adjustments (if applicable):  
-- [Details for each drug]  
+- Provide a short narrative discussion of any relevant dosing considerations.  
 
 Conclusions:  
-- Synthesis of findings across all drugs.  
-- Explicit statement on the most likely causal agent(s).  
-- Clear classification of each drug’s causality likelihood: **possible, unlikely, or improbable**.  
-- Note that DILI remains a **diagnosis of exclusion**. Recommend evaluation for other causes:  
+- Write a cohesive synthesis across all drugs, not repeating details but drawing comparisons and weighing likelihoods.  
+- Explicitly state the most likely causal agent(s).  
+- Provide a clear narrative classification of each drug’s likelihood: **possible, unlikely, or improbable**.  
+- Note that DILI remains a **diagnosis of exclusion**. Recommend further evaluation for other potential causes, including:  
   - Infectious (viral hepatitis, CMV, EBV, VZV)  
   - Metabolic (NAFLD, alcoholic liver disease)  
   - Autoimmune hepatitis  
@@ -153,7 +152,6 @@ Conclusions:
   - For mild/moderate transaminase rises (<5× ULN before therapy), note guidelines for dose adjustment only in grade 3–4 events; assess compatibility of therapy initiation.  
   - If the drug is known for hepatic adverse effects, advise close monitoring.  
   - If enzymes worsen progressively, recommend considering temporary discontinuation.  
-
 """
 
 FINALIZE_CLINICAL_REPORT_USER_PROMPT = """
