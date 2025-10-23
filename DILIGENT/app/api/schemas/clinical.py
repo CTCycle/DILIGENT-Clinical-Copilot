@@ -32,17 +32,12 @@ class PatientData(BaseModel):
     anamnesis: str | None = Field(
         None,
         max_length=20000,
-        description="Patient anamnesis notes.",
+        description="Patient anamnesis, including exam findings when provided.",
     )
     drugs: str | None = Field(
         None,
         max_length=20000,
         description="Medication list and dosage notes.",
-    )
-    exams: str | None = Field(
-        None,
-        max_length=20000,
-        description="Blood and instrumental exam notes.",
     )
     alt: str | None = Field(
         None,
@@ -84,7 +79,7 @@ class PatientData(BaseModel):
         return stripped or None
 
     @field_validator(
-        "anamnesis", "drugs", "exams", "alt", "alt_max", "alp", "alp_max", mode="before"
+        "anamnesis", "drugs", "alt", "alt_max", "alp", "alp_max", mode="before"
     )
     @classmethod
     def strip_text(cls, value: str | None) -> str | None:
@@ -140,7 +135,7 @@ class PatientData(BaseModel):
 
     @model_validator(mode="after")
     def require_sections(self) -> "PatientData":
-        if any((self.anamnesis, self.drugs, self.exams)):
+        if any((self.anamnesis, self.drugs)):
             return self
         raise ValueError("Provide at least one clinical section before submitting.")
 
@@ -207,11 +202,8 @@ class PatientData(BaseModel):
                 alp_tokens.append(f"(max {self.alp_max})")
             blood_lines.append(f"ALP: {' '.join(alp_tokens).strip()}")
         blood_body = "\n".join(line for line in blood_lines if line)
-        if blood_body or self.exams:
-            parts = [part for part in (blood_body, self.exams) if part]
-            sections.append(f"# BLOOD TESTS\n{'\n'.join(parts)}")
-        if self.exams:
-            sections.append(f"# ADDITIONAL TESTS\n{self.exams}")
+        if blood_body:
+            sections.append(f"# BLOOD TESTS\n{blood_body}")
         if self.drugs:
             sections.append(f"# DRUGS\n{self.drugs}")
         if not sections:

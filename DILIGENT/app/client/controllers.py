@@ -285,7 +285,6 @@ def clear_session_fields() -> tuple[
     str,
     str,
     str,
-    str,
     list[str],
     bool,
     bool,
@@ -296,7 +295,6 @@ def clear_session_fields() -> tuple[
     return (
         "",
         None,
-        "",
         "",
         "",
         "",
@@ -377,7 +375,6 @@ async def run_DILI_session(
     anamnesis: str,
     has_hepatic_diseases: bool,
     drugs: str,
-    exams: str,
     alt: str,
     alt_max: str,
     alp: str,
@@ -401,7 +398,6 @@ async def run_DILI_session(
         "anamnesis": sanitize_field(anamnesis),
         "has_hepatic_diseases": bool(has_hepatic_diseases),
         "drugs": sanitize_field(drugs),
-        "exams": sanitize_field(exams),
         "alt": sanitize_field(alt),
         "alt_max": sanitize_field(alt_max),
         "alp": sanitize_field(alp),
@@ -410,7 +406,7 @@ async def run_DILI_session(
         "use_rag": bool(use_rag),
     }
 
-    if not any(cleaned_payload[key] for key in ("anamnesis", "drugs", "exams")):
+    if not any(cleaned_payload[key] for key in ("anamnesis", "drugs")):
         return (
             "[ERROR] Please provide at least one clinical section.",
             build_json_output(None),
