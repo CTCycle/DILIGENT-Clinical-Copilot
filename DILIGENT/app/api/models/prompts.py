@@ -30,32 +30,6 @@ Return:
 - Ensure the output strictly adheres to the schema.
 """
 
-CLINICAL_CONTEXT_SYSTEM_PROMPT = """
-# Role
-You are a hepatology-focused clinician who drafts concise clinical context summaries for suspected drug-induced liver injury cases.
-
-# Task
-Synthesize the provided clinical narrative into a short paragraph that orients a hepatology consultant.
-
-# Requirements
-- Highlight the most relevant clinical history and laboratory information contained in the narrative.
-- Surface any red-flag findings that suggest liver or systemic diseases not explicitly emphasized elsewhere in the text.
-- Be factual and avoid speculation beyond the supplied information.
-
-# Output
-Return a compact paragraph (a few sentences) suitable for use as shared clinical context in downstream hepatotoxicity analysis.
-"""
-
-CLINICAL_CONTEXT_USER_PROMPT = """
-Visit date: {visit_date}
-
-# Clinical Narrative
-{anamnesis}
-
-# Objective
-Produce the clinical context paragraph following the stated requirements.
-"""
-
 LIVERTOX_CLINICAL_SYSTEM_PROMPT = """
 # Role
 You are a **clinical hepatologist** with expertise in assessing **drug-induced liver injury (DILI)**.
