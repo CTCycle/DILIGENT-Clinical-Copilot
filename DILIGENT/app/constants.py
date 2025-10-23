@@ -36,8 +36,7 @@ PARSING_MODEL_CHOICES = [
     "qwen3:8b",
     "qwen3:14b",
     "llama3.1:8b",
-    "mistral-nemo:12b",
-    "mixtral:8x7b-instruct",
+    "mistral-nemo:12b",    
     "gemma2:9b",
     "phi3.5:mini",
     "phi3:medium",
@@ -48,6 +47,9 @@ CLINICAL_MODEL_CHOICES = [
     "llama3.1:70b",
     "phi3.5:mini",
     "phi3.5:moe",
+    "deepseek-r1:14b",
+    "alibayram/medgemma:4b",
+    "alibayram/medgemma:27b"
     "gemma3:9b",
     "gemma3:27b",
 ]
