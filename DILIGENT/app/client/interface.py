@@ -51,8 +51,8 @@ def create_interface() -> gr.Blocks:
         with gr.Row():
             with gr.Column(scale=3):
                 anamnesis = gr.Textbox(
-                    label="Anamnesis and Exams",
-                    placeholder="Describe the clinical picture, including exams if relevant...",
+                    label="Anamnesis",
+                    placeholder="Describe the clinical picture, including exams and labs when relevant...",
                     lines=10,
                     max_lines=100,
                 )

@@ -178,7 +178,6 @@ async def process_single_patient(payload: PatientData) -> str:
             "hepatic_pattern": pattern_score.classification,
             "anamnesis": payload.anamnesis,
             "drugs": payload.drugs,
-            "exams": None,
             "parsing_model": getattr(drugs_parser, "model", None),
             "clinical_model": getattr(clinical_session, "llm_model", None),
             "total_duration": global_elapsed,
