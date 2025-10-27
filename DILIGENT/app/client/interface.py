@@ -23,6 +23,10 @@ from DILIGENT.app.client.controllers import (
     toggle_cloud_services,
 )
 from DILIGENT.app.client.layouts import (
+    CARD_BASE_CLASSES,
+    INTERFACE_THEME_CSS,
+    JSON_CARD_CLASSES,
+    PAGE_CONTAINER_CLASSES,
     VISIT_DATE_CSS,
     VISIT_DATE_ELEMENT_ID,
     VISIT_DATE_LOCALE_JS,
@@ -301,124 +305,139 @@ def main_page() -> None:
 
     cloud_enabled = ClientRuntimeConfig.is_cloud_enabled()
 
-    ui.add_head_html(f"<style>{VISIT_DATE_CSS}</style>")
-    ui.markdown("## DILIGENT Clinical Copilot")
+    ui.add_head_html(f"<style>{VISIT_DATE_CSS}{INTERFACE_THEME_CSS}</style>")
 
-    with ui.row().classes("w-full gap-4"):
-        with ui.column().classes("w-full gap-4").style("flex:3"):
-            anamnesis = ui.textarea(
-                label="Anamnesis",
-                placeholder=(
-                    "Describe the clinical picture, including exams and labs when relevant..."
-                ),
-            )
-            has_diseases = ui.checkbox(
-                "Has hepatic diseases",
-                value=False,
-            )
-            symptoms = ui.select(
-                ["Hitterus", "Pain", "Scretching"],
-                label="Observed symptoms",
-                multiple=True,
-                clearable=True,
-            )
-            drugs = ui.textarea(
-                label="Current Drugs",
-                placeholder="List current therapies, dosage and schedule...",
-            )
-            with ui.row().classes("w-full gap-4"):
-                alt = ui.input(
-                    label="ALT",
-                    placeholder="e.g., 189 or 189 U/L",
-                )
-                alt.props("dense")
-                alt_max = ui.input(
-                    label="ALT Max",
-                    placeholder="e.g., 47 U/L",
-                )
-                alt_max.props("dense")
-            with ui.row().classes("w-full gap-4"):
-                alp = ui.input(
-                    label="ALP",
-                    placeholder="e.g., 140 or 140 U/L",
-                )
-                alp.props("dense")
-                alp_max = ui.input(
-                    label="ALP Max",
-                    placeholder="e.g., 150 U/L",
-                )
-                alp_max.props("dense")
+    with ui.column().classes(PAGE_CONTAINER_CLASSES):
+        ui.markdown("## DILIGENT Clinical Copilot").classes(
+            "text-3xl font-semibold text-slate-800 dark:text-slate-100"
+        )
 
-        with ui.column().classes("w-full gap-4").style("flex:1"):
-            patient_name = ui.input(
-                label="Patient Name",
-                placeholder="e.g., Marco Rossi",
-            )
-            with ui.element("div").props(f"id={VISIT_DATE_ELEMENT_ID}"):
-                visit_date = ui.input(
-                    label="Visit Date",
-                    placeholder="Select a date",
-                )
-            visit_date.props("type=date")
-            run_button = ui.button("Run Workflow", color="primary")
-            export_button = ui.button("Download report", color="secondary")
-            export_button.disable()
-            clear_button = ui.button("Clear all")
-            with ui.expansion("Session Configurations", value=False):
-                use_rag_checkbox = ui.checkbox(
-                    "Use Retrieval Augmented Generation (RAG)",
+        with ui.grid(columns=1).classes("w-full gap-6 md:grid-cols-3"):
+            with ui.card().classes(f"{CARD_BASE_CLASSES} md:col-span-2"):
+                ui.label("Clinical Inputs").classes("diligent-card-title")
+                anamnesis = ui.textarea(
+                    label="Anamnesis",
+                    placeholder=(
+                        "Describe the clinical picture, including exams and labs when relevant..."
+                    ),
+                ).classes("w-full min-h-[12rem]")
+                has_diseases = ui.checkbox(
+                    "Has hepatic diseases",
                     value=False,
-                )
-            with ui.expansion("Model Configurations", value=False):
-                use_cloud_services = ui.checkbox(
-                    "Use Cloud Services",
-                    value=cloud_enabled,
-                )
-                with ui.row().classes("w-full gap-4"):
-                    with ui.column().classes("w-full gap-2"):
-                        ui.markdown("**Cloud Configuration**")
-                        llm_provider_dropdown = ui.select(
-                            CLOUD_PROVIDERS,
-                            label="Cloud Service",
-                            value=provider,
-                        )
-                        cloud_model_dropdown = ui.select(
-                            cloud_models,
-                            label="Cloud Model",
-                            value=selected_cloud_model or None,
-                        )
-                    with ui.column().classes("w-full gap-2"):
-                        ui.markdown("**Ollama Configuration**")
-                        parsing_model_dropdown = ui.select(
-                            PARSING_MODEL_CHOICES,
-                            label="Parsing Model",
-                            value=ClientRuntimeConfig.get_parsing_model(),
-                        )
-                        clinical_model_dropdown = ui.select(
-                            CLINICAL_MODEL_CHOICES,
-                            label="Clinical Model",
-                            value=ClientRuntimeConfig.get_clinical_model(),
-                        )
-                        temperature_input = ui.number(
-                            label="Temperature",
-                            value=ClientRuntimeConfig.get_ollama_temperature(),
-                            min=0.0,
-                            max=2.0,
-                            step=0.1,
-                        )
-                        reasoning_checkbox = ui.checkbox(
-                            "Enable reasoning (think)",
-                            value=ClientRuntimeConfig.is_ollama_reasoning_enabled(),
-                        )
-                        pull_models_button = ui.button("Pull models", color="secondary")
+                ).classes("pt-2")
+                symptoms = ui.select(
+                    ["Hitterus", "Pain", "Scretching"],
+                    label="Observed symptoms",
+                    multiple=True,
+                    clearable=True,
+                ).classes("w-full")
+                drugs = ui.textarea(
+                    label="Current Drugs",
+                    placeholder="List current therapies, dosage and schedule...",
+                ).classes("w-full")
+                with ui.grid(columns=1).classes("w-full gap-4 md:grid-cols-2"):
+                    alt = ui.input(
+                        label="ALT",
+                        placeholder="e.g., 189 or 189 U/L",
+                    ).classes("w-full")
+                    alt.props("dense")
+                    alt_max = ui.input(
+                        label="ALT Max",
+                        placeholder="e.g., 47 U/L",
+                    ).classes("w-full")
+                    alt_max.props("dense")
+                with ui.grid(columns=1).classes("w-full gap-4 md:grid-cols-2"):
+                    alp = ui.input(
+                        label="ALP",
+                        placeholder="e.g., 140 or 140 U/L",
+                    ).classes("w-full")
+                    alp.props("dense")
+                    alp_max = ui.input(
+                        label="ALP Max",
+                        placeholder="e.g., 150 U/L",
+                    ).classes("w-full")
+                    alp_max.props("dense")
 
-    json_container = ui.card().classes("w-full")
-    json_container.visible = False
-    with json_container:
-        json_code = ui.code("", language="json")
+            with ui.card().classes(f"{CARD_BASE_CLASSES} md:col-span-1"):
+                ui.label("Patient Information").classes("diligent-card-title")
+                patient_name = ui.input(
+                    label="Patient Name",
+                    placeholder="e.g., Marco Rossi",
+                ).classes("w-full")
+                with ui.element("div").props(f"id={VISIT_DATE_ELEMENT_ID}"):
+                    visit_date = ui.input(
+                        label="Visit Date",
+                        placeholder="Select a date",
+                    ).classes("w-full")
+                visit_date.props("type=date")
+                with ui.row().classes("w-full gap-3 flex-wrap"):
+                    run_button = ui.button("Run Workflow", color="primary")
+                    export_button = ui.button("Download report", color="secondary")
+                    export_button.disable()
+                    clear_button = ui.button("Clear all")
 
-    ui.markdown("### Agent Output")
-    markdown_output = ui.markdown("")
+        with ui.card().classes(CARD_BASE_CLASSES):
+            ui.label("Configuration").classes("diligent-card-title")
+            use_rag_checkbox = ui.checkbox(
+                "Use Retrieval Augmented Generation (RAG)",
+                value=False,
+            ).classes("pt-2")
+            use_cloud_services = ui.checkbox(
+                "Use Cloud Services",
+                value=cloud_enabled,
+            ).classes("pt-2")
+            with ui.grid(columns=1).classes("w-full gap-5 lg:grid-cols-2"):
+                with ui.column().classes("w-full gap-3"):
+                    ui.label("Cloud Configuration").classes("diligent-subtitle")
+                    llm_provider_dropdown = ui.select(
+                        CLOUD_PROVIDERS,
+                        label="Cloud Service",
+                        value=provider,
+                    ).classes("w-full")
+                    cloud_model_dropdown = ui.select(
+                        cloud_models,
+                        label="Cloud Model",
+                        value=selected_cloud_model or None,
+                    ).classes("w-full")
+                with ui.column().classes("w-full gap-3"):
+                    ui.label("Ollama Configuration").classes("diligent-subtitle")
+                    parsing_model_dropdown = ui.select(
+                        PARSING_MODEL_CHOICES,
+                        label="Parsing Model",
+                        value=ClientRuntimeConfig.get_parsing_model(),
+                    ).classes("w-full")
+                    clinical_model_dropdown = ui.select(
+                        CLINICAL_MODEL_CHOICES,
+                        label="Clinical Model",
+                        value=ClientRuntimeConfig.get_clinical_model(),
+                    ).classes("w-full")
+                    temperature_input = ui.number(
+                        label="Temperature",
+                        value=ClientRuntimeConfig.get_ollama_temperature(),
+                        min=0.0,
+                        max=2.0,
+                        step=0.1,
+                    ).classes("w-full")
+                    reasoning_checkbox = ui.checkbox(
+                        "Enable reasoning (think)",
+                        value=ClientRuntimeConfig.is_ollama_reasoning_enabled(),
+                    )
+                    pull_models_button = ui.button("Pull models", color="secondary")
+
+        with ui.card().classes(CARD_BASE_CLASSES):
+            ui.label("Results & Reports").classes("diligent-card-title")
+            with ui.row().classes("w-full gap-4 flex-col lg:flex-row"):
+                with ui.column().classes("w-full gap-3"):
+                    ui.label("Agent Output").classes("diligent-subtitle")
+                    markdown_output = ui.markdown("").classes(
+                        "prose prose-slate max-w-none dark:prose-invert"
+                    )
+                with ui.column().classes("w-full gap-3"):
+                    json_container = ui.card().classes(JSON_CARD_CLASSES)
+                    json_container.visible = False
+                    with json_container:
+                        ui.label("JSON Response").classes("diligent-subtitle")
+                        json_code = ui.code("", language="json").classes("w-full")
 
     components = ClientComponents(
         patient_name=patient_name,
