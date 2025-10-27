@@ -65,6 +65,18 @@ class LiverToxData(Base):
     __table_args__ = (UniqueConstraint("drug_name", "ingredient", "brand_name"),)
 
 
+###############################################################################
+class DrugsCatalog(Base):
+    __tablename__ = "DRUGS_CATALOG"
+    rxcui = Column(String, primary_key=True)
+    raw_name = Column(Text, primary_key=True)
+    term_type = Column(String)
+    name = Column(String)
+    brand_names = Column(Text)
+    synonyms = Column(Text)
+    __table_args__ = (UniqueConstraint("rxcui", "raw_name"),)
+
+
 # [DATABASE]
 ###############################################################################
 @singleton
