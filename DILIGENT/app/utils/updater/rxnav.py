@@ -562,7 +562,7 @@ class RxNavDrugCatalogBuilder:
         self.brand_pattern = re.compile(r"\[([^\]]+)\]")
 
     # -------------------------------------------------------------------------
-    def build_catalog(self, destination: str) -> dict[str, Any]:
+    def update_drug_catalog(self, destination: str) -> dict[str, Any]:
         directory = os.path.dirname(destination) or "."
         os.makedirs(directory, exist_ok=True)
 
