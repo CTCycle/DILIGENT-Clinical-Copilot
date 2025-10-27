@@ -321,7 +321,7 @@ def main_page() -> None:
                         placeholder=(
                             "Describe the clinical picture, including exams and labs when relevant..."
                         ),
-                    ).classes("w-full min-h-[24rem]")
+                    ).classes("w-full min-h-[12rem]")
                     has_diseases = ui.checkbox(
                         "Has hepatic diseases",
                         value=False,
@@ -335,7 +335,7 @@ def main_page() -> None:
                     drugs = ui.textarea(
                         label="Current Drugs",
                         placeholder="List current therapies, dosage and schedule...",
-                    ).classes("w-full min-h-[24rem]")
+                    ).classes("w-full min-h-[12rem]")
                     with ui.grid(columns=2).classes("w-full gap-4"):
                         alt = ui.input(
                             label="ALT",
