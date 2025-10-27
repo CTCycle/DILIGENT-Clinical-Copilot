@@ -92,6 +92,30 @@ OPENFDA_DOWNLOAD_BASE_URL = "https://download.open.fda.gov"
 OPENFDA_DRUG_EVENT_DATASET = "drug/event"
 OPENFDA_DRUG_EVENT_INDEX = "drug-event.json"
 OPENFDA_DOWNLOAD_CATALOG_URL = "https://api.fda.gov/download.json"
+RXNORM_FULL_DOWNLOAD_URL = (
+    "https://download.nlm.nih.gov/umls/kss/rxnorm/RxNorm_full_current.zip"
+)
+RXNORM_WEEKLY_DOWNLOAD_URL = (
+    "https://download.nlm.nih.gov/umls/kss/rxnorm/RxNorm_weekly_current.zip"
+)
+RXNORM_EXPECTED_FILES = {
+    "conso": "RXNCONSO.RRF",
+    "rel": "RXNREL.RRF",
+    "sat": "RXNSAT.RRF",
+    "changes": "RXNCUICHANGES.RRF",
+}
+PUBCHEM_PUG_REST_BASE_URL = "https://pubchem.ncbi.nlm.nih.gov/rest/pug"
+FDA_UNII_DOWNLOAD_URL = (
+    "https://precision.fda.gov/uniisearch/rest/download?format=csv"
+)
+OPENFDA_NDC_ENDPOINT = "https://api.fda.gov/drug/ndc.json"
+DAILYMED_SPL_BULK_BASE_URL = (
+    "https://dailymed.nlm.nih.gov/dailymed/services/v2/spls"
+)
+CHEMBL_API_BASE_URL = "https://www.ebi.ac.uk/chembl/api/data"
+FDA_INACTIVE_INGREDIENTS_URL = (
+    "https://www.accessdata.fda.gov/scripts/inactives/InactiveIngredients.csv"
+)
 DEFAULT_LLM_TIMEOUT_SECONDS = 3_600.0
 LIVERTOX_LLM_TIMEOUT_SECONDS = DEFAULT_LLM_TIMEOUT_SECONDS
 LIVERTOX_YIELD_INTERVAL = 25
