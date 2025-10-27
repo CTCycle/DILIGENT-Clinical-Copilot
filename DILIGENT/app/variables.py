@@ -3,6 +3,7 @@ from __future__ import annotations
 import os
 
 from dotenv import load_dotenv
+from DILIGENT.app.utils.singleton import singleton
 
 from DILIGENT.app.constants import PROJECT_DIR
 from DILIGENT.app.logger import logger
@@ -10,6 +11,7 @@ from DILIGENT.app.logger import logger
 
 # [IMPORT CUSTOM MODULES]
 ###############################################################################
+@singleton
 class EnvironmentVariables:
     def __init__(self) -> None:
         self.env_path = os.path.join(PROJECT_DIR, "setup", ".env")
@@ -21,3 +23,6 @@ class EnvironmentVariables:
     # -------------------------------------------------------------------------
     def get(self, key: str, default: str | None = None) -> str | None:
         return os.getenv(key, default)
+    
+
+env_variables = EnvironmentVariables()

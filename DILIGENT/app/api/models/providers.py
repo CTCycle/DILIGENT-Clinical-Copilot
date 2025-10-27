@@ -26,9 +26,10 @@ from DILIGENT.app.constants import (
     PARSING_MODEL_CHOICES,
 )
 from DILIGENT.app.logger import logger
+from DILIGENT.app.variables import env_variables
 
-OPENAI_API_KEY = os.getenv("OPENAI_API_KEY")
-GEMINI_API_KEY = os.getenv("GEMINI_API_KEY")
+OPENAI_API_KEY = env_variables.get("OPENAI_API_KEY")
+GEMINI_API_KEY = env_variables.get("GEMINI_API_KEY")
 
 # Type variable for typed schema returns
 T = TypeVar("T", bound=BaseModel)

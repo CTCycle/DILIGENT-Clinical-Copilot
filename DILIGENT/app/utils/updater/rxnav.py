@@ -27,9 +27,6 @@ def is_truthy(value: str | None) -> bool:
     return value.strip().lower() in {"1", "true", "yes", "on"}
 
 
-RXNORM_EXPANSION_ENABLED = is_truthy(os.getenv("PHARMAGENT_RXNORM_EXPANSION", "1"))
-
-
 ###############################################################################
 class RxNavClient:
     BASE_URL = "https://rxnav.nlm.nih.gov/REST/drugs.json"
@@ -152,10 +149,9 @@ class RxNavClient:
     )
     TERM_PATTERN = re.compile(r"[A-Za-z0-9]+(?:[-'][A-Za-z0-9]+)*")
     BRACKET_PATTERN = re.compile(r"\[([^\]]+)\]")
-
-    # -------------------------------------------------------------------------
+    
     def __init__(self, *, enabled: bool | None = None) -> None:
-        self.enabled = RXNORM_EXPANSION_ENABLED if enabled is None else enabled
+        self.enabled = True
         self.cache: dict[str, dict[str, RxNormCandidate]] = {}
 
     # -------------------------------------------------------------------------
