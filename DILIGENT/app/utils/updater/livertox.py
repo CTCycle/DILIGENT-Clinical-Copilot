@@ -66,6 +66,15 @@ def metadata_matches(stored: dict[str, Any], remote: dict[str, Any]) -> bool:
         stored.get("size", 0)
     ) == int(remote.get("size", 0))
 
+# -----------------------------------------------------------------------------
+def process_monograph_payload(
+    member_name: str,
+    data: bytes,
+) -> dict[str, str] | None:
+    return LiverToxUpdater.process_monograph_member(member_name, data)
+
+
+
 
 ###############################################################################
 async def download_file(
@@ -277,6 +286,7 @@ class LiverToxUpdater:
                     "%Y-%m-%d"
                 )
         metadata["records"] = len(sanitized.index)
+
         return metadata, sanitized
 
     # -------------------------------------------------------------------------
@@ -855,7 +865,7 @@ class LiverToxUpdater:
         with ProcessPoolExecutor(max_workers=worker_budget, mp_context=ctx) as executor:
             futures = {
                 executor.submit(
-                    _process_monograph_payload, member_name, data
+                    process_monograph_payload, member_name, data
                 ): member_name
                 for member_name, data in payloads
             }
@@ -1138,7 +1148,7 @@ class LiverToxUpdater:
                         continue
                     cache[alias] = {term for term in terms if isinstance(term, str)}
 
-        synonyms_values: list[str | pd.NA] = []
+        synonyms_values: list[str | Any] = []
         for aliases in alias_sets:
             if not aliases:
                 synonyms_values.append(pd.NA)
@@ -1223,12 +1233,3 @@ class LiverToxUpdater:
         return finalized.reset_index(drop=True)
 
 
-###############################################################################
-def process_monograph_payload(
-    member_name: str,
-    data: bytes,
-) -> dict[str, str] | None:
-    return LiverToxUpdater.process_monograph_member(member_name, data)
-
-
-###############################################################################
