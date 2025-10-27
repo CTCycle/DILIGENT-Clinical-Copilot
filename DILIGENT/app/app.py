@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import os
 
+import gradio as gr
 from fastapi import FastAPI
 from nicegui import ui
 
