@@ -31,13 +31,15 @@ Return:
 """
 
 LIVERTOX_REPORT_EXAMPLE = """
-Upadacitinib – LiverTox score D
+Example layout:
 
-An increase in ALT levels has been observed in up to 11% of patients treated with upadacitinib compared with 7% of patients treated with placebo, but in less than 2% of cases these levels were greater than 3 times the upper limit of normal (ULN). Moreover, similar rates of ALT elevation have been reported in patients treated with methotrexate or biological DMARDs. In these studies, which involved over 3,000 patients, no clinically apparent cases of liver injury, severe liver damage, or liver-related deaths were reported.
+Drug name – LiverTox score X
 
-Similarly, other JAK inhibitors such as tofacitinib and baricitinib have been associated with frequent mild increases in serum aminotransferases during treatment, but no episodes of clinically apparent liver injury have been reported. Furthermore, long-term treatment with upadacitinib and other Janus kinase inhibitors has been linked to rare cases of hepatitis B reactivation, which can be severe and have been associated with fatal outcomes. Reactivation may become clinically apparent after discontinuation of the JAK inhibitor, when immune reconstitution triggers an immune response to the intensified viral replication. [1]
+Summarize the key incidence data or study findings from the LiverTox excerpt, keeping statistics precise and attributed to the cited studies.
 
-If increases in ALT or AST are observed during routine patient monitoring and drug-related liver injury is suspected, treatment with Rinvoq® should be discontinued until this diagnosis can be ruled out.
+Add a short comparison with closely related agents when the excerpt mentions them, highlighting similarities or differences in hepatic risk.
+
+Close with monitoring or clinical management advice that reflects the patient context.
 
 Bibliography source: LiverTox
 """
