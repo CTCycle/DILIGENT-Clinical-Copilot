@@ -336,7 +336,7 @@ def main_page() -> None:
                         label="Current Drugs",
                         placeholder="List current therapies, dosage and schedule...",
                     ).classes("w-full")
-                    with ui.grid(columns=1).classes("w-full gap-4 md:grid-cols-2"):
+                    with ui.grid(columns=2).classes("w-full gap-4"):
                         alt = ui.input(
                             label="ALT",
                             placeholder="e.g., 189 or 189 U/L",
@@ -347,7 +347,7 @@ def main_page() -> None:
                             placeholder="e.g., 47 U/L",
                         ).classes("w-full")
                         alt_max.props("dense")
-                    with ui.grid(columns=1).classes("w-full gap-4 md:grid-cols-2"):
+                    with ui.grid(columns=2).classes("w-full gap-4"):
                         alp = ui.input(
                             label="ALP",
                             placeholder="e.g., 140 or 140 U/L",
