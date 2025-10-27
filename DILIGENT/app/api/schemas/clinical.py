@@ -18,6 +18,7 @@ class PatientData(BaseModel):
     - Normalizes whitespace and keeps compat with legacy single-text payloads.
 
     """
+
     name: str | None = Field(
         None,
         min_length=1,
