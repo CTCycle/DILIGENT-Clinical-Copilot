@@ -96,6 +96,5 @@ Guidelines:
 - Use quantitative data from the excerpt whenever available (e.g., incidence rates, case counts, study sizes).
 - Compare the findings with closely related agents when the excerpt mentions them; otherwise, briefly reference the agent or class listed in the metadata.
 - Provide monitoring or clinical management recommendations that align with the excerpt and the patient context.
-- Conclude with the exact sentence “Bibliography source: LiverTox”.
-- Do not invent data or cite sources other than LiverTox.
+- Do not invent data or cite sources other than those provided.
 """
