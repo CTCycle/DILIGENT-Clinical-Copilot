@@ -20,15 +20,15 @@ from DILIGENT.app.configurations import ClientRuntimeConfig
 from DILIGENT.app.constants import (
     CLINICAL_API_URL,
     CLOUD_MODEL_CHOICES,
-    DEFAULT_LLM_TIMEOUT_SECONDS,
+    CLIENT_REQUEST_TIMEOUT_SECONDS,
     API_BASE_URL,
 )
 
-LLM_REQUEST_TIMEOUT_SECONDS = DEFAULT_LLM_TIMEOUT_SECONDS
-LLM_REQUEST_TIMEOUT_DISPLAY = (
-    int(LLM_REQUEST_TIMEOUT_SECONDS)
-    if float(LLM_REQUEST_TIMEOUT_SECONDS).is_integer()
-    else LLM_REQUEST_TIMEOUT_SECONDS
+REQUEST_TIMEOUT_SECONDS = CLIENT_REQUEST_TIMEOUT_SECONDS
+REQUEST_TIMEOUT_DISPLAY = (
+    int(REQUEST_TIMEOUT_SECONDS)
+    if float(REQUEST_TIMEOUT_SECONDS).is_integer()
+    else REQUEST_TIMEOUT_SECONDS
 )
 
 
@@ -350,7 +350,7 @@ async def trigger_session(
     on_progress: Callable[[int, int, str], Awaitable[None] | None] | None = None,
 ) -> tuple[str, ComponentUpdate]:
     try:
-        async with httpx.AsyncClient(timeout=LLM_REQUEST_TIMEOUT_SECONDS) as client:
+        async with httpx.AsyncClient(timeout=REQUEST_TIMEOUT_SECONDS) as client:
             if on_progress is not None:
                 params = {"stream": "true"}
                 async with client.stream("POST", url, json=payload, params=params) as response:
@@ -461,7 +461,7 @@ async def trigger_session(
         return message, build_json_output(json_payload)
     except httpx.TimeoutException:
         return (
-            f"[ERROR] Request timed out after {LLM_REQUEST_TIMEOUT_DISPLAY} seconds.",
+            f"[ERROR] Request timed out after {REQUEST_TIMEOUT_DISPLAY} seconds.",
             build_json_output(None),
         )
     except Exception as exc:  # noqa: BLE001

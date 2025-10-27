@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import os
 from os.path import abspath, join
 
 # [PATHS]
@@ -94,6 +95,21 @@ OPENFDA_DRUG_EVENT_DATASET = "drug/event"
 OPENFDA_DRUG_EVENT_INDEX = "drug-event.json"
 OPENFDA_DOWNLOAD_CATALOG_URL = "https://api.fda.gov/download.json"
 DEFAULT_LLM_TIMEOUT_SECONDS = 3_600.0
+CLIENT_TIMEOUT_ENV = "DILIGENT_CLIENT_TIMEOUT_SECONDS"
+_client_timeout_raw = os.getenv(CLIENT_TIMEOUT_ENV)
+if _client_timeout_raw is None:
+    CLIENT_REQUEST_TIMEOUT_SECONDS = DEFAULT_LLM_TIMEOUT_SECONDS
+else:
+    try:
+        _client_timeout_value = float(_client_timeout_raw)
+    except (TypeError, ValueError):
+        CLIENT_REQUEST_TIMEOUT_SECONDS = DEFAULT_LLM_TIMEOUT_SECONDS
+    else:
+        CLIENT_REQUEST_TIMEOUT_SECONDS = (
+            _client_timeout_value
+            if _client_timeout_value > 0
+            else DEFAULT_LLM_TIMEOUT_SECONDS
+        )
 LIVERTOX_LLM_TIMEOUT_SECONDS = DEFAULT_LLM_TIMEOUT_SECONDS
 LIVERTOX_YIELD_INTERVAL = 25
 LIVERTOX_SKIP_DETERMINISTIC_RATIO = 0.80
