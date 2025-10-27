@@ -1,7 +1,5 @@
 from __future__ import annotations
 
-import os
-
 from DILIGENT.app.constants import SOURCES_PATH
 from DILIGENT.app.logger import logger
 from DILIGENT.app.utils.repository.database import database
@@ -9,7 +7,6 @@ from DILIGENT.app.utils.updater.livertox import LiverToxUpdater
 from DILIGENT.app.utils.updater.rxnav import RxNavDrugCatalogBuilder
 
 REDOWNLOAD = True
-RXNAV_CATALOG_FILENAME = "rxnav_drug_catalog.jsonl"
 
 ###############################################################################
 if __name__ == "__main__":
@@ -19,8 +16,8 @@ if __name__ == "__main__":
     logger.info("Refreshing RxNav drug catalog from %s", builder.TERMS_URL)
     catalog_info = builder.update_drug_catalog(catalog_path)    
     logger.info(
-        "RxNav catalog saved to %s with %d entries",
-        catalog_info.get("file_path"),
+        "RxNav catalog upserted into %s with %d entries",
+        catalog_info.get("table_name"),
         catalog_info.get("count", 0),
     )
 
