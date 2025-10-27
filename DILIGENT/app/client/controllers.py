@@ -4,10 +4,10 @@ import json
 import os
 import tempfile
 from datetime import date, datetime
+from dataclasses import dataclass
 from typing import Any
 
 import httpx
-from gradio import update as gr_update
 
 from DILIGENT.app.api.models.providers import (
     OllamaClient,
@@ -28,6 +28,20 @@ LLM_REQUEST_TIMEOUT_DISPLAY = (
     if float(LLM_REQUEST_TIMEOUT_SECONDS).is_integer()
     else LLM_REQUEST_TIMEOUT_SECONDS
 )
+
+
+###############################################################################
+MISSING = object()
+
+
+###############################################################################
+@dataclass
+class ComponentUpdate:
+    value: Any = MISSING
+    options: list[Any] | None = None
+    enabled: bool | None = None
+    visible: bool | None = None
+    download_path: str | None = None
 
 
 # [HELPERS]
@@ -59,10 +73,10 @@ def extract_text(result: Any) -> str:
 
 
 # -----------------------------------------------------------------------------
-def build_json_output(payload: dict[str, Any] | list[Any] | None) -> Any:
+def build_json_output(payload: dict[str, Any] | list[Any] | None) -> ComponentUpdate:
     if payload is None:
-        return gr_update(value=None, visible=False)
-    return gr_update(value=payload, visible=True)
+        return ComponentUpdate(value=None, visible=False)
+    return ComponentUpdate(value=payload, visible=True)
 
 
 # -----------------------------------------------------------------------------
@@ -75,11 +89,11 @@ def create_export_file(content: str) -> str:
 
 
 # -----------------------------------------------------------------------------
-def build_export_update(content: str | None) -> dict[str, Any]:
+def build_export_update(content: str | None) -> ComponentUpdate:
     if content:
         file_path = create_export_file(content)
-        return gr_update(value=file_path, interactive=True)
-    return gr_update(value=None, interactive=False)
+        return ComponentUpdate(value=file_path, enabled=True, download_path=file_path)
+    return ComponentUpdate(value=None, enabled=False, download_path=None)
 
 
 # -----------------------------------------------------------------------------
@@ -159,39 +173,39 @@ def normalize_visit_date_component(
 def toggle_cloud_services(
     enabled: bool,
 ) -> tuple[
-    dict[str, Any],
-    dict[str, Any],
-    dict[str, Any],
-    dict[str, Any],
-    dict[str, Any],
-    dict[str, Any],
+    ComponentUpdate,
+    ComponentUpdate,
+    ComponentUpdate,
+    ComponentUpdate,
+    ComponentUpdate,
+    ComponentUpdate,
 ]:
     ClientRuntimeConfig.set_use_cloud_services(enabled)
     provider = ClientRuntimeConfig.get_llm_provider()
-    provider_update = gr_update(value=provider, interactive=enabled)
+    provider_update = ComponentUpdate(value=provider, enabled=enabled)
     models = CLOUD_MODEL_CHOICES.get(provider, [])
     selected_model = ClientRuntimeConfig.get_cloud_model()
     if selected_model not in models:
         selected_model = ClientRuntimeConfig.set_cloud_model(
             models[0] if models else ""
         )
-    model_update = gr_update(
+    model_update = ComponentUpdate(
         value=selected_model,
-        choices=models,
-        interactive=enabled,
+        options=models,
+        enabled=enabled,
     )
-    button_update = gr_update(interactive=not enabled)
-    temperature_update = gr_update(
+    button_update = ComponentUpdate(enabled=not enabled)
+    temperature_update = ComponentUpdate(
         value=ClientRuntimeConfig.get_ollama_temperature(),
-        interactive=not enabled,
+        enabled=not enabled,
     )
-    reasoning_update = gr_update(
+    reasoning_update = ComponentUpdate(
         value=ClientRuntimeConfig.is_ollama_reasoning_enabled(),
-        interactive=not enabled,
+        enabled=not enabled,
     )
-    clinical_update = gr_update(
+    clinical_update = ComponentUpdate(
         value=ClientRuntimeConfig.get_clinical_model(),
-        interactive=not enabled,
+        enabled=not enabled,
     )
     return (
         provider_update,
@@ -204,16 +218,16 @@ def toggle_cloud_services(
 
 
 # -----------------------------------------------------------------------------
-def set_llm_provider(provider: str) -> tuple[str, dict[str, Any]]:
+def set_llm_provider(provider: str) -> tuple[str, ComponentUpdate]:
     selected = ClientRuntimeConfig.set_llm_provider(provider)
     models = CLOUD_MODEL_CHOICES.get(selected, [])
     current_model = ClientRuntimeConfig.get_cloud_model()
     if current_model not in models:
         current_model = ClientRuntimeConfig.set_cloud_model(models[0] if models else "")
-    model_update = gr_update(
+    model_update = ComponentUpdate(
         value=current_model,
-        choices=models,
-        interactive=ClientRuntimeConfig.is_cloud_enabled(),
+        options=models,
+        enabled=ClientRuntimeConfig.is_cloud_enabled(),
     )
     return selected, model_update
 
@@ -246,7 +260,7 @@ def set_ollama_reasoning(enabled: bool) -> bool:
 # -----------------------------------------------------------------------------
 async def pull_selected_models(
     parsing_model: str, clinical_model: str
-) -> tuple[str, Any]:
+) -> tuple[str, ComponentUpdate]:
     models: list[str] = []
     for name in (parsing_model, clinical_model):
         if not name:
@@ -290,8 +304,8 @@ def clear_session_fields() -> tuple[
     bool,
     bool,
     str,
-    Any,
-    dict[str, Any],
+    ComponentUpdate,
+    ComponentUpdate,
 ]:
     return (
         "",
@@ -316,7 +330,7 @@ def clear_session_fields() -> tuple[
 # -----------------------------------------------------------------------------
 async def trigger_session(
     url: str, payload: dict[str, Any] | None = None
-) -> tuple[str, Any]:
+) -> tuple[str, ComponentUpdate]:
     try:
         async with httpx.AsyncClient(timeout=LLM_REQUEST_TIMEOUT_SECONDS) as client:
             resp = await client.post(url, json=payload)
@@ -380,7 +394,7 @@ async def run_DILI_session(
     alp_max: str,
     symptoms: list[str],
     use_rag: bool,
-) -> tuple[str, Any, dict[str, Any]]:
+) -> tuple[str, ComponentUpdate, ComponentUpdate]:
     normalized_visit_date = normalize_visit_date(visit_date)
 
     cleaned_payload = {
