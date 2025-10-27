@@ -42,6 +42,15 @@ class ClinicalSession(Base):
     total_duration = Column(Float)
     final_report = Column(Text)
 
+###############################################################################
+class DrugsCatalog(Base):
+    __tablename__ = "DRUGS_CATALOG"
+    rxcui = Column(String, primary_key=True)
+    term_type = Column(String, primary_key=True)
+    raw_name = Column(Text)
+    name = Column(String)
+    brand_names = Column(Text)
+    __table_args__ = (UniqueConstraint("rxcui", "term_type"),)
 
 ###############################################################################
 class LiverToxData(Base):
