@@ -73,48 +73,6 @@ class LiverToxData(Base):
     __table_args__ = (UniqueConstraint("drug_name", "ingredient", "brand_name"),)
 
 
-###############################################################################
-class DrugCatalog(Base):
-    __tablename__ = "DRUG_CATALOG"
-    rxcui = Column(String, primary_key=True)
-    preferred_name = Column(String)
-    concept_type = Column(String)
-    synonyms = Column(Text)
-    brands = Column(Text)
-    rxcui_parents = Column(Text)
-    pubchem_cid = Column(String)
-    inchikey = Column(String)
-    unii = Column(String)
-    cas = Column(String)
-    xrefs = Column(Text)
-    status = Column(String)
-    updated_at = Column(DateTime)
-    __table_args__ = (UniqueConstraint("rxcui"),)
-
-
-###############################################################################
-class FdaAdverseEvent(Base):
-    __tablename__ = "FDA_ADVERSE_EVENTS"
-    report_id = Column(String, primary_key=True)
-    case_version = Column(String, primary_key=True)
-    receipt_date = Column(String)
-    occur_country = Column(String)
-    patient_age = Column(String)
-    patient_age_unit = Column(String)
-    patient_sex = Column(String)
-    reaction_terms = Column(Text)
-    all_reactions = Column(Text)
-    suspect_products = Column(Text)
-    suspect_product_count = Column(Integer)
-    serious = Column(Integer)
-    seriousness_death = Column(Integer)
-    seriousness_lifethreatening = Column(Integer)
-    seriousness_hospitalization = Column(Integer)
-    seriousness_disabling = Column(Integer)
-    seriousness_congenital_anom = Column(Integer)
-    seriousness_other = Column(Integer)
-    __table_args__ = (UniqueConstraint("report_id", "case_version"),)
-
 
 # [DATABASE]
 ###############################################################################
