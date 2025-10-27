@@ -62,6 +62,10 @@ class ClientComponents:
     temperature_input: Any
     reasoning_checkbox: Any
     pull_models_button: Any
+    run_button: Any
+    progress_container: Any
+    progress_bar: Any
+    progress_label: Any
     markdown_output: Any
     json_container: Any
     json_code: Any
@@ -101,6 +105,19 @@ def apply_json_update(components: ClientComponents, update: ComponentUpdate) -> 
             components.json_code.set_content(formatted)
     if update.visible is not None:
         components.json_container.visible = update.visible
+
+
+###############################################################################
+async def update_progress_display(
+    components: ClientComponents, step: int, total: int, message: str
+) -> None:
+    safe_total = total if total > 0 else 1
+    safe_step = max(0, min(step, safe_total))
+    ratio = safe_step / safe_total
+    components.progress_bar.value = ratio
+    components.progress_bar.update()
+    components.progress_label.text = message or ""
+    components.progress_label.update()
 
 
 ###############################################################################
@@ -209,22 +226,54 @@ async def handle_pull_models_click(
 async def handle_run_workflow(
     components: ClientComponents, event: Any
 ) -> None:
-    message, json_update, export_update = await run_DILI_session(
-        components.patient_name.value,
-        components.visit_date.value,
-        components.anamnesis.value,
-        bool(components.has_diseases.value),
-        components.drugs.value,
-        components.alt.value,
-        components.alt_max.value,
-        components.alp.value,
-        components.alp_max.value,
-        list(components.symptoms.value or []),
-        bool(components.use_rag.value),
-    )
+    components.run_button.disable()
+    components.export_button.disable()
+    components.progress_container.visible = True
+    components.progress_container.update()
+    await update_progress_display(components, 0, 1, "Preparing DILI analysis...")
+
+    progress_callback = partial(update_progress_display, components)
+
+    message: str | None = None
+    json_update = ComponentUpdate(value=None, visible=False)
+    export_update = ComponentUpdate(value=None, enabled=False)
+
+    try:
+        message, json_update, export_update = await run_DILI_session(
+            components.patient_name.value,
+            components.visit_date.value,
+            components.anamnesis.value,
+            bool(components.has_diseases.value),
+            components.drugs.value,
+            components.alt.value,
+            components.alt_max.value,
+            components.alp.value,
+            components.alp_max.value,
+            list(components.symptoms.value or []),
+            bool(components.use_rag.value),
+            on_progress=progress_callback,
+        )
+    except Exception as exc:  # noqa: BLE001
+        message = f"[ERROR] Unexpected error while running analysis: {exc}"
+        json_update = ComponentUpdate(value=None, visible=False)
+        export_update = ComponentUpdate(value=None, enabled=False)
+    finally:
+        components.run_button.enable()
+
     components.markdown_output.set_content(message or "")
     apply_json_update(components, json_update)
     apply_export_update(components, export_update)
+
+    normalized_message = (message or "").strip()
+    success = bool(normalized_message) and not normalized_message.startswith("[ERROR]")
+    if success:
+        components.progress_bar.value = 1.0
+        components.progress_label.text = "Analysis completed."
+    else:
+        components.progress_bar.value = 0.0
+        components.progress_label.text = "Analysis failed."
+    components.progress_bar.update()
+    components.progress_label.update()
 
 
 ###############################################################################
@@ -270,6 +319,12 @@ async def handle_clear_click(
     components.use_rag.value = use_rag
     components.use_rag.update()
     components.markdown_output.set_content(markdown_message or "")
+    components.progress_bar.value = 0.0
+    components.progress_bar.update()
+    components.progress_label.text = ""
+    components.progress_label.update()
+    components.progress_container.visible = False
+    components.progress_container.update()
     apply_json_update(components, json_update)
     apply_export_update(components, export_update)
 
@@ -381,6 +436,10 @@ def main_page() -> None:
                         ).classes("w-full")
                         export_button.disable()
                         clear_button = ui.button("Clear all").classes("w-full")
+                        progress_container = ui.column().classes("w-full gap-2")
+                        progress_container.visible = False
+                        progress_bar = ui.linear_progress(value=0).classes("w-full")
+                        progress_label = ui.label("").classes("text-sm text-slate-600 dark:text-slate-300")
 
                 with ui.expansion(
                     "Models & Analysis Configuration"
@@ -473,6 +532,10 @@ def main_page() -> None:
         temperature_input=temperature_input,
         reasoning_checkbox=reasoning_checkbox,
         pull_models_button=pull_models_button,
+        run_button=run_button,
+        progress_container=progress_container,
+        progress_bar=progress_bar,
+        progress_label=progress_label,
         markdown_output=markdown_output,
         json_container=json_container,
         json_code=json_code,

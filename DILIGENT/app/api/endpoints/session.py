@@ -1,11 +1,15 @@
 from __future__ import annotations
 
+import asyncio
+import inspect
+import json
 import time
+from collections.abc import Awaitable, Callable
 from datetime import date, datetime
 from typing import Any
 
-from fastapi import APIRouter, Body, HTTPException, status
-from fastapi.responses import PlainTextResponse
+from fastapi import APIRouter, Body, HTTPException, Query, status
+from fastapi.responses import PlainTextResponse, StreamingResponse
 from pydantic import ValidationError
 
 from DILIGENT.app.api.schemas.clinical import (
@@ -21,13 +25,17 @@ from DILIGENT.app.utils.services.parser import (
     DrugsParser,
 )
 
+
 drugs_parser = DrugsParser()
 pattern_analyzer = HepatotoxicityPatternAnalyzer()
 router = APIRouter(tags=["session"])
 serializer = DataSerializer()
 
 
-# [HELPERS]
+###############################################################################
+TOTAL_ANALYSIS_STEPS = 4
+
+
 ###############################################################################
 def build_bullet_list(content: str | None) -> list[str]:
     lines: list[str] = []
@@ -41,6 +49,7 @@ def build_bullet_list(content: str | None) -> list[str]:
     return lines
 
 
+###############################################################################
 def build_patient_narrative(
     *,
     patient_label: str,
@@ -103,9 +112,25 @@ def build_patient_narrative(
     return "\n\n".join(sections)
 
 
-# [ENPOINTS]
 ###############################################################################
-async def process_single_patient(payload: PatientData) -> str:
+async def report_progress(
+    callback: Callable[[int, int, str], Awaitable[None] | None] | None,
+    step: int,
+    total: int,
+    message: str,
+) -> None:
+    if callback is None:
+        return
+    outcome = callback(step, total, message)
+    if inspect.isawaitable(outcome):
+        await outcome
+
+
+###############################################################################
+async def process_single_patient(
+    payload: PatientData,
+    progress_callback: Callable[[int, int, str], Awaitable[None] | None] | None = None,
+) -> str:
     if payload.anamnesis is None or payload.drugs is None:
         raise HTTPException(
             status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
@@ -117,22 +142,39 @@ async def process_single_patient(payload: PatientData) -> str:
         payload.name,
     )
 
+    await report_progress(
+        progress_callback,
+        0,
+        TOTAL_ANALYSIS_STEPS,
+        "Starting DILI analysis.",
+    )
+
     global_start_time = time.perf_counter()
 
-    # Step 1: Calculate hepatic pattern score using ALT/ALP values
     pattern_score = pattern_analyzer.calculate_hepatotoxicity_pattern(payload)
     logger.info(
         "Patient hepatotoxicity pattern classified as %s (R=%.3f)",
         pattern_score.classification,
         pattern_score.r_score if pattern_score.r_score is not None else float("nan"),
     )
+    await report_progress(
+        progress_callback,
+        1,
+        TOTAL_ANALYSIS_STEPS,
+        f"Hepatotoxicity pattern classified as {pattern_score.classification}.",
+    )
 
-    # Step 2: Parse drug names and metadata from the raw text list
     start_time = time.perf_counter()
     drug_data = await drugs_parser.extract_drug_list(payload.drugs or "")
     elapsed = time.perf_counter() - start_time
     logger.info("Drugs extraction required %.4f seconds", elapsed)
     logger.info("Detected %s drugs", len(drug_data.entries))
+    await report_progress(
+        progress_callback,
+        2,
+        TOTAL_ANALYSIS_STEPS,
+        f"Extracted {len(drug_data.entries)} drugs from therapy list.",
+    )
 
     clinical_session = HepatoxConsultation(drug_data, patient_name=payload.name)
     drug_assessment = await clinical_session.run_analysis(
@@ -142,10 +184,16 @@ async def process_single_patient(payload: PatientData) -> str:
     )
     elapsed = time.perf_counter() - start_time
     logger.info("Hepato-toxicity consultation required %.4f seconds", elapsed)
+    await report_progress(
+        progress_callback,
+        3,
+        TOTAL_ANALYSIS_STEPS,
+        "Completed hepatotoxicity consultation.",
+    )
 
     final_report: str | None = None
     if isinstance(drug_assessment, dict):
-        final_report: str | None = drug_assessment.get("final_report", "").strip()
+        final_report = drug_assessment.get("final_report", "").strip()
 
     patient_label = payload.name or "Unknown patient"
     visit_label = (
@@ -160,7 +208,6 @@ async def process_single_patient(payload: PatientData) -> str:
         global_elapsed,
     )
 
-    # Step 3: Persist a structured representation of the session to SQLite
     detected_drugs = [entry.name for entry in drug_data.entries if entry.name]
     pattern_strings = pattern_analyzer.stringify_scores(pattern_score)
     serializer.record_clinical_session(
@@ -180,6 +227,12 @@ async def process_single_patient(payload: PatientData) -> str:
             "final_report": final_report,
         }
     )
+    await report_progress(
+        progress_callback,
+        TOTAL_ANALYSIS_STEPS,
+        TOTAL_ANALYSIS_STEPS,
+        "Generated clinical report.",
+    )
 
     narrative = build_patient_narrative(
         patient_label=patient_label,
@@ -195,7 +248,79 @@ async def process_single_patient(payload: PatientData) -> str:
     return narrative
 
 
-# -----------------------------------------------------------------------------
+###############################################################################
+class ClinicalSessionStreamer:
+    def __init__(self, payload: PatientData) -> None:
+        self.payload = payload
+        self.queue: asyncio.Queue[dict[str, Any] | None] = asyncio.Queue()
+
+    async def progress(self, step: int, total: int, message: str) -> None:
+        await self.queue.put(
+            {
+                "type": "progress",
+                "step": step,
+                "total": total,
+                "message": message,
+            }
+        )
+
+    async def run(self) -> None:
+        try:
+            result = await process_single_patient(
+                self.payload,
+                progress_callback=self.progress,
+            )
+        except HTTPException as exc:
+            detail = exc.detail
+            message = (
+                detail
+                if isinstance(detail, str)
+                else "Clinical session validation failed."
+            )
+            await self.queue.put(
+                {
+                    "type": "error",
+                    "message": message,
+                    "detail": detail,
+                    "status": exc.status_code,
+                }
+            )
+        except Exception as exc:  # noqa: BLE001
+            logger.exception(
+                "Unexpected error while running clinical session: %s",
+                exc,
+            )
+            await self.queue.put(
+                {
+                    "type": "error",
+                    "message": f"Unexpected error during analysis: {exc}",
+                    "status": status.HTTP_500_INTERNAL_SERVER_ERROR,
+                }
+            )
+        else:
+            await self.queue.put({"type": "result", "content": result})
+        finally:
+            await self.queue.put(None)
+
+    async def iterate(self):
+        asyncio.create_task(self.run())
+        while True:
+            item = await self.queue.get()
+            if item is None:
+                break
+            yield json.dumps(item, ensure_ascii=False) + "\n"
+
+
+###############################################################################
+# [ENPOINTS]
+###############################################################################
+async def process_single_patient_stream(payload: PatientData):
+    streamer = ClinicalSessionStreamer(payload)
+    async for chunk in streamer.iterate():
+        yield chunk
+
+
+###############################################################################
 @router.post(
     "/clinical",
     response_model=None,
@@ -214,7 +339,8 @@ async def start_clinical_session(
     alp: str | None = Body(default=None),
     alp_max: str | None = Body(default=None),
     symptoms: list[str] | None = Body(default=None),
-) -> PlainTextResponse:
+    stream: bool = Query(default=False),
+) -> PlainTextResponse | StreamingResponse:
     try:
         payload_data: dict[str, Any] = {
             "name": name,
@@ -235,5 +361,15 @@ async def start_clinical_session(
             status_code=status.HTTP_422_UNPROCESSABLE_ENTITY, detail=exc.errors()
         ) from exc
 
+    if stream:
+        return StreamingResponse(
+            process_single_patient_stream(payload),
+            media_type="application/jsonl",
+            status_code=status.HTTP_202_ACCEPTED,
+        )
+
     single_result = await process_single_patient(payload)
-    return PlainTextResponse(content=single_result)
+    return PlainTextResponse(
+        content=single_result,
+        status_code=status.HTTP_202_ACCEPTED,
+    )

@@ -1,10 +1,12 @@
 from __future__ import annotations
 
+import inspect
 import json
 import os
 import tempfile
-from datetime import date, datetime
+from collections.abc import Awaitable, Callable
 from dataclasses import dataclass
+from datetime import date, datetime
 from typing import Any
 
 import httpx
@@ -32,6 +34,20 @@ LLM_REQUEST_TIMEOUT_DISPLAY = (
 
 ###############################################################################
 MISSING = object()
+
+
+###############################################################################
+async def invoke_progress_callback(
+    callback: Callable[[int, int, str], Awaitable[None] | None] | None,
+    step: int,
+    total: int,
+    message: str,
+) -> None:
+    if callback is None:
+        return
+    outcome = callback(step, total, message)
+    if inspect.isawaitable(outcome):
+        await outcome
 
 
 ###############################################################################
@@ -329,10 +345,82 @@ def clear_session_fields() -> tuple[
 # on the requested endpoint URL (defined through run_DILI_session function)
 # -----------------------------------------------------------------------------
 async def trigger_session(
-    url: str, payload: dict[str, Any] | None = None
+    url: str,
+    payload: dict[str, Any] | None = None,
+    on_progress: Callable[[int, int, str], Awaitable[None] | None] | None = None,
 ) -> tuple[str, ComponentUpdate]:
     try:
         async with httpx.AsyncClient(timeout=LLM_REQUEST_TIMEOUT_SECONDS) as client:
+            if on_progress is not None:
+                params = {"stream": "true"}
+                async with client.stream("POST", url, json=payload, params=params) as response:
+                    response.raise_for_status()
+                    final_message = ""
+                    json_payload: dict[str, Any] | list[Any] | None = None
+                    buffered_lines: list[str] = []
+                    async for line in response.aiter_lines():
+                        if not line:
+                            continue
+                        try:
+                            data = json.loads(line)
+                        except json.JSONDecodeError:
+                            buffered_lines.append(line)
+                            continue
+                        event_type = data.get("type")
+                        if event_type == "progress":
+                            step_value = data.get("step", 0)
+                            total_value = data.get("total", 0)
+                            try:
+                                step_int = int(step_value)
+                            except (TypeError, ValueError):
+                                step_int = 0
+                            try:
+                                total_int = int(total_value)
+                            except (TypeError, ValueError):
+                                total_int = 0
+                            message_text = str(data.get("message", ""))
+                            await invoke_progress_callback(
+                                on_progress,
+                                step_int,
+                                total_int,
+                                message_text,
+                            )
+                        elif event_type == "result":
+                            final_message = str(data.get("content") or "")
+                            payload_candidate = data.get("json")
+                            if isinstance(payload_candidate, (dict, list)):
+                                json_payload = payload_candidate
+                        elif event_type == "error":
+                            json_candidate = data.get("json")
+                            json_payload = json_candidate if isinstance(json_candidate, (dict, list)) else None
+                            error_message = str(
+                                data.get(
+                                    "message",
+                                    "[ERROR] Unexpected error during analysis.",
+                                )
+                            )
+                            detail_payload = data.get("detail")
+                            if detail_payload:
+                                if isinstance(detail_payload, str):
+                                    error_message = f"{error_message}\nDetails: {detail_payload}"
+                                else:
+                                    try:
+                                        detail_serialized = json.dumps(
+                                            detail_payload,
+                                            ensure_ascii=False,
+                                            indent=2,
+                                        )
+                                    except (TypeError, ValueError):
+                                        detail_serialized = str(detail_payload)
+                                    error_message = f"{error_message}\nDetails: {detail_serialized}"
+                            return error_message, build_json_output(json_payload)
+                    if final_message:
+                        return final_message, build_json_output(json_payload)
+                    if buffered_lines:
+                        fallback_message = "\n".join(buffered_lines).strip()
+                        if fallback_message:
+                            return fallback_message, build_json_output(None)
+                    return "[ERROR] Empty response from backend.", build_json_output(None)
             resp = await client.post(url, json=payload)
             resp.raise_for_status()
             json_payload: dict[str, Any] | list[Any] | None = None
@@ -394,6 +482,7 @@ async def run_DILI_session(
     alp_max: str,
     symptoms: list[str],
     use_rag: bool,
+    on_progress: Callable[[int, int, str], Awaitable[None] | None] | None = None,
 ) -> tuple[str, ComponentUpdate, ComponentUpdate]:
     normalized_visit_date = normalize_visit_date(visit_date)
 
@@ -427,7 +516,11 @@ async def run_DILI_session(
         )
 
     url = f"{API_BASE_URL}{CLINICAL_API_URL}"
-    message, json_update = await trigger_session(url, cleaned_payload)
+    message, json_update = await trigger_session(
+        url,
+        cleaned_payload,
+        on_progress=on_progress,
+    )
     normalized_message = message.strip() if message else ""
     exportable = (
         message
