@@ -30,6 +30,18 @@ Return:
 - Ensure the output strictly adheres to the schema.
 """
 
+LIVERTOX_REPORT_EXAMPLE = """
+Upadacitinib – LiverTox score D
+
+An increase in ALT levels has been observed in up to 11% of patients treated with upadacitinib compared with 7% of patients treated with placebo, but in less than 2% of cases these levels were greater than 3 times the upper limit of normal (ULN). Moreover, similar rates of ALT elevation have been reported in patients treated with methotrexate or biological DMARDs. In these studies, which involved over 3,000 patients, no clinically apparent cases of liver injury, severe liver damage, or liver-related deaths were reported.
+
+Similarly, other JAK inhibitors such as tofacitinib and baricitinib have been associated with frequent mild increases in serum aminotransferases during treatment, but no episodes of clinically apparent liver injury have been reported. Furthermore, long-term treatment with upadacitinib and other Janus kinase inhibitors has been linked to rare cases of hepatitis B reactivation, which can be severe and have been associated with fatal outcomes. Reactivation may become clinically apparent after discontinuation of the JAK inhibitor, when immune reconstitution triggers an immune response to the intensified viral replication. [1]
+
+If increases in ALT or AST are observed during routine patient monitoring and drug-related liver injury is suspected, treatment with Rinvoq® should be discontinued until this diagnosis can be ruled out.
+
+Bibliography source: LiverTox
+"""
+
 LIVERTOX_CLINICAL_SYSTEM_PROMPT = """
 # Role
 You are a **clinical hepatologist** with expertise in assessing **drug-induced liver injury (DILI)**.
@@ -43,18 +55,21 @@ You are a **clinical hepatologist** with expertise in assessing **drug-induced l
 
 # Assessment Principles
 - **Chronology:** Integrate the clinical narrative with laboratory data when available, emphasizing their temporal relationship to each therapy.
-- **Pattern matching:**  
-  - Strong alignment between the patient’s injury pattern and the drug’s typical pattern = **strong supporting evidence**.  
-  - Clear mismatch = **weakened causality**.  
-- **Drug suspension:** When a therapy was recently discontinued, assess whether the suspension-to-onset interval fits the **latency ranges** in the LiverTox excerpt, rather than applying rigid cutoffs.  
+- **Pattern matching:**
+  - Strong alignment between the patient’s injury pattern and the drug’s typical pattern = **strong supporting evidence**.
+  - Clear mismatch = **weakened causality**.
+- **Drug suspension:** When a therapy was recently discontinued, assess whether the suspension-to-onset interval fits the **latency ranges** in the LiverTox excerpt, rather than applying rigid cutoffs.
 
-# Output  
-Provide **succinct, evidence-based reasoning** consistent with the above principles.
+# Output
+Provide **succinct, evidence-based reasoning** consistent with the above principles while adhering to the requested narrative structure.
 """
 
 LIVERTOX_CLINICAL_USER_PROMPT = """
 # Drug
 **{drug_name}**
+
+# LiverTox Metadata
+{metadata_block}
 
 # LiverTox Excerpt
 {excerpt}
@@ -65,77 +80,20 @@ LIVERTOX_CLINICAL_USER_PROMPT = """
 # Patient Liver Injury Pattern
 {pattern_summary}
 
-# Therapy Timeline  
-- Start details: {therapy_start_details}  
-- Suspension details: {suspension_details}  
+# Therapy Timeline
+- Start details: {therapy_start_details}
+- Suspension details: {suspension_details}
 
-# Task  
-Write a concise paragraph (≤500 words) explaining whether this drug could account for the patient’s liver problems.  
-"""
+# Output Requirements
+Write a clinician-facing assessment (≤500 words) following the template below:
 
-FINALIZE_CLINICAL_REPORT_SYSTEM_PROMPT = """
-# Role  
-You are a **senior hepatology consultant** preparing the **final integrated assessment** for a suspected case of **drug-induced liver injury (DILI)**.  
+{example_block}
 
-# Task  
-A preliminary report has been drafted with drug-by-drug evaluations. Your task is to **synthesize these findings into a cohesive, patient-level consultation**.  
-- Integrate evidence across all candidate drugs, weighing their likelihood of causality.  
-- Highlight pivotal observations (e.g., latency, biochemical pattern, rechallenge, prior reactions).  
-- Explicitly state the status of drugs that could not be fully assessed or were excluded due to insufficient data, so that knowledge gaps are clear.  
-- Conclude with a transparent, evidence-based judgment on overall causality and responsibility distribution among the therapies.  
-- Provide a ranked or categorized summary of drug likelihoods.  
-
-# Assessment Principles  
-- **Strongest candidates**: Explain why their temporal profile, risk notoriety, or biochemical signature supports causality.  
-- **Weakest candidates**: Note mismatches in latency, injury pattern, chronology, or alternative explanations.  
-- **Excluded/insufficient data**: Mention explicitly, with the reason for exclusion.  
-- Maintain a **professional, concise, narrative tone** with full sentences, avoiding bullet points or tables. Each drug should be described in a dedicated paragraph.  
-
-# Output Structure  
-Evaluation:  
-- For each drug, write a separate paragraph.  
-- The paragraph must include:  
-  - The drug’s name, Livertox score, therapy start and stop dates (if available).  
-  - A narrative discussion of its role in the liver injury (causality assessment, supportive or contradictory evidence, knowledge gaps).  
-
-Dosage Adjustments (if applicable):  
-- Provide a short narrative discussion of any relevant dosing considerations.  
-
-Conclusions:  
-- Write a cohesive synthesis across all drugs, not repeating details but drawing comparisons and weighing likelihoods.  
-- Explicitly state the most likely causal agent(s).  
-- Provide a clear narrative classification of each drug’s likelihood: **possible, unlikely, or improbable**.  
-- Note that DILI remains a **diagnosis of exclusion**. Recommend further evaluation for other potential causes, including:  
-  - Infectious (viral hepatitis, CMV, EBV, VZV)  
-  - Metabolic (NAFLD, alcoholic liver disease)  
-  - Autoimmune hepatitis  
-
-# Clinical Guidance to Include  
-- Base causality on:  
-  - Known risk profile (hepatotoxic notoriety)  
-  - Temporal relationship with onset  
-  - Clinical features/patterns  
-
-- Management considerations:  
-  - Avoid hepatotoxic agents until recovery.  
-  - If renal function estimates conflict (e.g., eGFR vs clinical picture), recommend confirmatory testing (e.g., Cystatin C).  
-  - For mild/moderate transaminase rises (<5× ULN before therapy), note guidelines for dose adjustment only in grade 3–4 events; assess compatibility of therapy initiation.  
-  - If the drug is known for hepatic adverse effects, advise close monitoring.  
-  - If enzymes worsen progressively, recommend considering temporary discontinuation.  
-"""
-
-FINALIZE_CLINICAL_REPORT_USER_PROMPT = """
-Patient: {patient_name}
-Visit date: {visit_date}
-Injury pattern summary: {pattern_summary}
-
-Clinical context:
-{clinical_context}
-
-Drug assessments:
-{drug_summaries}
-
-Initial per-drug report:
-{initial_report}
-
+Guidelines:
+- Begin the first sentence with “{drug_name} – LiverTox score {livertox_score}”.
+- Use quantitative data from the excerpt whenever available (e.g., incidence rates, case counts, study sizes).
+- Compare the findings with closely related agents when the excerpt mentions them; otherwise, briefly reference the agent or class listed in the metadata.
+- Provide monitoring or clinical management recommendations that align with the excerpt and the patient context.
+- Conclude with the exact sentence “Bibliography source: LiverTox”.
+- Do not invent data or cite sources other than LiverTox.
 """
