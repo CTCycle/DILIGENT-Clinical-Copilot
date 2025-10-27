@@ -2,17 +2,17 @@ from __future__ import annotations
 
 import codecs
 import json
-import os
 import re
-import tempfile
 import time
 import unicodedata
 from dataclasses import dataclass
 from typing import Any, Iterator
 
 import httpx
+import pandas as pd
 
 from DILIGENT.app.logger import logger
+from DILIGENT.app.utils.repository.database import database
 
 __all__ = ["RxNavClient", "RxNavDrugCatalogBuilder"]
 
@@ -542,6 +542,8 @@ class RxNavDrugCatalogBuilder:
     RETRY_STATUS = {429, 500, 502, 503, 504}
     TIMEOUT = 30.0
     BACKOFF_SECONDS = (0.8, 1.6, 3.2)
+    TABLE_NAME = "DRUGS_CATALOG"
+    BATCH_SIZE = 2000
 
     def __init__(self) -> None:
         combined: set[str] = set()
@@ -562,10 +564,7 @@ class RxNavDrugCatalogBuilder:
         self.brand_pattern = re.compile(r"\[([^\]]+)\]")
 
     # -------------------------------------------------------------------------
-    def build_catalog(self, destination: str) -> dict[str, Any]:
-        directory = os.path.dirname(destination) or "."
-        os.makedirs(directory, exist_ok=True)
-
+    def build_catalog(self) -> dict[str, Any]:
         attempt = 0
         last_error: Exception | None = None
         while attempt < self.MAX_RETRIES:
@@ -579,9 +578,7 @@ class RxNavDrugCatalogBuilder:
                         attempt += 1
                         continue
                     response.raise_for_status()
-                    return self.write_catalog(
-                        response.iter_bytes(self.CHUNK_SIZE), destination, directory
-                    )
+                    return self.persist_catalog(response.iter_bytes(self.CHUNK_SIZE))
             except httpx.HTTPStatusError as exc:  # pragma: no cover - network dependent
                 last_error = exc
                 if (
@@ -609,40 +606,35 @@ class RxNavDrugCatalogBuilder:
         raise RuntimeError("Failed to download RxNav drug catalog")
 
     # -------------------------------------------------------------------------
-    def write_catalog(
-        self,
-        chunks: Iterator[bytes],
-        destination: str,
-        directory: str,
-    ) -> dict[str, Any]:
+    def persist_catalog(self, chunks: Iterator[bytes]) -> dict[str, Any]:
         count = 0
-        temp_path = ""
-        with tempfile.NamedTemporaryFile(
-            "w",
-            encoding="utf-8",
-            delete=False,
-            dir=directory,
-        ) as handle:
-            temp_path = handle.name
-            try:
-                for concept in self.stream_min_concepts(chunks):
-                    payload = self.sanitize_concept(concept)
-                    if payload is None:
-                        continue
-                    json.dump(payload, handle, ensure_ascii=False)
-                    handle.write("\n")
-                    count += 1
-            except Exception:  # noqa: BLE001
-                handle.flush()
-                handle.close()
-                if temp_path:
-                    try:
-                        os.unlink(temp_path)
-                    except OSError:
-                        pass
-                raise
-        os.replace(temp_path, destination)
-        return {"file_path": destination, "count": count}
+        batch: list[dict[str, Any]] = []
+        for concept in self.stream_min_concepts(chunks):
+            payload = self.sanitize_concept(concept)
+            if payload is None:
+                continue
+            batch.append(payload)
+            if len(batch) >= self.BATCH_SIZE:
+                self.persist_batch(batch)
+                count += len(batch)
+                batch.clear()
+        if batch:
+            self.persist_batch(batch)
+            count += len(batch)
+        return {"table_name": self.TABLE_NAME, "count": count}
+
+    # -------------------------------------------------------------------------
+    def persist_batch(self, batch: list[dict[str, Any]]) -> None:
+        frame = pd.DataFrame(batch)
+        if frame.empty:
+            return
+        if "brand_names" in frame:
+            frame["brand_names"] = frame["brand_names"].apply(
+                lambda names: json.dumps(
+                    names if isinstance(names, list) else [], ensure_ascii=False
+                )
+            )
+        database.upsert_into_database(frame, self.TABLE_NAME)
 
     # -------------------------------------------------------------------------
     def stream_min_concepts(self, chunks: Iterator[bytes]) -> Iterator[dict[str, Any]]:
