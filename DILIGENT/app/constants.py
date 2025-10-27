@@ -36,7 +36,7 @@ PARSING_MODEL_CHOICES = [
     "qwen3:8b",
     "qwen3:14b",
     "llama3.1:8b",
-    "mistral-nemo:12b",    
+    "mistral-nemo:12b",
     "gemma2:9b",
     "phi3.5:mini",
     "phi3:medium",
@@ -49,8 +49,7 @@ CLINICAL_MODEL_CHOICES = [
     "phi3.5:moe",
     "deepseek-r1:14b",
     "alibayram/medgemma:4b",
-    "alibayram/medgemma:27b"
-    "gemma3:9b",
+    "alibayram/medgemma:27bgemma3:9b",
     "gemma3:27b",
 ]
 OPENAI_CLOUD_MODELS = ["gpt-4.1-mini", "gpt-4.1", "gpt-4o-mini", "gpt-4o"]

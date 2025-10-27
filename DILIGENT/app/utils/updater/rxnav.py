@@ -1,7 +1,6 @@
 from __future__ import annotations
 
 import json
-import os
 import re
 import time
 import unicodedata
@@ -149,7 +148,7 @@ class RxNavClient:
     )
     TERM_PATTERN = re.compile(r"[A-Za-z0-9]+(?:[-'][A-Za-z0-9]+)*")
     BRACKET_PATTERN = re.compile(r"\[([^\]]+)\]")
-    
+
     def __init__(self, *, enabled: bool | None = None) -> None:
         self.enabled = True
         self.cache: dict[str, dict[str, RxNormCandidate]] = {}
