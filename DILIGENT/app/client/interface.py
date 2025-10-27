@@ -132,9 +132,7 @@ async def handle_toggle_cloud_services(
 
 
 ###############################################################################
-async def handle_llm_provider_change(
-    components: ClientComponents, event: Any
-) -> None:
+async def handle_llm_provider_change(components: ClientComponents, event: Any) -> None:
     provider_value = str(event.value or "")
     selected, model_update = set_llm_provider(provider_value)
     if hasattr(components.llm_provider_dropdown, "value"):
@@ -144,9 +142,7 @@ async def handle_llm_provider_change(
 
 
 ###############################################################################
-async def handle_cloud_model_change(
-    components: ClientComponents, event: Any
-) -> None:
+async def handle_cloud_model_change(components: ClientComponents, event: Any) -> None:
     selection = set_cloud_model(str(event.value or ""))
     if hasattr(components.cloud_model_dropdown, "value"):
         components.cloud_model_dropdown.value = selection
@@ -154,9 +150,7 @@ async def handle_cloud_model_change(
 
 
 ###############################################################################
-async def handle_parsing_model_change(
-    components: ClientComponents, event: Any
-) -> None:
+async def handle_parsing_model_change(components: ClientComponents, event: Any) -> None:
     selection = set_parsing_model(str(event.value or ""))
     if hasattr(components.parsing_model_dropdown, "value"):
         components.parsing_model_dropdown.value = selection
@@ -174,9 +168,7 @@ async def handle_clinical_model_change(
 
 
 ###############################################################################
-async def handle_temperature_change(
-    components: ClientComponents, event: Any
-) -> None:
+async def handle_temperature_change(components: ClientComponents, event: Any) -> None:
     value = event.value if event.value is not None else None
     updated = set_ollama_temperature(value)
     if hasattr(components.temperature_input, "value"):
@@ -185,9 +177,7 @@ async def handle_temperature_change(
 
 
 ###############################################################################
-async def handle_reasoning_change(
-    components: ClientComponents, event: Any
-) -> None:
+async def handle_reasoning_change(components: ClientComponents, event: Any) -> None:
     updated = set_ollama_reasoning(bool(event.value))
     if hasattr(components.reasoning_checkbox, "value"):
         components.reasoning_checkbox.value = updated
@@ -195,9 +185,7 @@ async def handle_reasoning_change(
 
 
 ###############################################################################
-async def handle_pull_models_click(
-    components: ClientComponents, event: Any
-) -> None:
+async def handle_pull_models_click(components: ClientComponents, event: Any) -> None:
     parsing_model = str(components.parsing_model_dropdown.value or "")
     clinical_model = str(components.clinical_model_dropdown.value or "")
     message, json_update = await pull_selected_models(parsing_model, clinical_model)
@@ -206,9 +194,7 @@ async def handle_pull_models_click(
 
 
 ###############################################################################
-async def handle_run_workflow(
-    components: ClientComponents, event: Any
-) -> None:
+async def handle_run_workflow(components: ClientComponents, event: Any) -> None:
     message, json_update, export_update = await run_DILI_session(
         components.patient_name.value,
         components.visit_date.value,
@@ -228,9 +214,7 @@ async def handle_run_workflow(
 
 
 ###############################################################################
-async def handle_clear_click(
-    components: ClientComponents, event: Any
-) -> None:
+async def handle_clear_click(components: ClientComponents, event: Any) -> None:
     (
         patient_name,
         visit_date,
@@ -275,9 +259,7 @@ async def handle_clear_click(
 
 
 ###############################################################################
-async def handle_visit_date_change(
-    components: ClientComponents, event: Any
-) -> None:
+async def handle_visit_date_change(components: ClientComponents, event: Any) -> None:
     normalized = normalize_visit_date_component(event.value)
     if normalized is None:
         components.visit_date.value = ""
@@ -287,9 +269,7 @@ async def handle_visit_date_change(
 
 
 ###############################################################################
-async def handle_download_click(
-    components: ClientComponents, event: Any
-) -> None:
+async def handle_download_click(components: ClientComponents, event: Any) -> None:
     if components.export_path:
         ui.download(components.export_path)
 
@@ -382,61 +362,57 @@ def main_page() -> None:
                         export_button.disable()
                         clear_button = ui.button("Clear all").classes("w-full")
 
-                with ui.expansion(
-                    "Models & Analysis Configuration"
-                ).classes("w-full"):
-                        ui.label("Configuration").classes("diligent-card-title")
-                        use_rag_checkbox = ui.checkbox(
-                            "Use Retrieval Augmented Generation (RAG)",
-                            value=False,
-                        ).classes("pt-2")
-                        use_cloud_services = ui.checkbox(
-                            "Use Cloud Services",
-                            value=cloud_enabled,
-                        ).classes("pt-2")
-                        with ui.grid(columns=1).classes("w-full gap-5 lg:grid-cols-2"):
-                            with ui.column().classes("w-full gap-3"):
-                                ui.label("Cloud Configuration").classes(
-                                    "diligent-subtitle"
-                                )
-                                llm_provider_dropdown = ui.select(
-                                    CLOUD_PROVIDERS,
-                                    label="Cloud Service",
-                                    value=provider,
-                                ).classes("w-full")
-                                cloud_model_dropdown = ui.select(
-                                    cloud_models,
-                                    label="Cloud Model",
-                                    value=selected_cloud_model or None,
-                                ).classes("w-full")
-                            with ui.column().classes("w-full gap-3"):
-                                ui.label("Ollama Configuration").classes(
-                                    "diligent-subtitle"
-                                )
-                                parsing_model_dropdown = ui.select(
-                                    PARSING_MODEL_CHOICES,
-                                    label="Parsing Model",
-                                    value=ClientRuntimeConfig.get_parsing_model(),
-                                ).classes("w-full")
-                                clinical_model_dropdown = ui.select(
-                                    CLINICAL_MODEL_CHOICES,
-                                    label="Clinical Model",
-                                    value=ClientRuntimeConfig.get_clinical_model(),
-                                ).classes("w-full")
-                                temperature_input = ui.number(
-                                    label="Temperature",
-                                    value=ClientRuntimeConfig.get_ollama_temperature(),
-                                    min=0.0,
-                                    max=2.0,
-                                    step=0.1,
-                                ).classes("w-full")
-                                reasoning_checkbox = ui.checkbox(
-                                    "Enable reasoning (think)",
-                                    value=ClientRuntimeConfig.is_ollama_reasoning_enabled(),
-                                )
-                                pull_models_button = ui.button(
-                                    "Pull models", color="secondary"
-                                )
+                with ui.expansion("Models & Analysis Configuration").classes("w-full"):
+                    ui.label("Configuration").classes("diligent-card-title")
+                    use_rag_checkbox = ui.checkbox(
+                        "Use Retrieval Augmented Generation (RAG)",
+                        value=False,
+                    ).classes("pt-2")
+                    use_cloud_services = ui.checkbox(
+                        "Use Cloud Services",
+                        value=cloud_enabled,
+                    ).classes("pt-2")
+                    with ui.grid(columns=1).classes("w-full gap-5 lg:grid-cols-2"):
+                        with ui.column().classes("w-full gap-3"):
+                            ui.label("Cloud Configuration").classes("diligent-subtitle")
+                            llm_provider_dropdown = ui.select(
+                                CLOUD_PROVIDERS,
+                                label="Cloud Service",
+                                value=provider,
+                            ).classes("w-full")
+                            cloud_model_dropdown = ui.select(
+                                cloud_models,
+                                label="Cloud Model",
+                                value=selected_cloud_model or None,
+                            ).classes("w-full")
+                        with ui.column().classes("w-full gap-3"):
+                            ui.label("Ollama Configuration").classes(
+                                "diligent-subtitle"
+                            )
+                            parsing_model_dropdown = ui.select(
+                                PARSING_MODEL_CHOICES,
+                                label="Parsing Model",
+                                value=ClientRuntimeConfig.get_parsing_model(),
+                            ).classes("w-full")
+                            clinical_model_dropdown = ui.select(
+                                CLINICAL_MODEL_CHOICES,
+                                label="Clinical Model",
+                                value=ClientRuntimeConfig.get_clinical_model(),
+                            ).classes("w-full")
+                            temperature_input = ui.number(
+                                label="Temperature",
+                                value=ClientRuntimeConfig.get_ollama_temperature(),
+                                min=0.0,
+                                max=2.0,
+                                step=0.1,
+                            ).classes("w-full")
+                            reasoning_checkbox = ui.checkbox(
+                                "Enable reasoning (think)",
+                                value=ClientRuntimeConfig.is_ollama_reasoning_enabled(),
+                            )
+                            pull_models_button = ui.button(
+                                "Pull models", color="secondary"
+                            )
 
         with ui.card().classes(f"{CARD_BASE_CLASSES} w-full"):
             ui.label("Results & Reports").classes("diligent-card-title")
@@ -494,11 +470,19 @@ def main_page() -> None:
         reasoning_checkbox.enable()
         clinical_model_dropdown.enable()
 
-    use_cloud_services.on_value_change(partial(handle_toggle_cloud_services, components))
-    llm_provider_dropdown.on_value_change(partial(handle_llm_provider_change, components))
+    use_cloud_services.on_value_change(
+        partial(handle_toggle_cloud_services, components)
+    )
+    llm_provider_dropdown.on_value_change(
+        partial(handle_llm_provider_change, components)
+    )
     cloud_model_dropdown.on_value_change(partial(handle_cloud_model_change, components))
-    parsing_model_dropdown.on_value_change(partial(handle_parsing_model_change, components))
-    clinical_model_dropdown.on_value_change(partial(handle_clinical_model_change, components))
+    parsing_model_dropdown.on_value_change(
+        partial(handle_parsing_model_change, components)
+    )
+    clinical_model_dropdown.on_value_change(
+        partial(handle_clinical_model_change, components)
+    )
     temperature_input.on_value_change(partial(handle_temperature_change, components))
     reasoning_checkbox.on_value_change(partial(handle_reasoning_change, components))
     pull_models_button.on("click", partial(handle_pull_models_click, components))

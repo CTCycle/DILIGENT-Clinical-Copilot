@@ -95,7 +95,7 @@ def build_patient_narrative(
     clinical_report_section.append(
         final_report.strip() if final_report else "_No clinical report generated._"
     )
-    sections.append("\n".join(clinical_report_section))    
+    sections.append("\n".join(clinical_report_section))
 
     return "\n\n".join(sections)
 
