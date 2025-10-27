@@ -738,7 +738,7 @@ class RxNavDrugCatalogBuilder:
         normalized = self.brand_pattern.sub(" ", normalized)
         normalized = re.sub(r"\(.*?\)", " ", normalized)
         normalized = normalized.replace("/", " ")
-        normalized = re.sub(r"[^-A-Za-z\s']", " ", normalized)
+        normalized = re.sub(r"[^A-Za-z\s-']", " ", normalized)
         normalized = re.sub(r"\s+", " ", normalized)
         tokens = normalized.split(" ")
         cleaned: list[str] = []
