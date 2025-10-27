@@ -8,10 +8,9 @@ from datetime import date, datetime
 from typing import Any
 
 from DILIGENT.app.api.models.prompts import (
-    FINALIZE_CLINICAL_REPORT_SYSTEM_PROMPT,
-    FINALIZE_CLINICAL_REPORT_USER_PROMPT,
     LIVERTOX_CLINICAL_SYSTEM_PROMPT,
     LIVERTOX_CLINICAL_USER_PROMPT,
+    LIVERTOX_REPORT_EXAMPLE,
 )
 from DILIGENT.app.api.models.providers import initialize_llm_client
 from DILIGENT.app.api.schemas.clinical import (
@@ -268,14 +267,12 @@ class HepatoxConsultation:
             entries.append(entry)
 
             if suspension.excluded:
-                entry.paragraph = self.build_excluded_paragraph(
-                    drug_entry.name, suspension
-                )
+                entry.paragraph = self.build_excluded_paragraph(entry)
                 continue
 
             excerpt = self.select_excerpt(excerpts_list)
             if excerpt is None:
-                entry.paragraph = self.build_missing_excerpt_paragraph(drug_entry.name)
+                entry.paragraph = self.build_missing_excerpt_paragraph(entry)
                 continue
 
             # Kick off the patient-specific assessment for each candidate drug
@@ -288,6 +285,7 @@ class HepatoxConsultation:
                         clinical_context=normalized_context,
                         suspension=suspension,
                         pattern_summary=pattern_prompt,
+                        metadata=entry.matched_livertox_row,
                     ),
                 )
             )
@@ -303,17 +301,12 @@ class HepatoxConsultation:
                         entry.drug_name,
                         outcome,
                     )
-                    entry.paragraph = self.build_error_paragraph(entry.drug_name)
+                    entry.paragraph = self.build_error_paragraph(entry)
                 else:
                     entry.paragraph = outcome
 
         logger.info("Composing final clinical report for current patient")
-        final_report = await self.finalize_patient_report(
-            entries,
-            clinical_context=normalized_context,
-            visit_date=visit_date,
-            pattern_score=pattern_score,
-        )
+        final_report = await self.finalize_patient_report(entries)
 
         return PatientDrugClinicalReport(entries=entries, final_report=final_report)
 
@@ -571,6 +564,58 @@ class HepatoxConsultation:
         return " ".join(segments)
 
     # -------------------------------------------------------------------------
+    def resolve_livertox_score(self, metadata: dict[str, Any] | None) -> str:
+        if not metadata:
+            return "Not available"
+        score = metadata.get("likelihood_score")
+        if score is None:
+            return "Not available"
+        text = str(score).strip()
+        if not text or text.lower() == "nan":
+            return "Not available"
+        return text.upper() if text.isalpha() else text
+
+    # -------------------------------------------------------------------------
+    def prepare_metadata_prompt(
+        self, metadata: dict[str, Any] | None
+    ) -> tuple[str, str]:
+        score = self.resolve_livertox_score(metadata)
+        details: list[str] = [f"- Likelihood score: {score}"]
+        if metadata:
+            mapping = [
+                ("Agent classification", metadata.get("agent_classification")),
+                ("Primary classification", metadata.get("primary_classification")),
+                ("Secondary classification", metadata.get("secondary_classification")),
+                ("Reference count", metadata.get("reference_count")),
+                ("Year approved", metadata.get("year_approved")),
+            ]
+            seen: set[str] = set()
+            for label, raw in mapping:
+                if raw is None:
+                    continue
+                value = str(raw).strip()
+                if not value or value.lower() == "nan":
+                    continue
+                key = f"{label}:{value}"
+                if key in seen:
+                    continue
+                seen.add(key)
+                details.append(f"- {label}: {value}")
+        if len(details) == 1:
+            details.append("- No additional LiverTox metadata was available.")
+        return score, "\n".join(details)
+
+    # -------------------------------------------------------------------------
+    def format_drug_heading(self, drug_name: str, score: str) -> str:
+        normalized_name = drug_name.strip() if drug_name else ""
+        if not normalized_name:
+            normalized_name = "Unnamed drug"
+        normalized_score = score.strip() if score else ""
+        if not normalized_score:
+            normalized_score = "Not available"
+        return f"{normalized_name} – LiverTox score {normalized_score}"
+
+    # -------------------------------------------------------------------------
     async def request_drug_analysis(
         self,
         *,
@@ -579,9 +624,11 @@ class HepatoxConsultation:
         clinical_context: str,
         suspension: DrugSuspensionContext,
         pattern_summary: str,
+        metadata: dict[str, Any] | None,
     ) -> str:
         start_details = self.format_start_prompt(suspension)
         suspension_details = self.format_suspension_prompt(suspension)
+        score, metadata_block = self.prepare_metadata_prompt(metadata)
         user_prompt = LIVERTOX_CLINICAL_USER_PROMPT.format(
             drug_name=self.escape_braces(drug_name.strip() or drug_name),
             excerpt=self.escape_braces(excerpt),
@@ -589,6 +636,9 @@ class HepatoxConsultation:
             therapy_start_details=self.escape_braces(start_details),
             suspension_details=self.escape_braces(suspension_details),
             pattern_summary=self.escape_braces(pattern_summary),
+            metadata_block=self.escape_braces(metadata_block),
+            livertox_score=self.escape_braces(score),
+            example_block=self.escape_braces(LIVERTOX_REPORT_EXAMPLE),
         )
         messages = [
             {"role": "system", "content": LIVERTOX_CLINICAL_SYSTEM_PROMPT.strip()},
@@ -628,119 +678,57 @@ class HepatoxConsultation:
         return str(raw_response).strip()
 
     # -------------------------------------------------------------------------
-    def classify_entry_status(self, entry: DrugClinicalAssessment) -> str:
-        if entry.suspension.excluded:
-            return "excluded_from_analysis"
-        if not entry.extracted_excerpts:
-            return "not_evaluated_missing_livertox"
-        if entry.paragraph is None:
-            return "analysis_unavailable"
-        normalized = entry.paragraph.lower()
-        if "manual review is recommended" in normalized:
-            return "analysis_failed"
-        return "assessed"
-
-    # -------------------------------------------------------------------------
-    def summarize_entries_for_prompt(
-        self, entries: list[DrugClinicalAssessment]
-    ) -> str:
-        blocks: list[str] = []
-        for entry in entries:
-            status = self.classify_entry_status(entry)
-            lines: list[str] = [f"- Drug: {entry.drug_name}", f"  status: {status}"]
-            suspension_note = (
-                entry.suspension.note or "No suspension details available."
-            )
-            lines.append(f"  therapy_timing: {suspension_note}")
-            if entry.suspension.interval_days is not None:
-                lines.append(
-                    f"  suspension_interval_days: {entry.suspension.interval_days}"
-                )
-            if entry.suspension.start_interval_days is not None:
-                lines.append(
-                    f"  start_interval_days: {entry.suspension.start_interval_days}"
-                )
-            summary = entry.paragraph or "No analysis was produced for this drug."
-            lines.append(f"  assessment: {summary}")
-            blocks.append("\n".join(lines))
-        return "\n".join(blocks)
-
-    # -------------------------------------------------------------------------
     async def finalize_patient_report(
-        self,
-        entries: list[DrugClinicalAssessment],
-        *,
-        clinical_context: str,
-        visit_date: date | None,
-        pattern_score: HepatotoxicityPatternScore | None,
+        self, entries: list[DrugClinicalAssessment]
     ) -> str | None:
-        if not entries:
-            return None
-
-        blocks: list[str] = []
-        for entry in entries:
-            name = entry.drug_name.strip() or entry.drug_name
-            summary = (entry.paragraph or "No analysis available.").strip()
-            blocks.append(f"{name}\nConclusions: {summary}")
-        # Collate per-drug paragraphs into a clinician-friendly summary
-        report = "\n\n".join(blocks).strip()
-        if not report:
-            return None
-
-        summary_payload = self.summarize_entries_for_prompt(entries)
-        if not summary_payload.strip():
-            return None
-        patient_label = self.patient_name or "Unnamed patient"
-        visit_label = visit_date.isoformat() if visit_date else "Unknown visit date"
-        context_payload = clinical_context.strip() or "No clinical context provided."
-        pattern_summary_raw = self.format_pattern_prompt(pattern_score)
-        instruction_clause = "Treat drugs whose known hepatotoxicity pattern matches this classification as stronger causal candidates, and downgrade mismatches."
-        pattern_summary = pattern_summary_raw.replace(instruction_clause, "").strip()
-        if not pattern_summary:
-            pattern_summary = pattern_summary_raw
-        user_prompt = FINALIZE_CLINICAL_REPORT_USER_PROMPT.format(
-            patient_name=self.escape_braces(patient_label),
-            visit_date=self.escape_braces(visit_label),
-            pattern_summary=self.escape_braces(pattern_summary),
-            clinical_context=self.escape_braces(context_payload),
-            drug_summaries=self.escape_braces(summary_payload),
-            initial_report=self.escape_braces(report),
-        )
-        messages = [
-            {
-                "role": "system",
-                "content": FINALIZE_CLINICAL_REPORT_SYSTEM_PROMPT.strip(),
-            },
-            {"role": "user", "content": user_prompt},
+        paragraphs = [
+            entry.paragraph.strip()
+            for entry in entries
+            if entry.paragraph and entry.paragraph.strip()
         ]
-        chat_kwargs: dict[str, Any] = {
-            "model": self.llm_model,
-            "messages": messages,
-        }
-        if self.chat_supports_temperature:
-            chat_kwargs["temperature"] = self.report_temperature
-        else:
-            chat_kwargs["options"] = {"temperature": self.report_temperature}
-        try:
-            raw_response = await self.llm_client.chat(**chat_kwargs)
-        except Exception as exc:  # noqa: BLE001
-            logger.error("Holistic report rewrite failed: %s", exc)
+        if not paragraphs:
             return None
-        refined = self.coerce_chat_text(raw_response)
-        return refined or None
+        return "\n\n".join(paragraphs)
 
     # -------------------------------------------------------------------------
     def build_excluded_paragraph(
-        self, drug_name: str, suspension: DrugSuspensionContext
+        self, entry: DrugClinicalAssessment
     ) -> str:
+        score = self.resolve_livertox_score(entry.matched_livertox_row)
+        heading = self.format_drug_heading(entry.drug_name, score)
+        suspension = entry.suspension
         if suspension.suspension_date is not None:
-            return f"The therapy was suspended on {suspension.suspension_date.isoformat()} well before the visit; the drug was excluded from this DILI assessment."
-        return "The therapy was reported as suspended well before the visit and was excluded from the current DILI assessment."
+            detail = (
+                f"The therapy was suspended on {suspension.suspension_date.isoformat()} well before the visit, so the drug was excluded from this DILI assessment."
+            )
+        else:
+            detail = (
+                "The therapy was reported as suspended well before the visit and was excluded from the current DILI assessment."
+            )
+        recommendation = (
+            "Manual verification of latency is suggested if the exposure history becomes relevant again."
+        )
+        return f"{heading}\n\n{detail} {recommendation}\n\nBibliography source: LiverTox"
 
     # -------------------------------------------------------------------------
-    def build_missing_excerpt_paragraph(self, drug_name: str) -> str:
-        return "No LiverTox excerpt was available for this drug, so hepatotoxic involvement could not be evaluated."
+    def build_missing_excerpt_paragraph(
+        self, entry: DrugClinicalAssessment
+    ) -> str:
+        score = self.resolve_livertox_score(entry.matched_livertox_row)
+        heading = self.format_drug_heading(entry.drug_name, score)
+        note = (
+            "No LiverTox excerpt was available for this drug, so its hepatotoxic potential in this patient could not be evaluated automatically."
+        )
+        guidance = (
+            "Consider consulting the LiverTox monograph manually or alternative references before attributing causality."
+        )
+        return f"{heading}\n\n{note} {guidance}\n\nBibliography source: LiverTox"
 
     # -------------------------------------------------------------------------
-    def build_error_paragraph(self, drug_name: str) -> str:
-        return "Automated analysis was unavailable due to a technical issue; manual review is recommended."
+    def build_error_paragraph(self, entry: DrugClinicalAssessment) -> str:
+        score = self.resolve_livertox_score(entry.matched_livertox_row)
+        heading = self.format_drug_heading(entry.drug_name, score)
+        message = (
+            "Automated analysis was unavailable due to a technical issue; a clinician should review the LiverTox documentation manually."
+        )
+        return f"{heading}\n\n{message}\n\nBibliography source: LiverTox"
