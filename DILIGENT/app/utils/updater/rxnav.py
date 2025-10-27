@@ -4,6 +4,7 @@ import codecs
 import json
 import os
 import re
+import sys
 import time
 import unicodedata
 from dataclasses import dataclass
@@ -11,6 +12,7 @@ from typing import Any, Iterator
 
 import httpx
 import pandas as pd
+from tqdm.auto import tqdm
 
 from DILIGENT.app.logger import logger
 from DILIGENT.app.utils.repository.database import database
@@ -662,6 +664,7 @@ class RxNavDrugCatalogBuilder:
         self.rxcui_cache: dict[str, list[str]] = {}
         self.total_records: int | None = None
         self.last_logged_count = 0
+        self.progress_bar: tqdm | None = None
 
     # -------------------------------------------------------------------------
     def update_drug_catalog(self, *, total_records: int | None = None) -> dict[str, Any]:
@@ -709,22 +712,28 @@ class RxNavDrugCatalogBuilder:
 
     # -------------------------------------------------------------------------
     def persist_catalog(self, chunks: Iterator[bytes]) -> dict[str, Any]:
+        self.ensure_progress_bar()
         count = 0
         batch: list[dict[str, Any]] = []
-        for concept in self.stream_min_concepts(chunks):
-            payload = self.sanitize_concept(concept)
-            if payload is None:
-                continue
-            batch.append(payload)
-            if len(batch) >= self.BATCH_SIZE:
+        try:
+            for concept in self.stream_min_concepts(chunks):
+                payload = self.sanitize_concept(concept)
+                if payload is None:
+                    continue
+                batch.append(payload)
+                if len(batch) >= self.BATCH_SIZE:
+                    self.persist_batch(batch)
+                    count += len(batch)
+                    self.log_progress(count)
+                    batch.clear()
+            if batch:
                 self.persist_batch(batch)
                 count += len(batch)
-                self.log_progress(count)
-                batch.clear()
-        if batch:
-            self.persist_batch(batch)
-            count += len(batch)
-        self.log_progress(count, final=True)
+            self.log_progress(count, final=True)
+        finally:
+            if self.progress_bar is not None:
+                self.progress_bar.close()
+                self.progress_bar = None
         return {"table_name": self.TABLE_NAME, "count": count}
 
     # -------------------------------------------------------------------------
@@ -748,13 +757,14 @@ class RxNavDrugCatalogBuilder:
 
     # -------------------------------------------------------------------------
     def log_progress(self, processed: int, *, final: bool = False) -> None:
-        if processed <= 0:
-            return
-        if not final and processed < self.last_logged_count + self.PROGRESS_LOG_INTERVAL:
+        if processed <= 0 and not final:
             return
         total = self.total_records if self.total_records is not None else None
         if final and total is None:
             total = processed
+        self.update_progress_bar(processed, total, final)
+        if not final and processed < self.last_logged_count + self.PROGRESS_LOG_INTERVAL:
+            return
         if total is None:
             logger.info(
                 "RxNavDrugCatalogBuilder progress: rxNav data fetched for %s drug concepts",
@@ -883,23 +893,16 @@ class RxNavDrugCatalogBuilder:
         }
         aliases: dict[str, str] = {}
 
-        def add_alias(candidate: str) -> None:
-            cleaned = candidate.strip()
-            if not cleaned:
-                return
-            key = cleaned.casefold()
-            if normalized_name and key == normalized_name:
-                return
-            if key in normalized_brands:
-                return
-            if any(token.lower() in self.stopwords for token in cleaned.split()):
-                return
-            aliases.setdefault(key, cleaned)
+        queries = []
+        if isinstance(name, str):
+            queries.append(name)
+        if isinstance(raw_name, str):
+            queries.append(raw_name)
 
-        def extend_from_query(query: str) -> None:
+        for query in queries:
             stripped = query.strip()
             if not stripped:
-                return
+                continue
             cache_key = stripped.casefold()
             cached = self.alias_cache.get(cache_key)
             if cached is None:
@@ -912,12 +915,12 @@ class RxNavDrugCatalogBuilder:
                     cached = [term for term in fetched if isinstance(term, str)]
                 self.alias_cache[cache_key] = cached
             for term in cached:
-                add_alias(term)
-
-        if name:
-            extend_from_query(name)
-        if raw_name:
-            extend_from_query(raw_name)
+                self.register_alias_candidate(
+                    term,
+                    aliases,
+                    normalized_name,
+                    normalized_brands,
+                )
 
         identifier = rxcui.strip()
         if identifier:
@@ -938,11 +941,74 @@ class RxNavDrugCatalogBuilder:
                     ]
                 self.rxcui_cache[identifier] = cached_synonyms
             for term in cached_synonyms:
-                add_alias(term)
+                self.register_alias_candidate(
+                    term,
+                    aliases,
+                    normalized_name,
+                    normalized_brands,
+                )
 
         if not aliases:
             return []
         return sorted(aliases.values(), key=str.casefold)
+
+    ###########################################################################
+    def ensure_progress_bar(self) -> None:
+        if self.progress_bar is not None:
+            return
+        total = self.total_records if self.total_records is not None else None
+        disable = is_truthy(os.getenv("DISABLE_RXNAV_PROGRESS")) or not sys.stderr.isatty()
+        self.progress_bar = tqdm(
+            total=total,
+            desc="Building RxNav drug catalog",
+            unit="concepts",
+            disable=disable,
+            leave=False,
+            dynamic_ncols=True,
+        )
+
+    ###########################################################################
+    def update_progress_bar(
+        self,
+        processed: int,
+        total: int | None,
+        final: bool,
+    ) -> None:
+        if self.progress_bar is None:
+            self.ensure_progress_bar()
+        if self.progress_bar is None:
+            return
+        if total is not None and self.progress_bar.total != total:
+            self.progress_bar.total = total
+        current = int(self.progress_bar.n)
+        delta = processed - current
+        if delta > 0:
+            self.progress_bar.update(delta)
+        if final:
+            if total is not None:
+                self.progress_bar.total = total
+            self.progress_bar.close()
+            self.progress_bar = None
+
+    ###########################################################################
+    def register_alias_candidate(
+        self,
+        candidate: str,
+        aliases: dict[str, str],
+        normalized_name: str | None,
+        normalized_brands: set[str],
+    ) -> None:
+        cleaned = candidate.strip()
+        if not cleaned:
+            return
+        key = cleaned.casefold()
+        if normalized_name and key == normalized_name:
+            return
+        if key in normalized_brands:
+            return
+        if any(token.lower() in self.stopwords for token in cleaned.split()):
+            return
+        aliases.setdefault(key, cleaned)
 
     # -------------------------------------------------------------------------
     def sanitize_name(self, value: str) -> str:
