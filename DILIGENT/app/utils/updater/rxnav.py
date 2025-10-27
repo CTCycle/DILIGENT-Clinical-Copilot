@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import codecs
 import json
+import os
 import re
 import time
 import unicodedata
@@ -34,6 +35,7 @@ def is_truthy(value: str | None) -> bool:
 ###############################################################################
 class RxNavClient:
     BASE_URL = "https://rxnav.nlm.nih.gov/REST/drugs.json"
+    RXCUI_PROPERTY_URL = "https://rxnav.nlm.nih.gov/REST/rxcui/{rxcui}/property.json"
     MAX_RETRIES = 3
     BACKOFF_SECONDS = (0.6, 1.2, 2.4)
     RETRY_STATUS = {429, 500, 502, 503, 504}
@@ -157,6 +159,7 @@ class RxNavClient:
     def __init__(self, *, enabled: bool | None = None) -> None:
         self.enabled = True
         self.cache: dict[str, dict[str, RxNormCandidate]] = {}
+        self.synonym_cache: dict[str, list[str]] = {}
 
     # -------------------------------------------------------------------------
     def fetch_drug_terms(self, raw_name: str) -> list[str]:
@@ -193,6 +196,97 @@ class RxNavClient:
             store(term)
         store(raw_name)
         return sorted(collected.values(), key=str.casefold)
+
+    # -------------------------------------------------------------------------
+    def fetch_rxcui_synonyms(self, rxcui: str) -> list[str]:
+        identifier = str(rxcui).strip()
+        if not identifier:
+            return []
+        cached = self.synonym_cache.get(identifier)
+        if cached is not None:
+            return cached
+        url = self.RXCUI_PROPERTY_URL.format(rxcui=identifier)
+        params = {"propName": "RxNorm Synonym"}
+        payload: dict[str, Any] | None = None
+        for attempt in range(self.MAX_RETRIES):
+            try:
+                response = httpx.get(url, params=params, timeout=self.TIMEOUT)
+            except httpx.RequestError as exc:
+                if attempt + 1 == self.MAX_RETRIES:
+                    logger.debug(
+                        "RxNorm rxcui request failed for '%s': %s",
+                        identifier,
+                        exc,
+                    )
+                    self.synonym_cache[identifier] = []
+                    return []
+                time.sleep(
+                    self.BACKOFF_SECONDS[min(attempt, len(self.BACKOFF_SECONDS) - 1)]
+                )
+                continue
+            if response.status_code in self.RETRY_STATUS:
+                if attempt + 1 == self.MAX_RETRIES:
+                    logger.debug(
+                        "RxNorm property service returned %s for '%s'",
+                        response.status_code,
+                        identifier,
+                    )
+                    self.synonym_cache[identifier] = []
+                    return []
+                time.sleep(
+                    self.BACKOFF_SECONDS[min(attempt, len(self.BACKOFF_SECONDS) - 1)]
+                )
+                continue
+            if response.status_code >= 400:
+                logger.debug(
+                    "RxNorm property service returned %s for '%s'",
+                    response.status_code,
+                    identifier,
+                )
+                self.synonym_cache[identifier] = []
+                return []
+            try:
+                payload = response.json()
+            except json.JSONDecodeError as exc:
+                logger.debug(
+                    "RxNorm property JSON decode failed for '%s': %s",
+                    identifier,
+                    exc,
+                )
+                self.synonym_cache[identifier] = []
+                return []
+            break
+        if payload is None:
+            self.synonym_cache[identifier] = []
+            return []
+        collected: dict[str, str] = {}
+        group = payload.get("propConceptGroup")
+        concepts: list[dict[str, Any]] = []
+        if isinstance(group, dict):
+            raw_concepts = group.get("propConcept")
+            if isinstance(raw_concepts, list):
+                concepts.extend(
+                    concept for concept in raw_concepts if isinstance(concept, dict)
+                )
+            elif isinstance(raw_concepts, dict):
+                concepts.append(raw_concepts)
+        for concept in concepts:
+            prop_name = concept.get("propName")
+            if isinstance(prop_name, str) and "synonym" not in prop_name.lower():
+                continue
+            value = concept.get("propValue")
+            if not isinstance(value, str):
+                continue
+            normalized_value = self.standardize_term(value)
+            if normalized_value:
+                collected[normalized_value.casefold()] = normalized_value
+            for fragment in self.extract_core_names(value):
+                refined = self.standardize_term(fragment)
+                if refined:
+                    collected[refined.casefold()] = refined
+        synonyms = sorted(collected.values(), key=str.casefold)
+        self.synonym_cache[identifier] = synonyms
+        return synonyms
 
     # -------------------------------------------------------------------------
     def gather_property_values(self, prop: dict[str, Any]) -> list[str]:
@@ -545,7 +639,7 @@ class RxNavDrugCatalogBuilder:
     TABLE_NAME = "DRUGS_CATALOG"
     BATCH_SIZE = 2000
 
-    def __init__(self) -> None:
+    def __init__(self, rx_client: RxNavClient | None = None) -> None:
         combined: set[str] = set()
         for attr in ("SALT_STOPWORDS", "FORM_STOPWORDS", "UNIT_STOPWORDS"):
             values = getattr(RxNavClient, attr, set())
@@ -562,6 +656,9 @@ class RxNavDrugCatalogBuilder:
         })
         self.stopwords = combined
         self.brand_pattern = re.compile(r"\[([^\]]+)\]")
+        self.rx_client = rx_client or RxNavClient()
+        self.alias_cache: dict[str, list[str]] = {}
+        self.rxcui_cache: dict[str, list[str]] = {}
 
     # -------------------------------------------------------------------------
     def update_drug_catalog(self) -> dict[str, Any]:
@@ -630,6 +727,12 @@ class RxNavDrugCatalogBuilder:
             return
         if "brand_names" in frame:
             frame["brand_names"] = frame["brand_names"].apply(
+                lambda names: json.dumps(
+                    names if isinstance(names, list) else [], ensure_ascii=False
+                )
+            )
+        if "synonyms" in frame:
+            frame["synonyms"] = frame["synonyms"].apply(
                 lambda names: json.dumps(
                     names if isinstance(names, list) else [], ensure_ascii=False
                 )
@@ -711,18 +814,106 @@ class RxNavDrugCatalogBuilder:
         if not rxcui_str:
             return None
         term_type = concept.get("termType")
-        sanitized_name = self.sanitize_name(full_name)
-        brands = self.extract_brands(full_name)
+        sanitized_name = self.sanitize_name(full_name) or None
+        brands = sorted(self.extract_brands(full_name), key=str.casefold)
+        synonyms = self.collect_synonyms(
+            rxcui_str,
+            sanitized_name,
+            full_name.strip(),
+            brands,
+        )
         payload = {
             "rxcui": rxcui_str,
             "term_type": term_type.strip() if isinstance(term_type, str) else "",
             "raw_name": full_name.strip(),
-            "name": sanitized_name or None,
+            "name": sanitized_name,
             "brand_names": brands,
+            "synonyms": synonyms,
         }
-        if payload["name"] is None and not payload["brand_names"]:
+        if (
+            payload["name"] is None
+            and not payload["brand_names"]
+            and not payload["synonyms"]
+        ):
             return None
         return payload
+
+    # -------------------------------------------------------------------------
+    def collect_synonyms(
+        self,
+        rxcui: str,
+        name: str | None,
+        raw_name: str,
+        brand_names: list[str],
+    ) -> list[str]:
+        normalized_name = name.casefold() if isinstance(name, str) else None
+        normalized_brands = {
+            brand.casefold()
+            for brand in brand_names
+            if isinstance(brand, str) and brand
+        }
+        aliases: dict[str, str] = {}
+
+        def add_alias(candidate: str) -> None:
+            cleaned = candidate.strip()
+            if not cleaned:
+                return
+            key = cleaned.casefold()
+            if normalized_name and key == normalized_name:
+                return
+            if key in normalized_brands:
+                return
+            if any(token.lower() in self.stopwords for token in cleaned.split()):
+                return
+            aliases.setdefault(key, cleaned)
+
+        def extend_from_query(query: str) -> None:
+            stripped = query.strip()
+            if not stripped:
+                return
+            cache_key = stripped.casefold()
+            cached = self.alias_cache.get(cache_key)
+            if cached is None:
+                try:
+                    fetched = self.rx_client.fetch_drug_terms(stripped)
+                except Exception as exc:  # noqa: BLE001
+                    logger.warning("Failed to fetch RxNav aliases for '%s': %s", stripped, exc)
+                    cached = []
+                else:
+                    cached = [term for term in fetched if isinstance(term, str)]
+                self.alias_cache[cache_key] = cached
+            for term in cached:
+                add_alias(term)
+
+        if name:
+            extend_from_query(name)
+        if raw_name:
+            extend_from_query(raw_name)
+
+        identifier = rxcui.strip()
+        if identifier:
+            cached_synonyms = self.rxcui_cache.get(identifier)
+            if cached_synonyms is None:
+                try:
+                    fetched_synonyms = self.rx_client.fetch_rxcui_synonyms(identifier)
+                except Exception as exc:  # noqa: BLE001
+                    logger.warning(
+                        "Failed to fetch RxNav aliases for rxcui '%s': %s",
+                        identifier,
+                        exc,
+                    )
+                    cached_synonyms = []
+                else:
+                    cached_synonyms = [
+                        term for term in fetched_synonyms if isinstance(term, str)
+                    ]
+                self.rxcui_cache[identifier] = cached_synonyms
+            for term in cached_synonyms:
+                add_alias(term)
+
+        if not aliases:
+            return []
+        return sorted(aliases.values(), key=str.casefold)
 
     # -------------------------------------------------------------------------
     def sanitize_name(self, value: str) -> str:
