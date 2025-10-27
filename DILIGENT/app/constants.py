@@ -93,10 +93,10 @@ OPENFDA_DRUG_EVENT_DATASET = "drug/event"
 OPENFDA_DRUG_EVENT_INDEX = "drug-event.json"
 OPENFDA_DOWNLOAD_CATALOG_URL = "https://api.fda.gov/download.json"
 RXNORM_FULL_DOWNLOAD_URL = (
-    "https://download.nlm.nih.gov/umls/kss/rxnorm/RxNorm_full_current.zip"
+    "https://download.nlm.nih.gov/umls/kss/rxnorm/RxNorm_full_prescribe_current.zip"
 )
 RXNORM_WEEKLY_DOWNLOAD_URL = (
-    "https://download.nlm.nih.gov/umls/kss/rxnorm/RxNorm_weekly_current.zip"
+    "https://download.nlm.nih.gov/umls/kss/rxnorm/RxNorm_weekly_prescribe_current.zip"
 )
 RXNORM_EXPECTED_FILES = {
     "conso": "RXNCONSO.RRF",

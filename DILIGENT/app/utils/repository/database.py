@@ -89,6 +89,7 @@ class DrugCatalog(Base):
     xrefs = Column(Text)
     status = Column(String)
     updated_at = Column(DateTime)
+    __table_args__ = (UniqueConstraint("rxcui"),)
 
 
 ###############################################################################
