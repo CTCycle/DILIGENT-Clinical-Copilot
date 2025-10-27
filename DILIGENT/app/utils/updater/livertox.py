@@ -71,7 +71,155 @@ def process_monograph_payload(
     member_name: str,
     data: bytes,
 ) -> dict[str, str] | None:
-    return LiverToxUpdater.process_monograph_member(member_name, data)
+    return process_monograph_member(member_name, data)
+
+
+# -----------------------------------------------------------------------------
+def normalize_whitespace(value: str) -> str:
+    return re.sub(r"\s+", " ", value).strip()
+
+
+# -----------------------------------------------------------------------------
+def strip_punctuation(value: str) -> str:
+    normalized = unicodedata.normalize("NFKD", value)
+    folded = "".join(char for char in normalized if not unicodedata.combining(char))
+    return re.sub(r"[-_,.;:()\[\]{}\/\\]", " ", folded)
+
+
+# -----------------------------------------------------------------------------
+def html_to_text(html_text: str) -> str:
+    stripped = re.sub(r"(?is)<(script|style)[^>]*>.*?</\1>", " ", html_text)
+    stripped = re.sub(r"<[^>]+>", " ", stripped)
+    unescaped = html.unescape(stripped)
+    return normalize_whitespace(unescaped)
+
+
+# -----------------------------------------------------------------------------
+def clean_fragment(fragment: str) -> str:
+    return html_to_text(fragment)
+
+
+# -----------------------------------------------------------------------------
+def decode_markup(data: bytes) -> str:
+    try:
+        return data.decode("utf-8")
+    except UnicodeDecodeError:
+        return data.decode("latin-1", errors="ignore")
+
+
+# -----------------------------------------------------------------------------
+def pdf_to_text(data: bytes) -> str:
+    buffer = io.BytesIO(data)
+    if pdfminer_extract_text is not None:
+        try:
+            buffer.seek(0)
+            text = pdfminer_extract_text(buffer)
+            if text:
+                return text
+        except Exception:
+            buffer.seek(0)
+    if PdfReader is not None:
+        try:
+            buffer.seek(0)
+            reader = PdfReader(buffer)
+            collected: list[str] = []
+            for page in reader.pages:
+                page_text = page.extract_text()
+                if page_text:
+                    collected.append(page_text)
+            if collected:
+                return "\n".join(collected)
+        except Exception:
+            buffer.seek(0)
+    try:
+        return data.decode("utf-8")
+    except UnicodeDecodeError:
+        return data.decode("latin-1", errors="ignore")
+
+
+# -----------------------------------------------------------------------------
+def extract_nbk(member_name: str, content: str) -> str | None:
+    match = re.search(r"NBK\d+", member_name, re.IGNORECASE)
+    if match:
+        return match.group(0).upper()
+    match = re.search(r"NBK\d+", content, re.IGNORECASE)
+    if match:
+        return match.group(0).upper()
+    return None
+
+
+# -----------------------------------------------------------------------------
+def derive_identifier(member_name: str) -> str:
+    base = os.path.basename(member_name)
+    stem = os.path.splitext(base)[0]
+    cleaned = normalize_whitespace(strip_punctuation(stem))
+    return cleaned or base
+
+
+# -----------------------------------------------------------------------------
+def extract_title(html_text: str, plain_text: str, default: str) -> str:
+    patterns = (
+        r"<title[^>]*>(.*?)</title>",
+        r"<article-title[^>]*>(.*?)</article-title>",
+        r"<h1[^>]*>(.*?)</h1>",
+    )
+    for pattern in patterns:
+        match = re.search(pattern, html_text, flags=re.IGNORECASE | re.DOTALL)
+        if match:
+            fragment = clean_fragment(match.group(1))
+            if fragment:
+                return fragment
+    for line in plain_text.splitlines():
+        stripped = line.strip()
+        if stripped:
+            return stripped
+    return default
+
+
+# -----------------------------------------------------------------------------
+def convert_member_bytes(
+    member_name: str, data: bytes
+) -> tuple[str, str | None] | None:
+    lower_name = member_name.lower()
+    if lower_name.endswith(".pdf"):
+        text = pdf_to_text(data)
+        if text.strip():
+            return text, None
+        decoded = decode_markup(data)
+        return decoded, decoded
+    markup = decode_markup(data)
+    text = html_to_text(markup)
+    return text, markup
+
+
+# -----------------------------------------------------------------------------
+def process_monograph_member(
+    member_name: str,
+    data: bytes,
+) -> dict[str, str] | None:
+    payload = convert_member_bytes(member_name, data)
+    if payload is None:
+        return None
+    plain_text, markup_text = payload
+    if not plain_text:
+        return None
+    nbk_id = extract_nbk(member_name, markup_text or plain_text)
+    record_nbk = nbk_id or derive_identifier(member_name)
+    if not record_nbk:
+        return None
+    drug_name = extract_title(
+        markup_text or "",
+        plain_text,
+        record_nbk,
+    )
+    cleaned_text = plain_text.strip()
+    if not drug_name or not cleaned_text:
+        return None
+    return {
+        "nbk_id": record_nbk,
+        "drug_name": drug_name,
+        "excerpt": cleaned_text,
+    }
 
 
 
@@ -854,7 +1002,7 @@ class LiverToxUpdater:
                 base_name = os.path.basename(member_name).lower()
                 if base_name in processed_files:
                     continue
-                record = LiverToxUpdater.process_monograph_member(member_name, data)
+                record = process_monograph_member(member_name, data)
                 if not record:
                     continue
                 collected.append(record)
@@ -891,156 +1039,6 @@ class LiverToxUpdater:
                 processed_files.add(base_name)
 
         return collected
-
-    # -------------------------------------------------------------------------
-    @staticmethod
-    def process_monograph_member(
-        member_name: str,
-        data: bytes,
-    ) -> dict[str, str] | None:
-        payload = LiverToxUpdater.convert_member_bytes(member_name, data)
-        if payload is None:
-            return None
-        plain_text, markup_text = payload
-        if not plain_text:
-            return None
-        nbk_id = LiverToxUpdater.extract_nbk(member_name, markup_text or plain_text)
-        record_nbk = nbk_id or LiverToxUpdater.derive_identifier(member_name)
-        if not record_nbk:
-            return None
-        drug_name = LiverToxUpdater.extract_title(
-            markup_text or "",
-            plain_text,
-            record_nbk,
-        )
-        cleaned_text = plain_text.strip()
-        if not drug_name or not cleaned_text:
-            return None
-        return {
-            "nbk_id": record_nbk,
-            "drug_name": drug_name,
-            "excerpt": cleaned_text,
-        }
-
-    # -------------------------------------------------------------------------
-    @staticmethod
-    def convert_member_bytes(
-        member_name: str, data: bytes
-    ) -> tuple[str, str | None] | None:
-        lower_name = member_name.lower()
-        if lower_name.endswith(".pdf"):
-            text = LiverToxUpdater.pdf_to_text(data)
-            if text.strip():
-                return text, None
-            decoded = LiverToxUpdater.decode_markup(data)
-            return decoded, decoded
-        markup = LiverToxUpdater.decode_markup(data)
-        text = LiverToxUpdater.html_to_text(markup)
-        return text, markup
-
-    # -------------------------------------------------------------------------
-    @staticmethod
-    def decode_markup(data: bytes) -> str:
-        try:
-            return data.decode("utf-8")
-        except UnicodeDecodeError:
-            return data.decode("latin-1", errors="ignore")
-
-    # -------------------------------------------------------------------------
-    @staticmethod
-    def pdf_to_text(data: bytes) -> str:
-        buffer = io.BytesIO(data)
-        if pdfminer_extract_text is not None:
-            try:
-                buffer.seek(0)
-                text = pdfminer_extract_text(buffer)
-                if text:
-                    return text
-            except Exception:
-                buffer.seek(0)
-        if PdfReader is not None:
-            try:
-                buffer.seek(0)
-                reader = PdfReader(buffer)
-                collected: list[str] = []
-                for page in reader.pages:
-                    page_text = page.extract_text()
-                    if page_text:
-                        collected.append(page_text)
-                if collected:
-                    return "\n".join(collected)
-            except Exception:
-                buffer.seek(0)
-        try:
-            return data.decode("utf-8")
-        except UnicodeDecodeError:
-            return data.decode("latin-1", errors="ignore")
-
-    # -------------------------------------------------------------------------
-    @staticmethod
-    def extract_nbk(member_name: str, content: str) -> str | None:
-        match = re.search(r"NBK\d+", member_name, re.IGNORECASE)
-        if match:
-            return match.group(0).upper()
-        match = re.search(r"NBK\d+", content, re.IGNORECASE)
-        if match:
-            return match.group(0).upper()
-        return None
-
-    # -------------------------------------------------------------------------
-    @staticmethod
-    def derive_identifier(member_name: str) -> str:
-        base = os.path.basename(member_name)
-        stem = os.path.splitext(base)[0]
-        cleaned = LiverToxUpdater.normalize_whitespace(
-            LiverToxUpdater.strip_punctuation(stem)
-        )
-        return cleaned or base
-
-    # -------------------------------------------------------------------------
-    @staticmethod
-    def extract_title(html_text: str, plain_text: str, default: str) -> str:
-        patterns = (
-            r"<title[^>]*>(.*?)</title>",
-            r"<article-title[^>]*>(.*?)</article-title>",
-            r"<h1[^>]*>(.*?)</h1>",
-        )
-        for pattern in patterns:
-            match = re.search(pattern, html_text, flags=re.IGNORECASE | re.DOTALL)
-            if match:
-                fragment = LiverToxUpdater.clean_fragment(match.group(1))
-                if fragment:
-                    return fragment
-        for line in plain_text.splitlines():
-            stripped = line.strip()
-            if stripped:
-                return stripped
-        return default
-
-    # -------------------------------------------------------------------------
-    @staticmethod
-    def clean_fragment(fragment: str) -> str:
-        return LiverToxUpdater.html_to_text(fragment)
-
-    # -------------------------------------------------------------------------
-    @staticmethod
-    def html_to_text(html_text: str) -> str:
-        stripped = re.sub(r"(?is)<(script|style)[^>]*>.*?</\1>", " ", html_text)
-        stripped = re.sub(r"<[^>]+>", " ", stripped)
-        unescaped = html.unescape(stripped)
-        return LiverToxUpdater.normalize_whitespace(unescaped)
-
-    # -------------------------------------------------------------------------
-    @staticmethod
-    def normalize_whitespace(value: str) -> str:
-        return re.sub(r"\s+", " ", value).strip()
-
-    # -------------------------------------------------------------------------
-    @staticmethod
-    def strip_punctuation(value: str) -> str:
-        normalized = unicodedata.normalize("NFKD", value)
-        folded = "".join(char for char in normalized if not unicodedata.combining(char))
-        return re.sub(r"[-_,.;:()\[\]{}\/\\]", " ", folded)
 
     # -------------------------------------------------------------------------
     def sanitize_records(self, entries: list[dict[str, Any]]) -> pd.DataFrame:
@@ -1163,7 +1161,7 @@ class LiverToxUpdater:
             for candidate in collected:
                 if not isinstance(candidate, str):
                     continue
-                normalized = self.normalize_whitespace(candidate)
+                normalized = normalize_whitespace(candidate)
                 if (
                     not normalized
                     or len(normalized) < 4
