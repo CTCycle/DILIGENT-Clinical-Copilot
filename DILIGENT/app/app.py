@@ -32,5 +32,5 @@ app.include_router(report_router)
 app.include_router(models_router)
 
 ui_app = create_interface()
-# Serve the Gradio UI under /ui while keeping the FastAPI routes available
+# Serve the UI under /ui while keeping the FastAPI routes available
 app = gr.mount_gradio_app(app, ui_app, path="/ui", root_path="/ui")

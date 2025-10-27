@@ -50,7 +50,7 @@ The database schema is created automatically the first time the application star
 
 ## 3. How to use
 
-- **Windows**: run `DILIGENT/start_on_windows.bat` to launch both the FastAPI backend and the Gradio UI in a single step.
+- **Windows**: run `DILIGENT/start_on_windows.bat` to launch both the FastAPI backend and the UI in a single step.
 - **macOS/Linux**: activate your virtual environment, then start the web stack:
 
   ```bash
