@@ -8,6 +8,8 @@ from datetime import date, datetime
 from typing import Any
 
 from DILIGENT.app.api.models.prompts import (
+    LIVERTOX_CONCLUSION_SYSTEM_PROMPT,
+    LIVERTOX_CONCLUSION_USER_PROMPT,
     LIVERTOX_CLINICAL_SYSTEM_PROMPT,
     LIVERTOX_CLINICAL_USER_PROMPT,
     LIVERTOX_REPORT_EXAMPLE,
@@ -306,7 +308,10 @@ class HepatoxConsultation:
                     entry.paragraph = outcome
 
         logger.info("Composing final clinical report for current patient")
-        final_report = await self.finalize_patient_report(entries)
+        final_report = await self.finalize_patient_report(
+            entries,
+            clinical_context=normalized_context,
+        )
 
         return PatientDrugClinicalReport(entries=entries, final_report=final_report)
 
@@ -679,7 +684,10 @@ class HepatoxConsultation:
 
     # -------------------------------------------------------------------------
     async def finalize_patient_report(
-        self, entries: list[DrugClinicalAssessment]
+        self,
+        entries: list[DrugClinicalAssessment],
+        *,
+        clinical_context: str | None,
     ) -> str | None:
         paragraphs = [
             entry.paragraph.strip()
@@ -688,7 +696,51 @@ class HepatoxConsultation:
         ]
         if not paragraphs:
             return None
-        return "\n\n".join(paragraphs)
+        combined_report = "\n\n".join(paragraphs)
+        conclusion = await self.generate_conclusion(
+            clinical_context=clinical_context or "",
+            multi_drug_report=combined_report,
+        )
+        if conclusion:
+            combined_report = f"{combined_report}\n\n## Conclusion\n\n{conclusion}"
+        return combined_report
+
+    # -------------------------------------------------------------------------
+    async def generate_conclusion(
+        self,
+        *,
+        clinical_context: str,
+        multi_drug_report: str,
+    ) -> str | None:
+        report_body = multi_drug_report.strip()
+        if not report_body:
+            return None
+        context_body = clinical_context.strip()
+        if not context_body:
+            context_body = "No clinical context was provided."
+        user_prompt = LIVERTOX_CONCLUSION_USER_PROMPT.format(
+            clinical_context=self.escape_braces(context_body),
+            multi_drug_report=self.escape_braces(report_body),
+        )
+        messages = [
+            {"role": "system", "content": LIVERTOX_CONCLUSION_SYSTEM_PROMPT.strip()},
+            {"role": "user", "content": user_prompt},
+        ]
+        chat_kwargs: dict[str, Any] = {
+            "model": self.llm_model,
+            "messages": messages,
+        }
+        if self.chat_supports_temperature:
+            chat_kwargs["temperature"] = self.report_temperature
+        else:
+            chat_kwargs["options"] = {"temperature": self.report_temperature}
+        try:
+            raw_response = await self.llm_client.chat(**chat_kwargs)
+        except Exception as exc:  # noqa: BLE001
+            logger.error("Failed to generate clinical conclusion: %s", exc)
+            return None
+        conclusion = self.coerce_chat_text(raw_response).strip()
+        return conclusion or None
 
     # -------------------------------------------------------------------------
     def build_excluded_paragraph(self, entry: DrugClinicalAssessment) -> str:
