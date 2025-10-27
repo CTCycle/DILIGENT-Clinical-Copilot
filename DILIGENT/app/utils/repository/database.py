@@ -74,6 +74,24 @@ class LiverToxData(Base):
 
 
 ###############################################################################
+class DrugCatalog(Base):
+    __tablename__ = "DRUG_CATALOG"
+    rxcui = Column(String, primary_key=True)
+    preferred_name = Column(String)
+    concept_type = Column(String)
+    synonyms = Column(Text)
+    brands = Column(Text)
+    rxcui_parents = Column(Text)
+    pubchem_cid = Column(String)
+    inchikey = Column(String)
+    unii = Column(String)
+    cas = Column(String)
+    xrefs = Column(Text)
+    status = Column(String)
+    updated_at = Column(DateTime)
+
+
+###############################################################################
 class FdaAdverseEvent(Base):
     __tablename__ = "FDA_ADVERSE_EVENTS"
     report_id = Column(String, primary_key=True)
