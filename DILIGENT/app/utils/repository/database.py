@@ -25,14 +25,6 @@ Base = declarative_base()
 
 
 ###############################################################################
-class Documents(Base):
-    __tablename__ = "DOCUMENTS"
-    id = Column(String, primary_key=True)
-    text = Column(String)
-    __table_args__ = (UniqueConstraint("id"),)
-
-
-###############################################################################
 class ClinicalSession(Base):
     __tablename__ = "CLINICAL_SESSIONS"
     id = Column(Integer, primary_key=True, autoincrement=True)
@@ -71,30 +63,6 @@ class LiverToxData(Base):
     source_url = Column(String)
     source_last_modified = Column(String)
     __table_args__ = (UniqueConstraint("drug_name", "ingredient", "brand_name"),)
-
-
-###############################################################################
-class FdaAdverseEvent(Base):
-    __tablename__ = "FDA_ADVERSE_EVENTS"
-    report_id = Column(String, primary_key=True)
-    case_version = Column(String, primary_key=True)
-    receipt_date = Column(String)
-    occur_country = Column(String)
-    patient_age = Column(String)
-    patient_age_unit = Column(String)
-    patient_sex = Column(String)
-    reaction_terms = Column(Text)
-    all_reactions = Column(Text)
-    suspect_products = Column(Text)
-    suspect_product_count = Column(Integer)
-    serious = Column(Integer)
-    seriousness_death = Column(Integer)
-    seriousness_lifethreatening = Column(Integer)
-    seriousness_hospitalization = Column(Integer)
-    seriousness_disabling = Column(Integer)
-    seriousness_congenital_anom = Column(Integer)
-    seriousness_other = Column(Integer)
-    __table_args__ = (UniqueConstraint("report_id", "case_version"),)
 
 
 # [DATABASE]
