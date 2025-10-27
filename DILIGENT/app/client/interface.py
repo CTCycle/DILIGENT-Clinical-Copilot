@@ -321,7 +321,7 @@ def main_page() -> None:
                         placeholder=(
                             "Describe the clinical picture, including exams and labs when relevant..."
                         ),
-                    ).classes("w-full min-h-[12rem]")
+                    ).classes("w-full min-h-[24rem]")
                     has_diseases = ui.checkbox(
                         "Has hepatic diseases",
                         value=False,
@@ -335,8 +335,8 @@ def main_page() -> None:
                     drugs = ui.textarea(
                         label="Current Drugs",
                         placeholder="List current therapies, dosage and schedule...",
-                    ).classes("w-full")
-                    with ui.grid(columns=1).classes("w-full gap-4 md:grid-cols-2"):
+                    ).classes("w-full min-h-[24rem]")
+                    with ui.grid(columns=2).classes("w-full gap-4"):
                         alt = ui.input(
                             label="ALT",
                             placeholder="e.g., 189 or 189 U/L",
@@ -347,7 +347,7 @@ def main_page() -> None:
                             placeholder="e.g., 47 U/L",
                         ).classes("w-full")
                         alt_max.props("dense")
-                    with ui.grid(columns=1).classes("w-full gap-4 md:grid-cols-2"):
+                    with ui.grid(columns=2).classes("w-full gap-4"):
                         alp = ui.input(
                             label="ALP",
                             placeholder="e.g., 140 or 140 U/L",
@@ -382,10 +382,9 @@ def main_page() -> None:
                         export_button.disable()
                         clear_button = ui.button("Clear all").classes("w-full")
 
-                with ui.accordion().classes("w-full") as configuration_accordion:
-                    with configuration_accordion.add(
-                        "Models & Analysis Configuration"
-                    ):
+                with ui.expansion(
+                    "Models & Analysis Configuration"
+                ).classes("w-full"):
                         ui.label("Configuration").classes("diligent-card-title")
                         use_rag_checkbox = ui.checkbox(
                             "Use Retrieval Augmented Generation (RAG)",
