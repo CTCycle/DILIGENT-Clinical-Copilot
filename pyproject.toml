@@ -9,7 +9,7 @@ requires-python = ">=3.12,<3.13"
 
 dependencies = [
     "fastapi==0.118.0",
-    "gradio==5.47.2",
+    "nicegui==3.0.4",
     "numpy==2.3.2",
     "pandas==2.3.3",
     "tqdm==4.67.1",
