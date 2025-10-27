@@ -9,7 +9,7 @@ import os
 import re
 import tarfile
 import unicodedata
-from concurrent.futures import ProcessPoolExecutor, ThreadPoolExecutor, as_completed
+from concurrent.futures import ProcessPoolExecutor, as_completed
 from datetime import UTC, datetime
 from typing import Any
 
@@ -28,7 +28,6 @@ from DILIGENT.app.constants import (
 from DILIGENT.app.logger import logger
 from DILIGENT.app.utils.repository.serializer import DataSerializer
 from DILIGENT.app.utils.repository.database import database
-from DILIGENT.app.utils.updater.rxnav import RxNavClient
 
 __all__ = ["LiverToxUpdater"]
 
@@ -106,14 +105,11 @@ async def download_file(
 
 ###############################################################################
 class LiverToxUpdater:
-    RXNAV_MAX_WORKERS = 6
-
     def __init__(
         self,
         sources_path: str,
         *,
         redownload: bool,
-        rx_client: RxNavClient | None = None,
         serializer: DataSerializer | None = None,
         database_client=database,
     ) -> None:
@@ -124,7 +120,6 @@ class LiverToxUpdater:
 
         self.sources_path = os.path.abspath(sources_path)
         self.redownload = redownload
-        self.rx_client = rx_client or RxNavClient()
         self.serializer = serializer or DataSerializer()
         self.database = database_client
         self.header_row = 1
@@ -643,11 +638,9 @@ class LiverToxUpdater:
             master_frame,
             master_metadata,
         )
-        logger.info("Enriching %d unified records with RxNav terms", len(unified.index))
-        enriched = self.enrich_records(unified)
         logger.info("Finalizing sanitized dataset")
-        final_dataset = self.finalize_dataset(enriched)
-        logger.info("Persisting enriched records to database")
+        final_dataset = self.finalize_dataset(unified)
+        logger.info("Persisting finalized records to database")
         self.serializer.save_livertox_records(final_dataset)
 
         payload = {**master_metadata, **archive_metadata, **local_info}
@@ -1062,144 +1055,6 @@ class LiverToxUpdater:
             pd.notnull(sanitized["synonyms"]), pd.NA
         )
         return sanitized.reset_index(drop=True)
-
-    # -------------------------------------------------------------------------
-    def enrich_records(self, records: pd.DataFrame) -> pd.DataFrame:
-        if records.empty:
-            return records.copy()
-
-        subset = [
-            column
-            for column in ("drug_name", "ingredient", "brand_name")
-            if column in records.columns
-        ]
-        if subset:
-            deduped = records.drop_duplicates(subset=subset, keep="first")
-            removed = len(records) - len(deduped)
-            if removed:
-                logger.warning(
-                    "Detected %d duplicate LiverTox record(s); removing before enrichment",
-                    removed,
-                )
-            records = deduped.reset_index(drop=True)
-
-        enriched = records.copy()
-        enriched["synonyms"] = pd.NA
-        unit_stopwords = getattr(self.rx_client, "UNIT_STOPWORDS", set())
-        cache: dict[str, set[str]] = {}
-        raw_workers = getattr(self, "RXNAV_MAX_WORKERS", 6)
-        try:
-            max_workers = int(raw_workers)
-        except (TypeError, ValueError):
-            max_workers = 6
-        if max_workers < 1:
-            max_workers = 1
-
-        alias_sets: list[list[str]] = []
-        unique_aliases: set[str] = set()
-        for row in enriched.itertuples(index=False):
-            aliases: list[str] = []
-            seen_aliases: set[str] = set()
-            for attr in ("drug_name", "ingredient", "brand_name"):
-                value = getattr(row, attr, None)
-                if not isinstance(value, str):
-                    continue
-                normalized_alias = value.strip()
-                if (
-                    not normalized_alias
-                    or normalized_alias.lower() == "not available"
-                    or normalized_alias in seen_aliases
-                ):
-                    continue
-                seen_aliases.add(normalized_alias)
-                aliases.append(normalized_alias)
-            if aliases:
-                unique_aliases.update(aliases)
-            alias_sets.append(aliases)
-
-        expected_calls = len(unique_aliases)
-        per_request_budget = float(getattr(self.rx_client, "TIMEOUT", 10.0) or 10.0)
-        estimated_seconds = (expected_calls * per_request_budget) / max_workers
-        if expected_calls:
-            logger.info(
-                "Preparing RxNav enrichment for %d unique lookup(s) across %d worker(s); "
-                "worst-case duration %.1fs (%.1f min) with %.1fs request budget",
-                expected_calls,
-                max_workers,
-                estimated_seconds,
-                estimated_seconds / 60,
-                per_request_budget,
-            )
-
-        aliases_to_fetch = [alias for alias in unique_aliases if alias not in cache]
-        if aliases_to_fetch:
-            with ThreadPoolExecutor(max_workers=max_workers) as executor:
-                futures = {
-                    executor.submit(self.rx_client.fetch_drug_terms, alias): alias
-                    for alias in aliases_to_fetch
-                }
-                for future in as_completed(futures):
-                    alias = futures[future]
-                    try:
-                        terms = future.result()
-                    except Exception as exc:  # noqa: BLE001
-                        logger.warning("Failed to enrich '%s': %s", alias, exc)
-                        cache[alias] = set()
-                        continue
-                    cache[alias] = {term for term in terms if isinstance(term, str)}
-
-        synonyms_values: list[str | Any] = []
-        for aliases in alias_sets:
-            if not aliases:
-                synonyms_values.append(pd.NA)
-                continue
-
-            collected: set[str] = set()
-            for alias in aliases:
-                collected.update(cache.get(alias, set()))
-
-            sanitized: list[str] = []
-            seen_terms: set[str] = set()
-            for candidate in collected:
-                if not isinstance(candidate, str):
-                    continue
-                normalized = self.normalize_whitespace(candidate)
-                if (
-                    not normalized
-                    or len(normalized) < 4
-                    or normalized.isnumeric()
-                    or self.contains_symbol(normalized)
-                ):
-                    continue
-
-                tokens: list[str] = []
-                for token in normalized.split():
-                    cleaned = re.sub(r"[^A-Za-z0-9'-]", "", token)
-                    if (
-                        not cleaned
-                        or cleaned.lower() in unit_stopwords
-                        or cleaned.isnumeric()
-                        or len(cleaned) < 2
-                    ):
-                        continue
-                    tokens.append(cleaned)
-
-                refined = " ".join(tokens).strip()
-                if len(refined) < 4 or self.contains_symbol(refined):
-                    continue
-
-                key = refined.casefold()
-                if key in seen_terms:
-                    continue
-                seen_terms.add(key)
-                sanitized.append(refined)
-
-            if sanitized:
-                synonyms_values.append(", ".join(sorted(sanitized, key=str.casefold)))
-            else:
-                synonyms_values.append(pd.NA)
-        enriched["synonyms"] = synonyms_values
-        return enriched
 
     # -------------------------------------------------------------------------
     def finalize_dataset(self, frame: pd.DataFrame) -> pd.DataFrame:

@@ -1,7 +1,5 @@
 import os
 import sys
-import threading
-import time
 from unittest.mock import patch
 
 import pandas as pd
@@ -16,51 +14,11 @@ from DILIGENT.app.utils.updater.livertox import LiverToxUpdater
 
 
 ###############################################################################
-class StubRxClient:
-    UNIT_STOPWORDS = {"mg", "ml", "ng"}
-
-    def __init__(self, mapping: dict[str, list[str]]) -> None:
-        self.mapping = mapping
-
-    ###########################################################################
-    def fetch_drug_terms(self, name: str) -> list[str]:
-        return self.mapping.get(name, [])
-
-
-###############################################################################
-class RateCheckingRxClient:
-    UNIT_STOPWORDS = StubRxClient.UNIT_STOPWORDS
-
-    def __init__(self, mapping: dict[str, list[str]], delay: float = 0.01) -> None:
-        self.mapping = mapping
-        self.delay = delay
-        self.lock = threading.Lock()
-        self.active = 0
-        self.max_active = 0
-        self.call_count = 0
-
-    ###########################################################################
-    def fetch_drug_terms(self, name: str) -> list[str]:
-        with self.lock:
-            self.active += 1
-            self.call_count += 1
-            if self.active > self.max_active:
-                self.max_active = self.active
-        try:
-            time.sleep(self.delay)
-            return self.mapping.get(name, [])
-        finally:
-            with self.lock:
-                self.active -= 1
-
-
-###############################################################################
 @pytest.fixture()
 def updater() -> LiverToxUpdater:
     return LiverToxUpdater(
         ".",
         redownload=False,
-        rx_client=StubRxClient({}),
         serializer=DataSerializer(),
         database_client=None,
     )
@@ -138,87 +96,6 @@ def test_sanitization_rules_drop_invalid_values(updater: LiverToxUpdater) -> Non
 
     assert list(sanitized["drug_name"]) == ["Another Valid"]
     assert sanitized.iloc[0]["excerpt"] == "Excerpt"
-
-
-###############################################################################
-def test_enrichment_uses_all_aliases() -> None:
-    mapping = {
-        "Primary Drug": [
-            "Primary Synonym",
-            "mg",
-            "Multi Word Term",
-            "Invalid@Term",
-            "Abc",
-        ],
-        "Primary Ingredient": ["Ingredient Synonym"],
-        "PrimaryBrand": ["Brand Synonym", "5"],
-    }
-    updater = LiverToxUpdater(
-        ".",
-        redownload=False,
-        rx_client=StubRxClient(mapping),
-        serializer=DataSerializer(),
-        database_client=None,
-    )
-    dataset = pd.DataFrame(
-        [
-            {
-                "drug_name": "Primary Drug",
-                "ingredient": "Primary Ingredient",
-                "brand_name": "PrimaryBrand",
-                "excerpt": "Example",
-                "nbk_id": "NBK123",
-            }
-        ]
-    )
-
-    enriched = updater.enrich_records(updater.sanitize_unified_dataset(dataset))
-    synonyms = enriched.iloc[0]["synonyms"]
-
-    assert "Primary Synonym" in synonyms
-    assert "Ingredient Synonym" in synonyms
-    assert "Brand Synonym" in synonyms
-    assert "mg" not in synonyms
-    assert "Invalid@Term" not in synonyms
-    assert "Abc" not in synonyms
-
-
-###############################################################################
-def test_enrichment_respects_max_workers() -> None:
-    mapping: dict[str, list[str]] = {}
-    rows: list[dict[str, str | pd.NA]] = []
-    for index in range(12):
-        drug = f"Drug {index}"
-        ingredient = f"Ingredient {index}"
-        brand = f"Brand {index}"
-        mapping[drug] = [f"{drug} Alias"]
-        mapping[ingredient] = [f"{ingredient} Alias"]
-        mapping[brand] = [f"{brand} Alias"]
-        rows.append(
-            {
-                "drug_name": drug,
-                "ingredient": ingredient,
-                "brand_name": brand,
-                "synonyms": pd.NA,
-            }
-        )
-
-    rx_client = RateCheckingRxClient(mapping, delay=0.01)
-    updater = LiverToxUpdater(
-        ".",
-        redownload=False,
-        rx_client=rx_client,
-        serializer=DataSerializer(),
-        database_client=None,
-    )
-    updater.RXNAV_MAX_WORKERS = 4
-
-    dataset = pd.DataFrame(rows)
-    enriched = updater.enrich_records(dataset)
-
-    assert rx_client.call_count == len(mapping)
-    assert rx_client.max_active <= updater.RXNAV_MAX_WORKERS
-    assert enriched["synonyms"].notna().all()
 
 
 ###############################################################################
