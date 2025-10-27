@@ -4,6 +4,7 @@ import asyncio
 import math
 import json
 import os
+import re
 import zipfile
 from collections import defaultdict
 from collections.abc import Iterable, Sequence
@@ -139,23 +140,18 @@ class RxNormReleaseManager:
         destination = os.path.join(self.releases_path, archive_name)
         if redownload or not os.path.isfile(destination):
             logger.info("Downloading RxNorm release from %s", download_url)
-            response = self.http_client.get(download_url)
-            if response.status_code == 302 and "location" in response.headers:
-                raise httpx.HTTPStatusError(
-                    "Unexpected redirect when downloading RxNorm release",
-                    request=response.request,
-                    response=response,
-                )
-            response.raise_for_status()
-            content_type = response.headers.get("content-type", "").lower()
-            if content_type and "zip" not in content_type and "octet-stream" not in content_type:
-                raise httpx.HTTPStatusError(
-                    "Received unexpected content while downloading RxNorm release",
-                    request=response.request,
-                    response=response,
-                )
+            try:
+                content = self.fetch_release_content(download_url)
+            except httpx.HTTPStatusError:
+                if not self.is_prescribe_url(download_url):
+                    raise
+                fallback_url = self.find_latest_prescribe_url(monthly)
+                if fallback_url == download_url:
+                    raise
+                logger.info("Retrying RxNorm release download from %s", fallback_url)
+                content = self.fetch_release_content(fallback_url)
             with open(destination, "wb") as handle:
-                handle.write(response.content)
+                handle.write(content)
         return self.extract_archive(destination)
 
     # -------------------------------------------------------------------------
@@ -172,6 +168,96 @@ class RxNormReleaseManager:
         with open(marker, "w", encoding="utf-8") as handle:
             handle.write(datetime.now(UTC).isoformat())
         return extract_dir
+
+    # -------------------------------------------------------------------------
+    def fetch_release_content(self, url: str) -> bytes:
+        response = self.http_client.get(url)
+        if response.status_code == 302 and "location" in response.headers:
+            raise httpx.HTTPStatusError(
+                "Unexpected redirect when downloading RxNorm release",
+                request=response.request,
+                response=response,
+            )
+        response.raise_for_status()
+        if not self.is_zip_response(response):
+            message = "Received unexpected content while downloading RxNorm release"
+            if self.contains_uts_login(response):
+                message = (
+                    "RxNorm prescribe release requires UTS authentication; "
+                    "use a dated link instead of the 'current' pointer"
+                )
+            raise httpx.HTTPStatusError(
+                message,
+                request=response.request,
+                response=response,
+            )
+        return response.content
+
+    # -------------------------------------------------------------------------
+    def is_zip_response(self, response: httpx.Response) -> bool:
+        content_type = response.headers.get("content-type", "").lower()
+        if content_type:
+            if "zip" in content_type or "octet-stream" in content_type:
+                return True
+            if "html" in content_type:
+                return False
+        disposition = response.headers.get("content-disposition", "").lower()
+        if disposition and "zip" in disposition:
+            return True
+        return False
+
+    # -------------------------------------------------------------------------
+    def contains_uts_login(self, response: httpx.Response) -> bool:
+        if self.is_zip_response(response):
+            return False
+        try:
+            body = response.text
+        except UnicodeDecodeError:
+            return False
+        login_markers = [
+            "uts.nlm.nih.gov",
+            "UTS Login",
+            "Sign in",
+        ]
+        return any(marker.lower() in body.lower() for marker in login_markers)
+
+    # -------------------------------------------------------------------------
+    def is_prescribe_url(self, url: str) -> bool:
+        return "prescribe" in url.lower()
+
+    # -------------------------------------------------------------------------
+    def find_latest_prescribe_url(self, monthly: bool) -> str:
+        page_url = "https://www.nlm.nih.gov/research/umls/rxnorm/docs/rxnormfiles.html"
+        logger.info("Discovering latest RxNorm prescribe release from %s", page_url)
+        response = self.http_client.get(page_url)
+        response.raise_for_status()
+        release_type = "full" if monthly else "weekly"
+        pattern = (
+            rf"https://download\.nlm\.nih\.gov/umls/kss/rxnorm/"
+            rf"RxNorm_{release_type}_prescribe_\d{{8}}\.zip"
+        )
+        matches = list(re.finditer(pattern, response.text, re.IGNORECASE))
+        if not matches:
+            raise httpx.HTTPStatusError(
+                "Could not determine latest RxNorm prescribe release",
+                request=response.request,
+                response=response,
+            )
+        candidates: list[tuple[str, str]] = []
+        for match in matches:
+            url = match.group(0)
+            date_match = re.search(r"(\d{8})", url)
+            if not date_match:
+                continue
+            candidates.append((date_match.group(1), url))
+        if not candidates:
+            raise httpx.HTTPStatusError(
+                "Could not determine latest RxNorm prescribe release",
+                request=response.request,
+                response=response,
+            )
+        candidates.sort(key=lambda item: item[0], reverse=True)
+        return candidates[0][1]
 
 
 ###############################################################################
