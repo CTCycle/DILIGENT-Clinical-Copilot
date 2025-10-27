@@ -717,20 +717,42 @@ class RxNavDrugCatalogBuilder:
         self.ensure_progress_bar()
         count = 0
         batch: list[dict[str, Any]] = []
+        processed = 0
+        total = self.total_records
         try:
             for concept in self.stream_min_concepts(chunks):
+                processed += 1
+                self.update_progress_bar(processed, total, final=False)
+                if (
+                    (self.progress_bar is None or getattr(self.progress_bar, "disable", False))
+                    and processed - self.last_logged_count >= self.PROGRESS_LOG_INTERVAL
+                ):
+                    logger.info("Processed %s RxNav concepts", processed)
+                    self.last_logged_count = processed
                 payload = self.sanitize_concept(concept)
                 if payload is None:
                     continue
                 batch.append(payload)
                 if len(batch) >= self.BATCH_SIZE:
                     self.persist_batch(batch)
-                    count += len(batch)                    
+                    count += len(batch)
                     batch.clear()
             if batch:
                 self.persist_batch(batch)
-                count += len(batch)            
+                count += len(batch)
         finally:
+            progress_disabled = (
+                self.progress_bar is None
+                or getattr(self.progress_bar, "disable", False)
+            )
+            self.update_progress_bar(processed, total, final=True)
+            if (
+                progress_disabled
+                and processed > 0
+                and processed != self.last_logged_count
+            ):
+                logger.info("Processed %s RxNav concepts", processed)
+                self.last_logged_count = processed
             if self.progress_bar is not None:
                 self.progress_bar.close()
                 self.progress_bar = None
