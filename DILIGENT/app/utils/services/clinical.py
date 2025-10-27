@@ -138,7 +138,7 @@ class HepatoxConsultation:
         self.timeout_s = timeout_s
         self.serializer = DataSerializer()
         self.livertox_df = None
-        self.master_list_df = None
+        self.catalog_df = None
         self.matcher: LiverToxMatcher | None = None
         self.llm_client = initialize_llm_client(purpose="clinical", timeout_s=timeout_s)
         self.MAX_EXCERPT_LENGTH = MAX_EXCERPT_LENGTH
@@ -205,9 +205,14 @@ class HepatoxConsultation:
             )
             self.matcher = None
             return False
+        catalog = None
+        try:
+            catalog = self.serializer.get_drugs_catalog()
+        except Exception as exc:  # noqa: BLE001
+            logger.warning("Failed loading drugs catalog: %s", exc)
         self.livertox_df = dataset
-        self.master_list_df = None
-        self.matcher = LiverToxMatcher(dataset)
+        self.catalog_df = catalog
+        self.matcher = LiverToxMatcher(dataset, catalog)
         return True
 
     # -------------------------------------------------------------------------

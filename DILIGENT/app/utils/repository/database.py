@@ -55,11 +55,8 @@ class ClinicalSession(Base):
 class LiverToxData(Base):
     __tablename__ = "LIVERTOX_DATA"
     drug_name = Column(String, primary_key=True)
-    ingredient = Column(String, primary_key=True)
-    brand_name = Column(String, primary_key=True)
     nbk_id = Column(String)
     excerpt = Column(Text)
-    synonyms = Column(Text)
     likelihood_score = Column(String)
     last_update = Column(String)
     reference_count = Column(String)
@@ -70,7 +67,19 @@ class LiverToxData(Base):
     include_in_livertox = Column(String)
     source_url = Column(String)
     source_last_modified = Column(String)
-    __table_args__ = (UniqueConstraint("drug_name", "ingredient", "brand_name"),)
+    __table_args__ = (UniqueConstraint("drug_name"),)
+
+
+###############################################################################
+class DrugsCatalog(Base):
+    __tablename__ = "DRUGS_CATALOG"
+    rxcui = Column(String, primary_key=True)
+    full_name = Column(Text)
+    term_type = Column(String)
+    ingredient = Column(Text)
+    brand_name = Column(Text)
+    synonyms = Column(Text)
+    __table_args__ = (UniqueConstraint("rxcui"),)
 
 
 

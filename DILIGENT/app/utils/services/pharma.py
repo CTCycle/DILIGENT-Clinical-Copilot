@@ -95,6 +95,13 @@ MATCHING_STOPWORDS = {
 
 
 @dataclass(slots=True)
+class CatalogEntry:
+    synonyms: set[str]
+    ingredients: set[str]
+    brands: set[str]
+
+
+@dataclass(slots=True)
 class MonographRecord:
     nbk_id: str
     drug_name: str
@@ -130,13 +137,13 @@ class LiverToxMatcher:
     def __init__(
         self,
         livertox_df: pd.DataFrame,
-        master_list_df: pd.DataFrame | None = None,
+        catalog_df: pd.DataFrame | None = None,
     ) -> None:
         self.livertox_df = livertox_df
-        if master_list_df is not None and not master_list_df.empty:
-            self.master_list_df = master_list_df.copy()
+        if catalog_df is not None and not catalog_df.empty:
+            self.catalog_df = catalog_df.copy()
         else:
-            self.master_list_df = self.derive_master_alias_source(livertox_df)
+            self.catalog_df = None
         self.match_cache: dict[str, LiverToxMatch | None] = {}
         self.records: list[MonographRecord] = []
         self.primary_index: dict[str, MonographRecord] = {}
@@ -147,8 +154,10 @@ class LiverToxMatcher:
         self.brand_index: dict[str, list[tuple[str, str]]] = {}
         self.ingredient_index: dict[str, list[tuple[str, str]]] = {}
         self.rows_by_name: dict[str, dict[str, Any]] = {}
+        self.catalog_aliases: dict[str, CatalogEntry] = {}
+        self.build_catalog_aliases()
         self.build_records()
-        self.build_master_list_aliases()
+        self.build_catalog_mappings()
         self.finalize_token_index()
 
     # -------------------------------------------------------------------------
@@ -390,6 +399,9 @@ class LiverToxMatcher:
             excerpt = self.coerce_text(getattr(row, "excerpt", None))
             synonyms_value = getattr(row, "synonyms", None)
             synonyms = self.parse_synonyms(synonyms_value)
+            catalog_synonyms = self.lookup_catalog_synonyms(normalized_name)
+            if catalog_synonyms:
+                synonyms.update(catalog_synonyms)
             tokens = self.collect_tokens(raw_name, list(synonyms.values()))
             record = MonographRecord(
                 nbk_id=nbk_id,
@@ -420,35 +432,65 @@ class LiverToxMatcher:
         self.token_occurrences = token_occurrences
 
     # -------------------------------------------------------------------------
-    def build_master_list_aliases(self) -> None:
+    def build_catalog_aliases(self) -> None:
+        self.catalog_aliases = {}
+        if self.catalog_df is None or self.catalog_df.empty:
+            return
+        for row in self.catalog_df.itertuples(index=False):
+            full_name = self.coerce_text(getattr(row, "full_name", None))
+            synonyms = self.parse_catalog_field(getattr(row, "synonyms", None))
+            brands = self.parse_catalog_field(getattr(row, "brand_name", None))
+            ingredients = self.parse_catalog_field(getattr(row, "ingredient", None))
+            alias_values: set[str] = set()
+            if full_name:
+                alias_values.add(full_name)
+            alias_values.update(synonyms)
+            alias_values.update(brands)
+            alias_values.update(ingredients)
+            for alias in alias_values:
+                normalized_alias = self.normalize_name(alias)
+                if not normalized_alias:
+                    continue
+                entry = self.catalog_aliases.get(normalized_alias)
+                if entry is None:
+                    entry = CatalogEntry(set(), set(), set())
+                    self.catalog_aliases[normalized_alias] = entry
+                entry.synonyms.update(alias_values)
+                entry.ingredients.update(ingredients)
+                entry.brands.update(brands)
+
+    # -------------------------------------------------------------------------
+    def build_catalog_mappings(self) -> None:
         self.brand_index = {}
         self.ingredient_index = {}
-        if self.master_list_df is None or self.master_list_df.empty:
+        if not self.catalog_aliases:
             return
-        for row in self.master_list_df.itertuples(index=False):
-            drug_name = self.coerce_text(getattr(row, "drug_name", None))
-            if drug_name is None:
+        for entry in self.catalog_aliases.values():
+            canonical_sources = [
+                value for value in entry.synonyms if self.coerce_text(value)
+            ]
+            if not canonical_sources:
                 continue
-            brand = self.coerce_text(getattr(row, "brand_name", None))
-            ingredient = self.coerce_text(getattr(row, "ingredient", None))
-            for alias_type, value in ("brand", brand), ("ingredient", ingredient):
-                if value is None:
-                    continue
-                if value.lower() == "not available":
-                    continue
+            for value in entry.brands:
                 for variant in self.iter_alias_variants(value):
                     normalized_variant = self.normalize_name(variant)
                     if not normalized_variant:
                         continue
-                    index = (
-                        self.brand_index
-                        if alias_type == "brand"
-                        else self.ingredient_index
-                    )
-                    bucket = index.setdefault(normalized_variant, [])
-                    entry = (variant, drug_name)
-                    if entry not in bucket:
-                        bucket.append(entry)
+                    bucket = self.brand_index.setdefault(normalized_variant, [])
+                    for canonical in canonical_sources:
+                        pair = (variant, canonical)
+                        if pair not in bucket:
+                            bucket.append(pair)
+            for value in entry.ingredients:
+                for variant in self.iter_alias_variants(value):
+                    normalized_variant = self.normalize_name(variant)
+                    if not normalized_variant:
+                        continue
+                    bucket = self.ingredient_index.setdefault(normalized_variant, [])
+                    for canonical in canonical_sources:
+                        pair = (variant, canonical)
+                        if pair not in bucket:
+                            bucket.append(pair)
 
     # -------------------------------------------------------------------------
     def finalize_token_index(self) -> None:
@@ -492,19 +534,66 @@ class LiverToxMatcher:
         return list(variants)
 
     # -------------------------------------------------------------------------
-    def derive_master_alias_source(
-        self, dataset: pd.DataFrame | None
-    ) -> pd.DataFrame | None:
-        if dataset is None or dataset.empty:
-            return None
-        required = {"drug_name", "ingredient", "brand_name"}
-        if not required.issubset(dataset.columns):
-            return None
-        alias = dataset[list(required)].copy()
-        alias = alias.dropna(subset=["drug_name"])
-        alias = alias.replace("Not available", pd.NA)
-        alias = alias.dropna(how="all", subset=["ingredient", "brand_name"])
-        return alias.reset_index(drop=True)
+    def parse_catalog_field(self, value: Any) -> set[str]:
+        entries: set[str] = set()
+        if value is None:
+            return entries
+        if isinstance(value, str):
+            text = value.strip()
+            parsed = None
+            if text.startswith("[") or text.startswith("{"):
+                try:
+                    parsed = json.loads(text)
+                except (TypeError, ValueError):
+                    parsed = None
+            if isinstance(parsed, list):
+                for item in parsed:
+                    normalized = self.coerce_text(item)
+                    if normalized:
+                        entries.add(normalized)
+                return entries
+            normalized = self.coerce_text(text)
+            if normalized:
+                entries.add(normalized)
+            return entries
+        if isinstance(value, (list, tuple, set)):
+            for item in value:
+                normalized = self.coerce_text(item)
+                if normalized:
+                    entries.add(normalized)
+            return entries
+        normalized = self.coerce_text(value)
+        if normalized:
+            entries.add(normalized)
+        return entries
+
+    # -------------------------------------------------------------------------
+    def lookup_catalog_synonyms(self, normalized_name: str) -> dict[str, str]:
+        if not normalized_name:
+            return {}
+        entry = self.catalog_aliases.get(normalized_name)
+        if entry is None:
+            return {}
+        combined: set[str] = set()
+        combined.update(entry.synonyms)
+        combined.update(entry.ingredients)
+        combined.update(entry.brands)
+        mapping: dict[str, str] = {}
+        for value in combined:
+            text = self.coerce_text(value)
+            if text is None:
+                continue
+            for variant in self.iter_alias_variants(text):
+                normalized_variant = self.normalize_name(variant)
+                if not normalized_variant:
+                    continue
+                if normalized_variant in MATCHING_STOPWORDS:
+                    continue
+                if len(normalized_variant) < 4 and " " not in normalized_variant:
+                    continue
+                if normalized_variant not in mapping:
+                    mapping[normalized_variant] = variant
+        return mapping
 
     # -------------------------------------------------------------------------
     def parse_synonyms(self, value: Any) -> dict[str, str]:

@@ -1,5 +1,5 @@
 from __future__ import annotations
 
-from .catalog import DrugCatalogUpdater
+from .rxnav import DrugsCatalogUpdater, RxNavClient
 
-__all__ = ["DrugCatalogUpdater"]
+__all__ = ["DrugsCatalogUpdater", "RxNavClient"]

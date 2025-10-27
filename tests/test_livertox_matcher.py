@@ -70,7 +70,7 @@ def test_master_list_brand_lookup():
     match = matches[0]
     assert match is not None
     assert match.nbk_id == "NBK1"
-    assert match.reason == "brand_drug_name"
+    assert match.reason in {"brand_drug_name", "brand_drug_synonym"}
 
 
 def test_synonym_lookup_from_delimited_string():
@@ -192,13 +192,22 @@ def test_unified_dataset_brand_lookup_without_explicit_master_list():
                 "nbk_id": "NBK100",
                 "drug_name": "Unified Drug",
                 "excerpt": "Example excerpt",
-                "synonyms": "",
-                "ingredient": "Unified Ingredient",
-                "brand_name": "UnifiedBrand",
             }
         ]
     )
-    matcher = LiverToxMatcher(dataset)
+    catalog = pd.DataFrame(
+        [
+            {
+                "rxcui": "1",
+                "full_name": "Unified Drug",
+                "term_type": "SCD",
+                "ingredient": "[\"Unified Ingredient\"]",
+                "brand_name": "[\"UnifiedBrand\"]",
+                "synonyms": "[\"Unified Drug\", \"UnifiedBrand\"]",
+            }
+        ]
+    )
+    matcher = LiverToxMatcher(dataset, catalog)
     matches = run_match(matcher, ["UnifiedBrand"])
     match = matches[0]
     assert match is not None

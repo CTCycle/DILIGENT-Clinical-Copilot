@@ -4,12 +4,20 @@ import json
 import re
 import time
 import unicodedata
+from concurrent.futures import ThreadPoolExecutor, as_completed
 from dataclasses import dataclass
-from typing import Any
+from typing import Any, Iterator
 
 import httpx
+import pandas as pd
 
 from DILIGENT.app.logger import logger
+from DILIGENT.app.utils.repository.serializer import (
+    DRUGS_CATALOG_COLUMNS,
+    DataSerializer,
+)
+
+__all__ = ["RxNavClient", "DrugsCatalogUpdater"]
 
 
 ###############################################################################
@@ -17,6 +25,7 @@ from DILIGENT.app.logger import logger
 class RxNormCandidate:
     value: str
     kind: str
+    display: str
 
 
 # -----------------------------------------------------------------------------
@@ -275,18 +284,42 @@ class RxNavClient:
         cached = self.cache.get(normalized_key)
         if cached is not None:
             return {key: info.kind for key, info in cached.items()}
+        candidates = self.get_candidates(raw_name)
+        return {key: info.kind for key, info in candidates.items()}
+
+    # -------------------------------------------------------------------------
+    def get_candidates(self, raw_name: str) -> dict[str, RxNormCandidate]:
+        normalized_key = self.normalize_value(raw_name)
+        if not normalized_key:
+            return {}
+        if not self.enabled:
+            display = self.standardize_term(raw_name) or raw_name
+            return {
+                normalized_key: RxNormCandidate(
+                    value=normalized_key,
+                    kind="original",
+                    display=display,
+                )
+            }
+        cached = self.cache.get(normalized_key)
+        if cached is not None:
+            return cached
         candidates = self.collect_candidates(raw_name)
         if normalized_key not in candidates:
             candidates[normalized_key] = RxNormCandidate(
                 value=normalized_key,
                 kind="original",
+                display=self.standardize_term(raw_name) or raw_name,
             )
         else:
-            candidates[normalized_key].kind = "original"
+            info = candidates[normalized_key]
+            info.kind = "original"
+            if not info.display:
+                info.display = self.standardize_term(raw_name) or raw_name
         if len(candidates) == 1:
             logger.debug("RxNorm expansion returned no alternates for '%s'", raw_name)
         self.cache[normalized_key] = candidates
-        return {key: info.kind for key, info in candidates.items()}
+        return candidates
 
     # -------------------------------------------------------------------------
     def get_candidate_kind(self, original: str, candidate: str) -> str:
@@ -330,14 +363,30 @@ class RxNavClient:
                     if not normalized_value:
                         continue
                     kind = self.classify_kind(raw_value, source)
-                    self.store_candidate(collected, normalized_value, kind)
+                    display_value = self.standardize_term(raw_value) or raw_value
+                    self.store_candidate(
+                        collected,
+                        normalized_value,
+                        kind,
+                        display_value,
+                    )
                     ingredient_variants = self.derive_ingredients(raw_value)
                     if ingredient_variants:
                         if len(ingredient_variants) > 1:
                             combo = " / ".join(ingredient_variants)
-                            self.store_candidate(collected, combo, "ingredient_combo")
+                            self.store_candidate(
+                                collected,
+                                combo,
+                                "ingredient_combo",
+                                self.standardize_term(combo),
+                            )
                         for variant in ingredient_variants:
-                            self.store_candidate(collected, variant, "ingredient")
+                            self.store_candidate(
+                                collected,
+                                variant,
+                                "ingredient",
+                                self.standardize_term(variant),
+                            )
         return collected
 
     # -------------------------------------------------------------------------
@@ -447,16 +496,21 @@ class RxNavClient:
         collected: dict[str, RxNormCandidate],
         normalized_value: str,
         kind: str,
+        display: str | None,
     ) -> None:
         if not normalized_value:
             return
+        display_value = display or normalized_value
         existing = collected.get(normalized_value)
         if existing is None:
             collected[normalized_value] = RxNormCandidate(
                 value=normalized_value,
                 kind=kind,
+                display=self.standardize_term(display_value) or display_value,
             )
             return
+        if not existing.display and display_value:
+            existing.display = self.standardize_term(display_value) or display_value
         if existing.kind == "unknown" and kind != "unknown":
             existing.kind = kind
             return
@@ -527,3 +581,300 @@ class RxNavClient:
     def is_bracketed(self, value: str) -> bool:
         stripped = value.strip()
         return stripped.startswith("[") and stripped.endswith("]")
+
+
+###############################################################################
+class DrugsCatalogUpdater:
+    RXTERMS_URL = "https://rxnav.nlm.nih.gov/REST/RxTerms/allconcepts.json"
+    STREAM_CHUNK_SIZE = 131_072
+    BATCH_SIZE = 400
+    RXNAV_MAX_WORKERS = 8
+
+    def __init__(
+        self,
+        *,
+        rx_client: RxNavClient | None = None,
+        serializer: DataSerializer | None = None,
+    ) -> None:
+        self.rx_client = rx_client or RxNavClient()
+        self.serializer = serializer or DataSerializer()
+        self.alias_cache: dict[str, dict[str, RxNormCandidate]] = {}
+
+    # -------------------------------------------------------------------------
+    def update_catalog(self) -> dict[str, Any]:
+        logger.info("Refreshing RxNav drugs catalog")
+        frame = self.build_catalog_frame()
+        if frame.empty:
+            logger.warning("RxNav catalog returned no entries; clearing table")
+        self.serializer.save_drugs_catalog(frame)
+        return {"records": int(frame.shape[0])}
+
+    # -------------------------------------------------------------------------
+    def build_catalog_frame(self) -> pd.DataFrame:
+        records: list[dict[str, Any]] = []
+        seen_rxcui: set[str] = set()
+        for batch in self.iter_concept_batches(self.BATCH_SIZE):
+            enriched = self.enrich_batch(batch)
+            for record in enriched:
+                rxcui = record.get("rxcui")
+                if not rxcui or rxcui in seen_rxcui:
+                    continue
+                seen_rxcui.add(rxcui)
+                records.append(record)
+        if not records:
+            return pd.DataFrame(columns=DRUGS_CATALOG_COLUMNS)
+        frame = pd.DataFrame(records)
+        return frame.reindex(columns=DRUGS_CATALOG_COLUMNS)
+
+    # -------------------------------------------------------------------------
+    def iter_concept_batches(
+        self, batch_size: int
+    ) -> Iterator[list[dict[str, Any]]]:
+        batch: list[dict[str, Any]] = []
+        for concept in self.iter_concepts():
+            batch.append(concept)
+            if len(batch) >= batch_size:
+                yield batch
+                batch = []
+        if batch:
+            yield batch
+
+    # -------------------------------------------------------------------------
+    def iter_concepts(self) -> Iterator[dict[str, Any]]:
+        for raw in self.stream_concepts(self.STREAM_CHUNK_SIZE):
+            normalized = self.normalize_concept(raw)
+            if normalized is not None:
+                yield normalized
+
+    # -------------------------------------------------------------------------
+    def stream_concepts(self, chunk_size: int) -> Iterator[dict[str, Any]]:
+        decoder = json.JSONDecoder()
+        buffer = ""
+        key = '"conceptProperties"'
+        started = False
+        max_prefix = len(key)
+        timeout = getattr(self.rx_client, "TIMEOUT", 10.0) or 10.0
+        with httpx.Client(timeout=timeout, trust_env=False) as client:
+            with client.stream("GET", self.RXTERMS_URL) as response:
+                response.raise_for_status()
+                for chunk in response.iter_text(chunk_size=chunk_size):
+                    if not chunk:
+                        continue
+                    buffer += chunk
+                    while True:
+                        if not started:
+                            key_index = buffer.find(key)
+                            if key_index == -1:
+                                buffer = buffer[-max_prefix:]
+                                break
+                            bracket_index = buffer.find("[", key_index)
+                            if bracket_index == -1:
+                                buffer = buffer[key_index:]
+                                break
+                            buffer = buffer[bracket_index + 1 :]
+                            started = True
+                        buffer = buffer.lstrip()
+                        if not buffer:
+                            break
+                        if buffer[0] == "]":
+                            started = False
+                            buffer = buffer[1:]
+                            break
+                        try:
+                            item, offset = decoder.raw_decode(buffer)
+                        except json.JSONDecodeError:
+                            break
+                        if isinstance(item, dict):
+                            yield item
+                        buffer = buffer[offset:]
+                        buffer = buffer.lstrip()
+                        if buffer.startswith(","):
+                            buffer = buffer[1:]
+
+    # -------------------------------------------------------------------------
+    def normalize_concept(self, concept: dict[str, Any]) -> dict[str, Any] | None:
+        if not isinstance(concept, dict):
+            return None
+        rxcui = str(concept.get("rxcui") or "").strip()
+        full_name = str(concept.get("fullName") or "").strip()
+        if not rxcui or not full_name:
+            return None
+        term_type = str(concept.get("termType") or "").strip()
+        alias_candidates: list[str] = []
+        for key, value in concept.items():
+            if not isinstance(value, str):
+                continue
+            if "name" not in key.lower():
+                continue
+            cleaned = value.strip()
+            if cleaned:
+                alias_candidates.append(cleaned)
+        aliases = list(dict.fromkeys(alias_candidates))
+        if full_name and full_name not in aliases:
+            aliases.insert(0, full_name)
+        return {
+            "rxcui": rxcui,
+            "full_name": full_name,
+            "term_type": term_type,
+            "aliases": aliases,
+        }
+
+    # -------------------------------------------------------------------------
+    def collect_aliases(self, concept: dict[str, Any]) -> list[str]:
+        aliases: list[str] = []
+        seen: set[str] = set()
+        for alias in concept.get("aliases", []):
+            if not isinstance(alias, str):
+                continue
+            cleaned = alias.strip()
+            if not cleaned:
+                continue
+            if cleaned.lower() == "not available":
+                continue
+            if cleaned in seen:
+                continue
+            seen.add(cleaned)
+            aliases.append(cleaned)
+        return aliases
+
+    # -------------------------------------------------------------------------
+    def enrich_batch(
+        self, concepts: list[dict[str, Any]]
+    ) -> list[dict[str, Any]]:
+        if not concepts:
+            return []
+        alias_groups: list[tuple[dict[str, Any], list[str]]] = []
+        unique_aliases: list[str] = []
+        seen_aliases: set[str] = set()
+        for concept in concepts:
+            aliases = self.collect_aliases(concept)
+            alias_groups.append((concept, aliases))
+            for alias in aliases:
+                if alias in seen_aliases:
+                    continue
+                seen_aliases.add(alias)
+                unique_aliases.append(alias)
+
+        cache: dict[str, dict[str, RxNormCandidate]] = {}
+        pending: list[str] = []
+        for alias in unique_aliases:
+            cached = self.alias_cache.get(alias)
+            if cached is not None:
+                cache[alias] = cached
+                continue
+            pending.append(alias)
+
+        max_workers = self.resolve_max_workers()
+        per_request = float(getattr(self.rx_client, "TIMEOUT", 10.0) or 10.0)
+        if pending:
+            estimated = (len(pending) * per_request) / max_workers
+            logger.info(
+                "Preparing RxNav enrichment for %d unique lookup(s) across %d worker(s); "
+                "worst-case duration %.1fs (%.1f min)",
+                len(pending),
+                max_workers,
+                estimated,
+                estimated / 60,
+            )
+            with ThreadPoolExecutor(max_workers=max_workers) as executor:
+                futures = {
+                    executor.submit(self.rx_client.get_candidates, alias): alias
+                    for alias in pending
+                }
+                for future in as_completed(futures):
+                    alias = futures[future]
+                    try:
+                        result = future.result()
+                    except Exception as exc:  # noqa: BLE001
+                        logger.warning("Failed to enrich '%s': %s", alias, exc)
+                        result = {}
+                    cache[alias] = result
+                    self.alias_cache[alias] = result
+
+        records: list[dict[str, Any]] = []
+        for concept, aliases in alias_groups:
+            record = self.build_record(concept, aliases, cache)
+            if record is not None:
+                records.append(record)
+        return records
+
+    # -------------------------------------------------------------------------
+    def build_record(
+        self,
+        concept: dict[str, Any],
+        aliases: list[str],
+        cache: dict[str, dict[str, RxNormCandidate]],
+    ) -> dict[str, Any] | None:
+        rxcui = str(concept.get("rxcui") or "").strip()
+        full_name = str(concept.get("full_name") or "").strip()
+        if not rxcui or not full_name:
+            return None
+        term_type = str(concept.get("term_type") or "").strip()
+        ingredients: set[str] = set()
+        brands: set[str] = set()
+        synonyms: set[str] = set()
+        for alias in aliases:
+            formatted_alias = self.format_catalog_value(alias)
+            if formatted_alias is not None:
+                synonyms.add(formatted_alias)
+            candidates = cache.get(alias, {})
+            for candidate in candidates.values():
+                display = candidate.display or candidate.value
+                formatted = self.format_catalog_value(display)
+                if formatted is None:
+                    continue
+                if candidate.kind in {"ingredient", "ingredient_combo"}:
+                    ingredients.add(formatted)
+                elif candidate.kind == "brand":
+                    brands.add(formatted)
+                else:
+                    synonyms.add(formatted)
+        for value in brands:
+            synonyms.add(value)
+        for value in ingredients:
+            synonyms.add(value)
+        record = {
+            "rxcui": rxcui,
+            "full_name": full_name,
+            "term_type": term_type,
+            "ingredient": self.serialize_values(ingredients),
+            "brand_name": self.serialize_values(brands),
+            "synonyms": self.serialize_values(synonyms),
+        }
+        return record
+
+    # -------------------------------------------------------------------------
+    def resolve_max_workers(self) -> int:
+        raw = getattr(self, "RXNAV_MAX_WORKERS", 8)
+        try:
+            value = int(raw)
+        except (TypeError, ValueError):
+            return 8
+        if value < 1:
+            return 1
+        return value
+
+    # -------------------------------------------------------------------------
+    def format_catalog_value(self, value: str | None) -> str | None:
+        if not isinstance(value, str):
+            return None
+        cleaned = value.strip()
+        if not cleaned:
+            return None
+        lowered = cleaned.lower()
+        if lowered in {"not available", "none", "na", "n/a"}:
+            return None
+        formatted = self.rx_client.standardize_term(cleaned) or cleaned
+        normalized = formatted.strip()
+        if not normalized:
+            return None
+        if len(normalized) < 2 and " " not in normalized:
+            return None
+        return normalized
+
+    # -------------------------------------------------------------------------
+    def serialize_values(self, values: set[str]) -> str:
+        if not values:
+            return json.dumps([], ensure_ascii=False)
+        ordered = sorted(values, key=str.casefold)
+        return json.dumps(ordered, ensure_ascii=False)

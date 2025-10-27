@@ -1,7 +1,10 @@
 import os
 import sys
-import threading
-import time
+from unittest.mock import patch
+
+import json
+import os
+import sys
 from unittest.mock import patch
 
 import pandas as pd
@@ -11,47 +14,16 @@ REPO_ROOT = os.path.abspath(os.path.join(os.path.dirname(__file__), ".."))
 if REPO_ROOT not in sys.path:
     sys.path.insert(0, REPO_ROOT)
 
-from DILIGENT.app.utils.repository.serializer import DataSerializer, LIVERTOX_COLUMNS
-from DILIGENT.app.utils.updater.livertox import LiverToxUpdater
-
-
-###############################################################################
-class StubRxClient:
-    UNIT_STOPWORDS = {"mg", "ml", "ng"}
-
-    def __init__(self, mapping: dict[str, list[str]]) -> None:
-        self.mapping = mapping
-
-    ###########################################################################
-    def fetch_drug_terms(self, name: str) -> list[str]:
-        return self.mapping.get(name, [])
-
-
-###############################################################################
-class RateCheckingRxClient:
-    UNIT_STOPWORDS = StubRxClient.UNIT_STOPWORDS
-
-    def __init__(self, mapping: dict[str, list[str]], delay: float = 0.01) -> None:
-        self.mapping = mapping
-        self.delay = delay
-        self.lock = threading.Lock()
-        self.active = 0
-        self.max_active = 0
-        self.call_count = 0
-
-    ###########################################################################
-    def fetch_drug_terms(self, name: str) -> list[str]:
-        with self.lock:
-            self.active += 1
-            self.call_count += 1
-            if self.active > self.max_active:
-                self.max_active = self.active
-        try:
-            time.sleep(self.delay)
-            return self.mapping.get(name, [])
-        finally:
-            with self.lock:
-                self.active -= 1
+from DILIGENT.app.utils.repository.serializer import (  # noqa: E402
+    DRUGS_CATALOG_COLUMNS,
+    DataSerializer,
+    LIVERTOX_COLUMNS,
+)
+from DILIGENT.app.utils.updater.livertox import LiverToxUpdater  # noqa: E402
+from DILIGENT.app.utils.updater.rxnav import (  # noqa: E402
+    DrugsCatalogUpdater,
+    RxNormCandidate,
+)
 
 
 ###############################################################################
@@ -60,7 +32,6 @@ def updater() -> LiverToxUpdater:
     return LiverToxUpdater(
         ".",
         redownload=False,
-        rx_client=StubRxClient({}),
         serializer=DataSerializer(),
         database_client=None,
     )
@@ -86,28 +57,42 @@ def test_build_unified_dataset_merges_sources(updater: LiverToxUpdater) -> None:
         [
             {
                 "chapter_title": "Valid Drug",
-                "ingredient": "Valid Ingredient",
-                "brand_name": "ValidBrand",
                 "likelihood_score": "A",
+                "last_update": "2024-01-01",
             },
             {
                 "chapter_title": "Master Only",
-                "ingredient": "Master Ingredient",
-                "brand_name": "MasterBrand",
                 "likelihood_score": "B",
+                "last_update": "2024-01-02",
             },
         ]
     )
-    metadata = {"source_url": "http://example.com", "last_modified": "2024-01-01"}
+    metadata = {"source_url": "http://example.com", "last_modified": "2024-01-05"}
 
     unified = updater.build_unified_dataset(monographs, master_frame, metadata)
 
+    expected_columns = [
+        "drug_name",
+        "likelihood_score",
+        "last_update",
+        "reference_count",
+        "year_approved",
+        "agent_classification",
+        "primary_classification",
+        "secondary_classification",
+        "include_in_livertox",
+        "source_url",
+        "source_last_modified",
+        "nbk_id",
+        "excerpt",
+    ]
+    assert list(unified.columns) == expected_columns
     assert set(unified["drug_name"]) == {"Valid Drug", "Archive Only", "Master Only"}
     valid_row = unified[unified["drug_name"] == "Valid Drug"].iloc[0]
-    assert valid_row["ingredient"] == "Valid Ingredient"
+    assert valid_row["likelihood_score"] == "A"
     assert valid_row["source_url"] == "http://example.com"
     archive_row = unified[unified["drug_name"] == "Archive Only"].iloc[0]
-    assert pd.isna(archive_row["ingredient"])
+    assert archive_row["nbk_id"] == "NBK200"
 
 
 ###############################################################################
@@ -116,109 +101,27 @@ def test_sanitization_rules_drop_invalid_values(updater: LiverToxUpdater) -> Non
         [
             {
                 "drug_name": "12345",
-                "ingredient": "Ingredient",
-                "brand_name": "Brand",
+                "nbk_id": "NBK001",
                 "excerpt": "",
             },
             {
                 "drug_name": "Valid Name",
-                "ingredient": "Ingr#dient",
-                "brand_name": "Brand",
+                "nbk_id": "NBK002",
                 "excerpt": "  ",
             },
             {
                 "drug_name": "Another Valid",
-                "ingredient": "Good Ingredient",
-                "brand_name": "ValidBrand",
+                "nbk_id": "NBK003",
                 "excerpt": "Excerpt",
             },
         ]
     )
+
     sanitized = updater.sanitize_unified_dataset(raw)
 
-    assert list(sanitized["drug_name"]) == ["Another Valid"]
-    assert sanitized.iloc[0]["excerpt"] == "Excerpt"
-
-
-###############################################################################
-def test_enrichment_uses_all_aliases() -> None:
-    mapping = {
-        "Primary Drug": [
-            "Primary Synonym",
-            "mg",
-            "Multi Word Term",
-            "Invalid@Term",
-            "Abc",
-        ],
-        "Primary Ingredient": ["Ingredient Synonym"],
-        "PrimaryBrand": ["Brand Synonym", "5"],
-    }
-    updater = LiverToxUpdater(
-        ".",
-        redownload=False,
-        rx_client=StubRxClient(mapping),
-        serializer=DataSerializer(),
-        database_client=None,
-    )
-    dataset = pd.DataFrame(
-        [
-            {
-                "drug_name": "Primary Drug",
-                "ingredient": "Primary Ingredient",
-                "brand_name": "PrimaryBrand",
-                "excerpt": "Example",
-                "nbk_id": "NBK123",
-            }
-        ]
-    )
-
-    enriched = updater.enrich_records(updater.sanitize_unified_dataset(dataset))
-    synonyms = enriched.iloc[0]["synonyms"]
-
-    assert "Primary Synonym" in synonyms
-    assert "Ingredient Synonym" in synonyms
-    assert "Brand Synonym" in synonyms
-    assert "mg" not in synonyms
-    assert "Invalid@Term" not in synonyms
-    assert "Abc" not in synonyms
-
-
-###############################################################################
-def test_enrichment_respects_max_workers() -> None:
-    mapping: dict[str, list[str]] = {}
-    rows: list[dict[str, str | pd.NA]] = []
-    for index in range(12):
-        drug = f"Drug {index}"
-        ingredient = f"Ingredient {index}"
-        brand = f"Brand {index}"
-        mapping[drug] = [f"{drug} Alias"]
-        mapping[ingredient] = [f"{ingredient} Alias"]
-        mapping[brand] = [f"{brand} Alias"]
-        rows.append(
-            {
-                "drug_name": drug,
-                "ingredient": ingredient,
-                "brand_name": brand,
-                "synonyms": pd.NA,
-            }
-        )
-
-    rx_client = RateCheckingRxClient(mapping, delay=0.01)
-    updater = LiverToxUpdater(
-        ".",
-        redownload=False,
-        rx_client=rx_client,
-        serializer=DataSerializer(),
-        database_client=None,
-    )
-    updater.RXNAV_MAX_WORKERS = 4
-
-    dataset = pd.DataFrame(rows)
-    enriched = updater.enrich_records(dataset)
-
-    assert rx_client.call_count == len(mapping)
-    assert rx_client.max_active <= updater.RXNAV_MAX_WORKERS
-    assert enriched["synonyms"].notna().all()
+    assert list(sanitized["drug_name"]) == ["Valid Name", "Another Valid"]
+    assert sanitized.iloc[0]["excerpt"] == "Not available"
+    assert sanitized.iloc[1]["excerpt"] == "Excerpt"
 
 
 ###############################################################################
@@ -227,33 +130,27 @@ def test_finalize_dataset_fills_missing_entries(updater: LiverToxUpdater) -> Non
         [
             {
                 "drug_name": "Final Drug",
-                "ingredient": pd.NA,
-                "brand_name": pd.NA,
                 "nbk_id": pd.NA,
                 "excerpt": pd.NA,
-                "synonyms": pd.NA,
+                "likelihood_score": pd.NA,
             }
         ]
     )
     finalized = updater.finalize_dataset(dataset)
     row = finalized.iloc[0]
-    assert row["ingredient"] == "Not available"
     assert row["excerpt"] == "Not available"
-    assert row["synonyms"] == "Not available"
+    assert row["likelihood_score"] == "Not available"
 
 
 ###############################################################################
 def test_serializer_roundtrip_uses_unified_table() -> None:
     serializer = DataSerializer()
-    frame = pd.DataFrame(
+    livertox_frame = pd.DataFrame(
         [
             {
                 "drug_name": "Roundtrip",
-                "ingredient": "Base",
-                "brand_name": "Brand",
                 "nbk_id": "NBK999",
                 "excerpt": "Excerpt",
-                "synonyms": "Alias",
                 "likelihood_score": "A",
                 "last_update": "2024-01-01",
                 "reference_count": "2",
@@ -267,37 +164,101 @@ def test_serializer_roundtrip_uses_unified_table() -> None:
             }
         ]
     )
+    catalog_frame = pd.DataFrame(
+        [
+            {
+                "rxcui": "1",
+                "full_name": "Catalog Drug",
+                "term_type": "SCD",
+                "ingredient": "[\"Ingredient\"]",
+                "brand_name": "[\"Brand\"]",
+                "synonyms": "[\"Catalog Drug\", \"Brand\"]",
+            }
+        ]
+    )
 
     with patch(
         "DILIGENT.app.utils.repository.serializer.database.save_into_database"
     ) as save_mock:
-        serializer.save_livertox_records(frame)
-        assert save_mock.called
+        serializer.save_livertox_records(livertox_frame)
         saved_frame = save_mock.call_args.args[0]
-        assert "drug_name" in saved_frame.columns
-        assert "ingredient" in saved_frame.columns
+        assert list(saved_frame.columns) == LIVERTOX_COLUMNS
+
+    def loader(table_name: str) -> pd.DataFrame:
+        if table_name == "LIVERTOX_DATA":
+            return livertox_frame
+        if table_name == "DRUGS_CATALOG":
+            return catalog_frame
+        raise AssertionError(table_name)
 
     with patch(
         "DILIGENT.app.utils.repository.serializer.database.load_from_database",
-        return_value=frame,
+        side_effect=loader,
     ):
         monographs = serializer.get_livertox_records()
         assert list(monographs.columns) == LIVERTOX_COLUMNS
+        catalog = serializer.get_drugs_catalog()
+        assert list(catalog.columns) == DRUGS_CATALOG_COLUMNS
         master = serializer.get_livertox_master_list()
-        expected_master_cols = [
-            "drug_name",
-            "ingredient",
-            "brand_name",
-            "likelihood_score",
-            "last_update",
-            "reference_count",
-            "year_approved",
-            "agent_classification",
-            "primary_classification",
-            "secondary_classification",
-            "include_in_livertox",
-            "source_url",
-            "source_last_modified",
-        ]
-        assert list(master.columns) == expected_master_cols
-        assert master.iloc[0]["drug_name"] == "Roundtrip"
+        assert list(master.columns) == DRUGS_CATALOG_COLUMNS
+
+
+###############################################################################
+class StubCatalogClient:
+    TIMEOUT = 0.01
+
+    def __init__(self, mapping: dict[str, dict[str, RxNormCandidate]]) -> None:
+        self.mapping = mapping
+        self.calls: list[str] = []
+
+    ###########################################################################
+    def get_candidates(self, alias: str) -> dict[str, RxNormCandidate]:
+        self.calls.append(alias)
+        return self.mapping.get(alias, {})
+
+    ###########################################################################
+    def standardize_term(self, value: str) -> str:
+        return value
+
+
+###############################################################################
+def test_drugs_catalog_enrichment_collects_synonyms() -> None:
+    mapping = {
+        "Primary Drug": {
+            "primary drug": RxNormCandidate(
+                value="primary drug",
+                kind="original",
+                display="Primary Drug",
+            ),
+            "primary ingredient": RxNormCandidate(
+                value="primary ingredient",
+                kind="ingredient",
+                display="Primary Ingredient",
+            ),
+            "brandname": RxNormCandidate(
+                value="brandname",
+                kind="brand",
+                display="BrandName",
+            ),
+        }
+    }
+    rx_client = StubCatalogClient(mapping)
+    updater = DrugsCatalogUpdater(rx_client=rx_client, serializer=DataSerializer())
+    concepts = [
+        {
+            "rxcui": "1",
+            "full_name": "Primary Drug",
+            "term_type": "SCD",
+            "aliases": ["Primary Drug"],
+        }
+    ]
+
+    records = updater.enrich_batch(concepts)
+    assert len(records) == 1
+    record = records[0]
+    assert json.loads(record["ingredient"]) == ["Primary Ingredient"]
+    assert json.loads(record["brand_name"]) == ["BrandName"]
+    synonyms = json.loads(record["synonyms"])
+    assert "Primary Drug" in synonyms
+    assert "BrandName" in synonyms
+    assert rx_client.calls == ["Primary Drug"]
