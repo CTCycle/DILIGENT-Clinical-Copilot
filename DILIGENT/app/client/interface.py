@@ -1,10 +1,15 @@
 from __future__ import annotations
 
-from typing import Final
+import json
+from dataclasses import dataclass
+from functools import partial
+from typing import Any
 
-import gradio as gr
+from nicegui import ui
 
 from DILIGENT.app.client.controllers import (
+    ComponentUpdate,
+    MISSING,
     clear_session_fields,
     normalize_visit_date_component,
     pull_selected_models,
@@ -17,6 +22,11 @@ from DILIGENT.app.client.controllers import (
     set_parsing_model,
     toggle_cloud_services,
 )
+from DILIGENT.app.client.layouts import (
+    VISIT_DATE_CSS,
+    VISIT_DATE_ELEMENT_ID,
+    VISIT_DATE_LOCALE_JS,
+)
 from DILIGENT.app.configurations import ClientRuntimeConfig
 from DILIGENT.app.constants import (
     CLINICAL_MODEL_CHOICES,
@@ -25,284 +35,463 @@ from DILIGENT.app.constants import (
     PARSING_MODEL_CHOICES,
 )
 
-from DILIGENT.app.client.layouts import (
-    VISIT_DATE_ELEMENT_ID,
-    VISIT_DATE_CSS,
-    VISIT_DATE_LOCALE_JS,
-)
+
+###############################################################################
+@dataclass
+class ClientComponents:
+    patient_name: Any
+    visit_date: Any
+    anamnesis: Any
+    has_diseases: Any
+    drugs: Any
+    alt: Any
+    alt_max: Any
+    alp: Any
+    alp_max: Any
+    symptoms: Any
+    use_rag: Any
+    use_cloud_services: Any
+    llm_provider_dropdown: Any
+    cloud_model_dropdown: Any
+    parsing_model_dropdown: Any
+    clinical_model_dropdown: Any
+    temperature_input: Any
+    reasoning_checkbox: Any
+    pull_models_button: Any
+    markdown_output: Any
+    json_container: Any
+    json_code: Any
+    export_button: Any
+    export_path: str | None = None
 
 
 ###############################################################################
-def create_interface() -> gr.Blocks:
+def apply_component_update(component: Any, update: ComponentUpdate) -> None:
+    if update.value is not MISSING and hasattr(component, "value"):
+        value_to_set = update.value
+        if value_to_set == "" and hasattr(component, "set_options"):
+            value_to_set = None
+        component.value = value_to_set
+        if hasattr(component, "update"):
+            component.update()
+    if update.options is not None and hasattr(component, "set_options"):
+        component.set_options(update.options)
+        if hasattr(component, "update"):
+            component.update()
+    if update.enabled is not None:
+        if update.enabled and hasattr(component, "enable"):
+            component.enable()
+        elif not update.enabled and hasattr(component, "disable"):
+            component.disable()
+    if update.visible is not None and hasattr(component, "visible"):
+        component.visible = update.visible
+
+
+###############################################################################
+def apply_json_update(components: ClientComponents, update: ComponentUpdate) -> None:
+    if update.value is not MISSING:
+        if update.value is None:
+            components.json_code.set_content("")
+        else:
+            formatted = json.dumps(update.value, ensure_ascii=False, indent=2)
+            components.json_code.set_content(formatted)
+    if update.visible is not None:
+        components.json_container.visible = update.visible
+
+
+###############################################################################
+def apply_export_update(components: ClientComponents, update: ComponentUpdate) -> None:
+    if update.download_path is not None:
+        components.export_path = update.download_path
+    elif update.value is not MISSING:
+        export_value = update.value
+        components.export_path = export_value if isinstance(export_value, str) else None
+    if update.enabled is not None:
+        if update.enabled:
+            components.export_button.enable()
+        else:
+            components.export_button.disable()
+
+
+###############################################################################
+async def handle_toggle_cloud_services(
+    components: ClientComponents, event: Any
+) -> None:
+    enabled = bool(event.value)
+    updates = toggle_cloud_services(enabled)
+    apply_component_update(components.llm_provider_dropdown, updates[0])
+    apply_component_update(components.cloud_model_dropdown, updates[1])
+    apply_component_update(components.pull_models_button, updates[2])
+    apply_component_update(components.temperature_input, updates[3])
+    apply_component_update(components.reasoning_checkbox, updates[4])
+    apply_component_update(components.clinical_model_dropdown, updates[5])
+
+
+###############################################################################
+async def handle_llm_provider_change(
+    components: ClientComponents, event: Any
+) -> None:
+    provider_value = str(event.value or "")
+    selected, model_update = set_llm_provider(provider_value)
+    if hasattr(components.llm_provider_dropdown, "value"):
+        components.llm_provider_dropdown.value = selected
+        components.llm_provider_dropdown.update()
+    apply_component_update(components.cloud_model_dropdown, model_update)
+
+
+###############################################################################
+async def handle_cloud_model_change(
+    components: ClientComponents, event: Any
+) -> None:
+    selection = set_cloud_model(str(event.value or ""))
+    if hasattr(components.cloud_model_dropdown, "value"):
+        components.cloud_model_dropdown.value = selection
+        components.cloud_model_dropdown.update()
+
+
+###############################################################################
+async def handle_parsing_model_change(
+    components: ClientComponents, event: Any
+) -> None:
+    selection = set_parsing_model(str(event.value or ""))
+    if hasattr(components.parsing_model_dropdown, "value"):
+        components.parsing_model_dropdown.value = selection
+        components.parsing_model_dropdown.update()
+
+
+###############################################################################
+async def handle_clinical_model_change(
+    components: ClientComponents, event: Any
+) -> None:
+    selection = set_clinical_model(str(event.value or ""))
+    if hasattr(components.clinical_model_dropdown, "value"):
+        components.clinical_model_dropdown.value = selection
+        components.clinical_model_dropdown.update()
+
+
+###############################################################################
+async def handle_temperature_change(
+    components: ClientComponents, event: Any
+) -> None:
+    value = event.value if event.value is not None else None
+    updated = set_ollama_temperature(value)
+    if hasattr(components.temperature_input, "value"):
+        components.temperature_input.value = updated
+        components.temperature_input.update()
+
+
+###############################################################################
+async def handle_reasoning_change(
+    components: ClientComponents, event: Any
+) -> None:
+    updated = set_ollama_reasoning(bool(event.value))
+    if hasattr(components.reasoning_checkbox, "value"):
+        components.reasoning_checkbox.value = updated
+        components.reasoning_checkbox.update()
+
+
+###############################################################################
+async def handle_pull_models_click(
+    components: ClientComponents, event: Any
+) -> None:
+    parsing_model = str(components.parsing_model_dropdown.value or "")
+    clinical_model = str(components.clinical_model_dropdown.value or "")
+    message, json_update = await pull_selected_models(parsing_model, clinical_model)
+    components.markdown_output.set_content(message or "")
+    apply_json_update(components, json_update)
+
+
+###############################################################################
+async def handle_run_workflow(
+    components: ClientComponents, event: Any
+) -> None:
+    message, json_update, export_update = await run_DILI_session(
+        components.patient_name.value,
+        components.visit_date.value,
+        components.anamnesis.value,
+        bool(components.has_diseases.value),
+        components.drugs.value,
+        components.alt.value,
+        components.alt_max.value,
+        components.alp.value,
+        components.alp_max.value,
+        list(components.symptoms.value or []),
+        bool(components.use_rag.value),
+    )
+    components.markdown_output.set_content(message or "")
+    apply_json_update(components, json_update)
+    apply_export_update(components, export_update)
+
+
+###############################################################################
+async def handle_clear_click(
+    components: ClientComponents, event: Any
+) -> None:
+    (
+        patient_name,
+        visit_date,
+        anamnesis,
+        drugs,
+        alt,
+        alt_max,
+        alp,
+        alp_max,
+        symptoms,
+        has_diseases,
+        use_rag,
+        markdown_message,
+        json_update,
+        export_update,
+    ) = clear_session_fields()
+    components.patient_name.value = patient_name
+    components.patient_name.update()
+    components.visit_date.value = visit_date or ""
+    components.visit_date.update()
+    components.anamnesis.value = anamnesis
+    components.anamnesis.update()
+    components.drugs.value = drugs
+    components.drugs.update()
+    components.alt.value = alt
+    components.alt.update()
+    components.alt_max.value = alt_max
+    components.alt_max.update()
+    components.alp.value = alp
+    components.alp.update()
+    components.alp_max.value = alp_max
+    components.alp_max.update()
+    components.symptoms.value = symptoms or []
+    components.symptoms.update()
+    components.has_diseases.value = has_diseases
+    components.has_diseases.update()
+    components.use_rag.value = use_rag
+    components.use_rag.update()
+    components.markdown_output.set_content(markdown_message or "")
+    apply_json_update(components, json_update)
+    apply_export_update(components, export_update)
+
+
+###############################################################################
+async def handle_visit_date_change(
+    components: ClientComponents, event: Any
+) -> None:
+    normalized = normalize_visit_date_component(event.value)
+    if normalized is None:
+        components.visit_date.value = ""
+    else:
+        components.visit_date.value = normalized.date().isoformat()
+    components.visit_date.update()
+
+
+###############################################################################
+async def handle_download_click(
+    components: ClientComponents, event: Any
+) -> None:
+    if components.export_path:
+        ui.download(components.export_path)
+
+
+###############################################################################
+def main_page() -> None:
     provider = ClientRuntimeConfig.get_llm_provider()
     cloud_models = CLOUD_MODEL_CHOICES.get(provider, [])
     selected_cloud_model = ClientRuntimeConfig.get_cloud_model()
     if selected_cloud_model not in cloud_models:
         selected_cloud_model = cloud_models[0] if cloud_models else ""
         ClientRuntimeConfig.set_cloud_model(selected_cloud_model)
-    with gr.Blocks(
-        title="DILIGENT Clinical Copilot",
-        analytics_enabled=False,
-        theme="soft",
-        css=VISIT_DATE_CSS,
-    ) as demo:
-        gr.Markdown("## DILIGENT Clinical Copilot")
 
-        with gr.Row():
-            with gr.Column(scale=3):
-                anamnesis = gr.Textbox(
-                    label="Anamnesis",
-                    placeholder="Describe the clinical picture, including exams and labs when relevant...",
-                    lines=10,
-                    max_lines=100,
+    cloud_enabled = ClientRuntimeConfig.is_cloud_enabled()
+
+    ui.add_head_html(f"<style>{VISIT_DATE_CSS}</style>")
+    ui.markdown("## DILIGENT Clinical Copilot")
+
+    with ui.row().classes("w-full gap-4"):
+        with ui.column().classes("w-full gap-4").style("flex:3"):
+            anamnesis = ui.textarea(
+                label="Anamnesis",
+                placeholder=(
+                    "Describe the clinical picture, including exams and labs when relevant..."
+                ),
+            )
+            has_diseases = ui.checkbox(
+                "Has hepatic diseases",
+                value=False,
+            )
+            symptoms = ui.select(
+                ["Hitterus", "Pain", "Scretching"],
+                label="Observed symptoms",
+                multiple=True,
+                clearable=True,
+            )
+            drugs = ui.textarea(
+                label="Current Drugs",
+                placeholder="List current therapies, dosage and schedule...",
+            )
+            with ui.row().classes("w-full gap-4"):
+                alt = ui.input(
+                    label="ALT",
+                    placeholder="e.g., 189 or 189 U/L",
                 )
-                has_diseases = gr.Checkbox(
-                    label="Has hepatic diseases",
+                alt.props("dense")
+                alt_max = ui.input(
+                    label="ALT Max",
+                    placeholder="e.g., 47 U/L",
+                )
+                alt_max.props("dense")
+            with ui.row().classes("w-full gap-4"):
+                alp = ui.input(
+                    label="ALP",
+                    placeholder="e.g., 140 or 140 U/L",
+                )
+                alp.props("dense")
+                alp_max = ui.input(
+                    label="ALP Max",
+                    placeholder="e.g., 150 U/L",
+                )
+                alp_max.props("dense")
+
+        with ui.column().classes("w-full gap-4").style("flex:1"):
+            patient_name = ui.input(
+                label="Patient Name",
+                placeholder="e.g., Marco Rossi",
+            )
+            with ui.element("div").props(f"id={VISIT_DATE_ELEMENT_ID}"):
+                visit_date = ui.input(
+                    label="Visit Date",
+                    placeholder="Select a date",
+                )
+            visit_date.props("type=date")
+            run_button = ui.button("Run Workflow", color="primary")
+            export_button = ui.button("Download report", color="secondary")
+            export_button.disable()
+            clear_button = ui.button("Clear all")
+            with ui.expansion("Session Configurations", value=False):
+                use_rag_checkbox = ui.checkbox(
+                    "Use Retrieval Augmented Generation (RAG)",
                     value=False,
                 )
-                symptoms = gr.CheckboxGroup(
-                    label="Observed symptoms",
-                    choices=["Hitterus", "Pain", "Scretching"],
+            with ui.expansion("Model Configurations", value=False):
+                use_cloud_services = ui.checkbox(
+                    "Use Cloud Services",
+                    value=cloud_enabled,
                 )
-                drugs = gr.Textbox(
-                    label="Current Drugs",
-                    placeholder="List current therapies, dosage and schedule...",
-                    lines=10,
-                    max_lines=100,
-                )
-                with gr.Row():
-                    alt = gr.Textbox(
-                        label="ALT",
-                        placeholder="e.g., 189 or 189 U/L",
-                        lines=1,
-                        scale=3,
-                    )
-                    alt_max = gr.Textbox(
-                        label="ALT Max",
-                        placeholder="e.g., 47 U/L",
-                        lines=1,
-                        scale=2,
-                    )
-                with gr.Row():
-                    alp = gr.Textbox(
-                        label="ALP",
-                        placeholder="e.g., 140 or 140 U/L",
-                        lines=1,
-                        scale=3,
-                    )
-                    alp_max = gr.Textbox(
-                        label="ALP Max",
-                        placeholder="e.g., 150 U/L",
-                        lines=1,
-                        scale=2,
-                    )
-
-            with gr.Column(scale=1):
-                patient_name = gr.Textbox(
-                    label="Patient Name",
-                    placeholder="e.g., Marco Rossi",
-                    lines=1,
-                )
-                visit_date = gr.DateTime(
-                    label="Visit Date",
-                    include_time=False,
-                    type="datetime",
-                    value=None,
-                    elem_id=VISIT_DATE_ELEMENT_ID,
-                )
-                visit_date.change(
-                    fn=normalize_visit_date_component,
-                    inputs=visit_date,
-                    outputs=visit_date,
-                )
-                with gr.Column():
-                    run_button = gr.Button("Run Workflow", variant="primary")
-                    export_button = gr.DownloadButton(
-                        "Download report",
-                        value=None,
-                        interactive=False,
-                    )
-                    clear_button = gr.Button("Clear all")
-                with gr.Accordion("Session Configurations", open=False):
-                    use_rag_checkbox = gr.Checkbox(
-                        label="Use Retrieval Augmented Generation (RAG)",
-                        value=False,
-                    )
-                with gr.Accordion("Model Configurations", open=False):
-                    with gr.Column():
-                        use_cloud_services = gr.Checkbox(
-                            label="Use Cloud Services",
-                            value=ClientRuntimeConfig.is_cloud_enabled(),
+                with ui.row().classes("w-full gap-4"):
+                    with ui.column().classes("w-full gap-2"):
+                        ui.markdown("**Cloud Configuration**")
+                        llm_provider_dropdown = ui.select(
+                            CLOUD_PROVIDERS,
+                            label="Cloud Service",
+                            value=provider,
                         )
-                        with gr.Row():
-                            with gr.Column(scale=1):
-                                with gr.Group():
-                                    gr.Markdown("**Cloud Configuration**")
-                                    llm_provider_dropdown = gr.Dropdown(
-                                        label="Cloud Service",
-                                        choices=CLOUD_PROVIDERS,
-                                        value=provider,
-                                        interactive=ClientRuntimeConfig.is_cloud_enabled(),
-                                    )
-                                    cloud_model_dropdown = gr.Dropdown(
-                                        label="Cloud Model",
-                                        choices=cloud_models,
-                                        value=selected_cloud_model,
-                                        interactive=ClientRuntimeConfig.is_cloud_enabled(),
-                                    )
-                            with gr.Column(scale=1):
-                                with gr.Group():
-                                    gr.Markdown("**Ollama Configuration**")
-                                    parsing_model_dropdown = gr.Dropdown(
-                                        label="Parsing Model",
-                                        choices=PARSING_MODEL_CHOICES,
-                                        value=ClientRuntimeConfig.get_parsing_model(),
-                                    )
-                                    clinical_model_dropdown = gr.Dropdown(
-                                        label="Clinical Model",
-                                        choices=CLINICAL_MODEL_CHOICES,
-                                        value=ClientRuntimeConfig.get_clinical_model(),
-                                        interactive=not ClientRuntimeConfig.is_cloud_enabled(),
-                                    )
-                                    temperature_input = gr.Number(
-                                        label="Temperature",
-                                        value=ClientRuntimeConfig.get_ollama_temperature(),
-                                        minimum=0.0,
-                                        maximum=2.0,
-                                        step=0.1,
-                                        interactive=not ClientRuntimeConfig.is_cloud_enabled(),
-                                    )
-                                    reasoning_checkbox = gr.Checkbox(
-                                        label="Enable reasoning (think)",
-                                        value=ClientRuntimeConfig.is_ollama_reasoning_enabled(),
-                                        interactive=not ClientRuntimeConfig.is_cloud_enabled(),
-                                    )
-                                    pull_models_button = gr.Button(
-                                        "Pull models",
-                                        variant="secondary",
-                                        interactive=not ClientRuntimeConfig.is_cloud_enabled(),
-                                    )
-                json_output = gr.JSON(
-                    label="Agent Output (JSON)",
-                    value=None,
-                    visible=False,
-                )
+                        cloud_model_dropdown = ui.select(
+                            cloud_models,
+                            label="Cloud Model",
+                            value=selected_cloud_model or None,
+                        )
+                    with ui.column().classes("w-full gap-2"):
+                        ui.markdown("**Ollama Configuration**")
+                        parsing_model_dropdown = ui.select(
+                            PARSING_MODEL_CHOICES,
+                            label="Parsing Model",
+                            value=ClientRuntimeConfig.get_parsing_model(),
+                        )
+                        clinical_model_dropdown = ui.select(
+                            CLINICAL_MODEL_CHOICES,
+                            label="Clinical Model",
+                            value=ClientRuntimeConfig.get_clinical_model(),
+                        )
+                        temperature_input = ui.number(
+                            label="Temperature",
+                            value=ClientRuntimeConfig.get_ollama_temperature(),
+                            min=0.0,
+                            max=2.0,
+                            step=0.1,
+                        )
+                        reasoning_checkbox = ui.checkbox(
+                            "Enable reasoning (think)",
+                            value=ClientRuntimeConfig.is_ollama_reasoning_enabled(),
+                        )
+                        pull_models_button = ui.button("Pull models", color="secondary")
 
-        gr.Markdown("### Agent Output")
-        markdown_output = gr.Markdown(
-            value="",
-            render=False,
-        )
-        markdown_output.render()
+    json_container = ui.card().classes("w-full")
+    json_container.visible = False
+    with json_container:
+        json_code = ui.code("", language="json")
 
-        use_cloud_services.change(
-            fn=toggle_cloud_services,
-            inputs=use_cloud_services,
-            outputs=[
-                llm_provider_dropdown,
-                cloud_model_dropdown,
-                pull_models_button,
-                temperature_input,
-                reasoning_checkbox,
-                clinical_model_dropdown,
-            ],
-        )
-        llm_provider_dropdown.change(
-            fn=set_llm_provider,
-            inputs=llm_provider_dropdown,
-            outputs=[llm_provider_dropdown, cloud_model_dropdown],
-        )
-        cloud_model_dropdown.change(
-            fn=set_cloud_model,
-            inputs=cloud_model_dropdown,
-            outputs=cloud_model_dropdown,
-        )
-        parsing_model_dropdown.change(
-            fn=set_parsing_model,
-            inputs=parsing_model_dropdown,
-            outputs=parsing_model_dropdown,
-        )
-        clinical_model_dropdown.change(
-            fn=set_clinical_model,
-            inputs=clinical_model_dropdown,
-            outputs=clinical_model_dropdown,
-        )
-        temperature_input.change(
-            fn=set_ollama_temperature,
-            inputs=temperature_input,
-            outputs=temperature_input,
-        )
-        reasoning_checkbox.change(
-            fn=set_ollama_reasoning,
-            inputs=reasoning_checkbox,
-            outputs=reasoning_checkbox,
-        )
+    ui.markdown("### Agent Output")
+    markdown_output = ui.markdown("")
 
-        pull_models_button.click(
-            fn=pull_selected_models,
-            inputs=[
-                parsing_model_dropdown,
-                clinical_model_dropdown,
-            ],
-            outputs=[markdown_output, json_output],
-        )
+    components = ClientComponents(
+        patient_name=patient_name,
+        visit_date=visit_date,
+        anamnesis=anamnesis,
+        has_diseases=has_diseases,
+        drugs=drugs,
+        alt=alt,
+        alt_max=alt_max,
+        alp=alp,
+        alp_max=alp_max,
+        symptoms=symptoms,
+        use_rag=use_rag_checkbox,
+        use_cloud_services=use_cloud_services,
+        llm_provider_dropdown=llm_provider_dropdown,
+        cloud_model_dropdown=cloud_model_dropdown,
+        parsing_model_dropdown=parsing_model_dropdown,
+        clinical_model_dropdown=clinical_model_dropdown,
+        temperature_input=temperature_input,
+        reasoning_checkbox=reasoning_checkbox,
+        pull_models_button=pull_models_button,
+        markdown_output=markdown_output,
+        json_container=json_container,
+        json_code=json_code,
+        export_button=export_button,
+    )
 
-        run_button.click(
-            fn=run_DILI_session,
-            inputs=[
-                patient_name,
-                visit_date,
-                anamnesis,
-                has_diseases,
-                drugs,
-                alt,
-                alt_max,
-                alp,
-                alp_max,
-                symptoms,
-                use_rag_checkbox,
-            ],
-            outputs=[markdown_output, json_output, export_button],
-            api_name="run_DILI_session",
-        )
-        clear_button.click(
-            fn=clear_session_fields,
-            outputs=[
-                patient_name,
-                visit_date,
-                anamnesis,
-                drugs,
-                alt,
-                alt_max,
-                alp,
-                alp_max,
-                symptoms,
-                has_diseases,
-                use_rag_checkbox,
-                markdown_output,
-                json_output,
-                export_button,
-            ],
-        )
+    if cloud_enabled:
+        llm_provider_dropdown.enable()
+        cloud_model_dropdown.enable()
+        pull_models_button.disable()
+        temperature_input.disable()
+        reasoning_checkbox.disable()
+        clinical_model_dropdown.disable()
+    else:
+        llm_provider_dropdown.disable()
+        cloud_model_dropdown.disable()
+        pull_models_button.enable()
+        temperature_input.enable()
+        reasoning_checkbox.enable()
+        clinical_model_dropdown.enable()
 
-        demo.load(
-            fn=lambda: None,
-            inputs=None,
-            outputs=None,
-            js=VISIT_DATE_LOCALE_JS,
-        )
+    use_cloud_services.on_value_change(partial(handle_toggle_cloud_services, components))
+    llm_provider_dropdown.on_value_change(partial(handle_llm_provider_change, components))
+    cloud_model_dropdown.on_value_change(partial(handle_cloud_model_change, components))
+    parsing_model_dropdown.on_value_change(partial(handle_parsing_model_change, components))
+    clinical_model_dropdown.on_value_change(partial(handle_clinical_model_change, components))
+    temperature_input.on_value_change(partial(handle_temperature_change, components))
+    reasoning_checkbox.on_value_change(partial(handle_reasoning_change, components))
+    pull_models_button.on("click", partial(handle_pull_models_click, components))
+    run_button.on("click", partial(handle_run_workflow, components))
+    clear_button.on("click", partial(handle_clear_click, components))
+    visit_date.on_value_change(partial(handle_visit_date_change, components))
+    export_button.on("click", partial(handle_download_click, components))
 
-    return demo
+    ui.run_javascript(f"({VISIT_DATE_LOCALE_JS})();")
+
+
+###############################################################################
+def create_interface() -> None:
+    ui.page("/")(main_page)
 
 
 ###############################################################################
 def launch_interface() -> None:
-    create_interface().queue(max_size=32).launch(
-        server_name="127.0.0.1",
-        server_port=7861,
-        inbrowser=True,
+    create_interface()
+    ui.run(
+        host="0.0.0.0",
+        port=7861,
+        title="DILIGENT Clinical Copilot",
+        show_welcome_message=False,
     )
 
 
-if __name__ == "__main__":
+if __name__ in {"__main__", "__mp_main__"}:
     launch_interface()
