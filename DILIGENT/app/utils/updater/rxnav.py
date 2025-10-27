@@ -2,9 +2,7 @@ from __future__ import annotations
 
 import codecs
 import json
-import os
 import re
-import sys
 import time
 import unicodedata
 from concurrent.futures import ThreadPoolExecutor, as_completed
@@ -13,7 +11,6 @@ from typing import Any, Iterator
 
 import httpx
 import pandas as pd
-from tqdm.auto import tqdm
 
 from DILIGENT.app.logger import logger
 from DILIGENT.app.utils.repository.database import database
@@ -26,13 +23,6 @@ __all__ = ["RxNavClient", "RxNavDrugCatalogBuilder"]
 class RxNormCandidate:
     value: str
     kind: str
-
-
-# -----------------------------------------------------------------------------
-def is_truthy(value: str | None) -> bool:
-    if value is None:
-        return False
-    return value.strip().lower() in {"1", "true", "yes", "on"}
 
 
 ###############################################################################
@@ -641,7 +631,6 @@ class RxNavDrugCatalogBuilder:
     BACKOFF_SECONDS = (0.8, 1.6, 3.2)
     TABLE_NAME = "DRUGS_CATALOG"
     BATCH_SIZE = 2000
-    PROGRESS_LOG_INTERVAL = 2000
     SYNONYM_WORKERS = 8
 
     def __init__(self, rx_client: RxNavClient | None = None) -> None:
@@ -666,7 +655,6 @@ class RxNavDrugCatalogBuilder:
         self.rxcui_cache: dict[str, list[str]] = {}
         self.total_records: int | None = None
         self.last_logged_count = 0
-        self.progress_bar: tqdm | None = None
 
     # -------------------------------------------------------------------------
     def update_drug_catalog(self, *, total_records: int | None = None) -> dict[str, Any]:
@@ -714,26 +702,20 @@ class RxNavDrugCatalogBuilder:
 
     # -------------------------------------------------------------------------
     def persist_catalog(self, chunks: Iterator[bytes]) -> dict[str, Any]:
-        self.ensure_progress_bar()
         count = 0
         batch: list[dict[str, Any]] = []
-        try:
-            for concept in self.stream_min_concepts(chunks):
-                payload = self.sanitize_concept(concept)
-                if payload is None:
-                    continue
-                batch.append(payload)
-                if len(batch) >= self.BATCH_SIZE:
-                    self.persist_batch(batch)
-                    count += len(batch)                    
-                    batch.clear()
-            if batch:
+        for concept in self.stream_min_concepts(chunks):
+            payload = self.sanitize_concept(concept)
+            if payload is None:
+                continue
+            batch.append(payload)
+            if len(batch) >= self.BATCH_SIZE:
                 self.persist_batch(batch)
-                count += len(batch)            
-        finally:
-            if self.progress_bar is not None:
-                self.progress_bar.close()
-                self.progress_bar = None
+                count += len(batch)
+                batch.clear()
+        if batch:
+            self.persist_batch(batch)
+            count += len(batch)
         return {"table_name": self.TABLE_NAME, "count": count}
 
     # -------------------------------------------------------------------------
@@ -987,44 +969,6 @@ class RxNavDrugCatalogBuilder:
         if not aliases:
             return []
         return sorted(aliases.values(), key=str.casefold)
-
-    ###########################################################################
-    def ensure_progress_bar(self) -> None:
-        if self.progress_bar is not None:
-            return
-        total = self.total_records if self.total_records is not None else None
-        disable = is_truthy(os.getenv("DISABLE_RXNAV_PROGRESS")) or not sys.stderr.isatty()
-        self.progress_bar = tqdm(
-            total=total,
-            desc="Building RxNav drug catalog",
-            unit="concepts",
-            disable=disable,
-            leave=False,
-            dynamic_ncols=True,
-        )
-
-    ###########################################################################
-    def update_progress_bar(
-        self,
-        processed: int,
-        total: int | None,
-        final: bool,
-    ) -> None:
-        if self.progress_bar is None:
-            self.ensure_progress_bar()
-        if self.progress_bar is None:
-            return
-        if total is not None and self.progress_bar.total != total:
-            self.progress_bar.total = total
-        current = int(self.progress_bar.n)
-        delta = processed - current
-        if delta > 0:
-            self.progress_bar.update(delta)
-        if final:
-            if total is not None:
-                self.progress_bar.total = total
-            self.progress_bar.close()
-            self.progress_bar = None
 
     ###########################################################################
     def register_alias_candidate(
