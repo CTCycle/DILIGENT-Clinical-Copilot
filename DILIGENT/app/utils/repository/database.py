@@ -97,6 +97,17 @@ class FdaAdverseEvent(Base):
     __table_args__ = (UniqueConstraint("report_id", "case_version"),)
 
 
+###############################################################################
+class DrugsCatalog(Base):
+    __tablename__ = "DRUGS_CATALOG"
+    rxcui = Column(String, primary_key=True)
+    term_type = Column(String, primary_key=True)
+    raw_name = Column(Text)
+    name = Column(String)
+    brand_names = Column(Text)
+    __table_args__ = (UniqueConstraint("rxcui", "term_type"),)
+
+
 # [DATABASE]
 ###############################################################################
 @singleton
