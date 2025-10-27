@@ -638,6 +638,7 @@ class RxNavDrugCatalogBuilder:
     BACKOFF_SECONDS = (0.8, 1.6, 3.2)
     TABLE_NAME = "DRUGS_CATALOG"
     BATCH_SIZE = 2000
+    PROGRESS_LOG_INTERVAL = 2000
 
     def __init__(self, rx_client: RxNavClient | None = None) -> None:
         combined: set[str] = set()
@@ -659,9 +660,13 @@ class RxNavDrugCatalogBuilder:
         self.rx_client = rx_client or RxNavClient()
         self.alias_cache: dict[str, list[str]] = {}
         self.rxcui_cache: dict[str, list[str]] = {}
+        self.total_records: int | None = None
+        self.last_logged_count = 0
 
     # -------------------------------------------------------------------------
-    def update_drug_catalog(self) -> dict[str, Any]:
+    def update_drug_catalog(self, *, total_records: int | None = None) -> dict[str, Any]:
+        self.total_records = total_records
+        self.last_logged_count = 0
         attempt = 0
         last_error: Exception | None = None
         while attempt < self.MAX_RETRIES:
@@ -714,10 +719,12 @@ class RxNavDrugCatalogBuilder:
             if len(batch) >= self.BATCH_SIZE:
                 self.persist_batch(batch)
                 count += len(batch)
+                self.log_progress(count)
                 batch.clear()
         if batch:
             self.persist_batch(batch)
             count += len(batch)
+        self.log_progress(count, final=True)
         return {"table_name": self.TABLE_NAME, "count": count}
 
     # -------------------------------------------------------------------------
@@ -738,6 +745,28 @@ class RxNavDrugCatalogBuilder:
                 )
             )
         database.upsert_into_database(frame, self.TABLE_NAME)
+
+    # -------------------------------------------------------------------------
+    def log_progress(self, processed: int, *, final: bool = False) -> None:
+        if processed <= 0:
+            return
+        if not final and processed < self.last_logged_count + self.PROGRESS_LOG_INTERVAL:
+            return
+        total = self.total_records if self.total_records is not None else None
+        if final and total is None:
+            total = processed
+        if total is None:
+            logger.info(
+                "RxNavDrugCatalogBuilder progress: rxNav data fetched for %s drug concepts",
+                processed,
+            )
+        else:
+            logger.info(
+                "RxNavDrugCatalogBuilder progress: rxNav data fetched for %s/%s drug concepts",
+                processed,
+                total,
+            )
+        self.last_logged_count = processed
 
     # -------------------------------------------------------------------------
     def stream_min_concepts(self, chunks: Iterator[bytes]) -> Iterator[dict[str, Any]]:
