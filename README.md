@@ -1,7 +1,7 @@
 # DILIGENT
 
 ## 1. Introduction
-DILIGENT Clinical Copilot is an LLM-powered assistant that guides clinicians through Drug-Induced Liver Injury (DILI) investigations. The service combines a FastAPI backend with a Gradio front-end to collect patient data, analyse hepatotoxicity patterns, and produce structured consultation notes. It can reason with fully local language models served by Ollama and, when configured, fall back to approved cloud providers for advanced reasoning or document parsing. All sessions are stored in a local SQLite database so that outcomes, model selections, and timing data remain auditable.
+DILIGENT Clinical Copilot is an LLM-powered assistant that guides clinicians through Drug-Induced Liver Injury (DILI) investigations. The service combines a FastAPI backend with a NiceGUI front-end to collect patient data, analyse hepatotoxicity patterns, and produce structured consultation notes. It can reason with fully local language models served by Ollama and, when configured, fall back to approved cloud providers for advanced reasoning or document parsing. All sessions are stored in a local SQLite database so that outcomes, model selections, and timing data remain auditable.
 
 Core capabilities include:
 
@@ -50,14 +50,20 @@ The database schema is created automatically the first time the application star
 
 ## 3. How to use
 
-- **Windows**: run `DILIGENT/start_on_windows.bat` to launch both the FastAPI backend and the Gradio UI in a single step.
+- **Windows**: run `DILIGENT/start_on_windows.bat` to launch both the FastAPI backend and the NiceGUI UI in a single step.
 - **macOS/Linux**: activate your virtual environment, then start the web stack:
 
   ```bash
   uvicorn DILIGENT.app.app:app --host 0.0.0.0 --port 8000
   ```
 
-  The interactive UI will be available at `http://localhost:8000/ui`, while the API documentation can be viewed at `http://localhost:8000/docs`.
+  Start the NiceGUI client in a separate shell to access the graphical interface:
+
+  ```bash
+  python -m DILIGENT.app.client.interface
+  ```
+
+  The interactive UI will be available at `http://127.0.0.1:7861`, while the API documentation can be viewed at `http://localhost:8000/docs`.
 
 Once the UI is open:
 
@@ -98,7 +104,7 @@ Environment variables reside in `DILIGENT/setup/.env`. Create or edit this file 
 | Variable             | Description                                                     |
 |----------------------|-----------------------------------------------------------------|
 | FASTAPI_HOST         | Address the FastAPI server binds to (default `127.0.0.1`).      |
-| FASTAPI_PORT         | Port for the FastAPI/Gradio service (default `8000`).           |
+| FASTAPI_PORT         | Port for the FastAPI service (default `8000`).                  |
 | OLLAMA_HOST          | Base URL where the Ollama runtime is reachable.                 |
 | OPENAI_API_KEY       | API key for the configured cloud LLM provider (if applicable).  |
 | MPLBACKEND           | Matplotlib backend used by background plotting tasks.           |

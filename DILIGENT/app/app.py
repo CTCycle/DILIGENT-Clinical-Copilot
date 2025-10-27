@@ -6,12 +6,10 @@ EV = EnvironmentVariables()
 
 import os
 
-import gradio as gr
 from fastapi import FastAPI
 
 from DILIGENT.app.api.endpoints.session import router as report_router
 from DILIGENT.app.api.endpoints.ollama import router as models_router
-from DILIGENT.app.client.interface import create_interface
 from DILIGENT.app.logger import logger
 from DILIGENT.app.utils.repository.database import database
 
@@ -30,7 +28,3 @@ app = FastAPI(
 
 app.include_router(report_router)
 app.include_router(models_router)
-
-ui_app = create_interface()
-# Serve the Gradio UI under /ui while keeping the FastAPI routes available
-app = gr.mount_gradio_app(app, ui_app, path="/ui", root_path="/ui")
