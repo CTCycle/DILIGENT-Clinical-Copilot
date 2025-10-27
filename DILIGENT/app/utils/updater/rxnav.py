@@ -1,15 +1,20 @@
 from __future__ import annotations
 
+import codecs
 import json
+import os
 import re
+import tempfile
 import time
 import unicodedata
 from dataclasses import dataclass
-from typing import Any
+from typing import Any, Iterator
 
 import httpx
 
 from DILIGENT.app.logger import logger
+
+__all__ = ["RxNavClient", "RxNavDrugCatalogBuilder"]
 
 
 ###############################################################################
@@ -527,3 +532,244 @@ class RxNavClient:
     def is_bracketed(self, value: str) -> bool:
         stripped = value.strip()
         return stripped.startswith("[") and stripped.endswith("]")
+
+
+###############################################################################
+class RxNavDrugCatalogBuilder:
+    TERMS_URL = "https://rxnav.nlm.nih.gov/REST/RxTerms/allconcepts.json"
+    CHUNK_SIZE = 131_072
+    MAX_RETRIES = 3
+    RETRY_STATUS = {429, 500, 502, 503, 504}
+    TIMEOUT = 30.0
+    BACKOFF_SECONDS = (0.8, 1.6, 3.2)
+
+    def __init__(self) -> None:
+        combined: set[str] = set()
+        for attr in ("SALT_STOPWORDS", "FORM_STOPWORDS", "UNIT_STOPWORDS"):
+            values = getattr(RxNavClient, attr, set())
+            combined.update(word.lower() for word in values)
+        combined.update({
+            "sterile",
+            "single",
+            "multi",
+            "dose",
+            "kit",
+            "pack",
+            "per",
+            "each",
+        })
+        self.stopwords = combined
+        self.brand_pattern = re.compile(r"\[([^\]]+)\]")
+
+    # -------------------------------------------------------------------------
+    def build_catalog(self, destination: str) -> dict[str, Any]:
+        directory = os.path.dirname(destination) or "."
+        os.makedirs(directory, exist_ok=True)
+
+        attempt = 0
+        last_error: Exception | None = None
+        while attempt < self.MAX_RETRIES:
+            try:
+                with httpx.stream("GET", self.TERMS_URL, timeout=self.TIMEOUT) as response:
+                    if (
+                        response.status_code in self.RETRY_STATUS
+                        and attempt + 1 < self.MAX_RETRIES
+                    ):
+                        time.sleep(self.BACKOFF_SECONDS[min(attempt, len(self.BACKOFF_SECONDS) - 1)])
+                        attempt += 1
+                        continue
+                    response.raise_for_status()
+                    return self.write_catalog(
+                        response.iter_bytes(self.CHUNK_SIZE), destination, directory
+                    )
+            except httpx.HTTPStatusError as exc:  # pragma: no cover - network dependent
+                last_error = exc
+                if (
+                    exc.response is not None
+                    and exc.response.status_code in self.RETRY_STATUS
+                    and attempt + 1 < self.MAX_RETRIES
+                ):
+                    time.sleep(
+                        self.BACKOFF_SECONDS[min(attempt, len(self.BACKOFF_SECONDS) - 1)]
+                    )
+                    attempt += 1
+                    continue
+                break
+            except httpx.RequestError as exc:  # pragma: no cover - network dependent
+                last_error = exc
+                if attempt + 1 < self.MAX_RETRIES:
+                    time.sleep(
+                        self.BACKOFF_SECONDS[min(attempt, len(self.BACKOFF_SECONDS) - 1)]
+                    )
+                    attempt += 1
+                    continue
+                break
+        if last_error is not None:
+            raise RuntimeError("Failed to download RxNav drug catalog") from last_error
+        raise RuntimeError("Failed to download RxNav drug catalog")
+
+    # -------------------------------------------------------------------------
+    def write_catalog(
+        self,
+        chunks: Iterator[bytes],
+        destination: str,
+        directory: str,
+    ) -> dict[str, Any]:
+        count = 0
+        temp_path = ""
+        with tempfile.NamedTemporaryFile(
+            "w",
+            encoding="utf-8",
+            delete=False,
+            dir=directory,
+        ) as handle:
+            temp_path = handle.name
+            try:
+                for concept in self.stream_min_concepts(chunks):
+                    payload = self.sanitize_concept(concept)
+                    if payload is None:
+                        continue
+                    json.dump(payload, handle, ensure_ascii=False)
+                    handle.write("\n")
+                    count += 1
+            except Exception:  # noqa: BLE001
+                handle.flush()
+                handle.close()
+                if temp_path:
+                    try:
+                        os.unlink(temp_path)
+                    except OSError:
+                        pass
+                raise
+        os.replace(temp_path, destination)
+        return {"file_path": destination, "count": count}
+
+    # -------------------------------------------------------------------------
+    def stream_min_concepts(self, chunks: Iterator[bytes]) -> Iterator[dict[str, Any]]:
+        utf8_decoder = codecs.getincrementaldecoder("utf-8")()
+        decoder = json.JSONDecoder()
+        buffer = ""
+        in_array = False
+        for chunk in chunks:
+            text = utf8_decoder.decode(chunk)
+            if not text:
+                continue
+            buffer += text
+            while True:
+                if not in_array:
+                    index = buffer.find("[")
+                    if index == -1:
+                        if len(buffer) > 1024:
+                            buffer = buffer[-1024:]
+                        break
+                    in_array = True
+                    buffer = buffer[index + 1 :]
+                buffer = buffer.lstrip()
+                if not buffer:
+                    break
+                if buffer[0] == "]":
+                    in_array = False
+                    buffer = buffer[1:]
+                    continue
+                if buffer[0] == ",":
+                    buffer = buffer[1:]
+                    continue
+                try:
+                    parsed, offset = decoder.raw_decode(buffer)
+                except json.JSONDecodeError:
+                    break
+                if isinstance(parsed, dict):
+                    yield parsed
+                buffer = buffer[offset:]
+        buffer += utf8_decoder.decode(b"", final=True)
+        while True:
+            if not in_array:
+                index = buffer.find("[")
+                if index == -1:
+                    break
+                in_array = True
+                buffer = buffer[index + 1 :]
+            buffer = buffer.lstrip()
+            if not buffer:
+                break
+            if buffer[0] == "]":
+                in_array = False
+                buffer = buffer[1:]
+                continue
+            if buffer[0] == ",":
+                buffer = buffer[1:]
+                continue
+            try:
+                parsed, offset = decoder.raw_decode(buffer)
+            except json.JSONDecodeError:
+                break
+            if isinstance(parsed, dict):
+                yield parsed
+            buffer = buffer[offset:]
+
+    # -------------------------------------------------------------------------
+    def sanitize_concept(self, concept: dict[str, Any]) -> dict[str, Any] | None:
+        if not isinstance(concept, dict):
+            return None
+        full_name = concept.get("fullName")
+        if not isinstance(full_name, str):
+            return None
+        rxcui = concept.get("rxcui")
+        rxcui_str = str(rxcui).strip()
+        if not rxcui_str:
+            return None
+        term_type = concept.get("termType")
+        sanitized_name = self.sanitize_name(full_name)
+        brands = self.extract_brands(full_name)
+        payload = {
+            "rxcui": rxcui_str,
+            "term_type": term_type.strip() if isinstance(term_type, str) else "",
+            "raw_name": full_name.strip(),
+            "name": sanitized_name or None,
+            "brand_names": brands,
+        }
+        if payload["name"] is None and not payload["brand_names"]:
+            return None
+        return payload
+
+    # -------------------------------------------------------------------------
+    def sanitize_name(self, value: str) -> str:
+        normalized = unicodedata.normalize("NFKC", value)
+        normalized = self.brand_pattern.sub(" ", normalized)
+        normalized = re.sub(r"\(.*?\)", " ", normalized)
+        normalized = normalized.replace("/", " ")
+        normalized = re.sub(r"[^A-Za-z\s-']", " ", normalized)
+        normalized = re.sub(r"\s+", " ", normalized)
+        tokens = normalized.split(" ")
+        cleaned: list[str] = []
+        seen: set[str] = set()
+        for token in tokens:
+            stripped = re.sub(r"[^A-Za-z']", "", token)
+            if not stripped:
+                continue
+            lowered = stripped.lower()
+            if len(lowered) < 3:
+                continue
+            if lowered in self.stopwords or lowered.rstrip("s") in self.stopwords:
+                continue
+            if lowered in seen:
+                continue
+            seen.add(lowered)
+            cleaned.append(lowered)
+        return " ".join(cleaned)
+
+    # -------------------------------------------------------------------------
+    def extract_brands(self, value: str) -> list[str]:
+        seen: set[str] = set()
+        brands: list[str] = []
+        for match in self.brand_pattern.findall(value):
+            normalized = unicodedata.normalize("NFKC", match)
+            normalized = re.sub(r"\s+", " ", normalized).strip()
+            if not normalized:
+                continue
+            key = normalized.casefold()
+            if key in seen:
+                continue
+            seen.add(key)
+            brands.append(normalized)
+        return brands
