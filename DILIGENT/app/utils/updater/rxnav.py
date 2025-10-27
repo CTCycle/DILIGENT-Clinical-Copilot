@@ -32,6 +32,17 @@ def is_truthy(value: str | None) -> bool:
     return value.strip().lower() in {"1", "true", "yes", "on"}
 
 
+# -----------------------------------------------------------------------------
+def read_float_env(key: str, default: float) -> float:
+    value = os.getenv(key)
+    if value is None:
+        return default
+    try:
+        return float(value)
+    except (TypeError, ValueError):
+        return default
+
+
 ###############################################################################
 class RxNavClient:
     BASE_URL = "https://rxnav.nlm.nih.gov/REST/drugs.json"
@@ -638,6 +649,7 @@ class RxNavDrugCatalogBuilder:
     BACKOFF_SECONDS = (0.8, 1.6, 3.2)
     TABLE_NAME = "DRUGS_CATALOG"
     BATCH_SIZE = 2000
+    ESTIMATED_LATENCY_SECONDS = read_float_env("RXNAV_AVG_LATENCY_SECONDS", 0.35)
 
     def __init__(self, rx_client: RxNavClient | None = None) -> None:
         combined: set[str] = set()
@@ -704,9 +716,22 @@ class RxNavDrugCatalogBuilder:
 
     # -------------------------------------------------------------------------
     def persist_catalog(self, chunks: Iterator[bytes]) -> dict[str, Any]:
+        concepts = list(self.stream_min_concepts(chunks))
+        total = len(concepts)
+        if total == 0:
+            logger.info("No RxNav concepts retrieved; skipping catalog persistence")
+            return {"table_name": self.TABLE_NAME, "count": 0}
+        estimated_requests, estimated_seconds = self.estimate_processing_time(concepts)
+        logger.info(
+            "Starting RxNav catalog build for %s concepts (%s unique queries); "
+            "estimated RxNav fetch duration: %s",
+            total,
+            estimated_requests,
+            self.format_duration(estimated_seconds),
+        )
         count = 0
         batch: list[dict[str, Any]] = []
-        for concept in self.stream_min_concepts(chunks):
+        for concept in concepts:
             payload = self.sanitize_concept(concept)
             if payload is None:
                 continue
@@ -715,9 +740,16 @@ class RxNavDrugCatalogBuilder:
                 self.persist_batch(batch)
                 count += len(batch)
                 batch.clear()
+                self.log_progress(count, total)
         if batch:
             self.persist_batch(batch)
             count += len(batch)
+            self.log_progress(count, total)
+        logger.info(
+            "Completed RxNav catalog build; persisted %s rows into '%s'",
+            count,
+            self.TABLE_NAME,
+        )
         return {"table_name": self.TABLE_NAME, "count": count}
 
     # -------------------------------------------------------------------------
@@ -801,6 +833,54 @@ class RxNavDrugCatalogBuilder:
             if isinstance(parsed, dict):
                 yield parsed
             buffer = buffer[offset:]
+
+    # -------------------------------------------------------------------------
+    def estimate_processing_time(
+        self, concepts: list[dict[str, Any]]
+    ) -> tuple[int, float]:
+        unique_queries: set[str] = set()
+        unique_rxcui: set[str] = set()
+        for concept in concepts:
+            if not isinstance(concept, dict):
+                continue
+            raw_name = concept.get("fullName")
+            if isinstance(raw_name, str):
+                stripped = raw_name.strip()
+                if stripped:
+                    unique_queries.add(stripped.casefold())
+                sanitized = self.sanitize_name(raw_name)
+                if sanitized:
+                    unique_queries.add(sanitized.casefold())
+            rxcui = concept.get("rxcui")
+            rxcui_str = str(rxcui).strip()
+            if rxcui_str:
+                unique_rxcui.add(rxcui_str)
+        estimated_requests = len(unique_queries) + len(unique_rxcui)
+        estimated_seconds = estimated_requests * self.ESTIMATED_LATENCY_SECONDS
+        return estimated_requests, estimated_seconds
+
+    # -------------------------------------------------------------------------
+    def format_duration(self, seconds: float) -> str:
+        if seconds <= 0:
+            return "0s"
+        rounded = int(round(seconds))
+        minutes, remaining_seconds = divmod(rounded, 60)
+        if minutes == 0:
+            return f"{remaining_seconds}s"
+        hours, remaining_minutes = divmod(minutes, 60)
+        if hours == 0:
+            return f"{remaining_minutes}m {remaining_seconds}s"
+        return f"{hours}h {remaining_minutes}m"
+
+    # -------------------------------------------------------------------------
+    def log_progress(self, processed: int, total: int) -> None:
+        percentage = (processed / total) * 100 if total else 0
+        logger.info(
+            "RxNav catalog progress: %s/%s concepts processed (%.1f%%)",
+            processed,
+            total,
+            percentage,
+        )
 
     # -------------------------------------------------------------------------
     def sanitize_concept(self, concept: dict[str, Any]) -> dict[str, Any] | None:
