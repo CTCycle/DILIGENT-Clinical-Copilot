@@ -382,10 +382,9 @@ def main_page() -> None:
                         export_button.disable()
                         clear_button = ui.button("Clear all").classes("w-full")
 
-                with ui.accordion().classes("w-full") as configuration_accordion:
-                    with configuration_accordion.add(
-                        "Models & Analysis Configuration"
-                    ):
+                with ui.expansion(
+                    "Models & Analysis Configuration"
+                ).classes("w-full"):
                         ui.label("Configuration").classes("diligent-card-title")
                         use_rag_checkbox = ui.checkbox(
                             "Use Retrieval Augmented Generation (RAG)",
