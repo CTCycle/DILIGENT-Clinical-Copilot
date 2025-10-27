@@ -108,7 +108,15 @@ class RxNormReleaseManager:
         self.sources_path = os.path.abspath(sources_path)
         self.releases_path = os.path.join(self.sources_path, "rxnorm")
         os.makedirs(self.releases_path, exist_ok=True)
-        self.http_client = http_client or httpx.Client(timeout=DEFAULT_TIMEOUT)
+        default_headers = {"User-Agent": "DILIGENT-Clinical-Copilot/1.0"}
+        if http_client is None:
+            self.http_client = httpx.Client(
+                timeout=DEFAULT_TIMEOUT,
+                follow_redirects=True,
+                headers=default_headers,
+            )
+        else:
+            self.http_client = http_client
         self.owns_client = http_client is None
 
     # -------------------------------------------------------------------------
@@ -132,7 +140,20 @@ class RxNormReleaseManager:
         if redownload or not os.path.isfile(destination):
             logger.info("Downloading RxNorm release from %s", download_url)
             response = self.http_client.get(download_url)
+            if response.status_code == 302 and "location" in response.headers:
+                raise httpx.HTTPStatusError(
+                    "Unexpected redirect when downloading RxNorm release",
+                    request=response.request,
+                    response=response,
+                )
             response.raise_for_status()
+            content_type = response.headers.get("content-type", "").lower()
+            if content_type and "zip" not in content_type and "octet-stream" not in content_type:
+                raise httpx.HTTPStatusError(
+                    "Received unexpected content while downloading RxNorm release",
+                    request=response.request,
+                    response=response,
+                )
             with open(destination, "wb") as handle:
                 handle.write(response.content)
         return self.extract_archive(destination)
