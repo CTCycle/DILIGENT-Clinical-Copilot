@@ -7,6 +7,7 @@ import re
 import sys
 import time
 import unicodedata
+from concurrent.futures import ThreadPoolExecutor, as_completed
 from dataclasses import dataclass
 from typing import Any, Iterator
 
@@ -641,6 +642,7 @@ class RxNavDrugCatalogBuilder:
     TABLE_NAME = "DRUGS_CATALOG"
     BATCH_SIZE = 2000
     PROGRESS_LOG_INTERVAL = 2000
+    SYNONYM_WORKERS = 8
 
     def __init__(self, rx_client: RxNavClient | None = None) -> None:
         combined: set[str] = set()
@@ -874,6 +876,8 @@ class RxNavDrugCatalogBuilder:
         if isinstance(raw_name, str):
             queries.append(raw_name)
 
+        pending_alias_queries: dict[str, str] = {}
+
         for query in queries:
             stripped = query.strip()
             if not stripped:
@@ -881,14 +885,8 @@ class RxNavDrugCatalogBuilder:
             cache_key = stripped.casefold()
             cached = self.alias_cache.get(cache_key)
             if cached is None:
-                try:
-                    fetched = self.rx_client.fetch_drug_terms(stripped)
-                except Exception as exc:  # noqa: BLE001
-                    logger.warning("Failed to fetch RxNav aliases for '%s': %s", stripped, exc)
-                    cached = []
-                else:
-                    cached = [term for term in fetched if isinstance(term, str)]
-                self.alias_cache[cache_key] = cached
+                pending_alias_queries[cache_key] = stripped
+                continue
             for term in cached:
                 self.register_alias_candidate(
                     term,
@@ -898,23 +896,86 @@ class RxNavDrugCatalogBuilder:
                 )
 
         identifier = rxcui.strip()
+        pending_synonym_identifier: str | None = None
         if identifier:
             cached_synonyms = self.rxcui_cache.get(identifier)
             if cached_synonyms is None:
-                try:
-                    fetched_synonyms = self.rx_client.fetch_rxcui_synonyms(identifier)
-                except Exception as exc:  # noqa: BLE001
-                    logger.warning(
-                        "Failed to fetch RxNav aliases for rxcui '%s': %s",
-                        identifier,
-                        exc,
+                pending_synonym_identifier = identifier
+            else:
+                for term in cached_synonyms:
+                    self.register_alias_candidate(
+                        term,
+                        aliases,
+                        normalized_name,
+                        normalized_brands,
                     )
-                    cached_synonyms = []
-                else:
-                    cached_synonyms = [
-                        term for term in fetched_synonyms if isinstance(term, str)
-                    ]
-                self.rxcui_cache[identifier] = cached_synonyms
+
+        fetch_tasks: dict[Any, tuple[str, str, str]] = {}
+        if pending_alias_queries or pending_synonym_identifier:
+            total_tasks = len(pending_alias_queries)
+            if pending_synonym_identifier is not None:
+                total_tasks += 1
+            max_workers = min(self.SYNONYM_WORKERS, max(1, total_tasks))
+            with ThreadPoolExecutor(max_workers=max_workers) as executor:
+                for cache_key, stripped in pending_alias_queries.items():
+                    future = executor.submit(self.rx_client.fetch_drug_terms, stripped)
+                    fetch_tasks[future] = ("alias", cache_key, stripped)
+                if pending_synonym_identifier is not None:
+                    future = executor.submit(
+                        self.rx_client.fetch_rxcui_synonyms,
+                        pending_synonym_identifier,
+                    )
+                    fetch_tasks[future] = (
+                        "synonym",
+                        pending_synonym_identifier,
+                        pending_synonym_identifier,
+                    )
+                for future in as_completed(fetch_tasks):
+                    kind, cache_key, original = fetch_tasks[future]
+                    try:
+                        fetched_terms = future.result()
+                    except Exception as exc:  # noqa: BLE001
+                        if kind == "alias":
+                            logger.warning(
+                                "Failed to fetch RxNav aliases for '%s': %s",
+                                original,
+                                exc,
+                            )
+                        else:
+                            logger.warning(
+                                "Failed to fetch RxNav aliases for rxcui '%s': %s",
+                                original,
+                                exc,
+                            )
+                        filtered_terms: list[str] = []
+                    else:
+                        filtered_terms = [
+                            term for term in fetched_terms if isinstance(term, str)
+                        ]
+                    if kind == "alias":
+                        self.alias_cache[cache_key] = filtered_terms
+                    else:
+                        self.rxcui_cache[cache_key] = filtered_terms
+                    for term in filtered_terms:
+                        self.register_alias_candidate(
+                            term,
+                            aliases,
+                            normalized_name,
+                            normalized_brands,
+                        )
+
+        for cache_key, stripped in pending_alias_queries.items():
+            cached = self.alias_cache.get(cache_key, [])
+            for term in cached:
+                self.register_alias_candidate(
+                    term,
+                    aliases,
+                    normalized_name,
+                    normalized_brands,
+                )
+
+        if pending_synonym_identifier is not None:
+            cached_synonyms = self.rxcui_cache.get(pending_synonym_identifier, [])
             for term in cached_synonyms:
                 self.register_alias_candidate(
                     term,
