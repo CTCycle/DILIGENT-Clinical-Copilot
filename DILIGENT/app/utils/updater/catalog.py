@@ -9,8 +9,9 @@ import zipfile
 from collections import defaultdict
 from collections.abc import Iterable, Sequence
 from datetime import UTC, datetime
+from html.parser import HTMLParser
 from typing import Any
-from urllib.parse import quote
+from urllib.parse import quote, urljoin
 
 import httpx
 import pandas as pd
@@ -96,6 +97,25 @@ PUBCHEM_CONCURRENCY = 8
 OPENFDA_CONCURRENCY = 4
 DAILYMED_CONCURRENCY = 4
 CHEMBL_CONCURRENCY = 4
+
+
+###############################################################################
+class AnchorCollector(HTMLParser):
+    def __init__(self) -> None:
+        super().__init__()
+        self.links: list[str] = []
+
+    ###########################################################################
+    def handle_starttag(
+        self,
+        tag: str,
+        attrs: list[tuple[str, str | None]],
+    ) -> None:
+        if tag.lower() != "a":
+            return
+        for name, value in attrs:
+            if name.lower() == "href" and value:
+                self.links.append(value)
 
 
 ###############################################################################
@@ -232,24 +252,22 @@ class RxNormReleaseManager:
         response = self.http_client.get(page_url)
         response.raise_for_status()
         release_type = "full" if monthly else "weekly"
-        pattern = (
-            rf"https://download\.nlm\.nih\.gov/umls/kss/rxnorm/"
-            rf"RxNorm_{release_type}_prescribe_\d{{8}}\.zip"
+        parser = AnchorCollector()
+        parser.feed(response.text)
+        pattern = re.compile(
+            rf"RxNorm_{release_type}_prescribe_(\d{{8}})\.zip", re.IGNORECASE
         )
-        matches = list(re.finditer(pattern, response.text, re.IGNORECASE))
-        if not matches:
-            raise httpx.HTTPStatusError(
-                "Could not determine latest RxNorm prescribe release",
-                request=response.request,
-                response=response,
-            )
         candidates: list[tuple[str, str]] = []
-        for match in matches:
-            url = match.group(0)
-            date_match = re.search(r"(\d{8})", url)
-            if not date_match:
+        seen: set[str] = set()
+        for href in parser.links:
+            absolute = urljoin(page_url, href)
+            match = pattern.search(absolute)
+            if not match:
                 continue
-            candidates.append((date_match.group(1), url))
+            if absolute in seen:
+                continue
+            seen.add(absolute)
+            candidates.append((match.group(1), absolute))
         if not candidates:
             raise httpx.HTTPStatusError(
                 "Could not determine latest RxNorm prescribe release",
