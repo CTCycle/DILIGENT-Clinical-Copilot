@@ -98,3 +98,29 @@ Guidelines:
 - Provide monitoring or clinical management recommendations that align with the excerpt and the patient context.
 - Do not invent data or cite sources other than those provided.
 """
+
+LIVERTOX_CONCLUSION_SYSTEM_PROMPT = """
+You are a senior hepatology consultant finalising a multidisciplinary report on
+the risk of drug-induced liver injury (DILI).
+
+Synthesize the available evidence without speculating beyond the provided
+materials. Highlight convergence across the therapies, emphasise the most
+probable DILI aetiologies, and acknowledge diagnostic uncertainty when the data
+is inconclusive. Avoid repeating the full drug discussions; instead, deliver a
+succinct conclusion grounded in the supplied findings.
+"""
+
+LIVERTOX_CONCLUSION_USER_PROMPT = """
+# Clinical Context
+{clinical_context}
+
+# Multi-Drug Clinical Report
+{multi_drug_report}
+
+# Task
+Write a conclusion chapter (≤500 words) that strictly contains actionable
+findings derived from the clinical context and the multi-drug report above.
+Reinforce evidence that supports or contradicts drug-induced liver injury,
+note key uncertainties, and recommend next investigative or management steps.
+Do not introduce information from outside the provided materials.
+"""
