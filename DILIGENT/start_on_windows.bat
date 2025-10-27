@@ -137,6 +137,8 @@ REM ============================================================================
 set "FASTAPI_HOST=127.0.0.1"
 set "FASTAPI_PORT=8000"
 set "RELOAD=false"
+set "NICEGUI_HOST=127.0.0.1"
+set "NICEGUI_PORT=7861"
 
 if exist "%DOTENV%" (
   for /f "usebackq tokens=* delims=" %%L in ("%DOTENV%") do (
@@ -157,10 +159,16 @@ if exist "%DOTENV%" (
   echo [INFO] No .env overrides found at "%DOTENV%". Using defaults.
 )
 
+set "UI_URL=http://!NICEGUI_HOST!:!NICEGUI_PORT!"
 echo [INFO] FASTAPI_HOST=!FASTAPI_HOST! FASTAPI_PORT=!FASTAPI_PORT! RELOAD=!RELOAD!
-set "UI_URL=http://!FASTAPI_HOST!:!FASTAPI_PORT!/ui"
+echo [INFO] NICEGUI_HOST=!NICEGUI_HOST! NICEGUI_PORT=!NICEGUI_PORT!
 set "RELOAD_FLAG="
 if /i "!RELOAD!"=="true" set "RELOAD_FLAG=--reload"
+
+echo [RUN] Launching NiceGUI client interface
+pushd "%root_folder%" >nul
+start "DILIGENT UI" "%uv_exe%" run --python "%python_exe%" python -m DILIGENT.app.client.interface
+popd >nul
 
 start "" "!UI_URL!"
 
