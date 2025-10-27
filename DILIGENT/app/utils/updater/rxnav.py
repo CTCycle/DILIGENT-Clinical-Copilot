@@ -723,13 +723,11 @@ class RxNavDrugCatalogBuilder:
                 batch.append(payload)
                 if len(batch) >= self.BATCH_SIZE:
                     self.persist_batch(batch)
-                    count += len(batch)
-                    self.log_progress(count)
+                    count += len(batch)                    
                     batch.clear()
             if batch:
                 self.persist_batch(batch)
-                count += len(batch)
-            self.log_progress(count, final=True)
+                count += len(batch)            
         finally:
             if self.progress_bar is not None:
                 self.progress_bar.close()
@@ -754,29 +752,6 @@ class RxNavDrugCatalogBuilder:
                 )
             )
         database.upsert_into_database(frame, self.TABLE_NAME)
-
-    # -------------------------------------------------------------------------
-    def log_progress(self, processed: int, *, final: bool = False) -> None:
-        if processed <= 0 and not final:
-            return
-        total = self.total_records if self.total_records is not None else None
-        if final and total is None:
-            total = processed
-        self.update_progress_bar(processed, total, final)
-        if not final and processed < self.last_logged_count + self.PROGRESS_LOG_INTERVAL:
-            return
-        if total is None:
-            logger.info(
-                "RxNavDrugCatalogBuilder progress: rxNav data fetched for %s drug concepts",
-                processed,
-            )
-        else:
-            logger.info(
-                "RxNavDrugCatalogBuilder progress: rxNav data fetched for %s/%s drug concepts",
-                processed,
-                total,
-            )
-        self.last_logged_count = processed
 
     # -------------------------------------------------------------------------
     def stream_min_concepts(self, chunks: Iterator[bytes]) -> Iterator[dict[str, Any]]:
