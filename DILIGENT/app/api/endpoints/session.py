@@ -212,7 +212,6 @@ async def start_clinical_session(
     alt_max: str | None = Body(default=None),
     alp: str | None = Body(default=None),
     alp_max: str | None = Body(default=None),
-    symptoms: list[str] | None = Body(default=None),
 ) -> PlainTextResponse:
     try:
         payload_data: dict[str, Any] = {
@@ -226,7 +225,6 @@ async def start_clinical_session(
             "alt_max": alt_max,
             "alp": alp,
             "alp_max": alp_max,
-            "symptoms": symptoms or [],
         }
         payload = PatientData.model_validate(payload_data)
     except ValidationError as exc:
