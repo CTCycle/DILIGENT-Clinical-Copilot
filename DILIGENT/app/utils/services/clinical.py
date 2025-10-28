@@ -165,22 +165,17 @@ class HepatoxConsultation:
         visit_date: date | None = None,
         pattern_score: HepatotoxicityPatternScore | None = None,
     ) -> dict[str, Any] | None:
-        patient_drugs = self.collect_patient_drugs()
+        patient_drugs = [entry.name for entry in self.drugs.entries if entry.name]
         if not patient_drugs:
             logger.info("No drugs detected for toxicity analysis")
             return None
-        if not self.ensure_livertox_loaded():
+        if not self.ensure_livertox_loaded() or self.matcher is None:
             return None
 
-        if self.matcher is None:
-            return PatientDrugClinicalReport(entries=[], final_report=None).model_dump()
-
-        logger.info(
-            "Toxicity analysis: performing clinical assessment for matched drugs"
-        )
+        logger.info("Running clinical hepatotoxicity assessment for matched drugs")
         # Resolve free-text drug names against LiverTox to obtain structured data
         matches = await self.matcher.match_drug_names(patient_drugs)
-        resolved = self.resolve_matches(patient_drugs, matches)
+        resolved = self.matcher.build_patient_mapping(patient_drugs, matches)
         report = await self.compile_clinical_assessment(
             resolved,
             clinical_context=clinical_context,
@@ -209,20 +204,6 @@ class HepatoxConsultation:
         self.master_list_df = None
         self.matcher = LiverToxMatcher(dataset)
         return True
-
-    # -------------------------------------------------------------------------
-    def collect_patient_drugs(self) -> list[str]:
-        return [entry.name for entry in self.drugs.entries if entry.name]
-
-    # -------------------------------------------------------------------------
-    def resolve_matches(
-        self,
-        patient_drugs: list[str],
-        matches: list[LiverToxMatch | None],
-    ) -> list[dict[str, Any]]:
-        if self.matcher is None:
-            return []
-        return self.matcher.build_patient_mapping(patient_drugs, matches)
 
     # -------------------------------------------------------------------------
     async def compile_clinical_assessment(
