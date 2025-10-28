@@ -635,6 +635,7 @@ class RxNavDrugCatalogBuilder:
     SYNONYM_WORKERS = 12
     TOKEN_SPLIT_PATTERN = re.compile(r"[^A-Za-z0-9']+")
     SINGLE_TOKEN_DIGIT_PATTERN = re.compile(r"^\d+(?:\.\d+)?$")
+    SHORT_TOKEN_EXCEPTIONS = {"id"}
 
     def __init__(self, rx_client: RxNavClient | None = None) -> None:
         combined: set[str] = set()
@@ -650,6 +651,10 @@ class RxNavDrugCatalogBuilder:
             "pack",
             "per",
             "each",
+            "day",
+            "days",
+            "hour",
+            "hours",
         })
         synonym_stopwords = {word.casefold() for word in RXNAV_SYNONYM_STOPWORDS}
         combined.update(synonym_stopwords)
@@ -909,12 +914,13 @@ class RxNavDrugCatalogBuilder:
                 pending_alias_queries[cache_key] = stripped
                 continue
             for term in cached:
-                self.register_alias_candidate(
-                    term,
-                    aliases,
-                    normalized_name,
-                    normalized_brands,
-                )
+                for variant in self.expand_synonym_variants(term):
+                    self.register_alias_candidate(
+                        variant,
+                        aliases,
+                        normalized_name,
+                        normalized_brands,
+                    )
 
         identifier = rxcui.strip()
         pending_synonym_identifier: str | None = None
@@ -924,12 +930,13 @@ class RxNavDrugCatalogBuilder:
                 pending_synonym_identifier = identifier
             else:
                 for term in cached_synonyms:
-                    self.register_alias_candidate(
-                        term,
-                        aliases,
-                        normalized_name,
-                        normalized_brands,
-                    )
+                    for variant in self.expand_synonym_variants(term):
+                        self.register_alias_candidate(
+                            variant,
+                            aliases,
+                            normalized_name,
+                            normalized_brands,
+                        )
 
         fetch_tasks: dict[Any, tuple[str, str, str]] = {}
         if pending_alias_queries or pending_synonym_identifier:
@@ -978,36 +985,62 @@ class RxNavDrugCatalogBuilder:
                     else:
                         self.rxcui_cache[cache_key] = filtered_terms
                     for term in filtered_terms:
-                        self.register_alias_candidate(
-                            term,
-                            aliases,
-                            normalized_name,
-                            normalized_brands,
-                        )
+                        for variant in self.expand_synonym_variants(term):
+                            self.register_alias_candidate(
+                                variant,
+                                aliases,
+                                normalized_name,
+                                normalized_brands,
+                            )
 
         for cache_key, stripped in pending_alias_queries.items():
             cached = self.alias_cache.get(cache_key, [])
             for term in cached:
-                self.register_alias_candidate(
-                    term,
-                    aliases,
-                    normalized_name,
-                    normalized_brands,
-                )
+                for variant in self.expand_synonym_variants(term):
+                    self.register_alias_candidate(
+                        variant,
+                        aliases,
+                        normalized_name,
+                        normalized_brands,
+                    )
 
         if pending_synonym_identifier is not None:
             cached_synonyms = self.rxcui_cache.get(pending_synonym_identifier, [])
             for term in cached_synonyms:
-                self.register_alias_candidate(
-                    term,
-                    aliases,
-                    normalized_name,
-                    normalized_brands,
-                )
-
+                for variant in self.expand_synonym_variants(term):
+                    self.register_alias_candidate(
+                        variant,
+                        aliases,
+                        normalized_name,
+                        normalized_brands,
+                    )
+        
         if not aliases:
             return []
         return sorted(aliases.values(), key=str.casefold)
+
+    # -------------------------------------------------------------------------
+    def expand_synonym_variants(self, candidate: str) -> list[str]:
+        normalized = unicodedata.normalize("NFKC", candidate)
+        normalized = re.sub(r"\s+", " ", normalized)
+        fragments: list[str] = []
+        seen: set[str] = set()
+        for match in self.brand_pattern.findall(normalized):
+            stripped = match.strip()
+            if not stripped:
+                continue
+            key = stripped.casefold()
+            if key in seen:
+                continue
+            seen.add(key)
+            fragments.append(stripped)
+        base = self.brand_pattern.sub(" ", normalized).strip()
+        if base:
+            key = base.casefold()
+            if key not in seen:
+                seen.add(key)
+                fragments.append(base)
+        return fragments
 
     ###########################################################################
     def register_alias_candidate(
@@ -1021,34 +1054,49 @@ class RxNavDrugCatalogBuilder:
         if not cleaned:
             return
         cleaned = re.sub(r"\s+", " ", cleaned)
-        if len(cleaned) <= 2:
-            return
-        if self.SINGLE_TOKEN_DIGIT_PATTERN.match(cleaned):
-            return
-        key = cleaned.casefold()
-        if normalized_name and key == normalized_name:
-            return
-        if key in normalized_brands:
-            return
         tokens = [
             token
             for token in self.TOKEN_SPLIT_PATTERN.split(cleaned)
             if token
         ]
-        normalized_tokens = [token.casefold() for token in tokens]
-        if not normalized_tokens:
+        if not tokens:
             return
-        if any(token.isdigit() for token in tokens):
+        sanitized_tokens: list[str] = []
+        seen_tokens: set[str] = set()
+        for token in tokens:
+            stripped = token.strip("'")
+            if not stripped:
+                continue
+            if any(char.isdigit() for char in stripped):
+                continue
+            lowered = stripped.casefold()
+            if lowered in self.stopwords:
+                continue
+            if lowered.rstrip("s") in self.stopwords:
+                continue
+            if len(lowered) <= 2 and lowered not in self.SHORT_TOKEN_EXCEPTIONS:
+                continue
+            if lowered in seen_tokens:
+                continue
+            seen_tokens.add(lowered)
+            sanitized_tokens.append(stripped)
+        if not sanitized_tokens:
             return
-        if len(tokens) == 1 and any(char.isdigit() for char in tokens[0]):
+        cleaned_alias = " ".join(sanitized_tokens)
+        cleaned_alias = re.sub(r"\s+", " ", cleaned_alias).strip()
+        if not cleaned_alias:
             return
-        if key in self.synonym_stopwords:
+        if (
+            len(cleaned_alias) <= 2
+            and cleaned_alias.casefold() not in self.SHORT_TOKEN_EXCEPTIONS
+        ):
             return
-        if all(token in self.synonym_stopwords for token in normalized_tokens):
+        if self.SINGLE_TOKEN_DIGIT_PATTERN.match(cleaned_alias):
             return
-        if len(tokens) == 1 and normalized_tokens[0] in self.synonym_stopwords:
+        key = cleaned_alias.casefold()
+        if key in self.stopwords:
             return
-        aliases.setdefault(key, cleaned)
+        aliases.setdefault(key, cleaned_alias)
 
     # -------------------------------------------------------------------------
     def sanitize_name(self, value: str) -> str:
