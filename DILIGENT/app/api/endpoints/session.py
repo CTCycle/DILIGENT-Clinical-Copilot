@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import asyncio
 import time
 from datetime import date, datetime
 from typing import Any
@@ -160,7 +161,8 @@ async def process_single_patient(payload: PatientData) -> str:
     # Step 3: Persist a structured representation of the session to SQLite
     detected_drugs = [entry.name for entry in drug_data.entries if entry.name]
     pattern_strings = pattern_analyzer.stringify_scores(pattern_score)
-    serializer.record_clinical_session(
+    await asyncio.to_thread(
+        serializer.record_clinical_session,
         {
             "patient_name": payload.name,
             "session_timestamp": datetime.now(),
@@ -175,7 +177,7 @@ async def process_single_patient(payload: PatientData) -> str:
             "clinical_model": getattr(clinical_session, "llm_model", None),
             "total_duration": global_elapsed,
             "final_report": final_report,
-        }
+        },
     )
 
     narrative = build_patient_narrative(
