@@ -1,6 +1,5 @@
 from __future__ import annotations
 
-import os
 from DILIGENT.app.constants import SOURCES_PATH
 from DILIGENT.app.logger import logger
 from DILIGENT.app.utils.repository.database import database
@@ -21,7 +20,7 @@ if __name__ == "__main__":
         catalog_info.get("count", 0),
     )
 
-    # updater = LiverToxUpdater(SOURCES_PATH, redownload=REDOWNLOAD)
-    # logger.info("Running LiverTox updater")
-    # result = updater.update_from_livertox()
-    # logger.info("LiverTox updater summary: %s", result)
+    updater = LiverToxUpdater(SOURCES_PATH, redownload=REDOWNLOAD)
+    logger.info("Running LiverTox updater")
+    result = updater.update_from_livertox()
+    logger.info("LiverTox updater summary: %s", result)
