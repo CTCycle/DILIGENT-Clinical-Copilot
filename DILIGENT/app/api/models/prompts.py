@@ -33,15 +33,13 @@ Return:
 LIVERTOX_REPORT_EXAMPLE = """
 Example layout:
 
-Drug name – LiverTox score X
+**Drug name** – LiverTox score X
 
 Summarize the key incidence data or study findings from the LiverTox excerpt, keeping statistics precise and attributed to the cited studies.
-
 Add a short comparison with closely related agents when the excerpt mentions them, highlighting similarities or differences in hepatic risk.
-
 Close with monitoring or clinical management advice that reflects the patient context.
 
-Bibliography source: LiverTox
+**Bibliography source**: LiverTox
 """
 
 LIVERTOX_CLINICAL_SYSTEM_PROMPT = """

@@ -100,11 +100,9 @@ class LiverToxMatcher:
         self, patient_drugs: list[str]
     ) -> list[LiverToxMatch | None]:
         total = len(patient_drugs)       
-        results: list[LiverToxMatch | None] = [None] * total
-        if not self.records:
-            return results
-        normalized_queries = [self.normalize_name(name) for name in patient_drugs]
-        for idx, normalized in enumerate(normalized_queries):
+        results: list[LiverToxMatch | None] = [None] * total   
+        for idx, name in enumerate(patient_drugs):
+            normalized = self.normalize_name(name)
             if not normalized:
                 continue
             cached = self.match_cache.get(normalized)
@@ -225,9 +223,7 @@ class LiverToxMatcher:
     # -------------------------------------------------------------------------
     def collect_catalog_candidates(
         self, normalized_query: str
-    ) -> list[tuple[str, str, bool]]:
-        if not normalized_query:
-            return []
+    ) -> list[tuple[str, str, bool]]:        
         candidates: dict[str, tuple[str, bool]] = {}
         alias_values = self.catalog_alias_index.get(normalized_query)
         if alias_values:
