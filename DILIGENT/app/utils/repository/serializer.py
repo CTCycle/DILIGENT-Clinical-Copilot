@@ -1,7 +1,8 @@
 from __future__ import annotations
 
-import re
+import json
 import logging
+import re
 from typing import Any
 
 import pandas as pd
@@ -218,6 +219,31 @@ class DataSerializer:
         database.upsert_into_database(frame, "FDA_ADVERSE_EVENTS")
 
     # -----------------------------------------------------------------------------
+    def upsert_drugs_catalog_records(
+        self, records: pd.DataFrame | list[dict[str, Any]]
+    ) -> None:
+        if isinstance(records, pd.DataFrame):
+            frame = records.copy()
+        else:
+            frame = pd.DataFrame(records)
+        frame = frame.reindex(
+            columns=[
+                "rxcui",
+                "raw_name",
+                "term_type",
+                "name",
+                "brand_names",
+                "synonyms",
+            ]
+        )
+        if frame.empty:
+            return
+        frame = frame.where(pd.notnull(frame), None)
+        for column in ("brand_names", "synonyms"):
+            frame[column] = frame[column].apply(self.serialize_string_list)
+        database.upsert_into_database(frame, "DRUGS_CATALOG")
+
+    # -----------------------------------------------------------------------------
     def sanitize_livertox_records(self, records: list[dict[str, Any]]) -> pd.DataFrame:
         df = pd.DataFrame(records)
         required_columns = [
@@ -338,6 +364,44 @@ class DataSerializer:
         if not re.fullmatch(r"[A-Za-z0-9\s\-/(),'+\.]+", normalized):
             return False
         return True
+
+    # -----------------------------------------------------------------------------
+    def serialize_string_list(self, value: Any) -> str:
+        if isinstance(value, str):
+            stripped = value.strip()
+            if not stripped:
+                return "[]"
+            try:
+                parsed = json.loads(stripped)
+            except json.JSONDecodeError:
+                parsed_values = [stripped]
+            else:
+                if isinstance(parsed, list):
+                    parsed_values = parsed
+                else:
+                    parsed_values = [stripped]
+        elif isinstance(value, list):
+            parsed_values = value
+        elif pd.isna(value) or value is None:
+            parsed_values = []
+        else:
+            parsed_values = [value]
+        normalized: list[str] = []
+        for item in parsed_values:
+            normalized_item = self.normalize_list_item(item)
+            if normalized_item is not None:
+                normalized.append(normalized_item)
+        return json.dumps(normalized, ensure_ascii=False)
+
+    # -----------------------------------------------------------------------------
+    def normalize_list_item(self, value: Any) -> str | None:
+        if isinstance(value, str):
+            normalized = value.strip()
+            return normalized if normalized else None
+        if pd.isna(value) or value is None:
+            return None
+        normalized = str(value).strip()
+        return normalized if normalized else None
 
     # -----------------------------------------------------------------------------
     def get_livertox_records(self) -> pd.DataFrame:
