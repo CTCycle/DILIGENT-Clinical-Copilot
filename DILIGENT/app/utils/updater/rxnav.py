@@ -630,7 +630,7 @@ class RxNavDrugCatalogBuilder:
     TIMEOUT = 30.0
     BACKOFF_SECONDS = (0.8, 1.6, 3.2)
     TABLE_NAME = "DRUGS_CATALOG"
-    BATCH_SIZE = 2000
+    BATCH_SIZE = 200
     SYNONYM_WORKERS = 8
 
     def __init__(self, rx_client: RxNavClient | None = None) -> None:
@@ -717,6 +717,7 @@ class RxNavDrugCatalogBuilder:
         if batch:
             self.persist_batch(batch)
             count += len(batch)
+            logger.info('Total records upserted into database: %d', count)
         return {"table_name": self.TABLE_NAME, "count": count}
 
     # -------------------------------------------------------------------------
