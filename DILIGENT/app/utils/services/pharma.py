@@ -70,6 +70,8 @@ class LiverToxMatcher:
         *,
         drugs_catalog_df: pd.DataFrame | None = None,
     ) -> None:
+        # Build lookup tables from the LiverTox dataset so queries can be
+        # resolved quickly without repeatedly walking the source data.
         self.livertox_df = livertox_df
         if master_list_df is not None and not master_list_df.empty:
             self.master_list_df = master_list_df.copy()
@@ -97,6 +99,8 @@ class LiverToxMatcher:
 
     # -------------------------------------------------------------------------
     def match_drug_names(self, patient_drugs: list[str]) -> list[LiverToxMatch | None]:
+        # Normalize and resolve each patient supplied drug using cached results
+        # whenever possible to reduce redundant lookups.
         total = len(patient_drugs)
         results: list[LiverToxMatch | None] = [None] * total
         for idx, name in enumerate(patient_drugs):
@@ -129,6 +133,8 @@ class LiverToxMatcher:
         patient_drugs: list[str],
         matches: list[LiverToxMatch | None],
     ) -> list[dict[str, Any]]:
+        # Combine patient drug names with matched monographs and excerpts to
+        # create a payload suitable for downstream presentation.
         entries: list[dict[str, Any]] = []
         row_index = self.ensure_row_index()
         for original, match in zip(patient_drugs, matches, strict=False):
@@ -166,6 +172,8 @@ class LiverToxMatcher:
     def match_query(
         self, alias_entries: list[tuple[str, bool]]
     ) -> tuple[MonographRecord, float, str, list[str]] | None:
+        # Execute the layered matching strategy using progressively fuzzier
+        # heuristics until a suitable monograph record is found.
         if not alias_entries:
             return None
         candidates: list[tuple[str, str, bool]] = []
@@ -237,6 +245,8 @@ class LiverToxMatcher:
     def resolve_alias_candidates(
         self, original_name: str, normalized_query: str
     ) -> list[tuple[str, bool]]:
+        # Enumerate the most promising aliases for a patient provided name by
+        # blending catalog entries with the raw patient input.
         alias_entries: list[tuple[str, bool]] = []
         seen: set[str] = set()
 
@@ -274,6 +284,8 @@ class LiverToxMatcher:
         value: str,
         from_catalog: bool,
     ) -> None:
+        # Insert a new alias candidate while preventing duplicate normalized
+        # values from reaching later stages.
         normalized_value = self.normalize_name(value)
         if not normalized_value or normalized_value in seen:
             return
@@ -283,7 +295,9 @@ class LiverToxMatcher:
     # -------------------------------------------------------------------------
     def find_catalog_synonym_match(
         self, normalized_query: str
-    ) -> tuple[dict[str, Any], bool, str] | None:        
+    ) -> tuple[dict[str, Any], bool, str] | None:
+        # Look up catalog provided synonyms using exact, partial, and fuzzy
+        # comparisons to seed the alias expansion phase.
         if not self.catalog_synonym_records:
             return None
 
@@ -365,6 +379,8 @@ class LiverToxMatcher:
         from_catalog: bool,
         alias_value: str,
     ) -> tuple[MonographRecord, float, str, list[str]]:
+        # Label matches originating from the catalog so consumers can trace how
+        # an alias contributed to the final result.
         record, confidence, reason, notes = result
         updated_notes = list(notes)
         if from_catalog:
@@ -377,6 +393,8 @@ class LiverToxMatcher:
     def match_primary(
         self, normalized_query: str
     ) -> tuple[MonographRecord, float, str, list[str]] | None:
+        # Attempt to resolve the query directly against monograph primary names
+        # for the highest confidence match.
         record = self.primary_index.get(normalized_query)
         if record is None:
             return None
@@ -386,6 +404,8 @@ class LiverToxMatcher:
     def match_master_list(
         self, normalized_query: str
     ) -> tuple[MonographRecord, float, str, list[str]] | None:
+        # Use the expanded master alias list (brand and ingredient names) to
+        # route the query back to a monograph entry.
         alias_sources = (
             ("brand", self.brand_index),
             ("ingredient", self.ingredient_index),
@@ -413,6 +433,7 @@ class LiverToxMatcher:
     def match_synonym(
         self, normalized_query: str
     ) -> tuple[MonographRecord, float, str, list[str]] | None:
+        # Resolve the query through known synonyms extracted from monographs.
         alias = self.synonym_index.get(normalized_query)
         if alias is None:
             return None
@@ -424,6 +445,8 @@ class LiverToxMatcher:
     def match_partial(
         self, normalized_query: str
     ) -> tuple[MonographRecord, float, str, list[str]] | None:
+        # Perform token based matching for partial overlaps when full aliases
+        # fail, requiring a unique best scoring candidate.
         tokens = [
             token for token in normalized_query.split() if self.is_token_valid(token)
         ]
@@ -458,6 +481,8 @@ class LiverToxMatcher:
     def match_fuzzy(
         self, normalized_query: str
     ) -> tuple[MonographRecord, float, str, list[str]] | None:
+        # Fall back to fuzzy matching against all recorded variants when other
+        # strategies do not yield a result.
         if len(normalized_query) < 4:
             return None
         variant = self.find_best_variant(normalized_query)
@@ -474,6 +499,8 @@ class LiverToxMatcher:
     def match_primary_name(
         self, drug_name: str
     ) -> tuple[MonographRecord, float, str, list[str]] | None:
+        # Reconcile a raw drug name with the monograph set using primary names
+        # first and synonyms as a secondary option.
         normalized_name = self.normalize_name(drug_name)
         if not normalized_name:
             return None
@@ -492,6 +519,8 @@ class LiverToxMatcher:
     def find_best_variant(
         self, normalized_query: str
     ) -> tuple[MonographRecord, str, bool, float] | None:
+        # Identify the closest normalized variant across primary and synonym
+        # spellings using SequenceMatcher ratios.
         best: tuple[MonographRecord, str, bool, float] | None = None
         best_ratio = 0.0
         for candidate, record, original, is_primary in self.variant_catalog:
@@ -505,6 +534,8 @@ class LiverToxMatcher:
 
     # -------------------------------------------------------------------------
     def build_records(self) -> None:
+        # Preprocess the LiverTox dataset into monograph records that expose
+        # normalized names, synonyms, and token indexes.
         if self.livertox_df is None or self.livertox_df.empty:
             return
         token_occurrences: dict[str, list[MonographRecord]] = {}
@@ -681,6 +712,8 @@ class LiverToxMatcher:
 
     # -------------------------------------------------------------------------
     def coerce_text(self, value: Any) -> str | None:
+        # Standardize scalar values into trimmed strings while respecting NA
+        # semantics from pandas inputs.
         if value is None:
             return None
         try:
@@ -696,6 +729,8 @@ class LiverToxMatcher:
 
     # -------------------------------------------------------------------------
     def iter_alias_variants(self, value: str) -> list[str]:
+        # Generate text variants for a catalog alias by splitting common
+        # delimiters such as commas and slashes.
         normalized_value = self.normalize_whitespace(value)
         if not normalized_value:
             return []
@@ -710,6 +745,8 @@ class LiverToxMatcher:
     def derive_master_alias_source(
         self, dataset: pd.DataFrame | None
     ) -> pd.DataFrame | None:
+        # Construct a fallback master alias list directly from the LiverTox
+        # dataset when a dedicated catalog is unavailable.
         if dataset is None or dataset.empty:
             return None
         required = {"drug_name", "ingredient", "brand_name"}
@@ -723,6 +760,8 @@ class LiverToxMatcher:
 
     # -------------------------------------------------------------------------
     def parse_synonyms(self, value: Any) -> dict[str, str]:
+        # Extract normalized synonym mappings from the diverse data shapes
+        # present in the source dataset.
         synonyms: dict[str, str] = {}
         raw_values = self.extract_synonym_strings(value)
         if not raw_values:
@@ -751,6 +790,8 @@ class LiverToxMatcher:
     def extract_synonym_strings(
         self, value: Any, seen_refs: set[int] | None = None
     ) -> list[str]:
+        # Walk arbitrarily nested containers to surface raw synonym strings for
+        # further normalization.
         if seen_refs is None:
             seen_refs = set()
         if value is None:
@@ -787,6 +828,7 @@ class LiverToxMatcher:
 
     # -------------------------------------------------------------------------
     def try_parse_json(self, value: str) -> Any:
+        # Best effort parsing for serialized synonym blobs stored as strings.
         if not value:
             return None
         try:
@@ -796,6 +838,8 @@ class LiverToxMatcher:
 
     # -------------------------------------------------------------------------
     def expand_variant(self, value: str) -> list[str]:
+        # Produce additional alias candidates by stripping punctuation and
+        # parenthetical qualifiers from the provided value.
         normalized = self.normalize_whitespace(value)
         if not normalized:
             return []
@@ -808,6 +852,8 @@ class LiverToxMatcher:
 
     # -------------------------------------------------------------------------
     def collect_tokens(self, primary: str, synonyms: list[str]) -> set[str]:
+        # Aggregate normalized tokens from both primary names and synonyms to
+        # support partial matching.
         tokens: set[str] = set()
         for source in [primary, *synonyms]:
             tokens.update(self.tokenize(source))
@@ -815,6 +861,8 @@ class LiverToxMatcher:
 
     # -------------------------------------------------------------------------
     def tokenize(self, value: str) -> set[str]:
+        # Normalize an alias and split it into valid tokens used by the partial
+        # matching strategy.
         normalized = self.normalize_name(value)
         if not normalized:
             return set()
@@ -822,6 +870,8 @@ class LiverToxMatcher:
 
     # -------------------------------------------------------------------------
     def is_token_valid(self, token: str) -> bool:
+        # Guard the token index against short, stopword, or numeric terms that
+        # do not meaningfully improve matching quality.
         if len(token) < 4:
             return False
         if token in MATCHING_STOPWORDS:
@@ -830,10 +880,13 @@ class LiverToxMatcher:
 
     # -------------------------------------------------------------------------
     def normalize_whitespace(self, value: str) -> str:
+        # Collapse repeated whitespace to simplify downstream comparisons.
         return re.sub(r"\s+", " ", value).strip()
 
     # -------------------------------------------------------------------------
     def ensure_row_index(self) -> dict[str, dict[str, Any]]:
+        # Cache monograph rows keyed by normalized drug name for quick joins
+        # when preparing patient friendly responses.
         if self.rows_by_name:
             return self.rows_by_name
         if self.livertox_df is None or self.livertox_df.empty:
@@ -858,6 +911,8 @@ class LiverToxMatcher:
         reason: str,
         notes: list[str] | None,
     ) -> LiverToxMatch:
+        # Normalize the scoring metadata and bundle it with the resolved
+        # monograph so downstream consumers receive consistent payloads.
         normalized_confidence = round(min(max(confidence, self.MIN_CONFIDENCE), 1.0), 2)
         cleaned_notes = list(dict.fromkeys(note for note in (notes or []) if note))
         return LiverToxMatch(
@@ -871,6 +926,8 @@ class LiverToxMatcher:
 
     # -------------------------------------------------------------------------
     def normalize_name(self, name: str) -> str:
+        # Apply Unicode normalization and aggressive punctuation stripping to
+        # produce deterministic tokens used throughout matching.
         normalized = (
             unicodedata.normalize("NFKD", name)
             .encode("ascii", "ignore")
