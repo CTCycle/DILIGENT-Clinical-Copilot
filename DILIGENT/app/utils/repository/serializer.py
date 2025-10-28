@@ -1,7 +1,6 @@
 from __future__ import annotations
 
 import json
-import logging
 import re
 from typing import Any
 
@@ -87,8 +86,7 @@ class VectorSerializer:
         self.index_metric = index_metric
         self.index_type = index_type
         self.reset_collection = reset_collection
-        self.vector_column_name = vector_column_name
-        self.repository = LanceVectorRepository(database_path)
+        self.vector_column_name = vector_column_name        
 
     ############################################################################
     def save_embeddings(self, data: pa.Table) -> None:
