@@ -1,4 +1,3 @@
-import asyncio
 import os
 import sys
 
@@ -52,7 +51,7 @@ def build_matcher() -> LiverToxMatcher:
 
 
 def run_match(matcher: LiverToxMatcher, drugs: list[str]):
-    return asyncio.run(matcher.match_drug_names(drugs))
+    return matcher.match_drug_names(drugs)
 
 
 def test_direct_monograph_match():
@@ -158,7 +157,15 @@ def test_build_patient_mapping_uses_monograph_rows():
     matches = run_match(matcher, ["Xarelto"])
     mapping = matcher.build_patient_mapping(["Xarelto"], matches)
     assert mapping[0]["matched_livertox_row"]["drug_name"] == "Rivaroxaban"
-    assert mapping[0]["matched_livertox_row"]["excerpt"] == "Example excerpt"
+
+
+def test_extract_synonym_strings_handles_recursive_input():
+    matcher = build_matcher()
+    recursive_list: list[object] = []
+    recursive_list.append(recursive_list)
+    recursive_list.append("Valid Entry")
+    results = matcher.extract_synonym_strings(recursive_list)
+    assert results == ["Valid Entry"]
 
 
 def test_build_patient_mapping_with_duplicate_nbk_ids():

@@ -438,7 +438,7 @@ class LiverToxMatcher:
                 candidate_scores[key] = candidate_scores.get(key, 0) + 1
         if not candidate_scores:
             return None
-        best_key = max(candidate_scores, key=candidate_scores.get)
+        best_key = max(candidate_scores, key=lambda candidate: candidate_scores[candidate])
         best_score = candidate_scores[best_key]
         tied = [key for key, score in candidate_scores.items() if score == best_score]
         if len(tied) != 1:
@@ -748,30 +748,42 @@ class LiverToxMatcher:
         return synonyms
 
     # -------------------------------------------------------------------------
-    def extract_synonym_strings(self, value: Any) -> list[str]:
+    def extract_synonym_strings(
+        self, value: Any, seen_refs: set[int] | None = None
+    ) -> list[str]:
+        if seen_refs is None:
+            seen_refs = set()
         if value is None:
             return []
         if isinstance(value, dict):
+            marker = id(value)
+            if marker in seen_refs:
+                return []
+            seen_refs.add(marker)
             collected: list[str] = []
             for entry in value.values():
-                collected.extend(self.extract_synonym_strings(entry))
+                collected.extend(self.extract_synonym_strings(entry, seen_refs))
             return collected
         if isinstance(value, (list, tuple, set)):
+            marker = id(value)
+            if marker in seen_refs:
+                return []
+            seen_refs.add(marker)
             collected: list[str] = []
             for entry in value:
-                collected.extend(self.extract_synonym_strings(entry))
+                collected.extend(self.extract_synonym_strings(entry, seen_refs))
             return collected
         if isinstance(value, str):
             stripped = value.strip()
             if stripped.startswith(("{", "[")) and stripped.endswith(("}", "]")):
                 parsed = self.try_parse_json(stripped)
                 if isinstance(parsed, dict) or isinstance(parsed, list):
-                    return self.extract_synonym_strings(parsed)
+                    return self.extract_synonym_strings(parsed, seen_refs)
             return [value]
         text = self.coerce_text(value)
         if text is None:
             return []
-        return self.extract_synonym_strings(text)
+        return self.extract_synonym_strings(text, seen_refs)
 
     # -------------------------------------------------------------------------
     def try_parse_json(self, value: str) -> Any:
