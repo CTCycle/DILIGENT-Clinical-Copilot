@@ -99,9 +99,7 @@ class LiverToxMatcher:
     async def match_drug_names(
         self, patient_drugs: list[str]
     ) -> list[LiverToxMatch | None]:
-        total = len(patient_drugs)
-        if total == 0:
-            return []
+        total = len(patient_drugs)       
         results: list[LiverToxMatch | None] = [None] * total
         if not self.records:
             return results
