@@ -633,6 +633,8 @@ class RxNavDrugCatalogBuilder:
     TABLE_NAME = "DRUGS_CATALOG"
     BATCH_SIZE = 200
     SYNONYM_WORKERS = 12
+    TOKEN_SPLIT_PATTERN = re.compile(r"[^A-Za-z0-9']+")
+    SINGLE_TOKEN_DIGIT_PATTERN = re.compile(r"^\d+(?:\.\d+)?$")
 
     def __init__(self, rx_client: RxNavClient | None = None) -> None:
         combined: set[str] = set()
@@ -678,7 +680,15 @@ class RxNavDrugCatalogBuilder:
                         attempt += 1
                         continue
                     response.raise_for_status()
-                    return self.persist_catalog(response.iter_bytes(self.CHUNK_SIZE))
+                    started = time.perf_counter()
+                    result = self.persist_catalog(response.iter_bytes(self.CHUNK_SIZE))
+                    elapsed = time.perf_counter() - started
+                    return self.compose_catalog_payload(
+                        response,
+                        result,
+                        attempts=attempt + 1,
+                        elapsed=elapsed,
+                    )
             except httpx.HTTPStatusError as exc:  # pragma: no cover - network dependent
                 last_error = exc
                 if (
@@ -704,6 +714,38 @@ class RxNavDrugCatalogBuilder:
         if last_error is not None:
             raise RuntimeError("Failed to download RxNav drug catalog") from last_error
         raise RuntimeError("Failed to download RxNav drug catalog")
+
+    # -------------------------------------------------------------------------
+    def compose_catalog_payload(
+        self,
+        response: httpx.Response,
+        result: dict[str, Any],
+        *,
+        attempts: int,
+        elapsed: float,
+    ) -> dict[str, Any]:
+        headers = response.headers
+        try:
+            content_length = int(headers.get("Content-Length", 0) or 0)
+        except (TypeError, ValueError):
+            content_length = 0
+        payload = {
+            "source_url": str(response.request.url)
+            if response.request is not None
+            else self.TERMS_URL,
+            "downloaded": True,
+            "status_code": response.status_code,
+            "content_length": content_length,
+            "content_type": headers.get("Content-Type"),
+            "last_modified": headers.get("Last-Modified"),
+            "attempts": attempts,
+            "elapsed_seconds": elapsed,
+        }
+        payload.update(result)
+        count = result.get("count", 0)
+        payload.setdefault("records", count)
+        payload.setdefault("processed_entries", count)
+        return payload
 
     # -------------------------------------------------------------------------
     def persist_catalog(self, chunks: Iterator[bytes]) -> dict[str, Any]:
