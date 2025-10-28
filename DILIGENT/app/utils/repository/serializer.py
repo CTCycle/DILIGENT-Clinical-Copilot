@@ -239,8 +239,8 @@ class DataSerializer:
         if frame.empty:
             return
         frame = frame.where(pd.notnull(frame), None)
-        for column in ("brand_names", "synonyms"):
-            frame[column] = frame[column].apply(self.serialize_string_list)
+        frame["brand_names"] = frame["brand_names"].apply(self.serialize_brand_names)
+        frame["synonyms"] = frame["synonyms"].apply(self.serialize_string_list)
         database.upsert_into_database(frame, "DRUGS_CATALOG")
 
     # -----------------------------------------------------------------------------
@@ -394,6 +394,39 @@ class DataSerializer:
         return json.dumps(normalized, ensure_ascii=False)
 
     # -----------------------------------------------------------------------------
+    def serialize_brand_names(self, value: Any) -> str | None:
+        if isinstance(value, str):
+            stripped = value.strip()
+            if not stripped:
+                return None
+            try:
+                parsed = json.loads(stripped)
+            except json.JSONDecodeError:
+                return self.normalize_list_item(stripped)
+            return self.serialize_brand_names(parsed)
+        if isinstance(value, list):
+            normalized: list[str] = []
+            seen: set[str] = set()
+            for item in value:
+                normalized_item = self.normalize_list_item(item)
+                if normalized_item is None:
+                    continue
+                key = normalized_item.casefold()
+                if key in seen:
+                    continue
+                seen.add(key)
+                normalized.append(normalized_item)
+            if not normalized:
+                return None
+            if len(normalized) == 1:
+                return normalized[0]
+            return ", ".join(normalized)
+        if pd.isna(value) or value is None:
+            return None
+        normalized_item = self.normalize_list_item(value)
+        return normalized_item
+
+    # -----------------------------------------------------------------------------
     def normalize_list_item(self, value: Any) -> str | None:
         if isinstance(value, str):
             normalized = value.strip()
@@ -402,6 +435,35 @@ class DataSerializer:
             return None
         normalized = str(value).strip()
         return normalized if normalized else None
+
+    # -----------------------------------------------------------------------------
+    def deserialize_string_list(self, value: Any) -> list[str]:
+        if isinstance(value, list):
+            parsed_values = value
+        elif isinstance(value, str):
+            stripped = value.strip()
+            if not stripped:
+                return []
+            try:
+                parsed = json.loads(stripped)
+            except json.JSONDecodeError:
+                normalized_item = self.normalize_list_item(stripped)
+                return [normalized_item] if normalized_item is not None else []
+            if isinstance(parsed, list):
+                parsed_values = parsed
+            else:
+                normalized_item = self.normalize_list_item(parsed)
+                return [normalized_item] if normalized_item is not None else []
+        elif pd.isna(value) or value is None:
+            return []
+        else:
+            parsed_values = [value]
+        normalized: list[str] = []
+        for item in parsed_values:
+            normalized_item = self.normalize_list_item(item)
+            if normalized_item is not None:
+                normalized.append(normalized_item)
+        return normalized
 
     # -----------------------------------------------------------------------------
     def get_livertox_records(self) -> pd.DataFrame:
