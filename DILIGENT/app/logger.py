@@ -4,6 +4,7 @@ import logging
 import logging.config
 import os
 from datetime import datetime
+from typing import Any
 
 from DILIGENT.app.constants import LOGS_PATH
 
@@ -47,9 +48,9 @@ LOG_CONFIG: dict[str, Any] = {
             "propagate": False,
         },
         "httpx": {
-            "level": "WARNING",
-            "handlers": ["file"],
-            "propagate": False,
+            "level": "INFO",               
+            "handlers": ["console", "file"], 
+            "propagate": False,            
         },
     },
     "root": {
