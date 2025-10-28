@@ -13,6 +13,7 @@ import httpx
 import pandas as pd
 
 from DILIGENT.app.logger import logger
+from DILIGENT.app.utils.references import RXNAV_SYNONYM_STOPWORDS
 from DILIGENT.app.utils.repository.serializer import DataSerializer
 
 __all__ = ["RxNavClient", "RxNavDrugCatalogBuilder"]
@@ -632,6 +633,8 @@ class RxNavDrugCatalogBuilder:
     TABLE_NAME = "DRUGS_CATALOG"
     BATCH_SIZE = 200
     SYNONYM_WORKERS = 8
+    SINGLE_TOKEN_DIGIT_PATTERN = re.compile(r"^[^\s]*\d[^\s]*$")
+    TOKEN_SPLIT_PATTERN = re.compile(r"[\s\-/_]+")
 
     def __init__(self, rx_client: RxNavClient | None = None) -> None:
         combined: set[str] = set()
@@ -648,7 +651,10 @@ class RxNavDrugCatalogBuilder:
             "per",
             "each",
         })
+        synonym_stopwords = {word.casefold() for word in RXNAV_SYNONYM_STOPWORDS}
+        combined.update(synonym_stopwords)
         self.stopwords = combined
+        self.synonym_stopwords = synonym_stopwords
         self.brand_pattern = re.compile(r"\[([^\]]+)\]")
         self.rx_client = rx_client or RxNavClient()
         self.alias_cache: dict[str, list[str]] = {}
@@ -804,6 +810,7 @@ class RxNavDrugCatalogBuilder:
         term_type = concept.get("termType")
         sanitized_name = self.sanitize_name(full_name) or None
         brands = sorted(self.extract_brands(full_name), key=str.casefold)
+        formatted_brands = self.format_brand_names(brands)
         synonyms = self.collect_synonyms(
             rxcui_str,
             sanitized_name,
@@ -815,7 +822,7 @@ class RxNavDrugCatalogBuilder:
             "term_type": term_type.strip() if isinstance(term_type, str) else "",
             "raw_name": full_name.strip(),
             "name": sanitized_name,
-            "brand_names": brands,
+            "brand_names": formatted_brands,
             "synonyms": synonyms,
         }
         if (
@@ -968,15 +975,32 @@ class RxNavDrugCatalogBuilder:
         normalized_name: str | None,
         normalized_brands: set[str],
     ) -> None:
-        cleaned = candidate.strip()
+        cleaned = unicodedata.normalize("NFKC", candidate).strip()
         if not cleaned:
+            return
+        cleaned = re.sub(r"\s+", " ", cleaned)
+        if len(cleaned) <= 2:
+            return
+        if self.SINGLE_TOKEN_DIGIT_PATTERN.match(cleaned):
             return
         key = cleaned.casefold()
         if normalized_name and key == normalized_name:
             return
         if key in normalized_brands:
             return
-        if any(token.lower() in self.stopwords for token in cleaned.split()):
+        tokens = [
+            token
+            for token in self.TOKEN_SPLIT_PATTERN.split(cleaned)
+            if token
+        ]
+        normalized_tokens = [token.casefold() for token in tokens]
+        if not normalized_tokens:
+            return
+        if key in self.synonym_stopwords:
+            return
+        if all(token in self.synonym_stopwords for token in normalized_tokens):
+            return
+        if len(tokens) == 1 and normalized_tokens[0] in self.synonym_stopwords:
             return
         aliases.setdefault(key, cleaned)
 
@@ -1021,3 +1045,24 @@ class RxNavDrugCatalogBuilder:
             seen.add(key)
             brands.append(normalized)
         return brands
+
+    # -------------------------------------------------------------------------
+    def format_brand_names(self, brands: list[str]) -> str | None:
+        if not brands:
+            return None
+        seen: set[str] = set()
+        formatted: list[str] = []
+        for brand in brands:
+            stripped = brand.strip()
+            if not stripped:
+                continue
+            key = stripped.casefold()
+            if key in seen:
+                continue
+            seen.add(key)
+            formatted.append(stripped)
+        if not formatted:
+            return None
+        if len(formatted) == 1:
+            return formatted[0]
+        return ", ".join(formatted)
