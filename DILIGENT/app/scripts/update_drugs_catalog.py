@@ -10,8 +10,12 @@ REDOWNLOAD = True
 
 ###############################################################################
 if __name__ == "__main__":
-    database.initialize_database()
-    updater = LiverToxUpdater(SOURCES_PATH, redownload=REDOWNLOAD)
-    logger.info("Running LiverTox updater")
-    result = updater.update_from_livertox()
-    logger.info("LiverTox updater summary: %s", result)
+    database.initialize_database()    
+    builder = RxNavDrugCatalogBuilder()
+    logger.info("Refreshing RxNav drug catalog from %s", builder.TERMS_URL)
+    catalog_info = builder.update_drug_catalog()    
+    logger.info(
+        "RxNav catalog upserted into %s with %d entries",
+        catalog_info.get("table_name"),
+        catalog_info.get("count", 0),
+    )
