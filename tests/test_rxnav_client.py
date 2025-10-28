@@ -80,7 +80,10 @@ class RxNavDrugCatalogBuilderTests(unittest.TestCase):
         self.assertIsNotNone(payload)
         assert payload is not None
         self.assertEqual(payload["brand_names"], "BrandTerm")
-        self.assertEqual(payload["synonyms"], ["Alternate Alias", "Synonym From Id"])
+        self.assertEqual(
+            payload["synonyms"],
+            ["Alternate Alias", "BrandTerm", "Primary Drug", "Synonym From Id"],
+        )
 
     ###########################################################################
     def test_sanitize_concept_filters_invalid_synonyms(self) -> None:
@@ -108,6 +111,36 @@ class RxNavDrugCatalogBuilderTests(unittest.TestCase):
         assert payload is not None
         self.assertEqual(payload["brand_names"], "Brand")
         self.assertEqual(payload["synonyms"], ["Another Valid", "Valid Synonym"])
+
+    ###########################################################################
+    def test_collect_synonyms_sanitizes_dosage_descriptions(self) -> None:
+        class StubClient(RxNavClient):
+            def __init__(self) -> None:
+                super().__init__(enabled=False)
+
+            def fetch_drug_terms(self, raw_name: str) -> list[str]:
+                return [
+                    "0.5 ML Fitusiran 100 MG/ML Auto-Injector [Qfitlia]",
+                    "Per",
+                    "Qfitlia 50 MG Per 0.5 ML Auto-Injector",
+                ]
+
+            def fetch_rxcui_synonyms(self, rxcui: str) -> list[str]:
+                return []
+
+        builder = RxNavDrugCatalogBuilder(rx_client=StubClient())
+        concept = {
+            "fullName": "Fitusiran 0.5 MG/ML Solution for Injection [Qfitlia]",
+            "rxcui": "999",
+            "termType": "IN",
+        }
+
+        payload = builder.sanitize_concept(concept)
+
+        self.assertIsNotNone(payload)
+        assert payload is not None
+        self.assertEqual(payload["brand_names"], "Qfitlia")
+        self.assertEqual(payload["synonyms"], ["Fitusiran", "Qfitlia"])
 
     ###########################################################################
     def test_serializer_handles_brand_names_and_synonyms(self) -> None:
