@@ -89,10 +89,10 @@ class LiverToxMatcher:
         self.brand_index: dict[str, list[tuple[str, str]]] = {}
         self.ingredient_index: dict[str, list[tuple[str, str]]] = {}
         self.rows_by_name: dict[str, dict[str, Any]] = {}
-        self.catalog_alias_index: dict[str, set[str]] = {}
+        self.catalog_synonym_records: list[dict[str, Any]] = []
         self.build_records()
         self.build_master_list_aliases()
-        self.build_catalog_aliases()
+        self.prepare_catalog_synonyms()
         self.finalize_token_index()
 
     # -------------------------------------------------------------------------
@@ -109,7 +109,13 @@ class LiverToxMatcher:
             if cached is not None or normalized in self.match_cache:
                 results[idx] = cached
                 continue
-            lookup = self.match_query(normalized)
+            alias_entries = self.resolve_alias_candidates(
+                patient_drugs[idx], normalized
+            )
+            if not alias_entries:
+                self.match_cache[normalized] = None
+                continue
+            lookup = self.match_query(alias_entries)
             if lookup is None:
                 self.match_cache[normalized] = None
                 continue
@@ -160,9 +166,18 @@ class LiverToxMatcher:
 
     # -------------------------------------------------------------------------
     def match_query(
-        self, normalized_query: str
+        self, alias_entries: list[tuple[str, bool]]
     ) -> tuple[MonographRecord, float, str, list[str]] | None:
-        candidates = self.collect_catalog_candidates(normalized_query)
+        if not alias_entries:
+            return None
+        candidates: list[tuple[str, str, bool]] = []
+        seen: set[str] = set()
+        for alias_value, from_catalog in alias_entries:
+            normalized_value = self.normalize_name(alias_value)
+            if not normalized_value or normalized_value in seen:
+                continue
+            seen.add(normalized_value)
+            candidates.append((normalized_value, alias_value, from_catalog))
         if not candidates:
             return None
 
@@ -173,19 +188,19 @@ class LiverToxMatcher:
 
         synonym_matches: list[
             tuple[tuple[MonographRecord, float, str, list[str]], bool, str]
-        ] = []
-        for normalized_value, alias_value, from_catalog in candidates:
-            synonym = self.match_synonym(normalized_value)
-            if synonym is not None:
-                synonym_matches.append((synonym, from_catalog, alias_value))
+        ] = [
+            (synonym, from_catalog, alias_value)
+            for normalized_value, alias_value, from_catalog in candidates
+            if (synonym := self.match_synonym(normalized_value)) is not None
+        ]
 
         master_matches: list[
             tuple[tuple[MonographRecord, float, str, list[str]], bool, str]
-        ] = []
-        for normalized_value, alias_value, from_catalog in candidates:
-            master = self.match_master_list(normalized_value)
-            if master is not None:
-                master_matches.append((master, from_catalog, alias_value))
+        ] = [
+            (master, from_catalog, alias_value)
+            for normalized_value, alias_value, from_catalog in candidates
+            if (master := self.match_master_list(normalized_value)) is not None
+        ]
 
         for master_match in master_matches:
             master_record, _, _, _ = master_match[0]
@@ -221,24 +236,131 @@ class LiverToxMatcher:
         return None
 
     # -------------------------------------------------------------------------
-    def collect_catalog_candidates(
+    def resolve_alias_candidates(
+        self, original_name: str, normalized_query: str
+    ) -> list[tuple[str, bool]]:
+        alias_entries: list[tuple[str, bool]] = []
+        seen: set[str] = set()
+
+        catalog_match: tuple[dict[str, Any], bool, str] | None = None
+        if normalized_query:
+            catalog_match = self.find_catalog_synonym_match(normalized_query)
+
+        if catalog_match is not None:
+            entry, matched_is_synonym, matched_value = catalog_match
+            prioritized_synonyms: list[str] = []
+            if matched_is_synonym:
+                prioritized_synonyms.append(matched_value)
+            prioritized_synonyms.extend(
+                synonym
+                for synonym in entry["synonyms"]
+                if synonym not in prioritized_synonyms
+            )
+            for synonym in prioritized_synonyms:
+                self.add_alias_entry(alias_entries, seen, synonym, True)
+                for variant in self.expand_variant(synonym):
+                    self.add_alias_entry(alias_entries, seen, variant, True)
+            if not matched_is_synonym:
+                self.add_alias_entry(alias_entries, seen, matched_value, True)
+                for variant in self.expand_variant(matched_value):
+                    self.add_alias_entry(alias_entries, seen, variant, True)
+
+        self.add_alias_entry(alias_entries, seen, original_name, False)
+        return alias_entries
+
+    # -------------------------------------------------------------------------
+    def add_alias_entry(
+        self,
+        alias_entries: list[tuple[str, bool]],
+        seen: set[str],
+        value: str,
+        from_catalog: bool,
+    ) -> None:
+        normalized_value = self.normalize_name(value)
+        if not normalized_value or normalized_value in seen:
+            return
+        seen.add(normalized_value)
+        alias_entries.append((value, from_catalog))
+
+    # -------------------------------------------------------------------------
+    def find_catalog_synonym_match(
         self, normalized_query: str
-    ) -> list[tuple[str, str, bool]]:        
-        candidates: dict[str, tuple[str, bool]] = {}
-        alias_values = self.catalog_alias_index.get(normalized_query)
-        if alias_values:
-            for alias in sorted(alias_values, key=lambda value: value.casefold()):
+    ) -> tuple[dict[str, Any], bool, str] | None:
+        if not normalized_query:
+            return None
+        if not self.catalog_synonym_records:
+            return None
+
+        best_partial: tuple[dict[str, Any], str, int] | None = None
+        best_fuzzy: tuple[dict[str, Any], str, float] | None = None
+        for entry in self.catalog_synonym_records:
+            normalized_map: dict[str, str] = entry["normalized_map"]
+            matched = normalized_map.get(normalized_query)
+            if matched:
+                return entry, True, matched
+            for normalized_synonym, original in normalized_map.items():
+                if len(normalized_query) >= 4 or len(normalized_synonym) >= 4:
+                    if (
+                        normalized_query in normalized_synonym
+                        or normalized_synonym in normalized_query
+                    ):
+                        overlap = min(
+                            len(normalized_query),
+                            len(normalized_synonym),
+                        )
+                        if best_partial is None or overlap > best_partial[2]:
+                            best_partial = (entry, original, overlap)
+                ratio = SequenceMatcher(
+                    None, normalized_query, normalized_synonym
+                ).ratio()
+                if ratio >= self.FUZZY_THRESHOLD and (
+                    best_fuzzy is None or ratio > best_fuzzy[2]
+                ):
+                    best_fuzzy = (entry, original, ratio)
+
+        if best_partial is not None:
+            return best_partial[0], True, best_partial[1]
+        if best_fuzzy is not None:
+            return best_fuzzy[0], True, best_fuzzy[1]
+
+        fallback_partial: tuple[dict[str, Any], str, int] | None = None
+        fallback_fuzzy: tuple[dict[str, Any], str, float] | None = None
+        for entry in self.catalog_synonym_records:
+            fallback_aliases: list[str] = entry.get("fallback_aliases", [])
+            for alias in fallback_aliases:
                 normalized_alias = self.normalize_name(alias)
                 if not normalized_alias:
                     continue
-                if normalized_alias not in candidates:
-                    candidates[normalized_alias] = (alias, True)
-        if normalized_query not in candidates:
-            candidates[normalized_query] = (normalized_query, False)
-        ordered: list[tuple[str, str, bool]] = []
-        for normalized_value, (alias_value, from_catalog) in candidates.items():
-            ordered.append((normalized_value, alias_value, from_catalog))
-        return ordered
+                if normalized_alias == normalized_query:
+                    return entry, False, alias
+                if len(normalized_query) >= 4 or len(normalized_alias) >= 4:
+                    if (
+                        normalized_query in normalized_alias
+                        or normalized_alias in normalized_query
+                    ):
+                        overlap = min(
+                            len(normalized_query),
+                            len(normalized_alias),
+                        )
+                        if (
+                            fallback_partial is None
+                            or overlap > fallback_partial[2]
+                        ):
+                            fallback_partial = (entry, alias, overlap)
+                ratio = SequenceMatcher(
+                    None, normalized_query, normalized_alias
+                ).ratio()
+                if ratio >= self.FUZZY_THRESHOLD and (
+                    fallback_fuzzy is None or ratio > fallback_fuzzy[2]
+                ):
+                    fallback_fuzzy = (entry, alias, ratio)
+
+        if fallback_partial is not None:
+            return fallback_partial[0], False, fallback_partial[1]
+        if fallback_fuzzy is not None:
+            return fallback_fuzzy[0], False, fallback_fuzzy[1]
+
+        return None
 
     # -------------------------------------------------------------------------
     def annotate_catalog_match(
@@ -465,37 +587,58 @@ class LiverToxMatcher:
                         bucket.append(entry)
 
     # -------------------------------------------------------------------------
-    def build_catalog_aliases(self) -> None:
-        self.catalog_alias_index = {}
+    def prepare_catalog_synonyms(self) -> None:
+        self.catalog_synonym_records = []
         if self.drugs_catalog_df is None or self.drugs_catalog_df.empty:
             return
         for row in self.drugs_catalog_df.itertuples(index=False):
-            alias_values = self.collect_catalog_alias_values(row)
-            if not alias_values:
+            raw_synonyms = self.parse_catalog_synonyms(getattr(row, "synonyms", None))
+            if not raw_synonyms:
                 continue
-            for alias in alias_values:
-                for variant in self.iter_alias_variants(alias):
-                    normalized = self.normalize_name(variant)
-                    if not normalized:
+            unique_synonyms: list[str] = []
+            seen_synonyms: set[str] = set()
+            for synonym in raw_synonyms:
+                if synonym in seen_synonyms:
+                    continue
+                unique_synonyms.append(synonym)
+                seen_synonyms.add(synonym)
+            normalized_map: dict[str, str] = {}
+            for synonym in unique_synonyms:
+                base_normalized = self.normalize_name(synonym)
+                if base_normalized and base_normalized not in normalized_map:
+                    normalized_map[base_normalized] = synonym
+                for variant in self.expand_variant(synonym):
+                    normalized_variant = self.normalize_name(variant)
+                    if not normalized_variant:
                         continue
-                    bucket = self.catalog_alias_index.setdefault(normalized, set())
-                    bucket.update(alias_values)
-
-    # -------------------------------------------------------------------------
-    def collect_catalog_alias_values(self, row) -> set[str]:
-        alias_values: set[str] = set()
-        raw_name = self.coerce_text(getattr(row, "raw_name", None))
-        if raw_name:
-            alias_values.add(raw_name)
-        concept_name = self.coerce_text(getattr(row, "name", None))
-        if concept_name:
-            alias_values.add(concept_name)
-        for brand in self.parse_catalog_brand_names(getattr(row, "brand_names", None)):
-            alias_values.add(brand)
-        for synonym in self.parse_catalog_synonyms(getattr(row, "synonyms", None)):
-            alias_values.add(synonym)
-        cleaned = {value for value in alias_values if value}
-        return cleaned
+                    if normalized_variant not in normalized_map:
+                        normalized_map[normalized_variant] = synonym
+            if not normalized_map:
+                continue
+            fallback_aliases: list[str] = []
+            fallback_seen: set[str] = set()
+            for field_name in ("raw_name", "name"):
+                alias_value = self.coerce_text(getattr(row, field_name, None))
+                if alias_value is None:
+                    continue
+                if alias_value in fallback_seen:
+                    continue
+                fallback_aliases.append(alias_value)
+                fallback_seen.add(alias_value)
+            for brand in self.parse_catalog_brand_names(
+                getattr(row, "brand_names", None)
+            ):
+                if brand in fallback_seen:
+                    continue
+                fallback_aliases.append(brand)
+                fallback_seen.add(brand)
+            self.catalog_synonym_records.append(
+                {
+                    "synonyms": unique_synonyms,
+                    "normalized_map": normalized_map,
+                    "fallback_aliases": fallback_aliases,
+                }
+            )
 
     # -------------------------------------------------------------------------
     def parse_catalog_brand_names(self, value: Any) -> list[str]:
