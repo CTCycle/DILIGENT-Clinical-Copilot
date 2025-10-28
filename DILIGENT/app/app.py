@@ -33,5 +33,5 @@ ui.run_with(
     mount_path="/ui",
     title="DILIGENT Clinical Copilot",
     show_welcome_message=False,
-    socket_io_kwargs={"ping_timeout": 180, "ping_interval": 30},
+    reconnect_timeout=180,
 )
