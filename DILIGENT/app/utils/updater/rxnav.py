@@ -13,7 +13,7 @@ import httpx
 import pandas as pd
 
 from DILIGENT.app.logger import logger
-from DILIGENT.app.utils.repository.database import database
+from DILIGENT.app.utils.repository.serializer import DataSerializer
 
 __all__ = ["RxNavClient", "RxNavDrugCatalogBuilder"]
 
@@ -655,6 +655,7 @@ class RxNavDrugCatalogBuilder:
         self.rxcui_cache: dict[str, list[str]] = {}
         self.total_records: int | None = None
         self.last_logged_count = 0
+        self.serializer = DataSerializer()
 
     # -------------------------------------------------------------------------
     def update_drug_catalog(self, *, total_records: int | None = None) -> dict[str, Any]:
@@ -723,19 +724,7 @@ class RxNavDrugCatalogBuilder:
         frame = pd.DataFrame(batch)
         if frame.empty:
             return
-        if "brand_names" in frame:
-            frame["brand_names"] = frame["brand_names"].apply(
-                lambda names: json.dumps(
-                    names if isinstance(names, list) else [], ensure_ascii=False
-                )
-            )
-        if "synonyms" in frame:
-            frame["synonyms"] = frame["synonyms"].apply(
-                lambda names: json.dumps(
-                    names if isinstance(names, list) else [], ensure_ascii=False
-                )
-            )
-        database.upsert_into_database(frame, self.TABLE_NAME)
+        self.serializer.upsert_drugs_catalog_records(frame)
 
     # -------------------------------------------------------------------------
     def stream_min_concepts(self, chunks: Iterator[bytes]) -> Iterator[dict[str, Any]]:
