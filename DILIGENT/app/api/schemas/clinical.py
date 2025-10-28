@@ -61,9 +61,6 @@ class PatientData(BaseModel):
         description="Reference maximum for ALP.",
         examples=["150", "150 U/L"],
     )
-    symptoms: list[str] = Field(
-        default_factory=list, description="Additional boolean options from the UI."
-    )
     has_hepatic_diseases: bool = Field(
         default=False,
         description="Indicates whether the patient has a history of hepatic diseases.",

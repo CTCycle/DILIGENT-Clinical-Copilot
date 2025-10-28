@@ -8,7 +8,7 @@ Core capabilities include:
 - Automated hepatotoxicity pattern classification using ALT/ALP inputs.
 - Drug name extraction and LiverTox-powered risk summaries from free-text notes.
 - Configurable LLM providers (local Ollama models or authorised cloud APIs).
-- A clinician-oriented user interface that captures anamnesis (including embedded exam findings), symptoms, and lab values.
+- A clinician-oriented user interface that captures anamnesis (including embedded exam findings) and lab values.
 - REST endpoints for submitting patient sessions programmatically and querying the available Ollama models.
 
 ## 2. Installation
@@ -67,7 +67,7 @@ The database schema is created automatically the first time the application star
 
 Once the UI is open:
 
-1. Populate the anamnesis narrative (include exam findings as needed), symptom list, current medications, and lab values.
+1. Populate the anamnesis narrative (include exam findings as needed), current medications, and lab values.
 2. Choose the preferred provider (Ollama or cloud) and model family via the side configuration panel.
 3. Trigger the analysis; the agent collates lab trends, parses medications, queries the LiverTox knowledge base, and returns a Markdown consultation summary.
 4. Download or copy the generated report for inclusion in the patient record. All submissions are logged to the SQLite database for later review.
