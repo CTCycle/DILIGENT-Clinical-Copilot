@@ -204,3 +204,35 @@ def test_unified_dataset_brand_lookup_without_explicit_master_list():
     assert match is not None
     assert match.nbk_id == "NBK100"
     assert match.reason.startswith("brand_")
+
+
+def test_catalog_alias_resolution():
+    monographs = pd.DataFrame(
+        [
+            {
+                "nbk_id": "NBK_ACET",
+                "drug_name": "Acetaminophen",
+                "excerpt": "Acetaminophen excerpt",
+                "synonyms": "",
+            }
+        ]
+    )
+    catalog = pd.DataFrame(
+        [
+            {
+                "rxcui": "12345",
+                "raw_name": "Tylenol",
+                "term_type": "BN",
+                "name": "Tylenol",
+                "brand_names": "Tylenol",
+                "synonyms": '["Acetaminophen"]',
+            }
+        ]
+    )
+    matcher = LiverToxMatcher(monographs, drugs_catalog_df=catalog)
+    matches = run_match(matcher, ["Tylenol"])
+    match = matches[0]
+    assert match is not None
+    assert match.nbk_id == "NBK_ACET"
+    assert match.reason == "monograph_name"
+    assert "catalog_alias='Acetaminophen'" in match.notes
