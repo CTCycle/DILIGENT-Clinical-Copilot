@@ -301,40 +301,37 @@ class LiverToxMatcher:
         if not self.catalog_synonym_records:
             return None
 
-        best_partial: tuple[dict[str, Any], str, int] | None = None
-        best_fuzzy: tuple[dict[str, Any], str, float] | None = None
+        significant_query_tokens = self.catalog_significant_tokens(normalized_query)
+        best_synonym: tuple[
+            tuple[int, int, float, float, int],
+            dict[str, Any],
+            str,
+        ] | None = None
         for entry in self.catalog_synonym_records:
             normalized_map: dict[str, str] = entry["normalized_map"]
             matched = normalized_map.get(normalized_query)
             if matched:
                 return entry, True, matched
             for normalized_synonym, original in normalized_map.items():
-                if len(normalized_query) >= 4 or len(normalized_synonym) >= 4:
-                    if (
-                        normalized_query in normalized_synonym
-                        or normalized_synonym in normalized_query
-                    ):
-                        overlap = min(
-                            len(normalized_query),
-                            len(normalized_synonym),
-                        )
-                        if best_partial is None or overlap > best_partial[2]:
-                            best_partial = (entry, original, overlap)
-                ratio = SequenceMatcher(
-                    None, normalized_query, normalized_synonym
-                ).ratio()
-                if ratio >= self.FUZZY_THRESHOLD and (
-                    best_fuzzy is None or ratio > best_fuzzy[2]
-                ):
-                    best_fuzzy = (entry, original, ratio)
+                accepted, score = self.evaluate_catalog_candidate(
+                    normalized_query,
+                    normalized_synonym,
+                    significant_query_tokens,
+                )
+                if not accepted:
+                    continue
+                candidate = (score, entry, original)
+                if best_synonym is None or candidate[0] > best_synonym[0]:
+                    best_synonym = candidate
 
-        if best_partial is not None:
-            return best_partial[0], True, best_partial[1]
-        if best_fuzzy is not None:
-            return best_fuzzy[0], True, best_fuzzy[1]
+        if best_synonym is not None:
+            return best_synonym[1], True, best_synonym[2]
 
-        fallback_partial: tuple[dict[str, Any], str, int] | None = None
-        fallback_fuzzy: tuple[dict[str, Any], str, float] | None = None
+        best_alias: tuple[
+            tuple[int, int, float, float, int],
+            dict[str, Any],
+            str,
+        ] | None = None
         for entry in self.catalog_synonym_records:
             fallback_aliases: list[str] = entry.get("fallback_aliases", [])
             for alias in fallback_aliases:
@@ -343,34 +340,69 @@ class LiverToxMatcher:
                     continue
                 if normalized_alias == normalized_query:
                     return entry, False, alias
-                if len(normalized_query) >= 4 or len(normalized_alias) >= 4:
-                    if (
-                        normalized_query in normalized_alias
-                        or normalized_alias in normalized_query
-                    ):
-                        overlap = min(
-                            len(normalized_query),
-                            len(normalized_alias),
-                        )
-                        if (
-                            fallback_partial is None
-                            or overlap > fallback_partial[2]
-                        ):
-                            fallback_partial = (entry, alias, overlap)
-                ratio = SequenceMatcher(
-                    None, normalized_query, normalized_alias
-                ).ratio()
-                if ratio >= self.FUZZY_THRESHOLD and (
-                    fallback_fuzzy is None or ratio > fallback_fuzzy[2]
-                ):
-                    fallback_fuzzy = (entry, alias, ratio)
+                accepted, score = self.evaluate_catalog_candidate(
+                    normalized_query,
+                    normalized_alias,
+                    significant_query_tokens,
+                )
+                if not accepted:
+                    continue
+                candidate = (score, entry, alias)
+                if best_alias is None or candidate[0] > best_alias[0]:
+                    best_alias = candidate
 
-        if fallback_partial is not None:
-            return fallback_partial[0], False, fallback_partial[1]
-        if fallback_fuzzy is not None:
-            return fallback_fuzzy[0], False, fallback_fuzzy[1]
+        if best_alias is not None:
+            return best_alias[1], False, best_alias[2]
 
         return None
+
+    # -------------------------------------------------------------------------
+    def catalog_significant_tokens(self, value: str) -> list[str]:
+        tokens = value.split()
+        return [
+            token
+            for token in tokens
+            if len(token) >= 4 and token not in MATCHING_STOPWORDS
+        ]
+
+    # -------------------------------------------------------------------------
+    def evaluate_catalog_candidate(
+        self,
+        normalized_query: str,
+        candidate: str,
+        significant_query_tokens: list[str],
+    ) -> tuple[bool, tuple[int, int, float, float, int]]:
+        candidate_tokens = self.catalog_significant_tokens(candidate)
+        shared_tokens = set(significant_query_tokens) & set(candidate_tokens)
+        best_token_ratio = 0.0
+        if significant_query_tokens and candidate_tokens:
+            for query_token in significant_query_tokens:
+                for candidate_token in candidate_tokens:
+                    ratio = SequenceMatcher(None, query_token, candidate_token).ratio()
+                    if ratio > best_token_ratio:
+                        best_token_ratio = ratio
+        overall_ratio = SequenceMatcher(None, normalized_query, candidate).ratio()
+        substring_length = 0
+        if candidate in normalized_query:
+            substring_length = len(candidate)
+        elif normalized_query in candidate:
+            substring_length = len(normalized_query)
+        accepted = bool(shared_tokens)
+        if not accepted:
+            if substring_length >= 5:
+                accepted = True
+            elif best_token_ratio >= 0.85:
+                accepted = True
+            elif overall_ratio >= 0.90:
+                accepted = True
+        score = (
+            len(shared_tokens),
+            substring_length,
+            best_token_ratio,
+            overall_ratio,
+            -abs(len(candidate) - len(normalized_query)),
+        )
+        return accepted, score
 
     # -------------------------------------------------------------------------
     def annotate_catalog_match(
