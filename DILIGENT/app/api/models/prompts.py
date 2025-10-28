@@ -31,15 +31,17 @@ Return:
 """
 
 LIVERTOX_REPORT_EXAMPLE = """
-Example layout:
 
 **Drug name – LiverTox score X**
 
-Summarize the key incidence data or study findings from the LiverTox excerpt, keeping statistics precise and attributed to the cited studies.
-Add a short comparison with closely related agents when the excerpt mentions them, highlighting similarities or differences in hepatic risk.
-Close with monitoring or clinical management advice that reflects the patient context.
+Write a single-paragraph summary (≤500 words) that:
 
-**Bibliography source**: LiverTox
+1. **Evidence summary:** Present the key incidence data and study findings from the LiverTox excerpt, citing statistics precisely and attributing them to the referenced studies.  
+2. **Comparative risk:** Briefly compare the hepatic safety profile with related agents if mentioned, noting important similarities or differences.  
+3. **Clinical guidance:** Conclude with practical advice on monitoring and management, tailored to typical patient use.  
+
+**Source:** LiverTox
+
 """
 
 LIVERTOX_CLINICAL_SYSTEM_PROMPT = """
