@@ -300,7 +300,6 @@ def clear_session_fields() -> tuple[
     str,
     str,
     str,
-    list[str],
     bool,
     bool,
     str,
@@ -316,7 +315,6 @@ def clear_session_fields() -> tuple[
         "",
         "",
         "",
-        [],
         False,
         False,
         "",
@@ -392,7 +390,6 @@ async def run_DILI_session(
     alt_max: str,
     alp: str,
     alp_max: str,
-    symptoms: list[str],
     use_rag: bool,
 ) -> tuple[str, ComponentUpdate, ComponentUpdate]:
     normalized_visit_date = normalize_visit_date(visit_date)
@@ -415,7 +412,6 @@ async def run_DILI_session(
         "alt_max": sanitize_field(alt_max),
         "alp": sanitize_field(alp),
         "alp_max": sanitize_field(alp_max),
-        "symptoms": symptoms or [],
         "use_rag": bool(use_rag),
     }
 

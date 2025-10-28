@@ -52,7 +52,6 @@ class ClientComponents:
     alt_max: Any
     alp: Any
     alp_max: Any
-    symptoms: Any
     use_rag: Any
     use_cloud_services: Any
     llm_provider_dropdown: Any
@@ -205,7 +204,6 @@ async def handle_run_workflow(components: ClientComponents, event: Any) -> None:
         components.alt_max.value,
         components.alp.value,
         components.alp_max.value,
-        list(components.symptoms.value or []),
         bool(components.use_rag.value),
     )
     components.markdown_output.set_content(message or "")
@@ -224,7 +222,6 @@ async def handle_clear_click(components: ClientComponents, event: Any) -> None:
         alt_max,
         alp,
         alp_max,
-        symptoms,
         has_diseases,
         use_rag,
         markdown_message,
@@ -247,8 +244,6 @@ async def handle_clear_click(components: ClientComponents, event: Any) -> None:
     components.alp.update()
     components.alp_max.value = alp_max
     components.alp_max.update()
-    components.symptoms.value = symptoms or []
-    components.symptoms.update()
     components.has_diseases.value = has_diseases
     components.has_diseases.update()
     components.use_rag.value = use_rag
@@ -306,12 +301,6 @@ def main_page() -> None:
                         "Has hepatic diseases",
                         value=False,
                     ).classes("pt-2")
-                    symptoms = ui.select(
-                        ["Hitterus", "Pain", "Scretching"],
-                        label="Observed symptoms",
-                        multiple=True,
-                        clearable=True,
-                    ).classes("w-full")
                     drugs = ui.textarea(
                         label="Current Drugs",
                         placeholder="List current therapies, dosage and schedule...",
@@ -439,7 +428,6 @@ def main_page() -> None:
         alt_max=alt_max,
         alp=alp,
         alp_max=alp_max,
-        symptoms=symptoms,
         use_rag=use_rag_checkbox,
         use_cloud_services=use_cloud_services,
         llm_provider_dropdown=llm_provider_dropdown,
