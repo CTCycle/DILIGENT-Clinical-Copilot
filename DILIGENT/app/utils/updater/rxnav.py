@@ -632,9 +632,7 @@ class RxNavDrugCatalogBuilder:
     BACKOFF_SECONDS = (0.8, 1.6, 3.2)
     TABLE_NAME = "DRUGS_CATALOG"
     BATCH_SIZE = 200
-    SYNONYM_WORKERS = 8
-    SINGLE_TOKEN_DIGIT_PATTERN = re.compile(r"^[^\s]*\d[^\s]*$")
-    TOKEN_SPLIT_PATTERN = re.compile(r"[\s\-/_]+")
+    SYNONYM_WORKERS = 12
 
     def __init__(self, rx_client: RxNavClient | None = None) -> None:
         combined: set[str] = set()
@@ -720,10 +718,12 @@ class RxNavDrugCatalogBuilder:
                 self.persist_batch(batch)
                 count += len(batch)
                 batch.clear()
+                logger.info('Total records upserted into database: %d', count)
         if batch:
             self.persist_batch(batch)
             count += len(batch)
             logger.info('Total records upserted into database: %d', count)
+            
         return {"table_name": self.TABLE_NAME, "count": count}
 
     # -------------------------------------------------------------------------
