@@ -1038,6 +1038,10 @@ class RxNavDrugCatalogBuilder:
         normalized_tokens = [token.casefold() for token in tokens]
         if not normalized_tokens:
             return
+        if any(token.isdigit() for token in tokens):
+            return
+        if len(tokens) == 1 and any(char.isdigit() for char in tokens[0]):
+            return
         if key in self.synonym_stopwords:
             return
         if all(token in self.synonym_stopwords for token in normalized_tokens):
