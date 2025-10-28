@@ -476,12 +476,17 @@ class DrugSuspensionContext(BaseModel):
 
 
 ###############################################################################
+def create_drug_suspension_context() -> DrugSuspensionContext:
+    return DrugSuspensionContext()
+
+
+###############################################################################
 class DrugClinicalAssessment(BaseModel):
     drug_name: str = Field(..., min_length=1, max_length=200)
     matched_livertox_row: dict[str, Any] | None = Field(default=None)
     extracted_excerpts: list[str] = Field(default_factory=list)
     suspension: DrugSuspensionContext = Field(
-        default_factory=DrugSuspensionContext,
+        default_factory=create_drug_suspension_context,
     )
     paragraph: str | None = Field(default=None)
 
