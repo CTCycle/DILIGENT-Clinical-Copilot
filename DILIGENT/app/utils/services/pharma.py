@@ -67,12 +67,18 @@ class LiverToxMatcher:
         self,
         livertox_df: pd.DataFrame,
         master_list_df: pd.DataFrame | None = None,
+        *,
+        drugs_catalog_df: pd.DataFrame | None = None,
     ) -> None:
         self.livertox_df = livertox_df
         if master_list_df is not None and not master_list_df.empty:
             self.master_list_df = master_list_df.copy()
         else:
             self.master_list_df = self.derive_master_alias_source(livertox_df)
+        if drugs_catalog_df is not None and not drugs_catalog_df.empty:
+            self.drugs_catalog_df = drugs_catalog_df.copy()
+        else:
+            self.drugs_catalog_df = None
         self.match_cache: dict[str, LiverToxMatch | None] = {}
         self.records: list[MonographRecord] = []
         self.primary_index: dict[str, MonographRecord] = {}
@@ -83,8 +89,10 @@ class LiverToxMatcher:
         self.brand_index: dict[str, list[tuple[str, str]]] = {}
         self.ingredient_index: dict[str, list[tuple[str, str]]] = {}
         self.rows_by_name: dict[str, dict[str, Any]] = {}
+        self.catalog_alias_index: dict[str, set[str]] = {}
         self.build_records()
         self.build_master_list_aliases()
+        self.build_catalog_aliases()
         self.finalize_token_index()
 
     # -------------------------------------------------------------------------
@@ -158,24 +166,100 @@ class LiverToxMatcher:
     def match_query(
         self, normalized_query: str
     ) -> tuple[MonographRecord, float, str, list[str]] | None:
-        direct = self.match_primary(normalized_query)
-        if direct is not None:
-            return direct
-        synonym = self.match_synonym(normalized_query)
-        master = self.match_master_list(normalized_query)
-        if synonym is not None and master is not None:
-            syn_record, *_ = synonym
-            master_record, *_ = master
-            if syn_record.nbk_id == master_record.nbk_id:
-                return master
-        if synonym is not None:
-            return synonym
-        if master is not None:
-            return master
-        partial = self.match_partial(normalized_query)
-        if partial is not None:
-            return partial
-        return self.match_fuzzy(normalized_query)
+        candidates = self.collect_catalog_candidates(normalized_query)
+        if not candidates:
+            return None
+
+        for normalized_value, alias_value, from_catalog in candidates:
+            direct = self.match_primary(normalized_value)
+            if direct is not None:
+                return self.annotate_catalog_match(direct, from_catalog, alias_value)
+
+        synonym_matches: list[
+            tuple[tuple[MonographRecord, float, str, list[str]], bool, str]
+        ] = []
+        for normalized_value, alias_value, from_catalog in candidates:
+            synonym = self.match_synonym(normalized_value)
+            if synonym is not None:
+                synonym_matches.append((synonym, from_catalog, alias_value))
+
+        master_matches: list[
+            tuple[tuple[MonographRecord, float, str, list[str]], bool, str]
+        ] = []
+        for normalized_value, alias_value, from_catalog in candidates:
+            master = self.match_master_list(normalized_value)
+            if master is not None:
+                master_matches.append((master, from_catalog, alias_value))
+
+        for master_match in master_matches:
+            master_record, _, _, _ = master_match[0]
+            for synonym_match in synonym_matches:
+                synonym_record, _, _, _ = synonym_match[0]
+                if synonym_record.nbk_id == master_record.nbk_id:
+                    return self.annotate_catalog_match(
+                        master_match[0], master_match[1], master_match[2]
+                    )
+
+        if synonym_matches:
+            match_result = synonym_matches[0]
+            return self.annotate_catalog_match(
+                match_result[0], match_result[1], match_result[2]
+            )
+
+        if master_matches:
+            match_result = master_matches[0]
+            return self.annotate_catalog_match(
+                match_result[0], match_result[1], match_result[2]
+            )
+
+        for normalized_value, alias_value, from_catalog in candidates:
+            partial = self.match_partial(normalized_value)
+            if partial is not None:
+                return self.annotate_catalog_match(partial, from_catalog, alias_value)
+
+        for normalized_value, alias_value, from_catalog in candidates:
+            fuzzy = self.match_fuzzy(normalized_value)
+            if fuzzy is not None:
+                return self.annotate_catalog_match(fuzzy, from_catalog, alias_value)
+
+        return None
+
+    # -------------------------------------------------------------------------
+    def collect_catalog_candidates(
+        self, normalized_query: str
+    ) -> list[tuple[str, str, bool]]:
+        if not normalized_query:
+            return []
+        candidates: dict[str, tuple[str, bool]] = {}
+        alias_values = self.catalog_alias_index.get(normalized_query)
+        if alias_values:
+            for alias in sorted(alias_values, key=lambda value: value.casefold()):
+                normalized_alias = self.normalize_name(alias)
+                if not normalized_alias:
+                    continue
+                if normalized_alias not in candidates:
+                    candidates[normalized_alias] = (alias, True)
+        if normalized_query not in candidates:
+            candidates[normalized_query] = (normalized_query, False)
+        ordered: list[tuple[str, str, bool]] = []
+        for normalized_value, (alias_value, from_catalog) in candidates.items():
+            ordered.append((normalized_value, alias_value, from_catalog))
+        return ordered
+
+    # -------------------------------------------------------------------------
+    def annotate_catalog_match(
+        self,
+        result: tuple[MonographRecord, float, str, list[str]],
+        from_catalog: bool,
+        alias_value: str,
+    ) -> tuple[MonographRecord, float, str, list[str]]:
+        record, confidence, reason, notes = result
+        updated_notes = list(notes)
+        if from_catalog:
+            alias_note = self.coerce_text(alias_value)
+            if alias_note:
+                updated_notes.insert(0, f"catalog_alias='{alias_note}'")
+        return record, confidence, reason, updated_notes
 
     # -------------------------------------------------------------------------
     def match_primary(
@@ -385,6 +469,68 @@ class LiverToxMatcher:
                     entry = (variant, drug_name)
                     if entry not in bucket:
                         bucket.append(entry)
+
+    # -------------------------------------------------------------------------
+    def build_catalog_aliases(self) -> None:
+        self.catalog_alias_index = {}
+        if self.drugs_catalog_df is None or self.drugs_catalog_df.empty:
+            return
+        for row in self.drugs_catalog_df.itertuples(index=False):
+            alias_values = self.collect_catalog_alias_values(row)
+            if not alias_values:
+                continue
+            for alias in alias_values:
+                for variant in self.iter_alias_variants(alias):
+                    normalized = self.normalize_name(variant)
+                    if not normalized:
+                        continue
+                    bucket = self.catalog_alias_index.setdefault(normalized, set())
+                    bucket.update(alias_values)
+
+    # -------------------------------------------------------------------------
+    def collect_catalog_alias_values(self, row) -> set[str]:
+        alias_values: set[str] = set()
+        raw_name = self.coerce_text(getattr(row, "raw_name", None))
+        if raw_name:
+            alias_values.add(raw_name)
+        concept_name = self.coerce_text(getattr(row, "name", None))
+        if concept_name:
+            alias_values.add(concept_name)
+        for brand in self.parse_catalog_brand_names(getattr(row, "brand_names", None)):
+            alias_values.add(brand)
+        for synonym in self.parse_catalog_synonyms(getattr(row, "synonyms", None)):
+            alias_values.add(synonym)
+        cleaned = {value for value in alias_values if value}
+        return cleaned
+
+    # -------------------------------------------------------------------------
+    def parse_catalog_brand_names(self, value: Any) -> list[str]:
+        if value is None:
+            return []
+        if isinstance(value, str):
+            segments = re.split(r"[,;/\n]+", value)
+        elif isinstance(value, (list, tuple, set)):
+            segments = []
+            for entry in value:
+                segments.extend(re.split(r"[,;/\n]+", str(entry)))
+        else:
+            segments = [value]
+        names: list[str] = []
+        for segment in segments:
+            text = self.coerce_text(segment)
+            if text:
+                names.append(text)
+        return names
+
+    # -------------------------------------------------------------------------
+    def parse_catalog_synonyms(self, value: Any) -> list[str]:
+        raw_values = self.extract_synonym_strings(value)
+        synonyms: list[str] = []
+        for raw in raw_values:
+            text = self.coerce_text(raw)
+            if text:
+                synonyms.append(text)
+        return synonyms
 
     # -------------------------------------------------------------------------
     def finalize_token_index(self) -> None:

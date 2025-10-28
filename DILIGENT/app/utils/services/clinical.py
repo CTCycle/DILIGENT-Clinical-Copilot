@@ -190,6 +190,7 @@ class HepatoxConsultation:
             return True
         try:
             dataset = self.serializer.get_livertox_records()
+            catalog = self.serializer.get_drugs_catalog()
         except Exception as exc:  # noqa: BLE001
             logger.error("Failed loading LiverTox monographs from database: %s", exc)
             self.matcher = None
@@ -202,7 +203,7 @@ class HepatoxConsultation:
             return False
         self.livertox_df = dataset
         self.master_list_df = None
-        self.matcher = LiverToxMatcher(dataset)
+        self.matcher = LiverToxMatcher(dataset, drugs_catalog_df=catalog)
         return True
 
     # -------------------------------------------------------------------------
