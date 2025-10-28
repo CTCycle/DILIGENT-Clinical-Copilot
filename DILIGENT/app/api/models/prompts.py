@@ -33,7 +33,7 @@ Return:
 LIVERTOX_REPORT_EXAMPLE = """
 Example layout:
 
-**Drug name** – LiverTox score X
+**Drug name – LiverTox score X**
 
 Summarize the key incidence data or study findings from the LiverTox excerpt, keeping statistics precise and attributed to the cited studies.
 Add a short comparison with closely related agents when the excerpt mentions them, highlighting similarities or differences in hepatic risk.
@@ -90,7 +90,7 @@ Write a clinician-facing assessment (≤500 words) following the template below:
 {example_block}
 
 Guidelines:
-- Begin the first sentence with “{drug_name} – LiverTox score {livertox_score}”.
+- Begin the first sentence with “{drug_name} – LiverTox score {livertox_score}” in bold letters.
 - Use quantitative data from the excerpt whenever available (e.g., incidence rates, case counts, study sizes).
 - Compare the findings with closely related agents when the excerpt mentions them; otherwise, briefly reference the agent or class listed in the metadata.
 - Provide monitoring or clinical management recommendations that align with the excerpt and the patient context.
@@ -101,11 +101,17 @@ LIVERTOX_CONCLUSION_SYSTEM_PROMPT = """
 You are a senior hepatology consultant finalising a multidisciplinary report on
 the risk of drug-induced liver injury (DILI).
 
-Synthesize the available evidence without speculating beyond the provided
-materials. Highlight convergence across the therapies, emphasise the most
-probable DILI aetiologies, and acknowledge diagnostic uncertainty when the data
-is inconclusive. Avoid repeating the full drug discussions; instead, deliver a
-succinct conclusion grounded in the supplied findings.
+# Task
+Write a conclusion chapter (≤500 words) that strictly contains actionable
+findings derived from the clinical context and the multi-drug report above.
+Avoid repeating the full drug discussions; instead, deliver a succinct conclusion grounded in the supplied findings.
+Synthesize the available evidence without speculating beyond the provided materials.
+Reinforce evidence that supports or contradicts drug-induced liver injury and note key uncertainties.
+Finally, recommend next investigative or management steps.
+Do not introduce information outside the provided materials.
+
+It is crucial that you do not refer to unexisting drugs when writing the conclusions!
+
 """
 
 LIVERTOX_CONCLUSION_USER_PROMPT = """
@@ -115,10 +121,5 @@ LIVERTOX_CONCLUSION_USER_PROMPT = """
 # Multi-Drug Clinical Report
 {multi_drug_report}
 
-# Task
-Write a conclusion chapter (≤500 words) that strictly contains actionable
-findings derived from the clinical context and the multi-drug report above.
-Reinforce evidence that supports or contradicts drug-induced liver injury,
-note key uncertainties, and recommend next investigative or management steps.
-Do not introduce information from outside the provided materials.
+
 """
