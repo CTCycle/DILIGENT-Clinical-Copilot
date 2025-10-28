@@ -99,8 +99,12 @@ class LiverToxMatcher:
     async def match_drug_names(
         self, patient_drugs: list[str]
     ) -> list[LiverToxMatch | None]:
-        total = len(patient_drugs)       
-        results: list[LiverToxMatch | None] = [None] * total   
+        return self.match_drug_names_sync(patient_drugs)
+
+    # -------------------------------------------------------------------------
+    def match_drug_names_sync(self, patient_drugs: list[str]) -> list[LiverToxMatch | None]:
+        total = len(patient_drugs)
+        results: list[LiverToxMatch | None] = [None] * total
         for idx, name in enumerate(patient_drugs):
             normalized = self.normalize_name(name)
             if not normalized:

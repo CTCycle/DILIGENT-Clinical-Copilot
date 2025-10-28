@@ -169,13 +169,20 @@ class HepatoxConsultation:
         if not patient_drugs:
             logger.info("No drugs detected for toxicity analysis")
             return None
-        if not self.ensure_livertox_loaded() or self.matcher is None:
+        if not await self.ensure_livertox_loaded() or self.matcher is None:
             return None
 
         logger.info("Running clinical hepatotoxicity assessment for matched drugs")
         # Resolve free-text drug names against LiverTox to obtain structured data
-        matches = await self.matcher.match_drug_names(patient_drugs)
-        resolved = self.matcher.build_patient_mapping(patient_drugs, matches)
+        matches = await asyncio.to_thread(
+            self.matcher.match_drug_names_sync,
+            patient_drugs,
+        )
+        resolved = await asyncio.to_thread(
+            self.matcher.build_patient_mapping,
+            patient_drugs,
+            matches,
+        )
         report = await self.compile_clinical_assessment(
             resolved,
             clinical_context=clinical_context,
@@ -185,12 +192,14 @@ class HepatoxConsultation:
         return report.model_dump()
 
     # -------------------------------------------------------------------------
-    def ensure_livertox_loaded(self) -> bool:
+    async def ensure_livertox_loaded(self) -> bool:
         if self.matcher is not None:
             return True
         try:
-            dataset = self.serializer.get_livertox_records()
-            catalog = self.serializer.get_drugs_catalog()
+            dataset, catalog = await asyncio.gather(
+                asyncio.to_thread(self.serializer.get_livertox_records),
+                asyncio.to_thread(self.serializer.get_drugs_catalog),
+            )
         except Exception as exc:  # noqa: BLE001
             logger.error("Failed loading LiverTox monographs from database: %s", exc)
             self.matcher = None
@@ -203,7 +212,16 @@ class HepatoxConsultation:
             return False
         self.livertox_df = dataset
         self.master_list_df = None
-        self.matcher = LiverToxMatcher(dataset, drugs_catalog_df=catalog)
+        try:
+            self.matcher = await asyncio.to_thread(
+                LiverToxMatcher,
+                dataset,
+                drugs_catalog_df=catalog,
+            )
+        except Exception as exc:  # noqa: BLE001
+            logger.error("Failed preparing LiverTox matcher: %s", exc)
+            self.matcher = None
+            return False
         return True
 
     # -------------------------------------------------------------------------
