@@ -152,19 +152,19 @@ def test_serializer_roundtrip_uses_unified_table() -> None:
         assert save_mock.called
         saved_frame = save_mock.call_args.args[0]
         assert "drug_name" in saved_frame.columns
-        assert "ingredient" in saved_frame.columns
+        assert "ingredient" not in saved_frame.columns
+        assert "brand_name" not in saved_frame.columns
+        assert "synonyms" not in saved_frame.columns
 
     with patch(
         "DILIGENT.app.utils.repository.serializer.database.load_from_database",
-        return_value=frame,
+        return_value=saved_frame,
     ):
         monographs = serializer.get_livertox_records()
         assert list(monographs.columns) == LIVERTOX_COLUMNS
         master = serializer.get_livertox_master_list()
         expected_master_cols = [
             "drug_name",
-            "ingredient",
-            "brand_name",
             "likelihood_score",
             "last_update",
             "reference_count",
