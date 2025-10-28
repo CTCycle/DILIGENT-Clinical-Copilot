@@ -438,7 +438,7 @@ class LiverToxMatcher:
                 candidate_scores[key] = candidate_scores.get(key, 0) + 1
         if not candidate_scores:
             return None
-        best_key = max(candidate_scores, key=candidate_scores.get)
+        best_key = max(candidate_scores, key=lambda candidate: candidate_scores[candidate])
         best_score = candidate_scores[best_key]
         tied = [key for key, score in candidate_scores.items() if score == best_score]
         if len(tied) != 1:
