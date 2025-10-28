@@ -34,8 +34,4 @@ ui.run_with(
     title="DILIGENT Clinical Copilot",
     show_welcome_message=False,
     reconnect_timeout=180,
-    uvicorn_kwargs={
-        "ws_ping_interval": 30,
-        "ws_ping_timeout": 180,
-    },
 )
