@@ -511,6 +511,21 @@ class DataSerializer:
         )
 
     # -----------------------------------------------------------------------------
+    def get_drugs_catalog(self) -> pd.DataFrame:
+        frame = database.load_from_database("DRUGS_CATALOG")
+        columns = [
+            "rxcui",
+            "raw_name",
+            "term_type",
+            "name",
+            "brand_names",
+            "synonyms",
+        ]
+        if frame.empty:
+            return pd.DataFrame(columns=columns)
+        return frame.reindex(columns=columns)
+
+    # -----------------------------------------------------------------------------
     def normalize_string(self, value: Any) -> str | None:
         if isinstance(value, str):
             normalized = value.strip()
