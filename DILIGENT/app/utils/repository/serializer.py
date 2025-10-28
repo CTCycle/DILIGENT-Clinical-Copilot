@@ -11,10 +11,7 @@ from lancedb.table import LanceTable
 from sqlalchemy.exc import SQLAlchemyError
 
 from DILIGENT.app.utils.repository.database import ClinicalSession, database
-from DILIGENT.app.utils.repository.vectors import LanceVectorRepository
-
-
-logger = logging.getLogger(__name__)
+from DILIGENT.app.logger import logger
 
 
 # [DATA SERIALIZATION]
@@ -202,21 +199,7 @@ class DataSerializer:
         frame = frame.reindex(columns=LIVERTOX_COLUMNS)
         frame = frame.where(pd.notnull(frame), None)
         database.save_into_database(frame, "LIVERTOX_DATA")
-
-    # -----------------------------------------------------------------------------
-    def save_fda_records(self, records: pd.DataFrame) -> None:
-        frame = records.copy()
-        frame = frame.reindex(columns=FDA_COLUMNS)
-        frame = frame.where(pd.notnull(frame), None)
-        database.save_into_database(frame, "FDA_ADVERSE_EVENTS")
-
-    # -----------------------------------------------------------------------------
-    def upsert_fda_records(self, records: pd.DataFrame) -> None:
-        frame = records.copy()
-        frame = frame.reindex(columns=FDA_COLUMNS)
-        frame = frame.where(pd.notnull(frame), None)
-        database.upsert_into_database(frame, "FDA_ADVERSE_EVENTS")
-
+   
     # -----------------------------------------------------------------------------
     def upsert_drugs_catalog_records(
         self, records: pd.DataFrame | list[dict[str, Any]]
@@ -274,84 +257,6 @@ class DataSerializer:
         )
         df = df.drop_duplicates(subset=["nbk_id", "drug_name"], keep="first")
         return df.reset_index(drop=True)
-
-    # -----------------------------------------------------------------------------
-    def sanitize_fda_records(self, records: list[dict[str, Any]]) -> pd.DataFrame:
-        normalized: list[dict[str, Any]] = []
-        for record in records:
-            if not isinstance(record, dict):
-                continue
-            hepatic_terms = self.extract_hepatic_reactions(record)
-            if not hepatic_terms:
-                continue
-            report_id = self.normalize_string(
-                record.get("safetyreportid") or record.get("primaryid")
-            )
-            if not report_id:
-                continue
-            case_version = self.normalize_string(record.get("safetyreportversion"))
-            receipt_date = self.normalize_date(
-                record.get("receiptdate")
-                or record.get("receivedate")
-                or record.get("fulfillexpdate")
-            )
-            occur_country = self.normalize_string(
-                record.get("occurcountry") or record.get("primarysourcecountry")
-            )
-            patient_data = record.get("patient")
-            patient = patient_data if isinstance(patient_data, dict) else {}
-            patient_age = None
-            patient_age_unit = None
-            patient_sex = None
-            if patient:
-                patient_age = self.normalize_string(patient.get("patientonsetage"))
-                patient_age_unit = self.normalize_string(
-                    patient.get("patientonsetageunit")
-                )
-                patient_sex = self.map_patient_sex(patient.get("patientsex"))
-            all_reactions = self.collect_all_reactions(record)
-            suspect_products = self.extract_suspect_products(record)
-            normalized.append(
-                {
-                    "report_id": report_id,
-                    "case_version": case_version or "1",
-                    "receipt_date": receipt_date,
-                    "occur_country": occur_country,
-                    "patient_age": patient_age,
-                    "patient_age_unit": patient_age_unit,
-                    "patient_sex": patient_sex,
-                    "reaction_terms": self.join_values(hepatic_terms),
-                    "all_reactions": self.join_values(all_reactions),
-                    "suspect_products": self.join_values(suspect_products),
-                    "suspect_product_count": len(suspect_products)
-                    if suspect_products
-                    else None,
-                    "serious": self.normalize_flag(record.get("serious")),
-                    "seriousness_death": self.normalize_flag(
-                        record.get("seriousnessdeath")
-                    ),
-                    "seriousness_lifethreatening": self.normalize_flag(
-                        record.get("seriousnesslifethreatening")
-                    ),
-                    "seriousness_hospitalization": self.normalize_flag(
-                        record.get("seriousnesshospitalization")
-                    ),
-                    "seriousness_disabling": self.normalize_flag(
-                        record.get("seriousnessdisabling")
-                    ),
-                    "seriousness_congenital_anom": self.normalize_flag(
-                        record.get("seriousnesscongenitalanomali")
-                    ),
-                    "seriousness_other": self.normalize_flag(
-                        record.get("seriousnessother")
-                    ),
-                }
-            )
-        if not normalized:
-            return pd.DataFrame(columns=FDA_COLUMNS)
-        frame = pd.DataFrame(normalized)
-        frame = frame.drop_duplicates(subset=["report_id", "case_version"], keep="last")
-        return frame.reindex(columns=FDA_COLUMNS).reset_index(drop=True)
 
     # -----------------------------------------------------------------------------
     def is_valid_drug_name(self, value: str) -> bool:
@@ -569,108 +474,8 @@ class DataSerializer:
     def join_values(self, values: set[str]) -> str | None:
         if not values:
             return None
-        return "; ".join(sorted(values))
+        return "; ".join(sorted(values))    
 
-    # -----------------------------------------------------------------------------
-    def collect_all_reactions(self, record: dict[str, Any]) -> set[str]:
-        patient = record.get("patient")
-        if not isinstance(patient, dict):
-            return set()
-        reactions = patient.get("reaction")
-        if not isinstance(reactions, list):
-            return set()
-        collected: dict[str, str] = {}
-        for entry in reactions:
-            if not isinstance(entry, dict):
-                continue
-            term = self.normalize_string(entry.get("reactionmeddrapt"))
-            if not term:
-                continue
-            key = term.lower()
-            if key not in collected:
-                collected[key] = term
-        return set(collected.values())
+    
 
-    # -----------------------------------------------------------------------------
-    def extract_hepatic_reactions(self, record: dict[str, Any]) -> set[str]:
-        reactions = self.collect_all_reactions(record)
-        hepatic: dict[str, str] = {}
-        for term in reactions:
-            key = term.lower()
-            if key in HEPATOTOXIC_MEDDRA_TERMS and key not in hepatic:
-                hepatic[key] = term
-        return set(hepatic.values())
-
-    # -----------------------------------------------------------------------------
-    def extract_suspect_products(self, record: dict[str, Any]) -> set[str]:
-        patient = record.get("patient")
-        if not isinstance(patient, dict):
-            return set()
-        drugs = patient.get("drug")
-        if not isinstance(drugs, list):
-            return set()
-        products: dict[str, str] = {}
-        fallback: dict[str, str] = {}
-        for entry in drugs:
-            if not isinstance(entry, dict):
-                continue
-            characterization = self.normalize_string(entry.get("drugcharacterization"))
-            is_suspect = False
-            if characterization:
-                if characterization == "1" or characterization.lower() == "suspect":
-                    is_suspect = True
-            target = products if is_suspect else fallback
-            names: dict[str, str] = {}
-            product_name = self.normalize_string(entry.get("medicinalproduct"))
-            if product_name:
-                names[product_name.lower()] = product_name
-            openfda = entry.get("openfda")
-            if isinstance(openfda, dict):
-                for key in (
-                    "substance_name",
-                    "generic_name",
-                    "brand_name",
-                ):
-                    value = openfda.get(key)
-                    if isinstance(value, list):
-                        for item in value:
-                            candidate = self.normalize_string(item)
-                            if candidate and candidate.lower() not in names:
-                                names[candidate.lower()] = candidate
-                    else:
-                        candidate = self.normalize_string(value)
-                        if candidate and candidate.lower() not in names:
-                            names[candidate.lower()] = candidate
-            if not names:
-                continue
-            for key, value in names.items():
-                if key not in target:
-                    target[key] = value
-        if products:
-            return set(products.values())
-        return set(fallback.values())
-
-    # -----------------------------------------------------------------------------
-    def map_patient_sex(self, value: Any) -> str | None:
-        normalized = self.normalize_string(value)
-        if not normalized:
-            return None
-        mapping = {
-            "0": "unknown",
-            "1": "male",
-            "2": "female",
-            "3": "unknown",
-            "4": "unknown",
-            "male": "male",
-            "female": "female",
-            "unknown": "unknown",
-        }
-        lowered = normalized.lower()
-        return mapping.get(lowered, normalized)
-
-    # -----------------------------------------------------------------------------
-    def get_fda_records(self) -> pd.DataFrame:
-        frame = database.load_from_database("FDA_ADVERSE_EVENTS")
-        if frame.empty:
-            return pd.DataFrame(columns=FDA_COLUMNS)
-        return frame.reindex(columns=FDA_COLUMNS)
+    
