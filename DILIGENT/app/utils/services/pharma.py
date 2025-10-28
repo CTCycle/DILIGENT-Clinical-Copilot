@@ -72,6 +72,8 @@ class LiverToxMatcher:
     ) -> None:
         # Build lookup tables from the LiverTox dataset so queries can be
         # resolved quickly without repeatedly walking the source data.
+        # Persist the raw dataframes so the matcher can reuse them for
+        # additional lookups (for example, preparing response payloads).
         self.livertox_df = livertox_df
         if master_list_df is not None and not master_list_df.empty:
             self.master_list_df = master_list_df.copy()
@@ -81,6 +83,8 @@ class LiverToxMatcher:
             self.drugs_catalog_df = drugs_catalog_df.copy()
         else:
             self.drugs_catalog_df = None
+        # The matcher relies on several derived indexes; populate them once
+        # during initialization so later queries remain efficient.
         self.match_cache: dict[str, LiverToxMatch | None] = {}
         self.records: list[MonographRecord] = []
         self.primary_index: dict[str, MonographRecord] = {}
@@ -178,6 +182,8 @@ class LiverToxMatcher:
             return None
         candidates: list[tuple[str, str, bool]] = []
         seen: set[str] = set()
+        # Normalize each alias once so we can reuse the lowered value throughout
+        # the layered matching pipeline without reprocessing strings.
         for alias_value, from_catalog in alias_entries:
             normalized_value = self.normalize_name(alias_value)
             if not normalized_value or normalized_value in seen:
@@ -256,6 +262,8 @@ class LiverToxMatcher:
 
         if catalog_match is not None:
             entry, matched_is_synonym, matched_value = catalog_match
+            # Reorder the synonym list so the value that triggered the match is
+            # evaluated first, retaining catalog intent.
             prioritized_synonyms: list[str] = []
             if matched_is_synonym:
                 prioritized_synonyms.append(matched_value)
@@ -307,6 +315,8 @@ class LiverToxMatcher:
             dict[str, Any],
             str,
         ] | None = None
+        # First, inspect curated catalog synonyms since they represent the most
+        # trustworthy aliases available.
         for entry in self.catalog_synonym_records:
             normalized_map: dict[str, str] = entry["normalized_map"]
             matched = normalized_map.get(normalized_query)
@@ -332,6 +342,8 @@ class LiverToxMatcher:
             dict[str, Any],
             str,
         ] | None = None
+        # If no synonym qualifies, widen the search to fallback aliases such as
+        # catalog names or brand spellings.
         for entry in self.catalog_synonym_records:
             fallback_aliases: list[str] = entry.get("fallback_aliases", [])
             for alias in fallback_aliases:
@@ -372,6 +384,8 @@ class LiverToxMatcher:
         candidate: str,
         significant_query_tokens: list[str],
     ) -> tuple[bool, tuple[int, int, float, float, int]]:
+        # Significant tokens for the candidate allow quick rejection when the
+        # query and candidate share no meaningful language.
         candidate_tokens = self.catalog_significant_tokens(candidate)
         shared_tokens = set(significant_query_tokens) & set(candidate_tokens)
         best_token_ratio = 0.0
@@ -382,6 +396,8 @@ class LiverToxMatcher:
                     if ratio > best_token_ratio:
                         best_token_ratio = ratio
         overall_ratio = SequenceMatcher(None, normalized_query, candidate).ratio()
+        # Substring matches indicate one value is fully contained in the other,
+        # which provides a strong signal even when token overlap is low.
         substring_length = 0
         if candidate in normalized_query:
             substring_length = len(candidate)
@@ -603,6 +619,8 @@ class LiverToxMatcher:
             for normalized_synonym, original in synonyms.items():
                 if normalized_synonym not in self.synonym_index:
                     self.synonym_index[normalized_synonym] = (record, original)
+                # Record every synonym variant so fuzzy searches can inspect a
+                # uniform list without repeatedly normalizing strings.
                 self.variant_catalog.append(
                     (normalized_synonym, record, original, False)
                 )
@@ -661,6 +679,9 @@ class LiverToxMatcher:
                     continue
                 unique_synonyms.append(synonym)
                 seen_synonyms.add(synonym)
+            # Each catalog entry exposes a map of normalized synonym -> original
+            # spelling so we can reference the canonical synonym when a match
+            # succeeds.
             normalized_map: dict[str, str] = {}
             for synonym in unique_synonyms:
                 base_normalized = self.normalize_name(synonym)
@@ -674,6 +695,9 @@ class LiverToxMatcher:
                         normalized_map[normalized_variant] = synonym
             if not normalized_map:
                 continue
+            # Fallback aliases (brand names or raw catalog names) are only used
+            # when no synonym qualifies; they expand coverage for less curated
+            # catalog entries while remaining lower priority than true synonyms.
             fallback_aliases: list[str] = []
             fallback_seen: set[str] = set()
             for field_name in ("raw_name", "name"):
