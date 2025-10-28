@@ -46,6 +46,11 @@ LOG_CONFIG: dict[str, Any] = {
             "handlers": ["console", "file"],
             "propagate": False,
         },
+        "httpx": {
+            "level": "WARNING",
+            "handlers": ["file"],
+            "propagate": False,
+        },
     },
     "root": {
         "level": "DEBUG",
