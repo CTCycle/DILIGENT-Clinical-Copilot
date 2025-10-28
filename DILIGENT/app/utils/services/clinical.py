@@ -169,13 +169,13 @@ class HepatoxConsultation:
         if not patient_drugs:
             logger.info("No drugs detected for toxicity analysis")
             return None
-        if not await self.ensure_livertox_loaded() or self.matcher is None:
+        if not await self.ensure_livertox_data() or self.matcher is None:
             return None
 
         logger.info("Running clinical hepatotoxicity assessment for matched drugs")
         # Resolve free-text drug names against LiverTox to obtain structured data
         matches = await asyncio.to_thread(
-            self.matcher.match_drug_names_sync,
+            self.matcher.match_drug_names,
             patient_drugs,
         )
         resolved = await asyncio.to_thread(
@@ -192,7 +192,7 @@ class HepatoxConsultation:
         return report.model_dump()
 
     # -------------------------------------------------------------------------
-    async def ensure_livertox_loaded(self) -> bool:
+    async def ensure_livertox_data(self) -> bool:
         if self.matcher is not None:
             return True
         try:
