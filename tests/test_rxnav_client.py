@@ -9,6 +9,7 @@ REPO_ROOT = os.path.abspath(os.path.join(os.path.dirname(__file__), ".."))
 if REPO_ROOT not in sys.path:
     sys.path.insert(0, REPO_ROOT)
 
+from DILIGENT.app.utils.repository.serializer import DataSerializer
 from DILIGENT.app.utils.updater.rxnav import RxNavClient, RxNavDrugCatalogBuilder
 
 
@@ -78,8 +79,51 @@ class RxNavDrugCatalogBuilderTests(unittest.TestCase):
 
         self.assertIsNotNone(payload)
         assert payload is not None
-        self.assertEqual(payload["brand_names"], ["BrandTerm"])
+        self.assertEqual(payload["brand_names"], "BrandTerm")
         self.assertEqual(payload["synonyms"], ["Alternate Alias", "Synonym From Id"])
+
+    ###########################################################################
+    def test_sanitize_concept_filters_invalid_synonyms(self) -> None:
+        class StubClient(RxNavClient):
+            def __init__(self) -> None:
+                super().__init__(enabled=False)
+
+            def fetch_drug_terms(self, raw_name: str) -> list[str]:
+                return [
+                    "Valid Synonym",
+                    "Injectable",
+                    "In",
+                    "6-days",
+                ]
+
+            def fetch_rxcui_synonyms(self, rxcui: str) -> list[str]:
+                return ["12y", "Device", "Another Valid"]
+
+        builder = RxNavDrugCatalogBuilder(rx_client=StubClient())
+        concept = {"fullName": "Drug Name [Brand]", "rxcui": "ABC", "termType": "BN"}
+
+        payload = builder.sanitize_concept(concept)
+
+        self.assertIsNotNone(payload)
+        assert payload is not None
+        self.assertEqual(payload["brand_names"], "Brand")
+        self.assertEqual(payload["synonyms"], ["Another Valid", "Valid Synonym"])
+
+    ###########################################################################
+    def test_serializer_handles_brand_names_and_synonyms(self) -> None:
+        serializer = DataSerializer()
+
+        brand_value = serializer.serialize_brand_names(["Alpha", "alpha", "Beta"])
+        self.assertEqual(brand_value, "Alpha, Beta")
+
+        parsed_brand = serializer.serialize_brand_names('["Single"]')
+        self.assertEqual(parsed_brand, "Single")
+
+        synonyms_value = serializer.serialize_string_list(["One", "Two"])
+        self.assertEqual(synonyms_value, '["One", "Two"]')
+
+        deserialized = serializer.deserialize_string_list(synonyms_value)
+        self.assertEqual(deserialized, ["One", "Two"])
 
 
 if __name__ == "__main__":

@@ -9,6 +9,7 @@ from typing import Any
 
 import pandas as pd
 
+from DILIGENT.app.utils.references import MATCHING_STOPWORDS as BASE_MATCHING_STOPWORDS
 from DILIGENT.app.utils.updater.livertox import LiverToxUpdater
 
 __all__ = [
@@ -19,78 +20,13 @@ __all__ = [
 ]
 
 
-MATCHING_STOPWORDS = {
-    "and",
-    "apply",
-    "caps",
-    "capsule",
-    "capsules",
-    "chewable",
-    "cream",
-    "dose",
-    "doses",
-    "drink",
-    "drops",
-    "elixir",
-    "enteric",
-    "extended",
-    "foam",
-    "for",
-    "free",
-    "gel",
-    "granules",
-    "im",
-    "inj",
-    "injection",
-    "intramuscular",
-    "intravenous",
-    "iv",
-    "kit",
-    "liquid",
-    "lotion",
-    "mg",
-    "ml",
-    "nasal",
-    "ointment",
-    "ophthalmic",
-    "oral",
-    "plus",
-    "pack",
-    "packet",
-    "packets",
+MATCHING_STOPWORDS = BASE_MATCHING_STOPWORDS | {
     "combo",
     "combination",
     "of",
     "or",
     "patch",
     "po",
-    "powder",
-    "prefilled",
-    "release",
-    "sc",
-    "sol",
-    "solution",
-    "soln",
-    "spray",
-    "sterile",
-    "subcutaneous",
-    "suppository",
-    "susp",
-    "suspension",
-    "sustained",
-    "syringe",
-    "syrup",
-    "tablet",
-    "tablets",
-    "the",
-    "topical",
-    "treat",
-    "treatment",
-    "therapy",
-    "vial",
-    "use",
-    "with",
-    "without",
 }
 
 
