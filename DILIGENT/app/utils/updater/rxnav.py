@@ -633,6 +633,8 @@ class RxNavDrugCatalogBuilder:
     TABLE_NAME = "DRUGS_CATALOG"
     BATCH_SIZE = 200
     SYNONYM_WORKERS = 12
+    TOKEN_SPLIT_PATTERN = re.compile(r"[^A-Za-z0-9']+")
+    SINGLE_TOKEN_DIGIT_PATTERN = re.compile(r"^\d+(?:\.\d+)?$")
 
     def __init__(self, rx_client: RxNavClient | None = None) -> None:
         combined: set[str] = set()
