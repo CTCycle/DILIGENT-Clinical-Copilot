@@ -21,11 +21,8 @@ logger = logging.getLogger(__name__)
 ###############################################################################
 LIVERTOX_COLUMNS = [
     "drug_name",
-    "ingredient",
-    "brand_name",
     "nbk_id",
     "excerpt",
-    "synonyms",
     "likelihood_score",
     "last_update",
     "reference_count",
@@ -200,6 +197,8 @@ class DataSerializer:
     # -----------------------------------------------------------------------------
     def save_livertox_records(self, records: pd.DataFrame) -> None:
         frame = records.copy()
+        if "drug_name" in frame.columns:
+            frame = frame.drop_duplicates(subset=["drug_name"], keep="first")
         frame = frame.reindex(columns=LIVERTOX_COLUMNS)
         frame = frame.where(pd.notnull(frame), None)
         database.save_into_database(frame, "LIVERTOX_DATA")
@@ -479,8 +478,6 @@ class DataSerializer:
             return pd.DataFrame(
                 columns=[
                     "drug_name",
-                    "ingredient",
-                    "brand_name",
                     "likelihood_score",
                     "last_update",
                     "reference_count",
@@ -495,8 +492,6 @@ class DataSerializer:
             )
         alias_columns = [
             "drug_name",
-            "ingredient",
-            "brand_name",
             "likelihood_score",
             "last_update",
             "reference_count",
@@ -508,10 +503,11 @@ class DataSerializer:
             "source_url",
             "source_last_modified",
         ]
-        return (
-            frame.reindex(columns=alias_columns)
-            .dropna(subset=["drug_name"])
-            .reset_index(drop=True)
+        available = [column for column in alias_columns if column in frame.columns]
+        if not available:
+            return pd.DataFrame(columns=["drug_name"])
+        return frame.reindex(columns=available).dropna(subset=["drug_name"]).reset_index(
+            drop=True
         )
 
     # -----------------------------------------------------------------------------
