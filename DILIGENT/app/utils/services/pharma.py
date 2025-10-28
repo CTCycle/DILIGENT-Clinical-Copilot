@@ -96,13 +96,7 @@ class LiverToxMatcher:
         self.finalize_token_index()
 
     # -------------------------------------------------------------------------
-    async def match_drug_names(
-        self, patient_drugs: list[str]
-    ) -> list[LiverToxMatch | None]:
-        return self.match_drug_names_sync(patient_drugs)
-
-    # -------------------------------------------------------------------------
-    def match_drug_names_sync(self, patient_drugs: list[str]) -> list[LiverToxMatch | None]:
+    def match_drug_names(self, patient_drugs: list[str]) -> list[LiverToxMatch | None]:
         total = len(patient_drugs)
         results: list[LiverToxMatch | None] = [None] * total
         for idx, name in enumerate(patient_drugs):
@@ -289,9 +283,7 @@ class LiverToxMatcher:
     # -------------------------------------------------------------------------
     def find_catalog_synonym_match(
         self, normalized_query: str
-    ) -> tuple[dict[str, Any], bool, str] | None:
-        if not normalized_query:
-            return None
+    ) -> tuple[dict[str, Any], bool, str] | None:        
         if not self.catalog_synonym_records:
             return None
 
