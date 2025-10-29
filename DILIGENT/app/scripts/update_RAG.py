@@ -1,18 +1,16 @@
 from __future__ import annotations
 
-import os
-
-from DILIGENT.app.configurations import DEFAULT_CLOUD_MODEL, DEFAULT_CLOUD_PROVIDER
+from DILIGENT.app.configurations import (
+    RAG_CLOUD_MODEL,
+    RAG_CLOUD_PROVIDER,
+    RAG_USE_CLOUD_EMBEDDINGS,
+)
 from DILIGENT.app.logger import logger
 from DILIGENT.app.utils.updater.embeddings import RagEmbeddingUpdater
 
-USE_CLOUD_EMBEDDINGS = os.environ.get("USE_CLOUD_EMBEDDINGS", "0").lower() in {
-    "1",
-    "true",
-    "yes",
-}
-CLOUD_PROVIDER = os.environ.get("RAG_CLOUD_PROVIDER", DEFAULT_CLOUD_PROVIDER)
-CLOUD_MODEL = os.environ.get("RAG_CLOUD_MODEL", DEFAULT_CLOUD_MODEL)
+USE_CLOUD_EMBEDDINGS = RAG_USE_CLOUD_EMBEDDINGS
+CLOUD_PROVIDER = RAG_CLOUD_PROVIDER
+CLOUD_MODEL = RAG_CLOUD_MODEL
 
 ###############################################################################
 if __name__ == "__main__":

@@ -33,6 +33,9 @@ DEFAULT_CONFIGURATION: dict[str, Any] = {
         "vector_index_metric": "cosine",
         "vector_index_type": "IVF_FLAT",
         "reset_vector_collection": True,
+        "cloud_provider": "",
+        "cloud_model": "",
+        "use_cloud_embeddings": False,
     },
     "external_data": {
         "default_llm_timeout_seconds": 3600.0,
@@ -123,6 +126,11 @@ RAG_HF_EMBEDDING_MODEL = RAG_CONFIGURATION.get("hf_embedding_model", "")
 RAG_VECTOR_INDEX_METRIC = RAG_CONFIGURATION.get("vector_index_metric", "cosine")
 RAG_VECTOR_INDEX_TYPE = RAG_CONFIGURATION.get("vector_index_type", "IVF_FLAT")
 RAG_RESET_VECTOR_COLLECTION = RAG_CONFIGURATION.get("reset_vector_collection", True)
+RAG_CLOUD_PROVIDER = RAG_CONFIGURATION.get("cloud_provider") or DEFAULT_CLOUD_PROVIDER
+RAG_CLOUD_MODEL = RAG_CONFIGURATION.get("cloud_model") or DEFAULT_CLOUD_MODEL
+RAG_USE_CLOUD_EMBEDDINGS = RAG_CONFIGURATION.get(
+    "use_cloud_embeddings", DEFAULT_USE_CLOUD_SERVICES
+)
 
 EXTERNAL_DATA_CONFIGURATION = get_configuration_value("external_data", default={})
 DEFAULT_LLM_TIMEOUT_SECONDS = EXTERNAL_DATA_CONFIGURATION.get(
