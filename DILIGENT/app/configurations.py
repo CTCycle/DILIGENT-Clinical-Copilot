@@ -18,6 +18,7 @@ DEFAULT_CONFIGURATION: dict[str, Any] = {
         "default_clinical_model": "gpt-oss:20b",
         "default_cloud_provider": "openai",
         "default_cloud_model": "gpt-4.1-mini",
+        "default_cloud_embedding_model": "text-embedding-3-large",
         "default_use_cloud_services": False,
         "default_ollama_temperature": 0.7,
         "default_ollama_reasoning": False,
@@ -35,6 +36,7 @@ DEFAULT_CONFIGURATION: dict[str, Any] = {
         "reset_vector_collection": True,
         "cloud_provider": "",
         "cloud_model": "",
+        "cloud_embedding_model": "",
         "use_cloud_embeddings": False,
     },
     "external_data": {
@@ -102,6 +104,9 @@ DEFAULT_PARSING_MODEL = CLIENT_DEFAULTS.get("default_parsing_model", "")
 DEFAULT_CLINICAL_MODEL = CLIENT_DEFAULTS.get("default_clinical_model", "")
 DEFAULT_CLOUD_PROVIDER = CLIENT_DEFAULTS.get("default_cloud_provider", "")
 DEFAULT_CLOUD_MODEL = CLIENT_DEFAULTS.get("default_cloud_model", "")
+DEFAULT_CLOUD_EMBEDDING_MODEL = CLIENT_DEFAULTS.get(
+    "default_cloud_embedding_model", ""
+)
 DEFAULT_USE_CLOUD_SERVICES = CLIENT_DEFAULTS.get("default_use_cloud_services", False)
 DEFAULT_OLLAMA_TEMPERATURE = CLIENT_DEFAULTS.get("default_ollama_temperature", 0.7)
 DEFAULT_OLLAMA_REASONING = CLIENT_DEFAULTS.get("default_ollama_reasoning", False)
@@ -127,7 +132,9 @@ RAG_VECTOR_INDEX_METRIC = RAG_CONFIGURATION.get("vector_index_metric", "cosine")
 RAG_VECTOR_INDEX_TYPE = RAG_CONFIGURATION.get("vector_index_type", "IVF_FLAT")
 RAG_RESET_VECTOR_COLLECTION = RAG_CONFIGURATION.get("reset_vector_collection", True)
 RAG_CLOUD_PROVIDER = RAG_CONFIGURATION.get("cloud_provider") or DEFAULT_CLOUD_PROVIDER
-RAG_CLOUD_MODEL = RAG_CONFIGURATION.get("cloud_model") or DEFAULT_CLOUD_MODEL
+RAG_CLOUD_EMBEDDING_MODEL = (
+    RAG_CONFIGURATION.get("cloud_embedding_model") or DEFAULT_CLOUD_EMBEDDING_MODEL
+)
 RAG_USE_CLOUD_EMBEDDINGS = RAG_CONFIGURATION.get(
     "use_cloud_embeddings", DEFAULT_USE_CLOUD_SERVICES
 )
