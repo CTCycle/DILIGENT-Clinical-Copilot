@@ -1,16 +1,27 @@
 from __future__ import annotations
 
+import hashlib
 import json
+import os
 import re
+import urllib.error
+import urllib.request
+import zipfile
 from typing import Any
+from xml.etree import ElementTree
 
 import pandas as pd
-import pyarrow as pa
-from lancedb.table import LanceTable
+from langchain_community.document_loaders import PyPDFLoader
+from langchain_core.documents import Document
+from langchain_huggingface import HuggingFaceEmbeddings
+from langchain_ollama.embeddings import OllamaEmbeddings
+from langchain_text_splitters import RecursiveCharacterTextSplitter
 from sqlalchemy.exc import SQLAlchemyError
 
-from DILIGENT.app.utils.repository.database import ClinicalSession, database
+from DILIGENT.app.constants import GEMINI_API_BASE, OPENAI_API_BASE
 from DILIGENT.app.logger import logger
+from DILIGENT.app.utils.repository.database import ClinicalSession, database
+from DILIGENT.app.utils.repository.vectors import LanceVectorDatabase
 
 
 # [DATA SERIALIZATION]
@@ -371,8 +382,382 @@ class DataSerializer:
     def join_values(self, values: set[str]) -> str | None:
         if not values:
             return None
-        return "; ".join(sorted(values))    
+        return "; ".join(sorted(values))
 
-    
+
+
+###############################################################################
+class DocumentLoader:
+    SUPPORTED_EXTENSIONS = {".pdf", ".txt", ".xml", ".docx", ".doc"}
+
+    def __init__(self, documents_path: str) -> None:
+        self.documents_path = documents_path
+
+    # -------------------------------------------------------------------------
+    def collect_document_paths(self) -> list[str]:
+        if not os.path.isdir(self.documents_path):
+            logger.warning(
+                "Documents directory '%s' does not exist", self.documents_path
+            )
+            return []
+        collected: list[str] = []
+        for root, _, files in os.walk(self.documents_path):
+            for name in files:
+                extension = os.path.splitext(name)[1].lower()
+                if extension in self.SUPPORTED_EXTENSIONS:
+                    collected.append(os.path.join(root, name))
+                else:
+                    logger.debug("Skipping unsupported document '%s'", name)
+        collected.sort()
+        return collected
+
+    # -------------------------------------------------------------------------
+    def load_documents(self) -> list[Document]:
+        documents: list[Document] = []
+        for file_path in self.collect_document_paths():
+            extension = os.path.splitext(file_path)[1].lower()
+            if extension == ".pdf":
+                documents.extend(self.load_pdf(file_path))
+            elif extension == ".docx":
+                documents.extend(self.load_docx(file_path))
+            elif extension == ".doc":
+                logger.warning(
+                    "Legacy Word document '%s' is not supported; skipping", file_path
+                )
+            elif extension in {".txt", ".xml"}:
+                documents.extend(self.load_textual_file(file_path, extension))
+        return documents
+
+    # -------------------------------------------------------------------------
+    def load_pdf(self, file_path: str) -> list[Document]:
+        try:
+            loader = PyPDFLoader(file_path)
+            pages = loader.load()
+        except Exception as exc:  # noqa: BLE001
+            logger.error("Failed to load PDF '%s': %s", file_path, exc)
+            return []
+        metadata = self.build_metadata(file_path)
+        for index, document in enumerate(pages, start=1):
+            document.metadata.update(metadata)
+            document.metadata["page_number"] = index
+        return pages
+
+    # -------------------------------------------------------------------------
+    def load_docx(self, file_path: str) -> list[Document]:
+        try:
+            with zipfile.ZipFile(file_path) as archive:
+                xml_content = archive.read("word/document.xml")
+        except (KeyError, zipfile.BadZipFile, OSError) as exc:
+            logger.error("Unable to read DOCX '%s': %s", file_path, exc)
+            return []
+        try:
+            tree = ElementTree.fromstring(xml_content)
+        except ElementTree.ParseError as exc:
+            logger.error("Failed to parse DOCX '%s': %s", file_path, exc)
+            return []
+        namespace = "{http://schemas.openxmlformats.org/wordprocessingml/2006/main}"
+        paragraphs: list[str] = []
+        for paragraph in tree.iter(f"{namespace}p"):
+            texts = [
+                node.text
+                for node in paragraph.iter(f"{namespace}t")
+                if node.text and node.text.strip()
+            ]
+            if texts:
+                paragraphs.append("".join(texts))
+        content = "\n".join(paragraphs).strip()
+        if not content:
+            return []
+        document = Document(page_content=content, metadata=self.build_metadata(file_path))
+        return [document]
+
+    # -------------------------------------------------------------------------
+    def load_textual_file(self, file_path: str, extension: str) -> list[Document]:
+        text = self.read_text_content(file_path, extension)
+        if not text:
+            return []
+        document = Document(page_content=text, metadata=self.build_metadata(file_path))
+        return [document]
+
+    # -------------------------------------------------------------------------
+    def read_text_content(self, file_path: str, extension: str) -> str:
+        if extension == ".xml":
+            return self.read_xml_content(file_path)
+        encodings = ["utf-8", "utf-16", "latin-1"]
+        for encoding in encodings:
+            try:
+                with open(file_path, "r", encoding=encoding) as handle:
+                    text = handle.read()
+            except (OSError, UnicodeDecodeError):
+                continue
+            return text.strip()
+        logger.error("Failed to read text file '%s'", file_path)
+        return ""
+
+    # -------------------------------------------------------------------------
+    def read_xml_content(self, file_path: str) -> str:
+        try:
+            tree = ElementTree.parse(file_path)
+            root = tree.getroot()
+            text = " ".join(segment.strip() for segment in root.itertext())
+            return text.strip()
+        except (OSError, ElementTree.ParseError) as exc:
+            logger.error("Failed to parse XML '%s': %s", file_path, exc)
+        return ""
+
+    # -------------------------------------------------------------------------
+    def build_metadata(self, file_path: str) -> dict[str, Any]:
+        document_id = self.compute_document_id(file_path)
+        return {
+            "document_id": document_id,
+            "source": file_path,
+            "file_name": os.path.basename(file_path),
+        }
+
+    # -------------------------------------------------------------------------
+    def compute_document_id(self, file_path: str) -> str:
+        relative_path = os.path.relpath(file_path, self.documents_path)
+        return hashlib.sha256(relative_path.encode("utf-8")).hexdigest()
+
+
+###############################################################################
+class DocumentChunker:
+    def __init__(self, chunk_size: int, chunk_overlap: int) -> None:
+        self.chunk_size = max(chunk_size, 1)
+        self.chunk_overlap = max(chunk_overlap, 0)
+        self.splitter = RecursiveCharacterTextSplitter(
+            chunk_size=self.chunk_size,
+            chunk_overlap=self.chunk_overlap,
+            add_start_index=True,
+        )
+
+    # -------------------------------------------------------------------------
+    def chunk_documents(self, documents: list[Document]) -> list[Document]:
+        if not documents:
+            return []
+        chunks = self.splitter.split_documents(documents)
+        for index, chunk in enumerate(chunks):
+            chunk.metadata["chunk_index"] = index
+        return chunks
+
+
+###############################################################################
+class CloudEmbeddingClient:
+    def __init__(self, provider: str | None, model: str | None) -> None:
+        if not provider:
+            raise ValueError("Cloud provider is required for embeddings")
+        if not model:
+            raise ValueError("Cloud embedding model is required")
+        self.provider = provider.lower()
+        self.model = model
+
+    # -------------------------------------------------------------------------
+    def embed_documents(self, texts: list[str]) -> list[list[float]]:
+        if self.provider == "openai":
+            return self.embed_openai(texts)
+        if self.provider == "gemini":
+            return self.embed_gemini(texts)
+        raise ValueError(f"Unsupported cloud embedding provider: {self.provider}")
+
+    # -------------------------------------------------------------------------
+    def embed_openai(self, texts: list[str]) -> list[list[float]]:
+        api_key = os.environ.get("OPENAI_API_KEY", "").strip()
+        if not api_key:
+            raise RuntimeError("OPENAI_API_KEY environment variable is not set")
+        payload = json.dumps({"input": texts, "model": self.model}).encode("utf-8")
+        request = urllib.request.Request(
+            url=f"{OPENAI_API_BASE}/embeddings",
+            data=payload,
+            method="POST",
+            headers={
+                "Authorization": f"Bearer {api_key}",
+                "Content-Type": "application/json",
+            },
+        )
+        try:
+            with urllib.request.urlopen(request, timeout=60) as response:
+                body = response.read().decode("utf-8")
+        except (urllib.error.URLError, urllib.error.HTTPError) as exc:
+            raise RuntimeError("Failed to request OpenAI embeddings") from exc
+        data = json.loads(body)
+        embeddings: list[list[float]] = []
+        for item in sorted(data.get("data", []), key=lambda entry: entry.get("index", 0)):
+            values = [float(value) for value in item.get("embedding", [])]
+            embeddings.append(values)
+        if len(embeddings) != len(texts):
+            raise RuntimeError("Mismatch between OpenAI embeddings and inputs")
+        return embeddings
+
+    # -------------------------------------------------------------------------
+    def embed_gemini(self, texts: list[str]) -> list[list[float]]:
+        api_key = os.environ.get("GEMINI_API_KEY", "").strip()
+        if not api_key:
+            raise RuntimeError("GEMINI_API_KEY environment variable is not set")
+        requests_payload = [
+            {"content": {"parts": [{"text": text}]}}
+            for text in texts
+        ]
+        payload = json.dumps({"requests": requests_payload}).encode("utf-8")
+        request = urllib.request.Request(
+            url=f"{GEMINI_API_BASE}/models/{self.model}:batchEmbedContents?key={api_key}",
+            data=payload,
+            method="POST",
+            headers={"Content-Type": "application/json"},
+        )
+        try:
+            with urllib.request.urlopen(request, timeout=60) as response:
+                body = response.read().decode("utf-8")
+        except (urllib.error.URLError, urllib.error.HTTPError) as exc:
+            raise RuntimeError("Failed to request Gemini embeddings") from exc
+        data = json.loads(body)
+        embeddings: list[list[float]] = []
+        for item in data.get("embeddings", []):
+            values = item.get("values") or item.get("embedding") or []
+            embeddings.append([float(value) for value in values])
+        if len(embeddings) != len(texts):
+            raise RuntimeError("Mismatch between Gemini embeddings and inputs")
+        return embeddings
+
+
+###############################################################################
+class EmbeddingGenerator:
+    def __init__(
+        self,
+        backend: str,
+        ollama_base_url: str | None = None,
+        ollama_model: str | None = None,
+        hf_model: str | None = None,
+        use_cloud_embeddings: bool = False,
+        cloud_provider: str | None = None,
+        cloud_model: str | None = None,
+    ) -> None:
+        normalized_backend = backend.lower().strip() if backend else "ollama"
+        self.backend = "cloud" if use_cloud_embeddings else normalized_backend
+        if self.backend == "ollama":
+            if not ollama_model:
+                raise ValueError("Ollama embedding model is required")
+            self.embedder = OllamaEmbeddings(
+                base_url=ollama_base_url,
+                model=ollama_model,
+            )
+        elif self.backend == "huggingface":
+            if not hf_model:
+                raise ValueError("Hugging Face embedding model is required")
+            self.embedder = HuggingFaceEmbeddings(model_name=hf_model)
+        elif self.backend == "cloud":
+            self.embedder = CloudEmbeddingClient(cloud_provider, cloud_model)
+        else:
+            raise ValueError(f"Unsupported embedding backend: {backend}")
+
+    # -------------------------------------------------------------------------
+    def embed_texts(self, texts: list[str]) -> list[list[float]]:
+        sanitized = [text if text.strip() else " " for text in texts]
+        embeddings = self.embedder.embed_documents(sanitized)
+        return [[float(value) for value in vector] for vector in embeddings]
+
+
+###############################################################################
+class VectorSerializer:
+    def __init__(
+        self,
+        documents_path: str,
+        vector_database: LanceVectorDatabase,
+        chunk_size: int,
+        chunk_overlap: int,
+        embedding_backend: str,
+        ollama_base_url: str | None = None,
+        ollama_model: str | None = None,
+        hf_model: str | None = None,
+        use_cloud_embeddings: bool = False,
+        cloud_provider: str | None = None,
+        cloud_model: str | None = None,
+    ) -> None:
+        if not isinstance(vector_database, LanceVectorDatabase):
+            raise TypeError("vector_database must be a LanceVectorDatabase instance")
+        self.vector_database = vector_database
+        self.documents_path = documents_path
+        self.document_loader = DocumentLoader(documents_path)
+        self.chunker = DocumentChunker(chunk_size, chunk_overlap)
+        self.embedding_generator = EmbeddingGenerator(
+            backend=embedding_backend,
+            ollama_base_url=ollama_base_url,
+            ollama_model=ollama_model,
+            hf_model=hf_model,
+            use_cloud_embeddings=use_cloud_embeddings,
+            cloud_provider=cloud_provider,
+            cloud_model=cloud_model,
+        )
+
+    # -------------------------------------------------------------------------
+    def serialize(self, reset_collection: bool = False) -> dict[str, int]:
+        documents = self.document_loader.load_documents()
+        if not documents:
+            logger.warning("No documents available for embedding serialization")
+            self.vector_database.initialize(reset_collection)
+            return {"documents": 0, "chunks": 0}
+        chunks = self.chunker.chunk_documents(documents)
+        if not chunks:
+            logger.warning("Document chunking resulted in zero chunks")
+            self.vector_database.initialize(reset_collection)
+            return {"documents": 0, "chunks": 0}
+        embeddings = self.embedding_generator.embed_texts(
+            [chunk.page_content for chunk in chunks]
+        )
+        if len(embeddings) != len(chunks):
+            raise RuntimeError("Embedding count does not match chunk count")
+        records = self.build_records(chunks, embeddings)
+        self.vector_database.initialize(reset_collection)
+        if records:
+            self.vector_database.upsert_embeddings(records)
+        document_ids = {
+            str(chunk.metadata.get("document_id"))
+            for chunk in chunks
+            if chunk.metadata.get("document_id")
+        }
+        logger.info(
+            "Serialized %d documents into %d vector chunks",
+            len(document_ids),
+            len(records),
+        )
+        return {"documents": len(document_ids), "chunks": len(records)}
+
+    # -------------------------------------------------------------------------
+    def build_records(
+        self,
+        chunks: list[Document],
+        embeddings: list[list[float]],
+    ) -> list[dict[str, Any]]:
+        records: list[dict[str, Any]] = []
+        for chunk, embedding in zip(chunks, embeddings):
+            document_id = str(chunk.metadata.get("document_id", ""))
+            chunk_index = chunk.metadata.get("chunk_index")
+            chunk_id = (
+                f"{document_id}:{chunk_index}" if chunk_index is not None else document_id
+            )
+            metadata = self.serialize_metadata(chunk.metadata)
+            records.append(
+                {
+                    "document_id": document_id,
+                    "chunk_id": chunk_id,
+                    "text": chunk.page_content,
+                    "embedding": embedding,
+                    "source": metadata.get("source", ""),
+                    "metadata": json.dumps(metadata, ensure_ascii=False),
+                }
+            )
+        return records
+
+    # -------------------------------------------------------------------------
+    def serialize_metadata(self, metadata: dict[str, Any]) -> dict[str, Any]:
+        serialized: dict[str, Any] = {}
+        for key, value in metadata.items():
+            if key == "chunk_index":
+                continue
+            if isinstance(value, (str, int, float, bool)) or value is None:
+                serialized[key] = value
+            else:
+                serialized[key] = str(value)
+        return serialized
+
 
     
