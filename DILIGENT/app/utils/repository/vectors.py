@@ -43,6 +43,7 @@ class LanceVectorDatabase:
         self.table: LanceTable | None = None
         self.index_ready = False
         self.index_creation_attempted = False
+        self.embedding_size: int | None = None
 
     # -------------------------------------------------------------------------
     def connect(self) -> LanceDBConnection:
@@ -68,6 +69,7 @@ class LanceVectorDatabase:
             self.table = None
             self.index_ready = False
             self.index_creation_attempted = False
+            self.embedding_size = None
 
     # -------------------------------------------------------------------------
     def get_table(self) -> LanceTable:
@@ -101,9 +103,86 @@ class LanceVectorDatabase:
         if not records:
             logger.info("No embedding records to persist into LanceDB")
             return
+        embedding_length = 0
+        first_embedding = records[0].get("embedding")
+        if isinstance(first_embedding, list):
+            embedding_length = len(first_embedding)
+        if embedding_length > 0:
+            self.configure_embedding_size(embedding_length)
         table = self.get_table()
         table.add(records)
         self.ensure_vector_index(table)
+
+    # -------------------------------------------------------------------------
+    def configure_embedding_size(self, embedding_size: int) -> None:
+        if embedding_size <= 0:
+            return
+        if self.embedding_size == embedding_size:
+            return
+        try:
+            current_field = self.schema.field("embedding")
+        except KeyError:
+            return
+        desired_type = pa.list_(pa.float32(), embedding_size)
+        if isinstance(current_field.type, pa.FixedSizeListType):
+            if current_field.type.list_size == embedding_size:
+                self.embedding_size = embedding_size
+                return
+        fields: list[pa.Field] = []
+        for field in self.schema:
+            if field.name == "embedding":
+                fields.append(pa.field("embedding", desired_type))
+            else:
+                fields.append(field)
+        new_schema = pa.schema(fields)
+        if new_schema == self.schema and self.embedding_size == embedding_size:
+            return
+        existing_records: list[dict[str, Any]] = []
+        if self.table is not None:
+            row_count = 0
+            try:
+                row_count = self.table.count_rows()
+            except Exception:  # noqa: BLE001
+                row_count = 0
+            if row_count > 0:
+                try:
+                    existing_records = self.table.to_pylist()
+                except Exception as exc:  # noqa: BLE001
+                    logger.warning(
+                        "Unable to cache existing embeddings while updating LanceDB schema: %s",
+                        exc,
+                    )
+        connection = self.connect()
+        if self.collection_name in connection.table_names():
+            logger.info(
+                "Recreating LanceDB table '%s' with embedding size %d",
+                self.collection_name,
+                embedding_size,
+            )
+            connection.drop_table(self.collection_name)
+        self.schema = new_schema
+        self.table = None
+        self.index_ready = False
+        self.index_creation_attempted = False
+        self.embedding_size = embedding_size
+        table = self.get_table()
+        if existing_records:
+            valid_records: list[dict[str, Any]] = []
+            discarded = 0
+            for record in existing_records:
+                vector = record.get("embedding")
+                if isinstance(vector, list) and len(vector) == embedding_size:
+                    valid_records.append(record)
+                else:
+                    discarded += 1
+            if discarded:
+                logger.warning(
+                    "Discarded %d embeddings that did not match new dimension %d during LanceDB schema update",
+                    discarded,
+                    embedding_size,
+                )
+            if valid_records:
+                table.add(valid_records)
 
     # -------------------------------------------------------------------------
     def ensure_vector_index(self, table: LanceTable | None = None) -> None:
