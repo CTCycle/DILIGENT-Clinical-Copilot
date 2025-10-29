@@ -3,15 +3,16 @@ from __future__ import annotations
 import os
 
 from DILIGENT.app.configurations import (
-    DEFAULT_CLOUD_MODEL,
-    DEFAULT_CLOUD_PROVIDER,
     RAG_CHUNK_OVERLAP,
     RAG_CHUNK_SIZE,
+    RAG_CLOUD_MODEL,
+    RAG_CLOUD_PROVIDER,
     RAG_EMBEDDING_BACKEND,
     RAG_HF_EMBEDDING_MODEL,
     RAG_OLLAMA_BASE_URL,
     RAG_OLLAMA_EMBEDDING_MODEL,
     RAG_RESET_VECTOR_COLLECTION,
+    RAG_USE_CLOUD_EMBEDDINGS,
     RAG_VECTOR_INDEX_METRIC,
     RAG_VECTOR_INDEX_TYPE,
     VECTOR_COLLECTION_NAME,
@@ -27,15 +28,18 @@ class RagEmbeddingUpdater:
     def __init__(
         self,
         documents_path: str | None = None,
-        use_cloud_embeddings: bool = False,
+        use_cloud_embeddings: bool | None = None,
         cloud_provider: str | None = None,
         cloud_model: str | None = None,
         reset_collection: bool | None = None,
     ) -> None:
         self.documents_path = documents_path or DOCS_PATH
-        self.use_cloud_embeddings = use_cloud_embeddings
-        resolved_provider = cloud_provider or DEFAULT_CLOUD_PROVIDER
-        resolved_model = cloud_model or DEFAULT_CLOUD_MODEL
+        default_use_cloud = RAG_USE_CLOUD_EMBEDDINGS
+        self.use_cloud_embeddings = (
+            default_use_cloud if use_cloud_embeddings is None else use_cloud_embeddings
+        )
+        resolved_provider = cloud_provider or RAG_CLOUD_PROVIDER
+        resolved_model = cloud_model or RAG_CLOUD_MODEL
         self.reset_collection = (
             RAG_RESET_VECTOR_COLLECTION if reset_collection is None else reset_collection
         )
