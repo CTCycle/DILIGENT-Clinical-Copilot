@@ -71,8 +71,11 @@ class LanceVectorDatabase:
             return self.table
         connection = self.connect()
         if self.collection_name in connection.table_names():
-            self.table = connection.open_table(self.collection_name)
-        else:
+            try:
+                self.table = connection.open_table(self.collection_name)
+            except ValueError:
+                self.table = None
+        if self.table is None:
             logger.info(
                 "Creating LanceDB table '%s' at %s",
                 self.collection_name,
