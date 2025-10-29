@@ -28,7 +28,11 @@ dependencies = [
 ]
 
 [tool.hatch.build.targets.wheel]
-packages = ["diligent"] 
+packages = ["DILIGENT"]
+include = ["DILIGENT/app/configurations/files/app_config.json"]
+
+[tool.hatch.build.targets.sdist]
+include = ["DILIGENT/app/configurations/files/app_config.json"]
 
 
 

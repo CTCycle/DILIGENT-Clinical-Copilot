@@ -10,15 +10,66 @@ from DILIGENT.app.constants import CLOUD_MODEL_CHOICES
 CONFIG_DIRECTORY = os.path.dirname(__file__)
 CONFIG_FILE_PATH = os.path.join(CONFIG_DIRECTORY, "files", "app_config.json")
 
+DEFAULT_CONFIGURATION: dict[str, Any] = {
+    "ollama_host_default": "http://localhost:11434",
+    "cloud_providers": ["openai", "gemini"],
+    "client_defaults": {
+        "default_parsing_model": "qwen3:8b",
+        "default_clinical_model": "gpt-oss:20b",
+        "default_cloud_provider": "openai",
+        "default_cloud_model": "gpt-4.1-mini",
+        "default_use_cloud_services": False,
+        "default_ollama_temperature": 0.7,
+        "default_ollama_reasoning": False,
+    },
+    "rag": {
+        "vector_collection_name": "documents",
+        "chunk_size": 1024,
+        "chunk_overlap": 128,
+        "embedding_backend": "ollama",
+        "ollama_base_url": "http://localhost:11434",
+        "ollama_embedding_model": "nomic-embed-text",
+        "hf_embedding_model": "sentence-transformers/all-MiniLM-L6-v2",
+        "vector_index_metric": "cosine",
+        "vector_index_type": "IVF_FLAT",
+        "reset_vector_collection": True,
+    },
+    "external_data": {
+        "default_llm_timeout_seconds": 3600.0,
+        "livertox_llm_timeout_seconds": 3600.0,
+        "livertox_archive": "livertox_NBK547852.tar.gz",
+        "livertox_yield_interval": 25,
+        "livertox_skip_deterministic_ratio": 0.8,
+        "livertox_monograph_max_workers": 4,
+        "max_excerpt_length": 8000,
+        "llm_null_match_names": [
+            "",
+            "none",
+            "no match",
+            "no matches",
+            "not found",
+            "unknown",
+            "not applicable",
+            "n a",
+        ],
+    },
+    "clinical_analysis": {
+        "alt_labels": ["ALT", "ALAT"],
+        "alp_labels": ["ALP"],
+    },
+}
+
 
 def load_configuration_file() -> dict[str, Any]:
-    try:
-        with open(CONFIG_FILE_PATH, "r", encoding="utf-8") as handle:
-            return json.load(handle)
-    except (OSError, json.JSONDecodeError) as exc:
-        raise RuntimeError(
-            f"Unable to load configuration from {CONFIG_FILE_PATH}"
-        ) from exc
+    if os.path.exists(CONFIG_FILE_PATH):
+        try:
+            with open(CONFIG_FILE_PATH, "r", encoding="utf-8") as handle:
+                return json.load(handle)
+        except (OSError, json.JSONDecodeError) as exc:
+            raise RuntimeError(
+                f"Unable to load configuration from {CONFIG_FILE_PATH}"
+            ) from exc
+    return json.loads(json.dumps(DEFAULT_CONFIGURATION))
 
 
 def get_nested_value(data: dict[str, Any], *keys: str, default: Any | None = None) -> Any:
