@@ -19,6 +19,7 @@ if __name__ == "__main__":
         cloud_provider=CLOUD_PROVIDER,
         cloud_embedding_model=CLOUD_EMBEDDING_MODEL,
     )
+    updater.prepare_vector_database(reset_collection=False)
     summary = updater.refresh_embeddings()
     logger.info(
         "RAG pipeline update completed (%d documents, %d chunks)",
