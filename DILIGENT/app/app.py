@@ -3,6 +3,7 @@ from __future__ import annotations
 import os
 
 from fastapi import FastAPI
+from fastapi.responses import RedirectResponse
 from nicegui import ui
 
 from DILIGENT.app.api.endpoints.session import router as report_router
@@ -35,3 +36,8 @@ ui.run_with(
     show_welcome_message=False,
     reconnect_timeout=180,
 )
+
+
+@app.get("/")
+def redirect_to_ui() -> RedirectResponse:
+    return RedirectResponse(url="/ui")
