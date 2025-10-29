@@ -569,20 +569,18 @@ class VectorSerializer:
 
     # -------------------------------------------------------------------------
     def serialize(self, reset_collection: bool = False) -> dict[str, int]:
+        self.vector_database.initialize(False)
+        self.vector_database.get_table()
         documents = self.document_serializer.load_documents()
         if not documents:
             logger.warning("No documents available for embedding serialization")
-            self.vector_database.initialize(reset_collection)
-            self.vector_database.get_table()
             return {"documents": 0, "chunks": 0}
         chunks = self.chunker.chunk_documents(documents)
         if not chunks:
             logger.warning("Document chunking resulted in zero chunks")
-            self.vector_database.initialize(reset_collection)
-            self.vector_database.get_table()
             return {"documents": 0, "chunks": 0}
-        self.vector_database.initialize(reset_collection)
-        self.vector_database.get_table()
+        reset_pending = bool(reset_collection)
+        reset_applied = False
         batch_size = self.embedding_batch_size
         total_records = 0
         document_ids: set[str] = set()
@@ -601,6 +599,9 @@ class VectorSerializer:
             records = self.build_records(batch_chunks, embeddings)
             if not records:
                 continue
+            if reset_pending and not reset_applied:
+                self.vector_database.initialize(True)
+                reset_applied = True
             self.vector_database.upsert_embeddings(records)
             total_records += len(records)
         logger.info(
