@@ -19,12 +19,11 @@ from pdfminer.high_level import extract_text as pdfminer_extract_text
 from pypdf import PdfReader
 from tqdm import tqdm
 
-from DILIGENT.app.constants import (
+from DILIGENT.app.configurations import (
     LIVERTOX_ARCHIVE,
-    LIVERTOX_BASE_URL,
     LIVERTOX_MONOGRAPH_MAX_WORKERS,
-    SOURCES_PATH,
 )
+from DILIGENT.app.constants import LIVERTOX_BASE_URL, SOURCES_PATH
 from DILIGENT.app.logger import logger
 from DILIGENT.app.utils.repository.serializer import DataSerializer
 from DILIGENT.app.utils.repository.database import database
