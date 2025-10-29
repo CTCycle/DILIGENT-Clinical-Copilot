@@ -14,7 +14,7 @@ DOCS_PATH = join(DATA_PATH, "documents")
 SOURCES_PATH = join(DATA_PATH, "sources")
 TASKS_PATH = join(DATA_PATH, "tasks")
 LOGS_PATH = join(RSC_PATH, "logs")
-VECTOR_DB_PATH = join(DATA_PATH, "vector_store")
+VECTOR_DB_PATH = join(DATA_PATH, "vectors")
 
 # [ENDPOINS]
 ###############################################################################
