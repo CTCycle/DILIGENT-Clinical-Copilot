@@ -14,11 +14,13 @@ from DILIGENT.app.api.models.providers import (
     OllamaError,
     OllamaTimeout,
 )
-from DILIGENT.app.configurations import ClientRuntimeConfig
+from DILIGENT.app.configurations import (
+    ClientRuntimeConfig,
+    DEFAULT_LLM_TIMEOUT_SECONDS,
+)
 from DILIGENT.app.constants import (
     CLINICAL_API_URL,
     CLOUD_MODEL_CHOICES,
-    DEFAULT_LLM_TIMEOUT_SECONDS,
     API_BASE_URL,
 )
 

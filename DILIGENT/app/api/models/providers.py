@@ -17,11 +17,13 @@ import httpx
 from langchain_core.output_parsers import PydanticOutputParser
 from pydantic import BaseModel
 
-from DILIGENT.app.configurations import ClientRuntimeConfig
-from DILIGENT.app.constants import (
+from DILIGENT.app.configurations import (
+    ClientRuntimeConfig,
     DEFAULT_LLM_TIMEOUT_SECONDS,
-    GEMINI_API_BASE,
     OLLAMA_HOST_DEFAULT,
+)
+from DILIGENT.app.constants import (
+    GEMINI_API_BASE,
     OPENAI_API_BASE,
     PARSING_MODEL_CHOICES,
 )

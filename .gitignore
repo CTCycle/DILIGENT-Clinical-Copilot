@@ -10,6 +10,7 @@ __pycache__
 *.docx
 *.zip
 *.json
+!DILIGENT/app/configurations/files/*.json
 *.xlsx
 *.pdf
 *.csv   
