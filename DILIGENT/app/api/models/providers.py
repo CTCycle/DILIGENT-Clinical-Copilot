@@ -344,6 +344,42 @@ class OllamaClient:
             if model not in available:
                 raise OllamaError(f"Model '{model}' was not found after pull completed")
 
+    # -------------------------------------------------------------------------
+    async def embed(
+        self,
+        *,
+        model: str | None = None,
+        input_texts: list[str],
+    ) -> list[list[float]]:
+        if not input_texts:
+            return []
+
+        resolved_model = self.resolve_model_name(model)
+        embeddings: list[list[float]] = []
+        for text in input_texts:
+            payload = {"model": resolved_model, "prompt": text}
+            try:
+                resp = await self.client.post("/api/embeddings", json=payload)
+            except httpx.TimeoutException as exc:
+                raise OllamaTimeout("Timed out requesting Ollama embeddings") from exc
+            except httpx.RequestError as exc:  # noqa: PERF203 - convert to domain error
+                raise OllamaError(f"Failed to request Ollama embeddings: {exc}") from exc
+
+            self.raise_for_status(resp)
+            data = resp.json()
+            vector = data.get("embedding")
+            if not isinstance(vector, list):
+                raise OllamaError("Invalid embedding payload returned by Ollama")
+            try:
+                embeddings.append([float(value) for value in vector])
+            except (TypeError, ValueError) as exc:
+                raise OllamaError("Non-numeric values found in Ollama embeddings") from exc
+
+        if len(embeddings) != len(input_texts):
+            raise OllamaError("Mismatch between Ollama embeddings and inputs")
+
+        return embeddings
+
     @staticmethod
     def raise_for_status(resp: httpx.Response) -> None:
         try:
@@ -1271,6 +1307,22 @@ class CloudLLMClient:
         raise LLMError(f"Provider '{self.provider}' does not support chat yet")
 
     # ---------------------------------------------------------------------
+    async def embed(
+        self,
+        *,
+        model: str,
+        input_texts: list[str],
+    ) -> list[list[float]]:
+        if not input_texts:
+            return []
+
+        if self.provider == "openai":
+            return await self.embed_openai(model=model, input_texts=input_texts)
+        if self.provider == "gemini":
+            return await self.embed_gemini(model=model, input_texts=input_texts)
+        raise LLMError(f"Provider '{self.provider}' does not support embeddings yet")
+
+    # ---------------------------------------------------------------------
     async def chat_openai(
         self,
         *,
@@ -1368,6 +1420,71 @@ class CloudLLMClient:
             except json.JSONDecodeError:
                 return content
         return str(content)
+
+    # ---------------------------------------------------------------------
+    async def embed_openai(
+        self,
+        *,
+        model: str,
+        input_texts: list[str],
+    ) -> list[list[float]]:
+        body = {"model": model or self.default_model, "input": input_texts}
+
+        try:
+            resp = await self.client.post("/embeddings", json=body)
+        except httpx.TimeoutException as exc:
+            raise LLMTimeout("Timed out waiting for OpenAI embeddings") from exc
+
+        self.raise_for_status(resp)
+
+        data = resp.json()
+        entries = sorted(data.get("data", []), key=lambda entry: entry.get("index", 0))
+        embeddings: list[list[float]] = []
+        for item in entries:
+            vector = item.get("embedding", [])
+            try:
+                embeddings.append([float(value) for value in vector])
+            except (TypeError, ValueError) as exc:
+                raise LLMError("Non-numeric values found in OpenAI embeddings") from exc
+
+        if len(embeddings) != len(input_texts):
+            raise LLMError("Mismatch between OpenAI embeddings and inputs")
+
+        return embeddings
+
+    # ---------------------------------------------------------------------
+    async def embed_gemini(
+        self,
+        *,
+        model: str,
+        input_texts: list[str],
+    ) -> list[list[float]]:
+        requests_payload = [
+            {"content": {"parts": [{"text": text}]}} for text in input_texts
+        ]
+        body = {"requests": requests_payload}
+        path = f"/models/{model or self.default_model}:batchEmbedContents?key={GEMINI_API_KEY}"
+
+        try:
+            resp = await self.client.post(path, json=body)
+        except httpx.TimeoutException as exc:
+            raise LLMTimeout("Timed out waiting for Gemini embeddings") from exc
+
+        self.raise_for_status(resp)
+
+        data = resp.json()
+        embeddings: list[list[float]] = []
+        for item in data.get("embeddings", []):
+            values = item.get("values") or item.get("embedding") or []
+            try:
+                embeddings.append([float(value) for value in values])
+            except (TypeError, ValueError) as exc:
+                raise LLMError("Non-numeric values found in Gemini embeddings") from exc
+
+        if len(embeddings) != len(input_texts):
+            raise LLMError("Mismatch between Gemini embeddings and inputs")
+
+        return embeddings
 
     # ---------------------------------------------------------------------
     async def llm_structured_call(
