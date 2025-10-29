@@ -67,8 +67,10 @@ class RagEmbeddingUpdater:
     # -------------------------------------------------------------------------
     def prepare_vector_database(self, reset_collection: bool | None = None) -> None:
         should_reset = self.reset_collection if reset_collection is None else reset_collection
-        self.vector_database.initialize(should_reset)
+        self.vector_database.initialize(False)
         self.vector_database.get_table()
+        if should_reset != self.reset_collection:
+            self.reset_collection = should_reset
 
     # -------------------------------------------------------------------------
     def refresh_embeddings(self, reset_collection: bool | None = None) -> dict[str, int]:
