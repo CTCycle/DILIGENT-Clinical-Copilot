@@ -4,8 +4,6 @@ import asyncio
 from collections.abc import Coroutine
 from typing import Any
 
-from langchain_huggingface import HuggingFaceEmbeddings
-
 from DILIGENT.app.api.models.providers import CloudLLMClient, OllamaClient
 
 
@@ -26,8 +24,7 @@ class EmbeddingGenerator:
         self.backend = "cloud" if use_cloud_embeddings else normalized_backend
 
         self.ollama_model: str | None = None
-        self.ollama_base_url: str | None = None
-        self.hf_embedder: HuggingFaceEmbeddings | None = None
+        self.ollama_base_url: str | None = None        
         self.cloud_provider: str | None = None
         self.cloud_embedding_model: str | None = None
 
@@ -36,10 +33,7 @@ class EmbeddingGenerator:
                 raise ValueError("Ollama embedding model is required")
             self.ollama_model = ollama_model
             self.ollama_base_url = ollama_base_url
-        elif self.backend == "huggingface":
-            if not hf_model:
-                raise ValueError("Hugging Face embedding model is required")
-            self.hf_embedder = HuggingFaceEmbeddings(model_name=hf_model)
+        
         elif self.backend == "cloud":
             if not cloud_provider:
                 raise ValueError("Cloud provider is required for embeddings")
@@ -61,11 +55,7 @@ class EmbeddingGenerator:
                 raise ValueError("Ollama embedding model is not configured")
             embeddings = self.run_async(
                 self.embed_with_ollama(sanitized, self.ollama_model)
-            )
-        elif self.backend == "huggingface":
-            if self.hf_embedder is None:
-                raise ValueError("Hugging Face embedder is not configured")
-            embeddings = self.hf_embedder.embed_documents(sanitized)
+            )        
         elif self.backend == "cloud":
             if self.cloud_provider is None or self.cloud_embedding_model is None:
                 raise ValueError("Cloud embedding configuration is not set")
