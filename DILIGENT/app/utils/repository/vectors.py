@@ -45,7 +45,12 @@ class LanceVectorDatabase:
     # -------------------------------------------------------------------------
     def connect(self) -> LanceDBConnection:
         if self.connection is None:
-            os.makedirs(self.database_path, exist_ok=True)
+            path = self.database_path
+            suffix = os.path.splitext(path)[1]
+            base_directory = os.path.dirname(path) if suffix else path
+            if not base_directory:
+                base_directory = "."
+            os.makedirs(base_directory, exist_ok=True)
             self.connection = lancedb.connect(self.database_path)
         return self.connection
 
@@ -73,9 +78,10 @@ class LanceVectorDatabase:
                 self.collection_name,
                 self.database_path,
             )
+            empty_table = self.schema.empty_table()
             self.table = connection.create_table(
                 self.collection_name,
-                data=[],
+                data=empty_table,
                 schema=self.schema,
                 mode="create",
             )
