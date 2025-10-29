@@ -547,7 +547,7 @@ class VectorSerializer:
         hf_model: str | None = None,
         use_cloud_embeddings: bool = False,
         cloud_provider: str | None = None,
-        cloud_model: str | None = None,
+        cloud_embedding_model: str | None = None,
     ) -> None:
         if not isinstance(vector_database, LanceVectorDatabase):
             raise TypeError("vector_database must be a LanceVectorDatabase instance")
@@ -562,7 +562,7 @@ class VectorSerializer:
             hf_model=hf_model,
             use_cloud_embeddings=use_cloud_embeddings,
             cloud_provider=cloud_provider,
-            cloud_model=cloud_model,
+            cloud_embedding_model=cloud_embedding_model,
         )
 
     # -------------------------------------------------------------------------
