@@ -1,6 +1,8 @@
 DILIGENT/setup/python/*
 DILIGENT/setup/.env
 DILIGENT/resources/models/*
+DILIGENT/resources/database/vectors/*
+DILIGENT/resources/database/*.lance
 
 
 __pycache__
