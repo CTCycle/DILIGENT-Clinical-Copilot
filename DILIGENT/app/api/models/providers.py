@@ -355,6 +355,7 @@ class OllamaClient:
             return []
 
         resolved_model = self.resolve_model_name(model)
+        await self.ensure_model_ready(resolved_model)
         embeddings: list[list[float]] = []
         for text in input_texts:
             payload = {"model": resolved_model, "prompt": text}
