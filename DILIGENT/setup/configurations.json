@@ -20,7 +20,7 @@
     "chunk_overlap": 128,
     "embedding_backend": "ollama",
     "ollama_base_url": "http://localhost:11434",
-    "ollama_embedding_model": "nomic-embed-text",
+    "ollama_embedding_model": "nomic-embed-text:latest",
     "hf_embedding_model": "sentence-transformers/all-MiniLM-L6-v2",
     "vector_index_metric": "cosine",
     "vector_index_type": "IVF_FLAT",
