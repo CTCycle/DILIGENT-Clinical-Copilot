@@ -5,7 +5,7 @@ import os
 from DILIGENT.app.configurations import (
     RAG_CHUNK_OVERLAP,
     RAG_CHUNK_SIZE,
-    RAG_CLOUD_MODEL,
+    RAG_CLOUD_EMBEDDING_MODEL,
     RAG_CLOUD_PROVIDER,
     RAG_EMBEDDING_BACKEND,
     RAG_HF_EMBEDDING_MODEL,
@@ -30,7 +30,7 @@ class RagEmbeddingUpdater:
         documents_path: str | None = None,
         use_cloud_embeddings: bool | None = None,
         cloud_provider: str | None = None,
-        cloud_model: str | None = None,
+        cloud_embedding_model: str | None = None,
         reset_collection: bool | None = None,
     ) -> None:
         self.documents_path = documents_path or DOCS_PATH
@@ -39,7 +39,7 @@ class RagEmbeddingUpdater:
             default_use_cloud if use_cloud_embeddings is None else use_cloud_embeddings
         )
         resolved_provider = cloud_provider or RAG_CLOUD_PROVIDER
-        resolved_model = cloud_model or RAG_CLOUD_MODEL
+        resolved_model = cloud_embedding_model or RAG_CLOUD_EMBEDDING_MODEL
         self.reset_collection = (
             RAG_RESET_VECTOR_COLLECTION if reset_collection is None else reset_collection
         )
@@ -61,7 +61,7 @@ class RagEmbeddingUpdater:
             hf_model=RAG_HF_EMBEDDING_MODEL,
             use_cloud_embeddings=self.use_cloud_embeddings,
             cloud_provider=resolved_provider,
-            cloud_model=resolved_model,
+            cloud_embedding_model=resolved_model,
         )
 
     # -------------------------------------------------------------------------
