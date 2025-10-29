@@ -1,23 +1,109 @@
 from __future__ import annotations
 
+import json
+import os
 from dataclasses import dataclass
 from typing import Any, Literal
 
-from DILIGENT.app.constants import (
-    CLOUD_MODEL_CHOICES,
-    DEFAULT_CLINICAL_MODEL,
-    DEFAULT_CLOUD_MODEL,
-    DEFAULT_CLOUD_PROVIDER,
-    DEFAULT_PARSING_MODEL,
+from DILIGENT.app.constants import CLOUD_MODEL_CHOICES
+
+CONFIG_DIRECTORY = os.path.dirname(__file__)
+CONFIG_FILE_PATH = os.path.join(CONFIG_DIRECTORY, "files", "app_config.json")
+
+
+def load_configuration_file() -> dict[str, Any]:
+    try:
+        with open(CONFIG_FILE_PATH, "r", encoding="utf-8") as handle:
+            return json.load(handle)
+    except (OSError, json.JSONDecodeError) as exc:
+        raise RuntimeError(
+            f"Unable to load configuration from {CONFIG_FILE_PATH}"
+        ) from exc
+
+
+def get_nested_value(data: dict[str, Any], *keys: str, default: Any | None = None) -> Any:
+    current: Any = data
+    for key in keys:
+        if isinstance(current, dict) and key in current:
+            current = current[key]
+        else:
+            return default
+    return current
+
+
+CONFIGURATION_DATA = load_configuration_file()
+
+
+def get_configuration() -> dict[str, Any]:
+    return CONFIGURATION_DATA
+
+
+def get_configuration_value(*keys: str, default: Any | None = None) -> Any:
+    return get_nested_value(CONFIGURATION_DATA, *keys, default=default)
+
+
+CLOUD_PROVIDERS = list(get_configuration_value("cloud_providers", default=[]))
+CLIENT_DEFAULTS = get_configuration_value("client_defaults", default={})
+DEFAULT_PARSING_MODEL = CLIENT_DEFAULTS.get("default_parsing_model", "")
+DEFAULT_CLINICAL_MODEL = CLIENT_DEFAULTS.get("default_clinical_model", "")
+DEFAULT_CLOUD_PROVIDER = CLIENT_DEFAULTS.get("default_cloud_provider", "")
+DEFAULT_CLOUD_MODEL = CLIENT_DEFAULTS.get("default_cloud_model", "")
+DEFAULT_USE_CLOUD_SERVICES = CLIENT_DEFAULTS.get("default_use_cloud_services", False)
+DEFAULT_OLLAMA_TEMPERATURE = CLIENT_DEFAULTS.get("default_ollama_temperature", 0.7)
+DEFAULT_OLLAMA_REASONING = CLIENT_DEFAULTS.get("default_ollama_reasoning", False)
+
+if DEFAULT_CLOUD_PROVIDER not in CLOUD_PROVIDERS and CLOUD_PROVIDERS:
+    DEFAULT_CLOUD_PROVIDER = CLOUD_PROVIDERS[0]
+
+cloud_models = CLOUD_MODEL_CHOICES.get(DEFAULT_CLOUD_PROVIDER, [])
+if DEFAULT_CLOUD_MODEL not in cloud_models:
+    DEFAULT_CLOUD_MODEL = cloud_models[0] if cloud_models else ""
+
+OLLAMA_HOST_DEFAULT = get_configuration_value("ollama_host_default", default="")
+
+RAG_CONFIGURATION = get_configuration_value("rag", default={})
+VECTOR_COLLECTION_NAME = RAG_CONFIGURATION.get("vector_collection_name", "documents")
+RAG_CHUNK_SIZE = RAG_CONFIGURATION.get("chunk_size", 1024)
+RAG_CHUNK_OVERLAP = RAG_CONFIGURATION.get("chunk_overlap", 128)
+RAG_EMBEDDING_BACKEND = RAG_CONFIGURATION.get("embedding_backend", "ollama")
+RAG_OLLAMA_BASE_URL = RAG_CONFIGURATION.get("ollama_base_url", OLLAMA_HOST_DEFAULT)
+RAG_OLLAMA_EMBEDDING_MODEL = RAG_CONFIGURATION.get("ollama_embedding_model", "")
+RAG_HF_EMBEDDING_MODEL = RAG_CONFIGURATION.get("hf_embedding_model", "")
+RAG_VECTOR_INDEX_METRIC = RAG_CONFIGURATION.get("vector_index_metric", "cosine")
+RAG_VECTOR_INDEX_TYPE = RAG_CONFIGURATION.get("vector_index_type", "IVF_FLAT")
+RAG_RESET_VECTOR_COLLECTION = RAG_CONFIGURATION.get("reset_vector_collection", True)
+
+EXTERNAL_DATA_CONFIGURATION = get_configuration_value("external_data", default={})
+DEFAULT_LLM_TIMEOUT_SECONDS = EXTERNAL_DATA_CONFIGURATION.get(
+    "default_llm_timeout_seconds", 3_600.0
 )
+LIVERTOX_LLM_TIMEOUT_SECONDS = EXTERNAL_DATA_CONFIGURATION.get(
+    "livertox_llm_timeout_seconds", DEFAULT_LLM_TIMEOUT_SECONDS
+)
+LIVERTOX_ARCHIVE = EXTERNAL_DATA_CONFIGURATION.get(
+    "livertox_archive", "livertox_NBK547852.tar.gz"
+)
+LIVERTOX_YIELD_INTERVAL = EXTERNAL_DATA_CONFIGURATION.get("livertox_yield_interval", 25)
+LIVERTOX_SKIP_DETERMINISTIC_RATIO = EXTERNAL_DATA_CONFIGURATION.get(
+    "livertox_skip_deterministic_ratio", 0.80
+)
+LIVERTOX_MONOGRAPH_MAX_WORKERS = EXTERNAL_DATA_CONFIGURATION.get(
+    "livertox_monograph_max_workers", 4
+)
+MAX_EXCERPT_LENGTH = EXTERNAL_DATA_CONFIGURATION.get("max_excerpt_length", 8000)
+LLM_NULL_MATCH_NAMES = set(
+    EXTERNAL_DATA_CONFIGURATION.get("llm_null_match_names", [])
+)
+
+CLINICAL_ANALYSIS_CONFIGURATION = get_configuration_value("clinical_analysis", default={})
+ALT_LABELS = set(CLINICAL_ANALYSIS_CONFIGURATION.get("alt_labels", []))
+ALP_LABELS = set(CLINICAL_ANALYSIS_CONFIGURATION.get("alp_labels", []))
 
 
 ###############################################################################
 class Configuration:
     def __init__(self) -> None:
-        self.configuration = {
-            "model": "gpt-3.5-turbo",
-        }
+        self.configuration = get_configuration()
 
     # -------------------------------------------------------------------------
     def get_configuration(self) -> dict[str, Any]:
@@ -31,9 +117,9 @@ class ClientRuntimeConfig:
     clinical_model: str = DEFAULT_CLINICAL_MODEL
     llm_provider: str = DEFAULT_CLOUD_PROVIDER
     cloud_model: str = DEFAULT_CLOUD_MODEL
-    use_cloud_services: bool = False
-    ollama_temperature: float = 0.7
-    ollama_reasoning: bool = False
+    use_cloud_services: bool = DEFAULT_USE_CLOUD_SERVICES
+    ollama_temperature: float = DEFAULT_OLLAMA_TEMPERATURE
+    ollama_reasoning: bool = DEFAULT_OLLAMA_REASONING
     revision: int = 0
 
     # -------------------------------------------------------------------------
@@ -165,9 +251,9 @@ class ClientRuntimeConfig:
         cls.clinical_model = DEFAULT_CLINICAL_MODEL
         cls.llm_provider = DEFAULT_CLOUD_PROVIDER
         cls.cloud_model = DEFAULT_CLOUD_MODEL
-        cls.use_cloud_services = False
-        cls.ollama_temperature = 0.7
-        cls.ollama_reasoning = False
+        cls.use_cloud_services = DEFAULT_USE_CLOUD_SERVICES
+        cls.ollama_temperature = DEFAULT_OLLAMA_TEMPERATURE
+        cls.ollama_reasoning = DEFAULT_OLLAMA_REASONING
         cls.revision = 0
 
     # -------------------------------------------------------------------------
