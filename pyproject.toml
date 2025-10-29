@@ -4,7 +4,7 @@ build-backend = "hatchling.build"
 
 [project]
 name = "DILIGENT"
-version = "1.5"
+version = "2.0"
 requires-python = ">=3.12,<3.13"
 
 dependencies = [
@@ -29,10 +29,7 @@ dependencies = [
 
 [tool.hatch.build.targets.wheel]
 packages = ["DILIGENT"]
-include = ["DILIGENT/app/configurations/files/app_config.json"]
 
-[tool.hatch.build.targets.sdist]
-include = ["DILIGENT/app/configurations/files/app_config.json"]
 
 
 
