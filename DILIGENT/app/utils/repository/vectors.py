@@ -107,14 +107,39 @@ class LanceVectorDatabase:
             logger.warning("Unable to inspect LanceDB indices: %s", exc)
             return
         for index in indices:
-            column = index.get("column") or index.get("columns")
-            if column == "embedding" or (
-                isinstance(column, list) and "embedding" in column
-            ):
+            column = (
+                index.get("column")
+                or index.get("columns")
+                or index.get("vector_column")
+                or index.get("vector_column_name")
+            )
+            if column == "embedding":
                 return
+            if isinstance(column, dict):
+                name = (
+                    column.get("name")
+                    or column.get("column")
+                    or column.get("vector_column")
+                    or column.get("vector_column_name")
+                )
+                if name == "embedding":
+                    return
+            if isinstance(column, (list, tuple)):
+                for entry in column:
+                    if entry == "embedding":
+                        return
+                    if isinstance(entry, dict):
+                        name = (
+                            entry.get("name")
+                            or entry.get("column")
+                            or entry.get("vector_column")
+                            or entry.get("vector_column_name")
+                        )
+                        if name == "embedding":
+                            return
         try:
             table.create_index(
-                column="embedding",
+                vector_column_name="embedding",
                 metric=self.metric,
                 index_type=self.index_type,
             )
