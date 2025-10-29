@@ -31,11 +31,10 @@ from DILIGENT.app.client.layouts import (
     VISIT_DATE_ELEMENT_ID,
     VISIT_DATE_LOCALE_JS,
 )
-from DILIGENT.app.configurations import ClientRuntimeConfig
+from DILIGENT.app.configurations import (ClientRuntimeConfig, CLOUD_PROVIDERS)
 from DILIGENT.app.constants import (
     CLINICAL_MODEL_CHOICES,
     CLOUD_MODEL_CHOICES,
-    CLOUD_PROVIDERS,
     PARSING_MODEL_CHOICES,
 )
 

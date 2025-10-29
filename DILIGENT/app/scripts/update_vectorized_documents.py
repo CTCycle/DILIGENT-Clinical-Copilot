@@ -1,7 +1,6 @@
 from __future__ import annotations
 
-from DILIGENT.app.constants import (
-    DOCS_PATH,
+from DILIGENT.app.configurations import (
     RAG_CHUNK_OVERLAP,
     RAG_CHUNK_SIZE,
     RAG_EMBEDDING_BACKEND,
@@ -12,5 +11,5 @@ from DILIGENT.app.constants import (
     RAG_VECTOR_INDEX_METRIC,
     RAG_VECTOR_INDEX_TYPE,
     VECTOR_COLLECTION_NAME,
-    VECTOR_DB_PATH,
 )
+from DILIGENT.app.constants import DOCS_PATH, VECTOR_DB_PATH
