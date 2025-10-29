@@ -17,6 +17,12 @@ set "uv_exe=%uv_dir%\uv.exe"
 set "uv_zip_path=%uv_dir%\uv.zip"
 set "UV_CACHE_DIR=%setup_dir%\uv_cache"
 
+set "pyproject=%root_folder%pyproject.toml"
+set "update_script=%setup_dir%\scripts\update_project.py"
+set "log_path=%project_folder%resources\logs"
+set "uv_lock=%root_folder%uv.lock"
+set "venv_dir=%root_folder%.venv"
+
 
 :::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
 :: Show setup menu
