@@ -6,12 +6,16 @@ REM == Configuration: define project and Python paths
 REM ============================================================================
 set "project_folder=%~dp0"
 set "root_folder=%project_folder%..\"
-set "python_dir=%project_folder%setup\python"
+set "setup_dir=%project_folder%setup"
+set "python_dir=%setup_dir%\python"
 set "python_exe=%python_dir%\python.exe"
-set "pip_exe=%python_dir%\Scripts\pip.exe"
-set "app_script=%project_folder%app\app.py"
-set "requirements_path=%project_folder%setup\requirements.txt"
-set "log_path=%project_folder%resources\logs"
+set "python_pth_file=%python_dir%\python312._pth"
+set "env_marker=%python_dir%\.is_installed"
+
+set "uv_dir=%setup_dir%\uv"
+set "uv_exe=%uv_dir%\uv.exe"
+set "uv_zip_path=%uv_dir%\uv.zip"
+set "UV_CACHE_DIR=%setup_dir%\uv_cache"
 
 
 :::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
