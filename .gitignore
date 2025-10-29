@@ -2,6 +2,7 @@ DILIGENT/setup/python/*
 DILIGENT/setup/.env
 DILIGENT/resources/models/*
 
+
 __pycache__
 *.vscode
 *.venv
@@ -10,7 +11,6 @@ __pycache__
 *.docx
 *.zip
 *.json
-!DILIGENT/app/configurations/files/*.json
 *.xlsx
 *.pdf
 *.csv   
@@ -22,3 +22,4 @@ __pycache__
 *.gz
 !.gitkeep
 
+!DILIGENT/setup/*.json
