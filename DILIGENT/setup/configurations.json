@@ -23,7 +23,10 @@
     "hf_embedding_model": "sentence-transformers/all-MiniLM-L6-v2",
     "vector_index_metric": "cosine",
     "vector_index_type": "IVF_FLAT",
-    "reset_vector_collection": true
+    "reset_vector_collection": true,
+    "cloud_provider": "",
+    "cloud_model": "",
+    "use_cloud_embeddings": false
   },
   "external_data": {
     "default_llm_timeout_seconds": 3600.0,
