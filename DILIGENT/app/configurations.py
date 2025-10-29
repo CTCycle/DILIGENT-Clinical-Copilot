@@ -5,10 +5,10 @@ import os
 from dataclasses import dataclass
 from typing import Any, Literal
 
-from DILIGENT.app.constants import CLOUD_MODEL_CHOICES
+from DILIGENT.app.constants import SETUP_DIR, CLOUD_MODEL_CHOICES
 
-CONFIG_DIRECTORY = os.path.dirname(__file__)
-CONFIG_FILE_PATH = os.path.join(CONFIG_DIRECTORY, "files", "app_config.json")
+CONFIGURATION_CACHE: dict[str, Any] | None = None
+CONFIGURATION_FILE = os.path.join(SETUP_DIR, "configurations.json")
 
 DEFAULT_CONFIGURATION: dict[str, Any] = {
     "ollama_host_default": "http://localhost:11434",
@@ -61,13 +61,13 @@ DEFAULT_CONFIGURATION: dict[str, Any] = {
 
 
 def load_configuration_file() -> dict[str, Any]:
-    if os.path.exists(CONFIG_FILE_PATH):
+    if os.path.exists(CONFIGURATION_FILE):
         try:
-            with open(CONFIG_FILE_PATH, "r", encoding="utf-8") as handle:
+            with open(CONFIGURATION_FILE, "r", encoding="utf-8") as handle:
                 return json.load(handle)
         except (OSError, json.JSONDecodeError) as exc:
             raise RuntimeError(
-                f"Unable to load configuration from {CONFIG_FILE_PATH}"
+                f"Unable to load configuration from {CONFIGURATION_FILE}"
             ) from exc
     return json.loads(json.dumps(DEFAULT_CONFIGURATION))
 
