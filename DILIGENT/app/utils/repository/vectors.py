@@ -41,6 +41,8 @@ class LanceVectorDatabase:
         self.index_type = index_type
         self.connection: LanceDBConnection | None = None
         self.table: LanceTable | None = None
+        self.index_ready = False
+        self.index_creation_attempted = False
 
     # -------------------------------------------------------------------------
     def connect(self) -> LanceDBConnection:
@@ -64,6 +66,8 @@ class LanceVectorDatabase:
             connection.drop_table(self.collection_name)
         if reset_table:
             self.table = None
+            self.index_ready = False
+            self.index_creation_attempted = False
 
     # -------------------------------------------------------------------------
     def get_table(self) -> LanceTable:
@@ -88,6 +92,8 @@ class LanceVectorDatabase:
                 schema=self.schema,
                 mode="create",
             )
+            self.index_ready = False
+            self.index_creation_attempted = False
         return self.table
 
     # -------------------------------------------------------------------------
@@ -103,6 +109,8 @@ class LanceVectorDatabase:
     def ensure_vector_index(self, table: LanceTable | None = None) -> None:
         if not self.metric or not self.index_type:
             return
+        if self.index_ready:
+            return
         table = table or self.get_table()
         try:
             indices = table.list_indices()
@@ -117,6 +125,7 @@ class LanceVectorDatabase:
                 or index.get("vector_column_name")
             )
             if column == "embedding":
+                self.index_ready = True
                 return
             if isinstance(column, dict):
                 name = (
@@ -126,10 +135,12 @@ class LanceVectorDatabase:
                     or column.get("vector_column_name")
                 )
                 if name == "embedding":
+                    self.index_ready = True
                     return
             if isinstance(column, (list, tuple)):
                 for entry in column:
                     if entry == "embedding":
+                        self.index_ready = True
                         return
                     if isinstance(entry, dict):
                         name = (
@@ -139,15 +150,35 @@ class LanceVectorDatabase:
                             or entry.get("vector_column_name")
                         )
                         if name == "embedding":
+                            self.index_ready = True
                             return
+        if self.index_creation_attempted:
+            return
+        self.index_creation_attempted = True
+        try:
+            schema = table.schema
+            embedding_field = schema.field("embedding")
+        except KeyError:
+            logger.warning(
+                "Skipping LanceDB index creation because 'embedding' field is missing"
+            )
+            return
+        if not isinstance(embedding_field.type, pa.FixedSizeListType):
+            logger.warning(
+                "Skipping LanceDB vector index creation; expected FixedSizeList for 'embedding' column but received %s",
+                embedding_field.type,
+            )
+            return
         try:
             table.create_index(
                 vector_column_name="embedding",
                 metric=self.metric,
                 index_type=self.index_type,
             )
+            self.index_ready = True
         except Exception as exc:  # noqa: BLE001
             logger.error("Failed to create LanceDB vector index: %s", exc)
+            self.index_ready = False
 
     # -------------------------------------------------------------------------
     def load_embeddings(self, limit: int | None = None) -> list[dict[str, Any]]:
@@ -164,6 +195,8 @@ class LanceVectorDatabase:
             logger.info("Dropping LanceDB table '%s'", self.collection_name)
             connection.drop_table(self.collection_name)
         self.table = None
+        self.index_ready = False
+        self.index_creation_attempted = False
 
     # -------------------------------------------------------------------------
     def to_json(self, limit: int | None = None) -> str:
