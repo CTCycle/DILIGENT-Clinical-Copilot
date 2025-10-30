@@ -133,12 +133,14 @@ class HepatoxConsultation:
         drugs: PatientDrugs,
         *,
         patient_name: str | None = None,
+        use_rag: bool = False,
         timeout_s: float = DEFAULT_LLM_TIMEOUT_SECONDS,
         temperature: float | None = None,
         report_temperature: float | None = None,
     ) -> None:
         self.drugs = drugs
         self.timeout_s = timeout_s
+        self.use_rag = bool(use_rag)
         self.serializer = DataSerializer()
         self.livertox_df = None
         self.master_list_df = None
@@ -191,6 +193,7 @@ class HepatoxConsultation:
             clinical_context=clinical_context,
             visit_date=visit_date,
             pattern_score=pattern_score,
+            use_rag=self.use_rag,
         )
         return report.model_dump()
 
@@ -235,6 +238,7 @@ class HepatoxConsultation:
         clinical_context: str | None,
         visit_date: date | None,
         pattern_score: HepatotoxicityPatternScore | None,
+        use_rag: bool,
     ) -> PatientDrugClinicalReport:
         normalized_context = (clinical_context or "").strip()
         if not normalized_context:
@@ -258,6 +262,14 @@ class HepatoxConsultation:
             elif isinstance(raw_excerpts, list):
                 excerpts_list = [item for item in raw_excerpts if isinstance(item, str)]
             else:
+                excerpts_list = []
+
+            if not use_rag and excerpts_list:
+                logger.info(
+                    "RAG disabled; ignoring %s retrieved excerpt(s) for '%s'",
+                    len(excerpts_list),
+                    drug_entry.name,
+                )
                 excerpts_list = []
 
             suspension = self.evaluate_suspension(drug_entry, visit_date)
