@@ -132,7 +132,11 @@ async def process_single_patient(payload: PatientData) -> str:
     logger.info("Drugs extraction required %.4f seconds", elapsed)
     logger.info("Detected %s drugs", len(drug_data.entries))
 
-    clinical_session = HepatoxConsultation(drug_data, patient_name=payload.name)
+    clinical_session = HepatoxConsultation(
+        drug_data,
+        patient_name=payload.name,
+        use_rag=payload.use_rag,
+    )
     drug_assessment = await clinical_session.run_analysis(
         clinical_context=payload.anamnesis,
         visit_date=payload.visit_date,
