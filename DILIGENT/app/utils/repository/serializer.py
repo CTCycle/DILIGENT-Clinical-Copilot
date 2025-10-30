@@ -14,67 +14,11 @@ from langchain_core.documents import Document
 from langchain_text_splitters import RecursiveCharacterTextSplitter
 from sqlalchemy.exc import SQLAlchemyError
 
+from DILIGENT.app.constants import LIVERTOX_COLUMNS
 from DILIGENT.app.logger import logger
 from DILIGENT.app.utils.repository.database import ClinicalSession, database
 from DILIGENT.app.utils.repository.vectors import LanceVectorDatabase
 from DILIGENT.app.utils.services.embeddings import EmbeddingGenerator
-
-
-# [DATA SERIALIZATION]
-###############################################################################
-LIVERTOX_COLUMNS = [
-    "drug_name",
-    "nbk_id",
-    "excerpt",
-    "likelihood_score",
-    "last_update",
-    "reference_count",
-    "year_approved",
-    "agent_classification",
-    "primary_classification",
-    "secondary_classification",
-    "include_in_livertox",
-    "source_url",
-    "source_last_modified",
-]
-
-FDA_COLUMNS = [
-    "report_id",
-    "case_version",
-    "receipt_date",
-    "occur_country",
-    "patient_age",
-    "patient_age_unit",
-    "patient_sex",
-    "reaction_terms",
-    "all_reactions",
-    "suspect_products",
-    "suspect_product_count",
-    "serious",
-    "seriousness_death",
-    "seriousness_lifethreatening",
-    "seriousness_hospitalization",
-    "seriousness_disabling",
-    "seriousness_congenital_anom",
-    "seriousness_other",
-]
-
-HEPATOTOXIC_MEDDRA_TERMS = {
-    "hepatotoxicity",
-    "drug induced liver injury",
-    "drug-induced liver injury",
-    "liver injury",
-    "hepatic failure",
-    "acute hepatic failure",
-    "hepatitis cholestatic",
-    "cholestasis",
-    "liver disorder",
-    "liver function test increased",
-    "alanine aminotransferase increased",
-    "aspartate aminotransferase increased",
-    "alkaline phosphatase increased",
-    "blood bilirubin increased",
-}
 
 
 ###############################################################################
@@ -559,8 +503,7 @@ class VectorSerializer:
         self.embedding_generator = EmbeddingGenerator(
             backend=embedding_backend,
             ollama_base_url=ollama_base_url,
-            ollama_model=ollama_model,
-            hf_model=hf_model,
+            ollama_model=ollama_model,            
             use_cloud_embeddings=use_cloud_embeddings,
             cloud_provider=cloud_provider,
             cloud_embedding_model=cloud_embedding_model,
