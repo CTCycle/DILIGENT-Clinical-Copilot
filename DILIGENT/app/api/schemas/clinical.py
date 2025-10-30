@@ -239,46 +239,6 @@ class PatientOutputReport(BaseModel):
 
 
 ###############################################################################
-class BloodTest(BaseModel):
-    """A single blood test result extracted from text."""
-
-    name: str = Field(
-        ..., description="Test name exactly as found (minimally normalized)."
-    )
-    value: float | None = Field(
-        None, description="Numeric value if applicable (dot-decimal)."
-    )
-    value_text: str | None = Field(
-        None, description="Raw textual value when not numeric (e.g., '1:80')."
-    )
-    unit: str | None = Field(None, description="Unit as found, if present.")
-    cutoff: float | None = Field(None, description="Cutoff/upper limit if provided.")
-    cutoff_unit: str | None = Field(
-        None, description="Cutoff unit if specified; often same as unit."
-    )
-    note: str | None = Field(
-        None, description="Parenthetical note not related to cutoff."
-    )
-    context_date: str | None = Field(
-        None,
-        description="ISO YYYY-MM-DD if parsed, else original date string for this batch.",
-    )
-
-    @field_validator("name")
-    @classmethod
-    def normalize_name(cls, v: str) -> str:
-        v = re.sub(r"\s+", " ", v.strip())
-        return v.rstrip(",:;.- ")
-
-
-# -----------------------------------------------------------------------------
-class PatientBloodTests(BaseModel):
-    """Container for parsed blood test entries."""
-
-    entries: list[BloodTest] = Field(default_factory=list)
-
-
-###############################################################################
 class DrugEntry(BaseModel):
     """A single drug prescription extracted from text."""
 

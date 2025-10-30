@@ -1,12 +1,14 @@
 from __future__ import annotations
 
 import asyncio
+from collections import defaultdict
 import time
 from datetime import date, datetime
 from typing import Any
 
 from fastapi import APIRouter, Body, HTTPException, status
 from fastapi.responses import PlainTextResponse
+from lancedb import query
 from pydantic import ValidationError
 
 from DILIGENT.app.api.schemas.clinical import (
@@ -21,6 +23,7 @@ from DILIGENT.app.utils.services.clinical import (
 from DILIGENT.app.utils.services.parser import (
     DrugsParser,
 )
+from DILIGENT.app.utils.services.retrieval import DILIQueryBuilder
 
 drugs_parser = DrugsParser()
 pattern_analyzer = HepatotoxicityPatternAnalyzer()
@@ -132,15 +135,28 @@ async def process_single_patient(payload: PatientData) -> str:
     logger.info("Drugs extraction required %.4f seconds", elapsed)
     logger.info("Detected %s drugs", len(drug_data.entries))
 
+    # Optionally build a RAG query for each drug involved in clinical consultation
+    rag_query: dict[str, str] | None = None
+    if payload.use_rag:
+        query_builder = DILIQueryBuilder(drug_data)
+        logger.info("RAG retrieval enabled for clinical consultation")
+        rag_query = query_builder.build_dili_queries(
+            clinical_context=payload.anamnesis or "",
+            pattern_classification=pattern_score.classification,
+            r_score=pattern_score.r_score            
+        )
+
+    # Run the hepatotoxicity assessment using LLM calls to generate clinical report
+    # from clinical context, extracted drugs, hepatic pattern, and optional RAG data
     clinical_session = HepatoxConsultation(
         drug_data,
-        patient_name=payload.name,
-        use_rag=payload.use_rag,
+        patient_name=payload.name,        
     )
     drug_assessment = await clinical_session.run_analysis(
         clinical_context=payload.anamnesis,
         visit_date=payload.visit_date,
         pattern_score=pattern_score,
+        rag_query=rag_query,
     )
     elapsed = time.perf_counter() - start_time
     logger.info("Hepato-toxicity consultation required %.4f seconds", elapsed)

@@ -132,14 +132,14 @@ class LiverToxMatcher:
         return results
 
     # -------------------------------------------------------------------------
-    def build_patient_mapping(
+    def build_drugs_to_excerpt_mapping(
         self,
         patient_drugs: list[str],
         matches: list[LiverToxMatch | None],
-    ) -> list[dict[str, Any]]:
+    ) -> dict[str, Any]:
         # Combine patient drug names with matched monographs and excerpts to
         # create a payload suitable for downstream presentation.
-        entries: list[dict[str, Any]] = []
+        entries: dict[str, Any] = {}
         row_index = self.ensure_row_index()
         for original, match in zip(patient_drugs, matches, strict=False):
             row_data: dict[str, Any] | None = None
@@ -162,14 +162,17 @@ class LiverToxMatcher:
                     excerpts.append(match.record.excerpt)
                 if isinstance(excerpt_value, str) and excerpt_value:
                     excerpts.append(excerpt_value)
-            unique_excerpts = list(dict.fromkeys(excerpts))
-            entries.append(
-                {
-                    "drug_name": original,
+                unique_excerpts = list(dict.fromkeys(excerpts))  
+                      
+            else:
+                row_data = None
+                unique_excerpts = {}            
+            
+            entries[original] = {                    
                     "matched_livertox_row": row_data,
                     "extracted_excerpts": unique_excerpts,
                 }
-            )
+           
         return entries
 
     # -------------------------------------------------------------------------

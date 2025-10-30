@@ -1,10 +1,21 @@
+# --- file: embeddings.py (replace entire file) ---
 from __future__ import annotations
 
 import asyncio
 from collections.abc import Coroutine
-from typing import Any
+from typing import Any, Literal, cast
 
 from DILIGENT.app.api.models.providers import CloudLLMClient, OllamaClient
+
+
+ProviderName = Literal["openai", "azure-openai", "anthropic", "gemini"]
+EmbeddingBackend = Literal["ollama", "cloud"]
+ALLOWED_PROVIDERS: tuple[ProviderName, ...] = (
+    "openai",
+    "azure-openai",
+    "anthropic",
+    "gemini",
+)
 
 
 ###############################################################################
@@ -14,18 +25,20 @@ class EmbeddingGenerator:
         *,
         backend: str,
         ollama_base_url: str | None = None,
-        ollama_model: str | None = None,
-        hf_model: str | None = None,
+        ollama_model: str | None = None,        
         use_cloud_embeddings: bool = False,
         cloud_provider: str | None = None,
         cloud_embedding_model: str | None = None,
     ) -> None:
         normalized_backend = backend.lower().strip() if backend else "ollama"
-        self.backend = "cloud" if use_cloud_embeddings else normalized_backend
+        # Keep parameter flexible, but store as the constrained Literal type.
+        self.backend: EmbeddingBackend = (
+            "cloud" if use_cloud_embeddings else cast(EmbeddingBackend, normalized_backend)
+        )
 
         self.ollama_model: str | None = None
-        self.ollama_base_url: str | None = None        
-        self.cloud_provider: str | None = None
+        self.ollama_base_url: str | None = None
+        self.cloud_provider: ProviderName | None = None
         self.cloud_embedding_model: str | None = None
 
         if self.backend == "ollama":
@@ -33,13 +46,21 @@ class EmbeddingGenerator:
                 raise ValueError("Ollama embedding model is required")
             self.ollama_model = ollama_model
             self.ollama_base_url = ollama_base_url
-        
+
         elif self.backend == "cloud":
             if not cloud_provider:
                 raise ValueError("Cloud provider is required for embeddings")
             if not cloud_embedding_model:
                 raise ValueError("Cloud embedding model is required")
-            self.cloud_provider = cloud_provider
+
+            provider_normalized = cloud_provider.lower().strip()
+            if provider_normalized not in ALLOWED_PROVIDERS:
+                raise ValueError(
+                    f"Unsupported cloud provider: {cloud_provider}. "
+                    f"Allowed: {', '.join(ALLOWED_PROVIDERS)}"
+                )
+            # Safe cast after validation against ALLOWED_PROVIDERS.
+            self.cloud_provider = cast(ProviderName, provider_normalized)
             self.cloud_embedding_model = cloud_embedding_model
         else:
             raise ValueError(f"Unsupported embedding backend: {backend}")
@@ -55,7 +76,7 @@ class EmbeddingGenerator:
                 raise ValueError("Ollama embedding model is not configured")
             embeddings = self.run_async(
                 self.embed_with_ollama(sanitized, self.ollama_model)
-            )        
+            )
         elif self.backend == "cloud":
             if self.cloud_provider is None or self.cloud_embedding_model is None:
                 raise ValueError("Cloud embedding configuration is not set")
@@ -106,7 +127,7 @@ class EmbeddingGenerator:
 
     # -------------------------------------------------------------------------
     async def embed_with_cloud(
-        self, texts: list[str], provider: str, model: str
+        self, texts: list[str], provider: ProviderName, model: str
     ) -> list[list[float]]:
         async with CloudLLMClient(
             provider=provider, default_model=model

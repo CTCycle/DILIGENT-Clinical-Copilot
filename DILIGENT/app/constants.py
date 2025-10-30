@@ -70,3 +70,38 @@ OPENFDA_DOWNLOAD_BASE_URL = "https://download.open.fda.gov"
 OPENFDA_DOWNLOAD_CATALOG_URL = "https://api.fda.gov/download.json"
 OPENFDA_DRUG_EVENT_DATASET = "drug/event"
 OPENFDA_DRUG_EVENT_INDEX = "drug-event.json"
+
+
+LIVERTOX_COLUMNS = [
+    "drug_name",
+    "nbk_id",
+    "excerpt",
+    "likelihood_score",
+    "last_update",
+    "reference_count",
+    "year_approved",
+    "agent_classification",
+    "primary_classification",
+    "secondary_classification",
+    "include_in_livertox",
+    "source_url",
+    "source_last_modified",
+]
+
+
+HEPATOTOXIC_MEDDRA_TERMS = {
+    "hepatotoxicity",
+    "drug induced liver injury",
+    "drug-induced liver injury",
+    "liver injury",
+    "hepatic failure",
+    "acute hepatic failure",
+    "hepatitis cholestatic",
+    "cholestasis",
+    "liver disorder",
+    "liver function test increased",
+    "alanine aminotransferase increased",
+    "aspartate aminotransferase increased",
+    "alkaline phosphatase increased",
+    "blood bilirubin increased",
+}
