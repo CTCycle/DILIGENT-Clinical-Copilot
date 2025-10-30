@@ -152,10 +152,10 @@ def test_partial_match_with_duplicate_nbk_ids():
     assert match.matched_name == "Alpha Drug"
 
 
-def test_build_patient_mapping_uses_monograph_rows():
+def test_build_drugs_to_excerpt_mapping_uses_monograph_rows():
     matcher = build_matcher()
     matches = run_match(matcher, ["Xarelto"])
-    mapping = matcher.build_patient_mapping(["Xarelto"], matches)
+    mapping = matcher.build_drugs_to_excerpt_mapping(["Xarelto"], matches)
     assert mapping[0]["matched_livertox_row"]["drug_name"] == "Rivaroxaban"
 
 
@@ -168,7 +168,7 @@ def test_extract_synonym_strings_handles_recursive_input():
     assert results == ["Valid Entry"]
 
 
-def test_build_patient_mapping_with_duplicate_nbk_ids():
+def test_build_drugs_to_excerpt_mapping_with_duplicate_nbk_ids():
     monographs = pd.DataFrame(
         [
             {
@@ -185,7 +185,7 @@ def test_build_patient_mapping_with_duplicate_nbk_ids():
     )
     matcher = LiverToxMatcher(monographs)
     matches = run_match(matcher, ["Alpha Drug", "Beta Drug"])
-    mapping = matcher.build_patient_mapping(["Alpha Drug", "Beta Drug"], matches)
+    mapping = matcher.build_drugs_to_excerpt_mapping(["Alpha Drug", "Beta Drug"], matches)
     assert mapping[0]["matched_livertox_row"]["excerpt"] == "Alpha excerpt"
     assert mapping[1]["matched_livertox_row"]["excerpt"] == "Beta excerpt"
     assert mapping[0]["matched_livertox_row"]["drug_name"] == "Alpha Drug"

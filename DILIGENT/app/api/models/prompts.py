@@ -52,6 +52,7 @@ You are a **clinical hepatologist** with expertise in assessing **drug-induced l
 - Base all judgments **exclusively** on:
   - the provided **LiverTox excerpt**
   - the patient’s **clinical context** (verbatim anamnesis, including embedded exams and lab data)
+  - Any optional additional text from retrieved clinical documents.
 - Do **not** speculate or introduce information beyond these sources.
 - Derive **comorbidities and hepatic history** directly from the anamnesis, even if presented in a non-English language.
 
@@ -75,6 +76,9 @@ LIVERTOX_CLINICAL_USER_PROMPT = """
 
 # LiverTox Excerpt
 {excerpt}
+
+# Optional text from retrieved documents
+{documents}
 
 # Patient Clinical Context
 {clinical_context}
@@ -125,3 +129,4 @@ LIVERTOX_CONCLUSION_USER_PROMPT = """
 
 
 """
+

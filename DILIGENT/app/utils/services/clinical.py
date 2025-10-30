@@ -7,6 +7,8 @@ import re
 from datetime import date, datetime
 from typing import Any
 
+from langchain_community.document_loaders.blackboard import documents
+
 from DILIGENT.app.api.models.prompts import (
     LIVERTOX_CONCLUSION_SYSTEM_PROMPT,
     LIVERTOX_CONCLUSION_USER_PROMPT,
@@ -35,24 +37,10 @@ from DILIGENT.app.utils.services.pharma import LiverToxMatch, LiverToxMatcher
 
 
 ###############################################################################
-def resolve_temperature(preferred: float | None, *, scale: float = 1.0) -> float:
-    # Respect runtime overrides while clamping to the provider-supported range
-    base_value = ClientRuntimeConfig.get_ollama_temperature()
-    if preferred is not None:
-        try:
-            value = float(preferred)
-        except (TypeError, ValueError):
-            value = base_value * scale
-    else:
-        value = base_value * scale
-    value = max(0.0, min(2.0, value))
-    return round(value, 2)
-
-
-###############################################################################
 class HepatotoxicityPatternAnalyzer:
+
     def __init__(self) -> None:
-        pass
+        self.r_score: float | None = None
 
     # -------------------------------------------------------------------------
     def calculate_hepatotoxicity_pattern(
@@ -66,7 +54,7 @@ class HepatotoxicityPatternAnalyzer:
         alt_multiple = self.safe_ratio(alt_value, alt_max_value)
         alp_multiple = self.safe_ratio(alp_value, alp_max_value)
 
-        r_score: float | None = None
+        r_score = None
         if alt_multiple is not None and alp_multiple not in (None, 0.0):
             r_score = alt_multiple / alp_multiple
 
@@ -79,6 +67,8 @@ class HepatotoxicityPatternAnalyzer:
             else:
                 classification = "mixed"
 
+        self.r_score = r_score
+        
         return HepatotoxicityPatternScore(
             alt_multiple=alt_multiple,
             alp_multiple=alp_multiple,
@@ -132,15 +122,11 @@ class HepatoxConsultation:
         self,
         drugs: PatientDrugs,
         *,
-        patient_name: str | None = None,
-        use_rag: bool = False,
-        timeout_s: float = DEFAULT_LLM_TIMEOUT_SECONDS,
-        temperature: float | None = None,
-        report_temperature: float | None = None,
+        patient_name: str | None = None,        
+        timeout_s: float = DEFAULT_LLM_TIMEOUT_SECONDS,        
     ) -> None:
         self.drugs = drugs
-        self.timeout_s = timeout_s
-        self.use_rag = bool(use_rag)
+        self.timeout_s = timeout_s            
         self.serializer = DataSerializer()
         self.livertox_df = None
         self.master_list_df = None
@@ -148,9 +134,7 @@ class HepatoxConsultation:
         self.llm_client = initialize_llm_client(purpose="clinical", timeout_s=timeout_s)
         self.MAX_EXCERPT_LENGTH = MAX_EXCERPT_LENGTH
         self.patient_name = (patient_name or "").strip() or None
-        provider, model_candidate = ClientRuntimeConfig.resolve_provider_and_model(
-            "clinical"
-        )
+        _, model_candidate = ClientRuntimeConfig.resolve_provider_and_model("clinical")
         self.llm_model = model_candidate or ClientRuntimeConfig.get_clinical_model()
         try:
             chat_signature = inspect.signature(self.llm_client.chat)
@@ -159,8 +143,7 @@ class HepatoxConsultation:
         self.chat_supports_temperature = (
             chat_signature is not None and "temperature" in chat_signature.parameters
         )
-        self.temperature = resolve_temperature(temperature)
-        self.report_temperature = resolve_temperature(report_temperature, scale=0.5)
+        self.temperature = ClientRuntimeConfig.get_ollama_temperature()        
 
     # -------------------------------------------------------------------------
     async def run_analysis(
@@ -169,6 +152,7 @@ class HepatoxConsultation:
         clinical_context: str | None = None,
         visit_date: date | None = None,
         pattern_score: HepatotoxicityPatternScore | None = None,
+        rag_query: dict[str, str] | None = None,
     ) -> dict[str, Any] | None:
         patient_drugs = [entry.name for entry in self.drugs.entries if entry.name]
         if not patient_drugs:
@@ -183,17 +167,19 @@ class HepatoxConsultation:
             self.matcher.match_drug_names,
             patient_drugs,
         )
-        resolved = await asyncio.to_thread(
-            self.matcher.build_patient_mapping,
+
+        # extract livertox excertps for matched drugs
+        livertox_information = await asyncio.to_thread(
+            self.matcher.build_drugs_to_excerpt_mapping,
             patient_drugs,
             matches,
         )
         report = await self.compile_clinical_assessment(
-            resolved,
+            livertox_information,
             clinical_context=clinical_context,
             visit_date=visit_date,
             pattern_score=pattern_score,
-            use_rag=self.use_rag,
+            rag_query=rag_query,            
         )
         return report.model_dump()
 
@@ -233,45 +219,27 @@ class HepatoxConsultation:
     # -------------------------------------------------------------------------
     async def compile_clinical_assessment(
         self,
-        resolved_entries: list[dict[str, Any]],
+        resolved_drugs: dict[str, dict[str, Any]],
         *,
         clinical_context: str | None,
         visit_date: date | None,
-        pattern_score: HepatotoxicityPatternScore | None,
-        use_rag: bool,
+        pattern_score: HepatotoxicityPatternScore | None, 
+        rag_query: dict[str, str] | None = None,       
     ) -> PatientDrugClinicalReport:
-        normalized_context = (clinical_context or "").strip()
-        if not normalized_context:
-            normalized_context = "No synthesised clinical context was generated."
+        normalized_context = (clinical_context or "").strip()        
         pattern_prompt = self.format_pattern_prompt(pattern_score)
 
         entries: list[DrugClinicalAssessment] = []
         llm_jobs: list[tuple[int, Any]] = []
 
+        # iterate over all drugs to identify those with LiverTox excerpts and those without
         for idx, drug_entry in enumerate(self.drugs.entries):
-            resolved = resolved_entries[idx] if idx < len(resolved_entries) else {}
-            if not isinstance(resolved, dict):
-                resolved = {}
-
-            matched_row = resolved.get("matched_livertox_row")
-            if not isinstance(matched_row, dict):
-                matched_row = None
-            raw_excerpts = resolved.get("extracted_excerpts")
-            if isinstance(raw_excerpts, str):
-                excerpts_list = [raw_excerpts]
-            elif isinstance(raw_excerpts, list):
-                excerpts_list = [item for item in raw_excerpts if isinstance(item, str)]
-            else:
-                excerpts_list = []
-
-            if not use_rag and excerpts_list:
-                logger.info(
-                    "RAG disabled; ignoring %s retrieved excerpt(s) for '%s'",
-                    len(excerpts_list),
-                    drug_entry.name,
-                )
-                excerpts_list = []
-
+            has_excerpt = any(x.get("drug_name") == drug_entry.name for x in resolved_drugs.values())
+            livertox_data = resolved_drugs.get(drug_entry.name)         
+            
+            matched_row = livertox_data.get("matched_livertox_row", None)            
+            excerpts_list = livertox_data.get("extracted_excerpts", [])
+          
             suspension = self.evaluate_suspension(drug_entry, visit_date)
             entry = DrugClinicalAssessment(
                 drug_name=drug_entry.name,
@@ -292,6 +260,10 @@ class HepatoxConsultation:
                 entry.paragraph = self.build_missing_excerpt_paragraph(entry)
                 continue
 
+            # if requested, perform Retrieval-Augmented Generation (RAG) to enhance clinical context
+            if rag_query is not None:
+                pass
+
             # Kick off the patient-specific assessment for each candidate drug
             llm_jobs.append(
                 (
@@ -299,6 +271,7 @@ class HepatoxConsultation:
                     self.request_drug_analysis(
                         drug_name=drug_entry.name,
                         excerpt=excerpt,
+                        RAG_documents=None,
                         clinical_context=normalized_context,
                         suspension=suspension,
                         pattern_summary=pattern_prompt,
@@ -641,6 +614,7 @@ class HepatoxConsultation:
         *,
         drug_name: str,
         excerpt: str,
+        RAG_documents: str | None,
         clinical_context: str,
         suspension: DrugSuspensionContext,
         pattern_summary: str,
@@ -649,9 +623,11 @@ class HepatoxConsultation:
         start_details = self.format_start_prompt(suspension)
         suspension_details = self.format_suspension_prompt(suspension)
         score, metadata_block = self.prepare_metadata_prompt(metadata)
+        RAG_documents = RAG_documents or "No additional documents provided."
         user_prompt = LIVERTOX_CLINICAL_USER_PROMPT.format(
             drug_name=self.escape_braces(drug_name.strip() or drug_name),
             excerpt=self.escape_braces(excerpt),
+            documents=self.escape_braces(RAG_documents),
             clinical_context=self.escape_braces(clinical_context),
             therapy_start_details=self.escape_braces(start_details),
             suspension_details=self.escape_braces(suspension_details),
@@ -746,9 +722,9 @@ class HepatoxConsultation:
             "messages": messages,
         }
         if self.chat_supports_temperature:
-            chat_kwargs["temperature"] = self.report_temperature
+            chat_kwargs["temperature"] = self.temperature
         else:
-            chat_kwargs["options"] = {"temperature": self.report_temperature}
+            chat_kwargs["options"] = {"temperature": self.temperature}
         try:
             raw_response = await self.llm_client.chat(**chat_kwargs)
         except Exception as exc:  # noqa: BLE001
