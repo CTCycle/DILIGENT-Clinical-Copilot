@@ -33,6 +33,7 @@ from DILIGENT.app.configurations import (
 )
 from DILIGENT.app.logger import logger
 from DILIGENT.app.utils.repository.serializer import DataSerializer
+from DILIGENT.app.utils.services.embeddings import SimilaritySearch
 from DILIGENT.app.utils.services.pharma import LiverToxMatch, LiverToxMatcher
 
 
@@ -143,7 +144,9 @@ class HepatoxConsultation:
         self.chat_supports_temperature = (
             chat_signature is not None and "temperature" in chat_signature.parameters
         )
-        self.temperature = ClientRuntimeConfig.get_ollama_temperature()        
+        self.temperature = ClientRuntimeConfig.get_ollama_temperature()
+        self.similarity_search: SimilaritySearch | None = None
+        self.rag_top_k = 5
 
     # -------------------------------------------------------------------------
     async def run_analysis(
@@ -174,12 +177,13 @@ class HepatoxConsultation:
             patient_drugs,
             matches,
         )
+        resolved_mapping = self.normalize_livertox_mapping(livertox_information)
         report = await self.compile_clinical_assessment(
-            livertox_information,
+            resolved_mapping,
             clinical_context=clinical_context,
             visit_date=visit_date,
             pattern_score=pattern_score,
-            rag_query=rag_query,            
+            rag_query=rag_query,
         )
         return report.model_dump()
 
@@ -226,20 +230,38 @@ class HepatoxConsultation:
         pattern_score: HepatotoxicityPatternScore | None, 
         rag_query: dict[str, str] | None = None,       
     ) -> PatientDrugClinicalReport:
-        normalized_context = (clinical_context or "").strip()        
+        normalized_context = (clinical_context or "").strip()
         pattern_prompt = self.format_pattern_prompt(pattern_score)
 
         entries: list[DrugClinicalAssessment] = []
         llm_jobs: list[tuple[int, Any]] = []
+        rag_queries: dict[str, str] = {}
+        rag_cache: dict[str, str | None] = {}
+        if isinstance(rag_query, dict):
+            for key, value in rag_query.items():
+                if not isinstance(key, str) or not isinstance(value, str):
+                    continue
+                normalized_key = key.strip()
+                normalized_value = value.strip()
+                if not normalized_key or not normalized_value:
+                    continue
+                rag_queries[normalized_key.lower()] = normalized_value
+            if rag_queries and not self.ensure_similarity_search():
+                rag_queries = {}
 
         # iterate over all drugs to identify those with LiverTox excerpts and those without
         for idx, drug_entry in enumerate(self.drugs.entries):
-            has_excerpt = any(x.get("drug_name") == drug_entry.name for x in resolved_drugs.values())
-            livertox_data = resolved_drugs.get(drug_entry.name)         
-            
-            matched_row = livertox_data.get("matched_livertox_row", None)            
+            raw_name = drug_entry.name or ""
+            normalized_drug_name = raw_name.strip()
+            has_excerpt = any(
+                x.get("drug_name") == normalized_drug_name
+                for x in resolved_drugs.values()
+            )
+            livertox_data = resolved_drugs.get(normalized_drug_name, {})
+
+            matched_row = livertox_data.get("matched_livertox_row", None)
             excerpts_list = livertox_data.get("extracted_excerpts", [])
-          
+
             suspension = self.evaluate_suspension(drug_entry, visit_date)
             entry = DrugClinicalAssessment(
                 drug_name=drug_entry.name,
@@ -261,8 +283,20 @@ class HepatoxConsultation:
                 continue
 
             # if requested, perform Retrieval-Augmented Generation (RAG) to enhance clinical context
-            if rag_query is not None:
-                pass
+            rag_documents = None
+            if rag_queries and normalized_drug_name:
+                normalized_key = normalized_drug_name.lower()
+                if normalized_key:
+                    if normalized_key not in rag_cache:
+                        query_text = rag_queries.get(normalized_key)
+                        if query_text:
+                            rag_cache[normalized_key] = self.search_supporting_documents(
+                                query_text,
+                                top_k=self.rag_top_k,
+                            )
+                        else:
+                            rag_cache[normalized_key] = None
+                    rag_documents = rag_cache.get(normalized_key)
 
             # Kick off the patient-specific assessment for each candidate drug
             llm_jobs.append(
@@ -271,7 +305,7 @@ class HepatoxConsultation:
                     self.request_drug_analysis(
                         drug_name=drug_entry.name,
                         excerpt=excerpt,
-                        RAG_documents=None,
+                        RAG_documents=rag_documents or None,
                         clinical_context=normalized_context,
                         suspension=suspension,
                         pattern_summary=pattern_prompt,
@@ -304,6 +338,56 @@ class HepatoxConsultation:
         return PatientDrugClinicalReport(entries=entries, final_report=final_report)
 
     # -------------------------------------------------------------------------
+    def ensure_similarity_search(self) -> bool:
+        if self.similarity_search is not None:
+            return True
+        try:
+            self.similarity_search = SimilaritySearch()
+        except Exception as exc:  # noqa: BLE001
+            logger.error("Failed to initialize similarity search: %s", exc)
+            self.similarity_search = None
+            return False
+        return True
+
+    # -------------------------------------------------------------------------
+    def normalize_livertox_mapping(self, data: Any) -> dict[str, dict[str, Any]]:
+        normalized: dict[str, dict[str, Any]] = {}
+        if isinstance(data, dict):
+            for key, value in data.items():
+                if not isinstance(key, str):
+                    continue
+                stripped_key = key.strip()
+                if not stripped_key:
+                    continue
+                if not isinstance(value, dict):
+                    continue
+                normalized[stripped_key] = {
+                    "drug_name": stripped_key,
+                    "matched_livertox_row": value.get("matched_livertox_row"),
+                    "extracted_excerpts": self.normalize_excerpt_list(
+                        value.get("extracted_excerpts")
+                    ),
+                }
+        elif isinstance(data, list):
+            for item in data:
+                if not isinstance(item, dict):
+                    continue
+                drug_name = item.get("drug_name")
+                if not isinstance(drug_name, str):
+                    continue
+                stripped_name = drug_name.strip()
+                if not stripped_name:
+                    continue
+                normalized[stripped_name] = {
+                    "drug_name": stripped_name,
+                    "matched_livertox_row": item.get("matched_livertox_row"),
+                    "extracted_excerpts": self.normalize_excerpt_list(
+                        item.get("extracted_excerpts")
+                    ),
+                }
+        return normalized
+
+    # -------------------------------------------------------------------------
     def select_excerpt(self, excerpts: list[str]) -> str | None:
         excerpts = [chunk.strip() for chunk in excerpts if chunk.strip()]
         if not excerpts:
@@ -317,6 +401,64 @@ class HepatoxConsultation:
         if cutoff > 2000:
             truncated = truncated[:cutoff]
         return truncated.strip()
+
+    # -------------------------------------------------------------------------
+    def normalize_excerpt_list(self, excerpts: Any) -> list[str]:
+        if isinstance(excerpts, list):
+            normalized: list[str] = []
+            for entry in excerpts:
+                if isinstance(entry, str):
+                    stripped = entry.strip()
+                elif entry is None:
+                    stripped = ""
+                else:
+                    stripped = str(entry).strip()
+                if stripped:
+                    normalized.append(stripped)
+            return normalized
+        if isinstance(excerpts, str):
+            stripped = excerpts.strip()
+            return [stripped] if stripped else []
+        return []
+
+    # -------------------------------------------------------------------------
+    def search_supporting_documents(
+        self, query_text: str, *, top_k: int | None = None
+    ) -> str | None:
+        if not isinstance(query_text, str):
+            return None
+        normalized = query_text.strip()
+        if not normalized:
+            return None
+        if self.similarity_search is None:
+            return None
+        results = self.similarity_search.search(normalized, top_k=top_k)
+        if not results:
+            return None
+        fragments: list[str] = []
+        for index, record in enumerate(results, start=1):
+            text = str(record.get("text", "")).strip()
+            if not text:
+                continue
+            source = str(record.get("source", "") or "").strip()
+            metadata = record.get("metadata")
+            if not source and isinstance(metadata, dict):
+                fallback = metadata.get("file_name") or metadata.get("source")
+                if isinstance(fallback, str):
+                    source = fallback.strip()
+            if not source:
+                source = "Unknown source"
+            distance = record.get("distance")
+            if isinstance(distance, (int, float)):
+                header = (
+                    f"[Document {index} | Source: {source} | Distance: {distance:.4f}]"
+                )
+            else:
+                header = f"[Document {index} | Source: {source}]"
+            fragments.append(f"{header}\n{text}")
+        if not fragments:
+            return None
+        return "\n\n".join(fragments)
 
     # -------------------------------------------------------------------------
     def evaluate_suspension(
