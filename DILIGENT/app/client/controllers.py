@@ -7,8 +7,13 @@ from datetime import date, datetime
 from dataclasses import dataclass
 from typing import Any
 
+from fastapi import HTTPException, status
 import httpx
 
+from DILIGENT.app.utils.services.payload import (
+    normalize_visit_date, 
+    sanitize_dili_payload
+)
 from DILIGENT.app.api.models.providers import (
     OllamaClient,
     OllamaError,
@@ -73,13 +78,11 @@ def extract_text(result: Any) -> str:
         return str(result)
     return f"```json\n{formatted}\n```"
 
-
 # -----------------------------------------------------------------------------
 def build_json_output(payload: dict[str, Any] | list[Any] | None) -> ComponentUpdate:
     if payload is None:
         return ComponentUpdate(value=None, visible=False)
     return ComponentUpdate(value=payload, visible=True)
-
 
 # -----------------------------------------------------------------------------
 def create_export_file(content: str) -> str:
@@ -89,77 +92,12 @@ def create_export_file(content: str) -> str:
         handle.write(content)
     return file_path
 
-
 # -----------------------------------------------------------------------------
 def build_export_update(content: str | None) -> ComponentUpdate:
     if content:
         file_path = create_export_file(content)
         return ComponentUpdate(value=file_path, enabled=True, download_path=file_path)
     return ComponentUpdate(value=None, enabled=False, download_path=None)
-
-
-# -----------------------------------------------------------------------------
-def sanitize_field(value: str | None) -> str | None:
-    if value is None:
-        return None
-    stripped = value.strip()
-    return stripped or None
-
-
-# -----------------------------------------------------------------------------
-def normalize_visit_date(
-    value: datetime | date | dict[str, Any] | str | None,
-) -> date | None:
-    if value is None:
-        return None
-
-    if isinstance(value, dict):
-        day_raw = value.get("day")
-        month_raw = value.get("month")
-        year_raw = value.get("year")
-
-        if not isinstance(day_raw, (str, int)):
-            return None
-        if not isinstance(month_raw, (str, int)):
-            return None
-        if not isinstance(year_raw, (str, int)):
-            return None
-
-        try:
-            day = int(day_raw)
-            month = int(month_raw)
-            year = int(year_raw)
-            normalized = date(year, month, day)
-        except (TypeError, ValueError):
-            return None
-
-    elif isinstance(value, datetime):
-        normalized = value.date()
-
-    elif isinstance(value, date):
-        normalized = value
-
-    elif isinstance(value, str):
-        stripped = value.strip()
-        if not stripped:
-            return None
-        try:
-            parsed_datetime = datetime.fromisoformat(stripped)
-        except ValueError:
-            try:
-                normalized = date.fromisoformat(stripped)
-            except ValueError:
-                return None
-        else:
-            normalized = parsed_datetime.date()
-    else:
-        return None
-
-    today = date.today()
-    if normalized > today:
-        return today
-    return normalized
-
 
 # -----------------------------------------------------------------------------
 def normalize_visit_date_component(
@@ -170,32 +108,19 @@ def normalize_visit_date_component(
         return None
     return datetime.combine(normalized, datetime.min.time())
 
-
 # -----------------------------------------------------------------------------
-def toggle_cloud_services(
-    enabled: bool,
-) -> tuple[
-    ComponentUpdate,
-    ComponentUpdate,
-    ComponentUpdate,
-    ComponentUpdate,
-    ComponentUpdate,
-    ComponentUpdate,
-]:
+def toggle_cloud_services(enabled: bool) -> dict[str, ComponentUpdate]:
     ClientRuntimeConfig.set_use_cloud_services(enabled)
+
     provider = ClientRuntimeConfig.get_llm_provider()
     provider_update = ComponentUpdate(value=provider, enabled=enabled)
+
     models = CLOUD_MODEL_CHOICES.get(provider, [])
     selected_model = ClientRuntimeConfig.get_cloud_model()
     if selected_model not in models:
-        selected_model = ClientRuntimeConfig.set_cloud_model(
-            models[0] if models else ""
-        )
-    model_update = ComponentUpdate(
-        value=selected_model,
-        options=models,
-        enabled=enabled,
-    )
+        selected_model = ClientRuntimeConfig.set_cloud_model(models[0] if models else "")
+
+    model_update = ComponentUpdate(value=selected_model, options=models, enabled=enabled)
     button_update = ComponentUpdate(enabled=not enabled)
     temperature_update = ComponentUpdate(
         value=ClientRuntimeConfig.get_ollama_temperature(),
@@ -209,15 +134,15 @@ def toggle_cloud_services(
         value=ClientRuntimeConfig.get_clinical_model(),
         enabled=not enabled,
     )
-    return (
-        provider_update,
-        model_update,
-        button_update,
-        temperature_update,
-        reasoning_update,
-        clinical_update,
-    )
 
+    return {
+        "provider": provider_update,
+        "model": model_update,
+        "button": button_update,
+        "temperature": temperature_update,
+        "reasoning": reasoning_update,
+        "clinical": clinical_update,
+    }
 
 # -----------------------------------------------------------------------------
 def set_llm_provider(provider: str) -> tuple[str, ComponentUpdate]:
@@ -233,31 +158,25 @@ def set_llm_provider(provider: str) -> tuple[str, ComponentUpdate]:
     )
     return selected, model_update
 
-
 # -----------------------------------------------------------------------------
 def set_cloud_model(model: str) -> str:
     return ClientRuntimeConfig.set_cloud_model(model)
-
 
 # -----------------------------------------------------------------------------
 def set_parsing_model(model: str) -> str:
     return ClientRuntimeConfig.set_parsing_model(model)
 
-
 # -----------------------------------------------------------------------------
 def set_clinical_model(model: str) -> str:
     return ClientRuntimeConfig.set_clinical_model(model)
-
 
 # -----------------------------------------------------------------------------
 def set_ollama_temperature(value: float | None) -> float:
     return ClientRuntimeConfig.set_ollama_temperature(value)
 
-
 # -----------------------------------------------------------------------------
 def set_ollama_reasoning(enabled: bool) -> bool:
     return ClientRuntimeConfig.set_ollama_reasoning(enabled)
-
 
 # -----------------------------------------------------------------------------
 async def pull_selected_models(
@@ -290,7 +209,6 @@ async def pull_selected_models(
 
     pulled = ", ".join(models)
     return f"[INFO] Models available locally: {pulled}.", build_json_output(None)
-
 
 # -----------------------------------------------------------------------------
 def clear_session_fields() -> tuple[
@@ -394,36 +312,19 @@ async def run_DILI_session(
     alp_max: str,
     use_rag: bool,
 ) -> tuple[str, ComponentUpdate, ComponentUpdate]:
-    normalized_visit_date = normalize_visit_date(visit_date)
-
-    cleaned_payload = {
-        "name": sanitize_field(patient_name),
-        "visit_date": (
-            {
-                "day": normalized_visit_date.day,
-                "month": normalized_visit_date.month,
-                "year": normalized_visit_date.year,
-            }
-            if normalized_visit_date
-            else None
-        ),
-        "anamnesis": sanitize_field(anamnesis),
-        "has_hepatic_diseases": bool(has_hepatic_diseases),
-        "drugs": sanitize_field(drugs),
-        "alt": sanitize_field(alt),
-        "alt_max": sanitize_field(alt_max),
-        "alp": sanitize_field(alp),
-        "alp_max": sanitize_field(alp_max),
-        "use_rag": bool(use_rag),
-    }
-
-    if not any(cleaned_payload[key] for key in ("anamnesis", "drugs")):
-        return (
-            "[ERROR] Please provide at least one clinical section.",
-            build_json_output(None),
-            build_export_update(None),
+    cleaned_payload = sanitize_dili_payload(
+            patient_name=patient_name,
+            visit_date=visit_date,
+            anamnesis=anamnesis,
+            has_hepatic_diseases=has_hepatic_diseases,
+            drugs=drugs,
+            alt=alt,
+            alt_max=alt_max,
+            alp=alp,
+            alp_max=alp_max,
+            use_rag=use_rag,
         )
-
+    
     url = f"{API_BASE_URL}{CLINICAL_API_URL}"
     message, json_update = await trigger_session(url, cleaned_payload)
     normalized_message = message.strip() if message else ""
