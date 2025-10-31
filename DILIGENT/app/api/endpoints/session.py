@@ -107,12 +107,6 @@ def build_patient_narrative(
 # [ENPOINTS]
 ###############################################################################
 async def process_single_patient(payload: PatientData) -> str:
-    if payload.anamnesis is None or payload.drugs is None:
-        raise HTTPException(
-            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
-            detail="Both anamnesis and drugs fields are required.",
-        )
-
     logger.info(
         "Starting Drug-Induced Liver Injury (DILI) analysis for patient: %s",
         payload.name,
@@ -148,10 +142,7 @@ async def process_single_patient(payload: PatientData) -> str:
 
     # Run the hepatotoxicity assessment using LLM calls to generate clinical report
     # from clinical context, extracted drugs, hepatic pattern, and optional RAG data
-    clinical_session = HepatoxConsultation(
-        drug_data,
-        patient_name=payload.name,        
-    )
+    clinical_session = HepatoxConsultation(drug_data, patient_name=payload.name)
     drug_assessment = await clinical_session.run_analysis(
         clinical_context=payload.anamnesis,
         visit_date=payload.visit_date,
