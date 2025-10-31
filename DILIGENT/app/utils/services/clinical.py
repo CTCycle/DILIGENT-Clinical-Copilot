@@ -232,23 +232,9 @@ class HepatoxConsultation:
     ) -> PatientDrugClinicalReport:
         normalized_context = (clinical_context or "").strip()
         pattern_prompt = self.format_pattern_prompt(pattern_score)
-
         entries: list[DrugClinicalAssessment] = []
-        llm_jobs: list[tuple[int, Any]] = []
-        rag_queries: dict[str, str] = {}
-        rag_cache: dict[str, str | None] = {}
-        if isinstance(rag_query, dict):
-            for key, value in rag_query.items():
-                if not isinstance(key, str) or not isinstance(value, str):
-                    continue
-                normalized_key = key.strip()
-                normalized_value = value.strip()
-                if not normalized_key or not normalized_value:
-                    continue
-                rag_queries[normalized_key.lower()] = normalized_value
-            if rag_queries and not self.ensure_similarity_search():
-                rag_queries = {}
-
+        llm_jobs: list[tuple[int, Any]] = []       
+            
         # iterate over all drugs to identify those with LiverTox excerpts and those without
         for idx, drug_entry in enumerate(self.drugs.entries):
             raw_name = drug_entry.name or ""
@@ -284,19 +270,10 @@ class HepatoxConsultation:
 
             # if requested, perform Retrieval-Augmented Generation (RAG) to enhance clinical context
             rag_documents = None
-            if rag_queries and normalized_drug_name:
-                normalized_key = normalized_drug_name.lower()
-                if normalized_key:
-                    if normalized_key not in rag_cache:
-                        query_text = rag_queries.get(normalized_key)
-                        if query_text:
-                            rag_cache[normalized_key] = self.search_supporting_documents(
-                                query_text,
-                                top_k=self.rag_top_k,
-                            )
-                        else:
-                            rag_cache[normalized_key] = None
-                    rag_documents = rag_cache.get(normalized_key)
+            if rag_query is not None:
+                drug_RAG_query = rag_query.get(normalized_drug_name)
+                retrieved_docs = self.search_supporting_documents(drug_RAG_query, top_k=self.rag_top_k)
+  
 
             # Kick off the patient-specific assessment for each candidate drug
             llm_jobs.append(
@@ -423,7 +400,7 @@ class HepatoxConsultation:
 
     # -------------------------------------------------------------------------
     def search_supporting_documents(
-        self, query_text: str, *, top_k: int | None = None
+        self, query_text: str | Any, *, top_k: int | None = None
     ) -> str | None:
         if not isinstance(query_text, str):
             return None

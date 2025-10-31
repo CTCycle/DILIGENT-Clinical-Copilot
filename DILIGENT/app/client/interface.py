@@ -66,7 +66,7 @@ class ClientComponents:
     export_button: Any
     export_path: str | None = None
 
-
+# UPDATES
 ###############################################################################
 def apply_component_update(component: Any, update: ComponentUpdate) -> None:
     if update.value is not MISSING and hasattr(component, "value"):
@@ -88,8 +88,7 @@ def apply_component_update(component: Any, update: ComponentUpdate) -> None:
     if update.visible is not None and hasattr(component, "visible"):
         component.visible = update.visible
 
-
-###############################################################################
+# -----------------------------------------------------------------------------
 def apply_json_update(components: ClientComponents, update: ComponentUpdate) -> None:
     if update.value is not MISSING:
         if update.value is None:
@@ -100,8 +99,7 @@ def apply_json_update(components: ClientComponents, update: ComponentUpdate) -> 
     if update.visible is not None:
         components.json_container.visible = update.visible
 
-
-###############################################################################
+# -----------------------------------------------------------------------------
 def apply_export_update(components: ClientComponents, update: ComponentUpdate) -> None:
     if update.download_path is not None:
         components.export_path = update.download_path
@@ -114,22 +112,20 @@ def apply_export_update(components: ClientComponents, update: ComponentUpdate) -
         else:
             components.export_button.disable()
 
-
-###############################################################################
+# -----------------------------------------------------------------------------
 async def handle_toggle_cloud_services(
     components: ClientComponents, event: Any
 ) -> None:
     enabled = bool(event.value)
     updates = toggle_cloud_services(enabled)
-    apply_component_update(components.llm_provider_dropdown, updates[0])
-    apply_component_update(components.cloud_model_dropdown, updates[1])
-    apply_component_update(components.pull_models_button, updates[2])
-    apply_component_update(components.temperature_input, updates[3])
-    apply_component_update(components.reasoning_checkbox, updates[4])
-    apply_component_update(components.clinical_model_dropdown, updates[5])
+    apply_component_update(components.llm_provider_dropdown, updates["provider"])
+    apply_component_update(components.cloud_model_dropdown, updates["model"])
+    apply_component_update(components.pull_models_button, updates["button"])
+    apply_component_update(components.temperature_input, updates["temperature"])
+    apply_component_update(components.reasoning_checkbox, updates["reasoning"])
+    apply_component_update(components.clinical_model_dropdown, updates["clinical"])
 
-
-###############################################################################
+# -----------------------------------------------------------------------------
 async def handle_llm_provider_change(components: ClientComponents, event: Any) -> None:
     provider_value = str(event.value or "")
     selected, model_update = set_llm_provider(provider_value)
@@ -138,24 +134,21 @@ async def handle_llm_provider_change(components: ClientComponents, event: Any) -
         components.llm_provider_dropdown.update()
     apply_component_update(components.cloud_model_dropdown, model_update)
 
-
-###############################################################################
+# -----------------------------------------------------------------------------
 async def handle_cloud_model_change(components: ClientComponents, event: Any) -> None:
     selection = set_cloud_model(str(event.value or ""))
     if hasattr(components.cloud_model_dropdown, "value"):
         components.cloud_model_dropdown.value = selection
         components.cloud_model_dropdown.update()
 
-
-###############################################################################
+# -----------------------------------------------------------------------------
 async def handle_parsing_model_change(components: ClientComponents, event: Any) -> None:
     selection = set_parsing_model(str(event.value or ""))
     if hasattr(components.parsing_model_dropdown, "value"):
         components.parsing_model_dropdown.value = selection
         components.parsing_model_dropdown.update()
 
-
-###############################################################################
+# -----------------------------------------------------------------------------
 async def handle_clinical_model_change(
     components: ClientComponents, event: Any
 ) -> None:
@@ -164,8 +157,7 @@ async def handle_clinical_model_change(
         components.clinical_model_dropdown.value = selection
         components.clinical_model_dropdown.update()
 
-
-###############################################################################
+# -----------------------------------------------------------------------------
 async def handle_temperature_change(components: ClientComponents, event: Any) -> None:
     value = event.value if event.value is not None else None
     updated = set_ollama_temperature(value)
@@ -173,15 +165,23 @@ async def handle_temperature_change(components: ClientComponents, event: Any) ->
         components.temperature_input.value = updated
         components.temperature_input.update()
 
-
-###############################################################################
+# -----------------------------------------------------------------------------
 async def handle_reasoning_change(components: ClientComponents, event: Any) -> None:
     updated = set_ollama_reasoning(bool(event.value))
     if hasattr(components.reasoning_checkbox, "value"):
         components.reasoning_checkbox.value = updated
         components.reasoning_checkbox.update()
 
+# -----------------------------------------------------------------------------
+async def handle_visit_date_change(components: ClientComponents, event: Any) -> None:
+    normalized = normalize_visit_date_component(event.value)
+    if normalized is None:
+        components.visit_date.value = ""
+    else:
+        components.visit_date.value = normalized.date().isoformat()
+    components.visit_date.update()
 
+# ACTIONS
 ###############################################################################
 async def handle_pull_models_click(components: ClientComponents, event: Any) -> None:
     parsing_model = str(components.parsing_model_dropdown.value or "")
@@ -190,8 +190,7 @@ async def handle_pull_models_click(components: ClientComponents, event: Any) -> 
     components.markdown_output.set_content(message or "")
     apply_json_update(components, json_update)
 
-
-###############################################################################
+# -----------------------------------------------------------------------------
 async def handle_run_workflow(components: ClientComponents, event: Any) -> None:
     message, json_update, export_update = await run_DILI_session(
         components.patient_name.value,
@@ -209,8 +208,7 @@ async def handle_run_workflow(components: ClientComponents, event: Any) -> None:
     apply_json_update(components, json_update)
     apply_export_update(components, export_update)
 
-
-###############################################################################
+# -----------------------------------------------------------------------------
 async def handle_clear_click(components: ClientComponents, event: Any) -> None:
     (
         patient_name,
@@ -251,23 +249,12 @@ async def handle_clear_click(components: ClientComponents, event: Any) -> None:
     apply_json_update(components, json_update)
     apply_export_update(components, export_update)
 
-
-###############################################################################
-async def handle_visit_date_change(components: ClientComponents, event: Any) -> None:
-    normalized = normalize_visit_date_component(event.value)
-    if normalized is None:
-        components.visit_date.value = ""
-    else:
-        components.visit_date.value = normalized.date().isoformat()
-    components.visit_date.update()
-
-
-###############################################################################
+# -----------------------------------------------------------------------------
 async def handle_download_click(components: ClientComponents, event: Any) -> None:
     if components.export_path:
         ui.download(components.export_path)
 
-
+# MAIN UI PAGE
 ###############################################################################
 def main_page() -> None:
     provider = ClientRuntimeConfig.get_llm_provider()
@@ -481,12 +468,12 @@ def main_page() -> None:
     ui.run_javascript(f"({VISIT_DATE_LOCALE_JS})();")
 
 
+# MOUNT AND LAUNCH INTERFACE
 ###############################################################################
 def create_interface() -> None:
     ui.page("/")(main_page)
 
-
-###############################################################################
+# -----------------------------------------------------------------------------
 def launch_interface() -> None:
     create_interface()
     ui.run(
@@ -496,6 +483,6 @@ def launch_interface() -> None:
         show_welcome_message=False,
     )
 
-
+# -----------------------------------------------------------------------------
 if __name__ in {"__main__", "__mp_main__"}:
     launch_interface()
