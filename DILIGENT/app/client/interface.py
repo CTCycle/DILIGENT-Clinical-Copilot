@@ -128,7 +128,7 @@ async def handle_toggle_cloud_services(
     apply_component_update(components.clinical_model_dropdown, updates["clinical"])
 
 # -----------------------------------------------------------------------------
-async def handle_llm_provider_change(components: ClientComponents, event: Any) -> None:
+async def handle_cloud_provider_change(components: ClientComponents, event: Any) -> None:
     provider_value = str(event.value or "")
     selected, model_update = sync_cloud_model_options(
         provider_value, str(components.cloud_model_dropdown.value or "")
@@ -178,13 +178,13 @@ async def handle_run_workflow(components: ClientComponents, event: Any) -> None:
         components.patient_name.value,
         components.visit_date.value,
         components.anamnesis.value,
-        bool(components.has_diseases.value),
+        components.has_diseases.value,
         components.drugs.value,
         components.alt.value,
         components.alt_max.value,
         components.alp.value,
         components.alp_max.value,
-        bool(components.use_rag.value),
+        components.use_rag.value,
         settings,
     )
     components.markdown_output.set_content(message or "")
@@ -456,7 +456,7 @@ def main_page() -> None:
         partial(handle_toggle_cloud_services, components)
     )
     llm_provider_dropdown.on_value_change(
-        partial(handle_llm_provider_change, components)
+        partial(handle_cloud_provider_change, components)
     )
     pull_models_button.on("click", partial(handle_pull_models_click, components))
     run_button.on("click", partial(handle_run_workflow, components))
