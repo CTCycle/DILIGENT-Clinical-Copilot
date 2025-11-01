@@ -66,11 +66,6 @@ CLOUD_MODEL_CHOICES: dict[str, list[str]] = {
 ###############################################################################
 ATC_BASE_URL = "https://atcddd.fhi.no/atc_ddd_index/"
 LIVERTOX_BASE_URL = "https://ftp.ncbi.nlm.nih.gov/pub/litarch/29/31/"
-OPENFDA_DOWNLOAD_BASE_URL = "https://download.open.fda.gov"
-OPENFDA_DOWNLOAD_CATALOG_URL = "https://api.fda.gov/download.json"
-OPENFDA_DRUG_EVENT_DATASET = "drug/event"
-OPENFDA_DRUG_EVENT_INDEX = "drug-event.json"
-
 
 LIVERTOX_COLUMNS = [
     "drug_name",
@@ -87,7 +82,6 @@ LIVERTOX_COLUMNS = [
     "source_url",
     "source_last_modified",
 ]
-
 
 HEPATOTOXIC_MEDDRA_TERMS = {
     "hepatotoxicity",
@@ -201,7 +195,6 @@ CLINICAL_GENERIC_TERMS = {
 }
 
 RXNAV_SYNONYM_STOPWORDS = MATCHING_STOPWORDS | CLINICAL_GENERIC_TERMS
-
 
 __all__ = [
     "MATCHING_STOPWORDS",
