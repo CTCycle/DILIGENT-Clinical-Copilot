@@ -6,8 +6,8 @@ from fastapi import FastAPI
 from fastapi.responses import RedirectResponse
 from nicegui import ui
 
-from DILIGENT.app.api.endpoints.session import router as report_router
-from DILIGENT.app.api.endpoints.ollama import router as models_router
+from DILIGENT.app.api.endpoints.session import router as session_router
+from DILIGENT.app.api.endpoints.ollama import router as ollama_router
 from DILIGENT.app.client.interface import create_interface
 from DILIGENT.app.logger import logger
 from DILIGENT.app.utils.repository.database import database
@@ -20,13 +20,13 @@ if not os.path.exists(database.db_path):
     logger.info("DILIGENT database has been initialized successfully.")
 
 app = FastAPI(
-    title="LLM Backend",
+    title="DILIGENT Clinical Copilot Backend",
     version="0.1.0",
-    description="Minimal FastAPI bootstrap with chat, embeddings, and a placeholder endpoint.",
+    description="FastAPI backend",
 )
 
-app.include_router(report_router)
-app.include_router(models_router)
+app.include_router(session_router)
+app.include_router(ollama_router)
 
 create_interface()
 ui.run_with(
@@ -36,7 +36,6 @@ ui.run_with(
     show_welcome_message=False,
     reconnect_timeout=180,
 )
-
 
 @app.get("/")
 def redirect_to_ui() -> RedirectResponse:

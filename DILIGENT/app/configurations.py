@@ -10,6 +10,7 @@ from DILIGENT.app.constants import SETUP_DIR, CLOUD_MODEL_CHOICES
 CONFIGURATION_CACHE: dict[str, Any] | None = None
 CONFIGURATION_FILE = os.path.join(SETUP_DIR, "configurations.json")
 
+###############################################################################
 DEFAULT_CONFIGURATION: dict[str, Any] = {
     "ollama_host_default": "http://localhost:11434",
     "cloud_providers": ["openai", "gemini"],
@@ -64,7 +65,7 @@ DEFAULT_CONFIGURATION: dict[str, Any] = {
     },
 }
 
-
+###############################################################################
 def load_configuration_file() -> dict[str, Any]:
     if os.path.exists(CONFIGURATION_FILE):
         try:
@@ -76,7 +77,7 @@ def load_configuration_file() -> dict[str, Any]:
             ) from exc
     return json.loads(json.dumps(DEFAULT_CONFIGURATION))
 
-
+# -----------------------------------------------------------------------------
 def get_nested_value(data: dict[str, Any], *keys: str, default: Any | None = None) -> Any:
     current: Any = data
     for key in keys:
@@ -86,19 +87,16 @@ def get_nested_value(data: dict[str, Any], *keys: str, default: Any | None = Non
             return default
     return current
 
-
+###############################################################################
 CONFIGURATION_DATA = load_configuration_file()
-
 
 def get_configuration() -> dict[str, Any]:
     return CONFIGURATION_DATA
 
-
 def get_configuration_value(*keys: str, default: Any | None = None) -> Any:
     return get_nested_value(CONFIGURATION_DATA, *keys, default=default)
 
-
-CLOUD_PROVIDERS = list(get_configuration_value("cloud_providers", default=[]))
+###############################################################################
 CLIENT_DEFAULTS = get_configuration_value("client_defaults", default={})
 DEFAULT_PARSING_MODEL = CLIENT_DEFAULTS.get("default_parsing_model", "")
 DEFAULT_CLINICAL_MODEL = CLIENT_DEFAULTS.get("default_clinical_model", "")
@@ -111,15 +109,11 @@ DEFAULT_USE_CLOUD_SERVICES = CLIENT_DEFAULTS.get("default_use_cloud_services", F
 DEFAULT_OLLAMA_TEMPERATURE = CLIENT_DEFAULTS.get("default_ollama_temperature", 0.7)
 DEFAULT_OLLAMA_REASONING = CLIENT_DEFAULTS.get("default_ollama_reasoning", False)
 
-if DEFAULT_CLOUD_PROVIDER not in CLOUD_PROVIDERS and CLOUD_PROVIDERS:
-    DEFAULT_CLOUD_PROVIDER = CLOUD_PROVIDERS[0]
-
 cloud_models = CLOUD_MODEL_CHOICES.get(DEFAULT_CLOUD_PROVIDER, [])
 if DEFAULT_CLOUD_MODEL not in cloud_models:
     DEFAULT_CLOUD_MODEL = cloud_models[0] if cloud_models else ""
 
 OLLAMA_HOST_DEFAULT = get_configuration_value("ollama_host_default", default="")
-
 RAG_CONFIGURATION = get_configuration_value("rag", default={})
 VECTOR_COLLECTION_NAME = RAG_CONFIGURATION.get("vector_collection_name", "documents")
 RAG_CHUNK_SIZE = RAG_CONFIGURATION.get("chunk_size", 1024)
@@ -164,16 +158,6 @@ LLM_NULL_MATCH_NAMES = set(
 CLINICAL_ANALYSIS_CONFIGURATION = get_configuration_value("clinical_analysis", default={})
 ALT_LABELS = set(CLINICAL_ANALYSIS_CONFIGURATION.get("alt_labels", []))
 ALP_LABELS = set(CLINICAL_ANALYSIS_CONFIGURATION.get("alp_labels", []))
-
-
-###############################################################################
-class Configuration:
-    def __init__(self) -> None:
-        self.configuration = get_configuration()
-
-    # -------------------------------------------------------------------------
-    def get_configuration(self) -> dict[str, Any]:
-        return self.configuration
 
 
 ###############################################################################

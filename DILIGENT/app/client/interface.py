@@ -31,12 +31,14 @@ from DILIGENT.app.client.layouts import (
     VISIT_DATE_ELEMENT_ID,
     VISIT_DATE_LOCALE_JS,
 )
-from DILIGENT.app.configurations import (ClientRuntimeConfig, CLOUD_PROVIDERS)
+from DILIGENT.app.configurations import ClientRuntimeConfig
 from DILIGENT.app.constants import (
     CLINICAL_MODEL_CHOICES,
     CLOUD_MODEL_CHOICES,
     PARSING_MODEL_CHOICES,
 )
+
+CLOUD_PROVIDERS : list[str] = [k for k in CLOUD_MODEL_CHOICES.keys()]
 
 
 ###############################################################################
@@ -266,6 +268,7 @@ def main_page() -> None:
 
     cloud_enabled = ClientRuntimeConfig.is_cloud_enabled()
 
+    ui.page_title("DILIGENT Clinical Copilots")
     ui.add_head_html(f"<style>{VISIT_DATE_CSS}{INTERFACE_THEME_CSS}</style>")
 
     with ui.column().classes(PAGE_CONTAINER_CLASSES):
