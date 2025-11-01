@@ -10,16 +10,13 @@ from nicegui import ui
 from DILIGENT.app.client.controllers import (
     ComponentUpdate,
     MISSING,
+    RuntimeSettings,
     clear_session_fields,
+    get_runtime_settings,
     normalize_visit_date_component,
     pull_selected_models,
     run_DILI_session,
-    set_clinical_model,
-    set_cloud_model,
-    set_llm_provider,
-    set_ollama_reasoning,
-    set_ollama_temperature,
-    set_parsing_model,
+    sync_cloud_model_options,
     toggle_cloud_services,
 )
 from DILIGENT.app.client.layouts import (
@@ -31,7 +28,6 @@ from DILIGENT.app.client.layouts import (
     VISIT_DATE_ELEMENT_ID,
     VISIT_DATE_LOCALE_JS,
 )
-from DILIGENT.app.configurations import ClientRuntimeConfig
 from DILIGENT.app.constants import (
     CLINICAL_MODEL_CHOICES,
     CLOUD_MODEL_CHOICES,
@@ -119,7 +115,11 @@ async def handle_toggle_cloud_services(
     components: ClientComponents, event: Any
 ) -> None:
     enabled = bool(event.value)
-    updates = toggle_cloud_services(enabled)
+    updates = toggle_cloud_services(
+        enabled,
+        provider=str(components.llm_provider_dropdown.value or ""),
+        cloud_model=str(components.cloud_model_dropdown.value or ""),
+    )
     apply_component_update(components.llm_provider_dropdown, updates["provider"])
     apply_component_update(components.cloud_model_dropdown, updates["model"])
     apply_component_update(components.pull_models_button, updates["button"])
@@ -130,49 +130,13 @@ async def handle_toggle_cloud_services(
 # -----------------------------------------------------------------------------
 async def handle_llm_provider_change(components: ClientComponents, event: Any) -> None:
     provider_value = str(event.value or "")
-    selected, model_update = set_llm_provider(provider_value)
+    selected, model_update = sync_cloud_model_options(
+        provider_value, str(components.cloud_model_dropdown.value or "")
+    )
     if hasattr(components.llm_provider_dropdown, "value"):
         components.llm_provider_dropdown.value = selected
         components.llm_provider_dropdown.update()
     apply_component_update(components.cloud_model_dropdown, model_update)
-
-# -----------------------------------------------------------------------------
-async def handle_cloud_model_change(components: ClientComponents, event: Any) -> None:
-    selection = set_cloud_model(str(event.value or ""))
-    if hasattr(components.cloud_model_dropdown, "value"):
-        components.cloud_model_dropdown.value = selection
-        components.cloud_model_dropdown.update()
-
-# -----------------------------------------------------------------------------
-async def handle_parsing_model_change(components: ClientComponents, event: Any) -> None:
-    selection = set_parsing_model(str(event.value or ""))
-    if hasattr(components.parsing_model_dropdown, "value"):
-        components.parsing_model_dropdown.value = selection
-        components.parsing_model_dropdown.update()
-
-# -----------------------------------------------------------------------------
-async def handle_clinical_model_change(
-    components: ClientComponents, event: Any
-) -> None:
-    selection = set_clinical_model(str(event.value or ""))
-    if hasattr(components.clinical_model_dropdown, "value"):
-        components.clinical_model_dropdown.value = selection
-        components.clinical_model_dropdown.update()
-
-# -----------------------------------------------------------------------------
-async def handle_temperature_change(components: ClientComponents, event: Any) -> None:
-    value = event.value if event.value is not None else None
-    updated = set_ollama_temperature(value)
-    if hasattr(components.temperature_input, "value"):
-        components.temperature_input.value = updated
-        components.temperature_input.update()
-
-# -----------------------------------------------------------------------------
-async def handle_reasoning_change(components: ClientComponents, event: Any) -> None:
-    updated = set_ollama_reasoning(bool(event.value))
-    if hasattr(components.reasoning_checkbox, "value"):
-        components.reasoning_checkbox.value = updated
-        components.reasoning_checkbox.update()
 
 # -----------------------------------------------------------------------------
 async def handle_visit_date_change(components: ClientComponents, event: Any) -> None:
@@ -186,14 +150,30 @@ async def handle_visit_date_change(components: ClientComponents, event: Any) -> 
 # ACTIONS
 ###############################################################################
 async def handle_pull_models_click(components: ClientComponents, event: Any) -> None:
-    parsing_model = str(components.parsing_model_dropdown.value or "")
-    clinical_model = str(components.clinical_model_dropdown.value or "")
-    message, json_update = await pull_selected_models(parsing_model, clinical_model)
+    settings = RuntimeSettings(
+        use_cloud_services=bool(components.use_cloud_services.value),
+        provider=str(components.llm_provider_dropdown.value or ""),
+        cloud_model=str(components.cloud_model_dropdown.value or ""),
+        parsing_model=str(components.parsing_model_dropdown.value or ""),
+        clinical_model=str(components.clinical_model_dropdown.value or ""),
+        temperature=components.temperature_input.value,
+        reasoning=bool(components.reasoning_checkbox.value),
+    )
+    message, json_update = await pull_selected_models(settings)
     components.markdown_output.set_content(message or "")
     apply_json_update(components, json_update)
 
 # -----------------------------------------------------------------------------
 async def handle_run_workflow(components: ClientComponents, event: Any) -> None:
+    settings = RuntimeSettings(
+        use_cloud_services=bool(components.use_cloud_services.value),
+        provider=str(components.llm_provider_dropdown.value or ""),
+        cloud_model=str(components.cloud_model_dropdown.value or ""),
+        parsing_model=str(components.parsing_model_dropdown.value or ""),
+        clinical_model=str(components.clinical_model_dropdown.value or ""),
+        temperature=components.temperature_input.value,
+        reasoning=bool(components.reasoning_checkbox.value),
+    )
     message, json_update, export_update = await run_DILI_session(
         components.patient_name.value,
         components.visit_date.value,
@@ -205,6 +185,7 @@ async def handle_run_workflow(components: ClientComponents, event: Any) -> None:
         components.alp.value,
         components.alp_max.value,
         bool(components.use_rag.value),
+        settings,
     )
     components.markdown_output.set_content(message or "")
     apply_json_update(components, json_update)
@@ -226,6 +207,7 @@ async def handle_clear_click(components: ClientComponents, event: Any) -> None:
         markdown_message,
         json_update,
         export_update,
+        runtime_settings,
     ) = clear_session_fields()
     components.patient_name.value = patient_name
     components.patient_name.update()
@@ -247,6 +229,33 @@ async def handle_clear_click(components: ClientComponents, event: Any) -> None:
     components.has_diseases.update()
     components.use_rag.value = use_rag
     components.use_rag.update()
+    components.use_cloud_services.value = runtime_settings.use_cloud_services
+    components.use_cloud_services.update()
+    components.llm_provider_dropdown.value = runtime_settings.provider
+    components.llm_provider_dropdown.update()
+    _, model_update = sync_cloud_model_options(
+        runtime_settings.provider, runtime_settings.cloud_model
+    )
+    apply_component_update(components.cloud_model_dropdown, model_update)
+    components.parsing_model_dropdown.value = runtime_settings.parsing_model
+    components.parsing_model_dropdown.update()
+    components.clinical_model_dropdown.value = runtime_settings.clinical_model
+    components.clinical_model_dropdown.update()
+    components.temperature_input.value = runtime_settings.temperature
+    components.temperature_input.update()
+    components.reasoning_checkbox.value = runtime_settings.reasoning
+    components.reasoning_checkbox.update()
+    toggle_updates = toggle_cloud_services(
+        runtime_settings.use_cloud_services,
+        provider=runtime_settings.provider,
+        cloud_model=runtime_settings.cloud_model,
+    )
+    apply_component_update(components.llm_provider_dropdown, toggle_updates["provider"])
+    apply_component_update(components.cloud_model_dropdown, toggle_updates["model"])
+    apply_component_update(components.pull_models_button, toggle_updates["button"])
+    apply_component_update(components.temperature_input, toggle_updates["temperature"])
+    apply_component_update(components.reasoning_checkbox, toggle_updates["reasoning"])
+    apply_component_update(components.clinical_model_dropdown, toggle_updates["clinical"])
     components.markdown_output.set_content(markdown_message or "")
     apply_json_update(components, json_update)
     apply_export_update(components, export_update)
@@ -259,14 +268,13 @@ async def handle_download_click(components: ClientComponents, event: Any) -> Non
 # MAIN UI PAGE
 ###############################################################################
 def main_page() -> None:
-    provider = ClientRuntimeConfig.get_llm_provider()
-    cloud_models = CLOUD_MODEL_CHOICES.get(provider, [])
-    selected_cloud_model = ClientRuntimeConfig.get_cloud_model()
-    if selected_cloud_model not in cloud_models:
-        selected_cloud_model = cloud_models[0] if cloud_models else ""
-        ClientRuntimeConfig.set_cloud_model(selected_cloud_model)
-
-    cloud_enabled = ClientRuntimeConfig.is_cloud_enabled()
+    current_settings = get_runtime_settings()
+    provider, model_update = sync_cloud_model_options(
+        current_settings.provider, current_settings.cloud_model
+    )
+    cloud_models = model_update.options or []
+    selected_cloud_model = model_update.value
+    cloud_enabled = current_settings.use_cloud_services
 
     ui.page_title("DILIGENT Clinical Copilots")
     ui.add_head_html(f"<style>{VISIT_DATE_CSS}{INTERFACE_THEME_CSS}</style>")
@@ -370,23 +378,23 @@ def main_page() -> None:
                             parsing_model_dropdown = ui.select(
                                 PARSING_MODEL_CHOICES,
                                 label="Parsing Model",
-                                value=ClientRuntimeConfig.get_parsing_model(),
+                                value=current_settings.parsing_model,
                             ).classes("w-full")
                             clinical_model_dropdown = ui.select(
                                 CLINICAL_MODEL_CHOICES,
                                 label="Clinical Model",
-                                value=ClientRuntimeConfig.get_clinical_model(),
+                                value=current_settings.clinical_model,
                             ).classes("w-full")
                             temperature_input = ui.number(
                                 label="Temperature",
-                                value=ClientRuntimeConfig.get_ollama_temperature(),
+                                value=current_settings.temperature,
                                 min=0.0,
                                 max=2.0,
                                 step=0.1,
                             ).classes("w-full")
                             reasoning_checkbox = ui.checkbox(
                                 "Enable reasoning (think)",
-                                value=ClientRuntimeConfig.is_ollama_reasoning_enabled(),
+                                value=current_settings.reasoning,
                             )
                             pull_models_button = ui.button(
                                 "Pull models", color="secondary"
@@ -432,20 +440,17 @@ def main_page() -> None:
         export_button=export_button,
     )
 
-    if cloud_enabled:
-        llm_provider_dropdown.enable()
-        cloud_model_dropdown.enable()
-        pull_models_button.disable()
-        temperature_input.disable()
-        reasoning_checkbox.disable()
-        clinical_model_dropdown.disable()
-    else:
-        llm_provider_dropdown.disable()
-        cloud_model_dropdown.disable()
-        pull_models_button.enable()
-        temperature_input.enable()
-        reasoning_checkbox.enable()
-        clinical_model_dropdown.enable()
+    toggle_updates = toggle_cloud_services(
+        cloud_enabled,
+        provider=provider,
+        cloud_model=str(selected_cloud_model or ""),
+    )
+    apply_component_update(llm_provider_dropdown, toggle_updates["provider"])
+    apply_component_update(cloud_model_dropdown, toggle_updates["model"])
+    apply_component_update(pull_models_button, toggle_updates["button"])
+    apply_component_update(temperature_input, toggle_updates["temperature"])
+    apply_component_update(reasoning_checkbox, toggle_updates["reasoning"])
+    apply_component_update(clinical_model_dropdown, toggle_updates["clinical"])
 
     use_cloud_services.on_value_change(
         partial(handle_toggle_cloud_services, components)
@@ -453,15 +458,6 @@ def main_page() -> None:
     llm_provider_dropdown.on_value_change(
         partial(handle_llm_provider_change, components)
     )
-    cloud_model_dropdown.on_value_change(partial(handle_cloud_model_change, components))
-    parsing_model_dropdown.on_value_change(
-        partial(handle_parsing_model_change, components)
-    )
-    clinical_model_dropdown.on_value_change(
-        partial(handle_clinical_model_change, components)
-    )
-    temperature_input.on_value_change(partial(handle_temperature_change, components))
-    reasoning_checkbox.on_value_change(partial(handle_reasoning_change, components))
     pull_models_button.on("click", partial(handle_pull_models_click, components))
     run_button.on("click", partial(handle_run_workflow, components))
     clear_button.on("click", partial(handle_clear_click, components))
