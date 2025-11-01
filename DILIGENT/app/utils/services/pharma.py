@@ -9,7 +9,7 @@ from typing import Any
 
 import pandas as pd
 
-from DILIGENT.app.utils.references import MATCHING_STOPWORDS as BASE_MATCHING_STOPWORDS
+from DILIGENT.app.constants import MATCHING_STOPWORDS as BASE_MATCHING_STOPWORDS
 from DILIGENT.app.utils.updater.livertox import LiverToxUpdater
 
 __all__ = [

@@ -36,8 +36,6 @@ LLM_REQUEST_TIMEOUT_DISPLAY = (
     else LLM_REQUEST_TIMEOUT_SECONDS
 )
 
-
-###############################################################################
 MISSING = object()
 
 
@@ -51,7 +49,7 @@ class ComponentUpdate:
     download_path: str | None = None
 
 
-###############################################################################
+# -----------------------------------------------------------------------------
 @dataclass
 class RuntimeSettings:
     use_cloud_services: bool
@@ -207,7 +205,9 @@ def sync_cloud_model_options(
     model_update = ComponentUpdate(value=normalized_model, options=models)
     return normalized_provider, model_update
 
-# -----------------------------------------------------------------------------
+
+# EVENTS
+###############################################################################
 async def pull_selected_models(
     settings: RuntimeSettings,
 ) -> tuple[str, ComponentUpdate]:

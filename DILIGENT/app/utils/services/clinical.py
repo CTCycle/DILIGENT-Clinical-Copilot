@@ -7,8 +7,6 @@ import re
 from datetime import date, datetime
 from typing import Any
 
-from langchain_community.document_loaders.blackboard import documents
-
 from DILIGENT.app.api.models.prompts import (
     LIVERTOX_CONCLUSION_SYSTEM_PROMPT,
     LIVERTOX_CONCLUSION_USER_PROMPT,
