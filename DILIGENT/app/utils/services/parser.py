@@ -58,6 +58,7 @@ class DrugsParser:
             self.client_provider = "injected"
             self.runtime_revision = ClientRuntimeConfig.get_revision()
 
+    # -------------------------------------------------------------------------
     async def ensure_client(self) -> None:
         async with self.client_lock:
             revision = ClientRuntimeConfig.get_revision()
@@ -240,6 +241,7 @@ class DrugsParser:
 
         return grouped if grouped else lines
 
+    # -------------------------------------------------------------------------
     def parse_line(self, line: str) -> DrugEntry | None:
         schedule_match = self.SCHEDULE_RE.search(line)
         if not schedule_match:
