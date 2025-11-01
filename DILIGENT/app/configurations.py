@@ -5,7 +5,12 @@ import os
 from dataclasses import dataclass
 from typing import Any, Literal
 
-from DILIGENT.app.constants import SETUP_DIR, CLOUD_MODEL_CHOICES
+from DILIGENT.app.constants import (
+    CLINICAL_MODEL_CHOICES,
+    CLOUD_MODEL_CHOICES,
+    PARSING_MODEL_CHOICES,
+    SETUP_DIR,
+)
 
 CONFIGURATION_CACHE: dict[str, Any] | None = None
 CONFIGURATION_FILE = os.path.join(SETUP_DIR, "configurations.json")
@@ -14,16 +19,6 @@ CONFIGURATION_FILE = os.path.join(SETUP_DIR, "configurations.json")
 DEFAULT_CONFIGURATION: dict[str, Any] = {
     "ollama_host_default": "http://localhost:11434",
     "cloud_providers": ["openai", "gemini"],
-    "client_defaults": {
-        "default_parsing_model": "qwen3:8b",
-        "default_clinical_model": "gpt-oss:20b",
-        "default_cloud_provider": "openai",
-        "default_cloud_model": "gpt-4.1-mini",
-        "default_cloud_embedding_model": "text-embedding-3-large",
-        "default_use_cloud_services": False,
-        "default_ollama_temperature": 0.7,
-        "default_ollama_reasoning": False,
-    },
     "rag": {
         "vector_collection_name": "documents",
         "chunk_size": 1024,
@@ -90,28 +85,24 @@ def get_nested_value(data: dict[str, Any], *keys: str, default: Any | None = Non
 ###############################################################################
 CONFIGURATION_DATA = load_configuration_file()
 
-def get_configuration() -> dict[str, Any]:
-    return CONFIGURATION_DATA
-
 def get_configuration_value(*keys: str, default: Any | None = None) -> Any:
     return get_nested_value(CONFIGURATION_DATA, *keys, default=default)
 
 ###############################################################################
-CLIENT_DEFAULTS = get_configuration_value("client_defaults", default={})
-DEFAULT_PARSING_MODEL = CLIENT_DEFAULTS.get("default_parsing_model", "")
-DEFAULT_CLINICAL_MODEL = CLIENT_DEFAULTS.get("default_clinical_model", "")
-DEFAULT_CLOUD_PROVIDER = CLIENT_DEFAULTS.get("default_cloud_provider", "")
-DEFAULT_CLOUD_MODEL = CLIENT_DEFAULTS.get("default_cloud_model", "")
-DEFAULT_CLOUD_EMBEDDING_MODEL = CLIENT_DEFAULTS.get(
-    "default_cloud_embedding_model", ""
-)
-DEFAULT_USE_CLOUD_SERVICES = CLIENT_DEFAULTS.get("default_use_cloud_services", False)
-DEFAULT_OLLAMA_TEMPERATURE = CLIENT_DEFAULTS.get("default_ollama_temperature", 0.7)
-DEFAULT_OLLAMA_REASONING = CLIENT_DEFAULTS.get("default_ollama_reasoning", False)
+def _first_choice(options: list[str]) -> str:
+    return options[0] if options else ""
 
-cloud_models = CLOUD_MODEL_CHOICES.get(DEFAULT_CLOUD_PROVIDER, [])
-if DEFAULT_CLOUD_MODEL not in cloud_models:
-    DEFAULT_CLOUD_MODEL = cloud_models[0] if cloud_models else ""
+
+DEFAULT_PARSING_MODEL = _first_choice(PARSING_MODEL_CHOICES)
+DEFAULT_CLINICAL_MODEL = _first_choice(CLINICAL_MODEL_CHOICES)
+DEFAULT_CLOUD_PROVIDER = next(iter(CLOUD_MODEL_CHOICES), "")
+DEFAULT_CLOUD_MODEL = _first_choice(
+    CLOUD_MODEL_CHOICES.get(DEFAULT_CLOUD_PROVIDER, [])
+)
+DEFAULT_CLOUD_EMBEDDING_MODEL = ""
+DEFAULT_USE_CLOUD_SERVICES = False
+DEFAULT_OLLAMA_TEMPERATURE = 0.7
+DEFAULT_OLLAMA_REASONING = False
 
 OLLAMA_HOST_DEFAULT = get_configuration_value("ollama_host_default", default="")
 RAG_CONFIGURATION = get_configuration_value("rag", default={})
