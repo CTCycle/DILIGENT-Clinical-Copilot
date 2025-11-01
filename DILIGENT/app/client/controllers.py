@@ -51,6 +51,19 @@ class ComponentUpdate:
     download_path: str | None = None
 
 
+###############################################################################
+@dataclass
+class RuntimeSettings:
+    use_cloud_services: bool
+    provider: str
+    cloud_model: str
+    parsing_model: str
+    clinical_model: str
+    temperature: float | None
+    reasoning: bool
+
+
+
 # [HELPERS]
 ###############################################################################
 def extract_text(result: Any) -> str:
@@ -109,31 +122,71 @@ def normalize_visit_date_component(
     return datetime.combine(normalized, datetime.min.time())
 
 # -----------------------------------------------------------------------------
-def toggle_cloud_services(enabled: bool) -> dict[str, ComponentUpdate]:
-    ClientRuntimeConfig.set_use_cloud_services(enabled)
+def resolve_cloud_selection(
+    provider: str | None, cloud_model: str | None
+) -> tuple[str, list[str], str | None]:
+    normalized_provider = (provider or "").strip().lower()
+    if normalized_provider not in CLOUD_MODEL_CHOICES:
+        normalized_provider = next(iter(CLOUD_MODEL_CHOICES), "")
+    models = CLOUD_MODEL_CHOICES.get(normalized_provider, [])
+    normalized_model = (cloud_model or "").strip()
+    if normalized_model not in models:
+        normalized_model = models[0] if models else ""
+    return normalized_provider, models, normalized_model or None
 
-    provider = ClientRuntimeConfig.get_llm_provider()
-    provider_update = ComponentUpdate(value=provider, enabled=enabled)
+# -----------------------------------------------------------------------------
+def get_runtime_settings() -> RuntimeSettings:
+    return RuntimeSettings(
+        use_cloud_services=ClientRuntimeConfig.is_cloud_enabled(),
+        provider=ClientRuntimeConfig.get_llm_provider(),
+        cloud_model=ClientRuntimeConfig.get_cloud_model(),
+        parsing_model=ClientRuntimeConfig.get_parsing_model(),
+        clinical_model=ClientRuntimeConfig.get_clinical_model(),
+        temperature=ClientRuntimeConfig.get_ollama_temperature(),
+        reasoning=ClientRuntimeConfig.is_ollama_reasoning_enabled(),
+    )
 
-    models = CLOUD_MODEL_CHOICES.get(provider, [])
-    selected_model = ClientRuntimeConfig.get_cloud_model()
-    if selected_model not in models:
-        selected_model = ClientRuntimeConfig.set_cloud_model(models[0] if models else "")
+# -----------------------------------------------------------------------------
+def reset_runtime_settings() -> RuntimeSettings:
+    ClientRuntimeConfig.reset_defaults()
+    return get_runtime_settings()
 
-    model_update = ComponentUpdate(value=selected_model, options=models, enabled=enabled)
+# -----------------------------------------------------------------------------
+def apply_runtime_settings(settings: RuntimeSettings) -> RuntimeSettings:
+    ClientRuntimeConfig.set_use_cloud_services(settings.use_cloud_services)
+    provider = ClientRuntimeConfig.set_llm_provider(settings.provider)
+    ClientRuntimeConfig.set_cloud_model(settings.cloud_model)
+    parsing_model = ClientRuntimeConfig.set_parsing_model(settings.parsing_model)
+    clinical_model = ClientRuntimeConfig.set_clinical_model(settings.clinical_model)
+    temperature = ClientRuntimeConfig.set_ollama_temperature(settings.temperature)
+    reasoning = ClientRuntimeConfig.set_ollama_reasoning(settings.reasoning)
+    return RuntimeSettings(
+        use_cloud_services=ClientRuntimeConfig.is_cloud_enabled(),
+        provider=provider,
+        cloud_model=ClientRuntimeConfig.get_cloud_model(),
+        parsing_model=parsing_model,
+        clinical_model=clinical_model,
+        temperature=temperature,
+        reasoning=reasoning,
+    )
+
+# -----------------------------------------------------------------------------
+def toggle_cloud_services(
+    enabled: bool, *, provider: str | None, cloud_model: str | None
+) -> dict[str, ComponentUpdate]:
+    normalized_provider, models, normalized_model = resolve_cloud_selection(
+        provider, cloud_model
+    )
+    provider_update = ComponentUpdate(value=normalized_provider, enabled=enabled)
+    model_update = ComponentUpdate(
+        value=normalized_model,
+        options=models,
+        enabled=enabled,
+    )
     button_update = ComponentUpdate(enabled=not enabled)
-    temperature_update = ComponentUpdate(
-        value=ClientRuntimeConfig.get_ollama_temperature(),
-        enabled=not enabled,
-    )
-    reasoning_update = ComponentUpdate(
-        value=ClientRuntimeConfig.is_ollama_reasoning_enabled(),
-        enabled=not enabled,
-    )
-    clinical_update = ComponentUpdate(
-        value=ClientRuntimeConfig.get_clinical_model(),
-        enabled=not enabled,
-    )
+    temperature_update = ComponentUpdate(enabled=not enabled)
+    reasoning_update = ComponentUpdate(enabled=not enabled)
+    clinical_update = ComponentUpdate(enabled=not enabled)
 
     return {
         "provider": provider_update,
@@ -145,50 +198,30 @@ def toggle_cloud_services(enabled: bool) -> dict[str, ComponentUpdate]:
     }
 
 # -----------------------------------------------------------------------------
-def set_llm_provider(provider: str) -> tuple[str, ComponentUpdate]:
-    selected = ClientRuntimeConfig.set_llm_provider(provider)
-    models = CLOUD_MODEL_CHOICES.get(selected, [])
-    current_model = ClientRuntimeConfig.get_cloud_model()
-    if current_model not in models:
-        current_model = ClientRuntimeConfig.set_cloud_model(models[0] if models else "")
-    model_update = ComponentUpdate(
-        value=current_model,
-        options=models,
-        enabled=ClientRuntimeConfig.is_cloud_enabled(),
+def sync_cloud_model_options(
+    provider: str | None, current_model: str | None
+) -> tuple[str, ComponentUpdate]:
+    normalized_provider, models, normalized_model = resolve_cloud_selection(
+        provider, current_model
     )
-    return selected, model_update
-
-# -----------------------------------------------------------------------------
-def set_cloud_model(model: str) -> str:
-    return ClientRuntimeConfig.set_cloud_model(model)
-
-# -----------------------------------------------------------------------------
-def set_parsing_model(model: str) -> str:
-    return ClientRuntimeConfig.set_parsing_model(model)
-
-# -----------------------------------------------------------------------------
-def set_clinical_model(model: str) -> str:
-    return ClientRuntimeConfig.set_clinical_model(model)
-
-# -----------------------------------------------------------------------------
-def set_ollama_temperature(value: float | None) -> float:
-    return ClientRuntimeConfig.set_ollama_temperature(value)
-
-# -----------------------------------------------------------------------------
-def set_ollama_reasoning(enabled: bool) -> bool:
-    return ClientRuntimeConfig.set_ollama_reasoning(enabled)
+    model_update = ComponentUpdate(value=normalized_model, options=models)
+    return normalized_provider, model_update
 
 # -----------------------------------------------------------------------------
 async def pull_selected_models(
-    parsing_model: str, clinical_model: str
+    settings: RuntimeSettings,
 ) -> tuple[str, ComponentUpdate]:
+    normalized_settings = apply_runtime_settings(settings)
     models: list[str] = []
-    for name in (parsing_model, clinical_model):
+    for name in (
+        normalized_settings.parsing_model,
+        normalized_settings.clinical_model,
+    ):
         if not name:
             continue
-        normalized = name.strip()
-        if normalized and normalized not in models:
-            models.append(normalized)
+        candidate = name.strip()
+        if candidate and candidate not in models:
+            models.append(candidate)
 
     if not models:
         return "[ERROR] No models selected to pull.", build_json_output(None)
@@ -225,7 +258,9 @@ def clear_session_fields() -> tuple[
     str,
     ComponentUpdate,
     ComponentUpdate,
+    RuntimeSettings,
 ]:
+    defaults = reset_runtime_settings()
     return (
         "",
         None,
@@ -240,6 +275,7 @@ def clear_session_fields() -> tuple[
         "",
         build_json_output(None),
         build_export_update(None),
+        defaults,
     )
 
 
@@ -311,7 +347,9 @@ async def run_DILI_session(
     alp: str,
     alp_max: str,
     use_rag: bool,
+    settings: RuntimeSettings,
 ) -> tuple[str, ComponentUpdate, ComponentUpdate]:
+    apply_runtime_settings(settings)
     cleaned_payload = sanitize_dili_payload(
             patient_name=patient_name,
             visit_date=visit_date,
@@ -324,7 +362,7 @@ async def run_DILI_session(
             alp_max=alp_max,
             use_rag=use_rag,
         )
-    
+
     url = f"{API_BASE_URL}{CLINICAL_API_URL}"
     message, json_update = await trigger_session(url, cleaned_payload)
     normalized_message = message.strip() if message else ""
