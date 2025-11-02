@@ -36,7 +36,7 @@ from DILIGENT.app.constants import (
 
 CLOUD_PROVIDERS : list[str] = [k for k in CLOUD_MODEL_CHOICES.keys()]
 
-
+# [COMPONENTS DATACLASS]
 ###############################################################################
 @dataclass
 class ClientComponents:
