@@ -16,52 +16,7 @@ CONFIGURATION_CACHE: dict[str, Any] | None = None
 CONFIGURATION_FILE = os.path.join(SETUP_DIR, "configurations.json")
 
 ###############################################################################
-DEFAULT_CONFIGURATION: dict[str, Any] = {
-    "ollama_host_default": "http://localhost:11434",
-    "cloud_providers": ["openai", "gemini"],
-    "rag": {
-        "vector_collection_name": "documents",
-        "chunk_size": 1024,
-        "chunk_overlap": 128,
-        "embedding_backend": "ollama",
-        "ollama_base_url": "http://localhost:11434",
-        "ollama_embedding_model": "nomic-embed-text:latest",
-        "hf_embedding_model": "sentence-transformers/all-MiniLM-L6-v2",
-        "vector_index_metric": "cosine",
-        "vector_index_type": "IVF_FLAT",
-        "reset_vector_collection": True,
-        "cloud_provider": "",
-        "cloud_model": "",
-        "cloud_embedding_model": "",
-        "use_cloud_embeddings": False,
-    },
-    "external_data": {
-        "default_llm_timeout_seconds": 3600.0,
-        "livertox_llm_timeout_seconds": 3600.0,
-        "livertox_archive": "livertox_NBK547852.tar.gz",
-        "livertox_yield_interval": 25,
-        "livertox_skip_deterministic_ratio": 0.8,
-        "livertox_monograph_max_workers": 4,
-        "max_excerpt_length": 8000,
-        "llm_null_match_names": [
-            "",
-            "none",
-            "no match",
-            "no matches",
-            "not found",
-            "unknown",
-            "not applicable",
-            "n a",
-        ],
-    },
-    "clinical_analysis": {
-        "alt_labels": ["ALT", "ALAT"],
-        "alp_labels": ["ALP"],
-    },
-}
-
-###############################################################################
-def load_configuration_file() -> dict[str, Any]:
+def load_configuration_file() -> dict[str, Any] | None:
     if os.path.exists(CONFIGURATION_FILE):
         try:
             with open(CONFIGURATION_FILE, "r", encoding="utf-8") as handle:
@@ -70,7 +25,7 @@ def load_configuration_file() -> dict[str, Any]:
             raise RuntimeError(
                 f"Unable to load configuration from {CONFIGURATION_FILE}"
             ) from exc
-    return json.loads(json.dumps(DEFAULT_CONFIGURATION))
+             
 
 # -----------------------------------------------------------------------------
 def get_nested_value(data: dict[str, Any], *keys: str, default: Any | None = None) -> Any:
@@ -82,25 +37,20 @@ def get_nested_value(data: dict[str, Any], *keys: str, default: Any | None = Non
             return default
     return current
 
-###############################################################################
+# -----------------------------------------------------------------------------
 CONFIGURATION_DATA = load_configuration_file()
 
 def get_configuration_value(*keys: str, default: Any | None = None) -> Any:
-    return get_nested_value(CONFIGURATION_DATA, *keys, default=default)
+    configuration = CONFIGURATION_DATA if CONFIGURATION_DATA is not None else {}
+    return get_nested_value(configuration, *keys, default=default)
 
 ###############################################################################
-def _first_choice(options: list[str]) -> str:
-    return options[0] if options else ""
+DEFAULT_PARSING_MODEL = PARSING_MODEL_CHOICES[0]
+DEFAULT_CLINICAL_MODEL = CLINICAL_MODEL_CHOICES[0]
+DEFAULT_CLOUD_PROVIDER = CLOUD_MODEL_CHOICES["openai"]
+DEFAULT_CLOUD_MODEL = CLOUD_MODEL_CHOICES["openai"][0]
 
-
-DEFAULT_PARSING_MODEL = _first_choice(PARSING_MODEL_CHOICES)
-DEFAULT_CLINICAL_MODEL = _first_choice(CLINICAL_MODEL_CHOICES)
-DEFAULT_CLOUD_PROVIDER = next(iter(CLOUD_MODEL_CHOICES), "")
-DEFAULT_CLOUD_MODEL = _first_choice(
-    CLOUD_MODEL_CHOICES.get(DEFAULT_CLOUD_PROVIDER, [])
-)
 DEFAULT_CLOUD_EMBEDDING_MODEL = ""
-DEFAULT_USE_CLOUD_SERVICES = False
 DEFAULT_OLLAMA_TEMPERATURE = 0.7
 DEFAULT_OLLAMA_REASONING = False
 
@@ -120,9 +70,7 @@ RAG_CLOUD_PROVIDER = RAG_CONFIGURATION.get("cloud_provider") or DEFAULT_CLOUD_PR
 RAG_CLOUD_EMBEDDING_MODEL = (
     RAG_CONFIGURATION.get("cloud_embedding_model") or DEFAULT_CLOUD_EMBEDDING_MODEL
 )
-RAG_USE_CLOUD_EMBEDDINGS = RAG_CONFIGURATION.get(
-    "use_cloud_embeddings", DEFAULT_USE_CLOUD_SERVICES
-)
+RAG_USE_CLOUD_EMBEDDINGS = RAG_CONFIGURATION.get("use_cloud_embeddings", False)
 
 EXTERNAL_DATA_CONFIGURATION = get_configuration_value("external_data", default={})
 DEFAULT_LLM_TIMEOUT_SECONDS = EXTERNAL_DATA_CONFIGURATION.get(
@@ -142,10 +90,6 @@ LIVERTOX_MONOGRAPH_MAX_WORKERS = EXTERNAL_DATA_CONFIGURATION.get(
     "livertox_monograph_max_workers", 4
 )
 MAX_EXCERPT_LENGTH = EXTERNAL_DATA_CONFIGURATION.get("max_excerpt_length", 8000)
-LLM_NULL_MATCH_NAMES = set(
-    EXTERNAL_DATA_CONFIGURATION.get("llm_null_match_names", [])
-)
-
 CLINICAL_ANALYSIS_CONFIGURATION = get_configuration_value("clinical_analysis", default={})
 ALT_LABELS = set(CLINICAL_ANALYSIS_CONFIGURATION.get("alt_labels", []))
 ALP_LABELS = set(CLINICAL_ANALYSIS_CONFIGURATION.get("alp_labels", []))
@@ -156,9 +100,9 @@ ALP_LABELS = set(CLINICAL_ANALYSIS_CONFIGURATION.get("alp_labels", []))
 class ClientRuntimeConfig:
     parsing_model: str = DEFAULT_PARSING_MODEL
     clinical_model: str = DEFAULT_CLINICAL_MODEL
-    llm_provider: str = DEFAULT_CLOUD_PROVIDER
+    llm_provider: str = "openai"
     cloud_model: str = DEFAULT_CLOUD_MODEL
-    use_cloud_services: bool = DEFAULT_USE_CLOUD_SERVICES
+    use_cloud_services: bool = False
     ollama_temperature: float = DEFAULT_OLLAMA_TEMPERATURE
     ollama_reasoning: bool = DEFAULT_OLLAMA_REASONING
     revision: int = 0
@@ -290,9 +234,9 @@ class ClientRuntimeConfig:
     def reset_defaults(cls) -> None:
         cls.parsing_model = DEFAULT_PARSING_MODEL
         cls.clinical_model = DEFAULT_CLINICAL_MODEL
-        cls.llm_provider = DEFAULT_CLOUD_PROVIDER
+        cls.llm_provider = "openai"
         cls.cloud_model = DEFAULT_CLOUD_MODEL
-        cls.use_cloud_services = DEFAULT_USE_CLOUD_SERVICES
+        cls.use_cloud_services = False
         cls.ollama_temperature = DEFAULT_OLLAMA_TEMPERATURE
         cls.ollama_reasoning = DEFAULT_OLLAMA_REASONING
         cls.revision = 0
