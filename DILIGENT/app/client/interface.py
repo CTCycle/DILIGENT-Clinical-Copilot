@@ -114,7 +114,7 @@ def apply_export_update(components: ClientComponents, update: ComponentUpdate) -
 async def handle_toggle_cloud_services(
     components: ClientComponents, event: Any
 ) -> None:
-    enabled = bool(event.value)
+    enabled = event.value
     updates = toggle_cloud_services(
         enabled,
         provider=str(components.llm_provider_dropdown.value or ""),
@@ -125,6 +125,7 @@ async def handle_toggle_cloud_services(
     apply_component_update(components.pull_models_button, updates["button"])
     apply_component_update(components.temperature_input, updates["temperature"])
     apply_component_update(components.reasoning_checkbox, updates["reasoning"])
+    apply_component_update(components.clinical_model_dropdown, updates["parsingl"])
     apply_component_update(components.clinical_model_dropdown, updates["clinical"])
 
 # -----------------------------------------------------------------------------
@@ -356,7 +357,7 @@ def main_page() -> None:
                     ).classes("pt-2")
                     use_cloud_services = ui.checkbox(
                         "Use Cloud Services",
-                        value=cloud_enabled,
+                        value=False,
                     ).classes("pt-2")
                     with ui.grid(columns=1).classes("w-full gap-5 lg:grid-cols-2"):
                         with ui.column().classes("w-full gap-3"):
@@ -389,7 +390,7 @@ def main_page() -> None:
                                 label="Temperature",
                                 value=current_settings.temperature,
                                 min=0.0,
-                                max=2.0,
+                                max=5.0,
                                 step=0.1,
                             ).classes("w-full")
                             reasoning_checkbox = ui.checkbox(

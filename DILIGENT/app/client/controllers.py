@@ -178,9 +178,11 @@ def toggle_cloud_services(
         options=models,
         enabled=enabled,
     )
+  
     button_update = ComponentUpdate(enabled=not enabled)
     temperature_update = ComponentUpdate(enabled=not enabled)
     reasoning_update = ComponentUpdate(enabled=not enabled)
+    parsing_update = ComponentUpdate(enabled=not enabled)
     clinical_update = ComponentUpdate(enabled=not enabled)
 
     return {
@@ -189,6 +191,7 @@ def toggle_cloud_services(
         "button": button_update,
         "temperature": temperature_update,
         "reasoning": reasoning_update,
+        "parsing": reasoning_update,
         "clinical": clinical_update,
     }
 
