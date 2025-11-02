@@ -7,7 +7,6 @@ from datetime import date, datetime
 from dataclasses import dataclass
 from typing import Any
 
-from fastapi import HTTPException, status
 import httpx
 
 from DILIGENT.app.utils.services.payload import (
@@ -48,7 +47,6 @@ class ComponentUpdate:
     visible: bool | None = None
     download_path: str | None = None
 
-
 # -----------------------------------------------------------------------------
 @dataclass
 class RuntimeSettings:
@@ -59,8 +57,6 @@ class RuntimeSettings:
     clinical_model: str
     temperature: float | None
     reasoning: bool
-
-
 
 # [HELPERS]
 ###############################################################################
@@ -119,7 +115,8 @@ def normalize_visit_date_component(
         return None
     return datetime.combine(normalized, datetime.min.time())
 
-# -----------------------------------------------------------------------------
+# [LLM CLIENT CONTROLLERS]
+###############################################################################
 def resolve_cloud_selection(
     provider: str | None, cloud_model: str | None
 ) -> tuple[str, list[str], str | None]:
@@ -278,10 +275,9 @@ def clear_session_fields() -> tuple[
         defaults,
     )
 
-
-# trigger function to start the agent on button click. Payload is optional depending
-# on the requested endpoint URL (defined through run_DILI_session function)
-# -----------------------------------------------------------------------------
+###############################################################################
+# trigger function to start the agent on button click. 
+###############################################################################
 async def trigger_session(
     url: str, payload: dict[str, Any] | None = None
 ) -> tuple[str, ComponentUpdate]:
@@ -333,9 +329,7 @@ async def trigger_session(
     except Exception as exc:  # noqa: BLE001
         return f"[ERROR] Unexpected error: {exc}", build_json_output(None)
 
-
-# [AGENT RUNNING LOGIC]
-###############################################################################
+# -----------------------------------------------------------------------------
 async def run_DILI_session(
     patient_name: str | None,
     visit_date: datetime | date | dict[str, Any] | str | None,
