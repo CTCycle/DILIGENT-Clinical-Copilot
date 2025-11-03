@@ -3,15 +3,15 @@ from __future__ import annotations
 import json
 import os
 import tempfile
-from datetime import date, datetime
 from dataclasses import dataclass
+from datetime import date, datetime
 from typing import Any
 
 import httpx
 
 from DILIGENT.app.utils.services.payload import (
-    normalize_visit_date, 
-    sanitize_dili_payload
+    normalize_visit_date,
+    sanitize_dili_payload,
 )
 from DILIGENT.app.api.models.providers import (
     OllamaClient,
@@ -35,19 +35,8 @@ LLM_REQUEST_TIMEOUT_DISPLAY = (
     else LLM_REQUEST_TIMEOUT_SECONDS
 )
 
-MISSING = object()
-
 
 ###############################################################################
-@dataclass
-class ComponentUpdate:
-    value: Any = MISSING
-    options: list[Any] | None = None
-    enabled: bool | None = None
-    visible: bool | None = None
-    download_path: str | None = None
-
-# -----------------------------------------------------------------------------
 @dataclass
 class RuntimeSettings:
     use_cloud_services: bool
@@ -86,25 +75,12 @@ def extract_text(result: Any) -> str:
     return f"```json\n{formatted}\n```"
 
 # -----------------------------------------------------------------------------
-def build_json_output(payload: dict[str, Any] | list[Any] | None) -> ComponentUpdate:
-    if payload is None:
-        return ComponentUpdate(value=None, visible=False)
-    return ComponentUpdate(value=payload, visible=True)
-
-# -----------------------------------------------------------------------------
 def create_export_file(content: str) -> str:
     directory = tempfile.mkdtemp(prefix="diligent_report_")
     file_path = os.path.join(directory, "clinical_report.md")
     with open(file_path, "w", encoding="utf-8") as handle:
         handle.write(content)
     return file_path
-
-# -----------------------------------------------------------------------------
-def build_export_update(content: str | None) -> ComponentUpdate:
-    if content:
-        file_path = create_export_file(content)
-        return ComponentUpdate(value=file_path, enabled=True, download_path=file_path)
-    return ComponentUpdate(value=None, enabled=False, download_path=None)
 
 # -----------------------------------------------------------------------------
 def normalize_visit_date_component(
@@ -119,7 +95,7 @@ def normalize_visit_date_component(
 ###############################################################################
 def resolve_cloud_selection(
     provider: str | None, cloud_model: str | None
-) -> tuple[str, list[str], str | None]:
+) -> dict[str, Any]:
     normalized_provider = (provider or "").strip().lower()
     if normalized_provider not in CLOUD_MODEL_CHOICES:
         normalized_provider = next(iter(CLOUD_MODEL_CHOICES), "")
@@ -127,7 +103,11 @@ def resolve_cloud_selection(
     normalized_model = (cloud_model or "").strip()
     if normalized_model not in models:
         normalized_model = models[0] if models else ""
-    return normalized_provider, models, normalized_model or None
+    return {
+        "provider": normalized_provider,
+        "models": models,
+        "model": normalized_model or None,
+    }
 
 # -----------------------------------------------------------------------------
 def get_runtime_settings() -> RuntimeSettings:
@@ -166,51 +146,17 @@ def apply_runtime_settings(settings: RuntimeSettings) -> RuntimeSettings:
     )
 
 # -----------------------------------------------------------------------------
-def toggle_cloud_services(
-    enabled: bool, *, provider: str | None, cloud_model: str | None
-) -> dict[str, ComponentUpdate]:
-    normalized_provider, models, normalized_model = resolve_cloud_selection(
-        provider, cloud_model
-    )
-    provider_update = ComponentUpdate(value=normalized_provider, enabled=enabled)
-    model_update = ComponentUpdate(
-        value=normalized_model,
-        options=models,
-        enabled=enabled,
-    )
-  
-    button_update = ComponentUpdate(enabled=not enabled)
-    temperature_update = ComponentUpdate(enabled=not enabled)
-    reasoning_update = ComponentUpdate(enabled=not enabled)
-    parsing_update = ComponentUpdate(enabled=not enabled)
-    clinical_update = ComponentUpdate(enabled=not enabled)
-
-    return {
-        "provider": provider_update,
-        "model": model_update,
-        "button": button_update,
-        "temperature": temperature_update,
-        "reasoning": reasoning_update,
-        "parsing": reasoning_update,
-        "clinical": clinical_update,
-    }
-
-# -----------------------------------------------------------------------------
 def sync_cloud_model_options(
     provider: str | None, current_model: str | None
-) -> tuple[str, ComponentUpdate]:
-    normalized_provider, models, normalized_model = resolve_cloud_selection(
-        provider, current_model
-    )
-    model_update = ComponentUpdate(value=normalized_model, options=models)
-    return normalized_provider, model_update
+) -> dict[str, Any]:
+    return resolve_cloud_selection(provider, current_model)
 
 
 # EVENTS
 ###############################################################################
 async def pull_selected_models(
     settings: RuntimeSettings,
-) -> tuple[str, ComponentUpdate]:
+) -> dict[str, Any]:
     normalized_settings = apply_runtime_settings(settings)
     models: list[str] = []
     for name in (
@@ -224,66 +170,60 @@ async def pull_selected_models(
             models.append(candidate)
 
     if not models:
-        return "[ERROR] No models selected to pull.", build_json_output(None)
+        return {"message": "[ERROR] No models selected to pull.", "json": None}
 
     try:
         async with OllamaClient() as client:
             for model in models:
                 await client.pull(model, stream=False)
     except OllamaTimeout as exc:
-        return f"[ERROR] Timed out pulling models: {exc}", build_json_output(None)
+        return {
+            "message": f"[ERROR] Timed out pulling models: {exc}",
+            "json": None,
+        }
     except OllamaError as exc:
-        return f"[ERROR] Failed to pull models: {exc}", build_json_output(None)
+        return {
+            "message": f"[ERROR] Failed to pull models: {exc}",
+            "json": None,
+        }
     except Exception as exc:  # noqa: BLE001
-        return (
-            f"[ERROR] Unexpected error while pulling models: {exc}",
-            build_json_output(None),
-        )
+        return {
+            "message": f"[ERROR] Unexpected error while pulling models: {exc}",
+            "json": None,
+        }
 
     pulled = ", ".join(models)
-    return f"[INFO] Models available locally: {pulled}.", build_json_output(None)
+    return {
+        "message": f"[INFO] Models available locally: {pulled}.",
+        "json": None,
+    }
 
 # -----------------------------------------------------------------------------
-def clear_session_fields() -> tuple[
-    str,
-    datetime | None,
-    str,
-    str,
-    str,
-    str,
-    str,
-    str,
-    bool,
-    bool,
-    str,
-    ComponentUpdate,
-    ComponentUpdate,
-    RuntimeSettings,
-]:
+def clear_session_fields() -> dict[str, Any]:
     defaults = reset_runtime_settings()
-    return (
-        "",
-        None,
-        "",
-        "",
-        "",
-        "",
-        "",
-        "",
-        False,
-        False,
-        "",
-        build_json_output(None),
-        build_export_update(None),
-        defaults,
-    )
+    return {
+        "patient_name": "",
+        "visit_date": None,
+        "anamnesis": "",
+        "drugs": "",
+        "alt": "",
+        "alt_max": "",
+        "alp": "",
+        "alp_max": "",
+        "has_diseases": False,
+        "use_rag": False,
+        "message": "",
+        "json": None,
+        "export_path": None,
+        "settings": defaults,
+    }
 
 ###############################################################################
 # trigger function to start the agent on button click. 
 ###############################################################################
 async def trigger_session(
     url: str, payload: dict[str, Any] | None = None
-) -> tuple[str, ComponentUpdate]:
+) -> tuple[str, dict[str, Any] | list[Any] | None]:
     try:
         async with httpx.AsyncClient(timeout=LLM_REQUEST_TIMEOUT_SECONDS) as client:
             resp = await client.post(url, json=payload)
@@ -297,12 +237,12 @@ async def trigger_session(
                 message = extract_text(parsed)
                 if isinstance(parsed, (dict, list)):
                     json_payload = parsed
-            return message, build_json_output(json_payload)
+            return message, json_payload
 
     except httpx.ConnectError as exc:
         return (
             f"[ERROR] Could not connect to backend at {url}.\nDetails: {exc}",
-            build_json_output(None),
+            None,
         )
     except httpx.HTTPStatusError as exc:
         response = exc.response
@@ -323,14 +263,14 @@ async def trigger_session(
             message = f"{message}\n{body_content}"
         elif response is not None and response.text:
             message = f"{message}\nURL: {url}\nResponse body:\n{response.text}"
-        return message, build_json_output(json_payload)
+        return message, json_payload
     except httpx.TimeoutException:
         return (
             f"[ERROR] Request timed out after {LLM_REQUEST_TIMEOUT_DISPLAY} seconds.",
-            build_json_output(None),
+            None,
         )
     except Exception as exc:  # noqa: BLE001
-        return f"[ERROR] Unexpected error: {exc}", build_json_output(None)
+        return f"[ERROR] Unexpected error: {exc}", None
 
 # -----------------------------------------------------------------------------
 async def run_DILI_session(
@@ -345,27 +285,25 @@ async def run_DILI_session(
     alp_max: str,
     use_rag: bool,
     settings: RuntimeSettings,
-) -> tuple[str, ComponentUpdate, ComponentUpdate]:
+) -> dict[str, Any]:
     apply_runtime_settings(settings)
     cleaned_payload = sanitize_dili_payload(
-            patient_name=patient_name,
-            visit_date=visit_date,
-            anamnesis=anamnesis,
-            has_hepatic_diseases=has_hepatic_diseases,
-            drugs=drugs,
-            alt=alt,
-            alt_max=alt_max,
-            alp=alp,
-            alp_max=alp_max,
-            use_rag=use_rag,
-        )
+        patient_name=patient_name,
+        visit_date=visit_date,
+        anamnesis=anamnesis,
+        has_hepatic_diseases=has_hepatic_diseases,
+        drugs=drugs,
+        alt=alt,
+        alt_max=alt_max,
+        alp=alp,
+        alp_max=alp_max,
+        use_rag=use_rag,
+    )
 
     url = f"{API_BASE_URL}{CLINICAL_API_URL}"
-    message, json_update = await trigger_session(url, cleaned_payload)
+    message, json_payload = await trigger_session(url, cleaned_payload)
     normalized_message = message.strip() if message else ""
-    exportable = (
-        message
-        if normalized_message and not normalized_message.startswith("[ERROR]")
-        else None
-    )
-    return message, json_update, build_export_update(exportable)
+    export_path = None
+    if normalized_message and not normalized_message.startswith("[ERROR]"):
+        export_path = create_export_file(message)
+    return {"message": message, "json": json_payload, "export_path": export_path}
