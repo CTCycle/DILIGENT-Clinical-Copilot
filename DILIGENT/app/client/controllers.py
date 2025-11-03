@@ -29,11 +29,6 @@ from DILIGENT.app.constants import (
 )
 
 LLM_REQUEST_TIMEOUT_SECONDS = DEFAULT_LLM_TIMEOUT_SECONDS
-LLM_REQUEST_TIMEOUT_DISPLAY = (
-    int(LLM_REQUEST_TIMEOUT_SECONDS)
-    if float(LLM_REQUEST_TIMEOUT_SECONDS).is_integer()
-    else LLM_REQUEST_TIMEOUT_SECONDS
-)
 
 
 ###############################################################################
@@ -266,7 +261,7 @@ async def trigger_session(
         return message, json_payload
     except httpx.TimeoutException:
         return (
-            f"[ERROR] Request timed out after {LLM_REQUEST_TIMEOUT_DISPLAY} seconds.",
+            f"[ERROR] Request timed out after {LLM_REQUEST_TIMEOUT_SECONDS} seconds.",
             None,
         )
     except Exception as exc:  # noqa: BLE001
