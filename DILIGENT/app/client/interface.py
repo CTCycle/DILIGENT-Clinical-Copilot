@@ -47,7 +47,6 @@ def update_json_display(container: Any, code: Any, payload: Any) -> None:
         container.visible = False
         code.set_content("")
 
-
 # -----------------------------------------------------------------------------
 def update_cloud_controls(
     enabled: bool,
@@ -77,7 +76,6 @@ def update_cloud_controls(
         clinical_model_dropdown.enable()
         temperature_input.enable()
         reasoning_checkbox.enable()
-
 
 # -----------------------------------------------------------------------------
 async def handle_toggle_cloud_services(
@@ -111,7 +109,6 @@ async def handle_toggle_cloud_services(
         pull_models_button,
     )
 
-
 # -----------------------------------------------------------------------------
 async def handle_cloud_provider_change(
     llm_provider_dropdown: Any,
@@ -128,12 +125,12 @@ async def handle_cloud_provider_change(
     cloud_model_dropdown.value = selection["model"]
     cloud_model_dropdown.update()
 
-
 # -----------------------------------------------------------------------------
 async def handle_visit_date_change(visit_date_input: Any, event: Any) -> None:
     normalized = normalize_visit_date_component(event.value)
     visit_date_input.value = "" if normalized is None else normalized.date().isoformat()
     visit_date_input.update()
+    
 
 # ACTIONS
 ###############################################################################
@@ -212,7 +209,7 @@ async def handle_run_workflow(
     )
     markdown_output.set_content(result.get("message") or "")
     update_json_display(json_container, json_code, result.get("json"))
-    export_path = result.get("export_path")
+    export_path = result.get(export_attribute)
     setattr(export_button, export_attribute, export_path)
     if export_path:
         export_button.enable()
@@ -298,7 +295,7 @@ async def handle_clear_click(
     )
     markdown_output.set_content(defaults["message"])
     update_json_display(json_container, json_code, defaults.get("json"))
-    setattr(export_button, export_attribute, defaults.get("export_path"))
+    setattr(export_button, export_attribute, defaults.get(export_attribute))
     export_button.disable()
 
 # -----------------------------------------------------------------------------
@@ -484,7 +481,10 @@ def main_page() -> None:
         )
     )
     llm_provider_dropdown.on_value_change(
-        partial(handle_cloud_provider_change, llm_provider_dropdown, cloud_model_dropdown)
+        partial(
+            handle_cloud_provider_change, 
+            llm_provider_dropdown, 
+            cloud_model_dropdown)
     )
     pull_models_button.on(
         "click",
