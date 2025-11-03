@@ -140,12 +140,6 @@ def apply_runtime_settings(settings: RuntimeSettings) -> RuntimeSettings:
         reasoning=reasoning,
     )
 
-# -----------------------------------------------------------------------------
-def sync_cloud_model_options(
-    provider: str | None, current_model: str | None
-) -> dict[str, Any]:
-    return resolve_cloud_selection(provider, current_model)
-
 
 # EVENTS
 ###############################################################################

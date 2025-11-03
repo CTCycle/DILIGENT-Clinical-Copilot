@@ -13,8 +13,7 @@ from DILIGENT.app.client.controllers import (
     normalize_visit_date_component,
     pull_selected_models,
     resolve_cloud_selection,
-    run_DILI_session,
-    sync_cloud_model_options,
+    run_DILI_session,    
 )
 from DILIGENT.app.client.layouts import (
     CARD_BASE_CLASSES,
@@ -269,7 +268,7 @@ async def handle_clear_click(
     use_rag_checkbox.update()
     use_cloud_services_checkbox.value = settings.use_cloud_services
     use_cloud_services_checkbox.update()
-    selection = sync_cloud_model_options(settings.provider, settings.cloud_model)
+    selection = resolve_cloud_selection(settings.provider, settings.cloud_model)
     llm_provider_dropdown.value = selection["provider"]
     llm_provider_dropdown.update()
     cloud_model_dropdown.set_options(selection["models"])
@@ -304,11 +303,12 @@ async def handle_download_click(export_button: Any, event: Any) -> None:
     if export_path:
         ui.download(export_path)
 
+###############################################################################
 # MAIN UI PAGE
 ###############################################################################
 def main_page() -> None:
     current_settings = get_runtime_settings()
-    selection = sync_cloud_model_options(
+    selection = resolve_cloud_selection(
         current_settings.provider, current_settings.cloud_model
     )
     provider = selection["provider"]
