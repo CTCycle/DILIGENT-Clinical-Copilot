@@ -24,6 +24,7 @@ from DILIGENT.app.client.layouts import (
     VISIT_DATE_ELEMENT_ID,
     VISIT_DATE_LOCALE_JS,
 )
+from DILIGENT.app.configurations import UI_RUNTIME_SETTINGS
 from DILIGENT.app.constants import (
     CLINICAL_MODEL_CHOICES,
     CLOUD_MODEL_CHOICES,
@@ -572,10 +573,10 @@ def create_interface() -> None:
 def launch_interface() -> None:
     create_interface()
     ui.run(
-        host="0.0.0.0",
-        port=7861,
-        title="DILIGENT Clinical Copilot",
-        show_welcome_message=False,
+        host=UI_RUNTIME_SETTINGS.host,
+        port=UI_RUNTIME_SETTINGS.port,
+        title=UI_RUNTIME_SETTINGS.title,
+        show_welcome_message=UI_RUNTIME_SETTINGS.show_welcome_message,
     )
 
 # -----------------------------------------------------------------------------

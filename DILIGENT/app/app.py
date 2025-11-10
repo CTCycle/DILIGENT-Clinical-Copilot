@@ -9,6 +9,7 @@ from nicegui import ui
 from DILIGENT.app.api.endpoints.session import router as session_router
 from DILIGENT.app.api.endpoints.ollama import router as ollama_router
 from DILIGENT.app.client.interface import create_interface
+from DILIGENT.app.configurations import BACKEND_SETTINGS, UI_RUNTIME_SETTINGS
 from DILIGENT.app.logger import logger
 from DILIGENT.app.utils.repository.database import database
 
@@ -20,9 +21,9 @@ if not os.path.exists(database.db_path):
     logger.info("DILIGENT database has been initialized successfully.")
 
 app = FastAPI(
-    title="DILIGENT Clinical Copilot Backend",
-    version="0.1.0",
-    description="FastAPI backend",
+    title=BACKEND_SETTINGS.title,
+    version=BACKEND_SETTINGS.version,
+    description=BACKEND_SETTINGS.description,
 )
 
 app.include_router(session_router)
@@ -31,12 +32,12 @@ app.include_router(ollama_router)
 create_interface()
 ui.run_with(
     app,
-    mount_path="/ui",
-    title="DILIGENT Clinical Copilot",
-    show_welcome_message=False,
-    reconnect_timeout=180,
+    mount_path=UI_RUNTIME_SETTINGS.mount_path,
+    title=UI_RUNTIME_SETTINGS.title,
+    show_welcome_message=UI_RUNTIME_SETTINGS.show_welcome_message,
+    reconnect_timeout=UI_RUNTIME_SETTINGS.reconnect_timeout_seconds,
 )
 
 @app.get("/")
 def redirect_to_ui() -> RedirectResponse:
-    return RedirectResponse(url="/ui")
+    return RedirectResponse(url=UI_RUNTIME_SETTINGS.redirect_path)

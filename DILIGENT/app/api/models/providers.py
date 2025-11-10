@@ -28,6 +28,7 @@ from DILIGENT.app.constants import (
     PARSING_MODEL_CHOICES,
 )
 from DILIGENT.app.logger import logger
+from DILIGENT.app.utils.types import extract_positive_int
 from DILIGENT.app.variables import env_variables
 
 OPENAI_API_KEY = env_variables.get("OPENAI_API_KEY")
@@ -915,23 +916,6 @@ class OllamaClient:
             raise OllamaTimeout("Timed out during streamed generate response") from e
 
     # -------------------------------------------------------------------------
-    @staticmethod
-    def coerce_positive_int(value: Any) -> int | None:
-        if isinstance(value, bool):
-            return None
-        if isinstance(value, int):
-            return value if value > 0 else None
-        if isinstance(value, float):
-            candidate = int(value)
-            return candidate if candidate > 0 else None
-        if isinstance(value, str):
-            match = re.search(r"\d+", value)
-            if match:
-                candidate = int(match.group(0))
-                return candidate if candidate > 0 else None
-        return None
-
-    # -------------------------------------------------------------------------
     @classmethod
     def extract_context_limit(cls, metadata: dict[str, Any]) -> int | None:
         if not isinstance(metadata, dict):
@@ -944,7 +928,7 @@ class OllamaClient:
         for block in containers:
             for field in ("context_length", "context", "num_ctx", "ctx"):
                 if field in block:
-                    candidate = cls.coerce_positive_int(block[field])
+                    candidate = extract_positive_int(block[field])
                     if candidate:
                         return candidate
         return None

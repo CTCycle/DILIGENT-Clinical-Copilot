@@ -19,16 +19,18 @@ from DILIGENT.app.api.models.providers import (
     OllamaTimeout,
 )
 from DILIGENT.app.configurations import (
+    API_SETTINGS,
     ClientRuntimeConfig,
-    DEFAULT_LLM_TIMEOUT_SECONDS,
+    HTTP_SETTINGS,
 )
 from DILIGENT.app.constants import (
     CLINICAL_API_URL,
     CLOUD_MODEL_CHOICES,
-    API_BASE_URL,
+    REPORT_EXPORT_DIRECTORY_PREFIX,
+    REPORT_EXPORT_FILENAME,
 )
 
-LLM_REQUEST_TIMEOUT_SECONDS = DEFAULT_LLM_TIMEOUT_SECONDS
+LLM_REQUEST_TIMEOUT_SECONDS = HTTP_SETTINGS.timeout_seconds
 
 
 ###############################################################################
@@ -71,8 +73,8 @@ def extract_text(result: Any) -> str:
 
 # -----------------------------------------------------------------------------
 def create_export_file(content: str) -> str:
-    directory = tempfile.mkdtemp(prefix="diligent_report_")
-    file_path = os.path.join(directory, "clinical_report.md")
+    directory = tempfile.mkdtemp(prefix=REPORT_EXPORT_DIRECTORY_PREFIX)
+    file_path = os.path.join(directory, REPORT_EXPORT_FILENAME)
     with open(file_path, "w", encoding="utf-8") as handle:
         handle.write(content)
     return file_path
@@ -286,7 +288,7 @@ async def run_DILI_session(
         use_rag=use_rag,
     )
 
-    url = f"{API_BASE_URL}{CLINICAL_API_URL}"
+    url = f"{API_SETTINGS.base_url}{CLINICAL_API_URL}"
     message, json_payload = await trigger_session(url, cleaned_payload)
     normalized_message = message.strip() if message else ""
     export_path = None
