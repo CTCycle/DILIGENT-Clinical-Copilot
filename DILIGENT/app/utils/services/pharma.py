@@ -86,6 +86,7 @@ class LiverToxMatcher:
         # The matcher relies on several derived indexes; populate them once
         # during initialization so later queries remain efficient.
         self.match_cache: dict[str, LiverToxMatch | None] = {}
+        self.alias_cache: dict[str, tuple[list[tuple[str, bool]], set[str]]] = {}
         self.records: list[MonographRecord] = []
         self.primary_index: dict[str, MonographRecord] = {}
         self.synonym_index: dict[str, tuple[MonographRecord, str]] = {}
@@ -261,6 +262,14 @@ class LiverToxMatcher:
         # blending catalog entries with the raw patient input.
         alias_entries: list[tuple[str, bool]] = []
         seen: set[str] = set()
+        cache_entry = self.alias_cache.get(normalized_query)
+        if cache_entry is not None:
+            cached_entries, cached_seen = cache_entry
+            alias_entries = list(cached_entries)
+            seen = set(cached_seen)
+        else:
+            alias_entries = []
+            seen = set()
 
         catalog_match: tuple[dict[str, Any], bool, str] | None = None
         if normalized_query:
@@ -286,6 +295,12 @@ class LiverToxMatcher:
                 self.add_alias_entry(alias_entries, seen, matched_value, True)
                 for variant in self.expand_variant(matched_value):
                     self.add_alias_entry(alias_entries, seen, variant, True)
+
+        if normalized_query and normalized_query not in self.alias_cache:
+            self.alias_cache[normalized_query] = (
+                list(alias_entries),
+                set(seen),
+            )
 
         self.add_alias_entry(alias_entries, seen, original_name, False)
         return alias_entries
