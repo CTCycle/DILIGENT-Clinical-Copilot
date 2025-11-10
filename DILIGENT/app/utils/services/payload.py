@@ -72,8 +72,7 @@ def sanitize_dili_payload(
     *,
     patient_name: str | None,
     visit_date: datetime | date | dict[str, Any] | str | None,
-    anamnesis: str | None,
-    has_hepatic_diseases: bool,
+    anamnesis: str | None,   
     drugs: str | None,
     alt: str | None,
     alt_max: str | None,
@@ -101,7 +100,6 @@ def sanitize_dili_payload(
             else None
         ),
         "anamnesis": sanitize_field(anamnesis),
-        "has_hepatic_diseases": bool(has_hepatic_diseases),
         "drugs": sanitize_field(drugs),
         "alt": sanitize_field(alt),
         "alt_max": sanitize_field(alt_max),
