@@ -13,6 +13,7 @@ from DILIGENT.app.configurations import (
     RAG_EMBEDDING_BACKEND,
     RAG_OLLAMA_BASE_URL,
     RAG_OLLAMA_EMBEDDING_MODEL,
+    RAG_TOP_K_DOCUMENTS,
     RAG_USE_CLOUD_EMBEDDINGS,
     RAG_VECTOR_INDEX_METRIC,
     RAG_VECTOR_INDEX_TYPE,
@@ -157,7 +158,7 @@ class SimilaritySearch:
         *,
         vector_database: LanceVectorDatabase | None = None,
         embedding_generator: EmbeddingGenerator | None = None,
-        default_top_k: int = 3,
+        default_top_k: int = RAG_TOP_K_DOCUMENTS,
     ) -> None:
         self.default_top_k = max(int(default_top_k), 1)
         self.vector_database = vector_database or LanceVectorDatabase(

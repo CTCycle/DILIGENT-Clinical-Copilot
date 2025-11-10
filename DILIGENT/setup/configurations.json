@@ -4,6 +4,7 @@
     "vector_collection_name": "documents",
     "chunk_size": 1024,
     "chunk_overlap": 128,
+    "top_k_documents": 6,
     "embedding_backend": "ollama",
     "ollama_base_url": "http://localhost:11434",
     "ollama_embedding_model": "nomic-embed-text:latest",    
