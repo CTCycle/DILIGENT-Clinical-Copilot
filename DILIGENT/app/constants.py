@@ -16,10 +16,14 @@ TASKS_PATH = join(DATA_PATH, "tasks")
 LOGS_PATH = join(RSC_PATH, "logs")
 VECTOR_DB_PATH = join(DATA_PATH, "vectors")
 
-# [ENDPOINS]
+# [ENDPOINTS]
 ###############################################################################
-API_BASE_URL = "http://127.0.0.1:8000"
 CLINICAL_API_URL = "/clinical"
+
+# [EXPORTS]
+###############################################################################
+REPORT_EXPORT_DIRECTORY_PREFIX = "diligent_report_"
+REPORT_EXPORT_FILENAME = "clinical_report.md"
 
 # [LLM / PROVIDERS]
 ###############################################################################
