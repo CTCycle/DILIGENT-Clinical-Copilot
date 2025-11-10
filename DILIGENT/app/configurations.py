@@ -44,6 +44,15 @@ def get_configuration_value(*keys: str, default: Any | None = None) -> Any:
     configuration = CONFIGURATION_DATA if CONFIGURATION_DATA is not None else {}
     return get_nested_value(configuration, *keys, default=default)
 
+
+# -----------------------------------------------------------------------------
+def coerce_positive_int(value: Any, default: int) -> int:
+    try:
+        parsed = int(value)
+    except (TypeError, ValueError):
+        return default
+    return parsed if parsed > 0 else default
+
 ###############################################################################
 DEFAULT_PARSING_MODEL = PARSING_MODEL_CHOICES[0]
 DEFAULT_CLINICAL_MODEL = CLINICAL_MODEL_CHOICES[0]
@@ -66,6 +75,9 @@ RAG_HF_EMBEDDING_MODEL = RAG_CONFIGURATION.get("hf_embedding_model", "")
 RAG_VECTOR_INDEX_METRIC = RAG_CONFIGURATION.get("vector_index_metric", "cosine")
 RAG_VECTOR_INDEX_TYPE = RAG_CONFIGURATION.get("vector_index_type", "IVF_FLAT")
 RAG_RESET_VECTOR_COLLECTION = RAG_CONFIGURATION.get("reset_vector_collection", True)
+RAG_TOP_K_DOCUMENTS = coerce_positive_int(
+    RAG_CONFIGURATION.get("top_k_documents"), 3
+)
 RAG_CLOUD_PROVIDER = RAG_CONFIGURATION.get("cloud_provider") or DEFAULT_CLOUD_PROVIDER
 RAG_CLOUD_EMBEDDING_MODEL = (
     RAG_CONFIGURATION.get("cloud_embedding_model") or DEFAULT_CLOUD_EMBEDDING_MODEL

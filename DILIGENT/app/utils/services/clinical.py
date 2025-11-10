@@ -28,6 +28,7 @@ from DILIGENT.app.configurations import (
     ClientRuntimeConfig,
     DEFAULT_LLM_TIMEOUT_SECONDS,
     MAX_EXCERPT_LENGTH,
+    RAG_TOP_K_DOCUMENTS,
 )
 from DILIGENT.app.logger import logger
 from DILIGENT.app.utils.repository.serializer import DataSerializer
@@ -144,7 +145,7 @@ class HepatoxConsultation:
         )
         self.temperature = ClientRuntimeConfig.get_ollama_temperature()
         self.similarity_search: SimilaritySearch | None = None
-        self.rag_top_k = 5
+        self.rag_top_k = RAG_TOP_K_DOCUMENTS
 
     # -------------------------------------------------------------------------
     async def run_analysis(
@@ -269,7 +270,11 @@ class HepatoxConsultation:
             rag_documents = None
             if rag_query is not None:
                 drug_RAG_query = rag_query.get(normalized_drug_name)
-                retrieved_docs = self.search_supporting_documents(drug_RAG_query, top_k=self.rag_top_k)
+                if drug_RAG_query:
+                    rag_documents = self.search_supporting_documents(
+                        drug_RAG_query,
+                        top_k=self.rag_top_k,
+                    )
   
             # Kick off the patient-specific assessment for each candidate drug
             llm_jobs.append(

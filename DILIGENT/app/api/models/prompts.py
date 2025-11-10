@@ -30,9 +30,18 @@ Return:
 - Ensure the output strictly adheres to the schema.
 """
 
+DILI_RAG_QUERY_PROMPT = (
+    "{name} drug induced liver injury (DILI) {classification} pattern "
+    "Pattern of hepatotoxicity - {r_part} "
+    "Focus: latency, pattern match vs observed pattern, severity, risk factors, "
+    "case reports, rechallenge outcomes, likelihood grading, and management. "
+    "Summarize evidence, contradictions, and strength of association. "
+    "Clinical context: {clinical}"
+)
+
 LIVERTOX_REPORT_EXAMPLE = """
 
-**Drug name – LiverTox score X**
+**Drug name - LiverTox score X**
 
 Write a single-paragraph summary (≤500 words) that:
 
