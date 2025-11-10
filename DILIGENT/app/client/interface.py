@@ -165,7 +165,6 @@ async def handle_run_workflow(
     patient_name_input: Any,
     visit_date_input: Any,
     anamnesis_input: Any,
-    has_diseases_checkbox: Any,
     drugs_input: Any,
     alt_input: Any,
     alt_max_input: Any,
@@ -197,8 +196,7 @@ async def handle_run_workflow(
     result = await run_DILI_session(
         patient_name_input.value,
         visit_date_input.value,
-        anamnesis_input.value,
-        has_diseases_checkbox.value,
+        anamnesis_input.value,       
         drugs_input.value,
         alt_input.value,
         alt_max_input.value,
@@ -226,7 +224,6 @@ async def handle_clear_click(
     alt_max_input: Any,
     alp_input: Any,
     alp_max_input: Any,
-    has_diseases_checkbox: Any,
     use_rag_checkbox: Any,
     use_cloud_services_checkbox: Any,
     llm_provider_dropdown: Any,
@@ -263,8 +260,6 @@ async def handle_clear_click(
     alp_input.update()
     alp_max_input.value = defaults["alp_max"]
     alp_max_input.update()
-    has_diseases_checkbox.value = defaults["has_diseases"]
-    has_diseases_checkbox.update()
     use_rag_checkbox.value = defaults["use_rag"]
     use_rag_checkbox.update()
     use_cloud_services_checkbox.value = settings.use_cloud_services
@@ -334,11 +329,7 @@ def main_page() -> None:
                         placeholder=(
                             "Describe the clinical picture, including exams and labs when relevant..."
                         ),
-                    ).classes("w-full min-h-[12rem]")
-                    has_diseases = ui.checkbox(
-                        "Has hepatic diseases",
-                        value=False,
-                    ).classes("pt-2")
+                    ).classes("w-full min-h-[12rem]")               
                     drugs = ui.textarea(
                         label="Current Drugs",
                         placeholder="List current therapies, dosage and schedule...",
@@ -509,8 +500,7 @@ def main_page() -> None:
             handle_run_workflow,
             patient_name,
             visit_date,
-            anamnesis,
-            has_diseases,
+            anamnesis,      
             drugs,
             alt,
             alt_max,
@@ -542,7 +532,6 @@ def main_page() -> None:
             alt_max,
             alp,
             alp_max,
-            has_diseases,
             use_rag_checkbox,
             use_cloud_services,
             llm_provider_dropdown,
