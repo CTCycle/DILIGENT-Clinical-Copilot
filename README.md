@@ -56,14 +56,7 @@ The database schema is created automatically the first time the application star
   ```bash
   uvicorn DILIGENT.app.app:app --host 0.0.0.0 --port 8000
   ```
-
-  Start the NiceGUI client in a separate shell to access the graphical interface:
-
-  ```bash
-  python -m DILIGENT.app.client.interface
-  ```
-
-  The interactive UI will be available at `http://127.0.0.1:7861`, while the API documentation can be viewed at `http://localhost:8000/docs`.
+The interactive UI will be available at `http://127.0.0.1:7861`, while the API documentation can be viewed at `http://localhost:8000/docs`.
 
 Once the UI is open:
 
@@ -80,7 +73,7 @@ Execute `DILIGENT/setup_and_maintenance.bat` to open the maintenance console. Av
 - **Update project** – pull the latest revision from GitHub using the bundled Git client.
 - **Remove logs** – clear accumulated log files stored in `DILIGENT/resources/logs`.
 
-### 3.1.1 Database updater
+### 3.2 Database updater
 The LiverTox database shipped with the application changes over time as new monographs are released. Run the updater script every week or two so the toxicity assessments stay aligned with the latest guidance.
 
 1. Activate the same virtual environment you use for the main app.
@@ -92,7 +85,7 @@ The LiverTox database shipped with the application changes over time as new mono
 
 The script downloads the newest LiverTox content (set `REDOWNLOAD = False` inside `update_database.py` if you want to reuse existing archives), refreshes the SQLite tables, and writes a brief summary to the log. It can run independently from the FastAPI server, so schedule it with cron/Task Scheduler without taking the UI offline.
 
-### 3.1 Resources
+### 3.3 Resources
 Clinical data, configuration templates, and assets live under `DILIGENT/resources/`:
 
 - **database/** – contains the SQLite database (`database.db`) with session histories plus any exported evaluation artefacts.
@@ -109,34 +102,6 @@ Environment variables reside in `DILIGENT/setup/.env`. Create or edit this file 
 | OPENAI_API_KEY       | API key for the configured cloud LLM provider (if applicable).  |
 | MPLBACKEND           | Matplotlib backend used by background plotting tasks.           |
 
-
-## 3.2 LangSmith observability
-The LangChain components bundled with DILIGENT support LangSmith tracing. When the relevant environment variables are present, every structured LLM call—including Ollama and cloud chat requests—will emit trace data to LangSmith. To enable tracing:
-
-1. Create a free LangSmith account at [https://smith.langchain.com](https://smith.langchain.com) and generate an API key from **Settings → API Keys**.
-2. Add the following keys to your `.env` file (for example `DILIGENT/setup/.env`):
-
-   ```text
-   LANGSMITH_API_KEY="sk-..."
-   LANGSMITH_TRACING_V2="true"
-   LANGSMITH_PROJECT="DILIGENT"
-   # Optional: point to a self-hosted deployment
-   LANGSMITH_ENDPOINT="https://api.smith.langchain.com"
-   ```
-
-3. Export the same variables in your shell before starting the server:
-
-   ```bash
-   export LANGSMITH_API_KEY="sk-..."
-   export LANGSMITH_TRACING_V2="true"
-   export LANGSMITH_PROJECT="DILIGENT"
-   # Optional: point to a self-hosted deployment
-   # export LANGSMITH_ENDPOINT="https://api.smith.langchain.com"
-   ```
-
-   On Windows Command Prompt use `set`, and on PowerShell use `$Env:` instead of `export`.
-4. Launch the DILIGENT application and execute any workflow that calls the LLMs.
-5. Open the LangSmith web UI and select the project configured in `LANGSMITH_PROJECT` to inspect traces, prompts, model choices, and any retry/parsing attempts.
 
 ## License
 
