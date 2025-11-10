@@ -11,21 +11,32 @@ from DILIGENT.app.constants import (
     PARSING_MODEL_CHOICES,
     SETUP_DIR,
 )
+from DILIGENT.app.utils.types import (
+    coerce_bool,
+    coerce_float,
+    coerce_int,
+    coerce_positive_int,
+    coerce_str,
+)
 
-CONFIGURATION_CACHE: dict[str, Any] | None = None
 CONFIGURATION_FILE = os.path.join(SETUP_DIR, "configurations.json")
 
+
 ###############################################################################
-def load_configuration_file() -> dict[str, Any] | None:
-    if os.path.exists(CONFIGURATION_FILE):
-        try:
-            with open(CONFIGURATION_FILE, "r", encoding="utf-8") as handle:
-                return json.load(handle)
-        except (OSError, json.JSONDecodeError) as exc:
-            raise RuntimeError(
-                f"Unable to load configuration from {CONFIGURATION_FILE}"
-            ) from exc
-             
+def load_configuration_file() -> dict[str, Any]:
+    if not os.path.exists(CONFIGURATION_FILE):
+        return {}
+    try:
+        with open(CONFIGURATION_FILE, "r", encoding="utf-8") as handle:
+            payload = json.load(handle)
+    except (OSError, json.JSONDecodeError) as exc:
+        raise RuntimeError(
+            f"Unable to load configuration from {CONFIGURATION_FILE}"
+        ) from exc
+    if not isinstance(payload, dict):
+        return {}
+    return payload
+
 
 # -----------------------------------------------------------------------------
 def get_nested_value(data: dict[str, Any], *keys: str, default: Any | None = None) -> Any:
@@ -37,84 +48,267 @@ def get_nested_value(data: dict[str, Any], *keys: str, default: Any | None = Non
             return default
     return current
 
+
 # -----------------------------------------------------------------------------
+def get_configuration_value(*keys: str, default: Any | None = None) -> Any:
+    return get_nested_value(CONFIGURATION_DATA, *keys, default=default)
+
+
+# -----------------------------------------------------------------------------
+def ensure_mapping(value: Any) -> dict[str, Any]:
+    return value if isinstance(value, dict) else {}
+
+
 CONFIGURATION_DATA = load_configuration_file()
 
-def get_configuration_value(*keys: str, default: Any | None = None) -> Any:
-    configuration = CONFIGURATION_DATA if CONFIGURATION_DATA is not None else {}
-    return get_nested_value(configuration, *keys, default=default)
+
+###############################################################################
+@dataclass(frozen=True)
+class BackendSettings:
+    title: str
+    version: str
+    description: str
+
+
+###############################################################################
+@dataclass(frozen=True)
+class UIRuntimeSettings:
+    host: str
+    port: int
+    title: str
+    mount_path: str
+    redirect_path: str
+    show_welcome_message: bool
+    reconnect_timeout_seconds: int
+
+
+###############################################################################
+@dataclass(frozen=True)
+class APISettings:
+    base_url: str
+
+
+###############################################################################
+@dataclass(frozen=True)
+class HTTPSettings:
+    timeout_seconds: float
+
+
+###############################################################################
+@dataclass(frozen=True)
+class DatabaseSettings:
+    insert_batch_size: int
 
 
 # -----------------------------------------------------------------------------
-def coerce_positive_int(value: Any, default: int) -> int:
-    try:
-        parsed = int(value)
-    except (TypeError, ValueError):
-        return default
-    return parsed if parsed > 0 else default
+def build_backend_settings(data: dict[str, Any]) -> BackendSettings:
+    return BackendSettings(
+        title=coerce_str(data.get("title"), "DILIGENT Clinical Copilot Backend"),
+        version=coerce_str(data.get("version"), "0.1.0"),
+        description=coerce_str(data.get("description"), "FastAPI backend"),
+    )
 
-###############################################################################
-DEFAULT_PARSING_MODEL = PARSING_MODEL_CHOICES[0]
-DEFAULT_CLINICAL_MODEL = CLINICAL_MODEL_CHOICES[0]
-DEFAULT_CLOUD_PROVIDER = CLOUD_MODEL_CHOICES["openai"]
-DEFAULT_CLOUD_MODEL = CLOUD_MODEL_CHOICES["openai"][0]
+
+# -----------------------------------------------------------------------------
+def build_ui_runtime_settings(data: dict[str, Any]) -> UIRuntimeSettings:
+    return UIRuntimeSettings(
+        host=coerce_str(data.get("host"), "0.0.0.0"),
+        port=coerce_positive_int(data.get("port"), 7861),
+        title=coerce_str(data.get("title"), "DILIGENT Clinical Copilot"),
+        mount_path=coerce_str(data.get("mount_path"), "/ui"),
+        redirect_path=coerce_str(data.get("redirect_path"), "/ui"),
+        show_welcome_message=coerce_bool(data.get("show_welcome_message"), False),
+        reconnect_timeout_seconds=coerce_positive_int(
+            data.get("reconnect_timeout_seconds"),
+            180,
+        ),
+    )
+
+
+# -----------------------------------------------------------------------------
+def build_api_settings(data: dict[str, Any]) -> APISettings:
+    return APISettings(
+        base_url=coerce_str(data.get("base_url"), "http://127.0.0.1:8000"),
+    )
+
+
+# -----------------------------------------------------------------------------
+def build_http_settings(data: dict[str, Any]) -> HTTPSettings:
+    return HTTPSettings(
+        timeout_seconds=coerce_float(data.get("timeout_seconds"), 3_600.0),
+    )
+
+
+# -----------------------------------------------------------------------------
+def build_database_settings(data: dict[str, Any]) -> DatabaseSettings:
+    return DatabaseSettings(
+        insert_batch_size=coerce_positive_int(
+            data.get("insert_batch_size"),
+            1_000,
+        ),
+    )
+
+
+BACKEND_SETTINGS = build_backend_settings(
+    ensure_mapping(get_configuration_value("backend", default={}))
+)
+UI_RUNTIME_SETTINGS = build_ui_runtime_settings(
+    ensure_mapping(get_configuration_value("ui_runtime", default={}))
+)
+API_SETTINGS = build_api_settings(
+    ensure_mapping(get_configuration_value("api", default={}))
+)
+HTTP_SETTINGS = build_http_settings(
+    ensure_mapping(get_configuration_value("http", default={}))
+)
+DATABASE_SETTINGS = build_database_settings(
+    ensure_mapping(get_configuration_value("database", default={}))
+)
+
+CLIENT_RUNTIME_DEFAULTS = ensure_mapping(
+    get_configuration_value("client_runtime_defaults", default={})
+)
+
+DEFAULT_PARSING_MODEL = coerce_str(
+    CLIENT_RUNTIME_DEFAULTS.get("parsing_model"),
+    PARSING_MODEL_CHOICES[0] if PARSING_MODEL_CHOICES else "",
+)
+DEFAULT_CLINICAL_MODEL = coerce_str(
+    CLIENT_RUNTIME_DEFAULTS.get("clinical_model"),
+    CLINICAL_MODEL_CHOICES[0] if CLINICAL_MODEL_CHOICES else "",
+)
+DEFAULT_LLM_PROVIDER = coerce_str(
+    CLIENT_RUNTIME_DEFAULTS.get("llm_provider"),
+    "openai",
+)
+DEFAULT_CLOUD_PROVIDER = DEFAULT_LLM_PROVIDER
+_provider_models = CLOUD_MODEL_CHOICES.get(DEFAULT_CLOUD_PROVIDER, [])
+DEFAULT_CLOUD_MODEL = coerce_str(
+    CLIENT_RUNTIME_DEFAULTS.get("cloud_model"),
+    _provider_models[0] if _provider_models else "",
+)
+DEFAULT_USE_CLOUD_SERVICES = coerce_bool(
+    CLIENT_RUNTIME_DEFAULTS.get("use_cloud_services"),
+    False,
+)
+DEFAULT_OLLAMA_TEMPERATURE = coerce_float(
+    CLIENT_RUNTIME_DEFAULTS.get("ollama_temperature"),
+    0.7,
+)
+DEFAULT_OLLAMA_REASONING = coerce_bool(
+    CLIENT_RUNTIME_DEFAULTS.get("ollama_reasoning"),
+    False,
+)
 
 DEFAULT_CLOUD_EMBEDDING_MODEL = ""
-DEFAULT_OLLAMA_TEMPERATURE = 0.7
-DEFAULT_OLLAMA_REASONING = False
 
-OLLAMA_HOST_DEFAULT = get_configuration_value("ollama_host_default", default="")
-RAG_CONFIGURATION = get_configuration_value("rag", default={})
-VECTOR_COLLECTION_NAME = RAG_CONFIGURATION.get("vector_collection_name", "documents")
-RAG_CHUNK_SIZE = RAG_CONFIGURATION.get("chunk_size", 1024)
-RAG_CHUNK_OVERLAP = RAG_CONFIGURATION.get("chunk_overlap", 128)
-RAG_EMBEDDING_BACKEND = RAG_CONFIGURATION.get("embedding_backend", "ollama")
-RAG_OLLAMA_BASE_URL = RAG_CONFIGURATION.get("ollama_base_url", OLLAMA_HOST_DEFAULT)
-RAG_OLLAMA_EMBEDDING_MODEL = RAG_CONFIGURATION.get("ollama_embedding_model", "")
-RAG_HF_EMBEDDING_MODEL = RAG_CONFIGURATION.get("hf_embedding_model", "")
-RAG_VECTOR_INDEX_METRIC = RAG_CONFIGURATION.get("vector_index_metric", "cosine")
-RAG_VECTOR_INDEX_TYPE = RAG_CONFIGURATION.get("vector_index_type", "IVF_FLAT")
-RAG_RESET_VECTOR_COLLECTION = RAG_CONFIGURATION.get("reset_vector_collection", True)
+OLLAMA_HOST_DEFAULT = coerce_str(
+    get_configuration_value("ollama_host_default", default=""),
+    "",
+)
+
+RAG_CONFIGURATION = ensure_mapping(get_configuration_value("rag", default={}))
+VECTOR_COLLECTION_NAME = coerce_str(
+    RAG_CONFIGURATION.get("vector_collection_name"),
+    "documents",
+)
+RAG_CHUNK_SIZE = coerce_positive_int(RAG_CONFIGURATION.get("chunk_size"), 1_024)
+RAG_CHUNK_OVERLAP = coerce_positive_int(
+    RAG_CONFIGURATION.get("chunk_overlap"),
+    128,
+)
+RAG_EMBEDDING_BACKEND = coerce_str(
+    RAG_CONFIGURATION.get("embedding_backend"),
+    "ollama",
+)
+RAG_OLLAMA_BASE_URL = coerce_str(
+    RAG_CONFIGURATION.get("ollama_base_url"),
+    OLLAMA_HOST_DEFAULT,
+)
+RAG_OLLAMA_EMBEDDING_MODEL = coerce_str(
+    RAG_CONFIGURATION.get("ollama_embedding_model"),
+    "",
+)
+RAG_HF_EMBEDDING_MODEL = coerce_str(
+    RAG_CONFIGURATION.get("hf_embedding_model"),
+    "",
+)
+RAG_VECTOR_INDEX_METRIC = coerce_str(
+    RAG_CONFIGURATION.get("vector_index_metric"),
+    "cosine",
+)
+RAG_VECTOR_INDEX_TYPE = coerce_str(
+    RAG_CONFIGURATION.get("vector_index_type"),
+    "IVF_FLAT",
+)
+RAG_RESET_VECTOR_COLLECTION = coerce_bool(
+    RAG_CONFIGURATION.get("reset_vector_collection"),
+    True,
+)
 RAG_TOP_K_DOCUMENTS = coerce_positive_int(
-    RAG_CONFIGURATION.get("top_k_documents"), 3
+    RAG_CONFIGURATION.get("top_k_documents"),
+    3,
 )
-RAG_CLOUD_PROVIDER = RAG_CONFIGURATION.get("cloud_provider") or DEFAULT_CLOUD_PROVIDER
-RAG_CLOUD_EMBEDDING_MODEL = (
-    RAG_CONFIGURATION.get("cloud_embedding_model") or DEFAULT_CLOUD_EMBEDDING_MODEL
+RAG_CLOUD_PROVIDER = coerce_str(
+    RAG_CONFIGURATION.get("cloud_provider"),
+    DEFAULT_CLOUD_PROVIDER,
 )
-RAG_USE_CLOUD_EMBEDDINGS = RAG_CONFIGURATION.get("use_cloud_embeddings", False)
+RAG_CLOUD_EMBEDDING_MODEL = coerce_str(
+    RAG_CONFIGURATION.get("cloud_embedding_model"),
+    DEFAULT_CLOUD_EMBEDDING_MODEL,
+)
+RAG_USE_CLOUD_EMBEDDINGS = coerce_bool(
+    RAG_CONFIGURATION.get("use_cloud_embeddings"),
+    False,
+)
 
-EXTERNAL_DATA_CONFIGURATION = get_configuration_value("external_data", default={})
-DEFAULT_LLM_TIMEOUT_SECONDS = EXTERNAL_DATA_CONFIGURATION.get(
-    "default_llm_timeout_seconds", 3_600.0
+EXTERNAL_DATA_CONFIGURATION = ensure_mapping(
+    get_configuration_value("external_data", default={})
 )
-LIVERTOX_LLM_TIMEOUT_SECONDS = EXTERNAL_DATA_CONFIGURATION.get(
-    "livertox_llm_timeout_seconds", DEFAULT_LLM_TIMEOUT_SECONDS
+DEFAULT_LLM_TIMEOUT_SECONDS = coerce_float(
+    EXTERNAL_DATA_CONFIGURATION.get("default_llm_timeout_seconds"),
+    HTTP_SETTINGS.timeout_seconds,
 )
-LIVERTOX_ARCHIVE = EXTERNAL_DATA_CONFIGURATION.get(
-    "livertox_archive", "livertox_NBK547852.tar.gz"
+LIVERTOX_LLM_TIMEOUT_SECONDS = coerce_float(
+    EXTERNAL_DATA_CONFIGURATION.get("livertox_llm_timeout_seconds"),
+    DEFAULT_LLM_TIMEOUT_SECONDS,
 )
-LIVERTOX_YIELD_INTERVAL = EXTERNAL_DATA_CONFIGURATION.get("livertox_yield_interval", 25)
-LIVERTOX_SKIP_DETERMINISTIC_RATIO = EXTERNAL_DATA_CONFIGURATION.get(
-    "livertox_skip_deterministic_ratio", 0.80
+LIVERTOX_ARCHIVE = coerce_str(
+    EXTERNAL_DATA_CONFIGURATION.get("livertox_archive"),
+    "livertox_NBK547852.tar.gz",
 )
-LIVERTOX_MONOGRAPH_MAX_WORKERS = EXTERNAL_DATA_CONFIGURATION.get(
-    "livertox_monograph_max_workers", 4
+LIVERTOX_YIELD_INTERVAL = coerce_positive_int(
+    EXTERNAL_DATA_CONFIGURATION.get("livertox_yield_interval"),
+    25,
 )
-MAX_EXCERPT_LENGTH = EXTERNAL_DATA_CONFIGURATION.get("max_excerpt_length", 8000)
-CLINICAL_ANALYSIS_CONFIGURATION = get_configuration_value("clinical_analysis", default={})
+LIVERTOX_SKIP_DETERMINISTIC_RATIO = coerce_float(
+    EXTERNAL_DATA_CONFIGURATION.get("livertox_skip_deterministic_ratio"),
+    0.80,
+)
+LIVERTOX_MONOGRAPH_MAX_WORKERS = coerce_positive_int(
+    EXTERNAL_DATA_CONFIGURATION.get("livertox_monograph_max_workers"),
+    4,
+)
+MAX_EXCERPT_LENGTH = coerce_positive_int(
+    EXTERNAL_DATA_CONFIGURATION.get("max_excerpt_length"),
+    8_000,
+)
+LLM_NULL_MATCH_NAMES = EXTERNAL_DATA_CONFIGURATION.get("llm_null_match_names", [])
+
+CLINICAL_ANALYSIS_CONFIGURATION = ensure_mapping(
+    get_configuration_value("clinical_analysis", default={})
+)
 ALT_LABELS = set(CLINICAL_ANALYSIS_CONFIGURATION.get("alt_labels", []))
 ALP_LABELS = set(CLINICAL_ANALYSIS_CONFIGURATION.get("alp_labels", []))
 
 
 ###############################################################################
-@dataclass
 class ClientRuntimeConfig:
     parsing_model: str = DEFAULT_PARSING_MODEL
     clinical_model: str = DEFAULT_CLINICAL_MODEL
-    llm_provider: str = "openai"
+    llm_provider: str = DEFAULT_LLM_PROVIDER
     cloud_model: str = DEFAULT_CLOUD_MODEL
-    use_cloud_services: bool = False
+    use_cloud_services: bool = DEFAULT_USE_CLOUD_SERVICES
     ollama_temperature: float = DEFAULT_OLLAMA_TEMPERATURE
     ollama_reasoning: bool = DEFAULT_OLLAMA_REASONING
     revision: int = 0
@@ -146,7 +340,11 @@ class ClientRuntimeConfig:
     @classmethod
     def set_llm_provider(cls, provider: str) -> str:
         value = provider.strip()
-        if value and value != cls.llm_provider:
+        if not value:
+            return cls.llm_provider
+        if value not in CLOUD_MODEL_CHOICES:
+            value = DEFAULT_LLM_PROVIDER
+        if cls.llm_provider != value:
             cls.llm_provider = value
             models = CLOUD_MODEL_CHOICES.get(cls.llm_provider, [])
             if cls.cloud_model not in models:
@@ -246,9 +444,9 @@ class ClientRuntimeConfig:
     def reset_defaults(cls) -> None:
         cls.parsing_model = DEFAULT_PARSING_MODEL
         cls.clinical_model = DEFAULT_CLINICAL_MODEL
-        cls.llm_provider = "openai"
+        cls.llm_provider = DEFAULT_LLM_PROVIDER
         cls.cloud_model = DEFAULT_CLOUD_MODEL
-        cls.use_cloud_services = False
+        cls.use_cloud_services = DEFAULT_USE_CLOUD_SERVICES
         cls.ollama_temperature = DEFAULT_OLLAMA_TEMPERATURE
         cls.ollama_reasoning = DEFAULT_OLLAMA_REASONING
         cls.revision = 0
@@ -278,3 +476,39 @@ class ClientRuntimeConfig:
             else:
                 model = cls.get_clinical_model()
         return provider, model.strip()
+
+
+__all__ = [
+    "ALT_LABELS",
+    "API_SETTINGS",
+    "BACKEND_SETTINGS",
+    "ClientRuntimeConfig",
+    "DATABASE_SETTINGS",
+    "DEFAULT_CLINICAL_MODEL",
+    "DEFAULT_LLM_TIMEOUT_SECONDS",
+    "HTTP_SETTINGS",
+    "LIVERTOX_ARCHIVE",
+    "LIVERTOX_LLM_TIMEOUT_SECONDS",
+    "LIVERTOX_MONOGRAPH_MAX_WORKERS",
+    "LIVERTOX_SKIP_DETERMINISTIC_RATIO",
+    "LIVERTOX_YIELD_INTERVAL",
+    "MAX_EXCERPT_LENGTH",
+    "OLLAMA_HOST_DEFAULT",
+    "RAG_CHUNK_OVERLAP",
+    "RAG_CHUNK_SIZE",
+    "RAG_CLOUD_EMBEDDING_MODEL",
+    "RAG_CLOUD_PROVIDER",
+    "RAG_CONFIGURATION",
+    "RAG_EMBEDDING_BACKEND",
+    "RAG_HF_EMBEDDING_MODEL",
+    "RAG_OLLAMA_BASE_URL",
+    "RAG_OLLAMA_EMBEDDING_MODEL",
+    "RAG_RESET_VECTOR_COLLECTION",
+    "RAG_TOP_K_DOCUMENTS",
+    "RAG_USE_CLOUD_EMBEDDINGS",
+    "RAG_VECTOR_INDEX_METRIC",
+    "RAG_VECTOR_INDEX_TYPE",
+    "UI_RUNTIME_SETTINGS",
+    "VECTOR_COLLECTION_NAME",
+]
+

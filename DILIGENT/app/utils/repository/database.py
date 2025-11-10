@@ -18,6 +18,7 @@ from sqlalchemy import (
 from sqlalchemy.dialects.sqlite import insert
 from sqlalchemy.orm import declarative_base, sessionmaker
 
+from DILIGENT.app.configurations import DATABASE_SETTINGS
 from DILIGENT.app.constants import DATA_PATH
 from DILIGENT.app.utils.singleton import singleton
 
@@ -83,7 +84,7 @@ class DILIGENTDatabase:
             f"sqlite:///{self.db_path}", echo=False, future=True
         )
         self.Session = sessionmaker(bind=self.engine, future=True)
-        self.insert_batch_size = 1000
+        self.insert_batch_size = DATABASE_SETTINGS.insert_batch_size
 
     # -------------------------------------------------------------------------
     def initialize_database(self) -> None:
