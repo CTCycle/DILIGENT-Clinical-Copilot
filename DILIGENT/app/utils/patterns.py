@@ -143,6 +143,7 @@ FORM_TOKENS = {
 FORM_DESCRIPTORS = {
     "rivestite",
     "retard",
+    "ret",
     "oro",
     "sublinguale",
     "sublinguali",
