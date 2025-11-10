@@ -139,24 +139,45 @@ class DrugsParser:
         cleaned = self.clean_text(text)
         if not cleaned:
             return PatientDrugs(entries=[])
+        lines = [
+            segment
+            for segment in (entry.strip() for entry in cleaned.split("\n"))
+            if segment
+        ]
+        grouped_lines = self.group_lines_for_llm(lines)
+        parsed_chunks, fallback_chunks = self.rule_based_parse(grouped_lines)
+        if not fallback_chunks:
+            ordered = [entry for _, entry in parsed_chunks]
+            return PatientDrugs(entries=ordered)
+
         await self.ensure_client()
         if self.client is None:
             raise RuntimeError("LLM client is not initialized for drug extraction")
         try:
             # Ask the LLM for a structured list following the PatientDrugs schema
-            structured = await self.llm_extract_drugs(cleaned)
+            structured = await self.llm_extract_drugs(
+                [line for _, line in fallback_chunks]
+            )
         except Exception as exc:  # pragma: no cover - passthrough for visibility
             raise RuntimeError("Failed to extract drugs via LLM") from exc
 
-        return PatientDrugs(entries=list(structured.entries))
+        ordered_entries: list[DrugEntry | None] = [None] * len(grouped_lines)
+        for index, entry in parsed_chunks:
+            ordered_entries[index] = entry
+        llm_entries = list(structured.entries)
+        for offset, entry in enumerate(llm_entries):
+            if offset < len(fallback_chunks):
+                target_index = fallback_chunks[offset][0]
+                ordered_entries[target_index] = entry
+            else:
+                ordered_entries.append(entry)
+        combined = [entry for entry in ordered_entries if entry is not None]
+        return PatientDrugs(entries=combined)
 
-    async def llm_extract_drugs(self, text: str) -> PatientDrugs:
+    async def llm_extract_drugs(self, lines: list[str]) -> PatientDrugs:
         if self.client is None:
             raise RuntimeError("LLM client is not initialized for drug extraction")
 
-        lines = [
-            line for line in (segment.strip() for segment in text.split("\n")) if line
-        ]
         if not lines:
             return PatientDrugs(entries=[])
 
@@ -242,6 +263,20 @@ class DrugsParser:
         return grouped if grouped else lines
 
     # -------------------------------------------------------------------------
+    def rule_based_parse(
+        self, lines: list[str]
+    ) -> tuple[list[tuple[int, DrugEntry]], list[tuple[int, str]]]:
+        parsed: list[tuple[int, DrugEntry]] = []
+        fallback: list[tuple[int, str]] = []
+        for index, line in enumerate(lines):
+            entry = self.parse_line(line)
+            if entry is None:
+                fallback.append((index, line))
+                continue
+            parsed.append((index, entry))
+        return parsed, fallback
+
+    # -------------------------------------------------------------------------
     def parse_line(self, line: str) -> DrugEntry | None:
         schedule_match = self.SCHEDULE_RE.search(line)
         if not schedule_match:
@@ -313,9 +348,7 @@ class DrugsParser:
             if normalized in FORM_TOKENS:
                 mode_tokens.append(token)
                 continue
-            if mode_tokens and (
-                normalized in FORM_DESCRIPTORS or not self.token_has_numeric(token)
-            ):
+            if normalized in FORM_DESCRIPTORS:
                 mode_tokens.append(token)
                 continue
             if (
@@ -327,8 +360,11 @@ class DrugsParser:
                 continue
             if dosage_tokens:
                 dosage_tokens.append(token)
-            else:
-                name_tokens.append(token)
+                continue
+            if normalized in {"per", "os"}:
+                mode_tokens.append(token)
+                continue
+            name_tokens.append(token)
         if not dosage_tokens and remainder:
             dosage_tokens = remainder
         name = " ".join(name_tokens).strip() or None
@@ -340,15 +376,27 @@ class DrugsParser:
     def extract_mode_from_prefix(
         self, name_tokens: list[str], mode_tokens: list[str]
     ) -> None:
-        while name_tokens:
-            normalized = self.normalize_token(name_tokens[-1])
+        idx = len(name_tokens)
+        trailing: list[str] = []
+        saw_form = False
+        while idx > 0:
+            token = name_tokens[idx - 1]
+            normalized = self.normalize_token(token)
             if normalized in FORM_TOKENS:
-                mode_tokens.insert(0, name_tokens.pop())
+                saw_form = True
+                trailing.append(token)
+                idx -= 1
                 continue
-            if mode_tokens and normalized in FORM_DESCRIPTORS:
-                mode_tokens.insert(0, name_tokens.pop())
+            if normalized in FORM_DESCRIPTORS:
+                trailing.append(token)
+                idx -= 1
                 continue
             break
+        if not saw_form:
+            return
+        del name_tokens[idx:]
+        trailing.reverse()
+        mode_tokens.extend(trailing)
 
     # -------------------------------------------------------------------------
     def token_has_numeric(self, token: str) -> bool:

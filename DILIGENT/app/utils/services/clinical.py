@@ -247,11 +247,10 @@ class HepatoxConsultation:
             excerpts_list = livertox_data.get("extracted_excerpts", [])
 
             suspension = self.evaluate_suspension(drug_entry, visit_date)
+            matched_lvt_row = matched_row if isinstance(matched_row, dict) else None
             entry = DrugClinicalAssessment(
                 drug_name=drug_entry.name,
-                matched_livertox_row=matched_row
-                if isinstance(matched_row, dict)
-                else None,
+                matched_livertox_row=matched_lvt_row,
                 extracted_excerpts=excerpts_list,
                 suspension=suspension,
             )
@@ -272,7 +271,6 @@ class HepatoxConsultation:
                 drug_RAG_query = rag_query.get(normalized_drug_name)
                 retrieved_docs = self.search_supporting_documents(drug_RAG_query, top_k=self.rag_top_k)
   
-
             # Kick off the patient-specific assessment for each candidate drug
             llm_jobs.append(
                 (
