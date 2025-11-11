@@ -268,12 +268,13 @@ class HepatoxConsultation:
             if rag_query is not None:
                 drug_RAG_query = rag_query.get(normalized_drug_name)
                 if drug_RAG_query:
-                    rag_documents = self.search_supporting_documents(
+                    rag_documents = await asyncio.to_thread(
+                        self.search_supporting_documents,
                         drug_RAG_query,
-                        top_k=self.rag_top_k,
+                        self.rag_top_k,
                     )
   
-            # Kick off the patient-specific assessment for each candidate drug
+            # Create a list of patient-specific assessmens for each candidate drug
             llm_jobs.append(
                 (
                     idx,
@@ -398,16 +399,17 @@ class HepatoxConsultation:
 
     # -------------------------------------------------------------------------
     def search_supporting_documents(
-        self, query_text: str | Any, *, top_k: int | None = None
+        self, query_text: str | Any, top_k: int | None = None
     ) -> str | None:
         if not isinstance(query_text, str):
             return None
         normalized = query_text.strip()
-        if not normalized:
+        if not normalized or not self.ensure_similarity_search():
             return None
-        if self.similarity_search is None:
-            return None
-        results = self.similarity_search.search(normalized, top_k=top_k)
+        
+        results = None
+        if self.similarity_search:
+            results = self.similarity_search.search(normalized, top_k=top_k)
         if not results:
             return None
         fragments: list[str] = []
