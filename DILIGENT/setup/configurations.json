@@ -80,14 +80,6 @@
     "catalog_excluded_term_suffixes": [
       "PCK"
     ]
-  },
-  "clinical_analysis": {
-    "alt_labels": [
-      "ALT",
-      "ALAT"
-    ],
-    "alp_labels": [
-      "ALP"
-    ]
-  }
+  } 
+  
 }
