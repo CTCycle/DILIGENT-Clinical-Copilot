@@ -338,9 +338,6 @@ LLM_NULL_MATCH_NAMES = EXTERNAL_DATA_CONFIGURATION.get("llm_null_match_names", [
 CLINICAL_ANALYSIS_CONFIGURATION = ensure_mapping(
     get_configuration_value("clinical_analysis", default={})
 )
-ALT_LABELS = set(CLINICAL_ANALYSIS_CONFIGURATION.get("alt_labels", []))
-ALP_LABELS = set(CLINICAL_ANALYSIS_CONFIGURATION.get("alp_labels", []))
-
 
 ###############################################################################
 class ClientRuntimeConfig:
