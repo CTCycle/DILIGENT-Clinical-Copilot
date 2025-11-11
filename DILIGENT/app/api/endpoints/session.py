@@ -16,14 +16,14 @@ from DILIGENT.app.api.schemas.clinical import (
 )
 from DILIGENT.app.logger import logger
 from DILIGENT.app.utils.repository.serializer import DataSerializer
-from DILIGENT.app.utils.services.clinical import (
+from DILIGENT.app.utils.services.clinical.hepatox import (
     HepatotoxicityPatternAnalyzer,
     HepatoxConsultation,
 )
-from DILIGENT.app.utils.services.parser import (
+from DILIGENT.app.utils.services.clinical.parser import (
     DrugsParser,
 )
-from DILIGENT.app.utils.services.retrieval import DILIQueryBuilder
+from DILIGENT.app.utils.services.retrieval.query import DILIQueryBuilder
 
 drugs_parser = DrugsParser()
 pattern_analyzer = HepatotoxicityPatternAnalyzer()

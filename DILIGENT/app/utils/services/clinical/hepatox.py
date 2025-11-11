@@ -32,8 +32,8 @@ from DILIGENT.app.configurations import (
 )
 from DILIGENT.app.logger import logger
 from DILIGENT.app.utils.repository.serializer import DataSerializer
-from DILIGENT.app.utils.services.embeddings import SimilaritySearch
-from DILIGENT.app.utils.services.pharma import LiverToxMatch, LiverToxMatcher
+from DILIGENT.app.utils.services.retrieval.embeddings import SimilaritySearch
+from DILIGENT.app.utils.services.clinical.matches import LiverToxMatcher
 
 
 ###############################################################################
