@@ -79,7 +79,7 @@ class UIRuntimeSettings:
     mount_path: str
     redirect_path: str
     show_welcome_message: bool
-    reconnect_timeout_seconds: int
+    reconnect_timeout: int
 
 
 ###############################################################################
@@ -91,13 +91,27 @@ class APISettings:
 ###############################################################################
 @dataclass(frozen=True)
 class HTTPSettings:
-    timeout_seconds: float
+    timeout: float
 
 
 ###############################################################################
 @dataclass(frozen=True)
 class DatabaseSettings:
     insert_batch_size: int
+
+
+###############################################################################
+@dataclass(frozen=True)
+class PharmaMatcherSettings:
+    direct_confidence: float
+    master_confidence: float
+    synonym_confidence: float
+    partial_confidence: float
+    fuzzy_confidence: float
+    fuzzy_threshold: float
+    token_max_frequency: int
+    min_confidence: float
+    catalog_excluded_term_suffixes: tuple[str, ...]
 
 
 # -----------------------------------------------------------------------------
@@ -118,10 +132,7 @@ def build_ui_runtime_settings(data: dict[str, Any]) -> UIRuntimeSettings:
         mount_path=coerce_str(data.get("mount_path"), "/ui"),
         redirect_path=coerce_str(data.get("redirect_path"), "/ui"),
         show_welcome_message=coerce_bool(data.get("show_welcome_message"), False),
-        reconnect_timeout_seconds=coerce_positive_int(
-            data.get("reconnect_timeout_seconds"),
-            180,
-        ),
+        reconnect_timeout=coerce_positive_int(data.get("reconnect_timeout"), 180),
     )
 
 
@@ -135,7 +146,7 @@ def build_api_settings(data: dict[str, Any]) -> APISettings:
 # -----------------------------------------------------------------------------
 def build_http_settings(data: dict[str, Any]) -> HTTPSettings:
     return HTTPSettings(
-        timeout_seconds=coerce_float(data.get("timeout_seconds"), 3_600.0),
+        timeout=coerce_float(data.get("timeout"), 3_600.0),
     )
 
 
@@ -146,6 +157,32 @@ def build_database_settings(data: dict[str, Any]) -> DatabaseSettings:
             data.get("insert_batch_size"),
             1_000,
         ),
+    )
+
+
+# -----------------------------------------------------------------------------
+def build_pharma_matcher_settings(data: dict[str, Any]) -> PharmaMatcherSettings:
+    suffixes_value = data.get("catalog_excluded_term_suffixes", ["PCK"])
+    suffixes: list[str] = []
+    if isinstance(suffixes_value, (list, tuple, set)):
+        candidates = list(suffixes_value)
+    else:
+        candidates = [suffixes_value]
+    for entry in candidates:
+        text = coerce_str(entry, "")
+        if text:
+            suffixes.append(text.upper())
+    suffix_tuple = tuple(suffixes) if suffixes else ("PCK",)
+    return PharmaMatcherSettings(
+        direct_confidence=coerce_float(data.get("direct_confidence"), 1.0),
+        master_confidence=coerce_float(data.get("master_confidence"), 0.92),
+        synonym_confidence=coerce_float(data.get("synonym_confidence"), 0.90),
+        partial_confidence=coerce_float(data.get("partial_confidence"), 0.86),
+        fuzzy_confidence=coerce_float(data.get("fuzzy_confidence"), 0.84),
+        fuzzy_threshold=coerce_float(data.get("fuzzy_threshold"), 0.85),
+        token_max_frequency=coerce_positive_int(data.get("token_max_frequency"), 3),
+        min_confidence=coerce_float(data.get("min_confidence"), 0.40),
+        catalog_excluded_term_suffixes=suffix_tuple,
     )
 
 
@@ -163,6 +200,9 @@ HTTP_SETTINGS = build_http_settings(
 )
 DATABASE_SETTINGS = build_database_settings(
     ensure_mapping(get_configuration_value("database", default={}))
+)
+PHARMA_MATCHER_SETTINGS = build_pharma_matcher_settings(
+    ensure_mapping(get_configuration_value("pharma_matcher", default={}))
 )
 
 CLIENT_RUNTIME_DEFAULTS = ensure_mapping(
@@ -266,11 +306,11 @@ EXTERNAL_DATA_CONFIGURATION = ensure_mapping(
     get_configuration_value("external_data", default={})
 )
 DEFAULT_LLM_TIMEOUT_SECONDS = coerce_float(
-    EXTERNAL_DATA_CONFIGURATION.get("default_llm_timeout_seconds"),
-    HTTP_SETTINGS.timeout_seconds,
+    EXTERNAL_DATA_CONFIGURATION.get("default_llm_timeout"),
+    HTTP_SETTINGS.timeout,
 )
 LIVERTOX_LLM_TIMEOUT_SECONDS = coerce_float(
-    EXTERNAL_DATA_CONFIGURATION.get("livertox_llm_timeout_seconds"),
+    EXTERNAL_DATA_CONFIGURATION.get("livertox_llm_timeout"),
     DEFAULT_LLM_TIMEOUT_SECONDS,
 )
 LIVERTOX_ARCHIVE = coerce_str(
@@ -494,6 +534,7 @@ __all__ = [
     "LIVERTOX_YIELD_INTERVAL",
     "MAX_EXCERPT_LENGTH",
     "OLLAMA_HOST_DEFAULT",
+    "PHARMA_MATCHER_SETTINGS",
     "RAG_CHUNK_OVERLAP",
     "RAG_CHUNK_SIZE",
     "RAG_CLOUD_EMBEDDING_MODEL",
