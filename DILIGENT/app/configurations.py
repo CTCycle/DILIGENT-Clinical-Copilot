@@ -305,13 +305,13 @@ RAG_USE_CLOUD_EMBEDDINGS = coerce_bool(
 EXTERNAL_DATA_CONFIGURATION = ensure_mapping(
     get_configuration_value("external_data", default={})
 )
-DEFAULT_LLM_TIMEOUT_SECONDS = coerce_float(
+DEFAULT_LLM_TIMEOUT = coerce_float(
     EXTERNAL_DATA_CONFIGURATION.get("default_llm_timeout"),
     HTTP_SETTINGS.timeout,
 )
-LIVERTOX_LLM_TIMEOUT_SECONDS = coerce_float(
+LIVERTOX_LLM_TIMEOUT = coerce_float(
     EXTERNAL_DATA_CONFIGURATION.get("livertox_llm_timeout"),
-    DEFAULT_LLM_TIMEOUT_SECONDS,
+    DEFAULT_LLM_TIMEOUT,
 )
 LIVERTOX_ARCHIVE = coerce_str(
     EXTERNAL_DATA_CONFIGURATION.get("livertox_archive"),
@@ -515,17 +515,16 @@ class ClientRuntimeConfig:
         return provider, model.strip()
 
 
-__all__ = [
-    "ALT_LABELS",
+__all__ = [    
     "API_SETTINGS",
     "BACKEND_SETTINGS",
     "ClientRuntimeConfig",
     "DATABASE_SETTINGS",
     "DEFAULT_CLINICAL_MODEL",
-    "DEFAULT_LLM_TIMEOUT_SECONDS",
+    "DEFAULT_LLM_TIMEOUT",
     "HTTP_SETTINGS",
     "LIVERTOX_ARCHIVE",
-    "LIVERTOX_LLM_TIMEOUT_SECONDS",
+    "LIVERTOX_LLM_TIMEOUT",
     "LIVERTOX_MONOGRAPH_MAX_WORKERS",
     "LIVERTOX_SKIP_DETERMINISTIC_RATIO",
     "LIVERTOX_YIELD_INTERVAL",

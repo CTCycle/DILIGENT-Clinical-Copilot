@@ -15,7 +15,7 @@ from DILIGENT.app.api.schemas.clinical import (
 )
 from DILIGENT.app.configurations import (
     ClientRuntimeConfig,
-    DEFAULT_LLM_TIMEOUT_SECONDS,
+    DEFAULT_LLM_TIMEOUT,
 )
 from DILIGENT.app.utils.patterns import (
     DRUG_BRACKET_TRAIL_RE,
@@ -44,7 +44,7 @@ class DrugsParser:
         *,
         client: Any | None = None,
         temperature: float = 0.0,
-        timeout_s: float = DEFAULT_LLM_TIMEOUT_SECONDS,
+        timeout_s: float = DEFAULT_LLM_TIMEOUT,
     ) -> None:
         self.temperature = float(temperature)
         self.timeout_s = float(timeout_s)
