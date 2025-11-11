@@ -11,13 +11,13 @@
     "mount_path": "/ui",
     "redirect_path": "/ui",
     "show_welcome_message": false,
-    "reconnect_timeout_seconds": 180
+    "reconnect_timeout": 3600.0
   },
   "api": {
     "base_url": "http://127.0.0.1:8000"
   },
   "http": {
-    "timeout_seconds": 3600.0
+    "timeout": 3600.0
   },
   "database": {
     "insert_batch_size": 1000
@@ -49,8 +49,8 @@
     "use_cloud_embeddings": false
   },
   "external_data": {
-    "default_llm_timeout_seconds": 3600.0,
-    "livertox_llm_timeout_seconds": 3600.0,
+    "default_llm_timeout": 3600.0,
+    "livertox_llm_timeout": 3600.0,
     "livertox_archive": "livertox_NBK547852.tar.gz",
     "livertox_yield_interval": 25,
     "livertox_skip_deterministic_ratio": 0.8,
@@ -65,6 +65,19 @@
       "unknown",
       "not applicable",
       "n a"
+    ]
+  },
+  "pharma_matcher": {
+    "direct_confidence": 1.0,
+    "master_confidence": 0.92,
+    "synonym_confidence": 0.9,
+    "partial_confidence": 0.86,
+    "fuzzy_confidence": 0.84,
+    "fuzzy_threshold": 0.85,
+    "token_max_frequency": 3,
+    "min_confidence": 0.4,
+    "catalog_excluded_term_suffixes": [
+      "PCK"
     ]
   },
   "clinical_analysis": {

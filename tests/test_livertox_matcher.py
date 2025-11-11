@@ -243,3 +243,41 @@ def test_catalog_alias_resolution():
     assert match.nbk_id == "NBK_ACET"
     assert match.reason == "monograph_name"
     assert "catalog_alias='Acetaminophen'" in match.notes
+
+
+def test_catalog_excludes_pack_term_types():
+    monographs = pd.DataFrame(
+        [
+            {
+                "nbk_id": "NBK_QTP",
+                "drug_name": "Quetiapine",
+                "excerpt": "Quetiapine excerpt",
+                "synonyms": "",
+            }
+        ]
+    )
+    catalog = pd.DataFrame(
+        [
+            {
+                "rxcui": "111",
+                "raw_name": "Quetiapine 25 MG Oral Tablet",
+                "term_type": "SCD",
+                "name": "Quetiapine",
+                "brand_names": "Seroquel",
+                "synonyms": '["Quetiapine", "Seroquel"]',
+            },
+            {
+                "rxcui": "222",
+                "raw_name": "Seroquel XR Sample Kit",
+                "term_type": "BPCK",
+                "name": "Seroquel Sample Kit",
+                "brand_names": "Seroquel Sample",
+                "synonyms": '["Acute Bipolar Depression", "Seroquel Sample"]',
+            },
+        ]
+    )
+    matcher = LiverToxMatcher(monographs, drugs_catalog_df=catalog)
+    assert matcher.catalog_synonym_records
+    assert len(matcher.catalog_synonym_records) == 1
+    record = matcher.catalog_synonym_records[0]
+    assert "Acute Bipolar Depression" not in record["synonyms"]

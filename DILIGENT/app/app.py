@@ -35,7 +35,7 @@ ui.run_with(
     mount_path=UI_RUNTIME_SETTINGS.mount_path,
     title=UI_RUNTIME_SETTINGS.title,
     show_welcome_message=UI_RUNTIME_SETTINGS.show_welcome_message,
-    reconnect_timeout=UI_RUNTIME_SETTINGS.reconnect_timeout_seconds,
+    reconnect_timeout=UI_RUNTIME_SETTINGS.reconnect_timeout,
 )
 
 @app.get("/")
