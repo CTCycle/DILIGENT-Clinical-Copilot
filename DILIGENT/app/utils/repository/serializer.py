@@ -18,7 +18,7 @@ from DILIGENT.app.constants import LIVERTOX_COLUMNS
 from DILIGENT.app.logger import logger
 from DILIGENT.app.utils.repository.database import ClinicalSession, database
 from DILIGENT.app.utils.repository.vectors import LanceVectorDatabase
-from DILIGENT.app.utils.services.embeddings import EmbeddingGenerator
+from DILIGENT.app.utils.services.retrieval.embeddings import EmbeddingGenerator
 
 
 ###############################################################################
