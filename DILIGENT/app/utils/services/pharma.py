@@ -9,7 +9,7 @@ from typing import Any
 
 import pandas as pd
 
-from DILIGENT.app.configurations import PHARMA_MATCHER_SETTINGS
+from DILIGENT.app.configurations import DRUGS_MATCHER_SETTINGS
 from DILIGENT.app.constants import MATCHING_STOPWORDS as BASE_MATCHING_STOPWORDS
 from DILIGENT.app.utils.updater.livertox import LiverToxUpdater
 
@@ -54,16 +54,16 @@ class LiverToxMatch:
 
 ###############################################################################
 class LiverToxMatcher:
-    DIRECT_CONFIDENCE = PHARMA_MATCHER_SETTINGS.direct_confidence
-    MASTER_CONFIDENCE = PHARMA_MATCHER_SETTINGS.master_confidence
-    SYNONYM_CONFIDENCE = PHARMA_MATCHER_SETTINGS.synonym_confidence
-    PARTIAL_CONFIDENCE = PHARMA_MATCHER_SETTINGS.partial_confidence
-    FUZZY_CONFIDENCE = PHARMA_MATCHER_SETTINGS.fuzzy_confidence
-    FUZZY_THRESHOLD = PHARMA_MATCHER_SETTINGS.fuzzy_threshold
-    TOKEN_MAX_FREQUENCY = PHARMA_MATCHER_SETTINGS.token_max_frequency
-    MIN_CONFIDENCE = PHARMA_MATCHER_SETTINGS.min_confidence
+    DIRECT_CONFIDENCE = DRUGS_MATCHER_SETTINGS.direct_confidence
+    MASTER_CONFIDENCE = DRUGS_MATCHER_SETTINGS.master_confidence
+    SYNONYM_CONFIDENCE = DRUGS_MATCHER_SETTINGS.synonym_confidence
+    PARTIAL_CONFIDENCE = DRUGS_MATCHER_SETTINGS.partial_confidence
+    FUZZY_CONFIDENCE = DRUGS_MATCHER_SETTINGS.fuzzy_confidence
+    FUZZY_THRESHOLD = DRUGS_MATCHER_SETTINGS.fuzzy_threshold
+    TOKEN_MAX_FREQUENCY = DRUGS_MATCHER_SETTINGS.token_max_frequency
+    MIN_CONFIDENCE = DRUGS_MATCHER_SETTINGS.min_confidence
     CATALOG_EXCLUDED_TERM_SUFFIXES = (
-        PHARMA_MATCHER_SETTINGS.catalog_excluded_term_suffixes
+        DRUGS_MATCHER_SETTINGS.catalog_excluded_term_suffixes
     )
 
     # -------------------------------------------------------------------------
