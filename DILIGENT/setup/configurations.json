@@ -20,6 +20,7 @@
     "timeout": 3600.0
   },
   "database": {
+    "selected_database": "sqlite",
     "insert_batch_size": 1000
   },
   "client_runtime_defaults": {
@@ -67,7 +68,7 @@
       "n a"
     ]
   },
-  "pharma_matcher": {
+  "drugs_matcher": {
     "direct_confidence": 1.0,
     "master_confidence": 0.92,
     "synonym_confidence": 0.9,
