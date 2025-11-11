@@ -102,7 +102,7 @@ class DatabaseSettings:
 
 ###############################################################################
 @dataclass(frozen=True)
-class PharmaMatcherSettings:
+class DrugsMatcherSettings:
     direct_confidence: float
     master_confidence: float
     synonym_confidence: float
@@ -161,7 +161,7 @@ def build_database_settings(data: dict[str, Any]) -> DatabaseSettings:
 
 
 # -----------------------------------------------------------------------------
-def build_pharma_matcher_settings(data: dict[str, Any]) -> PharmaMatcherSettings:
+def build_drugs_matcher_settings(data: dict[str, Any]) -> DrugsMatcherSettings:
     suffixes_value = data.get("catalog_excluded_term_suffixes", ["PCK"])
     suffixes: list[str] = []
     if isinstance(suffixes_value, (list, tuple, set)):
@@ -173,7 +173,7 @@ def build_pharma_matcher_settings(data: dict[str, Any]) -> PharmaMatcherSettings
         if text:
             suffixes.append(text.upper())
     suffix_tuple = tuple(suffixes) if suffixes else ("PCK",)
-    return PharmaMatcherSettings(
+    return DrugsMatcherSettings(
         direct_confidence=coerce_float(data.get("direct_confidence"), 1.0),
         master_confidence=coerce_float(data.get("master_confidence"), 0.92),
         synonym_confidence=coerce_float(data.get("synonym_confidence"), 0.90),
@@ -201,8 +201,8 @@ HTTP_SETTINGS = build_http_settings(
 DATABASE_SETTINGS = build_database_settings(
     ensure_mapping(get_configuration_value("database", default={}))
 )
-PHARMA_MATCHER_SETTINGS = build_pharma_matcher_settings(
-    ensure_mapping(get_configuration_value("pharma_matcher", default={}))
+DRUGS_MATCHER_SETTINGS = build_drugs_matcher_settings(
+    ensure_mapping(get_configuration_value("drugs_matcher", default={}))
 )
 
 CLIENT_RUNTIME_DEFAULTS = ensure_mapping(
@@ -534,7 +534,7 @@ __all__ = [
     "LIVERTOX_YIELD_INTERVAL",
     "MAX_EXCERPT_LENGTH",
     "OLLAMA_HOST_DEFAULT",
-    "PHARMA_MATCHER_SETTINGS",
+    "DRUGS_MATCHER_SETTINGS",
     "RAG_CHUNK_OVERLAP",
     "RAG_CHUNK_SIZE",
     "RAG_CLOUD_EMBEDDING_MODEL",
