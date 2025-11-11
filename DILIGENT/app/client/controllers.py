@@ -30,7 +30,7 @@ from DILIGENT.app.constants import (
     REPORT_EXPORT_FILENAME,
 )
 
-LLM_REQUEST_TIMEOUT_SECONDS = HTTP_SETTINGS.timeout_seconds
+LLM_REQUEST_TIMEOUT_SECONDS = HTTP_SETTINGS.timeout
 
 
 ###############################################################################

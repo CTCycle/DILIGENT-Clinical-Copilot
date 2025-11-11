@@ -9,6 +9,7 @@ from typing import Any
 
 import pandas as pd
 
+from DILIGENT.app.configurations import PHARMA_MATCHER_SETTINGS
 from DILIGENT.app.constants import MATCHING_STOPWORDS as BASE_MATCHING_STOPWORDS
 from DILIGENT.app.utils.updater.livertox import LiverToxUpdater
 
@@ -53,14 +54,17 @@ class LiverToxMatch:
 
 ###############################################################################
 class LiverToxMatcher:
-    DIRECT_CONFIDENCE = 1.0
-    MASTER_CONFIDENCE = 0.92
-    SYNONYM_CONFIDENCE = 0.90
-    PARTIAL_CONFIDENCE = 0.86
-    FUZZY_CONFIDENCE = 0.84
-    FUZZY_THRESHOLD = 0.85
-    TOKEN_MAX_FREQUENCY = 3
-    MIN_CONFIDENCE = 0.40
+    DIRECT_CONFIDENCE = PHARMA_MATCHER_SETTINGS.direct_confidence
+    MASTER_CONFIDENCE = PHARMA_MATCHER_SETTINGS.master_confidence
+    SYNONYM_CONFIDENCE = PHARMA_MATCHER_SETTINGS.synonym_confidence
+    PARTIAL_CONFIDENCE = PHARMA_MATCHER_SETTINGS.partial_confidence
+    FUZZY_CONFIDENCE = PHARMA_MATCHER_SETTINGS.fuzzy_confidence
+    FUZZY_THRESHOLD = PHARMA_MATCHER_SETTINGS.fuzzy_threshold
+    TOKEN_MAX_FREQUENCY = PHARMA_MATCHER_SETTINGS.token_max_frequency
+    MIN_CONFIDENCE = PHARMA_MATCHER_SETTINGS.min_confidence
+    CATALOG_EXCLUDED_TERM_SUFFIXES = (
+        PHARMA_MATCHER_SETTINGS.catalog_excluded_term_suffixes
+    )
 
     # -------------------------------------------------------------------------
     def __init__(
@@ -690,6 +694,9 @@ class LiverToxMatcher:
         if self.drugs_catalog_df is None or self.drugs_catalog_df.empty:
             return
         for row in self.drugs_catalog_df.itertuples(index=False):
+            term_type = self.coerce_text(getattr(row, "term_type", None))
+            if not self.catalog_term_type_allowed(term_type):
+                continue
             raw_synonyms = self.parse_catalog_synonyms(getattr(row, "synonyms", None))
             if not raw_synonyms:
                 continue
@@ -743,6 +750,15 @@ class LiverToxMatcher:
                     "fallback_aliases": fallback_aliases,
                 }
             )
+
+    # -------------------------------------------------------------------------
+    def catalog_term_type_allowed(self, term_type: str | None) -> bool:
+        if term_type is None:
+            return True
+        normalized = term_type.strip().upper()
+        if not normalized:
+            return True
+        return not normalized.endswith(self.CATALOG_EXCLUDED_TERM_SUFFIXES)
 
     # -------------------------------------------------------------------------
     def parse_catalog_brand_names(self, value: Any) -> list[str]:
