@@ -26,7 +26,7 @@ from DILIGENT.app.api.schemas.clinical import (
 )
 from DILIGENT.app.configurations import (
     ClientRuntimeConfig,
-    DEFAULT_LLM_TIMEOUT_SECONDS,
+    DEFAULT_LLM_TIMEOUT,
     MAX_EXCERPT_LENGTH,
     RAG_TOP_K_DOCUMENTS,
 )
@@ -123,7 +123,7 @@ class HepatoxConsultation:
         drugs: PatientDrugs,
         *,
         patient_name: str | None = None,        
-        timeout_s: float = DEFAULT_LLM_TIMEOUT_SECONDS,        
+        timeout_s: float = DEFAULT_LLM_TIMEOUT,        
     ) -> None:
         self.drugs = drugs
         self.timeout_s = timeout_s            
@@ -238,10 +238,7 @@ class HepatoxConsultation:
         for idx, drug_entry in enumerate(self.drugs.entries):
             raw_name = drug_entry.name or ""
             normalized_drug_name = raw_name.strip()
-            has_excerpt = any(
-                x.get("drug_name") == normalized_drug_name
-                for x in resolved_drugs.values()
-            )
+            
             livertox_data = resolved_drugs.get(normalized_drug_name, {})
 
             matched_row = livertox_data.get("matched_livertox_row", None)

@@ -30,7 +30,7 @@ from DILIGENT.app.constants import (
     REPORT_EXPORT_FILENAME,
 )
 
-LLM_REQUEST_TIMEOUT_SECONDS = HTTP_SETTINGS.timeout
+LLM_REQUEST_TIMEOUT = HTTP_SETTINGS.timeout
 
 
 ###############################################################################
@@ -215,7 +215,7 @@ async def trigger_session(
     url: str, payload: dict[str, Any] | None = None
 ) -> tuple[str, dict[str, Any] | list[Any] | None]:
     try:
-        async with httpx.AsyncClient(timeout=LLM_REQUEST_TIMEOUT_SECONDS) as client:
+        async with httpx.AsyncClient(timeout=LLM_REQUEST_TIMEOUT) as client:
             resp = await client.post(url, json=payload)
             resp.raise_for_status()
             json_payload: dict[str, Any] | list[Any] | None = None
@@ -256,7 +256,7 @@ async def trigger_session(
         return message, json_payload
     except httpx.TimeoutException:
         return (
-            f"[ERROR] Request timed out after {LLM_REQUEST_TIMEOUT_SECONDS} seconds.",
+            f"[ERROR] Request timed out after {LLM_REQUEST_TIMEOUT} seconds.",
             None,
         )
     except Exception as exc:  # noqa: BLE001

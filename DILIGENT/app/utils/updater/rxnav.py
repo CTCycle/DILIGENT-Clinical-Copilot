@@ -31,7 +31,7 @@ class RxNavClient:
     BASE_URL = "https://rxnav.nlm.nih.gov/REST/drugs.json"
     RXCUI_PROPERTY_URL = "https://rxnav.nlm.nih.gov/REST/rxcui/{rxcui}/property.json"
     MAX_RETRIES = 3
-    BACKOFF_SECONDS = (0.6, 1.2, 2.4)
+    BACKOFF_TIME = (0.6, 1.2, 2.4)
     RETRY_STATUS = {429, 500, 502, 503, 504}
     TIMEOUT = 10.0
     SALT_STOPWORDS = {
@@ -215,7 +215,7 @@ class RxNavClient:
                     self.synonym_cache[identifier] = []
                     return []
                 time.sleep(
-                    self.BACKOFF_SECONDS[min(attempt, len(self.BACKOFF_SECONDS) - 1)]
+                    self.BACKOFF_TIME[min(attempt, len(self.BACKOFF_TIME) - 1)]
                 )
                 continue
             if response.status_code in self.RETRY_STATUS:
@@ -228,7 +228,7 @@ class RxNavClient:
                     self.synonym_cache[identifier] = []
                     return []
                 time.sleep(
-                    self.BACKOFF_SECONDS[min(attempt, len(self.BACKOFF_SECONDS) - 1)]
+                    self.BACKOFF_TIME[min(attempt, len(self.BACKOFF_TIME) - 1)]
                 )
                 continue
             if response.status_code >= 400:
@@ -448,7 +448,7 @@ class RxNavClient:
                     logger.debug("RxNorm request failed for '%s': %s", raw_name, exc)
                     return None
                 time.sleep(
-                    self.BACKOFF_SECONDS[min(attempt, len(self.BACKOFF_SECONDS) - 1)]
+                    self.BACKOFF_TIME[min(attempt, len(self.BACKOFF_TIME) - 1)]
                 )
                 continue
             if response.status_code in self.RETRY_STATUS:
@@ -460,7 +460,7 @@ class RxNavClient:
                     )
                     return None
                 time.sleep(
-                    self.BACKOFF_SECONDS[min(attempt, len(self.BACKOFF_SECONDS) - 1)]
+                    self.BACKOFF_TIME[min(attempt, len(self.BACKOFF_TIME) - 1)]
                 )
                 continue
             if response.status_code >= 400:
@@ -629,7 +629,7 @@ class RxNavDrugCatalogBuilder:
     MAX_RETRIES = 3
     RETRY_STATUS = {429, 500, 502, 503, 504}
     TIMEOUT = 30.0
-    BACKOFF_SECONDS = (0.8, 1.6, 3.2)
+    BACKOFF_TIME = (0.8, 1.6, 3.2)
     TABLE_NAME = "DRUGS_CATALOG"
     BATCH_SIZE = 200
     SYNONYM_WORKERS = 12
@@ -681,7 +681,7 @@ class RxNavDrugCatalogBuilder:
                         response.status_code in self.RETRY_STATUS
                         and attempt + 1 < self.MAX_RETRIES
                     ):
-                        time.sleep(self.BACKOFF_SECONDS[min(attempt, len(self.BACKOFF_SECONDS) - 1)])
+                        time.sleep(self.BACKOFF_TIME[min(attempt, len(self.BACKOFF_TIME) - 1)])
                         attempt += 1
                         continue
                     response.raise_for_status()
@@ -702,7 +702,7 @@ class RxNavDrugCatalogBuilder:
                     and attempt + 1 < self.MAX_RETRIES
                 ):
                     time.sleep(
-                        self.BACKOFF_SECONDS[min(attempt, len(self.BACKOFF_SECONDS) - 1)]
+                        self.BACKOFF_TIME[min(attempt, len(self.BACKOFF_TIME) - 1)]
                     )
                     attempt += 1
                     continue
@@ -711,7 +711,7 @@ class RxNavDrugCatalogBuilder:
                 last_error = exc
                 if attempt + 1 < self.MAX_RETRIES:
                     time.sleep(
-                        self.BACKOFF_SECONDS[min(attempt, len(self.BACKOFF_SECONDS) - 1)]
+                        self.BACKOFF_TIME[min(attempt, len(self.BACKOFF_TIME) - 1)]
                     )
                     attempt += 1
                     continue
