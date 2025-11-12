@@ -428,10 +428,10 @@ class HepatoxConsultation:
             distance = record.get("distance")
             if isinstance(distance, (int, float)):
                 header = (
-                    f"[Document {index} | Source: {source} | Distance: {distance:.4f}]"
+                    f"[Document {index} | Distance: {distance:.4f}]"
                 )
             else:
-                header = f"[Document {index} | Source: {source}]"
+                header = f"[Document {index}]"
             fragments.append(f"{header}\n{text}")
         if not fragments:
             return None
