@@ -95,9 +95,9 @@ def build_patient_narrative(
     )
     sections.append("\n".join(therapy_section))
 
-    clinical_report_section = ["## Clinical Report (LLM Output)", ""]
+    clinical_report_section = ["## Clinical Report", ""]
     clinical_report_section.append(
-        final_report.strip() if final_report else "_No clinical report generated._"
+        final_report.strip() if final_report else "No clinical report generated."
     )
     sections.append("\n".join(clinical_report_section))
 
