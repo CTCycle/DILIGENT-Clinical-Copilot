@@ -2,14 +2,13 @@ from __future__ import annotations
 
 import os
 
-from DILIGENT.src.packages.configurations import get_configurations
+from DILIGENT.src.packages.configurations import configurations
 from DILIGENT.src.packages.constants import DOCS_PATH, VECTOR_DB_PATH
 from DILIGENT.src.packages.logger import logger
 from DILIGENT.src.packages.utils.repository.serializer import VectorSerializer
 from DILIGENT.src.packages.utils.repository.vectors import LanceVectorDatabase
 
-CONFIG = get_configurations()
-RAG_SETTINGS = CONFIG.rag
+RAG_SETTINGS = configurations.rag
 
 
 ###############################################################################

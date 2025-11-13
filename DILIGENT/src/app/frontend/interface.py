@@ -24,14 +24,12 @@ from DILIGENT.src.app.frontend.layouts import (
     VISIT_DATE_ELEMENT_ID,
     VISIT_DATE_LOCALE_JS,
 )
-from DILIGENT.src.packages.configurations import get_configurations
+from DILIGENT.src.packages.configurations import configurations
 from DILIGENT.src.packages.constants import (
     CLINICAL_MODEL_CHOICES,
     CLOUD_MODEL_CHOICES,
     PARSING_MODEL_CHOICES,
 )
-
-CONFIG = get_configurations()
 
 export_attribute = "export_path"
 
@@ -564,10 +562,10 @@ def create_interface() -> None:
 def launch_interface() -> None:
     create_interface()
     ui.run(
-        host=CONFIG.ui_runtime.host,
-        port=CONFIG.ui_runtime.port,
-        title=CONFIG.ui_runtime.title,
-        show_welcome_message=CONFIG.ui_runtime.show_welcome_message,
+        host=configurations.ui_runtime.host,
+        port=configurations.ui_runtime.port,
+        title=configurations.ui_runtime.title,
+        show_welcome_message=configurations.ui_runtime.show_welcome_message,
     )
 
 # -----------------------------------------------------------------------------

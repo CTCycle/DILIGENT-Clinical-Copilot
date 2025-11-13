@@ -5,7 +5,7 @@ from typing import TYPE_CHECKING, Any
 
 import pandas as pd
 
-from DILIGENT.src.packages.configurations import get_configurations
+from DILIGENT.src.packages.configurations import configurations
 
 if TYPE_CHECKING:
     from DILIGENT.src.packages.utils.services.clinical.matches import (
@@ -14,10 +14,7 @@ if TYPE_CHECKING:
         MonographRecord,
     )
 
-
-###############################################################################
-CONFIG = get_configurations()
-MATCHER_SETTINGS = CONFIG.matcher
+MATCHER_SETTINGS = configurations.matcher
 
 
 ###############################################################################
@@ -205,7 +202,7 @@ class LiverToxData:
             normalized = self.lookup.normalize_name(drug_name)
             if not normalized:
                 continue
-            index[normalized] = row
+            index[normalized] = row # type: ignore
         self.rows_by_name = index
         return self.rows_by_name
 

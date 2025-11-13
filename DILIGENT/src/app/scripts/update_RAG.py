@@ -1,13 +1,12 @@
 from __future__ import annotations
 
-from DILIGENT.src.packages.configurations import get_configurations
+from DILIGENT.src.packages.configurations import configurations
 from DILIGENT.src.packages.logger import logger
 from DILIGENT.src.packages.utils.updater.embeddings import RagEmbeddingUpdater
 
-CONFIG = get_configurations()
-USE_CLOUD_EMBEDDINGS = CONFIG.rag.use_cloud_embeddings
-CLOUD_PROVIDER = CONFIG.rag.cloud_provider
-CLOUD_EMBEDDING_MODEL = CONFIG.rag.cloud_embedding_model
+USE_CLOUD_EMBEDDINGS = configurations.rag.use_cloud_embeddings
+CLOUD_PROVIDER = configurations.rag.cloud_provider
+CLOUD_EMBEDDING_MODEL = configurations.rag.cloud_embedding_model
 
 ###############################################################################
 if __name__ == "__main__":

@@ -19,14 +19,13 @@ from pdfminer.high_level import extract_text as pdfminer_extract_text
 from pypdf import PdfReader
 from tqdm import tqdm
 
-from DILIGENT.src.packages.configurations import get_configurations
+from DILIGENT.src.packages.configurations import configurations
 from DILIGENT.src.packages.constants import LIVERTOX_BASE_URL, SOURCES_PATH
 from DILIGENT.src.packages.logger import logger
 from DILIGENT.src.packages.utils.repository.serializer import DataSerializer
 from DILIGENT.src.packages.utils.repository.database import database
 
-CONFIG = get_configurations()
-EXTERNAL_DATA = CONFIG.external_data
+EXTERNAL_DATA = configurations.external_data
 
 __all__ = ["LiverToxUpdater"]
 
@@ -70,8 +69,6 @@ def process_monograph_payload(
     data: bytes,
 ) -> dict[str, str] | None:
     return LiverToxUpdater.process_monograph_member(member_name, data)
-
-
 
 
 ###############################################################################
