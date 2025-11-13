@@ -171,7 +171,7 @@ async def process_single_patient(payload: PatientData) -> str:
     detected_drugs = [entry.name for entry in drug_data.entries if entry.name]
     pattern_strings = pattern_analyzer.stringify_scores(pattern_score)
     await asyncio.to_thread(
-        serializer.record_clinical_session,
+        serializer.save_clinical_session,
         {
             "patient_name": payload.name,
             "session_timestamp": datetime.now(),

@@ -139,7 +139,7 @@ class AppConfigurations:
 
 
 # -----------------------------------------------------------------------------
-def _ensure_mapping(value: Any) -> dict[str, Any]:
+def ensure_mapping(value: Any) -> dict[str, Any]:
     if isinstance(value, dict):
         return value
     return {}
@@ -323,16 +323,16 @@ def build_external_data_settings(
 
 
 # -----------------------------------------------------------------------------
-def load_configurations(config_path: str | None = None) -> AppConfigurations:
+def get_configurations(config_path: str | None = None) -> AppConfigurations:
     path = config_path or CONFIGURATION_FILE
     data = load_configuration_data(path)
-    backend_payload = _ensure_mapping(data.get("backend"))
-    ui_payload = _ensure_mapping(data.get("ui_runtime") or data.get("ui"))
-    api_payload = _ensure_mapping(data.get("api"))
-    http_payload = _ensure_mapping(data.get("http"))
-    db_payload = _ensure_mapping(data.get("database"))
-    matcher_payload = _ensure_mapping(data.get("drugs_matcher"))
-    client_payload = _ensure_mapping(data.get("client_runtime_defaults"))
+    backend_payload = ensure_mapping(data.get("backend"))
+    ui_payload = ensure_mapping(data.get("ui_runtime") or data.get("ui"))
+    api_payload = ensure_mapping(data.get("api"))
+    http_payload = ensure_mapping(data.get("http"))
+    db_payload = ensure_mapping(data.get("database"))
+    matcher_payload = ensure_mapping(data.get("drugs_matcher"))
+    client_payload = ensure_mapping(data.get("client_runtime_defaults"))
     ollama_host_default = coerce_str(data.get("ollama_host_default"), "http://localhost:11434")
 
     backend_settings = build_backend_settings(backend_payload)
@@ -343,16 +343,17 @@ def load_configurations(config_path: str | None = None) -> AppConfigurations:
     matcher_settings = build_drugs_matcher_settings(matcher_payload)
     client_defaults = build_client_runtime_defaults(client_payload)
     rag_settings = build_rag_settings(
-        _ensure_mapping(data.get("rag")),
+        ensure_mapping(data.get("rag")),
         default_provider=client_defaults.llm_provider,
         default_cloud_model=client_defaults.cloud_model,
         default_ollama_host=ollama_host_default,
     )
     external_data_settings = build_external_data_settings(
-        _ensure_mapping(data.get("external_data")),
+        ensure_mapping(data.get("external_data")),
         fallback_timeout=http_settings.timeout,
     )
-    return AppConfigurations(
+
+    app_config =  AppConfigurations(
         backend=backend_settings,
         ui_runtime=ui_settings,
         api=api_settings,
@@ -364,6 +365,10 @@ def load_configurations(config_path: str | None = None) -> AppConfigurations:
         external_data=external_data_settings,
         ollama_host_default=ollama_host_default,
     )
+
+    ClientRuntimeConfig.configure(app_config.client_runtime)
+
+    return app_config
 
 
 ###############################################################################
@@ -558,14 +563,7 @@ class ClientRuntimeConfig:
         return provider, model.strip()
 
 
-_APP_CONFIGURATIONS = load_configurations()
-ClientRuntimeConfig.configure(_APP_CONFIGURATIONS.client_runtime)
-
-
-# -----------------------------------------------------------------------------
-def get_configurations() -> AppConfigurations:
-    return _APP_CONFIGURATIONS
-
+configurations = get_configurations()
 
 __all__ = [
     "APISettings",
@@ -579,6 +577,5 @@ __all__ = [
     "HTTPSettings",
     "RagSettings",
     "UIRuntimeSettings",
-    "get_configurations",
-    "load_configurations",
+    "get_configurations",    
 ]
