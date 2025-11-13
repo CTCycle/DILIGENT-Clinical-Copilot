@@ -34,7 +34,15 @@ class DataSerializer:
             return
         frame = frame.reindex(columns=CLINICAL_SESSION_COLUMNS)
         frame = frame.where(pd.notnull(frame), None)
-        database.save_into_database(frame, "CLINICAL_SESSIONS")
+        existing = database.load_from_database("CLINICAL_SESSIONS")
+        if existing.empty:
+            database.save_into_database(frame, "CLINICAL_SESSIONS")
+            return
+        target_columns = existing.columns.tolist()
+        normalized_frame = frame.reindex(columns=target_columns)
+        combined = pd.concat([existing, normalized_frame], ignore_index=True)
+        combined = combined.where(pd.notnull(combined), None)
+        database.save_into_database(combined, "CLINICAL_SESSIONS")
 
     # -----------------------------------------------------------------------------
     def save_livertox_records(self, records: pd.DataFrame) -> None:
