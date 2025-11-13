@@ -25,6 +25,11 @@ from DILIGENT.src.app.backend.schemas.clinical import (
     PatientDrugs,
 )
 from DILIGENT.src.packages.configurations import ClientRuntimeConfig, configurations
+from DILIGENT.src.packages.constants import (
+    DEFAULT_DILI_CLASSIFICATION,
+    R_SCORE_CHOLESTATIC_THRESHOLD,
+    R_SCORE_HEPATOCELLULAR_THRESHOLD,
+)
 from DILIGENT.src.packages.logger import logger
 from DILIGENT.src.packages.utils.repository.serializer import DataSerializer
 from DILIGENT.src.packages.utils.services.retrieval.embeddings import SimilaritySearch
@@ -57,11 +62,11 @@ class HepatotoxicityPatternAnalyzer:
         if alt_multiple is not None and alp_multiple not in (None, 0.0):
             r_score = alt_multiple / alp_multiple
 
-        classification = "indeterminate"
+        classification = DEFAULT_DILI_CLASSIFICATION
         if r_score is not None:
-            if r_score > 5:
+            if r_score > R_SCORE_HEPATOCELLULAR_THRESHOLD:
                 classification = "hepatocellular"
-            elif r_score < 2:
+            elif r_score < R_SCORE_CHOLESTATIC_THRESHOLD:
                 classification = "cholestatic"
             else:
                 classification = "mixed"
