@@ -9,7 +9,7 @@ from typing import Any
 
 import pandas as pd
 
-from DILIGENT.src.packages.configurations import get_configurations
+from DILIGENT.src.packages.configurations import configurations
 from DILIGENT.src.packages.constants import MATCHING_STOPWORDS as BASE_MATCHING_STOPWORDS
 from DILIGENT.src.packages.utils.services.clinical.livertox import LiverToxData
 
@@ -30,8 +30,7 @@ MATCHING_STOPWORDS = BASE_MATCHING_STOPWORDS | {
     "po",
 }
 
-CONFIG = get_configurations()
-MATCHER_SETTINGS = CONFIG.matcher
+MATCHER_SETTINGS = configurations.matcher
 
 ###############################################################################
 @dataclass(slots=True)
