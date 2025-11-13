@@ -5,11 +5,11 @@ from typing import Protocol
 
 import pandas as pd
 
-from DILIGENT.src.packages.configurations import DatabaseSettings, get_configurations
+from DILIGENT.src.packages.configurations import DatabaseSettings, configurations
 from DILIGENT.src.packages.logger import logger
 from DILIGENT.src.packages.singleton import singleton
 
-CONFIG = get_configurations()
+
 
 ###############################################################################
 class DatabaseBackend(Protocol):
@@ -54,7 +54,7 @@ BACKEND_FACTORIES: dict[str, BackendFactory] = {
 @singleton
 class DILIGENTDatabase:
     def __init__(self) -> None:
-        self.settings = CONFIG.database
+        self.settings = configurations.database
         self.backend = self._build_backend(self.settings.selected_database)
 
     # -------------------------------------------------------------------------
@@ -86,6 +86,10 @@ class DILIGENTDatabase:
     # -------------------------------------------------------------------------
     def upsert_into_database(self, df: pd.DataFrame, table_name: str) -> None:
         self.backend.upsert_into_database(df, table_name)
+
+    # -------------------------------------------------------------------------
+    def count_rows(self, table_name: str) -> int:
+        return self.backend.count_rows(table_name)
 
     
 

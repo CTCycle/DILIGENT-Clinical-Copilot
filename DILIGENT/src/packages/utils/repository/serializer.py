@@ -12,11 +12,11 @@ import pandas as pd
 from langchain_community.document_loaders import PyPDFLoader
 from langchain_core.documents import Document
 from langchain_text_splitters import RecursiveCharacterTextSplitter
-from sqlalchemy.exc import SQLAlchemyError
 
 from DILIGENT.src.packages.constants import LIVERTOX_COLUMNS
 from DILIGENT.src.packages.logger import logger
-from DILIGENT.src.packages.utils.repository.database import ClinicalSession, database
+from DILIGENT.src.packages.utils.repository.database import database
+from DILIGENT.src.packages.utils.repository.schema import CLINICAL_SESSION_COLUMNS
 from DILIGENT.src.packages.utils.repository.vectors import LanceVectorDatabase
 from DILIGENT.src.packages.utils.services.retrieval.embeddings import EmbeddingGenerator
 
@@ -27,17 +27,14 @@ class DataSerializer:
         pass
 
     # -------------------------------------------------------------------------
-    def record_clinical_session(self, session_data: dict[str, Any]) -> None:
-        session = database.Session()
-        try:
-            session.add(ClinicalSession(**session_data))
-            session.commit()
-        except SQLAlchemyError as exc:
-            session.rollback()
-            logger.error("Failed to record clinical session: %s", exc)
-            raise exc
-        finally:
-            session.close()
+    def save_clinical_session(self, session_data: dict[str, Any]) -> None:
+        frame = pd.DataFrame([session_data])
+        if frame.empty:
+            logger.warning("Skipping clinical session save; payload is empty")
+            return
+        frame = frame.reindex(columns=CLINICAL_SESSION_COLUMNS)
+        frame = frame.where(pd.notnull(frame), None)
+        database.save_into_database(frame, "CLINICAL_SESSIONS")
 
     # -----------------------------------------------------------------------------
     def save_livertox_records(self, records: pd.DataFrame) -> None:
