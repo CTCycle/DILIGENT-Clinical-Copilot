@@ -43,6 +43,7 @@ class RagEmbeddingUpdater:
             vector_database=self.vector_database,
             chunk_size=RAG_SETTINGS.chunk_size,
             chunk_overlap=RAG_SETTINGS.chunk_overlap,
+            embedding_batch_size=RAG_SETTINGS.embedding_batch_size,
             embedding_backend=RAG_SETTINGS.embedding_backend,
             ollama_base_url=RAG_SETTINGS.ollama_base_url,
             ollama_model=RAG_SETTINGS.ollama_embedding_model,

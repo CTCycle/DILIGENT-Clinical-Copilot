@@ -9,6 +9,8 @@ from DILIGENT.src.packages.constants import (
     CLINICAL_MODEL_CHOICES,
     CLOUD_MODEL_CHOICES,
     CONFIGURATION_FILE,
+    DEFAULT_DATABASE_FILENAME,
+    DEFAULT_EMBEDDING_BATCH_SIZE,
     PARSING_MODEL_CHOICES,
 )
 
@@ -86,6 +88,7 @@ class RagSettings:
     vector_collection_name: str
     chunk_size: int
     chunk_overlap: int
+    embedding_batch_size: int
     top_k_documents: int
     embedding_backend: str
     ollama_base_url: str
@@ -110,7 +113,14 @@ class ExternalDataSettings:
     livertox_skip_deterministic_ratio: float
     livertox_monograph_max_workers: int
     max_excerpt_length: int
-    llm_null_match_names: tuple[str, ...]
+    
+
+# -----------------------------------------------------------------------------
+@dataclass(frozen=True)
+class IngestionSettings:
+    drug_name_min_length: int
+    drug_name_max_length: int
+    drug_name_max_tokens: int
 
 
 # -----------------------------------------------------------------------------
@@ -137,6 +147,7 @@ class AppConfigurations:
     client_runtime: ClientRuntimeDefaults
     rag: RagSettings
     external_data: ExternalDataSettings
+    ingestion: IngestionSettings
     ollama_host_default: str
 
 
@@ -261,6 +272,10 @@ def build_rag_settings(
         vector_collection_name=coerce_str(data.get("vector_collection_name"), "documents"),
         chunk_size=coerce_positive_int(data.get("chunk_size"), 1_024),
         chunk_overlap=coerce_positive_int(data.get("chunk_overlap"), 128),
+        embedding_batch_size=coerce_positive_int(
+            data.get("embedding_batch_size"),
+            DEFAULT_EMBEDDING_BATCH_SIZE,
+        ),
         top_k_documents=coerce_positive_int(data.get("top_k_documents"), 3),
         embedding_backend=embedding_backend,
         ollama_base_url=coerce_str(data.get("ollama_base_url"), default_ollama_host),
@@ -300,8 +315,21 @@ def build_external_data_settings(
             data.get("livertox_monograph_max_workers"),
             4,
         ),
-        max_excerpt_length=coerce_positive_int(data.get("max_excerpt_length"), 8_000),
-        llm_null_match_names=coerce_string_tuple(data.get("llm_null_match_names")),
+        max_excerpt_length=coerce_positive_int(data.get("max_excerpt_length"), 8_000),        
+    )
+
+
+# -----------------------------------------------------------------------------
+def build_ingestion_settings(data: dict[str, Any]) -> IngestionSettings:
+    min_length = coerce_positive_int(data.get("drug_name_min_length"), 3)
+    max_length = coerce_positive_int(data.get("drug_name_max_length"), 200)
+    tokens = coerce_positive_int(data.get("drug_name_max_tokens"), 8)
+    if max_length < min_length:
+        max_length = min_length
+    return IngestionSettings(
+        drug_name_min_length=min_length,
+        drug_name_max_length=max_length,
+        drug_name_max_tokens=tokens,
     )
 
 
@@ -316,6 +344,7 @@ def get_configurations(config_path: str | None = None) -> AppConfigurations:
     db_payload = ensure_mapping(data.get("database"))
     matcher_payload = ensure_mapping(data.get("drugs_matcher"))
     client_payload = ensure_mapping(data.get("client_runtime_defaults"))
+    ingestion_payload = ensure_mapping(data.get("ingestion"))
     ollama_host_default = coerce_str(data.get("ollama_host_default"), "http://localhost:11434")
 
     backend_settings = build_backend_settings(backend_payload)
@@ -335,6 +364,7 @@ def get_configurations(config_path: str | None = None) -> AppConfigurations:
         ensure_mapping(data.get("external_data")),
         fallback_timeout=http_settings.timeout,
     )
+    ingestion_settings = build_ingestion_settings(ingestion_payload)
 
     app_config =  AppConfigurations(
         backend=backend_settings,
@@ -346,6 +376,7 @@ def get_configurations(config_path: str | None = None) -> AppConfigurations:
         client_runtime=client_defaults,
         rag=rag_settings,
         external_data=external_data_settings,
+        ingestion=ingestion_settings,
         ollama_host_default=ollama_host_default,
     )
 
@@ -557,6 +588,7 @@ __all__ = [
     "DatabaseSettings",
     "DrugsMatcherSettings",
     "ExternalDataSettings",
+    "IngestionSettings",
     "HTTPSettings",
     "RagSettings",
     "UIRuntimeSettings",
