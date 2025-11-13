@@ -13,13 +13,25 @@ from langchain_community.document_loaders import PyPDFLoader
 from langchain_core.documents import Document
 from langchain_text_splitters import RecursiveCharacterTextSplitter
 
-from DILIGENT.src.packages.constants import LIVERTOX_COLUMNS
+from DILIGENT.src.packages.configurations import configurations
+from DILIGENT.src.packages.constants import (
+    CLINICAL_SESSION_COLUMNS,
+    DEFAULT_EMBEDDING_BATCH_SIZE,
+    DRUG_NAME_ALLOWED_PATTERN,
+    DOCUMENT_SUPPORTED_EXTENSIONS,
+    DRUGS_CATALOG_COLUMNS,
+    LIVERTOX_COLUMNS,
+    LIVERTOX_MASTER_COLUMNS,
+    LIVERTOX_OPTIONAL_COLUMNS,
+    LIVERTOX_REQUIRED_COLUMNS,
+    TEXT_FILE_FALLBACK_ENCODINGS,
+)
 from DILIGENT.src.packages.logger import logger
 from DILIGENT.src.packages.utils.repository.database import database
-from DILIGENT.src.packages.utils.repository.schema import CLINICAL_SESSION_COLUMNS
 from DILIGENT.src.packages.utils.repository.vectors import LanceVectorDatabase
 from DILIGENT.src.packages.utils.services.retrieval.embeddings import EmbeddingGenerator
 
+INGESTION_SETTINGS = configurations.ingestion
 
 ###############################################################################
 class DataSerializer:
@@ -61,16 +73,7 @@ class DataSerializer:
             frame = records.copy()
         else:
             frame = pd.DataFrame(records)
-        frame = frame.reindex(
-            columns=[
-                "rxcui",
-                "raw_name",
-                "term_type",
-                "name",
-                "brand_names",
-                "synonyms",
-            ]
-        )
+        frame = frame.reindex(columns=DRUGS_CATALOG_COLUMNS)
         if frame.empty:
             return
         frame = frame.where(pd.notnull(frame), None)
@@ -81,20 +84,17 @@ class DataSerializer:
     # -----------------------------------------------------------------------------
     def sanitize_livertox_records(self, records: list[dict[str, Any]]) -> pd.DataFrame:
         df = pd.DataFrame(records)
-        required_columns = [
-            "nbk_id",
-            "drug_name",
-            "excerpt",
-            "synonyms",
-        ]
         if df.empty:
-            return pd.DataFrame(columns=required_columns)
-        for column in required_columns:
+            return pd.DataFrame(columns=LIVERTOX_REQUIRED_COLUMNS)
+        for column in LIVERTOX_REQUIRED_COLUMNS:
             if column not in df.columns:
                 df[column] = None
-        df = df[required_columns]
-        allowed_missing = {"nbk_id", "synonyms"}
-        drop_columns = [col for col in required_columns if col not in allowed_missing]
+        df = df[LIVERTOX_REQUIRED_COLUMNS]
+        drop_columns = [
+            column
+            for column in LIVERTOX_REQUIRED_COLUMNS
+            if column not in LIVERTOX_OPTIONAL_COLUMNS
+        ]
         df = df.dropna(subset=drop_columns)
         df["drug_name"] = df["drug_name"].astype(str).str.strip()
         df = df[df["drug_name"].apply(self.is_valid_drug_name)]
@@ -114,11 +114,14 @@ class DataSerializer:
     # -----------------------------------------------------------------------------
     def is_valid_drug_name(self, value: str) -> bool:
         normalized = value.strip()
-        if len(normalized) < 3 or len(normalized) > 200:
+        min_length = INGESTION_SETTINGS.drug_name_min_length
+        max_length = INGESTION_SETTINGS.drug_name_max_length
+        max_tokens = INGESTION_SETTINGS.drug_name_max_tokens
+        if len(normalized) < min_length or len(normalized) > max_length:
             return False
-        if len(normalized.split()) > 8:
+        if len(normalized.split()) > max_tokens:
             return False
-        if not re.fullmatch(r"[A-Za-z0-9\s\-/(),'+\.]+", normalized):
+        if not re.fullmatch(DRUG_NAME_ALLOWED_PATTERN, normalized):
             return False
         return True
 
@@ -233,35 +236,8 @@ class DataSerializer:
     def get_livertox_master_list(self) -> pd.DataFrame:
         frame = database.load_from_database("LIVERTOX_DATA")
         if frame.empty:
-            return pd.DataFrame(
-                columns=[
-                    "drug_name",
-                    "likelihood_score",
-                    "last_update",
-                    "reference_count",
-                    "year_approved",
-                    "agent_classification",
-                    "primary_classification",
-                    "secondary_classification",
-                    "include_in_livertox",
-                    "source_url",
-                    "source_last_modified",
-                ]
-            )
-        alias_columns = [
-            "drug_name",
-            "likelihood_score",
-            "last_update",
-            "reference_count",
-            "year_approved",
-            "agent_classification",
-            "primary_classification",
-            "secondary_classification",
-            "include_in_livertox",
-            "source_url",
-            "source_last_modified",
-        ]
-        available = [column for column in alias_columns if column in frame.columns]
+            return pd.DataFrame(columns=LIVERTOX_MASTER_COLUMNS)
+        available = [column for column in LIVERTOX_MASTER_COLUMNS if column in frame.columns]
         if not available:
             return pd.DataFrame(columns=["drug_name"])
         return frame.reindex(columns=available).dropna(subset=["drug_name"]).reset_index(
@@ -271,17 +247,9 @@ class DataSerializer:
     # -----------------------------------------------------------------------------
     def get_drugs_catalog(self) -> pd.DataFrame:
         frame = database.load_from_database("DRUGS_CATALOG")
-        columns = [
-            "rxcui",
-            "raw_name",
-            "term_type",
-            "name",
-            "brand_names",
-            "synonyms",
-        ]
         if frame.empty:
-            return pd.DataFrame(columns=columns)
-        return frame.reindex(columns=columns)
+            return pd.DataFrame(columns=DRUGS_CATALOG_COLUMNS)
+        return frame.reindex(columns=DRUGS_CATALOG_COLUMNS)
 
     # -----------------------------------------------------------------------------
     def normalize_string(self, value: Any) -> str | None:
@@ -333,7 +301,7 @@ class DataSerializer:
 
 ###############################################################################
 class DocumentSerializer:
-    SUPPORTED_EXTENSIONS = {".pdf", ".txt", ".xml", ".docx", ".doc"}
+    SUPPORTED_EXTENSIONS = DOCUMENT_SUPPORTED_EXTENSIONS
 
     def __init__(self, documents_path: str) -> None:
         self.documents_path = documents_path
@@ -423,8 +391,7 @@ class DocumentSerializer:
     def read_text_content(self, file_path: str, extension: str) -> str:
         if extension == ".xml":
             return self.read_xml_content(file_path)
-        encodings = ["utf-8", "utf-16", "latin-1", "iso-8859-1"]
-        for encoding in encodings:
+        for encoding in TEXT_FILE_FALLBACK_ENCODINGS:
             try:
                 with open(file_path, "r", encoding=encoding) as handle:
                     text = handle.read()
@@ -497,7 +464,7 @@ class VectorSerializer:
         use_cloud_embeddings: bool = False,
         cloud_provider: str | None = None,
         cloud_embedding_model: str | None = None,
-        embedding_batch_size: int = 64,
+        embedding_batch_size: int | None = None,
     ) -> None:
         if not isinstance(vector_database, LanceVectorDatabase):
             raise TypeError("vector_database must be a LanceVectorDatabase instance")
@@ -513,7 +480,10 @@ class VectorSerializer:
             cloud_provider=cloud_provider,
             cloud_embedding_model=cloud_embedding_model,
         )
-        self.embedding_batch_size = max(int(embedding_batch_size), 1)
+        resolved_batch_size = (
+            DEFAULT_EMBEDDING_BATCH_SIZE if embedding_batch_size is None else embedding_batch_size
+        )
+        self.embedding_batch_size = max(int(resolved_batch_size), 1)
 
     # -------------------------------------------------------------------------
     def serialize(self, reset_collection: bool = False) -> dict[str, int]:

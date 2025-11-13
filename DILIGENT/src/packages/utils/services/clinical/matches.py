@@ -10,7 +10,7 @@ from typing import Any
 import pandas as pd
 
 from DILIGENT.src.packages.configurations import configurations
-from DILIGENT.src.packages.constants import MATCHING_STOPWORDS as BASE_MATCHING_STOPWORDS
+from DILIGENT.src.packages.constants import MATCHING_STOPWORDS
 from DILIGENT.src.packages.utils.services.clinical.livertox import LiverToxData
 
 __all__ = [
@@ -20,15 +20,6 @@ __all__ = [
     "LiverToxMatcher",
 ]
 
-
-MATCHING_STOPWORDS = BASE_MATCHING_STOPWORDS | {
-    "combo",
-    "combination",
-    "of",
-    "or",
-    "patch",
-    "po",
-}
 
 MATCHER_SETTINGS = configurations.matcher
 

@@ -41,6 +41,7 @@
     "vector_collection_name": "documents",
     "chunk_size": 1024,
     "chunk_overlap": 128,
+    "embedding_batch_size": 64,
     "top_k_documents": 6,
     "embedding_backend": "ollama",
     "ollama_base_url": "http://localhost:11434",
@@ -61,17 +62,12 @@
     "livertox_yield_interval": 25,
     "livertox_skip_deterministic_ratio": 0.8,
     "livertox_monograph_max_workers": 4,
-    "max_excerpt_length": 8000,
-    "llm_null_match_names": [
-      "",
-      "none",
-      "no match",
-      "no matches",
-      "not found",
-      "unknown",
-      "not applicable",
-      "n a"
-    ]
+    "max_excerpt_length": 8000    
+  },
+  "ingestion": {
+    "drug_name_min_length": 3,
+    "drug_name_max_length": 200,
+    "drug_name_max_tokens": 8
   },
   "drugs_matcher": {
     "direct_confidence": 1.0,

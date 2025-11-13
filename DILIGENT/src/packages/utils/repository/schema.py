@@ -15,22 +15,6 @@ from sqlalchemy.orm import declarative_base
 
 Base = declarative_base()
 
-CLINICAL_SESSION_COLUMNS = [
-    "patient_name",
-    "session_timestamp",
-    "alt_value",
-    "alt_upper_limit",
-    "alp_value",
-    "alp_upper_limit",
-    "hepatic_pattern",
-    "anamnesis",
-    "drugs",
-    "parsing_model",
-    "clinical_model",
-    "total_duration",
-    "final_report",
-]
-
 
 ###############################################################################
 class ClinicalSession(Base):
