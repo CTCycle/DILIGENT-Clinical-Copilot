@@ -4,7 +4,6 @@ from DILIGENT.src.packages.constants import SOURCES_PATH
 from DILIGENT.src.packages.logger import logger
 from DILIGENT.src.packages.utils.repository.database import database
 from DILIGENT.src.packages.utils.updater.livertox import LiverToxUpdater
-from DILIGENT.src.packages.utils.updater.rxnav import RxNavDrugCatalogBuilder
 
 REDOWNLOAD = True
 

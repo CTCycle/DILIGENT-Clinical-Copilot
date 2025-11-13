@@ -11,7 +11,7 @@
     "mount_path": "/ui",
     "redirect_path": "/ui",
     "show_welcome_message": false,
-    "reconnect_timeout": 3600.0
+    "reconnect_timeout": 3600
   },
   "api": {
     "base_url": "http://127.0.0.1:8000"
@@ -21,6 +21,10 @@
   },
   "database": {
     "selected_database": "sqlite",
+    "database_address": null,
+    "database_name": null,
+    "username": null,
+    "password": null,
     "insert_batch_size": 1000
   },
   "client_runtime_defaults": {
@@ -41,11 +45,12 @@
     "embedding_backend": "ollama",
     "ollama_base_url": "http://localhost:11434",
     "ollama_embedding_model": "nomic-embed-text:latest",
+    "hf_embedding_model": "",
     "vector_index_metric": "cosine",
     "vector_index_type": "IVF_FLAT",
     "reset_vector_collection": true,
-    "cloud_provider": "",
-    "cloud_model": "",
+    "cloud_provider": "openai",
+    "cloud_model": "gpt-4o-mini",
     "cloud_embedding_model": "",
     "use_cloud_embeddings": false
   },
@@ -80,6 +85,5 @@
     "catalog_excluded_term_suffixes": [
       "PCK"
     ]
-  } 
-  
+  }
 }

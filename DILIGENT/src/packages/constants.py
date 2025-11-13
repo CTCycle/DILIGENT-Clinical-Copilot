@@ -4,9 +4,9 @@ from os.path import abspath, join
 
 # [PATHS]
 ###############################################################################
-ROOT_DIR = abspath(join(__file__, "../../.."))
+ROOT_DIR = abspath(join(__file__, "../../../.."))
 PROJECT_DIR = join(ROOT_DIR, "DILIGENT")
-SETUP_DIR = join(PROJECT_DIR, "setup")
+SETUP_PATH = join(PROJECT_DIR, "setup")
 RSC_PATH = join(PROJECT_DIR, "resources")
 MODELS_PATH = join(RSC_PATH, "models")
 DATA_PATH = join(RSC_PATH, "database")
@@ -15,6 +15,7 @@ SOURCES_PATH = join(DATA_PATH, "sources")
 TASKS_PATH = join(DATA_PATH, "tasks")
 LOGS_PATH = join(RSC_PATH, "logs")
 VECTOR_DB_PATH = join(DATA_PATH, "vectors")
+CONFIGURATION_FILE = join(SETUP_PATH, "configurations.json")
 
 # [ENDPOINTS]
 ###############################################################################

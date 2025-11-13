@@ -1,14 +1,12 @@
 from __future__ import annotations
 
 import asyncio
-from collections import defaultdict
 import time
 from datetime import date, datetime
 from typing import Any
 
 from fastapi import APIRouter, Body, HTTPException, status
 from fastapi.responses import PlainTextResponse
-from lancedb import query
 from pydantic import ValidationError
 
 from DILIGENT.src.app.backend.schemas.clinical import (
