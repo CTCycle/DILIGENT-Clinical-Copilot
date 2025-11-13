@@ -1,7 +1,6 @@
 from __future__ import annotations
 
 from collections.abc import Mapping
-import re
 from datetime import date, datetime
 from typing import Any, Literal
 

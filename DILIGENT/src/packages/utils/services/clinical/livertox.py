@@ -5,7 +5,7 @@ from typing import TYPE_CHECKING, Any
 
 import pandas as pd
 
-from DILIGENT.src.packages.configurations import DRUGS_MATCHER_SETTINGS
+from DILIGENT.src.packages.configurations import get_configurations
 
 if TYPE_CHECKING:
     from DILIGENT.src.packages.utils.services.clinical.matches import (
@@ -13,6 +13,11 @@ if TYPE_CHECKING:
         LiverToxMatch,
         MonographRecord,
     )
+
+
+###############################################################################
+CONFIG = get_configurations()
+MATCHER_SETTINGS = CONFIG.matcher
 
 
 ###############################################################################
@@ -137,7 +142,7 @@ class LiverToxData:
             return
         filtered: dict[str, list[MonographRecord]] = {}
         for token, records in self.token_occurrences.items():
-            if len(records) > DRUGS_MATCHER_SETTINGS.token_max_frequency:
+            if len(records) > MATCHER_SETTINGS.token_max_frequency:
                 continue
             filtered[token] = sorted(
                 records, key=lambda record: record.drug_name.lower()

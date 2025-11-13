@@ -3,8 +3,7 @@ from __future__ import annotations
 import os
 
 from dotenv import load_dotenv
-from DILIGENT.src.packages.utils.singleton import singleton
-
+from DILIGENT.src.packages.singleton import singleton
 from DILIGENT.src.packages.constants import PROJECT_DIR
 from DILIGENT.src.packages.logger import logger
 

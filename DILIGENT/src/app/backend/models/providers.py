@@ -17,19 +17,19 @@ import httpx
 from langchain_core.output_parsers import PydanticOutputParser
 from pydantic import BaseModel
 
-from DILIGENT.src.packages.configurations import (
-    ClientRuntimeConfig,
-    DEFAULT_LLM_TIMEOUT,
-    OLLAMA_HOST_DEFAULT,
-)
+from DILIGENT.src.packages.configurations import ClientRuntimeConfig, get_configurations
 from DILIGENT.src.packages.constants import (
     GEMINI_API_BASE,
     OPENAI_API_BASE,
     PARSING_MODEL_CHOICES,
 )
 from DILIGENT.src.packages.logger import logger
-from DILIGENT.src.packages.utils.types import extract_positive_int
-from DILIGENT.app.variables import env_variables
+from DILIGENT.src.packages.types import extract_positive_int
+from DILIGENT.src.packages.variables import env_variables
+
+CONFIG = get_configurations()
+DEFAULT_LLM_TIMEOUT = CONFIG.external_data.default_llm_timeout
+OLLAMA_HOST_DEFAULT = CONFIG.ollama_host_default
 
 OPENAI_API_KEY = env_variables.get("OPENAI_API_KEY")
 GEMINI_API_KEY = env_variables.get("GEMINI_API_KEY")

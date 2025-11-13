@@ -9,7 +9,7 @@ from typing import Any
 
 import pandas as pd
 
-from DILIGENT.src.packages.configurations import DRUGS_MATCHER_SETTINGS
+from DILIGENT.src.packages.configurations import get_configurations
 from DILIGENT.src.packages.constants import MATCHING_STOPWORDS as BASE_MATCHING_STOPWORDS
 from DILIGENT.src.packages.utils.services.clinical.livertox import LiverToxData
 
@@ -29,6 +29,9 @@ MATCHING_STOPWORDS = BASE_MATCHING_STOPWORDS | {
     "patch",
     "po",
 }
+
+CONFIG = get_configurations()
+MATCHER_SETTINGS = CONFIG.matcher
 
 ###############################################################################
 @dataclass(slots=True)
@@ -54,17 +57,15 @@ class LiverToxMatch:
 
 ###############################################################################
 class DrugsLookup:
-    DIRECT_CONFIDENCE = DRUGS_MATCHER_SETTINGS.direct_confidence
-    MASTER_CONFIDENCE = DRUGS_MATCHER_SETTINGS.master_confidence
-    SYNONYM_CONFIDENCE = DRUGS_MATCHER_SETTINGS.synonym_confidence
-    PARTIAL_CONFIDENCE = DRUGS_MATCHER_SETTINGS.partial_confidence
-    FUZZY_CONFIDENCE = DRUGS_MATCHER_SETTINGS.fuzzy_confidence
-    FUZZY_THRESHOLD = DRUGS_MATCHER_SETTINGS.fuzzy_threshold
-    TOKEN_MAX_FREQUENCY = DRUGS_MATCHER_SETTINGS.token_max_frequency
-    MIN_CONFIDENCE = DRUGS_MATCHER_SETTINGS.min_confidence
-    CATALOG_EXCLUDED_TERM_SUFFIXES = (
-        DRUGS_MATCHER_SETTINGS.catalog_excluded_term_suffixes
-    )
+    DIRECT_CONFIDENCE = MATCHER_SETTINGS.direct_confidence
+    MASTER_CONFIDENCE = MATCHER_SETTINGS.master_confidence
+    SYNONYM_CONFIDENCE = MATCHER_SETTINGS.synonym_confidence
+    PARTIAL_CONFIDENCE = MATCHER_SETTINGS.partial_confidence
+    FUZZY_CONFIDENCE = MATCHER_SETTINGS.fuzzy_confidence
+    FUZZY_THRESHOLD = MATCHER_SETTINGS.fuzzy_threshold
+    TOKEN_MAX_FREQUENCY = MATCHER_SETTINGS.token_max_frequency
+    MIN_CONFIDENCE = MATCHER_SETTINGS.min_confidence
+    CATALOG_EXCLUDED_TERM_SUFFIXES = MATCHER_SETTINGS.catalog_excluded_term_suffixes
 
     # -------------------------------------------------------------------------
     def __init__(self) -> None:
