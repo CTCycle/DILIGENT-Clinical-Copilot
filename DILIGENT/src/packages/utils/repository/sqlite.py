@@ -17,7 +17,6 @@ from DILIGENT.src.packages.utils.repository.schema import Base
 
 
 
-
 ###############################################################################
 class SQLiteRepository:
     def __init__(self, settings: DatabaseSettings) -> None:
