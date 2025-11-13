@@ -5,6 +5,7 @@ from typing import Protocol
 
 import pandas as pd
 
+from DILIGENT.src.packages.utils.repository.sqlite import SQLiteRepository
 from DILIGENT.src.packages.configurations import DatabaseSettings, configurations
 from DILIGENT.src.packages.logger import logger
 from DILIGENT.src.packages.singleton import singleton
@@ -40,8 +41,7 @@ BackendFactory = Callable[[DatabaseSettings], DatabaseBackend]
 
 
 # -----------------------------------------------------------------------------
-def build_sqlite_backend(settings: DatabaseSettings) -> DatabaseBackend:
-    from DILIGENT.src.packages.utils.repository.sqlite import SQLiteRepository
+def build_sqlite_backend(settings: DatabaseSettings) -> DatabaseBackend:    
     return SQLiteRepository(settings)
 
 
