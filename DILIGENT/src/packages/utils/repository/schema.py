@@ -49,6 +49,7 @@ class ClinicalSession(Base):
     clinical_model = Column(String)
     total_duration = Column(Float)
     final_report = Column(Text)
+    __table_args__ = (UniqueConstraint("id"),)
 
 ###############################################################################
 class LiverToxData(Base):

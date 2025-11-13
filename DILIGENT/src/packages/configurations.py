@@ -11,6 +11,7 @@ from DILIGENT.src.packages.constants import (
     CONFIGURATION_FILE,
     PARSING_MODEL_CHOICES,
 )
+
 from DILIGENT.src.packages.types import (
     coerce_bool,
     coerce_float,
@@ -18,6 +19,7 @@ from DILIGENT.src.packages.types import (
     coerce_positive_int,
     coerce_str,
     coerce_str_or_none,
+    coerce_string_tuple
 )
 
 
@@ -29,7 +31,7 @@ class BackendSettings:
     description: str
 
 
-###############################################################################
+# -----------------------------------------------------------------------------
 @dataclass(frozen=True)
 class UIRuntimeSettings:
     host: str
@@ -41,19 +43,19 @@ class UIRuntimeSettings:
     reconnect_timeout: int
 
 
-###############################################################################
+# -----------------------------------------------------------------------------
 @dataclass(frozen=True)
 class APISettings:
     base_url: str
 
 
-###############################################################################
+# -----------------------------------------------------------------------------
 @dataclass(frozen=True)
 class HTTPSettings:
     timeout: float
 
 
-###############################################################################
+# -----------------------------------------------------------------------------
 @dataclass(frozen=True)
 class DatabaseSettings:
     selected_database: str
@@ -64,7 +66,7 @@ class DatabaseSettings:
     insert_batch_size: int
 
 
-###############################################################################
+# -----------------------------------------------------------------------------
 @dataclass(frozen=True)
 class DrugsMatcherSettings:
     direct_confidence: float
@@ -78,19 +80,7 @@ class DrugsMatcherSettings:
     catalog_excluded_term_suffixes: tuple[str, ...]
 
 
-###############################################################################
-@dataclass(frozen=True)
-class ClientRuntimeDefaults:
-    parsing_model: str
-    clinical_model: str
-    llm_provider: str
-    cloud_model: str
-    use_cloud_services: bool
-    ollama_temperature: float
-    ollama_reasoning: bool
-
-
-###############################################################################
+# -----------------------------------------------------------------------------
 @dataclass(frozen=True)
 class RagSettings:
     vector_collection_name: str
@@ -110,7 +100,7 @@ class RagSettings:
     use_cloud_embeddings: bool
 
 
-###############################################################################
+# -----------------------------------------------------------------------------
 @dataclass(frozen=True)
 class ExternalDataSettings:
     default_llm_timeout: float
@@ -123,7 +113,19 @@ class ExternalDataSettings:
     llm_null_match_names: tuple[str, ...]
 
 
-###############################################################################
+# -----------------------------------------------------------------------------
+@dataclass(frozen=True)
+class ClientRuntimeDefaults:
+    parsing_model: str
+    clinical_model: str
+    llm_provider: str
+    cloud_model: str
+    use_cloud_services: bool
+    ollama_temperature: float
+    ollama_reasoning: bool
+
+
+# -----------------------------------------------------------------------------
 @dataclass(frozen=True)
 class AppConfigurations:
     backend: BackendSettings
@@ -138,30 +140,11 @@ class AppConfigurations:
     ollama_host_default: str
 
 
-# -----------------------------------------------------------------------------
+###############################################################################
 def ensure_mapping(value: Any) -> dict[str, Any]:
     if isinstance(value, dict):
         return value
     return {}
-
-
-# -----------------------------------------------------------------------------
-def _coerce_string_tuple(value: Any) -> tuple[str, ...]:
-    if isinstance(value, (list, tuple, set)):
-        candidates = list(value)
-    elif value is None:
-        candidates = []
-    else:
-        candidates = [value]
-    normalized: list[str] = []
-    for candidate in candidates:
-        if candidate is None:
-            continue
-        text = candidate.strip() if isinstance(candidate, str) else str(candidate).strip()
-        if text:
-            normalized.append(text)
-    return tuple(normalized)
-
 
 # -----------------------------------------------------------------------------
 def load_configuration_data(path: str) -> dict[str, Any]:
@@ -177,7 +160,7 @@ def load_configuration_data(path: str) -> dict[str, Any]:
     return data
 
 
-# -----------------------------------------------------------------------------
+###############################################################################
 def build_backend_settings(data: dict[str, Any]) -> BackendSettings:
     return BackendSettings(
         title=coerce_str(data.get("title"), "DILIGENT Clinical Copilot Backend"),
@@ -318,7 +301,7 @@ def build_external_data_settings(
             4,
         ),
         max_excerpt_length=coerce_positive_int(data.get("max_excerpt_length"), 8_000),
-        llm_null_match_names=_coerce_string_tuple(data.get("llm_null_match_names")),
+        llm_null_match_names=coerce_string_tuple(data.get("llm_null_match_names")),
     )
 
 
