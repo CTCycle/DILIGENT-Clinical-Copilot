@@ -1,7 +1,6 @@
 from __future__ import annotations
 
 from collections import defaultdict
-from typing import Any
 
 from DILIGENT.src.app.backend.models.prompts import DILI_RAG_QUERY_PROMPT
 from DILIGENT.src.app.backend.schemas.clinical import PatientDrugs

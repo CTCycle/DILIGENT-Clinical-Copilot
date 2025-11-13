@@ -24,16 +24,16 @@ from DILIGENT.src.app.backend.schemas.clinical import (
     PatientDrugClinicalReport,
     PatientDrugs,
 )
-from DILIGENT.src.packages.configurations import (
-    ClientRuntimeConfig,
-    DEFAULT_LLM_TIMEOUT,
-    MAX_EXCERPT_LENGTH,
-    RAG_TOP_K_DOCUMENTS,
-)
+from DILIGENT.src.packages.configurations import ClientRuntimeConfig, get_configurations
 from DILIGENT.src.packages.logger import logger
 from DILIGENT.src.packages.utils.repository.serializer import DataSerializer
 from DILIGENT.src.packages.utils.services.retrieval.embeddings import SimilaritySearch
 from DILIGENT.src.packages.utils.services.clinical.matches import LiverToxMatcher
+
+CONFIG = get_configurations()
+DEFAULT_LLM_TIMEOUT = CONFIG.external_data.default_llm_timeout
+MAX_EXCERPT_LENGTH = CONFIG.external_data.max_excerpt_length
+RAG_TOP_K_DOCUMENTS = CONFIG.rag.top_k_documents
 
 
 ###############################################################################

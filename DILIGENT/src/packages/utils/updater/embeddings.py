@@ -2,25 +2,14 @@ from __future__ import annotations
 
 import os
 
-from DILIGENT.src.packages.configurations import (
-    RAG_CHUNK_OVERLAP,
-    RAG_CHUNK_SIZE,
-    RAG_CLOUD_EMBEDDING_MODEL,
-    RAG_CLOUD_PROVIDER,
-    RAG_EMBEDDING_BACKEND,
-    RAG_HF_EMBEDDING_MODEL,
-    RAG_OLLAMA_BASE_URL,
-    RAG_OLLAMA_EMBEDDING_MODEL,
-    RAG_RESET_VECTOR_COLLECTION,
-    RAG_USE_CLOUD_EMBEDDINGS,
-    RAG_VECTOR_INDEX_METRIC,
-    RAG_VECTOR_INDEX_TYPE,
-    VECTOR_COLLECTION_NAME,
-)
+from DILIGENT.src.packages.configurations import get_configurations
 from DILIGENT.src.packages.constants import DOCS_PATH, VECTOR_DB_PATH
 from DILIGENT.src.packages.logger import logger
 from DILIGENT.src.packages.utils.repository.serializer import VectorSerializer
 from DILIGENT.src.packages.utils.repository.vectors import LanceVectorDatabase
+
+CONFIG = get_configurations()
+RAG_SETTINGS = CONFIG.rag
 
 
 ###############################################################################
@@ -34,31 +23,31 @@ class RagEmbeddingUpdater:
         reset_collection: bool | None = None,
     ) -> None:
         self.documents_path = documents_path or DOCS_PATH
-        default_use_cloud = RAG_USE_CLOUD_EMBEDDINGS
+        default_use_cloud = RAG_SETTINGS.use_cloud_embeddings
         self.use_cloud_embeddings = (
             default_use_cloud if use_cloud_embeddings is None else use_cloud_embeddings
         )
-        resolved_provider = cloud_provider or RAG_CLOUD_PROVIDER
-        resolved_model = cloud_embedding_model or RAG_CLOUD_EMBEDDING_MODEL
+        resolved_provider = cloud_provider or RAG_SETTINGS.cloud_provider
+        resolved_model = cloud_embedding_model or RAG_SETTINGS.cloud_embedding_model
         self.reset_collection = (
-            RAG_RESET_VECTOR_COLLECTION if reset_collection is None else reset_collection
+            RAG_SETTINGS.reset_vector_collection if reset_collection is None else reset_collection
         )
         os.makedirs(self.documents_path, exist_ok=True)
         self.vector_database = LanceVectorDatabase(
             database_path=VECTOR_DB_PATH,
-            collection_name=VECTOR_COLLECTION_NAME,
-            metric=RAG_VECTOR_INDEX_METRIC,
-            index_type=RAG_VECTOR_INDEX_TYPE,
+            collection_name=RAG_SETTINGS.vector_collection_name,
+            metric=RAG_SETTINGS.vector_index_metric,
+            index_type=RAG_SETTINGS.vector_index_type,
         )
         self.serializer = VectorSerializer(
             documents_path=self.documents_path,
             vector_database=self.vector_database,
-            chunk_size=RAG_CHUNK_SIZE,
-            chunk_overlap=RAG_CHUNK_OVERLAP,
-            embedding_backend=RAG_EMBEDDING_BACKEND,
-            ollama_base_url=RAG_OLLAMA_BASE_URL,
-            ollama_model=RAG_OLLAMA_EMBEDDING_MODEL,
-            hf_model=RAG_HF_EMBEDDING_MODEL,
+            chunk_size=RAG_SETTINGS.chunk_size,
+            chunk_overlap=RAG_SETTINGS.chunk_overlap,
+            embedding_backend=RAG_SETTINGS.embedding_backend,
+            ollama_base_url=RAG_SETTINGS.ollama_base_url,
+            ollama_model=RAG_SETTINGS.ollama_embedding_model,
+            hf_model=RAG_SETTINGS.hf_embedding_model,
             use_cloud_embeddings=self.use_cloud_embeddings,
             cloud_provider=resolved_provider,
             cloud_embedding_model=resolved_model,

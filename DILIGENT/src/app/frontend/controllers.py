@@ -18,11 +18,7 @@ from DILIGENT.src.app.backend.models.providers import (
     OllamaError,
     OllamaTimeout,
 )
-from DILIGENT.src.packages.configurations import (
-    API_SETTINGS,
-    ClientRuntimeConfig,
-    HTTP_SETTINGS,
-)
+from DILIGENT.src.packages.configurations import ClientRuntimeConfig, get_configurations
 from DILIGENT.src.packages.constants import (
     CLINICAL_API_URL,
     CLOUD_MODEL_CHOICES,
@@ -30,7 +26,8 @@ from DILIGENT.src.packages.constants import (
     REPORT_EXPORT_FILENAME,
 )
 
-LLM_REQUEST_TIMEOUT = HTTP_SETTINGS.timeout
+CONFIG = get_configurations()
+LLM_REQUEST_TIMEOUT = CONFIG.http.timeout
 
 
 ###############################################################################
@@ -288,7 +285,7 @@ async def run_DILI_session(
         use_rag=use_rag,
     )
 
-    url = f"{API_SETTINGS.base_url}{CLINICAL_API_URL}"
+    url = f"{CONFIG.api.base_url}{CLINICAL_API_URL}"
     message, json_payload = await trigger_session(url, cleaned_payload)
     normalized_message = message.strip() if message else ""
     export_path = None

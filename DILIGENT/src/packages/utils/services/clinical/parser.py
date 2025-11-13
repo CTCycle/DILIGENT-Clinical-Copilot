@@ -13,11 +13,8 @@ from DILIGENT.src.app.backend.schemas.clinical import (
     DrugEntry,
     PatientDrugs,
 )
-from DILIGENT.src.packages.configurations import (
-    ClientRuntimeConfig,
-    DEFAULT_LLM_TIMEOUT,
-)
-from DILIGENT.src.packages.utils.patterns import (
+from DILIGENT.src.packages.configurations import ClientRuntimeConfig, get_configurations
+from DILIGENT.src.packages.patterns import (
     DRUG_BRACKET_TRAIL_RE,
     DRUG_BULLET_RE,
     DRUG_SCHEDULE_RE,
@@ -28,6 +25,9 @@ from DILIGENT.src.packages.utils.patterns import (
     FORM_TOKENS,
     UNIT_TOKENS,
 )
+
+CONFIG = get_configurations()
+DEFAULT_LLM_TIMEOUT = CONFIG.external_data.default_llm_timeout
 
 
 ###############################################################################

@@ -8,58 +8,17 @@ from typing import Any, Literal
 from DILIGENT.src.packages.constants import (
     CLINICAL_MODEL_CHOICES,
     CLOUD_MODEL_CHOICES,
+    CONFIGURATION_FILE,
     PARSING_MODEL_CHOICES,
-    SETUP_DIR,
 )
-from DILIGENT.src.packages.utils.types import (
+from DILIGENT.src.packages.types import (
     coerce_bool,
     coerce_float,
     coerce_int,
     coerce_positive_int,
     coerce_str,
+    coerce_str_or_none,
 )
-
-CONFIGURATION_FILE = os.path.join(SETUP_DIR, "configurations.json")
-
-
-###############################################################################
-def load_configuration_file() -> dict[str, Any]:
-    if not os.path.exists(CONFIGURATION_FILE):
-        return {}
-    try:
-        with open(CONFIGURATION_FILE, "r", encoding="utf-8") as handle:
-            payload = json.load(handle)
-    except (OSError, json.JSONDecodeError) as exc:
-        raise RuntimeError(
-            f"Unable to load configuration from {CONFIGURATION_FILE}"
-        ) from exc
-    if not isinstance(payload, dict):
-        return {}
-    return payload
-
-
-# -----------------------------------------------------------------------------
-def get_nested_value(data: dict[str, Any], *keys: str, default: Any | None = None) -> Any:
-    current: Any = data
-    for key in keys:
-        if isinstance(current, dict) and key in current:
-            current = current[key]
-        else:
-            return default
-    return current
-
-
-# -----------------------------------------------------------------------------
-def get_configuration_value(*keys: str, default: Any | None = None) -> Any:
-    return get_nested_value(CONFIGURATION_DATA, *keys, default=default)
-
-
-# -----------------------------------------------------------------------------
-def ensure_mapping(value: Any) -> dict[str, Any]:
-    return value if isinstance(value, dict) else {}
-
-
-CONFIGURATION_DATA = load_configuration_file()
 
 
 ###############################################################################
@@ -97,6 +56,11 @@ class HTTPSettings:
 ###############################################################################
 @dataclass(frozen=True)
 class DatabaseSettings:
+    selected_database: str
+    database_address: str | None
+    database_name: str | None
+    username: str | None
+    password: str | None
     insert_batch_size: int
 
 
@@ -112,6 +76,105 @@ class DrugsMatcherSettings:
     token_max_frequency: int
     min_confidence: float
     catalog_excluded_term_suffixes: tuple[str, ...]
+
+
+###############################################################################
+@dataclass(frozen=True)
+class ClientRuntimeDefaults:
+    parsing_model: str
+    clinical_model: str
+    llm_provider: str
+    cloud_model: str
+    use_cloud_services: bool
+    ollama_temperature: float
+    ollama_reasoning: bool
+
+
+###############################################################################
+@dataclass(frozen=True)
+class RagSettings:
+    vector_collection_name: str
+    chunk_size: int
+    chunk_overlap: int
+    top_k_documents: int
+    embedding_backend: str
+    ollama_base_url: str
+    ollama_embedding_model: str
+    hf_embedding_model: str
+    vector_index_metric: str
+    vector_index_type: str
+    reset_vector_collection: bool
+    cloud_provider: str
+    cloud_model: str
+    cloud_embedding_model: str
+    use_cloud_embeddings: bool
+
+
+###############################################################################
+@dataclass(frozen=True)
+class ExternalDataSettings:
+    default_llm_timeout: float
+    livertox_llm_timeout: float
+    livertox_archive: str
+    livertox_yield_interval: int
+    livertox_skip_deterministic_ratio: float
+    livertox_monograph_max_workers: int
+    max_excerpt_length: int
+    llm_null_match_names: tuple[str, ...]
+
+
+###############################################################################
+@dataclass(frozen=True)
+class AppConfigurations:
+    backend: BackendSettings
+    ui_runtime: UIRuntimeSettings
+    api: APISettings
+    http: HTTPSettings
+    database: DatabaseSettings
+    matcher: DrugsMatcherSettings
+    client_runtime: ClientRuntimeDefaults
+    rag: RagSettings
+    external_data: ExternalDataSettings
+    ollama_host_default: str
+
+
+# -----------------------------------------------------------------------------
+def _ensure_mapping(value: Any) -> dict[str, Any]:
+    if isinstance(value, dict):
+        return value
+    return {}
+
+
+# -----------------------------------------------------------------------------
+def _coerce_string_tuple(value: Any) -> tuple[str, ...]:
+    if isinstance(value, (list, tuple, set)):
+        candidates = list(value)
+    elif value is None:
+        candidates = []
+    else:
+        candidates = [value]
+    normalized: list[str] = []
+    for candidate in candidates:
+        if candidate is None:
+            continue
+        text = candidate.strip() if isinstance(candidate, str) else str(candidate).strip()
+        if text:
+            normalized.append(text)
+    return tuple(normalized)
+
+
+# -----------------------------------------------------------------------------
+def load_configuration_data(path: str) -> dict[str, Any]:
+    if not os.path.exists(path):
+        raise RuntimeError(f"Configuration file not found: {path}")
+    try:
+        with open(path, "r", encoding="utf-8") as handle:
+            data = json.load(handle)
+    except (OSError, json.JSONDecodeError) as exc:
+        raise RuntimeError(f"Unable to load configuration from {path}") from exc
+    if not isinstance(data, dict):
+        raise RuntimeError("Configuration root must be a JSON object.")
+    return data
 
 
 # -----------------------------------------------------------------------------
@@ -138,40 +201,38 @@ def build_ui_runtime_settings(data: dict[str, Any]) -> UIRuntimeSettings:
 
 # -----------------------------------------------------------------------------
 def build_api_settings(data: dict[str, Any]) -> APISettings:
-    return APISettings(
-        base_url=coerce_str(data.get("base_url"), "http://127.0.0.1:8000"),
-    )
+    return APISettings(base_url=coerce_str(data.get("base_url"), "http://127.0.0.1:8000"))
 
 
 # -----------------------------------------------------------------------------
 def build_http_settings(data: dict[str, Any]) -> HTTPSettings:
-    return HTTPSettings(
-        timeout=coerce_float(data.get("timeout"), 3_600.0),
-    )
+    return HTTPSettings(timeout=coerce_float(data.get("timeout"), 3_600.0))
 
 
 # -----------------------------------------------------------------------------
 def build_database_settings(data: dict[str, Any]) -> DatabaseSettings:
     return DatabaseSettings(
-        insert_batch_size=coerce_positive_int(
-            data.get("insert_batch_size"),
-            1_000,
-        ),
+        selected_database=coerce_str(data.get("selected_database"), "sqlite").lower(),
+        database_address=coerce_str_or_none(data.get("database_address")),
+        database_name=coerce_str_or_none(data.get("database_name")),
+        username=coerce_str_or_none(data.get("username")),
+        password=coerce_str_or_none(data.get("password")),
+        insert_batch_size=coerce_int(data.get("insert_batch_size"), 1_000, minimum=1),
     )
 
 
 # -----------------------------------------------------------------------------
 def build_drugs_matcher_settings(data: dict[str, Any]) -> DrugsMatcherSettings:
     suffixes_value = data.get("catalog_excluded_term_suffixes", ["PCK"])
-    suffixes: list[str] = []
     if isinstance(suffixes_value, (list, tuple, set)):
         candidates = list(suffixes_value)
     else:
         candidates = [suffixes_value]
+    suffixes: list[str] = []
     for entry in candidates:
-        text = coerce_str(entry, "")
+        text = coerce_str(entry, "").upper()
         if text:
-            suffixes.append(text.upper())
+            suffixes.append(text)
     suffix_tuple = tuple(suffixes) if suffixes else ("PCK",)
     return DrugsMatcherSettings(
         direct_confidence=coerce_float(data.get("direct_confidence"), 1.0),
@@ -186,169 +247,149 @@ def build_drugs_matcher_settings(data: dict[str, Any]) -> DrugsMatcherSettings:
     )
 
 
-BACKEND_SETTINGS = build_backend_settings(
-    ensure_mapping(get_configuration_value("backend", default={}))
-)
-UI_RUNTIME_SETTINGS = build_ui_runtime_settings(
-    ensure_mapping(get_configuration_value("ui_runtime", default={}))
-)
-API_SETTINGS = build_api_settings(
-    ensure_mapping(get_configuration_value("api", default={}))
-)
-HTTP_SETTINGS = build_http_settings(
-    ensure_mapping(get_configuration_value("http", default={}))
-)
-DATABASE_SETTINGS = build_database_settings(
-    ensure_mapping(get_configuration_value("database", default={}))
-)
-DRUGS_MATCHER_SETTINGS = build_drugs_matcher_settings(
-    ensure_mapping(get_configuration_value("drugs_matcher", default={}))
-)
+# -----------------------------------------------------------------------------
+def build_client_runtime_defaults(data: dict[str, Any]) -> ClientRuntimeDefaults:
+    parsing_default = PARSING_MODEL_CHOICES[0] if PARSING_MODEL_CHOICES else ""
+    clinical_default = CLINICAL_MODEL_CHOICES[0] if CLINICAL_MODEL_CHOICES else ""
+    provider_default = coerce_str(data.get("llm_provider"), "openai").lower()
+    provider_models = CLOUD_MODEL_CHOICES.get(provider_default, [])
+    cloud_default = provider_models[0] if provider_models else ""
+    return ClientRuntimeDefaults(
+        parsing_model=coerce_str(data.get("parsing_model"), parsing_default),
+        clinical_model=coerce_str(data.get("clinical_model"), clinical_default),
+        llm_provider=provider_default,
+        cloud_model=coerce_str(data.get("cloud_model"), cloud_default),
+        use_cloud_services=coerce_bool(data.get("use_cloud_services"), False),
+        ollama_temperature=coerce_float(data.get("ollama_temperature"), 0.7),
+        ollama_reasoning=coerce_bool(data.get("ollama_reasoning"), False),
+    )
 
-CLIENT_RUNTIME_DEFAULTS = ensure_mapping(
-    get_configuration_value("client_runtime_defaults", default={})
-)
 
-DEFAULT_PARSING_MODEL = coerce_str(
-    CLIENT_RUNTIME_DEFAULTS.get("parsing_model"),
-    PARSING_MODEL_CHOICES[0] if PARSING_MODEL_CHOICES else "",
-)
-DEFAULT_CLINICAL_MODEL = coerce_str(
-    CLIENT_RUNTIME_DEFAULTS.get("clinical_model"),
-    CLINICAL_MODEL_CHOICES[0] if CLINICAL_MODEL_CHOICES else "",
-)
-DEFAULT_LLM_PROVIDER = coerce_str(
-    CLIENT_RUNTIME_DEFAULTS.get("llm_provider"),
-    "openai",
-)
-DEFAULT_CLOUD_PROVIDER = DEFAULT_LLM_PROVIDER
-_provider_models = CLOUD_MODEL_CHOICES.get(DEFAULT_CLOUD_PROVIDER, [])
-DEFAULT_CLOUD_MODEL = coerce_str(
-    CLIENT_RUNTIME_DEFAULTS.get("cloud_model"),
-    _provider_models[0] if _provider_models else "",
-)
-DEFAULT_USE_CLOUD_SERVICES = coerce_bool(
-    CLIENT_RUNTIME_DEFAULTS.get("use_cloud_services"),
-    False,
-)
-DEFAULT_OLLAMA_TEMPERATURE = coerce_float(
-    CLIENT_RUNTIME_DEFAULTS.get("ollama_temperature"),
-    0.7,
-)
-DEFAULT_OLLAMA_REASONING = coerce_bool(
-    CLIENT_RUNTIME_DEFAULTS.get("ollama_reasoning"),
-    False,
-)
+# -----------------------------------------------------------------------------
+def build_rag_settings(
+    data: dict[str, Any],
+    *,
+    default_provider: str,
+    default_cloud_model: str,
+    default_ollama_host: str,
+) -> RagSettings:
+    embedding_backend = coerce_str(data.get("embedding_backend"), "ollama")
+    return RagSettings(
+        vector_collection_name=coerce_str(data.get("vector_collection_name"), "documents"),
+        chunk_size=coerce_positive_int(data.get("chunk_size"), 1_024),
+        chunk_overlap=coerce_positive_int(data.get("chunk_overlap"), 128),
+        top_k_documents=coerce_positive_int(data.get("top_k_documents"), 3),
+        embedding_backend=embedding_backend,
+        ollama_base_url=coerce_str(data.get("ollama_base_url"), default_ollama_host),
+        ollama_embedding_model=coerce_str(data.get("ollama_embedding_model"), ""),
+        hf_embedding_model=coerce_str(data.get("hf_embedding_model"), ""),
+        vector_index_metric=coerce_str(data.get("vector_index_metric"), "cosine"),
+        vector_index_type=coerce_str(data.get("vector_index_type"), "IVF_FLAT"),
+        reset_vector_collection=coerce_bool(data.get("reset_vector_collection"), True),
+        cloud_provider=coerce_str(data.get("cloud_provider"), default_provider),
+        cloud_model=coerce_str(data.get("cloud_model"), default_cloud_model),
+        cloud_embedding_model=coerce_str(data.get("cloud_embedding_model"), ""),
+        use_cloud_embeddings=coerce_bool(data.get("use_cloud_embeddings"), False),
+    )
 
-DEFAULT_CLOUD_EMBEDDING_MODEL = ""
 
-OLLAMA_HOST_DEFAULT = coerce_str(
-    get_configuration_value("ollama_host_default", default=""),
-    "",
-)
+# -----------------------------------------------------------------------------
+def build_external_data_settings(
+    data: dict[str, Any],
+    *,
+    fallback_timeout: float,
+) -> ExternalDataSettings:
+    default_llm_timeout = coerce_float(data.get("default_llm_timeout"), fallback_timeout)
+    livertox_timeout = coerce_float(
+        data.get("livertox_llm_timeout"),
+        default_llm_timeout,
+    )
+    return ExternalDataSettings(
+        default_llm_timeout=default_llm_timeout,
+        livertox_llm_timeout=livertox_timeout,
+        livertox_archive=coerce_str(data.get("livertox_archive"), "livertox_NBK547852.tar.gz"),
+        livertox_yield_interval=coerce_positive_int(data.get("livertox_yield_interval"), 25),
+        livertox_skip_deterministic_ratio=coerce_float(
+            data.get("livertox_skip_deterministic_ratio"),
+            0.80,
+        ),
+        livertox_monograph_max_workers=coerce_positive_int(
+            data.get("livertox_monograph_max_workers"),
+            4,
+        ),
+        max_excerpt_length=coerce_positive_int(data.get("max_excerpt_length"), 8_000),
+        llm_null_match_names=_coerce_string_tuple(data.get("llm_null_match_names")),
+    )
 
-RAG_CONFIGURATION = ensure_mapping(get_configuration_value("rag", default={}))
-VECTOR_COLLECTION_NAME = coerce_str(
-    RAG_CONFIGURATION.get("vector_collection_name"),
-    "documents",
-)
-RAG_CHUNK_SIZE = coerce_positive_int(RAG_CONFIGURATION.get("chunk_size"), 1_024)
-RAG_CHUNK_OVERLAP = coerce_positive_int(
-    RAG_CONFIGURATION.get("chunk_overlap"),
-    128,
-)
-RAG_EMBEDDING_BACKEND = coerce_str(
-    RAG_CONFIGURATION.get("embedding_backend"),
-    "ollama",
-)
-RAG_OLLAMA_BASE_URL = coerce_str(
-    RAG_CONFIGURATION.get("ollama_base_url"),
-    OLLAMA_HOST_DEFAULT,
-)
-RAG_OLLAMA_EMBEDDING_MODEL = coerce_str(
-    RAG_CONFIGURATION.get("ollama_embedding_model"),
-    "",
-)
-RAG_HF_EMBEDDING_MODEL = coerce_str(
-    RAG_CONFIGURATION.get("hf_embedding_model"),
-    "",
-)
-RAG_VECTOR_INDEX_METRIC = coerce_str(
-    RAG_CONFIGURATION.get("vector_index_metric"),
-    "cosine",
-)
-RAG_VECTOR_INDEX_TYPE = coerce_str(
-    RAG_CONFIGURATION.get("vector_index_type"),
-    "IVF_FLAT",
-)
-RAG_RESET_VECTOR_COLLECTION = coerce_bool(
-    RAG_CONFIGURATION.get("reset_vector_collection"),
-    True,
-)
-RAG_TOP_K_DOCUMENTS = coerce_positive_int(
-    RAG_CONFIGURATION.get("top_k_documents"),
-    3,
-)
-RAG_CLOUD_PROVIDER = coerce_str(
-    RAG_CONFIGURATION.get("cloud_provider"),
-    DEFAULT_CLOUD_PROVIDER,
-)
-RAG_CLOUD_EMBEDDING_MODEL = coerce_str(
-    RAG_CONFIGURATION.get("cloud_embedding_model"),
-    DEFAULT_CLOUD_EMBEDDING_MODEL,
-)
-RAG_USE_CLOUD_EMBEDDINGS = coerce_bool(
-    RAG_CONFIGURATION.get("use_cloud_embeddings"),
-    False,
-)
 
-EXTERNAL_DATA_CONFIGURATION = ensure_mapping(
-    get_configuration_value("external_data", default={})
-)
-DEFAULT_LLM_TIMEOUT = coerce_float(
-    EXTERNAL_DATA_CONFIGURATION.get("default_llm_timeout"),
-    HTTP_SETTINGS.timeout,
-)
-LIVERTOX_LLM_TIMEOUT = coerce_float(
-    EXTERNAL_DATA_CONFIGURATION.get("livertox_llm_timeout"),
-    DEFAULT_LLM_TIMEOUT,
-)
-LIVERTOX_ARCHIVE = coerce_str(
-    EXTERNAL_DATA_CONFIGURATION.get("livertox_archive"),
-    "livertox_NBK547852.tar.gz",
-)
-LIVERTOX_YIELD_INTERVAL = coerce_positive_int(
-    EXTERNAL_DATA_CONFIGURATION.get("livertox_yield_interval"),
-    25,
-)
-LIVERTOX_SKIP_DETERMINISTIC_RATIO = coerce_float(
-    EXTERNAL_DATA_CONFIGURATION.get("livertox_skip_deterministic_ratio"),
-    0.80,
-)
-LIVERTOX_MONOGRAPH_MAX_WORKERS = coerce_positive_int(
-    EXTERNAL_DATA_CONFIGURATION.get("livertox_monograph_max_workers"),
-    4,
-)
-MAX_EXCERPT_LENGTH = coerce_positive_int(
-    EXTERNAL_DATA_CONFIGURATION.get("max_excerpt_length"),
-    8_000,
-)
-LLM_NULL_MATCH_NAMES = EXTERNAL_DATA_CONFIGURATION.get("llm_null_match_names", [])
+# -----------------------------------------------------------------------------
+def load_configurations(config_path: str | None = None) -> AppConfigurations:
+    path = config_path or CONFIGURATION_FILE
+    data = load_configuration_data(path)
+    backend_payload = _ensure_mapping(data.get("backend"))
+    ui_payload = _ensure_mapping(data.get("ui_runtime") or data.get("ui"))
+    api_payload = _ensure_mapping(data.get("api"))
+    http_payload = _ensure_mapping(data.get("http"))
+    db_payload = _ensure_mapping(data.get("database"))
+    matcher_payload = _ensure_mapping(data.get("drugs_matcher"))
+    client_payload = _ensure_mapping(data.get("client_runtime_defaults"))
+    ollama_host_default = coerce_str(data.get("ollama_host_default"), "http://localhost:11434")
 
-CLINICAL_ANALYSIS_CONFIGURATION = ensure_mapping(
-    get_configuration_value("clinical_analysis", default={})
-)
+    backend_settings = build_backend_settings(backend_payload)
+    ui_settings = build_ui_runtime_settings(ui_payload)
+    api_settings = build_api_settings(api_payload)
+    http_settings = build_http_settings(http_payload)
+    database_settings = build_database_settings(db_payload)
+    matcher_settings = build_drugs_matcher_settings(matcher_payload)
+    client_defaults = build_client_runtime_defaults(client_payload)
+    rag_settings = build_rag_settings(
+        _ensure_mapping(data.get("rag")),
+        default_provider=client_defaults.llm_provider,
+        default_cloud_model=client_defaults.cloud_model,
+        default_ollama_host=ollama_host_default,
+    )
+    external_data_settings = build_external_data_settings(
+        _ensure_mapping(data.get("external_data")),
+        fallback_timeout=http_settings.timeout,
+    )
+    return AppConfigurations(
+        backend=backend_settings,
+        ui_runtime=ui_settings,
+        api=api_settings,
+        http=http_settings,
+        database=database_settings,
+        matcher=matcher_settings,
+        client_runtime=client_defaults,
+        rag=rag_settings,
+        external_data=external_data_settings,
+        ollama_host_default=ollama_host_default,
+    )
+
 
 ###############################################################################
 class ClientRuntimeConfig:
-    parsing_model: str = DEFAULT_PARSING_MODEL
-    clinical_model: str = DEFAULT_CLINICAL_MODEL
-    llm_provider: str = DEFAULT_LLM_PROVIDER
-    cloud_model: str = DEFAULT_CLOUD_MODEL
-    use_cloud_services: bool = DEFAULT_USE_CLOUD_SERVICES
-    ollama_temperature: float = DEFAULT_OLLAMA_TEMPERATURE
-    ollama_reasoning: bool = DEFAULT_OLLAMA_REASONING
+    defaults: ClientRuntimeDefaults | None = None
+    parsing_model: str = ""
+    clinical_model: str = ""
+    llm_provider: str = ""
+    cloud_model: str = ""
+    use_cloud_services: bool = False
+    ollama_temperature: float = 0.0
+    ollama_reasoning: bool = False
     revision: int = 0
+
+    # -------------------------------------------------------------------------
+    @classmethod
+    def configure(cls, defaults: ClientRuntimeDefaults) -> None:
+        cls.defaults = defaults
+        cls.reset_defaults()
+
+    # -------------------------------------------------------------------------
+    @classmethod
+    def _get_defaults(cls) -> ClientRuntimeDefaults:
+        if cls.defaults is None:
+            raise RuntimeError("Client runtime defaults are not configured.")
+        return cls.defaults
 
     # -------------------------------------------------------------------------
     @classmethod
@@ -376,11 +417,12 @@ class ClientRuntimeConfig:
     # -------------------------------------------------------------------------
     @classmethod
     def set_llm_provider(cls, provider: str) -> str:
-        value = provider.strip()
+        defaults = cls._get_defaults()
+        value = provider.strip().lower()
         if not value:
             return cls.llm_provider
         if value not in CLOUD_MODEL_CHOICES:
-            value = DEFAULT_LLM_PROVIDER
+            value = defaults.llm_provider
         if cls.llm_provider != value:
             cls.llm_provider = value
             models = CLOUD_MODEL_CHOICES.get(cls.llm_provider, [])
@@ -400,8 +442,9 @@ class ClientRuntimeConfig:
             return cls.cloud_model
         models = CLOUD_MODEL_CHOICES.get(cls.llm_provider, [])
         if value not in models:
-            if models and cls.cloud_model != models[0]:
-                cls.cloud_model = models[0]
+            fallback = models[0] if models else ""
+            if fallback and fallback != cls.cloud_model:
+                cls.cloud_model = fallback
                 cls.touch_revision()
             return cls.cloud_model
         if cls.cloud_model != value:
@@ -421,10 +464,11 @@ class ClientRuntimeConfig:
     # -------------------------------------------------------------------------
     @classmethod
     def set_ollama_temperature(cls, value: float | None) -> float:
+        defaults = cls._get_defaults()
         try:
             parsed = float(value) if value is not None else cls.ollama_temperature
         except (TypeError, ValueError):
-            parsed = cls.ollama_temperature
+            parsed = defaults.ollama_temperature
         parsed = max(0.0, min(2.0, parsed))
         rounded = round(parsed, 2)
         if cls.ollama_temperature != rounded:
@@ -479,13 +523,17 @@ class ClientRuntimeConfig:
     # -------------------------------------------------------------------------
     @classmethod
     def reset_defaults(cls) -> None:
-        cls.parsing_model = DEFAULT_PARSING_MODEL
-        cls.clinical_model = DEFAULT_CLINICAL_MODEL
-        cls.llm_provider = DEFAULT_LLM_PROVIDER
-        cls.cloud_model = DEFAULT_CLOUD_MODEL
-        cls.use_cloud_services = DEFAULT_USE_CLOUD_SERVICES
-        cls.ollama_temperature = DEFAULT_OLLAMA_TEMPERATURE
-        cls.ollama_reasoning = DEFAULT_OLLAMA_REASONING
+        defaults = cls._get_defaults()
+        cls.parsing_model = defaults.parsing_model
+        cls.clinical_model = defaults.clinical_model
+        cls.llm_provider = defaults.llm_provider
+        cls.cloud_model = defaults.cloud_model
+        cls.use_cloud_services = defaults.use_cloud_services
+        cls.ollama_temperature = round(
+            max(0.0, min(2.0, defaults.ollama_temperature)),
+            2,
+        )
+        cls.ollama_reasoning = defaults.ollama_reasoning
         cls.revision = 0
 
     # -------------------------------------------------------------------------
@@ -496,56 +544,41 @@ class ClientRuntimeConfig:
     # -------------------------------------------------------------------------
     @classmethod
     def resolve_provider_and_model(
-        cls, purpose: Literal["clinical", "parser"]
+        cls,
+        purpose: Literal["clinical", "parser"],
     ) -> tuple[str, str]:
         if cls.is_cloud_enabled():
             provider = cls.get_llm_provider()
             model = cls.get_cloud_model().strip()
             if not model:
-                if purpose == "parser":
-                    model = cls.get_parsing_model()
-                else:
-                    model = cls.get_clinical_model()
+                model = cls.get_parsing_model() if purpose == "parser" else cls.get_clinical_model()
         else:
             provider = "ollama"
-            if purpose == "parser":
-                model = cls.get_parsing_model()
-            else:
-                model = cls.get_clinical_model()
+            model = cls.get_parsing_model() if purpose == "parser" else cls.get_clinical_model()
         return provider, model.strip()
 
 
-__all__ = [    
-    "API_SETTINGS",
-    "BACKEND_SETTINGS",
-    "ClientRuntimeConfig",
-    "DATABASE_SETTINGS",
-    "DEFAULT_CLINICAL_MODEL",
-    "DEFAULT_LLM_TIMEOUT",
-    "HTTP_SETTINGS",
-    "LIVERTOX_ARCHIVE",
-    "LIVERTOX_LLM_TIMEOUT",
-    "LIVERTOX_MONOGRAPH_MAX_WORKERS",
-    "LIVERTOX_SKIP_DETERMINISTIC_RATIO",
-    "LIVERTOX_YIELD_INTERVAL",
-    "MAX_EXCERPT_LENGTH",
-    "OLLAMA_HOST_DEFAULT",
-    "DRUGS_MATCHER_SETTINGS",
-    "RAG_CHUNK_OVERLAP",
-    "RAG_CHUNK_SIZE",
-    "RAG_CLOUD_EMBEDDING_MODEL",
-    "RAG_CLOUD_PROVIDER",
-    "RAG_CONFIGURATION",
-    "RAG_EMBEDDING_BACKEND",
-    "RAG_HF_EMBEDDING_MODEL",
-    "RAG_OLLAMA_BASE_URL",
-    "RAG_OLLAMA_EMBEDDING_MODEL",
-    "RAG_RESET_VECTOR_COLLECTION",
-    "RAG_TOP_K_DOCUMENTS",
-    "RAG_USE_CLOUD_EMBEDDINGS",
-    "RAG_VECTOR_INDEX_METRIC",
-    "RAG_VECTOR_INDEX_TYPE",
-    "UI_RUNTIME_SETTINGS",
-    "VECTOR_COLLECTION_NAME",
-]
+_APP_CONFIGURATIONS = load_configurations()
+ClientRuntimeConfig.configure(_APP_CONFIGURATIONS.client_runtime)
 
+
+# -----------------------------------------------------------------------------
+def get_configurations() -> AppConfigurations:
+    return _APP_CONFIGURATIONS
+
+
+__all__ = [
+    "APISettings",
+    "AppConfigurations",
+    "BackendSettings",
+    "ClientRuntimeConfig",
+    "ClientRuntimeDefaults",
+    "DatabaseSettings",
+    "DrugsMatcherSettings",
+    "ExternalDataSettings",
+    "HTTPSettings",
+    "RagSettings",
+    "UIRuntimeSettings",
+    "get_configurations",
+    "load_configurations",
+]
