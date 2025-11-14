@@ -134,6 +134,7 @@ class DrugsParser:
             " 'await extract_drug_list(...)' instead."
         )
 
+    # -------------------------------------------------------------------------
     async def extract_drug_list(self, text: str | None) -> PatientDrugs:
         cleaned = self.clean_text(text)
         if not cleaned:
@@ -173,6 +174,7 @@ class DrugsParser:
         combined = [entry for entry in ordered_entries if entry is not None]
         return PatientDrugs(entries=combined)
 
+    # -------------------------------------------------------------------------
     async def llm_extract_drugs(self, lines: list[str]) -> PatientDrugs:
         if self.client is None:
             raise RuntimeError("LLM client is not initialized for drug extraction")

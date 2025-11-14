@@ -12,6 +12,7 @@ from DILIGENT.src.app.frontend.interface import create_interface
 from DILIGENT.src.packages.configurations import configurations
 from DILIGENT.src.packages.logger import logger
 from DILIGENT.src.packages.utils.repository.database import database
+from DILIGENT.src.packages.variables import env_variables
 
 ###############################################################################
 # initialize the database if it has not been created

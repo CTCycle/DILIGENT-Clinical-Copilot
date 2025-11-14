@@ -8,7 +8,7 @@ from DILIGENT.src.packages.constants import PROJECT_DIR
 from DILIGENT.src.packages.logger import logger
 
 
-# [IMPORT CUSTOM MODULES]
+# [LOAD ENVIRONMENT VARIABLES]
 ###############################################################################
 @singleton
 class EnvironmentVariables:
