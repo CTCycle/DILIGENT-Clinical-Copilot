@@ -19,7 +19,7 @@ CONFIGURATION_FILE = join(SETUP_PATH, "configurations.json")
 
 # [DATABASE DEFAULTS]
 ###############################################################################
-DEFAULT_DATABASE_FILENAME = "database.db"
+DATABASE_FILENAME = "database.db"
 
 # [ENDPOINTS]
 ###############################################################################
