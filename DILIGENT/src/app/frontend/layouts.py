@@ -22,9 +22,9 @@ INTERFACE_THEME_CSS: Final = """
 }
 
 body {
-    background: radial-gradient(circle at top, rgba(23, 162, 184, 0.08), transparent 55%),
-        radial-gradient(circle at bottom, rgba(99, 102, 241, 0.08), transparent 45%),
-        var(--nicegui-background);
+    background: radial-gradient(circle at 20% 20%, rgba(105, 176, 255, 0.24), transparent 30%),
+        radial-gradient(circle at 80% 0%, rgba(82, 140, 212, 0.22), transparent 28%),
+        linear-gradient(180deg, #e8f3ff 0%, #e1eefb 45%, #e7f1fc 100%);
 }
 
 .diligent-page-container {
@@ -35,15 +35,17 @@ body {
 }
 
 .diligent-card {
-    background: rgba(255, 255, 255, 0.92);
+    background: linear-gradient(145deg, rgba(248, 242, 232, 0.95), rgba(242, 234, 221, 0.95));
     backdrop-filter: blur(6px);
+    border: 1px solid rgba(206, 190, 165, 0.35);
     border-radius: 1rem;
-    box-shadow: 0 18px 45px -25px rgba(15, 23, 42, 0.35);
+    box-shadow: 0 18px 45px -25px rgba(15, 23, 42, 0.28);
     padding: 1.75rem;
 }
 
 .dark .diligent-card {
-    background: rgba(15, 23, 42, 0.78);
+    background: rgba(18, 27, 47, 0.82);
+    border-color: rgba(148, 163, 184, 0.28);
     box-shadow: 0 18px 45px -30px rgba(15, 23, 42, 0.85);
 }
 
@@ -70,7 +72,7 @@ body {
 }
 
 .diligent-json-card {
-    background: rgba(148, 163, 184, 0.12);
+    background: rgba(227, 232, 240, 0.55);
     border-radius: 0.9rem;
     padding: 1rem;
 }
