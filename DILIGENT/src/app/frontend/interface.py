@@ -473,19 +473,18 @@ class InterfaceStructure:
                                 "Enable SDL/Reasoning (Ollama)",
                                 value=current_settings.reasoning,
                             ).classes("pt-2")
-                        with ui.column().classes("w-full gap-3"):
-                            markdown_output = ui.markdown("").classes(
-                                "text-sm whitespace-pre-wrap"
-                            )
-                            with ui.card().classes(JSON_CARD_CLASSES) as json_container:
-                                json_container.classes("w-full")
-                                with json_container:
-                                    ui.label("JSON Response").classes(
-                                        "diligent-subtitle"
-                                    )
-                                    json_code = ui.code(
-                                        "", language="json"
-                                    ).classes("w-full")
+
+            with ui.card().classes(f"{CARD_BASE_CLASSES} w-full"):
+                ui.label("Report Output").classes("diligent-card-title")
+                markdown_output = ui.markdown("").classes(
+                    "text-sm whitespace-pre-wrap"
+                )
+
+            with ui.card().classes(JSON_CARD_CLASSES) as json_container:
+                json_container.classes("w-full")
+                with json_container:
+                    ui.label("JSON Response").classes("diligent-subtitle")
+                    json_code = ui.code("", language="json").classes("w-full")
 
         setattr(export_button, export_attribute, None)
 
