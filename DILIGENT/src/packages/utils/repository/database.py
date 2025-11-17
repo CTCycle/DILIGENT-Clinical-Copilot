@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import os
 from collections.abc import Callable
 from typing import Protocol
 
@@ -74,6 +75,14 @@ class DILIGENTDatabase:
     # -------------------------------------------------------------------------
     def initialize_database(self) -> None:
         self.backend.initialize_database()
+
+    # -------------------------------------------------------------------------
+    def requires_sqlite_initialization(self) -> bool:
+        if self.settings.selected_database != "sqlite":
+            return False
+        if not self.db_path:
+            return False
+        return not os.path.exists(self.db_path)
 
     # -------------------------------------------------------------------------
     def load_from_database(self, table_name: str) -> pd.DataFrame:

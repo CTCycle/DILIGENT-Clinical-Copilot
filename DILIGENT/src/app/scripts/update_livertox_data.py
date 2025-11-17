@@ -9,7 +9,10 @@ REDOWNLOAD = True
 
 ###############################################################################
 if __name__ == "__main__":
-    database.initialize_database()
+    if database.requires_sqlite_initialization():
+        logger.info("Database not found, creating instance and making all tables")
+        database.initialize_database()
+        logger.info("DILIGENT database has been initialized successfully.")
     updater = LiverToxUpdater(SOURCES_PATH, redownload=REDOWNLOAD)
     logger.info("Running LiverTox updater")
     result = updater.update_from_livertox()
