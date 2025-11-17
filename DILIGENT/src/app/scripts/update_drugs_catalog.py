@@ -8,7 +8,10 @@ REDOWNLOAD = True
 
 ###############################################################################
 if __name__ == "__main__":
-    database.initialize_database()    
+    if database.requires_sqlite_initialization():
+        logger.info("Database not found, creating instance and making all tables")
+        database.initialize_database()
+        logger.info("DILIGENT database has been initialized successfully.")  
     builder = RxNavDrugCatalogBuilder()
     logger.info("Refreshing RxNav drug catalog from %s", builder.TERMS_URL)
     catalog_info = builder.update_drug_catalog()    
