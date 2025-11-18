@@ -22,9 +22,9 @@ INTERFACE_THEME_CSS: Final = """
 }
 
 body {
-    background: radial-gradient(circle at 20% 20%, rgba(105, 176, 255, 0.24), transparent 30%),
-        radial-gradient(circle at 80% 0%, rgba(82, 140, 212, 0.22), transparent 28%),
-        linear-gradient(180deg, #e8f3ff 0%, #e1eefb 45%, #e7f1fc 100%);
+    background: radial-gradient(circle at 20% 20%, rgba(126, 186, 132, 0.2), transparent 32%),
+        radial-gradient(circle at 82% 8%, rgba(102, 170, 118, 0.18), transparent 30%),
+        linear-gradient(180deg, #f0faee 0%, #e3f4de 46%, #eef8e9 100%);
 }
 
 .diligent-page-container {
