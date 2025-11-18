@@ -7,13 +7,13 @@ from typing import Any
 
 from nicegui import ui
 
-from DILIGENT.src.app.frontend.controllers import (
+from DILIGENT.src.app.client.controllers import (
     DiliSessionController,
     ModelPullController,
     RuntimeSettings,
     SettingsController,
 )
-from DILIGENT.src.app.frontend.layouts import (
+from DILIGENT.src.app.client.layouts import (
     CARD_BASE_CLASSES,
     INTERFACE_THEME_CSS,
     JSON_CARD_CLASSES,

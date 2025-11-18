@@ -4,9 +4,9 @@ from fastapi import FastAPI
 from fastapi.responses import RedirectResponse
 from nicegui import ui
 
-from DILIGENT.src.app.backend.endpoints.session import router as session_router
-from DILIGENT.src.app.backend.endpoints.ollama import router as ollama_router
-from DILIGENT.src.app.frontend.interface import create_interface
+from DILIGENT.src.app.server.endpoints.session import router as session_router
+from DILIGENT.src.app.server.endpoints.ollama import router as ollama_router
+from DILIGENT.src.app.client.interface import create_interface
 from DILIGENT.src.packages.configurations import configurations
 from DILIGENT.src.packages.logger import logger
 from DILIGENT.src.packages.utils.repository.database import database
@@ -20,9 +20,9 @@ if database.requires_sqlite_initialization():
     logger.info("DILIGENT database has been initialized successfully.")
 
 app = FastAPI(
-    title=configurations.backend.title,
-    version=configurations.backend.version,
-    description=configurations.backend.description,
+    title=configurations.server.title,
+    version=configurations.server.version,
+    description=configurations.server.description,
 )
 
 app.include_router(session_router)
