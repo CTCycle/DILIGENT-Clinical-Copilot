@@ -2,8 +2,8 @@ from __future__ import annotations
 
 from fastapi import APIRouter, HTTPException, Query, status
 
-from DILIGENT.src.app.backend.models.providers import OllamaClient, OllamaError, OllamaTimeout
-from DILIGENT.src.app.backend.schemas.models import ModelListResponse, ModelPullResponse
+from DILIGENT.src.app.server.models.providers import OllamaClient, OllamaError, OllamaTimeout
+from DILIGENT.src.app.server.schemas.models import ModelListResponse, ModelPullResponse
 from DILIGENT.src.packages.logger import logger
 
 router = APIRouter(prefix="/models", tags=["models"])
@@ -54,7 +54,7 @@ class OllamaEndpoint:
                     status="success", pulled=(not already), model=name
                 )
         except Exception as exc:
-            from DILIGENT.src.app.backend.models.providers import (
+            from DILIGENT.src.app.server.models.providers import (
                 OllamaError,
                 OllamaTimeout,
             )

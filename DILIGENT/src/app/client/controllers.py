@@ -10,7 +10,7 @@ from typing import Any
 
 import httpx
 
-from DILIGENT.src.app.backend.models.providers import (
+from DILIGENT.src.app.server.models.providers import (
     OllamaClient,
     OllamaError,
     OllamaTimeout,
