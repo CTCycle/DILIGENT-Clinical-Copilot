@@ -6,7 +6,7 @@ import json
 from collections.abc import Coroutine
 from typing import Any, Literal, cast
 
-from DILIGENT.src.app.backend.models.providers import CloudLLMClient, OllamaClient
+from DILIGENT.src.app.server.models.providers import CloudLLMClient, OllamaClient
 from DILIGENT.src.packages.configurations import configurations
 from DILIGENT.src.packages.constants import VECTOR_DB_PATH
 from DILIGENT.src.packages.logger import logger

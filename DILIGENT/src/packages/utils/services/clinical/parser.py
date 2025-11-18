@@ -7,9 +7,9 @@ import unicodedata
 from datetime import date
 from typing import Any
 
-from DILIGENT.src.app.backend.models.prompts import DRUG_EXTRACTION_PROMPT
-from DILIGENT.src.app.backend.models.providers import initialize_llm_client
-from DILIGENT.src.app.backend.schemas.clinical import (
+from DILIGENT.src.app.server.models.prompts import DRUG_EXTRACTION_PROMPT
+from DILIGENT.src.app.server.models.providers import initialize_llm_client
+from DILIGENT.src.app.server.schemas.clinical import (
     DrugEntry,
     PatientDrugs,
 )
