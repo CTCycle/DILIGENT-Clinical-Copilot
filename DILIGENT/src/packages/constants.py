@@ -6,7 +6,7 @@ from os.path import abspath, join
 ###############################################################################
 ROOT_DIR = abspath(join(__file__, "../../../.."))
 PROJECT_DIR = join(ROOT_DIR, "DILIGENT")
-SETUP_PATH = join(PROJECT_DIR, "setup")
+SETTING_PATH = join(PROJECT_DIR, "setup", "settings")
 RSC_PATH = join(PROJECT_DIR, "resources")
 MODELS_PATH = join(RSC_PATH, "models")
 DATA_PATH = join(RSC_PATH, "database")
@@ -15,10 +15,8 @@ SOURCES_PATH = join(DATA_PATH, "sources")
 TASKS_PATH = join(DATA_PATH, "tasks")
 LOGS_PATH = join(RSC_PATH, "logs")
 VECTOR_DB_PATH = join(DATA_PATH, "vectors")
-CONFIGURATION_FILE = join(SETUP_PATH, "configurations.json")
-
-# [DATABASE DEFAULTS]
-###############################################################################
+CONFIGURATION_FILE = join(SETTING_PATH, "configurations.json")
+ENV_FILE_PATH = join(SETTING_PATH, ".env")
 DATABASE_FILENAME = "database.db"
 
 # [ENDPOINTS]
