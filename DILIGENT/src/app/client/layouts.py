@@ -35,7 +35,7 @@ body {
 }
 
 .diligent-card {
-    background: linear-gradient(145deg, rgba(248, 242, 232, 0.95), rgba(242, 234, 221, 0.95));
+    background: #ffffff;
     backdrop-filter: blur(6px);
     border: 1px solid rgba(206, 190, 165, 0.35);
     border-radius: 1rem;
@@ -44,7 +44,7 @@ body {
 }
 
 .dark .diligent-card {
-    background: rgba(18, 27, 47, 0.82);
+    background: #ffffff;
     border-color: rgba(148, 163, 184, 0.28);
     box-shadow: 0 18px 45px -30px rgba(15, 23, 42, 0.85);
 }
