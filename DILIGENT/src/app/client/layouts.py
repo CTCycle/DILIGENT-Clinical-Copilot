@@ -81,6 +81,54 @@ body {
     background: rgba(100, 116, 139, 0.22);
 }
 
+.diligent-session-spinner {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 0.65rem;
+    min-height: 4.5rem;
+    width: 100%;
+}
+
+.diligent-session-spinner-container {
+    width: 100%;
+    min-height: 7.5rem;
+    margin-top: 1.25rem;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+.diligent-spinner-wheel {
+    width: 56px;
+    height: 56px;
+    border-radius: 9999px;
+    border: 5px solid rgba(34, 197, 94, 0.25);
+    border-top-color: rgb(34, 197, 94);
+    animation: diligent-spin 0.85s linear infinite;
+}
+
+.diligent-spinner-label {
+    font-size: 0.95rem;
+    font-weight: 600;
+    color: rgb(30, 41, 59);
+    text-align: center;
+}
+
+.dark .diligent-spinner-label {
+    color: rgb(226, 232, 240);
+}
+
+@keyframes diligent-spin {
+    0% {
+        transform: rotate(0deg);
+    }
+    100% {
+        transform: rotate(360deg);
+    }
+}
+
 .diligent-equal-row {
     width: 100%;
     display: flex;
