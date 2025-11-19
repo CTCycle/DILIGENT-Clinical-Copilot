@@ -810,7 +810,8 @@ class HepatoxConsultation:
         ]
         if not paragraphs:
             return None
-        combined_report = "\n\n".join(paragraphs)
+        separator = "\n\n---\n\n" if len(paragraphs) > 1 else "\n\n"
+        combined_report = separator.join(paragraphs)
         conclusion = await self.generate_conclusion(
             clinical_context=clinical_context or "",
             multi_drug_report=combined_report,
