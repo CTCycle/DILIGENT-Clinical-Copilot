@@ -347,14 +347,88 @@ class InterfaceStructure:
         ui.page_title("DILIGENT Clinical Copilots")
         ui.add_head_html(f"<style>{VISIT_DATE_CSS}{INTERFACE_THEME_CSS}</style>")
 
+        config_toolbar = ui.left_drawer(value=False, fixed=True).props(
+            "width=360 overlay bordered elevated"
+        )
+        with config_toolbar:
+            with ui.column().classes("gap-4 p-4 w-full"):
+                ui.label("Model Configurations").classes("diligent-card-title")
+                use_rag_checkbox = ui.checkbox(
+                    "Use Retrieval Augmented Generation (RAG)",
+                    value=False,
+                ).classes("pt-2")
+                use_cloud_services = ui.checkbox(
+                    "Use Cloud Services",
+                    value=cloud_enabled,
+                ).classes("pt-2")
+                with ui.column().classes("w-full gap-3"):
+                    ui.label("Cloud Configuration").classes("diligent-subtitle")
+                    llm_provider_dropdown = ui.select(
+                        CLOUD_PROVIDERS,
+                        label="Cloud Service",
+                        value=provider,
+                    ).classes("w-full")
+                    llm_provider_dropdown.disable()
+                    llm_provider_dropdown.props("dense")
+                    cloud_model_dropdown = ui.select(
+                        cloud_models,
+                        label="Cloud Model",
+                        value=selected_cloud_model,
+                    ).classes("w-full")
+                    cloud_model_dropdown.disable()
+                    cloud_model_dropdown.props("dense")
+                with ui.column().classes("w-full gap-3"):
+                    ui.label("Local Configuration").classes("diligent-subtitle")
+                    parsing_model_dropdown = ui.select(
+                        PARSING_MODEL_CHOICES,
+                        label="Parsing Model",
+                        value=current_settings.parsing_model,
+                    ).classes("w-full")
+                    parsing_model_dropdown.props("dense")
+                    clinical_model_dropdown = ui.select(
+                        CLINICAL_MODEL_CHOICES,
+                        label="Clinical Model",
+                        value=current_settings.clinical_model,
+                    ).classes("w-full")
+                    clinical_model_dropdown.props("dense")
+                with ui.column().classes("w-full gap-3"):
+                    temperature_input = ui.number(
+                        label="Temperature (Ollama)",
+                        value=current_settings.temperature,
+                        format="%.2f",
+                    ).classes("w-full")
+                    temperature_input.props("dense")
+                    reasoning_checkbox = ui.checkbox(
+                        "Enable SDL/Reasoning (Ollama)",
+                        value=current_settings.reasoning,
+                    ).classes("pt-2")
+                pull_models_button = ui.button("Pull Selected Models").classes(
+                    "w-full"
+                )
+            ui.button(
+                icon="chevron_left",
+                on_click=lambda _: config_toolbar.set_value(False),
+            ).props("flat color=primary").classes("self-start mt-auto mb-2")
+
+        toolbar_toggle = ui.element("div").classes(
+            "fixed left-0 top-1/2 -translate-y-1/2 z-40 cursor-pointer "
+            "bg-primary text-white rounded-r-lg shadow-lg opacity-70 hover:opacity-100 "
+            "transition-all duration-300 px-1 py-3"
+        ).style("min-width:16px;")
+        toolbar_toggle.on("click", lambda _: config_toolbar.set_value(True))
+        with toolbar_toggle:
+            ui.icon("chevron_right").classes("text-white text-lg")
+
         with ui.column().classes(PAGE_CONTAINER_CLASSES):
             ui.markdown("## DILIGENT Clinical Copilot").classes(
                 "text-3xl font-semibold text-slate-800 dark:text-slate-100"
             )
 
-            with ui.row().classes("w-full gap-6 flex-col xl:flex-row"):
-                with ui.column().classes("flex-1 w-full gap-6"):
-                    with ui.card().classes(f"{CARD_BASE_CLASSES} w-full"):
+            with ui.element("div").classes("diligent-equal-row"):
+                with ui.column().classes("diligent-equal-column flex-1 w-full"):
+                    with ui.card().classes(
+                        f"{CARD_BASE_CLASSES} diligent-equal-card w-full"
+                    ):
                         ui.label("Clinical Inputs").classes("diligent-card-title")
                         anamnesis = ui.textarea(
                             label="Anamnesis",
@@ -389,8 +463,10 @@ class InterfaceStructure:
                             ).classes("w-full")
                             alp_max.props("dense")
 
-                with ui.column().classes("w-full xl:w-[26rem] gap-6"):
-                    with ui.card().classes(f"{CARD_BASE_CLASSES} w-full"):
+                with ui.column().classes("diligent-equal-column w-full"):
+                    with ui.card().classes(
+                        f"{CARD_BASE_CLASSES} diligent-equal-card w-full"
+                    ):
                         ui.label("Patient Information").classes(
                             "diligent-card-title"
                         )
@@ -413,66 +489,6 @@ class InterfaceStructure:
                             ).classes("w-full")
                             export_button.disable()
                             clear_button = ui.button("Clear all").classes("w-full")
-
-                    with ui.expansion("Models & Analysis Configuration").classes(
-                        "w-full"
-                    ):
-                        ui.label("Configuration").classes("diligent-card-title")
-                        use_rag_checkbox = ui.checkbox(
-                            "Use Retrieval Augmented Generation (RAG)",
-                            value=False,
-                        ).classes("pt-2")
-                        use_cloud_services = ui.checkbox(
-                            "Use Cloud Services",
-                            value=cloud_enabled,
-                        ).classes("pt-2")
-                        with ui.grid(columns=1).classes("w-full gap-5 lg:grid-cols-2"):
-                            with ui.column().classes("w-full gap-3"):
-                                ui.label("Cloud Configuration").classes(
-                                    "diligent-subtitle"
-                                )
-                                llm_provider_dropdown = ui.select(
-                                    CLOUD_PROVIDERS,
-                                    label="Cloud Service",
-                                    value=provider,
-                                ).classes("w-full")
-                                llm_provider_dropdown.disable()
-                                llm_provider_dropdown.props("dense")
-                                cloud_model_dropdown = ui.select(
-                                    cloud_models,
-                                    label="Cloud Model",
-                                    value=selected_cloud_model,
-                                ).classes("w-full")
-                                cloud_model_dropdown.disable()
-                                cloud_model_dropdown.props("dense")
-                                pull_models_button = ui.button("Pull Selected Models")
-                            with ui.column().classes("w-full gap-3"):
-                                ui.label("Local Configuration").classes(
-                                    "diligent-subtitle"
-                                )
-                                parsing_model_dropdown = ui.select(
-                                    PARSING_MODEL_CHOICES,
-                                    label="Parsing Model",
-                                    value=current_settings.parsing_model,
-                                ).classes("w-full")
-                                parsing_model_dropdown.props("dense")
-                                clinical_model_dropdown = ui.select(
-                                    CLINICAL_MODEL_CHOICES,
-                                    label="Clinical Model",
-                                    value=current_settings.clinical_model,
-                                ).classes("w-full")
-                                clinical_model_dropdown.props("dense")
-                        with ui.grid(columns=1).classes("w-full gap-5 lg:grid-cols-2"):
-                            temperature_input = ui.number(
-                                label="Temperature (Ollama)",
-                                value=current_settings.temperature,
-                                format="%.2f",
-                            ).classes("w-full")
-                            temperature_input.props("dense")
-                            reasoning_checkbox = ui.checkbox(
-                                "Enable SDL/Reasoning (Ollama)",
-                                value=current_settings.reasoning,
-                            ).classes("pt-2")
 
             with ui.card().classes(f"{CARD_BASE_CLASSES} w-full"):
                 ui.label("Report Output").classes("diligent-card-title")
