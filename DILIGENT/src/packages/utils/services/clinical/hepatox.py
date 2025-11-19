@@ -439,7 +439,7 @@ class HepatoxConsultation:
             fragments.append(f"{header}\n{text}")
         if not fragments:
             return None
-        return "\n\n".join(fragments)
+        return "\n".join(fragments)
 
     # -------------------------------------------------------------------------
     def evaluate_suspension(
@@ -868,7 +868,7 @@ class HepatoxConsultation:
             detail = "The therapy was reported as suspended well before the visit and was excluded from the current DILI assessment."
         recommendation = "Manual verification of latency is suggested if the exposure history becomes relevant again."
         return (
-            f"{heading}\n\n{detail} {recommendation}\n\nBibliography source: LiverTox"
+            f"{heading}\n{detail} {recommendation}\nBibliography source: LiverTox"
         )
 
     # -------------------------------------------------------------------------
@@ -877,11 +877,11 @@ class HepatoxConsultation:
         heading = self.format_drug_heading(entry.drug_name, score)
         note = "No LiverTox excerpt was available for this drug, so its hepatotoxic potential in this patient could not be evaluated automatically."
         guidance = "Consider consulting the LiverTox monograph manually or alternative references before attributing causality."
-        return f"{heading}\n\n{note} {guidance}\n\nBibliography source: LiverTox"
+        return f"{heading}\n{note} {guidance}\nBibliography source: LiverTox"
 
     # -------------------------------------------------------------------------
     def build_error_paragraph(self, entry: DrugClinicalAssessment) -> str:
         score = self.resolve_livertox_score(entry.matched_livertox_row)
         heading = self.format_drug_heading(entry.drug_name, score)
         message = "Automated analysis was unavailable due to a technical issue; a clinician should review the LiverTox documentation manually."
-        return f"{heading}\n\n{message}\n\nBibliography source: LiverTox"
+        return f"{heading}\n{message}\nBibliography source: LiverTox"

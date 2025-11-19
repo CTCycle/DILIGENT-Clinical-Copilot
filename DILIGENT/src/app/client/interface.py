@@ -88,6 +88,18 @@ class InterfaceController:
             reasoning_checkbox.enable()
 
     # -------------------------------------------------------------------------
+    def set_session_progress_state(
+        self,
+        markdown_output: Any,
+        session_spinner: Any,
+        loading: bool,
+    ) -> None:
+        session_spinner.visible = loading
+        session_spinner.update()
+        markdown_output.visible = not loading
+        markdown_output.update()
+
+    # -------------------------------------------------------------------------
     async def handle_toggle_cloud_services(
         self,
         llm_provider_dropdown: Any,
@@ -199,6 +211,7 @@ class InterfaceController:
         temperature_input: Any,
         reasoning_checkbox: Any,
         markdown_output: Any,
+        session_spinner: Any,
         json_container: Any,
         json_code: Any,
         export_button: Any,
@@ -213,18 +226,23 @@ class InterfaceController:
             temperature=temperature_input.value,
             reasoning=bool(reasoning_checkbox.value),
         )
-        result = await self.dili_session_controller.run_DILI_session(
-            patient_name_input.value,
-            visit_date_input.value,
-            anamnesis_input.value,
-            drugs_input.value,
-            alt_input.value,
-            alt_max_input.value,
-            alp_input.value,
-            alp_max_input.value,
-            use_rag_checkbox.value,
-            settings,
-        )
+        self.set_session_progress_state(markdown_output, session_spinner, True)
+        try:
+            result = await self.dili_session_controller.run_DILI_session(
+                patient_name_input.value,
+                visit_date_input.value,
+                anamnesis_input.value,
+                drugs_input.value,
+                alt_input.value,
+                alt_max_input.value,
+                alp_input.value,
+                alp_max_input.value,
+                use_rag_checkbox.value,
+                settings,
+            )
+        except Exception:
+            self.set_session_progress_state(markdown_output, session_spinner, False)
+            raise
         markdown_output.set_content(result.get("message") or "")
         self.update_json_display(json_container, json_code, result.get("json"))
         export_path = result.get(export_attribute)
@@ -233,6 +251,7 @@ class InterfaceController:
             export_button.enable()
         else:
             export_button.disable()
+        self.set_session_progress_state(markdown_output, session_spinner, False)
 
     # -------------------------------------------------------------------------
     async def handle_clear_click(
@@ -255,6 +274,7 @@ class InterfaceController:
         temperature_input: Any,
         reasoning_checkbox: Any,
         markdown_output: Any,
+        session_spinner: Any,
         json_container: Any,
         json_code: Any,
         export_button: Any,
@@ -313,6 +333,7 @@ class InterfaceController:
         )
         markdown_output.set_content(defaults["message"])
         self.update_json_display(json_container, json_code, defaults.get("json"))
+        self.set_session_progress_state(markdown_output, session_spinner, False)
         setattr(export_button, export_attribute, defaults.get(export_attribute))
         export_button.disable()
 
@@ -489,6 +510,19 @@ class InterfaceStructure:
                             ).classes("w-full")
                             export_button.disable()
                             clear_button = ui.button("Clear all").classes("w-full")
+                        spinner_container = ui.element("div").classes(
+                            "diligent-session-spinner-container"
+                        )
+                        with spinner_container:
+                            session_spinner = ui.element("div").classes(
+                                "diligent-session-spinner"
+                            )
+                            with session_spinner:
+                                ui.element("div").classes("diligent-spinner-wheel")
+                                ui.label("Generating report...").classes(
+                                    "diligent-spinner-label"
+                                )
+                        session_spinner.visible = False
 
             with ui.card().classes(f"{CARD_BASE_CLASSES} w-full"):
                 ui.label("Report Output").classes("diligent-card-title")
@@ -571,6 +605,7 @@ class InterfaceStructure:
                 temperature_input,
                 reasoning_checkbox,
                 markdown_output,
+                session_spinner,
                 json_container,
                 json_code,
                 export_button,
@@ -598,6 +633,7 @@ class InterfaceStructure:
                 temperature_input,
                 reasoning_checkbox,
                 markdown_output,
+                session_spinner,
                 json_container,
                 json_code,
                 export_button,
