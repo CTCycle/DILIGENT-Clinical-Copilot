@@ -47,6 +47,23 @@ class NarrativeBuilder:
 
     # -------------------------------------------------------------------------
     @staticmethod
+    def compact_spacing(content: str) -> str:
+        cleaned: list[str] = []
+        previous_blank = False
+        for raw_line in content.splitlines():
+            line = raw_line.rstrip()
+            if not line:
+                if previous_blank:
+                    continue
+                previous_blank = True
+                cleaned.append("")
+                continue
+            previous_blank = False
+            cleaned.append(line)
+        return "\n".join(cleaned).strip()
+
+    # -------------------------------------------------------------------------
+    @staticmethod
     def build_patient_narrative(
         *,
         patient_label: str,
@@ -103,7 +120,7 @@ class NarrativeBuilder:
         )
         sections.append("\n".join(clinical_report_section))
 
-        return "\n\n".join(sections)
+        return NarrativeBuilder.compact_spacing("\n\n".join(sections))
 
 
 ###############################################################################
