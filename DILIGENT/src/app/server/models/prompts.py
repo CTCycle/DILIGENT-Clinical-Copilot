@@ -40,24 +40,15 @@ DILI_RAG_QUERY_PROMPT = (
 )
 
 LIVERTOX_REPORT_EXAMPLE = """
-Each drug subreport MUST follow the structure below. Keep every heading even if
-data is missing by stating "Not reported".
+# Example Report Structure
+The drug report MUST follow the structure below. Keep every heading even if no data is available.
 
 **Drug name - LiverTox score X**
 
-**Evidence Summary**
-Concise synthesis anchored in LiverTox data (incidence, study size, latency,
-pattern, case reports). Cite quantitative values verbatim from the excerpt.
+**Report**
+The generated report about Drug-Induced Liver Injury (DILI) 
 
-**Comparative Risk**
-Contrast the hepatic profile with related agents or classes that appear in the
-excerpt or metadata. Highlight similarities or differentiators.
-
-**Clinical Guidance**
-Translate the evidence into monitoring, rechallenge, or management advice that
-references the patient context where relevant.
-
-Bibliography source: LiverTox or additional documents as applicable.
+**Bibliography source**: Cite LiverTox or other referenced documents as the bibliography source
 
 """
 
