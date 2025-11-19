@@ -31,6 +31,8 @@ serializer = DataSerializer()
 
 ###############################################################################
 class NarrativeBuilder:
+    
+    # -------------------------------------------------------------------------
     @staticmethod
     def build_bullet_list(content: str | None) -> list[str]:
         lines: list[str] = []
@@ -43,6 +45,7 @@ class NarrativeBuilder:
             lines.append("- No data provided.")
         return lines
 
+    # -------------------------------------------------------------------------
     @staticmethod
     def build_patient_narrative(
         *,
@@ -127,6 +130,7 @@ class ClinicalSessionEndpoint:
             response_class=PlainTextResponse,
         )
 
+    # -------------------------------------------------------------------------
     async def process_single_patient(self, payload: PatientData) -> str:
         logger.info(
             "Starting Drug-Induced Liver Injury (DILI) analysis for patient: %s",
@@ -219,6 +223,7 @@ class ClinicalSessionEndpoint:
 
         return narrative
 
+    # -------------------------------------------------------------------------
     async def start_clinical_session(
         self,
         name: str | None = Body(default=None),

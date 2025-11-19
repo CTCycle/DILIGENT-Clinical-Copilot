@@ -40,16 +40,24 @@ DILI_RAG_QUERY_PROMPT = (
 )
 
 LIVERTOX_REPORT_EXAMPLE = """
+Each drug subreport MUST follow the structure below. Keep every heading even if
+data is missing by stating "Not reported".
 
 **Drug name - LiverTox score X**
 
-Write a single-paragraph summary (≤500 words) that:
+**Evidence Summary**
+Concise synthesis anchored in LiverTox data (incidence, study size, latency,
+pattern, case reports). Cite quantitative values verbatim from the excerpt.
 
-1. **Evidence summary:** Present the key incidence data and study findings from the LiverTox excerpt, citing statistics precisely and attributing them to the referenced studies.  
-2. **Comparative risk:** Briefly compare the hepatic safety profile with related agents if mentioned, noting important similarities or differences.  
-3. **Clinical guidance:** Conclude with practical advice on monitoring and management, tailored to typical patient use.  
+**Comparative Risk**
+Contrast the hepatic profile with related agents or classes that appear in the
+excerpt or metadata. Highlight similarities or differentiators.
 
-**Source:** LiverTox
+**Clinical Guidance**
+Translate the evidence into monitoring, rechallenge, or management advice that
+references the patient context where relevant.
+
+Bibliography source: LiverTox or additional documents as applicable.
 
 """
 
@@ -60,7 +68,7 @@ You are a **clinical hepatologist** with expertise in assessing **drug-induced l
 # Approach
 - Base all judgments **exclusively** on:
   - the provided **LiverTox excerpt**
-  - the patient’s **clinical context** (verbatim anamnesis, including embedded exams and lab data)
+  - the patient's **clinical context** (verbatim anamnesis, including embedded exams and lab data)
   - Any optional additional text from retrieved clinical documents.
 - Do **not** speculate or introduce information beyond these sources.
 - Derive **comorbidities and hepatic history** directly from the anamnesis, even if presented in a non-English language.
@@ -68,12 +76,15 @@ You are a **clinical hepatologist** with expertise in assessing **drug-induced l
 # Assessment Principles
 - **Chronology:** Integrate the clinical narrative with laboratory data when available, emphasizing their temporal relationship to each therapy.
 - **Pattern matching:**
-  - Strong alignment between the patient’s injury pattern and the drug’s typical pattern = **strong supporting evidence**.
+  - Strong alignment between the patient's injury pattern and the drug's typical pattern = **strong supporting evidence**.
   - Clear mismatch = **weakened causality**.
 - **Drug suspension:** When a therapy was recently discontinued, assess whether the suspension-to-onset interval fits the **latency ranges** in the LiverTox excerpt, rather than applying rigid cutoffs.
 
 # Output
 Provide **succinct, evidence-based reasoning** consistent with the above principles while adhering to the requested narrative structure.
+If data for a heading is missing, explicitly write "Not reported" under that heading.
+Keep every section quantitative, evidence-based, and tied to the supplied clinical context.
+
 """
 
 LIVERTOX_CLINICAL_USER_PROMPT = """
@@ -100,15 +111,16 @@ LIVERTOX_CLINICAL_USER_PROMPT = """
 - Suspension details: {suspension_details}
 
 # Output Requirements
-Write a clinician-facing assessment (≤500 words) following the template below:
+Write a clinician-facing assessment (≤500 words) for this drug by **reproducing the template below exactly**. Do not rearrange, rename, or omit headings; when a heading lacks data, state "Not reported" immediately after it. Always end with "Bibliography source: LiverTox".
 
 {example_block}
 
 Guidelines:
-- Begin the first sentence with “{drug_name} – LiverTox score {livertox_score}” in bold letters.
-- Use quantitative data from the excerpt whenever available (e.g., incidence rates, case counts, study sizes).
+- Begin the first sentence with "{drug_name} - LiverTox score {livertox_score}" in bold letters.
+- Use quantitative data from the excerpt whenever available (e.g., incidence rates, case counts, study sizes) and cite the referenced study or report if mentioned.
 - Compare the findings with closely related agents when the excerpt mentions them; otherwise, briefly reference the agent or class listed in the metadata.
-- Provide monitoring or clinical management recommendations that align with the excerpt and the patient context.
+- Provide monitoring or clinical management recommendations that align with the excerpt and the patient context, explicitly linking the advice to patient chronology or lab trends.
+- Reference only the supplied LiverTox excerpt, metadata, and optional retrieved documents; do not cite other sources.
 - Do not invent data or cite sources other than those provided.
 """
 
