@@ -80,6 +80,32 @@ body {
 .dark .diligent-json-card {
     background: rgba(100, 116, 139, 0.22);
 }
+
+.diligent-equal-row {
+    width: 100%;
+    display: flex;
+    flex-direction: column;
+    gap: 1.5rem;
+}
+
+@media (min-width: 1280px) {
+    .diligent-equal-row {
+        display: grid;
+        grid-template-columns: minmax(0, 1fr) 26rem;
+        align-items: stretch;
+    }
+}
+
+.diligent-equal-column {
+    display: flex;
+    flex-direction: column;
+    gap: 1.5rem;
+    height: 100%;
+}
+
+.diligent-equal-card {
+    height: 100%;
+}
 """
 
 PAGE_CONTAINER_CLASSES: Final = "diligent-page-container flex flex-col gap-6"
