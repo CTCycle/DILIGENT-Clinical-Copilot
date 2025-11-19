@@ -20,9 +20,9 @@ if database.requires_sqlite_initialization():
     logger.info("DILIGENT database has been initialized successfully.")
 
 app = FastAPI(
-    title=configurations.server.title,
-    version=configurations.server.version,
-    description=configurations.server.description,
+    title=configurations.backend.title,
+    version=configurations.backend.version,
+    description=configurations.backend.description,
 )
 
 app.include_router(session_router)
