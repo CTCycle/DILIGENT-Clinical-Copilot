@@ -69,6 +69,7 @@ class PatientData(BaseModel):
         description="Enables retrieval augmented generation during analysis.",
     )
 
+    # -------------------------------------------------------------------------
     @field_validator("name", mode="before")
     @classmethod
     def strip_name(cls, value: str | None) -> str | None:
@@ -77,6 +78,7 @@ class PatientData(BaseModel):
         stripped = str(value).strip()
         return stripped or None
 
+    # -------------------------------------------------------------------------
     @field_validator(
         "anamnesis", "drugs", "alt", "alt_max", "alp", "alp_max", mode="before"
     )
@@ -87,6 +89,7 @@ class PatientData(BaseModel):
         stripped = str(value).strip()
         return stripped or None
 
+    # -------------------------------------------------------------------------
     @field_validator("visit_date", mode="before")
     @classmethod
     def coerce_visit_date(cls, value: Any) -> date | None:
@@ -122,6 +125,7 @@ class PatientData(BaseModel):
                 return parsed_datetime.date()
         return None
 
+    # -------------------------------------------------------------------------
     @field_validator("visit_date")
     @classmethod
     def validate_visit_date(cls, value: date | None) -> date | None:
@@ -138,6 +142,7 @@ class PatientData(BaseModel):
             return self
         raise ValueError("Provide at least one clinical section before submitting.")
 
+    # -------------------------------------------------------------------------
     @staticmethod
     def coerce_marker(value: str | None) -> tuple[float | None, str | None]:
         if value is None:
@@ -151,6 +156,7 @@ class PatientData(BaseModel):
         except ValueError:
             return None, stripped
 
+    # -------------------------------------------------------------------------
     def manual_hepatic_markers(self) -> dict[str, Any]:
         markers: dict[str, Any] = {}
         alt_value, alt_text = self.coerce_marker(self.alt)
@@ -181,6 +187,7 @@ class PatientData(BaseModel):
             markers["ALP"] = entry
         return markers
 
+    # -------------------------------------------------------------------------
     def compose_structured_text(self) -> str | None:
         sections: list[str] = []
         anamnesis_lines: list[str] = []
@@ -209,7 +216,7 @@ class PatientData(BaseModel):
                 anamnesis_lines.append("Key laboratory markers:")
                 anamnesis_lines.extend(cleaned_markers)
         if anamnesis_lines:
-            anamnesis_body = "\n".join(line for line in anamnesis_lines if line.strip())
+            anamnesis_body = "".join(line for line in anamnesis_lines if line.strip())
             if anamnesis_body:
                 sections.append(f"# ANAMNESIS\n{anamnesis_body}")
         if self.drugs:
@@ -436,7 +443,17 @@ class DrugSuspensionContext(BaseModel):
 
 ###############################################################################
 def create_drug_suspension_context() -> DrugSuspensionContext:
-    return DrugSuspensionContext()
+    return DrugSuspensionContext(
+        suspended=False,
+        suspension_date=None,
+        excluded=False,
+        note=None,
+        interval_days=None,
+        start_reported=False,
+        start_date=None,
+        start_interval_days=None,
+        start_note=None,
+    )
 
 
 ###############################################################################
