@@ -20,7 +20,7 @@
     "timeout": 3600.0
   },
   "database": {
-    "selected_database": "sqlite",
+    "selected_database": "sqlite.db",
     "database_address": null,
     "database_name": null,
     "username": null,

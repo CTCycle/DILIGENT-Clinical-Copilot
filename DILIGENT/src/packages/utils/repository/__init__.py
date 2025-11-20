@@ -6,14 +6,14 @@ from typing import Any
 
 __all__ = [
     "serializer",
-    "sqlite",
+    "sqlite.db",
     "vectors",
     "VectorDatabase",
 ]
 
 
 def __getattr__(name: str) -> Any:
-    if name in {"serializer", "sqlite", "vectors"}:
+    if name in {"serializer", "sqlite.db", "vectors"}:
         return importlib.import_module(f"{__name__}.{name}")
     if name == "VectorDatabase":
         module = importlib.import_module(f"{__name__}.vectors")
