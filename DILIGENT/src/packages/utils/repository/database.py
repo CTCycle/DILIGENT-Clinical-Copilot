@@ -47,7 +47,7 @@ def build_sqlite_backend(settings: DatabaseSettings) -> DatabaseBackend:
 
 
 BACKEND_FACTORIES: dict[str, BackendFactory] = {
-    "sqlite": build_sqlite_backend,
+    "sqlite.db": build_sqlite_backend,
 }
 
 
@@ -78,7 +78,7 @@ class DILIGENTDatabase:
 
     # -------------------------------------------------------------------------
     def requires_sqlite_initialization(self) -> bool:
-        if self.settings.selected_database != "sqlite":
+        if self.settings.selected_database != "sqlite.db":
             return False
         if not self.db_path:
             return False
