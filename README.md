@@ -88,7 +88,7 @@ The script downloads the newest LiverTox content (set `REDOWNLOAD = False` insid
 ### 3.3 Resources
 Clinical data, configuration templates, and assets live under `DILIGENT/resources/`:
 
-- **database/** – contains the SQLite database (`database.db`) with session histories plus any exported evaluation artefacts.
+- **database/** – contains the SQLite database (`sqlite`) with session histories plus any exported evaluation artefacts.
 - **logs/** – runtime logs produced by the FastAPI workers and background tasks.
 - **templates/** – reusable templates such as the `.env` scaffold and document layouts.
 

@@ -206,7 +206,7 @@ def build_http_settings(data: dict[str, Any]) -> HTTPSettings:
 # -----------------------------------------------------------------------------
 def build_database_settings(data: dict[str, Any]) -> DatabaseSettings:
     return DatabaseSettings(
-        selected_database=coerce_str(data.get("selected_database"), "sqlite").lower(),
+        selected_database=coerce_str(data.get("selected_database"), "sqlite.db").lower(),
         database_address=coerce_str_or_none(data.get("database_address")),
         database_name=coerce_str_or_none(data.get("database_name")),
         username=coerce_str_or_none(data.get("username")),
