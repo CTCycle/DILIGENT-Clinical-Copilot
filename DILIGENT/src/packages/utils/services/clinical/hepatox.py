@@ -24,7 +24,7 @@ from DILIGENT.src.app.server.schemas.clinical import (
     PatientDrugClinicalReport,
     PatientDrugs,
 )
-from DILIGENT.src.packages.configurations import ClientRuntimeConfig, configurations
+from DILIGENT.src.packages.configurations import LLMRuntimeConfig, configurations
 from DILIGENT.src.packages.constants import (
     DEFAULT_DILI_CLASSIFICATION,
     R_SCORE_CHOLESTATIC_THRESHOLD,
@@ -34,10 +34,6 @@ from DILIGENT.src.packages.logger import logger
 from DILIGENT.src.packages.utils.repository.serializer import DataSerializer
 from DILIGENT.src.packages.utils.services.retrieval.embeddings import SimilaritySearch
 from DILIGENT.src.packages.utils.services.clinical.matches import LiverToxMatcher
-
-DEFAULT_LLM_TIMEOUT = configurations.external_data.default_llm_timeout
-MAX_EXCERPT_LENGTH = configurations.external_data.max_excerpt_length
-RAG_TOP_K_DOCUMENTS = configurations.rag.top_k_documents
 
 
 ###############################################################################
@@ -127,7 +123,7 @@ class HepatoxConsultation:
         drugs: PatientDrugs,
         *,
         patient_name: str | None = None,        
-        timeout_s: float = DEFAULT_LLM_TIMEOUT,        
+        timeout_s: float = configurations.server.external_data.default_llm_timeout,        
     ) -> None:
         self.drugs = drugs
         self.timeout_s = timeout_s            
@@ -136,10 +132,10 @@ class HepatoxConsultation:
         self.master_list_df = None
         self.matcher: LiverToxMatcher | None = None
         self.llm_client = initialize_llm_client(purpose="clinical", timeout_s=timeout_s)
-        self.MAX_EXCERPT_LENGTH = MAX_EXCERPT_LENGTH
+        self.MAX_EXCERPT_LENGTH = configurations.server.external_data.max_excerpt_length
         self.patient_name = (patient_name or "").strip() or None
-        _, model_candidate = ClientRuntimeConfig.resolve_provider_and_model("clinical")
-        self.llm_model = model_candidate or ClientRuntimeConfig.get_clinical_model()
+        _, model_candidate = LLMRuntimeConfig.resolve_provider_and_model("clinical")
+        self.llm_model = model_candidate or LLMRuntimeConfig.get_clinical_model()
         try:
             chat_signature = inspect.signature(self.llm_client.chat)
         except (TypeError, ValueError):
@@ -147,9 +143,9 @@ class HepatoxConsultation:
         self.chat_supports_temperature = (
             chat_signature is not None and "temperature" in chat_signature.parameters
         )
-        self.temperature = ClientRuntimeConfig.get_ollama_temperature()
+        self.temperature = LLMRuntimeConfig.get_ollama_temperature()
         self.similarity_search: SimilaritySearch | None = None
-        self.rag_top_k = RAG_TOP_K_DOCUMENTS
+        self.rag_top_k = configurations.server.rag.top_k_documents
 
     # -------------------------------------------------------------------------
     async def run_analysis(

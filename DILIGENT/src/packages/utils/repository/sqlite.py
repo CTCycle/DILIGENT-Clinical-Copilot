@@ -11,30 +11,24 @@ from sqlalchemy.engine import Engine
 from sqlalchemy.orm import sessionmaker
 
 from DILIGENT.src.packages.configurations import DatabaseSettings
-from DILIGENT.src.packages.constants import DATA_PATH
+from DILIGENT.src.packages.constants import DATA_PATH, DATABASE_FILENAME
 from DILIGENT.src.packages.logger import logger
 from DILIGENT.src.packages.utils.repository.schema import Base
 
 
-
+# [SQLITE DATABASE]
 ###############################################################################
 class SQLiteRepository:
     def __init__(self, settings: DatabaseSettings) -> None:
-        filename = settings.database_name or "sqlite.db"
-        if not filename.endswith(".db"):
-            filename = f"{filename}.db"
-        self.db_path: str | None = os.path.join(DATA_PATH, filename)
+        self.db_path: str | None = os.path.join(DATA_PATH, DATABASE_FILENAME)
         os.makedirs(os.path.dirname(self.db_path), exist_ok=True)
         self.engine: Engine = sqlalchemy.create_engine(
             f"sqlite:///{self.db_path}", echo=False, future=True
         )
         self.Session = sessionmaker(bind=self.engine, future=True)
         self.insert_batch_size = settings.insert_batch_size
-
-    # -------------------------------------------------------------------------
-    def initialize_database(self) -> None:
-        if not os.path.exists(self.db_path):
-            Base.metadata.create_all(self.engine)
+        if self.db_path is not None and not os.path.exists(self.db_path):
+            Base.metadata.create_all(self.engine)       
 
     # -------------------------------------------------------------------------
     def get_table_class(self, table_name: str) -> Any:
