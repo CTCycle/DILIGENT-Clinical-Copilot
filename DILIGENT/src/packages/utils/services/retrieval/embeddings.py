@@ -6,13 +6,11 @@ import json
 from collections.abc import Coroutine
 from typing import Any, Literal, cast
 
-from DILIGENT.src.app.server.models.providers import CloudLLMClient, OllamaClient
+from DILIGENT.src.server.models.providers import CloudLLMClient, OllamaClient
 from DILIGENT.src.packages.configurations import configurations
 from DILIGENT.src.packages.constants import VECTOR_DB_PATH
 from DILIGENT.src.packages.logger import logger
 from DILIGENT.src.packages.utils.repository.vectors import LanceVectorDatabase
-
-RAG_SETTINGS = configurations.rag
 
 ProviderName = Literal["openai", "azure-openai", "anthropic", "gemini"]
 EmbeddingBackend = Literal["ollama", "cloud"]
@@ -148,22 +146,22 @@ class SimilaritySearch:
         *,
         vector_database: LanceVectorDatabase | None = None,
         embedding_generator: EmbeddingGenerator | None = None,
-        default_top_k: int = RAG_SETTINGS.top_k_documents,
+        default_top_k: int = configurations.server.rag.top_k_documents,
     ) -> None:
         self.default_top_k = max(int(default_top_k), 1)
         self.vector_database = vector_database or LanceVectorDatabase(
             database_path=VECTOR_DB_PATH,
-            collection_name=RAG_SETTINGS.vector_collection_name,
-            metric=RAG_SETTINGS.vector_index_metric,
-            index_type=RAG_SETTINGS.vector_index_type,
+            collection_name=configurations.server.rag.vector_collection_name,
+            metric=configurations.server.rag.vector_index_metric,
+            index_type=configurations.server.rag.vector_index_type,
         )
         self.embedding_generator = embedding_generator or EmbeddingGenerator(
-            backend=RAG_SETTINGS.embedding_backend,
-            ollama_base_url=RAG_SETTINGS.ollama_base_url,
-            ollama_model=RAG_SETTINGS.ollama_embedding_model,
-            use_cloud_embeddings=RAG_SETTINGS.use_cloud_embeddings,
-            cloud_provider=RAG_SETTINGS.cloud_provider,
-            cloud_embedding_model=RAG_SETTINGS.cloud_embedding_model,
+            backend=configurations.server.rag.embedding_backend,
+            ollama_base_url=configurations.server.rag.ollama_base_url,
+            ollama_model=configurations.server.rag.ollama_embedding_model,
+            use_cloud_embeddings=configurations.server.rag.use_cloud_embeddings,
+            cloud_provider=configurations.server.rag.cloud_provider,
+            cloud_embedding_model=configurations.server.rag.cloud_embedding_model,
         )
         try:
             self.vector_database.initialize(False)

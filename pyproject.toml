@@ -20,11 +20,8 @@ dependencies = [
     "langchain==0.3.27",
     "langchain-community==0.3.27",
     "langchain-text-splitters==0.3.11",
-    "langchain-ollama==0.3.10",
-    "langchain-huggingface==0.3.1",
     "lancedb==0.24.1",
-    "openpyxl==3.1.5",
-    "pytest==9.0.0",
+    "openpyxl==3.1.5",    
 
 ]
 

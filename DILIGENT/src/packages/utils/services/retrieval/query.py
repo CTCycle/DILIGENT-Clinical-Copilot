@@ -2,8 +2,8 @@ from __future__ import annotations
 
 from collections import defaultdict
 
-from DILIGENT.src.app.server.models.prompts import DILI_RAG_QUERY_PROMPT
-from DILIGENT.src.app.server.schemas.clinical import PatientDrugs
+from DILIGENT.src.server.models.prompts import DILI_RAG_QUERY_PROMPT
+from DILIGENT.src.server.schemas.clinical import PatientDrugs
 from DILIGENT.src.packages.constants import (
     DEFAULT_DILI_CLASSIFICATION,
     NO_CLINICAL_CONTEXT_FALLBACK,

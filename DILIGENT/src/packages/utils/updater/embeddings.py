@@ -22,32 +22,32 @@ class RagEmbeddingUpdater:
         reset_collection: bool | None = None,
     ) -> None:
         self.documents_path = documents_path or DOCS_PATH
-        default_use_cloud = RAG_SETTINGS.use_cloud_embeddings
+        default_use_cloud = configurations.server.rag.use_cloud_embeddings
         self.use_cloud_embeddings = (
             default_use_cloud if use_cloud_embeddings is None else use_cloud_embeddings
         )
-        resolved_provider = cloud_provider or RAG_SETTINGS.cloud_provider
-        resolved_model = cloud_embedding_model or RAG_SETTINGS.cloud_embedding_model
+        resolved_provider = cloud_provider or configurations.server.rag.cloud_provider
+        resolved_model = cloud_embedding_model or configurations.server.rag.cloud_embedding_model
         self.reset_collection = (
-            RAG_SETTINGS.reset_vector_collection if reset_collection is None else reset_collection
+            configurations.server.rag.reset_vector_collection if reset_collection is None else reset_collection
         )
         os.makedirs(self.documents_path, exist_ok=True)
         self.vector_database = LanceVectorDatabase(
             database_path=VECTOR_DB_PATH,
-            collection_name=RAG_SETTINGS.vector_collection_name,
-            metric=RAG_SETTINGS.vector_index_metric,
-            index_type=RAG_SETTINGS.vector_index_type,
+            collection_name=configurations.server.rag.vector_collection_name,
+            metric=configurations.server.rag.vector_index_metric,
+            index_type=configurations.server.rag.vector_index_type,
         )
         self.serializer = VectorSerializer(
             documents_path=self.documents_path,
             vector_database=self.vector_database,
-            chunk_size=RAG_SETTINGS.chunk_size,
-            chunk_overlap=RAG_SETTINGS.chunk_overlap,
-            embedding_batch_size=RAG_SETTINGS.embedding_batch_size,
-            embedding_backend=RAG_SETTINGS.embedding_backend,
-            ollama_base_url=RAG_SETTINGS.ollama_base_url,
-            ollama_model=RAG_SETTINGS.ollama_embedding_model,
-            hf_model=RAG_SETTINGS.hf_embedding_model,
+            chunk_size=configurations.server.rag.chunk_size,
+            chunk_overlap=configurations.server.rag.chunk_overlap,
+            embedding_batch_size=configurations.server.rag.embedding_batch_size,
+            embedding_backend=configurations.server.rag.embedding_backend,
+            ollama_base_url=configurations.server.rag.ollama_base_url,
+            ollama_model=configurations.server.rag.ollama_embedding_model,
+            hf_model=configurations.server.rag.hf_embedding_model,
             use_cloud_embeddings=self.use_cloud_embeddings,
             cloud_provider=resolved_provider,
             cloud_embedding_model=resolved_model,

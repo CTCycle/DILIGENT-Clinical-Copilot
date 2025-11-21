@@ -8,13 +8,13 @@ from typing import Any
 from langchain_community.agent_toolkits.nla import toolkit
 from nicegui import ui
 
-from DILIGENT.src.app.client.services import (
+from DILIGENT.src.client.services import (
     DILISessionEndpointService,
     ModelPullEndpointService,
     RuntimeSettings,
     SettingsService,
 )
-from DILIGENT.src.app.client.layouts import (
+from DILIGENT.src.client.layouts import (
     CARD_BASE_CLASSES,
     INTERFACE_THEME_CSS,
     JSON_CARD_CLASSES,
