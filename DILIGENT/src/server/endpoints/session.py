@@ -9,7 +9,7 @@ from fastapi import APIRouter, Body, HTTPException, status
 from fastapi.responses import PlainTextResponse
 from pydantic import ValidationError
 
-from DILIGENT.src.app.server.schemas.clinical import (
+from DILIGENT.src.server.schemas.clinical import (
     PatientData,
 )
 from DILIGENT.src.packages.logger import logger

@@ -7,15 +7,15 @@ import re
 from datetime import date, datetime
 from typing import Any
 
-from DILIGENT.src.app.server.models.prompts import (
+from DILIGENT.src.server.models.prompts import (
     LIVERTOX_CONCLUSION_SYSTEM_PROMPT,
     LIVERTOX_CONCLUSION_USER_PROMPT,
     LIVERTOX_CLINICAL_SYSTEM_PROMPT,
     LIVERTOX_CLINICAL_USER_PROMPT,
     LIVERTOX_REPORT_EXAMPLE,
 )
-from DILIGENT.src.app.server.models.providers import initialize_llm_client
-from DILIGENT.src.app.server.schemas.clinical import (
+from DILIGENT.src.server.models.providers import initialize_llm_client
+from DILIGENT.src.server.schemas.clinical import (
     DrugEntry,
     DrugClinicalAssessment,
     DrugSuspensionContext,

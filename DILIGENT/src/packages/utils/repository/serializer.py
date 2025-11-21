@@ -31,8 +31,6 @@ from DILIGENT.src.packages.utils.repository.database import database
 from DILIGENT.src.packages.utils.repository.vectors import LanceVectorDatabase
 from DILIGENT.src.packages.utils.services.retrieval.embeddings import EmbeddingGenerator
 
-INGESTION_SETTINGS = configurations.ingestion
-
 ###############################################################################
 class DataSerializer:
     def __init__(self) -> None:
@@ -114,9 +112,9 @@ class DataSerializer:
     # -----------------------------------------------------------------------------
     def is_valid_drug_name(self, value: str) -> bool:
         normalized = value.strip()
-        min_length = INGESTION_SETTINGS.drug_name_min_length
-        max_length = INGESTION_SETTINGS.drug_name_max_length
-        max_tokens = INGESTION_SETTINGS.drug_name_max_tokens
+        min_length = configurations.server.ingestion.drug_name_min_length
+        max_length = configurations.server.ingestion.drug_name_max_length
+        max_tokens = configurations.server.ingestion.drug_name_max_tokens
         if len(normalized) < min_length or len(normalized) > max_length:
             return False
         if len(normalized.split()) > max_tokens:

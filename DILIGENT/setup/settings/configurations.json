@@ -3,7 +3,8 @@
     "fastapi": {
       "title": "DILIGENT Clinical Copilot Backend",
       "version": "0.1.0",
-      "description": "FastAPI backend"
+      "description": "FastAPI backend",
+      "api_base_url": "http://127.0.0.1:8000"
     },   
     "database": {
       "embedded_database": true,
@@ -78,12 +79,9 @@
     "ui": {
       "host": "0.0.0.0",
       "port": 7861,
-      "title": "AEGIS Geographics",
-      "mount_path": "/ui",
-      "redirect_path": "/ui",
+      "title": "DILIGENT Clinical Copilot",
       "show_welcome_message": false,
-      "reconnect_timeout": 3600,
-      "api_base_url": "http://127.0.0.1:8000",
+      "reconnect_timeout": 3600,      
       "http_timeout": 1800.0   
     }
   }

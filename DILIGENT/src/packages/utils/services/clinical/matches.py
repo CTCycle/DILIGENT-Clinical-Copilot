@@ -21,8 +21,6 @@ __all__ = [
 ]
 
 
-MATCHER_SETTINGS = configurations.matcher
-
 ###############################################################################
 @dataclass(slots=True)
 class MonographRecord:
@@ -47,15 +45,15 @@ class LiverToxMatch:
 
 ###############################################################################
 class DrugsLookup:
-    DIRECT_CONFIDENCE = MATCHER_SETTINGS.direct_confidence
-    MASTER_CONFIDENCE = MATCHER_SETTINGS.master_confidence
-    SYNONYM_CONFIDENCE = MATCHER_SETTINGS.synonym_confidence
-    PARTIAL_CONFIDENCE = MATCHER_SETTINGS.partial_confidence
-    FUZZY_CONFIDENCE = MATCHER_SETTINGS.fuzzy_confidence
-    FUZZY_THRESHOLD = MATCHER_SETTINGS.fuzzy_threshold
-    TOKEN_MAX_FREQUENCY = MATCHER_SETTINGS.token_max_frequency
-    MIN_CONFIDENCE = MATCHER_SETTINGS.min_confidence
-    CATALOG_EXCLUDED_TERM_SUFFIXES = MATCHER_SETTINGS.catalog_excluded_term_suffixes
+    DIRECT_CONFIDENCE = configurations.server.drugs_matcher.direct_confidence
+    MASTER_CONFIDENCE = configurations.server.drugs_matcher.master_confidence
+    SYNONYM_CONFIDENCE = configurations.server.drugs_matcher.synonym_confidence
+    PARTIAL_CONFIDENCE = configurations.server.drugs_matcher.partial_confidence
+    FUZZY_CONFIDENCE = configurations.server.drugs_matcher.fuzzy_confidence
+    FUZZY_THRESHOLD = configurations.server.drugs_matcher.fuzzy_threshold
+    TOKEN_MAX_FREQUENCY = configurations.server.drugs_matcher.token_max_frequency
+    MIN_CONFIDENCE = configurations.server.drugs_matcher.min_confidence
+    CATALOG_EXCLUDED_TERM_SUFFIXES = configurations.server.drugs_matcher.catalog_excluded_term_suffixes
 
     # -------------------------------------------------------------------------
     def __init__(self) -> None:
