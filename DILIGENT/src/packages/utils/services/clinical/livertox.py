@@ -14,9 +14,6 @@ if TYPE_CHECKING:
         MonographRecord,
     )
 
-MATCHER_SETTINGS = configurations.matcher
-
-
 ###############################################################################
 class LiverToxData:
     
@@ -139,7 +136,7 @@ class LiverToxData:
             return
         filtered: dict[str, list[MonographRecord]] = {}
         for token, records in self.token_occurrences.items():
-            if len(records) > MATCHER_SETTINGS.token_max_frequency:
+            if len(records) > configurations.server.drugs_matcher.token_max_frequency:
                 continue
             filtered[token] = sorted(
                 records, key=lambda record: record.drug_name.lower()

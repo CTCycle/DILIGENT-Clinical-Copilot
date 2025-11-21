@@ -225,6 +225,7 @@ class FastAPISettings:
     title: str
     description: str
     version: str
+    api_base_url: str
 
 # -----------------------------------------------------------------------------
 @dataclass(frozen=True)
@@ -241,7 +242,6 @@ class DatabaseSettings:
     connect_timeout: int
     insert_batch_size: int
 
-
 # -----------------------------------------------------------------------------
 @dataclass(frozen=True)
 class DrugsMatcherSettings:
@@ -254,7 +254,6 @@ class DrugsMatcherSettings:
     token_max_frequency: int
     min_confidence: float
     catalog_excluded_term_suffixes: tuple[str, ...]
-
 
 # -----------------------------------------------------------------------------
 @dataclass(frozen=True)
@@ -276,7 +275,6 @@ class RagSettings:
     cloud_embedding_model: str
     use_cloud_embeddings: bool
 
-
 # -----------------------------------------------------------------------------
 @dataclass(frozen=True)
 class ExternalDataSettings:
@@ -286,8 +284,7 @@ class ExternalDataSettings:
     livertox_yield_interval: int
     livertox_skip_deterministic_ratio: float
     livertox_monograph_max_workers: int
-    max_excerpt_length: int
-    
+    max_excerpt_length: int    
 
 # -----------------------------------------------------------------------------
 @dataclass(frozen=True)
@@ -295,7 +292,6 @@ class IngestionSettings:
     drug_name_min_length: int
     drug_name_max_length: int
     drug_name_max_tokens: int
-
 
 # -----------------------------------------------------------------------------
 @dataclass(frozen=True)
@@ -327,12 +323,9 @@ class ServerSettings:
 class UIRuntimeSettings:
     host: str
     port: int
-    title: str
-    mount_path: str
-    redirect_path: str
+    title: str    
     show_welcome_message: bool
-    reconnect_timeout: int
-    api_base_url: str
+    reconnect_timeout: int    
     http_timeout: float
 
 # -----------------------------------------------------------------------------
@@ -377,6 +370,7 @@ def build_fastapi_settings(data: dict[str, Any]) -> FastAPISettings:
         title=coerce_str(data.get("title"), "DILIGENT Clinical Copilot Backend"),
         version=coerce_str(data.get("version"), "0.1.0"),
         description=coerce_str(data.get("description"), "FastAPI backend"),
+        api_base_url=coerce_str(payload.get("base_url"), "http://127.0.0.1:8000")
     )
 
 # -----------------------------------------------------------------------------
@@ -542,10 +536,7 @@ def build_server_settings(data: dict[str, Any] | Any) -> ServerSettings:
     llm_defaults = build_llm_runtime_defaults(llm_defaults_payload)
     default_provider = llm_defaults.llm_provider
     default_cloud_model = llm_defaults.cloud_model
-    default_ollama_host = coerce_str(
-        payload.get("ollama_base_url"),
-        os.environ.get("OLLAMA_HOST", "http://localhost:11434"),
-    )
+    default_ollama_host = coerce_str(payload.get("ollama_base_url"), "http://localhost:11434")    
 
     rag_settings = build_rag_settings(
         rag_payload,
@@ -574,12 +565,9 @@ def build_ui_settings(payload: dict[str, Any] | Any | Any) -> UIRuntimeSettings:
     return UIRuntimeSettings(
         host=coerce_str(payload.get("host"), "0.0.0.0"),
         port=coerce_int(payload.get("port"), 7861, minimum=1, maximum=65535),
-        title=coerce_str(payload.get("title"), "ADSORFIT Model Fitting"),
-        mount_path=coerce_str(payload.get("mount_path"), "/ui"),
-        redirect_path=coerce_str(payload.get("redirect_path"), "/ui"),
+        title=coerce_str(payload.get("title"), "ADSORFIT Model Fitting"),        
         show_welcome_message=coerce_bool(payload.get("show_welcome_message"), False),
-        reconnect_timeout=coerce_int(payload.get("reconnect_timeout"), 180, minimum=1),
-        api_base_url=coerce_str(payload.get("base_url"), "http://127.0.0.1:8000"),
+        reconnect_timeout=coerce_int(payload.get("reconnect_timeout"), 180, minimum=1),   
         http_timeout=coerce_float(payload.get("timeout"), 120.0, minimum=1.0)
     )
 
