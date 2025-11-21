@@ -5,13 +5,14 @@ from collections.abc import Callable
 from functools import partial
 from typing import Any
 
+from langchain_community.agent_toolkits.nla import toolkit
 from nicegui import ui
 
-from DILIGENT.src.app.client.controllers import (
-    DiliSessionController,
-    ModelPullController,
+from DILIGENT.src.app.client.services import (
+    DILISessionEndpointService,
+    ModelPullEndpointService,
     RuntimeSettings,
-    SettingsController,
+    SettingsService,
 )
 from DILIGENT.src.app.client.layouts import (
     CARD_BASE_CLASSES,
@@ -32,19 +33,12 @@ from DILIGENT.src.packages.constants import (
 export_attribute = "export_path"
 
 CLOUD_PROVIDERS: list[str] = [key for key in CLOUD_MODEL_CHOICES]
+ui_settings = configurations.client.ui
 
 
+# [TOOLKIT]
 ###############################################################################
-class InterfaceController:
-    def __init__(
-        self,
-        settings_controller: SettingsController,
-        model_pull_controller: ModelPullController,
-        dili_session_controller: DiliSessionController,
-    ) -> None:
-        self.settings_controller = settings_controller
-        self.model_pull_controller = model_pull_controller
-        self.dili_session_controller = dili_session_controller
+class InterfaceToolkit:    
 
     # -------------------------------------------------------------------------
     def update_json_display(self, container: Any, code: Any, payload: Any) -> None:
@@ -99,6 +93,22 @@ class InterfaceController:
         markdown_output.visible = not loading
         markdown_output.update()
 
+
+# [INTERFACE CONTROLLER]
+###############################################################################
+class InterfaceService:
+    def __init__(
+        self,
+        settings_controller: SettingsService,
+        model_pull_controller: ModelPullEndpointService,
+        dili_session_controller: DILISessionEndpointService,
+        toolkit: InterfaceToolkit,
+    ) -> None:
+        self.settings_controller = settings_controller
+        self.model_pull_controller = model_pull_controller
+        self.dili_session_controller = dili_session_controller
+        self.toolkit = toolkit    
+
     # -------------------------------------------------------------------------
     async def handle_toggle_cloud_services(
         self,
@@ -121,7 +131,7 @@ class InterfaceController:
         cloud_model_dropdown.set_options(selection["models"])
         cloud_model_dropdown.value = selection["model"]
         cloud_model_dropdown.update()
-        self.update_cloud_controls(
+        self.toolkit.update_cloud_controls(
             enabled,
             llm_provider_dropdown,
             cloud_model_dropdown,
@@ -189,7 +199,7 @@ class InterfaceController:
         )
         result = await self.model_pull_controller.pull_selected_models(settings)
         markdown_output.set_content(result.get("message") or "")
-        self.update_json_display(json_container, json_code, result.get("json"))
+        self.toolkit.update_json_display(json_container, json_code, result.get("json"))
 
     # -------------------------------------------------------------------------
     async def handle_run_workflow(
@@ -226,7 +236,7 @@ class InterfaceController:
             temperature=temperature_input.value,
             reasoning=bool(reasoning_checkbox.value),
         )
-        self.set_session_progress_state(markdown_output, session_spinner, True)
+        self.toolkit.set_session_progress_state(markdown_output, session_spinner, True)
         try:
             result = await self.dili_session_controller.run_DILI_session(
                 patient_name_input.value,
@@ -241,17 +251,15 @@ class InterfaceController:
                 settings,
             )
         except Exception:
-            self.set_session_progress_state(markdown_output, session_spinner, False)
+            self.toolkit.set_session_progress_state(markdown_output, session_spinner, False)
             raise
+
         markdown_output.set_content(result.get("message") or "")
-        self.update_json_display(json_container, json_code, result.get("json"))
+        self.toolkit.update_json_display(json_container, json_code, result.get("json"))
         export_path = result.get(export_attribute)
         setattr(export_button, export_attribute, export_path)
-        if export_path:
-            export_button.enable()
-        else:
-            export_button.disable()
-        self.set_session_progress_state(markdown_output, session_spinner, False)
+        export_button.enable() if export_path else export_button.disable()
+        self.toolkit.set_session_progress_state(markdown_output, session_spinner, False)
 
     # -------------------------------------------------------------------------
     async def handle_clear_click(
@@ -321,7 +329,7 @@ class InterfaceController:
         temperature_input.update()
         reasoning_checkbox.value = settings.reasoning
         reasoning_checkbox.update()
-        self.update_cloud_controls(
+        self.toolkit.update_cloud_controls(
             settings.use_cloud_services,
             llm_provider_dropdown,
             cloud_model_dropdown,
@@ -332,8 +340,8 @@ class InterfaceController:
             pull_models_button,
         )
         markdown_output.set_content(defaults["message"])
-        self.update_json_display(json_container, json_code, defaults.get("json"))
-        self.set_session_progress_state(markdown_output, session_spinner, False)
+        self.toolkit.update_json_display(json_container, json_code, defaults.get("json"))
+        self.toolkit.set_session_progress_state(markdown_output, session_spinner, False)
         setattr(export_button, export_attribute, defaults.get(export_attribute))
         export_button.disable()
 
@@ -344,18 +352,21 @@ class InterfaceController:
             ui.download(export_path)
 
 
+# [INTERFACE STRUCTURE]
 ###############################################################################
 class InterfaceStructure:
     def __init__(
         self,
-        settings_controller: SettingsController,
-        controller: InterfaceController,
+        settings_controller: SettingsService,
+        controller: InterfaceService,
+        toolkit: InterfaceToolkit,
     ) -> None:
         self.settings_controller = settings_controller
         self.controller = controller
+        self.toolkit = toolkit
 
     # -------------------------------------------------------------------------
-    def main_page(self) -> None:
+    def compose_main_page(self) -> None:
         current_settings = self.settings_controller.get_runtime_settings()
         selection = self.settings_controller.resolve_cloud_selection(
             current_settings.provider, current_settings.cloud_model
@@ -537,8 +548,7 @@ class InterfaceStructure:
                     json_code = ui.code("", language="json").classes("w-full")
 
         setattr(export_button, export_attribute, None)
-
-        self.controller.update_cloud_controls(
+        self.toolkit.update_cloud_controls(
             cloud_enabled,
             llm_provider_dropdown,
             cloud_model_dropdown,
@@ -561,6 +571,7 @@ class InterfaceStructure:
                 pull_models_button,
             )
         )
+
         llm_provider_dropdown.on_value_change(
             partial(
                 self.controller.handle_cloud_provider_change,
@@ -568,6 +579,7 @@ class InterfaceStructure:
                 cloud_model_dropdown,
             )
         )
+
         pull_models_button.on(
             "click",
             partial(
@@ -584,6 +596,7 @@ class InterfaceStructure:
                 json_code,
             ),
         )
+
         run_button.on(
             "click",
             partial(
@@ -611,6 +624,7 @@ class InterfaceStructure:
                 export_button,
             ),
         )
+
         clear_button.on(
             "click",
             partial(
@@ -639,40 +653,54 @@ class InterfaceStructure:
                 export_button,
             ),
         )
+
         visit_date.on_value_change(
             partial(self.controller.handle_visit_date_change, visit_date)
         )
+
         export_button.on(
             "click", partial(self.controller.handle_download_click, export_button)
         )
 
         ui.run_javascript(f"({VISIT_DATE_LOCALE_JS})();")
 
+    # -------------------------------------------------------------------------
+    def mount_routes(self) -> None:
+        ui.page("/")(self.compose_main_page)
+        
 
+# [INTERFACE CREATION AND LAUNCHING]
 ###############################################################################
-def create_interface() -> None:
-    settings_controller = SettingsController()
-    model_pull_controller = ModelPullController(settings_controller)
-    dili_session_controller = DiliSessionController(settings_controller)
-    controller = InterfaceController(
+def create_interface() -> InterfaceStructure: 
+    settings_controller = SettingsService()
+    model_pull_controller = ModelPullEndpointService()
+    dili_session_controller = DILISessionEndpointService()
+    toolkit = InterfaceToolkit()
+    controller = InterfaceService(
         settings_controller,
         model_pull_controller,
         dili_session_controller,
+        toolkit
     )
-    structure = InterfaceStructure(settings_controller, controller)
-    ui.page("/")(structure.main_page)
+    structure = InterfaceStructure(
+        settings_controller, 
+        controller,
+        toolkit)
+    
+    structure.mount_routes()
 
+    return structure
 
 # -----------------------------------------------------------------------------
 def launch_interface() -> None:
     create_interface()
     ui.run(
-        host=configurations.ui_runtime.host,
-        port=configurations.ui_runtime.port,
-        title=configurations.ui_runtime.title,
-        show_welcome_message=configurations.ui_runtime.show_welcome_message,
+        host=ui_settings.host,
+        port=ui_settings.port,
+        title=ui_settings.title,
+        show_welcome_message=ui_settings.show_welcome_message,
+        reconnect_timeout=ui_settings.reconnect_timeout,
     )
-
 
 # -----------------------------------------------------------------------------
 if __name__ in {"__main__", "__mp_main__"}:
