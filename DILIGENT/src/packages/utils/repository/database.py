@@ -6,7 +6,8 @@ from typing import Protocol
 
 import pandas as pd
 
-from DILIGENT.src.packages.utils.repository.sqlite import SQLiteRepository
+from DILIGENT.src.packages.utils.repository.postgres import PostgresRepository
+from DILIGENT.src.packages.utils.repository.sqlite import Any, SQLiteRepository
 from DILIGENT.src.packages.configurations import DatabaseSettings, configurations
 from DILIGENT.src.packages.logger import logger
 from DILIGENT.src.packages.singleton import singleton
@@ -16,10 +17,7 @@ from DILIGENT.src.packages.singleton import singleton
 ###############################################################################
 class DatabaseBackend(Protocol):
     db_path: str | None
-
-    # -------------------------------------------------------------------------
-    def initialize_database(self) -> None:
-        ...
+    engine: Any   
 
     # -------------------------------------------------------------------------
     def load_from_database(self, table_name: str) -> pd.DataFrame:
@@ -42,48 +40,43 @@ BackendFactory = Callable[[DatabaseSettings], DatabaseBackend]
 
 
 # -----------------------------------------------------------------------------
-def build_sqlite_backend(settings: DatabaseSettings) -> DatabaseBackend:    
+def build_sqlite_backend(settings: DatabaseSettings) -> DatabaseBackend:
     return SQLiteRepository(settings)
+
+# -----------------------------------------------------------------------------
+def build_postgres_backend(settings: DatabaseSettings) -> DatabaseBackend:
+    return PostgresRepository(settings)
 
 
 BACKEND_FACTORIES: dict[str, BackendFactory] = {
-    "sqlite.db": build_sqlite_backend,
+    "sqlite": build_sqlite_backend,
+    "postgres": build_postgres_backend,
 }
 
 
+# [DATABASE]
 ###############################################################################
 @singleton
 class DILIGENTDatabase:
     def __init__(self) -> None:
-        self.settings = configurations.database
-        self.backend = self._build_backend(self.settings.selected_database)
+        self.settings = configurations.server.database
+        self.backend = self._build_backend(self.settings.embedded_database)
 
     # -------------------------------------------------------------------------
-    def _build_backend(self, backend_name: str) -> DatabaseBackend:
-        key = backend_name.strip().lower()
-        if key not in BACKEND_FACTORIES:
-            raise RuntimeError(f"Unsupported database backend requested: {backend_name}")
-        logger.info("Initializing %s database backend", key)
-        factory = BACKEND_FACTORIES[key]
+    def _build_backend(self, is_embedded: bool) -> DatabaseBackend:
+        backend_name = "sqlite" if is_embedded else (self.settings.engine or "postgres")
+        normalized_name = backend_name.lower()
+        logger.info("Initializing %s database backend", backend_name)
+        if normalized_name not in BACKEND_FACTORIES:
+            raise ValueError(f"Unsupported database engine: {backend_name}")
+        factory = BACKEND_FACTORIES[normalized_name]
         return factory(self.settings)
 
     # -------------------------------------------------------------------------
     @property
     def db_path(self) -> str | None:
         return getattr(self.backend, "db_path", None)
-
-    # -------------------------------------------------------------------------
-    def initialize_database(self) -> None:
-        self.backend.initialize_database()
-
-    # -------------------------------------------------------------------------
-    def requires_sqlite_initialization(self) -> bool:
-        if self.settings.selected_database != "sqlite.db":
-            return False
-        if not self.db_path:
-            return False
-        return not os.path.exists(self.db_path)
-
+    
     # -------------------------------------------------------------------------
     def load_from_database(self, table_name: str) -> pd.DataFrame:
         return self.backend.load_from_database(table_name)
@@ -101,6 +94,4 @@ class DILIGENTDatabase:
         return self.backend.count_rows(table_name)
 
     
-
-###############################################################################
 database = DILIGENTDatabase()

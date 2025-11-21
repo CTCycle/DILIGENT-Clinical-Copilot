@@ -17,7 +17,7 @@ import httpx
 from langchain_core.output_parsers import PydanticOutputParser
 from pydantic import BaseModel
 
-from DILIGENT.src.packages.configurations import ClientRuntimeConfig, configurations
+from DILIGENT.src.packages.configurations import LLMRuntimeConfig, configurations
 from DILIGENT.src.packages.constants import (
     GEMINI_API_BASE,
     OPENAI_API_BASE,
@@ -26,9 +26,6 @@ from DILIGENT.src.packages.constants import (
 from DILIGENT.src.packages.logger import logger
 from DILIGENT.src.packages.types import extract_positive_int
 from DILIGENT.src.packages.variables import env_variables
-
-DEFAULT_LLM_TIMEOUT = configurations.external_data.default_llm_timeout
-OLLAMA_HOST_DEFAULT = configurations.ollama_host_default
 
 OPENAI_API_KEY = env_variables.get("OPENAI_API_KEY")
 GEMINI_API_KEY = env_variables.get("GEMINI_API_KEY")
@@ -44,10 +41,8 @@ RuntimePurpose = Literal["clinical", "parser"]
 class OllamaError(RuntimeError):
     pass
 
-
 class OllamaTimeout(OllamaError):
     """Raised when requests to Ollama exceed the configured timeout."""
-
 
 ProgressCb: TypeAlias = Callable[[dict[str, Any]], None | Awaitable[None]]
 
@@ -79,12 +74,12 @@ class OllamaClient:
     def __init__(
         self,
         base_url: str | None = None,
-        timeout_s: float = DEFAULT_LLM_TIMEOUT,
+        timeout_s: float = configurations.server.external_data.default_llm_timeout,
         keepalive_connections: int = 10,
         keepalive_max: int = 20,
         default_model: str | None = None,
     ) -> None:
-        self.base_url = (base_url or OLLAMA_HOST_DEFAULT).rstrip("/")
+        self.base_url = (base_url or configurations.server.llm_defaults.ollama_host_default).rstrip("/")
         self.default_model = (default_model or "").strip() or None
         limits = httpx.Limits(
             max_keepalive_connections=keepalive_connections,
@@ -180,7 +175,7 @@ class OllamaClient:
         think: bool | None,
         options: dict[str, Any] | None,
     ) -> tuple[float, bool, dict[str, Any] | None]:
-        default_temp = ClientRuntimeConfig.get_ollama_temperature()
+        default_temp = LLMRuntimeConfig.get_ollama_temperature()
         if temperature is None:
             temp_value = default_temp
         else:
@@ -200,7 +195,7 @@ class OllamaClient:
                 options_payload = None
         temp_value = max(0.0, min(2.0, float(temp_value)))
         if think is None:
-            think_value = ClientRuntimeConfig.is_ollama_reasoning_enabled()
+            think_value = LLMRuntimeConfig.is_ollama_reasoning_enabled()
         else:
             think_value = bool(think)
         return round(temp_value, 2), think_value, options_payload
@@ -1055,7 +1050,7 @@ class OllamaClient:
         for candidate in (
             (model or "").strip(),
             (self.default_model or "").strip(),
-            (ClientRuntimeConfig.get_parsing_model() or "").strip(),
+            (LLMRuntimeConfig.get_parsing_model() or "").strip(),
         ):
             if candidate and candidate not in preferred:
                 preferred.append(candidate)
@@ -1194,7 +1189,7 @@ class CloudLLMClient:
         *,
         provider: ProviderName = "openai",
         base_url: str | None = None,
-        timeout_s: float = DEFAULT_LLM_TIMEOUT,
+        timeout_s: float = configurations.server.external_data.default_llm_timeout,
         keepalive_connections: int = 10,
         keepalive_max: int = 20,
         default_model: str | None = None,
@@ -1563,7 +1558,7 @@ def select_llm_provider(
     if p == "ollama":
         return OllamaClient(
             base_url=kwargs.get("base_url"),
-            timeout_s=kwargs.get("timeout_s", DEFAULT_LLM_TIMEOUT),
+            timeout_s=kwargs.get("timeout_s", configurations.server.external_data.default_llm_timeout),
             keepalive_connections=kwargs.get("keepalive_connections", 10),
             keepalive_max=kwargs.get("keepalive_max", 20),
             default_model=kwargs.get("default_model"),
@@ -1572,7 +1567,7 @@ def select_llm_provider(
         return CloudLLMClient(
             provider=p,  # type: ignore[arg-type]
             base_url=kwargs.get("base_url"),
-            timeout_s=kwargs.get("timeout_s", DEFAULT_LLM_TIMEOUT),
+            timeout_s=kwargs.get("timeout_s", configurations.server.external_data.default_llm_timeout),
             keepalive_connections=kwargs.get("keepalive_connections", 10),
             keepalive_max=kwargs.get("keepalive_max", 20),
             default_model=kwargs.get("default_model"),
@@ -1584,8 +1579,8 @@ def select_llm_provider(
 def initialize_llm_client(
     *, purpose: RuntimePurpose = "clinical", **kwargs: Any
 ) -> OllamaClient | CloudLLMClient:
-    kwargs.setdefault("timeout_s", DEFAULT_LLM_TIMEOUT)
-    provider, default_model = ClientRuntimeConfig.resolve_provider_and_model(purpose)
+    kwargs.setdefault("timeout_s", configurations.server.external_data.default_llm_timeout)
+    provider, default_model = LLMRuntimeConfig.resolve_provider_and_model(purpose)
     selected_model = kwargs.pop("default_model", default_model)
     return select_llm_provider(
         provider=provider,

@@ -13,7 +13,7 @@ from DILIGENT.src.app.server.schemas.clinical import (
     DrugEntry,
     PatientDrugs,
 )
-from DILIGENT.src.packages.configurations import ClientRuntimeConfig, configurations
+from DILIGENT.src.packages.configurations import LLMRuntimeConfig, configurations
 from DILIGENT.src.packages.patterns import (
     DRUG_BRACKET_TRAIL_RE,
     DRUG_BULLET_RE,
@@ -25,8 +25,6 @@ from DILIGENT.src.packages.patterns import (
     FORM_TOKENS,
     UNIT_TOKENS,
 )
-
-DEFAULT_LLM_TIMEOUT = configurations.external_data.default_llm_timeout
 
 
 ###############################################################################
@@ -43,7 +41,7 @@ class DrugsParser:
         *,
         client: Any | None = None,
         temperature: float = 0.0,
-        timeout_s: float = DEFAULT_LLM_TIMEOUT,
+        timeout_s: float = configurations.server.external_data.default_llm_timeout,
     ) -> None:
         self.temperature = float(temperature)
         self.timeout_s = float(timeout_s)
@@ -55,13 +53,13 @@ class DrugsParser:
             self.runtime_revision = -1
         else:
             self.client_provider = "injected"
-            self.runtime_revision = ClientRuntimeConfig.get_revision()
+            self.runtime_revision = LLMRuntimeConfig.get_revision()
 
     # -------------------------------------------------------------------------
     async def ensure_client(self) -> None:
         async with self.client_lock:
-            revision = ClientRuntimeConfig.get_revision()
-            provider, model = ClientRuntimeConfig.resolve_provider_and_model("parser")
+            revision = LLMRuntimeConfig.get_revision()
+            provider, model = LLMRuntimeConfig.resolve_provider_and_model("parser")
             if self.client_provider == "injected" and self.client is not None:
                 self.model = model
                 self.runtime_revision = revision
