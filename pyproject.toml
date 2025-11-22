@@ -22,7 +22,6 @@ dependencies = [
     "langchain-text-splitters==0.3.11",
     "lancedb==0.24.1",
     "openpyxl==3.1.5",    
-
 ]
 
 [tool.hatch.build.targets.wheel]
