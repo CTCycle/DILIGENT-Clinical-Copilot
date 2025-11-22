@@ -3,6 +3,7 @@ from __future__ import annotations
 from fastapi import FastAPI
 from fastapi.responses import RedirectResponse
 
+from DILIGENT.src.packages.variables import env_variables
 from DILIGENT.src.server.endpoints.session import router as session_router
 from DILIGENT.src.server.endpoints.ollama import router as ollama_router
 from DILIGENT.src.packages.configurations import configurations
