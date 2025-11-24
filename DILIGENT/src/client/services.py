@@ -94,8 +94,7 @@ class SettingsService:
 
     # -------------------------------------------------------------------------
     def apply_runtime_settings(self, settings: RuntimeSettings) -> RuntimeSettings:
-        self.runtime_config.set_use_cloud_services(settings.use_cloud_services)
-        provider = self.runtime_config.set_llm_provider(settings.provider)
+        self.runtime_config.set_use_cloud_services(settings.use_cloud_services)        
         self.runtime_config.set_cloud_model(settings.cloud_model)
         parsing_model = self.runtime_config.set_parsing_model(settings.parsing_model)
         clinical_model = self.runtime_config.set_clinical_model(settings.clinical_model)
@@ -103,7 +102,7 @@ class SettingsService:
         reasoning = self.runtime_config.set_ollama_reasoning(settings.reasoning)
         return RuntimeSettings(
             use_cloud_services=self.runtime_config.is_cloud_enabled(),
-            provider=provider,
+            provider=self.runtime_config.set_llm_provider(settings.provider),
             cloud_model=self.runtime_config.get_cloud_model(),
             parsing_model=parsing_model,
             clinical_model=clinical_model,
