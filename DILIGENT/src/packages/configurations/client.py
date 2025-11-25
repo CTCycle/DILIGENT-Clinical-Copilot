@@ -42,7 +42,7 @@ def build_ui_settings(payload: dict[str, Any] | Any | Any) -> UIRuntimeSettings:
         title=coerce_str(payload.get("title"), "ADSORFIT Model Fitting"),       
         show_welcome_message=coerce_bool(payload.get("show_welcome_message"), False),
         reconnect_timeout=coerce_int(payload.get("reconnect_timeout"), 180, minimum=1),        
-        http_timeout=coerce_float(payload.get("timeout"), 120.0, minimum=1.0),
+        http_timeout=coerce_float(payload.get("http_timeout"), 120.0, minimum=1.0),
         api_base_url=coerce_str(payload.get("api_base_url"), "http://127.0.0.1:8000")
     )
 
