@@ -15,10 +15,12 @@ from DILIGENT.src.server.models.providers import (
     OllamaError,
     OllamaTimeout,
 )
-from DILIGENT.src.packages.configurations import (
-    AppConfigurations,
+
+from DILIGENT.src.packages.configurations import (    
+    ClientSettings,
     LLMRuntimeConfig,
-    configurations
+    client_settings,
+    server_settings    
 )
 
 from DILIGENT.src.packages.constants import (
@@ -51,12 +53,12 @@ class RuntimeSettings:
 ###############################################################################
 class SettingsService:
     def __init__(
-        self, 
-        runtime_config: type[LLMRuntimeConfig] = LLMRuntimeConfig,
-        app_config: AppConfigurations = configurations
+        self,
+        runtime_config: type[LLMRuntimeConfig] = LLMRuntimeConfig,        
+        config: ClientSettings = client_settings,
     ) -> None:
         self.runtime_config = runtime_config
-        self.app_config = app_config
+        self.client_config = config
 
     # -------------------------------------------------------------------------
     def resolve_cloud_selection(
@@ -142,8 +144,8 @@ class SettingsService:
 # [MODEL PULL CONTROLLER]
 ###############################################################################
 class ModelPullEndpointService:
-    def __init__(self, config: AppConfigurations = configurations) -> None:
-        self.config = config
+    def __init__(self, config: ClientSettings = client_settings) -> None:
+        self.client_config = config
         self.settings_controller = SettingsService()
 
     # -------------------------------------------------------------------------
@@ -193,8 +195,8 @@ class ModelPullEndpointService:
 # [DILI SESSION CONTROLLER]
 ###############################################################################
 class DILISessionEndpointService:
-    def __init__(self, config: AppConfigurations = configurations) -> None:
-        self.config = config
+    def __init__(self, config: ClientSettings = client_settings) -> None:
+        self.client_config = config
         self.settings_controller = SettingsService()
         
     # -------------------------------------------------------------------------
@@ -236,7 +238,7 @@ class DILISessionEndpointService:
         self, url: str, payload: dict[str, Any] | None = None
     ) -> tuple[str, dict[str, Any] | list[Any] | None]:
         try:
-            async with httpx.AsyncClient(timeout=self.config.client.ui.http_timeout) as client:
+            async with httpx.AsyncClient(timeout=self.client_config.ui.http_timeout) as client:
                 resp = await client.post(url, json=payload)
                 resp.raise_for_status()
                 json_payload: dict[str, Any] | list[Any] | None = None
@@ -277,7 +279,7 @@ class DILISessionEndpointService:
             return message, json_payload
         except httpx.TimeoutException:
             return (
-                f"[ERROR] Request timed out after {self.config.client.ui.http_timeout} seconds.",
+                f"[ERROR] Request timed out after {self.client_config.ui.http_timeout} seconds.",
                 None,
             )
         except Exception as exc:  # noqa: BLE001
@@ -310,7 +312,7 @@ class DILISessionEndpointService:
             use_rag=use_rag,
         )
 
-        url = f"{self.config.client.ui.api_base_url}{CLINICAL_API_URL}"
+        url = f"{self.client_config.ui.api_base_url}{CLINICAL_API_URL}"
         message, json_payload = await self.trigger_session(url, cleaned_payload)
         normalized_message = message.strip() if message else ""
         export_path = None

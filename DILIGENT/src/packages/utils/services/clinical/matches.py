@@ -9,16 +9,9 @@ from typing import Any
 
 import pandas as pd
 
-from DILIGENT.src.packages.configurations import configurations
+from DILIGENT.src.packages.configurations import server_settings
 from DILIGENT.src.packages.constants import MATCHING_STOPWORDS
 from DILIGENT.src.packages.utils.services.clinical.livertox import LiverToxData
-
-__all__ = [
-    "MonographRecord",
-    "LiverToxMatch",
-    "DrugsLookup",
-    "LiverToxMatcher",
-]
 
 
 ###############################################################################
@@ -45,15 +38,15 @@ class LiverToxMatch:
 
 ###############################################################################
 class DrugsLookup:
-    DIRECT_CONFIDENCE = configurations.server.drugs_matcher.direct_confidence
-    MASTER_CONFIDENCE = configurations.server.drugs_matcher.master_confidence
-    SYNONYM_CONFIDENCE = configurations.server.drugs_matcher.synonym_confidence
-    PARTIAL_CONFIDENCE = configurations.server.drugs_matcher.partial_confidence
-    FUZZY_CONFIDENCE = configurations.server.drugs_matcher.fuzzy_confidence
-    FUZZY_THRESHOLD = configurations.server.drugs_matcher.fuzzy_threshold
-    TOKEN_MAX_FREQUENCY = configurations.server.drugs_matcher.token_max_frequency
-    MIN_CONFIDENCE = configurations.server.drugs_matcher.min_confidence
-    CATALOG_EXCLUDED_TERM_SUFFIXES = configurations.server.drugs_matcher.catalog_excluded_term_suffixes
+    DIRECT_CONFIDENCE = server_settings.drugs_matcher.direct_confidence
+    MASTER_CONFIDENCE = server_settings.drugs_matcher.master_confidence
+    SYNONYM_CONFIDENCE = server_settings.drugs_matcher.synonym_confidence
+    PARTIAL_CONFIDENCE = server_settings.drugs_matcher.partial_confidence
+    FUZZY_CONFIDENCE = server_settings.drugs_matcher.fuzzy_confidence
+    FUZZY_THRESHOLD = server_settings.drugs_matcher.fuzzy_threshold
+    TOKEN_MAX_FREQUENCY = server_settings.drugs_matcher.token_max_frequency
+    MIN_CONFIDENCE = server_settings.drugs_matcher.min_confidence
+    CATALOG_EXCLUDED_TERM_SUFFIXES = server_settings.drugs_matcher.catalog_excluded_term_suffixes
 
     # -------------------------------------------------------------------------
     def __init__(self) -> None:

@@ -1,19 +1,16 @@
 from __future__ import annotations
 
-from DILIGENT.src.packages.configurations import configurations
+from DILIGENT.src.packages.configurations import server_settings
 from DILIGENT.src.packages.logger import logger
 from DILIGENT.src.packages.utils.updater.embeddings import RagEmbeddingUpdater
 
-USE_CLOUD_EMBEDDINGS = configurations.rag.use_cloud_embeddings
-CLOUD_PROVIDER = configurations.rag.cloud_provider
-CLOUD_EMBEDDING_MODEL = configurations.rag.cloud_embedding_model
 
 ###############################################################################
 if __name__ == "__main__":
     updater = RagEmbeddingUpdater(
-        use_cloud_embeddings=USE_CLOUD_EMBEDDINGS,
-        cloud_provider=CLOUD_PROVIDER,
-        cloud_embedding_model=CLOUD_EMBEDDING_MODEL,
+        use_cloud_embeddings=server_settings.rag.use_cloud_embeddings,
+        cloud_provider=server_settings.rag.cloud_provider,
+        cloud_embedding_model=server_settings.rag.cloud_embedding_model,
     )
     updater.prepare_vector_database(reset_collection=False)
     summary = updater.refresh_embeddings()

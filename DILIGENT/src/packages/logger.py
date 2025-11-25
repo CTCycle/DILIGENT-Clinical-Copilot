@@ -10,8 +10,9 @@ from DILIGENT.src.packages.constants import LOGS_PATH
 
 # Generate timestamp for the log filename
 ###############################################################################
+os.makedirs(LOGS_PATH, exist_ok=True)
 current_timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
-log_filename = os.path.join(LOGS_PATH, f"DILIGENT_{current_timestamp}.log")
+log_filename = os.path.join(LOGS_PATH, f"AEGIS_{current_timestamp}.log")
 
 # Define logger configuration
 ###############################################################################

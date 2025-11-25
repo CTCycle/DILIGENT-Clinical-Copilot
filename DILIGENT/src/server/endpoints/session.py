@@ -18,9 +18,7 @@ from DILIGENT.src.packages.utils.services.clinical.hepatox import (
     HepatotoxicityPatternAnalyzer,
     HepatoxConsultation,
 )
-from DILIGENT.src.packages.utils.services.clinical.parser import (
-    DrugsParser,
-)
+from DILIGENT.src.packages.utils.services.clinical.parser import DrugsParser
 from DILIGENT.src.packages.utils.services.retrieval.query import DILIQueryBuilder
 
 drugs_parser = DrugsParser()

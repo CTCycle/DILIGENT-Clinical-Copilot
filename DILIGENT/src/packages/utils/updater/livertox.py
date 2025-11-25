@@ -19,15 +19,11 @@ from pdfminer.high_level import extract_text as pdfminer_extract_text
 from pypdf import PdfReader
 from tqdm import tqdm
 
-from DILIGENT.src.packages.configurations import configurations
+from DILIGENT.src.packages.configurations import server_settings
 from DILIGENT.src.packages.constants import LIVERTOX_BASE_URL, SOURCES_PATH
 from DILIGENT.src.packages.logger import logger
 from DILIGENT.src.packages.utils.repository.serializer import DataSerializer
 from DILIGENT.src.packages.utils.repository.database import database
-
-EXTERNAL_DATA = configurations.external_data
-
-__all__ = ["LiverToxUpdater"]
 
 SUPPORTED_MONOGRAPH_EXTENSIONS = (".html", ".htm", ".xhtml", ".xml", ".nxml", ".pdf")
 
@@ -121,7 +117,7 @@ class LiverToxUpdater:
         self.header_row = 1
 
         self.base_url = LIVERTOX_BASE_URL
-        self.file_name = EXTERNAL_DATA.livertox_archive
+        self.file_name = server_settings.external_data.livertox_archive
         self.tar_file_path = os.path.join(SOURCES_PATH, self.file_name)
         self.master_list_path = os.path.join(SOURCES_PATH, "LiverTox_Master_List.xlsx")
         self.master_list_metadata_path = os.path.join(
@@ -620,7 +616,7 @@ class LiverToxUpdater:
         logger.info("Checking LiverTox archive metadata")
         archive_metadata = asyncio.run(self.download_bulk_data(self.sources_path))
         archive_path = archive_metadata.get("file_path") or os.path.join(
-            self.sources_path, EXTERNAL_DATA.livertox_archive
+            self.sources_path, server_settings.external_data.livertox_archive
         )
 
         local_info = self.collect_local_archive_info(archive_path)
@@ -800,7 +796,7 @@ class LiverToxUpdater:
 
         collected: list[dict[str, str]] = []
         processed_files: set[str] = set()
-        max_workers = max(1, EXTERNAL_DATA.livertox_monograph_max_workers)
+        max_workers = max(1, server_settings.external_data.livertox_monograph_max_workers)
         with tarfile.open(normalized_path, "r:gz") as archive:
             members = [member for member in archive.getmembers() if member.isfile()]
             allowed_members: list[tarfile.TarInfo] = []

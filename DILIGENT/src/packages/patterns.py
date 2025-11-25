@@ -38,55 +38,6 @@ DRUG_START_DATE_RE = re.compile(
 )
 
 # -----------------------------------------------------------------------------
-# Blood test and date parsing patterns
-# -----------------------------------------------------------------------------
-ITALIAN_MONTHS = {
-    "gennaio": 1,
-    "febbraio": 2,
-    "marzo": 3,
-    "aprile": 4,
-    "maggio": 5,
-    "giugno": 6,
-    "luglio": 7,
-    "agosto": 8,
-    "settembre": 9,
-    "ottobre": 10,
-    "novembre": 11,
-    "dicembre": 12,
-}
-
-DATE_PATS = [
-    re.compile(r"\((?P<d>\d{1,2}\.\d{1,2}\.\d{4})\)"),
-    re.compile(r"(?<!\d)(?P<d>\d{1,2}\.\d{1,2}\.\d{4})(?!\d)"),
-    re.compile(
-        r"(?P<m>\b[A-Za-zÀ-ÿ]+)\s+(?P<day>\d{1,2})[.,]?\s*(?P<year>\d{4})",
-        re.IGNORECASE,
-    ),
-]
-
-TITER_RE = re.compile(
-    r"(?P<name>[A-Za-zÀ-ÿ][A-Za-zÀ-ÿ\-/ ]{0,40}?)\s*(?P<ratio>\d+\s*:\s*\d+)\b"
-)
-
-NUMERIC_RE = re.compile(
-    r"""
-    (?P<name>[A-Za-zÀ-ÿ][A-Za-zÀ-ÿ0-9\-/ ]{0,50}?)    # test name (lazy)
-    \s*
-    (?P<value>\d+(?:[.,]\d+)?)                        # number
-    \s*
-    (?P<unit>[A-Za-zµ/%\.0-9\-/\^]+)?                # unit (optional)
-    \s*
-    (?P<paren>\([^)]+\))?                             # parentheses (optional)
-    """,
-    re.VERBOSE,
-)
-
-CUTOFF_IN_PAREN_RE = re.compile(
-    r"cut[\s\-]?off[: ]*\s*(\d+(?:[.,]\d+)?)", re.IGNORECASE
-)
-
-
-# -----------------------------------------------------------------------------
 # LiverTox excerpt sanitation patterns
 # -----------------------------------------------------------------------------
 LIVERTOX_HEADER_RE = re.compile(
@@ -179,12 +130,7 @@ __all__ = [
     "DRUG_BRACKET_TRAIL_RE",
     "DRUG_SUSPENSION_RE",
     "DRUG_SUSPENSION_DATE_RE",
-    "DRUG_START_DATE_RE",
-    "ITALIAN_MONTHS",
-    "DATE_PATS",
-    "TITER_RE",
-    "NUMERIC_RE",
-    "CUTOFF_IN_PAREN_RE",
+    "DRUG_START_DATE_RE", 
     "LIVERTOX_HEADER_RE",
     "LIVERTOX_FOOTER_RE",
 ]
