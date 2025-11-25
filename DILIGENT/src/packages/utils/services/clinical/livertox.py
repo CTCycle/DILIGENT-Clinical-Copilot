@@ -6,11 +6,6 @@ from typing import Any
 import pandas as pd
 
 from DILIGENT.src.packages.configurations import server_settings
-from DILIGENT.src.packages.utils.services.clinical.matches import (
-    DrugsLookup,
-    LiverToxMatch,
-    MonographRecord,
-)
 
 ###############################################################################
 class LiverToxData:
@@ -18,11 +13,11 @@ class LiverToxData:
     def __init__(
         self,
         *,
-        lookup: DrugsLookup,
+        lookup: Any,
         livertox_df: pd.DataFrame,
         master_list_df: pd.DataFrame | None,
         drugs_catalog_df: pd.DataFrame | None,
-        record_factory: Callable[..., MonographRecord],
+        record_factory: Callable[..., Any],
     ) -> None:
         self.lookup = lookup
         self.record_factory = record_factory
@@ -35,12 +30,12 @@ class LiverToxData:
             self.drugs_catalog_df = drugs_catalog_df.copy()
         else:
             self.drugs_catalog_df = None
-        self.records: list[MonographRecord] = []
-        self.primary_index: dict[str, MonographRecord] = {}
-        self.synonym_index: dict[str, tuple[MonographRecord, str]] = {}
-        self.variant_catalog: list[tuple[str, MonographRecord, str, bool]] = []
-        self.token_occurrences: dict[str, list[MonographRecord]] = {}
-        self.token_index: dict[str, list[MonographRecord]] = {}
+        self.records: list[Any] = []
+        self.primary_index: dict[str, Any] = {}
+        self.synonym_index: dict[str, tuple[Any, str]] = {}
+        self.variant_catalog: list[tuple[str, Any, str, bool]] = []
+        self.token_occurrences: dict[str, list[Any]] = {}
+        self.token_index: dict[str, list[Any]] = {}
         self.brand_index: dict[str, list[tuple[str, str]]] = {}
         self.ingredient_index: dict[str, list[tuple[str, str]]] = {}
         self.rows_by_name: dict[str, dict[str, Any]] = {}
@@ -52,7 +47,7 @@ class LiverToxData:
     def build_records(self) -> None:
         if self.livertox_df is None or self.livertox_df.empty:
             return
-        token_occurrences: dict[str, list[MonographRecord]] = {}
+        token_occurrences: dict[str, list[Any]] = {}
         for row in self.livertox_df.itertuples(index=False):
             raw_name = self.lookup.coerce_text(getattr(row, "drug_name", None))
             if raw_name is None:
@@ -132,7 +127,7 @@ class LiverToxData:
         if not self.token_occurrences:
             self.token_index = {}
             return
-        filtered: dict[str, list[MonographRecord]] = {}
+        filtered: dict[str, list[Any]] = {}
         for token, records in self.token_occurrences.items():
             if len(records) > server_settings.drugs_matcher.token_max_frequency:
                 continue
@@ -145,7 +140,7 @@ class LiverToxData:
     def build_drugs_to_excerpt_mapping(
         self,
         patient_drugs: list[str],
-        matches: list["LiverToxMatch | None"],
+        matches: list[Any | None],
     ) -> list[dict[str, Any]]:
         entries: list[dict[str, Any]] = []
         row_index = self.ensure_row_index()
