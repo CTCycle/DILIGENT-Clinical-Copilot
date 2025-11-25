@@ -7,16 +7,16 @@ import time
 import unicodedata
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from dataclasses import dataclass
-from typing import Any, Iterator
+from typing import Any
+from collections.abc import Iterator
 
 import httpx
 import pandas as pd
 
 from DILIGENT.src.packages.logger import logger
-from DILIGENT.src.packages.utils.references import RXNAV_SYNONYM_STOPWORDS
+from DILIGENT.src.packages.constants import RXNAV_SYNONYM_STOPWORDS
 from DILIGENT.src.packages.utils.repository.serializer import DataSerializer
 
-__all__ = ["RxNavClient", "RxNavDrugCatalogBuilder"]
 
 
 ###############################################################################

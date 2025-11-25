@@ -5,13 +5,13 @@ import os
 from dataclasses import dataclass
 from typing import Any, Literal
 
+from DILIGENT.src.packages.configurations import ensure_mapping, load_configuration_data
 from DILIGENT.src.packages.constants import (
     CLINICAL_MODEL_CHOICES,
-    CLOUD_MODEL_CHOICES,
-    CONFIGURATION_FILE,
-    DATABASE_FILENAME,
+    CLOUD_MODEL_CHOICES, 
     DEFAULT_EMBEDDING_BATCH_SIZE,
     PARSING_MODEL_CHOICES,
+    SERVER_CONFIGURATION_FILE,
 )
 
 from DILIGENT.src.packages.types import (
@@ -224,8 +224,7 @@ class LLMRuntimeConfig:
 class FastAPISettings:
     title: str
     description: str
-    version: str
-    api_base_url: str
+    version: str    
 
 # -----------------------------------------------------------------------------
 @dataclass(frozen=True)
@@ -317,60 +316,14 @@ class ServerSettings:
     llm_defaults: LLMRuntimeDefaults
 
 
-# [CLIENT SETTINGS]
-###############################################################################
-@dataclass(frozen=True)
-class UIRuntimeSettings:
-    host: str
-    port: int
-    title: str    
-    show_welcome_message: bool
-    reconnect_timeout: int    
-    http_timeout: float
-
-# -----------------------------------------------------------------------------
-@dataclass(frozen=True)
-class ClientSettings:
-    ui: UIRuntimeSettings
-
-# [APPLICATION SETTINGS]
-###############################################################################
-@dataclass(frozen=True)
-class AppConfigurations:
-    server: ServerSettings
-    client: ClientSettings
-
-
-# [UTILITY FUNCTIONS]
-###############################################################################
-def ensure_mapping(value: Any) -> dict[str, Any]:
-    if isinstance(value, dict):
-        return value
-    return {}
-
-# -----------------------------------------------------------------------------
-def load_configuration_data(path: str) -> dict[str, Any]:
-    if not os.path.exists(path):
-        raise RuntimeError(f"Configuration file not found: {path}")
-    try:
-        with open(path, "r", encoding="utf-8") as handle:
-            data = json.load(handle)
-    except (OSError, json.JSONDecodeError) as exc:
-        raise RuntimeError(f"Unable to load configuration from {path}") from exc
-    if not isinstance(data, dict):
-        raise RuntimeError("Configuration root must be a JSON object.")
-    return data
-
-
 # [BUILDER FUNCTIONS]
 ###############################################################################
 def build_fastapi_settings(data: dict[str, Any]) -> FastAPISettings:
     payload = ensure_mapping(data)
     return FastAPISettings(
-        title=coerce_str(data.get("title"), "DILIGENT Clinical Copilot Backend"),
-        version=coerce_str(data.get("version"), "0.1.0"),
-        description=coerce_str(data.get("description"), "FastAPI backend"),
-        api_base_url=coerce_str(payload.get("base_url"), "http://127.0.0.1:8000")
+        title=coerce_str(payload.get("title"), "AEGIS Geospatial Search Backend"),
+        version=coerce_str(payload.get("version"), "0.1.0"),
+        description=coerce_str(payload.get("description"), "FastAPI backend"),        
     )
 
 # -----------------------------------------------------------------------------
@@ -560,53 +513,15 @@ def build_server_settings(data: dict[str, Any] | Any) -> ServerSettings:
         llm_defaults=llm_defaults,
     )
 
-# -----------------------------------------------------------------------------
-def build_ui_settings(payload: dict[str, Any] | Any | Any) -> UIRuntimeSettings:
-    return UIRuntimeSettings(
-        host=coerce_str(payload.get("host"), "0.0.0.0"),
-        port=coerce_int(payload.get("port"), 7861, minimum=1, maximum=65535),
-        title=coerce_str(payload.get("title"), "ADSORFIT Model Fitting"),        
-        show_welcome_message=coerce_bool(payload.get("show_welcome_message"), False),
-        reconnect_timeout=coerce_int(payload.get("reconnect_timeout"), 180, minimum=1),   
-        http_timeout=coerce_float(payload.get("timeout"), 120.0, minimum=1.0)
-    )
 
-# -----------------------------------------------------------------------------
-def build_client_settings(payload: dict[str, Any] | Any) -> ClientSettings:
-    ui_payload = payload.get("ui") if isinstance(payload.get("ui"), dict) else {}
-    return ClientSettings(
-        ui=build_ui_settings(ui_payload)        
-    )
-
-
-# [APPLICATION CONFIGURATION LOADER]
+# [SERVER CONFIGURATION LOADER]
 ###############################################################################
-def get_configurations(config_path: str | None = None) -> AppConfigurations:
-    path = config_path or CONFIGURATION_FILE
-    data = load_configuration_data(path)
-    server_payload = data.get("server") if isinstance(data.get("server"), dict) else {}
-    client_payload = data.get("client") if isinstance(data.get("client"), dict) else {}    
-    app_configs = AppConfigurations(
-        server=build_server_settings(server_payload),
-        client=build_client_settings(client_payload),
-    )
+def get_server_settings(config_path: str | None = None) -> ServerSettings:
+    path = config_path or SERVER_CONFIGURATION_FILE
+    payload = load_configuration_data(path)   
 
-    LLMRuntimeConfig.configure(app_configs.server.llm_defaults)
-
-    return app_configs
-
-configurations = get_configurations()
+    return build_server_settings(payload)
 
 
-__all__ = [    
-    "AppConfigurations",    
-    "LLMRuntimeConfig",
-    "LLMRuntimeDefaults",
-    "DatabaseSettings",
-    "DrugsMatcherSettings",
-    "ExternalDataSettings",
-    "IngestionSettings",   
-    "RagSettings",
-    "UIRuntimeSettings",
-    "get_configurations",    
-]
+server_settings = get_server_settings()
+

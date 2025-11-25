@@ -24,5 +24,6 @@ __pycache__
 *.gz
 !.gitkeep
 
-!DILIGENT/setup/settings/configurations.json
+!DILIGENT/setup/settings/client_configurations.json
+!DILIGENT/setup/settings/server_configurations.json
 AGENTS.md

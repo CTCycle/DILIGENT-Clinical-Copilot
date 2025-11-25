@@ -13,7 +13,7 @@ from langchain_community.document_loaders import PyPDFLoader
 from langchain_core.documents import Document
 from langchain_text_splitters import RecursiveCharacterTextSplitter
 
-from DILIGENT.src.packages.configurations import configurations
+from DILIGENT.src.packages.configurations import server_settings
 from DILIGENT.src.packages.constants import (
     CLINICAL_SESSION_COLUMNS,
     DEFAULT_EMBEDDING_BATCH_SIZE,
@@ -112,9 +112,9 @@ class DataSerializer:
     # -----------------------------------------------------------------------------
     def is_valid_drug_name(self, value: str) -> bool:
         normalized = value.strip()
-        min_length = configurations.server.ingestion.drug_name_min_length
-        max_length = configurations.server.ingestion.drug_name_max_length
-        max_tokens = configurations.server.ingestion.drug_name_max_tokens
+        min_length = server_settings.ingestion.drug_name_min_length
+        max_length = server_settings.ingestion.drug_name_max_length
+        max_tokens = server_settings.ingestion.drug_name_max_tokens
         if len(normalized) < min_length or len(normalized) > max_length:
             return False
         if len(normalized.split()) > max_tokens:

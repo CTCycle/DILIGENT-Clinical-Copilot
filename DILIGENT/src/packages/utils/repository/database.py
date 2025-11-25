@@ -8,7 +8,7 @@ import pandas as pd
 
 from DILIGENT.src.packages.utils.repository.postgres import PostgresRepository
 from DILIGENT.src.packages.utils.repository.sqlite import Any, SQLiteRepository
-from DILIGENT.src.packages.configurations import DatabaseSettings, configurations
+from DILIGENT.src.packages.configurations import DatabaseSettings, server_settings
 from DILIGENT.src.packages.logger import logger
 from DILIGENT.src.packages.singleton import singleton
 
@@ -59,7 +59,7 @@ BACKEND_FACTORIES: dict[str, BackendFactory] = {
 @singleton
 class DILIGENTDatabase:
     def __init__(self) -> None:
-        self.settings = configurations.server.database
+        self.settings = server_settings.database
         self.backend = self._build_backend(self.settings.embedded_database)
 
     # -------------------------------------------------------------------------

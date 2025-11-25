@@ -7,19 +7,13 @@ from collections.abc import Coroutine
 from typing import Any, Literal, cast
 
 from DILIGENT.src.server.models.providers import CloudLLMClient, OllamaClient
-from DILIGENT.src.packages.configurations import configurations
-from DILIGENT.src.packages.constants import VECTOR_DB_PATH
+from DILIGENT.src.packages.configurations import server_settings
+from DILIGENT.src.packages.constants import CLOUD_MODEL_CHOICES, VECTOR_DB_PATH
 from DILIGENT.src.packages.logger import logger
 from DILIGENT.src.packages.utils.repository.vectors import LanceVectorDatabase
 
 ProviderName = Literal["openai", "azure-openai", "anthropic", "gemini"]
 EmbeddingBackend = Literal["ollama", "cloud"]
-ALLOWED_PROVIDERS: tuple[ProviderName, ...] = (
-    "openai",
-    "azure-openai",
-    "anthropic",
-    "gemini",
-)
 
 
 ###############################################################################
@@ -58,10 +52,10 @@ class EmbeddingGenerator:
                 raise ValueError("Cloud embedding model is required")
 
             provider_normalized = cloud_provider.lower().strip()
-            if provider_normalized not in ALLOWED_PROVIDERS:
+            if provider_normalized not in CLOUD_MODEL_CHOICES:
                 raise ValueError(
                     f"Unsupported cloud provider: {cloud_provider}. "
-                    f"Allowed: {', '.join(ALLOWED_PROVIDERS)}"
+                    f"Allowed: {', '.join(CLOUD_MODEL_CHOICES.keys())}"
                 )
             # Safe cast after validation against ALLOWED_PROVIDERS.
             self.cloud_provider = cast(ProviderName, provider_normalized)
@@ -146,22 +140,22 @@ class SimilaritySearch:
         *,
         vector_database: LanceVectorDatabase | None = None,
         embedding_generator: EmbeddingGenerator | None = None,
-        default_top_k: int = configurations.server.rag.top_k_documents,
+        default_top_k: int = server_settings.rag.top_k_documents,
     ) -> None:
         self.default_top_k = max(int(default_top_k), 1)
         self.vector_database = vector_database or LanceVectorDatabase(
             database_path=VECTOR_DB_PATH,
-            collection_name=configurations.server.rag.vector_collection_name,
-            metric=configurations.server.rag.vector_index_metric,
-            index_type=configurations.server.rag.vector_index_type,
+            collection_name=server_settings.rag.vector_collection_name,
+            metric=server_settings.rag.vector_index_metric,
+            index_type=server_settings.rag.vector_index_type,
         )
         self.embedding_generator = embedding_generator or EmbeddingGenerator(
-            backend=configurations.server.rag.embedding_backend,
-            ollama_base_url=configurations.server.rag.ollama_base_url,
-            ollama_model=configurations.server.rag.ollama_embedding_model,
-            use_cloud_embeddings=configurations.server.rag.use_cloud_embeddings,
-            cloud_provider=configurations.server.rag.cloud_provider,
-            cloud_embedding_model=configurations.server.rag.cloud_embedding_model,
+            backend=server_settings.rag.embedding_backend,
+            ollama_base_url=server_settings.rag.ollama_base_url,
+            ollama_model=server_settings.rag.ollama_embedding_model,
+            use_cloud_embeddings=server_settings.rag.use_cloud_embeddings,
+            cloud_provider=server_settings.rag.cloud_provider,
+            cloud_embedding_model=server_settings.rag.cloud_embedding_model,
         )
         try:
             self.vector_database.initialize(False)

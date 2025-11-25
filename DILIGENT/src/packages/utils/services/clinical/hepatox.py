@@ -24,7 +24,7 @@ from DILIGENT.src.server.schemas.clinical import (
     PatientDrugClinicalReport,
     PatientDrugs,
 )
-from DILIGENT.src.packages.configurations import LLMRuntimeConfig, configurations
+from DILIGENT.src.packages.configurations import LLMRuntimeConfig, server_settings
 from DILIGENT.src.packages.constants import (
     DEFAULT_DILI_CLASSIFICATION,
     R_SCORE_CHOLESTATIC_THRESHOLD,
@@ -123,7 +123,7 @@ class HepatoxConsultation:
         drugs: PatientDrugs,
         *,
         patient_name: str | None = None,        
-        timeout_s: float = configurations.server.external_data.default_llm_timeout,        
+        timeout_s: float = server_settings.external_data.default_llm_timeout,        
     ) -> None:
         self.drugs = drugs
         self.timeout_s = timeout_s            
@@ -132,7 +132,7 @@ class HepatoxConsultation:
         self.master_list_df = None
         self.matcher: LiverToxMatcher | None = None
         self.llm_client = initialize_llm_client(purpose="clinical", timeout_s=timeout_s)
-        self.MAX_EXCERPT_LENGTH = configurations.server.external_data.max_excerpt_length
+        self.MAX_EXCERPT_LENGTH = server_settings.external_data.max_excerpt_length
         self.patient_name = (patient_name or "").strip() or None
         _, model_candidate = LLMRuntimeConfig.resolve_provider_and_model("clinical")
         self.llm_model = model_candidate or LLMRuntimeConfig.get_clinical_model()
@@ -145,7 +145,7 @@ class HepatoxConsultation:
         )
         self.temperature = LLMRuntimeConfig.get_ollama_temperature()
         self.similarity_search: SimilaritySearch | None = None
-        self.rag_top_k = configurations.server.rag.top_k_documents
+        self.rag_top_k = server_settings.rag.top_k_documents
 
     # -------------------------------------------------------------------------
     async def run_analysis(
