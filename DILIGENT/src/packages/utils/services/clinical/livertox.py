@@ -1,18 +1,16 @@
 from __future__ import annotations
 
 from collections.abc import Callable
-from typing import TYPE_CHECKING, Any
+from typing import Any
 
 import pandas as pd
 
-from DILIGENT.src.packages.configurations import configurations
-
-if TYPE_CHECKING:
-    from DILIGENT.src.packages.utils.services.clinical.matches import (
-        DrugsLookup,
-        LiverToxMatch,
-        MonographRecord,
-    )
+from DILIGENT.src.packages.configurations import server_settings
+from DILIGENT.src.packages.utils.services.clinical.matches import (
+    DrugsLookup,
+    LiverToxMatch,
+    MonographRecord,
+)
 
 ###############################################################################
 class LiverToxData:
@@ -136,7 +134,7 @@ class LiverToxData:
             return
         filtered: dict[str, list[MonographRecord]] = {}
         for token, records in self.token_occurrences.items():
-            if len(records) > configurations.server.drugs_matcher.token_max_frequency:
+            if len(records) > server_settings.drugs_matcher.token_max_frequency:
                 continue
             filtered[token] = sorted(
                 records, key=lambda record: record.drug_name.lower()

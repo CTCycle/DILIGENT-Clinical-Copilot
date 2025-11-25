@@ -11,7 +11,6 @@ from lancedb.table import LanceTable
 
 from DILIGENT.src.packages.logger import logger
 
-
 VECTOR_TABLE_SCHEMA = pa.schema(
     [
         pa.field("document_id", pa.string()),

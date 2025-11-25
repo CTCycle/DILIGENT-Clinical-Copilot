@@ -1,0 +1,77 @@
+{  
+  "fastapi": {
+    "title": "DILIGENT Clinical Copilot Backend",
+    "version": "0.1.0",
+    "description": "FastAPI backend"      
+  },   
+  "database": {
+    "embedded_database": true,
+    "engine": "postgres",
+    "host": "localhost",
+    "port": 5432,
+    "database_name": "adsorfit",
+    "username": "replace-me",
+    "password": "replace-me",
+    "ssl": false,
+    "ssl_ca": null,
+    "connect_timeout": 30,
+    "insert_batch_size": 1000
+  },    
+  "rag": {
+    "vector_collection_name": "documents",
+    "chunk_size": 1024,
+    "chunk_overlap": 128,
+    "embedding_batch_size": 64,
+    "top_k_documents": 6,
+    "embedding_backend": "ollama",
+    "ollama_base_url": "http://localhost:11434",
+    "ollama_embedding_model": "nomic-embed-text:latest",
+    "hf_embedding_model": "",
+    "vector_index_metric": "cosine",
+    "vector_index_type": "IVF_FLAT",
+    "reset_vector_collection": true,
+    "cloud_provider": "openai",
+    "cloud_model": "gpt-4o-mini",
+    "cloud_embedding_model": "",
+    "use_cloud_embeddings": false
+  },
+  "external_data": {
+    "default_llm_timeout": 3600.0,
+    "livertox_llm_timeout": 3600.0,
+    "livertox_archive": "livertox_NBK547852.tar.gz",
+    "livertox_yield_interval": 25,
+    "livertox_skip_deterministic_ratio": 0.8,
+    "livertox_monograph_max_workers": 4,
+    "max_excerpt_length": 8000    
+  },
+  "ingestion": {
+    "drug_name_min_length": 3,
+    "drug_name_max_length": 200,
+    "drug_name_max_tokens": 8
+  },
+  "drugs_matcher": {
+    "direct_confidence": 1.0,
+    "master_confidence": 0.92,
+    "synonym_confidence": 0.9,
+    "partial_confidence": 0.86,
+    "fuzzy_confidence": 0.84,
+    "fuzzy_threshold": 0.85,
+    "token_max_frequency": 3,
+    "min_confidence": 0.4,
+    "catalog_excluded_term_suffixes": [
+      "PCK"
+    ]
+  },
+  "llm_runtime_defaults": {
+    "parsing_model": "qwen3:1.7b",
+    "clinical_model": "gpt-oss:20b",
+    "llm_provider": "openai",
+    "cloud_model": "gpt-4o-mini",
+    "use_cloud_services": false,
+    "ollama_temperature": 0.7,
+    "ollama_reasoning": false,
+    "ollama_host_default": "http://localhost:11434"  
+  }
+}  
+
+

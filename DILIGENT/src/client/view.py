@@ -23,7 +23,8 @@ from DILIGENT.src.client.layouts import (
     VISIT_DATE_ELEMENT_ID,
     VISIT_DATE_LOCALE_JS,
 )
-from DILIGENT.src.packages.configurations import configurations
+
+from DILIGENT.src.packages.configurations import client_settings
 from DILIGENT.src.packages.constants import (
     CLINICAL_MODEL_CHOICES,
     CLOUD_MODEL_CHOICES,
@@ -33,7 +34,6 @@ from DILIGENT.src.packages.constants import (
 export_attribute = "export_path"
 
 CLOUD_PROVIDERS: list[str] = [key for key in CLOUD_MODEL_CHOICES]
-ui_settings = configurations.client.ui
 
 
 # [TOOLKIT]
@@ -695,11 +695,11 @@ def create_interface() -> InterfaceStructure:
 def launch_interface() -> None:
     create_interface()
     ui.run(
-        host=ui_settings.host,
-        port=ui_settings.port,
-        title=ui_settings.title,
-        show_welcome_message=ui_settings.show_welcome_message,
-        reconnect_timeout=ui_settings.reconnect_timeout,
+        host=client_settings.ui.host,
+        port=client_settings.ui.port,
+        title=client_settings.ui.title,
+        show_welcome_message=client_settings.ui.show_welcome_message,
+        reconnect_timeout=client_settings.ui.reconnect_timeout,
     )
 
 # -----------------------------------------------------------------------------

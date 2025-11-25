@@ -13,7 +13,7 @@ from DILIGENT.src.server.schemas.clinical import (
     DrugEntry,
     PatientDrugs,
 )
-from DILIGENT.src.packages.configurations import LLMRuntimeConfig, configurations
+from DILIGENT.src.packages.configurations import LLMRuntimeConfig, server_settings
 from DILIGENT.src.packages.patterns import (
     DRUG_BRACKET_TRAIL_RE,
     DRUG_BULLET_RE,
@@ -41,7 +41,7 @@ class DrugsParser:
         *,
         client: Any | None = None,
         temperature: float = 0.0,
-        timeout_s: float = configurations.server.external_data.default_llm_timeout,
+        timeout_s: float = server_settings.external_data.default_llm_timeout,
     ) -> None:
         self.temperature = float(temperature)
         self.timeout_s = float(timeout_s)

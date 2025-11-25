@@ -6,16 +6,14 @@ from fastapi.responses import RedirectResponse
 from DILIGENT.src.packages.variables import env_variables
 from DILIGENT.src.server.endpoints.session import router as session_router
 from DILIGENT.src.server.endpoints.ollama import router as ollama_router
-from DILIGENT.src.packages.configurations import configurations
+from DILIGENT.src.packages.configurations import server_settings
 
 
 ###############################################################################
-fastapi_settings = configurations.server.fastapi
-ui_settings = configurations.client.ui
 app = FastAPI(
-    title=fastapi_settings.title,
-    version=fastapi_settings.version,
-    description=fastapi_settings.description,
+    title=server_settings.fastapi.title,
+    version=server_settings.fastapi.version,
+    description=server_settings.fastapi.description,
 )
 
 app.include_router(session_router)
