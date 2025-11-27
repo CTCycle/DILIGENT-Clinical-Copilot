@@ -54,7 +54,7 @@ The database schema is created automatically the first time the application star
 - **macOS/Linux**: activate your virtual environment, then start the web stack:
 
   ```bash
-  uvicorn DILIGENT.src.app:app --host 0.0.0.0 --port 8000
+  uvicorn DILIGENT.app:app --host 0.0.0.0 --port 8000
   ```
 The interactive UI will be available at `http://127.0.0.1:7861`, while the API documentation can be viewed at `http://localhost:8000/docs`.
 
