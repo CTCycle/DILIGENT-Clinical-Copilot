@@ -29,8 +29,8 @@ set "UV_ZIP_ARM=https://github.com/astral-sh/uv/releases/%UV_CHANNEL%/download/u
 
 REM pyproject + app
 set "pyproject=%root_folder%pyproject.toml"
-set "UVICORN_MODULE=DILIGENT.src.server.app:app"
-set "FRONTEND_MODULE=DILIGENT.src.client.main"
+set "UVICORN_MODULE=DILIGENT.server.app:app"
+set "FRONTEND_MODULE=DILIGENT.client.main"
 
 REM .env overrides
 set "DOTENV=%setup_dir%\settings\.env"
