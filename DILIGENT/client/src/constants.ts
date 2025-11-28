@@ -1,7 +1,11 @@
 import { ClinicalFormState, RuntimeSettings } from "./types";
 
 const apiBaseEnv = (import.meta.env.VITE_API_BASE_URL || "").trim();
-export const API_BASE_URL = (apiBaseEnv || "/api").replace(/\/+$/, "");
+const absoluteBase = /^https?:\/\//i.test(apiBaseEnv);
+const devBase = "/api";
+const selectedBase =
+  import.meta.env.DEV && absoluteBase ? devBase : apiBaseEnv || devBase;
+export const API_BASE_URL = selectedBase.replace(/\/+$/, "");
 
 export const PARSING_MODEL_CHOICES = [
   "qwen3:1.7b",
