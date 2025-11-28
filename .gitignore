@@ -3,6 +3,10 @@ DILIGENT/setup/settings/.env
 DILIGENT/resources/models/*
 DILIGENT/resources/database/vectors/*
 DILIGENT/resources/database/*.lance
+DILIGENT/client/node_modules
+DILIGENT/client/dist
+DILIGENT/client/.vite
+node_modules
 
 
 __pycache__
