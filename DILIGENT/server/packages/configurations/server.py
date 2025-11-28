@@ -321,7 +321,7 @@ class ServerSettings:
 def build_fastapi_settings(data: dict[str, Any]) -> FastAPISettings:
     payload = ensure_mapping(data)
     return FastAPISettings(
-        title=coerce_str(payload.get("title"), "AEGIS Geospatial Search Backend"),
+        title=coerce_str(payload.get("title"), "DILIGENT Geospatial Search Backend"),
         version=coerce_str(payload.get("version"), "0.1.0"),
         description=coerce_str(payload.get("description"), "FastAPI backend"),        
     )
