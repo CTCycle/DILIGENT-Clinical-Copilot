@@ -12,13 +12,10 @@ from DILIGENT.server.packages.configurations import server_settings
 
 
 ###############################################################################
-root_path = os.getenv("FASTAPI_ROOT_PATH", "").strip()
-
 app = FastAPI(
     title=server_settings.fastapi.title,
     version=server_settings.fastapi.version,
-    description=server_settings.fastapi.description,
-    root_path=root_path or "",
+    description=server_settings.fastapi.description,   
 )
 
 app.include_router(session_router)
