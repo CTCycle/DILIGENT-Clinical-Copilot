@@ -485,7 +485,9 @@ def build_server_settings(data: dict[str, Any] | Any) -> ServerSettings:
     rag_payload = ensure_mapping(payload.get("rag"))
     external_data_payload = ensure_mapping(payload.get("external_data"))
     ingestion_payload = ensure_mapping(payload.get("ingestion"))
-    llm_defaults_payload = ensure_mapping(payload.get("llm_defaults"))
+    llm_defaults_payload = ensure_mapping(
+        payload.get("llm_defaults") or payload.get("llm_runtime_defaults")
+    )
     llm_defaults = build_llm_runtime_defaults(llm_defaults_payload)
     default_provider = llm_defaults.llm_provider
     default_cloud_model = llm_defaults.cloud_model
@@ -518,9 +520,10 @@ def build_server_settings(data: dict[str, Any] | Any) -> ServerSettings:
 ###############################################################################
 def get_server_settings(config_path: str | None = None) -> ServerSettings:
     path = config_path or SERVER_CONFIGURATION_FILE
-    payload = load_configuration_data(path)   
-
-    return build_server_settings(payload)
+    payload = load_configuration_data(path)
+    settings = build_server_settings(payload)
+    LLMRuntimeConfig.configure(settings.llm_defaults)
+    return settings
 
 
 server_settings = get_server_settings()

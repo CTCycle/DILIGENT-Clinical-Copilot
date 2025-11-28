@@ -487,7 +487,7 @@ function App(): React.JSX.Element {
             </div>
 
             <div className="spinner-container">
-              {isRunning ? spinner : <div className="placeholder-row" />}
+              <div className="placeholder-row" />
             </div>
           </section>
         </div>
