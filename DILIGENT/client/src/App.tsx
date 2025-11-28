@@ -11,7 +11,7 @@ import {
   PARSING_MODEL_CHOICES,
   REPORT_EXPORT_FILENAME,
 } from "./constants";
-import { pullModels, runClinicalSession } from "./api";
+import { pullModels, runClinicalSession } from "./services/api";
 import { ClinicalFormState, RuntimeSettings } from "./types";
 import {
   buildClinicalPayload,
