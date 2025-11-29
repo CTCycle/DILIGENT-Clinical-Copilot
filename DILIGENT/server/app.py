@@ -6,8 +6,8 @@ from fastapi import FastAPI
 from fastapi.responses import RedirectResponse
 
 from DILIGENT.server.packages.variables import env_variables
-from DILIGENT.server.endpoints.session import router as session_router
-from DILIGENT.server.endpoints.ollama import router as ollama_router
+from DILIGENT.server.routes.session import router as session_router
+from DILIGENT.server.routes.ollama import router as ollama_router
 from DILIGENT.server.packages.configurations import server_settings
 
 
