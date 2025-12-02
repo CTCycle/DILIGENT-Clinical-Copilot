@@ -47,7 +47,13 @@ class DrugsLookup:
     FUZZY_CONFIDENCE = server_settings.drugs_matcher.fuzzy_confidence
     FUZZY_THRESHOLD = server_settings.drugs_matcher.fuzzy_threshold
     TOKEN_MAX_FREQUENCY = server_settings.drugs_matcher.token_max_frequency
+    TOKEN_MIN_LENGTH = server_settings.drugs_matcher.token_min_length
     MIN_CONFIDENCE = server_settings.drugs_matcher.min_confidence
+    FUZZY_EARLY_EXIT_RATIO = server_settings.drugs_matcher.fuzzy_early_exit_ratio
+    NORMALIZATION_CACHE_LIMIT = (
+        server_settings.drugs_matcher.normalization_cache_limit
+    )
+    VARIANT_CACHE_LIMIT = server_settings.drugs_matcher.variant_cache_limit
     CATALOG_EXCLUDED_TERM_SUFFIXES = server_settings.drugs_matcher.catalog_excluded_term_suffixes
     CATALOG_TOKEN_RATIO_THRESHOLD = (
         server_settings.drugs_matcher.catalog_token_ratio_threshold
@@ -62,12 +68,18 @@ class DrugsLookup:
         self.match_cache: dict[str, LiverToxMatch | None] = {}
         self.alias_cache: dict[str, tuple[list[tuple[str, bool]], set[str]]] = {}
         self.catalog_synonym_records: list[dict[str, Any]] = []
+        self.catalog_global_index: dict[str, tuple[dict[str, Any], bool, str]] = {}
+        self.normalization_cache: dict[str, str] = {}
+        self.variant_cache: dict[str, list[str]] = {}
 
     # -------------------------------------------------------------------------
     def attach_data(self, data: LiverToxData) -> None:
         self.data = data
         self.match_cache.clear()
         self.alias_cache.clear()
+        self.normalization_cache.clear()
+        self.variant_cache.clear()
+        self.catalog_global_index = {}
         self.prepare_catalog_synonyms()
 
     # -------------------------------------------------------------------------
@@ -104,13 +116,26 @@ class DrugsLookup:
             )
             if not alias_entries:
                 self.match_cache[normalized] = None
+                logger.warning(
+                    "No alias candidates found for '%s' (normalized: '%s'). "
+                    "Check catalog availability and term type filters.",
+                    name,
+                    normalized,
+                )
                 continue
             match_start = time.perf_counter()
             lookup = self.match_query(alias_entries)
             match_elapsed_ms = (time.perf_counter() - match_start) * 1000
             if lookup is None:
                 self.match_cache[normalized] = None
-                logger.info("No match found for '%s' (%.1f ms)", name, match_elapsed_ms)
+                logger.warning(
+                    "No match found for '%s' after %d aliases in %.1f ms. "
+                    "Checks: primary=checked, synonym=checked, master=checked, "
+                    "partial=checked, fuzzy=checked",
+                    name,
+                    len(alias_entries),
+                    match_elapsed_ms,
+                )
                 continue
             record, confidence, reason, notes = lookup
             match = self.create_match(record, confidence, reason, notes)
@@ -211,37 +236,45 @@ class DrugsLookup:
             alias_entries = list(cached_entries)
             seen = set(cached_seen)
         else:
-            alias_entries = []
-            seen = set()
+            catalog_match: tuple[dict[str, Any], bool, str] | None = None
+            if normalized_query:
+                catalog_match = self.find_catalog_synonym_match(normalized_query)
 
-        catalog_match: tuple[dict[str, Any], bool, str] | None = None
-        if normalized_query:
-            catalog_match = self.find_catalog_synonym_match(normalized_query)
+            if catalog_match is not None:
+                entry, matched_is_synonym, matched_value = catalog_match
+                values_to_expand: set[str] = set()
 
-        if catalog_match is not None:
-            entry, matched_is_synonym, matched_value = catalog_match
-            prioritized_synonyms: list[str] = []
-            if matched_is_synonym:
-                prioritized_synonyms.append(matched_value)
-            prioritized_synonyms.extend(
-                synonym
-                for synonym in entry["synonyms"]
-                if synonym not in prioritized_synonyms
-            )
-            for synonym in prioritized_synonyms:
-                self.add_alias_entry(alias_entries, seen, synonym, True)
-                for variant in self.expand_variant(synonym):
-                    self.add_alias_entry(alias_entries, seen, variant, True)
-            if not matched_is_synonym:
-                self.add_alias_entry(alias_entries, seen, matched_value, True)
-                for variant in self.expand_variant(matched_value):
-                    self.add_alias_entry(alias_entries, seen, variant, True)
+                if matched_is_synonym:
+                    values_to_expand.update(
+                        value for value in entry["synonyms"] if value
+                    )
+                else:
+                    if matched_value:
+                        values_to_expand.add(matched_value)
+                    base_name = entry.get("base_name")
+                    if base_name:
+                        values_to_expand.add(base_name)
+                    raw_name = entry.get("raw_name")
+                    if raw_name:
+                        values_to_expand.add(raw_name)
+                    values_to_expand.update(
+                        value for value in entry["synonyms"] if value
+                    )
 
-        if normalized_query and normalized_query not in self.alias_cache:
-            self.alias_cache[normalized_query] = (
-                list(alias_entries),
-                set(seen),
-            )
+                for fallback_alias in entry.get("fallback_aliases", []):
+                    if fallback_alias:
+                        values_to_expand.add(fallback_alias)
+
+                for value in values_to_expand:
+                    self.add_alias_entry(alias_entries, seen, value, True)
+                    for variant in self.expand_variant(value):
+                        self.add_alias_entry(alias_entries, seen, variant, True)
+
+            if normalized_query:
+                self.alias_cache[normalized_query] = (
+                    list(alias_entries),
+                    set(seen),
+                )
 
         self.add_alias_entry(alias_entries, seen, original_name, False)
         return alias_entries
@@ -264,60 +297,40 @@ class DrugsLookup:
     def find_catalog_synonym_match(
         self, normalized_query: str
     ) -> tuple[dict[str, Any], bool, str] | None:
-        if not self.catalog_synonym_records:
+        if not normalized_query:
             return None
+        direct_match = self.catalog_global_index.get(normalized_query)
+        if direct_match is not None:
+            return direct_match
+
+        if not self.catalog_global_index:
+            return None
+
         significant_query_tokens = self.catalog_significant_tokens(normalized_query)
-        best_synonym: tuple[
-            tuple[int, int, float, float, int],
-            dict[str, Any],
-            str,
+        if not significant_query_tokens:
+            return None
+
+        best_candidate: tuple[
+            tuple[int, int, float, float, int], dict[str, Any], bool, str
         ] | None = None
-        for entry in self.catalog_synonym_records:
-            normalized_map: dict[str, str] = entry["normalized_map"]
-            matched = normalized_map.get(normalized_query)
-            if matched:
-                return entry, True, matched
-            for normalized_synonym, original in normalized_map.items():
-                accepted, score = self.evaluate_catalog_candidate(
-                    normalized_query,
-                    normalized_synonym,
-                    significant_query_tokens,
-                )
-                if not accepted:
-                    continue
-                candidate = (score, entry, original)
-                if best_synonym is None or candidate[0] > best_synonym[0]:
-                    best_synonym = candidate
+        for candidate_normalized, (
+            entry,
+            is_synonym,
+            original,
+        ) in self.catalog_global_index.items():
+            accepted, score = self.evaluate_catalog_candidate(
+                normalized_query,
+                candidate_normalized,
+                significant_query_tokens,
+            )
+            if not accepted:
+                continue
+            candidate = (score, entry, is_synonym, original)
+            if best_candidate is None or candidate[0] > best_candidate[0]:
+                best_candidate = candidate
 
-        if best_synonym is not None:
-            return best_synonym[1], True, best_synonym[2]
-
-        best_alias: tuple[
-            tuple[int, int, float, float, int],
-            dict[str, Any],
-            str,
-        ] | None = None
-        for entry in self.catalog_synonym_records:
-            fallback_aliases: list[str] = entry.get("fallback_aliases", [])
-            for alias in fallback_aliases:
-                normalized_alias = self.normalize_name(alias)
-                if not normalized_alias:
-                    continue
-                if normalized_alias == normalized_query:
-                    return entry, False, alias
-                accepted, score = self.evaluate_catalog_candidate(
-                    normalized_query,
-                    normalized_alias,
-                    significant_query_tokens,
-                )
-                if not accepted:
-                    continue
-                candidate = (score, entry, alias)
-                if best_alias is None or candidate[0] > best_alias[0]:
-                    best_alias = candidate
-
-        if best_alias is not None:
-            return best_alias[1], False, best_alias[2]
+        if best_candidate is not None:
+            return best_candidate[1], best_candidate[2], best_candidate[3]
 
         return None
 
@@ -327,7 +340,7 @@ class DrugsLookup:
         return [
             token
             for token in tokens
-            if len(token) >= 4 and token not in MATCHING_STOPWORDS
+            if len(token) >= self.TOKEN_MIN_LENGTH and token not in MATCHING_STOPWORDS
         ]
 
     # -------------------------------------------------------------------------
@@ -472,7 +485,7 @@ class DrugsLookup:
     def match_fuzzy(
         self, normalized_query: str
     ) -> tuple[MonographRecord, float, str, list[str]] | None:
-        if len(normalized_query) < 4:
+        if len(normalized_query) < self.TOKEN_MIN_LENGTH:
             return None
         variant = self.find_best_variant(normalized_query)
         if variant is None:
@@ -511,10 +524,14 @@ class DrugsLookup:
         best: tuple[MonographRecord, str, bool, float] | None = None
         best_ratio = 0.0
         for candidate, record, original, is_primary in data.variant_catalog:
+            if candidate == normalized_query:
+                return record, original, is_primary, 1.0
             ratio = SequenceMatcher(None, normalized_query, candidate).ratio()
             if ratio > best_ratio:
                 best_ratio = ratio
                 best = (record, original, is_primary, ratio)
+                if best_ratio >= self.FUZZY_EARLY_EXIT_RATIO:
+                    break
         if best is None or best_ratio < self.FUZZY_THRESHOLD:
             return None
         return best
@@ -523,6 +540,7 @@ class DrugsLookup:
     def prepare_catalog_synonyms(self) -> None:
         data = self.data
         self.catalog_synonym_records = []
+        self.catalog_global_index = {}
         if data is None:
             return
         catalog_df = data.drugs_catalog_df
@@ -532,6 +550,8 @@ class DrugsLookup:
             term_type = self.coerce_text(getattr(row, "term_type", None))
             if not self.catalog_term_type_allowed(term_type):
                 continue
+            raw_name_value = self.coerce_text(getattr(row, "raw_name", None))
+            base_name_value = self.coerce_text(getattr(row, "name", None))
             raw_synonyms = self.parse_catalog_synonyms(getattr(row, "synonyms", None))
             if not raw_synonyms:
                 continue
@@ -557,8 +577,7 @@ class DrugsLookup:
                 continue
             fallback_aliases: list[str] = []
             fallback_seen: set[str] = set()
-            for field_name in ("raw_name", "name"):
-                alias_value = self.coerce_text(getattr(row, field_name, None))
+            for alias_value in (raw_name_value, base_name_value):
                 if alias_value is None:
                     continue
                 if alias_value in fallback_seen:
@@ -577,8 +596,29 @@ class DrugsLookup:
                     "synonyms": unique_synonyms,
                     "normalized_map": normalized_map,
                     "fallback_aliases": fallback_aliases,
+                    "raw_name": raw_name_value,
+                    "base_name": base_name_value,
                 }
             )
+
+        self.catalog_global_index = {}
+        for entry in self.catalog_synonym_records:
+            normalized_map = entry["normalized_map"]
+            for normalized_synonym, original in normalized_map.items():
+                if normalized_synonym not in self.catalog_global_index:
+                    self.catalog_global_index[normalized_synonym] = (
+                        entry,
+                        True,
+                        original,
+                    )
+            for alias in entry.get("fallback_aliases", []):
+                normalized_alias = self.normalize_name(alias)
+                if normalized_alias and normalized_alias not in self.catalog_global_index:
+                    self.catalog_global_index[normalized_alias] = (
+                        entry,
+                        False,
+                        alias,
+                    )
 
     # -------------------------------------------------------------------------
     def catalog_term_type_allowed(self, term_type: str | None) -> bool:
@@ -665,7 +705,7 @@ class DrugsLookup:
                         continue
                     if normalized in MATCHING_STOPWORDS:
                         continue
-                    if len(normalized) < 4 and " " not in normalized:
+                    if len(normalized) < self.TOKEN_MIN_LENGTH and " " not in normalized:
                         continue
                     if normalized not in synonyms:
                         synonyms[normalized] = variant
@@ -720,15 +760,21 @@ class DrugsLookup:
 
     # -------------------------------------------------------------------------
     def expand_variant(self, value: str) -> list[str]:
+        cached = self.variant_cache.get(value)
+        if cached is not None:
+            return cached
         normalized = self.normalize_whitespace(value)
         if not normalized:
             return []
         variants = {normalized}
-        for segment in re.split(r"[()]", normalized):
+        for segment in re.split(r"[()\[\]]", normalized):
             candidate = segment.strip(" -")
             if candidate:
                 variants.add(candidate)
-        return list(variants)
+        result = list(variants)
+        if len(self.variant_cache) < self.VARIANT_CACHE_LIMIT:
+            self.variant_cache[value] = result
+        return result
 
     # -------------------------------------------------------------------------
     def collect_tokens(self, primary: str, synonyms: list[str]) -> set[str]:
@@ -746,7 +792,7 @@ class DrugsLookup:
 
     # -------------------------------------------------------------------------
     def is_token_valid(self, token: str) -> bool:
-        if len(token) < 4:
+        if len(token) < self.TOKEN_MIN_LENGTH:
             return False
         if token in MATCHING_STOPWORDS:
             return False
@@ -776,7 +822,45 @@ class DrugsLookup:
         )
 
     # -------------------------------------------------------------------------
+    def diagnose_missing_drug(self, drug_name: str) -> dict[str, Any]:
+        normalized = self.normalize_name(drug_name)
+        data = self.require_data()
+        diagnosis = {
+            "original_name": drug_name,
+            "normalized_name": normalized,
+            "in_primary_index": normalized in data.primary_index,
+            "in_synonym_index": normalized in data.synonym_index,
+            "in_catalog_index": normalized in self.catalog_global_index,
+            "catalog_entries": [],
+            "alias_candidates": [],
+            "token_matches": [],
+        }
+        if normalized in self.catalog_global_index:
+            entry, is_synonym, original = self.catalog_global_index[normalized]
+            diagnosis["catalog_entries"].append(
+                {
+                    "is_synonym": is_synonym,
+                    "original": original,
+                    "base_name": entry.get("base_name"),
+                }
+            )
+        alias_entries = self.resolve_alias_candidates(drug_name, normalized)
+        diagnosis["alias_candidates"] = [
+            {"alias": alias, "from_catalog": from_catalog}
+            for alias, from_catalog in alias_entries[:10]
+        ]
+        for token in self.tokenize(normalized):
+            if token in data.token_index:
+                diagnosis["token_matches"].append(
+                    {"token": token, "record_count": len(data.token_index[token])}
+                )
+        return diagnosis
+
+    # -------------------------------------------------------------------------
     def normalize_name(self, name: str) -> str:
+        cached = self.normalization_cache.get(name)
+        if cached is not None:
+            return cached
         normalized = (
             unicodedata.normalize("NFKD", name)
             .encode("ascii", "ignore")
@@ -785,6 +869,8 @@ class DrugsLookup:
         normalized = normalized.lower()
         normalized = re.sub(r"[^a-z0-9\s]", " ", normalized)
         normalized = re.sub(r"\s+", " ", normalized).strip()
+        if len(self.normalization_cache) < self.NORMALIZATION_CACHE_LIMIT:
+            self.normalization_cache[name] = normalized
         return normalized
 
     # -------------------------------------------------------------------------

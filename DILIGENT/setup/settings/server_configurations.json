@@ -56,7 +56,11 @@
     "partial_confidence": 0.86,
     "fuzzy_confidence": 0.84,
     "fuzzy_threshold": 0.85,
+    "fuzzy_early_exit_ratio": 0.95,
     "token_max_frequency": 3,
+    "token_min_length": 4,
+    "normalization_cache_limit": 10000,
+    "variant_cache_limit": 10000,
     "min_confidence": 0.4,
     "catalog_excluded_term_suffixes": [
       "PCK"
