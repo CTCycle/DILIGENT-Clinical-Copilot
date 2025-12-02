@@ -107,12 +107,12 @@ class DrugsLookup:
                 continue
             alias_start = time.perf_counter()
             alias_entries = self.resolve_alias_candidates(patient_drugs[idx], normalized)
-            alias_elapsed_ms = (time.perf_counter() - alias_start) * 1000
+            alias_elapsed_s = time.perf_counter() - alias_start
             logger.info(
-                "Fetched %d candidate names for '%s' in %.1f ms",
+                "Fetched %d candidate names for '%s' in %.3f s",
                 len(alias_entries),
                 name,
-                alias_elapsed_ms,
+                alias_elapsed_s,
             )
             if not alias_entries:
                 self.match_cache[normalized] = None
@@ -125,16 +125,16 @@ class DrugsLookup:
                 continue
             match_start = time.perf_counter()
             lookup = self.match_query(alias_entries)
-            match_elapsed_ms = (time.perf_counter() - match_start) * 1000
+            match_elapsed_s = time.perf_counter() - match_start
             if lookup is None:
                 self.match_cache[normalized] = None
                 logger.warning(
-                    "No match found for '%s' after %d aliases in %.1f ms. "
+                    "No match found for '%s' after %d aliases in %.3f s. "
                     "Checks: primary=checked, synonym=checked, master=checked, "
                     "partial=checked, fuzzy=checked",
                     name,
                     len(alias_entries),
-                    match_elapsed_ms,
+                    match_elapsed_s,
                 )
                 continue
             record, confidence, reason, notes = lookup
@@ -143,13 +143,13 @@ class DrugsLookup:
             results[idx] = match
             summary_notes = "; ".join(match.notes) if match.notes else ""
             logger.info(
-                "Best candidate for '%s': '%s' via %s (confidence=%.2f)%s in %.1f ms",
+                "Best candidate for '%s': '%s' via %s (confidence=%.2f)%s in %.3f s",
                 name,
                 match.matched_name,
                 match.reason,
                 match.confidence,
                 f" [{summary_notes}]" if summary_notes else "",
-                match_elapsed_ms,
+                match_elapsed_s,
             )
         return results
 
@@ -458,28 +458,68 @@ class DrugsLookup:
             return None
         candidate_scores: dict[str, int] = {}
         record_lookup: dict[str, MonographRecord] = {}
+        matched_tokens: dict[str, set[str]] = {}
         for token in tokens:
             for record in data.token_index.get(token, []):
                 key = record.normalized_name or record.drug_name.lower()
                 record_lookup[key] = record
-                candidate_scores[key] = candidate_scores.get(key, 0) + 1
+                bucket = matched_tokens.setdefault(key, set())
+                bucket.add(token)
+                candidate_scores[key] = len(bucket)
         if not candidate_scores:
             return None
-        best_key = max(candidate_scores, key=lambda candidate: candidate_scores[candidate])
-        best_score = candidate_scores[best_key]
+        best_score = max(candidate_scores.values())
         tied = [key for key, score in candidate_scores.items() if score == best_score]
         if len(tied) != 1:
-            return None
-        best_record = record_lookup[best_key]
-        matched_tokens: list[str] = []
-        for token in tokens:
-            for candidate in data.token_index.get(token, []):
-                key = candidate.normalized_name or candidate.drug_name.lower()
-                if key == best_key:
-                    matched_tokens.append(token)
-                    break
-        notes = [f"token='{token}'" for token in sorted(set(matched_tokens))]
+            best_record = self.select_best_partial_record(
+                normalized_query,
+                tied,
+                record_lookup,
+                matched_tokens,
+            )
+            if best_record is None:
+                return None
+            best_key = best_record.normalized_name or best_record.drug_name.lower()
+        else:
+            best_key = tied[0]
+            best_record = record_lookup[best_key]
+        note_tokens = sorted(matched_tokens.get(best_key, set()))
+        notes = [f"token='{token}'" for token in note_tokens]
         return best_record, self.PARTIAL_CONFIDENCE, "partial_synonym", notes
+
+    # -------------------------------------------------------------------------
+    def select_best_partial_record(
+        self,
+        normalized_query: str,
+        candidates: list[str],
+        record_lookup: dict[str, MonographRecord],
+        matched_tokens: dict[str, set[str]],
+    ) -> MonographRecord | None:
+        best_record: MonographRecord | None = None
+        best_score: tuple[int, float, int] | None = None
+        for key in candidates:
+            record = record_lookup.get(key)
+            if record is None:
+                continue
+            normalized_target = record.normalized_name or self.normalize_name(
+                record.drug_name
+            )
+            token_overlap = len(matched_tokens.get(key, set()))
+            ratio = (
+                SequenceMatcher(None, normalized_query, normalized_target).ratio()
+                if normalized_target
+                else 0.0
+            )
+            length_bias = (
+                -abs(len(normalized_target) - len(normalized_query))
+                if normalized_target
+                else -len(normalized_query)
+            )
+            score = (token_overlap, ratio, length_bias)
+            if best_score is None or score > best_score:
+                best_score = score
+                best_record = record
+        return best_record
 
     # -------------------------------------------------------------------------
     def match_fuzzy(
