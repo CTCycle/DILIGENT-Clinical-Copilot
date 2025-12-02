@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import json
 import re
+import time
 import unicodedata
 from dataclasses import dataclass
 from difflib import SequenceMatcher
@@ -11,6 +12,7 @@ import pandas as pd
 
 from DILIGENT.server.packages.configurations import server_settings
 from DILIGENT.server.packages.constants import MATCHING_STOPWORDS
+from DILIGENT.server.packages.logger import logger
 from DILIGENT.server.packages.utils.services.clinical.livertox import LiverToxData
 
 
@@ -47,6 +49,12 @@ class DrugsLookup:
     TOKEN_MAX_FREQUENCY = server_settings.drugs_matcher.token_max_frequency
     MIN_CONFIDENCE = server_settings.drugs_matcher.min_confidence
     CATALOG_EXCLUDED_TERM_SUFFIXES = server_settings.drugs_matcher.catalog_excluded_term_suffixes
+    CATALOG_TOKEN_RATIO_THRESHOLD = (
+        server_settings.drugs_matcher.catalog_token_ratio_threshold
+    )
+    CATALOG_OVERALL_RATIO_THRESHOLD = (
+        server_settings.drugs_matcher.catalog_overall_ratio_threshold
+    )
 
     # -------------------------------------------------------------------------
     def __init__(self) -> None:
@@ -70,22 +78,54 @@ class DrugsLookup:
             normalized = self.normalize_name(name)
             if not normalized:
                 continue
+            logger.info("Finding matches for drug '%s'", name)
             cached = self.match_cache.get(normalized)
             if cached is not None or normalized in self.match_cache:
+                if cached is not None:
+                    logger.info(
+                        "Cache hit for '%s': '%s' via %s (confidence=%.2f)",
+                        name,
+                        cached.matched_name,
+                        cached.reason,
+                        cached.confidence,
+                    )
+                else:
+                    logger.info("Cache recorded no match for '%s'", name)
                 results[idx] = cached
                 continue
+            alias_start = time.perf_counter()
             alias_entries = self.resolve_alias_candidates(patient_drugs[idx], normalized)
+            alias_elapsed_ms = (time.perf_counter() - alias_start) * 1000
+            logger.info(
+                "Fetched %d candidate names for '%s' in %.1f ms",
+                len(alias_entries),
+                name,
+                alias_elapsed_ms,
+            )
             if not alias_entries:
                 self.match_cache[normalized] = None
                 continue
+            match_start = time.perf_counter()
             lookup = self.match_query(alias_entries)
+            match_elapsed_ms = (time.perf_counter() - match_start) * 1000
             if lookup is None:
                 self.match_cache[normalized] = None
+                logger.info("No match found for '%s' (%.1f ms)", name, match_elapsed_ms)
                 continue
             record, confidence, reason, notes = lookup
             match = self.create_match(record, confidence, reason, notes)
             self.match_cache[normalized] = match
             results[idx] = match
+            summary_notes = "; ".join(match.notes) if match.notes else ""
+            logger.info(
+                "Best candidate for '%s': '%s' via %s (confidence=%.2f)%s in %.1f ms",
+                name,
+                match.matched_name,
+                match.reason,
+                match.confidence,
+                f" [{summary_notes}]" if summary_notes else "",
+                match_elapsed_ms,
+            )
         return results
 
     # -------------------------------------------------------------------------
@@ -314,11 +354,10 @@ class DrugsLookup:
             substring_length = len(normalized_query)
         accepted = bool(shared_tokens)
         if not accepted:
-            if substring_length >= 5:
-                accepted = True
-            elif best_token_ratio >= 0.85:
-                accepted = True
-            elif overall_ratio >= 0.90:
+            if (
+                best_token_ratio >= self.CATALOG_TOKEN_RATIO_THRESHOLD
+                and overall_ratio >= self.CATALOG_OVERALL_RATIO_THRESHOLD
+            ):
                 accepted = True
         score = (
             len(shared_tokens),
