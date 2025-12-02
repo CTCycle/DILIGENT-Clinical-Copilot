@@ -3,14 +3,12 @@ from __future__ import annotations
 import os
 
 from dotenv import load_dotenv
-from DILIGENT.server.packages.singleton import singleton
 from DILIGENT.server.packages.constants import ENV_FILE_PATH
 from DILIGENT.server.packages.logger import logger
 
 
 # [LOAD ENVIRONMENT VARIABLES]
 ###############################################################################
-@singleton
 class EnvironmentVariables:
     def __init__(self) -> None:
         self.env_path = ENV_FILE_PATH

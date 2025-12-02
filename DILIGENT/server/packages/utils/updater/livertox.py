@@ -23,7 +23,7 @@ from DILIGENT.server.packages.configurations import server_settings
 from DILIGENT.server.packages.constants import LIVERTOX_BASE_URL, SOURCES_PATH
 from DILIGENT.server.packages.logger import logger
 from DILIGENT.server.packages.utils.repository.serializer import DataSerializer
-from DILIGENT.server.packages.utils.repository.database import database
+from DILIGENT.server.packages.database.database import database
 
 SUPPORTED_MONOGRAPH_EXTENSIONS = (".html", ".htm", ".xhtml", ".xml", ".nxml", ".pdf")
 
@@ -269,7 +269,7 @@ class LiverToxUpdater:
                 "last_update" in sanitized.columns
                 and pd.api.types.is_datetime64_any_dtype(sanitized["last_update"])
             ):
-                sanitized["last_update"] = sanitized["last_update"].dt.strftime(
+                sanitized["last_update"] = sanitized["last_update"].dt.strftime( # type: ignore
                     "%Y-%m-%d"
                 )
         metadata["records"] = len(sanitized.index)

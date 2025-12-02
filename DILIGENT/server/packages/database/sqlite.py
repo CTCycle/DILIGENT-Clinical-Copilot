@@ -13,7 +13,7 @@ from sqlalchemy.orm import sessionmaker
 from DILIGENT.server.packages.configurations import DatabaseSettings
 from DILIGENT.server.packages.constants import DATA_PATH, DATABASE_FILENAME
 from DILIGENT.server.packages.logger import logger
-from DILIGENT.server.packages.utils.repository.schema import Base
+from DILIGENT.server.packages.database.schema import Base
 
 
 # [SQLITE DATABASE]
