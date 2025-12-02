@@ -146,6 +146,20 @@ class ClinicalSessionEndpoint:
         )
 
     # -------------------------------------------------------------------------
+    @staticmethod
+    def serialize_validation_errors(
+        errors: list[dict[str, Any]],
+    ) -> list[dict[str, Any]]:
+        serialized: list[dict[str, Any]] = []
+        for error in errors:
+            ctx = error.get("ctx")
+            if isinstance(ctx, dict) and "error" in ctx:
+                serialized.append({**error, "ctx": {**ctx, "error": str(ctx["error"])}})
+                continue
+            serialized.append(error)
+        return serialized
+
+    # -------------------------------------------------------------------------
     async def process_single_patient(self, payload: PatientData) -> str:
         logger.info(
             "Starting Drug-Induced Liver Injury (DILI) analysis for patient: %s",
@@ -251,7 +265,7 @@ class ClinicalSessionEndpoint:
         alt_max: str | None = Body(default=None),
         alp: str | None = Body(default=None),
         alp_max: str | None = Body(default=None),
-    ) -> PlainTextResponse:
+        ) -> PlainTextResponse:
         try:
             payload_data: dict[str, Any] = {
                 "name": name,
@@ -268,7 +282,8 @@ class ClinicalSessionEndpoint:
             payload = PatientData.model_validate(payload_data)
         except ValidationError as exc:
             raise HTTPException(
-                status_code=status.HTTP_422_UNPROCESSABLE_ENTITY, detail=exc.errors()
+                status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+                detail=self.serialize_validation_errors(exc.errors()),
             ) from exc
 
         single_result = await self.process_single_patient(payload)
