@@ -198,15 +198,7 @@ function App(): React.JSX.Element {
         </div>
 
         <div className="drawer-section">
-          <label className="field checkbox">
-            <input
-              type="checkbox"
-              checked={form.useRag}
-              onChange={(event) => handleFormChange("useRag", event.target.checked)}
-            />
-            <span>Use Retrieval Augmented Generation (RAG)</span>
-          </label>
-
+          <p className="section-title">Execution Mode</p>
           <label className="field checkbox">
             <input
               type="checkbox"
@@ -351,15 +343,6 @@ function App(): React.JSX.Element {
               hepatotoxicity assessment.
             </p>
           </div>
-          <div className="toolbar">
-            <button
-              className="ghost-button"
-              type="button"
-              onClick={() => setSidebarOpen(true)}
-            >
-              Configure models
-            </button>
-          </div>
         </header>
 
         <div className="content-grid">
@@ -442,6 +425,28 @@ function App(): React.JSX.Element {
               <p className="helper">Basic demographics and visit data.</p>
             </div>
 
+            <div className="control-panel">
+              <div className="control-copy">
+                <p className="control-title">Evidence retrieval</p>
+                <p className="control-helper">
+                  Toggle RAG only when you need supporting evidence for this visit.
+                </p>
+              </div>
+              <label className="chip-toggle">
+                <input
+                  type="checkbox"
+                  checked={form.useRag}
+                  onChange={(event) =>
+                    handleFormChange("useRag", event.target.checked)
+                  }
+                />
+                <span className="chip-track" aria-hidden="true">
+                  <span className="chip-thumb" />
+                </span>
+                <span className="chip-label">RAG</span>
+              </label>
+            </div>
+
             <label className="field">
               <span>Patient Name</span>
               <input
@@ -492,19 +497,26 @@ function App(): React.JSX.Element {
           </section>
         </div>
 
-        <section className="card">
-          <div className="card-header">
-            <h2>Report Output</h2>
-            <p className="helper">Markdown rendering of the clinical report.</p>
-          </div>
-          <div className="report-surface">
-            {isRunning ? (
-              spinner
-            ) : (
-              <ReactMarkdown remarkPlugins={[remarkGfm]} className="markdown">
-                {message || "_No report generated yet._"}
-              </ReactMarkdown>
-            )}
+        <section className="report-section">
+          <div className="report-shell">
+            <div className="report-header">
+              <div>
+                <p className="report-eyebrow">Session output</p>
+                <h2>Report Output</h2>
+                <p className="report-helper">
+                  Markdown rendering of the clinical report.
+                </p>
+              </div>
+            </div>
+            <div className="report-surface">
+              {isRunning ? (
+                spinner
+              ) : (
+                <ReactMarkdown remarkPlugins={[remarkGfm]} className="markdown">
+                  {message || "_No report generated yet._"}
+                </ReactMarkdown>
+              )}
+            </div>
           </div>
         </section>
 
