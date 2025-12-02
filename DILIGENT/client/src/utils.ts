@@ -3,6 +3,7 @@ import {
   ClinicalFormState,
   ClinicalRequestPayload,
   CloudSelection,
+  RuntimeSettings,
 } from "./types";
 
 export function sanitizeField(value: string): string | null {
@@ -105,6 +106,7 @@ function buildVisitDatePayload(
 
 export function buildClinicalPayload(
   form: ClinicalFormState,
+  settings: RuntimeSettings,
 ): ClinicalRequestPayload {
   return {
     name: sanitizeField(form.patientName),
@@ -116,6 +118,13 @@ export function buildClinicalPayload(
     alp: sanitizeField(form.alp),
     alp_max: sanitizeField(form.alpMax),
     use_rag: form.useRag,
+    use_cloud_services: settings.useCloudServices,
+    llm_provider: settings.provider,
+    cloud_model: settings.cloudModel,
+    parsing_model: settings.parsingModel,
+    clinical_model: settings.clinicalModel,
+    ollama_temperature: settings.temperature,
+    ollama_reasoning: settings.reasoning,
   };
 }
 
