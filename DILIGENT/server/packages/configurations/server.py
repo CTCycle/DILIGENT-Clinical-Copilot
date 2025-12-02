@@ -251,10 +251,14 @@ class DrugsMatcherSettings:
     fuzzy_confidence: float
     fuzzy_threshold: float
     token_max_frequency: int
+    token_min_length: int
+    normalization_cache_limit: int
+    variant_cache_limit: int
     min_confidence: float
     catalog_excluded_term_suffixes: tuple[str, ...]
     catalog_token_ratio_threshold: float
     catalog_overall_ratio_threshold: float
+    fuzzy_early_exit_ratio: float
 
 # -----------------------------------------------------------------------------
 @dataclass(frozen=True)
@@ -385,6 +389,15 @@ def build_drugs_matcher_settings(data: dict[str, Any]) -> DrugsMatcherSettings:
         fuzzy_confidence=coerce_float(data.get("fuzzy_confidence"), 0.84),
         fuzzy_threshold=coerce_float(data.get("fuzzy_threshold"), 0.85),
         token_max_frequency=coerce_positive_int(data.get("token_max_frequency"), 3),
+        token_min_length=coerce_positive_int(data.get("token_min_length"), 4),
+        normalization_cache_limit=coerce_positive_int(
+            data.get("normalization_cache_limit"),
+            10000,
+        ),
+        variant_cache_limit=coerce_positive_int(
+            data.get("variant_cache_limit"),
+            10000,
+        ),
         min_confidence=coerce_float(data.get("min_confidence"), 0.40),
         catalog_excluded_term_suffixes=suffix_tuple,
         catalog_token_ratio_threshold=coerce_float(
@@ -394,6 +407,10 @@ def build_drugs_matcher_settings(data: dict[str, Any]) -> DrugsMatcherSettings:
         catalog_overall_ratio_threshold=coerce_float(
             data.get("catalog_overall_ratio_threshold"),
             0.93,
+        ),
+        fuzzy_early_exit_ratio=coerce_float(
+            data.get("fuzzy_early_exit_ratio"),
+            0.95,
         ),
     )
 
