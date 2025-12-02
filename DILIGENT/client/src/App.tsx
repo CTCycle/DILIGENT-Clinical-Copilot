@@ -105,7 +105,7 @@ function App(): React.JSX.Element {
     setIsRunning(true);
     resetOutputs();
     try {
-      const payload = buildClinicalPayload(form);
+      const payload = buildClinicalPayload(form, settings);
       const result = await runClinicalSession(payload);
       setMessage(result.message);
       setJsonPayload(result.json);
