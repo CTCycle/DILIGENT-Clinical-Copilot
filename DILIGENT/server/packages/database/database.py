@@ -6,12 +6,10 @@ from typing import Protocol
 
 import pandas as pd
 
-from DILIGENT.server.packages.utils.repository.postgres import PostgresRepository
-from DILIGENT.server.packages.utils.repository.sqlite import Any, SQLiteRepository
+from DILIGENT.server.packages.database.postgres import PostgresRepository
+from DILIGENT.server.packages.database.sqlite import Any, SQLiteRepository
 from DILIGENT.server.packages.configurations import DatabaseSettings, server_settings
 from DILIGENT.server.packages.logger import logger
-from DILIGENT.server.packages.singleton import singleton
-
 
 
 ###############################################################################
@@ -56,7 +54,6 @@ BACKEND_FACTORIES: dict[str, BackendFactory] = {
 
 # [DATABASE]
 ###############################################################################
-@singleton
 class DILIGENTDatabase:
     def __init__(self) -> None:
         self.settings = server_settings.database

@@ -5,7 +5,7 @@ import json
 import os
 import re
 import zipfile
-from typing import Any
+from typing import Any, cast
 from xml.etree import ElementTree
 
 import pandas as pd
@@ -27,7 +27,7 @@ from DILIGENT.server.packages.constants import (
     TEXT_FILE_FALLBACK_ENCODINGS,
 )
 from DILIGENT.server.packages.logger import logger
-from DILIGENT.server.packages.utils.repository.database import database
+from DILIGENT.server.packages.database.database import database
 from DILIGENT.server.packages.utils.repository.vectors import LanceVectorDatabase
 from DILIGENT.server.packages.utils.services.retrieval.embeddings import EmbeddingGenerator
 
@@ -43,7 +43,7 @@ class DataSerializer:
             logger.warning("Skipping clinical session save; payload is empty")
             return
         frame = frame.reindex(columns=CLINICAL_SESSION_COLUMNS)
-        frame = frame.where(pd.notnull(frame), None)
+        frame = frame.where(pd.notnull(frame), cast(Any, None))
         existing = database.load_from_database("CLINICAL_SESSIONS")
         if existing.empty:
             database.save_into_database(frame, "CLINICAL_SESSIONS")
@@ -51,7 +51,7 @@ class DataSerializer:
         target_columns = existing.columns.tolist()
         normalized_frame = frame.reindex(columns=target_columns)
         combined = pd.concat([existing, normalized_frame], ignore_index=True)
-        combined = combined.where(pd.notnull(combined), None)
+        combined = combined.where(pd.notnull(combined), cast(Any, None))
         database.save_into_database(combined, "CLINICAL_SESSIONS")
 
     # -----------------------------------------------------------------------------
@@ -60,7 +60,7 @@ class DataSerializer:
         if "drug_name" in frame.columns:
             frame = frame.drop_duplicates(subset=["drug_name"], keep="first")
         frame = frame.reindex(columns=LIVERTOX_COLUMNS)
-        frame = frame.where(pd.notnull(frame), None)
+        frame = frame.where(pd.notnull(frame), cast(Any, None))
         database.save_into_database(frame, "LIVERTOX_DATA")
    
     # -----------------------------------------------------------------------------
@@ -74,7 +74,7 @@ class DataSerializer:
         frame = frame.reindex(columns=DRUGS_CATALOG_COLUMNS)
         if frame.empty:
             return
-        frame = frame.where(pd.notnull(frame), None)
+        frame = frame.where(pd.notnull(frame), cast(Any, None))
         frame["brand_names"] = frame["brand_names"].apply(self.serialize_brand_names)
         frame["synonyms"] = frame["synonyms"].apply(self.serialize_string_list)
         database.upsert_into_database(frame, "DRUGS_CATALOG")
