@@ -12,6 +12,7 @@ from pydantic import ValidationError
 from DILIGENT.server.schemas.clinical import (
     PatientData,
 )
+from DILIGENT.server.packages.configurations import LLMRuntimeConfig
 from DILIGENT.server.packages.logger import logger
 from DILIGENT.server.packages.utils.repository.serializer import DataSerializer
 from DILIGENT.server.packages.utils.services.clinical.hepatox import (
@@ -160,6 +161,48 @@ class ClinicalSessionEndpoint:
         return serialized
 
     # -------------------------------------------------------------------------
+    def apply_runtime_overrides(
+        self,
+        *,
+        use_cloud_services: bool | None,
+        llm_provider: str | None,
+        cloud_model: str | None,
+        parsing_model: str | None,
+        clinical_model: str | None,
+        ollama_temperature: float | None,
+        ollama_reasoning: bool | None,
+    ) -> None:
+        if use_cloud_services is not None:
+            LLMRuntimeConfig.set_use_cloud_services(use_cloud_services)
+        if llm_provider is not None:
+            LLMRuntimeConfig.set_llm_provider(llm_provider)
+        if cloud_model is not None:
+            LLMRuntimeConfig.set_cloud_model(cloud_model)
+        if parsing_model is not None:
+            LLMRuntimeConfig.set_parsing_model(parsing_model)
+        if clinical_model is not None:
+            LLMRuntimeConfig.set_clinical_model(clinical_model)
+        if ollama_temperature is not None:
+            LLMRuntimeConfig.set_ollama_temperature(ollama_temperature)
+        if ollama_reasoning is not None:
+            LLMRuntimeConfig.set_ollama_reasoning(ollama_reasoning)
+
+        parser_provider, parser_model = LLMRuntimeConfig.resolve_provider_and_model("parser")
+        clinical_provider, clinical_model_resolved = LLMRuntimeConfig.resolve_provider_and_model("clinical")
+        logger.info(
+            "Resolved LLM runtime for request: cloud=%s provider=%s cloud_model=%s parsing_provider=%s parsing_model=%s clinical_provider=%s clinical_model=%s temperature=%.2f reasoning=%s",
+            LLMRuntimeConfig.is_cloud_enabled(),
+            LLMRuntimeConfig.get_llm_provider(),
+            LLMRuntimeConfig.get_cloud_model(),
+            parser_provider,
+            parser_model,
+            clinical_provider,
+            clinical_model_resolved,
+            LLMRuntimeConfig.get_ollama_temperature(),
+            LLMRuntimeConfig.is_ollama_reasoning_enabled(),
+        )
+
+    # -------------------------------------------------------------------------
     async def process_single_patient(self, payload: PatientData) -> str:
         logger.info(
             "Starting Drug-Induced Liver Injury (DILI) analysis for patient: %s",
@@ -265,7 +308,23 @@ class ClinicalSessionEndpoint:
         alt_max: str | None = Body(default=None),
         alp: str | None = Body(default=None),
         alp_max: str | None = Body(default=None),
+        use_cloud_services: bool | None = Body(default=None),
+        llm_provider: str | None = Body(default=None),
+        cloud_model: str | None = Body(default=None),
+        parsing_model: str | None = Body(default=None),
+        clinical_model: str | None = Body(default=None),
+        ollama_temperature: float | None = Body(default=None),
+        ollama_reasoning: bool | None = Body(default=None),
         ) -> PlainTextResponse:
+        self.apply_runtime_overrides(
+            use_cloud_services=use_cloud_services,
+            llm_provider=llm_provider,
+            cloud_model=cloud_model,
+            parsing_model=parsing_model,
+            clinical_model=clinical_model,
+            ollama_temperature=ollama_temperature,
+            ollama_reasoning=ollama_reasoning,
+        )
         try:
             payload_data: dict[str, Any] = {
                 "name": name,

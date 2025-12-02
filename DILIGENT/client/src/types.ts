@@ -30,6 +30,13 @@ export type ClinicalRequestPayload = {
   alp: string | null;
   alp_max: string | null;
   use_rag: boolean;
+  use_cloud_services: boolean;
+  llm_provider: string | null;
+  cloud_model: string | null;
+  parsing_model: string;
+  clinical_model: string;
+  ollama_temperature: number;
+  ollama_reasoning: boolean;
 };
 
 export type ApiResult = {
