@@ -60,7 +60,9 @@
     "min_confidence": 0.4,
     "catalog_excluded_term_suffixes": [
       "PCK"
-    ]
+    ],
+    "catalog_token_ratio_threshold": 0.93,
+    "catalog_overall_ratio_threshold": 0.93
   },
   "llm_runtime_defaults": {
     "parsing_model": "qwen3:1.7b",

@@ -253,6 +253,8 @@ class DrugsMatcherSettings:
     token_max_frequency: int
     min_confidence: float
     catalog_excluded_term_suffixes: tuple[str, ...]
+    catalog_token_ratio_threshold: float
+    catalog_overall_ratio_threshold: float
 
 # -----------------------------------------------------------------------------
 @dataclass(frozen=True)
@@ -385,6 +387,14 @@ def build_drugs_matcher_settings(data: dict[str, Any]) -> DrugsMatcherSettings:
         token_max_frequency=coerce_positive_int(data.get("token_max_frequency"), 3),
         min_confidence=coerce_float(data.get("min_confidence"), 0.40),
         catalog_excluded_term_suffixes=suffix_tuple,
+        catalog_token_ratio_threshold=coerce_float(
+            data.get("catalog_token_ratio_threshold"),
+            0.93,
+        ),
+        catalog_overall_ratio_threshold=coerce_float(
+            data.get("catalog_overall_ratio_threshold"),
+            0.93,
+        ),
     )
 
 # -----------------------------------------------------------------------------
