@@ -113,11 +113,6 @@ Environment variables reside in `DILIGENT/setup/settings/.env` for the backend a
 
 | Variable             | Description                                                                 |
 |----------------------|-----------------------------------------------------------------------------|
-| FASTAPI_HOST         | Address the FastAPI server binds to (default `127.0.0.1`).                  |
-| FASTAPI_PORT         | Port for the FastAPI service (default `8000`).                              |
-| UI_HOST / UI_PORT    | Host/port for the Vite preview server (defaults `127.0.0.1:7861`).          |
-| VITE_API_BASE_URL    | Override for the frontend-to-backend base URL (falls back to `/api`).       |
-| OLLAMA_HOST          | Base URL where the Ollama runtime is reachable.                             |
 | OPENAI_API_KEY       | API key for OpenAI-backed cloud inference (if applicable).                  |
 | GEMINI_API_KEY       | API key for Gemini-backed cloud inference (if applicable).                  |
 | MPLBACKEND           | Matplotlib backend used by background plotting tasks.                       |
