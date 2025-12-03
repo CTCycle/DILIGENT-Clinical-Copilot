@@ -5,13 +5,13 @@
     "description": "FastAPI backend"      
   },   
   "database": {
-    "embedded_database": true,
+    "embedded_database": false,
     "engine": "postgres",
     "host": "localhost",
     "port": 5432,
-    "database_name": "adsorfit",
-    "username": "replace-me",
-    "password": "replace-me",
+    "database_name": "DILIGENT",
+    "username": "postgres",
+    "password": "admin",
     "ssl": false,
     "ssl_ca": null,
     "connect_timeout": 30,

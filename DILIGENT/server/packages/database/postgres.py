@@ -10,10 +10,10 @@ from sqlalchemy.dialects.postgresql import insert
 from sqlalchemy.engine import Engine
 from sqlalchemy.orm import sessionmaker
 
-from DILIGENT.server.packages.database.initializer import normalize_postgres_engine
 from DILIGENT.server.packages.configurations import DatabaseSettings
-from DILIGENT.server.packages.logger import logger
 from DILIGENT.server.packages.database.schema import Base
+from DILIGENT.server.packages.database.utils import normalize_postgres_engine
+from DILIGENT.server.packages.logger import logger
 
 
 ###############################################################################
