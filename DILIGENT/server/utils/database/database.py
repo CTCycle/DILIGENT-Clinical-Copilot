@@ -1,13 +1,13 @@
 from __future__ import annotations
 
 import os
-from collections.abc import Callable
-from typing import Protocol
+from collections.abc import Callable, Iterator
+from typing import Any, Protocol
 
 import pandas as pd
 
 from DILIGENT.server.utils.database.postgres import PostgresRepository
-from DILIGENT.server.utils.database.sqlite import Any, SQLiteRepository
+from DILIGENT.server.utils.database.sqlite import SQLiteRepository
 from DILIGENT.server.utils.configurations import DatabaseSettings, server_settings
 from DILIGENT.server.utils.logger import logger
 
@@ -31,6 +31,10 @@ class DatabaseBackend(Protocol):
 
     # -------------------------------------------------------------------------
     def count_rows(self, table_name: str) -> int:
+        ...
+
+    # -------------------------------------------------------------------------
+    def stream_rows(self, table_name: str, page_size: int) -> Iterator[pd.DataFrame]:
         ...
 
 
@@ -89,6 +93,13 @@ class DILIGENTDatabase:
     # -------------------------------------------------------------------------
     def count_rows(self, table_name: str) -> int:
         return self.backend.count_rows(table_name)
+
+    # -------------------------------------------------------------------------
+    def stream_rows(
+        self, table_name: str, page_size: int | None = None
+    ) -> Iterator[pd.DataFrame]:
+        chunk_size = page_size or self.settings.select_page_size
+        return self.backend.stream_rows(table_name, chunk_size)
 
     
 database = DILIGENTDatabase()

@@ -230,16 +230,18 @@ class FastAPISettings:
 @dataclass(frozen=True)
 class DatabaseSettings:
     embedded_database: bool
-    engine: str | None          
-    host: str | None            
-    port: int | None            
+    engine: str | None
+    host: str | None
+    port: int | None
     database_name: str | None
     username: str | None
     password: str | None
-    ssl: bool                   
-    ssl_ca: str | None         
+    ssl: bool
+    ssl_ca: str | None
     connect_timeout: int
     insert_batch_size: int
+    insert_commit_interval: int
+    select_page_size: int
 
 # -----------------------------------------------------------------------------
 @dataclass(frozen=True)
@@ -254,11 +256,15 @@ class DrugsMatcherSettings:
     token_min_length: int
     normalization_cache_limit: int
     variant_cache_limit: int
+    match_cache_limit: int
+    alias_cache_limit: int
     min_confidence: float
     catalog_excluded_term_suffixes: tuple[str, ...]
     catalog_token_ratio_threshold: float
     catalog_overall_ratio_threshold: float
     fuzzy_early_exit_ratio: float
+    catalog_index_limit: int
+    catalog_candidate_limit: int
 
 # -----------------------------------------------------------------------------
 @dataclass(frozen=True)
@@ -279,6 +285,8 @@ class RagSettings:
     cloud_model: str
     cloud_embedding_model: str
     use_cloud_embeddings: bool
+    vector_stream_batch_size: int
+    embedding_max_workers: int
 
 # -----------------------------------------------------------------------------
 @dataclass(frozen=True)
@@ -289,7 +297,9 @@ class ExternalDataSettings:
     livertox_yield_interval: int
     livertox_skip_deterministic_ratio: float
     livertox_monograph_max_workers: int
-    max_excerpt_length: int    
+    max_excerpt_length: int
+    rxnav_request_timeout: float
+    rxnav_max_concurrency: int
 
 # -----------------------------------------------------------------------------
 @dataclass(frozen=True)
@@ -335,6 +345,8 @@ def build_fastapi_settings(data: dict[str, Any]) -> FastAPISettings:
 # -----------------------------------------------------------------------------
 def build_database_settings(payload: dict[str, Any] | Any) -> DatabaseSettings:
     embedded = bool(payload.get("embedded_database", True))
+    commit_interval = coerce_int(payload.get("insert_commit_interval"), 5, minimum=1)
+    select_page_size = coerce_int(payload.get("select_page_size"), 2000, minimum=100)
     if embedded:
         # External fields are ignored entirely when embedded DB is active
         return DatabaseSettings(
@@ -349,6 +361,8 @@ def build_database_settings(payload: dict[str, Any] | Any) -> DatabaseSettings:
             ssl_ca=None,
             connect_timeout=10,
             insert_batch_size=coerce_int(payload.get("insert_batch_size"), 1000, minimum=1),
+            insert_commit_interval=commit_interval,
+            select_page_size=select_page_size,
         )
 
     # External DB mode
@@ -366,6 +380,8 @@ def build_database_settings(payload: dict[str, Any] | Any) -> DatabaseSettings:
         ssl_ca=coerce_str_or_none(payload.get("ssl_ca")),
         connect_timeout=coerce_int(payload.get("connect_timeout"), 10, minimum=1),
         insert_batch_size=coerce_int(payload.get("insert_batch_size"), 1000, minimum=1),
+        insert_commit_interval=commit_interval,
+        select_page_size=select_page_size,
     )
 
 # -----------------------------------------------------------------------------
@@ -412,6 +428,13 @@ def build_drugs_matcher_settings(data: dict[str, Any]) -> DrugsMatcherSettings:
             data.get("fuzzy_early_exit_ratio"),
             0.95,
         ),
+        match_cache_limit=coerce_positive_int(data.get("match_cache_limit"), 5000),
+        alias_cache_limit=coerce_positive_int(data.get("alias_cache_limit"), 2000),
+        catalog_index_limit=coerce_positive_int(data.get("catalog_index_limit"), 75000),
+        catalog_candidate_limit=coerce_positive_int(
+            data.get("catalog_candidate_limit"),
+            750,
+        ),
     )
 
 # -----------------------------------------------------------------------------
@@ -443,6 +466,14 @@ def build_rag_settings(
         cloud_model=coerce_str(data.get("cloud_model"), default_cloud_model),
         cloud_embedding_model=coerce_str(data.get("cloud_embedding_model"), ""),
         use_cloud_embeddings=coerce_bool(data.get("use_cloud_embeddings"), False),
+        vector_stream_batch_size=coerce_positive_int(
+            data.get("vector_stream_batch_size"),
+            1024,
+        ),
+        embedding_max_workers=coerce_positive_int(
+            data.get("embedding_max_workers"),
+            4,
+        ),
     )
 
 # -----------------------------------------------------------------------------
@@ -469,7 +500,15 @@ def build_external_data_settings(
             data.get("livertox_monograph_max_workers"),
             4,
         ),
-        max_excerpt_length=coerce_positive_int(data.get("max_excerpt_length"), 8_000),        
+        max_excerpt_length=coerce_positive_int(data.get("max_excerpt_length"), 8_000),
+        rxnav_request_timeout=coerce_float(
+            data.get("rxnav_request_timeout"),
+            12.0,
+        ),
+        rxnav_max_concurrency=coerce_positive_int(
+            data.get("rxnav_max_concurrency"),
+            16,
+        ),
     )
 
 # -----------------------------------------------------------------------------
