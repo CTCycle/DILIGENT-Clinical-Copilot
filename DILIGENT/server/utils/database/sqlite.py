@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 import os
-from typing import Any
+from typing import Any, Iterator
 
 import pandas as pd
 import sqlalchemy
@@ -27,6 +27,8 @@ class SQLiteRepository:
         )
         self.Session = sessionmaker(bind=self.engine, future=True)
         self.insert_batch_size = settings.insert_batch_size
+        self.insert_commit_interval = settings.insert_commit_interval
+        self.select_page_size = settings.select_page_size
         if self.db_path is not None and not os.path.exists(self.db_path):
             Base.metadata.create_all(self.engine)       
 
@@ -50,6 +52,7 @@ class SQLiteRepository:
             if not unique_cols:
                 raise ValueError(f"No unique constraint found for {table_cls.__name__}")
             records = df.to_dict(orient="records")
+            pending = 0
             for i in range(0, len(records), self.insert_batch_size):
                 batch = records[i : i + self.insert_batch_size]
                 if not batch:
@@ -64,7 +67,15 @@ class SQLiteRepository:
                     index_elements=unique_cols, set_=update_cols
                 )
                 session.execute(stmt)
+                pending += 1
+                if pending >= self.insert_commit_interval:
+                    session.commit()
+                    pending = 0
+            if pending:
                 session.commit()
+        except Exception:
+            session.rollback()
+            raise
         finally:
             session.close()
 
@@ -99,5 +110,20 @@ class SQLiteRepository:
             )
             value = result.scalar() or 0
         return int(value)
+
+    # -------------------------------------------------------------------------
+    def stream_rows(self, table_name: str, page_size: int) -> Iterator[pd.DataFrame]:
+        chunk_size = page_size if page_size > 0 else self.select_page_size
+        if chunk_size <= 0:
+            yield self.load_from_database(table_name)
+            return
+        with self.engine.connect() as conn:
+            inspector = inspect(conn)
+            if not inspector.has_table(table_name):
+                logger.warning("Table %s does not exist", table_name)
+                return
+            query = text(f'SELECT * FROM "{table_name}"')
+            for chunk in pd.read_sql_query(query, conn, chunksize=chunk_size):
+                yield chunk
 
     

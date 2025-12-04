@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import json
 import os
-from typing import Any
+from typing import Any, Iterator
 
 import lancedb
 import pyarrow as pa
@@ -32,12 +32,14 @@ class LanceVectorDatabase:
         schema: pa.Schema | None = None,
         metric: str | None = None,
         index_type: str | None = None,
+        stream_batch_size: int | None = None,
     ) -> None:
         self.database_path = database_path
         self.collection_name = collection_name
         self.schema = schema or VECTOR_TABLE_SCHEMA
         self.metric = metric
         self.index_type = index_type
+        self.stream_batch_size = stream_batch_size
         self.connection: LanceDBConnection | None = None
         self.table: LanceTable | None = None
         self.index_ready = False
@@ -259,7 +261,43 @@ class LanceVectorDatabase:
             self.index_ready = False
 
     # -------------------------------------------------------------------------
+    def iter_embeddings(
+        self,
+        batch_size: int | None = None,
+        limit: int | None = None,
+    ) -> Iterator[list[dict[str, Any]]]:
+        table = self.get_table()
+        resolved_batch = batch_size or self.stream_batch_size or 1024
+        remaining = limit
+        try:
+            batches = table.to_batches(batch_size=resolved_batch)
+        except AttributeError:
+            batches = table.to_arrow().to_batches(resolved_batch)
+        for batch in batches:
+            records = batch.to_pylist()
+            if remaining is not None:
+                if remaining <= 0:
+                    break
+                if len(records) > remaining:
+                    yield records[:remaining]
+                    break
+                remaining -= len(records)
+            yield records
+
+    # -------------------------------------------------------------------------
     def load_embeddings(self, limit: int | None = None) -> list[dict[str, Any]]:
+        if self.stream_batch_size:
+            records: list[dict[str, Any]] = []
+            remaining = limit
+            for batch in self.iter_embeddings(self.stream_batch_size, limit=remaining):
+                records.extend(batch)
+                if remaining is not None:
+                    remaining -= len(batch)
+                    if remaining <= 0:
+                        break
+            if limit is not None and len(records) > limit:
+                return records[:limit]
+            return records
         table = self.get_table()
         data = table.to_arrow()
         if limit is not None:

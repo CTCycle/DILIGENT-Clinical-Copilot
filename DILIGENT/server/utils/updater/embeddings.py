@@ -34,6 +34,7 @@ class RagEmbeddingUpdater:
             collection_name=server_settings.rag.vector_collection_name,
             metric=server_settings.rag.vector_index_metric,
             index_type=server_settings.rag.vector_index_type,
+            stream_batch_size=server_settings.rag.vector_stream_batch_size,
         )
         self.serializer = VectorSerializer(
             documents_path=self.documents_path,
@@ -41,6 +42,7 @@ class RagEmbeddingUpdater:
             chunk_size=server_settings.rag.chunk_size,
             chunk_overlap=server_settings.rag.chunk_overlap,
             embedding_batch_size=server_settings.rag.embedding_batch_size,
+            embedding_workers=server_settings.rag.embedding_max_workers,
             embedding_backend=server_settings.rag.embedding_backend,
             ollama_base_url=server_settings.rag.ollama_base_url,
             ollama_model=server_settings.rag.ollama_embedding_model,
