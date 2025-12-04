@@ -6,6 +6,7 @@ from typing import Any
 import pandas as pd
 
 from DILIGENT.server.utils.configurations import server_settings
+from DILIGENT.server.utils.services.text.normalization import coerce_text
 
 ###############################################################################
 class LiverToxData:
@@ -49,7 +50,7 @@ class LiverToxData:
             return
         token_occurrences: dict[str, list[Any]] = {}
         for row in self.livertox_df.itertuples(index=False):
-            raw_name = self.lookup.coerce_text(getattr(row, "drug_name", None))
+            raw_name = coerce_text(getattr(row, "drug_name", None))
             if raw_name is None:
                 continue
             normalized_name = self.lookup.normalize_name(raw_name)
@@ -59,7 +60,7 @@ class LiverToxData:
             nbk_id = str(nbk_raw).strip() if nbk_raw not in (None, "") else ""
             if not nbk_id:
                 continue
-            excerpt = self.lookup.coerce_text(getattr(row, "excerpt", None))
+            excerpt = coerce_text(getattr(row, "excerpt", None))
             synonyms_value = getattr(row, "synonyms", None)
             synonyms = self.lookup.parse_synonyms(synonyms_value)
             tokens = self.lookup.collect_tokens(raw_name, list(synonyms.values()))
@@ -98,11 +99,11 @@ class LiverToxData:
         if self.master_list_df is None or self.master_list_df.empty:
             return
         for row in self.master_list_df.itertuples(index=False):
-            drug_name = self.lookup.coerce_text(getattr(row, "drug_name", None))
+            drug_name = coerce_text(getattr(row, "drug_name", None))
             if drug_name is None:
                 continue
-            brand = self.lookup.coerce_text(getattr(row, "brand_name", None))
-            ingredient = self.lookup.coerce_text(getattr(row, "ingredient", None))
+            brand = coerce_text(getattr(row, "brand_name", None))
+            ingredient = coerce_text(getattr(row, "ingredient", None))
             for alias_type, value in ("brand", brand), ("ingredient", ingredient):
                 if value is None:
                     continue
@@ -186,7 +187,7 @@ class LiverToxData:
             return {}
         index: dict[str, dict[str, Any]] = {}
         for row in self.livertox_df.to_dict(orient="records"):
-            drug_name = self.lookup.coerce_text(row.get("drug_name"))
+            drug_name = coerce_text(row.get("drug_name"))
             if drug_name is None:
                 continue
             normalized = self.lookup.normalize_name(drug_name)

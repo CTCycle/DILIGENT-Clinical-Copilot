@@ -22,6 +22,7 @@ from tqdm import tqdm
 from DILIGENT.server.utils.configurations import server_settings
 from DILIGENT.server.utils.constants import LIVERTOX_BASE_URL, SOURCES_PATH
 from DILIGENT.server.utils.logger import logger
+from DILIGENT.server.utils.services.text.normalization import normalize_whitespace
 from DILIGENT.server.utils.repository.serializer import DataSerializer
 from DILIGENT.server.utils.database.database import database
 
@@ -977,9 +978,7 @@ class LiverToxUpdater:
     def derive_identifier(member_name: str) -> str:
         base = os.path.basename(member_name)
         stem = os.path.splitext(base)[0]
-        cleaned = LiverToxUpdater.normalize_whitespace(
-            LiverToxUpdater.strip_punctuation(stem)
-        )
+        cleaned = normalize_whitespace(LiverToxUpdater.strip_punctuation(stem))
         return cleaned or base
 
     # -------------------------------------------------------------------------
@@ -1013,12 +1012,7 @@ class LiverToxUpdater:
         stripped = re.sub(r"(?is)<(script|style)[^>]*>.*?</\1>", " ", html_text)
         stripped = re.sub(r"<[^>]+>", " ", stripped)
         unescaped = html.unescape(stripped)
-        return LiverToxUpdater.normalize_whitespace(unescaped)
-
-    # -------------------------------------------------------------------------
-    @staticmethod
-    def normalize_whitespace(value: str) -> str:
-        return re.sub(r"\s+", " ", value).strip()
+        return normalize_whitespace(unescaped)
 
     # -------------------------------------------------------------------------
     @staticmethod
