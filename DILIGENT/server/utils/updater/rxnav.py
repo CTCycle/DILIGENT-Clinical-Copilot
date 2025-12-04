@@ -13,9 +13,9 @@ from collections.abc import Iterator
 import httpx
 import pandas as pd
 
-from DILIGENT.server.packages.logger import logger
-from DILIGENT.server.packages.constants import RXNAV_SYNONYM_STOPWORDS
-from DILIGENT.server.packages.utils.repository.serializer import DataSerializer
+from DILIGENT.server.utils.logger import logger
+from DILIGENT.server.utils.constants import RXNAV_SYNONYM_STOPWORDS
+from DILIGENT.server.utils.repository.serializer import DataSerializer
 
 
 

@@ -4,8 +4,8 @@ import json
 import os
 import time
 
-from DILIGENT.server.packages.database.initializer import initialize_database
-from DILIGENT.server.packages.logger import logger
+from DILIGENT.server.utils.database.initializer import initialize_database
+from DILIGENT.server.utils.logger import logger
 
 
 # -----------------------------------------------------------------------------

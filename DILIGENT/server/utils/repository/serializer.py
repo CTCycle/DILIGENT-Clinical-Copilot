@@ -13,8 +13,8 @@ from langchain_community.document_loaders import PyPDFLoader
 from langchain_core.documents import Document
 from langchain_text_splitters import RecursiveCharacterTextSplitter
 
-from DILIGENT.server.packages.configurations import server_settings
-from DILIGENT.server.packages.constants import (
+from DILIGENT.server.utils.configurations import server_settings
+from DILIGENT.server.utils.constants import (
     CLINICAL_SESSION_COLUMNS,
     DEFAULT_EMBEDDING_BATCH_SIZE,
     DRUG_NAME_ALLOWED_PATTERN,
@@ -26,10 +26,10 @@ from DILIGENT.server.packages.constants import (
     LIVERTOX_REQUIRED_COLUMNS,
     TEXT_FILE_FALLBACK_ENCODINGS,
 )
-from DILIGENT.server.packages.logger import logger
-from DILIGENT.server.packages.database.database import database
-from DILIGENT.server.packages.utils.repository.vectors import LanceVectorDatabase
-from DILIGENT.server.packages.utils.services.retrieval.embeddings import EmbeddingGenerator
+from DILIGENT.server.utils.logger import logger
+from DILIGENT.server.utils.database.database import database
+from DILIGENT.server.utils.repository.vectors import LanceVectorDatabase
+from DILIGENT.server.utils.services.retrieval.embeddings import EmbeddingGenerator
 
 ###############################################################################
 class DataSerializer:

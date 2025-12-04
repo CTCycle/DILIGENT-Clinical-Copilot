@@ -7,10 +7,10 @@ from collections.abc import Coroutine
 from typing import Any, Literal, cast
 
 from DILIGENT.server.models.providers import CloudLLMClient, OllamaClient
-from DILIGENT.server.packages.configurations import server_settings
-from DILIGENT.server.packages.constants import CLOUD_MODEL_CHOICES, VECTOR_DB_PATH
-from DILIGENT.server.packages.logger import logger
-from DILIGENT.server.packages.utils.repository.vectors import LanceVectorDatabase
+from DILIGENT.server.utils.configurations import server_settings
+from DILIGENT.server.utils.constants import CLOUD_MODEL_CHOICES, VECTOR_DB_PATH
+from DILIGENT.server.utils.logger import logger
+from DILIGENT.server.utils.repository.vectors import LanceVectorDatabase
 
 ProviderName = Literal["openai", "azure-openai", "anthropic", "gemini"]
 EmbeddingBackend = Literal["ollama", "cloud"]

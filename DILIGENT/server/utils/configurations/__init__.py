@@ -1,11 +1,11 @@
 from __future__ import annotations
 
-from DILIGENT.server.packages.configurations.base import (
+from DILIGENT.server.utils.configurations.base import (
     ensure_mapping,
     load_configuration_data,
 )
 
-from DILIGENT.server.packages.configurations.server import (
+from DILIGENT.server.utils.configurations.server import (
     DatabaseSettings,
     FastAPISettings,
     DrugsMatcherSettings,

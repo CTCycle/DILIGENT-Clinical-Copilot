@@ -12,15 +12,15 @@ from pydantic import ValidationError
 from DILIGENT.server.schemas.clinical import (
     PatientData,
 )
-from DILIGENT.server.packages.configurations import LLMRuntimeConfig
-from DILIGENT.server.packages.logger import logger
-from DILIGENT.server.packages.utils.repository.serializer import DataSerializer
-from DILIGENT.server.packages.utils.services.clinical.hepatox import (
+from DILIGENT.server.utils.configurations import LLMRuntimeConfig
+from DILIGENT.server.utils.logger import logger
+from DILIGENT.server.utils.repository.serializer import DataSerializer
+from DILIGENT.server.utils.services.clinical.hepatox import (
     HepatotoxicityPatternAnalyzer,
     HepatoxConsultation,
 )
-from DILIGENT.server.packages.utils.services.clinical.parser import DrugsParser
-from DILIGENT.server.packages.utils.services.retrieval.query import DILIQueryBuilder
+from DILIGENT.server.utils.services.clinical.parser import DrugsParser
+from DILIGENT.server.utils.services.retrieval.query import DILIQueryBuilder
 
 drugs_parser = DrugsParser()
 pattern_analyzer = HepatotoxicityPatternAnalyzer()
