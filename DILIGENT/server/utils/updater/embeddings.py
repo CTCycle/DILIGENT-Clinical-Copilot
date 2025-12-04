@@ -2,11 +2,11 @@ from __future__ import annotations
 
 import os
 
-from DILIGENT.server.packages.configurations import server_settings
-from DILIGENT.server.packages.constants import DOCS_PATH, VECTOR_DB_PATH
-from DILIGENT.server.packages.logger import logger
-from DILIGENT.server.packages.utils.repository.serializer import VectorSerializer
-from DILIGENT.server.packages.utils.repository.vectors import LanceVectorDatabase
+from DILIGENT.server.utils.configurations import server_settings
+from DILIGENT.server.utils.constants import DOCS_PATH, VECTOR_DB_PATH
+from DILIGENT.server.utils.logger import logger
+from DILIGENT.server.utils.repository.serializer import VectorSerializer
+from DILIGENT.server.utils.repository.vectors import LanceVectorDatabase
 
 ###############################################################################
 class RagEmbeddingUpdater:
