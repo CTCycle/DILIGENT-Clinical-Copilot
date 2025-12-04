@@ -6,7 +6,19 @@ DILIGENT/resources/database/*.lance
 DILIGENT/client/node_modules
 DILIGENT/client/dist
 DILIGENT/client/.vite
-node_modules
+DILIGENT/resources/database/*
+DILIGENT/resources/runtimes/python/*
+DILIGENT/resources/runtimes/nodejs/*
+DILIGENT/resources/runtimes/uv/*
+DILIGENT/resources/runtimes/uv_cache/*
+DILIGENT/settings/.env
+DILIGENT/client/node_modules/
+DILIGENT/client/dist/
+DILIGENT/client/dist-ssr/
+DILIGENT/client/.env
+DILIGENT/client/*.local
+DILIGENT/client/logs/
+
 
 
 __pycache__
@@ -28,6 +40,5 @@ __pycache__
 *.gz
 !.gitkeep
 
-!DILIGENT/setup/settings/client_configurations.json
-!DILIGENT/setup/settings/server_configurations.json
+!DILIGENT/settings/server_configurations.json
 AGENTS.md
