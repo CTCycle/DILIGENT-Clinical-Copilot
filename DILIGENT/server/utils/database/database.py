@@ -6,10 +6,10 @@ from typing import Protocol
 
 import pandas as pd
 
-from DILIGENT.server.packages.database.postgres import PostgresRepository
-from DILIGENT.server.packages.database.sqlite import Any, SQLiteRepository
-from DILIGENT.server.packages.configurations import DatabaseSettings, server_settings
-from DILIGENT.server.packages.logger import logger
+from DILIGENT.server.utils.database.postgres import PostgresRepository
+from DILIGENT.server.utils.database.sqlite import Any, SQLiteRepository
+from DILIGENT.server.utils.configurations import DatabaseSettings, server_settings
+from DILIGENT.server.utils.logger import logger
 
 
 ###############################################################################

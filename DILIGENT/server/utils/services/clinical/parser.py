@@ -13,8 +13,8 @@ from DILIGENT.server.schemas.clinical import (
     DrugEntry,
     PatientDrugs,
 )
-from DILIGENT.server.packages.configurations import LLMRuntimeConfig, server_settings
-from DILIGENT.server.packages.patterns import (
+from DILIGENT.server.utils.configurations import LLMRuntimeConfig, server_settings
+from DILIGENT.server.utils.patterns import (
     DRUG_BRACKET_TRAIL_RE,
     DRUG_BULLET_RE,
     DRUG_SCHEDULE_RE,

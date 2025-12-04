@@ -10,10 +10,10 @@ from typing import Any
 
 import pandas as pd
 
-from DILIGENT.server.packages.configurations import server_settings
-from DILIGENT.server.packages.constants import MATCHING_STOPWORDS
-from DILIGENT.server.packages.logger import logger
-from DILIGENT.server.packages.utils.services.clinical.livertox import LiverToxData
+from DILIGENT.server.utils.configurations import server_settings
+from DILIGENT.server.utils.constants import MATCHING_STOPWORDS
+from DILIGENT.server.utils.logger import logger
+from DILIGENT.server.utils.services.clinical.livertox import LiverToxData
 
 
 ###############################################################################

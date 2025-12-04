@@ -5,8 +5,8 @@ import os
 from dataclasses import dataclass
 from typing import Any, Literal
 
-from DILIGENT.server.packages.configurations import ensure_mapping, load_configuration_data
-from DILIGENT.server.packages.constants import (
+from DILIGENT.server.utils.configurations import ensure_mapping, load_configuration_data
+from DILIGENT.server.utils.constants import (
     CLINICAL_MODEL_CHOICES,
     CLOUD_MODEL_CHOICES, 
     DEFAULT_EMBEDDING_BATCH_SIZE,
@@ -14,7 +14,7 @@ from DILIGENT.server.packages.constants import (
     SERVER_CONFIGURATION_FILE,
 )
 
-from DILIGENT.server.packages.types import (
+from DILIGENT.server.utils.types import (
     coerce_bool,
     coerce_float,
     coerce_int,

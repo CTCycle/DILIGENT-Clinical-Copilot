@@ -17,15 +17,15 @@ import httpx
 from langchain_core.output_parsers import PydanticOutputParser
 from pydantic import BaseModel
 
-from DILIGENT.server.packages.configurations import LLMRuntimeConfig, server_settings
-from DILIGENT.server.packages.constants import (
+from DILIGENT.server.utils.configurations import LLMRuntimeConfig, server_settings
+from DILIGENT.server.utils.constants import (
     GEMINI_API_BASE,
     OPENAI_API_BASE,
     PARSING_MODEL_CHOICES,
 )
-from DILIGENT.server.packages.logger import logger
-from DILIGENT.server.packages.types import extract_positive_int
-from DILIGENT.server.packages.variables import env_variables
+from DILIGENT.server.utils.logger import logger
+from DILIGENT.server.utils.types import extract_positive_int
+from DILIGENT.server.utils.variables import env_variables
 
 OPENAI_API_KEY = env_variables.get("OPENAI_API_KEY")
 GEMINI_API_KEY = env_variables.get("GEMINI_API_KEY")

@@ -4,7 +4,7 @@ from fastapi import APIRouter, HTTPException, Query, status
 
 from DILIGENT.server.models.providers import OllamaClient, OllamaError, OllamaTimeout
 from DILIGENT.server.schemas.models import ModelListResponse, ModelPullResponse
-from DILIGENT.server.packages.logger import logger
+from DILIGENT.server.utils.logger import logger
 
 router = APIRouter(prefix="/models", tags=["models"])
 

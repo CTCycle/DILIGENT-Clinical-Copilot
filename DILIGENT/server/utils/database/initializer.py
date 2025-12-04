@@ -5,12 +5,12 @@ import urllib.parse
 import sqlalchemy
 from sqlalchemy.exc import SQLAlchemyError
 
-from DILIGENT.server.packages.configurations import DatabaseSettings, server_settings
-from DILIGENT.server.packages.database.postgres import PostgresRepository
-from DILIGENT.server.packages.database.schema import Base
-from DILIGENT.server.packages.database.sqlite import SQLiteRepository
-from DILIGENT.server.packages.database.utils import normalize_postgres_engine
-from DILIGENT.server.packages.logger import logger
+from DILIGENT.server.utils.configurations import DatabaseSettings, server_settings
+from DILIGENT.server.utils.database.postgres import PostgresRepository
+from DILIGENT.server.utils.database.schema import Base
+from DILIGENT.server.utils.database.sqlite import SQLiteRepository
+from DILIGENT.server.utils.database.utils import normalize_postgres_engine
+from DILIGENT.server.utils.logger import logger
 
 
 ###############################################################################

@@ -5,7 +5,7 @@ from typing import Any
 
 import pandas as pd
 
-from DILIGENT.server.packages.configurations import server_settings
+from DILIGENT.server.utils.configurations import server_settings
 
 ###############################################################################
 class LiverToxData:

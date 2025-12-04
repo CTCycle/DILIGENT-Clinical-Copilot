@@ -19,11 +19,11 @@ from pdfminer.high_level import extract_text as pdfminer_extract_text
 from pypdf import PdfReader
 from tqdm import tqdm
 
-from DILIGENT.server.packages.configurations import server_settings
-from DILIGENT.server.packages.constants import LIVERTOX_BASE_URL, SOURCES_PATH
-from DILIGENT.server.packages.logger import logger
-from DILIGENT.server.packages.utils.repository.serializer import DataSerializer
-from DILIGENT.server.packages.database.database import database
+from DILIGENT.server.utils.configurations import server_settings
+from DILIGENT.server.utils.constants import LIVERTOX_BASE_URL, SOURCES_PATH
+from DILIGENT.server.utils.logger import logger
+from DILIGENT.server.utils.repository.serializer import DataSerializer
+from DILIGENT.server.utils.database.database import database
 
 SUPPORTED_MONOGRAPH_EXTENSIONS = (".html", ".htm", ".xhtml", ".xml", ".nxml", ".pdf")
 

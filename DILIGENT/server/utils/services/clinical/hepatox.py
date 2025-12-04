@@ -24,16 +24,16 @@ from DILIGENT.server.schemas.clinical import (
     PatientDrugClinicalReport,
     PatientDrugs,
 )
-from DILIGENT.server.packages.configurations import LLMRuntimeConfig, server_settings
-from DILIGENT.server.packages.constants import (
+from DILIGENT.server.utils.configurations import LLMRuntimeConfig, server_settings
+from DILIGENT.server.utils.constants import (
     DEFAULT_DILI_CLASSIFICATION,
     R_SCORE_CHOLESTATIC_THRESHOLD,
     R_SCORE_HEPATOCELLULAR_THRESHOLD,
 )
-from DILIGENT.server.packages.logger import logger
-from DILIGENT.server.packages.utils.repository.serializer import DataSerializer
-from DILIGENT.server.packages.utils.services.retrieval.embeddings import SimilaritySearch
-from DILIGENT.server.packages.utils.services.clinical.matches import LiverToxMatcher
+from DILIGENT.server.utils.logger import logger
+from DILIGENT.server.utils.repository.serializer import DataSerializer
+from DILIGENT.server.utils.services.retrieval.embeddings import SimilaritySearch
+from DILIGENT.server.utils.services.clinical.matches import LiverToxMatcher
 
 
 ###############################################################################
