@@ -28,6 +28,7 @@ from DILIGENT.server.utils.constants import (
 )
 from DILIGENT.server.utils.logger import logger
 from DILIGENT.server.utils.database.database import database
+from DILIGENT.server.utils.services.text.normalization import coerce_text
 from DILIGENT.server.utils.repository.vectors import LanceVectorDatabase
 from DILIGENT.server.utils.services.retrieval.embeddings import EmbeddingGenerator
 
@@ -94,18 +95,13 @@ class DataSerializer:
             if column not in LIVERTOX_OPTIONAL_COLUMNS
         ]
         df = df.dropna(subset=drop_columns)
-        df["drug_name"] = df["drug_name"].astype(str).str.strip()
+        df["drug_name"] = df["drug_name"].apply(coerce_text)
+        df = df[df["drug_name"].notna()]
         df = df[df["drug_name"].apply(self.is_valid_drug_name)]
-        df["excerpt"] = df["excerpt"].astype(str).str.strip()
-        df = df[df["excerpt"] != ""]
-        df["nbk_id"] = df["nbk_id"].apply(
-            lambda value: str(value).strip() if pd.notna(value) else None
-        )
-        df["synonyms"] = df["synonyms"].apply(
-            lambda value: (
-                str(value).strip() if pd.notna(value) and str(value).strip() else None
-            )
-        )
+        df["excerpt"] = df["excerpt"].apply(coerce_text)
+        df = df[df["excerpt"].notna()]
+        df["nbk_id"] = df["nbk_id"].apply(coerce_text)
+        df["synonyms"] = df["synonyms"].apply(coerce_text)
         df = df.drop_duplicates(subset=["nbk_id", "drug_name"], keep="first")
         return df.reset_index(drop=True)
 
@@ -186,13 +182,7 @@ class DataSerializer:
 
     # -----------------------------------------------------------------------------
     def normalize_list_item(self, value: Any) -> str | None:
-        if isinstance(value, str):
-            normalized = value.strip()
-            return normalized if normalized else None
-        if pd.isna(value) or value is None:
-            return None
-        normalized = str(value).strip()
-        return normalized if normalized else None
+        return coerce_text(value)
 
     # -----------------------------------------------------------------------------
     def deserialize_string_list(self, value: Any) -> list[str]:
