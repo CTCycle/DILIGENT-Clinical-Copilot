@@ -14,6 +14,7 @@ from DILIGENT.server.schemas.clinical import (
     PatientDrugs,
 )
 from DILIGENT.server.utils.configurations import LLMRuntimeConfig, server_settings
+from DILIGENT.server.utils.services.text.normalization import normalize_token
 from DILIGENT.server.utils.patterns import (
     DRUG_BRACKET_TRAIL_RE,
     DRUG_BULLET_RE,
@@ -343,7 +344,7 @@ class DrugsParser:
         self.extract_mode_from_prefix(name_tokens, mode_tokens)
         dosage_tokens: list[str] = []
         for token in remainder:
-            normalized = self.normalize_token(token)
+            normalized = normalize_token(token)
             if normalized in FORM_TOKENS:
                 mode_tokens.append(token)
                 continue
@@ -380,7 +381,7 @@ class DrugsParser:
         saw_form = False
         while idx > 0:
             token = name_tokens[idx - 1]
-            normalized = self.normalize_token(token)
+            normalized = normalize_token(token)
             if normalized in FORM_TOKENS:
                 saw_form = True
                 trailing.append(token)
@@ -400,10 +401,6 @@ class DrugsParser:
     # -------------------------------------------------------------------------
     def token_has_numeric(self, token: str) -> bool:
         return any(ch.isdigit() for ch in token)
-
-    # -------------------------------------------------------------------------
-    def normalize_token(self, token: str) -> str:
-        return re.sub(r"[.,;:]+$", "", token.lower())
 
     # -------------------------------------------------------------------------
     def detect_suspension(

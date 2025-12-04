@@ -1,9 +1,7 @@
 from __future__ import annotations
 
-import json
 import re
 import time
-import unicodedata
 from dataclasses import dataclass
 from difflib import SequenceMatcher
 from typing import Any
@@ -13,7 +11,17 @@ import pandas as pd
 from DILIGENT.server.utils.configurations import server_settings
 from DILIGENT.server.utils.constants import MATCHING_STOPWORDS
 from DILIGENT.server.utils.logger import logger
+from DILIGENT.server.utils.services.text.normalization import (
+    coerce_text,
+    normalize_drug_name,
+    normalize_whitespace,
+)
 from DILIGENT.server.utils.services.clinical.livertox import LiverToxData
+from DILIGENT.server.utils.services.text.synonyms import (
+    extract_synonym_strings,
+    parse_synonym_list,
+    split_synonym_variants,
+)
 
 
 ###############################################################################
@@ -391,7 +399,7 @@ class DrugsLookup:
         record, confidence, reason, notes = result
         updated_notes = list(notes)
         if from_catalog:
-            alias_note = self.coerce_text(alias_value)
+            alias_note = coerce_text(alias_value)
             if alias_note:
                 updated_notes.insert(0, f"catalog_alias='{alias_note}'")
         return record, confidence, reason, updated_notes
@@ -587,11 +595,11 @@ class DrugsLookup:
         if catalog_df is None or catalog_df.empty:
             return
         for row in catalog_df.itertuples(index=False):
-            term_type = self.coerce_text(getattr(row, "term_type", None))
+            term_type = coerce_text(getattr(row, "term_type", None))
             if not self.catalog_term_type_allowed(term_type):
                 continue
-            raw_name_value = self.coerce_text(getattr(row, "raw_name", None))
-            base_name_value = self.coerce_text(getattr(row, "name", None))
+            raw_name_value = coerce_text(getattr(row, "raw_name", None))
+            base_name_value = coerce_text(getattr(row, "name", None))
             raw_synonyms = self.parse_catalog_synonyms(getattr(row, "synonyms", None))
             if not raw_synonyms:
                 continue
@@ -674,53 +682,32 @@ class DrugsLookup:
         if value is None:
             return []
         if isinstance(value, str):
-            segments = re.split(r"[,;/\n]+", value)
+            segments = split_synonym_variants(value)
         elif isinstance(value, (list, tuple, set)):
             segments = []
             for entry in value:
-                segments.extend(re.split(r"[,;/\n]+", str(entry)))
+                segments.extend(split_synonym_variants(str(entry)))
         else:
-            segments = [value]
+            segments = split_synonym_variants(str(value))
         names: list[str] = []
         for segment in segments:
-            text = self.coerce_text(segment)
+            text = coerce_text(segment)
             if text:
                 names.append(text)
         return names
 
     # -------------------------------------------------------------------------
     def parse_catalog_synonyms(self, value: Any) -> list[str]:
-        raw_values = self.extract_synonym_strings(value)
-        synonyms: list[str] = []
-        for raw in raw_values:
-            text = self.coerce_text(raw)
-            if text:
-                synonyms.append(text)
-        return synonyms
-
-    # -------------------------------------------------------------------------
-    def coerce_text(self, value: Any) -> str | None:
-        if value is None:
-            return None
-        try:
-            if pd.isna(value):
-                return None
-        except TypeError:
-            pass
-        if isinstance(value, str):
-            text = value.strip()
-            return text or None
-        text = str(value).strip()
-        return text or None
+        return parse_synonym_list(value)
 
     # -------------------------------------------------------------------------
     def iter_alias_variants(self, value: str) -> list[str]:
-        normalized_value = self.normalize_whitespace(value)
+        normalized_value = normalize_whitespace(value)
         if not normalized_value:
             return []
         variants: set[str] = {normalized_value}
         for segment in re.split(r"[;,/\n]+", value):
-            candidate = self.normalize_whitespace(segment)
+            candidate = normalize_whitespace(segment)
             if candidate:
                 variants.add(candidate)
         return list(variants)
@@ -728,17 +715,17 @@ class DrugsLookup:
     # -------------------------------------------------------------------------
     def parse_synonyms(self, value: Any) -> dict[str, str]:
         synonyms: dict[str, str] = {}
-        raw_values = self.extract_synonym_strings(value)
+        raw_values = extract_synonym_strings(value)
         if not raw_values:
-            text = self.coerce_text(value)
+            text = coerce_text(value)
             if text is None:
                 return {}
             raw_values = [text]
         for raw in raw_values:
-            text = self.coerce_text(raw)
+            text = coerce_text(raw)
             if text is None:
                 continue
-            for candidate in re.split(r"[;,/\n]+", text):
+            for candidate in split_synonym_variants(text):
                 for variant in self.expand_variant(candidate):
                     normalized = self.normalize_name(variant)
                     if not normalized:
@@ -752,58 +739,11 @@ class DrugsLookup:
         return synonyms
 
     # -------------------------------------------------------------------------
-    def extract_synonym_strings(
-        self, value: Any, seen_refs: set[int] | None = None
-    ) -> list[str]:
-        if seen_refs is None:
-            seen_refs = set()
-        if value is None:
-            return []
-        if isinstance(value, dict):
-            marker = id(value)
-            if marker in seen_refs:
-                return []
-            seen_refs.add(marker)
-            collected: list[str] = []
-            for entry in value.values():
-                collected.extend(self.extract_synonym_strings(entry, seen_refs))
-            return collected
-        if isinstance(value, (list, tuple, set)):
-            marker = id(value)
-            if marker in seen_refs:
-                return []
-            seen_refs.add(marker)
-            collected: list[str] = []
-            for entry in value:
-                collected.extend(self.extract_synonym_strings(entry, seen_refs))
-            return collected
-        if isinstance(value, str):
-            stripped = value.strip()
-            if stripped.startswith(("{", "[")) and stripped.endswith(("}", "]")):
-                parsed = self.try_parse_json(stripped)
-                if isinstance(parsed, dict) or isinstance(parsed, list):
-                    return self.extract_synonym_strings(parsed, seen_refs)
-            return [value]
-        text = self.coerce_text(value)
-        if text is None:
-            return []
-        return self.extract_synonym_strings(text, seen_refs)
-
-    # -------------------------------------------------------------------------
-    def try_parse_json(self, value: str) -> Any:
-        if not value:
-            return None
-        try:
-            return json.loads(value)
-        except (ValueError, TypeError):
-            return None
-
-    # -------------------------------------------------------------------------
     def expand_variant(self, value: str) -> list[str]:
         cached = self.variant_cache.get(value)
         if cached is not None:
             return cached
-        normalized = self.normalize_whitespace(value)
+        normalized = normalize_whitespace(value)
         if not normalized:
             return []
         variants = {normalized}
@@ -837,10 +777,6 @@ class DrugsLookup:
         if token in MATCHING_STOPWORDS:
             return False
         return not token.isdigit()
-
-    # -------------------------------------------------------------------------
-    def normalize_whitespace(self, value: str) -> str:
-        return re.sub(r"\s+", " ", value).strip()
 
     # -------------------------------------------------------------------------
     def create_match(
@@ -901,14 +837,7 @@ class DrugsLookup:
         cached = self.normalization_cache.get(name)
         if cached is not None:
             return cached
-        normalized = (
-            unicodedata.normalize("NFKD", name)
-            .encode("ascii", "ignore")
-            .decode("ascii")
-        )
-        normalized = normalized.lower()
-        normalized = re.sub(r"[^a-z0-9\s]", " ", normalized)
-        normalized = re.sub(r"\s+", " ", normalized).strip()
+        normalized = normalize_drug_name(name)
         if len(self.normalization_cache) < self.NORMALIZATION_CACHE_LIMIT:
             self.normalization_cache[name] = normalized
         return normalized
