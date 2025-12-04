@@ -15,7 +15,9 @@
     "ssl": false,
     "ssl_ca": null,
     "connect_timeout": 30,
-    "insert_batch_size": 1000
+    "insert_batch_size": 1000,
+    "insert_commit_interval": 5,
+    "select_page_size": 2000
   },    
   "rag": {
     "vector_collection_name": "documents",
@@ -33,7 +35,9 @@
     "cloud_provider": "openai",
     "cloud_model": "gpt-4o-mini",
     "cloud_embedding_model": "",
-    "use_cloud_embeddings": false
+    "use_cloud_embeddings": false,
+    "vector_stream_batch_size": 1024,
+    "embedding_max_workers": 4
   },
   "external_data": {
     "default_llm_timeout": 3600.0,
@@ -42,7 +46,9 @@
     "livertox_yield_interval": 25,
     "livertox_skip_deterministic_ratio": 0.8,
     "livertox_monograph_max_workers": 4,
-    "max_excerpt_length": 8000    
+    "max_excerpt_length": 8000,
+    "rxnav_request_timeout": 12.0,
+    "rxnav_max_concurrency": 16
   },
   "ingestion": {
     "drug_name_min_length": 3,
@@ -66,7 +72,11 @@
       "PCK"
     ],
     "catalog_token_ratio_threshold": 0.93,
-    "catalog_overall_ratio_threshold": 0.93
+    "catalog_overall_ratio_threshold": 0.93,
+    "match_cache_limit": 5000,
+    "alias_cache_limit": 2000,
+    "catalog_index_limit": 75000,
+    "catalog_candidate_limit": 750
   },
   "llm_runtime_defaults": {
     "parsing_model": "qwen3:1.7b",

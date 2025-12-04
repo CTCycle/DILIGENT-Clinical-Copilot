@@ -5,7 +5,8 @@ import json
 import os
 import re
 import zipfile
-from typing import Any, cast
+from concurrent.futures import ThreadPoolExecutor, as_completed
+from typing import Any, Iterator, cast
 from xml.etree import ElementTree
 
 import pandas as pd
@@ -240,6 +241,17 @@ class DataSerializer:
         return frame.reindex(columns=DRUGS_CATALOG_COLUMNS)
 
     # -----------------------------------------------------------------------------
+    def stream_drugs_catalog(
+        self, page_size: int | None = None
+    ) -> Iterator[pd.DataFrame]:
+        chunk_size = (
+            server_settings.database.select_page_size
+            if page_size is None
+            else max(int(page_size), 1)
+        )
+        yield from database.stream_rows("DRUGS_CATALOG", chunk_size)
+
+    # -----------------------------------------------------------------------------
     def normalize_string(self, value: Any) -> str | None:
         if isinstance(value, str):
             normalized = value.strip()
@@ -453,6 +465,7 @@ class VectorSerializer:
         cloud_provider: str | None = None,
         cloud_embedding_model: str | None = None,
         embedding_batch_size: int | None = None,
+        embedding_workers: int | None = None,
     ) -> None:
         if not isinstance(vector_database, LanceVectorDatabase):
             raise TypeError("vector_database must be a LanceVectorDatabase instance")
@@ -472,6 +485,12 @@ class VectorSerializer:
             DEFAULT_EMBEDDING_BATCH_SIZE if embedding_batch_size is None else embedding_batch_size
         )
         self.embedding_batch_size = max(int(resolved_batch_size), 1)
+        resolved_workers = (
+            server_settings.rag.embedding_max_workers
+            if embedding_workers is None
+            else embedding_workers
+        )
+        self.embedding_workers = max(int(resolved_workers), 1)
 
     # -------------------------------------------------------------------------
     def serialize(self, reset_collection: bool = False) -> dict[str, int]:
@@ -490,32 +509,50 @@ class VectorSerializer:
         batch_size = self.embedding_batch_size
         total_records = 0
         document_ids: set[str] = set()
+        batch_iter: list[list[Document]] = []
         for start in range(0, len(chunks), batch_size):
-            batch_chunks = chunks[start : start + batch_size]
-            embeddings = self.embedding_generator.embed_texts(
-                [chunk.page_content for chunk in batch_chunks]
-            )
-            if len(embeddings) != len(batch_chunks):
-                raise RuntimeError("Embedding count does not match chunk count")
-            document_ids.update(
-                str(chunk.metadata.get("document_id"))
-                for chunk in batch_chunks
-                if chunk.metadata.get("document_id")
-            )
-            records = self.build_records(batch_chunks, embeddings)
-            if not records:
-                continue
-            if reset_pending and not reset_applied:
-                self.vector_database.initialize(True)
-                reset_applied = True
-            self.vector_database.upsert_embeddings(records)
-            total_records += len(records)
+            batch = chunks[start : start + batch_size]
+            if batch:
+                batch_iter.append(batch)
+        with ThreadPoolExecutor(max_workers=self.embedding_workers) as executor:
+            futures = [
+                executor.submit(self._embed_chunk_batch, batch_chunks)
+                for batch_chunks in batch_iter
+            ]
+            for future in as_completed(futures):
+                records, batch_ids = future.result()
+                document_ids.update(batch_ids)
+                if not records:
+                    continue
+                if reset_pending and not reset_applied:
+                    self.vector_database.initialize(True)
+                    reset_applied = True
+                self.vector_database.upsert_embeddings(records)
+                total_records += len(records)
         logger.info(
             "Serialized %d documents into %d vector chunks",
             len(document_ids),
             total_records,
         )
         return {"documents": len(document_ids), "chunks": total_records}
+
+    # -------------------------------------------------------------------------
+    def _embed_chunk_batch(
+        self, batch_chunks: list[Document]
+    ) -> tuple[list[dict[str, Any]], set[str]]:
+        if not batch_chunks:
+            return [], set()
+        texts = [chunk.page_content for chunk in batch_chunks]
+        embeddings = self.embedding_generator.embed_texts(texts)
+        if len(embeddings) != len(batch_chunks):
+            raise RuntimeError("Embedding count does not match chunk count")
+        document_ids = {
+            str(chunk.metadata.get("document_id"))
+            for chunk in batch_chunks
+            if chunk.metadata.get("document_id")
+        }
+        records = self.build_records(batch_chunks, embeddings)
+        return records, document_ids
 
     # -------------------------------------------------------------------------
     def build_records(

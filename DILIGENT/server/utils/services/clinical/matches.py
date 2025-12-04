@@ -2,11 +2,12 @@ from __future__ import annotations
 
 import re
 import time
+from collections import OrderedDict
 from dataclasses import dataclass
-from difflib import SequenceMatcher
-from typing import Any
+from typing import Any, Iterable, Iterator, TypeVar, Generic
 
 import pandas as pd
+from rapidfuzz import fuzz
 
 from DILIGENT.server.utils.configurations import server_settings
 from DILIGENT.server.utils.constants import MATCHING_STOPWORDS
@@ -22,6 +23,49 @@ from DILIGENT.server.utils.services.text.synonyms import (
     parse_synonym_list,
     split_synonym_variants,
 )
+
+
+KT = TypeVar("KT")
+VT = TypeVar("VT")
+CACHE_MISS = object()
+
+
+###############################################################################
+class BoundedCache(Generic[KT, VT]):
+    __slots__ = ("limit", "store")
+
+    def __init__(self, limit: int) -> None:
+        self.limit = max(int(limit), 1)
+        self.store: OrderedDict[KT, VT] = OrderedDict()
+
+    # ------------------------------------------------------------------
+    def get(self, key: KT, default: Any = CACHE_MISS) -> Any:
+        if key not in self.store:
+            return default
+        value = self.store.pop(key)
+        self.store[key] = value
+        return value
+
+    # ------------------------------------------------------------------
+    def put(self, key: KT, value: VT) -> None:
+        if self.limit <= 0:
+            return
+        if key in self.store:
+            self.store.pop(key)
+        elif len(self.store) >= self.limit:
+            self.store.popitem(last=False)
+        self.store[key] = value
+
+    # ------------------------------------------------------------------
+    def clear(self) -> None:
+        self.store.clear()
+
+
+###############################################################################
+@dataclass(slots=True)
+class AliasCacheEntry:
+    entries: list[tuple[str, bool]]
+    seen: set[str]
 
 
 ###############################################################################
@@ -62,6 +106,8 @@ class DrugsLookup:
         server_settings.drugs_matcher.normalization_cache_limit
     )
     VARIANT_CACHE_LIMIT = server_settings.drugs_matcher.variant_cache_limit
+    MATCH_CACHE_LIMIT = server_settings.drugs_matcher.match_cache_limit
+    ALIAS_CACHE_LIMIT = server_settings.drugs_matcher.alias_cache_limit
     CATALOG_EXCLUDED_TERM_SUFFIXES = server_settings.drugs_matcher.catalog_excluded_term_suffixes
     CATALOG_TOKEN_RATIO_THRESHOLD = (
         server_settings.drugs_matcher.catalog_token_ratio_threshold
@@ -69,16 +115,26 @@ class DrugsLookup:
     CATALOG_OVERALL_RATIO_THRESHOLD = (
         server_settings.drugs_matcher.catalog_overall_ratio_threshold
     )
+    CATALOG_INDEX_LIMIT = server_settings.drugs_matcher.catalog_index_limit
+    CATALOG_CANDIDATE_LIMIT = server_settings.drugs_matcher.catalog_candidate_limit
 
     # -------------------------------------------------------------------------
     def __init__(self) -> None:
         self.data: LiverToxData | None = None
-        self.match_cache: dict[str, LiverToxMatch | None] = {}
-        self.alias_cache: dict[str, tuple[list[tuple[str, bool]], set[str]]] = {}
-        self.catalog_synonym_records: list[dict[str, Any]] = []
+        self.match_cache: BoundedCache[str, LiverToxMatch | None] = BoundedCache(
+            self.MATCH_CACHE_LIMIT
+        )
+        self.alias_cache: BoundedCache[str, AliasCacheEntry] = BoundedCache(
+            self.ALIAS_CACHE_LIMIT
+        )
         self.catalog_global_index: dict[str, tuple[dict[str, Any], bool, str]] = {}
-        self.normalization_cache: dict[str, str] = {}
-        self.variant_cache: dict[str, list[str]] = {}
+        self.catalog_token_index: dict[str, set[str]] = {}
+        self.normalization_cache: BoundedCache[str, str] = BoundedCache(
+            self.NORMALIZATION_CACHE_LIMIT
+        )
+        self.variant_cache: BoundedCache[str, list[str]] = BoundedCache(
+            self.VARIANT_CACHE_LIMIT
+        )
 
     # -------------------------------------------------------------------------
     def attach_data(self, data: LiverToxData) -> None:
@@ -88,6 +144,7 @@ class DrugsLookup:
         self.normalization_cache.clear()
         self.variant_cache.clear()
         self.catalog_global_index = {}
+        self.catalog_token_index = {}
         self.prepare_catalog_synonyms()
 
     # -------------------------------------------------------------------------
@@ -99,8 +156,8 @@ class DrugsLookup:
             if not normalized:
                 continue
             logger.info("Finding matches for drug '%s'", name)
-            cached = self.match_cache.get(normalized)
-            if cached is not None or normalized in self.match_cache:
+            cached = self.match_cache.get(normalized, CACHE_MISS)
+            if cached is not CACHE_MISS:
                 if cached is not None:
                     logger.info(
                         "Cache hit for '%s': '%s' via %s (confidence=%.2f)",
@@ -123,7 +180,7 @@ class DrugsLookup:
                 alias_elapsed_s,
             )
             if not alias_entries:
-                self.match_cache[normalized] = None
+                self.match_cache.put(normalized, None)
                 logger.warning(
                     "No alias candidates found for '%s' (normalized: '%s'). "
                     "Check catalog availability and term type filters.",
@@ -135,7 +192,7 @@ class DrugsLookup:
             lookup = self.match_query(alias_entries)
             match_elapsed_s = time.perf_counter() - match_start
             if lookup is None:
-                self.match_cache[normalized] = None
+                self.match_cache.put(normalized, None)
                 logger.warning(
                     "No match found for '%s' after %d aliases in %.3f s. "
                     "Checks: primary=checked, synonym=checked, master=checked, "
@@ -147,7 +204,7 @@ class DrugsLookup:
                 continue
             record, confidence, reason, notes = lookup
             match = self.create_match(record, confidence, reason, notes)
-            self.match_cache[normalized] = match
+            self.match_cache.put(normalized, match)
             results[idx] = match
             summary_notes = "; ".join(match.notes) if match.notes else ""
             logger.info(
@@ -238,11 +295,10 @@ class DrugsLookup:
     ) -> list[tuple[str, bool]]:
         alias_entries: list[tuple[str, bool]] = []
         seen: set[str] = set()
-        cache_entry = self.alias_cache.get(normalized_query)
-        if cache_entry is not None:
-            cached_entries, cached_seen = cache_entry
-            alias_entries = list(cached_entries)
-            seen = set(cached_seen)
+        cache_entry = self.alias_cache.get(normalized_query, CACHE_MISS)
+        if cache_entry is not CACHE_MISS:
+            alias_entries = list(cache_entry.entries)
+            seen = set(cache_entry.seen)
         else:
             catalog_match: tuple[dict[str, Any], bool, str] | None = None
             if normalized_query:
@@ -279,9 +335,9 @@ class DrugsLookup:
                         self.add_alias_entry(alias_entries, seen, variant, True)
 
             if normalized_query:
-                self.alias_cache[normalized_query] = (
-                    list(alias_entries),
-                    set(seen),
+                self.alias_cache.put(
+                    normalized_query,
+                    AliasCacheEntry(list(alias_entries), set(seen)),
                 )
 
         self.add_alias_entry(alias_entries, seen, original_name, False)
@@ -315,17 +371,28 @@ class DrugsLookup:
             return None
 
         significant_query_tokens = self.catalog_significant_tokens(normalized_query)
-        if not significant_query_tokens:
-            return None
+        candidate_keys: set[str] = set()
+        if significant_query_tokens:
+            for token in significant_query_tokens:
+                matches = self.catalog_token_index.get(token)
+                if matches:
+                    candidate_keys.update(matches)
+                if len(candidate_keys) >= self.CATALOG_CANDIDATE_LIMIT:
+                    break
+        if not candidate_keys:
+            candidate_keys = set(self.catalog_global_index.keys())
+        candidate_list = sorted(candidate_keys)
+        if len(candidate_list) > self.CATALOG_CANDIDATE_LIMIT:
+            candidate_list = candidate_list[: self.CATALOG_CANDIDATE_LIMIT]
 
         best_candidate: tuple[
-            tuple[int, int, float, float, int], dict[str, Any], bool, str
+            tuple[int, int, float, float, float, int], dict[str, Any], bool, str
         ] | None = None
-        for candidate_normalized, (
-            entry,
-            is_synonym,
-            original,
-        ) in self.catalog_global_index.items():
+        for candidate_normalized in candidate_list:
+            payload = self.catalog_global_index.get(candidate_normalized)
+            if payload is None:
+                continue
+            entry, is_synonym, original = payload
             accepted, score = self.evaluate_catalog_candidate(
                 normalized_query,
                 candidate_normalized,
@@ -357,17 +424,12 @@ class DrugsLookup:
         normalized_query: str,
         candidate: str,
         significant_query_tokens: list[str],
-    ) -> tuple[bool, tuple[int, int, float, float, int]]:
+    ) -> tuple[bool, tuple[int, int, float, float, float, int]]:
         candidate_tokens = self.catalog_significant_tokens(candidate)
         shared_tokens = set(significant_query_tokens) & set(candidate_tokens)
-        best_token_ratio = 0.0
-        if significant_query_tokens and candidate_tokens:
-            for query_token in significant_query_tokens:
-                for candidate_token in candidate_tokens:
-                    ratio = SequenceMatcher(None, query_token, candidate_token).ratio()
-                    if ratio > best_token_ratio:
-                        best_token_ratio = ratio
-        overall_ratio = SequenceMatcher(None, normalized_query, candidate).ratio()
+        token_ratio = fuzz.token_set_ratio(normalized_query, candidate) / 100.0
+        partial_ratio = fuzz.partial_ratio(normalized_query, candidate) / 100.0
+        overall_ratio = fuzz.ratio(normalized_query, candidate) / 100.0
         substring_length = 0
         if candidate in normalized_query:
             substring_length = len(candidate)
@@ -375,15 +437,15 @@ class DrugsLookup:
             substring_length = len(normalized_query)
         accepted = bool(shared_tokens)
         if not accepted:
-            if (
-                best_token_ratio >= self.CATALOG_TOKEN_RATIO_THRESHOLD
-                and overall_ratio >= self.CATALOG_OVERALL_RATIO_THRESHOLD
-            ):
-                accepted = True
+            accepted = bool(
+                token_ratio >= self.CATALOG_TOKEN_RATIO_THRESHOLD
+                and partial_ratio >= self.CATALOG_OVERALL_RATIO_THRESHOLD
+            )
         score = (
             len(shared_tokens),
             substring_length,
-            best_token_ratio,
+            token_ratio,
+            partial_ratio,
             overall_ratio,
             -abs(len(candidate) - len(normalized_query)),
         )
@@ -514,7 +576,7 @@ class DrugsLookup:
             )
             token_overlap = len(matched_tokens.get(key, set()))
             ratio = (
-                SequenceMatcher(None, normalized_query, normalized_target).ratio()
+                fuzz.ratio(normalized_query, normalized_target) / 100.0
                 if normalized_target
                 else 0.0
             )
@@ -574,7 +636,7 @@ class DrugsLookup:
         for candidate, record, original, is_primary in data.variant_catalog:
             if candidate == normalized_query:
                 return record, original, is_primary, 1.0
-            ratio = SequenceMatcher(None, normalized_query, candidate).ratio()
+            ratio = fuzz.ratio(normalized_query, candidate) / 100.0
             if ratio > best_ratio:
                 best_ratio = ratio
                 best = (record, original, is_primary, ratio)
@@ -587,14 +649,14 @@ class DrugsLookup:
     # -------------------------------------------------------------------------
     def prepare_catalog_synonyms(self) -> None:
         data = self.data
-        self.catalog_synonym_records = []
         self.catalog_global_index = {}
+        self.catalog_token_index = {}
         if data is None:
             return
-        catalog_df = data.drugs_catalog_df
-        if catalog_df is None or catalog_df.empty:
+        catalog_source = data.drugs_catalog_df
+        if catalog_source is None:
             return
-        for row in catalog_df.itertuples(index=False):
+        for row in data.iter_catalog_rows():
             term_type = coerce_text(getattr(row, "term_type", None))
             if not self.catalog_term_type_allowed(term_type):
                 continue
@@ -639,34 +701,71 @@ class DrugsLookup:
                     continue
                 fallback_aliases.append(brand)
                 fallback_seen.add(brand)
-            self.catalog_synonym_records.append(
-                {
-                    "synonyms": unique_synonyms,
-                    "normalized_map": normalized_map,
-                    "fallback_aliases": fallback_aliases,
-                    "raw_name": raw_name_value,
-                    "base_name": base_name_value,
-                }
-            )
+            entry = {
+                "rxcui": getattr(row, "rxcui", ""),
+                "term_type": term_type,
+                "raw_name": raw_name_value,
+                "name": base_name_value,
+                "brand_names": fallback_aliases[:],
+                "synonyms": unique_synonyms,
+                "fallback_aliases": fallback_aliases,
+            }
+            self.register_catalog_entry(entry, normalized_map, fallback_aliases)
 
-        self.catalog_global_index = {}
-        for entry in self.catalog_synonym_records:
-            normalized_map = entry["normalized_map"]
-            for normalized_synonym, original in normalized_map.items():
-                if normalized_synonym not in self.catalog_global_index:
-                    self.catalog_global_index[normalized_synonym] = (
-                        entry,
-                        True,
-                        original,
-                    )
-            for alias in entry.get("fallback_aliases", []):
-                normalized_alias = self.normalize_name(alias)
-                if normalized_alias and normalized_alias not in self.catalog_global_index:
-                    self.catalog_global_index[normalized_alias] = (
-                        entry,
-                        False,
-                        alias,
-                    )
+    # -------------------------------------------------------------------------
+    def register_catalog_entry(
+        self,
+        entry: dict[str, Any],
+        normalized_map: dict[str, str],
+        fallback_aliases: list[str],
+    ) -> None:
+        for normalized_synonym, original in normalized_map.items():
+            self.add_catalog_index_entry(normalized_synonym, entry, True, original)
+        for alias in fallback_aliases:
+            normalized_alias = self.normalize_name(alias)
+            if not normalized_alias:
+                continue
+            self.add_catalog_index_entry(normalized_alias, entry, False, alias)
+
+    # -------------------------------------------------------------------------
+    def add_catalog_index_entry(
+        self,
+        normalized_value: str,
+        entry: dict[str, Any],
+        is_synonym: bool,
+        original: str,
+    ) -> None:
+        if normalized_value in self.catalog_global_index:
+            self.catalog_global_index[normalized_value] = (
+                entry,
+                is_synonym,
+                original,
+            )
+            self._register_catalog_tokens(normalized_value)
+            return
+        if len(self.catalog_global_index) >= self.CATALOG_INDEX_LIMIT:
+            return
+        self.catalog_global_index[normalized_value] = (
+            entry,
+            is_synonym,
+            original,
+        )
+        self._register_catalog_tokens(normalized_value)
+
+    # -------------------------------------------------------------------------
+    def _register_catalog_tokens(self, normalized_value: str) -> None:
+        tokens = self.catalog_significant_tokens(normalized_value)
+        if not tokens:
+            return
+        for token in tokens:
+            bucket = self.catalog_token_index.setdefault(token, set())
+            bucket.add(normalized_value)
+            if len(bucket) > self.CATALOG_CANDIDATE_LIMIT * 2:
+                while len(bucket) > self.CATALOG_CANDIDATE_LIMIT:
+                    try:
+                        bucket.pop()
+                    except KeyError:  # pragma: no cover - defensive
+                        break
 
     # -------------------------------------------------------------------------
     def catalog_term_type_allowed(self, term_type: str | None) -> bool:
@@ -740,9 +839,9 @@ class DrugsLookup:
 
     # -------------------------------------------------------------------------
     def expand_variant(self, value: str) -> list[str]:
-        cached = self.variant_cache.get(value)
-        if cached is not None:
-            return cached
+        cached = self.variant_cache.get(value, CACHE_MISS)
+        if cached is not CACHE_MISS:
+            return list(cached)
         normalized = normalize_whitespace(value)
         if not normalized:
             return []
@@ -752,8 +851,7 @@ class DrugsLookup:
             if candidate:
                 variants.add(candidate)
         result = list(variants)
-        if len(self.variant_cache) < self.VARIANT_CACHE_LIMIT:
-            self.variant_cache[value] = result
+        self.variant_cache.put(value, result)
         return result
 
     # -------------------------------------------------------------------------
@@ -834,12 +932,11 @@ class DrugsLookup:
 
     # -------------------------------------------------------------------------
     def normalize_name(self, name: str) -> str:
-        cached = self.normalization_cache.get(name)
-        if cached is not None:
+        cached = self.normalization_cache.get(name, CACHE_MISS)
+        if cached is not CACHE_MISS:
             return cached
         normalized = normalize_drug_name(name)
-        if len(self.normalization_cache) < self.NORMALIZATION_CACHE_LIMIT:
-            self.normalization_cache[name] = normalized
+        self.normalization_cache.put(name, normalized)
         return normalized
 
     # -------------------------------------------------------------------------
@@ -857,13 +954,12 @@ class LiverToxMatcher:
         livertox_df: pd.DataFrame,
         master_list_df: pd.DataFrame | None = None,
         *,
-        drugs_catalog_df: pd.DataFrame | None = None,
+        drugs_catalog_df: pd.DataFrame | Iterable[pd.DataFrame] | None = None,
     ) -> None:
-        catalog_df = (
-            drugs_catalog_df.copy()
-            if drugs_catalog_df is not None and not drugs_catalog_df.empty
-            else None
-        )
+        if isinstance(drugs_catalog_df, pd.DataFrame) and drugs_catalog_df.empty:
+            catalog_df: pd.DataFrame | Iterable[pd.DataFrame] | None = None
+        else:
+            catalog_df = drugs_catalog_df
         self.lookup = DrugsLookup()
         self.data = LiverToxData(
             lookup=self.lookup,

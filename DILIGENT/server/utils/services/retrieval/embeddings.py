@@ -148,6 +148,7 @@ class SimilaritySearch:
             collection_name=server_settings.rag.vector_collection_name,
             metric=server_settings.rag.vector_index_metric,
             index_type=server_settings.rag.vector_index_type,
+            stream_batch_size=server_settings.rag.vector_stream_batch_size,
         )
         self.embedding_generator = embedding_generator or EmbeddingGenerator(
             backend=server_settings.rag.embedding_backend,

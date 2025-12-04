@@ -1,6 +1,7 @@
 from __future__ import annotations
 
-from collections.abc import Callable
+from collections.abc import Callable, Iterable, Iterator
+from types import SimpleNamespace
 from typing import Any
 
 import pandas as pd
@@ -17,20 +18,17 @@ class LiverToxData:
         lookup: Any,
         livertox_df: pd.DataFrame,
         master_list_df: pd.DataFrame | None,
-        drugs_catalog_df: pd.DataFrame | None,
+        drugs_catalog_df: pd.DataFrame | Iterable[pd.DataFrame] | None,
         record_factory: Callable[..., Any],
     ) -> None:
         self.lookup = lookup
         self.record_factory = record_factory
         self.livertox_df = livertox_df
-        if master_list_df is not None and not master_list_df.empty:
-            self.master_list_df = master_list_df.copy()
+        if isinstance(master_list_df, pd.DataFrame) and not master_list_df.empty:
+            self.master_list_df = master_list_df.copy(deep=False)
         else:
             self.master_list_df = self.derive_master_alias_source(livertox_df)
-        if drugs_catalog_df is not None and not drugs_catalog_df.empty:
-            self.drugs_catalog_df = drugs_catalog_df.copy()
-        else:
-            self.drugs_catalog_df = None
+        self.drugs_catalog_df = self._prepare_catalog_source(drugs_catalog_df)
         self.records: list[Any] = []
         self.primary_index: dict[str, Any] = {}
         self.synonym_index: dict[str, tuple[Any, str]] = {}
@@ -211,3 +209,47 @@ class LiverToxData:
         alias = alias.replace("Not available", pd.NA)
         alias = alias.dropna(how="all", subset=["ingredient", "brand_name"])
         return alias.reset_index(drop=True)
+
+    # -------------------------------------------------------------------------
+    def _prepare_catalog_source(
+        self, source: pd.DataFrame | Iterable[pd.DataFrame] | None
+    ) -> pd.DataFrame | Iterable[pd.DataFrame] | None:
+        if source is None:
+            return None
+        if isinstance(source, pd.DataFrame):
+            return source.copy(deep=False) if not source.empty else None
+        if isinstance(source, Iterable):
+            return source
+        return None
+
+    # -------------------------------------------------------------------------
+    def iter_catalog_rows(self) -> Iterator[Any]:
+        catalog_source = self.drugs_catalog_df
+        if catalog_source is None:
+            return
+        if isinstance(catalog_source, pd.DataFrame):
+            yield from catalog_source.itertuples(index=False)
+            return
+        if isinstance(catalog_source, Iterable):
+            for chunk in catalog_source:
+                if isinstance(chunk, pd.DataFrame):
+                    if chunk.empty:
+                        continue
+                    yield from chunk.itertuples(index=False)
+                    continue
+                if isinstance(chunk, dict):
+                    yield SimpleNamespace(**chunk)
+                    continue
+                if hasattr(chunk, "_fields"):
+                    yield chunk
+                    continue
+                if hasattr(chunk, "__dict__"):
+                    yield chunk
+                    continue
+                try:
+                    mapping = dict(chunk)
+                except Exception:  # noqa: BLE001
+                    continue
+                yield SimpleNamespace(**mapping)
+            return
+        return

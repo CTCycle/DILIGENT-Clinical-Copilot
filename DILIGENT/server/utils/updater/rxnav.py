@@ -1,11 +1,11 @@
 from __future__ import annotations
 
+import asyncio
 import codecs
 import json
 import re
 import time
 import unicodedata
-from concurrent.futures import ThreadPoolExecutor, as_completed
 from dataclasses import dataclass
 from typing import Any
 from collections.abc import Iterator
@@ -13,6 +13,7 @@ from collections.abc import Iterator
 import httpx
 import pandas as pd
 
+from DILIGENT.server.utils.configurations import server_settings
 from DILIGENT.server.utils.logger import logger
 from DILIGENT.server.utils.constants import RXNAV_SYNONYM_STOPWORDS
 from DILIGENT.server.utils.repository.serializer import DataSerializer
@@ -152,12 +153,82 @@ class RxNavClient:
 
     def __init__(self, *, enabled: bool | None = None) -> None:
         self.enabled = True
+        external_settings = server_settings.external_data
+        self.timeout = max(float(external_settings.rxnav_request_timeout), 1.0)
+        self.max_concurrency = max(int(external_settings.rxnav_max_concurrency), 1)
         self.cache: dict[str, dict[str, RxNormCandidate]] = {}
         self.synonym_cache: dict[str, list[str]] = {}
 
     # -------------------------------------------------------------------------
-    def fetch_drug_terms(self, raw_name: str) -> list[str]:
-        payload = self.request(raw_name)
+    def _build_limits(self) -> httpx.Limits:
+        return httpx.Limits(
+            max_connections=self.max_concurrency,
+            max_keepalive_connections=self.max_concurrency,
+        )
+
+    # -------------------------------------------------------------------------
+    async def _request_json(
+        self,
+        url: str,
+        *,
+        params: dict[str, Any] | None = None,
+        client: httpx.AsyncClient | None = None,
+    ) -> dict[str, Any] | None:
+        owns_client = client is None
+        session = client or httpx.AsyncClient(
+            timeout=self.timeout,
+            limits=self._build_limits(),
+        )
+        try:
+            for attempt in range(self.MAX_RETRIES):
+                try:
+                    response = await session.get(url, params=params)
+                except httpx.RequestError as exc:
+                    if attempt + 1 == self.MAX_RETRIES:
+                        logger.debug("RxNorm request failed for '%s': %s", url, exc)
+                        return None
+                    await asyncio.sleep(
+                        self.BACKOFF_TIME[min(attempt, len(self.BACKOFF_TIME) - 1)]
+                    )
+                    continue
+                if response.status_code in self.RETRY_STATUS:
+                    if attempt + 1 == self.MAX_RETRIES:
+                        logger.debug(
+                            "RxNorm service returned %s for '%s'",
+                            response.status_code,
+                            url,
+                        )
+                        return None
+                    await asyncio.sleep(
+                        self.BACKOFF_TIME[min(attempt, len(self.BACKOFF_TIME) - 1)]
+                    )
+                    continue
+                if response.status_code >= 400:
+                    logger.debug(
+                        "RxNorm service returned %s for '%s'",
+                        response.status_code,
+                        url,
+                    )
+                    return None
+                try:
+                    return response.json()
+                except json.JSONDecodeError as exc:
+                    logger.debug("RxNorm JSON decode failed for '%s': %s", url, exc)
+                    return None
+        finally:
+            if owns_client:
+                await session.aclose()
+        return None
+
+    # -------------------------------------------------------------------------
+    async def fetch_drug_terms_async(
+        self, raw_name: str, *, client: httpx.AsyncClient | None = None
+    ) -> list[str]:
+        payload = await self._request_json(
+            self.BASE_URL,
+            params={"name": raw_name, "expand": "psn"},
+            client=client,
+        )
         collected: dict[str, str] = {}
 
         def store(term: str) -> None:
@@ -192,64 +263,24 @@ class RxNavClient:
         return sorted(collected.values(), key=str.casefold)
 
     # -------------------------------------------------------------------------
-    def fetch_rxcui_synonyms(self, rxcui: str) -> list[str]:
+    def fetch_drug_terms(self, raw_name: str) -> list[str]:
+        return asyncio.run(self.fetch_drug_terms_async(raw_name))
+
+    # -------------------------------------------------------------------------
+    async def fetch_rxcui_synonyms_async(
+        self, rxcui: str, *, client: httpx.AsyncClient | None = None
+    ) -> list[str]:
         identifier = str(rxcui).strip()
         if not identifier:
             return []
         cached = self.synonym_cache.get(identifier)
         if cached is not None:
             return cached
-        url = self.RXCUI_PROPERTY_URL.format(rxcui=identifier)
-        params = {"propName": "RxNorm Synonym"}
-        payload: dict[str, Any] | None = None
-        for attempt in range(self.MAX_RETRIES):
-            try:
-                response = httpx.get(url, params=params, timeout=self.TIMEOUT)
-            except httpx.RequestError as exc:
-                if attempt + 1 == self.MAX_RETRIES:
-                    logger.debug(
-                        "RxNorm rxcui request failed for '%s': %s",
-                        identifier,
-                        exc,
-                    )
-                    self.synonym_cache[identifier] = []
-                    return []
-                time.sleep(
-                    self.BACKOFF_TIME[min(attempt, len(self.BACKOFF_TIME) - 1)]
-                )
-                continue
-            if response.status_code in self.RETRY_STATUS:
-                if attempt + 1 == self.MAX_RETRIES:
-                    logger.debug(
-                        "RxNorm property service returned %s for '%s'",
-                        response.status_code,
-                        identifier,
-                    )
-                    self.synonym_cache[identifier] = []
-                    return []
-                time.sleep(
-                    self.BACKOFF_TIME[min(attempt, len(self.BACKOFF_TIME) - 1)]
-                )
-                continue
-            if response.status_code >= 400:
-                logger.debug(
-                    "RxNorm property service returned %s for '%s'",
-                    response.status_code,
-                    identifier,
-                )
-                self.synonym_cache[identifier] = []
-                return []
-            try:
-                payload = response.json()
-            except json.JSONDecodeError as exc:
-                logger.debug(
-                    "RxNorm property JSON decode failed for '%s': %s",
-                    identifier,
-                    exc,
-                )
-                self.synonym_cache[identifier] = []
-                return []
-            break
+        payload = await self._request_json(
+            self.RXCUI_PROPERTY_URL.format(rxcui=identifier),
+            params={"propName": "RxNorm Synonym"},
+            client=client,
+        )
         if payload is None:
             self.synonym_cache[identifier] = []
             return []
@@ -281,6 +312,10 @@ class RxNavClient:
         synonyms = sorted(collected.values(), key=str.casefold)
         self.synonym_cache[identifier] = synonyms
         return synonyms
+
+    # -------------------------------------------------------------------------
+    def fetch_rxcui_synonyms(self, rxcui: str) -> list[str]:
+        return asyncio.run(self.fetch_rxcui_synonyms_async(rxcui))
 
     # -------------------------------------------------------------------------
     def gather_property_values(self, prop: dict[str, Any]) -> list[str]:
@@ -396,7 +431,12 @@ class RxNavClient:
 
     # -------------------------------------------------------------------------
     def collect_candidates(self, raw_name: str) -> dict[str, RxNormCandidate]:
-        payload = self.request(raw_name)
+        payload = asyncio.run(
+            self._request_json(
+                self.BASE_URL,
+                params={"name": raw_name, "expand": "psn"},
+            )
+        )
         if payload is None:
             return {}
         drug_group = payload.get("drugGroup")
@@ -432,50 +472,6 @@ class RxNavClient:
                         for variant in ingredient_variants:
                             self.store_candidate(collected, variant, "ingredient")
         return collected
-
-    # -------------------------------------------------------------------------
-    def request(self, raw_name: str) -> dict[str, Any] | None:
-        params = {"name": raw_name, "expand": "psn"}
-        for attempt in range(self.MAX_RETRIES):
-            try:
-                response = httpx.get(
-                    self.BASE_URL,
-                    params=params,
-                    timeout=self.TIMEOUT,
-                )
-            except httpx.RequestError as exc:
-                if attempt + 1 == self.MAX_RETRIES:
-                    logger.debug("RxNorm request failed for '%s': %s", raw_name, exc)
-                    return None
-                time.sleep(
-                    self.BACKOFF_TIME[min(attempt, len(self.BACKOFF_TIME) - 1)]
-                )
-                continue
-            if response.status_code in self.RETRY_STATUS:
-                if attempt + 1 == self.MAX_RETRIES:
-                    logger.debug(
-                        "RxNorm service returned %s for '%s'",
-                        response.status_code,
-                        raw_name,
-                    )
-                    return None
-                time.sleep(
-                    self.BACKOFF_TIME[min(attempt, len(self.BACKOFF_TIME) - 1)]
-                )
-                continue
-            if response.status_code >= 400:
-                logger.debug(
-                    "RxNorm service returned %s for '%s'",
-                    response.status_code,
-                    raw_name,
-                )
-                return None
-            try:
-                return response.json()
-            except json.JSONDecodeError as exc:
-                logger.debug("RxNorm JSON decode failed for '%s': %s", raw_name, exc)
-                return None
-        return None
 
     # -------------------------------------------------------------------------
     def extract_property_values(self, prop: dict[str, Any]) -> list[tuple[str, str]]:
@@ -938,60 +934,31 @@ class RxNavDrugCatalogBuilder:
                             normalized_brands,
                         )
 
-        fetch_tasks: dict[Any, tuple[str, str, str]] = {}
         if pending_alias_queries or pending_synonym_identifier:
-            total_tasks = len(pending_alias_queries)
+            alias_results, synonym_results = self.fetch_pending_queries(
+                pending_alias_queries,
+                pending_synonym_identifier,
+            )
+            for cache_key, filtered_terms in alias_results.items():
+                self.alias_cache[cache_key] = filtered_terms
+                for term in filtered_terms:
+                    for variant in self.expand_synonym_variants(term):
+                        self.register_alias_candidate(
+                            variant,
+                            aliases,
+                            normalized_name,
+                            normalized_brands,
+                        )
             if pending_synonym_identifier is not None:
-                total_tasks += 1
-            max_workers = min(self.SYNONYM_WORKERS, max(1, total_tasks))
-            with ThreadPoolExecutor(max_workers=max_workers) as executor:
-                for cache_key, stripped in pending_alias_queries.items():
-                    future = executor.submit(self.rx_client.fetch_drug_terms, stripped)
-                    fetch_tasks[future] = ("alias", cache_key, stripped)
-                if pending_synonym_identifier is not None:
-                    future = executor.submit(
-                        self.rx_client.fetch_rxcui_synonyms,
-                        pending_synonym_identifier,
-                    )
-                    fetch_tasks[future] = (
-                        "synonym",
-                        pending_synonym_identifier,
-                        pending_synonym_identifier,
-                    )
-                for future in as_completed(fetch_tasks):
-                    kind, cache_key, original = fetch_tasks[future]
-                    try:
-                        fetched_terms = future.result()
-                    except Exception as exc:  # noqa: BLE001
-                        if kind == "alias":
-                            logger.warning(
-                                "Failed to fetch RxNav aliases for '%s': %s",
-                                original,
-                                exc,
-                            )
-                        else:
-                            logger.warning(
-                                "Failed to fetch RxNav aliases for rxcui '%s': %s",
-                                original,
-                                exc,
-                            )
-                        filtered_terms: list[str] = []
-                    else:
-                        filtered_terms = [
-                            term for term in fetched_terms if isinstance(term, str)
-                        ]
-                    if kind == "alias":
-                        self.alias_cache[cache_key] = filtered_terms
-                    else:
-                        self.rxcui_cache[cache_key] = filtered_terms
-                    for term in filtered_terms:
-                        for variant in self.expand_synonym_variants(term):
-                            self.register_alias_candidate(
-                                variant,
-                                aliases,
-                                normalized_name,
-                                normalized_brands,
-                            )
+                self.rxcui_cache[pending_synonym_identifier] = synonym_results
+                for term in synonym_results:
+                    for variant in self.expand_synonym_variants(term):
+                        self.register_alias_candidate(
+                            variant,
+                            aliases,
+                            normalized_name,
+                            normalized_brands,
+                        )
 
         for cache_key, stripped in pending_alias_queries.items():
             cached = self.alias_cache.get(cache_key, [])
@@ -1018,6 +985,61 @@ class RxNavDrugCatalogBuilder:
         if not aliases:
             return []
         return sorted(aliases.values(), key=str.casefold)
+
+    # -------------------------------------------------------------------------
+    def fetch_pending_queries(
+        self,
+        pending_alias_queries: dict[str, str],
+        pending_synonym_identifier: str | None,
+    ) -> tuple[dict[str, list[str]], list[str]]:
+        if not pending_alias_queries and pending_synonym_identifier is None:
+            return {}, []
+
+        async def runner() -> tuple[dict[str, list[str]], list[str]]:
+            alias_results: dict[str, list[str]] = {}
+            synonym_results: list[str] = []
+            async with httpx.AsyncClient(
+                timeout=self.rx_client.timeout,
+                limits=self.rx_client._build_limits(),
+            ) as client:
+                alias_tasks = {
+                    cache_key: asyncio.create_task(
+                        self.rx_client.fetch_drug_terms_async(stripped, client=client)
+                    )
+                    for cache_key, stripped in pending_alias_queries.items()
+                }
+                synonym_task = (
+                    asyncio.create_task(
+                        self.rx_client.fetch_rxcui_synonyms_async(
+                            pending_synonym_identifier, client=client
+                        )
+                    )
+                    if pending_synonym_identifier
+                    else None
+                )
+                for cache_key, task in alias_tasks.items():
+                    try:
+                        alias_results[cache_key] = await task
+                    except Exception as exc:  # noqa: BLE001
+                        logger.warning(
+                            "Failed to fetch RxNav aliases for '%s': %s",
+                            pending_alias_queries.get(cache_key),
+                            exc,
+                        )
+                        alias_results[cache_key] = []
+                if synonym_task is not None:
+                    try:
+                        synonym_results = await synonym_task
+                    except Exception as exc:  # noqa: BLE001
+                        logger.warning(
+                            "Failed to fetch RxNav synonyms for '%s': %s",
+                            pending_synonym_identifier,
+                            exc,
+                        )
+                        synonym_results = []
+            return alias_results, synonym_results
+
+        return asyncio.run(runner())
 
     # -------------------------------------------------------------------------
     def expand_synonym_variants(self, candidate: str) -> list[str]:

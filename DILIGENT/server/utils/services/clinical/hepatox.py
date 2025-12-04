@@ -191,10 +191,7 @@ class HepatoxConsultation:
         if self.matcher is not None:
             return True
         try:
-            dataset, catalog = await asyncio.gather(
-                asyncio.to_thread(self.serializer.get_livertox_records),
-                asyncio.to_thread(self.serializer.get_drugs_catalog),
-            )
+            dataset = await asyncio.to_thread(self.serializer.get_livertox_records)
         except Exception as exc:  # noqa: BLE001
             logger.error("Failed loading LiverTox monographs from database: %s", exc)
             self.matcher = None
@@ -207,11 +204,12 @@ class HepatoxConsultation:
             return False
         self.livertox_df = dataset
         self.master_list_df = None
+        catalog_stream = self.serializer.stream_drugs_catalog()
         try:
             self.matcher = await asyncio.to_thread(
                 LiverToxMatcher,
                 dataset,
-                drugs_catalog_df=catalog,
+                drugs_catalog_df=catalog_stream,
             )
         except Exception as exc:  # noqa: BLE001
             logger.error("Failed preparing LiverTox matcher: %s", exc)
