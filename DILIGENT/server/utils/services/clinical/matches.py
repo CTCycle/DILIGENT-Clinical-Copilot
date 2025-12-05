@@ -1,7 +1,6 @@
 from __future__ import annotations
 
 import re
-import time
 from collections import OrderedDict
 from dataclasses import dataclass
 from typing import Any, Iterable, Iterator, TypeVar, Generic
@@ -170,51 +169,41 @@ class DrugsLookup:
                     logger.info("Cache recorded no match for '%s'", name)
                 results[idx] = cached
                 continue
-            alias_start = time.perf_counter()
             alias_entries = self.resolve_alias_candidates(patient_drugs[idx], normalized)
-            alias_elapsed_s = time.perf_counter() - alias_start
+            alias_count = len(alias_entries)
             logger.info(
-                "Fetched %d candidate names for '%s' in %.3f s",
-                len(alias_entries),
+                "Resolved %d alias candidates for '%s'",
+                alias_count,
                 name,
-                alias_elapsed_s,
             )
             if not alias_entries:
                 self.match_cache.put(normalized, None)
                 logger.warning(
-                    "No alias candidates found for '%s' (normalized: '%s'). "
-                    "Check catalog availability and term type filters.",
+                    "No alias candidates found for '%s' (normalized: '%s').",
                     name,
                     normalized,
                 )
                 continue
-            match_start = time.perf_counter()
             lookup = self.match_query(alias_entries)
-            match_elapsed_s = time.perf_counter() - match_start
             if lookup is None:
                 self.match_cache.put(normalized, None)
                 logger.warning(
-                    "No match found for '%s' after %d aliases in %.3f s. "
-                    "Checks: primary=checked, synonym=checked, master=checked, "
-                    "partial=checked, fuzzy=checked",
+                    "No match found for '%s' after %d alias candidates",
                     name,
-                    len(alias_entries),
-                    match_elapsed_s,
+                    alias_count,
                 )
                 continue
             record, confidence, reason, notes = lookup
             match = self.create_match(record, confidence, reason, notes)
             self.match_cache.put(normalized, match)
             results[idx] = match
-            summary_notes = "; ".join(match.notes) if match.notes else ""
             logger.info(
-                "Best candidate for '%s': '%s' via %s (confidence=%.2f)%s in %.3f s",
+                "Match found for '%s': '%s' via %s (aliases=%d, confidence=%.2f)",
                 name,
                 match.matched_name,
                 match.reason,
+                alias_count,
                 match.confidence,
-                f" [{summary_notes}]" if summary_notes else "",
-                match_elapsed_s,
             )
         return results
 
