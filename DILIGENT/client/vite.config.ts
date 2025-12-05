@@ -1,40 +1,36 @@
-import path from "node:path";
+import { defineConfig } from 'vite'
+import react from '@vitejs/plugin-react'
 
-import react from "@vitejs/plugin-react-swc";
-import { defineConfig } from "vite";
+// https://vite.dev/config/
+const apiHost = process.env.FASTAPI_HOST || '127.0.0.1'
+const apiPort = process.env.FASTAPI_PORT || '8000'
+const apiTarget = `http://${apiHost}:${apiPort}`
 
-const FASTAPI_HOST = process.env.FASTAPI_HOST || "127.0.0.1";
-const FASTAPI_PORT =
-  Number.parseInt(process.env.FASTAPI_PORT || "", 10) || 8000;
-const FASTAPI_TARGET = `http://${FASTAPI_HOST}:${FASTAPI_PORT}`;
 
 export default defineConfig({
-  plugins: [react()],
-  resolve: {
-    alias: {
-      "@": path.resolve(__dirname, "src"),
+    plugins: [react()],
+    server: {
+        host: '127.0.0.1',
+        port: 7861,
+        strictPort: true,
+        proxy: {
+            '/api': {
+                target: apiTarget,
+                changeOrigin: true,
+                rewrite: (path) => path.replace(/^\/api/, ''),
+            },
+        },
     },
-  },
-  server: {
-    host: true,
-    port: 5173,
-    proxy: {
-      "/api": {
-        target: FASTAPI_TARGET,
-        changeOrigin: true,
-        secure: false,
-        rewrite: (rawPath) => rawPath.replace(/^\/api/, ""),
-      },
+    preview: {
+        host: '127.0.0.1',
+        port: 7861,
+        strictPort: true,
+        proxy: {
+            '/api': {
+                target: apiTarget,
+                changeOrigin: true,
+                rewrite: (path) => path.replace(/^\/api/, ''),
+            },
+        },
     },
-  },
-  preview: {
-    proxy: {
-      "/api": {
-        target: FASTAPI_TARGET,
-        changeOrigin: true,
-        secure: false,
-        rewrite: (rawPath) => rawPath.replace(/^\/api/, ""),
-      },
-    },
-  },
-});
+})
