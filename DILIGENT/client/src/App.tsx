@@ -22,6 +22,38 @@ import {
 
 const todayIso = new Date().toISOString().slice(0, 10);
 
+// SVG Icons as components
+const CopyIcon = () => (
+  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+    <rect x="9" y="9" width="13" height="13" rx="2" ry="2" />
+    <path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1" />
+  </svg>
+);
+
+const ExpandIcon = () => (
+  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+    <polyline points="15 3 21 3 21 9" />
+    <polyline points="9 21 3 21 3 15" />
+    <line x1="21" y1="3" x2="14" y2="10" />
+    <line x1="3" y1="21" x2="10" y2="14" />
+  </svg>
+);
+
+const DownloadIcon = () => (
+  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+    <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" />
+    <polyline points="7 10 12 15 17 10" />
+    <line x1="12" y1="15" x2="12" y2="3" />
+  </svg>
+);
+
+const CloseIcon = () => (
+  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+    <line x1="18" y1="6" x2="6" y2="18" />
+    <line x1="6" y1="6" x2="18" y2="18" />
+  </svg>
+);
+
 function App(): React.JSX.Element {
   const [settings, setSettings] = useState<RuntimeSettings>(DEFAULT_SETTINGS);
   const [form, setForm] = useState<ClinicalFormState>(DEFAULT_FORM_STATE);
@@ -34,6 +66,7 @@ function App(): React.JSX.Element {
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [isRunning, setIsRunning] = useState(false);
   const [isPulling, setIsPulling] = useState(false);
+  const [isExpanded, setIsExpanded] = useState(false);
 
   const cloudEnabled = settings.useCloudServices;
   const pullDisabled = cloudEnabled || isPulling;
@@ -160,6 +193,20 @@ function App(): React.JSX.Element {
     anchor.click();
   };
 
+  const handleCopyReport = async () => {
+    if (message) {
+      try {
+        await navigator.clipboard.writeText(message);
+      } catch (err) {
+        console.error("Failed to copy:", err);
+      }
+    }
+  };
+
+  const handleToggleExpand = () => {
+    setIsExpanded((prev) => !prev);
+  };
+
   const spinner = (
     <div className="session-spinner">
       <div className="spinner-wheel" />
@@ -180,144 +227,162 @@ function App(): React.JSX.Element {
 
   return (
     <div className="app-shell">
+      {/* Configuration Drawer */}
       <aside className={`config-drawer ${sidebarOpen ? "open" : ""}`}>
         <div className="drawer-header">
-          <div>
+          <div className="drawer-header-content">
             <p className="drawer-title">Model Configurations</p>
             <p className="drawer-subtitle">
               Adjust runtime preferences for DILI analysis
             </p>
           </div>
           <button
-            className="text-button"
+            className="drawer-close"
             type="button"
             onClick={() => setSidebarOpen(false)}
+            aria-label="Close configuration panel"
           >
-            Close
+            <CloseIcon />
           </button>
         </div>
 
-        <div className="drawer-section">
-          <p className="section-title">Execution Mode</p>
-          <label className="field checkbox">
-            <input
-              type="checkbox"
-              checked={cloudEnabled}
-              onChange={(event) => handleUseCloudChange(event.target.checked)}
-            />
-            <span>Use Cloud Services</span>
-          </label>
+        <div className="drawer-body">
+          {/* Group 1: Execution Mode */}
+          <div className="drawer-section">
+            <p className="drawer-section-title">Execution Mode</p>
+            <label className="field checkbox">
+              <input
+                type="checkbox"
+                id="use-cloud-services"
+                checked={cloudEnabled}
+                onChange={(event) => handleUseCloudChange(event.target.checked)}
+              />
+              <span className="field-label">Use Cloud Services</span>
+            </label>
+          </div>
+
+          {/* Group 2: Cloud Configuration */}
+          <div className="drawer-section">
+            <p className="drawer-section-title">Cloud Configuration</p>
+            <div className="field">
+              <label className="field-label" htmlFor="cloud-service">Cloud Service</label>
+              <select
+                id="cloud-service"
+                value={cloudSelection.provider}
+                onChange={(event) => handleProviderChange(event.target.value)}
+                disabled={!cloudEnabled}
+              >
+                {CLOUD_PROVIDERS.map((provider) => (
+                  <option key={provider} value={provider}>
+                    {provider}
+                  </option>
+                ))}
+              </select>
+            </div>
+
+            <div className="field">
+              <label className="field-label" htmlFor="cloud-model">Cloud Model</label>
+              <select
+                id="cloud-model"
+                value={cloudSelection.model ?? ""}
+                onChange={(event) => handleCloudModelChange(event.target.value)}
+                disabled={!cloudEnabled}
+              >
+                {(CLOUD_MODEL_CHOICES[cloudSelection.provider] || []).map((model) => (
+                  <option key={model} value={model}>
+                    {model}
+                  </option>
+                ))}
+              </select>
+            </div>
+          </div>
+
+          {/* Group 3: Local Configuration */}
+          <div className="drawer-section">
+            <p className="drawer-section-title">Local Configuration</p>
+            <div className="field">
+              <label className="field-label" htmlFor="parsing-model">Parsing Model</label>
+              <select
+                id="parsing-model"
+                value={settings.parsingModel}
+                onChange={(event) =>
+                  handleSettingsChange({ parsingModel: event.target.value })
+                }
+                disabled={cloudEnabled}
+              >
+                {PARSING_MODEL_CHOICES.map((model) => (
+                  <option key={model} value={model}>
+                    {model}
+                  </option>
+                ))}
+              </select>
+            </div>
+
+            <div className="field">
+              <label className="field-label" htmlFor="clinical-model">Clinical Model</label>
+              <select
+                id="clinical-model"
+                value={settings.clinicalModel}
+                onChange={(event) =>
+                  handleSettingsChange({ clinicalModel: event.target.value })
+                }
+                disabled={cloudEnabled}
+              >
+                {CLINICAL_MODEL_CHOICES.map((model) => (
+                  <option key={model} value={model}>
+                    {model}
+                  </option>
+                ))}
+              </select>
+            </div>
+          </div>
+
+          {/* Group 4: Advanced */}
+          <div className="drawer-section">
+            <p className="drawer-section-title">Advanced</p>
+            <div className="field">
+              <label className="field-label" htmlFor="temperature">Temperature (Ollama)</label>
+              <input
+                id="temperature"
+                type="number"
+                min={0}
+                max={2}
+                step={0.05}
+                value={settings.temperature}
+                onChange={(event) =>
+                  handleSettingsChange({
+                    temperature: Number.parseFloat(event.target.value) || 0,
+                  })
+                }
+                disabled={cloudEnabled}
+              />
+            </div>
+
+            <label className="field checkbox">
+              <input
+                type="checkbox"
+                id="enable-reasoning"
+                checked={settings.reasoning}
+                onChange={(event) =>
+                  handleSettingsChange({ reasoning: event.target.checked })
+                }
+                disabled={cloudEnabled}
+              />
+              <span className="field-label">Enable SDL/Reasoning (Ollama)</span>
+            </label>
+          </div>
         </div>
 
-        <div className="drawer-section">
-          <p className="section-title">Cloud Configuration</p>
-          <label className="field">
-            <span>Cloud Service</span>
-            <select
-              value={cloudSelection.provider}
-              onChange={(event) => handleProviderChange(event.target.value)}
-              disabled={!cloudEnabled}
-            >
-              {CLOUD_PROVIDERS.map((provider) => (
-                <option key={provider} value={provider}>
-                  {provider}
-                </option>
-              ))}
-            </select>
-          </label>
-
-          <label className="field">
-            <span>Cloud Model</span>
-            <select
-              value={cloudSelection.model ?? ""}
-              onChange={(event) => handleCloudModelChange(event.target.value)}
-              disabled={!cloudEnabled}
-            >
-              {(CLOUD_MODEL_CHOICES[cloudSelection.provider] || []).map((model) => (
-                <option key={model} value={model}>
-                  {model}
-                </option>
-              ))}
-            </select>
-          </label>
+        <div className="drawer-footer">
+          <button
+            className="btn btn-primary"
+            type="button"
+            disabled={pullDisabled}
+            onClick={handlePullModels}
+          >
+            {isPulling ? "Pulling models..." : "Pull Selected Models"}
+          </button>
         </div>
-
-        <div className="drawer-section">
-          <p className="section-title">Local Configuration</p>
-          <label className="field">
-            <span>Parsing Model</span>
-            <select
-              value={settings.parsingModel}
-              onChange={(event) =>
-                handleSettingsChange({ parsingModel: event.target.value })
-              }
-              disabled={cloudEnabled}
-            >
-              {PARSING_MODEL_CHOICES.map((model) => (
-                <option key={model} value={model}>
-                  {model}
-                </option>
-              ))}
-            </select>
-          </label>
-
-          <label className="field">
-            <span>Clinical Model</span>
-            <select
-              value={settings.clinicalModel}
-              onChange={(event) =>
-                handleSettingsChange({ clinicalModel: event.target.value })
-              }
-              disabled={cloudEnabled}
-            >
-              {CLINICAL_MODEL_CHOICES.map((model) => (
-                <option key={model} value={model}>
-                  {model}
-                </option>
-              ))}
-            </select>
-          </label>
-        </div>
-
-        <div className="drawer-section">
-          <label className="field">
-            <span>Temperature (Ollama)</span>
-            <input
-              type="number"
-              min={0}
-              max={2}
-              step={0.05}
-              value={settings.temperature}
-              onChange={(event) =>
-                handleSettingsChange({
-                  temperature: Number.parseFloat(event.target.value) || 0,
-                })
-              }
-              disabled={cloudEnabled}
-            />
-          </label>
-
-          <label className="field checkbox">
-            <input
-              type="checkbox"
-              checked={settings.reasoning}
-              onChange={(event) =>
-                handleSettingsChange({ reasoning: event.target.checked })
-              }
-              disabled={cloudEnabled}
-            />
-            <span>Enable SDL/Reasoning (Ollama)</span>
-          </label>
-        </div>
-
-        <button
-          className="primary-button"
-          type="button"
-          disabled={pullDisabled}
-          onClick={handlePullModels}
-        >
-          {isPulling ? "Pulling models..." : "Pull Selected Models"}
-        </button>
       </aside>
 
       {sidebarOpen && (
@@ -328,128 +393,146 @@ function App(): React.JSX.Element {
         className="drawer-toggle"
         type="button"
         onClick={() => setSidebarOpen(true)}
-        aria-label="Open configuration"
+        aria-label="Open configuration panel"
       >
         <span>&rsaquo;</span>
       </button>
 
+      {/* Main Content */}
       <main className="page-container">
         <header className="page-header">
-          <div>
-            <p className="eyebrow">DILIGENT Clinical Copilot</p>
-            <h1>Drug-Induced Liver Injury analysis</h1>
-            <p className="lede">
-              Provide clinical context and lab data to generate a structured
-              hepatotoxicity assessment.
-            </p>
-          </div>
+          <p className="eyebrow">DILIGENT Clinical Copilot</p>
+          <h1>Drug-Induced Liver Injury analysis</h1>
+          <p className="lede">
+            Provide clinical context and lab data to generate a structured
+            hepatotoxicity assessment.
+          </p>
         </header>
 
-        <div className="content-grid">
-          <section className="card">
+        <div className="main-form-grid">
+          {/* Clinical Inputs Column */}
+          <section className="card clinical-inputs">
             <div className="card-header">
               <h2>Clinical Inputs</h2>
               <p className="helper">
                 Describe the clinical picture and therapies for this visit.
               </p>
             </div>
-            <label className="field">
-              <span>Anamnesis</span>
-              <textarea
-                placeholder="Describe the clinical picture, including exams and labs when relevant..."
-                value={form.anamnesis}
-                onChange={(event) =>
-                  handleFormChange("anamnesis", event.target.value)
-                }
-              />
-            </label>
-            <label className="field">
-              <span>Current Drugs</span>
-              <textarea
-                placeholder="List current therapies, dosage and schedule..."
-                value={form.drugs}
-                onChange={(event) => handleFormChange("drugs", event.target.value)}
-              />
-            </label>
 
-            <div className="two-column">
-              <label className="field">
-                <span>ALT</span>
-                <input
-                  type="text"
-                  placeholder="e.g., 189 or 189 U/L"
-                  value={form.alt}
-                  onChange={(event) => handleFormChange("alt", event.target.value)}
-                />
-              </label>
-              <label className="field">
-                <span>ALT Max</span>
-                <input
-                  type="text"
-                  placeholder="e.g., 47 U/L"
-                  value={form.altMax}
+            {/* Section 1: Clinical Context */}
+            <div className="clinical-section">
+              <p className="section-title">Clinical context</p>
+              <div className="field">
+                <label className="field-label" htmlFor="anamnesis">Anamnesis</label>
+                <textarea
+                  id="anamnesis"
+                  placeholder="Patient history and clinical observations..."
+                  value={form.anamnesis}
                   onChange={(event) =>
-                    handleFormChange("altMax", event.target.value)
+                    handleFormChange("anamnesis", event.target.value)
                   }
                 />
-              </label>
+                <span className="field-helper">Include relevant exams and previous lab results when available.</span>
+              </div>
+              <div className="field">
+                <label className="field-label" htmlFor="drugs">Current Drugs</label>
+                <textarea
+                  id="drugs"
+                  placeholder="Medication list with dosages..."
+                  value={form.drugs}
+                  onChange={(event) => handleFormChange("drugs", event.target.value)}
+                />
+                <span className="field-helper">List current therapies, dosage and schedule.</span>
+              </div>
             </div>
 
-            <div className="two-column">
-              <label className="field">
-                <span>ALP</span>
-                <input
-                  type="text"
-                  placeholder="e.g., 140 or 140 U/L"
-                  value={form.alp}
-                  onChange={(event) => handleFormChange("alp", event.target.value)}
-                />
-              </label>
-              <label className="field">
-                <span>ALP Max</span>
-                <input
-                  type="text"
-                  placeholder="e.g., 150 U/L"
-                  value={form.alpMax}
-                  onChange={(event) =>
-                    handleFormChange("alpMax", event.target.value)
-                  }
-                />
-              </label>
+            {/* Section 2: Lab Values */}
+            <div className="clinical-section">
+              <p className="section-title">Lab values</p>
+              <div className="lab-grid">
+                <div className="field">
+                  <label className="field-label" htmlFor="alt">ALT (U/L)</label>
+                  <input
+                    id="alt"
+                    type="text"
+                    placeholder="189"
+                    value={form.alt}
+                    onChange={(event) => handleFormChange("alt", event.target.value)}
+                  />
+                </div>
+                <div className="field">
+                  <label className="field-label" htmlFor="alt-max">ALT Max (U/L)</label>
+                  <input
+                    id="alt-max"
+                    type="text"
+                    placeholder="47"
+                    value={form.altMax}
+                    onChange={(event) =>
+                      handleFormChange("altMax", event.target.value)
+                    }
+                  />
+                  <span className="field-helper">Upper limit of normal</span>
+                </div>
+                <div className="field">
+                  <label className="field-label" htmlFor="alp">ALP (U/L)</label>
+                  <input
+                    id="alp"
+                    type="text"
+                    placeholder="140"
+                    value={form.alp}
+                    onChange={(event) => handleFormChange("alp", event.target.value)}
+                  />
+                </div>
+                <div className="field">
+                  <label className="field-label" htmlFor="alp-max">ALP Max (U/L)</label>
+                  <input
+                    id="alp-max"
+                    type="text"
+                    placeholder="150"
+                    value={form.alpMax}
+                    onChange={(event) =>
+                      handleFormChange("alpMax", event.target.value)
+                    }
+                  />
+                  <span className="field-helper">Upper limit of normal</span>
+                </div>
+              </div>
             </div>
           </section>
 
-          <section className="card">
+          {/* Patient Information Column */}
+          <section className="card patient-info">
             <div className="card-header">
               <h2>Patient Information</h2>
               <p className="helper">Basic demographics and visit data.</p>
             </div>
 
-            <div className="control-panel">
-              <div className="control-copy">
-                <p className="control-title">Evidence retrieval</p>
-                <p className="control-helper">
-                  Toggle RAG only when you need supporting evidence for this visit.
-                </p>
+            {/* Advanced Options Block */}
+            <div className="advanced-options">
+              <p className="advanced-options-header">Evidence Retrieval</p>
+              <div className="toggle-row">
+                <span className="toggle-label">Enable RAG for supporting evidence</span>
+                <label className="toggle-switch">
+                  <input
+                    type="checkbox"
+                    id="use-rag"
+                    checked={form.useRag}
+                    onChange={(event) =>
+                      handleFormChange("useRag", event.target.checked)
+                    }
+                  />
+                  <span className="toggle-track" aria-hidden="true">
+                    <span className="toggle-thumb" />
+                  </span>
+                </label>
               </div>
-              <label className="chip-toggle">
-                <input
-                  type="checkbox"
-                  checked={form.useRag}
-                  onChange={(event) =>
-                    handleFormChange("useRag", event.target.checked)
-                  }
-                />
-                <span className="chip-track" aria-hidden="true">
-                  <span className="chip-thumb" />
-                </span>
-                <span className="chip-label">RAG</span>
-              </label>
             </div>
 
-            <label className="field">
-              <span>Patient Name</span>
+            {/* Basic Fields */}
+            <div className="field">
+              <label className="field-label" htmlFor="patient-name">Patient Name</label>
               <input
+                id="patient-name"
                 type="text"
                 placeholder="e.g., Marco Rossi"
                 value={form.patientName}
@@ -457,21 +540,23 @@ function App(): React.JSX.Element {
                   handleFormChange("patientName", event.target.value)
                 }
               />
-            </label>
+            </div>
 
-            <label className="field">
-              <span>Visit Date</span>
+            <div className="field">
+              <label className="field-label" htmlFor="visit-date">Visit Date</label>
               <input
+                id="visit-date"
                 type="date"
                 max={todayIso}
                 value={form.visitDate}
                 onChange={(event) => handleVisitDateChange(event.target.value)}
               />
-            </label>
+            </div>
 
-            <div className="stacked-actions">
+            {/* Action Buttons */}
+            <div className="action-stack">
               <button
-                className="primary-button"
+                className="btn btn-primary"
                 type="button"
                 disabled={isRunning}
                 onClick={handleRunSession}
@@ -479,46 +564,86 @@ function App(): React.JSX.Element {
                 {isRunning ? "Running..." : "Run DILI analysis"}
               </button>
               <button
-                className="secondary-button"
+                className="btn btn-secondary"
                 type="button"
                 disabled={!exportUrl}
                 onClick={handleDownload}
               >
                 Download report
               </button>
-              <button className="ghost-button" type="button" onClick={handleClear}>
+              <button
+                className="btn btn-tertiary"
+                type="button"
+                onClick={handleClear}
+              >
                 Clear all
               </button>
             </div>
-
-            <div className="spinner-container">
-              <div className="placeholder-row" />
-            </div>
           </section>
-        </div>
 
-        <section className="report-section">
-          <div className="report-shell">
-            <div className="report-header">
-              <div>
+          {/* Report Output Section */}
+          <section className="report-section">
+            <div className="report-shell" style={isExpanded ? { maxHeight: 'none' } : undefined}>
+              <div className="report-header">
                 <p className="report-eyebrow">Session output</p>
                 <h2>Report Output</h2>
-                <p className="report-helper">
+                <p className="report-subtitle">
                   Markdown rendering of the clinical report.
                 </p>
               </div>
+
+              <div className="report-toolbar">
+                <button
+                  className="toolbar-btn"
+                  type="button"
+                  onClick={handleCopyReport}
+                  disabled={!message}
+                  title="Copy to clipboard"
+                >
+                  <CopyIcon />
+                  <span>Copy</span>
+                </button>
+                <button
+                  className="toolbar-btn"
+                  type="button"
+                  onClick={handleToggleExpand}
+                  disabled={!message}
+                  title={isExpanded ? "Collapse" : "Expand"}
+                >
+                  <ExpandIcon />
+                  <span>{isExpanded ? "Collapse" : "Expand"}</span>
+                </button>
+                <button
+                  className="toolbar-btn"
+                  type="button"
+                  onClick={handleDownload}
+                  disabled={!exportUrl}
+                  title="Download markdown file"
+                >
+                  <DownloadIcon />
+                  <span>Download markdown</span>
+                </button>
+              </div>
+
+              <div
+                className="report-content"
+                style={isExpanded ? { maxHeight: 'none' } : undefined}
+              >
+                {isRunning ? (
+                  spinner
+                ) : message ? (
+                  <ReactMarkdown remarkPlugins={[remarkGfm]} className="markdown">
+                    {message}
+                  </ReactMarkdown>
+                ) : (
+                  <div className="report-placeholder">
+                    No report generated yet. Run analysis to see results.
+                  </div>
+                )}
+              </div>
             </div>
-            <div className="report-surface">
-              {isRunning ? (
-                spinner
-              ) : (
-                <ReactMarkdown remarkPlugins={[remarkGfm]} className="markdown">
-                  {message || "_No report generated yet._"}
-                </ReactMarkdown>
-              )}
-            </div>
-          </div>
-        </section>
+          </section>
+        </div>
 
         {jsonPayload !== null && (
           <section className="card json-card">
