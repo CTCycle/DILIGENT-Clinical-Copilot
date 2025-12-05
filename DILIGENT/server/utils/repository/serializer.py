@@ -28,7 +28,7 @@ from DILIGENT.server.utils.constants import (
     TEXT_FILE_FALLBACK_ENCODINGS,
 )
 from DILIGENT.server.utils.logger import logger
-from DILIGENT.server.utils.database.database import database
+from DILIGENT.server.database.database import database
 from DILIGENT.server.utils.services.text.normalization import coerce_text
 from DILIGENT.server.utils.repository.vectors import LanceVectorDatabase
 from DILIGENT.server.utils.services.retrieval.embeddings import EmbeddingGenerator

@@ -11,8 +11,8 @@ from sqlalchemy.engine import Engine
 from sqlalchemy.orm import sessionmaker
 
 from DILIGENT.server.utils.configurations import DatabaseSettings
-from DILIGENT.server.utils.database.schema import Base
-from DILIGENT.server.utils.database.utils import normalize_postgres_engine
+from DILIGENT.server.database.schema import Base
+from DILIGENT.server.database.utils import normalize_postgres_engine
 from DILIGENT.server.utils.logger import logger
 
 

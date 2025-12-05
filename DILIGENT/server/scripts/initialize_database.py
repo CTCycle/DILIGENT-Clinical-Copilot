@@ -5,7 +5,7 @@ import os
 import time
 
 from DILIGENT.server.utils.constants import SERVER_CONFIGURATION_FILE
-from DILIGENT.server.utils.database.initializer import initialize_database
+from DILIGENT.server.database.initializer import initialize_database
 from DILIGENT.server.utils.logger import logger
 
 
