@@ -19,11 +19,13 @@ from DILIGENT.server.utils.services.clinical.hepatox import (
     HepatotoxicityPatternAnalyzer,
     HepatoxConsultation,
 )
+from DILIGENT.server.utils.services.clinical.preparation import ClinicalKnowledgePreparation
 from DILIGENT.server.utils.services.clinical.parser import DrugsParser
 from DILIGENT.server.utils.services.retrieval.query import DILIQueryBuilder
 
 drugs_parser = DrugsParser()
 pattern_analyzer = HepatotoxicityPatternAnalyzer()
+input_preparator = ClinicalKnowledgePreparation()
 router = APIRouter(tags=["session"])
 serializer = DataSerializer()
 
@@ -234,11 +236,16 @@ class ClinicalSessionEndpoint:
                 r_score=pattern_score.r_score,
             )
 
+        prepared_inputs = await input_preparator.prepare_inputs(
+            drug_data,
+            clinical_context=payload.anamnesis,
+            pattern_score=pattern_score,
+        )
+
         clinical_session = HepatoxConsultation(drug_data, patient_name=payload.name)
         drug_assessment = await clinical_session.run_analysis(
-            clinical_context=payload.anamnesis,
+            prepared_inputs=prepared_inputs,
             visit_date=payload.visit_date,
-            pattern_score=pattern_score,
             rag_query=rag_query,
         )
         elapsed = time.perf_counter() - start_time
