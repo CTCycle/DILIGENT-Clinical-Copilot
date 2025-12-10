@@ -31,9 +31,8 @@ from DILIGENT.server.utils.constants import (
     R_SCORE_HEPATOCELLULAR_THRESHOLD,
 )
 from DILIGENT.server.utils.logger import logger
-from DILIGENT.server.utils.repository.serializer import DataSerializer
 from DILIGENT.server.utils.services.retrieval.embeddings import SimilaritySearch
-from DILIGENT.server.utils.services.clinical.matches import LiverToxMatcher
+from DILIGENT.server.utils.services.clinical.preparation import HepatoxPreparedInputs
 
 
 ###############################################################################
@@ -122,15 +121,11 @@ class HepatoxConsultation:
         self,
         drugs: PatientDrugs,
         *,
-        patient_name: str | None = None,        
-        timeout_s: float = server_settings.external_data.default_llm_timeout,        
+        patient_name: str | None = None,
+        timeout_s: float = server_settings.external_data.default_llm_timeout,
     ) -> None:
         self.drugs = drugs
-        self.timeout_s = timeout_s            
-        self.serializer = DataSerializer()
-        self.livertox_df = None
-        self.master_list_df = None
-        self.matcher: LiverToxMatcher | None = None
+        self.timeout_s = timeout_s
         self.llm_client = initialize_llm_client(purpose="clinical", timeout_s=timeout_s)
         self.MAX_EXCERPT_LENGTH = server_settings.external_data.max_excerpt_length
         self.patient_name = (patient_name or "").strip() or None
@@ -151,71 +146,28 @@ class HepatoxConsultation:
     async def run_analysis(
         self,
         *,
-        clinical_context: str | None = None,
+        prepared_inputs: HepatoxPreparedInputs | None,
         visit_date: date | None = None,
-        pattern_score: HepatotoxicityPatternScore | None = None,
         rag_query: dict[str, str] | None = None,
     ) -> dict[str, Any] | None:
-        patient_drugs = [entry.name for entry in self.drugs.entries if entry.name]
-        if not patient_drugs:
-            logger.info("No drugs detected for toxicity analysis")
+        if prepared_inputs is None:
+            logger.info("No prepared inputs provided; skipping hepatotoxicity consultation")
             return None
-        if not await self.ensure_livertox_data() or self.matcher is None:
+
+        resolved_mapping = prepared_inputs.resolved_drugs
+        if not resolved_mapping:
+            logger.info("No matched drugs available for hepatotoxicity consultation")
             return None
 
         logger.info("Running clinical hepatotoxicity assessment for matched drugs")
-        # Resolve free-text drug names against LiverTox to obtain structured data
-        matches = await asyncio.to_thread(
-            self.matcher.match_drug_names,
-            patient_drugs,
-        )
-
-        # extract livertox excertps for matched drugs
-        livertox_information = await asyncio.to_thread(
-            self.matcher.build_drugs_to_excerpt_mapping,
-            patient_drugs,
-            matches,
-        )
-        resolved_mapping = self.normalize_livertox_mapping(livertox_information)
         report = await self.compile_clinical_assessment(
             resolved_mapping,
-            clinical_context=clinical_context,
+            clinical_context=prepared_inputs.clinical_context,
             visit_date=visit_date,
-            pattern_score=pattern_score,
+            pattern_prompt=prepared_inputs.pattern_prompt,
             rag_query=rag_query,
         )
         return report.model_dump()
-
-    # -------------------------------------------------------------------------
-    async def ensure_livertox_data(self) -> bool:
-        if self.matcher is not None:
-            return True
-        try:
-            dataset = await asyncio.to_thread(self.serializer.get_livertox_records)
-        except Exception as exc:  # noqa: BLE001
-            logger.error("Failed loading LiverTox monographs from database: %s", exc)
-            self.matcher = None
-            return False
-        if dataset is None or dataset.empty:
-            logger.warning(
-                "LiverTox monograph table is empty; toxicity essay cannot run"
-            )
-            self.matcher = None
-            return False
-        self.livertox_df = dataset
-        self.master_list_df = None
-        catalog_stream = self.serializer.stream_drugs_catalog()
-        try:
-            self.matcher = await asyncio.to_thread(
-                LiverToxMatcher,
-                dataset,
-                drugs_catalog_df=catalog_stream,
-            )
-        except Exception as exc:  # noqa: BLE001
-            logger.error("Failed preparing LiverTox matcher: %s", exc)
-            self.matcher = None
-            return False
-        return True
 
     # -------------------------------------------------------------------------
     async def compile_clinical_assessment(
@@ -224,11 +176,14 @@ class HepatoxConsultation:
         *,
         clinical_context: str | None,
         visit_date: date | None,
-        pattern_score: HepatotoxicityPatternScore | None, 
+        pattern_prompt: str, 
         rag_query: dict[str, str] | None = None,       
     ) -> PatientDrugClinicalReport:
-        normalized_context = (clinical_context or "").strip()
-        pattern_prompt = self.format_pattern_prompt(pattern_score)
+        normalized_context = clinical_context.strip() if clinical_context else ""
+        pattern_summary = (
+            pattern_prompt.strip()
+            or "Hepatotoxicity pattern classification was unavailable; weigh pattern matches qualitatively."
+        )
         entries: list[DrugClinicalAssessment] = []
         llm_jobs: list[tuple[int, Any]] = []       
             
@@ -282,7 +237,7 @@ class HepatoxConsultation:
                         RAG_documents=rag_documents or None,
                         clinical_context=normalized_context,
                         suspension=suspension,
-                        pattern_summary=pattern_prompt,
+                        pattern_summary=pattern_summary,
                         metadata=entry.matched_livertox_row,
                     ),
                 )
@@ -324,44 +279,6 @@ class HepatoxConsultation:
         return True
 
     # -------------------------------------------------------------------------
-    def normalize_livertox_mapping(self, data: Any) -> dict[str, dict[str, Any]]:
-        normalized: dict[str, dict[str, Any]] = {}
-        if isinstance(data, dict):
-            for key, value in data.items():
-                if not isinstance(key, str):
-                    continue
-                stripped_key = key.strip()
-                if not stripped_key:
-                    continue
-                if not isinstance(value, dict):
-                    continue
-                normalized[stripped_key] = {
-                    "drug_name": stripped_key,
-                    "matched_livertox_row": value.get("matched_livertox_row"),
-                    "extracted_excerpts": self.normalize_excerpt_list(
-                        value.get("extracted_excerpts")
-                    ),
-                }
-        elif isinstance(data, list):
-            for item in data:
-                if not isinstance(item, dict):
-                    continue
-                drug_name = item.get("drug_name")
-                if not isinstance(drug_name, str):
-                    continue
-                stripped_name = drug_name.strip()
-                if not stripped_name:
-                    continue
-                normalized[stripped_name] = {
-                    "drug_name": stripped_name,
-                    "matched_livertox_row": item.get("matched_livertox_row"),
-                    "extracted_excerpts": self.normalize_excerpt_list(
-                        item.get("extracted_excerpts")
-                    ),
-                }
-        return normalized
-
-    # -------------------------------------------------------------------------
     def select_excerpt(self, excerpts: list[str]) -> str | None:
         excerpts = [chunk.strip() for chunk in excerpts if chunk.strip()]
         if not excerpts:
@@ -375,25 +292,6 @@ class HepatoxConsultation:
         if cutoff > 2000:
             truncated = truncated[:cutoff]
         return truncated.strip()
-
-    # -------------------------------------------------------------------------
-    def normalize_excerpt_list(self, excerpts: Any) -> list[str]:
-        if isinstance(excerpts, list):
-            normalized: list[str] = []
-            for entry in excerpts:
-                if isinstance(entry, str):
-                    stripped = entry.strip()
-                elif entry is None:
-                    stripped = ""
-                else:
-                    stripped = str(entry).strip()
-                if stripped:
-                    normalized.append(stripped)
-            return normalized
-        if isinstance(excerpts, str):
-            stripped = excerpts.strip()
-            return [stripped] if stripped else []
-        return []
 
     # -------------------------------------------------------------------------
     def search_supporting_documents(
@@ -647,31 +545,6 @@ class HepatoxConsultation:
         if suspension.start_reported:
             return "Therapy start was reported, but no reliable date was available."
         return "No therapy start information was detected; treat the exposure window as chronic unless contradicted."
-
-    # -------------------------------------------------------------------------
-    def format_pattern_prompt(
-        self, pattern_score: HepatotoxicityPatternScore | None
-    ) -> str:
-        if pattern_score is None:
-            return "Hepatotoxicity pattern classification was unavailable; weigh pattern matches qualitatively."
-        classification = pattern_score.classification.replace("_", " ")
-        segments: list[str] = [
-            f"Observed liver injury pattern: {classification.capitalize()}.",
-        ]
-        if pattern_score.r_score is not None:
-            segments.append(f"R ratio ≈ {pattern_score.r_score:.2f}.")
-        if pattern_score.alt_multiple is not None:
-            segments.append(
-                f"ALT is about {pattern_score.alt_multiple:.2f} × the upper reference limit."
-            )
-        if pattern_score.alp_multiple is not None:
-            segments.append(
-                f"ALP is about {pattern_score.alp_multiple:.2f} × the upper reference limit."
-            )
-        segments.append(
-            "Treat drugs whose known hepatotoxicity pattern matches this classification as stronger causal candidates, and downgrade mismatches."
-        )
-        return " ".join(segments)
 
     # -------------------------------------------------------------------------
     def resolve_livertox_score(self, metadata: dict[str, Any] | None) -> str:
