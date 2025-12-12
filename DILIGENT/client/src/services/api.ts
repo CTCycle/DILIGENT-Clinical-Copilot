@@ -95,9 +95,8 @@ async function parseApiResponse(
     return { message: bodyText.trim(), json: null };
   }
 
-  const errorMessage = `[ERROR] Backend returned status ${response.status}.${
-    bodyText ? `\n${bodyText}` : `\nURL: ${url}`
-  }`;
+  const errorMessage = `[ERROR] Backend returned status ${response.status}.${bodyText ? `\n${bodyText}` : `\nURL: ${url}`
+    }`;
   return { message: errorMessage, json: null };
 }
 
@@ -153,4 +152,32 @@ export async function pullModels(models: string[]): Promise<ApiResult> {
     message: `[INFO] Models available locally: ${selected.join(", ")}.`,
     json: null,
   };
+}
+
+export interface TableDataResponse {
+  columns: string[];
+  rows: Record<string, unknown>[];
+  totalRows: number;
+}
+
+export async function fetchTableData(tableId: string): Promise<TableDataResponse> {
+  try {
+    const response = await fetchWithTimeout(`${API_BASE_URL}/browser/${tableId}`, {
+      method: "GET",
+    });
+
+    if (!response.ok) {
+      throw new Error(`Failed to fetch table data: ${response.status}`);
+    }
+
+    const data = await response.json();
+    return {
+      columns: data.columns ?? [],
+      rows: data.rows ?? [],
+      totalRows: data.total_rows ?? data.rows?.length ?? 0,
+    };
+  } catch (error) {
+    console.error("fetchTableData error:", error);
+    return { columns: [], rows: [], totalRows: 0 };
+  }
 }
