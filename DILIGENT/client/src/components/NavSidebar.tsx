@@ -58,7 +58,7 @@ export function NavSidebar(): React.JSX.Element {
     return (
         <nav className="nav-sidebar" aria-label="Main navigation">
             <div className="nav-brand">
-                <span className="nav-brand-letter">D</span>
+                <span className="nav-brand-letter">DILI</span>
             </div>
             <div className="nav-items">
                 {navItems.map((item) => (

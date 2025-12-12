@@ -81,7 +81,7 @@ export function DatabaseBrowserPage(): React.JSX.Element {
             </header>
 
             <div className="browser-layout">
-                {/* Controls Bar */}
+                {/* Controls Bar with Stats */}
                 <div className="browser-controls">
                     <div className="table-selector">
                         <label htmlFor="table-select" className="field-label">Select Table</label>
@@ -106,10 +106,33 @@ export function DatabaseBrowserPage(): React.JSX.Element {
                             </button>
                         </div>
                     </div>
+
+                    {/* Stats Panel - inline beside dropdown */}
+                    <aside className="stats-panel">
+                        <div className="stats-header">
+                            <h3>Statistics</h3>
+                        </div>
+                        <div className="stats-body">
+                            <div className="stat-item">
+                                <span className="stat-label">Rows:</span>
+                                <span className="stat-value">{rowCount.toLocaleString()}</span>
+                            </div>
+                            <div className="stat-item">
+                                <span className="stat-label">Columns:</span>
+                                <span className="stat-value">{columnCount}</span>
+                            </div>
+                            <div className="stat-item">
+                                <span className="stat-label">Table:</span>
+                                <span className="stat-value stat-table-name">
+                                    {TABLE_OPTIONS.find((t) => t.id === selectedTable)?.label ?? selectedTable}
+                                </span>
+                            </div>
+                        </div>
+                    </aside>
                 </div>
 
+                {/* Data Table - Full Width */}
                 <div className="browser-content">
-                    {/* Data Table */}
                     <div className="table-panel">
                         <DataTable
                             columns={currentData?.columns ?? []}
@@ -118,29 +141,6 @@ export function DatabaseBrowserPage(): React.JSX.Element {
                             emptyMessage="No data available for this table."
                         />
                     </div>
-
-                    {/* Stats Panel */}
-                    <aside className="stats-panel">
-                        <div className="stats-header">
-                            <h3>Statistics</h3>
-                        </div>
-                        <div className="stats-body">
-                            <div className="stat-item">
-                                <span className="stat-label">Rows</span>
-                                <span className="stat-value">{rowCount.toLocaleString()}</span>
-                            </div>
-                            <div className="stat-item">
-                                <span className="stat-label">Columns</span>
-                                <span className="stat-value">{columnCount}</span>
-                            </div>
-                            <div className="stat-item">
-                                <span className="stat-label">Table</span>
-                                <span className="stat-value stat-table-name">
-                                    {TABLE_OPTIONS.find((t) => t.id === selectedTable)?.label ?? selectedTable}
-                                </span>
-                            </div>
-                        </div>
-                    </aside>
                 </div>
             </div>
         </main>
