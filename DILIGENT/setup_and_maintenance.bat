@@ -25,6 +25,16 @@ set "uv_lock=%root_folder%uv.lock"
 set "venv_dir=%root_folder%.venv"
 set "client_dir=%project_folder%client"
 set "nodejs_dir=%runtimes_dir%\nodejs"
+set "server_dir=%project_folder%server"
+set "scripts_dir=%server_dir%\scripts"
+set "init_db_script=%scripts_dir%\initialize_database.py"
+set "drugs_script=%scripts_dir%\update_drugs_catalog.py"
+set "livertox_script=%scripts_dir%\update_livertox_data.py"
+set "rag_script=%scripts_dir%\update_RAG.py"
+set "init_db_module=DILIGENT.server.scripts.initialize_database"
+set "drugs_module=DILIGENT.server.scripts.update_drugs_catalog"
+set "livertox_module=DILIGENT.server.scripts.update_livertox_data"
+set "rag_module=DILIGENT.server.scripts.update_RAG"
 
 
 :::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
@@ -37,13 +47,21 @@ echo                         Setup and Maintenance
 echo ==========================================================================
 echo 1. Remove logs
 echo 2. Uninstall app
-echo 3. Exit
+echo 3. Initialize database
+echo 4. Update RxNav drugs catalog
+echo 5. Update LiverTox data
+echo 6. Vectorize RAG documents
+echo 7. Exit
 echo.
-set /p sub_choice="Select an option (1-3): "
+set /p sub_choice="Select an option (1-7): "
 
 if "%sub_choice%"=="1" goto :logs
 if "%sub_choice%"=="2" goto :uninstall
-if "%sub_choice%"=="3" goto :exit
+if "%sub_choice%"=="3" goto :run_init_db
+if "%sub_choice%"=="4" goto :run_drugs
+if "%sub_choice%"=="5" goto :run_livertox
+if "%sub_choice%"=="6" goto :run_rag
+if "%sub_choice%"=="7" goto :exit
 echo Invalid option, try again.
 pause
 goto :setup_menu
@@ -153,6 +171,58 @@ if exist "%runtimes_dir%" (
 echo [SUCCESS] Uninstall completed.
 pause
 goto :setup_menu
+
+:run_init_db
+call :run_server_script "%init_db_module%" "Database initialization" "%init_db_script%"
+goto :setup_menu
+
+:run_drugs
+call :run_server_script "%drugs_module%" "RxNav drugs catalog refresh" "%drugs_script%"
+goto :setup_menu
+
+:run_livertox
+call :run_server_script "%livertox_module%" "LiverTox dataset refresh" "%livertox_script%"
+goto :setup_menu
+
+:run_rag
+call :run_server_script "%rag_module%" "RAG embeddings refresh" "%rag_script%"
+goto :setup_menu
+
+:run_server_script
+set "script_module=%~1"
+set "script_label=%~2"
+set "script_path=%~3"
+set "run_script_ec=0"
+if not exist "%uv_exe%" (
+  echo [ERROR] uv runtime not found at "%uv_exe%".
+  echo        Run start_on_windows.bat to install project runtimes before executing server scripts.
+  set "run_script_ec=1"
+  goto :run_server_script_end
+)
+if not exist "%python_exe%" (
+  echo [ERROR] python.exe not found at "%python_exe%".
+  echo        Run start_on_windows.bat to install the embeddable Python runtime.
+  set "run_script_ec=1"
+  goto :run_server_script_end
+)
+if not exist "%script_path%" (
+  echo [ERROR] Script not found at "%script_path%".
+  set "run_script_ec=1"
+  goto :run_server_script_end
+)
+echo [RUN] !script_label!
+pushd "%root_folder%" >nul
+"%uv_exe%" run --python "%python_exe%" python -m %script_module%
+set "run_script_ec=!ERRORLEVEL!"
+popd >nul
+if "!run_script_ec!"=="0" (
+  echo [SUCCESS] !script_label! completed successfully.
+) else (
+  echo [ERROR] !script_label! failed with exit code !run_script_ec!.
+)
+:run_server_script_end
+pause
+exit /b !run_script_ec!
 
 :exit
 endlocal
