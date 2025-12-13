@@ -70,3 +70,5 @@ export const DEFAULT_FORM_STATE: ClinicalFormState = {
 export const REPORT_EXPORT_FILENAME = "clinical_report.md";
 
 export const HTTP_TIMEOUT_SECONDS = 3600;
+
+export const TABLE_PAGE_SIZE = 1000;

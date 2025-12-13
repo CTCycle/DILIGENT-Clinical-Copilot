@@ -158,13 +158,23 @@ export interface TableDataResponse {
   columns: string[];
   rows: Record<string, unknown>[];
   totalRows: number;
+  hasMore: boolean;
 }
 
-export async function fetchTableData(tableId: string): Promise<TableDataResponse> {
+export async function fetchTableData(
+  tableId: string,
+  offset: number = 0,
+  limit: number = 1000,
+): Promise<TableDataResponse> {
   try {
-    const response = await fetchWithTimeout(`${API_BASE_URL}/browser/${tableId}`, {
-      method: "GET",
+    const params = new URLSearchParams({
+      offset: String(offset),
+      limit: String(limit),
     });
+    const response = await fetchWithTimeout(
+      `${API_BASE_URL}/browser/${tableId}?${params}`,
+      { method: "GET" },
+    );
 
     if (!response.ok) {
       throw new Error(`Failed to fetch table data: ${response.status}`);
@@ -175,9 +185,10 @@ export async function fetchTableData(tableId: string): Promise<TableDataResponse
       columns: data.columns ?? [],
       rows: data.rows ?? [],
       totalRows: data.total_rows ?? data.rows?.length ?? 0,
+      hasMore: data.has_more ?? false,
     };
   } catch (error) {
     console.error("fetchTableData error:", error);
-    return { columns: [], rows: [], totalRows: 0 };
+    return { columns: [], rows: [], totalRows: 0, hasMore: false };
   }
 }

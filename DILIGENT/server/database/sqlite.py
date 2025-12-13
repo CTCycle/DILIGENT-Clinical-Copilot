@@ -126,4 +126,16 @@ class SQLiteRepository:
             for chunk in pd.read_sql_query(query, conn, chunksize=chunk_size):
                 yield chunk
 
-    
+    # -------------------------------------------------------------------------
+    def load_paginated(
+        self, table_name: str, offset: int, limit: int
+    ) -> pd.DataFrame:
+        with self.engine.connect() as conn:
+            inspector = inspect(conn)
+            if not inspector.has_table(table_name):
+                logger.warning("Table %s does not exist", table_name)
+                return pd.DataFrame()
+            query = text(f'SELECT * FROM "{table_name}" LIMIT :limit OFFSET :offset')
+            data = pd.read_sql_query(query, conn, params={"limit": limit, "offset": offset})
+        return data
+

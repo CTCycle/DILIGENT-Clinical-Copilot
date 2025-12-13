@@ -1,7 +1,8 @@
-import React, { useEffect } from "react";
+import React, { useEffect, useCallback } from "react";
 import { TableId, useAppState } from "../context/AppStateContext";
 import { DataTable } from "../components/DataTable";
 import { fetchTableData } from "../services/api";
+import { TABLE_PAGE_SIZE } from "../constants";
 
 // ---------------------------------------------------------------------------
 // Constants
@@ -16,8 +17,8 @@ const TABLE_OPTIONS: { id: TableId; label: string }[] = [
 // DatabaseBrowserPage
 // ---------------------------------------------------------------------------
 export function DatabaseBrowserPage(): React.JSX.Element {
-    const { state, updateDatabaseBrowser, setTableData } = useAppState();
-    const { selectedTable, tableCache, isLoading } = state.databaseBrowser;
+    const { state, updateDatabaseBrowser, setTableData, appendTableData } = useAppState();
+    const { selectedTable, tableCache, isLoading, isLoadingMore } = state.databaseBrowser;
 
     const currentData = tableCache[selectedTable];
 
@@ -32,7 +33,7 @@ export function DatabaseBrowserPage(): React.JSX.Element {
         const loadData = async () => {
             updateDatabaseBrowser({ isLoading: true });
             try {
-                const result = await fetchTableData(selectedTable);
+                const result = await fetchTableData(selectedTable, 0, TABLE_PAGE_SIZE);
                 if (!cancelled) {
                     setTableData(selectedTable, result);
                 }
@@ -59,7 +60,7 @@ export function DatabaseBrowserPage(): React.JSX.Element {
     const handleRefresh = async () => {
         updateDatabaseBrowser({ isLoading: true });
         try {
-            const result = await fetchTableData(selectedTable);
+            const result = await fetchTableData(selectedTable, 0, TABLE_PAGE_SIZE);
             setTableData(selectedTable, result);
         } catch (error) {
             console.error("Failed to refresh table data:", error);
@@ -68,9 +69,27 @@ export function DatabaseBrowserPage(): React.JSX.Element {
         }
     };
 
+    const handleLoadMore = useCallback(async () => {
+        if (!currentData || isLoadingMore || !currentData.hasMore) {
+            return;
+        }
+
+        updateDatabaseBrowser({ isLoadingMore: true });
+        try {
+            const offset = currentData.rows.length;
+            const result = await fetchTableData(selectedTable, offset, TABLE_PAGE_SIZE);
+            appendTableData(selectedTable, result.rows, result.hasMore);
+        } catch (error) {
+            console.error("Failed to load more data:", error);
+        } finally {
+            updateDatabaseBrowser({ isLoadingMore: false });
+        }
+    }, [currentData, isLoadingMore, selectedTable, updateDatabaseBrowser, appendTableData]);
+
     // Stats
     const rowCount = currentData?.totalRows ?? 0;
     const columnCount = currentData?.columns.length ?? 0;
+    const loadedRows = currentData?.rows.length ?? 0;
 
     return (
         <main className="page-container database-browser">
@@ -115,7 +134,11 @@ export function DatabaseBrowserPage(): React.JSX.Element {
                         <div className="stats-body">
                             <div className="stat-item">
                                 <span className="stat-label">Rows:</span>
-                                <span className="stat-value">{rowCount.toLocaleString()}</span>
+                                <span className="stat-value">
+                                    {loadedRows !== rowCount
+                                        ? `${loadedRows.toLocaleString()} / ${rowCount.toLocaleString()}`
+                                        : rowCount.toLocaleString()}
+                                </span>
                             </div>
                             <div className="stat-item">
                                 <span className="stat-label">Columns:</span>
@@ -139,6 +162,9 @@ export function DatabaseBrowserPage(): React.JSX.Element {
                             rows={currentData?.rows ?? []}
                             isLoading={isLoading}
                             emptyMessage="No data available for this table."
+                            hasMore={currentData?.hasMore ?? false}
+                            isLoadingMore={isLoadingMore}
+                            onLoadMore={handleLoadMore}
                         />
                     </div>
                 </div>
@@ -157,3 +183,4 @@ const RefreshIcon = () => (
         <path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15" />
     </svg>
 );
+
