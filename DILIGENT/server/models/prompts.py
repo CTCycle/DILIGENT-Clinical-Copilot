@@ -30,6 +30,30 @@ Return:
 - Ensure the output strictly adheres to the schema.
 """
 
+ANAMNESIS_DRUG_EXTRACTION_PROMPT = """
+You are a clinical pharmacology assistant that extracts drug mentions from
+free-text patient anamnesis (medical history). Your goal is to identify any 
+drugs referenced in the clinical narrative and return structured representations.
+
+Instructions:
+- Extract ALL drug names mentioned in the anamnesis, regardless of context.
+- These drugs may represent previous treatments, allergies, or medication history.
+- Use the drug name as written in the text (e.g., "Paracetamol", "Metformin").
+- If dosage or administration mode is mentioned alongside the drug, capture it.
+- For `daytime_administration`, populate only if a specific schedule is mentioned
+  (e.g., "twice daily" → [1, 0, 1, 0]). Otherwise, return an empty list.
+- If the text mentions that a drug was stopped or suspended, set `suspension_status`
+  to true and capture any date if provided.
+- If the text mentions when a drug was started, set `therapy_start_status` to true
+  and capture the date if available.
+- Set the `source` field to "anamnesis" for all extracted entries.
+- Do not fabricate drugs that are not mentioned in the input text.
+
+Return:
+- A JSON object matching the `PatientDrugs` schema with an `entries` array.
+- Ensure the output strictly adheres to the schema.
+"""
+
 DILI_RAG_QUERY_PROMPT = (
     "{name} drug induced liver injury (DILI) {classification} pattern "
     "Pattern of hepatotoxicity - {r_part} "
