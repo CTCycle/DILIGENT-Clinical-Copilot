@@ -280,10 +280,13 @@ class DrugEntry(BaseModel):
         ),
     )
 
-    @field_validator("daytime_administration")
+    @field_validator("daytime_administration", mode="before")
     @classmethod
-    def validate_schedule(cls, value: list[float]) -> list[float]:
-        if not value:
+    def validate_schedule(cls, value: Any) -> list[float]:
+        if value is None:
+            return []
+
+        if not isinstance(value, list) or not value:
             return []
 
         cleaned = [float(slot) for slot in value if slot is not None]
