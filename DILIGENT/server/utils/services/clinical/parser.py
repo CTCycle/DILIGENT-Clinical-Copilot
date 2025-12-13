@@ -7,7 +7,10 @@ import unicodedata
 from datetime import date
 from typing import Any
 
-from DILIGENT.server.models.prompts import DRUG_EXTRACTION_PROMPT
+from DILIGENT.server.models.prompts import (
+    ANAMNESIS_DRUG_EXTRACTION_PROMPT,
+    DRUG_EXTRACTION_PROMPT,
+)
 from DILIGENT.server.models.providers import initialize_llm_client
 from DILIGENT.server.schemas.clinical import (
     DrugEntry,
@@ -127,14 +130,14 @@ class DrugsParser:
         try:
             asyncio.get_running_loop()
         except RuntimeError:
-            return asyncio.run(self.extract_drug_list(text))
+            return asyncio.run(self.extract_drugs_from_therapy(text))
         raise RuntimeError(
             "parse_drug_list cannot be used inside a running event loop; use"
-            " 'await extract_drug_list(...)' instead."
+            " 'await extract_drugs_from_therapy(...)' instead."
         )
 
     # -------------------------------------------------------------------------
-    async def extract_drug_list(self, text: str | None) -> PatientDrugs:
+    async def extract_drugs_from_therapy(self, text: str | None) -> PatientDrugs:
         cleaned = self.clean_text(text)
         if not cleaned:
             return PatientDrugs(entries=[])
@@ -171,6 +174,8 @@ class DrugsParser:
             else:
                 ordered_entries.append(entry)
         combined = [entry for entry in ordered_entries if entry is not None]
+        for entry in combined:
+            entry.source = "therapy"
         return PatientDrugs(entries=combined)
 
     # -------------------------------------------------------------------------
@@ -207,6 +212,43 @@ class DrugsParser:
             entries.extend(parsed.entries)
 
         return PatientDrugs(entries=entries)
+
+    # -------------------------------------------------------------------------
+    async def extract_drugs_from_anamnesis(self, anamnesis: str | None) -> PatientDrugs:
+        """
+        Extract drug mentions from free-text anamnesis using the LLM.
+
+        Unlike the therapy list extraction (which uses rules first),
+        anamnesis extraction is fully LLM-based due to the unstructured nature
+        of clinical narrative text.
+        """
+        if not anamnesis or not anamnesis.strip():
+            return PatientDrugs(entries=[])
+
+        await self.ensure_client()
+        if self.client is None:
+            raise RuntimeError("LLM client is not initialized for drug extraction")
+
+        try:
+            parsed = await self.client.llm_structured_call(
+                model=self.model,
+                system_prompt=ANAMNESIS_DRUG_EXTRACTION_PROMPT.strip(),
+                user_prompt=(
+                    "Extract all drugs mentioned in the following patient anamnesis:\n\n"
+                    f"{anamnesis.strip()}"
+                ),
+                schema=PatientDrugs,
+                temperature=self.temperature,
+                use_json_mode=True,
+                max_repair_attempts=2,
+            )
+        except Exception as exc:
+            raise RuntimeError("Failed to extract drugs from anamnesis via LLM") from exc
+
+        for entry in parsed.entries:
+            entry.source = "anamnesis"
+
+        return parsed
 
     # -------------------------------------------------------------------------
     def group_lines_for_llm(self, lines: list[str]) -> list[str]:

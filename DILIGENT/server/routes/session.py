@@ -11,6 +11,7 @@ from pydantic import ValidationError
 
 from DILIGENT.server.schemas.clinical import (
     PatientData,
+    PatientDrugs,
 )
 from DILIGENT.server.utils.configurations import LLMRuntimeConfig
 from DILIGENT.server.utils.logger import logger
@@ -221,10 +222,22 @@ class ClinicalSessionEndpoint:
         )
 
         start_time = time.perf_counter()
-        drug_data = await self.drugs_parser.extract_drug_list(payload.drugs or "")
+        drug_data = await self.drugs_parser.extract_drugs_from_therapy(payload.drugs or "")
         elapsed = time.perf_counter() - start_time
-        logger.info("Drugs extraction required %.4f seconds", elapsed)
-        logger.info("Detected %s drugs", len(drug_data.entries))
+        logger.info("Therapy drugs extraction required %.4f seconds", elapsed)
+        logger.info("Detected %s drugs from therapy list", len(drug_data.entries))
+
+        start_time = time.perf_counter()
+        anamnesis_drugs = await self.drugs_parser.extract_drugs_from_anamnesis(
+            payload.anamnesis
+        )
+        elapsed = time.perf_counter() - start_time
+        logger.info("Anamnesis drugs extraction required %.4f seconds", elapsed)
+        logger.info("Detected %s drugs from anamnesis", len(anamnesis_drugs.entries))
+
+        merged_entries = drug_data.entries + anamnesis_drugs.entries
+        drug_data = PatientDrugs(entries=merged_entries)
+        logger.info("Total merged drug pool: %s entries", len(drug_data.entries))
 
         rag_query: dict[str, str] | None = None
         if payload.use_rag:
