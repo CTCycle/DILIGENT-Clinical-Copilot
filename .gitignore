@@ -55,6 +55,7 @@ Thumbs.db
 *.sqlite*
 *.exe
 *.gz
+AGENTS.MD
 
 !.gitkeep
 !DILIGENT/settings/server_configurations.json
