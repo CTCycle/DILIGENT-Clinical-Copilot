@@ -376,6 +376,7 @@ class OllamaClient:
 
         return embeddings
 
+    # -------------------------------------------------------------------------
     @staticmethod
     def raise_for_status(resp: httpx.Response) -> None:
         try:
@@ -580,10 +581,12 @@ class OllamaClient:
     # -------------------------------------------------------------------------
     @staticmethod
     def get_available_memory_bytes() -> int:
-        if sys.platform == "win32":
+        kernel32 = getattr(getattr(ctypes, "windll", None), "kernel32", None)
+        memory_status_fn = getattr(kernel32, "GlobalMemoryStatusEx", None)
+        if memory_status_fn is not None:
 
             class MemoryStatus(ctypes.Structure):
-                fields_ = [
+                _fields_ = [
                     ("dwLength", ctypes.c_ulong),
                     ("dwMemoryLoad", ctypes.c_ulong),
                     ("ullTotalPhys", ctypes.c_ulonglong),
@@ -597,14 +600,15 @@ class OllamaClient:
 
             status = MemoryStatus()
             status.dwLength = ctypes.sizeof(MemoryStatus)
-            if ctypes.windll.kernel32.GlobalMemoryStatusEx(ctypes.byref(status)):
+            if memory_status_fn(ctypes.byref(status)):
                 return int(status.ullAvailPhys)
             return 0
 
         if hasattr(os, "sysconf"):
             try:
                 page_size = os.sysconf("SC_PAGE_SIZE")
-                if "SC_AVPHYS_PAGES" in os.sysconf_names:
+                sysconf_names = getattr(os, "sysconf_names", {})
+                if "SC_AVPHYS_PAGES" in sysconf_names:
                     pages = os.sysconf("SC_AVPHYS_PAGES")
                 else:
                     pages = os.sysconf("SC_PHYS_PAGES")

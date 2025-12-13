@@ -272,6 +272,13 @@ class DrugEntry(BaseModel):
     therapy_start_date: str | None = Field(
         None, description="Therapy start date in the original format, if captured."
     )
+    source: Literal["therapy", "anamnesis"] | None = Field(
+        default=None,
+        description=(
+            "Source of the drug entry: 'therapy' for drugs from the medication list, "
+            "'anamnesis' for drugs mentioned in clinical history."
+        ),
+    )
 
     @field_validator("daytime_administration")
     @classmethod
