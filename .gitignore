@@ -1,44 +1,61 @@
-DILIGENT/setup/python/*
-DILIGENT/setup/settings/.env
-DILIGENT/resources/models/*
-DILIGENT/resources/database/vectors/*
-DILIGENT/resources/database/*.lance
-DILIGENT/client/node_modules
-DILIGENT/client/dist
-DILIGENT/client/.vite
-DILIGENT/resources/database/*
-DILIGENT/resources/runtimes/python/*
-DILIGENT/resources/runtimes/nodejs/*
-DILIGENT/resources/runtimes/uv/*
-DILIGENT/resources/runtimes/uv_cache/*
-DILIGENT/settings/.env
+# Project-specific generated/runtime artifacts
+DILIGENT/resources/database/**
+DILIGENT/resources/runtimes/**
+DILIGENT/resources/runtimes/uv_cache/**
+DILIGENT/resources/logs/**
 DILIGENT/client/node_modules/
 DILIGENT/client/dist/
 DILIGENT/client/dist-ssr/
-DILIGENT/client/.env
-DILIGENT/client/*.local
+DILIGENT/client/package-lock.json
 DILIGENT/client/logs/
 
+# Environment files (keep templates)
+DILIGENT/settings/.env
+DILIGENT/client/.env
+DILIGENT/client/*.local
+!.env.example
+!.env.sample
+!DILIGENT/resources/templates/.env
 
+# Python
+__pycache__/
+*.py[cod]
+*.egg-info/
+.venv/
+venv/
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+dist/
+build/
+.coverage
+htmlcov/
 
-__pycache__
-*.vscode
-*.venv
-*.db
+# Node / JS
+**/node_modules/
+**/dist/
+**/dist-ssr/
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+lerna-debug.log*
+
+# IDE / OS
+.vscode/
+!.vscode/extensions.json
+.idea/
+.DS_Store
+Thumbs.db
+
+# Misc
 *.log
-*.docx
-*.zip
-*.json
-*.xlsx
-*.pdf
-*.csv   
-*.txt
-*.npy
-*.lock
+*.db
+*.sqlite*
 *.exe
-*.egg-info
 *.gz
-!.gitkeep
 
+!.gitkeep
 !DILIGENT/settings/server_configurations.json
-AGENTS.md
+
+
