@@ -374,14 +374,6 @@ export function DiluAgentPage(): React.JSX.Element {
                     <p className="lede">
                         Provide clinical context and lab data to generate a structured hepatotoxicity assessment.
                     </p>
-                    <button
-                        className="btn btn-secondary config-trigger"
-                        type="button"
-                        onClick={() => setConfigModalOpen(true)}
-                    >
-                        <SettingsIcon />
-                        <span>Model Configurations</span>
-                    </button>
                 </header>
 
                 <div className="main-form-grid">
@@ -538,6 +530,14 @@ export function DiluAgentPage(): React.JSX.Element {
                             </button>
                             <button className="btn btn-tertiary" type="button" onClick={handleClear}>
                                 Clear all
+                            </button>
+                            <button
+                                className="btn btn-secondary config-trigger"
+                                type="button"
+                                onClick={() => setConfigModalOpen(true)}
+                            >
+                                <SettingsIcon />
+                                <span>Model Configurations</span>
                             </button>
                         </div>
                     </section>
