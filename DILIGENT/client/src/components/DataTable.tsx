@@ -37,25 +37,29 @@ export function DataTable({
     }
 
     return (
-        <div className="data-table-wrapper">
-            <table className="data-table">
-                <thead>
-                    <tr>
-                        {columns.map((col) => (
-                            <th key={col}>{formatColumnName(col)}</th>
-                        ))}
-                    </tr>
-                </thead>
-                <tbody>
-                    {rows.map((row, rowIndex) => (
-                        <tr key={rowIndex}>
-                            {columns.map((col) => (
-                                <td key={col}>{formatCellValue(row[col])}</td>
+        <div className="data-table-container">
+            <div className="data-table-scroll-x">
+                <div className="data-table-scroll-y">
+                    <table className="data-table">
+                        <thead>
+                            <tr>
+                                {columns.map((col) => (
+                                    <th key={col}>{formatColumnName(col)}</th>
+                                ))}
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {rows.map((row, rowIndex) => (
+                                <tr key={rowIndex}>
+                                    {columns.map((col) => (
+                                        <td key={col}>{formatCellValue(row[col])}</td>
+                                    ))}
+                                </tr>
                             ))}
-                        </tr>
-                    ))}
-                </tbody>
-            </table>
+                        </tbody>
+                    </table>
+                </div>
+            </div>
         </div>
     );
 }
