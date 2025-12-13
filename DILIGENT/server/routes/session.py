@@ -3,11 +3,13 @@ from __future__ import annotations
 import asyncio
 import time
 from datetime import date, datetime
+from collections.abc import Sequence
 from typing import Any
 
 from fastapi import APIRouter, Body, HTTPException, status
 from fastapi.responses import PlainTextResponse
 from pydantic import ValidationError
+from pydantic_core import ErrorDetails
 
 from DILIGENT.server.schemas.clinical import (
     PatientData,
@@ -152,15 +154,16 @@ class ClinicalSessionEndpoint:
     # -------------------------------------------------------------------------
     @staticmethod
     def serialize_validation_errors(
-        errors: list[dict[str, Any]],
+        errors: Sequence[ErrorDetails],
     ) -> list[dict[str, Any]]:
         serialized: list[dict[str, Any]] = []
         for error in errors:
-            ctx = error.get("ctx")
+            error_dict: dict[str, Any] = dict(error)
+            ctx = error_dict.get("ctx")
             if isinstance(ctx, dict) and "error" in ctx:
-                serialized.append({**error, "ctx": {**ctx, "error": str(ctx["error"])}})
+                serialized.append({**error_dict, "ctx": {**ctx, "error": str(ctx["error"])}})
                 continue
-            serialized.append(error)
+            serialized.append(error_dict)
         return serialized
 
     # -------------------------------------------------------------------------
