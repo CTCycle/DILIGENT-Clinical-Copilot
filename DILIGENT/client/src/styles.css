@@ -1237,6 +1237,29 @@ input[type="date"]::-webkit-calendar-picker-indicator:hover {
   border-radius: var(--radius-lg);
 }
 
+/* Infinite Scroll */
+.scroll-sentinel {
+  height: 1px;
+  width: 100%;
+}
+
+.data-table-loading-more {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: var(--space-sm);
+  padding: var(--space-lg);
+  color: var(--color-text-muted);
+  font-size: var(--font-sm);
+}
+
+.spinner-small {
+  width: 20px;
+  height: 20px;
+  border-width: 2px;
+}
+
+
 /* ============================================
    Database Browser Page
    ============================================ */

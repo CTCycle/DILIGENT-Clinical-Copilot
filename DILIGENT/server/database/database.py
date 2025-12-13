@@ -37,6 +37,12 @@ class DatabaseBackend(Protocol):
     def stream_rows(self, table_name: str, page_size: int) -> Iterator[pd.DataFrame]:
         ...
 
+    # -------------------------------------------------------------------------
+    def load_paginated(
+        self, table_name: str, offset: int, limit: int
+    ) -> pd.DataFrame:
+        ...
+
 
 BackendFactory = Callable[[DatabaseSettings], DatabaseBackend]
 
@@ -100,6 +106,12 @@ class DILIGENTDatabase:
     ) -> Iterator[pd.DataFrame]:
         chunk_size = page_size or self.settings.select_page_size
         return self.backend.stream_rows(table_name, chunk_size)
+
+    # -------------------------------------------------------------------------
+    def load_paginated(
+        self, table_name: str, offset: int, limit: int
+    ) -> pd.DataFrame:
+        return self.backend.load_paginated(table_name, offset, limit)
 
     
 database = DILIGENTDatabase()
