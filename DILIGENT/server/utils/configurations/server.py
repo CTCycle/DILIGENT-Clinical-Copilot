@@ -242,6 +242,7 @@ class DatabaseSettings:
     insert_batch_size: int
     insert_commit_interval: int
     select_page_size: int
+    browser_page_size: int
 
 # -----------------------------------------------------------------------------
 @dataclass(frozen=True)
@@ -347,6 +348,7 @@ def build_database_settings(payload: dict[str, Any] | Any) -> DatabaseSettings:
     embedded = bool(payload.get("embedded_database", True))
     commit_interval = coerce_int(payload.get("insert_commit_interval"), 5, minimum=1)
     select_page_size = coerce_int(payload.get("select_page_size"), 2000, minimum=100)
+    browser_page_size = coerce_int(payload.get("browser_page_size"), 1000, minimum=100)
     if embedded:
         # External fields are ignored entirely when embedded DB is active
         return DatabaseSettings(
@@ -363,6 +365,7 @@ def build_database_settings(payload: dict[str, Any] | Any) -> DatabaseSettings:
             insert_batch_size=coerce_int(payload.get("insert_batch_size"), 1000, minimum=1),
             insert_commit_interval=commit_interval,
             select_page_size=select_page_size,
+            browser_page_size=browser_page_size,
         )
 
     # External DB mode
@@ -382,6 +385,7 @@ def build_database_settings(payload: dict[str, Any] | Any) -> DatabaseSettings:
         insert_batch_size=coerce_int(payload.get("insert_batch_size"), 1000, minimum=1),
         insert_commit_interval=commit_interval,
         select_page_size=select_page_size,
+        browser_page_size=browser_page_size,
     )
 
 # -----------------------------------------------------------------------------

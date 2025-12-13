@@ -17,6 +17,7 @@ export interface TableData {
     columns: string[];
     rows: Record<string, unknown>[];
     totalRows: number;
+    hasMore: boolean;
 }
 
 export interface TableCache {
@@ -41,6 +42,7 @@ export interface DatabaseBrowserState {
     selectedTable: TableId;
     tableCache: TableCache;
     isLoading: boolean;
+    isLoadingMore: boolean;
 }
 
 export interface AppState {
@@ -55,6 +57,7 @@ interface AppStateContextValue {
     updateDiluAgent: (updates: Partial<DiluAgentState>) => void;
     updateDatabaseBrowser: (updates: Partial<DatabaseBrowserState>) => void;
     setTableData: (tableId: TableId, data: TableData) => void;
+    appendTableData: (tableId: TableId, newRows: Record<string, unknown>[], hasMore: boolean) => void;
 }
 
 // ---------------------------------------------------------------------------
@@ -88,6 +91,7 @@ const DEFAULT_DATABASE_BROWSER_STATE: DatabaseBrowserState = {
         drugs: null,
     },
     isLoading: false,
+    isLoadingMore: false,
 };
 
 const DEFAULT_APP_STATE: AppState = {
@@ -150,6 +154,30 @@ export function AppStateProvider({ children }: AppStateProviderProps): React.JSX
         }));
     }, []);
 
+    const appendTableData = useCallback(
+        (tableId: TableId, newRows: Record<string, unknown>[], hasMore: boolean) => {
+            setState((prev) => {
+                const existing = prev.databaseBrowser.tableCache[tableId];
+                if (!existing) return prev;
+                return {
+                    ...prev,
+                    databaseBrowser: {
+                        ...prev.databaseBrowser,
+                        tableCache: {
+                            ...prev.databaseBrowser.tableCache,
+                            [tableId]: {
+                                ...existing,
+                                rows: [...existing.rows, ...newRows],
+                                hasMore,
+                            },
+                        },
+                    },
+                };
+            });
+        },
+        [],
+    );
+
     const value = useMemo<AppStateContextValue>(
         () => ({
             state,
@@ -157,8 +185,9 @@ export function AppStateProvider({ children }: AppStateProviderProps): React.JSX
             updateDiluAgent,
             updateDatabaseBrowser,
             setTableData,
+            appendTableData,
         }),
-        [state, setActivePage, updateDiluAgent, updateDatabaseBrowser, setTableData],
+        [state, setActivePage, updateDiluAgent, updateDatabaseBrowser, setTableData, appendTableData],
     );
 
     return (
