@@ -289,7 +289,6 @@ class DrugEntry(BaseModel):
 # -----------------------------------------------------------------------------
 class PatientDrugs(BaseModel):
     """Container for parsed drug entries."""
-
     entries: list[DrugEntry] = Field(default_factory=list)
 
 
