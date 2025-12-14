@@ -43,6 +43,7 @@ export interface DatabaseBrowserState {
     tableCache: TableCache;
     isLoading: boolean;
     isLoadingMore: boolean;
+    hasUserTriggeredFetch: boolean;
 }
 
 export interface AppState {
@@ -92,6 +93,7 @@ const DEFAULT_DATABASE_BROWSER_STATE: DatabaseBrowserState = {
     },
     isLoading: false,
     isLoadingMore: false,
+    hasUserTriggeredFetch: false,
 };
 
 const DEFAULT_APP_STATE: AppState = {
