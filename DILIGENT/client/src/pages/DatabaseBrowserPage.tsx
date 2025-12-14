@@ -18,12 +18,17 @@ const TABLE_OPTIONS: { id: TableId; label: string }[] = [
 // ---------------------------------------------------------------------------
 export function DatabaseBrowserPage(): React.JSX.Element {
     const { state, updateDatabaseBrowser, setTableData, appendTableData } = useAppState();
-    const { selectedTable, tableCache, isLoading, isLoadingMore } = state.databaseBrowser;
+    const { selectedTable, tableCache, isLoading, isLoadingMore, hasUserTriggeredFetch } =
+        state.databaseBrowser;
 
     const currentData = tableCache[selectedTable];
 
     // Fetch data when table changes (only if not cached)
     useEffect(() => {
+        if (!hasUserTriggeredFetch) {
+            return;
+        }
+
         if (currentData !== null) {
             return; // Already cached
         }
@@ -51,14 +56,14 @@ export function DatabaseBrowserPage(): React.JSX.Element {
         return () => {
             cancelled = true;
         };
-    }, [selectedTable, currentData, updateDatabaseBrowser, setTableData]);
+    }, [hasUserTriggeredFetch, selectedTable, currentData, updateDatabaseBrowser, setTableData]);
 
     const handleTableChange = (tableId: TableId) => {
-        updateDatabaseBrowser({ selectedTable: tableId });
+        updateDatabaseBrowser({ selectedTable: tableId, hasUserTriggeredFetch: true });
     };
 
     const handleRefresh = async () => {
-        updateDatabaseBrowser({ isLoading: true });
+        updateDatabaseBrowser({ isLoading: true, hasUserTriggeredFetch: true });
         try {
             const result = await fetchTableData(selectedTable, 0, TABLE_PAGE_SIZE);
             setTableData(selectedTable, result);
@@ -161,7 +166,11 @@ export function DatabaseBrowserPage(): React.JSX.Element {
                             columns={currentData?.columns ?? []}
                             rows={currentData?.rows ?? []}
                             isLoading={isLoading}
-                            emptyMessage="No data available for this table."
+                            emptyMessage={
+                                hasUserTriggeredFetch
+                                    ? "No data available for this table."
+                                    : "Select a table or click refresh to load data."
+                            }
                             hasMore={currentData?.hasMore ?? false}
                             isLoadingMore={isLoadingMore}
                             onLoadMore={handleLoadMore}
@@ -183,4 +192,3 @@ const RefreshIcon = () => (
         <path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15" />
     </svg>
 );
-
