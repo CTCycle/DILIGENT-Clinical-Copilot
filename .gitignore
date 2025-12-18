@@ -55,6 +55,7 @@ Thumbs.db
 *.sqlite*
 *.exe
 *.gz
+rules/
 AGENTS.MD
 
 !.gitkeep
