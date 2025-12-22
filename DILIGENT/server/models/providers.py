@@ -44,6 +44,9 @@ class OllamaError(RuntimeError):
 class OllamaTimeout(OllamaError):
     """Raised when requests to Ollama exceed the configured timeout."""
 
+class _OllamaChatFallback(Exception):
+    """Internal control flow for switching to /api/generate streaming."""
+
 ProgressCb: TypeAlias = Callable[[dict[str, Any]], None | Awaitable[None]]
 
 
@@ -647,21 +650,33 @@ class OllamaClient:
     # -------------------------------------------------------------------------
     @staticmethod
     def _get_available_memory_proc() -> int:
+        def parse_meminfo_line(line: str) -> int | None:
+            if not line.startswith("MemAvailable:"):
+                return None
+            parts = line.split()
+            if len(parts) < 2:
+                return None
+            try:
+                value = int(parts[1])
+            except ValueError:
+                return None
+            unit = parts[2].lower() if len(parts) >= 3 else "kb"
+            multiplier = {
+                "kb": 1_024,
+                "kib": 1_024,
+                "mb": 1_048_576,
+                "mib": 1_048_576,
+                "gb": 1_073_741_824,
+                "gib": 1_073_741_824,
+            }.get(unit)
+            return value * multiplier if multiplier else value
+
         try:
             with open("/proc/meminfo", "r", encoding="utf-8") as handle:
                 for line in handle:
-                    if line.startswith("MemAvailable:"):
-                        parts = line.split()
-                        if len(parts) >= 2:
-                            value = int(parts[1])
-                            unit = parts[2].lower() if len(parts) >= 3 else "kb"
-                            if unit in {"kb", "kib"}:
-                                return value * 1_024
-                            if unit in {"mb", "mib"}:
-                                return value * 1_048_576
-                            if unit in {"gb", "gib"}:
-                                return value * 1_073_741_824
-                            return value
+                    parsed = parse_meminfo_line(line)
+                    if parsed is not None:
+                        return parsed
         except (FileNotFoundError, PermissionError, ValueError):
             pass
         return 0
@@ -814,39 +829,44 @@ class OllamaClient:
             options=options_payload,
             keep_alive=keep_alive,
         )
+        try:
+            async for evt in self._stream_chat_http(body):
+                yield evt
+            return
+        except _OllamaChatFallback:
+            self.legacy_generate = True
 
-        use_fallback = False
+        async for evt in self.chat_stream_via_generate(
+            model=resolved_model,
+            messages=messages,
+            format=format,
+            temperature=temp_value,
+            think=think_value,
+            options=options_payload,
+            keep_alive=keep_alive,
+        ):
+            yield evt
 
+    # -------------------------------------------------------------------------
+    async def _stream_chat_http(
+        self, body: dict[str, Any]
+    ) -> AsyncGenerator[dict[str, Any], None]:
         try:
             async with self.client.stream("POST", "/api/chat", json=body) as r:
                 if r.status_code == 404:
-                    use_fallback = True
                     await r.aread()
-                else:
-                    self.raise_for_status(r)
-                    async for line in r.aiter_lines():
-                        if not line:
-                            continue
-                        try:
-                            evt = json.loads(line)
-                        except json.JSONDecodeError:
-                            continue
-                        yield evt
+                    raise _OllamaChatFallback
+                self.raise_for_status(r)
+                async for line in r.aiter_lines():
+                    if not line:
+                        continue
+                    try:
+                        evt = json.loads(line)
+                    except json.JSONDecodeError:
+                        continue
+                    yield evt
         except httpx.TimeoutException as e:
             raise OllamaTimeout("Timed out during streamed chat response") from e
-
-        if use_fallback:
-            self.legacy_generate = True
-            async for evt in self.chat_stream_via_generate(
-                model=resolved_model,
-                messages=messages,
-                format=format,
-                temperature=temp_value,
-                think=think_value,
-                options=options_payload,
-                keep_alive=keep_alive,
-            ):
-                yield evt
 
     # -----------------------------------------------------------------------------
     async def chat_via_generate(
@@ -1190,7 +1210,7 @@ class OllamaClient:
             pass
 
         # Extract first top-level JSON object (handles extra text/noise).
-        m = re.search(r"\{(?:[^{}]|(?R))*\}", obj_or_text, flags=re.DOTALL)
+        m = re.search(r"\{(?:[^{}]|(?R))+\}|\{\}", obj_or_text, flags=re.DOTALL)
         if not m:
             return None
         try:
