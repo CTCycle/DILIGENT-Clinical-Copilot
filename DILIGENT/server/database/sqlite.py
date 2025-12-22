@@ -13,6 +13,7 @@ from sqlalchemy.orm import sessionmaker
 from DILIGENT.server.utils.configurations import DatabaseSettings
 from DILIGENT.server.utils.constants import DATA_PATH, DATABASE_FILENAME
 from DILIGENT.server.utils.logger import logger
+from DILIGENT.server.database.utils import MISSING_TABLE_MESSAGE
 from DILIGENT.server.database.schema import Base
 
 
@@ -25,7 +26,7 @@ class SQLiteRepository:
         self.engine: Engine = sqlalchemy.create_engine(
             f"sqlite:///{self.db_path}", echo=False, future=True
         )
-        self.Session = sessionmaker(bind=self.engine, future=True)
+        self.session_factory = sessionmaker(bind=self.engine, future=True)
         self.insert_batch_size = settings.insert_batch_size
         self.insert_commit_interval = settings.insert_commit_interval
         self.select_page_size = settings.select_page_size
@@ -42,7 +43,7 @@ class SQLiteRepository:
     # -------------------------------------------------------------------------
     def upsert_dataframe(self, df: pd.DataFrame, table_cls) -> None:
         table = table_cls.__table__
-        session = self.Session()
+        session = self.session_factory()
         try:
             unique_cols = []
             for uc in table.constraints:
@@ -84,7 +85,7 @@ class SQLiteRepository:
         with self.engine.connect() as conn:
             inspector = inspect(conn)
             if not inspector.has_table(table_name):
-                logger.warning("Table %s does not exist", table_name)
+                logger.warning(MISSING_TABLE_MESSAGE, table_name)
                 return pd.DataFrame()
             data = pd.read_sql_table(table_name, conn)
         return data
@@ -120,7 +121,7 @@ class SQLiteRepository:
         with self.engine.connect() as conn:
             inspector = inspect(conn)
             if not inspector.has_table(table_name):
-                logger.warning("Table %s does not exist", table_name)
+                logger.warning(MISSING_TABLE_MESSAGE, table_name)
                 return
             query = text(f'SELECT * FROM "{table_name}"')
             for chunk in pd.read_sql_query(query, conn, chunksize=chunk_size):
@@ -133,7 +134,7 @@ class SQLiteRepository:
         with self.engine.connect() as conn:
             inspector = inspect(conn)
             if not inspector.has_table(table_name):
-                logger.warning("Table %s does not exist", table_name)
+                logger.warning(MISSING_TABLE_MESSAGE, table_name)
                 return pd.DataFrame()
             query = text(f'SELECT * FROM "{table_name}" LIMIT :limit OFFSET :offset')
             data = pd.read_sql_query(query, conn, params={"limit": limit, "offset": offset})
