@@ -516,9 +516,9 @@ class RxNavClient:
 
     # -------------------------------------------------------------------------
     def derive_ingredients(self, raw_value: str) -> list[str]:
-        stripped = re.sub(r"\[.*?\]", " ", raw_value)
-        stripped = re.sub(r"\(.*?\)", " ", stripped)
-        parts = re.split(r"\s*(?:/|\+|,)\s*", stripped)
+        stripped = re.sub(r"\[[^\]]*\]", " ", raw_value)
+        stripped = re.sub(r"\([^)]*\)", " ", stripped)
+        parts = re.split(r"[/+,]", stripped)
         normalized_parts: list[str] = []
         for part in parts:
             normalized = self.normalize_single_ingredient(part)
@@ -1124,7 +1124,7 @@ class RxNavDrugCatalogBuilder:
     def sanitize_name(self, value: str) -> str:
         normalized = unicodedata.normalize("NFKC", value)
         normalized = self.brand_pattern.sub(" ", normalized)
-        normalized = re.sub(r"\(.*?\)", " ", normalized)
+        normalized = re.sub(r"\([^)]*\)", " ", normalized)
         normalized = normalized.replace("/", " ")
         normalized = re.sub(r"[^A-Za-z\s'-]", " ", normalized)
         normalized = re.sub(r"\s+", " ", normalized)

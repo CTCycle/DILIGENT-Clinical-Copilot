@@ -48,8 +48,8 @@ LIVERTOX_HEADER_RE = re.compile(
 )
 
 LIVERTOX_FOOTER_RE = re.compile(
-    r"OTHER REFERENCE LINKS\s+Recent References on\s+.+?:\s+from\s+PubMed\.gov\s+"
-    r"Trials on\s+.+?:\s+from\s+ClinicalTrials\.gov\.?\s*$",
+    r"OTHER REFERENCE LINKS\s+Recent References on\s+[^:]+:\s+from\s+PubMed\.gov\s+"
+    r"Trials on\s+[^:]+:\s+from\s+ClinicalTrials\.gov\.?\s*$",
     re.IGNORECASE,
 )
 

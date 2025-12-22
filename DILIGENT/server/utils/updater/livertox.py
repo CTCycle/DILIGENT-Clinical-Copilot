@@ -416,9 +416,9 @@ class LiverToxUpdater:
         response.raise_for_status()
         content = response.text
         matches = re.finditer(
-            r"<a[^>]+href=\"([^\"]+\.xlsx)\"[^>]*>(.*?)</a>",
+            r"<a[^>]+href=\"([^\"]+\.xlsx)\"[^>]*>([^<]*(?:<[^>]+>[^<]*)*)</a>",
             content,
-            flags=re.IGNORECASE | re.DOTALL,
+            flags=re.IGNORECASE,
         )
         candidates: list[tuple[str, str]] = []
         for match in matches:
@@ -985,9 +985,9 @@ class LiverToxUpdater:
     @staticmethod
     def extract_title(html_text: str, plain_text: str, default: str) -> str:
         patterns = (
-            r"<title[^>]*>(.*?)</title>",
-            r"<article-title[^>]*>(.*?)</article-title>",
-            r"<h1[^>]*>(.*?)</h1>",
+            r"<title[^>]*>([^<]*(?:<[^>]+>[^<]*)*)</title>",
+            r"<article-title[^>]*>([^<]*(?:<[^>]+>[^<]*)*)</article-title>",
+            r"<h1[^>]*>([^<]*(?:<[^>]+>[^<]*)*)</h1>",
         )
         for pattern in patterns:
             match = re.search(pattern, html_text, flags=re.IGNORECASE | re.DOTALL)
@@ -1009,7 +1009,10 @@ class LiverToxUpdater:
     # -------------------------------------------------------------------------
     @staticmethod
     def html_to_text(html_text: str) -> str:
-        stripped = re.sub(r"(?is)<(script|style)[^>]*>.*?</\1>", " ", html_text)
+        # Tempered dot avoids runaway backtracking on malformed HTML.
+        stripped = re.sub(
+            r"(?is)<(script|style)[^>]*>(?:(?!</\1>).)*</\1>", " ", html_text
+        )
         stripped = re.sub(r"<[^>]+>", " ", stripped)
         unescaped = html.unescape(stripped)
         return normalize_whitespace(unescaped)
