@@ -5,27 +5,31 @@ from collections.abc import Iterable
 from typing import Any
 
 # -----------------------------------------------------------------------------
+def _extract_int_from_str(value: str) -> int | None:
+    stripped = value.strip()
+    if not stripped:
+        return None
+    if stripped.isdigit():
+        return int(stripped)
+    match = re.search(r"\d+", stripped)
+    return int(match.group(0)) if match else None
+
+
+# -----------------------------------------------------------------------------
 def extract_positive_int(value: Any) -> int | None:
-    candidate: int | None = None
     if isinstance(value, bool) or value is None:
-        candidate = None
-    elif isinstance(value, int):
+        return None
+    if isinstance(value, int):
         candidate = value
     elif isinstance(value, float):
         candidate = int(value)
     elif isinstance(value, str):
-        stripped = value.strip()
-        if stripped.isdigit():
-            candidate = int(stripped)
-        else:
-            match = re.search(r"\d+", stripped)
-            if match:
-                candidate = int(match.group(0))
+        candidate = _extract_int_from_str(value)
     else:
         try:
             candidate = int(value)
         except (TypeError, ValueError):
-            candidate = None
+            return None
     if candidate is None or candidate <= 0:
         return None
     return candidate
@@ -132,6 +136,14 @@ def coerce_str_sequence(value: Any, default: Iterable[str]) -> tuple[str, ...]:
     return tuple(items)
 
 # -----------------------------------------------------------------------------
+def _normalize_string_candidate(candidate: Any) -> str | None:
+    if candidate is None:
+        return None
+    text = candidate.strip() if isinstance(candidate, str) else str(candidate).strip()
+    return text or None
+
+
+# -----------------------------------------------------------------------------
 def coerce_string_tuple(value: Any) -> tuple[str, ...]:
     if isinstance(value, (list, tuple, set)):
         candidates = list(value)
@@ -139,13 +151,9 @@ def coerce_string_tuple(value: Any) -> tuple[str, ...]:
         candidates = []
     else:
         candidates = [value]
-    normalized: list[str] = []
-    for candidate in candidates:
-        if candidate is None:
-            continue
-        text = candidate.strip() if isinstance(candidate, str) else str(candidate).strip()
-        if text:
-            normalized.append(text)
+    normalized = [
+        text for candidate in candidates if (text := _normalize_string_candidate(candidate))
+    ]
     return tuple(normalized)
 
 
