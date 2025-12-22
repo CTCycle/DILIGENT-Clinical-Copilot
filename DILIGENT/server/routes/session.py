@@ -8,7 +8,7 @@ from typing import Any
 
 from fastapi import APIRouter, Body, HTTPException, status
 from fastapi.responses import PlainTextResponse
-from pydantic import ValidationError
+from pydantic import BaseModel, ValidationError
 from pydantic_core import ErrorDetails
 
 from DILIGENT.server.schemas.clinical import (
@@ -31,6 +31,7 @@ pattern_analyzer = HepatotoxicityPatternAnalyzer()
 input_preparator = ClinicalKnowledgePreparation()
 router = APIRouter(tags=["session"])
 serializer = DataSerializer()
+NOT_AVAILABLE = "Not available"
 
 
 ###############################################################################
@@ -79,10 +80,10 @@ class NarrativeBuilder:
         detected_drugs: list[str],
         final_report: str | None,
     ) -> str:
-        classification = getattr(pattern_score, "classification", "Not available")
-        alt_multiple = pattern_strings.get("alt_multiple", "Not available")
-        alp_multiple = pattern_strings.get("alp_multiple", "Not available")
-        r_score = pattern_strings.get("r_score", "Not available")
+        classification = getattr(pattern_score, "classification", NOT_AVAILABLE)
+        alt_multiple = pattern_strings.get("alt_multiple", NOT_AVAILABLE)
+        alp_multiple = pattern_strings.get("alp_multiple", NOT_AVAILABLE)
+        r_score = pattern_strings.get("r_score", NOT_AVAILABLE)
         drug_summary = ", ".join(detected_drugs) if detected_drugs else "None detected"
 
         sections: list[str] = []
@@ -319,56 +320,60 @@ class ClinicalSessionEndpoint:
         return narrative
 
     # -------------------------------------------------------------------------
+    class ClinicalSessionRequest(BaseModel):
+        name: str | None = None
+        visit_date: date | dict[str, int] | str | None = None
+        anamnesis: str | None = None
+        has_hepatic_diseases: bool = False
+        use_rag: bool = False
+        drugs: str | None = None
+        alt: str | None = None
+        alt_max: str | None = None
+        alp: str | None = None
+        alp_max: str | None = None
+        use_cloud_services: bool | None = None
+        llm_provider: str | None = None
+        cloud_model: str | None = None
+        parsing_model: str | None = None
+        clinical_model: str | None = None
+        ollama_temperature: float | None = None
+        ollama_reasoning: bool | None = None
+
+    # -------------------------------------------------------------------------
     async def start_clinical_session(
         self,
-        name: str | None = Body(default=None),
-        visit_date: date | dict[str, int] | str | None = Body(default=None),
-        anamnesis: str | None = Body(default=None),
-        has_hepatic_diseases: bool = Body(default=False),
-        use_rag: bool = Body(default=False),
-        drugs: str | None = Body(default=None),
-        alt: str | None = Body(default=None),
-        alt_max: str | None = Body(default=None),
-        alp: str | None = Body(default=None),
-        alp_max: str | None = Body(default=None),
-        use_cloud_services: bool | None = Body(default=None),
-        llm_provider: str | None = Body(default=None),
-        cloud_model: str | None = Body(default=None),
-        parsing_model: str | None = Body(default=None),
-        clinical_model: str | None = Body(default=None),
-        ollama_temperature: float | None = Body(default=None),
-        ollama_reasoning: bool | None = Body(default=None),
-        ) -> PlainTextResponse:
+        request_payload: ClinicalSessionRequest = Body(...),
+    ) -> PlainTextResponse:
         self.apply_runtime_overrides(
-            use_cloud_services=use_cloud_services,
-            llm_provider=llm_provider,
-            cloud_model=cloud_model,
-            parsing_model=parsing_model,
-            clinical_model=clinical_model,
-            ollama_temperature=ollama_temperature,
-            ollama_reasoning=ollama_reasoning,
+            use_cloud_services=request_payload.use_cloud_services,
+            llm_provider=request_payload.llm_provider,
+            cloud_model=request_payload.cloud_model,
+            parsing_model=request_payload.parsing_model,
+            clinical_model=request_payload.clinical_model,
+            ollama_temperature=request_payload.ollama_temperature,
+            ollama_reasoning=request_payload.ollama_reasoning,
         )
         try:
             payload_data: dict[str, Any] = {
-                "name": name,
-                "visit_date": visit_date,
-                "anamnesis": anamnesis,
-                "has_hepatic_diseases": has_hepatic_diseases,
-                "use_rag": use_rag,
-                "drugs": drugs,
-                "alt": alt,
-                "alt_max": alt_max,
-                "alp": alp,
-                "alp_max": alp_max,
+                "name": request_payload.name,
+                "visit_date": request_payload.visit_date,
+                "anamnesis": request_payload.anamnesis,
+                "has_hepatic_diseases": request_payload.has_hepatic_diseases,
+                "use_rag": request_payload.use_rag,
+                "drugs": request_payload.drugs,
+                "alt": request_payload.alt,
+                "alt_max": request_payload.alt_max,
+                "alp": request_payload.alp,
+                "alp_max": request_payload.alp_max,
             }
-            payload = PatientData.model_validate(payload_data)
+            patient_payload = PatientData.model_validate(payload_data)
         except ValidationError as exc:
             raise HTTPException(
                 status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
                 detail=self.serialize_validation_errors(exc.errors()),
             ) from exc
 
-        single_result = await self.process_single_patient(payload)
+        single_result = await self.process_single_patient(patient_payload)
         return PlainTextResponse(content=single_result)
 
 
