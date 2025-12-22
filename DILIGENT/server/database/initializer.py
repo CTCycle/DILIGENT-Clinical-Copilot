@@ -51,13 +51,15 @@ def clone_settings_with_database(
         ssl_ca=settings.ssl_ca,
         connect_timeout=settings.connect_timeout,
         insert_batch_size=settings.insert_batch_size,
+        insert_commit_interval=settings.insert_commit_interval,
+        select_page_size=settings.select_page_size,
+        browser_page_size=settings.browser_page_size,
     )
 
 
 # -----------------------------------------------------------------------------
 def initialize_sqlite_database(settings: DatabaseSettings) -> None:
-    repository = SQLiteRepository(settings)
-    Base.metadata.create_all(repository.engine)
+    repository = SQLiteRepository(settings)    
     logger.info("Initialized SQLite database at %s", repository.db_path)
 
 
