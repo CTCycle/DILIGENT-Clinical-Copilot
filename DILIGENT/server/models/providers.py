@@ -447,35 +447,57 @@ class OllamaClient:
 
         """
         payload = {"name": name, "stream": bool(stream)}
-        completed = False
         try:
             if stream:
-                async with self.client.stream("POST", "/api/pull", json=payload) as r:
-                    self.raise_for_status(r)
-                    async for line in r.aiter_lines():
-                        if not line:
-                            continue
-                        try:
-                            evt = json.loads(line)
-                        except json.JSONDecodeError:
-                            continue
-                        await self.maybe_await(progress_callback, evt)
-                        if str(evt.get("status", "")).lower() == "success":
-                            completed = True
-                            break
-                        if poll_sleep_s > 0:
-                            await asyncio.sleep(poll_sleep_s)
+                completed = await self.pull_stream(
+                    payload=payload,
+                    progress_callback=progress_callback,
+                    poll_sleep_s=poll_sleep_s,
+                )
             else:
-                resp = await self.client.post("/api/pull", json=payload)
-                self.raise_for_status(resp)
-                completed = True
+                completed = await self.pull_once(payload=payload)
         except httpx.TimeoutException as e:
             raise OllamaTimeout(f"Timed out pulling model '{name}'") from e
-        if completed:
-            try:
-                await self.refresh_model_cache()
-            except OllamaError as exc:
-                logger.debug("Failed to refresh Ollama model cache after pull: %s", exc)
+        await self.refresh_cache_after_pull(completed)
+
+    # -------------------------------------------------------------------------
+    async def pull_stream(
+        self,
+        *,
+        payload: dict[str, Any],
+        progress_callback: ProgressCb | None,
+        poll_sleep_s: float,
+    ) -> bool:
+        async with self.client.stream("POST", "/api/pull", json=payload) as r:
+            self.raise_for_status(r)
+            async for line in r.aiter_lines():
+                if not line:
+                    continue
+                try:
+                    evt = json.loads(line)
+                except json.JSONDecodeError:
+                    continue
+                await self.maybe_await(progress_callback, evt)
+                if str(evt.get("status", "")).lower() == "success":
+                    return True
+                if poll_sleep_s > 0:
+                    await asyncio.sleep(poll_sleep_s)
+        return False
+
+    # -------------------------------------------------------------------------
+    async def pull_once(self, *, payload: dict[str, Any]) -> bool:
+        resp = await self.client.post("/api/pull", json=payload)
+        self.raise_for_status(resp)
+        return True
+
+    # -------------------------------------------------------------------------
+    async def refresh_cache_after_pull(self, completed: bool) -> None:
+        if not completed:
+            return
+        try:
+            await self.refresh_model_cache()
+        except OllamaError as exc:
+            logger.debug("Failed to refresh Ollama model cache after pull: %s", exc)
 
     # -------------------------------------------------------------------------
     async def show_model(self, name: str) -> dict[str, Any]:
@@ -1090,8 +1112,32 @@ class OllamaClient:
         """
         parser = PydanticOutputParser(pydantic_object=schema)
         format_instructions = parser.get_format_instructions()
+        messages = self.build_structured_messages(
+            system_prompt=system_prompt,
+            user_prompt=user_prompt,
+            format_instructions=format_instructions,
+        )
+        preferred = await self.resolve_parsing_models(model)
+        return await self.call_with_structured_models(
+            parser=parser,
+            messages=messages,
+            system_prompt=system_prompt,
+            format_instructions=format_instructions,
+            preferred=preferred,
+            temperature=temperature,
+            use_json_mode=use_json_mode,
+            max_repair_attempts=max_repair_attempts,
+        )
 
-        messages = [
+    # -------------------------------------------------------------------------
+    @staticmethod
+    def build_structured_messages(
+        *,
+        system_prompt: str,
+        user_prompt: str,
+        format_instructions: str,
+    ) -> list[dict[str, str]]:
+        return [
             {
                 "role": "system",
                 "content": f"{system_prompt.strip()}\n\n{format_instructions}",
@@ -1099,6 +1145,8 @@ class OllamaClient:
             {"role": "user", "content": user_prompt},
         ]
 
+    # -------------------------------------------------------------------------
+    async def resolve_parsing_models(self, model: str) -> list[str]:
         preferred: list[str] = []
         for candidate in (
             (model or "").strip(),
@@ -1107,10 +1155,29 @@ class OllamaClient:
         ):
             if candidate and candidate not in preferred:
                 preferred.append(candidate)
-
         if not preferred:
             preferred = await self.collect_structured_fallbacks([])
+        return preferred
 
+    # -------------------------------------------------------------------------
+    @staticmethod
+    def is_missing_model_error(err: OllamaError) -> bool:
+        message = str(err).lower()
+        return "not found" in message or "404" in message
+
+    # -------------------------------------------------------------------------
+    async def call_with_structured_models(
+        self,
+        *,
+        parser: PydanticOutputParser,
+        messages: list[dict[str, str]],
+        system_prompt: str,
+        format_instructions: str,
+        preferred: list[str],
+        temperature: float,
+        use_json_mode: bool,
+        max_repair_attempts: int,
+    ) -> T:
         queue = preferred.copy()
         tried: set[str] = set()
         missing: list[str] = []
@@ -1131,8 +1198,7 @@ class OllamaClient:
                     temperature=temperature,
                 )
             except OllamaError as e:
-                message = str(e).lower()
-                if "not found" in message or "404" in message:
+                if self.is_missing_model_error(e):
                     missing.append(active_model)
                     last_missing_error = e
                     if fallbacks is None:
@@ -1144,42 +1210,15 @@ class OllamaClient:
                     continue
                 raise RuntimeError(f"LLM call failed: {e}") from e
 
-            text = json.dumps(raw) if isinstance(raw, dict) else str(raw)
-
-            for attempt in range(max_repair_attempts + 1):
-                try:
-                    return cast(T, parser.parse(text))
-                except Exception as err:
-                    if attempt >= max_repair_attempts:
-                        logger.error(
-                            "Structured parse failed after retries. Last text: %s",
-                            text,
-                        )
-                        raise RuntimeError(f"Structured parsing failed: {err}") from err
-
-                    repair_messages = [
-                        {"role": "system", "content": system_prompt.strip()},
-                        {
-                            "role": "user",
-                            "content": (
-                                "The previous reply did not match the required JSON schema.\n"
-                                "Follow these format instructions exactly and return ONLY a valid JSON object:\n"
-                                f"{format_instructions}\n\n"
-                                f"Previous reply:\n{text}"
-                            ),
-                        },
-                    ]
-                    try:
-                        raw = await self.chat(
-                            model=active_model,
-                            messages=repair_messages,
-                            format="json" if use_json_mode else None,
-                            temperature=0.0,
-                        )
-                        text = json.dumps(raw) if isinstance(raw, dict) else str(raw)
-
-                    except OllamaError as e:
-                        raise RuntimeError(f"Repair attempt failed: {e}") from e
+            return await self.parse_with_repairs(
+                parser=parser,
+                text=json.dumps(raw) if isinstance(raw, dict) else str(raw),
+                active_model=active_model,
+                system_prompt=system_prompt,
+                format_instructions=format_instructions,
+                use_json_mode=use_json_mode,
+                max_repair_attempts=max_repair_attempts,
+            )
 
         if last_missing_error:
             attempted = ", ".join(missing)
@@ -1189,6 +1228,55 @@ class OllamaClient:
             ) from last_missing_error
 
         raise RuntimeError("LLM call failed: no parsing model candidates available")
+
+    # -------------------------------------------------------------------------
+    async def parse_with_repairs(
+        self,
+        *,
+        parser: PydanticOutputParser,
+        text: str,
+        active_model: str,
+        system_prompt: str,
+        format_instructions: str,
+        use_json_mode: bool,
+        max_repair_attempts: int,
+    ) -> T:
+        for attempt in range(max_repair_attempts + 1):
+            try:
+                return cast(T, parser.parse(text))
+            except Exception as err:
+                if attempt >= max_repair_attempts:
+                    logger.error(
+                        "Structured parse failed after retries. Last text: %s",
+                        text,
+                    )
+                    raise RuntimeError(f"Structured parsing failed: {err}") from err
+
+                repair_messages = [
+                    {"role": "system", "content": system_prompt.strip()},
+                    {
+                        "role": "user",
+                        "content": (
+                            "The previous reply did not match the required JSON schema.\n"
+                            "Follow these format instructions exactly and return ONLY a valid JSON object:\n"
+                            f"{format_instructions}\n\n"
+                            f"Previous reply:\n{text}"
+                        ),
+                    },
+                ]
+                try:
+                    raw = await self.chat(
+                        model=active_model,
+                        messages=repair_messages,
+                        format="json" if use_json_mode else None,
+                        temperature=0.0,
+                    )
+                    text = json.dumps(raw) if isinstance(raw, dict) else str(raw)
+
+                except OllamaError as e:
+                    raise RuntimeError(f"Repair attempt failed: {e}") from e
+
+        raise RuntimeError("No structured output produced by the model")
 
     # -------------------------------------------------------------------------
     @staticmethod
@@ -1210,7 +1298,9 @@ class OllamaClient:
             pass
 
         # Extract first top-level JSON object (handles extra text/noise).
-        m = re.search(r"\{(?:[^{}]|(?R))+\}|\{\}", obj_or_text, flags=re.DOTALL)
+        m = re.search(r"\{(?:[^{}]|(?R))+\}", obj_or_text, flags=re.DOTALL)
+        if not m and "{}" in obj_or_text:
+            m = re.search(r"\{\}", obj_or_text)
         if not m:
             return None
         try:
