@@ -1169,7 +1169,7 @@ class OllamaClient:
     async def call_with_structured_models(
         self,
         *,
-        parser: PydanticOutputParser,
+        parser: PydanticOutputParser[T],
         messages: list[dict[str, str]],
         system_prompt: str,
         format_instructions: str,
@@ -1233,7 +1233,7 @@ class OllamaClient:
     async def parse_with_repairs(
         self,
         *,
-        parser: PydanticOutputParser,
+        parser: PydanticOutputParser[T],
         text: str,
         active_model: str,
         system_prompt: str,
@@ -1280,6 +1280,40 @@ class OllamaClient:
 
     # -------------------------------------------------------------------------
     @staticmethod
+    def extract_first_json_object(text: str) -> str | None:
+        start = text.find("{")
+        if start == -1:
+            return None
+        depth = 0
+        in_string = False
+        escape = False
+        obj_start: int | None = None
+        for idx in range(start, len(text)):
+            ch = text[idx]
+            if in_string:
+                if escape:
+                    escape = False
+                elif ch == "\\":
+                    escape = True
+                elif ch == '"':
+                    in_string = False
+                continue
+            if ch == '"':
+                in_string = True
+                continue
+            if ch == "{":
+                if depth == 0:
+                    obj_start = idx
+                depth += 1
+            elif ch == "}":
+                if depth > 0:
+                    depth -= 1
+                    if depth == 0 and obj_start is not None:
+                        return text[obj_start : idx + 1]
+        return None
+
+    # -------------------------------------------------------------------------
+    @staticmethod
     def parse_json(obj_or_text: dict[str, Any] | str) -> dict[str, Any] | None:
         """
         Robustly return a dict JSON object from either a dict or a text blob with JSON inside.
@@ -1298,13 +1332,11 @@ class OllamaClient:
             pass
 
         # Extract first top-level JSON object (handles extra text/noise).
-        m = re.search(r"\{(?:[^{}]|(?R))+\}", obj_or_text, flags=re.DOTALL)
-        if not m and "{}" in obj_or_text:
-            m = re.search(r"\{\}", obj_or_text)
-        if not m:
+        extracted = OllamaClient.extract_first_json_object(obj_or_text)
+        if not extracted:
             return None
         try:
-            loaded = json.loads(m.group(0))
+            loaded = json.loads(extracted)
             return loaded if isinstance(loaded, dict) else None
         except json.JSONDecodeError:
             return None
@@ -1622,7 +1654,39 @@ class CloudLLMClient:
         parser = PydanticOutputParser(pydantic_object=schema)
         format_instructions = parser.get_format_instructions()
 
-        messages = [
+        resolved_model = model or (self.default_model or "")
+        messages = self.build_structured_messages(
+            system_prompt=system_prompt,
+            user_prompt=user_prompt,
+            format_instructions=format_instructions,
+        )
+
+        raw = await self.chat(
+            model=resolved_model,
+            messages=messages,
+            format="json" if use_json_mode else None,
+            options={"temperature": temperature},
+        )
+        text = json.dumps(raw) if isinstance(raw, dict) else str(raw)
+        return await self.parse_with_repairs(
+            parser=parser,
+            text=text,
+            model=resolved_model,
+            system_prompt=system_prompt,
+            format_instructions=format_instructions,
+            use_json_mode=use_json_mode,
+            max_repair_attempts=max_repair_attempts,
+        )
+
+    # ---------------------------------------------------------------------
+    @staticmethod
+    def build_structured_messages(
+        *,
+        system_prompt: str,
+        user_prompt: str,
+        format_instructions: str,
+    ) -> list[dict[str, str]]:
+        return [
             {
                 "role": "system",
                 "content": f"{system_prompt.strip()}\n\n{format_instructions}",
@@ -1630,15 +1694,39 @@ class CloudLLMClient:
             {"role": "user", "content": user_prompt},
         ]
 
-        raw = await self.chat(
-            model=model or (self.default_model or ""),
-            messages=messages,
-            format="json" if use_json_mode else None,
-            options={"temperature": temperature},
-        )
+    # ---------------------------------------------------------------------
+    @staticmethod
+    def build_repair_messages(
+        *,
+        system_prompt: str,
+        format_instructions: str,
+        text: str,
+    ) -> list[dict[str, str]]:
+        return [
+            {"role": "system", "content": system_prompt.strip()},
+            {
+                "role": "user",
+                "content": (
+                    "The previous reply did not match the required JSON schema.\n"
+                    "Follow these format instructions exactly and return ONLY a valid JSON object:\n"
+                    f"{format_instructions}\n\n"
+                    f"Previous reply:\n{text}"
+                ),
+            },
+        ]
 
-        text = json.dumps(raw) if isinstance(raw, dict) else str(raw)
-
+    # ---------------------------------------------------------------------
+    async def parse_with_repairs(
+        self,
+        *,
+        parser: PydanticOutputParser[T],
+        text: str,
+        model: str,
+        system_prompt: str,
+        format_instructions: str,
+        use_json_mode: bool,
+        max_repair_attempts: int,
+    ) -> T:
         for attempt in range(max_repair_attempts + 1):
             try:
                 return cast(T, parser.parse(text))
@@ -1649,21 +1737,13 @@ class CloudLLMClient:
                     )
                     raise RuntimeError(f"Structured parsing failed: {err}") from err
 
-                repair_messages = [
-                    {"role": "system", "content": system_prompt.strip()},
-                    {
-                        "role": "user",
-                        "content": (
-                            "The previous reply did not match the required JSON schema.\n"
-                            "Follow these format instructions exactly and return ONLY a valid JSON object:\n"
-                            f"{format_instructions}\n\n"
-                            f"Previous reply:\n{text}"
-                        ),
-                    },
-                ]
-
+                repair_messages = self.build_repair_messages(
+                    system_prompt=system_prompt,
+                    format_instructions=format_instructions,
+                    text=text,
+                )
                 raw = await self.chat(
-                    model=model or (self.default_model or ""),
+                    model=model,
                     messages=repair_messages,
                     format="json" if use_json_mode else None,
                     options={"temperature": 0.0},
