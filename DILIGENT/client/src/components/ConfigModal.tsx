@@ -24,29 +24,11 @@ export function ConfigModal({ isOpen, onClose, children }: ConfigModalProps): Re
         return null;
     }
 
-    const handleOverlayClick = (e: React.MouseEvent<HTMLDivElement>) => {
-        if (e.target === e.currentTarget) {
-            onClose();
-        }
-    };
-
-    const handleOverlayKeyDown = (e: React.KeyboardEvent<HTMLDivElement>) => {
-        if (e.key === "Enter" || e.key === " ") {
-            e.preventDefault();
-            onClose();
-        }
-    };
-
     return (
         <div
             className="modal-overlay"
-            onClick={handleOverlayClick}
-            onKeyDown={handleOverlayKeyDown}
-            role="button"
-            tabIndex={0}
-            aria-label="Close configuration modal"
         >
-            <div className="modal-container" role="dialog" aria-modal="true" aria-labelledby="modal-title">
+            <dialog className="modal-container" aria-modal="true" aria-labelledby="modal-title" open>
                 <div className="modal-header">
                     <div className="modal-header-content">
                         <p className="modal-title" id="modal-title">Model Configurations</p>
@@ -64,7 +46,7 @@ export function ConfigModal({ isOpen, onClose, children }: ConfigModalProps): Re
                 <div className="modal-body">
                     {children}
                 </div>
-            </div>
+            </dialog>
         </div>
     );
 }
