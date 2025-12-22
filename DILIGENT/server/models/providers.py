@@ -471,7 +471,7 @@ class OllamaClient:
         if completed:
             try:
                 await self.refresh_model_cache()
-            except (OllamaError, OllamaTimeout) as exc:
+            except OllamaError as exc:
                 logger.debug("Failed to refresh Ollama model cache after pull: %s", exc)
 
     # -------------------------------------------------------------------------
@@ -588,43 +588,65 @@ class OllamaClient:
     # -------------------------------------------------------------------------
     @staticmethod
     def get_available_memory_bytes() -> int:
+        for getter in (
+            OllamaClient._get_available_memory_windows,
+            OllamaClient._get_available_memory_sysconf,
+            OllamaClient._get_available_memory_proc,
+        ):
+            available = getter()
+            if available:
+                return available
+        return 0
+
+    # -------------------------------------------------------------------------
+    @staticmethod
+    def _get_available_memory_windows() -> int:
         kernel32 = getattr(getattr(ctypes, "windll", None), "kernel32", None)
         memory_status_fn = getattr(kernel32, "GlobalMemoryStatusEx", None)
-        if memory_status_fn is not None:
-
-            class MemoryStatus(ctypes.Structure):
-                _fields_ = [
-                    ("dwLength", ctypes.c_ulong),
-                    ("dwMemoryLoad", ctypes.c_ulong),
-                    ("ullTotalPhys", ctypes.c_ulonglong),
-                    ("ullAvailPhys", ctypes.c_ulonglong),
-                    ("ullTotalPageFile", ctypes.c_ulonglong),
-                    ("ullAvailPageFile", ctypes.c_ulonglong),
-                    ("ullTotalVirtual", ctypes.c_ulonglong),
-                    ("ullAvailVirtual", ctypes.c_ulonglong),
-                    ("ullAvailExtendedVirtual", ctypes.c_ulonglong),
-                ]
-
-            status = MemoryStatus()
-            status.dwLength = ctypes.sizeof(MemoryStatus)
-            if memory_status_fn(ctypes.byref(status)):
-                return int(status.ullAvailPhys)
+        if memory_status_fn is None:
             return 0
 
-        sysconf = getattr(os, "sysconf", None)
-        if callable(sysconf):
-            try:
-                page_size = sysconf("SC_PAGE_SIZE")
-                sysconf_names = getattr(os, "sysconf_names", {})
-                if "SC_AVPHYS_PAGES" in sysconf_names:
-                    pages = sysconf("SC_AVPHYS_PAGES")
-                else:
-                    pages = sysconf("SC_PHYS_PAGES")
-                if isinstance(page_size, int) and isinstance(pages, int):
-                    return page_size * pages
-            except (ValueError, OSError, AttributeError):
-                pass
+        class MemoryStatus(ctypes.Structure):
+            _fields_ = [
+                ("dwLength", ctypes.c_ulong),
+                ("dwMemoryLoad", ctypes.c_ulong),
+                ("ullTotalPhys", ctypes.c_ulonglong),
+                ("ullAvailPhys", ctypes.c_ulonglong),
+                ("ullTotalPageFile", ctypes.c_ulonglong),
+                ("ullAvailPageFile", ctypes.c_ulonglong),
+                ("ullTotalVirtual", ctypes.c_ulonglong),
+                ("ullAvailVirtual", ctypes.c_ulonglong),
+                ("ullAvailExtendedVirtual", ctypes.c_ulonglong),
+            ]
 
+        status = MemoryStatus()
+        status.dwLength = ctypes.sizeof(MemoryStatus)
+        if memory_status_fn(ctypes.byref(status)):
+            return int(status.ullAvailPhys)
+        return 0
+
+    # -------------------------------------------------------------------------
+    @staticmethod
+    def _get_available_memory_sysconf() -> int:
+        sysconf = getattr(os, "sysconf", None)
+        if not callable(sysconf):
+            return 0
+        try:
+            page_size = sysconf("SC_PAGE_SIZE")
+            sysconf_names = getattr(os, "sysconf_names", {})
+            if "SC_AVPHYS_PAGES" in sysconf_names:
+                pages = sysconf("SC_AVPHYS_PAGES")
+            else:
+                pages = sysconf("SC_PHYS_PAGES")
+            if isinstance(page_size, int) and isinstance(pages, int):
+                return page_size * pages
+        except (ValueError, OSError, AttributeError):
+            pass
+        return 0
+
+    # -------------------------------------------------------------------------
+    @staticmethod
+    def _get_available_memory_proc() -> int:
         try:
             with open("/proc/meminfo", "r", encoding="utf-8") as handle:
                 for line in handle:
@@ -642,7 +664,6 @@ class OllamaClient:
                             return value
         except (FileNotFoundError, PermissionError, ValueError):
             pass
-
         return 0
 
     # -------------------------------------------------------------------------
@@ -1287,7 +1308,6 @@ class CloudLLMClient:
         messages: list[dict[str, str]],
         format: str | None = None,
         options: dict[str, Any] | None = None,
-        keep_alive: str | None = None,  # unused but kept for compatibility
     ) -> dict[str, Any] | str:
         if self.provider == "openai":
             return await self.chat_openai(
@@ -1365,11 +1385,11 @@ class CloudLLMClient:
             role = m.get("role", "user")
             text = m.get("content", "")
             if role == "system":
-                system_text = (
-                    f"{(system_text + '\n') if system_text else ''}{text}"
-                    if text
-                    else system_text
-                )
+                if text:
+                    if system_text:
+                        system_text = f"{system_text}\n{text}"
+                    else:
+                        system_text = text
                 continue
             gem_role = "user" if role == "user" else "model"
             contents.append({"role": gem_role, "parts": [{"text": text}]})
