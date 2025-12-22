@@ -12,7 +12,10 @@ from sqlalchemy.orm import sessionmaker
 
 from DILIGENT.server.utils.configurations import DatabaseSettings
 from DILIGENT.server.database.schema import Base
-from DILIGENT.server.database.utils import normalize_postgres_engine
+from DILIGENT.server.database.utils import (
+    MISSING_TABLE_MESSAGE,
+    normalize_postgres_engine,
+)
 from DILIGENT.server.utils.logger import logger
 
 
@@ -49,7 +52,7 @@ class PostgresRepository:
             connect_args=connect_args,
             pool_pre_ping=True,
         )
-        self.Session = sessionmaker(bind=self.engine, future=True)
+        self.session_factory = sessionmaker(bind=self.engine, future=True)
         self.insert_batch_size = settings.insert_batch_size
         self.insert_commit_interval = settings.insert_commit_interval
         self.select_page_size = settings.select_page_size
@@ -64,7 +67,7 @@ class PostgresRepository:
     # -------------------------------------------------------------------------
     def upsert_dataframe(self, df: pd.DataFrame, table_cls) -> None:
         table = table_cls.__table__
-        session = self.Session()
+        session = self.session_factory()
         try:
             unique_cols = []
             for uc in table.constraints:
@@ -106,7 +109,7 @@ class PostgresRepository:
         with self.engine.connect() as conn:
             inspector = inspect(conn)
             if not inspector.has_table(table_name):
-                logger.warning("Table %s does not exist", table_name)
+                logger.warning(MISSING_TABLE_MESSAGE, table_name)
                 return pd.DataFrame()
             data = pd.read_sql_table(table_name, conn)
         return data
@@ -142,7 +145,7 @@ class PostgresRepository:
         with self.engine.connect() as conn:
             inspector = inspect(conn)
             if not inspector.has_table(table_name):
-                logger.warning("Table %s does not exist", table_name)
+                logger.warning(MISSING_TABLE_MESSAGE, table_name)
                 return
             query = sqlalchemy.text(f'SELECT * FROM "{table_name}"')
             for chunk in pd.read_sql_query(query, conn, chunksize=chunk_size):
@@ -155,7 +158,7 @@ class PostgresRepository:
         with self.engine.connect() as conn:
             inspector = inspect(conn)
             if not inspector.has_table(table_name):
-                logger.warning("Table %s does not exist", table_name)
+                logger.warning(MISSING_TABLE_MESSAGE, table_name)
                 return pd.DataFrame()
             query = sqlalchemy.text(
                 f'SELECT * FROM "{table_name}" LIMIT :limit OFFSET :offset'

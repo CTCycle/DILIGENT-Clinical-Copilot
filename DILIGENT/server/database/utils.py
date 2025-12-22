@@ -9,3 +9,6 @@ def normalize_postgres_engine(engine: str | None) -> str:
     if lowered in {"postgres", "postgresql"}:
         return "postgresql+psycopg"
     return engine
+
+
+MISSING_TABLE_MESSAGE = "Table %s does not exist"
