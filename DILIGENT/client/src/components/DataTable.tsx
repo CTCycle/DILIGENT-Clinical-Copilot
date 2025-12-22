@@ -4,13 +4,13 @@ import React, { useRef, useEffect, useCallback } from "react";
 // Types
 // ---------------------------------------------------------------------------
 interface DataTableProps {
-    columns: string[];
-    rows: Record<string, unknown>[];
-    isLoading?: boolean;
-    emptyMessage?: string;
-    hasMore?: boolean;
-    isLoadingMore?: boolean;
-    onLoadMore?: () => void;
+    readonly columns: ReadonlyArray<string>;
+    readonly rows: ReadonlyArray<Record<string, unknown>>;
+    readonly isLoading?: boolean;
+    readonly emptyMessage?: string;
+    readonly hasMore?: boolean;
+    readonly isLoadingMore?: boolean;
+    readonly onLoadMore?: () => void;
 }
 
 // ---------------------------------------------------------------------------
@@ -24,7 +24,7 @@ export function DataTable({
     hasMore = false,
     isLoadingMore = false,
     onLoadMore,
-}: DataTableProps): React.JSX.Element {
+}: Readonly<DataTableProps>): React.JSX.Element {
     const sentinelRef = useRef<HTMLDivElement>(null);
 
     // Set up IntersectionObserver for infinite scroll
@@ -85,8 +85,8 @@ export function DataTable({
                             </tr>
                         </thead>
                         <tbody>
-                            {rows.map((row, rowIndex) => (
-                                <tr key={rowIndex}>
+                            {rows.map((row) => (
+                                <tr key={getRowKey(row, columns)}>
                                     {columns.map((col) => (
                                         <td key={col}>{formatCellValue(row[col])}</td>
                                     ))}
@@ -113,8 +113,8 @@ export function DataTable({
 // ---------------------------------------------------------------------------
 function formatColumnName(name: string): string {
     return name
-        .replace(/_/g, " ")
-        .replace(/\b\w/g, (char) => char.toUpperCase());
+        .replaceAll("_", " ")
+        .replaceAll(/\b\w/g, (char) => char.toUpperCase());
 }
 
 function formatCellValue(value: unknown): string {
@@ -129,4 +129,17 @@ function formatCellValue(value: unknown): string {
         }
     }
     return String(value);
+}
+
+function getRowKey(row: Record<string, unknown>, columns: ReadonlyArray<string>): string {
+    const preferredIdColumn = columns.find((col) => /(^id$|_id$|id$)/i.test(col));
+    if (preferredIdColumn) {
+        const idValue = row[preferredIdColumn];
+        if (idValue !== null && idValue !== undefined && idValue !== "") {
+            return `${preferredIdColumn}:${String(idValue)}`;
+        }
+    }
+
+    const rowKeyParts = columns.map((col) => String(row[col] ?? ""));
+    return rowKeyParts.join("|");
 }
