@@ -14,9 +14,9 @@ const CloseIcon = () => (
 // ConfigModal
 // ---------------------------------------------------------------------------
 interface ConfigModalProps {
-    isOpen: boolean;
-    onClose: () => void;
-    children: React.ReactNode;
+    readonly isOpen: boolean;
+    readonly onClose: () => void;
+    readonly children: React.ReactNode;
 }
 
 export function ConfigModal({ isOpen, onClose, children }: ConfigModalProps): React.JSX.Element | null {
@@ -30,8 +30,22 @@ export function ConfigModal({ isOpen, onClose, children }: ConfigModalProps): Re
         }
     };
 
+    const handleOverlayKeyDown = (e: React.KeyboardEvent<HTMLDivElement>) => {
+        if (e.key === "Enter" || e.key === " ") {
+            e.preventDefault();
+            onClose();
+        }
+    };
+
     return (
-        <div className="modal-overlay" onClick={handleOverlayClick}>
+        <div
+            className="modal-overlay"
+            onClick={handleOverlayClick}
+            onKeyDown={handleOverlayKeyDown}
+            role="button"
+            tabIndex={0}
+            aria-label="Close configuration modal"
+        >
             <div className="modal-container" role="dialog" aria-modal="true" aria-labelledby="modal-title">
                 <div className="modal-header">
                     <div className="modal-header-content">
