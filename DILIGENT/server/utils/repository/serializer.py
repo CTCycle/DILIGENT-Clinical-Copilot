@@ -122,30 +122,8 @@ class DataSerializer:
 
     # -----------------------------------------------------------------------------
     def serialize_string_list(self, value: Any) -> str:
-        if isinstance(value, str):
-            stripped = value.strip()
-            if not stripped:
-                return "[]"
-            try:
-                parsed = json.loads(stripped)
-            except json.JSONDecodeError:
-                parsed_values = [stripped]
-            else:
-                if isinstance(parsed, list):
-                    parsed_values = parsed
-                else:
-                    parsed_values = [stripped]
-        elif isinstance(value, list):
-            parsed_values = value
-        elif pd.isna(value) or value is None:
-            parsed_values = []
-        else:
-            parsed_values = [value]
-        normalized: list[str] = []
-        for item in parsed_values:
-            normalized_item = self.normalize_list_item(item)
-            if normalized_item is not None:
-                normalized.append(normalized_item)
+        parsed_values = self._parse_serialized_list_input(value)
+        normalized = self._normalize_list_items(parsed_values)
         return json.dumps(normalized, ensure_ascii=False)
 
     # -----------------------------------------------------------------------------
@@ -154,23 +132,12 @@ class DataSerializer:
             stripped = value.strip()
             if not stripped:
                 return None
-            try:
-                parsed = json.loads(stripped)
-            except json.JSONDecodeError:
+            ok, parsed = self._try_json_loads(stripped)
+            if not ok:
                 return self.normalize_list_item(stripped)
             return self.serialize_brand_names(parsed)
         if isinstance(value, list):
-            normalized: list[str] = []
-            seen: set[str] = set()
-            for item in value:
-                normalized_item = self.normalize_list_item(item)
-                if normalized_item is None:
-                    continue
-                key = normalized_item.casefold()
-                if key in seen:
-                    continue
-                seen.add(key)
-                normalized.append(normalized_item)
+            normalized = self._normalize_unique_list_items(value)
             if not normalized:
                 return None
             if len(normalized) == 1:
@@ -187,31 +154,72 @@ class DataSerializer:
 
     # -----------------------------------------------------------------------------
     def deserialize_string_list(self, value: Any) -> list[str]:
+        parsed_values = self._parse_deserialized_list_input(value)
+        return self._normalize_list_items(parsed_values)
+
+    # -----------------------------------------------------------------------------
+    def _try_json_loads(self, value: str) -> tuple[bool, Any]:
+        try:
+            return True, json.loads(value)
+        except json.JSONDecodeError:
+            return False, None
+
+    # -----------------------------------------------------------------------------
+    def _parse_serialized_list_input(self, value: Any) -> list[Any]:
         if isinstance(value, list):
-            parsed_values = value
-        elif isinstance(value, str):
+            return value
+        if isinstance(value, str):
             stripped = value.strip()
             if not stripped:
                 return []
-            try:
-                parsed = json.loads(stripped)
-            except json.JSONDecodeError:
-                normalized_item = self.normalize_list_item(stripped)
-                return [normalized_item] if normalized_item is not None else []
-            if isinstance(parsed, list):
-                parsed_values = parsed
-            else:
-                normalized_item = self.normalize_list_item(parsed)
-                return [normalized_item] if normalized_item is not None else []
-        elif pd.isna(value) or value is None:
+            ok, parsed = self._try_json_loads(stripped)
+            if ok and isinstance(parsed, list):
+                return parsed
+            return [stripped]
+        if pd.isna(value) or value is None:
             return []
-        else:
-            parsed_values = [value]
+        return [value]
+
+    # -----------------------------------------------------------------------------
+    def _parse_deserialized_list_input(self, value: Any) -> list[Any]:
+        if isinstance(value, list):
+            return value
+        if isinstance(value, str):
+            stripped = value.strip()
+            if not stripped:
+                return []
+            ok, parsed = self._try_json_loads(stripped)
+            if not ok:
+                return [stripped]
+            if isinstance(parsed, list):
+                return parsed
+            return [parsed]
+        if pd.isna(value) or value is None:
+            return []
+        return [value]
+
+    # -----------------------------------------------------------------------------
+    def _normalize_list_items(self, values: list[Any]) -> list[str]:
         normalized: list[str] = []
-        for item in parsed_values:
+        for item in values:
             normalized_item = self.normalize_list_item(item)
             if normalized_item is not None:
                 normalized.append(normalized_item)
+        return normalized
+
+    # -----------------------------------------------------------------------------
+    def _normalize_unique_list_items(self, values: list[Any]) -> list[str]:
+        normalized: list[str] = []
+        seen: set[str] = set()
+        for item in values:
+            normalized_item = self.normalize_list_item(item)
+            if normalized_item is None:
+                continue
+            key = normalized_item.casefold()
+            if key in seen:
+                continue
+            seen.add(key)
+            normalized.append(normalized_item)
         return normalized
 
     # -----------------------------------------------------------------------------
