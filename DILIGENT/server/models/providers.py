@@ -175,15 +175,27 @@ class OllamaClient:
         think: bool | None,
         options: dict[str, Any] | None,
     ) -> tuple[float, bool, dict[str, Any] | None]:
-        default_temp = LLMRuntimeConfig.get_ollama_temperature()
-        if temperature is None:
-            temp_value = default_temp
+        temp_value, options_payload = self.resolve_temperature(temperature, options)
+        temp_value = max(0.0, min(2.0, float(temp_value)))
+        if think is None:
+            think_value = LLMRuntimeConfig.is_ollama_reasoning_enabled()
         else:
+            think_value = bool(think)
+        return round(temp_value, 2), think_value, options_payload
+
+    # -------------------------------------------------------------------------
+    @staticmethod
+    def resolve_temperature(
+        temperature: float | None, options: dict[str, Any] | None
+    ) -> tuple[float, dict[str, Any] | None]:
+        default_temp = LLMRuntimeConfig.get_ollama_temperature()
+        options_payload = dict(options) if options else None
+        temp_value = default_temp
+        if temperature is not None:
             try:
                 temp_value = float(temperature)
             except (TypeError, ValueError):
                 temp_value = default_temp
-        options_payload = dict(options) if options else None
         if options_payload and "temperature" in options_payload:
             if temperature is None:
                 try:
@@ -193,12 +205,7 @@ class OllamaClient:
             options_payload.pop("temperature", None)
             if not options_payload:
                 options_payload = None
-        temp_value = max(0.0, min(2.0, float(temp_value)))
-        if think is None:
-            think_value = LLMRuntimeConfig.is_ollama_reasoning_enabled()
-        else:
-            think_value = bool(think)
-        return round(temp_value, 2), think_value, options_payload
+        return temp_value, options_payload
 
     # -------------------------------------------------------------------------
     @staticmethod
@@ -604,14 +611,15 @@ class OllamaClient:
                 return int(status.ullAvailPhys)
             return 0
 
-        if hasattr(os, "sysconf"):
+        sysconf = getattr(os, "sysconf", None)
+        if callable(sysconf):
             try:
-                page_size = os.sysconf("SC_PAGE_SIZE")
+                page_size = sysconf("SC_PAGE_SIZE")
                 sysconf_names = getattr(os, "sysconf_names", {})
                 if "SC_AVPHYS_PAGES" in sysconf_names:
-                    pages = os.sysconf("SC_AVPHYS_PAGES")
+                    pages = sysconf("SC_AVPHYS_PAGES")
                 else:
-                    pages = os.sysconf("SC_PHYS_PAGES")
+                    pages = sysconf("SC_PHYS_PAGES")
                 if isinstance(page_size, int) and isinstance(pages, int):
                     return page_size * pages
             except (ValueError, OSError, AttributeError):
