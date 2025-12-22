@@ -14,6 +14,8 @@ router = APIRouter(prefix="/browser", tags=["browser"])
 
 # Default page size from configuration
 DEFAULT_PAGE_SIZE = server_settings.database.browser_page_size
+OFFSET_DESCRIPTION = "Number of rows to skip"
+LIMIT_DESCRIPTION = "Number of rows to fetch"
 
 
 ###############################################################################
@@ -33,34 +35,34 @@ TABLE_MAPPING = {
 
 ###############################################################################
 @router.get("/sessions", response_model=TableDataResponse)
-async def get_sessions_data(
-    offset: int = Query(0, ge=0, description="Number of rows to skip"),
-    limit: int = Query(DEFAULT_PAGE_SIZE, ge=1, le=10000, description="Number of rows to fetch"),
+def get_sessions_data(
+    offset: int = Query(0, ge=0, description=OFFSET_DESCRIPTION),
+    limit: int = Query(DEFAULT_PAGE_SIZE, ge=1, le=10000, description=LIMIT_DESCRIPTION),
 ) -> TableDataResponse:
     """Fetch clinical sessions table data with pagination."""
-    return await _fetch_table_data("sessions", offset, limit)
+    return _fetch_table_data("sessions", offset, limit)
 
 
 @router.get("/livertox", response_model=TableDataResponse)
-async def get_livertox_data(
-    offset: int = Query(0, ge=0, description="Number of rows to skip"),
-    limit: int = Query(DEFAULT_PAGE_SIZE, ge=1, le=10000, description="Number of rows to fetch"),
+def get_livertox_data(
+    offset: int = Query(0, ge=0, description=OFFSET_DESCRIPTION),
+    limit: int = Query(DEFAULT_PAGE_SIZE, ge=1, le=10000, description=LIMIT_DESCRIPTION),
 ) -> TableDataResponse:
     """Fetch LiverTox catalog data with pagination."""
-    return await _fetch_table_data("livertox", offset, limit)
+    return _fetch_table_data("livertox", offset, limit)
 
 
 @router.get("/drugs", response_model=TableDataResponse)
-async def get_drugs_data(
-    offset: int = Query(0, ge=0, description="Number of rows to skip"),
-    limit: int = Query(DEFAULT_PAGE_SIZE, ge=1, le=10000, description="Number of rows to fetch"),
+def get_drugs_data(
+    offset: int = Query(0, ge=0, description=OFFSET_DESCRIPTION),
+    limit: int = Query(DEFAULT_PAGE_SIZE, ge=1, le=10000, description=LIMIT_DESCRIPTION),
 ) -> TableDataResponse:
     """Fetch drugs catalog data with pagination."""
-    return await _fetch_table_data("drugs", offset, limit)
+    return _fetch_table_data("drugs", offset, limit)
 
 
 ###############################################################################
-async def _fetch_table_data(table_key: str, offset: int, limit: int) -> TableDataResponse:
+def _fetch_table_data(table_key: str, offset: int, limit: int) -> TableDataResponse:
     """Generic helper to fetch paginated data from a table."""
     table_name = TABLE_MAPPING.get(table_key)
     if not table_name:
