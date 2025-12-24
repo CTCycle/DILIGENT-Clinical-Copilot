@@ -123,39 +123,17 @@ class LanceVectorDatabase:
             return
         if self.embedding_size == embedding_size:
             return
-        try:
-            current_field = self.schema.field("embedding")
-        except KeyError:
+        current_field = self._get_embedding_field()
+        if current_field is None:
             return
-        desired_type = pa.list_(pa.float32(), embedding_size)
         if isinstance(current_field.type, pa.FixedSizeListType):
             if current_field.type.list_size == embedding_size:
                 self.embedding_size = embedding_size
                 return
-        fields: list[pa.Field] = []
-        for field in self.schema:
-            if field.name == "embedding":
-                fields.append(pa.field("embedding", desired_type))
-            else:
-                fields.append(field)
-        new_schema = pa.schema(fields)
+        new_schema = self._schema_with_embedding_size(embedding_size)
         if new_schema == self.schema and self.embedding_size == embedding_size:
             return
-        existing_records: list[dict[str, Any]] = []
-        if self.table is not None:
-            row_count = 0
-            try:
-                row_count = self.table.count_rows()
-            except Exception:  # noqa: BLE001
-                row_count = 0
-            if row_count > 0:
-                try:
-                    existing_records = self.table.to_arrow().to_pylist()
-                except Exception as exc:  # noqa: BLE001
-                    logger.warning(
-                        "Unable to cache existing embeddings while updating LanceDB schema: %s",
-                        exc,
-                    )
+        existing_records = self._load_existing_records()
         connection = self.connect()
         if self.collection_name in connection.table_names():
             logger.info(
@@ -164,21 +142,12 @@ class LanceVectorDatabase:
                 embedding_size,
             )
             connection.drop_table(self.collection_name)
-        self.schema = new_schema
-        self.table = None
-        self.index_ready = False
-        self.index_creation_attempted = False
-        self.embedding_size = embedding_size
+        self._reset_table_state(new_schema, embedding_size)
         table = self.get_table()
         if existing_records:
-            valid_records: list[dict[str, Any]] = []
-            discarded = 0
-            for record in existing_records:
-                vector = record.get("embedding")
-                if isinstance(vector, list) and len(vector) == embedding_size:
-                    valid_records.append(record)
-                else:
-                    discarded += 1
+            valid_records, discarded = self._filter_records_by_embedding_size(
+                existing_records, embedding_size
+            )
             if discarded:
                 logger.warning(
                     "Discarded %d embeddings that did not match new dimension %d during LanceDB schema update",
@@ -195,51 +164,15 @@ class LanceVectorDatabase:
         if self.index_ready:
             return
         table = table or self.get_table()
-        def _index_value(index: Any, key: str) -> Any:
-            if isinstance(index, dict):
-                return index.get(key)
-            return getattr(index, key, None)
-
         try:
             indices = cast(list[Any], table.list_indices())
         except Exception as exc:  # noqa: BLE001
             logger.warning("Unable to inspect LanceDB indices: %s", exc)
             return
         for index in indices:
-            column = (
-                _index_value(index, "column")
-                or _index_value(index, "columns")
-                or _index_value(index, "vector_column")
-                or _index_value(index, "vector_column_name")
-            )
-            if column == "embedding":
+            if self._index_has_embedding_column(index):
                 self.index_ready = True
                 return
-            if isinstance(column, dict):
-                name = (
-                    _index_value(column, "name")
-                    or _index_value(column, "column")
-                    or _index_value(column, "vector_column")
-                    or _index_value(column, "vector_column_name")
-                )
-                if name == "embedding":
-                    self.index_ready = True
-                    return
-            if isinstance(column, (list, tuple)):
-                for entry in column:
-                    if entry == "embedding":
-                        self.index_ready = True
-                        return
-                    if isinstance(entry, dict):
-                        name = (
-                            _index_value(entry, "name")
-                            or _index_value(entry, "column")
-                            or _index_value(entry, "vector_column")
-                            or _index_value(entry, "vector_column_name")
-                        )
-                        if name == "embedding":
-                            self.index_ready = True
-                            return
         if self.index_creation_attempted:
             return
         self.index_creation_attempted = True
@@ -267,6 +200,97 @@ class LanceVectorDatabase:
         except Exception as exc:  # noqa: BLE001
             logger.error("Failed to create LanceDB vector index: %s", exc)
             self.index_ready = False
+
+    # -------------------------------------------------------------------------
+    def _get_embedding_field(self) -> pa.Field | None:
+        try:
+            return self.schema.field("embedding")
+        except KeyError:
+            return None
+
+    def _schema_with_embedding_size(self, embedding_size: int) -> pa.Schema:
+        desired_type = pa.list_(pa.float32(), embedding_size)
+        fields: list[pa.Field] = []
+        for field in self.schema:
+            if field.name == "embedding":
+                fields.append(pa.field("embedding", desired_type))
+            else:
+                fields.append(field)
+        return pa.schema(fields)
+
+    def _load_existing_records(self) -> list[dict[str, Any]]:
+        if self.table is None:
+            return []
+        try:
+            row_count = self.table.count_rows()
+        except Exception:  # noqa: BLE001
+            return []
+        if row_count <= 0:
+            return []
+        try:
+            return self.table.to_arrow().to_pylist()
+        except Exception as exc:  # noqa: BLE001
+            logger.warning(
+                "Unable to cache existing embeddings while updating LanceDB schema: %s",
+                exc,
+            )
+            return []
+
+    def _reset_table_state(self, schema: pa.Schema, embedding_size: int) -> None:
+        self.schema = schema
+        self.table = None
+        self.index_ready = False
+        self.index_creation_attempted = False
+        self.embedding_size = embedding_size
+
+    def _filter_records_by_embedding_size(
+        self, records: list[dict[str, Any]], embedding_size: int
+    ) -> tuple[list[dict[str, Any]], int]:
+        valid_records: list[dict[str, Any]] = []
+        discarded = 0
+        for record in records:
+            vector = record.get("embedding")
+            if isinstance(vector, list) and len(vector) == embedding_size:
+                valid_records.append(record)
+            else:
+                discarded += 1
+        return valid_records, discarded
+
+    def _index_has_embedding_column(self, index: Any) -> bool:
+        column = (
+            self._index_value(index, "column")
+            or self._index_value(index, "columns")
+            or self._index_value(index, "vector_column")
+            or self._index_value(index, "vector_column_name")
+        )
+        for entry in self._iter_column_entries(column):
+            name = self._column_entry_name(entry)
+            if name == "embedding":
+                return True
+        return False
+
+    def _iter_column_entries(self, column: Any) -> Iterator[Any]:
+        if column is None:
+            return iter(())
+        if isinstance(column, (list, tuple, set)):
+            return iter(column)
+        return iter((column,))
+
+    def _column_entry_name(self, entry: Any) -> str | None:
+        if isinstance(entry, str):
+            return entry
+        return (
+            self._index_value(entry, "name")
+            or self._index_value(entry, "column")
+            or self._index_value(entry, "vector_column")
+            or self._index_value(entry, "vector_column_name")
+        )
+
+    @staticmethod
+    def _index_value(index: Any, key: str) -> Any:
+        if isinstance(index, dict):
+            return index.get(key)
+        return getattr(index, key, None)
 
     # -------------------------------------------------------------------------
     def iter_embeddings(
