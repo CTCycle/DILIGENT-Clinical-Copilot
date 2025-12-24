@@ -2,12 +2,12 @@ from __future__ import annotations
 
 import json
 import os
-from typing import Any, Iterator
+from typing import Any, Iterator, Literal, cast
 
 import lancedb
 import pyarrow as pa
-from lancedb import LanceDBConnection
-from lancedb.table import LanceTable
+from lancedb.db import DBConnection
+from lancedb.table import LanceTable, Table
 
 from DILIGENT.server.utils.logger import logger
 
@@ -21,6 +21,9 @@ VECTOR_TABLE_SCHEMA = pa.schema(
         pa.field("metadata", pa.string()),
     ]
 )
+
+DistanceType = Literal["l2", "cosine", "dot"]
+IndexType = Literal["IVF_FLAT", "IVF_PQ", "IVF_HNSW_SQ", "IVF_HNSW_PQ"]
 
 
 ###############################################################################
@@ -40,14 +43,14 @@ class LanceVectorDatabase:
         self.metric = metric
         self.index_type = index_type
         self.stream_batch_size = stream_batch_size
-        self.connection: LanceDBConnection | None = None
-        self.table: LanceTable | None = None
+        self.connection: DBConnection | None = None
+        self.table: Table | None = None
         self.index_ready = False
         self.index_creation_attempted = False
         self.embedding_size: int | None = None
 
     # -------------------------------------------------------------------------
-    def connect(self) -> LanceDBConnection:
+    def connect(self) -> DBConnection:
         if self.connection is None:
             path = self.database_path
             suffix = os.path.splitext(path)[1]
@@ -73,7 +76,7 @@ class LanceVectorDatabase:
             self.embedding_size = None
 
     # -------------------------------------------------------------------------
-    def get_table(self) -> LanceTable:
+    def get_table(self) -> Table:
         if self.table is not None:
             return self.table
         connection = self.connect()
@@ -147,7 +150,7 @@ class LanceVectorDatabase:
                 row_count = 0
             if row_count > 0:
                 try:
-                    existing_records = self.table.to_pylist()
+                    existing_records = self.table.to_arrow().to_pylist()
                 except Exception as exc:  # noqa: BLE001
                     logger.warning(
                         "Unable to cache existing embeddings while updating LanceDB schema: %s",
@@ -186,7 +189,7 @@ class LanceVectorDatabase:
                 table.add(valid_records)
 
     # -------------------------------------------------------------------------
-    def ensure_vector_index(self, table: LanceTable | None = None) -> None:
+    def ensure_vector_index(self, table: Table | None = None) -> None:
         if not self.metric or not self.index_type:
             return
         if self.index_ready:
@@ -252,8 +255,8 @@ class LanceVectorDatabase:
         try:
             table.create_index(
                 vector_column_name="embedding",
-                metric=self.metric,
-                index_type=self.index_type,
+                metric=cast(DistanceType, self.metric),
+                index_type=cast(IndexType, self.index_type),
             )
             self.index_ready = True
         except Exception as exc:  # noqa: BLE001
