@@ -195,27 +195,32 @@ class LanceVectorDatabase:
         if self.index_ready:
             return
         table = table or self.get_table()
+        def _index_value(index: Any, key: str) -> Any:
+            if isinstance(index, dict):
+                return index.get(key)
+            return getattr(index, key, None)
+
         try:
-            indices = table.list_indices()
+            indices = cast(list[Any], table.list_indices())
         except Exception as exc:  # noqa: BLE001
             logger.warning("Unable to inspect LanceDB indices: %s", exc)
             return
         for index in indices:
             column = (
-                index.get("column")
-                or index.get("columns")
-                or index.get("vector_column")
-                or index.get("vector_column_name")
+                _index_value(index, "column")
+                or _index_value(index, "columns")
+                or _index_value(index, "vector_column")
+                or _index_value(index, "vector_column_name")
             )
             if column == "embedding":
                 self.index_ready = True
                 return
             if isinstance(column, dict):
                 name = (
-                    column.get("name")
-                    or column.get("column")
-                    or column.get("vector_column")
-                    or column.get("vector_column_name")
+                    _index_value(column, "name")
+                    or _index_value(column, "column")
+                    or _index_value(column, "vector_column")
+                    or _index_value(column, "vector_column_name")
                 )
                 if name == "embedding":
                     self.index_ready = True
@@ -227,10 +232,10 @@ class LanceVectorDatabase:
                         return
                     if isinstance(entry, dict):
                         name = (
-                            entry.get("name")
-                            or entry.get("column")
-                            or entry.get("vector_column")
-                            or entry.get("vector_column_name")
+                            _index_value(entry, "name")
+                            or _index_value(entry, "column")
+                            or _index_value(entry, "vector_column")
+                            or _index_value(entry, "vector_column_name")
                         )
                         if name == "embedding":
                             self.index_ready = True
@@ -272,10 +277,7 @@ class LanceVectorDatabase:
         table = self.get_table()
         resolved_batch = batch_size or self.stream_batch_size or 1024
         remaining = limit
-        try:
-            batches = table.to_batches(batch_size=resolved_batch)
-        except AttributeError:
-            batches = table.to_arrow().to_batches(resolved_batch)
+        batches = table.to_arrow().to_batches(resolved_batch)
         for batch in batches:
             records = batch.to_pylist()
             if remaining is not None:
