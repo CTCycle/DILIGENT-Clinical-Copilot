@@ -36,6 +36,10 @@ from DILIGENT.server.utils.services.clinical.preparation import HepatoxPreparedI
 
 
 ###############################################################################
+NOT_AVAILABLE_TEXT = "Not available"
+
+
+###############################################################################
 class HepatotoxicityPatternAnalyzer:
 
     def __init__(self) -> None:
@@ -110,7 +114,7 @@ class HepatotoxicityPatternAnalyzer:
         }
 
         return {
-            key: fmt.format(val) if val is not None else "Not available"
+            key: fmt.format(val) if val is not None else NOT_AVAILABLE_TEXT
             for key, (val, fmt) in mapping.items()
         }
 
@@ -189,59 +193,18 @@ class HepatoxConsultation:
             
         # iterate over all drugs to identify those with LiverTox excerpts and those without
         for idx, drug_entry in enumerate(self.drugs.entries):
-            raw_name = drug_entry.name or ""
-            normalized_drug_name = raw_name.strip()
-            
-            livertox_data = resolved_drugs.get(normalized_drug_name, {})
-
-            matched_row = livertox_data.get("matched_livertox_row", None)
-            excerpts_list = livertox_data.get("extracted_excerpts", [])
-
-            suspension = self.evaluate_suspension(drug_entry, visit_date)
-            matched_lvt_row = matched_row if isinstance(matched_row, dict) else None
-            entry = DrugClinicalAssessment(
-                drug_name=drug_entry.name,
-                matched_livertox_row=matched_lvt_row,
-                extracted_excerpts=excerpts_list,
-                suspension=suspension,
+            entry, job = await self.prepare_drug_assessment(
+                idx=idx,
+                drug_entry=drug_entry,
+                resolved_drugs=resolved_drugs,
+                visit_date=visit_date,
+                normalized_context=normalized_context,
+                pattern_summary=pattern_summary,
+                rag_query=rag_query,
             )
             entries.append(entry)
-
-            if suspension.excluded:
-                entry.paragraph = self.build_excluded_paragraph(entry)
-                continue
-
-            excerpt = self.select_excerpt(excerpts_list)
-            if excerpt is None:
-                entry.paragraph = self.build_missing_excerpt_paragraph(entry)
-                continue
-
-            # if requested, perform Retrieval-Augmented Generation (RAG) to enhance clinical context
-            rag_documents = None
-            if rag_query is not None:
-                drug_RAG_query = rag_query.get(normalized_drug_name)
-                if drug_RAG_query:
-                    rag_documents = await asyncio.to_thread(
-                        self.search_supporting_documents,
-                        drug_RAG_query,
-                        self.rag_top_k,
-                    )
-  
-            # Create a list of patient-specific assessmens for each candidate drug
-            llm_jobs.append(
-                (
-                    idx,
-                    self.request_drug_analysis(
-                        drug_name=drug_entry.name,
-                        excerpt=excerpt,
-                        RAG_documents=rag_documents or None,
-                        clinical_context=normalized_context,
-                        suspension=suspension,
-                        pattern_summary=pattern_summary,
-                        metadata=entry.matched_livertox_row,
-                    ),
-                )
-            )
+            if job:
+                llm_jobs.append(job)
 
         if llm_jobs:
             indices, tasks = zip(*llm_jobs)
@@ -265,6 +228,70 @@ class HepatoxConsultation:
         )
 
         return PatientDrugClinicalReport(entries=entries, final_report=final_report)
+
+    # -------------------------------------------------------------------------
+    async def prepare_drug_assessment(
+        self,
+        *,
+        idx: int,
+        drug_entry: DrugEntry,
+        resolved_drugs: dict[str, dict[str, Any]],
+        visit_date: date | None,
+        normalized_context: str,
+        pattern_summary: str,
+        rag_query: dict[str, str] | None,
+    ) -> tuple[DrugClinicalAssessment, tuple[int, Any] | None]:
+        raw_name = drug_entry.name or ""
+        normalized_drug_name = raw_name.strip()
+
+        livertox_data = resolved_drugs.get(normalized_drug_name, {})
+        matched_row = livertox_data.get("matched_livertox_row", None)
+        excerpts_list = livertox_data.get("extracted_excerpts", [])
+
+        suspension = self.evaluate_suspension(drug_entry, visit_date)
+        matched_lvt_row = matched_row if isinstance(matched_row, dict) else None
+        entry = DrugClinicalAssessment(
+            drug_name=drug_entry.name,
+            matched_livertox_row=matched_lvt_row,
+            extracted_excerpts=excerpts_list,
+            suspension=suspension,
+        )
+
+        if suspension.excluded:
+            entry.paragraph = self.build_excluded_paragraph(entry)
+            return entry, None
+
+        excerpt = self.select_excerpt(excerpts_list)
+        if excerpt is None:
+            entry.paragraph = self.build_missing_excerpt_paragraph(entry)
+            return entry, None
+
+        rag_documents = await self.fetch_rag_documents(rag_query, normalized_drug_name)
+        job = self.request_drug_analysis(
+            drug_name=drug_entry.name,
+            excerpt=excerpt,
+            rag_documents=rag_documents or None,
+            clinical_context=normalized_context,
+            suspension=suspension,
+            pattern_summary=pattern_summary,
+            metadata=entry.matched_livertox_row,
+        )
+        return entry, (idx, job)
+
+    # -------------------------------------------------------------------------
+    async def fetch_rag_documents(
+        self, rag_query: dict[str, str] | None, normalized_drug_name: str
+    ) -> str | None:
+        if not rag_query:
+            return None
+        drug_rag_query = rag_query.get(normalized_drug_name)
+        if not drug_rag_query:
+            return None
+        return await asyncio.to_thread(
+            self.search_supporting_documents,
+            drug_rag_query,
+            self.rag_top_k,
+        )
 
     # -------------------------------------------------------------------------
     def ensure_similarity_search(self) -> bool:
@@ -302,36 +329,37 @@ class HepatoxConsultation:
         normalized = query_text.strip()
         if not normalized or not self.ensure_similarity_search():
             return None
-        
-        results = None
-        if self.similarity_search:
-            results = self.similarity_search.search(normalized, top_k=top_k)
+
+        results = (
+            self.similarity_search.search(normalized, top_k=top_k)
+            if self.similarity_search
+            else None
+        )
         if not results:
             return None
         fragments: list[str] = []
         for index, record in enumerate(results, start=1):
-            text = str(record.get("text", "")).strip()
-            if not text:
-                continue
-            source = str(record.get("source", "") or "").strip()
-            metadata = record.get("metadata")
-            if not source and isinstance(metadata, dict):
-                fallback = metadata.get("file_name") or metadata.get("source")
-                if isinstance(fallback, str):
-                    source = fallback.strip()
-            if not source:
-                source = "Unknown source"
-            distance = record.get("distance")
-            if isinstance(distance, (int, float)):
-                header = (
-                    f"[Document {index} | Distance: {distance:.4f}]"
-                )
-            else:
-                header = f"[Document {index}]"
-            fragments.append(f"{header}\n{text}")
+            fragment = self.format_similarity_fragment(index, record)
+            if fragment:
+                fragments.append(fragment)
         if not fragments:
             return None
         return "\n".join(fragments)
+
+    # -------------------------------------------------------------------------
+    def format_similarity_fragment(self, index: int, record: dict[str, Any]) -> str | None:
+        text = str(record.get("text", "")).strip()
+        if not text:
+            return None
+        header = self.format_similarity_header(index, record.get("distance"))
+        return f"{header}\n{text}"
+
+    # -------------------------------------------------------------------------
+    @staticmethod
+    def format_similarity_header(index: int, distance: Any) -> str:
+        if isinstance(distance, (int, float)):
+            return f"[Document {index} | Distance: {distance:.4f}]"
+        return f"[Document {index}]"
 
     # -------------------------------------------------------------------------
     def evaluate_suspension(
@@ -549,13 +577,13 @@ class HepatoxConsultation:
     # -------------------------------------------------------------------------
     def resolve_livertox_score(self, metadata: dict[str, Any] | None) -> str:
         if not metadata:
-            return "Not available"
+            return NOT_AVAILABLE_TEXT
         score = metadata.get("likelihood_score")
         if score is None:
-            return "Not available"
+            return NOT_AVAILABLE_TEXT
         text = str(score).strip()
         if not text or text.lower() == "nan":
-            return "Not available"
+            return NOT_AVAILABLE_TEXT
         return text.upper() if text.isalpha() else text
 
     # -------------------------------------------------------------------------
@@ -595,8 +623,8 @@ class HepatoxConsultation:
             normalized_name = "Unnamed drug"
         normalized_score = score.strip() if score else ""
         if not normalized_score:
-            normalized_score = "Not available"
-        return f"{normalized_name} – LiverTox score {normalized_score}"
+            normalized_score = NOT_AVAILABLE_TEXT
+        return f"{normalized_name} - LiverTox score {normalized_score}"
 
     # -------------------------------------------------------------------------
     async def request_drug_analysis(
@@ -604,7 +632,7 @@ class HepatoxConsultation:
         *,
         drug_name: str,
         excerpt: str,
-        RAG_documents: str | None,
+        rag_documents: str | None,
         clinical_context: str,
         suspension: DrugSuspensionContext,
         pattern_summary: str,
@@ -613,11 +641,11 @@ class HepatoxConsultation:
         start_details = self.format_start_prompt(suspension)
         suspension_details = self.format_suspension_prompt(suspension)
         score, metadata_block = self.prepare_metadata_prompt(metadata)
-        RAG_documents = RAG_documents or "No additional documents provided."
+        rag_documents = rag_documents or "No additional documents provided."
         user_prompt = LIVERTOX_CLINICAL_USER_PROMPT.format(
             drug_name=self.escape_braces(drug_name.strip() or drug_name),
             excerpt=self.escape_braces(excerpt),
-            documents=self.escape_braces(RAG_documents),
+            documents=self.escape_braces(rag_documents),
             clinical_context=self.escape_braces(clinical_context),
             therapy_start_details=self.escape_braces(start_details),
             suspension_details=self.escape_braces(suspension_details),
