@@ -227,6 +227,27 @@ class PatientData(BaseModel):
 
 
 ###############################################################################
+class ClinicalSessionRequest(BaseModel):
+    name: str | None = None
+    visit_date: date | dict[str, int] | str | None = None
+    anamnesis: str | None = None
+    has_hepatic_diseases: bool = False
+    use_rag: bool = False
+    drugs: str | None = None
+    alt: str | None = None
+    alt_max: str | None = None
+    alp: str | None = None
+    alp_max: str | None = None
+    use_cloud_services: bool | None = None
+    llm_provider: str | None = None
+    cloud_model: str | None = None
+    parsing_model: str | None = None
+    clinical_model: str | None = None
+    ollama_temperature: float | None = None
+    ollama_reasoning: bool | None = None
+
+
+###############################################################################
 class PatientOutputReport(BaseModel):
     report: str = Field(
         ...,
