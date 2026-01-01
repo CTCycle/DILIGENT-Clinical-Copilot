@@ -50,7 +50,7 @@ echo 2. Uninstall app
 echo 3. Initialize database
 echo 4. Update RxNav drugs catalog
 echo 5. Update LiverTox data
-echo 6. Vectorize RAG documents
+echo 6. Update RAG documents
 echo 7. Exit
 echo.
 set /p sub_choice="Select an option (1-7): "
