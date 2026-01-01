@@ -2,16 +2,17 @@ from __future__ import annotations
 
 import asyncio
 import time
-from datetime import date, datetime
+from datetime import datetime
 from collections.abc import Sequence
 from typing import Any
 
 from fastapi import APIRouter, Body, HTTPException, status
 from fastapi.responses import PlainTextResponse
-from pydantic import BaseModel, ValidationError
+from pydantic import ValidationError
 from pydantic_core import ErrorDetails
 
 from DILIGENT.server.schemas.clinical import (
+    ClinicalSessionRequest,
     PatientData,
     PatientDrugs,
 )
@@ -128,7 +129,6 @@ class NarrativeBuilder:
         return NarrativeBuilder.compact_spacing("\n\n".join(sections))
 
 
-###############################################################################
 class ClinicalSessionEndpoint:
     def __init__(
         self,
@@ -319,27 +319,6 @@ class ClinicalSessionEndpoint:
 
         return narrative
 
-    # -------------------------------------------------------------------------
-    class ClinicalSessionRequest(BaseModel):
-        name: str | None = None
-        visit_date: date | dict[str, int] | str | None = None
-        anamnesis: str | None = None
-        has_hepatic_diseases: bool = False
-        use_rag: bool = False
-        drugs: str | None = None
-        alt: str | None = None
-        alt_max: str | None = None
-        alp: str | None = None
-        alp_max: str | None = None
-        use_cloud_services: bool | None = None
-        llm_provider: str | None = None
-        cloud_model: str | None = None
-        parsing_model: str | None = None
-        clinical_model: str | None = None
-        ollama_temperature: float | None = None
-        ollama_reasoning: bool | None = None
-
-    # -------------------------------------------------------------------------
     async def start_clinical_session(
         self,
         request_payload: ClinicalSessionRequest = Body(...),
