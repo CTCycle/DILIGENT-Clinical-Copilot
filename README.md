@@ -1,30 +1,24 @@
 # DILIGENT Clinical Copilot
 
 ## 1. Project Overview
-DILIGENT Clinical Copilot supports clinicians during Drug-Induced Liver Injury (DILI) evaluations using a FastAPI backend and a React + TypeScript frontend (Vite). The UI guides data entry (anamnesis, medications, ALT/ALP), while the backend orchestrates drug parsing and LLM-assisted clinical analysis using either local Ollama models or approved cloud providers. Retrieval-Augmented Generation (RAG) can ground outputs on a local LiverTox archive, and sessions can be stored in the project database for review and auditing.
+DILIGENT Clinical Copilot supports clinicians during Drug-Induced Liver Injury (DILI) evaluations with a FastAPI backend and a React + TypeScript (Vite) frontend. The frontend collects anamnesis, medications, and lab values, while the backend coordinates drug parsing and LLM-assisted clinical analysis. Optional Retrieval-Augmented Generation (RAG) grounds outputs on a local LiverTox archive, and sessions can be stored for review and auditing. The frontend consumes the backend API, which manages analysis, persistence, and integrations.
 
-## [OPTIONAL] 2. Model and dataset
-This repository does not train a model. It orchestrates inference using configurable LLMs (local via Ollama or cloud providers) and uses a local LiverTox archive as a retrieval corpus for RAG.
-
-- **Models (runtime-configurable):** defaults are defined in `DILIGENT/settings/server_configurations.json` (e.g., `llm_runtime_defaults.cloud_model`, `llm_runtime_defaults.parsing_model`, `llm_runtime_defaults.clinical_model`).
-- **Dataset (RAG corpus):** the LiverTox archive ships in `DILIGENT/resources/templates/livertox_NBK547852.tar.gz` and can be refreshed via the maintenance script.
 
 ## 2. Installation
 
 ### 2.1 Windows (One Click Setup)
 Windows setup is automated and portable. Launch `DILIGENT/start_on_windows.bat`; the launcher will:
 
-1. Create `DILIGENT/resources/runtimes/` if missing.
-2. Download and unpack local, portable runtimes into `DILIGENT/resources/runtimes/` when missing (first run only).
-3. Install backend dependencies from `pyproject.toml`.
-4. Install frontend dependencies and build the UI when needed.
-5. Start the backend API and the UI server, then open the browser.
+1. Verify or download portable runtimes into the repository (first run only).
+2. Install backend dependencies.
+3. Install frontend dependencies and build the UI when needed.
+4. Start the backend API and the UI server, then open the browser.
 
-**First Run:** A few minutes while Python/Node.js/dependencies download and the UI builds. Artifacts live under `DILIGENT/resources/runtimes/` and are reused.
+**First Run:** A few minutes while runtimes and dependencies download and the UI builds. Artifacts are reused on later runs.
 
 **Subsequent Runs:** Skip downloads/builds unless missing; startup takes seconds.
 
-> **Note:** The launcher keeps everything inside the repo folder, but it will download runtimes into `DILIGENT/resources/runtimes/` and may stop any process currently using the configured backend/UI ports before starting.
+> **Note:** The launcher keeps everything inside the repo folder without system-wide installs, and may stop any process currently using the configured backend/UI ports before starting.
 
 ### 2.2 macOS / Linux (Manual Setup)
 **Prerequisites:**
@@ -56,7 +50,7 @@ Windows setup is automated and portable. Launch `DILIGENT/start_on_windows.bat`;
    - Copy `DILIGENT/resources/templates/.env` to `DILIGENT/settings/.env`, then set API keys and any host/port overrides.
    - Optionally create `DILIGENT/client/.env` and set `VITE_API_BASE_URL` if you are not relying on the Vite dev proxy.
 
-## 3. How to use
+## 3. How to Use
 
 ### 3.1 Windows
 Run `DILIGENT/start_on_windows.bat`.
@@ -94,6 +88,10 @@ UI: `http://localhost:5173` (dev) or `http://localhost:7861` (preview). Backend:
 - Run the clinical analysis to parse medications and produce the consultation summary.
 - Review/export the report; sessions and model choices can be persisted to the configured database (SQLite in embedded mode by default).
 
+- ![Clinical intake form](DILIGENT/assets/figures/session_page.png) 
+
+- ![Analysis results](DILIGENT/assets/figures/database_browser.png) 
+
 ## 4. Setup and Maintenance
 Run `DILIGENT/setup_and_maintenance.bat` to access setup and maintenance actions:
 
@@ -108,13 +106,13 @@ Run `DILIGENT/setup_and_maintenance.bat` to access setup and maintenance actions
 `DILIGENT/resources` aggregates runtime assets, datasets, and templates:
 
 - **database:** embedded database and retrieval artifacts (e.g., `sqlite.db`, `documents/`, `sources/`, `vectors/`).
-- **logs:** Backend and background-task logs for troubleshooting.
-- **models:** Storage for local model artifacts (when used).
-- **runtimes:** Portable Python/uv/Node.js downloaded by the Windows launcher.
-- **templates:** Starter assets such as the `.env` scaffold, `database_backup.db`, and the LiverTox archive template.
+- **logs:** backend and background-task logs for troubleshooting.
+- **models:** storage for local model artifacts (when used).
+- **runtimes:** portable Python/uv/Node.js downloaded by the Windows launcher.
+- **templates:** starter assets such as the `.env` scaffold, `database_backup.db`, and the LiverTox archive template.
 
 ## 6. Configuration
-Backend settings live in `DILIGENT/settings/server_configurations.json` (FastAPI metadata, database mode, RAG, ingestion, LLM defaults). Runtime overrides and API keys are read from `DILIGENT/settings/.env`. Frontend builds can pin the backend via `DILIGENT/client/.env` (e.g., `VITE_API_BASE_URL`).
+Backend configuration is defined in `DILIGENT/settings/server_configurations.json` and loaded by the API at startup. Runtime overrides and secrets are read from `DILIGENT/settings/.env`. Frontend configuration is read from `DILIGENT/client/.env` during development or build time.
 
 | Variable | Description |
 |----------|-------------|
@@ -126,7 +124,7 @@ Backend settings live in `DILIGENT/settings/server_configurations.json` (FastAPI
 | OPENAI_API_KEY | OpenAI API key (cloud inference); defined in `DILIGENT/settings/.env`; default empty. |
 | GEMINI_API_KEY | Gemini API key (cloud inference); defined in `DILIGENT/settings/.env`; default empty. |
 | MPLBACKEND | Matplotlib backend for background tasks; defined in `DILIGENT/settings/.env`; default `Agg`. |
-| VITE_API_BASE_URL | Backend base URL for the frontend when not using the dev proxy; defined in `DILIGENT/client/.env`; default unset. |
+
 
 ## 7. License
 Non-commercial use is covered by the Polyform Noncommercial License 1.0.0; commercial licensing is available separately. See `LICENSE` for full terms.
