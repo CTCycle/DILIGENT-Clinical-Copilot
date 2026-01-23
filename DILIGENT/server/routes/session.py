@@ -129,6 +129,7 @@ class NarrativeBuilder:
         return NarrativeBuilder.compact_spacing("\n\n".join(sections))
 
 
+###############################################################################
 class ClinicalSessionEndpoint:
     def __init__(
         self,
@@ -141,16 +142,7 @@ class ClinicalSessionEndpoint:
         self.router = router
         self.drugs_parser = drugs_parser
         self.pattern_analyzer = pattern_analyzer
-        self.serializer = serializer
-
-        self.router.add_api_route(
-            "/clinical",
-            self.start_clinical_session,
-            methods=["POST"],
-            response_model=None,
-            status_code=status.HTTP_202_ACCEPTED,
-            response_class=PlainTextResponse,
-        )
+        self.serializer = serializer        
 
     # -------------------------------------------------------------------------
     @staticmethod
@@ -319,6 +311,7 @@ class ClinicalSessionEndpoint:
 
         return narrative
 
+    # -------------------------------------------------------------------------
     async def start_clinical_session(
         self,
         request_payload: ClinicalSessionRequest = Body(...),
@@ -354,6 +347,17 @@ class ClinicalSessionEndpoint:
 
         single_result = await self.process_single_patient(patient_payload)
         return PlainTextResponse(content=single_result)
+    
+    # -------------------------------------------------------------------------
+    def add_routes(self) -> None:
+        self.router.add_api_route(
+            "/clinical",
+            self.start_clinical_session,
+            methods=["POST"],
+            response_model=None,
+            status_code=status.HTTP_202_ACCEPTED,
+            response_class=PlainTextResponse,
+        )
 
 
 endpoint = ClinicalSessionEndpoint(
@@ -362,3 +366,4 @@ endpoint = ClinicalSessionEndpoint(
     pattern_analyzer=pattern_analyzer,
     serializer=serializer,
 )
+endpoint.add_routes()

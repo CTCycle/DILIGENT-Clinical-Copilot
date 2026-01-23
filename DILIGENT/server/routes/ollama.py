@@ -12,26 +12,9 @@ router = APIRouter(prefix="/models", tags=["models"])
 ###############################################################################
 class OllamaEndpoint:
     def __init__(self, *, router: APIRouter) -> None:
-        self.router = router
-        self.router.add_api_route(
-            "/pull",
-            self.pull_model,
-            methods=["GET"],
-            response_model=ModelPullResponse,
-            status_code=status.HTTP_200_OK,
-            summary="Pull a specific Ollama model",
-            description="Synchronously pull an Ollama model by name. If the model already exists locally, no pull is performed.",
-        )
-        self.router.add_api_route(
-            "/list",
-            self.list_available_models,
-            methods=["GET"],
-            response_model=ModelListResponse,
-            status_code=status.HTTP_200_OK,
-            summary="List locally available Ollama models",
-            description="Returns the list of model tags already present on the Ollama host.",
-        )
+        self.router = router        
 
+    # -------------------------------------------------------------------------
     async def pull_model(
         self,
         name: str = Query(
@@ -67,6 +50,7 @@ class OllamaEndpoint:
                 status_code=500, detail="Unexpected error while pulling model"
             )
 
+    # -------------------------------------------------------------------------
     async def list_available_models(self) -> ModelListResponse:
         try:
             async with OllamaClient() as client:
@@ -80,6 +64,24 @@ class OllamaEndpoint:
             raise HTTPException(
                 status_code=500, detail="Unexpected error while listing models"
             )
+        
+    # -------------------------------------------------------------------------
+    def add_routes(self) -> None:
+        self.router.add_api_route(
+            "/pull",
+            self.pull_model,
+            methods=["GET"],
+            response_model=ModelPullResponse,
+            status_code=status.HTTP_200_OK,
+        )
+        self.router.add_api_route(
+            "/list",
+            self.list_available_models,
+            methods=["GET"],
+            response_model=ModelListResponse,
+            status_code=status.HTTP_200_OK,
+        )
 
 
 endpoint = OllamaEndpoint(router=router)
+endpoint.add_routes()
