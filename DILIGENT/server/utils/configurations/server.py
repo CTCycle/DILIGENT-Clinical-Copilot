@@ -11,7 +11,7 @@ from DILIGENT.server.utils.constants import (
     CLOUD_MODEL_CHOICES, 
     DEFAULT_EMBEDDING_BATCH_SIZE,
     PARSING_MODEL_CHOICES,
-    SERVER_CONFIGURATION_FILE,
+    CONFIGURATIONS_FILE,
 )
 
 from DILIGENT.server.utils.types import (
@@ -589,7 +589,7 @@ def build_server_settings(data: dict[str, Any] | Any) -> ServerSettings:
 # [SERVER CONFIGURATION LOADER]
 ###############################################################################
 def get_server_settings(config_path: str | None = None) -> ServerSettings:
-    path = config_path or SERVER_CONFIGURATION_FILE
+    path = config_path or CONFIGURATIONS_FILE
     payload = load_configuration_data(path)
     settings = build_server_settings(payload)
     LLMRuntimeConfig.configure(settings.llm_defaults)

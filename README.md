@@ -3,6 +3,7 @@
 ## 1. Project Overview
 DILIGENT Clinical Copilot supports clinicians during Drug-Induced Liver Injury (DILI) evaluations with a FastAPI backend and a React + TypeScript (Vite) frontend. The frontend collects anamnesis, medications, and lab values, while the backend coordinates drug parsing and LLM-assisted clinical analysis. Optional Retrieval-Augmented Generation (RAG) grounds outputs on a local LiverTox archive, and sessions can be stored for review and auditing. The frontend consumes the backend API, which manages analysis, persistence, and integrations.
 
+> **Work in Progress**: This project is still under active development. It will be updated regularly, but you may encounter bugs, issues, or incomplete features.
 
 ## 2. Installation
 
@@ -13,8 +14,6 @@ Windows setup is automated and portable. Launch `DILIGENT/start_on_windows.bat`;
 2. Install backend dependencies.
 3. Install frontend dependencies and build the UI when needed.
 4. Start the backend API and the UI server, then open the browser.
-
-**First Run:** A few minutes while runtimes and dependencies download and the UI builds. Artifacts are reused on later runs.
 
 **Subsequent Runs:** Skip downloads/builds unless missing; startup takes seconds.
 
@@ -88,9 +87,9 @@ UI: `http://localhost:5173` (dev) or `http://localhost:7861` (preview). Backend:
 - Run the clinical analysis to parse medications and produce the consultation summary.
 - Review/export the report; sessions and model choices can be persisted to the configured database (SQLite in embedded mode by default).
 
-- ![Clinical intake form](DILIGENT/assets/figures/session_page.png) 
+- ![Clinical intake form](assets/figures/session_page.png) 
 
-- ![Analysis results](DILIGENT/assets/figures/database_browser.png) 
+- ![Analysis results](assets/figures/database_browser.png) 
 
 ## 4. Setup and Maintenance
 Run `DILIGENT/setup_and_maintenance.bat` to access setup and maintenance actions:
@@ -112,7 +111,7 @@ Run `DILIGENT/setup_and_maintenance.bat` to access setup and maintenance actions
 - **templates:** starter assets such as the `.env` scaffold, `database_backup.db`, and the LiverTox archive template.
 
 ## 6. Configuration
-Backend configuration is defined in `DILIGENT/settings/server_configurations.json` and loaded by the API at startup. Runtime overrides and secrets are read from `DILIGENT/settings/.env`. Frontend configuration is read from `DILIGENT/client/.env` during development or build time.
+Backend configuration is defined in `DILIGENT/settings/configurations.json` and loaded by the API at startup. Runtime overrides and secrets are read from `DILIGENT/settings/.env`. Frontend configuration is read from `DILIGENT/client/.env` during development or build time.
 
 | Variable | Description |
 |----------|-------------|
