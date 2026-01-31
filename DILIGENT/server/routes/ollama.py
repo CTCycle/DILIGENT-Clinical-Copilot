@@ -13,8 +13,8 @@ from DILIGENT.server.schemas.jobs import (
     JobStatusResponse,
 )
 from DILIGENT.server.schemas.models import ModelListResponse, ModelPullResponse
-from DILIGENT.server.utils.configurations import server_settings
-from DILIGENT.server.utils.jobs import job_manager
+from DILIGENT.server.configurations import server_settings
+from DILIGENT.server.services.jobs import job_manager
 from DILIGENT.server.utils.logger import logger
 
 router = APIRouter(prefix="/models", tags=["models"])

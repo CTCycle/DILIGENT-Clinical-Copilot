@@ -21,17 +21,17 @@ from DILIGENT.server.schemas.jobs import (
     JobStartResponse,
     JobStatusResponse,
 )
-from DILIGENT.server.utils.configurations import LLMRuntimeConfig, server_settings
-from DILIGENT.server.utils.jobs import job_manager
+from DILIGENT.server.configurations import LLMRuntimeConfig, server_settings
+from DILIGENT.server.services.jobs import job_manager
 from DILIGENT.server.utils.logger import logger
-from DILIGENT.server.utils.repository.serializer import DataSerializer
-from DILIGENT.server.utils.services.clinical.hepatox import (
+from DILIGENT.server.repositories.serializer import DataSerializer
+from DILIGENT.server.services.clinical.hepatox import (
     HepatotoxicityPatternAnalyzer,
     HepatoxConsultation,
 )
-from DILIGENT.server.utils.services.clinical.preparation import ClinicalKnowledgePreparation
-from DILIGENT.server.utils.services.clinical.parser import DrugsParser
-from DILIGENT.server.utils.services.retrieval.query import DILIQueryBuilder
+from DILIGENT.server.services.clinical.preparation import ClinicalKnowledgePreparation
+from DILIGENT.server.services.clinical.parser import DrugsParser
+from DILIGENT.server.services.retrieval.query import DILIQueryBuilder
 
 drugs_parser = DrugsParser()
 pattern_analyzer = HepatotoxicityPatternAnalyzer()

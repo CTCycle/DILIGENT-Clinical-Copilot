@@ -16,8 +16,8 @@ from DILIGENT.server.schemas.clinical import (
     DrugEntry,
     PatientDrugs,
 )
-from DILIGENT.server.utils.configurations import LLMRuntimeConfig, server_settings
-from DILIGENT.server.utils.services.text.normalization import normalize_token
+from DILIGENT.server.configurations import LLMRuntimeConfig, server_settings
+from DILIGENT.server.services.text.normalization import normalize_token
 from DILIGENT.server.utils.patterns import (
     DRUG_BRACKET_TRAIL_RE,
     DRUG_BULLET_RE,

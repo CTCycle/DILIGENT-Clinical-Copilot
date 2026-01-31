@@ -3,9 +3,9 @@ from __future__ import annotations
 from fastapi import APIRouter, HTTPException, Query, status
 from pydantic import BaseModel
 
-from DILIGENT.server.database.database import database
-from DILIGENT.server.database.schema import ClinicalSession, LiverToxData, DrugsCatalog
-from DILIGENT.server.utils.configurations import server_settings
+from DILIGENT.server.repositories.database import database
+from DILIGENT.server.repositories.schema import ClinicalSession, LiverToxData, DrugsCatalog
+from DILIGENT.server.configurations import server_settings
 from DILIGENT.server.utils.logger import logger
 
 

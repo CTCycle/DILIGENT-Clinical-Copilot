@@ -14,7 +14,7 @@ from langchain_community.document_loaders import PyPDFLoader
 from langchain_core.documents import Document
 from langchain_text_splitters import RecursiveCharacterTextSplitter
 
-from DILIGENT.server.utils.configurations import server_settings
+from DILIGENT.server.configurations import server_settings
 from DILIGENT.server.utils.constants import (
     CLINICAL_SESSION_COLUMNS,
     DEFAULT_EMBEDDING_BATCH_SIZE,
@@ -28,10 +28,10 @@ from DILIGENT.server.utils.constants import (
     TEXT_FILE_FALLBACK_ENCODINGS,
 )
 from DILIGENT.server.utils.logger import logger
-from DILIGENT.server.database.database import database
-from DILIGENT.server.utils.services.text.normalization import coerce_text
-from DILIGENT.server.utils.repository.vectors import LanceVectorDatabase
-from DILIGENT.server.utils.services.retrieval.embeddings import EmbeddingGenerator
+from DILIGENT.server.repositories.database import database
+from DILIGENT.server.services.text.normalization import coerce_text
+from DILIGENT.server.repositories.vectors import LanceVectorDatabase
+from DILIGENT.server.services.retrieval.embeddings import EmbeddingGenerator
 
 ###############################################################################
 class DataSerializer:
