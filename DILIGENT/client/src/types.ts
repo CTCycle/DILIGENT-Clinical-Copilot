@@ -44,6 +44,29 @@ export type ApiResult = {
   json: unknown | null;
 };
 
+export type JobStartResponse = {
+  job_id: string;
+  job_type: string;
+  status: string;
+  message: string;
+  poll_interval: number;
+};
+
+export type JobStatusResponse = {
+  job_id: string;
+  job_type: string;
+  status: string;
+  progress: number;
+  result: Record<string, unknown> | null;
+  error: string | null;
+};
+
+export type JobCancelResponse = {
+  job_id: string;
+  success: boolean;
+  message: string;
+};
+
 export type CloudSelection = {
   provider: string;
   models: string[];

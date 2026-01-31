@@ -1,5 +1,11 @@
 import { API_BASE_URL, HTTP_TIMEOUT_SECONDS } from "../constants";
-import { ApiResult, ClinicalRequestPayload } from "../types";
+import {
+  ApiResult,
+  ClinicalRequestPayload,
+  JobCancelResponse,
+  JobStartResponse,
+  JobStatusResponse,
+} from "../types";
 
 const HTTP_TIMEOUT =
   Number.parseFloat(import.meta.env.VITE_HTTP_TIMEOUT ?? "") ||
@@ -100,6 +106,21 @@ async function parseApiResponse(
   return { message: errorMessage, json: null };
 }
 
+async function requestJson<T>(
+  url: string,
+  options: RequestInit,
+): Promise<T> {
+  const response = await fetchWithTimeout(url, options);
+  const result = await parseApiResponse(response, url);
+  if (!response.ok) {
+    throw new Error(result.message || `[ERROR] Request failed: ${response.status}`);
+  }
+  if (!result.json) {
+    throw new Error("[ERROR] Expected JSON payload from backend.");
+  }
+  return result.json as T;
+}
+
 export async function runClinicalSession(
   payload: ClinicalRequestPayload,
 ): Promise<ApiResult> {
@@ -118,6 +139,79 @@ export async function runClinicalSession(
       error instanceof Error ? error.message : "Unexpected error";
     return { message: `[ERROR] ${description}`, json: null };
   }
+}
+
+export async function startClinicalJob(
+  payload: ClinicalRequestPayload,
+): Promise<JobStartResponse> {
+  return requestJson<JobStartResponse>(`${API_BASE_URL}/clinical/jobs`, {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify(payload),
+  });
+}
+
+export async function fetchClinicalJobStatus(
+  jobId: string,
+): Promise<JobStatusResponse> {
+  return requestJson<JobStatusResponse>(
+    `${API_BASE_URL}/clinical/jobs/${encodeURIComponent(jobId)}`,
+    { method: "GET" },
+  );
+}
+
+export async function cancelClinicalJob(
+  jobId: string,
+): Promise<JobCancelResponse> {
+  return requestJson<JobCancelResponse>(
+    `${API_BASE_URL}/clinical/jobs/${encodeURIComponent(jobId)}`,
+    { method: "DELETE" },
+  );
+}
+
+export function pollClinicalJobStatus(
+  jobId: string,
+  intervalMs: number,
+  onUpdate: (status: JobStatusResponse) => void,
+  onError: (message: string) => void,
+): { stop: () => void } {
+  let timeoutId: number | null = null;
+  let stopped = false;
+  const waitMs = Math.max(intervalMs, 250);
+
+  const poll = async () => {
+    if (stopped) return;
+    try {
+      const status = await fetchClinicalJobStatus(jobId);
+      onUpdate(status);
+      if (
+        status.status === "completed" ||
+        status.status === "failed" ||
+        status.status === "cancelled"
+      ) {
+        return;
+      }
+    } catch (error) {
+      const message =
+        error instanceof Error ? error.message : "Unexpected polling error";
+      onError(message);
+      return;
+    }
+    timeoutId = window.setTimeout(poll, waitMs);
+  };
+
+  poll();
+
+  return {
+    stop: () => {
+      stopped = true;
+      if (timeoutId !== null) {
+        window.clearTimeout(timeoutId);
+      }
+    },
+  };
 }
 
 export async function pullModels(models: string[]): Promise<ApiResult> {
