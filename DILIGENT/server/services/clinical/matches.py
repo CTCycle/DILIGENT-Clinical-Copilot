@@ -8,16 +8,16 @@ from typing import Any, Iterable, Iterator, TypeVar, Generic
 import pandas as pd
 from rapidfuzz import fuzz
 
-from DILIGENT.server.utils.configurations import server_settings
+from DILIGENT.server.configurations import server_settings
 from DILIGENT.server.utils.constants import MATCHING_STOPWORDS
 from DILIGENT.server.utils.logger import logger
-from DILIGENT.server.utils.services.text.normalization import (
+from DILIGENT.server.services.text.normalization import (
     coerce_text,
     normalize_drug_name,
     normalize_whitespace,
 )
-from DILIGENT.server.utils.services.clinical.livertox import LiverToxData
-from DILIGENT.server.utils.services.text.synonyms import (
+from DILIGENT.server.services.clinical.livertox import LiverToxData
+from DILIGENT.server.services.text.synonyms import (
     extract_synonym_strings,
     parse_synonym_list,
     split_synonym_variants,

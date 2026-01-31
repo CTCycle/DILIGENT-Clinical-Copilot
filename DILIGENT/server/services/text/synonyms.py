@@ -4,7 +4,7 @@ import json
 import re
 from typing import Any
 
-from DILIGENT.server.utils.services.text.normalization import coerce_text
+from DILIGENT.server.services.text.normalization import coerce_text
 
 SYNONYM_SPLIT_RE = re.compile(r"[;,/\n]+")
 

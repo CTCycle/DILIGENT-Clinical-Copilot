@@ -9,8 +9,8 @@ from DILIGENT.server.schemas.clinical import (
     PatientDrugs,
 )
 from DILIGENT.server.utils.logger import logger
-from DILIGENT.server.utils.repository.serializer import DataSerializer
-from DILIGENT.server.utils.services.clinical.matches import LiverToxMatcher
+from DILIGENT.server.repositories.serializer import DataSerializer
+from DILIGENT.server.services.clinical.matches import LiverToxMatcher
 
 
 @dataclass(slots=True)

@@ -1,11 +1,11 @@
 from __future__ import annotations
 
-from DILIGENT.server.utils.configurations.base import (
+from DILIGENT.server.configurations.base import (
     ensure_mapping,
     load_configuration_data,
 )
 
-from DILIGENT.server.utils.configurations.server import (
+from DILIGENT.server.configurations.server import (
     DatabaseSettings,
     FastAPISettings,
     JobsSettings,

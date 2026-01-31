@@ -1,7 +1,5 @@
 from __future__ import annotations
 
-import os
-
 from fastapi import FastAPI
 from fastapi.responses import RedirectResponse
 
@@ -9,7 +7,7 @@ from DILIGENT.server.utils.variables import env_variables
 from DILIGENT.server.routes.session import router as session_router
 from DILIGENT.server.routes.ollama import router as ollama_router
 from DILIGENT.server.routes.browser import router as browser_router
-from DILIGENT.server.utils.configurations import server_settings
+from DILIGENT.server.configurations import server_settings
 
 
 ###############################################################################

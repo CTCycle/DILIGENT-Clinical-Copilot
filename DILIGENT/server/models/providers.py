@@ -17,7 +17,7 @@ import httpx
 from langchain_core.output_parsers import PydanticOutputParser
 from pydantic import BaseModel
 
-from DILIGENT.server.utils.configurations import LLMRuntimeConfig, server_settings
+from DILIGENT.server.configurations import LLMRuntimeConfig, server_settings
 from DILIGENT.server.utils.constants import (
     GEMINI_API_BASE,
     OPENAI_API_BASE,

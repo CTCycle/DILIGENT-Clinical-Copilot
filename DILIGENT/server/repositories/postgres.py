@@ -10,9 +10,9 @@ from sqlalchemy.dialects.postgresql import insert
 from sqlalchemy.engine import Engine
 from sqlalchemy.orm import sessionmaker
 
-from DILIGENT.server.utils.configurations import DatabaseSettings
-from DILIGENT.server.database.schema import Base
-from DILIGENT.server.database.utils import (
+from DILIGENT.server.configurations import DatabaseSettings
+from DILIGENT.server.repositories.schema import Base
+from DILIGENT.server.repositories.utils import (
     MISSING_TABLE_MESSAGE,
     normalize_postgres_engine,
 )
