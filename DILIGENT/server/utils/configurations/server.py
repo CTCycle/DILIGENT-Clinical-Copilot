@@ -228,6 +228,11 @@ class FastAPISettings:
 
 # -----------------------------------------------------------------------------
 @dataclass(frozen=True)
+class JobsSettings:
+    polling_interval: float
+
+# -----------------------------------------------------------------------------
+@dataclass(frozen=True)
 class DatabaseSettings:
     embedded_database: bool
     engine: str | None
@@ -325,6 +330,7 @@ class LLMRuntimeDefaults:
 @dataclass(frozen=True)
 class ServerSettings:
     fastapi: FastAPISettings
+    jobs: JobsSettings
     database: DatabaseSettings
     drugs_matcher: DrugsMatcherSettings
     rag: RagSettings
@@ -341,6 +347,16 @@ def build_fastapi_settings(data: dict[str, Any]) -> FastAPISettings:
         title=coerce_str(payload.get("title"), "DILIGENT Geospatial Search Backend"),
         version=coerce_str(payload.get("version"), "0.1.0"),
         description=coerce_str(payload.get("description"), "FastAPI backend"),        
+    )
+
+# -----------------------------------------------------------------------------
+def build_jobs_settings(data: dict[str, Any]) -> JobsSettings:
+    payload = ensure_mapping(data)
+    polling_interval = coerce_float(payload.get("polling_interval"), 1.0)
+    if polling_interval <= 0:
+        polling_interval = 1.0
+    return JobsSettings(
+        polling_interval=polling_interval,
     )
 
 # -----------------------------------------------------------------------------
@@ -550,6 +566,7 @@ def build_llm_runtime_defaults(data: dict[str, Any]) -> LLMRuntimeDefaults:
 def build_server_settings(data: dict[str, Any] | Any) -> ServerSettings:
     payload = ensure_mapping(data)
     fastapi_payload = ensure_mapping(payload.get("fastapi"))
+    jobs_payload = ensure_mapping(payload.get("jobs"))
     database_payload = ensure_mapping(payload.get("database"))
     drugs_matcher_payload = ensure_mapping(payload.get("drugs_matcher"))
     rag_payload = ensure_mapping(payload.get("rag"))
@@ -577,6 +594,7 @@ def build_server_settings(data: dict[str, Any] | Any) -> ServerSettings:
 
     return ServerSettings(
         fastapi=build_fastapi_settings(fastapi_payload),
+        jobs=build_jobs_settings(jobs_payload),
         database=build_database_settings(database_payload),
         drugs_matcher=build_drugs_matcher_settings(drugs_matcher_payload),
         rag=rag_settings,

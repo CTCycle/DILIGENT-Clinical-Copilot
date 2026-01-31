@@ -1,16 +1,48 @@
 from __future__ import annotations
+from __future__ import annotations
+
+import asyncio
+from typing import Any
 
 from fastapi import APIRouter, HTTPException, Query, status
 
 from DILIGENT.server.models.providers import OllamaClient, OllamaError, OllamaTimeout
+from DILIGENT.server.schemas.jobs import (
+    JobCancelResponse,
+    JobStartResponse,
+    JobStatusResponse,
+)
 from DILIGENT.server.schemas.models import ModelListResponse, ModelPullResponse
+from DILIGENT.server.utils.configurations import server_settings
+from DILIGENT.server.utils.jobs import job_manager
 from DILIGENT.server.utils.logger import logger
 
 router = APIRouter(prefix="/models", tags=["models"])
 
 
 ###############################################################################
+async def pull_model_async(name: str, stream: bool) -> dict[str, Any]:
+    async with OllamaClient() as client:
+        local = set(await client.list_models())
+        already = name in local
+        if not already:
+            logger.info("Downloading model %s from Ollama library", name)
+            await client.pull(name, stream=stream)
+        return {"model": name, "pulled": not already}
+
+
+###############################################################################
+def run_model_pull_job(name: str, stream: bool, job_id: str) -> dict[str, Any]:
+    if job_manager.should_stop(job_id):
+        return {}
+    job_manager.update_progress(job_id, 5.0)
+    return asyncio.run(pull_model_async(name=name, stream=stream))
+
+
+###############################################################################
 class OllamaEndpoint:
+    JOB_TYPE = "ollama_pull"
+
     def __init__(self, *, router: APIRouter) -> None:
         self.router = router        
 
@@ -51,6 +83,75 @@ class OllamaEndpoint:
             )
 
     # -------------------------------------------------------------------------
+    def start_pull_job(
+        self,
+        name: str = Query(
+            ...,
+            description="Exact Ollama model name, e.g. 'llama3.1:8b'",
+        ),
+        stream: bool = Query(
+            False,
+            description="If True, stream pull from Ollama. Job returns only final status.",
+        ),
+    ) -> JobStartResponse:
+        if job_manager.is_job_running(self.JOB_TYPE):
+            raise HTTPException(
+                status_code=status.HTTP_409_CONFLICT,
+                detail="A model pull job is already in progress",
+            )
+
+        job_id = job_manager.start_job(
+            job_type=self.JOB_TYPE,
+            runner=run_model_pull_job,
+            kwargs={
+                "name": name,
+                "stream": stream,
+            },
+        )
+
+        job_status = job_manager.get_job_status(job_id)
+        if job_status is None:
+            raise HTTPException(
+                status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+                detail="Failed to initialize model pull job",
+            )
+
+        return JobStartResponse(
+            job_id=job_id,
+            job_type=job_status["job_type"],
+            status=job_status["status"],
+            message="Model pull job started",
+            poll_interval=server_settings.jobs.polling_interval,
+        )
+
+    # -------------------------------------------------------------------------
+    def get_pull_job_status(self, job_id: str) -> JobStatusResponse:
+        job_status = job_manager.get_job_status(job_id)
+        if job_status is None:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail=f"Job not found: {job_id}",
+            )
+        return JobStatusResponse(**job_status)
+
+    # -------------------------------------------------------------------------
+    def cancel_pull_job(self, job_id: str) -> JobCancelResponse:
+        job_status = job_manager.get_job_status(job_id)
+        if job_status is None:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail=f"Job not found: {job_id}",
+            )
+        success = job_manager.cancel_job(job_id)
+        if success:
+            logger.info("Model pull stop requested for job %s", job_id)
+        return JobCancelResponse(
+            job_id=job_id,
+            success=success,
+            message="Cancellation requested" if success else "Job cannot be cancelled",
+        )
+
+    # -------------------------------------------------------------------------
     async def list_available_models(self) -> ModelListResponse:
         try:
             async with OllamaClient() as client:
@@ -72,6 +173,27 @@ class OllamaEndpoint:
             self.pull_model,
             methods=["GET"],
             response_model=ModelPullResponse,
+            status_code=status.HTTP_200_OK,
+        )
+        self.router.add_api_route(
+            "/pull/jobs",
+            self.start_pull_job,
+            methods=["POST"],
+            response_model=JobStartResponse,
+            status_code=status.HTTP_202_ACCEPTED,
+        )
+        self.router.add_api_route(
+            "/jobs/{job_id}",
+            self.get_pull_job_status,
+            methods=["GET"],
+            response_model=JobStatusResponse,
+            status_code=status.HTTP_200_OK,
+        )
+        self.router.add_api_route(
+            "/jobs/{job_id}",
+            self.cancel_pull_job,
+            methods=["DELETE"],
+            response_model=JobCancelResponse,
             status_code=status.HTTP_200_OK,
         )
         self.router.add_api_route(

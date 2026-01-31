@@ -4,6 +4,9 @@
     "version": "0.1.0",
     "description": "FastAPI backend"      
   },   
+  "jobs": {
+    "polling_interval": 1
+  },
   "database": {
     "embedded_database": true,
     "engine": "postgres",
