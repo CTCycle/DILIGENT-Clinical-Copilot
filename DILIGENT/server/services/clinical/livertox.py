@@ -6,8 +6,8 @@ from typing import Any
 
 import pandas as pd
 
-from DILIGENT.server.utils.configurations import server_settings
-from DILIGENT.server.utils.services.text.normalization import coerce_text
+from DILIGENT.server.configurations import server_settings
+from DILIGENT.server.services.text.normalization import coerce_text
 
 ###############################################################################
 class LiverToxData:

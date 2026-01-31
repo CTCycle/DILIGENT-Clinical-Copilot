@@ -10,11 +10,11 @@ from sqlalchemy.dialects.sqlite import insert
 from sqlalchemy.engine import Engine
 from sqlalchemy.orm import sessionmaker
 
-from DILIGENT.server.utils.configurations import DatabaseSettings
+from DILIGENT.server.configurations import DatabaseSettings
 from DILIGENT.server.utils.constants import DATA_PATH, DATABASE_FILENAME
 from DILIGENT.server.utils.logger import logger
-from DILIGENT.server.database.utils import MISSING_TABLE_MESSAGE
-from DILIGENT.server.database.schema import Base
+from DILIGENT.server.repositories.utils import MISSING_TABLE_MESSAGE
+from DILIGENT.server.repositories.schema import Base
 
 
 # [SQLITE DATABASE]
