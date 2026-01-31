@@ -16,7 +16,13 @@ from DILIGENT.server.schemas.clinical import (
     PatientData,
     PatientDrugs,
 )
-from DILIGENT.server.utils.configurations import LLMRuntimeConfig
+from DILIGENT.server.schemas.jobs import (
+    JobCancelResponse,
+    JobStartResponse,
+    JobStatusResponse,
+)
+from DILIGENT.server.utils.configurations import LLMRuntimeConfig, server_settings
+from DILIGENT.server.utils.jobs import job_manager
 from DILIGENT.server.utils.logger import logger
 from DILIGENT.server.utils.repository.serializer import DataSerializer
 from DILIGENT.server.utils.services.clinical.hepatox import (
@@ -130,7 +136,47 @@ class NarrativeBuilder:
 
 
 ###############################################################################
+async def execute_clinical_job(
+    payload: PatientData,
+    runtime_overrides: dict[str, Any],
+    job_id: str,
+) -> str:
+    endpoint.apply_runtime_overrides(
+        use_cloud_services=runtime_overrides.get("use_cloud_services"),
+        llm_provider=runtime_overrides.get("llm_provider"),
+        cloud_model=runtime_overrides.get("cloud_model"),
+        parsing_model=runtime_overrides.get("parsing_model"),
+        clinical_model=runtime_overrides.get("clinical_model"),
+        ollama_temperature=runtime_overrides.get("ollama_temperature"),
+        ollama_reasoning=runtime_overrides.get("ollama_reasoning"),
+    )
+
+    if job_manager.should_stop(job_id):
+        return ""
+
+    job_manager.update_progress(job_id, 5.0)
+    result = await endpoint.process_single_patient(payload)
+    return result
+
+
+###############################################################################
+def run_clinical_job(
+    payload: PatientData,
+    runtime_overrides: dict[str, Any],
+    job_id: str,
+) -> dict[str, Any]:
+    result = asyncio.run(
+        execute_clinical_job(payload=payload, runtime_overrides=runtime_overrides, job_id=job_id)
+    )
+    if not result:
+        return {}
+    return {"report": result}
+
+
+###############################################################################
 class ClinicalSessionEndpoint:
+    JOB_TYPE = "clinical"
+
     def __init__(
         self,
         *,
@@ -200,6 +246,31 @@ class ClinicalSessionEndpoint:
             LLMRuntimeConfig.get_ollama_temperature(),
             LLMRuntimeConfig.is_ollama_reasoning_enabled(),
         )
+
+    # -------------------------------------------------------------------------
+    def build_patient_payload(
+        self,
+        request_payload: ClinicalSessionRequest,
+    ) -> PatientData:
+        try:
+            payload_data: dict[str, Any] = {
+                "name": request_payload.name,
+                "visit_date": request_payload.visit_date,
+                "anamnesis": request_payload.anamnesis,
+                "has_hepatic_diseases": request_payload.has_hepatic_diseases,
+                "use_rag": request_payload.use_rag,
+                "drugs": request_payload.drugs,
+                "alt": request_payload.alt,
+                "alt_max": request_payload.alt_max,
+                "alp": request_payload.alp,
+                "alp_max": request_payload.alp_max,
+            }
+            return PatientData.model_validate(payload_data)
+        except ValidationError as exc:
+            raise HTTPException(
+                status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+                detail=self.serialize_validation_errors(exc.errors()),
+            ) from exc
 
     # -------------------------------------------------------------------------
     async def process_single_patient(self, payload: PatientData) -> str:
@@ -325,28 +396,83 @@ class ClinicalSessionEndpoint:
             ollama_temperature=request_payload.ollama_temperature,
             ollama_reasoning=request_payload.ollama_reasoning,
         )
-        try:
-            payload_data: dict[str, Any] = {
-                "name": request_payload.name,
-                "visit_date": request_payload.visit_date,
-                "anamnesis": request_payload.anamnesis,
-                "has_hepatic_diseases": request_payload.has_hepatic_diseases,
-                "use_rag": request_payload.use_rag,
-                "drugs": request_payload.drugs,
-                "alt": request_payload.alt,
-                "alt_max": request_payload.alt_max,
-                "alp": request_payload.alp,
-                "alp_max": request_payload.alp_max,
-            }
-            patient_payload = PatientData.model_validate(payload_data)
-        except ValidationError as exc:
-            raise HTTPException(
-                status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
-                detail=self.serialize_validation_errors(exc.errors()),
-            ) from exc
 
+        patient_payload = self.build_patient_payload(request_payload)
         single_result = await self.process_single_patient(patient_payload)
         return PlainTextResponse(content=single_result)
+
+    # -------------------------------------------------------------------------
+    def start_clinical_job(
+        self,
+        request_payload: ClinicalSessionRequest = Body(...),
+    ) -> JobStartResponse:
+        if job_manager.is_job_running(self.JOB_TYPE):
+            raise HTTPException(
+                status_code=status.HTTP_409_CONFLICT,
+                detail="Clinical analysis is already in progress",
+            )
+
+        patient_payload = self.build_patient_payload(request_payload)
+        runtime_overrides = {
+            "use_cloud_services": request_payload.use_cloud_services,
+            "llm_provider": request_payload.llm_provider,
+            "cloud_model": request_payload.cloud_model,
+            "parsing_model": request_payload.parsing_model,
+            "clinical_model": request_payload.clinical_model,
+            "ollama_temperature": request_payload.ollama_temperature,
+            "ollama_reasoning": request_payload.ollama_reasoning,
+        }
+
+        job_id = job_manager.start_job(
+            job_type=self.JOB_TYPE,
+            runner=run_clinical_job,
+            kwargs={
+                "payload": patient_payload,
+                "runtime_overrides": runtime_overrides,
+            },
+        )
+
+        job_status = job_manager.get_job_status(job_id)
+        if job_status is None:
+            raise HTTPException(
+                status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+                detail="Failed to initialize clinical analysis job",
+            )
+
+        return JobStartResponse(
+            job_id=job_id,
+            job_type=job_status["job_type"],
+            status=job_status["status"],
+            message="Clinical analysis job started",
+            poll_interval=server_settings.jobs.polling_interval,
+        )
+
+    # -------------------------------------------------------------------------
+    def get_clinical_job_status(self, job_id: str) -> JobStatusResponse:
+        job_status = job_manager.get_job_status(job_id)
+        if job_status is None:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail=f"Job not found: {job_id}",
+            )
+        return JobStatusResponse(**job_status)
+
+    # -------------------------------------------------------------------------
+    def cancel_clinical_job(self, job_id: str) -> JobCancelResponse:
+        job_status = job_manager.get_job_status(job_id)
+        if job_status is None:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail=f"Job not found: {job_id}",
+            )
+        success = job_manager.cancel_job(job_id)
+        if success:
+            logger.info("Clinical analysis stop requested for job %s", job_id)
+        return JobCancelResponse(
+            job_id=job_id,
+            success=success,
+            message="Cancellation requested" if success else "Job cannot be cancelled",
+        )
     
     # -------------------------------------------------------------------------
     def add_routes(self) -> None:
@@ -357,6 +483,27 @@ class ClinicalSessionEndpoint:
             response_model=None,
             status_code=status.HTTP_202_ACCEPTED,
             response_class=PlainTextResponse,
+        )
+        self.router.add_api_route(
+            "/clinical/jobs",
+            self.start_clinical_job,
+            methods=["POST"],
+            response_model=JobStartResponse,
+            status_code=status.HTTP_202_ACCEPTED,
+        )
+        self.router.add_api_route(
+            "/clinical/jobs/{job_id}",
+            self.get_clinical_job_status,
+            methods=["GET"],
+            response_model=JobStatusResponse,
+            status_code=status.HTTP_200_OK,
+        )
+        self.router.add_api_route(
+            "/clinical/jobs/{job_id}",
+            self.cancel_clinical_job,
+            methods=["DELETE"],
+            response_model=JobCancelResponse,
+            status_code=status.HTTP_200_OK,
         )
 
 

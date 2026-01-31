@@ -8,6 +8,7 @@ from DILIGENT.server.utils.configurations.base import (
 from DILIGENT.server.utils.configurations.server import (
     DatabaseSettings,
     FastAPISettings,
+    JobsSettings,
     DrugsMatcherSettings,
     ExternalDataSettings,
     IngestionSettings,    
@@ -23,6 +24,7 @@ __all__ = [
     "load_configuration_data",
     "DatabaseSettings",
     "FastAPISettings",
+    "JobsSettings",
     "DrugsMatcherSettings",
     "ExternalDataSettings",
     "IngestionSettings",
