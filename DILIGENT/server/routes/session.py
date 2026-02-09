@@ -11,12 +11,12 @@ from fastapi.responses import PlainTextResponse
 from pydantic import ValidationError
 from pydantic_core import ErrorDetails
 
-from DILIGENT.server.schemas.clinical import (
+from DILIGENT.server.entities.clinical import (
     ClinicalSessionRequest,
     PatientData,
     PatientDrugs,
 )
-from DILIGENT.server.schemas.jobs import (
+from DILIGENT.server.entities.jobs import (
     JobCancelResponse,
     JobStartResponse,
     JobStatusResponse,
