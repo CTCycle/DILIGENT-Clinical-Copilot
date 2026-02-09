@@ -4,7 +4,7 @@ import asyncio
 from dataclasses import dataclass
 from typing import Any
 
-from DILIGENT.server.schemas.clinical import (
+from DILIGENT.server.entities.clinical import (
     HepatotoxicityPatternScore,
     PatientDrugs,
 )

@@ -1,5 +1,4 @@
 # Project-specific generated/runtime artifacts
-assets/docs/**
 DILIGENT/resources/database/**
 DILIGENT/resources/runtimes/**
 DILIGENT/resources/runtimes/uv_cache/**
@@ -49,6 +48,9 @@ lerna-debug.log*
 .DS_Store
 Thumbs.db
 
+# Agents
+.agent/**
+
 # Misc
 *.lock
 *.log
@@ -59,6 +61,6 @@ Thumbs.db
 rules/
 
 !.gitkeep
-!DILIGENT/settings/configurations.json
+
 
 

@@ -15,7 +15,7 @@ from DILIGENT.server.models.prompts import (
     LIVERTOX_REPORT_EXAMPLE,
 )
 from DILIGENT.server.models.providers import initialize_llm_client
-from DILIGENT.server.schemas.clinical import (
+from DILIGENT.server.entities.clinical import (
     DrugEntry,
     DrugClinicalAssessment,
     DrugSuspensionContext,

@@ -1,14 +1,14 @@
 {  
   "fastapi": {
     "title": "DILIGENT Clinical Copilot Backend",
-    "version": "0.1.0",
+    "version": "1.0.0",
     "description": "FastAPI backend"      
   },   
   "jobs": {
     "polling_interval": 1
   },
   "database": {
-    "embedded_database": true,
+    "embedded_database": false,
     "engine": "postgres",
     "host": "localhost",
     "port": 5432,
@@ -21,7 +21,7 @@
     "insert_batch_size": 1000,
     "insert_commit_interval": 5,
     "select_page_size": 2000,
-    "browser_page_size": 1000
+    "browse_page_size": 1000
   },    
   "rag": {
     "vector_collection_name": "documents",
