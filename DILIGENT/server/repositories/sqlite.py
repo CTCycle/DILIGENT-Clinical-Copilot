@@ -11,7 +11,7 @@ from sqlalchemy.engine import Engine
 from sqlalchemy.orm import sessionmaker
 
 from DILIGENT.server.configurations import DatabaseSettings
-from DILIGENT.server.utils.constants import DATA_PATH, DATABASE_FILENAME
+from DILIGENT.server.utils.constants import RESOURCES_PATH, DATABASE_FILENAME
 from DILIGENT.server.utils.logger import logger
 from DILIGENT.server.repositories.utils import MISSING_TABLE_MESSAGE
 from DILIGENT.server.repositories.schema import Base
