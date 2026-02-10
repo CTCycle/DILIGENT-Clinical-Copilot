@@ -174,7 +174,7 @@ export function DiluAgentPage(): React.JSX.Element {
                 jobProgress: 0,
                 jobStatus: startResult.status,
             });
-            const intervalMs = Math.max(startResult.poll_interval * 1000, 250);
+            const intervalMs = startResult.poll_interval * 1000;
 
             pollerRef.current = pollClinicalJobStatus(
                 startResult.job_id,

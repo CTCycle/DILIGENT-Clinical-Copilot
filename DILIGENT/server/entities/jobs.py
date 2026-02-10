@@ -11,7 +11,7 @@ class JobStartResponse(BaseModel):
     job_type: str
     status: str
     message: str
-    poll_interval: float = 1.0
+    poll_interval: float
 
 
 ###############################################################################
