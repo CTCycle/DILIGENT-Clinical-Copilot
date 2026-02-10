@@ -11,7 +11,7 @@ import re
 import shutil
 import sys
 from collections.abc import AsyncGenerator, Awaitable, Callable
-from typing import Any, Literal, TypeAlias, TypeVar, cast
+from typing import Any, Literal, NoReturn, TypeAlias, TypeVar, cast
 
 import httpx
 from langchain_core.output_parsers import PydanticOutputParser
@@ -1066,7 +1066,7 @@ class OllamaClient:
         available: set[str] = set()
         try:
             available = await self.get_cached_models()
-        except (OllamaError, OllamaTimeout) as exc:
+        except OllamaError as exc:
             logger.debug("Failed to list Ollama models for fallback: %s", exc)
             available = set()
 
@@ -1166,6 +1166,64 @@ class OllamaClient:
         return "not found" in message or "404" in message
 
     # -------------------------------------------------------------------------
+    async def _chat_structured_model(
+        self,
+        *,
+        active_model: str,
+        messages: list[dict[str, str]],
+        use_json_mode: bool,
+        temperature: float,
+    ) -> dict[str, Any] | str:
+        try:
+            return await self.chat(
+                model=active_model,
+                messages=messages,
+                format="json" if use_json_mode else None,
+                temperature=temperature,
+            )
+        except OllamaError as err:
+            if self.is_missing_model_error(err):
+                raise
+            raise RuntimeError(f"LLM call failed: {err}") from err
+
+    # -------------------------------------------------------------------------
+    async def _extend_structured_model_queue(
+        self,
+        *,
+        queue: list[str],
+        preferred: list[str],
+        tried: set[str],
+        fallbacks: list[str] | None,
+    ) -> list[str]:
+        if fallbacks is None:
+            fallbacks = await self.collect_structured_fallbacks(preferred)
+            preferred.extend(fallbacks)
+        for candidate in fallbacks:
+            if candidate and candidate not in tried and candidate not in queue:
+                queue.append(candidate)
+        return fallbacks
+
+    # -------------------------------------------------------------------------
+    @staticmethod
+    def _coerce_llm_text(raw: dict[str, Any] | str) -> str:
+        return json.dumps(raw) if isinstance(raw, dict) else str(raw)
+
+    # -------------------------------------------------------------------------
+    @staticmethod
+    def _raise_structured_models_exhausted(
+        *,
+        last_missing_error: Exception | None,
+        missing: list[str],
+    ) -> NoReturn:
+        if last_missing_error:
+            attempted = ", ".join(missing)
+            raise RuntimeError(
+                "LLM call failed: no local parsing models were found. "
+                f"Tried: {attempted}"
+            ) from last_missing_error
+        raise RuntimeError("LLM call failed: no parsing model candidates available")
+
+    # -------------------------------------------------------------------------
     async def call_with_structured_models(
         self,
         *,
@@ -1191,28 +1249,26 @@ class OllamaClient:
             tried.add(active_model)
 
             try:
-                raw = await self.chat(
-                    model=active_model,
+                raw = await self._chat_structured_model(
+                    active_model=active_model,
                     messages=messages,
-                    format="json" if use_json_mode else None,
+                    use_json_mode=use_json_mode,
                     temperature=temperature,
                 )
             except OllamaError as e:
-                if self.is_missing_model_error(e):
-                    missing.append(active_model)
-                    last_missing_error = e
-                    if fallbacks is None:
-                        fallbacks = await self.collect_structured_fallbacks(preferred)
-                        preferred.extend(fallbacks)
-                    for candidate in fallbacks:
-                        if candidate not in tried and candidate not in queue:
-                            queue.append(candidate)
-                    continue
-                raise RuntimeError(f"LLM call failed: {e}") from e
+                missing.append(active_model)
+                last_missing_error = e
+                fallbacks = await self._extend_structured_model_queue(
+                    queue=queue,
+                    preferred=preferred,
+                    tried=tried,
+                    fallbacks=fallbacks,
+                )
+                continue
 
             return await self.parse_with_repairs(
                 parser=parser,
-                text=json.dumps(raw) if isinstance(raw, dict) else str(raw),
+                text=self._coerce_llm_text(raw),
                 active_model=active_model,
                 system_prompt=system_prompt,
                 format_instructions=format_instructions,
@@ -1220,14 +1276,10 @@ class OllamaClient:
                 max_repair_attempts=max_repair_attempts,
             )
 
-        if last_missing_error:
-            attempted = ", ".join(missing)
-            raise RuntimeError(
-                "LLM call failed: no local parsing models were found. "
-                f"Tried: {attempted}"
-            ) from last_missing_error
-
-        raise RuntimeError("LLM call failed: no parsing model candidates available")
+        self._raise_structured_models_exhausted(
+            last_missing_error=last_missing_error,
+            missing=missing,
+        )
 
     # -------------------------------------------------------------------------
     async def parse_with_repairs(
@@ -1281,35 +1333,15 @@ class OllamaClient:
     # -------------------------------------------------------------------------
     @staticmethod
     def extract_first_json_object(text: str) -> str | None:
-        start = text.find("{")
-        if start == -1:
-            return None
-        depth = 0
-        in_string = False
-        escape = False
-        obj_start: int | None = None
-        for idx in range(start, len(text)):
-            ch = text[idx]
-            if in_string:
-                if escape:
-                    escape = False
-                elif ch == "\\":
-                    escape = True
-                elif ch == '"':
-                    in_string = False
+        decoder = json.JSONDecoder()
+        for match in re.finditer(r"\{", text):
+            start = match.start()
+            try:
+                parsed, end = decoder.raw_decode(text[start:])
+            except json.JSONDecodeError:
                 continue
-            if ch == '"':
-                in_string = True
-                continue
-            if ch == "{":
-                if depth == 0:
-                    obj_start = idx
-                depth += 1
-            elif ch == "}":
-                if depth > 0:
-                    depth -= 1
-                    if depth == 0 and obj_start is not None:
-                        return text[obj_start : idx + 1]
+            if isinstance(parsed, dict):
+                return text[start : start + end]
         return None
 
     # -------------------------------------------------------------------------
