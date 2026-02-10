@@ -23,8 +23,8 @@ from DILIGENT.server.configurations import server_settings
 from DILIGENT.server.utils.constants import LIVERTOX_BASE_URL, SOURCES_PATH
 from DILIGENT.server.utils.logger import logger
 from DILIGENT.server.services.text.normalization import normalize_whitespace
-from DILIGENT.server.repositories.serializer import DataSerializer
-from DILIGENT.server.repositories.database import database
+from DILIGENT.server.repositories.serialization.data import DataSerializer
+from DILIGENT.server.repositories.database.backend import database
 
 SUPPORTED_MONOGRAPH_EXTENSIONS = (".html", ".htm", ".xhtml", ".xml", ".nxml", ".pdf")
 

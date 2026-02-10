@@ -1,61 +1,37 @@
 from __future__ import annotations
 
-import urllib.parse
+import os
 from typing import Any, Iterator
 
 import pandas as pd
 import sqlalchemy
-from sqlalchemy import UniqueConstraint, inspect
-from sqlalchemy.dialects.postgresql import insert
+from sqlalchemy import UniqueConstraint, inspect, text
+from sqlalchemy.dialects.sqlite import insert
 from sqlalchemy.engine import Engine
 from sqlalchemy.orm import sessionmaker
 
 from DILIGENT.server.configurations import DatabaseSettings
-from DILIGENT.server.repositories.schema import Base
-from DILIGENT.server.repositories.utils import (
-    MISSING_TABLE_MESSAGE,
-    normalize_postgres_engine,
-)
+from DILIGENT.server.repositories.database.utils import MISSING_TABLE_MESSAGE
+from DILIGENT.server.repositories.schemas.models import Base
+from DILIGENT.server.utils.constants import DATABASE_FILENAME, RESOURCES_PATH
 from DILIGENT.server.utils.logger import logger
 
 
+# [SQLITE DATABASE]
 ###############################################################################
-class PostgresRepository:
+class SQLiteRepository:
     def __init__(self, settings: DatabaseSettings) -> None:
-        if not settings.host:
-            raise ValueError("Database host must be provided for external database.")
-        if not settings.database_name:
-            raise ValueError(
-                "Database name must be provided for external database."
-            )
-        if not settings.username:
-            raise ValueError(
-                "Database username must be provided for external database."
-            )
-
-        port = settings.port or 5432
-        engine_name = normalize_postgres_engine(settings.engine)
-        password = settings.password or ""
-        connect_args: dict[str, Any] = {"connect_timeout": settings.connect_timeout}
-        if settings.ssl:
-            connect_args["sslmode"] = "require"
-            if settings.ssl_ca:
-                connect_args["sslrootcert"] = settings.ssl_ca
-
-        safe_username = urllib.parse.quote_plus(settings.username)
-        safe_password = urllib.parse.quote_plus(password)
-        self.db_path: str | None = None
+        self.db_path: str | None = os.path.join(RESOURCES_PATH, DATABASE_FILENAME)
+        os.makedirs(os.path.dirname(self.db_path), exist_ok=True)
         self.engine: Engine = sqlalchemy.create_engine(
-            f"{engine_name}://{safe_username}:{safe_password}@{settings.host}:{port}/{settings.database_name}",
-            echo=False,
-            future=True,
-            connect_args=connect_args,
-            pool_pre_ping=True,
+            f"sqlite:///{self.db_path}", echo=False, future=True
         )
         self.session_factory = sessionmaker(bind=self.engine, future=True)
         self.insert_batch_size = settings.insert_batch_size
         self.insert_commit_interval = settings.insert_commit_interval
         self.select_page_size = settings.select_page_size
+        if self.db_path is not None and not os.path.exists(self.db_path):
+            Base.metadata.create_all(self.engine)       
 
     # -------------------------------------------------------------------------
     def get_table_class(self, table_name: str) -> Any:
@@ -127,7 +103,7 @@ class PostgresRepository:
         table_cls = self.get_table_class(table_name)
         self.upsert_dataframe(df, table_cls)
 
-    # -------------------------------------------------------------------------
+    # -----------------------------------------------------------------------------
     def count_rows(self, table_name: str) -> int:
         with self.engine.connect() as conn:
             result = conn.execute(
@@ -147,7 +123,7 @@ class PostgresRepository:
             if not inspector.has_table(table_name):
                 logger.warning(MISSING_TABLE_MESSAGE, table_name)
                 return
-            query = sqlalchemy.text(f'SELECT * FROM "{table_name}"')
+            query = text(f'SELECT * FROM "{table_name}"')
             for chunk in pd.read_sql_query(query, conn, chunksize=chunk_size):
                 yield chunk
 
@@ -160,11 +136,11 @@ class PostgresRepository:
             if not inspector.has_table(table_name):
                 logger.warning(MISSING_TABLE_MESSAGE, table_name)
                 return pd.DataFrame()
-            query = sqlalchemy.text(
-                f'SELECT * FROM "{table_name}" LIMIT :limit OFFSET :offset'
-            )
+            query = text(f'SELECT * FROM "{table_name}" LIMIT :limit OFFSET :offset')
             data = pd.read_sql_query(
-                query, conn, params={"limit": limit, "offset": offset}
+                query,
+                conn,
+                params={"limit": limit, "offset": offset},
             )
         return data
 

@@ -16,7 +16,7 @@ import pandas as pd
 from DILIGENT.server.configurations import server_settings
 from DILIGENT.server.utils.logger import logger
 from DILIGENT.server.utils.constants import RXNAV_SYNONYM_STOPWORDS
-from DILIGENT.server.repositories.serializer import DataSerializer
+from DILIGENT.server.repositories.serialization.data import DataSerializer
 
 
 

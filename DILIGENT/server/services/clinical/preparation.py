@@ -9,7 +9,7 @@ from DILIGENT.server.entities.clinical import (
     PatientDrugs,
 )
 from DILIGENT.server.utils.logger import logger
-from DILIGENT.server.repositories.serializer import DataSerializer
+from DILIGENT.server.repositories.serialization.data import DataSerializer
 from DILIGENT.server.services.clinical.matches import LiverToxMatcher
 
 

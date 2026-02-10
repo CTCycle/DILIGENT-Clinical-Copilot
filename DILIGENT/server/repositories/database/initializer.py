@@ -6,10 +6,10 @@ import sqlalchemy
 from sqlalchemy.exc import SQLAlchemyError
 
 from DILIGENT.server.configurations import DatabaseSettings, server_settings
-from DILIGENT.server.repositories.postgres import PostgresRepository
-from DILIGENT.server.repositories.schema import Base
-from DILIGENT.server.repositories.sqlite import SQLiteRepository
-from DILIGENT.server.repositories.utils import normalize_postgres_engine
+from DILIGENT.server.repositories.database.postgres import PostgresRepository
+from DILIGENT.server.repositories.database.sqlite import SQLiteRepository
+from DILIGENT.server.repositories.database.utils import normalize_postgres_engine
+from DILIGENT.server.repositories.schemas.models import Base
 from DILIGENT.server.utils.logger import logger
 
 
@@ -113,7 +113,12 @@ def run_database_initialization() -> None:
         return
 
     engine_name = normalize_postgres_engine(settings.engine).lower()
-    if engine_name not in {"postgres", "postgresql", "postgresql+psycopg", "postgresql+psycopg2"}:
+    if engine_name not in {
+        "postgres",
+        "postgresql",
+        "postgresql+psycopg",
+        "postgresql+psycopg2",
+    }:
         raise ValueError(f"Unsupported database engine: {settings.engine}")
 
     ensure_postgres_database(settings)
