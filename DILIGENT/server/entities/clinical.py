@@ -70,20 +70,16 @@ class PatientData(BaseModel):
     )
 
     # -------------------------------------------------------------------------
-    @field_validator("name", mode="before")
-    @classmethod
-    def strip_name(cls, value: str | None) -> str | None:
-        if value is None:
-            return None
-        stripped = str(value).strip()
-        return stripped or None
-
-    # -------------------------------------------------------------------------
     @field_validator(
-        "anamnesis", "drugs", "alt", "alt_max", "alp", "alp_max", mode="before"
+        "name", "anamnesis", "drugs", "alt", "alt_max", "alp", "alp_max", mode="before"
     )
     @classmethod
     def strip_text(cls, value: str | None) -> str | None:
+        return cls._strip_optional_text(value)
+
+    # -------------------------------------------------------------------------
+    @staticmethod
+    def _strip_optional_text(value: Any) -> str | None:
         if value is None:
             return None
         stripped = str(value).strip()
@@ -100,30 +96,40 @@ class PatientData(BaseModel):
         if isinstance(value, datetime):
             return value.date()
         if isinstance(value, Mapping):
-            try:
-                day = int(str(value.get("day", "")).strip())
-                month = int(str(value.get("month", "")).strip())
-                year = int(str(value.get("year", "")).strip())
-            except (TypeError, ValueError):
-                return None
-            try:
-                return date(year, month, day)
-            except ValueError:
-                return None
+            return cls._parse_date_mapping(value)
         if isinstance(value, str):
-            stripped = value.strip()
-            if not stripped:
-                return None
-            try:
-                parsed_datetime = datetime.fromisoformat(stripped)
-            except ValueError:
-                try:
-                    return date.fromisoformat(stripped)
-                except ValueError:
-                    return None
-            else:
-                return parsed_datetime.date()
+            return cls._parse_date_string(value)
         return None
+
+    # -------------------------------------------------------------------------
+    @staticmethod
+    def _parse_date_mapping(value: Mapping[Any, Any]) -> date | None:
+        try:
+            day = int(str(value.get("day", "")).strip())
+            month = int(str(value.get("month", "")).strip())
+            year = int(str(value.get("year", "")).strip())
+        except (TypeError, ValueError):
+            return None
+        try:
+            return date(year, month, day)
+        except ValueError:
+            return None
+
+    # -------------------------------------------------------------------------
+    @staticmethod
+    def _parse_date_string(value: str) -> date | None:
+        stripped = value.strip()
+        if not stripped:
+            return None
+        try:
+            parsed_datetime = datetime.fromisoformat(stripped)
+        except ValueError:
+            try:
+                return date.fromisoformat(stripped)
+            except ValueError:
+                return None
+        else:
+            return parsed_datetime.date()
 
     # -------------------------------------------------------------------------
     @field_validator("visit_date")
@@ -190,40 +196,56 @@ class PatientData(BaseModel):
     # -------------------------------------------------------------------------
     def compose_structured_text(self) -> str | None:
         sections: list[str] = []
-        anamnesis_lines: list[str] = []
-        if self.anamnesis:
-            anamnesis_lines.append(self.anamnesis)
-        marker_lines: list[str] = []
-        if self.alt or self.alt_max:
-            alt_tokens: list[str] = []
-            if self.alt:
-                alt_tokens.append(str(self.alt))
-            if self.alt_max:
-                alt_tokens.append(f"(max {self.alt_max})")
-            marker_lines.append(f"ALAT: {' '.join(alt_tokens).strip()}")
-        if self.alp or self.alp_max:
-            alp_tokens: list[str] = []
-            if self.alp:
-                alp_tokens.append(str(self.alp))
-            if self.alp_max:
-                alp_tokens.append(f"(max {self.alp_max})")
-            marker_lines.append(f"ALP: {' '.join(alp_tokens).strip()}")
-        if marker_lines:
-            cleaned_markers = [line for line in marker_lines if line.strip()]
-            if cleaned_markers:
-                if anamnesis_lines:
-                    anamnesis_lines.append("")
-                anamnesis_lines.append("Key laboratory markers:")
-                anamnesis_lines.extend(cleaned_markers)
-        if anamnesis_lines:
-            anamnesis_body = "".join(line for line in anamnesis_lines if line.strip())
-            if anamnesis_body:
-                sections.append(f"# ANAMNESIS\n{anamnesis_body}")
+        anamnesis_body = self._compose_anamnesis_body()
+        if anamnesis_body:
+            sections.append(f"# ANAMNESIS\n{anamnesis_body}")
         if self.drugs:
             sections.append(f"# DRUGS\n{self.drugs}")
         if not sections:
             return None
         return "\n\n".join(section.strip() for section in sections if section.strip())
+
+    # -------------------------------------------------------------------------
+    def _compose_anamnesis_body(self) -> str | None:
+        marker_lines = self._build_marker_lines()
+        lines: list[str] = []
+        if self.anamnesis:
+            lines.append(self.anamnesis)
+        if marker_lines:
+            if lines:
+                lines.append("")
+            lines.append("Key laboratory markers:")
+            lines.extend(marker_lines)
+        if not lines:
+            return None
+        body = "".join(line for line in lines if line.strip())
+        return body or None
+
+    # -------------------------------------------------------------------------
+    def _build_marker_lines(self) -> list[str]:
+        return [
+            line
+            for line in (
+                self._format_marker_line("ALAT", self.alt, self.alt_max),
+                self._format_marker_line("ALP", self.alp, self.alp_max),
+            )
+            if line
+        ]
+
+    # -------------------------------------------------------------------------
+    @staticmethod
+    def _format_marker_line(
+        marker_name: str, value: str | None, max_value: str | None
+    ) -> str | None:
+        if not value and not max_value:
+            return None
+        tokens: list[str] = []
+        if value:
+            tokens.append(str(value))
+        if max_value:
+            tokens.append(f"(max {max_value})")
+        marker_body = " ".join(tokens).strip()
+        return f"{marker_name}: {marker_body}" if marker_body else None
 
 
 ###############################################################################
