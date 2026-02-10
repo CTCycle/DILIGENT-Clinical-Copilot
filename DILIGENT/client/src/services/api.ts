@@ -179,7 +179,6 @@ export function pollClinicalJobStatus(
 ): { stop: () => void } {
   let timeoutId: number | null = null;
   let stopped = false;
-  const waitMs = Math.max(intervalMs, 250);
 
   const poll = async () => {
     if (stopped) return;
@@ -199,7 +198,7 @@ export function pollClinicalJobStatus(
       onError(message);
       return;
     }
-    timeoutId = window.setTimeout(poll, waitMs);
+    timeoutId = window.setTimeout(poll, intervalMs);
   };
 
   poll();

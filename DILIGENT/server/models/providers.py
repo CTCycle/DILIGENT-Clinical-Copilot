@@ -535,7 +535,7 @@ class OllamaClient:
         self,
         *,
         wait_timeout_s: float = 15.0,
-        poll_interval_s: float = 0.5,
+        poll_interval_s: float = server_settings.jobs.polling_interval,
     ) -> Literal["started", "already_running"]:
         if await self.is_server_online():
             return "already_running"
