@@ -22,9 +22,9 @@ from DILIGENT.server.entities.jobs import (
     JobStatusResponse,
 )
 from DILIGENT.server.configurations import LLMRuntimeConfig, server_settings
+from DILIGENT.server.repositories.serialization.data import DataSerializer
 from DILIGENT.server.services.jobs import job_manager
 from DILIGENT.server.utils.logger import logger
-from DILIGENT.server.repositories.serializer import DataSerializer
 from DILIGENT.server.services.clinical.hepatox import (
     HepatotoxicityPatternAnalyzer,
     HepatoxConsultation,

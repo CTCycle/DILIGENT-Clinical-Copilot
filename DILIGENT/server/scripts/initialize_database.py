@@ -1,11 +1,10 @@
 from __future__ import annotations
 
 import json
-import os
 import time
 
+from DILIGENT.server.repositories.database.initializer import initialize_database
 from DILIGENT.server.utils.constants import CONFIGURATIONS_FILE
-from DILIGENT.server.repositories.initializer import initialize_database
 from DILIGENT.server.utils.logger import logger
 
 

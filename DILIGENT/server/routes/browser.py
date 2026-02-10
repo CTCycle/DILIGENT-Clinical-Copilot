@@ -3,14 +3,19 @@ from __future__ import annotations
 from fastapi import APIRouter, HTTPException, Query, status
 from pydantic import BaseModel
 
-from DILIGENT.server.repositories.database import database
-from DILIGENT.server.repositories.schema import ClinicalSession, LiverToxData, DrugsCatalog
 from DILIGENT.server.configurations import server_settings
+from DILIGENT.server.repositories.queries.data import DataRepositoryQueries
+from DILIGENT.server.repositories.schemas.models import (
+    ClinicalSession,
+    DrugsCatalog,
+    LiverToxData,
+)
 from DILIGENT.server.utils.logger import logger
 
 
 ###############################################################################
 router = APIRouter(prefix="/browser", tags=["browser"])
+queries = DataRepositoryQueries()
 
 # Default page size from configuration
 DEFAULT_PAGE_SIZE = server_settings.database.browser_page_size
@@ -75,10 +80,10 @@ def _fetch_table_data(table_key: str, offset: int, limit: int) -> TableDataRespo
         logger.info("Fetching data for table: %s (offset=%d, limit=%d)", table_name, offset, limit)
         
         # Get total count for has_more calculation
-        total_rows = database.count_rows(table_name)
+        total_rows = queries.count_rows(table_name)
         
         # Fetch only the requested page
-        df = database.load_paginated(table_name, offset, limit)
+        df = queries.load_table_paginated(table_name, offset, limit)
         
         columns = df.columns.tolist()
         # Convert DataFrame to list of dicts, handling NaN and timestamps

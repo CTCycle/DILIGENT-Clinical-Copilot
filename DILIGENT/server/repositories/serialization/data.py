@@ -28,15 +28,15 @@ from DILIGENT.server.utils.constants import (
     TEXT_FILE_FALLBACK_ENCODINGS,
 )
 from DILIGENT.server.utils.logger import logger
-from DILIGENT.server.repositories.database import database
-from DILIGENT.server.services.text.normalization import coerce_text
+from DILIGENT.server.repositories.queries.data import DataRepositoryQueries
 from DILIGENT.server.repositories.vectors import LanceVectorDatabase
 from DILIGENT.server.services.retrieval.embeddings import EmbeddingGenerator
+from DILIGENT.server.services.text.normalization import coerce_text
 
 ###############################################################################
 class DataSerializer:
-    def __init__(self) -> None:
-        pass
+    def __init__(self, queries: DataRepositoryQueries | None = None) -> None:
+        self.queries = queries or DataRepositoryQueries()
 
     # -------------------------------------------------------------------------
     def save_clinical_session(self, session_data: dict[str, Any]) -> None:
@@ -46,15 +46,15 @@ class DataSerializer:
             return
         frame = frame.reindex(columns=CLINICAL_SESSION_COLUMNS)
         frame = frame.where(pd.notnull(frame), cast(Any, None))
-        existing = database.load_from_database("CLINICAL_SESSIONS")
+        existing = self.queries.load_table("CLINICAL_SESSIONS")
         if existing.empty:
-            database.save_into_database(frame, "CLINICAL_SESSIONS")
+            self.queries.save_table(frame, "CLINICAL_SESSIONS")
             return
         target_columns = existing.columns.tolist()
         normalized_frame = frame.reindex(columns=target_columns)
         combined = pd.concat([existing, normalized_frame], ignore_index=True)
         combined = combined.where(pd.notnull(combined), cast(Any, None))
-        database.save_into_database(combined, "CLINICAL_SESSIONS")
+        self.queries.save_table(combined, "CLINICAL_SESSIONS")
 
     # -----------------------------------------------------------------------------
     def save_livertox_records(self, records: pd.DataFrame) -> None:
@@ -63,7 +63,7 @@ class DataSerializer:
             frame = frame.drop_duplicates(subset=["drug_name"], keep="first")
         frame = frame.reindex(columns=LIVERTOX_COLUMNS)
         frame = frame.where(pd.notnull(frame), cast(Any, None))
-        database.save_into_database(frame, "LIVERTOX_DATA")
+        self.queries.save_table(frame, "LIVERTOX_DATA")
    
     # -----------------------------------------------------------------------------
     def upsert_drugs_catalog_records(
@@ -79,7 +79,7 @@ class DataSerializer:
         frame = frame.where(pd.notnull(frame), cast(Any, None))
         frame["brand_names"] = frame["brand_names"].apply(self.serialize_brand_names)
         frame["synonyms"] = frame["synonyms"].apply(self.serialize_string_list)
-        database.upsert_into_database(frame, "DRUGS_CATALOG")
+        self.queries.upsert_table(frame, "DRUGS_CATALOG")
 
     # -----------------------------------------------------------------------------
     def sanitize_livertox_records(self, records: list[dict[str, Any]]) -> pd.DataFrame:
@@ -224,14 +224,14 @@ class DataSerializer:
 
     # -----------------------------------------------------------------------------
     def get_livertox_records(self) -> pd.DataFrame:
-        frame = database.load_from_database("LIVERTOX_DATA")
+        frame = self.queries.load_table("LIVERTOX_DATA")
         if frame.empty:
             return pd.DataFrame(columns=LIVERTOX_COLUMNS)
         return frame.reindex(columns=LIVERTOX_COLUMNS)
 
     # -----------------------------------------------------------------------------
     def get_livertox_master_list(self) -> pd.DataFrame:
-        frame = database.load_from_database("LIVERTOX_DATA")
+        frame = self.queries.load_table("LIVERTOX_DATA")
         if frame.empty:
             return pd.DataFrame(columns=LIVERTOX_MASTER_COLUMNS)
         available = [column for column in LIVERTOX_MASTER_COLUMNS if column in frame.columns]
@@ -243,7 +243,7 @@ class DataSerializer:
 
     # -----------------------------------------------------------------------------
     def get_drugs_catalog(self) -> pd.DataFrame:
-        frame = database.load_from_database("DRUGS_CATALOG")
+        frame = self.queries.load_table("DRUGS_CATALOG")
         if frame.empty:
             return pd.DataFrame(columns=DRUGS_CATALOG_COLUMNS)
         return frame.reindex(columns=DRUGS_CATALOG_COLUMNS)
@@ -257,7 +257,7 @@ class DataSerializer:
             if page_size is None
             else max(int(page_size), 1)
         )
-        yield from database.stream_rows("DRUGS_CATALOG", chunk_size)
+        yield from self.queries.stream_table("DRUGS_CATALOG", chunk_size)
 
     # -----------------------------------------------------------------------------
     def normalize_string(self, value: Any) -> str | None:
