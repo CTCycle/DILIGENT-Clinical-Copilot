@@ -25,7 +25,7 @@ class LiverToxData:
         self.record_factory = record_factory
         self.livertox_df = livertox_df
         if isinstance(master_list_df, pd.DataFrame) and not master_list_df.empty:
-            self.master_list_df = master_list_df.copy(deep=False)
+            self.master_list_df = master_list_df.copy()
         else:
             self.master_list_df = self.derive_master_alias_source(livertox_df)
         self.drugs_catalog_df = self._prepare_catalog_source(drugs_catalog_df)
@@ -217,7 +217,7 @@ class LiverToxData:
         if source is None:
             return None
         if isinstance(source, pd.DataFrame):
-            return source.copy(deep=False) if not source.empty else None
+            return source.copy() if not source.empty else None
         if isinstance(source, Iterable):
             return source
         return None

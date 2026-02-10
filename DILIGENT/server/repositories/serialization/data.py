@@ -294,7 +294,30 @@ class DataSerializer:
         normalized = self.normalize_string(value)
         if not normalized:
             return None
-        parsed = pd.to_datetime(normalized, errors="coerce", utc=True)
+        parsed: Any
+        if re.fullmatch(r"[+-]?\d+", normalized):
+            digits = normalized[1:] if normalized.startswith(("+", "-")) else normalized
+            if len(digits) == 8:
+                parsed = pd.to_datetime(
+                    normalized, errors="coerce", format="%Y%m%d", utc=True
+                )
+            else:
+                inferred_unit = {
+                    10: "s",
+                    13: "ms",
+                    16: "us",
+                    19: "ns",
+                }.get(len(digits))
+                if inferred_unit is None:
+                    return normalized
+                parsed = pd.to_datetime(
+                    int(normalized),
+                    errors="coerce",
+                    utc=True,
+                    unit=inferred_unit,
+                )
+        else:
+            parsed = pd.to_datetime(normalized, errors="coerce", utc=True)
         if pd.isna(parsed):
             return normalized
         return parsed.date().isoformat()
