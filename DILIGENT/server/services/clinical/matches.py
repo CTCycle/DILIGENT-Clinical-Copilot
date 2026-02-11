@@ -169,22 +169,31 @@ class DrugsLookup:
                     logger.info("Cache recorded no match for '%s'", name)
                 results[idx] = cached
                 continue
-            alias_entries = self.resolve_alias_candidates(patient_drugs[idx], normalized)
+            alias_entries = self.resolve_alias_candidates(
+                patient_drugs[idx],
+                normalized,
+                include_catalog=False,
+            )
             alias_count = len(alias_entries)
             logger.info(
                 "Resolved %d alias candidates for '%s'",
                 alias_count,
                 name,
             )
-            if not alias_entries:
-                self.match_cache.put(normalized, None)
-                logger.warning(
-                    "No alias candidates found for '%s' (normalized: '%s').",
-                    name,
-                    normalized,
-                )
-                continue
             lookup = self.match_query(alias_entries)
+            if lookup is None:
+                alias_entries = self.resolve_alias_candidates(
+                    patient_drugs[idx],
+                    normalized,
+                    include_catalog=True,
+                )
+                alias_count = len(alias_entries)
+                logger.info(
+                    "Retrying '%s' with %d catalog-expanded aliases",
+                    name,
+                    alias_count,
+                )
+                lookup = self.match_query(alias_entries)
             if lookup is None:
                 self.match_cache.put(normalized, None)
                 logger.warning(
@@ -224,113 +233,180 @@ class DrugsLookup:
         if not candidates:
             return None
 
+        direct_matches: list[tuple[tuple[MonographRecord, float, str, list[str]], str]] = []
         for normalized_value, alias_value, from_catalog in candidates:
             direct = self.match_primary(normalized_value)
             if direct is not None:
-                return self.annotate_catalog_match(direct, from_catalog, alias_value)
+                direct_matches.append(
+                    (
+                        self.annotate_catalog_match(direct, from_catalog, alias_value),
+                        normalized_value,
+                    )
+                )
+        if direct_matches:
+            return self.select_best_match_result(direct_matches)
 
         synonym_matches: list[
-            tuple[tuple[MonographRecord, float, str, list[str]], bool, str]
+            tuple[tuple[MonographRecord, float, str, list[str]], bool, str, str]
         ] = [
-            (synonym, from_catalog, alias_value)
+            (synonym, from_catalog, alias_value, normalized_value)
             for normalized_value, alias_value, from_catalog in candidates
             if (synonym := self.match_synonym(normalized_value)) is not None
         ]
 
         master_matches: list[
-            tuple[tuple[MonographRecord, float, str, list[str]], bool, str]
+            tuple[tuple[MonographRecord, float, str, list[str]], bool, str, str]
         ] = [
-            (master, from_catalog, alias_value)
+            (master, from_catalog, alias_value, normalized_value)
             for normalized_value, alias_value, from_catalog in candidates
             if (master := self.match_master_list(normalized_value)) is not None
         ]
 
-        for master_match in master_matches:
-            master_record, _, _, _ = master_match[0]
-            for synonym_match in synonym_matches:
-                synonym_record, _, _, _ = synonym_match[0]
-                if synonym_record.nbk_id == master_record.nbk_id:
-                    return self.annotate_catalog_match(
-                        master_match[0], master_match[1], master_match[2]
-                    )
-
         if synonym_matches:
-            match_result = synonym_matches[0]
-            return self.annotate_catalog_match(
-                match_result[0], match_result[1], match_result[2]
-            )
+            ranked = [
+                (
+                    self.annotate_catalog_match(match_result[0], match_result[1], match_result[2]),
+                    match_result[3],
+                )
+                for match_result in synonym_matches
+            ]
+            return self.select_best_match_result(ranked)
 
         if master_matches:
-            match_result = master_matches[0]
-            return self.annotate_catalog_match(
-                match_result[0], match_result[1], match_result[2]
-            )
+            ranked = [
+                (
+                    self.annotate_catalog_match(match_result[0], match_result[1], match_result[2]),
+                    match_result[3],
+                )
+                for match_result in master_matches
+            ]
+            return self.select_best_match_result(ranked)
 
+        partial_matches: list[tuple[tuple[MonographRecord, float, str, list[str]], str]] = []
         for normalized_value, alias_value, from_catalog in candidates:
             partial = self.match_partial(normalized_value)
             if partial is not None:
-                return self.annotate_catalog_match(partial, from_catalog, alias_value)
+                partial_matches.append(
+                    (
+                        self.annotate_catalog_match(partial, from_catalog, alias_value),
+                        normalized_value,
+                    )
+                )
+        if partial_matches:
+            return self.select_best_match_result(partial_matches)
 
+        fuzzy_matches: list[tuple[tuple[MonographRecord, float, str, list[str]], str]] = []
         for normalized_value, alias_value, from_catalog in candidates:
             fuzzy = self.match_fuzzy(normalized_value)
             if fuzzy is not None:
-                return self.annotate_catalog_match(fuzzy, from_catalog, alias_value)
+                fuzzy_matches.append(
+                    (
+                        self.annotate_catalog_match(fuzzy, from_catalog, alias_value),
+                        normalized_value,
+                    )
+                )
+        if fuzzy_matches:
+            return self.select_best_match_result(fuzzy_matches)
 
         return None
 
     # -------------------------------------------------------------------------
     def resolve_alias_candidates(
-        self, original_name: str, normalized_query: str
+        self, original_name: str, normalized_query: str, *, include_catalog: bool = True
     ) -> list[tuple[str, bool]]:
         alias_entries: list[tuple[str, bool]] = []
         seen: set[str] = set()
-        cache_entry = self.alias_cache.get(normalized_query, CACHE_MISS)
-        if cache_entry is not CACHE_MISS:
-            alias_entries = list(cache_entry.entries)
-            seen = set(cache_entry.seen)
-        else:
-            catalog_match: tuple[dict[str, Any], bool, str] | None = None
-            if normalized_query:
-                catalog_match = self.find_catalog_synonym_match(normalized_query)
+        if include_catalog:
+            cache_entry = self.alias_cache.get(normalized_query, CACHE_MISS)
+            if cache_entry is not CACHE_MISS:
+                alias_entries = list(cache_entry.entries)
+                seen = set(cache_entry.seen)
+            else:
+                catalog_match: tuple[dict[str, Any], bool, str] | None = None
+                if normalized_query:
+                    catalog_match = self.find_catalog_synonym_match(normalized_query)
 
-            if catalog_match is not None:
-                entry, matched_is_synonym, matched_value = catalog_match
-                values_to_expand: set[str] = set()
+                if catalog_match is not None:
+                    entry, matched_is_synonym, matched_value = catalog_match
+                    values_to_expand: set[str] = set()
 
-                if matched_is_synonym:
-                    values_to_expand.update(
-                        value for value in entry["synonyms"] if value
+                    if matched_is_synonym:
+                        values_to_expand.update(
+                            value for value in entry["synonyms"] if value
+                        )
+                    else:
+                        if matched_value:
+                            values_to_expand.add(matched_value)
+                        base_name = entry.get("base_name")
+                        if base_name:
+                            values_to_expand.add(base_name)
+                        raw_name = entry.get("raw_name")
+                        if raw_name:
+                            values_to_expand.add(raw_name)
+                        values_to_expand.update(
+                            value for value in entry["synonyms"] if value
+                        )
+
+                    for fallback_alias in entry.get("fallback_aliases", []):
+                        if fallback_alias:
+                            values_to_expand.add(fallback_alias)
+
+                    for value in values_to_expand:
+                        self.add_alias_entry(alias_entries, seen, value, True)
+                        for variant in self.expand_variant(value):
+                            self.add_alias_entry(alias_entries, seen, variant, True)
+
+                if normalized_query:
+                    self.alias_cache.put(
+                        normalized_query,
+                        AliasCacheEntry(list(alias_entries), set(seen)),
                     )
-                else:
-                    if matched_value:
-                        values_to_expand.add(matched_value)
-                    base_name = entry.get("base_name")
-                    if base_name:
-                        values_to_expand.add(base_name)
-                    raw_name = entry.get("raw_name")
-                    if raw_name:
-                        values_to_expand.add(raw_name)
-                    values_to_expand.update(
-                        value for value in entry["synonyms"] if value
-                    )
-
-                for fallback_alias in entry.get("fallback_aliases", []):
-                    if fallback_alias:
-                        values_to_expand.add(fallback_alias)
-
-                for value in values_to_expand:
-                    self.add_alias_entry(alias_entries, seen, value, True)
-                    for variant in self.expand_variant(value):
-                        self.add_alias_entry(alias_entries, seen, variant, True)
-
-            if normalized_query:
-                self.alias_cache.put(
-                    normalized_query,
-                    AliasCacheEntry(list(alias_entries), set(seen)),
-                )
 
         self.add_alias_entry(alias_entries, seen, original_name, False)
+        for variant in self.expand_variant(original_name):
+            self.add_alias_entry(alias_entries, seen, variant, False)
         return alias_entries
+
+    # -------------------------------------------------------------------------
+    def reason_priority(self, reason: str) -> int:
+        lowered = reason.lower()
+        if lowered == "monograph_name":
+            return 5
+        if lowered.startswith("synonym"):
+            return 4
+        if lowered.startswith("brand_") or lowered.startswith("ingredient_"):
+            return 3
+        if lowered.startswith("partial"):
+            return 2
+        if lowered.startswith("fuzzy"):
+            return 1
+        return 0
+
+    # -------------------------------------------------------------------------
+    def select_best_match_result(
+        self, matches: list[tuple[tuple[MonographRecord, float, str, list[str]], str]]
+    ) -> tuple[MonographRecord, float, str, list[str]]:
+        best_match: tuple[MonographRecord, float, str, list[str]] | None = None
+        best_score: tuple[float, int, int, int] | None = None
+        for match_result, normalized_query in matches:
+            record, confidence, reason, notes = match_result
+            token_overlap = sum(
+                1 for note in notes if isinstance(note, str) and note.startswith("token=")
+            )
+            target_name = record.normalized_name or self.normalize_name(record.drug_name)
+            length_distance = -abs(len(target_name) - len(normalized_query))
+            score = (
+                float(confidence),
+                self.reason_priority(reason),
+                token_overlap,
+                length_distance,
+            )
+            if best_score is None or score > best_score:
+                best_score = score
+                best_match = match_result
+        if best_match is None:
+            raise RuntimeError("select_best_match_result called with empty candidates")
+        return best_match
 
     # -------------------------------------------------------------------------
     def add_alias_entry(

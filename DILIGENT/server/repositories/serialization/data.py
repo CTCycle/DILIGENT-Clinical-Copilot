@@ -10,60 +10,157 @@ from typing import Any, Iterator, cast
 from xml.etree import ElementTree
 
 import pandas as pd
+from sqlalchemy import select
+from sqlalchemy.orm import Session, sessionmaker
 from langchain_community.document_loaders import PyPDFLoader
 from langchain_core.documents import Document
 from langchain_text_splitters import RecursiveCharacterTextSplitter
 
 from DILIGENT.server.configurations import server_settings
 from DILIGENT.server.utils.constants import (
-    CLINICAL_SESSION_COLUMNS,
     DEFAULT_EMBEDDING_BATCH_SIZE,
     DRUG_NAME_ALLOWED_PATTERN,
     DOCUMENT_SUPPORTED_EXTENSIONS,
-    DRUGS_CATALOG_COLUMNS,
     LIVERTOX_COLUMNS,
     LIVERTOX_MASTER_COLUMNS,
     LIVERTOX_OPTIONAL_COLUMNS,
     LIVERTOX_REQUIRED_COLUMNS,
+    RXNORM_CATALOG_COLUMNS,
+    TABLE_DRUGS,
+    TABLE_DRUG_ALIASES,
+    TABLE_LIVERTOX_MONOGRAPHS,
     TEXT_FILE_FALLBACK_ENCODINGS,
 )
 from DILIGENT.server.utils.logger import logger
 from DILIGENT.server.repositories.queries.data import DataRepositoryQueries
+from DILIGENT.server.repositories.schemas.models import (
+    ClinicalSession,
+    ClinicalSessionDrug,
+    ClinicalSessionLab,
+    ClinicalSessionSection,
+    Drug,
+    DrugAlias,
+    LiverToxMonograph,
+)
 from DILIGENT.server.repositories.vectors import LanceVectorDatabase
 from DILIGENT.server.services.retrieval.embeddings import EmbeddingGenerator
-from DILIGENT.server.services.text.normalization import coerce_text
+from DILIGENT.server.services.text.normalization import coerce_text, normalize_drug_name
+from DILIGENT.server.services.text.synonyms import parse_synonym_list, split_synonym_variants
 
 ###############################################################################
 class DataSerializer:
     def __init__(self, queries: DataRepositoryQueries | None = None) -> None:
         self.queries = queries or DataRepositoryQueries()
+        self.session_factory = sessionmaker(
+            bind=self.queries.database.backend.engine,  # type: ignore[attr-defined]
+            future=True,
+        )
 
     # -------------------------------------------------------------------------
     def save_clinical_session(self, session_data: dict[str, Any]) -> None:
-        frame = pd.DataFrame([session_data])
-        if frame.empty:
+        if not session_data:
             logger.warning("Skipping clinical session save; payload is empty")
             return
-        frame = frame.reindex(columns=CLINICAL_SESSION_COLUMNS)
-        frame = frame.where(pd.notnull(frame), cast(Any, None))
-        existing = self.queries.load_table("CLINICAL_SESSIONS")
-        if existing.empty:
-            self.queries.save_table(frame, "CLINICAL_SESSIONS")
-            return
-        target_columns = existing.columns.tolist()
-        normalized_frame = frame.reindex(columns=target_columns)
-        combined = pd.concat([existing, normalized_frame], ignore_index=True)
-        combined = combined.where(pd.notnull(combined), cast(Any, None))
-        self.queries.save_table(combined, "CLINICAL_SESSIONS")
+        db_session = self.session_factory()
+        try:
+            persisted_session = ClinicalSession(
+                patient_name=self.normalize_string(session_data.get("patient_name")),
+                session_timestamp=self.parse_datetime(
+                    session_data.get("session_timestamp")
+                ),
+                hepatic_pattern=self.normalize_string(session_data.get("hepatic_pattern")),
+                parsing_model=self.normalize_string(session_data.get("parsing_model")),
+                clinical_model=self.normalize_string(session_data.get("clinical_model")),
+                total_duration=self.to_float(session_data.get("total_duration")),
+            )
+            db_session.add(persisted_session)
+            db_session.flush()
+            session_id = int(persisted_session.id)
+            self.persist_session_sections(db_session, session_id, session_data)
+            self.persist_session_labs(db_session, session_id, session_data)
+            self.persist_session_drugs(db_session, session_id, session_data)
+            db_session.commit()
+        except Exception:
+            db_session.rollback()
+            raise
+        finally:
+            db_session.close()
 
     # -----------------------------------------------------------------------------
     def save_livertox_records(self, records: pd.DataFrame) -> None:
         frame = records.copy()
+        if frame.empty:
+            return
         if "drug_name" in frame.columns:
             frame = frame.drop_duplicates(subset=["drug_name"], keep="first")
-        frame = frame.reindex(columns=LIVERTOX_COLUMNS)
-        frame = frame.where(pd.notnull(frame), cast(Any, None))
-        self.queries.save_table(frame, "LIVERTOX_DATA")
+        db_session = self.session_factory()
+        try:
+            for row in frame.to_dict(orient="records"):
+                drug_name = self.normalize_string(row.get("drug_name"))
+                if drug_name is None:
+                    continue
+                normalized_name = normalize_drug_name(drug_name)
+                if not normalized_name:
+                    continue
+                nbk_id = self.normalize_string(row.get("nbk_id"))
+                drug = self.ensure_drug(
+                    db_session,
+                    canonical_name=drug_name,
+                    canonical_name_norm=normalized_name,
+                    rxnorm_rxcui=None,
+                    livertox_nbk_id=nbk_id,
+                )
+                self.upsert_drug_alias(
+                    db_session,
+                    drug_id=int(drug.id),
+                    alias=drug_name,
+                    alias_kind="canonical",
+                    source="livertox",
+                    term_type=None,
+                )
+                self.persist_livertox_aliases(db_session, int(drug.id), row)
+                monograph = (
+                    db_session.execute(
+                        select(LiverToxMonograph).where(
+                            LiverToxMonograph.drug_id == int(drug.id)
+                        )
+                    )
+                    .scalars()
+                    .first()
+                )
+                if monograph is None:
+                    monograph = LiverToxMonograph(drug_id=int(drug.id))
+                    db_session.add(monograph)
+                monograph.excerpt = self.normalize_string(row.get("excerpt"))
+                monograph.likelihood_score = self.normalize_string(
+                    row.get("likelihood_score")
+                )
+                monograph.last_update = self.normalize_date(row.get("last_update"))
+                monograph.reference_count = self.to_int(row.get("reference_count"))
+                monograph.year_approved = self.to_int(row.get("year_approved"))
+                monograph.agent_classification = self.normalize_string(
+                    row.get("agent_classification")
+                )
+                monograph.primary_classification = self.normalize_string(
+                    row.get("primary_classification")
+                )
+                monograph.secondary_classification = self.normalize_string(
+                    row.get("secondary_classification")
+                )
+                include_flag = self.normalize_flag(row.get("include_in_livertox"))
+                monograph.include_in_livertox = (
+                    None if include_flag is None else include_flag == 1
+                )
+                monograph.source_url = self.normalize_string(row.get("source_url"))
+                monograph.source_last_modified = self.normalize_string(
+                    row.get("source_last_modified")
+                )
+            db_session.commit()
+        except Exception:
+            db_session.rollback()
+            raise
+        finally:
+            db_session.close()
    
     # -----------------------------------------------------------------------------
     def upsert_drugs_catalog_records(
@@ -73,13 +170,83 @@ class DataSerializer:
             frame = records.copy()
         else:
             frame = pd.DataFrame(records)
-        frame = frame.reindex(columns=DRUGS_CATALOG_COLUMNS)
+        frame = frame.reindex(columns=RXNORM_CATALOG_COLUMNS)
         if frame.empty:
             return
         frame = frame.where(pd.notnull(frame), cast(Any, None))
-        frame["brand_names"] = frame["brand_names"].apply(self.serialize_brand_names)
-        frame["synonyms"] = frame["synonyms"].apply(self.serialize_string_list)
-        self.queries.upsert_table(frame, "DRUGS_CATALOG")
+        db_session = self.session_factory()
+        try:
+            for row in frame.to_dict(orient="records"):
+                rxcui = self.normalize_string(row.get("rxcui"))
+                if rxcui is None:
+                    continue
+                raw_name = self.normalize_string(row.get("raw_name"))
+                standard_name = self.normalize_string(row.get("name"))
+                canonical_name = standard_name or raw_name
+                if canonical_name is None:
+                    continue
+                canonical_name_norm = normalize_drug_name(canonical_name)
+                if not canonical_name_norm:
+                    continue
+                term_type = self.normalize_string(row.get("term_type"))
+                drug = self.ensure_drug(
+                    db_session,
+                    canonical_name=canonical_name,
+                    canonical_name_norm=canonical_name_norm,
+                    rxnorm_rxcui=rxcui,
+                    livertox_nbk_id=None,
+                )
+                drug_id = int(drug.id)
+                self.upsert_drug_alias(
+                    db_session,
+                    drug_id=drug_id,
+                    alias=canonical_name,
+                    alias_kind="canonical",
+                    source="derived",
+                    term_type=term_type,
+                )
+                if raw_name is not None:
+                    self.upsert_drug_alias(
+                        db_session,
+                        drug_id=drug_id,
+                        alias=raw_name,
+                        alias_kind="raw_name",
+                        source="rxnorm",
+                        term_type=term_type,
+                    )
+                if standard_name is not None:
+                    self.upsert_drug_alias(
+                        db_session,
+                        drug_id=drug_id,
+                        alias=standard_name,
+                        alias_kind="standard_name",
+                        source="rxnorm",
+                        term_type=term_type,
+                    )
+                for brand in self.extract_text_candidates(row.get("brand_names")):
+                    self.upsert_drug_alias(
+                        db_session,
+                        drug_id=drug_id,
+                        alias=brand,
+                        alias_kind="brand",
+                        source="rxnorm",
+                        term_type=term_type,
+                    )
+                for synonym in self.extract_synonym_candidates(row.get("synonyms")):
+                    self.upsert_drug_alias(
+                        db_session,
+                        drug_id=drug_id,
+                        alias=synonym,
+                        alias_kind="synonym",
+                        source="rxnorm",
+                        term_type=term_type,
+                    )
+            db_session.commit()
+        except Exception:
+            db_session.rollback()
+            raise
+        finally:
+            db_session.close()
 
     # -----------------------------------------------------------------------------
     def sanitize_livertox_records(self, records: list[dict[str, Any]]) -> pd.DataFrame:
@@ -121,117 +288,63 @@ class DataSerializer:
         return True
 
     # -----------------------------------------------------------------------------
-    def serialize_string_list(self, value: Any) -> str:
-        parsed_values = self._parse_serialized_list_input(value)
-        normalized = self._normalize_list_items(parsed_values)
-        return json.dumps(normalized, ensure_ascii=False)
-
-    # -----------------------------------------------------------------------------
-    def serialize_brand_names(self, value: Any) -> str | None:
-        if isinstance(value, str):
-            stripped = value.strip()
-            if not stripped:
-                return None
-            ok, parsed = self._try_json_loads(stripped)
-            if not ok:
-                return self.normalize_list_item(stripped)
-            return self.serialize_brand_names(parsed)
-        if isinstance(value, list):
-            normalized = self._normalize_unique_list_items(value)
-            if not normalized:
-                return None
-            if len(normalized) == 1:
-                return normalized[0]
-            return ", ".join(normalized)
-        if pd.isna(value) or value is None:
-            return None
-        normalized_item = self.normalize_list_item(value)
-        return normalized_item
-
-    # -----------------------------------------------------------------------------
-    def normalize_list_item(self, value: Any) -> str | None:
-        return coerce_text(value)
-
-    # -----------------------------------------------------------------------------
-    def deserialize_string_list(self, value: Any) -> list[str]:
-        parsed_values = self._parse_deserialized_list_input(value)
-        return self._normalize_list_items(parsed_values)
-
-    # -----------------------------------------------------------------------------
-    def _try_json_loads(self, value: str) -> tuple[bool, Any]:
-        try:
-            return True, json.loads(value)
-        except json.JSONDecodeError:
-            return False, None
-
-    # -----------------------------------------------------------------------------
-    def _parse_serialized_list_input(self, value: Any) -> list[Any]:
-        if isinstance(value, list):
-            return value
-        if isinstance(value, str):
-            stripped = value.strip()
-            if not stripped:
-                return []
-            ok, parsed = self._try_json_loads(stripped)
-            if ok and isinstance(parsed, list):
-                return parsed
-            return [stripped]
-        if pd.isna(value) or value is None:
-            return []
-        return [value]
-
-    # -----------------------------------------------------------------------------
-    def _parse_deserialized_list_input(self, value: Any) -> list[Any]:
-        if isinstance(value, list):
-            return value
-        if isinstance(value, str):
-            stripped = value.strip()
-            if not stripped:
-                return []
-            ok, parsed = self._try_json_loads(stripped)
-            if not ok:
-                return [stripped]
-            if isinstance(parsed, list):
-                return parsed
-            return [parsed]
-        if pd.isna(value) or value is None:
-            return []
-        return [value]
-
-    # -----------------------------------------------------------------------------
-    def _normalize_list_items(self, values: list[Any]) -> list[str]:
-        normalized: list[str] = []
-        for item in values:
-            normalized_item = self.normalize_list_item(item)
-            if normalized_item is not None:
-                normalized.append(normalized_item)
-        return normalized
-
-    # -----------------------------------------------------------------------------
-    def _normalize_unique_list_items(self, values: list[Any]) -> list[str]:
-        normalized: list[str] = []
-        seen: set[str] = set()
-        for item in values:
-            normalized_item = self.normalize_list_item(item)
-            if normalized_item is None:
-                continue
-            key = normalized_item.casefold()
-            if key in seen:
-                continue
-            seen.add(key)
-            normalized.append(normalized_item)
-        return normalized
-
-    # -----------------------------------------------------------------------------
     def get_livertox_records(self) -> pd.DataFrame:
-        frame = self.queries.load_table("LIVERTOX_DATA")
+        drugs_frame = self.queries.load_table(TABLE_DRUGS)
+        monographs_frame = self.queries.load_table(TABLE_LIVERTOX_MONOGRAPHS)
+        aliases_frame = self.queries.load_table(TABLE_DRUG_ALIASES)
+        if drugs_frame.empty or monographs_frame.empty:
+            return pd.DataFrame(columns=LIVERTOX_COLUMNS)
+        merged = monographs_frame.merge(
+            drugs_frame,
+            left_on="drug_id",
+            right_on="id",
+            how="left",
+            suffixes=("_monograph", "_drug"),
+        )
+        aliases_by_drug = self.build_alias_lookup_by_kind(aliases_frame)
+        records: list[dict[str, Any]] = []
+        for row in merged.to_dict(orient="records"):
+            drug_id = row.get("drug_id")
+            grouped_aliases = (
+                aliases_by_drug.get(int(drug_id), {}) if drug_id is not None else {}
+            )
+            records.append(
+                {
+                    "drug_name": self.normalize_string(row.get("canonical_name")),
+                    "nbk_id": self.normalize_string(row.get("livertox_nbk_id")),
+                    "ingredient": self.join_values(grouped_aliases.get("ingredient", set())),
+                    "brand_name": self.join_values(grouped_aliases.get("brand", set())),
+                    "synonyms": self.join_values(grouped_aliases.get("synonym", set())),
+                    "excerpt": self.normalize_string(row.get("excerpt")),
+                    "likelihood_score": self.normalize_string(row.get("likelihood_score")),
+                    "last_update": self.normalize_string(row.get("last_update")),
+                    "reference_count": row.get("reference_count"),
+                    "year_approved": row.get("year_approved"),
+                    "agent_classification": self.normalize_string(
+                        row.get("agent_classification")
+                    ),
+                    "primary_classification": self.normalize_string(
+                        row.get("primary_classification")
+                    ),
+                    "secondary_classification": self.normalize_string(
+                        row.get("secondary_classification")
+                    ),
+                    "include_in_livertox": row.get("include_in_livertox"),
+                    "source_url": self.normalize_string(row.get("source_url")),
+                    "source_last_modified": self.normalize_string(
+                        row.get("source_last_modified")
+                    ),
+                }
+            )
+        frame = pd.DataFrame(records)
         if frame.empty:
             return pd.DataFrame(columns=LIVERTOX_COLUMNS)
+        frame = frame.where(pd.notnull(frame), cast(Any, None))
         return frame.reindex(columns=LIVERTOX_COLUMNS)
 
     # -----------------------------------------------------------------------------
     def get_livertox_master_list(self) -> pd.DataFrame:
-        frame = self.queries.load_table("LIVERTOX_DATA")
+        frame = self.get_livertox_records()
         if frame.empty:
             return pd.DataFrame(columns=LIVERTOX_MASTER_COLUMNS)
         available = [column for column in LIVERTOX_MASTER_COLUMNS if column in frame.columns]
@@ -243,10 +356,45 @@ class DataSerializer:
 
     # -----------------------------------------------------------------------------
     def get_drugs_catalog(self) -> pd.DataFrame:
-        frame = self.queries.load_table("DRUGS_CATALOG")
-        if frame.empty:
-            return pd.DataFrame(columns=DRUGS_CATALOG_COLUMNS)
-        return frame.reindex(columns=DRUGS_CATALOG_COLUMNS)
+        drugs_frame = self.queries.load_table(TABLE_DRUGS)
+        aliases_frame = self.queries.load_table(TABLE_DRUG_ALIASES)
+        if drugs_frame.empty:
+            return pd.DataFrame(columns=RXNORM_CATALOG_COLUMNS)
+        if aliases_frame.empty:
+            return pd.DataFrame(columns=RXNORM_CATALOG_COLUMNS)
+        source_series = aliases_frame.get("source", pd.Series(dtype=str))
+        aliases_frame = aliases_frame[
+            source_series.astype(str).str.casefold() == "rxnorm"
+        ].copy()
+        if aliases_frame.empty:
+            return pd.DataFrame(columns=RXNORM_CATALOG_COLUMNS)
+        records: list[dict[str, Any]] = []
+        for row in drugs_frame.to_dict(orient="records"):
+            rxcui = self.normalize_string(row.get("rxnorm_rxcui"))
+            if rxcui is None:
+                continue
+            drug_id = int(row["id"])
+            aliases = aliases_frame[aliases_frame["drug_id"] == drug_id]
+            raw_name = self.first_alias_value(aliases, "raw_name")
+            standard_name = self.first_alias_value(aliases, "standard_name")
+            term_type = self.first_alias_term_type(aliases)
+            brand_names = self.join_values(self.alias_values_for_kind(aliases, "brand"))
+            synonyms = sorted(self.alias_values_for_kind(aliases, "synonym"))
+            records.append(
+                {
+                    "rxcui": rxcui,
+                    "raw_name": raw_name or self.normalize_string(row.get("canonical_name")),
+                    "term_type": term_type,
+                    "name": standard_name
+                    or self.normalize_string(row.get("canonical_name")),
+                    "brand_names": brand_names,
+                    "synonyms": json.dumps(synonyms, ensure_ascii=False),
+                }
+            )
+        if not records:
+            return pd.DataFrame(columns=RXNORM_CATALOG_COLUMNS)
+        frame = pd.DataFrame(records)
+        return frame.reindex(columns=RXNORM_CATALOG_COLUMNS)
 
     # -----------------------------------------------------------------------------
     def stream_drugs_catalog(
@@ -257,19 +405,33 @@ class DataSerializer:
             if page_size is None
             else max(int(page_size), 1)
         )
-        yield from self.queries.stream_table("DRUGS_CATALOG", chunk_size)
+        frame = self.get_drugs_catalog()
+        if frame.empty:
+            return
+        for start in range(0, len(frame), chunk_size):
+            chunk = frame.iloc[start : start + chunk_size]
+            if not chunk.empty:
+                yield chunk.reset_index(drop=True)
 
     # -----------------------------------------------------------------------------
     def normalize_string(self, value: Any) -> str | None:
         if isinstance(value, str):
             normalized = value.strip()
-            return normalized if normalized else None
+            if not normalized:
+                return None
+            if normalized.lower() in {"not available", "nan", "none", "<na>", "nat"}:
+                return None
+            return normalized
         if pd.isna(value):
             return None
         if value is None:
             return None
         normalized = str(value).strip()
-        return normalized if normalized else None
+        if not normalized:
+            return None
+        if normalized.lower() in {"not available", "nan", "none", "<na>", "nat"}:
+            return None
+        return normalized
 
     # -----------------------------------------------------------------------------
     def normalize_flag(self, value: Any) -> int | None:
@@ -327,6 +489,390 @@ class DataSerializer:
         if not values:
             return None
         return "; ".join(sorted(values))
+
+    # -----------------------------------------------------------------------------
+    def to_int(self, value: Any) -> int | None:
+        normalized = self.normalize_string(value)
+        if normalized is None:
+            return None
+        try:
+            return int(float(normalized))
+        except (TypeError, ValueError):
+            return None
+
+    # -----------------------------------------------------------------------------
+    def to_float(self, value: Any) -> float | None:
+        normalized = self.normalize_string(value)
+        if normalized is None:
+            return None
+        try:
+            return float(normalized)
+        except (TypeError, ValueError):
+            return None
+
+    # -----------------------------------------------------------------------------
+    def parse_datetime(self, value: Any) -> Any:
+        if value is None:
+            return None
+        if isinstance(value, pd.Timestamp):
+            return value.to_pydatetime()
+        parsed = pd.to_datetime(value, errors="coerce")
+        if pd.isna(parsed):
+            return None
+        if isinstance(parsed, pd.Timestamp):
+            return parsed.to_pydatetime()
+        return parsed
+
+    # -----------------------------------------------------------------------------
+    def persist_session_sections(
+        self, db_session: Session, session_id: int, session_data: dict[str, Any]
+    ) -> None:
+        payload = {
+            "anamnesis": session_data.get("anamnesis"),
+            "drugs": session_data.get("drugs"),
+            "final_report": session_data.get("final_report"),
+        }
+        for section_kind, value in payload.items():
+            content = self.normalize_string(value)
+            if content is None:
+                continue
+            db_session.add(
+                ClinicalSessionSection(
+                    session_id=session_id,
+                    section_kind=section_kind,
+                    content=content,
+                )
+            )
+
+    # -----------------------------------------------------------------------------
+    def persist_session_labs(
+        self, db_session: Session, session_id: int, session_data: dict[str, Any]
+    ) -> None:
+        mapping = [
+            ("alt", "alt_value", "alt_upper_limit"),
+            ("alp", "alp_value", "alp_upper_limit"),
+        ]
+        for lab_code, value_key, upper_limit_key in mapping:
+            value_raw = self.normalize_string(session_data.get(value_key))
+            upper_limit_raw = self.normalize_string(session_data.get(upper_limit_key))
+            if value_raw is None and upper_limit_raw is None:
+                continue
+            db_session.add(
+                ClinicalSessionLab(
+                    session_id=session_id,
+                    lab_code=lab_code,
+                    value_raw=value_raw,
+                    upper_limit_raw=upper_limit_raw,
+                )
+            )
+
+    # -----------------------------------------------------------------------------
+    def persist_session_drugs(
+        self, db_session: Session, session_id: int, session_data: dict[str, Any]
+    ) -> None:
+        payload = session_data.get("matched_drugs")
+        records: list[dict[str, Any]] = []
+        if isinstance(payload, list):
+            for item in payload:
+                if isinstance(item, dict):
+                    records.append(item)
+                elif isinstance(item, str):
+                    records.append({"raw_drug_name": item})
+        if not records:
+            detected_drugs = session_data.get("detected_drugs")
+            if isinstance(detected_drugs, list):
+                for item in detected_drugs:
+                    if isinstance(item, str):
+                        records.append({"raw_drug_name": item})
+        seen: set[str] = set()
+        for item in records:
+            raw_drug_name = self.normalize_string(
+                item.get("raw_drug_name") or item.get("name")
+            )
+            if raw_drug_name is None:
+                continue
+            raw_drug_name_norm = normalize_drug_name(raw_drug_name)
+            if not raw_drug_name_norm or raw_drug_name_norm in seen:
+                continue
+            seen.add(raw_drug_name_norm)
+            matched_drug_name = self.normalize_string(item.get("matched_drug_name"))
+            rxcui = self.normalize_string(item.get("rxcui"))
+            nbk_id = self.normalize_string(item.get("nbk_id"))
+            resolved_drug_id = self.resolve_drug_id(
+                db_session,
+                matched_drug_name=matched_drug_name,
+                rxcui=rxcui,
+                nbk_id=nbk_id,
+            )
+            notes = item.get("match_notes")
+            if isinstance(notes, (list, dict)):
+                notes_value = json.dumps(notes, ensure_ascii=False)
+            else:
+                notes_value = self.normalize_string(notes)
+            db_session.add(
+                ClinicalSessionDrug(
+                    session_id=session_id,
+                    raw_drug_name=raw_drug_name,
+                    raw_drug_name_norm=raw_drug_name_norm,
+                    drug_id=resolved_drug_id,
+                    match_confidence=self.to_float(item.get("match_confidence")),
+                    match_reason=self.normalize_string(item.get("match_reason")),
+                    match_notes=notes_value,
+                )
+            )
+
+    # -----------------------------------------------------------------------------
+    def resolve_drug_id(
+        self,
+        db_session: Session,
+        *,
+        matched_drug_name: str | None,
+        rxcui: str | None,
+        nbk_id: str | None,
+    ) -> int | None:
+        if rxcui is not None:
+            drug = (
+                db_session.execute(select(Drug).where(Drug.rxnorm_rxcui == rxcui))
+                .scalars()
+                .first()
+            )
+            if drug is not None:
+                return int(drug.id)
+        if nbk_id is not None:
+            drug = (
+                db_session.execute(select(Drug).where(Drug.livertox_nbk_id == nbk_id))
+                .scalars()
+                .first()
+            )
+            if drug is not None:
+                return int(drug.id)
+        if matched_drug_name is None:
+            return None
+        normalized_name = normalize_drug_name(matched_drug_name)
+        if not normalized_name:
+            return None
+        drug = (
+            db_session.execute(select(Drug).where(Drug.canonical_name_norm == normalized_name))
+            .scalars()
+            .first()
+        )
+        if drug is not None:
+            return int(drug.id)
+        alias = (
+            db_session.execute(select(DrugAlias).where(DrugAlias.alias_norm == normalized_name))
+            .scalars()
+            .first()
+        )
+        if alias is None:
+            return None
+        return int(alias.drug_id)
+
+    # -----------------------------------------------------------------------------
+    def ensure_drug(
+        self,
+        db_session: Session,
+        *,
+        canonical_name: str,
+        canonical_name_norm: str,
+        rxnorm_rxcui: str | None,
+        livertox_nbk_id: str | None,
+    ) -> Drug:
+        candidate: Drug | None = None
+        if rxnorm_rxcui is not None:
+            candidate = (
+                db_session.execute(select(Drug).where(Drug.rxnorm_rxcui == rxnorm_rxcui))
+                .scalars()
+                .first()
+            )
+        if candidate is None and livertox_nbk_id is not None:
+            candidate = (
+                db_session.execute(
+                    select(Drug).where(Drug.livertox_nbk_id == livertox_nbk_id)
+                )
+                .scalars()
+                .first()
+            )
+        if candidate is None:
+            candidate = (
+                db_session.execute(
+                    select(Drug).where(Drug.canonical_name_norm == canonical_name_norm)
+                )
+                .scalars()
+                .first()
+            )
+        if candidate is None:
+            candidate = Drug(
+                canonical_name=canonical_name,
+                canonical_name_norm=canonical_name_norm,
+                rxnorm_rxcui=rxnorm_rxcui,
+                livertox_nbk_id=livertox_nbk_id,
+            )
+            db_session.add(candidate)
+            db_session.flush()
+            return candidate
+        if not candidate.rxnorm_rxcui and rxnorm_rxcui is not None:
+            candidate.rxnorm_rxcui = rxnorm_rxcui
+        if not candidate.livertox_nbk_id and livertox_nbk_id is not None:
+            candidate.livertox_nbk_id = livertox_nbk_id
+        return candidate
+
+    # -----------------------------------------------------------------------------
+    def upsert_drug_alias(
+        self,
+        db_session: Session,
+        *,
+        drug_id: int,
+        alias: str,
+        alias_kind: str,
+        source: str,
+        term_type: str | None,
+    ) -> None:
+        clean_alias = self.normalize_string(alias)
+        if clean_alias is None:
+            return
+        alias_norm = normalize_drug_name(clean_alias)
+        if not alias_norm:
+            return
+        existing = (
+            db_session.execute(
+                select(DrugAlias).where(
+                    DrugAlias.drug_id == drug_id,
+                    DrugAlias.alias_norm == alias_norm,
+                    DrugAlias.alias_kind == alias_kind,
+                    DrugAlias.source == source,
+                )
+            )
+            .scalars()
+            .first()
+        )
+        if existing is None:
+            db_session.add(
+                DrugAlias(
+                    drug_id=drug_id,
+                    alias=clean_alias,
+                    alias_norm=alias_norm,
+                    alias_kind=alias_kind,
+                    source=source,
+                    term_type=term_type,
+                )
+            )
+            return
+        if existing.term_type is None and term_type is not None:
+            existing.term_type = term_type
+
+    # -----------------------------------------------------------------------------
+    def persist_livertox_aliases(
+        self, db_session: Session, drug_id: int, row: dict[str, Any]
+    ) -> None:
+        for alias in self.extract_text_candidates(row.get("ingredient")):
+            self.upsert_drug_alias(
+                db_session,
+                drug_id=drug_id,
+                alias=alias,
+                alias_kind="ingredient",
+                source="livertox",
+                term_type=None,
+            )
+        for alias in self.extract_text_candidates(row.get("brand_name")):
+            self.upsert_drug_alias(
+                db_session,
+                drug_id=drug_id,
+                alias=alias,
+                alias_kind="brand",
+                source="livertox",
+                term_type=None,
+            )
+        for alias in self.extract_synonym_candidates(row.get("synonyms")):
+            self.upsert_drug_alias(
+                db_session,
+                drug_id=drug_id,
+                alias=alias,
+                alias_kind="synonym",
+                source="livertox",
+                term_type=None,
+            )
+
+    # -----------------------------------------------------------------------------
+    def extract_text_candidates(self, value: Any) -> list[str]:
+        if value is None:
+            return []
+        collected: list[str] = []
+        if isinstance(value, list):
+            for item in value:
+                if isinstance(item, str):
+                    collected.extend(split_synonym_variants(item))
+            return self.unique_text(collected)
+        text_value = self.normalize_string(value)
+        if text_value is None:
+            return []
+        collected.extend(split_synonym_variants(text_value))
+        return self.unique_text(collected)
+
+    # -----------------------------------------------------------------------------
+    def extract_synonym_candidates(self, value: Any) -> list[str]:
+        collected: list[str] = []
+        for item in parse_synonym_list(value):
+            collected.extend(split_synonym_variants(item))
+        return self.unique_text(collected)
+
+    # -----------------------------------------------------------------------------
+    def unique_text(self, values: list[str]) -> list[str]:
+        unique: dict[str, str] = {}
+        for value in values:
+            normalized = self.normalize_string(value)
+            if normalized is None:
+                continue
+            key = normalized.casefold()
+            if key not in unique:
+                unique[key] = normalized
+        return list(unique.values())
+
+    # -----------------------------------------------------------------------------
+    def build_alias_lookup_by_kind(
+        self, aliases_frame: pd.DataFrame
+    ) -> dict[int, dict[str, set[str]]]:
+        lookup: dict[int, dict[str, set[str]]] = {}
+        if aliases_frame.empty:
+            return lookup
+        for row in aliases_frame.to_dict(orient="records"):
+            drug_id = row.get("drug_id")
+            alias_kind = self.normalize_string(row.get("alias_kind"))
+            alias = self.normalize_string(row.get("alias"))
+            if drug_id is None or alias_kind is None or alias is None:
+                continue
+            by_kind = lookup.setdefault(int(drug_id), {})
+            values = by_kind.setdefault(alias_kind, set())
+            values.add(alias)
+        return lookup
+
+    # -----------------------------------------------------------------------------
+    def alias_values_for_kind(self, aliases: pd.DataFrame, alias_kind: str) -> set[str]:
+        if aliases.empty:
+            return set()
+        selected = aliases[
+            aliases["alias_kind"].astype(str).str.casefold() == alias_kind.casefold()
+        ]
+        values: set[str] = set()
+        for item in selected["alias"].tolist():
+            normalized = self.normalize_string(item)
+            if normalized is not None:
+                values.add(normalized)
+        return values
+
+    # -----------------------------------------------------------------------------
+    def first_alias_value(self, aliases: pd.DataFrame, alias_kind: str) -> str | None:
+        values = sorted(self.alias_values_for_kind(aliases, alias_kind), key=str.casefold)
+        return values[0] if values else None
+
+    # -----------------------------------------------------------------------------
+    def first_alias_term_type(self, aliases: pd.DataFrame) -> str | None:
+        if aliases.empty or "term_type" not in aliases.columns:
+            return None
+        for value in aliases["term_type"].tolist():
+            normalized = self.normalize_string(value)
+            if normalized is not None:
+                return normalized
+        return None
 
 
 

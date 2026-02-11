@@ -5,7 +5,7 @@ from typing import Any, Iterator
 
 import pandas as pd
 import sqlalchemy
-from sqlalchemy import UniqueConstraint, inspect, text
+from sqlalchemy import UniqueConstraint, event, inspect, text
 from sqlalchemy.dialects.sqlite import insert
 from sqlalchemy.engine import Engine
 from sqlalchemy.orm import sessionmaker
@@ -26,12 +26,22 @@ class SQLiteRepository:
         self.engine: Engine = sqlalchemy.create_engine(
             f"sqlite:///{self.db_path}", echo=False, future=True
         )
+        event.listen(self.engine, "connect", self._enable_foreign_keys)
         self.session_factory = sessionmaker(bind=self.engine, future=True)
         self.insert_batch_size = settings.insert_batch_size
         self.insert_commit_interval = settings.insert_commit_interval
         self.select_page_size = settings.select_page_size
         if self.db_path is not None and not os.path.exists(self.db_path):
-            Base.metadata.create_all(self.engine)       
+            Base.metadata.create_all(self.engine)
+
+    # -------------------------------------------------------------------------
+    @staticmethod
+    def _enable_foreign_keys(dbapi_connection, _connection_record) -> None:
+        cursor = dbapi_connection.cursor()
+        try:
+            cursor.execute("PRAGMA foreign_keys=ON")
+        finally:
+            cursor.close()
 
     # -------------------------------------------------------------------------
     def get_table_class(self, table_name: str) -> Any:

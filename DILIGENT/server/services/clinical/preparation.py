@@ -108,6 +108,9 @@ class ClinicalKnowledgePreparation:
                     "extracted_excerpts": self.normalize_excerpt_list(
                         value.get("extracted_excerpts")
                     ),
+                    "match_confidence": value.get("match_confidence"),
+                    "match_reason": value.get("match_reason"),
+                    "match_notes": value.get("match_notes", []),
                 }
         elif isinstance(data, list):
             for item in data:
@@ -125,6 +128,9 @@ class ClinicalKnowledgePreparation:
                     "extracted_excerpts": self.normalize_excerpt_list(
                         item.get("extracted_excerpts")
                     ),
+                    "match_confidence": item.get("match_confidence"),
+                    "match_reason": item.get("match_reason"),
+                    "match_notes": item.get("match_notes", []),
                 }
         return normalized
 

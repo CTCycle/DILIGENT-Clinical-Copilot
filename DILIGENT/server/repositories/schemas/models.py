@@ -1,65 +1,162 @@
 from __future__ import annotations
 
 from sqlalchemy import (
+    Boolean,
     Column,
     DateTime,
     Float,
+    ForeignKey,
+    Index,
     Integer,
     String,
     Text,
     UniqueConstraint,
 )
-
-from sqlalchemy.orm import declarative_base
+from sqlalchemy.orm import declarative_base, relationship
 
 Base = declarative_base()
 
 
 ###############################################################################
 class ClinicalSession(Base):
-    __tablename__ = "CLINICAL_SESSIONS"
+    __tablename__ = "clinical_sessions"
     id = Column(Integer, primary_key=True, autoincrement=True)
     patient_name = Column(String)
     session_timestamp = Column(DateTime)
-    alt_value = Column(String)
-    alt_upper_limit = Column(String)
-    alp_value = Column(String)
-    alp_upper_limit = Column(String)
     hepatic_pattern = Column(String)
-    anamnesis = Column(Text)
-    drugs = Column(Text)
     parsing_model = Column(String)
     clinical_model = Column(String)
     total_duration = Column(Float)
-    final_report = Column(Text)
-    __table_args__ = (UniqueConstraint("id"),)
+    sections = relationship("ClinicalSessionSection", back_populates="session")
+    labs = relationship("ClinicalSessionLab", back_populates="session")
+    drugs = relationship("ClinicalSessionDrug", back_populates="session")
+    __table_args__ = (Index("ix_clinical_sessions_timestamp", "session_timestamp"),)
+
 
 ###############################################################################
-class LiverToxData(Base):
-    __tablename__ = "LIVERTOX_DATA"
-    drug_name = Column(String, primary_key=True)
-    nbk_id = Column(String)
+class Drug(Base):
+    __tablename__ = "drugs"
+    id = Column(Integer, primary_key=True, autoincrement=True)
+    canonical_name = Column(Text, nullable=False)
+    canonical_name_norm = Column(String, nullable=False)
+    rxnorm_rxcui = Column(String, nullable=True)
+    livertox_nbk_id = Column(String, nullable=True)
+    aliases = relationship("DrugAlias", back_populates="drug")
+    monograph = relationship("LiverToxMonograph", back_populates="drug", uselist=False)
+    session_drugs = relationship("ClinicalSessionDrug", back_populates="drug")
+    __table_args__ = (
+        UniqueConstraint("canonical_name_norm", name="uq_drugs_canonical_name_norm"),
+        UniqueConstraint("rxnorm_rxcui", name="uq_drugs_rxnorm_rxcui"),
+        UniqueConstraint("livertox_nbk_id", name="uq_drugs_livertox_nbk_id"),
+        Index("ix_drugs_rxnorm_rxcui", "rxnorm_rxcui"),
+        Index("ix_drugs_livertox_nbk_id", "livertox_nbk_id"),
+    )
+
+
+###############################################################################
+class DrugAlias(Base):
+    __tablename__ = "drug_aliases"
+    id = Column(Integer, primary_key=True, autoincrement=True)
+    drug_id = Column(Integer, ForeignKey("drugs.id"), nullable=False)
+    alias = Column(Text, nullable=False)
+    alias_norm = Column(String, nullable=False)
+    alias_kind = Column(String, nullable=False)
+    source = Column(String, nullable=False)
+    term_type = Column(String, nullable=True)
+    drug = relationship("Drug", back_populates="aliases")
+    __table_args__ = (
+        UniqueConstraint(
+            "drug_id",
+            "alias_norm",
+            "alias_kind",
+            "source",
+            name="uq_drug_aliases_identity",
+        ),
+        Index("ix_drug_aliases_alias_norm_source", "alias_norm", "source"),
+        Index("ix_drug_aliases_drug_id", "drug_id"),
+    )
+
+
+###############################################################################
+class LiverToxMonograph(Base):
+    __tablename__ = "livertox_monographs"
+    id = Column(Integer, primary_key=True, autoincrement=True)
+    drug_id = Column(Integer, ForeignKey("drugs.id"), nullable=False, unique=True)
     excerpt = Column(Text)
     likelihood_score = Column(String)
     last_update = Column(String)
-    reference_count = Column(String)
-    year_approved = Column(String)
+    reference_count = Column(Integer)
+    year_approved = Column(Integer)
     agent_classification = Column(String)
     primary_classification = Column(String)
     secondary_classification = Column(String)
-    include_in_livertox = Column(String)
+    include_in_livertox = Column(Boolean)
     source_url = Column(String)
     source_last_modified = Column(String)
-    __table_args__ = (UniqueConstraint("drug_name"),)
+    drug = relationship("Drug", back_populates="monograph")
+    __table_args__ = (
+        UniqueConstraint("drug_id", name="uq_livertox_monographs_drug_id"),
+        Index("ix_livertox_monographs_drug_id", "drug_id"),
+    )
 
 
 ###############################################################################
-class DrugsCatalog(Base):
-    __tablename__ = "DRUGS_CATALOG"
-    rxcui = Column(String, primary_key=True)
-    raw_name = Column(Text, primary_key=True)
-    term_type = Column(String)
-    name = Column(String)
-    brand_names = Column(Text)
-    synonyms = Column(Text)
-    __table_args__ = (UniqueConstraint("rxcui", "raw_name"),)
+class ClinicalSessionSection(Base):
+    __tablename__ = "clinical_session_sections"
+    id = Column(Integer, primary_key=True, autoincrement=True)
+    session_id = Column(Integer, ForeignKey("clinical_sessions.id"), nullable=False)
+    section_kind = Column(String, nullable=False)
+    content = Column(Text, nullable=False)
+    session = relationship("ClinicalSession", back_populates="sections")
+    __table_args__ = (
+        UniqueConstraint(
+            "session_id",
+            "section_kind",
+            name="uq_clinical_session_sections_identity",
+        ),
+        Index("ix_clinical_session_sections_session_id", "session_id"),
+    )
+
+
+###############################################################################
+class ClinicalSessionLab(Base):
+    __tablename__ = "clinical_session_labs"
+    id = Column(Integer, primary_key=True, autoincrement=True)
+    session_id = Column(Integer, ForeignKey("clinical_sessions.id"), nullable=False)
+    lab_code = Column(String, nullable=False)
+    value_raw = Column(String)
+    upper_limit_raw = Column(String)
+    session = relationship("ClinicalSession", back_populates="labs")
+    __table_args__ = (
+        UniqueConstraint(
+            "session_id",
+            "lab_code",
+            name="uq_clinical_session_labs_identity",
+        ),
+        Index("ix_clinical_session_labs_session_id", "session_id"),
+    )
+
+
+###############################################################################
+class ClinicalSessionDrug(Base):
+    __tablename__ = "clinical_session_drugs"
+    id = Column(Integer, primary_key=True, autoincrement=True)
+    session_id = Column(Integer, ForeignKey("clinical_sessions.id"), nullable=False)
+    raw_drug_name = Column(Text, nullable=False)
+    raw_drug_name_norm = Column(String, nullable=False)
+    drug_id = Column(Integer, ForeignKey("drugs.id"), nullable=True)
+    match_confidence = Column(Float)
+    match_reason = Column(String)
+    match_notes = Column(Text)
+    session = relationship("ClinicalSession", back_populates="drugs")
+    drug = relationship("Drug", back_populates="session_drugs")
+    __table_args__ = (
+        UniqueConstraint(
+            "session_id",
+            "raw_drug_name_norm",
+            name="uq_clinical_session_drugs_identity",
+        ),
+        Index("ix_clinical_session_drugs_session_id", "session_id"),
+        Index("ix_clinical_session_drugs_drug_id", "drug_id"),
+        Index("ix_clinical_session_drugs_raw_drug_name_norm", "raw_drug_name_norm"),
+    )

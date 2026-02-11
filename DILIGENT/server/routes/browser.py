@@ -7,8 +7,8 @@ from DILIGENT.server.configurations import server_settings
 from DILIGENT.server.repositories.queries.data import DataRepositoryQueries
 from DILIGENT.server.repositories.schemas.models import (
     ClinicalSession,
-    DrugsCatalog,
-    LiverToxData,
+    Drug,
+    LiverToxMonograph,
 )
 from DILIGENT.server.utils.logger import logger
 
@@ -33,8 +33,8 @@ class TableDataResponse(BaseModel):
 
 TABLE_MAPPING = {
     "sessions": ClinicalSession.__tablename__,
-    "livertox": LiverToxData.__tablename__,
-    "drugs": DrugsCatalog.__tablename__,
+    "livertox": LiverToxMonograph.__tablename__,
+    "drugs": Drug.__tablename__,
 }
 
 

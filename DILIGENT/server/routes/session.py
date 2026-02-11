@@ -349,6 +349,44 @@ class ClinicalSessionEndpoint:
         )
 
         detected_drugs = [entry.name for entry in drug_data.entries if entry.name]
+        resolved_drug_map: dict[str, dict[str, Any]] = {}
+        if prepared_inputs is not None:
+            for key, value in prepared_inputs.resolved_drugs.items():
+                normalized_key = key.strip().casefold()
+                if normalized_key:
+                    resolved_drug_map[normalized_key] = value
+        matched_drugs_payload: list[dict[str, Any]] = []
+        for detected_name in detected_drugs:
+            normalized_name = detected_name.strip().casefold()
+            resolved = resolved_drug_map.get(normalized_name, {})
+            matched_row = (
+                resolved.get("matched_livertox_row")
+                if isinstance(resolved, dict)
+                else None
+            )
+            matched_name = (
+                matched_row.get("drug_name")
+                if isinstance(matched_row, dict)
+                else None
+            )
+            matched_drugs_payload.append(
+                {
+                    "raw_drug_name": detected_name,
+                    "matched_drug_name": matched_name,
+                    "nbk_id": matched_row.get("nbk_id")
+                    if isinstance(matched_row, dict)
+                    else None,
+                    "match_confidence": resolved.get("match_confidence")
+                    if isinstance(resolved, dict)
+                    else None,
+                    "match_reason": resolved.get("match_reason")
+                    if isinstance(resolved, dict)
+                    else None,
+                    "match_notes": resolved.get("match_notes")
+                    if isinstance(resolved, dict)
+                    else [],
+                }
+            )
         pattern_strings = self.pattern_analyzer.stringify_scores(pattern_score)
         await asyncio.to_thread(
             self.serializer.save_clinical_session,
@@ -366,6 +404,8 @@ class ClinicalSessionEndpoint:
                 "clinical_model": getattr(clinical_session, "llm_model", None),
                 "total_duration": global_elapsed,
                 "final_report": final_report,
+                "detected_drugs": detected_drugs,
+                "matched_drugs": matched_drugs_payload,
             },
         )
 

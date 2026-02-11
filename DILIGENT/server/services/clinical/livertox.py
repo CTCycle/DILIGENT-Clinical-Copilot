@@ -173,6 +173,9 @@ class LiverToxData:
                     "drug_name": original,
                     "matched_livertox_row": row_data,
                     "extracted_excerpts": unique_excerpts,
+                    "match_confidence": match.confidence if match is not None else None,
+                    "match_reason": match.reason if match is not None else None,
+                    "match_notes": list(match.notes) if match is not None else [],
                 }
             )
         return entries
