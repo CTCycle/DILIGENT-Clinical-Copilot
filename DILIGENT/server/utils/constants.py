@@ -73,23 +73,15 @@ CLOUD_MODEL_CHOICES: dict[str, list[str]] = {
 
 # [DATA SERIALIZATION]
 ###############################################################################
-CLINICAL_SESSION_COLUMNS = [
-    "patient_name",
-    "session_timestamp",
-    "alt_value",
-    "alt_upper_limit",
-    "alp_value",
-    "alp_upper_limit",
-    "hepatic_pattern",
-    "anamnesis",
-    "drugs",
-    "parsing_model",
-    "clinical_model",
-    "total_duration",
-    "final_report",
-]
+TABLE_CLINICAL_SESSIONS = "clinical_sessions"
+TABLE_CLINICAL_SESSION_SECTIONS = "clinical_session_sections"
+TABLE_CLINICAL_SESSION_LABS = "clinical_session_labs"
+TABLE_CLINICAL_SESSION_DRUGS = "clinical_session_drugs"
+TABLE_DRUGS = "drugs"
+TABLE_DRUG_ALIASES = "drug_aliases"
+TABLE_LIVERTOX_MONOGRAPHS = "livertox_monographs"
 
-DRUGS_CATALOG_COLUMNS = [
+RXNORM_CATALOG_COLUMNS = [
     "rxcui",
     "raw_name",
     "term_type",
@@ -109,6 +101,9 @@ LIVERTOX_OPTIONAL_COLUMNS = {"nbk_id", "synonyms"}
 LIVERTOX_COLUMNS = [
     "drug_name",
     "nbk_id",
+    "ingredient",
+    "brand_name",
+    "synonyms",
     "excerpt",
     "likelihood_score",
     "last_update",

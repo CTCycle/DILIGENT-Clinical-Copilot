@@ -626,7 +626,7 @@ class RxNavDrugCatalogBuilder:
     RETRY_STATUS = {429, 500, 502, 503, 504}
     TIMEOUT = 30.0
     BACKOFF_TIME = (0.8, 1.6, 3.2)
-    TABLE_NAME = "DRUGS_CATALOG"
+    TABLE_NAME = "drug_aliases"
     BATCH_SIZE = 200
     SYNONYM_WORKERS = 12
     TOKEN_SPLIT_PATTERN = re.compile(r"[^A-Za-z0-9']+")

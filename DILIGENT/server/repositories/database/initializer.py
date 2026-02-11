@@ -13,7 +13,6 @@ from DILIGENT.server.repositories.schemas.models import Base
 from DILIGENT.server.utils.logger import logger
 
 
-###############################################################################
 def build_postgres_connect_args(settings: DatabaseSettings) -> dict[str, str | int]:
     connect_args: dict[str, str | int] = {"connect_timeout": settings.connect_timeout}
     if settings.ssl:
@@ -59,8 +58,9 @@ def clone_settings_with_database(
 
 # -----------------------------------------------------------------------------
 def initialize_sqlite_database(settings: DatabaseSettings) -> None:
-    repository = SQLiteRepository(settings)    
-    logger.info("Initialized SQLite database at %s", repository.db_path)
+    repository = SQLiteRepository(settings)
+    Base.metadata.create_all(repository.engine)
+    logger.info("Initialized SQLite database schema at %s", repository.db_path)
 
 
 # -----------------------------------------------------------------------------
