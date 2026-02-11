@@ -776,8 +776,8 @@ class LiverToxUpdater:
         sanitized["excerpt"] = sanitized["excerpt"].astype(str).str.strip()
         sanitized.loc[
             sanitized["excerpt"].isin(["", "nan", "None", "NaT"]), "excerpt"
-        ] = "Not available"
-        sanitized.loc[sanitized["excerpt"].isna(), "excerpt"] = "Not available"
+        ] = pd.NA
+        sanitized.loc[sanitized["excerpt"].isna(), "excerpt"] = pd.NA
 
         sanitized = sanitized.drop_duplicates(
             subset=["drug_name", "ingredient", "brand_name"], keep="first"
@@ -1050,30 +1050,27 @@ class LiverToxUpdater:
         if frame.empty:
             return frame.copy()
         finalized = self.sanitize_unified_dataset(frame)
-        fill_value = "Not available"
         for column in finalized.columns:
             if column == "drug_name":
                 continue
-            finalized[column] = finalized[column].where(
-                pd.notnull(finalized[column]), fill_value
-            )
+            finalized[column] = finalized[column].where(pd.notnull(finalized[column]), pd.NA)
             finalized[column] = finalized[column].astype(str).str.strip()
             finalized.loc[
                 finalized[column].isin(["", "nan", "NaT", "None", "<NA>"]), column
-            ] = fill_value
+            ] = pd.NA
         finalized["synonyms"] = finalized["synonyms"].apply(
             lambda value: (
                 value.strip()
                 if isinstance(value, str)
                 and value.strip()
                 and value.strip().lower() not in {"<na>", "nan", "nat", "none"}
-                else fill_value
+                else pd.NA
             )
         )
         finalized["excerpt"] = finalized["excerpt"].astype(str).str.strip()
         finalized.loc[
             finalized["excerpt"].isin(["", "nan", "NaT", "None", "<NA>"]), "excerpt"
-        ] = fill_value
+        ] = pd.NA
         return finalized.reset_index(drop=True)
 
 
