@@ -11,14 +11,6 @@ const AgentIcon = () => (
     </svg>
 );
 
-const DatabaseIcon = () => (
-    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-        <ellipse cx="12" cy="5" rx="9" ry="3" />
-        <path d="M21 12c0 1.66-4 3-9 3s-9-1.34-9-3" />
-        <path d="M3 5v14c0 1.66 4 3 9 3s9-1.34 9-3V5" />
-    </svg>
-);
-
 const SettingsIcon = () => (
     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
         <circle cx="12" cy="12" r="3" />
@@ -63,7 +55,6 @@ export function NavSidebar({ onOpenConfigModal }: NavSidebarProps): React.JSX.El
 
     const navItems: { pageId: PageId; icon: React.ReactNode; label: string }[] = [
         { pageId: "dili-agent", icon: <AgentIcon />, label: "DILI Agent" },
-        { pageId: "database-browser", icon: <DatabaseIcon />, label: "Database Browser" },
     ];
 
     return (

@@ -26,4 +26,3 @@ def test_openapi_contains_core_routes(api_context: APIRequestContext):
     paths = payload.get("paths", {})
     assert "/clinical" in paths
     assert "/models/list" in paths
-    assert "/browser/sessions" in paths
