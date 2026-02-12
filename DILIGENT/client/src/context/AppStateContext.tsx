@@ -9,22 +9,7 @@ import { resolveCloudSelection } from "../utils";
 // ---------------------------------------------------------------------------
 // Types
 // ---------------------------------------------------------------------------
-export type PageId = "dili-agent" | "database-browser";
-
-export type TableId = "sessions" | "livertox" | "drugs";
-
-export interface TableData {
-    columns: string[];
-    rows: Record<string, unknown>[];
-    totalRows: number;
-    hasMore: boolean;
-}
-
-export interface TableCache {
-    sessions: TableData | null;
-    livertox: TableData | null;
-    drugs: TableData | null;
-}
+export type PageId = "dili-agent";
 
 export interface DiluAgentState {
     settings: RuntimeSettings;
@@ -41,27 +26,15 @@ export interface DiluAgentState {
     isExpanded: boolean;
 }
 
-export interface DatabaseBrowserState {
-    selectedTable: TableId;
-    tableCache: TableCache;
-    isLoading: boolean;
-    isLoadingMore: boolean;
-    hasUserTriggeredFetch: boolean;
-}
-
 export interface AppState {
     activePage: PageId;
     diluAgent: DiluAgentState;
-    databaseBrowser: DatabaseBrowserState;
 }
 
 interface AppStateContextValue {
     state: AppState;
     setActivePage: (page: PageId) => void;
     updateDiluAgent: (updates: Partial<DiluAgentState>) => void;
-    updateDatabaseBrowser: (updates: Partial<DatabaseBrowserState>) => void;
-    setTableData: (tableId: TableId, data: TableData) => void;
-    appendTableData: (tableId: TableId, newRows: Record<string, unknown>[], hasMore: boolean) => void;
 }
 
 // ---------------------------------------------------------------------------
@@ -90,22 +63,9 @@ const DEFAULT_DILU_AGENT_STATE: DiluAgentState = {
     isExpanded: false,
 };
 
-const DEFAULT_DATABASE_BROWSER_STATE: DatabaseBrowserState = {
-    selectedTable: "sessions",
-    tableCache: {
-        sessions: null,
-        livertox: null,
-        drugs: null,
-    },
-    isLoading: false,
-    isLoadingMore: false,
-    hasUserTriggeredFetch: false,
-};
-
 const DEFAULT_APP_STATE: AppState = {
     activePage: "dili-agent",
     diluAgent: DEFAULT_DILU_AGENT_STATE,
-    databaseBrowser: DEFAULT_DATABASE_BROWSER_STATE,
 };
 
 // ---------------------------------------------------------------------------
@@ -142,60 +102,13 @@ export function AppStateProvider({ children }: AppStateProviderProps): React.JSX
         }));
     }, []);
 
-    const updateDatabaseBrowser = useCallback((updates: Partial<DatabaseBrowserState>) => {
-        setState((prev) => ({
-            ...prev,
-            databaseBrowser: { ...prev.databaseBrowser, ...updates },
-        }));
-    }, []);
-
-    const setTableData = useCallback((tableId: TableId, data: TableData) => {
-        setState((prev) => ({
-            ...prev,
-            databaseBrowser: {
-                ...prev.databaseBrowser,
-                tableCache: {
-                    ...prev.databaseBrowser.tableCache,
-                    [tableId]: data,
-                },
-            },
-        }));
-    }, []);
-
-    const appendTableData = useCallback(
-        (tableId: TableId, newRows: Record<string, unknown>[], hasMore: boolean) => {
-            setState((prev) => {
-                const existing = prev.databaseBrowser.tableCache[tableId];
-                if (!existing) return prev;
-                return {
-                    ...prev,
-                    databaseBrowser: {
-                        ...prev.databaseBrowser,
-                        tableCache: {
-                            ...prev.databaseBrowser.tableCache,
-                            [tableId]: {
-                                ...existing,
-                                rows: [...existing.rows, ...newRows],
-                                hasMore,
-                            },
-                        },
-                    },
-                };
-            });
-        },
-        [],
-    );
-
     const value = useMemo<AppStateContextValue>(
         () => ({
             state,
             setActivePage,
             updateDiluAgent,
-            updateDatabaseBrowser,
-            setTableData,
-            appendTableData,
         }),
-        [state, setActivePage, updateDiluAgent, updateDatabaseBrowser, setTableData, appendTableData],
+        [state, setActivePage, updateDiluAgent],
     );
 
     return (

@@ -9,7 +9,6 @@ from fastapi.responses import RedirectResponse
 from DILIGENT.server.utils.variables import env_variables
 from DILIGENT.server.routes.session import router as session_router
 from DILIGENT.server.routes.ollama import router as ollama_router
-from DILIGENT.server.routes.browser import router as browser_router
 from DILIGENT.server.configurations import server_settings
 
 
@@ -22,7 +21,6 @@ app = FastAPI(
 
 app.include_router(session_router)
 app.include_router(ollama_router)
-app.include_router(browser_router)
 
 @app.get("/")
 def redirect_to_docs() -> RedirectResponse:

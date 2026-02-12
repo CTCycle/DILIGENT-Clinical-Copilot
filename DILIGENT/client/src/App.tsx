@@ -2,7 +2,6 @@ import React, { useState } from "react";
 import { AppStateProvider, useAppState } from "./context/AppStateContext";
 import { NavSidebar } from "./components/NavSidebar";
 import { DiluAgentPage } from "./pages/DiluAgentPage";
-import { DatabaseBrowserPage } from "./pages/DatabaseBrowserPage";
 
 // ---------------------------------------------------------------------------
 // AppContent - Renders the active page
@@ -21,7 +20,6 @@ function AppContent(): React.JSX.Element {
             onCloseConfigModal={() => setConfigModalOpen(false)}
           />
         )}
-        {state.activePage === "database-browser" && <DatabaseBrowserPage />}
       </div>
     </div>
   );

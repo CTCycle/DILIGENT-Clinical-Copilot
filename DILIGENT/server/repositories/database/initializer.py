@@ -52,7 +52,6 @@ def clone_settings_with_database(
         insert_batch_size=settings.insert_batch_size,
         insert_commit_interval=settings.insert_commit_interval,
         select_page_size=settings.select_page_size,
-        browser_page_size=settings.browser_page_size,
     )
 
 
