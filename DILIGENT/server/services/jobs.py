@@ -104,8 +104,12 @@ class JobManager:
             return False
         if state.status not in ("pending", "running"):
             return False
-        state.update(stop_requested=True, status="cancelled", completed_at=monotonic())
-        logger.info("Cancelled job %s", job_id)
+        if state.status == "pending":
+            state.update(stop_requested=True, status="cancelled", completed_at=monotonic())
+            logger.info("Cancelled pending job %s", job_id)
+            return True
+        state.update(stop_requested=True)
+        logger.info("Cancellation requested for job %s", job_id)
         return True
 
     # -------------------------------------------------------------------------
@@ -164,6 +168,10 @@ class JobManager:
         with self.lock:
             state = self.jobs.get(job_id)
         if state is None:
+            return
+        if state.stop_requested:
+            state.update(status="cancelled", completed_at=monotonic())
+            logger.info("Job %s cancelled before execution", job_id)
             return
 
         try:
