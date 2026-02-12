@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useRef, useState } from "react";
+import React, { useEffect, useMemo, useRef } from "react";
 import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
 
@@ -54,17 +54,18 @@ const DownloadIcon = () => (
     </svg>
 );
 
-const SettingsIcon = () => (
-    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-        <circle cx="12" cy="12" r="3" />
-        <path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z" />
-    </svg>
-);
-
 // ---------------------------------------------------------------------------
 // DiluAgentPage
 // ---------------------------------------------------------------------------
-export function DiluAgentPage(): React.JSX.Element {
+interface DiluAgentPageProps {
+    configModalOpen: boolean;
+    onCloseConfigModal: () => void;
+}
+
+export function DiluAgentPage({
+    configModalOpen,
+    onCloseConfigModal,
+}: DiluAgentPageProps): React.JSX.Element {
     const { state, updateDiluAgent } = useAppState();
     const {
         settings,
@@ -79,7 +80,6 @@ export function DiluAgentPage(): React.JSX.Element {
         isExpanded,
     } = state.diluAgent;
 
-    const [configModalOpen, setConfigModalOpen] = useState(false);
     const pollerRef = useRef<{ stop: () => void } | null>(null);
 
     const cloudEnabled = settings.useCloudServices;
@@ -348,7 +348,7 @@ export function DiluAgentPage(): React.JSX.Element {
     return (
         <>
             {/* Config Modal */}
-            <ConfigModal isOpen={configModalOpen} onClose={() => setConfigModalOpen(false)}>
+            <ConfigModal isOpen={configModalOpen} onClose={onCloseConfigModal}>
                 {/* Group 1: Execution Mode */}
                 <div className="modal-section">
                     <p className="modal-section-title">Execution Mode</p>
@@ -482,13 +482,12 @@ export function DiluAgentPage(): React.JSX.Element {
                     {/* Clinical Inputs Column */}
                     <section className="card clinical-inputs">
                         <div className="card-header">
-                            <h2>Clinical Inputs</h2>
-                            <p className="helper">Describe the clinical picture and therapies for this visit.</p>
+                            <h2>Clinical Context</h2>
+                            <p className="helper">Summarize history, current therapy, and key liver labs for this visit.</p>
                         </div>
 
                         {/* Section 1: Clinical Context */}
                         <div className="clinical-section">
-                            <p className="section-title">Clinical context</p>
                             <div className="field">
                                 <label className="field-label" htmlFor="anamnesis">Anamnesis</label>
                                 <textarea
@@ -516,48 +515,74 @@ export function DiluAgentPage(): React.JSX.Element {
                         {/* Section 2: Lab Values */}
                         <div className="clinical-section">
                             <p className="section-title">Lab values</p>
-                            <div className="lab-grid">
-                                <div className="field">
-                                    <label className="field-label" htmlFor="alt">ALT (U/L)</label>
-                                    <input
-                                        id="alt"
-                                        type="text"
-                                        placeholder="189"
-                                        value={form.alt}
-                                        onChange={(e) => handleFormChange("alt", e.target.value)}
-                                    />
+                            <div className="lab-layout">
+                                <div className="lab-widget">
+                                    <div className="lab-row">
+                                        <div className="field compact-field">
+                                            <label className="field-label" htmlFor="alt">ALT (U/L)</label>
+                                            <input
+                                                id="alt"
+                                                type="text"
+                                                placeholder="189"
+                                                value={form.alt}
+                                                onChange={(e) => handleFormChange("alt", e.target.value)}
+                                            />
+                                        </div>
+                                        <div className="field compact-field">
+                                            <label className="field-label" htmlFor="alt-max">ALT Max (U/L)</label>
+                                            <input
+                                                id="alt-max"
+                                                type="text"
+                                                placeholder="47"
+                                                value={form.altMax}
+                                                onChange={(e) => handleFormChange("altMax", e.target.value)}
+                                            />
+                                            <span className="field-helper">Upper limit of normal</span>
+                                        </div>
+                                    </div>
+                                    <div className="lab-row">
+                                        <div className="field compact-field">
+                                            <label className="field-label" htmlFor="alp">ALP (U/L)</label>
+                                            <input
+                                                id="alp"
+                                                type="text"
+                                                placeholder="140"
+                                                value={form.alp}
+                                                onChange={(e) => handleFormChange("alp", e.target.value)}
+                                            />
+                                        </div>
+                                        <div className="field compact-field">
+                                            <label className="field-label" htmlFor="alp-max">ALP Max (U/L)</label>
+                                            <input
+                                                id="alp-max"
+                                                type="text"
+                                                placeholder="150"
+                                                value={form.alpMax}
+                                                onChange={(e) => handleFormChange("alpMax", e.target.value)}
+                                            />
+                                            <span className="field-helper">Upper limit of normal</span>
+                                        </div>
+                                    </div>
                                 </div>
-                                <div className="field">
-                                    <label className="field-label" htmlFor="alt-max">ALT Max (U/L)</label>
-                                    <input
-                                        id="alt-max"
-                                        type="text"
-                                        placeholder="47"
-                                        value={form.altMax}
-                                        onChange={(e) => handleFormChange("altMax", e.target.value)}
-                                    />
-                                    <span className="field-helper">Upper limit of normal</span>
-                                </div>
-                                <div className="field">
-                                    <label className="field-label" htmlFor="alp">ALP (U/L)</label>
-                                    <input
-                                        id="alp"
-                                        type="text"
-                                        placeholder="140"
-                                        value={form.alp}
-                                        onChange={(e) => handleFormChange("alp", e.target.value)}
-                                    />
-                                </div>
-                                <div className="field">
-                                    <label className="field-label" htmlFor="alp-max">ALP Max (U/L)</label>
-                                    <input
-                                        id="alp-max"
-                                        type="text"
-                                        placeholder="150"
-                                        value={form.alpMax}
-                                        onChange={(e) => handleFormChange("alpMax", e.target.value)}
-                                    />
-                                    <span className="field-helper">Upper limit of normal</span>
+                                <div className="lab-controls-panel">
+                                    <div className="advanced-options">
+                                        <p className="advanced-options-header">Evidence Retrieval</p>
+                                        <div className="toggle-row">
+                                            <span className="toggle-label">Enable RAG for supporting evidence</span>
+                                            <label className="toggle-switch">
+                                                <input
+                                                    type="checkbox"
+                                                    id="use-rag"
+                                                    checked={form.useRag}
+                                                    onChange={(e) => handleFormChange("useRag", e.target.checked)}
+                                                />
+                                                <span className="toggle-track" aria-hidden="true">
+                                                    <span className="toggle-thumb" />
+                                                </span>
+                                            </label>
+                                        </div>
+                                    </div>
+                                    <div className="lab-controls-future" aria-hidden="true" />
                                 </div>
                             </div>
                         </div>
@@ -568,25 +593,6 @@ export function DiluAgentPage(): React.JSX.Element {
                         <div className="card-header">
                             <h2>Patient Information</h2>
                             <p className="helper">Basic demographics and visit data.</p>
-                        </div>
-
-                        {/* Advanced Options Block */}
-                        <div className="advanced-options">
-                            <p className="advanced-options-header">Evidence Retrieval</p>
-                            <div className="toggle-row">
-                                <span className="toggle-label">Enable RAG for supporting evidence</span>
-                                <label className="toggle-switch">
-                                    <input
-                                        type="checkbox"
-                                        id="use-rag"
-                                        checked={form.useRag}
-                                        onChange={(e) => handleFormChange("useRag", e.target.checked)}
-                                    />
-                                    <span className="toggle-track" aria-hidden="true">
-                                        <span className="toggle-thumb" />
-                                    </span>
-                                </label>
-                            </div>
                         </div>
 
                         {/* Basic Fields */}
@@ -632,14 +638,6 @@ export function DiluAgentPage(): React.JSX.Element {
                             </button>
                             <button className="btn btn-tertiary" type="button" onClick={handleClear}>
                                 Clear all
-                            </button>
-                            <button
-                                className="btn btn-secondary config-trigger"
-                                type="button"
-                                onClick={() => setConfigModalOpen(true)}
-                            >
-                                <SettingsIcon />
-                                <span>Model Configurations</span>
                             </button>
                         </div>
                     </section>
