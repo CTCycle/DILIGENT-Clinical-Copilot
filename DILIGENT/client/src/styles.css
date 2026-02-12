@@ -79,14 +79,13 @@ body {
    App Shell & Layout
    ============================================ */
 .app-shell {
-  display: flex;
   min-height: 100vh;
 }
 
 .page-container {
   width: 100%;
-  max-width: var(--container-max);
-  margin: 0 auto;
+  max-width: none;
+  margin: 0;
   padding: var(--space-2xl) var(--space-xl) var(--space-3xl);
 }
 
@@ -304,17 +303,60 @@ body {
   cursor: pointer;
 }
 
-/* Lab Values Grid */
-.lab-grid {
+/* Lab Values Layout */
+.lab-layout {
   display: grid;
-  grid-template-columns: repeat(2, 1fr);
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: var(--space-lg);
+}
+
+.lab-widget {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-sm);
+}
+
+.lab-row {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: var(--space-sm);
+}
+
+.compact-field {
+  margin-bottom: 0;
+}
+
+.compact-field .field-label {
+  font-size: var(--font-xs);
+}
+
+.compact-field input[type="text"] {
+  min-height: 34px;
+  padding: 8px 10px;
+  font-size: var(--font-sm);
+}
+
+.compact-field .field-helper {
+  font-size: 10px;
+}
+
+.lab-controls-panel {
+  border-left: 1px solid var(--color-divider);
+  padding-left: var(--space-lg);
+  display: flex;
+  flex-direction: column;
   gap: var(--space-md);
 }
 
-@media (max-width: 480px) {
-  .lab-grid {
-    grid-template-columns: 1fr;
-  }
+.lab-controls-panel .advanced-options {
+  margin-bottom: 0;
+}
+
+.lab-controls-future {
+  min-height: 120px;
+  border-radius: var(--radius-md);
+  border: 1px dashed rgba(148, 163, 184, 0.45);
+  background: rgba(248, 250, 252, 0.6);
 }
 
 /* ============================================
@@ -935,7 +977,7 @@ input[type="date"]::-webkit-calendar-picker-indicator:hover {
   left: 0;
   top: 0;
   bottom: 0;
-  width: 80px;
+  width: 104px;
   background: linear-gradient(180deg, #0f172a 0%, #1e293b 100%);
   border-right: 1px solid rgba(255, 255, 255, 0.08);
   display: flex;
@@ -965,16 +1007,23 @@ input[type="date"]::-webkit-calendar-picker-indicator:hover {
   flex: 1;
   display: flex;
   flex-direction: column;
-  gap: var(--space-xs);
-  padding: var(--space-md) var(--space-sm);
+  align-items: center;
+  gap: var(--space-md);
+  padding: var(--space-lg) var(--space-sm);
+}
+
+.nav-footer {
+  display: flex;
+  justify-content: center;
+  padding: var(--space-md) var(--space-sm) var(--space-lg);
 }
 
 .nav-item {
   display: flex;
   align-items: center;
   justify-content: center;
-  width: 48px;
-  height: 48px;
+  width: 52px;
+  height: 52px;
   border: none;
   border-radius: var(--radius-md);
   background: transparent;
@@ -995,8 +1044,8 @@ input[type="date"]::-webkit-calendar-picker-indicator:hover {
 }
 
 .nav-icon {
-  width: 22px;
-  height: 22px;
+  width: 26px;
+  height: 26px;
 }
 
 .nav-icon svg {
@@ -1006,7 +1055,9 @@ input[type="date"]::-webkit-calendar-picker-indicator:hover {
 
 /* App Layout Adjustments */
 .app-main {
-  margin-left: 80px;
+  margin-left: 104px;
+  width: calc(100% - 104px);
+  max-width: none;
   min-height: 100vh;
 }
 
@@ -1130,25 +1181,6 @@ input[type="date"]::-webkit-calendar-picker-indicator:hover {
 }
 
 .modal-footer .btn {
-  width: 100%;
-}
-
-/* Config Trigger Button */
-.config-trigger {
-  display: inline-flex;
-  align-items: center;
-  gap: var(--space-sm);
-  margin-top: var(--space-md);
-  width: auto;
-}
-
-.config-trigger svg {
-  width: 18px;
-  height: 18px;
-}
-
-.action-stack .config-trigger {
-  margin-top: 0;
   width: 100%;
 }
 
@@ -1399,22 +1431,38 @@ input[type="date"]::-webkit-calendar-picker-indicator:hover {
 }
 
 @media (max-width: 768px) {
+  .lab-layout {
+    grid-template-columns: 1fr;
+  }
+
+  .lab-controls-panel {
+    border-left: none;
+    border-top: 1px solid var(--color-divider);
+    padding-left: 0;
+    padding-top: var(--space-md);
+  }
+
+  .lab-controls-future {
+    min-height: 96px;
+  }
+
   .nav-sidebar {
-    width: 64px;
+    width: 84px;
   }
 
   .app-main {
-    margin-left: 64px;
+    margin-left: 84px;
+    width: calc(100% - 84px);
   }
 
   .nav-item {
-    width: 40px;
-    height: 40px;
+    width: 46px;
+    height: 46px;
   }
 
   .nav-icon {
-    width: 18px;
-    height: 18px;
+    width: 22px;
+    height: 22px;
   }
 
   .nav-brand-letter {
