@@ -5,14 +5,18 @@ from typing import Any
 
 import pandas as pd
 import pytest
+from sqlalchemy import create_engine, select
+from sqlalchemy.orm import sessionmaker
 
 from DILIGENT.server.services.clinical.livertox import LiverToxData
-from DILIGENT.server.utils.constants import CLINICAL_SESSION_COLUMNS
 
 try:
     from DILIGENT.server.repositories.serialization.data import DataSerializer
+    from DILIGENT.server.repositories.schemas.models import Base, ClinicalSession
 except ModuleNotFoundError:
     DataSerializer = None  # type: ignore[assignment]
+    Base = None  # type: ignore[assignment]
+    ClinicalSession = None  # type: ignore[assignment]
 
 try:
     from DILIGENT.server.services.updater.livertox import LiverToxUpdater
@@ -22,21 +26,8 @@ except ModuleNotFoundError:
 
 ###############################################################################
 class QueryStub:
-    def __init__(self, existing: pd.DataFrame | None = None) -> None:
-        self.existing = existing if existing is not None else pd.DataFrame()
-        self.saved: pd.DataFrame | None = None
-
-    # -------------------------------------------------------------------------
-    def load_table(self, table_name: str) -> pd.DataFrame:
-        return self.existing.copy()
-
-    # -------------------------------------------------------------------------
-    def save_table(self, dataset: pd.DataFrame, table_name: str) -> None:
-        self.saved = dataset.copy()
-
-    # -------------------------------------------------------------------------
-    def upsert_table(self, dataset: pd.DataFrame, table_name: str) -> None:
-        self.saved = dataset.copy()
+    def __init__(self, engine: Any) -> None:
+        self.database = SimpleNamespace(backend=SimpleNamespace(engine=engine))
 
 
 ###############################################################################
@@ -59,9 +50,19 @@ class LookupStub:
 
 
 # -----------------------------------------------------------------------------
+def build_serializer() -> tuple[Any, Any]:
+    if DataSerializer is None or Base is None:
+        raise RuntimeError("Serialization dependencies are not available")
+    engine = create_engine("sqlite+pysqlite:///:memory:", future=True)
+    Base.metadata.create_all(engine)
+    serializer = DataSerializer(queries=QueryStub(engine))
+    return serializer, engine
+
+
+# -----------------------------------------------------------------------------
 @pytest.mark.skipif(DataSerializer is None, reason="Serialization optional dependencies missing")
 def test_normalize_date_uses_explicit_units_for_numeric_timestamps() -> None:
-    serializer = DataSerializer(queries=QueryStub())
+    serializer, _ = build_serializer()
     assert serializer.normalize_date("1735689600") == "2025-01-01"
     assert serializer.normalize_date("1735689600000") == "2025-01-01"
     assert serializer.normalize_date("20250101") == "2025-01-01"
@@ -70,20 +71,31 @@ def test_normalize_date_uses_explicit_units_for_numeric_timestamps() -> None:
 # -----------------------------------------------------------------------------
 @pytest.mark.skipif(DataSerializer is None, reason="Serialization optional dependencies missing")
 def test_save_clinical_session_preserves_row_append_order() -> None:
-    key_column = CLINICAL_SESSION_COLUMNS[0]
-    existing_row = {column: None for column in CLINICAL_SESSION_COLUMNS}
-    existing_row[key_column] = "existing"
-    existing = pd.DataFrame([existing_row], columns=CLINICAL_SESSION_COLUMNS)
-    query_stub = QueryStub(existing=existing)
-    serializer = DataSerializer(queries=query_stub)
+    serializer, engine = build_serializer()
+    serializer.save_clinical_session(
+        {
+            "patient_name": "existing",
+            "session_timestamp": "2025-01-01T00:00:00",
+        }
+    )
+    serializer.save_clinical_session(
+        {
+            "patient_name": "incoming",
+            "session_timestamp": "2025-01-02T00:00:00",
+        }
+    )
 
-    serializer.save_clinical_session({key_column: "incoming"})
+    factory = sessionmaker(bind=engine, future=True)
+    with factory() as db_session:
+        rows = (
+            db_session.execute(select(ClinicalSession).order_by(ClinicalSession.id))
+            .scalars()
+            .all()
+        )
 
-    assert query_stub.saved is not None
-    saved = query_stub.saved
-    assert list(saved.columns) == CLINICAL_SESSION_COLUMNS
-    assert saved.iloc[0][key_column] == "existing"
-    assert saved.iloc[1][key_column] == "incoming"
+    assert len(rows) == 2
+    assert rows[0].patient_name == "existing"
+    assert rows[1].patient_name == "incoming"
 
 
 # -----------------------------------------------------------------------------

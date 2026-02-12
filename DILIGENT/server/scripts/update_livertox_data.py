@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from DILIGENT.server.utils.constants import SOURCES_PATH
 from DILIGENT.server.utils.logger import logger
-from DILIGENT.server.utils.updater.livertox import LiverToxUpdater
+from DILIGENT.server.services.updater.livertox import LiverToxUpdater
 
 REDOWNLOAD = True
 
