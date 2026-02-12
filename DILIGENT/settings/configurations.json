@@ -21,7 +21,7 @@
     "insert_batch_size": 1000,
     "insert_commit_interval": 5,
     "select_page_size": 2000,
-    "browse_page_size": 1000
+    "browser_page_size": 1000
   },    
   "rag": {
     "vector_collection_name": "documents",

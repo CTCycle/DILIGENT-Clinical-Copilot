@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from DILIGENT.server.configurations import server_settings
 from DILIGENT.server.utils.logger import logger
-from DILIGENT.server.utils.updater.embeddings import RagEmbeddingUpdater
+from DILIGENT.server.services.updater.embeddings import RagEmbeddingUpdater
 
 
 ###############################################################################
