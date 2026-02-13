@@ -11,10 +11,9 @@ import re
 import shutil
 import sys
 from collections.abc import AsyncGenerator, Awaitable, Callable
-from typing import Any, Literal, NoReturn, TypeAlias, TypeVar, cast
+from typing import Any, Generic, Literal, NoReturn, TypeAlias, TypeVar
 
 import httpx
-from langchain_core.output_parsers import PydanticOutputParser
 from pydantic import BaseModel
 
 from DILIGENT.server.configurations import LLMRuntimeConfig, server_settings
@@ -32,6 +31,58 @@ GEMINI_API_KEY = env_variables.get("GEMINI_API_KEY")
 
 # Type variable for typed schema returns
 T = TypeVar("T", bound=BaseModel)
+
+
+###############################################################################
+def extract_first_json_dict(text: str) -> dict[str, Any] | None:
+    decoder = json.JSONDecoder()
+    for match in re.finditer(r"\{", text):
+        start = match.start()
+        try:
+            parsed, _ = decoder.raw_decode(text[start:])
+        except json.JSONDecodeError:
+            continue
+        if isinstance(parsed, dict):
+            return parsed
+    return None
+
+
+###############################################################################
+def parse_json_dict(obj_or_text: dict[str, Any] | str) -> dict[str, Any] | None:
+    if isinstance(obj_or_text, dict):
+        return obj_or_text
+    if not isinstance(obj_or_text, str) or not obj_or_text.strip():
+        return None
+    try:
+        loaded = json.loads(obj_or_text)
+        return loaded if isinstance(loaded, dict) else None
+    except json.JSONDecodeError:
+        return extract_first_json_dict(obj_or_text)
+
+
+###############################################################################
+class StructuredOutputParser(Generic[T]):
+    def __init__(self, *, schema: type[T]) -> None:
+        self.schema = schema
+
+    def get_format_instructions(self) -> str:
+        schema_json = json.dumps(
+            self.schema.model_json_schema(),
+            separators=(",", ":"),
+            ensure_ascii=True,
+        )
+        return (
+            "Return ONLY a valid JSON object that conforms to this JSON schema.\n"
+            "Do not include markdown, comments, or additional keys.\n"
+            f"JSON schema:\n{schema_json}"
+        )
+
+    def parse(self, text: str) -> T:
+        payload = parse_json_dict(text)
+        if payload is None:
+            raise ValueError("No JSON object found in model output")
+        return self.schema.model_validate(payload)
+
 
 ProviderName = Literal["openai", "azure-openai", "anthropic", "gemini"]
 RuntimePurpose = Literal["clinical", "parser"]
@@ -1100,7 +1151,7 @@ class OllamaClient:
     ) -> T:
         """
         Call your Ollama LLM and validate the response against a Pydantic schema
-        using LangChain's PydanticOutputParser.
+        using a local JSON-schema-guided parser.
 
         - Injects format instructions so the LLM knows to return the expected JSON.
         - Parses & validates. If invalid, makes up to `max_repair_attempts` repair calls.
@@ -1110,7 +1161,7 @@ class OllamaClient:
         across parsers by supplying different prompts/schemas.
 
         """
-        parser = PydanticOutputParser(pydantic_object=schema)
+        parser = StructuredOutputParser(schema=schema)
         format_instructions = parser.get_format_instructions()
         messages = self.build_structured_messages(
             system_prompt=system_prompt,
@@ -1227,7 +1278,7 @@ class OllamaClient:
     async def call_with_structured_models(
         self,
         *,
-        parser: PydanticOutputParser[T],
+        parser: StructuredOutputParser[T],
         messages: list[dict[str, str]],
         system_prompt: str,
         format_instructions: str,
@@ -1285,7 +1336,7 @@ class OllamaClient:
     async def parse_with_repairs(
         self,
         *,
-        parser: PydanticOutputParser[T],
+        parser: StructuredOutputParser[T],
         text: str,
         active_model: str,
         system_prompt: str,
@@ -1295,7 +1346,7 @@ class OllamaClient:
     ) -> T:
         for attempt in range(max_repair_attempts + 1):
             try:
-                return cast(T, parser.parse(text))
+                return parser.parse(text)
             except Exception as err:
                 if attempt >= max_repair_attempts:
                     logger.error(
@@ -1683,7 +1734,7 @@ class CloudLLMClient:
         use_json_mode: bool = True,
         max_repair_attempts: int = 2,
     ) -> T:
-        parser = PydanticOutputParser(pydantic_object=schema)
+        parser = StructuredOutputParser(schema=schema)
         format_instructions = parser.get_format_instructions()
 
         resolved_model = model or (self.default_model or "")
@@ -1751,7 +1802,7 @@ class CloudLLMClient:
     async def parse_with_repairs(
         self,
         *,
-        parser: PydanticOutputParser[T],
+        parser: StructuredOutputParser[T],
         text: str,
         model: str,
         system_prompt: str,
@@ -1761,7 +1812,7 @@ class CloudLLMClient:
     ) -> T:
         for attempt in range(max_repair_attempts + 1):
             try:
-                return cast(T, parser.parse(text))
+                return parser.parse(text)
             except Exception as err:
                 if attempt >= max_repair_attempts:
                     logger.error(

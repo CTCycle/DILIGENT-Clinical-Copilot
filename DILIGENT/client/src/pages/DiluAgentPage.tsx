@@ -3,27 +3,20 @@ import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
 
 import {
-    CLINICAL_MODEL_CHOICES,
-    CLOUD_MODEL_CHOICES,
-    CLOUD_PROVIDERS,
     DEFAULT_SETTINGS,
-    PARSING_MODEL_CHOICES,
     REPORT_EXPORT_FILENAME,
 } from "../constants";
 import { useAppState } from "../context/AppStateContext";
 import {
     pollClinicalJobStatus,
-    pullModels,
     startClinicalJob,
 } from "../services/api";
-import { RuntimeSettings } from "../types";
 import {
     buildClinicalPayload,
     createDownloadUrl,
     normalizeVisitDateInput,
     resolveCloudSelection,
 } from "../utils";
-import { ConfigModal } from "../components/ConfigModal";
 
 const todayIso = new Date().toISOString().slice(0, 10);
 
@@ -57,33 +50,20 @@ const DownloadIcon = () => (
 // ---------------------------------------------------------------------------
 // DiluAgentPage
 // ---------------------------------------------------------------------------
-interface DiluAgentPageProps {
-    configModalOpen: boolean;
-    onCloseConfigModal: () => void;
-}
-
-export function DiluAgentPage({
-    configModalOpen,
-    onCloseConfigModal,
-}: DiluAgentPageProps): React.JSX.Element {
+export function DiluAgentPage(): React.JSX.Element {
     const { state, updateDiluAgent } = useAppState();
     const {
         settings,
         form,
-        cloudSelection,
         message,
         jsonPayload,
         exportUrl,
         jobProgress,
         isRunning,
-        isPulling,
         isExpanded,
     } = state.diluAgent;
 
     const pollerRef = useRef<{ stop: () => void } | null>(null);
-
-    const cloudEnabled = settings.useCloudServices;
-    const pullDisabled = cloudEnabled || isPulling;
 
     // Cleanup export URL on unmount
     useEffect(() => {
@@ -113,42 +93,6 @@ export function DiluAgentPage({
             jobProgress: 0,
             jobStatus: null,
         });
-    };
-
-    const handleSettingsChange = (next: Partial<RuntimeSettings>) => {
-        const merged = { ...settings, ...next };
-        const selection = resolveCloudSelection(merged.provider, merged.cloudModel);
-        updateDiluAgent({
-            settings: {
-                ...merged,
-                provider: selection.provider || DEFAULT_SETTINGS.provider,
-                cloudModel: selection.model,
-            },
-            cloudSelection: { provider: selection.provider, model: selection.model },
-        });
-    };
-
-    const handleUseCloudChange = (value: boolean) => {
-        handleSettingsChange({ useCloudServices: value });
-    };
-
-    const handleProviderChange = (provider: string) => {
-        const selection = resolveCloudSelection(provider, settings.cloudModel);
-        updateDiluAgent({
-            cloudSelection: { provider: selection.provider, model: selection.model },
-        });
-        handleSettingsChange({
-            provider: selection.provider,
-            cloudModel: selection.model,
-        });
-    };
-
-    const handleCloudModelChange = (model: string) => {
-        const selection = resolveCloudSelection(settings.provider, model);
-        updateDiluAgent({
-            cloudSelection: { provider: selection.provider, model: selection.model },
-        });
-        handleSettingsChange({ cloudModel: selection.model });
     };
 
     const handleFormChange = <K extends keyof typeof form>(key: K, value: (typeof form)[K]) => {
@@ -257,18 +201,6 @@ export function DiluAgentPage({
         }
     };
 
-    const handlePullModels = async () => {
-        if (cloudEnabled) return;
-        updateDiluAgent({ isPulling: true });
-        resetOutputs();
-        try {
-            const result = await pullModels([settings.parsingModel, settings.clinicalModel]);
-            updateDiluAgent({ message: result.message, jsonPayload: result.json });
-        } finally {
-            updateDiluAgent({ isPulling: false });
-        }
-    };
-
     const handleClear = () => {
         if (exportUrl) {
             URL.revokeObjectURL(exportUrl);
@@ -347,128 +279,6 @@ export function DiluAgentPage({
 
     return (
         <>
-            {/* Config Modal */}
-            <ConfigModal isOpen={configModalOpen} onClose={onCloseConfigModal}>
-                {/* Group 1: Execution Mode */}
-                <div className="modal-section">
-                    <p className="modal-section-title">Execution Mode</p>
-                    <label className="field checkbox">
-                        <input
-                            type="checkbox"
-                            id="use-cloud-services"
-                            checked={cloudEnabled}
-                            onChange={(e) => handleUseCloudChange(e.target.checked)}
-                        />
-                        <span className="field-label">Use Cloud Services</span>
-                    </label>
-                </div>
-
-                {/* Group 2: Cloud Configuration */}
-                <div className="modal-section">
-                    <p className="modal-section-title">Cloud Configuration</p>
-                    <div className="field">
-                        <label className="field-label" htmlFor="cloud-service">Cloud Service</label>
-                        <select
-                            id="cloud-service"
-                            value={cloudSelection.provider}
-                            onChange={(e) => handleProviderChange(e.target.value)}
-                            disabled={!cloudEnabled}
-                        >
-                            {CLOUD_PROVIDERS.map((provider) => (
-                                <option key={provider} value={provider}>{provider}</option>
-                            ))}
-                        </select>
-                    </div>
-                    <div className="field">
-                        <label className="field-label" htmlFor="cloud-model">Cloud Model</label>
-                        <select
-                            id="cloud-model"
-                            value={cloudSelection.model ?? ""}
-                            onChange={(e) => handleCloudModelChange(e.target.value)}
-                            disabled={!cloudEnabled}
-                        >
-                            {(CLOUD_MODEL_CHOICES[cloudSelection.provider] || []).map((model) => (
-                                <option key={model} value={model}>{model}</option>
-                            ))}
-                        </select>
-                    </div>
-                </div>
-
-                {/* Group 3: Local Configuration */}
-                <div className="modal-section">
-                    <p className="modal-section-title">Local Configuration</p>
-                    <div className="field">
-                        <label className="field-label" htmlFor="parsing-model">Parsing Model</label>
-                        <select
-                            id="parsing-model"
-                            value={settings.parsingModel}
-                            onChange={(e) => handleSettingsChange({ parsingModel: e.target.value })}
-                            disabled={cloudEnabled}
-                        >
-                            {PARSING_MODEL_CHOICES.map((model) => (
-                                <option key={model} value={model}>{model}</option>
-                            ))}
-                        </select>
-                    </div>
-                    <div className="field">
-                        <label className="field-label" htmlFor="clinical-model">Clinical Model</label>
-                        <select
-                            id="clinical-model"
-                            value={settings.clinicalModel}
-                            onChange={(e) => handleSettingsChange({ clinicalModel: e.target.value })}
-                            disabled={cloudEnabled}
-                        >
-                            {CLINICAL_MODEL_CHOICES.map((model) => (
-                                <option key={model} value={model}>{model}</option>
-                            ))}
-                        </select>
-                    </div>
-                </div>
-
-                {/* Group 4: Advanced */}
-                <div className="modal-section">
-                    <p className="modal-section-title">Advanced</p>
-                    <div className="field">
-                        <label className="field-label" htmlFor="temperature">Temperature (Ollama)</label>
-                        <input
-                            id="temperature"
-                            type="number"
-                            min={0}
-                            max={2}
-                            step={0.05}
-                            value={settings.temperature}
-                            onChange={(e) =>
-                                handleSettingsChange({ temperature: Number.parseFloat(e.target.value) || 0 })
-                            }
-                            disabled={cloudEnabled}
-                        />
-                    </div>
-                    <label className="field checkbox">
-                        <input
-                            type="checkbox"
-                            id="enable-reasoning"
-                            checked={settings.reasoning}
-                            onChange={(e) => handleSettingsChange({ reasoning: e.target.checked })}
-                            disabled={cloudEnabled}
-                        />
-                        <span className="field-label">Enable SDL/Reasoning (Ollama)</span>
-                    </label>
-                </div>
-
-                {/* Pull Models Button */}
-                <div className="modal-footer">
-                    <button
-                        className="btn btn-primary"
-                        type="button"
-                        disabled={pullDisabled}
-                        onClick={handlePullModels}
-                    >
-                        {isPulling ? "Pulling models..." : "Pull Selected Models"}
-                    </button>
-                </div>
-            </ConfigModal>
-
-            {/* Page Content */}
             <main className="page-container">
                 <header className="page-header">
                     <p className="eyebrow">DILIGENT Clinical Copilot</p>

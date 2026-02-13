@@ -6,15 +6,14 @@ import os
 import re
 import zipfile
 from concurrent.futures import ThreadPoolExecutor, as_completed
+from dataclasses import dataclass, field
 from typing import Any, Iterator, cast
 from xml.etree import ElementTree
 
 import pandas as pd
+from pypdf import PdfReader
 from sqlalchemy import select
 from sqlalchemy.orm import Session, sessionmaker
-from langchain_community.document_loaders import PyPDFLoader
-from langchain_core.documents import Document
-from langchain_text_splitters import RecursiveCharacterTextSplitter
 
 from DILIGENT.server.configurations import server_settings
 from DILIGENT.server.utils.constants import (
@@ -46,6 +45,14 @@ from DILIGENT.server.repositories.vectors import LanceVectorDatabase
 from DILIGENT.server.services.retrieval.embeddings import EmbeddingGenerator
 from DILIGENT.server.services.text.normalization import coerce_text, normalize_drug_name
 from DILIGENT.server.services.text.synonyms import parse_synonym_list, split_synonym_variants
+
+
+###############################################################################
+@dataclass
+class Document:
+    page_content: str
+    metadata: dict[str, Any] = field(default_factory=dict)
+
 
 ###############################################################################
 class DataSerializer:
@@ -916,15 +923,30 @@ class DocumentSerializer:
     # -------------------------------------------------------------------------
     def load_pdf(self, file_path: str) -> list[Document]:
         try:
-            loader = PyPDFLoader(file_path)
-            pages = loader.load()
+            reader = PdfReader(file_path)
         except Exception as exc:  # noqa: BLE001
             logger.error("Failed to load PDF '%s': %s", file_path, exc)
             return []
+
         metadata = self.build_metadata(file_path)
-        for index, document in enumerate(pages, start=1):
-            document.metadata.update(metadata)
-            document.metadata["page_number"] = index
+        pages: list[Document] = []
+        for index, page in enumerate(reader.pages, start=1):
+            try:
+                text = page.extract_text() or ""
+            except Exception as exc:  # noqa: BLE001
+                logger.error(
+                    "Failed to extract text from '%s' page %d: %s",
+                    file_path,
+                    index,
+                    exc,
+                )
+                continue
+            content = text.strip()
+            if not content:
+                continue
+            page_metadata = dict(metadata)
+            page_metadata["page_number"] = index
+            pages.append(Document(page_content=content, metadata=page_metadata))
         return pages
 
     # -------------------------------------------------------------------------
@@ -1009,17 +1031,37 @@ class DocumentChunker:
     def __init__(self, chunk_size: int, chunk_overlap: int) -> None:
         self.chunk_size = max(chunk_size, 1)
         self.chunk_overlap = max(chunk_overlap, 0)
-        self.splitter = RecursiveCharacterTextSplitter(
-            chunk_size=self.chunk_size,
-            chunk_overlap=self.chunk_overlap,
-            add_start_index=True,
-        )
+
+    # -------------------------------------------------------------------------
+    def split_text(self, content: str) -> list[tuple[str, int]]:
+        text = content.strip()
+        if not text:
+            return []
+        step = max(self.chunk_size - self.chunk_overlap, 1)
+        chunks: list[tuple[str, int]] = []
+        start = 0
+        text_length = len(text)
+        while start < text_length:
+            end = min(start + self.chunk_size, text_length)
+            chunk_text = text[start:end].strip()
+            if chunk_text:
+                chunks.append((chunk_text, start))
+            if end >= text_length:
+                break
+            start += step
+        return chunks
 
     # -------------------------------------------------------------------------
     def chunk_documents(self, documents: list[Document]) -> list[Document]:
         if not documents:
             return []
-        chunks = self.splitter.split_documents(documents)
+        chunks: list[Document] = []
+        for document in documents:
+            metadata = dict(document.metadata)
+            for chunk_text, start_index in self.split_text(document.page_content):
+                chunk_metadata = dict(metadata)
+                chunk_metadata["start_index"] = start_index
+                chunks.append(Document(page_content=chunk_text, metadata=chunk_metadata))
         for index, chunk in enumerate(chunks):
             chunk.metadata["chunk_index"] = index
         return chunks

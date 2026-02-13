@@ -47,11 +47,11 @@ function NavItem({ pageId, icon, label, isActive, onClick }: NavItemProps): Reac
 // NavSidebar
 // ---------------------------------------------------------------------------
 interface NavSidebarProps {
-    onOpenConfigModal: () => void;
+    onNavigate: (pageId: PageId) => void;
 }
 
-export function NavSidebar({ onOpenConfigModal }: NavSidebarProps): React.JSX.Element {
-    const { state, setActivePage } = useAppState();
+export function NavSidebar({ onNavigate }: NavSidebarProps): React.JSX.Element {
+    const { state } = useAppState();
 
     const navItems: { pageId: PageId; icon: React.ReactNode; label: string }[] = [
         { pageId: "dili-agent", icon: <AgentIcon />, label: "DILI Agent" },
@@ -68,25 +68,23 @@ export function NavSidebar({ onOpenConfigModal }: NavSidebarProps): React.JSX.El
                         icon={item.icon}
                         label={item.label}
                         isActive={state.activePage === item.pageId}
-                        onClick={setActivePage}
+                        onClick={onNavigate}
                     />
                 ))}
             </div>
-            {state.activePage === "dili-agent" && (
-                <div className="nav-footer">
-                    <button
-                        type="button"
-                        className="nav-item nav-settings"
-                        onClick={onOpenConfigModal}
-                        aria-label="Model Configurations"
-                        title="Model Configurations"
-                    >
-                        <span className="nav-icon">
-                            <SettingsIcon />
-                        </span>
-                    </button>
-                </div>
-            )}
+            <div className="nav-footer">
+                <button
+                    type="button"
+                    className={`nav-item nav-settings ${state.activePage === "model-config" ? "active" : ""}`}
+                    onClick={() => onNavigate("model-config")}
+                    aria-label="Model Configurations"
+                    title="Model Configurations"
+                >
+                    <span className="nav-icon">
+                        <SettingsIcon />
+                    </span>
+                </button>
+            </div>
         </nav>
     );
 }

@@ -159,6 +159,60 @@ body {
 }
 
 /* ============================================
+   Model Configuration Page
+   ============================================ */
+.model-config-page {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2xl);
+}
+
+.model-config-first-row {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: var(--space-2xl);
+}
+
+@media (min-width: 1024px) {
+  .model-config-first-row {
+    grid-template-columns: 1fr 1fr;
+  }
+}
+
+.model-config-column {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-md);
+}
+
+.model-config-column-disabled {
+  opacity: 0.8;
+}
+
+.model-config-cloud-fields {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-md);
+}
+
+.model-config-pull-btn {
+  margin-top: var(--space-xs);
+  width: fit-content;
+  min-width: 220px;
+}
+
+.model-config-disabled-note {
+  margin: 0;
+  color: var(--color-text-muted);
+  font-size: var(--font-sm);
+}
+
+.model-config-second-row {
+  min-height: 160px;
+  border-top: 1px dashed var(--color-divider);
+}
+
+/* ============================================
    Cards
    ============================================ */
 .card {
@@ -271,7 +325,9 @@ body {
 }
 
 .field textarea {
-  min-height: 140px;
+  min-height: 160px;
+  max-height: 360px;
+  overflow-y: auto;
   resize: vertical;
   line-height: 1.5;
 }
