@@ -1,25 +1,45 @@
-import React, { useState } from "react";
-import { AppStateProvider, useAppState } from "./context/AppStateContext";
+import React, { useEffect } from "react";
+import {
+  AppStateProvider,
+  PageId,
+  resolvePageIdFromPath,
+  resolvePathFromPage,
+  useAppState,
+} from "./context/AppStateContext";
 import { NavSidebar } from "./components/NavSidebar";
 import { DiluAgentPage } from "./pages/DiluAgentPage";
+import { ModelConfigPage } from "./pages/ModelConfigPage";
 
 // ---------------------------------------------------------------------------
 // AppContent - Renders the active page
 // ---------------------------------------------------------------------------
 function AppContent(): React.JSX.Element {
-  const { state } = useAppState();
-  const [configModalOpen, setConfigModalOpen] = useState(false);
+  const { state, setActivePage } = useAppState();
+
+  useEffect(() => {
+    const handlePopState = () => {
+      setActivePage(resolvePageIdFromPath(window.location.pathname));
+    };
+    window.addEventListener("popstate", handlePopState);
+    return () => {
+      window.removeEventListener("popstate", handlePopState);
+    };
+  }, [setActivePage]);
+
+  const navigateToPage = (pageId: PageId) => {
+    const nextPath = resolvePathFromPage(pageId);
+    if (window.location.pathname !== nextPath) {
+      window.history.pushState({}, "", nextPath);
+    }
+    setActivePage(pageId);
+  };
 
   return (
     <div className="app-shell">
-      <NavSidebar onOpenConfigModal={() => setConfigModalOpen(true)} />
+      <NavSidebar onNavigate={navigateToPage} />
       <div className="app-main">
-        {state.activePage === "dili-agent" && (
-          <DiluAgentPage
-            configModalOpen={configModalOpen}
-            onCloseConfigModal={() => setConfigModalOpen(false)}
-          />
-        )}
+        {state.activePage === "dili-agent" && <DiluAgentPage />}
+        {state.activePage === "model-config" && <ModelConfigPage />}
       </div>
     </div>
   );
