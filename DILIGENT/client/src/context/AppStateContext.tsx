@@ -9,7 +9,34 @@ import { resolveCloudSelection } from "../utils";
 // ---------------------------------------------------------------------------
 // Types
 // ---------------------------------------------------------------------------
-export type PageId = "dili-agent";
+export type PageId = "dili-agent" | "model-config";
+
+const DEFAULT_PAGE: PageId = "dili-agent";
+const PAGE_PATHS: Record<PageId, string> = {
+    "dili-agent": "/",
+    "model-config": "/model-config",
+};
+
+function normalizePathname(pathname: string): string {
+    const trimmed = pathname.trim();
+    if (!trimmed) return "/";
+    if (trimmed.length > 1 && trimmed.endsWith("/")) {
+        return trimmed.slice(0, -1);
+    }
+    return trimmed;
+}
+
+export function resolvePageIdFromPath(pathname: string): PageId {
+    const normalized = normalizePathname(pathname);
+    if (normalized === PAGE_PATHS["model-config"]) {
+        return "model-config";
+    }
+    return DEFAULT_PAGE;
+}
+
+export function resolvePathFromPage(page: PageId): string {
+    return PAGE_PATHS[page] || PAGE_PATHS[DEFAULT_PAGE];
+}
 
 export interface DiluAgentState {
     settings: RuntimeSettings;
@@ -64,7 +91,9 @@ const DEFAULT_DILU_AGENT_STATE: DiluAgentState = {
 };
 
 const DEFAULT_APP_STATE: AppState = {
-    activePage: "dili-agent",
+    activePage: resolvePageIdFromPath(
+        typeof window !== "undefined" ? window.location.pathname : "/",
+    ),
     diluAgent: DEFAULT_DILU_AGENT_STATE,
 };
 
