@@ -460,6 +460,32 @@ class OllamaClient:
             raise OllamaError(f"Progress callback failed: {e!r}") from e
 
     # -------------------------------------------------------------------------
+    @staticmethod
+    def decode_response_content(content: Any) -> Any:
+        if isinstance(content, dict):
+            return content
+        if isinstance(content, str):
+            try:
+                return json.loads(content)
+            except json.JSONDecodeError:
+                return content
+        return str(content)
+
+    # -------------------------------------------------------------------------
+    @staticmethod
+    async def iter_json_stream_events(
+        response: httpx.Response,
+    ) -> AsyncGenerator[dict[str, Any], None]:
+        async for line in response.aiter_lines():
+            if not line:
+                continue
+            try:
+                evt = json.loads(line)
+            except json.JSONDecodeError:
+                continue
+            yield evt
+
+    # -------------------------------------------------------------------------
     async def list_models(self) -> list[str]:
         await self.get_cached_models(force_refresh=True)
         async with self.model_cache_lock:
@@ -521,13 +547,7 @@ class OllamaClient:
     ) -> bool:
         async with self.client.stream("POST", "/api/pull", json=payload) as r:
             self.raise_for_status(r)
-            async for line in r.aiter_lines():
-                if not line:
-                    continue
-                try:
-                    evt = json.loads(line)
-                except json.JSONDecodeError:
-                    continue
+            async for evt in self.iter_json_stream_events(r):
                 await self.maybe_await(progress_callback, evt)
                 if str(evt.get("status", "")).lower() == "success":
                     return True
@@ -839,15 +859,7 @@ class OllamaClient:
 
         data = resp.json()
         content = (data.get("message") or {}).get("content", "")
-
-        if isinstance(content, dict):
-            return content
-        if isinstance(content, str):
-            try:
-                return json.loads(content)
-            except json.JSONDecodeError:
-                return content
-        return str(content)
+        return self.decode_response_content(content)
 
     # -------------------------------------------------------------------------
     async def chat_stream(
@@ -930,16 +942,42 @@ class OllamaClient:
                     await r.aread()
                     raise _OllamaChatFallback
                 self.raise_for_status(r)
-                async for line in r.aiter_lines():
-                    if not line:
-                        continue
-                    try:
-                        evt = json.loads(line)
-                    except json.JSONDecodeError:
-                        continue
+                async for evt in self.iter_json_stream_events(r):
                     yield evt
         except httpx.TimeoutException as e:
             raise OllamaTimeout("Timed out during streamed chat response") from e
+
+    # -----------------------------------------------------------------------------
+    async def build_generate_payload_from_messages(
+        self,
+        *,
+        model: str,
+        messages: list[dict[str, str]],
+        stream: bool,
+        format: str | None,
+        temperature: float,
+        think: bool,
+        options: dict[str, Any] | None,
+        keep_alive: str | None,
+    ) -> dict[str, Any]:
+        prompt = self.messages_to_prompt(messages)
+        resolved_model = self.resolve_model_name(model)
+        resolved_options = await self.ensure_context_option(
+            model=resolved_model,
+            messages=None,
+            prompt=prompt,
+            options=options,
+        )
+        return self.build_generate_payload(
+            model=resolved_model,
+            prompt=prompt,
+            stream=stream,
+            format=format,
+            temperature=temperature,
+            think=think,
+            options=resolved_options,
+            keep_alive=keep_alive,
+        )
 
     # -----------------------------------------------------------------------------
     async def chat_via_generate(
@@ -953,17 +991,9 @@ class OllamaClient:
         options: dict[str, Any] | None,
         keep_alive: str | None,
     ) -> dict[str, Any] | str:
-        prompt = self.messages_to_prompt(messages)
-        resolved_model = self.resolve_model_name(model)
-        options = await self.ensure_context_option(
-            model=resolved_model,
-            messages=None,
-            prompt=prompt,
-            options=options,
-        )
-        payload = self.build_generate_payload(
-            model=resolved_model,
-            prompt=prompt,
+        payload = await self.build_generate_payload_from_messages(
+            model=model,
+            messages=messages,
             stream=False,
             format=format,
             temperature=temperature,
@@ -980,15 +1010,7 @@ class OllamaClient:
         self.raise_for_status(resp)
         data = resp.json()
         content = data.get("response", "")
-
-        if isinstance(content, dict):
-            return content
-        if isinstance(content, str):
-            try:
-                return json.loads(content)
-            except json.JSONDecodeError:
-                return content
-        return str(content)
+        return self.decode_response_content(content)
 
     # -----------------------------------------------------------------------------
     async def chat_stream_via_generate(
@@ -1002,17 +1024,9 @@ class OllamaClient:
         options: dict[str, Any] | None,
         keep_alive: str | None,
     ) -> AsyncGenerator[dict[str, Any], None]:
-        prompt = self.messages_to_prompt(messages)
-        resolved_model = self.resolve_model_name(model)
-        options = await self.ensure_context_option(
-            model=resolved_model,
-            messages=None,
-            prompt=prompt,
-            options=options,
-        )
-        payload = self.build_generate_payload(
-            model=resolved_model,
-            prompt=prompt,
+        payload = await self.build_generate_payload_from_messages(
+            model=model,
+            messages=messages,
             stream=True,
             format=format,
             temperature=temperature,
@@ -1024,13 +1038,7 @@ class OllamaClient:
         try:
             async with self.client.stream("POST", "/api/generate", json=payload) as r:
                 self.raise_for_status(r)
-                async for line in r.aiter_lines():
-                    if not line:
-                        continue
-                    try:
-                        evt = json.loads(line)
-                    except json.JSONDecodeError:
-                        continue
+                async for evt in self.iter_json_stream_events(r):
                     yield evt
         except httpx.TimeoutException as e:
             raise OllamaTimeout("Timed out during streamed generate response") from e
@@ -1242,13 +1250,12 @@ class OllamaClient:
         self,
         *,
         queue: list[str],
-        preferred: list[str],
+        preferred_models: list[str],
         tried: set[str],
         fallbacks: list[str] | None,
     ) -> list[str]:
         if fallbacks is None:
-            fallbacks = await self.collect_structured_fallbacks(preferred)
-            preferred.extend(fallbacks)
+            fallbacks = await self.collect_structured_fallbacks(preferred_models)
         for candidate in fallbacks:
             if candidate and candidate not in tried and candidate not in queue:
                 queue.append(candidate)
@@ -1273,6 +1280,27 @@ class OllamaClient:
                 f"Tried: {attempted}"
             ) from last_missing_error
         raise RuntimeError("LLM call failed: no parsing model candidates available")
+
+    # -------------------------------------------------------------------------
+    @staticmethod
+    def build_repair_messages(
+        *,
+        system_prompt: str,
+        format_instructions: str,
+        text: str,
+    ) -> list[dict[str, str]]:
+        return [
+            {"role": "system", "content": system_prompt.strip()},
+            {
+                "role": "user",
+                "content": (
+                    "The previous reply did not match the required JSON schema.\n"
+                    "Follow these format instructions exactly and return ONLY a valid JSON object:\n"
+                    f"{format_instructions}\n\n"
+                    f"Previous reply:\n{text}"
+                ),
+            },
+        ]
 
     # -------------------------------------------------------------------------
     async def call_with_structured_models(
@@ -1311,7 +1339,7 @@ class OllamaClient:
                 last_missing_error = e
                 fallbacks = await self._extend_structured_model_queue(
                     queue=queue,
-                    preferred=preferred,
+                    preferred_models=preferred,
                     tried=tried,
                     fallbacks=fallbacks,
                 )
@@ -1355,18 +1383,11 @@ class OllamaClient:
                     )
                     raise RuntimeError(f"Structured parsing failed: {err}") from err
 
-                repair_messages = [
-                    {"role": "system", "content": system_prompt.strip()},
-                    {
-                        "role": "user",
-                        "content": (
-                            "The previous reply did not match the required JSON schema.\n"
-                            "Follow these format instructions exactly and return ONLY a valid JSON object:\n"
-                            f"{format_instructions}\n\n"
-                            f"Previous reply:\n{text}"
-                        ),
-                    },
-                ]
+                repair_messages = self.build_repair_messages(
+                    system_prompt=system_prompt,
+                    format_instructions=format_instructions,
+                    text=text,
+                )
                 try:
                     raw = await self.chat(
                         model=active_model,
@@ -1374,7 +1395,7 @@ class OllamaClient:
                         format="json" if use_json_mode else None,
                         temperature=0.0,
                     )
-                    text = json.dumps(raw) if isinstance(raw, dict) else str(raw)
+                    text = self._coerce_llm_text(raw)
 
                 except OllamaError as e:
                     raise RuntimeError(f"Repair attempt failed: {e}") from e
@@ -1398,31 +1419,7 @@ class OllamaClient:
     # -------------------------------------------------------------------------
     @staticmethod
     def parse_json(obj_or_text: dict[str, Any] | str) -> dict[str, Any] | None:
-        """
-        Robustly return a dict JSON object from either a dict or a text blob with JSON inside.
-
-        """
-        if isinstance(obj_or_text, dict):
-            return obj_or_text
-
-        if not isinstance(obj_or_text, str) or not obj_or_text.strip():
-            return None
-
-        try:
-            loaded = json.loads(obj_or_text)
-            return loaded if isinstance(loaded, dict) else None
-        except json.JSONDecodeError:
-            pass
-
-        # Extract first top-level JSON object (handles extra text/noise).
-        extracted = OllamaClient.extract_first_json_object(obj_or_text)
-        if not extracted:
-            return None
-        try:
-            loaded = json.loads(extracted)
-            return loaded if isinstance(loaded, dict) else None
-        except json.JSONDecodeError:
-            return None
+        return parse_json_dict(obj_or_text)
 
 
 ###############################################################################
