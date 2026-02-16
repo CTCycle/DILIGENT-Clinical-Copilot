@@ -20,8 +20,8 @@ from pypdf import PdfReader
 from tqdm import tqdm
 
 from DILIGENT.server.configurations import server_settings
-from DILIGENT.server.utils.constants import LIVERTOX_BASE_URL, SOURCES_PATH
-from DILIGENT.server.utils.logger import logger
+from DILIGENT.common.constants import LIVERTOX_BASE_URL, SOURCES_PATH
+from DILIGENT.common.utils.logger import logger
 from DILIGENT.server.services.text.normalization import normalize_whitespace
 from DILIGENT.server.repositories.serialization.data import DataSerializer
 from DILIGENT.server.repositories.database.backend import database
@@ -1072,5 +1072,6 @@ class LiverToxUpdater:
             finalized["excerpt"].isin(["", "nan", "NaT", "None", "<NA>"]), "excerpt"
         ] = pd.NA
         return finalized.reset_index(drop=True)
+
 
 

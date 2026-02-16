@@ -15,7 +15,7 @@ from DILIGENT.server.entities.jobs import (
 from DILIGENT.server.entities.models import ModelListResponse, ModelPullResponse
 from DILIGENT.server.configurations import server_settings
 from DILIGENT.server.services.jobs import job_manager
-from DILIGENT.server.utils.logger import logger
+from DILIGENT.common.utils.logger import logger
 
 router = APIRouter(prefix="/models", tags=["models"])
 
@@ -207,3 +207,4 @@ class OllamaEndpoint:
 
 endpoint = OllamaEndpoint(router=router)
 endpoint.add_routes()
+

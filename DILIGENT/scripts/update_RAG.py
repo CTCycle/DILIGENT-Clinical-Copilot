@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 from DILIGENT.server.configurations import server_settings
-from DILIGENT.server.utils.logger import logger
+from DILIGENT.common.utils.logger import logger
 from DILIGENT.server.services.updater.embeddings import RagEmbeddingUpdater
 
 
@@ -19,3 +19,4 @@ if __name__ == "__main__":
         summary.get("documents", 0),
         summary.get("chunks", 0),
     )
+

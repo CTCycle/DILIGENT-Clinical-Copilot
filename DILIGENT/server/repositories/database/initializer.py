@@ -10,7 +10,7 @@ from DILIGENT.server.repositories.database.postgres import PostgresRepository
 from DILIGENT.server.repositories.database.sqlite import SQLiteRepository
 from DILIGENT.server.repositories.database.utils import normalize_postgres_engine
 from DILIGENT.server.repositories.schemas.models import Base
-from DILIGENT.server.utils.logger import logger
+from DILIGENT.common.utils.logger import logger
 
 
 def build_postgres_connect_args(settings: DatabaseSettings) -> dict[str, str | int]:
@@ -133,3 +133,4 @@ def initialize_database() -> None:
     except Exception as exc:
         logger.exception("Unexpected error during database initialization.")
         raise SystemExit(1) from exc
+

@@ -8,8 +8,8 @@ from typing import Any, Literal, cast
 
 from DILIGENT.server.models.providers import CloudLLMClient, OllamaClient
 from DILIGENT.server.configurations import server_settings
-from DILIGENT.server.utils.constants import CLOUD_MODEL_CHOICES, VECTOR_DB_PATH
-from DILIGENT.server.utils.logger import logger
+from DILIGENT.common.constants import CLOUD_MODEL_CHOICES, VECTOR_DB_PATH
+from DILIGENT.common.utils.logger import logger
 from DILIGENT.server.repositories.vectors import LanceVectorDatabase
 
 ProviderName = Literal["openai", "azure-openai", "anthropic", "gemini"]
@@ -225,3 +225,4 @@ class SimilaritySearch:
 
 
 __all__ = ["EmbeddingGenerator", "SimilaritySearch"]
+

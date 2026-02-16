@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from DILIGENT.server.utils.logger import logger
+from DILIGENT.common.utils.logger import logger
 from DILIGENT.server.services.updater.rxnav import RxNavDrugCatalogBuilder
 
 REDOWNLOAD = True
@@ -15,3 +15,4 @@ if __name__ == "__main__":
         catalog_info.get("table_name"),
         catalog_info.get("count", 0),
     )
+

@@ -16,7 +16,7 @@ from DILIGENT.server.repositories.database.utils import (
     normalize_postgres_engine,
 )
 from DILIGENT.server.repositories.schemas.models import Base
-from DILIGENT.server.utils.logger import logger
+from DILIGENT.common.utils.logger import logger
 
 
 ###############################################################################
@@ -167,4 +167,5 @@ class PostgresRepository:
                 query, conn, params={"limit": limit, "offset": offset}
             )
         return data
+
 

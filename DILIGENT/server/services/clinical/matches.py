@@ -9,8 +9,8 @@ import pandas as pd
 from rapidfuzz import fuzz
 
 from DILIGENT.server.configurations import server_settings
-from DILIGENT.server.utils.constants import MATCHING_STOPWORDS
-from DILIGENT.server.utils.logger import logger
+from DILIGENT.common.constants import MATCHING_STOPWORDS
+from DILIGENT.common.utils.logger import logger
 from DILIGENT.server.services.text.normalization import (
     coerce_text,
     normalize_drug_name,
@@ -1046,3 +1046,4 @@ class LiverToxMatcher:
         matches: list[LiverToxMatch | None],
     ) -> list[dict[str, Any]]:
         return self.data.build_drugs_to_excerpt_mapping(patient_drugs, matches)
+

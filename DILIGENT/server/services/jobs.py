@@ -9,7 +9,7 @@ from typing import Any
 
 from collections.abc import Callable
 
-from DILIGENT.server.utils.logger import logger
+from DILIGENT.common.utils.logger import logger
 
 
 ###############################################################################
@@ -213,3 +213,4 @@ class JobManager:
 
 ###############################################################################
 job_manager = JobManager()
+

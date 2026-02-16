@@ -8,7 +8,7 @@ from DILIGENT.server.entities.clinical import (
     HepatotoxicityPatternScore,
     PatientDrugs,
 )
-from DILIGENT.server.utils.logger import logger
+from DILIGENT.common.utils.logger import logger
 from DILIGENT.server.repositories.serialization.data import DataSerializer
 from DILIGENT.server.services.clinical.matches import LiverToxMatcher
 
@@ -178,3 +178,4 @@ class ClinicalKnowledgePreparation:
             "Treat drugs whose known hepatotoxicity pattern matches this classification as stronger causal candidates, and downgrade mismatches."
         )
         return " ".join(segments)
+

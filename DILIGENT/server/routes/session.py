@@ -24,7 +24,7 @@ from DILIGENT.server.entities.jobs import (
 from DILIGENT.server.configurations import LLMRuntimeConfig, server_settings
 from DILIGENT.server.repositories.serialization.data import DataSerializer
 from DILIGENT.server.services.jobs import job_manager
-from DILIGENT.server.utils.logger import logger
+from DILIGENT.common.utils.logger import logger
 from DILIGENT.server.services.clinical.hepatox import (
     HepatotoxicityPatternAnalyzer,
     HepatoxConsultation,
@@ -554,3 +554,4 @@ endpoint = ClinicalSessionEndpoint(
     serializer=serializer,
 )
 endpoint.add_routes()
+

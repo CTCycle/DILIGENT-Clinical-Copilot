@@ -8,7 +8,7 @@ import pandas as pd
 from DILIGENT.server.configurations import DatabaseSettings, server_settings
 from DILIGENT.server.repositories.database.postgres import PostgresRepository
 from DILIGENT.server.repositories.database.sqlite import SQLiteRepository
-from DILIGENT.server.utils.logger import logger
+from DILIGENT.common.utils.logger import logger
 
 
 ###############################################################################
@@ -114,3 +114,4 @@ class DILIGENTDatabase:
 
     
 database = DILIGENTDatabase()
+
