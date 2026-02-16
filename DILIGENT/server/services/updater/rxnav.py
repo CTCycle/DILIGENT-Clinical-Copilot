@@ -14,8 +14,8 @@ import httpx
 import pandas as pd
 
 from DILIGENT.server.configurations import server_settings
-from DILIGENT.server.utils.logger import logger
-from DILIGENT.server.utils.constants import RXNAV_SYNONYM_STOPWORDS
+from DILIGENT.common.utils.logger import logger
+from DILIGENT.common.constants import RXNAV_SYNONYM_STOPWORDS
 from DILIGENT.server.repositories.serialization.data import DataSerializer
 
 
@@ -1182,3 +1182,4 @@ class RxNavDrugCatalogBuilder:
         if len(formatted) == 1:
             return formatted[0]
         return ", ".join(formatted)
+

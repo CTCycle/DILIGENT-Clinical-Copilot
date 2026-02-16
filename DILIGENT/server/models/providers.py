@@ -17,14 +17,14 @@ import httpx
 from pydantic import BaseModel
 
 from DILIGENT.server.configurations import LLMRuntimeConfig, server_settings
-from DILIGENT.server.utils.constants import (
+from DILIGENT.common.constants import (
     GEMINI_API_BASE,
     OPENAI_API_BASE,
     PARSING_MODEL_CHOICES,
 )
-from DILIGENT.server.utils.logger import logger
-from DILIGENT.server.utils.types import extract_positive_int
-from DILIGENT.server.utils.variables import env_variables
+from DILIGENT.common.utils.logger import logger
+from DILIGENT.common.utils.types import extract_positive_int
+from DILIGENT.common.utils.variables import env_variables
 
 OPENAI_API_KEY = env_variables.get("OPENAI_API_KEY")
 GEMINI_API_KEY = env_variables.get("GEMINI_API_KEY")
@@ -1889,3 +1889,4 @@ def initialize_llm_client(
         default_model=selected_model,
         **kwargs,
     )
+

@@ -6,7 +6,7 @@ warnings.filterwarnings("ignore", category=FutureWarning)
 from fastapi import FastAPI
 from fastapi.responses import RedirectResponse
 
-from DILIGENT.server.utils.variables import env_variables
+from DILIGENT.common.utils.variables import env_variables
 from DILIGENT.server.routes.session import router as session_router
 from DILIGENT.server.routes.ollama import router as ollama_router
 from DILIGENT.server.configurations import server_settings
@@ -25,3 +25,4 @@ app.include_router(ollama_router)
 @app.get("/")
 def redirect_to_docs() -> RedirectResponse:
     return RedirectResponse(url="/docs")
+

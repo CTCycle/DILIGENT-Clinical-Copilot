@@ -3,8 +3,8 @@ from __future__ import annotations
 import os
 
 from DILIGENT.server.configurations import server_settings
-from DILIGENT.server.utils.constants import DOCS_PATH, VECTOR_DB_PATH
-from DILIGENT.server.utils.logger import logger
+from DILIGENT.common.constants import DOCS_PATH, VECTOR_DB_PATH
+from DILIGENT.common.utils.logger import logger
 from DILIGENT.server.repositories.serialization.data import VectorSerializer
 from DILIGENT.server.repositories.vectors import LanceVectorDatabase
 
@@ -75,3 +75,4 @@ class RagEmbeddingUpdater:
 
 
 __all__ = ["RagEmbeddingUpdater"]
+

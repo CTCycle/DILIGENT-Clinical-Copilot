@@ -25,12 +25,12 @@ from DILIGENT.server.entities.clinical import (
     PatientDrugs,
 )
 from DILIGENT.server.configurations import LLMRuntimeConfig, server_settings
-from DILIGENT.server.utils.constants import (
+from DILIGENT.common.constants import (
     DEFAULT_DILI_CLASSIFICATION,
     R_SCORE_CHOLESTATIC_THRESHOLD,
     R_SCORE_HEPATOCELLULAR_THRESHOLD,
 )
-from DILIGENT.server.utils.logger import logger
+from DILIGENT.common.utils.logger import logger
 from DILIGENT.server.services.retrieval.embeddings import SimilaritySearch
 from DILIGENT.server.services.clinical.preparation import HepatoxPreparedInputs
 
@@ -780,3 +780,4 @@ class HepatoxConsultation:
         heading = self.format_drug_heading(entry.drug_name, score)
         message = "Automated analysis was unavailable due to a technical issue; a clinician should review the LiverTox documentation manually."
         return f"{heading}\n{message}\nBibliography source: LiverTox"
+
