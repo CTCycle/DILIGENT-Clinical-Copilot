@@ -13,8 +13,8 @@ from sqlalchemy.orm import sessionmaker
 from DILIGENT.server.configurations import DatabaseSettings
 from DILIGENT.server.repositories.database.utils import MISSING_TABLE_MESSAGE
 from DILIGENT.server.repositories.schemas.models import Base
-from DILIGENT.server.utils.constants import DATABASE_FILENAME, RESOURCES_PATH
-from DILIGENT.server.utils.logger import logger
+from DILIGENT.common.constants import DATABASE_FILENAME, RESOURCES_PATH
+from DILIGENT.common.utils.logger import logger
 
 
 # [SQLITE DATABASE]
@@ -153,4 +153,5 @@ class SQLiteRepository:
                 params={"limit": limit, "offset": offset},
             )
         return data
+
 

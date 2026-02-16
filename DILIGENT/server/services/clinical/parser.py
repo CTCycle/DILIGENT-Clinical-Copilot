@@ -18,7 +18,7 @@ from DILIGENT.server.entities.clinical import (
 )
 from DILIGENT.server.configurations import LLMRuntimeConfig, server_settings
 from DILIGENT.server.services.text.normalization import normalize_token
-from DILIGENT.server.utils.patterns import (
+from DILIGENT.common.utils.patterns import (
     DRUG_BRACKET_TRAIL_RE,
     DRUG_BULLET_RE,
     DRUG_SCHEDULE_RE,
@@ -488,3 +488,4 @@ class DrugsParser:
             except ValueError:
                 return stripped
         return f"{day.zfill(2)}.{month.zfill(2)}"
+
