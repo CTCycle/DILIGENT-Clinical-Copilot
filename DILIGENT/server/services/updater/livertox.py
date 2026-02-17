@@ -20,7 +20,7 @@ from pypdf import PdfReader
 from tqdm import tqdm
 
 from DILIGENT.server.configurations import server_settings
-from DILIGENT.common.constants import LIVERTOX_BASE_URL, SOURCES_PATH
+from DILIGENT.common.constants import LIVERTOX_BASE_URL, ARCHIVES_PATH
 from DILIGENT.common.utils.logger import logger
 from DILIGENT.server.services.text.normalization import normalize_whitespace
 from DILIGENT.server.repositories.serialization.data import DataSerializer
@@ -119,13 +119,13 @@ class LiverToxUpdater:
 
         self.base_url = LIVERTOX_BASE_URL
         self.file_name = server_settings.external_data.livertox_archive
-        self.tar_file_path = os.path.join(SOURCES_PATH, self.file_name)
-        self.master_list_path = os.path.join(SOURCES_PATH, "LiverTox_Master_List.xlsx")
+        self.tar_file_path = os.path.join(ARCHIVES_PATH, self.file_name)
+        self.master_list_path = os.path.join(ARCHIVES_PATH, "LiverTox_Master_List.xlsx")
         self.master_list_metadata_path = os.path.join(
-            SOURCES_PATH, "livertox_master_list.metadata.json"
+            ARCHIVES_PATH, "livertox_master_list.metadata.json"
         )
         self.archive_metadata_path = os.path.join(
-            SOURCES_PATH, "livertox_archive.metadata.json"
+            ARCHIVES_PATH, "livertox_archive.metadata.json"
         )
 
     # -------------------------------------------------------------------------
