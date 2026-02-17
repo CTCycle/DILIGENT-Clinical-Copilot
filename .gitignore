@@ -1,5 +1,5 @@
 # Project-specific generated/runtime artifacts
-DILIGENT/resources/database/**
+DILIGENT/resources/sources/**
 DILIGENT/resources/runtimes/**
 DILIGENT/resources/runtimes/uv_cache/**
 DILIGENT/resources/logs/**
