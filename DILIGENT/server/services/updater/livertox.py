@@ -27,6 +27,7 @@ from DILIGENT.server.repositories.serialization.data import DataSerializer
 from DILIGENT.server.repositories.database.backend import database
 
 SUPPORTED_MONOGRAPH_EXTENSIONS = (".html", ".htm", ".xhtml", ".xml", ".nxml", ".pdf")
+NBK_ID_PATTERN = re.compile(r"^NBK\d+$", re.IGNORECASE)
 
 DEFAULT_HTTP_HEADERS = {
     "User-Agent": (
@@ -778,10 +779,6 @@ class LiverToxUpdater:
             sanitized["excerpt"].isin(["", "nan", "None", "NaT"]), "excerpt"
         ] = pd.NA
         sanitized.loc[sanitized["excerpt"].isna(), "excerpt"] = pd.NA
-
-        sanitized = sanitized.drop_duplicates(
-            subset=["drug_name", "ingredient", "brand_name"], keep="first"
-        )
         return sanitized.reset_index(drop=True)
 
     # -----------------------------------------------------------------------------
@@ -845,7 +842,7 @@ class LiverToxUpdater:
                     continue
                 collected.append(record)
                 processed_files.add(base_name)
-            return collected
+            return self.sort_monograph_records(collected)
 
         ctx = multiprocessing.get_context("spawn")
         with ProcessPoolExecutor(max_workers=worker_budget, mp_context=ctx) as executor:
@@ -875,8 +872,20 @@ class LiverToxUpdater:
                     continue
                 collected.append(record)
                 processed_files.add(base_name)
+        return self.sort_monograph_records(collected)
 
-        return collected
+    # -------------------------------------------------------------------------
+    def sort_monograph_records(
+        self, records: list[dict[str, str]]
+    ) -> list[dict[str, str]]:
+        return sorted(
+            records,
+            key=lambda item: (
+                str(item.get("drug_name", "")).casefold(),
+                str(item.get("nbk_id", "")).casefold(),
+                str(item.get("excerpt", "")).casefold(),
+            ),
+        )
 
     # -------------------------------------------------------------------------
     @staticmethod
@@ -1071,7 +1080,69 @@ class LiverToxUpdater:
         finalized.loc[
             finalized["excerpt"].isin(["", "nan", "NaT", "None", "<NA>"]), "excerpt"
         ] = pd.NA
-        return finalized.reset_index(drop=True)
+        if "nbk_id" not in finalized.columns:
+            finalized["nbk_id"] = pd.NA
+        nbk_series = finalized["nbk_id"].apply(self.normalize_nbk_id)
+        counts = nbk_series.dropna().value_counts()
+        safe_nbk_values = set(counts[counts == 1].index.tolist())
+        safe_mask = nbk_series.isin(safe_nbk_values)
+        nulled_nbk_count = int((nbk_series.notna() & ~safe_mask).sum())
+        safe_nbk_count = int(safe_mask.sum())
+        finalized["nbk_id"] = nbk_series.where(safe_mask, pd.NA)
+        logger.info(
+            "LiverTox NBK audit: total_rows=%d safe_nbk_count=%d nulled_nbk_count=%d",
+            len(finalized.index),
+            safe_nbk_count,
+            nulled_nbk_count,
+        )
+
+        for column in ("source_last_modified", "source_url", "last_update"):
+            if column not in finalized.columns:
+                finalized[column] = pd.NA
+        sort_frame = finalized.assign(
+            _drug_name_sort=finalized["drug_name"].astype(str).str.casefold(),
+            _source_last_modified_sort=finalized["source_last_modified"]
+            .fillna("")
+            .astype(str)
+            .str.casefold(),
+            _source_url_sort=finalized["source_url"].fillna("").astype(str).str.casefold(),
+            _last_update_sort=finalized["last_update"].fillna("").astype(str).str.casefold(),
+        )
+        sort_frame = sort_frame.sort_values(
+            by=[
+                "_drug_name_sort",
+                "_source_last_modified_sort",
+                "_source_url_sort",
+                "_last_update_sort",
+            ],
+            kind="mergesort",
+        )
+        deduped = sort_frame.drop_duplicates(
+            subset=["drug_name", "ingredient", "brand_name"],
+            keep="first",
+        )
+        deduped = deduped.drop(
+            columns=[
+                "_drug_name_sort",
+                "_source_last_modified_sort",
+                "_source_url_sort",
+                "_last_update_sort",
+            ]
+        )
+        return deduped.reset_index(drop=True)
+
+    # -------------------------------------------------------------------------
+    def normalize_nbk_id(self, value: Any) -> str | None:
+        if value is None:
+            return None
+        if pd.isna(value):
+            return None
+        normalized = str(value).strip().upper()
+        if not normalized:
+            return None
+        if not NBK_ID_PATTERN.fullmatch(normalized):
+            return None
+        return normalized
 
 
 
