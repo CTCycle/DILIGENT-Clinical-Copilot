@@ -29,6 +29,7 @@ export type ClinicalRequestPayload = {
   alt_max: string | null;
   alp: string | null;
   alp_max: string | null;
+  allow_missing_labs?: boolean | null;
   use_rag: boolean;
   use_cloud_services: boolean;
   llm_provider: string | null;

@@ -17,22 +17,30 @@ DRUG_SCHEDULE_RE = re.compile(
 )
 DRUG_BULLET_RE = re.compile(r"^[\-\u2022\u2023\u2043\*]+\s*")
 DRUG_BRACKET_TRAIL_RE = re.compile(r"\[(?P<content>[^\]]+)\]\s*$")
-DRUG_SUSPENSION_RE = re.compile(r"\bsospes[oa]\b", re.IGNORECASE)
-DRUG_SUSPENSION_DATE_RE = re.compile(
-    r"\bsospes[oa](?:\s+(?:dal|dall'))?\s*(?P<date>\d{1,2}[./]\d{1,2}(?:[./]\d{2,4})?)",
+DRUG_SUSPENSION_RE = re.compile(
+    r"\b(?:sospes[oaie]|interrott[aoie]|suspend(?:ed|ere|ing)?|stopp?ed|discontinued?)\b",
     re.IGNORECASE,
+)
+DRUG_SUSPENSION_DATE_RE = re.compile(
+    r"""
+    \b(?:sospes[oaie]|interrott[aoie]|suspend(?:ed)?|stopp?ed|discontinued?)
+    (?:\s+(?:dal|da|dall['’]|since|from|on|il))?
+    \s*(?P<date>\d{1,2}[./-]\d{1,2}(?:[./-]\d{2,4})?)
+    """,
+    re.IGNORECASE | re.VERBOSE,
 )
 DRUG_START_DATE_RE = re.compile(
     r"""
     (?P<prefix>
         \b(?:iniz(?:io|iat[oaie])|avviat[oaie]|ripres[oaie]|riprend[ei]re|
-        assunzion[ei]|in\s+terapia|in\s+trattamento|terapia|trattamento)
-        (?:\s+(?:dal|da|dall['’]|il))?
+        assunzion[ei]|in\s+terapia|in\s+trattamento|terapia|trattamento|
+        start(?:ed|ing)?|initiat(?:ed|ion)|began|begin|resume[sd]?|taking)
+        (?:\s+(?:dal|da|dall['’]|il|from|since|on))?
         |
-        \b(?:dal|da|dall['’]|il)\b
+        \b(?:dal|da|dall['’]|il|from|since|on)\b
     )
     \s*
-    (?P<date>\d{1,2}[./]\d{1,2}(?:[./]\d{2,4})?)
+    (?P<date>\d{1,2}[./-]\d{1,2}(?:[./-]\d{2,4})?)
     """,
     re.IGNORECASE | re.VERBOSE,
 )

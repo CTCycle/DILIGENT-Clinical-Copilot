@@ -16,13 +16,16 @@ from DILIGENT.server.models.prompts import (
 )
 from DILIGENT.server.models.providers import initialize_llm_client
 from DILIGENT.server.entities.clinical import (
+    ClinicalPipelineValidationError,
     DrugEntry,
     DrugClinicalAssessment,
     DrugSuspensionContext,
+    HepatotoxicityPatternAssessment,
     HepatotoxicityPatternScore,
     PatientData,
     PatientDrugClinicalReport,
     PatientDrugs,
+    PipelineIssue,
 )
 from DILIGENT.server.configurations import LLMRuntimeConfig, server_settings
 from DILIGENT.common.constants import (
@@ -40,22 +43,18 @@ NOT_AVAILABLE_TEXT = "Not available"
 
 
 ###############################################################################
-class HepatotoxicityPatternAnalyzer:
-
-    def __init__(self) -> None:
-        self.r_score: float | None = None
-
+class HepatotoxicityPatternCalculator:
     # -------------------------------------------------------------------------
-    def calculate_hepatotoxicity_pattern(
-        self, payload: PatientData
+    def calculate(
+        self,
+        *,
+        alt_value: float | None,
+        alt_uln: float | None,
+        alp_value: float | None,
+        alp_uln: float | None,
     ) -> HepatotoxicityPatternScore:
-        alt_value = self.parse_marker_value(payload.alt)
-        alt_max_value = self.parse_marker_value(payload.alt_max)
-        alp_value = self.parse_marker_value(payload.alp)
-        alp_max_value = self.parse_marker_value(payload.alp_max)
-
-        alt_multiple = self.safe_ratio(alt_value, alt_max_value)
-        alp_multiple = self.safe_ratio(alp_value, alp_max_value)
+        alt_multiple = self.safe_ratio(alt_value, alt_uln)
+        alp_multiple = self.safe_ratio(alp_value, alp_uln)
 
         r_score = None
         if alt_multiple is not None and alp_multiple not in (None, 0.0):
@@ -70,13 +69,111 @@ class HepatotoxicityPatternAnalyzer:
             else:
                 classification = "mixed"
 
-        self.r_score = r_score
-        
         return HepatotoxicityPatternScore(
             alt_multiple=alt_multiple,
             alp_multiple=alp_multiple,
             r_score=r_score,
             classification=classification,
+        )
+
+    # -------------------------------------------------------------------------
+    @staticmethod
+    def safe_ratio(value: float | None, reference: float | None) -> float | None:
+        if value is None or reference is None:
+            return None
+        if reference == 0:
+            return None
+        return value / reference
+
+
+###############################################################################
+class HepatotoxicityPatternAnalyzer:
+
+    def __init__(self) -> None:
+        self.r_score: float | None = None
+        self.calculator = HepatotoxicityPatternCalculator()
+
+    # -------------------------------------------------------------------------
+    def calculate_hepatotoxicity_pattern(
+        self, payload: PatientData
+    ) -> HepatotoxicityPatternScore:
+        alt_value = self.parse_marker_value(payload.alt)
+        alt_max_value = self.parse_marker_value(payload.alt_max)
+        alp_value = self.parse_marker_value(payload.alp)
+        alp_max_value = self.parse_marker_value(payload.alp_max)
+
+        score = self.calculator.calculate(
+            alt_value=alt_value,
+            alt_uln=alt_max_value,
+            alp_value=alp_value,
+            alp_uln=alp_max_value,
+        )
+        self.r_score = score.r_score
+        return score
+
+    # -------------------------------------------------------------------------
+    def assess_payload(
+        self,
+        payload: PatientData,
+        *,
+        allow_missing_labs: bool = False,
+    ) -> HepatotoxicityPatternAssessment:
+        field_mapping = [
+            ("alt", "ALT"),
+            ("alt_max", "ALT upper limit"),
+            ("alp", "ALP"),
+            ("alp_max", "ALP upper limit"),
+        ]
+        parsed_values: dict[str, float] = {}
+        issues: list[PipelineIssue] = []
+        for field_name, label in field_mapping:
+            raw_value = getattr(payload, field_name, None)
+            parsed = self.parse_marker_value(raw_value)
+            if parsed is None:
+                issues.append(
+                    PipelineIssue(
+                        severity="warning",
+                        code="missing_labs",
+                        message=(
+                            f"{label} is missing or invalid. ALT, ALT max, ALP, and ALP max "
+                            "are required for a determined hepatotoxicity pattern."
+                        ),
+                        field=field_name,
+                    )
+                )
+                continue
+            parsed_values[field_name] = parsed
+
+        if issues:
+            if not allow_missing_labs:
+                raise ClinicalPipelineValidationError(
+                    issues=issues,
+                    message="Missing laboratory values required for hepatotoxicity pattern assessment.",
+                )
+            indeterminate = HepatotoxicityPatternScore(
+                alt_multiple=None,
+                alp_multiple=None,
+                r_score=None,
+                classification=DEFAULT_DILI_CLASSIFICATION,
+            )
+            self.r_score = indeterminate.r_score
+            return HepatotoxicityPatternAssessment(
+                score=indeterminate,
+                status="undetermined_due_to_missing_labs",
+                issues=issues,
+            )
+
+        score = self.calculator.calculate(
+            alt_value=parsed_values["alt"],
+            alt_uln=parsed_values["alt_max"],
+            alp_value=parsed_values["alp"],
+            alp_uln=parsed_values["alp_max"],
+        )
+        self.r_score = score.r_score
+        return HepatotoxicityPatternAssessment(
+            score=score,
+            status="ok",
+            issues=[],
         )
 
     # -------------------------------------------------------------------------
@@ -94,11 +191,7 @@ class HepatotoxicityPatternAnalyzer:
 
     # -------------------------------------------------------------------------
     def safe_ratio(self, value: float | None, reference: float | None) -> float | None:
-        if value is None or reference is None:
-            return None
-        if reference == 0:
-            return None
-        return value / reference
+        return self.calculator.safe_ratio(value, reference)
 
     # -------------------------------------------------------------------------
     def stringify_scores(

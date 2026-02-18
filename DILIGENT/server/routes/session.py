@@ -12,9 +12,10 @@ from pydantic import ValidationError
 from pydantic_core import ErrorDetails
 
 from DILIGENT.server.entities.clinical import (
+    ClinicalPipelineValidationError,
     ClinicalSessionRequest,
     PatientData,
-    PatientDrugs,
+    PipelineIssue,
 )
 from DILIGENT.server.entities.jobs import (
     JobCancelResponse,
@@ -85,6 +86,8 @@ class NarrativeBuilder:
         pattern_score,
         pattern_strings: dict[str, str],
         detected_drugs: list[str],
+        anamnesis_detected_drugs: list[str],
+        issues: list[PipelineIssue],
         final_report: str | None,
     ) -> str:
         classification = getattr(pattern_score, "classification", NOT_AVAILABLE)
@@ -126,6 +129,25 @@ class NarrativeBuilder:
         )
         sections.append("\n".join(therapy_section))
 
+        anamnesis_drug_summary = (
+            ", ".join(anamnesis_detected_drugs) if anamnesis_detected_drugs else "None detected"
+        )
+        sections.append(
+            "\n".join(
+                [
+                    "## Drugs Mentioned in Anamnesis (Historical)",
+                    "",
+                    f"- **Historical mentions ({len(anamnesis_detected_drugs)}):** {anamnesis_drug_summary}",
+                ]
+            )
+        )
+
+        if issues:
+            warnings_section = ["## Warnings", ""]
+            for issue in issues:
+                warnings_section.append(f"- {issue.message}")
+            sections.append("\n".join(warnings_section))
+
         clinical_report_section = ["## Clinical Report", ""]
         clinical_report_section.append(
             final_report.strip() if final_report else "No clinical report generated."
@@ -140,7 +162,7 @@ async def execute_clinical_job(
     payload: PatientData,
     runtime_overrides: dict[str, Any],
     job_id: str,
-) -> str:
+) -> dict[str, Any]:
     endpoint.apply_runtime_overrides(
         use_cloud_services=runtime_overrides.get("use_cloud_services"),
         llm_provider=runtime_overrides.get("llm_provider"),
@@ -155,7 +177,20 @@ async def execute_clinical_job(
         return ""
 
     job_manager.update_progress(job_id, 5.0)
-    result = await endpoint.process_single_patient(payload)
+    try:
+        result = await endpoint.process_single_patient(
+            payload,
+            allow_missing_labs=bool(runtime_overrides.get("allow_missing_labs")),
+        )
+    except ClinicalPipelineValidationError as exc:
+        job_manager.update_result(
+            job_id,
+            {
+                "validation_error": str(exc),
+                "issues": [issue.model_dump() for issue in exc.issues],
+            },
+        )
+        raise
     return result
 
 
@@ -170,7 +205,7 @@ def run_clinical_job(
     )
     if not result:
         return {}
-    return {"report": result}
+    return result
 
 
 ###############################################################################
@@ -204,6 +239,11 @@ class ClinicalSessionEndpoint:
                 continue
             serialized.append(error_dict)
         return serialized
+
+    # -------------------------------------------------------------------------
+    @staticmethod
+    def serialize_pipeline_issues(issues: Sequence[PipelineIssue]) -> list[dict[str, Any]]:
+        return [issue.model_dump() for issue in issues]
 
     # -------------------------------------------------------------------------
     def apply_runtime_overrides(
@@ -273,26 +313,57 @@ class ClinicalSessionEndpoint:
             ) from exc
 
     # -------------------------------------------------------------------------
-    async def process_single_patient(self, payload: PatientData) -> str:
+    async def process_single_patient(
+        self,
+        payload: PatientData,
+        *,
+        allow_missing_labs: bool = False,
+    ) -> dict[str, Any]:
         logger.info(
             "Starting Drug-Induced Liver Injury (DILI) analysis for patient: %s",
             payload.name,
         )
 
         global_start_time = time.perf_counter()
-
-        pattern_score = self.pattern_analyzer.calculate_hepatotoxicity_pattern(payload)
+        issues: list[PipelineIssue] = []
+        pattern_assessment = self.pattern_analyzer.assess_payload(
+            payload,
+            allow_missing_labs=allow_missing_labs,
+        )
+        pattern_score = pattern_assessment.score
+        issues.extend(pattern_assessment.issues)
         logger.info(
-            "Patient hepatotoxicity pattern classified as %s (R=%.3f)",
+            "Patient hepatotoxicity pattern classified as %s (R=%.3f, status=%s)",
             pattern_score.classification,
             pattern_score.r_score if pattern_score.r_score is not None else float("nan"),
+            pattern_assessment.status,
         )
 
+        cleaned_therapy_text = self.drugs_parser.clean_text(payload.drugs or "")
+        if not cleaned_therapy_text:
+            issue = PipelineIssue(
+                severity="error",
+                code="missing_therapy_drugs",
+                message="At least one therapy drug is required for DILI analysis.",
+                field="drugs",
+            )
+            raise ClinicalPipelineValidationError(issues=[issue], message=issue.message)
+
         start_time = time.perf_counter()
-        drug_data = await self.drugs_parser.extract_drugs_from_therapy(payload.drugs or "")
+        therapy_drugs = await self.drugs_parser.extract_drugs_from_therapy(
+            cleaned_therapy_text
+        )
         elapsed = time.perf_counter() - start_time
         logger.info("Therapy drugs extraction required %.4f seconds", elapsed)
-        logger.info("Detected %s drugs from therapy list", len(drug_data.entries))
+        logger.info("Detected %s drugs from therapy list", len(therapy_drugs.entries))
+        if not therapy_drugs.entries:
+            issue = PipelineIssue(
+                severity="error",
+                code="missing_therapy_drugs",
+                message="At least one therapy drug is required for DILI analysis.",
+                field="drugs",
+            )
+            raise ClinicalPipelineValidationError(issues=[issue], message=issue.message)
 
         start_time = time.perf_counter()
         anamnesis_drugs = await self.drugs_parser.extract_drugs_from_anamnesis(
@@ -302,13 +373,9 @@ class ClinicalSessionEndpoint:
         logger.info("Anamnesis drugs extraction required %.4f seconds", elapsed)
         logger.info("Detected %s drugs from anamnesis", len(anamnesis_drugs.entries))
 
-        merged_entries = drug_data.entries + anamnesis_drugs.entries
-        drug_data = PatientDrugs(entries=merged_entries)
-        logger.info("Total merged drug pool: %s entries", len(drug_data.entries))
-
         rag_query: dict[str, str] | None = None
         if payload.use_rag:
-            query_builder = DILIQueryBuilder(drug_data)
+            query_builder = DILIQueryBuilder(therapy_drugs)
             logger.info("RAG retrieval enabled for clinical consultation")
             rag_query = query_builder.build_dili_queries(
                 clinical_context=payload.anamnesis or "",
@@ -317,12 +384,13 @@ class ClinicalSessionEndpoint:
             )
 
         prepared_inputs = await input_preparator.prepare_inputs(
-            drug_data,
+            therapy_drugs,
             clinical_context=payload.anamnesis,
             pattern_score=pattern_score,
         )
 
-        clinical_session = HepatoxConsultation(drug_data, patient_name=payload.name)
+        start_time = time.perf_counter()
+        clinical_session = HepatoxConsultation(therapy_drugs, patient_name=payload.name)
         drug_assessment = await clinical_session.run_analysis(
             prepared_inputs=prepared_inputs,
             visit_date=payload.visit_date,
@@ -348,7 +416,10 @@ class ClinicalSessionEndpoint:
             global_elapsed,
         )
 
-        detected_drugs = [entry.name for entry in drug_data.entries if entry.name]
+        detected_drugs = [entry.name for entry in therapy_drugs.entries if entry.name]
+        anamnesis_detected_drugs = [
+            entry.name for entry in anamnesis_drugs.entries if entry.name
+        ]
         resolved_drug_map: dict[str, dict[str, Any]] = {}
         if prepared_inputs is not None:
             for key, value in prepared_inputs.resolved_drugs.items():
@@ -387,6 +458,7 @@ class ClinicalSessionEndpoint:
                     else [],
                 }
             )
+        serialized_issues = self.serialize_pipeline_issues(issues)
         pattern_strings = self.pattern_analyzer.stringify_scores(pattern_score)
         await asyncio.to_thread(
             self.serializer.save_clinical_session,
@@ -406,6 +478,7 @@ class ClinicalSessionEndpoint:
                 "final_report": final_report,
                 "detected_drugs": detected_drugs,
                 "matched_drugs": matched_drugs_payload,
+                "issues": serialized_issues,
             },
         )
 
@@ -417,10 +490,19 @@ class ClinicalSessionEndpoint:
             pattern_score=pattern_score,
             pattern_strings=pattern_strings,
             detected_drugs=detected_drugs,
+            anamnesis_detected_drugs=anamnesis_detected_drugs,
+            issues=issues,
             final_report=final_report,
         )
 
-        return narrative
+        return {
+            "report": narrative,
+            "issues": serialized_issues,
+            "pattern_status": pattern_assessment.status,
+            "detected_drugs": detected_drugs,
+            "anamnesis_drugs": anamnesis_detected_drugs,
+            "matched_drugs": matched_drugs_payload,
+        }
 
     # -------------------------------------------------------------------------
     async def start_clinical_session(
@@ -438,8 +520,18 @@ class ClinicalSessionEndpoint:
         )
 
         patient_payload = self.build_patient_payload(request_payload)
-        single_result = await self.process_single_patient(patient_payload)
-        return PlainTextResponse(content=single_result)
+        try:
+            single_result = await self.process_single_patient(
+                patient_payload,
+                allow_missing_labs=bool(request_payload.allow_missing_labs),
+            )
+        except ClinicalPipelineValidationError as exc:
+            raise HTTPException(
+                status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+                detail=self.serialize_pipeline_issues(exc.issues),
+            ) from exc
+        report = str(single_result.get("report", "")).strip()
+        return PlainTextResponse(content=report)
 
     # -------------------------------------------------------------------------
     def start_clinical_job(
@@ -461,6 +553,7 @@ class ClinicalSessionEndpoint:
             "clinical_model": request_payload.clinical_model,
             "ollama_temperature": request_payload.ollama_temperature,
             "ollama_reasoning": request_payload.ollama_reasoning,
+            "allow_missing_labs": request_payload.allow_missing_labs,
         }
 
         job_id = job_manager.start_job(

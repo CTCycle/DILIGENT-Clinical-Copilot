@@ -1,7 +1,8 @@
-import React, { useEffect, useMemo, useRef } from "react";
+import React, { useEffect, useMemo, useRef, useState } from "react";
 import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
 
+import { ConfirmModal } from "../components/ConfirmModal";
 import {
     DEFAULT_SETTINGS,
     REPORT_EXPORT_FILENAME,
@@ -64,6 +65,7 @@ export function DiluAgentPage(): React.JSX.Element {
     } = state.diluAgent;
 
     const pollerRef = useRef<{ stop: () => void } | null>(null);
+    const [isMissingLabsModalOpen, setIsMissingLabsModalOpen] = useState(false);
 
     // Cleanup export URL on unmount
     useEffect(() => {
@@ -103,7 +105,7 @@ export function DiluAgentPage(): React.JSX.Element {
         handleFormChange("visitDate", normalizeVisitDateInput(value));
     };
 
-    const handleRunSession = async () => {
+    const executeRunSession = async (allowMissingLabs: boolean | null) => {
         updateDiluAgent({ isRunning: true });
         resetOutputs();
         if (pollerRef.current) {
@@ -111,7 +113,7 @@ export function DiluAgentPage(): React.JSX.Element {
             pollerRef.current = null;
         }
         try {
-            const payload = buildClinicalPayload(form, settings);
+            const payload = buildClinicalPayload(form, settings, allowMissingLabs);
             const startResult = await startClinicalJob(payload);
             updateDiluAgent({
                 jobId: startResult.job_id,
@@ -193,12 +195,46 @@ export function DiluAgentPage(): React.JSX.Element {
                 message: `[ERROR] ${description}`,
                 jsonPayload: null,
                 exportUrl: null,
+                isRunning: false,
             });
         } finally {
             if (!pollerRef.current) {
                 updateDiluAgent({ isRunning: false });
             }
         }
+    };
+
+    const handleRunSession = async () => {
+        const cleanedDrugs = form.drugs.trim();
+        if (!cleanedDrugs) {
+            resetOutputs();
+            updateDiluAgent({
+                isRunning: false,
+                message: "[ERROR] At least one therapy drug is required for DILI analysis.",
+                jsonPayload: null,
+                exportUrl: null,
+            });
+            return;
+        }
+
+        const missingLabs = [form.alt, form.altMax, form.alp, form.alpMax].some(
+            (value) => !value.trim(),
+        );
+        if (missingLabs) {
+            setIsMissingLabsModalOpen(true);
+            return;
+        }
+
+        await executeRunSession(null);
+    };
+
+    const handleConfirmMissingLabs = async () => {
+        setIsMissingLabsModalOpen(false);
+        await executeRunSession(true);
+    };
+
+    const handleCancelMissingLabs = () => {
+        setIsMissingLabsModalOpen(false);
     };
 
     const handleClear = () => {
@@ -527,6 +563,15 @@ export function DiluAgentPage(): React.JSX.Element {
                     </section>
                 )}
             </main>
+            <ConfirmModal
+                isOpen={isMissingLabsModalOpen}
+                title="Missing ALT/ALP labs"
+                message="ALT/ALP values are missing; pattern will be undetermined. Continue anyway?"
+                confirmLabel="Continue anyway"
+                cancelLabel="Cancel"
+                onConfirm={() => { void handleConfirmMissingLabs(); }}
+                onCancel={handleCancelMissingLabs}
+            />
         </>
     );
 }

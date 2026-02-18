@@ -260,6 +260,7 @@ class ClinicalSessionRequest(BaseModel):
     alt_max: str | None = None
     alp: str | None = None
     alp_max: str | None = None
+    allow_missing_labs: bool | None = None
     use_cloud_services: bool | None = None
     llm_provider: str | None = None
     cloud_model: str | None = None
@@ -296,6 +297,14 @@ class DrugEntry(BaseModel):
     administration_mode: str | None = Field(
         None, description="Pharmaceutical form or administration mode (e.g., cpr, sir)."
     )
+    route: str | None = Field(
+        None,
+        description="Administration route when explicitly reported (e.g., oral, iv).",
+    )
+    administration_pattern: str | None = Field(
+        None,
+        description="Normalized raw administration schedule text when available.",
+    )
     daytime_administration: list[float] = Field(
         default_factory=list,
         description="Administration schedule across the day (four slots).",
@@ -322,6 +331,16 @@ class DrugEntry(BaseModel):
             "'anamnesis' for drugs mentioned in clinical history."
         ),
     )
+    temporal_classification: Literal["temporal_known", "temporal_uncertain"] | None = (
+        Field(
+            default=None,
+            description="Whether temporal metadata was detected for this drug entry.",
+        )
+    )
+    historical_flag: bool | None = Field(
+        default=None,
+        description="True for historical/anamnesis mentions, False for active therapy entries.",
+    )
 
     @field_validator("daytime_administration", mode="before")
     @classmethod
@@ -332,11 +351,44 @@ class DrugEntry(BaseModel):
         if not isinstance(value, list) or not value:
             return []
 
-        cleaned = [float(slot) for slot in value if slot is not None]
+        cleaned: list[float] = []
+        for slot in value:
+            if slot is None:
+                continue
+            try:
+                cleaned.append(float(slot))
+            except (TypeError, ValueError):
+                continue
+        if not cleaned:
+            return []
         if len(cleaned) >= 4:
             return cleaned[:4]
+        cleaned.extend([0.0] * (4 - len(cleaned)))
+        return cleaned
 
-        return []
+
+###############################################################################
+class PipelineIssue(BaseModel):
+    severity: Literal["warning", "error"]
+    code: str = Field(..., min_length=1, max_length=100)
+    message: str = Field(..., min_length=1, max_length=500)
+    field: str | None = Field(default=None, max_length=100)
+    line_index: int | None = Field(default=None, ge=0)
+    raw_line: str | None = Field(default=None, max_length=5000)
+
+
+###############################################################################
+class ClinicalPipelineValidationError(Exception):
+    def __init__(
+        self,
+        issues: list[PipelineIssue],
+        message: str | None = None,
+    ) -> None:
+        self.issues = issues
+        first_line = message or (
+            issues[0].message if issues else "Clinical pipeline validation failed."
+        )
+        super().__init__(first_line)
 
 
 # -----------------------------------------------------------------------------
@@ -407,6 +459,13 @@ class HepatotoxicityPatternScore(BaseModel):
         "indeterminate",
         description="DILI pattern classification derived from the R ratio.",
     )
+
+
+###############################################################################
+class HepatotoxicityPatternAssessment(BaseModel):
+    score: HepatotoxicityPatternScore
+    status: Literal["ok", "undetermined_due_to_missing_labs"] = "ok"
+    issues: list[PipelineIssue] = Field(default_factory=list)
 
 
 ###############################################################################
