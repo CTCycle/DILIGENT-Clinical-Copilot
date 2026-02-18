@@ -5,7 +5,7 @@ import contextlib
 import re
 import unicodedata
 from datetime import date
-from typing import Any
+from typing import Any, Literal
 
 from DILIGENT.server.models.prompts import (
     ANAMNESIS_DRUG_EXTRACTION_PROMPT,
@@ -39,6 +39,31 @@ class DrugsParser:
     SUSPENSION_RE = DRUG_SUSPENSION_RE
     SUSPENSION_DATE_RE = DRUG_SUSPENSION_DATE_RE
     START_DATE_RE = DRUG_START_DATE_RE
+    ROUTE_PATTERNS: tuple[tuple[str, re.Pattern[str]], ...] = (
+        ("oral", re.compile(r"\b(?:po|p\.?o\.?|per\s+os|orale|oral)\b", re.IGNORECASE)),
+        (
+            "iv",
+            re.compile(
+                r"\b(?:iv|i\.?v\.?|ev|e\.?v\.?|endovenos[ao]?|intraven(?:ous|osa)?)\b",
+                re.IGNORECASE,
+            ),
+        ),
+        (
+            "im",
+            re.compile(
+                r"\b(?:im|i\.?m\.?|intramuscolar[ei]|intramuscular)\b",
+                re.IGNORECASE,
+            ),
+        ),
+        (
+            "sc",
+            re.compile(
+                r"\b(?:sc|s\.?c\.?|sottocutane[ao]?|subcut(?:aneous|anea)?)\b",
+                re.IGNORECASE,
+            ),
+        ),
+        ("topical", re.compile(r"\b(?:topical|topic[ao]|cutane[ao])\b", re.IGNORECASE)),
+    )
 
     def __init__(
         self,
@@ -105,24 +130,7 @@ class DrugsParser:
             stripped = self.BULLET_RE.sub("", stripped)
             if not stripped:
                 continue
-            if not lines:
-                lines.append(stripped)
-                continue
-
-            has_schedule = bool(self.SCHEDULE_RE.search(stripped))
-            has_metadata = bool(
-                self.SUSPENSION_RE.search(stripped)
-                or self.SUSPENSION_DATE_RE.search(stripped)
-                or self.START_DATE_RE.search(stripped)
-            )
-
-            if has_schedule:
-                lines.append(stripped)
-            elif has_metadata:
-                # Attach metadata lines to the preceding drug entry
-                lines[-1] = f"{lines[-1]} {stripped}"
-            else:
-                lines.append(stripped)
+            lines.append(stripped)
         return "\n".join(lines)
 
     # -------------------------------------------------------------------------
@@ -148,34 +156,46 @@ class DrugsParser:
         ]
         grouped_lines = self.group_lines_for_llm(lines)
         parsed_chunks, fallback_chunks = self.rule_based_parse(grouped_lines)
-        if not fallback_chunks:
-            ordered = [entry for _, entry in parsed_chunks]
-            return PatientDrugs(entries=ordered)
-
-        await self.ensure_client()
-        if self.client is None:
-            raise RuntimeError("LLM client is not initialized for drug extraction")
-        try:
-            # Ask the LLM for a structured list following the PatientDrugs schema
-            structured = await self.llm_extract_drugs(
-                [line for _, line in fallback_chunks]
-            )
-        except Exception as exc:  # pragma: no cover - passthrough for visibility
-            raise RuntimeError("Failed to extract drugs via LLM") from exc
-
         ordered_entries: list[DrugEntry | None] = [None] * len(grouped_lines)
         for index, entry in parsed_chunks:
-            ordered_entries[index] = entry
-        llm_entries = list(structured.entries)
-        for offset, entry in enumerate(llm_entries):
-            if offset < len(fallback_chunks):
-                target_index = fallback_chunks[offset][0]
-                ordered_entries[target_index] = entry
-            else:
-                ordered_entries.append(entry)
+            normalized = self.normalize_entry(
+                entry,
+                source="therapy",
+                historical_flag=False,
+            )
+            ordered_entries[index] = normalized
+
+        if fallback_chunks:
+            await self.ensure_client()
+            if self.client is None:
+                raise RuntimeError("LLM client is not initialized for drug extraction")
+            try:
+                # Ask the LLM for structured entries only for lines with true rule failures.
+                structured = await self.llm_extract_drugs(
+                    [line for _, line in fallback_chunks]
+                )
+            except Exception as exc:  # pragma: no cover - passthrough for visibility
+                raise RuntimeError("Failed to extract drugs via LLM") from exc
+
+            llm_entries = list(structured.entries)
+            for offset, (target_index, raw_line) in enumerate(fallback_chunks):
+                llm_entry = llm_entries[offset] if offset < len(llm_entries) else None
+                normalized = self.post_process_llm_entry(
+                    llm_entry,
+                    raw_line=raw_line,
+                    source="therapy",
+                    historical_flag=False,
+                )
+                ordered_entries[target_index] = normalized
+            for entry in llm_entries[len(fallback_chunks) :]:
+                normalized = self.normalize_entry(
+                    entry,
+                    source="therapy",
+                    historical_flag=False,
+                )
+                ordered_entries.append(normalized)
+
         combined = [entry for entry in ordered_entries if entry is not None]
-        for entry in combined:
-            entry.source = "therapy"
         return PatientDrugs(entries=combined)
 
     # -------------------------------------------------------------------------
@@ -245,63 +265,20 @@ class DrugsParser:
         except Exception as exc:
             raise RuntimeError("Failed to extract drugs from anamnesis via LLM") from exc
 
+        entries: list[DrugEntry] = []
         for entry in parsed.entries:
-            entry.source = "anamnesis"
-
-        return parsed
+            normalized = self.normalize_entry(
+                entry,
+                source="anamnesis",
+                historical_flag=True,
+            )
+            if normalized is not None:
+                entries.append(normalized)
+        return PatientDrugs(entries=entries)
 
     # -------------------------------------------------------------------------
     def group_lines_for_llm(self, lines: list[str]) -> list[str]:
-        grouped: list[str] = []
-        metadata_buffer: list[str] = []
-        prefix_buffer: list[str] = []
-        for index, line in enumerate(lines):
-            schedule_match = self.SCHEDULE_RE.search(line)
-            has_schedule = bool(schedule_match)
-            has_metadata = bool(
-                self.SUSPENSION_RE.search(line)
-                or self.SUSPENSION_DATE_RE.search(line)
-                or self.START_DATE_RE.search(line)
-            )
-            if has_metadata and not has_schedule:
-                metadata_buffer.append(line)
-                continue
-
-            has_numeric = bool(re.search(r"\d", line))
-            if not has_numeric and not has_schedule:
-                next_line = lines[index + 1] if index + 1 < len(lines) else ""
-                next_has_schedule = (
-                    bool(self.SCHEDULE_RE.search(next_line)) if next_line else False
-                )
-                next_has_numeric = (
-                    bool(re.search(r"\d", next_line)) if next_line else False
-                )
-                if next_has_numeric or next_has_schedule:
-                    prefix_buffer.append(line)
-                    continue
-
-            if grouped and schedule_match and not metadata_buffer and not prefix_buffer:
-                prefix = line[: schedule_match.start()]
-                prefix = self.BULLET_RE.sub("", prefix).strip(" \t,.;:-/")
-                if not prefix:
-                    grouped[-1] = f"{grouped[-1]} {line}".strip()
-                    continue
-
-            combined_parts = metadata_buffer + prefix_buffer + [line]
-            # Deliver dosage, schedule, and annotations to the model as a single chunk
-            combined = " ".join(part for part in combined_parts if part).strip()
-            if combined:
-                grouped.append(combined)
-            else:
-                grouped.append(line)
-            metadata_buffer.clear()
-            prefix_buffer.clear()
-
-        leftover_parts = metadata_buffer + prefix_buffer
-        if leftover_parts and grouped:
-            # Append trailing metadata that never received its own schedule line
-            grouped[-1] = f"{grouped[-1]} {' '.join(leftover_parts)}".strip()
-
+        grouped = [line.strip() for line in lines if line and line.strip()]
         return grouped if grouped else lines
 
     # -------------------------------------------------------------------------
@@ -320,34 +297,48 @@ class DrugsParser:
 
     # -------------------------------------------------------------------------
     def parse_line(self, line: str) -> DrugEntry | None:
-        schedule_match = self.SCHEDULE_RE.search(line)
-        if not schedule_match:
+        if not self.has_alpha_token(line):
             return None
-        schedule_text = schedule_match.group("schedule")
-        schedule_values = self.parse_schedule(schedule_text)
-        before = line[: schedule_match.start()].strip(" ,;:\t")
-        tail = line[schedule_match.end() :].strip()
+
+        schedule_match = self.SCHEDULE_RE.search(line)
+        schedule_text = schedule_match.group("schedule") if schedule_match else None
+        schedule_values = self.parse_schedule(schedule_text) if schedule_text else []
+        administration_pattern = (
+            self.normalize_schedule_pattern(schedule_text) if schedule_text else None
+        )
+        if schedule_match:
+            before = line[: schedule_match.start()].strip(" ,;:\t")
+            tail = line[schedule_match.end() :].strip()
+        else:
+            before = line.strip(" ,;:\t")
+            tail = line
         bracket_match = self.BRACKET_TRAIL_RE.search(before)
         if bracket_match:
             before = before[: bracket_match.start()].strip()
         name, dosage, administration_mode = self.split_heading(before)
         if not name:
             name = before or line.strip()
+        route = self.detect_route(line)
         suspension_status, suspension_date = self.detect_suspension(line, tail)
         start_status, start_date = self.detect_start(line, tail)
-        return DrugEntry(
+        candidate = DrugEntry(
             name=name,
             dosage=dosage,
             administration_mode=administration_mode,
+            route=route,
+            administration_pattern=administration_pattern,
             daytime_administration=schedule_values,
             suspension_status=suspension_status,
             suspension_date=suspension_date,
             therapy_start_status=start_status,
             therapy_start_date=start_date,
         )
+        return self.normalize_entry(candidate, source="therapy", historical_flag=False)
 
     # -------------------------------------------------------------------------
-    def parse_schedule(self, text: str) -> list[float]:
+    def parse_schedule(self, text: str | None) -> list[float]:
+        if not text:
+            return []
         slots: list[float] = []
         for token in re.split(r"[-\s]+", text):
             normalized = token.strip()
@@ -358,13 +349,29 @@ class DrugsParser:
                 value = float(normalized)
             except ValueError:
                 continue
-            if value.is_integer():
-                slots.append(int(value))
-            else:
-                slots.append(value)
-        if len(slots) >= 4:
-            return slots[:4]
-        return []
+            slots.append(value)
+            if len(slots) >= 4:
+                break
+        return slots
+
+    # -------------------------------------------------------------------------
+    def normalize_schedule_pattern(self, text: str | None) -> str | None:
+        if not text:
+            return None
+        parts: list[str] = []
+        for token in text.split("-"):
+            normalized = token.strip().replace(",", ".")
+            if not normalized:
+                continue
+            try:
+                value = float(normalized)
+                if value.is_integer():
+                    parts.append(str(int(value)))
+                else:
+                    parts.append(f"{value:g}")
+            except ValueError:
+                parts.append(normalized)
+        return "-".join(parts) if parts else None
 
     # -------------------------------------------------------------------------
     def split_heading(self, text: str) -> tuple[str | None, str | None, str | None]:
@@ -445,6 +452,16 @@ class DrugsParser:
         return any(ch.isdigit() for ch in token)
 
     # -------------------------------------------------------------------------
+    def detect_route(self, text: str) -> str | None:
+        normalized = text.strip()
+        if not normalized:
+            return None
+        for route_name, route_re in self.ROUTE_PATTERNS:
+            if route_re.search(normalized):
+                return route_name
+        return None
+
+    # -------------------------------------------------------------------------
     def detect_suspension(
         self, full_line: str, tail: str
     ) -> tuple[bool | None, str | None]:
@@ -474,11 +491,136 @@ class DrugsParser:
         return None, None
 
     # -------------------------------------------------------------------------
+    def has_alpha_token(self, text: str | None) -> bool:
+        if not text:
+            return False
+        return bool(re.search(r"[A-Za-zÀ-ÖØ-öø-ÿ]", text))
+
+    # -------------------------------------------------------------------------
+    def sanitize_name(self, value: str | None) -> str | None:
+        if value is None:
+            return None
+        raw_text = str(value)
+        if "\n" in raw_text or "\r" in raw_text:
+            return None
+        normalized = re.sub(r"\s+", " ", raw_text).strip(" \t,;:.-")
+        if not normalized:
+            return None
+        if len(normalized.split()) > 8:
+            return None
+        if not self.has_alpha_token(normalized):
+            return None
+        if re.search(r"[.;:!?]{2,}", normalized):
+            return None
+        return normalized
+
+    # -------------------------------------------------------------------------
+    def sanitize_text_field(self, value: str | None) -> str | None:
+        if value is None:
+            return None
+        normalized = re.sub(r"\s+", " ", str(value)).strip()
+        return normalized or None
+
+    # -------------------------------------------------------------------------
+    def derive_temporal_classification(self, entry: DrugEntry) -> str:
+        schedule_present = bool(entry.administration_pattern) or bool(
+            entry.daytime_administration
+        )
+        start_present = (
+            entry.therapy_start_status is not None or bool(entry.therapy_start_date)
+        )
+        suspension_present = (
+            entry.suspension_status is not None or bool(entry.suspension_date)
+        )
+        if schedule_present or start_present or suspension_present:
+            return "temporal_known"
+        return "temporal_uncertain"
+
+    # -------------------------------------------------------------------------
+    def normalize_entry(
+        self,
+        entry: DrugEntry | None,
+        *,
+        source: Literal["therapy", "anamnesis"],
+        historical_flag: bool,
+    ) -> DrugEntry | None:
+        if entry is None:
+            return None
+        name = self.sanitize_name(entry.name)
+        if name is None:
+            return None
+        normalized = entry.model_copy(deep=True)
+        normalized.name = name
+        normalized.dosage = self.sanitize_text_field(normalized.dosage)
+        normalized.administration_mode = self.sanitize_text_field(
+            normalized.administration_mode
+        )
+        normalized.route = self.sanitize_text_field(normalized.route)
+        normalized.administration_pattern = self.sanitize_text_field(
+            normalized.administration_pattern
+        )
+        normalized.suspension_date = self.sanitize_text_field(normalized.suspension_date)
+        normalized.therapy_start_date = self.sanitize_text_field(
+            normalized.therapy_start_date
+        )
+        normalized.source = source
+        normalized.historical_flag = historical_flag
+        normalized.temporal_classification = self.derive_temporal_classification(
+            normalized
+        )
+        return normalized
+
+    # -------------------------------------------------------------------------
+    def enrich_entry_from_line(self, entry: DrugEntry, raw_line: str) -> DrugEntry:
+        normalized = entry.model_copy(deep=True)
+        schedule_match = self.SCHEDULE_RE.search(raw_line)
+        if schedule_match:
+            schedule_text = schedule_match.group("schedule")
+            schedule_values = self.parse_schedule(schedule_text)
+            if schedule_values:
+                normalized.daytime_administration = schedule_values
+            schedule_pattern = self.normalize_schedule_pattern(schedule_text)
+            if schedule_pattern:
+                normalized.administration_pattern = schedule_pattern
+        route = self.detect_route(raw_line)
+        if route:
+            normalized.route = route
+        suspension_status, suspension_date = self.detect_suspension(raw_line, raw_line)
+        if suspension_status is not None:
+            normalized.suspension_status = suspension_status
+        if suspension_date:
+            normalized.suspension_date = suspension_date
+        start_status, start_date = self.detect_start(raw_line, raw_line)
+        if start_status is not None:
+            normalized.therapy_start_status = start_status
+        if start_date:
+            normalized.therapy_start_date = start_date
+        return normalized
+
+    # -------------------------------------------------------------------------
+    def post_process_llm_entry(
+        self,
+        entry: DrugEntry | None,
+        *,
+        raw_line: str,
+        source: Literal["therapy", "anamnesis"],
+        historical_flag: bool,
+    ) -> DrugEntry | None:
+        if entry is None:
+            return None
+        enriched = self.enrich_entry_from_line(entry, raw_line)
+        return self.normalize_entry(
+            enriched,
+            source=source,
+            historical_flag=historical_flag,
+        )
+
+    # -------------------------------------------------------------------------
     def normalize_date_token(self, token: str | None) -> str | None:
         if not token:
             return None
         stripped = token.strip(" .,:;")
-        match = re.fullmatch(r"(\d{1,2})[./](\d{1,2})(?:[./](\d{4}))?", stripped)
+        match = re.fullmatch(r"(\d{1,2})[./-](\d{1,2})(?:[./-](\d{4}))?", stripped)
         if not match:
             return stripped or None
         day, month, year = match.groups()

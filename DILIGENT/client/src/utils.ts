@@ -107,8 +107,9 @@ function buildVisitDatePayload(
 export function buildClinicalPayload(
   form: ClinicalFormState,
   settings: RuntimeSettings,
+  allowMissingLabs: boolean | null = null,
 ): ClinicalRequestPayload {
-  return {
+  const payload: ClinicalRequestPayload = {
     name: sanitizeField(form.patientName),
     visit_date: buildVisitDatePayload(form.visitDate),
     anamnesis: sanitizeField(form.anamnesis),
@@ -126,6 +127,10 @@ export function buildClinicalPayload(
     ollama_temperature: settings.temperature,
     ollama_reasoning: settings.reasoning,
   };
+  if (allowMissingLabs !== null) {
+    payload.allow_missing_labs = allowMissingLabs;
+  }
+  return payload;
 }
 
 export function createDownloadUrl(content: string, filename: string): string {
