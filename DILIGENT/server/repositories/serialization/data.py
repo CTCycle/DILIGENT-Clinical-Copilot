@@ -673,10 +673,17 @@ class _RepositorySerializationService:
     def persist_session_sections(
         self, db_session: Session, session_id: int, session_data: dict[str, Any]
     ) -> None:
+        issues_content: str | None = None
+        issues_raw = session_data.get("issues")
+        if isinstance(issues_raw, (list, dict)):
+            issues_content = json.dumps(issues_raw, ensure_ascii=False)
+        elif isinstance(issues_raw, str):
+            issues_content = self.normalize_string(issues_raw)
         payload = {
             "anamnesis": session_data.get("anamnesis"),
             "drugs": session_data.get("drugs"),
             "final_report": session_data.get("final_report"),
+            "issues": issues_content,
         }
         for section_kind, value in payload.items():
             content = self.normalize_string(value)

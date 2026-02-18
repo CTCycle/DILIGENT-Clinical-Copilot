@@ -1240,6 +1240,16 @@ input[type="date"]::-webkit-calendar-picker-indicator:hover {
   width: 100%;
 }
 
+.confirm-modal-actions {
+  display: flex;
+  gap: var(--space-sm);
+}
+
+.confirm-modal-actions .btn {
+  width: auto;
+  flex: 1;
+}
+
 @media (max-width: 768px) {
   .lab-layout {
     grid-template-columns: 1fr;
