@@ -994,26 +994,43 @@ class LiverToxUpdater:
     @staticmethod
     def extract_title(html_text: str, plain_text: str, default: str) -> str:
         patterns = (
-            r"<title[^>]*>([^<]*(?:<[^>]+>[^<]*)*)</title>",
-            r"<article-title[^>]*>([^<]*(?:<[^>]+>[^<]*)*)</article-title>",
-            r"<h1[^>]*>([^<]*(?:<[^>]+>[^<]*)*)</h1>",
+            r"<title-group[^>]*>\s*<title[^>]*>(.*?)</title>",
+            r"<article-title[^>]*>(.*?)</article-title>",
+            r"<h1[^>]*>(.*?)</h1>",
+            r"<title[^>]*>(.*?)</title>",
         )
         for pattern in patterns:
-            match = re.search(pattern, html_text, flags=re.IGNORECASE | re.DOTALL)
-            if match:
+            for match in re.finditer(pattern, html_text, flags=re.IGNORECASE | re.DOTALL):
                 fragment = LiverToxUpdater.clean_fragment(match.group(1))
-                if fragment:
-                    return fragment
+                normalized = LiverToxUpdater.normalize_extracted_title(fragment)
+                if normalized:
+                    return normalized
         for line in plain_text.splitlines():
             stripped = line.strip()
             if stripped:
-                return stripped
-        return default
+                normalized = LiverToxUpdater.normalize_extracted_title(stripped)
+                if normalized:
+                    return normalized
+        return LiverToxUpdater.normalize_extracted_title(default) or default
 
     # -------------------------------------------------------------------------
     @staticmethod
     def clean_fragment(fragment: str) -> str:
         return LiverToxUpdater.html_to_text(fragment)
+
+    # -------------------------------------------------------------------------
+    @staticmethod
+    def normalize_extracted_title(value: str) -> str:
+        cleaned = normalize_whitespace(value)
+        if not cleaned:
+            return ""
+        cleaned = re.sub(
+            r"\s*[-|:]\s*(?:LiverTox|NCBI Bookshelf)\b.*$",
+            "",
+            cleaned,
+            flags=re.IGNORECASE,
+        )
+        return normalize_whitespace(cleaned)
 
     # -------------------------------------------------------------------------
     @staticmethod

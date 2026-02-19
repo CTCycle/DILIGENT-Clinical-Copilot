@@ -14,6 +14,7 @@ try:
         Base,
         Drug,
         DrugAlias,
+        DrugRxnormCode,
         LiverToxMonograph,
     )
 except ModuleNotFoundError:
@@ -21,6 +22,7 @@ except ModuleNotFoundError:
     Base = None  # type: ignore[assignment]
     Drug = None  # type: ignore[assignment]
     DrugAlias = None  # type: ignore[assignment]
+    DrugRxnormCode = None  # type: ignore[assignment]
     LiverToxMonograph = None  # type: ignore[assignment]
 
 try:
@@ -46,13 +48,14 @@ def build_serializer() -> tuple[Any, Any]:
 
 
 # -----------------------------------------------------------------------------
-def fetch_counts(engine: Any) -> tuple[int, int, int]:
+def fetch_counts(engine: Any) -> tuple[int, int, int, int]:
     factory = sessionmaker(bind=engine, future=True)
     with factory() as db_session:
         drugs = len(db_session.execute(select(Drug)).scalars().all())
+        rxcui_codes = len(db_session.execute(select(DrugRxnormCode)).scalars().all())
         aliases = len(db_session.execute(select(DrugAlias)).scalars().all())
         monographs = len(db_session.execute(select(LiverToxMonograph)).scalars().all())
-    return drugs, aliases, monographs
+    return drugs, rxcui_codes, aliases, monographs
 
 
 # -----------------------------------------------------------------------------
@@ -84,6 +87,91 @@ def test_rxnav_upsert_idempotent_twice() -> None:
     second_counts = fetch_counts(engine)
 
     assert first_counts == second_counts
+
+
+# -----------------------------------------------------------------------------
+@pytest.mark.skipif(DataSerializer is None, reason="Serialization optional dependencies missing")
+def test_rxnav_upsert_allows_multiple_rxcui_for_same_canonical() -> None:
+    serializer, engine = build_serializer()
+    payload = [
+        {
+            "rxcui": "1098122",
+            "raw_name": "0.35 ML chondroitin sulfates 40 MG/ML / sodium hyaluronate 30 MG/ML Prefilled Syringe",
+            "term_type": "SCD",
+            "name": "chondroitin hyaluronate",
+            "brand_names": None,
+            "synonyms": '["chondroitin hyaluronate"]',
+        },
+        {
+            "rxcui": "1098124",
+            "raw_name": "0.35 ML chondroitin sulfates 40 MG/ML / sodium hyaluronate 30 MG/ML Prefilled Syringe [Viscoat]",
+            "term_type": "SBD",
+            "name": "chondroitin hyaluronate",
+            "brand_names": "Viscoat",
+            "synonyms": '["chondroitin hyaluronate"]',
+        },
+    ]
+
+    serializer.upsert_drugs_catalog_records(payload)
+
+    factory = sessionmaker(bind=engine, future=True)
+    with factory() as db_session:
+        drugs = db_session.execute(select(Drug)).scalars().all()
+        rxcui_codes = db_session.execute(select(DrugRxnormCode)).scalars().all()
+
+    assert len(drugs) == 1
+    assert sorted(code.rxcui for code in rxcui_codes) == ["1098122", "1098124"]
+
+
+# -----------------------------------------------------------------------------
+@pytest.mark.skipif(DataSerializer is None, reason="Serialization optional dependencies missing")
+def test_rxnav_upsert_commits_by_interval() -> None:
+    serializer, engine = build_serializer()
+    factory = sessionmaker(bind=engine, future=True)
+
+    with factory() as db_session:
+        serializer.ensure_drug(
+            db_session,
+            canonical_name="Drug One",
+            canonical_name_norm="drug one",
+            rxnorm_rxcui="111",
+            livertox_nbk_id=None,
+        )
+        serializer.ensure_drug(
+            db_session,
+            canonical_name="Drug Two",
+            canonical_name_norm="drug two",
+            rxnorm_rxcui="222",
+            livertox_nbk_id=None,
+        )
+        db_session.commit()
+
+    payload = [
+        {
+            "rxcui": "001",
+            "raw_name": "Drug Three 10 MG Tablet",
+            "term_type": "SCD",
+            "name": "Drug Three",
+            "brand_names": None,
+            "synonyms": "[]",
+        },
+        {
+            "rxcui": "111",
+            "raw_name": "Drug Two 20 MG Tablet",
+            "term_type": "SCD",
+            "name": "Drug Two",
+            "brand_names": None,
+            "synonyms": "[]",
+        },
+    ]
+
+    with pytest.raises(RuntimeError):
+        serializer.upsert_drugs_catalog_records(payload, commit_interval=1)
+
+    with factory() as db_session:
+        drugs = db_session.execute(select(Drug)).scalars().all()
+
+    assert len(drugs) == 3
 
 
 # -----------------------------------------------------------------------------
