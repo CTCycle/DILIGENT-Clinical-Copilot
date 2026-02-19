@@ -41,6 +41,7 @@ class Drug(Base):
     canonical_name_norm = Column(String, nullable=False)
     rxnorm_rxcui = Column(String, nullable=True)
     livertox_nbk_id = Column(String, nullable=True)
+    rxnorm_codes = relationship("DrugRxnormCode", back_populates="drug")
     aliases = relationship("DrugAlias", back_populates="drug")
     monograph = relationship("LiverToxMonograph", back_populates="drug", uselist=False)
     session_drugs = relationship("ClinicalSessionDrug", back_populates="drug")
@@ -50,6 +51,20 @@ class Drug(Base):
         UniqueConstraint("livertox_nbk_id", name="uq_drugs_livertox_nbk_id"),
         Index("ix_drugs_rxnorm_rxcui", "rxnorm_rxcui"),
         Index("ix_drugs_livertox_nbk_id", "livertox_nbk_id"),
+    )
+
+
+###############################################################################
+class DrugRxnormCode(Base):
+    __tablename__ = "drug_rxnorm_codes"
+    id = Column(Integer, primary_key=True, autoincrement=True)
+    drug_id = Column(Integer, ForeignKey("drugs.id"), nullable=False)
+    rxcui = Column(String, nullable=False)
+    drug = relationship("Drug", back_populates="rxnorm_codes")
+    __table_args__ = (
+        UniqueConstraint("rxcui", name="uq_drug_rxnorm_codes_rxcui"),
+        UniqueConstraint("drug_id", "rxcui", name="uq_drug_rxnorm_codes_identity"),
+        Index("ix_drug_rxnorm_codes_drug_id", "drug_id"),
     )
 
 

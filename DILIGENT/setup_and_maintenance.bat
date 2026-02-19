@@ -31,10 +31,10 @@ set "init_db_script=%scripts_dir%\initialize_database.py"
 set "drugs_script=%scripts_dir%\update_drugs_catalog.py"
 set "livertox_script=%scripts_dir%\update_livertox_data.py"
 set "rag_script=%scripts_dir%\update_RAG.py"
-set "init_db_module=DILIGENT.server.scripts.initialize_database"
-set "drugs_module=DILIGENT.server.scripts.update_drugs_catalog"
-set "livertox_module=DILIGENT.server.scripts.update_livertox_data"
-set "rag_module=DILIGENT.server.scripts.update_RAG"
+set "init_db_module=DILIGENT.scripts.initialize_database"
+set "drugs_module=DILIGENT.scripts.update_drugs_catalog"
+set "livertox_module=DILIGENT.scripts.update_livertox_data"
+set "rag_module=DILIGENT.scripts.update_RAG"
 
 
 :::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
