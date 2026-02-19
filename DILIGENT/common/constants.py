@@ -78,6 +78,7 @@ TABLE_CLINICAL_SESSION_SECTIONS = "clinical_session_sections"
 TABLE_CLINICAL_SESSION_LABS = "clinical_session_labs"
 TABLE_CLINICAL_SESSION_DRUGS = "clinical_session_drugs"
 TABLE_DRUGS = "drugs"
+TABLE_DRUG_RXNORM_CODES = "drug_rxnorm_codes"
 TABLE_DRUG_ALIASES = "drug_aliases"
 TABLE_LIVERTOX_MONOGRAPHS = "livertox_monographs"
 

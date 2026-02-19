@@ -37,7 +37,7 @@ set "npm_cmd=%nodejs_dir%\npm.cmd"
 set "env_marker_node=%nodejs_dir%\.is_installed"
 
 set "pyproject=%root_folder%pyproject.toml"
-set "UVICORN_MODULE=DILIGENT.server.app:app"
+set "UVICORN_MODULE=FAIRS.server.app:app"
 set "FRONTEND_DIR=%project_folder%client"
 set "FRONTEND_DIST=%FRONTEND_DIR%\dist"
 
@@ -51,7 +51,7 @@ set "TMPFINDNODE=%TEMP%\app_find_node.ps1"
 
 set "UV_LINK_MODE=copy"
 
-title DILIGENT Launcher
+title FAIRS Launcher
 echo.
 
 set "NPM_CMD=%npm_cmd%"
@@ -159,8 +159,9 @@ REM ============================================================================
 set "FASTAPI_HOST=127.0.0.1"
 set "FASTAPI_PORT=8000"
 set "UI_HOST=127.0.0.1"
-set "UI_PORT=7861"
+set "UI_PORT=5173"
 set "RELOAD=false"
+set "VITE_API_BASE_URL=/api"
 set "OPTIONAL_DEPENDENCIES=false"
 
 if exist "%DOTENV%" (
@@ -268,7 +269,7 @@ if not exist "%FRONTEND_DIST%" (
 )
 
 REM ============================================================================
-REM Wait for backend to allow it to initialize
+REM Wait for backend
 REM ============================================================================
 echo [WAIT] Waiting for backend to be ready on port !FASTAPI_PORT!...
 for /L %%i in (1,1,20) do (

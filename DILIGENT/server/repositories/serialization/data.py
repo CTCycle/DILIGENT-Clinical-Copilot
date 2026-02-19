@@ -26,6 +26,7 @@ from DILIGENT.common.constants import (
     LIVERTOX_REQUIRED_COLUMNS,
     RXNORM_CATALOG_COLUMNS,
     TABLE_DRUGS,
+    TABLE_DRUG_RXNORM_CODES,
     TABLE_DRUG_ALIASES,
     TABLE_LIVERTOX_MONOGRAPHS,
     TEXT_FILE_FALLBACK_ENCODINGS,
@@ -39,6 +40,7 @@ from DILIGENT.server.repositories.schemas.models import (
     ClinicalSessionSection,
     Drug,
     DrugAlias,
+    DrugRxnormCode,
     LiverToxMonograph,
 )
 from DILIGENT.server.repositories.vectors import LanceVectorDatabase
@@ -256,13 +258,18 @@ class _RepositorySerializationService:
    
     # -----------------------------------------------------------------------------
     def upsert_drugs_catalog_records(
-        self, records: pd.DataFrame | list[dict[str, Any]]
+        self,
+        records: pd.DataFrame | list[dict[str, Any]],
+        *,
+        commit_interval: int | None = None,
     ) -> None:
         prepared_rows = self.prepare_rxnav_rows(records)
         if not prepared_rows:
             return
+        effective_commit_interval = self.resolve_commit_interval(commit_interval)
         db_session = self.session_factory()
         try:
+            pending = 0
             for row in prepared_rows:
                 rxcui = cast(str, row["_rxcui"])
                 raw_name = cast(str | None, row.get("_raw_name"))
@@ -322,12 +329,23 @@ class _RepositorySerializationService:
                         source="rxnorm",
                         term_type=term_type,
                     )
-            db_session.commit()
+                pending += 1
+                if pending >= effective_commit_interval:
+                    db_session.commit()
+                    pending = 0
+            if pending:
+                db_session.commit()
         except Exception:
             db_session.rollback()
             raise
         finally:
             db_session.close()
+
+    # -----------------------------------------------------------------------------
+    def resolve_commit_interval(self, override: int | None) -> int:
+        if override is not None:
+            return max(int(override), 1)
+        return max(int(server_settings.database.insert_commit_interval), 1)
 
     # -----------------------------------------------------------------------------
     def prepare_rxnav_rows(
@@ -503,6 +521,7 @@ class _RepositorySerializationService:
     # -----------------------------------------------------------------------------
     def get_drugs_catalog(self) -> pd.DataFrame:
         drugs_frame = self.queries.load_table(TABLE_DRUGS)
+        rxcui_frame = self.queries.load_table(TABLE_DRUG_RXNORM_CODES)
         aliases_frame = self.queries.load_table(TABLE_DRUG_ALIASES)
         if drugs_frame.empty:
             return pd.DataFrame(columns=RXNORM_CATALOG_COLUMNS)
@@ -514,29 +533,43 @@ class _RepositorySerializationService:
         ].copy()
         if aliases_frame.empty:
             return pd.DataFrame(columns=RXNORM_CATALOG_COLUMNS)
+        rxcui_by_drug: dict[int, set[str]] = {}
+        if not rxcui_frame.empty:
+            for mapping in rxcui_frame.to_dict(orient="records"):
+                drug_id = mapping.get("drug_id")
+                normalized_rxcui = self.normalize_string(mapping.get("rxcui"))
+                if drug_id is None or normalized_rxcui is None:
+                    continue
+                values = rxcui_by_drug.setdefault(int(drug_id), set())
+                values.add(normalized_rxcui)
         records: list[dict[str, Any]] = []
         for row in drugs_frame.to_dict(orient="records"):
-            rxcui = self.normalize_string(row.get("rxnorm_rxcui"))
-            if rxcui is None:
-                continue
             drug_id = int(row["id"])
+            rxcui_values = set(rxcui_by_drug.get(drug_id, set()))
+            primary_rxcui = self.normalize_string(row.get("rxnorm_rxcui"))
+            if primary_rxcui is not None:
+                rxcui_values.add(primary_rxcui)
+            if not rxcui_values:
+                continue
             aliases = aliases_frame[aliases_frame["drug_id"] == drug_id]
             raw_name = self.first_alias_value(aliases, "raw_name")
             standard_name = self.first_alias_value(aliases, "standard_name")
             term_type = self.first_alias_term_type(aliases)
             brand_names = self.join_values(self.alias_values_for_kind(aliases, "brand"))
             synonyms = sorted(self.alias_values_for_kind(aliases, "synonym"))
-            records.append(
-                {
-                    "rxcui": rxcui,
-                    "raw_name": raw_name or self.normalize_string(row.get("canonical_name")),
-                    "term_type": term_type,
-                    "name": standard_name
-                    or self.normalize_string(row.get("canonical_name")),
-                    "brand_names": brand_names,
-                    "synonyms": json.dumps(synonyms, ensure_ascii=False),
-                }
-            )
+            for rxcui in sorted(rxcui_values):
+                records.append(
+                    {
+                        "rxcui": rxcui,
+                        "raw_name": raw_name
+                        or self.normalize_string(row.get("canonical_name")),
+                        "term_type": term_type,
+                        "name": standard_name
+                        or self.normalize_string(row.get("canonical_name")),
+                        "brand_names": brand_names,
+                        "synonyms": json.dumps(synonyms, ensure_ascii=False),
+                    }
+                )
         if not records:
             return pd.DataFrame(columns=RXNORM_CATALOG_COLUMNS)
         frame = pd.DataFrame(records)
@@ -843,11 +876,20 @@ class _RepositorySerializationService:
             )
             db_session.add(candidate)
             db_session.flush()
+            self.upsert_drug_rxcui(
+                db_session,
+                drug_id=int(candidate.id),
+                rxcui=rxnorm_rxcui,
+            )
             return candidate
-        self.assign_identifier_if_consistent(
+        self.assign_primary_rxcui_if_missing(
             drug=candidate,
-            field_name="rxnorm_rxcui",
-            incoming_value=rxnorm_rxcui,
+            incoming_rxcui=rxnorm_rxcui,
+        )
+        self.upsert_drug_rxcui(
+            db_session,
+            drug_id=int(candidate.id),
+            rxcui=rxnorm_rxcui,
         )
         if use_livertox_nbk_lookup:
             self.assign_identifier_if_consistent(
@@ -856,6 +898,19 @@ class _RepositorySerializationService:
                 incoming_value=livertox_nbk_id,
             )
         return candidate
+
+    # -----------------------------------------------------------------------------
+    def assign_primary_rxcui_if_missing(
+        self,
+        *,
+        drug: Drug,
+        incoming_rxcui: str | None,
+    ) -> None:
+        if incoming_rxcui is None:
+            return
+        current_rxcui = self.normalize_string(drug.rxnorm_rxcui)
+        if current_rxcui is None:
+            drug.rxnorm_rxcui = incoming_rxcui
 
     # -----------------------------------------------------------------------------
     def assign_identifier_if_consistent(
@@ -877,15 +932,54 @@ class _RepositorySerializationService:
             setattr(drug, field_name, incoming_value)
 
     # -----------------------------------------------------------------------------
+    def upsert_drug_rxcui(
+        self,
+        db_session: Session,
+        *,
+        drug_id: int,
+        rxcui: str | None,
+    ) -> None:
+        normalized_rxcui = self.normalize_string(rxcui)
+        if normalized_rxcui is None:
+            return
+        existing = (
+            db_session.execute(
+                select(DrugRxnormCode).where(DrugRxnormCode.rxcui == normalized_rxcui)
+            )
+            .scalars()
+            .first()
+        )
+        if existing is None:
+            db_session.add(DrugRxnormCode(drug_id=drug_id, rxcui=normalized_rxcui))
+            return
+        if int(existing.drug_id) != int(drug_id):
+            raise RuntimeError(
+                "Conflicting rxcui mapping for existing drug row "
+                f"(rxcui='{normalized_rxcui}', existing_drug_id={int(existing.drug_id)}, incoming_drug_id={drug_id})"
+            )
+
+    # -----------------------------------------------------------------------------
     def get_drug_by_rxcui(
         self,
         db_session: Session,
         rxcui: str | None,
     ) -> Drug | None:
-        if rxcui is None:
+        normalized_rxcui = self.normalize_string(rxcui)
+        if normalized_rxcui is None:
             return None
+        mapped = (
+            db_session.execute(
+                select(Drug)
+                .join(DrugRxnormCode)
+                .where(DrugRxnormCode.rxcui == normalized_rxcui)
+            )
+            .scalars()
+            .first()
+        )
+        if mapped is not None:
+            return mapped
         return (
-            db_session.execute(select(Drug).where(Drug.rxnorm_rxcui == rxcui))
+            db_session.execute(select(Drug).where(Drug.rxnorm_rxcui == normalized_rxcui))
             .scalars()
             .first()
         )
