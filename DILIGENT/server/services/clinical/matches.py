@@ -3,7 +3,7 @@ from __future__ import annotations
 import re
 from collections import OrderedDict
 from dataclasses import dataclass
-from typing import Any, Iterable, Iterator, TypeVar, Generic
+from typing import Any, Generic, Iterable, Iterator, Literal, TypeVar
 
 import pandas as pd
 from rapidfuzz import fuzz
@@ -12,8 +12,9 @@ from DILIGENT.server.configurations import server_settings
 from DILIGENT.common.constants import MATCHING_STOPWORDS
 from DILIGENT.common.utils.logger import logger
 from DILIGENT.server.services.text.normalization import (
+    canonicalize_drug_query,
     coerce_text,
-    normalize_drug_name,
+    normalize_drug_query_name,
     normalize_whitespace,
 )
 from DILIGENT.server.services.clinical.livertox import LiverToxData
@@ -81,11 +82,16 @@ class MonographRecord:
 ###############################################################################
 @dataclass(slots=True)
 class LiverToxMatch:
-    nbk_id: str
-    matched_name: str
-    confidence: float
+    status: Literal["matched", "missing", "ambiguous"]
+    query_name: str
+    canonical_query: str
+    normalized_query: str
+    nbk_id: str | None
+    matched_name: str | None
+    confidence: float | None
     reason: str
     notes: list[str]
+    candidate_names: list[str]
     record: MonographRecord | None = None
 
 
@@ -120,7 +126,7 @@ class DrugsLookup:
     # -------------------------------------------------------------------------
     def __init__(self) -> None:
         self.data: LiverToxData | None = None
-        self.match_cache: BoundedCache[str, LiverToxMatch | None] = BoundedCache(
+        self.match_cache: BoundedCache[str, LiverToxMatch] = BoundedCache(
             self.MATCH_CACHE_LIMIT
         )
         self.alias_cache: BoundedCache[str, AliasCacheEntry] = BoundedCache(
@@ -147,168 +153,459 @@ class DrugsLookup:
         self.prepare_catalog_synonyms()
 
     # -------------------------------------------------------------------------
-    def match_drug_names(self, patient_drugs: list[str]) -> list[LiverToxMatch | None]:
-        total = len(patient_drugs)
-        results: list[LiverToxMatch | None] = [None] * total
-        for idx, name in enumerate(patient_drugs):
-            normalized = self.normalize_name(name)
-            if not normalized:
-                continue
-            logger.info("Finding matches for drug '%s'", name)
-            cached = self.match_cache.get(normalized, CACHE_MISS)
-            if cached is not CACHE_MISS:
-                if cached is not None:
-                    logger.info(
-                        "Cache hit for '%s': '%s' via %s (confidence=%.2f)",
-                        name,
-                        cached.matched_name,
-                        cached.reason,
-                        cached.confidence,
+    def match_drug_names(self, patient_drugs: list[str]) -> list[LiverToxMatch]:
+        results: list[LiverToxMatch] = []
+        for raw_name in patient_drugs:
+            canonical_query = self.canonicalize_query(raw_name)
+            normalized_query = self.normalize_name(canonical_query or raw_name)
+            if not normalized_query:
+                results.append(
+                    self.create_missing_result(
+                        raw_name=raw_name,
+                        canonical_query=canonical_query,
+                        normalized_query=normalized_query,
+                        reason="invalid_query",
+                        notes=["Unable to normalize query."],
                     )
-                else:
-                    logger.info("Cache recorded no match for '%s'", name)
-                results[idx] = cached
+                )
                 continue
+
+            cached = self.match_cache.get(normalized_query, CACHE_MISS)
+            if cached is not CACHE_MISS:
+                results.append(self.clone_cached_match(cached, raw_name, canonical_query))
+                continue
+
             alias_entries = self.resolve_alias_candidates(
-                patient_drugs[idx],
-                normalized,
+                raw_name,
+                normalized_query,
                 include_catalog=False,
             )
-            alias_count = len(alias_entries)
-            logger.info(
-                "Resolved %d alias candidates for '%s'",
-                alias_count,
-                name,
+            match = self.match_query(
+                raw_name=raw_name,
+                canonical_query=canonical_query,
+                normalized_query=normalized_query,
+                alias_entries=alias_entries,
             )
-            lookup = self.match_query(alias_entries)
-            if lookup is None:
+
+            if match.status == "missing":
                 alias_entries = self.resolve_alias_candidates(
-                    patient_drugs[idx],
-                    normalized,
+                    raw_name,
+                    normalized_query,
                     include_catalog=True,
                 )
-                alias_count = len(alias_entries)
+                match = self.match_query(
+                    raw_name=raw_name,
+                    canonical_query=canonical_query,
+                    normalized_query=normalized_query,
+                    alias_entries=alias_entries,
+                )
+
+            self.match_cache.put(normalized_query, match)
+            results.append(match)
+            if match.status == "matched":
                 logger.info(
-                    "Retrying '%s' with %d catalog-expanded aliases",
-                    name,
-                    alias_count,
+                    "Matched '%s' to '%s' via %s (confidence=%s)",
+                    raw_name,
+                    match.matched_name,
+                    match.reason,
+                    f"{match.confidence:.2f}" if match.confidence is not None else "NA",
                 )
-                lookup = self.match_query(alias_entries)
-            if lookup is None:
-                self.match_cache.put(normalized, None)
+            elif match.status == "ambiguous":
                 logger.warning(
-                    "No match found for '%s' after %d alias candidates",
-                    name,
-                    alias_count,
+                    "Ambiguous match for '%s': %s",
+                    raw_name,
+                    ", ".join(match.candidate_names),
                 )
-                continue
-            record, confidence, reason, notes = lookup
-            match = self.create_match(record, confidence, reason, notes)
-            self.match_cache.put(normalized, match)
-            results[idx] = match
-            logger.info(
-                "Match found for '%s': '%s' via %s (aliases=%d, confidence=%.2f)",
-                name,
-                match.matched_name,
-                match.reason,
-                alias_count,
-                match.confidence,
-            )
+            else:
+                logger.warning("No LiverTox match for '%s'", raw_name)
         return results
 
     # -------------------------------------------------------------------------
     def match_query(
-        self, alias_entries: list[tuple[str, bool]]
-    ) -> tuple[MonographRecord, float, str, list[str]] | None:
+        self,
+        *,
+        raw_name: str,
+        canonical_query: str,
+        normalized_query: str,
+        alias_entries: list[tuple[str, bool]],
+    ) -> LiverToxMatch:
         if not alias_entries:
-            return None
-        candidates: list[tuple[str, str, bool]] = []
+            return self.create_missing_result(
+                raw_name=raw_name,
+                canonical_query=canonical_query,
+                normalized_query=normalized_query,
+                reason="no_alias_candidates",
+                notes=["No alias candidates available."],
+            )
+
+        local_aliases = [alias for alias, from_catalog in alias_entries if not from_catalog]
+        stage1_keys = self.build_unique_keys(
+            [canonical_query, *local_aliases],
+            self.canonicalize_query,
+        )
+        stage1 = self.resolve_stage_matches(stage1_keys, self.match_primary_all)
+        stage1_result = self.finalize_stage_result(
+            stage_name="exact_canonical",
+            raw_name=raw_name,
+            canonical_query=canonical_query,
+            normalized_query=normalized_query,
+            stage_matches=stage1,
+        )
+        if stage1_result is not None:
+            return stage1_result
+
+        stage2_keys = self.build_unique_keys(
+            [alias for alias, _ in alias_entries],
+            self.canonicalize_query,
+        )
+        stage2 = self.resolve_stage_matches(stage2_keys, self.match_alias_exact_all)
+        stage2_result = self.finalize_stage_result(
+            stage_name="exact_alias",
+            raw_name=raw_name,
+            canonical_query=canonical_query,
+            normalized_query=normalized_query,
+            stage_matches=stage2,
+        )
+        if stage2_result is not None:
+            return stage2_result
+
+        stage3_keys = self.build_unique_keys(
+            [normalized_query, *(alias for alias, _ in alias_entries)],
+            self.normalize_name,
+        )
+        stage3 = self.resolve_stage_matches(stage3_keys, self.match_normalized_all)
+        stage3_result = self.finalize_stage_result(
+            stage_name="normalized_exact",
+            raw_name=raw_name,
+            canonical_query=canonical_query,
+            normalized_query=normalized_query,
+            stage_matches=stage3,
+        )
+        if stage3_result is not None:
+            return stage3_result
+
+        fuzzy = self.match_fuzzy_candidates(normalized_query)
+        if len(fuzzy) == 1:
+            record, confidence, notes = fuzzy[0]
+            return self.create_matched_result(
+                raw_name=raw_name,
+                canonical_query=canonical_query,
+                normalized_query=normalized_query,
+                record=record,
+                confidence=confidence,
+                reason="fuzzy",
+                notes=notes,
+            )
+        if len(fuzzy) > 1:
+            return self.create_ambiguous_result(
+                raw_name=raw_name,
+                canonical_query=canonical_query,
+                normalized_query=normalized_query,
+                reason="ambiguous_fuzzy",
+                stage_matches=fuzzy,
+            )
+        return self.create_missing_result(
+            raw_name=raw_name,
+            canonical_query=canonical_query,
+            normalized_query=normalized_query,
+            reason="no_match",
+            notes=["No deterministic exact/alias/normalized/fuzzy match."],
+        )
+
+    # -------------------------------------------------------------------------
+    def canonicalize_query(self, value: str | None) -> str:
+        return canonicalize_drug_query(value)
+
+    # -------------------------------------------------------------------------
+    def clone_cached_match(
+        self,
+        match: LiverToxMatch,
+        raw_name: str,
+        canonical_query: str,
+    ) -> LiverToxMatch:
+        return LiverToxMatch(
+            status=match.status,
+            query_name=raw_name,
+            canonical_query=canonical_query,
+            normalized_query=match.normalized_query,
+            nbk_id=match.nbk_id,
+            matched_name=match.matched_name,
+            confidence=match.confidence,
+            reason=match.reason,
+            notes=list(match.notes),
+            candidate_names=list(match.candidate_names),
+            record=match.record,
+        )
+
+    # -------------------------------------------------------------------------
+    def build_unique_keys(
+        self,
+        values: list[str],
+        normalize_fn: Any,
+    ) -> list[str]:
+        unique: list[str] = []
         seen: set[str] = set()
-        for alias_value, from_catalog in alias_entries:
-            normalized_value = self.normalize_name(alias_value)
-            if not normalized_value or normalized_value in seen:
+        for value in values:
+            key = normalize_fn(value)
+            if not key or key in seen:
                 continue
-            seen.add(normalized_value)
-            candidates.append((normalized_value, alias_value, from_catalog))
-        if not candidates:
+            seen.add(key)
+            unique.append(key)
+        return unique
+
+    # -------------------------------------------------------------------------
+    def resolve_stage_matches(
+        self,
+        keys: list[str],
+        resolver: Any,
+    ) -> list[tuple[MonographRecord, float, list[str]]]:
+        merged: dict[str, tuple[MonographRecord, float, list[str]]] = {}
+        for key in keys:
+            for record, confidence, notes in resolver(key):
+                existing = merged.get(record.nbk_id)
+                if existing is None or confidence > existing[1]:
+                    merged[record.nbk_id] = (
+                        record,
+                        confidence,
+                        list(dict.fromkeys(notes)),
+                    )
+                    continue
+                if existing is not None:
+                    combined = list(dict.fromkeys(existing[2] + notes))
+                    merged[record.nbk_id] = (existing[0], existing[1], combined)
+        ordered = list(merged.values())
+        ordered.sort(key=lambda item: (item[0].drug_name.casefold(), item[0].nbk_id.casefold()))
+        return ordered
+
+    # -------------------------------------------------------------------------
+    def finalize_stage_result(
+        self,
+        *,
+        stage_name: str,
+        raw_name: str,
+        canonical_query: str,
+        normalized_query: str,
+        stage_matches: list[tuple[MonographRecord, float, list[str]]],
+    ) -> LiverToxMatch | None:
+        if not stage_matches:
             return None
+        if len(stage_matches) == 1:
+            record, confidence, notes = stage_matches[0]
+            return self.create_matched_result(
+                raw_name=raw_name,
+                canonical_query=canonical_query,
+                normalized_query=normalized_query,
+                record=record,
+                confidence=confidence,
+                reason=stage_name,
+                notes=notes,
+            )
+        return self.create_ambiguous_result(
+            raw_name=raw_name,
+            canonical_query=canonical_query,
+            normalized_query=normalized_query,
+            reason=f"ambiguous_{stage_name}",
+            stage_matches=stage_matches,
+        )
 
-        direct_matches: list[tuple[tuple[MonographRecord, float, str, list[str]], str]] = []
-        for normalized_value, alias_value, from_catalog in candidates:
-            direct = self.match_primary(normalized_value)
-            if direct is not None:
-                direct_matches.append(
-                    (
-                        self.annotate_catalog_match(direct, from_catalog, alias_value),
-                        normalized_value,
+    # -------------------------------------------------------------------------
+    def match_primary_all(
+        self,
+        canonical_query: str,
+    ) -> list[tuple[MonographRecord, float, list[str]]]:
+        data = self.require_data()
+        matches: list[tuple[MonographRecord, float, list[str]]] = []
+        for record in data.records:
+            if self.canonicalize_query(record.drug_name) != canonical_query:
+                continue
+            matches.append((record, self.DIRECT_CONFIDENCE, []))
+        return matches
+
+    # -------------------------------------------------------------------------
+    def match_alias_exact_all(
+        self,
+        canonical_query: str,
+    ) -> list[tuple[MonographRecord, float, list[str]]]:
+        data = self.require_data()
+        matches: dict[str, tuple[MonographRecord, float, list[str]]] = {}
+
+        for record in data.records:
+            for synonym_original in record.synonyms.values():
+                if self.canonicalize_query(synonym_original) != canonical_query:
+                    continue
+                matches[record.nbk_id] = (
+                    record,
+                    self.SYNONYM_CONFIDENCE,
+                    [f"synonym='{synonym_original}'"],
+                )
+
+        alias_sources: tuple[tuple[str, dict[str, list[tuple[str, str]]]], ...] = (
+            ("brand", data.brand_index),
+            ("ingredient", data.ingredient_index),
+        )
+        for alias_type, alias_index in alias_sources:
+            for entries in alias_index.values():
+                for alias_value, primary_name in entries:
+                    if self.canonicalize_query(alias_value) != canonical_query:
+                        continue
+                    primary_matches = self.match_primary_all(
+                        self.canonicalize_query(primary_name)
                     )
-                )
-        if direct_matches:
-            return self.select_best_match_result(direct_matches)
+                    for record, _, _ in primary_matches:
+                        matches[record.nbk_id] = (
+                            record,
+                            self.MASTER_CONFIDENCE,
+                            [f"{alias_type}='{alias_value}'", f"drug='{primary_name}'"],
+                        )
+        ordered = list(matches.values())
+        ordered.sort(key=lambda item: (item[0].drug_name.casefold(), item[0].nbk_id.casefold()))
+        return ordered
 
-        synonym_matches: list[
-            tuple[tuple[MonographRecord, float, str, list[str]], bool, str, str]
-        ] = [
-            (synonym, from_catalog, alias_value, normalized_value)
-            for normalized_value, alias_value, from_catalog in candidates
-            if (synonym := self.match_synonym(normalized_value)) is not None
-        ]
+    # -------------------------------------------------------------------------
+    def match_normalized_all(
+        self,
+        normalized_query: str,
+    ) -> list[tuple[MonographRecord, float, list[str]]]:
+        data = self.require_data()
+        matches: dict[str, tuple[MonographRecord, float, list[str]]] = {}
 
-        master_matches: list[
-            tuple[tuple[MonographRecord, float, str, list[str]], bool, str, str]
-        ] = [
-            (master, from_catalog, alias_value, normalized_value)
-            for normalized_value, alias_value, from_catalog in candidates
-            if (master := self.match_master_list(normalized_value)) is not None
-        ]
+        direct = data.primary_index.get(normalized_query, [])
+        for record in direct:
+            matches[record.nbk_id] = (record, self.DIRECT_CONFIDENCE, [])
 
-        if synonym_matches:
-            ranked = [
-                (
-                    self.annotate_catalog_match(match_result[0], match_result[1], match_result[2]),
-                    match_result[3],
-                )
-                for match_result in synonym_matches
-            ]
-            return self.select_best_match_result(ranked)
+        for record, original in data.synonym_index.get(normalized_query, []):
+            matches[record.nbk_id] = (
+                record,
+                self.SYNONYM_CONFIDENCE,
+                [f"synonym='{original}'"],
+            )
 
-        if master_matches:
-            ranked = [
-                (
-                    self.annotate_catalog_match(match_result[0], match_result[1], match_result[2]),
-                    match_result[3],
-                )
-                for match_result in master_matches
-            ]
-            return self.select_best_match_result(ranked)
-
-        partial_matches: list[tuple[tuple[MonographRecord, float, str, list[str]], str]] = []
-        for normalized_value, alias_value, from_catalog in candidates:
-            partial = self.match_partial(normalized_value)
-            if partial is not None:
-                partial_matches.append(
-                    (
-                        self.annotate_catalog_match(partial, from_catalog, alias_value),
-                        normalized_value,
+        for alias_type, alias_index in (("brand", data.brand_index), ("ingredient", data.ingredient_index)):
+            for alias_value, primary_name in alias_index.get(normalized_query, []):
+                primary_matches = self.match_primary_all(self.canonicalize_query(primary_name))
+                for record, _, _ in primary_matches:
+                    matches[record.nbk_id] = (
+                        record,
+                        self.MASTER_CONFIDENCE,
+                        [f"{alias_type}='{alias_value}'", f"drug='{primary_name}'"],
                     )
-                )
-        if partial_matches:
-            return self.select_best_match_result(partial_matches)
 
-        fuzzy_matches: list[tuple[tuple[MonographRecord, float, str, list[str]], str]] = []
-        for normalized_value, alias_value, from_catalog in candidates:
-            fuzzy = self.match_fuzzy(normalized_value)
-            if fuzzy is not None:
-                fuzzy_matches.append(
-                    (
-                        self.annotate_catalog_match(fuzzy, from_catalog, alias_value),
-                        normalized_value,
-                    )
-                )
-        if fuzzy_matches:
-            return self.select_best_match_result(fuzzy_matches)
+        ordered = list(matches.values())
+        ordered.sort(key=lambda item: (item[0].drug_name.casefold(), item[0].nbk_id.casefold()))
+        return ordered
 
-        return None
+    # -------------------------------------------------------------------------
+    def match_fuzzy_candidates(
+        self,
+        normalized_query: str,
+    ) -> list[tuple[MonographRecord, float, list[str]]]:
+        if len(normalized_query) < self.TOKEN_MIN_LENGTH:
+            return []
+        data = self.require_data()
+        per_record: dict[str, tuple[MonographRecord, float, list[str]]] = {}
+        for candidate, record, original, is_primary in data.variant_catalog:
+            ratio = fuzz.ratio(normalized_query, candidate) / 100.0
+            if ratio < self.FUZZY_THRESHOLD:
+                continue
+            confidence = max(self.FUZZY_CONFIDENCE, ratio)
+            notes = [f"score={ratio:.2f}"]
+            if not is_primary:
+                notes.insert(0, f"variant='{original}'")
+            current = per_record.get(record.nbk_id)
+            if current is None or confidence > current[1]:
+                per_record[record.nbk_id] = (record, confidence, notes)
+        ordered = list(per_record.values())
+        ordered.sort(
+            key=lambda item: (
+                -item[1],
+                item[0].drug_name.casefold(),
+                item[0].nbk_id.casefold(),
+            )
+        )
+        return ordered
+
+    # -------------------------------------------------------------------------
+    def create_matched_result(
+        self,
+        *,
+        raw_name: str,
+        canonical_query: str,
+        normalized_query: str,
+        record: MonographRecord,
+        confidence: float,
+        reason: str,
+        notes: list[str],
+    ) -> LiverToxMatch:
+        normalized_confidence = round(min(max(confidence, self.MIN_CONFIDENCE), 1.0), 2)
+        cleaned_notes = list(dict.fromkeys(note for note in notes if note))
+        return LiverToxMatch(
+            status="matched",
+            query_name=raw_name,
+            canonical_query=canonical_query,
+            normalized_query=normalized_query,
+            nbk_id=record.nbk_id,
+            matched_name=record.drug_name,
+            confidence=normalized_confidence,
+            reason=reason,
+            notes=cleaned_notes,
+            candidate_names=[record.drug_name],
+            record=record,
+        )
+
+    # -------------------------------------------------------------------------
+    def create_missing_result(
+        self,
+        *,
+        raw_name: str,
+        canonical_query: str,
+        normalized_query: str,
+        reason: str,
+        notes: list[str],
+    ) -> LiverToxMatch:
+        return LiverToxMatch(
+            status="missing",
+            query_name=raw_name,
+            canonical_query=canonical_query,
+            normalized_query=normalized_query,
+            nbk_id=None,
+            matched_name=None,
+            confidence=None,
+            reason=reason,
+            notes=list(dict.fromkeys(note for note in notes if note)),
+            candidate_names=[],
+            record=None,
+        )
+
+    # -------------------------------------------------------------------------
+    def create_ambiguous_result(
+        self,
+        *,
+        raw_name: str,
+        canonical_query: str,
+        normalized_query: str,
+        reason: str,
+        stage_matches: list[tuple[MonographRecord, float, list[str]]],
+    ) -> LiverToxMatch:
+        candidate_names = sorted(
+            dict.fromkeys(record.drug_name for record, _, _ in stage_matches),
+            key=str.casefold,
+        )
+        notes: list[str] = []
+        for _, _, entry_notes in stage_matches:
+            notes.extend(entry_notes)
+        return LiverToxMatch(
+            status="ambiguous",
+            query_name=raw_name,
+            canonical_query=canonical_query,
+            normalized_query=normalized_query,
+            nbk_id=None,
+            matched_name=None,
+            confidence=None,
+            reason=reason,
+            notes=list(dict.fromkeys(note for note in notes if note)),
+            candidate_names=candidate_names,
+            record=None,
+        )
 
     # -------------------------------------------------------------------------
     def resolve_alias_candidates(
@@ -337,7 +634,7 @@ class DrugsLookup:
                     else:
                         if matched_value:
                             values_to_expand.add(matched_value)
-                        base_name = entry.get("base_name")
+                        base_name = entry.get("base_name") or entry.get("name")
                         if base_name:
                             values_to_expand.add(base_name)
                         raw_name = entry.get("raw_name")
@@ -351,7 +648,7 @@ class DrugsLookup:
                         if fallback_alias:
                             values_to_expand.add(fallback_alias)
 
-                    for value in values_to_expand:
+                    for value in sorted(values_to_expand, key=str.casefold):
                         self.add_alias_entry(alias_entries, seen, value, True)
                         for variant in self.expand_variant(value):
                             self.add_alias_entry(alias_entries, seen, variant, True)
@@ -536,9 +833,10 @@ class DrugsLookup:
         self, normalized_query: str
     ) -> tuple[MonographRecord, float, str, list[str]] | None:
         data = self.require_data()
-        record = data.primary_index.get(normalized_query)
-        if record is None:
+        records = data.primary_index.get(normalized_query, [])
+        if not records:
             return None
+        record = records[0]
         return record, self.DIRECT_CONFIDENCE, "monograph_name", []
 
     # -------------------------------------------------------------------------
@@ -574,10 +872,10 @@ class DrugsLookup:
         self, normalized_query: str
     ) -> tuple[MonographRecord, float, str, list[str]] | None:
         data = self.require_data()
-        alias = data.synonym_index.get(normalized_query)
-        if alias is None:
+        aliases = data.synonym_index.get(normalized_query, [])
+        if not aliases:
             return None
-        record, original = alias
+        record, original = aliases[0]
         notes = [f"synonym='{original}'"]
         return record, self.SYNONYM_CONFIDENCE, "synonym_match", notes
 
@@ -684,10 +982,10 @@ class DrugsLookup:
             record, confidence, _, _ = direct
             return record, confidence, "drug_name", []
         data = self.require_data()
-        alias = data.synonym_index.get(normalized_name)
-        if alias is None:
+        aliases = data.synonym_index.get(normalized_name, [])
+        if not aliases:
             return None
-        record, original = alias
+        record, original = aliases[0]
         notes = [f"synonym='{original}'"]
         return record, self.SYNONYM_CONFIDENCE, "drug_synonym", notes
 
@@ -826,11 +1124,10 @@ class DrugsLookup:
             bucket = self.catalog_token_index.setdefault(token, set())
             bucket.add(normalized_value)
             if len(bucket) > self.CATALOG_CANDIDATE_LIMIT * 2:
-                while len(bucket) > self.CATALOG_CANDIDATE_LIMIT:
-                    try:
-                        bucket.pop()
-                    except KeyError:  # pragma: no cover - defensive
-                        break
+                ordered = sorted(bucket)
+                bucket.clear()
+                for candidate in ordered[: self.CATALOG_CANDIDATE_LIMIT]:
+                    bucket.add(candidate)
 
     # -------------------------------------------------------------------------
     def catalog_term_type_allowed(self, term_type: str | None) -> bool:
@@ -858,11 +1155,11 @@ class DrugsLookup:
             text = coerce_text(segment)
             if text:
                 names.append(text)
-        return names
+        return sorted(dict.fromkeys(names), key=str.casefold)
 
     # -------------------------------------------------------------------------
     def parse_catalog_synonyms(self, value: Any) -> list[str]:
-        return parse_synonym_list(value)
+        return sorted(dict.fromkeys(parse_synonym_list(value)), key=str.casefold)
 
     # -------------------------------------------------------------------------
     def iter_alias_variants(self, value: str) -> list[str]:
@@ -874,7 +1171,7 @@ class DrugsLookup:
             candidate = normalize_whitespace(segment)
             if candidate:
                 variants.add(candidate)
-        return list(variants)
+        return sorted(variants, key=str.casefold)
 
     # -------------------------------------------------------------------------
     def parse_synonyms(self, value: Any) -> dict[str, str]:
@@ -915,7 +1212,7 @@ class DrugsLookup:
             candidate = segment.strip(" -")
             if candidate:
                 variants.add(candidate)
-        result = list(variants)
+        result = sorted(variants, key=str.casefold)
         self.variant_cache.put(value, result)
         return result
 
@@ -949,15 +1246,14 @@ class DrugsLookup:
         reason: str,
         notes: list[str] | None,
     ) -> LiverToxMatch:
-        normalized_confidence = round(min(max(confidence, self.MIN_CONFIDENCE), 1.0), 2)
-        cleaned_notes = list(dict.fromkeys(note for note in (notes or []) if note))
-        return LiverToxMatch(
-            nbk_id=record.nbk_id,
-            matched_name=record.drug_name,
-            confidence=normalized_confidence,
-            reason=reason,
-            notes=cleaned_notes,
+        return self.create_matched_result(
+            raw_name=record.drug_name,
+            canonical_query=self.canonicalize_query(record.drug_name),
+            normalized_query=self.normalize_name(record.drug_name),
             record=record,
+            confidence=confidence,
+            reason=reason,
+            notes=list(notes or []),
         )
 
     # -------------------------------------------------------------------------
@@ -1000,7 +1296,7 @@ class DrugsLookup:
         cached = self.normalization_cache.get(name, CACHE_MISS)
         if cached is not CACHE_MISS:
             return cached
-        normalized = normalize_drug_name(name)
+        normalized = normalize_drug_query_name(name)
         self.normalization_cache.put(name, normalized)
         return normalized
 
@@ -1036,14 +1332,14 @@ class LiverToxMatcher:
         self.lookup.attach_data(self.data)
 
     # -------------------------------------------------------------------------
-    def match_drug_names(self, patient_drugs: list[str]) -> list[LiverToxMatch | None]:
+    def match_drug_names(self, patient_drugs: list[str]) -> list[LiverToxMatch]:
         return self.lookup.match_drug_names(patient_drugs)
 
     # -------------------------------------------------------------------------
     def build_drugs_to_excerpt_mapping(
         self,
         patient_drugs: list[str],
-        matches: list[LiverToxMatch | None],
+        matches: list[LiverToxMatch],
     ) -> list[dict[str, Any]]:
         return self.data.build_drugs_to_excerpt_mapping(patient_drugs, matches)
 

@@ -89,3 +89,11 @@ def test_extract_drugs_from_therapy_detects_ongoing_vs_suspended() -> None:
     assert ongoing.therapy_start_status is True
     assert ongoing.therapy_start_date == "2024-02-11"
     assert ongoing.temporal_classification == "temporal_known"
+
+
+def test_extract_drugs_from_therapy_empty_input_is_safe() -> None:
+    parser = DrugsParser(client=object())
+
+    parsed = asyncio.run(parser.extract_drugs_from_therapy(""))
+
+    assert parsed.entries == []
