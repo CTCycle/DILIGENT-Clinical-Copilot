@@ -4,4 +4,7 @@ from DILIGENT.server.repositories.serialization.data import (
     DocumentSerializer,
     VectorSerializer,
 )
-
+from DILIGENT.server.repositories.serialization.modelconfig import (
+    ModelConfigSerializer,
+    ModelConfigSnapshot,
+)

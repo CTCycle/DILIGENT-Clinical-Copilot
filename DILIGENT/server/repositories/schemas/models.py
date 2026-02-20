@@ -4,6 +4,7 @@ from sqlalchemy import (
     Boolean,
     Column,
     DateTime,
+    Enum,
     Float,
     ForeignKey,
     Index,
@@ -11,6 +12,7 @@ from sqlalchemy import (
     String,
     Text,
     UniqueConstraint,
+    text,
 )
 from sqlalchemy.orm import declarative_base, relationship
 
@@ -174,4 +176,43 @@ class ClinicalSessionDrug(Base):
         Index("ix_clinical_session_drugs_session_id", "session_id"),
         Index("ix_clinical_session_drugs_drug_id", "drug_id"),
         Index("ix_clinical_session_drugs_raw_drug_name_norm", "raw_drug_name_norm"),
+    )
+
+
+###############################################################################
+class ModelSelection(Base):
+    __tablename__ = "model_selections"
+    id = Column(Integer, primary_key=True, autoincrement=True)
+    role_type = Column(
+        Enum(
+            "clinical",
+            "text_extraction",
+            "cloud",
+            name="model_role_type",
+            native_enum=False,
+            create_constraint=True,
+            validate_strings=True,
+        ),
+        nullable=False,
+    )
+    provider = Column(String, nullable=True)
+    model_name = Column(String, nullable=True)
+    is_active = Column(Boolean, nullable=False, server_default=text("true"))
+    created_at = Column(DateTime, nullable=False, server_default=text("CURRENT_TIMESTAMP"))
+    updated_at = Column(
+        DateTime,
+        nullable=False,
+        server_default=text("CURRENT_TIMESTAMP"),
+        server_onupdate=text("CURRENT_TIMESTAMP"),
+    )
+    __table_args__ = (
+        UniqueConstraint("role_type", name="uq_model_selections_role_type"),
+        Index("ix_model_selections_role_type", "role_type"),
+        Index(
+            "uq_model_selections_active_role_type",
+            "role_type",
+            unique=True,
+            sqlite_where=text("is_active = 1"),
+            postgresql_where=text("is_active = true"),
+        ),
     )

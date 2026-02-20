@@ -1,10 +1,11 @@
-import React, { createContext, useContext, useState, useCallback, useMemo } from "react";
+import React, { createContext, useContext, useState, useCallback, useMemo, useEffect } from "react";
 import {
+    CLOUD_MODEL_CHOICES,
     DEFAULT_FORM_STATE,
     DEFAULT_SETTINGS,
 } from "../constants";
 import { ClinicalFormState, RuntimeSettings } from "../types";
-import { resolveCloudSelection } from "../utils";
+import { fetchModelConfigState } from "../services/api";
 
 // ---------------------------------------------------------------------------
 // Types
@@ -41,7 +42,6 @@ export function resolvePathFromPage(page: PageId): string {
 export interface DiluAgentState {
     settings: RuntimeSettings;
     form: ClinicalFormState;
-    cloudSelection: { provider: string; model: string | null };
     message: string;
     jsonPayload: unknown | null;
     exportUrl: string | null;
@@ -67,18 +67,9 @@ interface AppStateContextValue {
 // ---------------------------------------------------------------------------
 // Default State
 // ---------------------------------------------------------------------------
-const defaultCloudSelection = resolveCloudSelection(
-    DEFAULT_SETTINGS.provider,
-    DEFAULT_SETTINGS.cloudModel,
-);
-
 const DEFAULT_DILU_AGENT_STATE: DiluAgentState = {
     settings: DEFAULT_SETTINGS,
     form: DEFAULT_FORM_STATE,
-    cloudSelection: {
-        provider: defaultCloudSelection.provider,
-        model: defaultCloudSelection.model,
-    },
     message: "",
     jsonPayload: null,
     exportUrl: null,
@@ -119,6 +110,51 @@ interface AppStateProviderProps {
 
 export function AppStateProvider({ children }: AppStateProviderProps): React.JSX.Element {
     const [state, setState] = useState<AppState>(DEFAULT_APP_STATE);
+
+    useEffect(() => {
+        let cancelled = false;
+        const hydrateSettings = async () => {
+            try {
+                const payload = await fetchModelConfigState();
+                if (cancelled) {
+                    return;
+                }
+                const providerRaw = (payload.llm_provider || "").trim().toLowerCase();
+                const cloudChoices = payload.cloud_model_choices || CLOUD_MODEL_CHOICES;
+                const provider = cloudChoices[providerRaw] ? providerRaw : DEFAULT_SETTINGS.provider;
+                const providerModels = cloudChoices[provider] || [];
+                const cloudModel = (
+                    payload.cloud_model && providerModels.includes(payload.cloud_model)
+                        ? payload.cloud_model
+                        : providerModels[0] ?? null
+                );
+                setState((prev) => {
+                    const nextSettings: RuntimeSettings = {
+                        ...prev.diluAgent.settings,
+                        useCloudServices: payload.use_cloud_services,
+                        provider,
+                        cloudModel,
+                        parsingModel: payload.text_extraction_model || prev.diluAgent.settings.parsingModel,
+                        clinicalModel: payload.clinical_model || prev.diluAgent.settings.clinicalModel,
+                        reasoning: payload.ollama_reasoning,
+                    };
+                    return {
+                        ...prev,
+                        diluAgent: {
+                            ...prev.diluAgent,
+                            settings: nextSettings,
+                        },
+                    };
+                });
+            } catch {
+                // Keep defaults when backend config is not reachable.
+            }
+        };
+        void hydrateSettings();
+        return () => {
+            cancelled = true;
+        };
+    }, []);
 
     const setActivePage = useCallback((page: PageId) => {
         setState((prev) => ({ ...prev, activePage: page }));

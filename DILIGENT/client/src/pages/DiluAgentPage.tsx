@@ -16,7 +16,6 @@ import {
     buildClinicalPayload,
     createDownloadUrl,
     normalizeVisitDateInput,
-    resolveCloudSelection,
 } from "../utils";
 
 const todayIso = new Date().toISOString().slice(0, 10);
@@ -241,10 +240,6 @@ export function DiluAgentPage(): React.JSX.Element {
         if (exportUrl) {
             URL.revokeObjectURL(exportUrl);
         }
-        const defaultSelection = resolveCloudSelection(
-            DEFAULT_SETTINGS.provider,
-            DEFAULT_SETTINGS.cloudModel,
-        );
         updateDiluAgent({
             settings: DEFAULT_SETTINGS,
             form: {
@@ -258,7 +253,6 @@ export function DiluAgentPage(): React.JSX.Element {
                 alpMax: "",
                 useRag: false,
             },
-            cloudSelection: { provider: defaultSelection.provider, model: defaultSelection.model },
             message: "",
             jsonPayload: null,
             exportUrl: null,

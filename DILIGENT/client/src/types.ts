@@ -8,6 +8,33 @@ export type RuntimeSettings = {
   reasoning: boolean;
 };
 
+export type LocalModelCard = {
+  name: string;
+  description: string;
+};
+
+export type ModelConfigStateResponse = {
+  status: "success";
+  local_models: LocalModelCard[];
+  cloud_model_choices: Record<string, string[]>;
+  use_cloud_services: boolean;
+  llm_provider: string;
+  cloud_model: string | null;
+  clinical_model: string | null;
+  text_extraction_model: string | null;
+  ollama_reasoning: boolean;
+  updated_at: string | null;
+};
+
+export type ModelConfigUpdateRequest = {
+  use_cloud_services?: boolean;
+  llm_provider?: string;
+  cloud_model?: string | null;
+  clinical_model?: string | null;
+  text_extraction_model?: string | null;
+  ollama_reasoning?: boolean;
+};
+
 export type ClinicalFormState = {
   patientName: string;
   visitDate: string;
@@ -66,10 +93,4 @@ export type JobCancelResponse = {
   job_id: string;
   success: boolean;
   message: string;
-};
-
-export type CloudSelection = {
-  provider: string;
-  models: string[];
-  model: string | null;
 };
