@@ -189,15 +189,15 @@ export function ModelConfigPage(): React.JSX.Element {
                             <p className="helper">Select one clinical model and one text extraction model.</p>
                         </div>
 
-                        <div className="model-config-local-cards" role="list">
+                        <ul className="model-config-local-cards">
                             {!localModels.length && (
-                                <p className="model-config-empty-note">
+                                <li className="model-config-empty-note">
                                     {isLoading ? "Loading local models..." : "No local Ollama models available."}
-                                </p>
+                                </li>
                             )}
 
                             {localModels.map((model) => (
-                                <article key={model.name} className="model-config-local-card" role="listitem">
+                                <li key={model.name} className="model-config-local-card">
                                     <h3>{model.name}</h3>
                                     <p>{model.description}</p>
                                     <div className="model-config-role-controls">
@@ -222,9 +222,9 @@ export function ModelConfigPage(): React.JSX.Element {
                                             <span className="field-label">Text Extraction Model</span>
                                         </label>
                                     </div>
-                                </article>
+                                </li>
                             ))}
-                        </div>
+                        </ul>
                     </div>
 
                     <div className="model-config-ollama-row">

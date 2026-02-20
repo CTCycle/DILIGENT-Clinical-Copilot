@@ -17,6 +17,8 @@ from sqlalchemy import (
 from sqlalchemy.orm import declarative_base, relationship
 
 Base = declarative_base()
+DRUGS_ID_FK = "drugs.id"
+CLINICAL_SESSIONS_ID_FK = "clinical_sessions.id"
 
 
 ###############################################################################
@@ -60,7 +62,7 @@ class Drug(Base):
 class DrugRxnormCode(Base):
     __tablename__ = "drug_rxnorm_codes"
     id = Column(Integer, primary_key=True, autoincrement=True)
-    drug_id = Column(Integer, ForeignKey("drugs.id"), nullable=False)
+    drug_id = Column(Integer, ForeignKey(DRUGS_ID_FK), nullable=False)
     rxcui = Column(String, nullable=False)
     drug = relationship("Drug", back_populates="rxnorm_codes")
     __table_args__ = (
@@ -74,7 +76,7 @@ class DrugRxnormCode(Base):
 class DrugAlias(Base):
     __tablename__ = "drug_aliases"
     id = Column(Integer, primary_key=True, autoincrement=True)
-    drug_id = Column(Integer, ForeignKey("drugs.id"), nullable=False)
+    drug_id = Column(Integer, ForeignKey(DRUGS_ID_FK), nullable=False)
     alias = Column(Text, nullable=False)
     alias_norm = Column(String, nullable=False)
     alias_kind = Column(String, nullable=False)
@@ -98,7 +100,7 @@ class DrugAlias(Base):
 class LiverToxMonograph(Base):
     __tablename__ = "livertox_monographs"
     id = Column(Integer, primary_key=True, autoincrement=True)
-    drug_id = Column(Integer, ForeignKey("drugs.id"), nullable=False, unique=True)
+    drug_id = Column(Integer, ForeignKey(DRUGS_ID_FK), nullable=False, unique=True)
     excerpt = Column(Text)
     likelihood_score = Column(String)
     last_update = Column(String)
@@ -121,7 +123,7 @@ class LiverToxMonograph(Base):
 class ClinicalSessionSection(Base):
     __tablename__ = "clinical_session_sections"
     id = Column(Integer, primary_key=True, autoincrement=True)
-    session_id = Column(Integer, ForeignKey("clinical_sessions.id"), nullable=False)
+    session_id = Column(Integer, ForeignKey(CLINICAL_SESSIONS_ID_FK), nullable=False)
     section_kind = Column(String, nullable=False)
     content = Column(Text, nullable=False)
     session = relationship("ClinicalSession", back_populates="sections")
@@ -139,7 +141,7 @@ class ClinicalSessionSection(Base):
 class ClinicalSessionLab(Base):
     __tablename__ = "clinical_session_labs"
     id = Column(Integer, primary_key=True, autoincrement=True)
-    session_id = Column(Integer, ForeignKey("clinical_sessions.id"), nullable=False)
+    session_id = Column(Integer, ForeignKey(CLINICAL_SESSIONS_ID_FK), nullable=False)
     lab_code = Column(String, nullable=False)
     value_raw = Column(String)
     upper_limit_raw = Column(String)
@@ -158,10 +160,10 @@ class ClinicalSessionLab(Base):
 class ClinicalSessionDrug(Base):
     __tablename__ = "clinical_session_drugs"
     id = Column(Integer, primary_key=True, autoincrement=True)
-    session_id = Column(Integer, ForeignKey("clinical_sessions.id"), nullable=False)
+    session_id = Column(Integer, ForeignKey(CLINICAL_SESSIONS_ID_FK), nullable=False)
     raw_drug_name = Column(Text, nullable=False)
     raw_drug_name_norm = Column(String, nullable=False)
-    drug_id = Column(Integer, ForeignKey("drugs.id"), nullable=True)
+    drug_id = Column(Integer, ForeignKey(DRUGS_ID_FK), nullable=True)
     match_confidence = Column(Float)
     match_reason = Column(String)
     match_notes = Column(Text)

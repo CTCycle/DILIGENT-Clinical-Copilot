@@ -43,7 +43,7 @@ export interface DiluAgentState {
     settings: RuntimeSettings;
     form: ClinicalFormState;
     message: string;
-    jsonPayload: unknown | null;
+    jsonPayload: unknown;
     exportUrl: string | null;
     jobId: string | null;
     jobProgress: number;
@@ -82,9 +82,7 @@ const DEFAULT_DILU_AGENT_STATE: DiluAgentState = {
 };
 
 const DEFAULT_APP_STATE: AppState = {
-    activePage: resolvePageIdFromPath(
-        typeof window !== "undefined" ? window.location.pathname : "/",
-    ),
+    activePage: resolvePageIdFromPath(globalThis.location?.pathname ?? "/"),
     diluAgent: DEFAULT_DILU_AGENT_STATE,
 };
 
@@ -105,7 +103,7 @@ export function useAppState(): AppStateContextValue {
 // Provider
 // ---------------------------------------------------------------------------
 interface AppStateProviderProps {
-    children: React.ReactNode;
+    readonly children: React.ReactNode;
 }
 
 export function AppStateProvider({ children }: AppStateProviderProps): React.JSX.Element {
