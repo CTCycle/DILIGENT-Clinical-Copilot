@@ -54,12 +54,12 @@ async function fetchWithTimeout(
 ): Promise<Response> {
   const controller = new AbortController();
   const timeoutMs = Math.max(HTTP_TIMEOUT, 1) * 1000;
-  const timer = window.setTimeout(() => controller.abort(), timeoutMs);
+  const timer = globalThis.setTimeout(() => controller.abort(), timeoutMs);
 
   try {
     return await fetch(url, { ...options, signal: controller.signal });
   } finally {
-    window.clearTimeout(timer);
+    globalThis.clearTimeout(timer);
   }
 }
 
@@ -69,7 +69,8 @@ async function parseApiResponse(
 ): Promise<ApiResult> {
   const contentType = response.headers.get("content-type") || "";
   const bodyText = await response.text();
-  let parsed: unknown | undefined;
+  let parsed: unknown;
+  let hasParsed = false;
 
   if (bodyText) {
     const shouldTryJson =
@@ -79,13 +80,14 @@ async function parseApiResponse(
     if (shouldTryJson) {
       try {
         parsed = JSON.parse(bodyText);
+        hasParsed = true;
       } catch {
-        parsed = undefined;
+        hasParsed = false;
       }
     }
   }
 
-  if (parsed !== undefined) {
+  if (hasParsed) {
     const message = extractTextFromResult(parsed);
     const jsonPayload =
       typeof parsed === "object" || Array.isArray(parsed) ? parsed : null;
@@ -103,8 +105,8 @@ async function parseApiResponse(
     return { message: bodyText.trim(), json: null };
   }
 
-  const errorMessage = `[ERROR] Backend returned status ${response.status}.${bodyText ? `\n${bodyText}` : `\nURL: ${url}`
-    }`;
+  const errorDetails = bodyText ? `\n${bodyText}` : `\nURL: ${url}`;
+  const errorMessage = `[ERROR] Backend returned status ${response.status}.${errorDetails}`;
   return { message: errorMessage, json: null };
 }
 
@@ -179,7 +181,7 @@ export function pollClinicalJobStatus(
   onUpdate: (status: JobStatusResponse) => void,
   onError: (message: string) => void,
 ): { stop: () => void } {
-  let timeoutId: number | null = null;
+  let timeoutId: ReturnType<typeof globalThis.setTimeout> | null = null;
   let stopped = false;
 
   const poll = async () => {
@@ -200,7 +202,7 @@ export function pollClinicalJobStatus(
       onError(message);
       return;
     }
-    timeoutId = window.setTimeout(poll, intervalMs);
+    timeoutId = globalThis.setTimeout(poll, intervalMs);
   };
 
   poll();
@@ -209,7 +211,7 @@ export function pollClinicalJobStatus(
     stop: () => {
       stopped = true;
       if (timeoutId !== null) {
-        window.clearTimeout(timeoutId);
+        globalThis.clearTimeout(timeoutId);
       }
     },
   };

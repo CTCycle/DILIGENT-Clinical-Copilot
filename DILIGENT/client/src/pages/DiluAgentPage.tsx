@@ -307,6 +307,24 @@ export function DiluAgentPage(): React.JSX.Element {
         }
     }, [jsonPayload]);
 
+    const reportContent = (() => {
+        if (isRunning) {
+            return spinner;
+        }
+        if (message) {
+            return (
+                <ReactMarkdown remarkPlugins={[remarkGfm]} className="markdown">
+                    {message}
+                </ReactMarkdown>
+            );
+        }
+        return (
+            <div className="report-placeholder">
+                No report generated yet. Run analysis to see results.
+            </div>
+        );
+    })();
+
     return (
         <>
             <main className="page-container">
@@ -410,6 +428,7 @@ export function DiluAgentPage(): React.JSX.Element {
                                         <div className="toggle-row">
                                             <span className="toggle-label">Enable RAG for supporting evidence</span>
                                             <label className="toggle-switch">
+                                                <span className="visually-hidden">Enable RAG for supporting evidence</span>
                                                 <input
                                                     type="checkbox"
                                                     id="use-rag"
@@ -531,17 +550,7 @@ export function DiluAgentPage(): React.JSX.Element {
                                 className="report-content"
                                 style={isExpanded ? { maxHeight: "none" } : undefined}
                             >
-                                {isRunning ? (
-                                    spinner
-                                ) : message ? (
-                                    <ReactMarkdown remarkPlugins={[remarkGfm]} className="markdown">
-                                        {message}
-                                    </ReactMarkdown>
-                                ) : (
-                                    <div className="report-placeholder">
-                                        No report generated yet. Run analysis to see results.
-                                    </div>
-                                )}
+                                {reportContent}
                             </div>
                         </div>
                     </section>
