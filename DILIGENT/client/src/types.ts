@@ -69,7 +69,7 @@ export type ClinicalRequestPayload = {
 
 export type ApiResult = {
   message: string;
-  json: unknown | null;
+  json: unknown;
 };
 
 export type JobStartResponse = {
