@@ -21,6 +21,7 @@ from DILIGENT.server.repositories.serialization.modelconfig import (
 
 router = APIRouter(prefix="/model-config", tags=["model-config"])
 serializer = ModelConfigSerializer()
+GRANITE31_FAMILY = "granite3.1"
 
 LOCAL_MODEL_CATALOG: tuple[tuple[str, str, str], ...] = (
     (
@@ -95,22 +96,22 @@ LOCAL_MODEL_CATALOG: tuple[tuple[str, str, str], ...] = (
     ),
     (
         "granite3.1-dense:2b",
-        "granite3.1",
+        GRANITE31_FAMILY,
         "IBM Granite 3.1 Dense 2B model for compact enterprise-oriented language tasks.",
     ),
     (
         "granite3.1-dense:8b",
-        "granite3.1",
+        GRANITE31_FAMILY,
         "IBM Granite 3.1 Dense 8B model with improved general utility.",
     ),
     (
         "granite3.1-moe:1b",
-        "granite3.1",
+        GRANITE31_FAMILY,
         "IBM Granite 3.1 MoE 1B model using sparse expert routing for efficiency.",
     ),
     (
         "granite3.1-moe:3b",
-        "granite3.1",
+        GRANITE31_FAMILY,
         "IBM Granite 3.1 MoE 3B model using sparse expert routing for stronger quality.",
     ),
     (

@@ -60,6 +60,17 @@ function resolveCloudModel(
     return options[0];
 }
 
+function resolveAvailabilityBadgeClass(modelAvailableInOllama: boolean | undefined): string {
+    return modelAvailableInOllama ? "model-config-summary-ok" : "model-config-summary-muted";
+}
+
+function resolveAvailabilityLabel(modelAvailableInOllama: boolean | undefined): string {
+    if (modelAvailableInOllama === undefined) {
+        return "Unknown";
+    }
+    return modelAvailableInOllama ? "Installed" : "Not installed";
+}
+
 export function ModelConfigPage(): React.JSX.Element {
     const { state, updateDiluAgent } = useAppState();
     const { settings, isPulling } = state.diluAgent;
@@ -155,6 +166,18 @@ export function ModelConfigPage(): React.JSX.Element {
     const selectedTextExtractionModel = useMemo(
         () => localModels.find((model) => model.name === settings.parsingModel) || null,
         [localModels, settings.parsingModel],
+    );
+    const clinicalAvailabilityClassName = resolveAvailabilityBadgeClass(
+        selectedClinicalModel?.available_in_ollama,
+    );
+    const clinicalAvailabilityLabel = resolveAvailabilityLabel(
+        selectedClinicalModel?.available_in_ollama,
+    );
+    const extractionAvailabilityClassName = resolveAvailabilityBadgeClass(
+        selectedTextExtractionModel?.available_in_ollama,
+    );
+    const extractionAvailabilityLabel = resolveAvailabilityLabel(
+        selectedTextExtractionModel?.available_in_ollama,
     );
 
     const handleRoleSelection = async (role: "clinical" | "text_extraction", modelName: string) => {
@@ -392,15 +415,15 @@ export function ModelConfigPage(): React.JSX.Element {
                                 <tr>
                                     <th scope="row">Clinical</th>
                                     <td>{settings.clinicalModel || "Not set"}</td>
-                                    <td className={selectedClinicalModel?.available_in_ollama ? "model-config-summary-ok" : "model-config-summary-muted"}>
-                                        {selectedClinicalModel ? (selectedClinicalModel.available_in_ollama ? "Installed" : "Not installed") : "Unknown"}
+                                    <td className={clinicalAvailabilityClassName}>
+                                        {clinicalAvailabilityLabel}
                                     </td>
                                 </tr>
                                 <tr>
                                     <th scope="row">Text Extraction</th>
                                     <td>{settings.parsingModel || "Not set"}</td>
-                                    <td className={selectedTextExtractionModel?.available_in_ollama ? "model-config-summary-ok" : "model-config-summary-muted"}>
-                                        {selectedTextExtractionModel ? (selectedTextExtractionModel.available_in_ollama ? "Installed" : "Not installed") : "Unknown"}
+                                    <td className={extractionAvailabilityClassName}>
+                                        {extractionAvailabilityLabel}
                                     </td>
                                 </tr>
                                 <tr>

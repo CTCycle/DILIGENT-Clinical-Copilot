@@ -1492,8 +1492,8 @@ input[type="date"]::-webkit-calendar-picker-indicator:hover {
 }
 
 .nav-item:hover {
-  background: rgba(255, 255, 255, 0.18);
-  color: rgba(255, 255, 255, 0.96);
+  background: rgba(15, 23, 42, 0.52);
+  color: #f8fafc;
 }
 
 .nav-item.active {
