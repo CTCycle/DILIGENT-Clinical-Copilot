@@ -10,6 +10,8 @@ from pydantic import BaseModel, Field
 class LocalModelCard(BaseModel):
     name: str = Field(..., min_length=1, max_length=200)
     description: str = Field(..., min_length=1, max_length=400)
+    family: str = Field(..., min_length=1, max_length=80)
+    available_in_ollama: bool = False
 
 
 ###############################################################################
