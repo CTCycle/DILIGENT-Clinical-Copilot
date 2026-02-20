@@ -22,6 +22,14 @@ const KeyIcon = () => (
     </svg>
 );
 
+const PullIcon = () => (
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+        <path d="M12 3v11" />
+        <path d="m7 10 5 5 5-5" />
+        <path d="M5 21h14" />
+    </svg>
+);
+
 function resolveProvider(
     provider: string | null | undefined,
     cloudChoices: Record<string, string[]>,
@@ -60,12 +68,24 @@ export function ModelConfigPage(): React.JSX.Element {
     const [isSaving, setIsSaving] = useState(false);
     const [localModels, setLocalModels] = useState<ModelConfigStateResponse["local_models"]>([]);
     const [cloudChoices, setCloudChoices] = useState<Record<string, string[]>>(CLOUD_MODEL_CHOICES);
-    const [pullModelName, setPullModelName] = useState("");
+    const [modelSearchQuery, setModelSearchQuery] = useState("");
     const [statusMessage, setStatusMessage] = useState("");
     const [openProviderMenu, setOpenProviderMenu] = useState<string | null>(null);
 
     const cloudEnabled = settings.useCloudServices;
     const localSelectionDisabled = cloudEnabled || isSaving || isLoading;
+    const ollamaControlsDisabled = cloudEnabled || isSaving || isLoading;
+    const availableLocalModelCount = useMemo(
+        () => localModels.filter((model) => model.available_in_ollama).length,
+        [localModels],
+    );
+    const filteredLocalModels = useMemo(() => {
+        const query = modelSearchQuery.trim().toLowerCase();
+        if (!query) {
+            return localModels;
+        }
+        return localModels.filter((model) => model.name.toLowerCase().includes(query));
+    }, [localModels, modelSearchQuery]);
 
     const applyConfigToState = (payload: ModelConfigStateResponse) => {
         setLocalModels(payload.local_models || []);
@@ -128,6 +148,14 @@ export function ModelConfigPage(): React.JSX.Element {
     const activeProvider = resolveProvider(settings.provider, cloudChoices);
     const activeCloudModel = resolveCloudModel(activeProvider, settings.cloudModel, cloudChoices);
     const activeCloudModels = cloudChoices[activeProvider] || [];
+    const selectedClinicalModel = useMemo(
+        () => localModels.find((model) => model.name === settings.clinicalModel) || null,
+        [localModels, settings.clinicalModel],
+    );
+    const selectedTextExtractionModel = useMemo(
+        () => localModels.find((model) => model.name === settings.parsingModel) || null,
+        [localModels, settings.parsingModel],
+    );
 
     const handleRoleSelection = async (role: "clinical" | "text_extraction", modelName: string) => {
         if (role === "clinical") {
@@ -153,21 +181,19 @@ export function ModelConfigPage(): React.JSX.Element {
         await persistConfigPatch({ ollama_reasoning: enabled });
     };
 
-    const handlePullModel = async () => {
-        const candidate = pullModelName.trim();
+    const handlePullModel = async (requestedModelName: string) => {
+        const candidate = requestedModelName.trim();
         if (!candidate) {
             setStatusMessage("[ERROR] Enter a model name to pull from Ollama.");
             return;
         }
 
         updateDiluAgent({ isPulling: true });
+        setStatusMessage(`[INFO] Pulling '${candidate}' from Ollama...`);
         try {
             const result = await pullModels([candidate]);
             setStatusMessage(result.message);
             await loadModelConfig();
-            if (!result.message.startsWith("[ERROR]")) {
-                setPullModelName("");
-            }
         } finally {
             updateDiluAgent({ isPulling: false });
         }
@@ -185,20 +211,69 @@ export function ModelConfigPage(): React.JSX.Element {
                 <section className="model-config-left-column">
                     <div className={`model-config-local-row ${localSelectionDisabled ? "is-disabled" : ""}`} aria-disabled={localSelectionDisabled}>
                         <div className="model-config-row-header">
-                            <p className="modal-section-title">Local Model Preview</p>
-                            <p className="helper">Select one clinical model and one text extraction model.</p>
+                            <div className="model-config-row-header-top">
+                                <div>
+                                    <p className="modal-section-title">Local Model Catalog</p>
+                                    <p className="helper">
+                                        Select one clinical model and one text extraction model from the full catalog.
+                                        {` ${availableLocalModelCount} installed in Ollama.`}
+                                    </p>
+                                </div>
+                                <div className="model-config-search">
+                                    <label className="visually-hidden" htmlFor="model-search-by-name">Search model by name</label>
+                                    <input
+                                        id="model-search-by-name"
+                                        type="text"
+                                        value={modelSearchQuery}
+                                        placeholder="Search by name..."
+                                        onChange={(event) => setModelSearchQuery(event.target.value)}
+                                        disabled={isLoading}
+                                    />
+                                </div>
+                            </div>
                         </div>
 
                         <ul className="model-config-local-cards">
                             {!localModels.length && (
                                 <li className="model-config-empty-note">
-                                    {isLoading ? "Loading local models..." : "No local Ollama models available."}
+                                    {isLoading ? "Loading local model catalog..." : "No local model catalog entries available."}
                                 </li>
                             )}
 
-                            {localModels.map((model) => (
-                                <li key={model.name} className="model-config-local-card">
-                                    <h3>{model.name}</h3>
+                            {!!localModels.length && !filteredLocalModels.length && (
+                                <li className="model-config-empty-note">
+                                    No models match "{modelSearchQuery.trim()}".
+                                </li>
+                            )}
+
+                            {filteredLocalModels.map((model) => (
+                                <li
+                                    key={model.name}
+                                    className={`model-config-local-card ${model.available_in_ollama ? "is-available" : ""}`}
+                                >
+                                    <div className="model-config-local-card-header">
+                                        <h3>{model.name}</h3>
+                                        <div className="model-config-local-card-actions">
+                                            <span
+                                                className={`model-config-availability-pill ${model.available_in_ollama ? "is-available" : "is-unavailable"}`}
+                                            >
+                                                {model.available_in_ollama ? "Available in Ollama" : "Not installed"}
+                                            </span>
+                                            {!model.available_in_ollama && (
+                                                <button
+                                                    className="model-config-card-pull"
+                                                    type="button"
+                                                    onClick={() => { void handlePullModel(model.name); }}
+                                                    disabled={isPulling || ollamaControlsDisabled}
+                                                    aria-label={`Pull ${model.name} from Ollama`}
+                                                    title={`Pull ${model.name}`}
+                                                >
+                                                    <PullIcon />
+                                                </button>
+                                            )}
+                                        </div>
+                                    </div>
+                                    <p className="model-config-family">Family: {model.family}</p>
                                     <p>{model.description}</p>
                                     <div className="model-config-role-controls">
                                         <label className="field checkbox">
@@ -219,7 +294,7 @@ export function ModelConfigPage(): React.JSX.Element {
                                                 onChange={() => { void handleRoleSelection("text_extraction", model.name); }}
                                                 disabled={localSelectionDisabled}
                                             />
-                                            <span className="field-label">Text Extraction Model</span>
+                                            <span className="field-label">Text Extraction</span>
                                         </label>
                                     </div>
                                 </li>
@@ -227,39 +302,17 @@ export function ModelConfigPage(): React.JSX.Element {
                         </ul>
                     </div>
 
-                    <div className="model-config-ollama-row">
+                    <div className={`model-config-ollama-row ${ollamaControlsDisabled ? "is-disabled" : ""}`} aria-disabled={ollamaControlsDisabled}>
                         <p className="modal-section-title">Ollama Settings</p>
                         <label className="field checkbox">
                             <input
                                 type="checkbox"
                                 checked={settings.reasoning}
                                 onChange={(e) => { void handleReasoningChange(e.target.checked); }}
-                                disabled={isSaving || isLoading}
+                                disabled={ollamaControlsDisabled}
                             />
                             <span className="field-label">Enable SDL/Reasoning</span>
                         </label>
-
-                        <div className="model-config-pull-widget">
-                            <label className="field-label" htmlFor="pull-model-name">Pull model from Ollama</label>
-                            <div className="model-config-pull-actions">
-                                <input
-                                    id="pull-model-name"
-                                    type="text"
-                                    value={pullModelName}
-                                    placeholder="e.g. qwen3:8b"
-                                    onChange={(e) => setPullModelName(e.target.value)}
-                                    disabled={isPulling || isSaving || isLoading}
-                                />
-                                <button
-                                    className="btn btn-primary"
-                                    type="button"
-                                    onClick={handlePullModel}
-                                    disabled={isPulling || isSaving || isLoading}
-                                >
-                                    {isPulling ? "Pulling..." : "Pull Model"}
-                                </button>
-                            </div>
-                        </div>
                     </div>
                 </section>
 
@@ -333,13 +386,35 @@ export function ModelConfigPage(): React.JSX.Element {
                     </div>
 
                     <div className="model-config-right-footer-row">
-                        <p className="modal-section-title">Cloud Status</p>
-                        <p className="helper">
-                            Active provider: <strong>{PROVIDER_LABELS[activeProvider] || activeProvider}</strong>
-                        </p>
-                        <p className="helper">
-                            Active model: <strong>{activeCloudModel || "Not set"}</strong>
-                        </p>
+                        <p className="modal-section-title">Current Selection Summary</p>
+                        <table className="model-config-summary-table" aria-label="Current selection summary">
+                            <tbody>
+                                <tr>
+                                    <th scope="row">Clinical</th>
+                                    <td>{settings.clinicalModel || "Not set"}</td>
+                                    <td className={selectedClinicalModel?.available_in_ollama ? "model-config-summary-ok" : "model-config-summary-muted"}>
+                                        {selectedClinicalModel ? (selectedClinicalModel.available_in_ollama ? "Installed" : "Not installed") : "Unknown"}
+                                    </td>
+                                </tr>
+                                <tr>
+                                    <th scope="row">Text Extraction</th>
+                                    <td>{settings.parsingModel || "Not set"}</td>
+                                    <td className={selectedTextExtractionModel?.available_in_ollama ? "model-config-summary-ok" : "model-config-summary-muted"}>
+                                        {selectedTextExtractionModel ? (selectedTextExtractionModel.available_in_ollama ? "Installed" : "Not installed") : "Unknown"}
+                                    </td>
+                                </tr>
+                                <tr>
+                                    <th scope="row">Provider</th>
+                                    <td>{PROVIDER_LABELS[activeProvider] || activeProvider}</td>
+                                    <td>{cloudEnabled ? "Cloud active" : "Cloud disabled"}</td>
+                                </tr>
+                                <tr>
+                                    <th scope="row">Cloud Model</th>
+                                    <td>{activeCloudModel || "Not set"}</td>
+                                    <td>{cloudEnabled ? "In use" : "Standby"}</td>
+                                </tr>
+                            </tbody>
+                        </table>
                     </div>
                 </section>
             </div>

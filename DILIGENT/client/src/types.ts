@@ -11,6 +11,8 @@ export type RuntimeSettings = {
 export type LocalModelCard = {
   name: string;
   description: string;
+  family: string;
+  available_in_ollama: boolean;
 };
 
 export type ModelConfigStateResponse = {

@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from collections.abc import Iterable
 from typing import Any
 
 from fastapi import APIRouter, Body, HTTPException, status
@@ -21,6 +22,240 @@ from DILIGENT.server.repositories.serialization.modelconfig import (
 router = APIRouter(prefix="/model-config", tags=["model-config"])
 serializer = ModelConfigSerializer()
 
+LOCAL_MODEL_CATALOG: tuple[tuple[str, str, str], ...] = (
+    (
+        "llama3.1:8b",
+        "llama3",
+        "Meta Llama 3.1 8B instruction model for general-purpose generation (dense transformer).",
+    ),
+    (
+        "llama3.1:70b",
+        "llama3",
+        "Meta Llama 3.1 70B instruction model for high-quality long-form reasoning (dense transformer).",
+    ),
+    (
+        "dolphin3:8b",
+        "dolphin3",
+        "Dolphin 3 8B instruction model based on Llama 3.1, tuned for tool use and structured reasoning.",
+    ),
+    (
+        "olmo2:7b",
+        "olmo2",
+        "AllenAI OLMo 2 7B fully open model for general language tasks.",
+    ),
+    (
+        "olmo2:13b",
+        "olmo2",
+        "AllenAI OLMo 2 13B fully open model with expanded capability over 7B.",
+    ),
+    (
+        "deepseek-v3:671b",
+        "deepseek-v3",
+        "DeepSeek-V3 671B Mixture-of-Experts language model for large-scale reasoning.",
+    ),
+    (
+        "mistral-nemo:12b",
+        "mistral-nemo",
+        "Mistral NeMo 12B multilingual model from Mistral AI and NVIDIA.",
+    ),
+    (
+        "smollm2:135m",
+        "smollm2",
+        "SmolLM2 135M compact open model optimized for lightweight local inference.",
+    ),
+    (
+        "smollm2:360m",
+        "smollm2",
+        "SmolLM2 360M compact open model for low-latency general language tasks.",
+    ),
+    (
+        "smollm2:1.7b",
+        "smollm2",
+        "SmolLM2 1.7B compact open model balancing quality and efficiency.",
+    ),
+    (
+        "deepcoder:1.5b",
+        "deepcoder",
+        "DeepCoder 1.5B code-specialized model for programming and code reasoning tasks.",
+    ),
+    (
+        "deepcoder:14b",
+        "deepcoder",
+        "DeepCoder 14B code-specialized model with stronger synthesis and debugging ability.",
+    ),
+    (
+        "phi4-reasoning:14b",
+        "phi4-reasoning",
+        "Microsoft Phi-4 Reasoning 14B model focused on deliberate multi-step reasoning.",
+    ),
+    (
+        "phi4-mini-reasoning:3.8b",
+        "phi4-mini-reasoning",
+        "Microsoft Phi-4 Mini Reasoning 3.8B model for efficient structured reasoning.",
+    ),
+    (
+        "granite3.1-dense:2b",
+        "granite3.1",
+        "IBM Granite 3.1 Dense 2B model for compact enterprise-oriented language tasks.",
+    ),
+    (
+        "granite3.1-dense:8b",
+        "granite3.1",
+        "IBM Granite 3.1 Dense 8B model with improved general utility.",
+    ),
+    (
+        "granite3.1-moe:1b",
+        "granite3.1",
+        "IBM Granite 3.1 MoE 1B model using sparse expert routing for efficiency.",
+    ),
+    (
+        "granite3.1-moe:3b",
+        "granite3.1",
+        "IBM Granite 3.1 MoE 3B model using sparse expert routing for stronger quality.",
+    ),
+    (
+        "granite3.3:2b",
+        "granite3.3",
+        "IBM Granite 3.3 2B open model for compact enterprise and coding tasks.",
+    ),
+    (
+        "granite3.3:8b",
+        "granite3.3",
+        "IBM Granite 3.3 8B open model tuned for higher-quality enterprise use.",
+    ),
+    (
+        "granite4:350m",
+        "granite4",
+        "IBM Granite 4 350M model for extremely lightweight local inference.",
+    ),
+    (
+        "granite4:1b",
+        "granite4",
+        "IBM Granite 4 1B model for compact, general language workloads.",
+    ),
+    (
+        "granite4:3b",
+        "granite4",
+        "IBM Granite 4 3B model for higher-quality local language tasks.",
+    ),
+    (
+        "deepseek-r1:1.5b",
+        "deepseek-r1",
+        "DeepSeek-R1 1.5B reasoning model from the R1 family.",
+    ),
+    (
+        "deepseek-r1:7b",
+        "deepseek-r1",
+        "DeepSeek-R1 7B reasoning model for local multi-step problem solving.",
+    ),
+    (
+        "deepseek-r1:8b",
+        "deepseek-r1",
+        "DeepSeek-R1 8B reasoning model variant in the R1 lineup.",
+    ),
+    (
+        "deepseek-r1:14b",
+        "deepseek-r1",
+        "DeepSeek-R1 14B reasoning model balancing quality and efficiency.",
+    ),
+    (
+        "deepseek-r1:32b",
+        "deepseek-r1",
+        "DeepSeek-R1 32B reasoning model for stronger long-form reasoning.",
+    ),
+    (
+        "deepseek-r1:70b",
+        "deepseek-r1",
+        "DeepSeek-R1 70B reasoning model for high-quality complex tasks.",
+    ),
+    (
+        "deepseek-r1:671b",
+        "deepseek-r1",
+        "DeepSeek-R1 671B flagship reasoning model in the R1 series.",
+    ),
+    (
+        "exaone-deep:2.4b",
+        "exaone-deep",
+        "EXAONE Deep 2.4B reasoning model from LG AI Research.",
+    ),
+    (
+        "exaone-deep:7.8b",
+        "exaone-deep",
+        "EXAONE Deep 7.8B reasoning model for stronger complex reasoning.",
+    ),
+    (
+        "exaone-deep:32b",
+        "exaone-deep",
+        "EXAONE Deep 32B reasoning model for high-capability local inference.",
+    ),
+    (
+        "qwen3:0.6b",
+        "qwen3",
+        "Qwen3 0.6B open model in the Qwen3 dense and MoE family.",
+    ),
+    (
+        "qwen3:1.7b",
+        "qwen3",
+        "Qwen3 1.7B open model in the Qwen3 dense and MoE family.",
+    ),
+    (
+        "qwen3:4b",
+        "qwen3",
+        "Qwen3 4B open model in the Qwen3 dense and MoE family.",
+    ),
+    (
+        "qwen3:8b",
+        "qwen3",
+        "Qwen3 8B open model in the Qwen3 dense and MoE family.",
+    ),
+    (
+        "qwen3:14b",
+        "qwen3",
+        "Qwen3 14B open model in the Qwen3 dense and MoE family.",
+    ),
+    (
+        "qwen3:30b",
+        "qwen3",
+        "Qwen3 30B open model in the Qwen3 dense and MoE family.",
+    ),
+    (
+        "qwen3:32b",
+        "qwen3",
+        "Qwen3 32B open model in the Qwen3 dense and MoE family.",
+    ),
+    (
+        "qwen3:235b",
+        "qwen3",
+        "Qwen3 235B flagship open model in the Qwen3 dense and MoE family.",
+    ),
+    (
+        "ministral3:3b",
+        "ministral-3",
+        "Mistral Ministral 3B open model for compact multilingual and agentic workloads.",
+    ),
+    (
+        "ministral3:8b",
+        "ministral-3",
+        "Mistral Ministral 8B open model for stronger multilingual and agentic workloads.",
+    ),
+    (
+        "ministral3:14b",
+        "ministral-3",
+        "Mistral Ministral 14B open model for high-capability multilingual and agentic workloads.",
+    ),
+    (
+        "gpt-oss:20b",
+        "gpt-oss",
+        "OpenAI gpt-oss-20b open-weight model for local reasoning and tool usage.",
+    ),
+    (
+        "gpt-oss:120b",
+        "gpt-oss",
+        "OpenAI gpt-oss-120b open-weight model for advanced local reasoning and agentic tasks.",
+    ),
+)
+LOCAL_MODEL_CATALOG_NAMES = {name for name, _, _ in LOCAL_MODEL_CATALOG}
+
 
 ###############################################################################
 class ModelConfigEndpoint:
@@ -37,7 +272,12 @@ class ModelConfigEndpoint:
     async def get_state(self) -> ModelConfigStateResponse:
         snapshot = self.ensure_defaults()
         self.apply_runtime_snapshot(snapshot)
-        local_models = await self.list_local_model_cards()
+        local_models = await self.list_local_model_cards(
+            selected_models=(
+                snapshot.clinical_model,
+                snapshot.text_extraction_model,
+            )
+        )
         return self.build_response(snapshot=snapshot, local_models=local_models)
 
     # -------------------------------------------------------------------------
@@ -46,7 +286,12 @@ class ModelConfigEndpoint:
         payload: ModelConfigUpdateRequest = Body(...),
     ) -> ModelConfigStateResponse:
         snapshot = self.ensure_defaults()
-        local_models = await self.list_local_model_cards()
+        local_models = await self.list_local_model_cards(
+            selected_models=(
+                snapshot.clinical_model,
+                snapshot.text_extraction_model,
+            )
+        )
         local_model_names = {item.name for item in local_models}
         updates: dict[str, Any] = {}
         fields_set = payload.model_fields_set
@@ -114,12 +359,12 @@ class ModelConfigEndpoint:
         if not local_model_names:
             raise HTTPException(
                 status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
-                detail="No installed local Ollama models are currently available.",
+                detail="No model catalog entries are available.",
             )
         if model_name not in local_model_names:
             raise HTTPException(
                 status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
-                detail=f"Model '{model_name}' is not installed for role '{role_name}'.",
+                detail=f"Model '{model_name}' is not supported for role '{role_name}'.",
             )
 
     # -------------------------------------------------------------------------
@@ -188,27 +433,59 @@ class ModelConfigEndpoint:
         return f"Installed local Ollama model from the {family} family."
 
     # -------------------------------------------------------------------------
-    async def list_local_model_cards(self) -> list[LocalModelCard]:
+    async def list_available_ollama_models(self) -> set[str]:
         try:
             async with OllamaClient() as client:
                 models = await client.list_models()
         except Exception as exc:
             if isinstance(exc, (OllamaTimeout, OllamaError)):
                 logger.warning("Unable to list local Ollama models: %s", exc)
-                return []
+                return set()
             logger.exception("Unexpected error while listing local Ollama models")
-            return []
-        normalized_models = sorted(
-            {model.strip() for model in models if isinstance(model, str) and model.strip()},
+            return set()
+        return {
+            model.strip()
+            for model in models
+            if isinstance(model, str) and model.strip()
+        }
+
+    # -------------------------------------------------------------------------
+    async def list_local_model_cards(
+        self,
+        *,
+        selected_models: Iterable[str | None] = (),
+    ) -> list[LocalModelCard]:
+        available_models = await self.list_available_ollama_models()
+        cards = [
+            LocalModelCard(
+                name=name,
+                family=family,
+                description=description,
+                available_in_ollama=name in available_models,
+            )
+            for name, family, description in LOCAL_MODEL_CATALOG
+        ]
+
+        selected_candidates = {
+            candidate.strip()
+            for candidate in selected_models
+            if isinstance(candidate, str) and candidate.strip()
+        }
+
+        extra_models = sorted(
+            (available_models | selected_candidates) - LOCAL_MODEL_CATALOG_NAMES,
             key=str.casefold,
         )
-        return [
+        cards.extend(
             LocalModelCard(
                 name=model_name,
+                family="custom",
                 description=self.describe_local_model(model_name),
+                available_in_ollama=model_name in available_models,
             )
-            for model_name in normalized_models
-        ]
+            for model_name in extra_models
+        )
+        return cards
 
     # -------------------------------------------------------------------------
     def apply_runtime_snapshot(self, snapshot: ModelConfigSnapshot) -> None:
