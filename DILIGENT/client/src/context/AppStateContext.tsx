@@ -48,6 +48,8 @@ export interface DiluAgentState {
     jobId: string | null;
     jobProgress: number;
     jobStatus: string | null;
+    jobStage: string | null;
+    jobStageMessage: string | null;
     isRunning: boolean;
     isPulling: boolean;
     isExpanded: boolean;
@@ -76,6 +78,8 @@ const DEFAULT_DILU_AGENT_STATE: DiluAgentState = {
     jobId: null,
     jobProgress: 0,
     jobStatus: null,
+    jobStage: null,
+    jobStageMessage: null,
     isRunning: false,
     isPulling: false,
     isExpanded: false,

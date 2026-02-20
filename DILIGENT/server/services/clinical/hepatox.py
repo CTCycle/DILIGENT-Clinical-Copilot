@@ -4,6 +4,7 @@ import asyncio
 import inspect
 import json
 import re
+from collections.abc import Callable
 from datetime import date, datetime
 from typing import Any
 
@@ -36,6 +37,7 @@ from DILIGENT.common.constants import (
 from DILIGENT.common.utils.logger import logger
 from DILIGENT.server.services.retrieval.embeddings import SimilaritySearch
 from DILIGENT.server.services.clinical.preparation import HepatoxPreparedInputs
+from DILIGENT.server.services.text.normalization import normalize_drug_query_name
 
 
 ###############################################################################
@@ -246,6 +248,7 @@ class HepatoxConsultation:
         prepared_inputs: HepatoxPreparedInputs | None,
         visit_date: date | None = None,
         rag_query: dict[str, str] | None = None,
+        progress_callback: Callable[[str, float], None] | None = None,
     ) -> dict[str, Any] | None:
         if prepared_inputs is None:
             logger.info("No prepared inputs provided; skipping hepatotoxicity consultation")
@@ -263,6 +266,7 @@ class HepatoxConsultation:
             visit_date=visit_date,
             pattern_prompt=prepared_inputs.pattern_prompt,
             rag_query=rag_query,
+            progress_callback=progress_callback,
         )
         return report.model_dump()
 
@@ -274,7 +278,8 @@ class HepatoxConsultation:
         clinical_context: str | None,
         visit_date: date | None,
         pattern_prompt: str, 
-        rag_query: dict[str, str] | None = None,       
+        rag_query: dict[str, str] | None = None,
+        progress_callback: Callable[[str, float], None] | None = None,
     ) -> PatientDrugClinicalReport:
         normalized_context = clinical_context.strip() if clinical_context else ""
         pattern_summary = (
@@ -282,8 +287,14 @@ class HepatoxConsultation:
             or "Hepatotoxicity pattern classification was unavailable; weigh pattern matches qualitatively."
         )
         entries: list[DrugClinicalAssessment] = []
-        llm_jobs: list[tuple[int, Any]] = []       
-            
+        llm_jobs: list[tuple[int, Any]] = []
+
+        def emit_progress(stage: str, fraction: float) -> None:
+            if progress_callback is None:
+                return
+            bounded_fraction = min(1.0, max(0.0, float(fraction)))
+            progress_callback(stage, bounded_fraction)
+
         # iterate over all drugs to identify those with LiverTox excerpts and those without
         for idx, drug_entry in enumerate(self.drugs.entries):
             entry, job = await self.prepare_drug_assessment(
@@ -299,10 +310,24 @@ class HepatoxConsultation:
             if job:
                 llm_jobs.append(job)
 
+        emit_progress("llm_analysis", 0.0)
         if llm_jobs:
-            indices, tasks = zip(*llm_jobs)
-            responses = await asyncio.gather(*tasks, return_exceptions=True)
-            for idx, outcome in zip(indices, responses):
+            async def execute_indexed_job(
+                index: int, coroutine: Any
+            ) -> tuple[int, Any]:
+                try:
+                    return index, await coroutine
+                except Exception as exc:  # noqa: BLE001
+                    return index, exc
+
+            pending_tasks = [
+                asyncio.create_task(execute_indexed_job(idx, task))
+                for idx, task in llm_jobs
+            ]
+            completed = 0
+            total = len(pending_tasks)
+            for task in asyncio.as_completed(pending_tasks):
+                idx, outcome = await task
                 entry = entries[idx]
                 if isinstance(outcome, Exception):
                     logger.error(
@@ -313,12 +338,18 @@ class HepatoxConsultation:
                     entry.paragraph = self.build_error_paragraph(entry)
                 else:
                     entry.paragraph = outcome
+                completed += 1
+                emit_progress("llm_analysis", completed / total if total else 1.0)
+        else:
+            emit_progress("llm_analysis", 1.0)
 
         logger.info("Composing final clinical report for current patient")
+        emit_progress("report_composition", 0.0)
         final_report = await self.finalize_patient_report(
             entries,
             clinical_context=normalized_context,
         )
+        emit_progress("report_composition", 1.0)
 
         return PatientDrugClinicalReport(entries=entries, final_report=final_report)
 
@@ -335,18 +366,40 @@ class HepatoxConsultation:
         rag_query: dict[str, str] | None,
     ) -> tuple[DrugClinicalAssessment, tuple[int, Any] | None]:
         raw_name = drug_entry.name or ""
-        normalized_drug_name = raw_name.strip()
+        normalized_drug_key = normalize_drug_query_name(raw_name)
 
-        livertox_data = resolved_drugs.get(normalized_drug_name, {})
+        livertox_data = resolved_drugs.get(normalized_drug_key, {})
         matched_row = livertox_data.get("matched_livertox_row", None)
         excerpts_list = livertox_data.get("extracted_excerpts", [])
+        canonical_name = str(livertox_data.get("canonical_name") or raw_name).strip() or raw_name
+        origins = [
+            origin
+            for origin in livertox_data.get("origins", [])
+            if isinstance(origin, str) and origin.strip()
+        ]
+        if not origins and drug_entry.source in {"therapy", "anamnesis"}:
+            origins = [drug_entry.source]
+        extraction_metadata = livertox_data.get("extraction_metadata", [])
+        missing_livertox = bool(livertox_data.get("missing_livertox"))
+        ambiguous_match = bool(livertox_data.get("ambiguous_match"))
+        match_candidates = [
+            str(candidate).strip()
+            for candidate in livertox_data.get("match_candidates", [])
+            if str(candidate).strip()
+        ]
 
         suspension = self.evaluate_suspension(drug_entry, visit_date)
         matched_lvt_row = matched_row if isinstance(matched_row, dict) else None
         entry = DrugClinicalAssessment(
             drug_name=drug_entry.name,
+            canonical_name=canonical_name,
+            origins=origins,
+            extraction_metadata=extraction_metadata,
             matched_livertox_row=matched_lvt_row,
             extracted_excerpts=excerpts_list,
+            missing_livertox=missing_livertox,
+            ambiguous_match=ambiguous_match,
+            match_candidates=match_candidates,
             suspension=suspension,
         )
 
@@ -354,14 +407,29 @@ class HepatoxConsultation:
             entry.paragraph = self.build_excluded_paragraph(entry)
             return entry, None
 
+        if entry.ambiguous_match:
+            entry.paragraph = self.build_ambiguous_match_paragraph(entry)
+            return entry, None
+
         excerpt = self.select_excerpt(excerpts_list)
-        if excerpt is None:
+        if excerpt is None or entry.missing_livertox:
+            entry.missing_livertox = True
             entry.paragraph = self.build_missing_excerpt_paragraph(entry)
             return entry, None
 
-        rag_documents = await self.fetch_rag_documents(rag_query, normalized_drug_name)
+        rag_documents = await self.fetch_rag_documents(rag_query, raw_name)
         job = self.request_drug_analysis(
             drug_name=drug_entry.name,
+            canonical_name=entry.canonical_name or drug_entry.name,
+            origins=entry.origins,
+            extraction_metadata=entry.extraction_metadata,
+            livertox_status=(
+                "missing_livertox"
+                if entry.missing_livertox
+                else "ambiguous_match"
+                if entry.ambiguous_match
+                else "matched"
+            ),
             excerpt=excerpt,
             rag_documents=rag_documents or None,
             clinical_context=normalized_context,
@@ -373,11 +441,17 @@ class HepatoxConsultation:
 
     # -------------------------------------------------------------------------
     async def fetch_rag_documents(
-        self, rag_query: dict[str, str] | None, normalized_drug_name: str
+        self, rag_query: dict[str, str] | None, drug_name: str
     ) -> str | None:
         if not rag_query:
             return None
-        drug_rag_query = rag_query.get(normalized_drug_name)
+        normalized_key = normalize_drug_query_name(drug_name)
+        drug_rag_query = rag_query.get(drug_name) or rag_query.get(normalized_key)
+        if drug_rag_query is None:
+            for key, value in rag_query.items():
+                if normalize_drug_query_name(key) == normalized_key:
+                    drug_rag_query = value
+                    break
         if not drug_rag_query:
             return None
         return await asyncio.to_thread(
@@ -724,6 +798,10 @@ class HepatoxConsultation:
         self,
         *,
         drug_name: str,
+        canonical_name: str,
+        origins: list[str],
+        extraction_metadata: list[dict[str, Any]],
+        livertox_status: str,
         excerpt: str,
         rag_documents: str | None,
         clinical_context: str,
@@ -735,8 +813,19 @@ class HepatoxConsultation:
         suspension_details = self.format_suspension_prompt(suspension)
         score, metadata_block = self.prepare_metadata_prompt(metadata)
         rag_documents = rag_documents or "No additional documents provided."
+        origin_block = ", ".join(origins) if origins else "unknown"
+        metadata_items = [
+            f"- {json.dumps(item, ensure_ascii=False)}"
+            for item in extraction_metadata
+            if isinstance(item, dict) and item
+        ]
+        extraction_block = "\n".join(metadata_items) if metadata_items else "- Not available"
         user_prompt = LIVERTOX_CLINICAL_USER_PROMPT.format(
             drug_name=self.escape_braces(drug_name.strip() or drug_name),
+            canonical_name=self.escape_braces(canonical_name.strip() or canonical_name),
+            origins=self.escape_braces(origin_block),
+            extraction_metadata=self.escape_braces(extraction_block),
+            livertox_status=self.escape_braces(livertox_status),
             excerpt=self.escape_braces(excerpt),
             documents=self.escape_braces(rag_documents),
             clinical_context=self.escape_braces(clinical_context),
@@ -866,6 +955,18 @@ class HepatoxConsultation:
         note = "No LiverTox excerpt was available for this drug, so its hepatotoxic potential in this patient could not be evaluated automatically."
         guidance = "Consider consulting the LiverTox monograph manually or alternative references before attributing causality."
         return f"{heading}\n{note} {guidance}\nBibliography source: LiverTox"
+
+    # -------------------------------------------------------------------------
+    def build_ambiguous_match_paragraph(self, entry: DrugClinicalAssessment) -> str:
+        heading = self.format_drug_heading(entry.drug_name, NOT_AVAILABLE_TEXT)
+        candidates = ", ".join(entry.match_candidates) if entry.match_candidates else "Not available"
+        note = (
+            "Drug matching was ambiguous; no LiverTox excerpt was injected to avoid an "
+            "incorrect attribution."
+        )
+        details = f"Candidate matches: {candidates}."
+        guidance = "Manual curation is required before causality assessment."
+        return f"{heading}\n{note} {details} {guidance}\nBibliography source: LiverTox"
 
     # -------------------------------------------------------------------------
     def build_error_paragraph(self, entry: DrugClinicalAssessment) -> str:
