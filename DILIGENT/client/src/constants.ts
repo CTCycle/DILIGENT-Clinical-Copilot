@@ -32,14 +32,19 @@ export const CLINICAL_MODEL_CHOICES = [
 ];
 
 export const CLOUD_MODEL_CHOICES: Record<string, string[]> = {
-  openai: ["gpt-4.1-mini", "gpt-4.1", "gpt-4o-mini", "gpt-4o"],
+  openai: [
+    "gpt-5.2",
+    "gpt-5.2-pro",
+    "gpt-5",
+    "gpt-5-mini",
+    "gpt-5-nano",
+    "gpt-4.1",
+    "gpt-4.1-mini",
+  ],
   gemini: [
-    "gemini-1.5-flash",
-    "gemini-1.5-flash-latest",
-    "gemini-1.5-pro",
-    "gemini-1.5-pro-latest",
-    "gemini-1.0-pro",
-    "gemini-1.0-pro-vision",
+    "gemini-2.5-pro",
+    "gemini-2.5-flash",
+    "gemini-2.5-flash-lite",
   ],
 };
 
@@ -48,7 +53,7 @@ export const CLOUD_PROVIDERS = Object.keys(CLOUD_MODEL_CHOICES);
 export const DEFAULT_SETTINGS: RuntimeSettings = {
   useCloudServices: false,
   provider: "openai",
-  cloudModel: "gpt-4o-mini",
+  cloudModel: "gpt-5.2",
   parsingModel: "qwen3:1.7b",
   clinicalModel: "gpt-oss:20b",
   temperature: 0.7,

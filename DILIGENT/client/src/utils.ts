@@ -1,8 +1,6 @@
-import { CLOUD_MODEL_CHOICES, CLOUD_PROVIDERS } from "./constants";
 import {
   ClinicalFormState,
   ClinicalRequestPayload,
-  CloudSelection,
   RuntimeSettings,
 } from "./types";
 
@@ -55,25 +53,6 @@ export function normalizeVisitDateInput(value: string): string {
   return `${year.toString().padStart(4, "0")}-${month
     .toString()
     .padStart(2, "0")}-${day.toString().padStart(2, "0")}`;
-}
-
-export function resolveCloudSelection(
-  provider: string,
-  cloudModel: string | null,
-): CloudSelection {
-  const normalizedProvider = provider.trim().toLowerCase();
-  const providerChoice = CLOUD_MODEL_CHOICES[normalizedProvider]
-    ? normalizedProvider
-    : CLOUD_PROVIDERS[0] ?? "";
-  const models = CLOUD_MODEL_CHOICES[providerChoice] ?? [];
-  const chosenModel =
-    cloudModel && models.includes(cloudModel) ? cloudModel : models[0] ?? null;
-
-  return {
-    provider: providerChoice,
-    models,
-    model: chosenModel,
-  };
 }
 
 function buildVisitDatePayload(

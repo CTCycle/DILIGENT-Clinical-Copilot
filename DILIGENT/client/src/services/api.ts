@@ -5,6 +5,8 @@ import {
   JobCancelResponse,
   JobStartResponse,
   JobStatusResponse,
+  ModelConfigStateResponse,
+  ModelConfigUpdateRequest,
 } from "../types";
 
 const HTTP_TIMEOUT =
@@ -211,6 +213,24 @@ export function pollClinicalJobStatus(
       }
     },
   };
+}
+
+export async function fetchModelConfigState(): Promise<ModelConfigStateResponse> {
+  return requestJson<ModelConfigStateResponse>(`${API_BASE_URL}/model-config`, {
+    method: "GET",
+  });
+}
+
+export async function updateModelConfigState(
+  payload: ModelConfigUpdateRequest,
+): Promise<ModelConfigStateResponse> {
+  return requestJson<ModelConfigStateResponse>(`${API_BASE_URL}/model-config`, {
+    method: "PUT",
+    headers: {
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify(payload),
+  });
 }
 
 export async function pullModels(models: string[]): Promise<ApiResult> {

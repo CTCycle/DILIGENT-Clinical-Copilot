@@ -57,14 +57,19 @@ CLINICAL_MODEL_CHOICES = [
     "gemma3:9b",
     "gemma3:27b",
 ]
-OPENAI_CLOUD_MODELS = ["gpt-4.1-mini", "gpt-4.1", "gpt-4o-mini", "gpt-4o"]
+OPENAI_CLOUD_MODELS = [
+    "gpt-5.2",
+    "gpt-5.2-pro",
+    "gpt-5",
+    "gpt-5-mini",
+    "gpt-5-nano",
+    "gpt-4.1",
+    "gpt-4.1-mini",
+]
 GEMINI_CLOUD_MODELS = [
-    "gemini-1.5-flash",
-    "gemini-1.5-flash-latest",
-    "gemini-1.5-pro",
-    "gemini-1.5-pro-latest",
-    "gemini-1.0-pro",
-    "gemini-1.0-pro-vision",
+    "gemini-2.5-pro",
+    "gemini-2.5-flash",
+    "gemini-2.5-flash-lite",
 ]
 CLOUD_MODEL_CHOICES: dict[str, list[str]] = {
     "openai": OPENAI_CLOUD_MODELS,
@@ -81,6 +86,7 @@ TABLE_DRUGS = "drugs"
 TABLE_DRUG_RXNORM_CODES = "drug_rxnorm_codes"
 TABLE_DRUG_ALIASES = "drug_aliases"
 TABLE_LIVERTOX_MONOGRAPHS = "livertox_monographs"
+TABLE_MODEL_SELECTIONS = "model_selections"
 
 RXNORM_CATALOG_COLUMNS = [
     "rxcui",
