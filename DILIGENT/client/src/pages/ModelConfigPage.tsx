@@ -1,86 +1,173 @@
-import React from "react";
+import React, { useEffect, useMemo, useState } from "react";
 
-import {
-    CLINICAL_MODEL_CHOICES,
-    CLOUD_MODEL_CHOICES,
-    CLOUD_PROVIDERS,
-    DEFAULT_SETTINGS,
-    PARSING_MODEL_CHOICES,
-} from "../constants";
+import { CLOUD_MODEL_CHOICES, DEFAULT_SETTINGS } from "../constants";
 import { useAppState } from "../context/AppStateContext";
-import { pullModels } from "../services/api";
-import { RuntimeSettings } from "../types";
-import { resolveCloudSelection } from "../utils";
+import {
+    fetchModelConfigState,
+    pullModels,
+    updateModelConfigState,
+} from "../services/api";
+import { ModelConfigStateResponse, ModelConfigUpdateRequest, RuntimeSettings } from "../types";
+
+const PROVIDER_LABELS: Record<string, string> = {
+    openai: "OpenAI",
+    gemini: "Gemini",
+};
+
+const KeyIcon = () => (
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+        <circle cx="8" cy="15" r="3" />
+        <path d="M11 15h10" />
+        <path d="M18 12v6" />
+    </svg>
+);
+
+function resolveProvider(
+    provider: string | null | undefined,
+    cloudChoices: Record<string, string[]>,
+): string {
+    const normalized = (provider || "").trim().toLowerCase();
+    if (normalized && cloudChoices[normalized]) {
+        return normalized;
+    }
+    if (cloudChoices.openai) {
+        return "openai";
+    }
+    const fallback = Object.keys(cloudChoices)[0];
+    return fallback || DEFAULT_SETTINGS.provider;
+}
+
+function resolveCloudModel(
+    provider: string,
+    cloudModel: string | null,
+    cloudChoices: Record<string, string[]>,
+): string | null {
+    const options = cloudChoices[provider] || [];
+    if (!options.length) {
+        return null;
+    }
+    if (cloudModel && options.includes(cloudModel)) {
+        return cloudModel;
+    }
+    return options[0];
+}
 
 export function ModelConfigPage(): React.JSX.Element {
     const { state, updateDiluAgent } = useAppState();
-    const {
-        settings,
-        cloudSelection,
-        exportUrl,
-        isPulling,
-    } = state.diluAgent;
+    const { settings, isPulling } = state.diluAgent;
+
+    const [isLoading, setIsLoading] = useState(true);
+    const [isSaving, setIsSaving] = useState(false);
+    const [localModels, setLocalModels] = useState<ModelConfigStateResponse["local_models"]>([]);
+    const [cloudChoices, setCloudChoices] = useState<Record<string, string[]>>(CLOUD_MODEL_CHOICES);
+    const [pullModelName, setPullModelName] = useState("");
+    const [statusMessage, setStatusMessage] = useState("");
+    const [openProviderMenu, setOpenProviderMenu] = useState<string | null>(null);
 
     const cloudEnabled = settings.useCloudServices;
-    const pullDisabled = cloudEnabled || isPulling;
+    const localSelectionDisabled = cloudEnabled || isSaving || isLoading;
 
-    const resetOutputs = () => {
-        if (exportUrl) {
-            URL.revokeObjectURL(exportUrl);
-        }
-        updateDiluAgent({
-            message: "",
-            jsonPayload: null,
-            exportUrl: null,
-            jobId: null,
-            jobProgress: 0,
-            jobStatus: null,
-        });
+    const applyConfigToState = (payload: ModelConfigStateResponse) => {
+        setLocalModels(payload.local_models || []);
+        setCloudChoices(payload.cloud_model_choices || CLOUD_MODEL_CHOICES);
+
+        const provider = resolveProvider(payload.llm_provider, payload.cloud_model_choices);
+        const cloudModel = resolveCloudModel(provider, payload.cloud_model, payload.cloud_model_choices);
+        const nextSettings: RuntimeSettings = {
+            ...settings,
+            useCloudServices: payload.use_cloud_services,
+            provider,
+            cloudModel,
+            parsingModel: payload.text_extraction_model || settings.parsingModel,
+            clinicalModel: payload.clinical_model || settings.clinicalModel,
+            reasoning: payload.ollama_reasoning,
+        };
+        updateDiluAgent({ settings: nextSettings });
     };
 
-    const handleSettingsChange = (next: Partial<RuntimeSettings>) => {
-        const merged = { ...settings, ...next };
-        const selection = resolveCloudSelection(merged.provider, merged.cloudModel);
-        updateDiluAgent({
-            settings: {
-                ...merged,
-                provider: selection.provider || DEFAULT_SETTINGS.provider,
-                cloudModel: selection.model,
-            },
-            cloudSelection: { provider: selection.provider, model: selection.model },
-        });
-    };
-
-    const handleUseCloudChange = (value: boolean) => {
-        handleSettingsChange({ useCloudServices: value });
-    };
-
-    const handleProviderChange = (provider: string) => {
-        const selection = resolveCloudSelection(provider, settings.cloudModel);
-        updateDiluAgent({
-            cloudSelection: { provider: selection.provider, model: selection.model },
-        });
-        handleSettingsChange({
-            provider: selection.provider,
-            cloudModel: selection.model,
-        });
-    };
-
-    const handleCloudModelChange = (model: string) => {
-        const selection = resolveCloudSelection(settings.provider, model);
-        updateDiluAgent({
-            cloudSelection: { provider: selection.provider, model: selection.model },
-        });
-        handleSettingsChange({ cloudModel: selection.model });
-    };
-
-    const handlePullModels = async () => {
-        if (cloudEnabled) return;
-        updateDiluAgent({ isPulling: true });
-        resetOutputs();
+    const loadModelConfig = async () => {
+        setIsLoading(true);
         try {
-            const result = await pullModels([settings.parsingModel, settings.clinicalModel]);
-            updateDiluAgent({ message: result.message, jsonPayload: result.json });
+            const payload = await fetchModelConfigState();
+            applyConfigToState(payload);
+            setStatusMessage("");
+        } catch (error) {
+            const description = error instanceof Error ? error.message : "Unable to load model settings.";
+            setStatusMessage(`[ERROR] ${description}`);
+        } finally {
+            setIsLoading(false);
+        }
+    };
+
+    useEffect(() => {
+        void loadModelConfig();
+    }, []);
+
+    const persistConfigPatch = async (patch: ModelConfigUpdateRequest) => {
+        setIsSaving(true);
+        try {
+            const payload = await updateModelConfigState(patch);
+            applyConfigToState(payload);
+            setStatusMessage("");
+        } catch (error) {
+            const description = error instanceof Error ? error.message : "Unable to save model settings.";
+            setStatusMessage(`[ERROR] ${description}`);
+        } finally {
+            setIsSaving(false);
+        }
+    };
+
+    const providerOptions = useMemo(() => {
+        const values = Object.keys(cloudChoices);
+        if (values.length) {
+            return values;
+        }
+        return ["openai", "gemini"];
+    }, [cloudChoices]);
+
+    const activeProvider = resolveProvider(settings.provider, cloudChoices);
+    const activeCloudModel = resolveCloudModel(activeProvider, settings.cloudModel, cloudChoices);
+    const activeCloudModels = cloudChoices[activeProvider] || [];
+
+    const handleRoleSelection = async (role: "clinical" | "text_extraction", modelName: string) => {
+        if (role === "clinical") {
+            await persistConfigPatch({ clinical_model: modelName });
+            return;
+        }
+        await persistConfigPatch({ text_extraction_model: modelName });
+    };
+
+    const handleCloudSwitchChange = async (value: boolean) => {
+        await persistConfigPatch({ use_cloud_services: value });
+    };
+
+    const handleProviderChange = async (provider: string) => {
+        await persistConfigPatch({ llm_provider: provider });
+    };
+
+    const handleCloudModelChange = async (modelName: string) => {
+        await persistConfigPatch({ cloud_model: modelName });
+    };
+
+    const handleReasoningChange = async (enabled: boolean) => {
+        await persistConfigPatch({ ollama_reasoning: enabled });
+    };
+
+    const handlePullModel = async () => {
+        const candidate = pullModelName.trim();
+        if (!candidate) {
+            setStatusMessage("[ERROR] Enter a model name to pull from Ollama.");
+            return;
+        }
+
+        updateDiluAgent({ isPulling: true });
+        try {
+            const result = await pullModels([candidate]);
+            setStatusMessage(result.message);
+            await loadModelConfig();
+            if (!result.message.startsWith("[ERROR]")) {
+                setPullModelName("");
+            }
         } finally {
             updateDiluAgent({ isPulling: false });
         }
@@ -94,128 +181,170 @@ export function ModelConfigPage(): React.JSX.Element {
                 <p className="lede">Adjust runtime preferences for DILI analysis.</p>
             </header>
 
-            <div className="model-config-first-row">
-                <section className="model-config-column">
-                    <p className="modal-section-title">Local (Ollama) Parameters</p>
-                    <div className="field">
-                        <label className="field-label" htmlFor="local-parsing-model">
-                            Data Extraction Model
+            <div className="model-config-layout">
+                <section className="model-config-left-column">
+                    <div className={`model-config-local-row ${localSelectionDisabled ? "is-disabled" : ""}`} aria-disabled={localSelectionDisabled}>
+                        <div className="model-config-row-header">
+                            <p className="modal-section-title">Local Model Preview</p>
+                            <p className="helper">Select one clinical model and one text extraction model.</p>
+                        </div>
+
+                        <div className="model-config-local-cards" role="list">
+                            {!localModels.length && (
+                                <p className="model-config-empty-note">
+                                    {isLoading ? "Loading local models..." : "No local Ollama models available."}
+                                </p>
+                            )}
+
+                            {localModels.map((model) => (
+                                <article key={model.name} className="model-config-local-card" role="listitem">
+                                    <h3>{model.name}</h3>
+                                    <p>{model.description}</p>
+                                    <div className="model-config-role-controls">
+                                        <label className="field checkbox">
+                                            <input
+                                                type="radio"
+                                                name="clinical-role"
+                                                checked={settings.clinicalModel === model.name}
+                                                onChange={() => { void handleRoleSelection("clinical", model.name); }}
+                                                disabled={localSelectionDisabled}
+                                            />
+                                            <span className="field-label">Clinical Model</span>
+                                        </label>
+                                        <label className="field checkbox">
+                                            <input
+                                                type="radio"
+                                                name="text-extraction-role"
+                                                checked={settings.parsingModel === model.name}
+                                                onChange={() => { void handleRoleSelection("text_extraction", model.name); }}
+                                                disabled={localSelectionDisabled}
+                                            />
+                                            <span className="field-label">Text Extraction Model</span>
+                                        </label>
+                                    </div>
+                                </article>
+                            ))}
+                        </div>
+                    </div>
+
+                    <div className="model-config-ollama-row">
+                        <p className="modal-section-title">Ollama Settings</p>
+                        <label className="field checkbox">
+                            <input
+                                type="checkbox"
+                                checked={settings.reasoning}
+                                onChange={(e) => { void handleReasoningChange(e.target.checked); }}
+                                disabled={isSaving || isLoading}
+                            />
+                            <span className="field-label">Enable SDL/Reasoning</span>
                         </label>
-                        <select
-                            id="local-parsing-model"
-                            value={settings.parsingModel}
-                            onChange={(e) => handleSettingsChange({ parsingModel: e.target.value })}
-                            disabled={cloudEnabled}
-                        >
-                            {PARSING_MODEL_CHOICES.map((model) => (
-                                <option key={model} value={model}>
-                                    {model}
-                                </option>
-                            ))}
-                        </select>
+
+                        <div className="model-config-pull-widget">
+                            <label className="field-label" htmlFor="pull-model-name">Pull model from Ollama</label>
+                            <div className="model-config-pull-actions">
+                                <input
+                                    id="pull-model-name"
+                                    type="text"
+                                    value={pullModelName}
+                                    placeholder="e.g. qwen3:8b"
+                                    onChange={(e) => setPullModelName(e.target.value)}
+                                    disabled={isPulling || isSaving || isLoading}
+                                />
+                                <button
+                                    className="btn btn-primary"
+                                    type="button"
+                                    onClick={handlePullModel}
+                                    disabled={isPulling || isSaving || isLoading}
+                                >
+                                    {isPulling ? "Pulling..." : "Pull Model"}
+                                </button>
+                            </div>
+                        </div>
                     </div>
-                    <div className="field">
-                        <label className="field-label" htmlFor="local-clinical-model">Clinical Model</label>
-                        <select
-                            id="local-clinical-model"
-                            value={settings.clinicalModel}
-                            onChange={(e) => handleSettingsChange({ clinicalModel: e.target.value })}
-                            disabled={cloudEnabled}
-                        >
-                            {CLINICAL_MODEL_CHOICES.map((model) => (
-                                <option key={model} value={model}>
-                                    {model}
-                                </option>
-                            ))}
-                        </select>
-                    </div>
-                    <div className="field">
-                        <label className="field-label" htmlFor="local-temperature">Temperature (Ollama)</label>
-                        <input
-                            id="local-temperature"
-                            type="number"
-                            min={0}
-                            max={2}
-                            step={0.05}
-                            value={settings.temperature}
-                            onChange={(e) =>
-                                handleSettingsChange({ temperature: Number.parseFloat(e.target.value) || 0 })
-                            }
-                            disabled={cloudEnabled}
-                        />
-                    </div>
-                    <label className="field checkbox">
-                        <input
-                            type="checkbox"
-                            id="local-reasoning"
-                            checked={settings.reasoning}
-                            onChange={(e) => handleSettingsChange({ reasoning: e.target.checked })}
-                            disabled={cloudEnabled}
-                        />
-                        <span className="field-label">Enable SDL/Reasoning (Ollama)</span>
-                    </label>
-                    <button
-                        className="btn btn-primary model-config-pull-btn"
-                        type="button"
-                        disabled={pullDisabled}
-                        onClick={handlePullModels}
-                    >
-                        {isPulling ? "Pulling models..." : "Pull Selected Models"}
-                    </button>
                 </section>
 
-                <section className={`model-config-column ${cloudEnabled ? "" : "model-config-column-disabled"}`}>
-                    <p className="modal-section-title">Cloud Provider Parameters</p>
-                    <label className="field checkbox">
-                        <input
-                            type="checkbox"
-                            id="use-cloud-providers"
-                            checked={cloudEnabled}
-                            onChange={(e) => handleUseCloudChange(e.target.checked)}
-                        />
-                        <span className="field-label">Use Cloud Providers</span>
-                    </label>
+                <section className="model-config-right-column">
+                    <div className="model-config-cloud-row">
+                        <p className="modal-section-title">Cloud Model Control</p>
+                        <label className="field checkbox">
+                            <input
+                                type="checkbox"
+                                checked={cloudEnabled}
+                                onChange={(e) => { void handleCloudSwitchChange(e.target.checked); }}
+                                disabled={isSaving || isLoading}
+                            />
+                            <span className="field-label">Use Cloud Models</span>
+                        </label>
 
-                    {cloudEnabled ? (
-                        <div className="model-config-cloud-fields">
-                            <div className="field">
-                                <label className="field-label" htmlFor="cloud-service">Cloud Service</label>
-                                <select
-                                    id="cloud-service"
-                                    value={cloudSelection.provider}
-                                    onChange={(e) => handleProviderChange(e.target.value)}
-                                >
-                                    {CLOUD_PROVIDERS.map((provider) => (
-                                        <option key={provider} value={provider}>
-                                            {provider}
-                                        </option>
-                                    ))}
-                                </select>
+                        <div className={`model-config-provider-grid ${cloudEnabled ? "" : "is-disabled"}`}>
+                            <div className="model-config-provider-list">
+                                {providerOptions.map((provider) => (
+                                    <div
+                                        key={provider}
+                                        className={`model-config-provider-card ${activeProvider === provider ? "is-active" : ""}`}
+                                    >
+                                        <button
+                                            className="model-config-provider-button"
+                                            type="button"
+                                            onClick={() => { void handleProviderChange(provider); }}
+                                            disabled={!cloudEnabled || isSaving || isLoading}
+                                        >
+                                            <span>{PROVIDER_LABELS[provider] || provider}</span>
+                                        </button>
+                                        <button
+                                            className="model-config-provider-key"
+                                            type="button"
+                                            aria-haspopup="menu"
+                                            aria-expanded={openProviderMenu === provider}
+                                            onClick={() =>
+                                                setOpenProviderMenu((current) => (
+                                                    current === provider ? null : provider
+                                                ))
+                                            }
+                                            disabled={!cloudEnabled || isSaving || isLoading}
+                                        >
+                                            <KeyIcon />
+                                        </button>
+                                        {openProviderMenu === provider && (
+                                            <div className="model-config-provider-menu" role="menu">
+                                                API key management placeholder.
+                                            </div>
+                                        )}
+                                    </div>
+                                ))}
                             </div>
+
                             <div className="field">
-                                <label className="field-label" htmlFor="cloud-model">Cloud Model</label>
+                                <label className="field-label" htmlFor="cloud-model-select">Cloud Model</label>
                                 <select
-                                    id="cloud-model"
-                                    value={cloudSelection.model ?? ""}
-                                    onChange={(e) => handleCloudModelChange(e.target.value)}
+                                    id="cloud-model-select"
+                                    value={activeCloudModel || ""}
+                                    onChange={(e) => { void handleCloudModelChange(e.target.value); }}
+                                    disabled={!cloudEnabled || isSaving || isLoading || !activeCloudModels.length}
                                 >
-                                    {(CLOUD_MODEL_CHOICES[cloudSelection.provider] || []).map((model) => (
-                                        <option key={model} value={model}>
-                                            {model}
+                                    {activeCloudModels.map((modelName) => (
+                                        <option key={modelName} value={modelName}>
+                                            {modelName}
                                         </option>
                                     ))}
                                 </select>
                             </div>
                         </div>
-                    ) : (
-                        <p className="helper model-config-disabled-note">
-                            Cloud providers are disabled and not active.
+                    </div>
+
+                    <div className="model-config-right-footer-row">
+                        <p className="modal-section-title">Cloud Status</p>
+                        <p className="helper">
+                            Active provider: <strong>{PROVIDER_LABELS[activeProvider] || activeProvider}</strong>
                         </p>
-                    )}
+                        <p className="helper">
+                            Active model: <strong>{activeCloudModel || "Not set"}</strong>
+                        </p>
+                    </div>
                 </section>
             </div>
 
-            <div className="model-config-second-row" aria-hidden="true" />
+            {statusMessage && <p className="model-config-status-message">{statusMessage}</p>}
         </main>
     );
 }
