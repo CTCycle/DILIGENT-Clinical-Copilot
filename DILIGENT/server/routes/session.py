@@ -3,7 +3,7 @@ from __future__ import annotations
 import asyncio
 import time
 from datetime import datetime
-from collections.abc import Sequence
+from collections.abc import Callable, Sequence
 from typing import Any
 
 from fastapi import APIRouter, Body, HTTPException, status
@@ -14,7 +14,9 @@ from pydantic_core import ErrorDetails
 from DILIGENT.server.entities.clinical import (
     ClinicalPipelineValidationError,
     ClinicalSessionRequest,
+    DrugEntry,
     PatientData,
+    PatientDrugs,
     PipelineIssue,
 )
 from DILIGENT.server.entities.jobs import (
@@ -33,6 +35,7 @@ from DILIGENT.server.services.clinical.hepatox import (
 from DILIGENT.server.services.clinical.preparation import ClinicalKnowledgePreparation
 from DILIGENT.server.services.clinical.parser import DrugsParser
 from DILIGENT.server.services.retrieval.query import DILIQueryBuilder
+from DILIGENT.server.services.text.normalization import normalize_drug_query_name
 
 drugs_parser = DrugsParser()
 pattern_analyzer = HepatotoxicityPatternAnalyzer()
@@ -40,6 +43,31 @@ input_preparator = ClinicalKnowledgePreparation()
 router = APIRouter(tags=["session"])
 serializer = DataSerializer()
 NOT_AVAILABLE = "Not available"
+CLINICAL_PROGRESS_MESSAGES: dict[str, str] = {
+    "session_initialization": "Initializing clinical session",
+    "hepatotoxicity_pattern": "Calculating hepatotoxicity pattern",
+    "therapy_extraction": "Extracting drugs from therapy",
+    "anamnesis_extraction": "Extracting drugs from anamnesis",
+    "rag_query_building": "Building RAG queries",
+    "livertox_lookup": "Consulting LiverTox knowledge base",
+    "llm_analysis": "Running LLM drug-by-drug assessment",
+    "report_composition": "Composing final clinical report",
+    "finalization": "Finalizing and persisting session",
+}
+
+
+# -----------------------------------------------------------------------------
+def report_clinical_job_progress(job_id: str, *, stage: str, progress: float) -> None:
+    bounded = min(100.0, max(0.0, float(progress)))
+    message = CLINICAL_PROGRESS_MESSAGES.get(stage, stage.replace("_", " ").strip())
+    job_manager.update_progress(job_id, bounded)
+    job_manager.update_result(
+        job_id,
+        {
+            "progress_stage": stage,
+            "progress_message": message,
+        },
+    )
 
 
 ###############################################################################
@@ -176,11 +204,20 @@ async def execute_clinical_job(
     if job_manager.should_stop(job_id):
         return ""
 
-    job_manager.update_progress(job_id, 5.0)
+    report_clinical_job_progress(
+        job_id,
+        stage="session_initialization",
+        progress=5.0,
+    )
+
+    def progress_callback(stage: str, progress: float) -> None:
+        report_clinical_job_progress(job_id, stage=stage, progress=progress)
+
     try:
         result = await endpoint.process_single_patient(
             payload,
             allow_missing_labs=bool(runtime_overrides.get("allow_missing_labs")),
+            progress_callback=progress_callback,
         )
     except ClinicalPipelineValidationError as exc:
         job_manager.update_result(
@@ -244,6 +281,64 @@ class ClinicalSessionEndpoint:
     @staticmethod
     def serialize_pipeline_issues(issues: Sequence[PipelineIssue]) -> list[dict[str, Any]]:
         return [issue.model_dump() for issue in issues]
+
+    # -------------------------------------------------------------------------
+    @staticmethod
+    def merge_drugs_for_analysis(
+        therapy_drugs: PatientDrugs,
+        anamnesis_drugs: PatientDrugs,
+    ) -> PatientDrugs:
+        merged_entries: list[DrugEntry] = []
+        seen_keys: set[str] = set()
+        ordered = [*therapy_drugs.entries, *anamnesis_drugs.entries]
+        for entry in ordered:
+            raw_name = (entry.name or "").strip()
+            if not raw_name:
+                continue
+            lookup_key = normalize_drug_query_name(raw_name)
+            if not lookup_key or lookup_key in seen_keys:
+                continue
+            seen_keys.add(lookup_key)
+            merged_entries.append(entry)
+        return PatientDrugs(entries=merged_entries)
+
+    # -------------------------------------------------------------------------
+    @staticmethod
+    def build_structured_clinical_context(
+        payload: PatientData,
+        *,
+        therapy_drugs: PatientDrugs,
+        anamnesis_drugs: PatientDrugs,
+        pattern_score: Any,
+    ) -> str:
+        therapy_mentions = [
+            entry.name.strip()
+            for entry in therapy_drugs.entries
+            if isinstance(entry.name, str) and entry.name.strip()
+        ]
+        anamnesis_mentions = [
+            entry.name.strip()
+            for entry in anamnesis_drugs.entries
+            if isinstance(entry.name, str) and entry.name.strip()
+        ]
+        lines: list[str] = [
+            "# Clinical Context",
+            f"Anamnesis: {(payload.anamnesis or '').strip() or 'Not provided.'}",
+            "",
+            "# Therapy List (Raw)",
+            (payload.drugs or "").strip() or "Not provided.",
+            "",
+            "# Detected Drugs",
+            f"- Therapy: {', '.join(therapy_mentions) if therapy_mentions else 'None'}",
+            f"- Anamnesis: {', '.join(anamnesis_mentions) if anamnesis_mentions else 'None'}",
+            "",
+            "# Hepatotoxicity Pattern",
+            f"- Classification: {getattr(pattern_score, 'classification', 'indeterminate')}",
+            f"- ALT multiple: {getattr(pattern_score, 'alt_multiple', None)}",
+            f"- ALP multiple: {getattr(pattern_score, 'alp_multiple', None)}",
+            f"- R score: {getattr(pattern_score, 'r_score', None)}",
+        ]
+        return "\n".join(lines).strip()
 
     # -------------------------------------------------------------------------
     def apply_runtime_overrides(
@@ -318,13 +413,20 @@ class ClinicalSessionEndpoint:
         payload: PatientData,
         *,
         allow_missing_labs: bool = False,
+        progress_callback: Callable[[str, float], None] | None = None,
     ) -> dict[str, Any]:
         logger.info(
             "Starting Drug-Induced Liver Injury (DILI) analysis for patient: %s",
             payload.name,
         )
 
+        def emit_progress(stage: str, value: float) -> None:
+            if progress_callback is None:
+                return
+            progress_callback(stage, value)
+
         global_start_time = time.perf_counter()
+        emit_progress("session_initialization", 5.0)
         issues: list[PipelineIssue] = []
         pattern_assessment = self.pattern_analyzer.assess_payload(
             payload,
@@ -338,6 +440,7 @@ class ClinicalSessionEndpoint:
             pattern_score.r_score if pattern_score.r_score is not None else float("nan"),
             pattern_assessment.status,
         )
+        emit_progress("hepatotoxicity_pattern", 15.0)
 
         cleaned_therapy_text = self.drugs_parser.clean_text(payload.drugs or "")
         if not cleaned_therapy_text:
@@ -356,6 +459,7 @@ class ClinicalSessionEndpoint:
         elapsed = time.perf_counter() - start_time
         logger.info("Therapy drugs extraction required %.4f seconds", elapsed)
         logger.info("Detected %s drugs from therapy list", len(therapy_drugs.entries))
+        emit_progress("therapy_extraction", 30.0)
         if not therapy_drugs.entries:
             issue = PipelineIssue(
                 severity="error",
@@ -372,29 +476,56 @@ class ClinicalSessionEndpoint:
         elapsed = time.perf_counter() - start_time
         logger.info("Anamnesis drugs extraction required %.4f seconds", elapsed)
         logger.info("Detected %s drugs from anamnesis", len(anamnesis_drugs.entries))
+        emit_progress("anamnesis_extraction", 42.0)
 
-        rag_query: dict[str, str] | None = None
-        if payload.use_rag:
-            query_builder = DILIQueryBuilder(therapy_drugs)
-            logger.info("RAG retrieval enabled for clinical consultation")
-            rag_query = query_builder.build_dili_queries(
-                clinical_context=payload.anamnesis or "",
-                pattern_classification=pattern_score.classification,
-                r_score=pattern_score.r_score,
-            )
-
-        prepared_inputs = await input_preparator.prepare_inputs(
-            therapy_drugs,
-            clinical_context=payload.anamnesis,
+        all_detected_drugs = PatientDrugs(
+            entries=[*therapy_drugs.entries, *anamnesis_drugs.entries]
+        )
+        analysis_drugs = self.merge_drugs_for_analysis(therapy_drugs, anamnesis_drugs)
+        logger.info(
+            "Using %s deduplicated drugs for matching/consultation",
+            len(analysis_drugs.entries),
+        )
+        structured_context = self.build_structured_clinical_context(
+            payload,
+            therapy_drugs=therapy_drugs,
+            anamnesis_drugs=anamnesis_drugs,
             pattern_score=pattern_score,
         )
 
+        rag_query: dict[str, str] | None = None
+        if payload.use_rag:
+            query_builder = DILIQueryBuilder(analysis_drugs)
+            logger.info("RAG retrieval enabled for clinical consultation")
+            rag_query = query_builder.build_dili_queries(
+                clinical_context=structured_context,
+                pattern_classification=pattern_score.classification,
+                r_score=pattern_score.r_score,
+            )
+        emit_progress("rag_query_building", 50.0)
+
+        prepared_inputs = await input_preparator.prepare_inputs(
+            all_detected_drugs,
+            clinical_context=structured_context,
+            pattern_score=pattern_score,
+        )
+        emit_progress("livertox_lookup", 62.0)
+
         start_time = time.perf_counter()
-        clinical_session = HepatoxConsultation(therapy_drugs, patient_name=payload.name)
+        clinical_session = HepatoxConsultation(analysis_drugs, patient_name=payload.name)
+
+        def consultation_progress_callback(stage: str, fraction: float) -> None:
+            bounded_fraction = min(1.0, max(0.0, float(fraction)))
+            if stage == "llm_analysis":
+                emit_progress("llm_analysis", 62.0 + (bounded_fraction * 24.0))
+            elif stage == "report_composition":
+                emit_progress("report_composition", 86.0 + (bounded_fraction * 8.0))
+
         drug_assessment = await clinical_session.run_analysis(
             prepared_inputs=prepared_inputs,
             visit_date=payload.visit_date,
             rag_query=rag_query,
+            progress_callback=consultation_progress_callback,
         )
         elapsed = time.perf_counter() - start_time
         logger.info("Hepato-toxicity consultation required %.4f seconds", elapsed)
@@ -416,19 +547,19 @@ class ClinicalSessionEndpoint:
             global_elapsed,
         )
 
-        detected_drugs = [entry.name for entry in therapy_drugs.entries if entry.name]
+        detected_drugs = [entry.name for entry in analysis_drugs.entries if entry.name]
         anamnesis_detected_drugs = [
             entry.name for entry in anamnesis_drugs.entries if entry.name
         ]
         resolved_drug_map: dict[str, dict[str, Any]] = {}
         if prepared_inputs is not None:
             for key, value in prepared_inputs.resolved_drugs.items():
-                normalized_key = key.strip().casefold()
+                normalized_key = normalize_drug_query_name(key)
                 if normalized_key:
                     resolved_drug_map[normalized_key] = value
         matched_drugs_payload: list[dict[str, Any]] = []
         for detected_name in detected_drugs:
-            normalized_name = detected_name.strip().casefold()
+            normalized_name = normalize_drug_query_name(detected_name)
             resolved = resolved_drug_map.get(normalized_name, {})
             matched_row = (
                 resolved.get("matched_livertox_row")
@@ -456,10 +587,27 @@ class ClinicalSessionEndpoint:
                     "match_notes": resolved.get("match_notes")
                     if isinstance(resolved, dict)
                     else [],
+                    "match_status": resolved.get("match_status")
+                    if isinstance(resolved, dict)
+                    else None,
+                    "match_candidates": resolved.get("match_candidates")
+                    if isinstance(resolved, dict)
+                    else [],
+                    "missing_livertox": resolved.get("missing_livertox")
+                    if isinstance(resolved, dict)
+                    else True,
+                    "ambiguous_match": resolved.get("ambiguous_match")
+                    if isinstance(resolved, dict)
+                    else False,
+                    "origins": resolved.get("origins") if isinstance(resolved, dict) else [],
+                    "raw_mentions": resolved.get("raw_mentions")
+                    if isinstance(resolved, dict)
+                    else [],
                 }
             )
         serialized_issues = self.serialize_pipeline_issues(issues)
         pattern_strings = self.pattern_analyzer.stringify_scores(pattern_score)
+        emit_progress("finalization", 96.0)
         await asyncio.to_thread(
             self.serializer.save_clinical_session,
             {
@@ -481,6 +629,7 @@ class ClinicalSessionEndpoint:
                 "issues": serialized_issues,
             },
         )
+        emit_progress("finalization", 99.0)
 
         narrative = NarrativeBuilder.build_patient_narrative(
             patient_label=patient_label,

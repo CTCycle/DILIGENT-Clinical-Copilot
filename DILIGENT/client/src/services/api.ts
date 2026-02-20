@@ -51,9 +51,10 @@ function extractTextFromResult(data: unknown): string {
 async function fetchWithTimeout(
   url: string,
   options: RequestInit,
+  timeoutSeconds: number = HTTP_TIMEOUT,
 ): Promise<Response> {
   const controller = new AbortController();
-  const timeoutMs = Math.max(HTTP_TIMEOUT, 1) * 1000;
+  const timeoutMs = Math.max(timeoutSeconds, 1) * 1000;
   const timer = globalThis.setTimeout(() => controller.abort(), timeoutMs);
 
   try {
@@ -113,8 +114,9 @@ async function parseApiResponse(
 async function requestJson<T>(
   url: string,
   options: RequestInit,
+  timeoutSeconds: number = HTTP_TIMEOUT,
 ): Promise<T> {
-  const response = await fetchWithTimeout(url, options);
+  const response = await fetchWithTimeout(url, options, timeoutSeconds);
   const result = await parseApiResponse(response, url);
   if (!response.ok) {
     throw new Error(result.message || `[ERROR] Request failed: ${response.status}`);
@@ -159,10 +161,12 @@ export async function startClinicalJob(
 
 export async function fetchClinicalJobStatus(
   jobId: string,
+  timeoutSeconds: number = HTTP_TIMEOUT,
 ): Promise<JobStatusResponse> {
   return requestJson<JobStatusResponse>(
     `${API_BASE_URL}/clinical/jobs/${encodeURIComponent(jobId)}`,
     { method: "GET" },
+    timeoutSeconds,
   );
 }
 
@@ -181,13 +185,22 @@ export function pollClinicalJobStatus(
   onUpdate: (status: JobStatusResponse) => void,
   onError: (message: string) => void,
 ): { stop: () => void } {
+  const safeIntervalMs = Math.max(intervalMs, 250);
+  const requestTimeoutSeconds = Math.min(
+    30,
+    Math.max(5, Math.ceil((safeIntervalMs / 1000) * 4)),
+  );
+  const maxConsecutivePollErrors = 3;
   let timeoutId: ReturnType<typeof globalThis.setTimeout> | null = null;
   let stopped = false;
+  let consecutivePollErrors = 0;
 
   const poll = async () => {
     if (stopped) return;
     try {
-      const status = await fetchClinicalJobStatus(jobId);
+      const status = await fetchClinicalJobStatus(jobId, requestTimeoutSeconds);
+      if (stopped) return;
+      consecutivePollErrors = 0;
       onUpdate(status);
       if (
         status.status === "completed" ||
@@ -197,12 +210,21 @@ export function pollClinicalJobStatus(
         return;
       }
     } catch (error) {
+      if (stopped) return;
+      consecutivePollErrors += 1;
+      if (consecutivePollErrors < maxConsecutivePollErrors) {
+        timeoutId = globalThis.setTimeout(poll, safeIntervalMs);
+        return;
+      }
       const message =
         error instanceof Error ? error.message : "Unexpected polling error";
-      onError(message);
+      onError(
+        `Polling failed after ${maxConsecutivePollErrors} attempts: ${message}`,
+      );
       return;
     }
-    timeoutId = globalThis.setTimeout(poll, intervalMs);
+    if (stopped) return;
+    timeoutId = globalThis.setTimeout(poll, safeIntervalMs);
   };
 
   poll();

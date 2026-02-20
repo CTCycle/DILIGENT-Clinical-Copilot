@@ -59,6 +59,7 @@ export function DiluAgentPage(): React.JSX.Element {
         jsonPayload,
         exportUrl,
         jobProgress,
+        jobStageMessage,
         isRunning,
         isExpanded,
     } = state.diluAgent;
@@ -93,6 +94,8 @@ export function DiluAgentPage(): React.JSX.Element {
             jobId: null,
             jobProgress: 0,
             jobStatus: null,
+            jobStage: null,
+            jobStageMessage: null,
         });
     };
 
@@ -118,6 +121,8 @@ export function DiluAgentPage(): React.JSX.Element {
                 jobId: startResult.job_id,
                 jobProgress: 0,
                 jobStatus: startResult.status,
+                jobStage: "session_initialization",
+                jobStageMessage: "Initializing clinical session",
             });
             const intervalMs = startResult.poll_interval * 1000;
 
@@ -125,9 +130,19 @@ export function DiluAgentPage(): React.JSX.Element {
                 startResult.job_id,
                 intervalMs,
                 (status) => {
+                    const stage =
+                        status.result && typeof status.result.progress_stage === "string"
+                            ? status.result.progress_stage
+                            : null;
+                    const stageMessage =
+                        status.result && typeof status.result.progress_message === "string"
+                            ? status.result.progress_message
+                            : null;
                     updateDiluAgent({
                         jobProgress: status.progress ?? 0,
                         jobStatus: status.status,
+                        jobStage: stage,
+                        jobStageMessage: stageMessage,
                     });
 
                     if (
@@ -153,6 +168,8 @@ export function DiluAgentPage(): React.JSX.Element {
                             message: report || "[INFO] Clinical analysis completed.",
                             jsonPayload: status.result,
                             exportUrl: newExportUrl,
+                            jobStage: null,
+                            jobStageMessage: null,
                             isRunning: false,
                         });
                     } else if (status.status === "failed") {
@@ -163,6 +180,8 @@ export function DiluAgentPage(): React.JSX.Element {
                             message: errorMessage,
                             jsonPayload: status.result,
                             exportUrl: null,
+                            jobStage: null,
+                            jobStageMessage: null,
                             isRunning: false,
                         });
                     } else if (status.status === "cancelled") {
@@ -170,6 +189,8 @@ export function DiluAgentPage(): React.JSX.Element {
                             message: "[INFO] Clinical analysis cancelled.",
                             jsonPayload: status.result,
                             exportUrl: null,
+                            jobStage: null,
+                            jobStageMessage: null,
                             isRunning: false,
                         });
                     }
@@ -183,6 +204,8 @@ export function DiluAgentPage(): React.JSX.Element {
                         message: `[ERROR] ${pollError}`,
                         jsonPayload: null,
                         exportUrl: null,
+                        jobStage: null,
+                        jobStageMessage: null,
                         isRunning: false,
                     });
                 },
@@ -194,6 +217,8 @@ export function DiluAgentPage(): React.JSX.Element {
                 message: `[ERROR] ${description}`,
                 jsonPayload: null,
                 exportUrl: null,
+                jobStage: null,
+                jobStageMessage: null,
                 isRunning: false,
             });
         } finally {
@@ -212,6 +237,8 @@ export function DiluAgentPage(): React.JSX.Element {
                 message: "[ERROR] At least one therapy drug is required for DILI analysis.",
                 jsonPayload: null,
                 exportUrl: null,
+                jobStage: null,
+                jobStageMessage: null,
             });
             return;
         }
@@ -259,6 +286,8 @@ export function DiluAgentPage(): React.JSX.Element {
             jobId: null,
             jobProgress: 0,
             jobStatus: null,
+            jobStage: null,
+            jobStageMessage: null,
         });
     };
 
@@ -291,9 +320,9 @@ export function DiluAgentPage(): React.JSX.Element {
         <div className="session-spinner">
             <div className="spinner-wheel" />
             <p className="spinner-label">
-                {jobProgress > 0
-                    ? `Generating report... ${Math.round(jobProgress)}%`
-                    : "Generating report..."}
+                {`${jobStageMessage || "Generating report"}${
+                    jobProgress > 0 ? `... ${Math.round(jobProgress)}%` : "..."
+                }`}
             </p>
         </div>
     );

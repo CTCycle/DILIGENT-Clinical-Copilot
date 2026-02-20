@@ -30,8 +30,8 @@ class LiverToxData:
             self.master_list_df = self.derive_master_alias_source(livertox_df)
         self.drugs_catalog_df = self._prepare_catalog_source(drugs_catalog_df)
         self.records: list[Any] = []
-        self.primary_index: dict[str, Any] = {}
-        self.synonym_index: dict[str, tuple[Any, str]] = {}
+        self.primary_index: dict[str, list[Any]] = {}
+        self.synonym_index: dict[str, list[tuple[Any, str]]] = {}
         self.variant_catalog: list[tuple[str, Any, str, bool]] = []
         self.token_occurrences: dict[str, list[Any]] = {}
         self.token_index: dict[str, list[Any]] = {}
@@ -54,10 +54,12 @@ class LiverToxData:
             normalized_name = self.lookup.normalize_name(raw_name)
             if not normalized_name:
                 continue
-            nbk_raw = getattr(row, "nbk_id", None)
-            nbk_id = str(nbk_raw).strip() if nbk_raw not in (None, "") else ""
-            if not nbk_id:
-                continue
+            nbk_id = coerce_text(getattr(row, "nbk_id", None))
+            # Some local database snapshots can contain valid monographs while
+            # `nbk_id` is null for every row; keep deterministic synthetic IDs
+            # so matching remains available instead of failing globally.
+            if nbk_id is None:
+                nbk_id = f"synthetic::{normalized_name}"
             excerpt = coerce_text(getattr(row, "excerpt", None))
             synonyms_value = getattr(row, "synonyms", None)
             synonyms = self.lookup.parse_synonyms(synonyms_value)
@@ -71,14 +73,16 @@ class LiverToxData:
                 tokens=tokens,
             )
             self.records.append(record)
-            if normalized_name not in self.primary_index:
-                self.primary_index[normalized_name] = record
+            primary_bucket = self.primary_index.setdefault(normalized_name, [])
+            if all(existing.nbk_id != record.nbk_id for existing in primary_bucket):
+                primary_bucket.append(record)
             self.variant_catalog.append(
                 (normalized_name, record, record.drug_name, True)
             )
             for normalized_synonym, original in synonyms.items():
-                if normalized_synonym not in self.synonym_index:
-                    self.synonym_index[normalized_synonym] = (record, original)
+                synonym_bucket = self.synonym_index.setdefault(normalized_synonym, [])
+                if all(existing[0].nbk_id != record.nbk_id for existing in synonym_bucket):
+                    synonym_bucket.append((record, original))
                 self.variant_catalog.append(
                     (normalized_synonym, record, original, False)
                 )
@@ -87,7 +91,23 @@ class LiverToxData:
                 if record not in bucket:
                     bucket.append(record)
         self.records.sort(key=lambda record: record.drug_name.lower())
-        self.variant_catalog.sort(key=lambda item: item[0])
+        for key, bucket in self.primary_index.items():
+            self.primary_index[key] = sorted(
+                bucket,
+                key=lambda record: (record.drug_name.casefold(), record.nbk_id.casefold()),
+            )
+        for key, bucket in self.synonym_index.items():
+            self.synonym_index[key] = sorted(
+                bucket,
+                key=lambda item: (
+                    item[0].drug_name.casefold(),
+                    item[0].nbk_id.casefold(),
+                    item[1].casefold(),
+                ),
+            )
+        self.variant_catalog.sort(
+            key=lambda item: (item[0], item[1].drug_name.casefold(), item[1].nbk_id.casefold())
+        )
         self.token_occurrences = token_occurrences
 
     # -------------------------------------------------------------------------
@@ -120,6 +140,12 @@ class LiverToxData:
                     entry = (variant, drug_name)
                     if entry not in bucket:
                         bucket.append(entry)
+        for alias_index in (self.brand_index, self.ingredient_index):
+            for key, entries in alias_index.items():
+                alias_index[key] = sorted(
+                    entries,
+                    key=lambda item: (item[0].casefold(), item[1].casefold()),
+                )
 
     # -------------------------------------------------------------------------
     def finalize_token_index(self) -> None:
@@ -139,43 +165,58 @@ class LiverToxData:
     def build_drugs_to_excerpt_mapping(
         self,
         patient_drugs: list[str],
-        matches: list[Any | None],
+        matches: list[Any],
     ) -> list[dict[str, Any]]:
         entries: list[dict[str, Any]] = []
         row_index = self.ensure_row_index()
         for original, match in zip(patient_drugs, matches, strict=False):
             row_data: dict[str, Any] | None = None
-            excerpts: list[str] = []
-            if match is not None:
-                normalized_key: str | None = None
-                if match.record is not None:
+            normalized_key: str = ""
+            match_status = str(getattr(match, "status", "missing"))
+            if match_status == "matched":
+                if getattr(match, "record", None) is not None:
                     normalized_key = (
                         match.record.normalized_name
                         or self.lookup.normalize_name(match.record.drug_name)
                     )
                 if not normalized_key:
-                    normalized_key = self.lookup.normalize_name(match.matched_name)
+                    normalized_key = self.lookup.normalize_name(
+                        getattr(match, "matched_name", None)
+                    )
                 if normalized_key:
                     row = row_index.get(normalized_key)
                     if row:
                         row_data = dict(row)
-                excerpt_value = row_data.get("excerpt") if row_data else None
-                if match.record and match.record.excerpt:
-                    excerpts.append(match.record.excerpt)
-                if isinstance(excerpt_value, str) and excerpt_value:
-                    excerpts.append(excerpt_value)
-                unique_excerpts = list(dict.fromkeys(excerpts))
-            else:
-                row_data = None
-                unique_excerpts = []
+            excerpt_candidates: list[str] = []
+            if match_status == "matched":
+                record_excerpt = coerce_text(
+                    match.record.excerpt if getattr(match, "record", None) else None
+                )
+                if record_excerpt:
+                    excerpt_candidates.append(record_excerpt)
+                row_excerpt = coerce_text(row_data.get("excerpt") if row_data else None)
+                if row_excerpt:
+                    excerpt_candidates.append(row_excerpt)
+            unique_excerpts = list(dict.fromkeys(excerpt_candidates))
+            missing_livertox = match_status != "matched" or not unique_excerpts
+            ambiguous_match = match_status == "ambiguous"
+            notes = list(getattr(match, "notes", []) or [])
+            if match_status == "matched" and not unique_excerpts:
+                notes = list(dict.fromkeys([*notes, "matched_record_missing_excerpt"]))
             entries.append(
                 {
                     "drug_name": original,
+                    "canonical_drug_name": getattr(match, "canonical_query", None),
+                    "normalized_drug_name": getattr(match, "normalized_query", None),
                     "matched_livertox_row": row_data,
                     "extracted_excerpts": unique_excerpts,
-                    "match_confidence": match.confidence if match is not None else None,
-                    "match_reason": match.reason if match is not None else None,
-                    "match_notes": list(match.notes) if match is not None else [],
+                    "match_confidence": getattr(match, "confidence", None),
+                    "match_reason": getattr(match, "reason", None),
+                    "match_notes": notes,
+                    "match_status": match_status,
+                    "match_candidates": list(getattr(match, "candidate_names", []) or []),
+                    "missing_livertox": missing_livertox,
+                    "ambiguous_match": ambiguous_match,
                 }
             )
         return entries
@@ -187,12 +228,21 @@ class LiverToxData:
         if self.livertox_df is None or self.livertox_df.empty:
             return {}
         index: dict[str, dict[str, Any]] = {}
-        for row in self.livertox_df.to_dict(orient="records"):
+        rows = sorted(
+            self.livertox_df.to_dict(orient="records"),
+            key=lambda row: (
+                self.lookup.normalize_name(str(row.get("drug_name", ""))),
+                str(row.get("nbk_id", "")).casefold(),
+            ),
+        )
+        for row in rows:
             drug_name = coerce_text(row.get("drug_name"))
             if drug_name is None:
                 continue
             normalized = self.lookup.normalize_name(drug_name)
             if not normalized:
+                continue
+            if normalized in index:
                 continue
             index[normalized] = row # type: ignore
         self.rows_by_name = index

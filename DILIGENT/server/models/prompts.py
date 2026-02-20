@@ -106,6 +106,14 @@ LIVERTOX_CLINICAL_USER_PROMPT = """
 # Drug
 **{drug_name}**
 
+# Drug Identity
+- Canonical name: {canonical_name}
+- Origin(s): {origins}
+- Match status: {livertox_status}
+
+# Extracted Drug Metadata
+{extraction_metadata}
+
 # LiverTox Metadata
 {metadata_block}
 
