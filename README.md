@@ -1,129 +1,130 @@
 # DILIGENT Clinical Copilot
 
 ## 1. Project Overview
-DILIGENT Clinical Copilot supports clinicians during Drug-Induced Liver Injury (DILI) evaluations with a FastAPI backend and a React + TypeScript (Vite) frontend. The frontend collects anamnesis, medications, and lab values, while the backend coordinates drug parsing and LLM-assisted clinical analysis. Optional Retrieval-Augmented Generation (RAG) grounds outputs on a local LiverTox archive, and sessions can be stored for review and auditing. The frontend consumes the backend API, which manages analysis, persistence, and integrations.
+DILIGENT Clinical Copilot supports clinicians during Drug-Induced Liver Injury (DILI) evaluations with a FastAPI backend and a React + TypeScript (Vite) frontend. The frontend collects anamnesis, medications, and lab values, while the backend coordinates drug parsing and LLM-assisted clinical analysis. Optional Retrieval-Augmented Generation (RAG) grounds outputs on a local LiverTox archive, and sessions can be stored for review and auditing.
 
-> **Work in Progress**: This project is still under active development. It will be updated regularly, but you may encounter bugs, issues, or incomplete features.
+> **Work in Progress**: This project is still under active development. You may encounter bugs or incomplete features.
 
-## 2. Installation
+## 2. Dual-Mode Runtime Model
+DILIGENT is configuration-first and uses one active runtime file: `DILIGENT/settings/.env`.
 
-### 2.1 Windows (One Click Setup)
-Windows setup is automated and portable. Launch `DILIGENT/start_on_windows.bat`; the launcher will:
+- Local mode is the default workflow for developers (no Docker required).
+- Cloud mode is provided through Docker (`backend` + `frontend`) using the same `.env` contract.
+- Mode switching is done by replacing `.env` values only.
 
+Runtime profiles:
+- `DILIGENT/settings/.env.local.example`
+- `DILIGENT/settings/.env.cloud.example`
+- Active runtime file: `DILIGENT/settings/.env`
+
+Exact mode switch procedure:
+```cmd
+copy /Y DILIGENT\settings\.env.local.example DILIGENT\settings\.env
+```
+or
+```cmd
+copy /Y DILIGENT\settings\.env.cloud.example DILIGENT\settings\.env
+```
+
+Detailed packaging notes: `docs/PACKAGING_AND_RUNTIME_MODES.md`.
+
+## 3. Local Mode (Default)
+
+### 3.1 Windows (One-Click Setup)
+Run:
+```cmd
+DILIGENT\start_on_windows.bat
+```
+
+The launcher will:
 1. Verify or download portable runtimes into the repository (first run only).
-2. Install backend dependencies.
-3. Install frontend dependencies and build the UI when needed.
-4. Start the backend API and the UI server, then open the browser.
+2. Install backend dependencies with `uv`.
+3. Install frontend dependencies (`npm ci` when lockfile exists, fallback `npm install`).
+4. Build frontend when needed and start backend/frontend.
 
-**Subsequent Runs:** Skip downloads/builds unless missing; startup takes seconds.
+### 3.2 macOS / Linux (Manual)
+Prerequisites:
+- Python 3.14+
+- Node.js 18+ and npm
 
-> **Note:** The launcher keeps everything inside the repo folder without system-wide installs, and may stop any process currently using the configured backend/UI ports before starting.
-
-### 2.2 macOS / Linux (Manual Setup)
-**Prerequisites:**
-- **Python 3.12**
-- **Node.js 18+** and npm
-- (Optional) Ollama running locally for on-prem models
-- Cloud provider keys (OpenAI, Gemini) if you plan to use remote inference
-
-**Setup Steps:**
-1. Clone and enter the repo:
-   ```bash
-   git clone <repo-url>
-   cd <repo-folder>
-   ```
-2. Backend:
-   ```bash
-   python -m venv .venv
-   source .venv/bin/activate
-   pip install --upgrade pip
-   pip install -e .
-   ```
-3. Frontend:
-   ```bash
-   cd DILIGENT/client
-   npm install
-   cd ..
-   ```
-4. Configuration:
-   - Copy `DILIGENT/resources/templates/.env` to `DILIGENT/settings/.env`, then set API keys and any host/port overrides.
-   - Optionally create `DILIGENT/client/.env` and set `VITE_API_BASE_URL` if you are not relying on the Vite dev proxy.
-
-## 3. How to Use
-
-### 3.1 Windows
-Run `DILIGENT/start_on_windows.bat`.
-
-- **First run:** Downloads runtimes, installs dependencies, builds the UI, then starts backend and preview server.
-- **Later runs:** Reuse cached runtimes/builds and launch immediately.
-
-The browser opens to `http://127.0.0.1:7861`. API root: `http://127.0.0.1:8000`. Docs: `http://127.0.0.1:8000/docs`.
-
-### 3.2 macOS / Linux
 Backend:
 ```bash
+python -m venv .venv
 source .venv/bin/activate
-uvicorn DILIGENT.server.app:app --host 0.0.0.0 --port 8000
+pip install --upgrade pip
+pip install -e .
+uvicorn DILIGENT.server.app:app --host 127.0.0.1 --port 8000
 ```
 
-Frontend (development with proxy to backend):
+Frontend:
 ```bash
 cd DILIGENT/client
-FASTAPI_HOST=127.0.0.1 FASTAPI_PORT=8000 npm run dev
-```
-
-Frontend (preview build):
-```bash
-cd DILIGENT/client
+npm install
 npm run build
-npm run preview -- --host 0.0.0.0 --port 7861
+npm run preview -- --host 127.0.0.1 --port 7861
 ```
 
-UI: `http://localhost:5173` (dev) or `http://localhost:7861` (preview). Backend: `http://localhost:8000`. Docs: `http://localhost:8000/docs`.
+## 4. Cloud Mode (Docker)
+1. Activate cloud profile:
+```cmd
+copy /Y DILIGENT\settings\.env.cloud.example DILIGENT\settings\.env
+```
+2. Build images:
+```cmd
+docker compose --env-file DILIGENT/settings/.env build --no-cache
+```
+3. Start:
+```cmd
+docker compose --env-file DILIGENT/settings/.env up -d
+```
+4. Stop:
+```cmd
+docker compose --env-file DILIGENT/settings/.env down
+```
 
-### 3.3 Using the Application
+Cloud topology:
+- `backend`: FastAPI/Uvicorn container on internal port `8000`.
+- `frontend`: Nginx static hosting.
+- Frontend proxies `/api` to `backend:8000` for same-origin API calls.
+
+## 5. Deterministic Dependencies
+- Backend is lockfile-backed by `uv.lock` and installed with `uv sync --frozen` in Docker.
+- Frontend is lockfile-backed by `DILIGENT/client/package-lock.json` and installed with `npm ci` in Docker.
+- Docker base images are pinned in `docker/backend.Dockerfile` and `docker/frontend.Dockerfile`.
+
+## 6. Using the Application
 - Enter anamnesis, exam notes, current medications, and ALT/ALP values.
-- Choose inference path (Ollama or cloud), select parsing/clinical models, and toggle RAG for LiverTox-backed retrieval.
-- Run the clinical analysis to parse medications and produce the consultation summary.
-- Review/export the report; sessions and model choices can be persisted to the configured database (SQLite in embedded mode by default).
+- Choose inference path (Ollama or cloud), select parsing/clinical models, and toggle RAG.
+- Run the analysis and review/export the report.
 
-- ![Clinical intake form](assets/figures/session_page.png) 
+- ![Clinical intake form](assets/figures/session_page.png)
+- ![Analysis results](assets/figures/database_browser.png)
 
-- ![Analysis results](assets/figures/database_browser.png) 
-
-## 4. Setup and Maintenance
-Run `DILIGENT/setup_and_maintenance.bat` to access setup and maintenance actions:
-
-- **Remove logs** - clear `.log` files under `DILIGENT/resources/logs`.
-- **Uninstall app** - remove local runtimes and build artifacts (uv, embedded Python, portable Node.js, `node_modules`, `dist`, `.venv`, `uv.lock`) while preserving folder scaffolding.
-- **Initialize database** - create or reset the project database schema.
-- **Update RxNav drugs catalog** - refresh the local drugs catalog from RxNav.
-- **Update LiverTox data** - refresh the LiverTox dataset used for ingestion/RAG.
-- **Vectorize RAG documents** - rebuild embeddings and the vector store for retrieval.
-
-## 5. Resources
-`DILIGENT/resources` aggregates runtime assets, datasets, and templates:
-
-- **database:** embedded database and retrieval artifacts (e.g., `sqlite.db`, `documents/`, `sources/`, `vectors/`).
-- **logs:** backend and background-task logs for troubleshooting.
-- **models:** storage for local model artifacts (when used).
-- **runtimes:** portable Python/uv/Node.js downloaded by the Windows launcher.
-- **templates:** starter assets such as the `.env` scaffold, `database_backup.db`, and the LiverTox archive template.
-
-## 6. Configuration
-Backend configuration is defined in `DILIGENT/settings/configurations.json` and loaded by the API at startup. Runtime overrides and secrets are read from `DILIGENT/settings/.env`. Frontend configuration is read from `DILIGENT/client/.env` during development or build time.
+## 7. Configuration Reference
+Runtime values are read from `DILIGENT/settings/.env`.
 
 | Variable | Description |
-|----------|-------------|
-| FASTAPI_HOST | Backend host used by the Windows launcher; defined in `DILIGENT/settings/.env`; default `127.0.0.1`. |
-| FASTAPI_PORT | Backend port for uvicorn; defined in `DILIGENT/settings/.env`; default `8000`. |
-| UI_HOST | Host for the Vite preview server; defined in `DILIGENT/settings/.env`; default `127.0.0.1`. |
-| UI_PORT | Port for the Vite preview server; defined in `DILIGENT/settings/.env`; default `7861`. |
-| RELOAD | Enables uvicorn reload when `true`; defined in `DILIGENT/settings/.env`; default `false`. |
-| OPENAI_API_KEY | OpenAI API key (cloud inference); defined in `DILIGENT/settings/.env`; default empty. |
-| GEMINI_API_KEY | Gemini API key (cloud inference); defined in `DILIGENT/settings/.env`; default empty. |
-| MPLBACKEND | Matplotlib backend for background tasks; defined in `DILIGENT/settings/.env`; default `Agg`. |
+|---|---|
+| `FASTAPI_HOST`, `FASTAPI_PORT` | Backend host/port. |
+| `UI_HOST`, `UI_PORT` | Frontend host/port (local preview, cloud publish port). |
+| `VITE_API_BASE_URL` | Frontend API base path (`/api` recommended). |
+| `RELOAD` | Enables uvicorn reload when `true`. |
+| `DB_EMBEDDED` | `true` uses embedded SQLite; `false` enables external DB settings. |
+| `DB_ENGINE`, `DB_HOST`, `DB_PORT`, `DB_NAME`, `DB_USER`, `DB_PASSWORD` | External DB connection settings. |
+| `DB_SSL`, `DB_SSL_CA` | External DB TLS settings. |
+| `DB_CONNECT_TIMEOUT`, `DB_INSERT_BATCH_SIZE` | DB runtime tuning settings. |
+| `OPTIONAL_DEPENDENCIES` | Enables optional launcher dependency installation path. |
+| `MPLBACKEND`, `KERAS_BACKEND` | Runtime plotting/ML backend settings. |
+| `OPENAI_API_KEY`, `GEMINI_API_KEY` | Cloud provider API keys. |
 
+## 8. Setup and Maintenance
+Run `DILIGENT/setup_and_maintenance.bat` for maintenance operations:
+- Remove logs
+- Uninstall app (local runtimes/artifacts)
+- Initialize database
+- Update RxNav catalog
+- Update LiverTox data
+- Vectorize RAG documents
 
-## 7. License
-Non-commercial use is covered by the Polyform Noncommercial License 1.0.0; commercial licensing is available separately. See `LICENSE` for full terms.
+## 9. License
+Non-commercial use is covered by the Polyform Noncommercial License 1.0.0; commercial licensing is available separately. See `LICENSE`.

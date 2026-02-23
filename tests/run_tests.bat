@@ -23,6 +23,7 @@ set "npm_cmd=%nodejs_dir%\npm.cmd"
 set "DOTENV=%settings_dir%\.env"
 set "FRONTEND_DIR=%project_folder%client"
 set "FRONTEND_DIST=%FRONTEND_DIR%\dist"
+set "FRONTEND_LOCKFILE=%FRONTEND_DIR%\package-lock.json"
 set "UVICORN_MODULE=DILIGENT.server.app:app"
 
 title DILIGENT Test Runner
@@ -75,6 +76,18 @@ if exist "%DOTENV%" (
     )
 )
 
+set "APP_TEST_BACKEND_HOST=%FASTAPI_HOST%"
+if "%APP_TEST_BACKEND_HOST%"=="0.0.0.0" set "APP_TEST_BACKEND_HOST=127.0.0.1"
+set "APP_TEST_FRONTEND_HOST=%UI_HOST%"
+if "%APP_TEST_FRONTEND_HOST%"=="0.0.0.0" set "APP_TEST_FRONTEND_HOST=127.0.0.1"
+set "APP_TEST_BACKEND_URL=http://%APP_TEST_BACKEND_HOST%:%FASTAPI_PORT%"
+set "APP_TEST_FRONTEND_URL=http://%APP_TEST_FRONTEND_HOST%:%UI_PORT%"
+set "API_BASE_URL=%APP_TEST_BACKEND_URL%"
+set "UI_BASE_URL=%APP_TEST_FRONTEND_URL%"
+
+echo [INFO] APP_TEST_BACKEND_URL=%APP_TEST_BACKEND_URL%
+echo [INFO] APP_TEST_FRONTEND_URL=%APP_TEST_FRONTEND_URL%
+
 REM ============================================================================
 REM == Force portable runtimes (avoid global Python/npm)
 REM ============================================================================
@@ -124,13 +137,7 @@ start "" /b "%uv_exe%" run --python "%python_exe%" python -m uvicorn %UVICORN_MO
 
 REM Wait for backend to be ready
 echo [INFO] Waiting for backend to start...
-for /L %%i in (1,1,120) do (
-  netstat -ano | findstr ":%FASTAPI_PORT%" | findstr "LISTENING" >nul
-  if !errorlevel! equ 0 goto :backend_ready_check
-  timeout /t 1 /nobreak >nul
-)
-echo [WARN] Timed out waiting for backend.
-:backend_ready_check
+call :wait_for_url "%APP_TEST_BACKEND_URL%/docs" 120
 
 REM ============================================================================
 REM == Start frontend
@@ -140,7 +147,16 @@ echo [STEP 3/4] Starting frontend server...
 if not exist "%FRONTEND_DIR%\node_modules" (
     echo [INFO] Installing frontend dependencies...
     pushd "%FRONTEND_DIR%" >nul
-    call "%npm_cmd%" install
+    if exist "%FRONTEND_LOCKFILE%" (
+        call "%npm_cmd%" ci
+        set "npm_ec=!ERRORLEVEL!"
+        if not "!npm_ec!"=="0" (
+            echo [WARN] npm ci failed with code !npm_ec!. Falling back to npm install.
+            call "%npm_cmd%" install
+        )
+    ) else (
+        call "%npm_cmd%" install
+    )
     popd >nul
 )
 
@@ -158,7 +174,7 @@ popd >nul
 
 REM Wait for frontend to be ready
 echo [INFO] Waiting for frontend to start...
-timeout /t 3 /nobreak >nul
+call :wait_for_url "%APP_TEST_FRONTEND_URL%" 120
 
 REM ============================================================================
 REM == Run tests
@@ -199,6 +215,24 @@ echo.
 echo !!! An error occurred. !!!
 pause
 endlocal & exit /b 1
+
+REM ============================================================================
+REM == Wait for URL readiness
+REM ============================================================================
+:wait_for_url
+set "target_url=%~1"
+set "timeout_seconds=%~2"
+if not defined timeout_seconds set "timeout_seconds=60"
+for /L %%i in (1,1,%timeout_seconds%) do (
+    powershell -NoLogo -NoProfile -Command "$ProgressPreference='SilentlyContinue'; try { Invoke-WebRequest -UseBasicParsing -Uri '%target_url%' -TimeoutSec 2 > $null; exit 0 } catch { exit 1 }" >nul 2>&1
+    if !errorlevel! equ 0 (
+        echo [OK] Ready: %target_url%
+        goto :eof
+    )
+    timeout /t 1 /nobreak >nul
+)
+echo [WARN] Timed out waiting for %target_url%
+goto :eof
 
 REM ============================================================================
 REM == Kill process on port

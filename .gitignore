@@ -6,7 +6,6 @@ DILIGENT/resources/logs/**
 DILIGENT/client/node_modules/
 DILIGENT/client/dist/
 DILIGENT/client/dist-ssr/
-DILIGENT/client/package-lock.json
 DILIGENT/client/logs/
 
 # Environment files (keep templates)
