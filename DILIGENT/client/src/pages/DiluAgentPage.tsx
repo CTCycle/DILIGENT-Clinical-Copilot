@@ -47,6 +47,10 @@ const DownloadIcon = () => (
     </svg>
 );
 
+function isTerminalJobStatus(status: string | null): boolean {
+    return status === "completed" || status === "failed" || status === "cancelled";
+}
+
 // ---------------------------------------------------------------------------
 // DiluAgentPage
 // ---------------------------------------------------------------------------
@@ -59,6 +63,7 @@ export function DiluAgentPage(): React.JSX.Element {
         jsonPayload,
         exportUrl,
         jobProgress,
+        jobStatus,
         jobStageMessage,
         isRunning,
         isExpanded,
@@ -130,6 +135,7 @@ export function DiluAgentPage(): React.JSX.Element {
                 startResult.job_id,
                 intervalMs,
                 (status) => {
+                    const terminalStatus = isTerminalJobStatus(status.status);
                     const stage =
                         status.result && typeof status.result.progress_stage === "string"
                             ? status.result.progress_stage
@@ -143,17 +149,18 @@ export function DiluAgentPage(): React.JSX.Element {
                         jobStatus: status.status,
                         jobStage: stage,
                         jobStageMessage: stageMessage,
+                        isRunning: !terminalStatus,
                     });
 
-                    if (
-                        status.status === "completed" ||
-                        status.status === "failed" ||
-                        status.status === "cancelled"
-                    ) {
+                    if (terminalStatus) {
                         if (pollerRef.current) {
                             pollerRef.current.stop();
                             pollerRef.current = null;
                         }
+                    }
+
+                    if (!terminalStatus) {
+                        return;
                     }
 
                     if (status.status === "completed") {
@@ -170,7 +177,6 @@ export function DiluAgentPage(): React.JSX.Element {
                             exportUrl: newExportUrl,
                             jobStage: null,
                             jobStageMessage: null,
-                            isRunning: false,
                         });
                     } else if (status.status === "failed") {
                         const errorMessage = status.error
@@ -182,7 +188,6 @@ export function DiluAgentPage(): React.JSX.Element {
                             exportUrl: null,
                             jobStage: null,
                             jobStageMessage: null,
-                            isRunning: false,
                         });
                     } else if (status.status === "cancelled") {
                         updateDiluAgent({
@@ -191,7 +196,6 @@ export function DiluAgentPage(): React.JSX.Element {
                             exportUrl: null,
                             jobStage: null,
                             jobStageMessage: null,
-                            isRunning: false,
                         });
                     }
                 },
@@ -337,7 +341,7 @@ export function DiluAgentPage(): React.JSX.Element {
     }, [jsonPayload]);
 
     const reportContent = (() => {
-        if (isRunning) {
+        if (isRunning && !isTerminalJobStatus(jobStatus)) {
             return spinner;
         }
         if (message) {
