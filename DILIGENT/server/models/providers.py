@@ -742,32 +742,34 @@ class OllamaClient:
 
     # -------------------------------------------------------------------------
     @staticmethod
-    def _get_available_memory_proc() -> int:
-        def parse_meminfo_line(line: str) -> int | None:
-            if not line.startswith("MemAvailable:"):
-                return None
-            parts = line.split()
-            if len(parts) < 2:
-                return None
-            try:
-                value = int(parts[1])
-            except ValueError:
-                return None
-            unit = parts[2].lower() if len(parts) >= 3 else "kb"
-            multiplier = {
-                "kb": 1_024,
-                "kib": 1_024,
-                "mb": 1_048_576,
-                "mib": 1_048_576,
-                "gb": 1_073_741_824,
-                "gib": 1_073_741_824,
-            }.get(unit)
-            return value * multiplier if multiplier else value
+    def _parse_meminfo_line(line: str) -> int | None:
+        if not line.startswith("MemAvailable:"):
+            return None
+        parts = line.split()
+        if len(parts) < 2:
+            return None
+        try:
+            value = int(parts[1])
+        except ValueError:
+            return None
+        unit = parts[2].lower() if len(parts) >= 3 else "kb"
+        multiplier = {
+            "kb": 1_024,
+            "kib": 1_024,
+            "mb": 1_048_576,
+            "mib": 1_048_576,
+            "gb": 1_073_741_824,
+            "gib": 1_073_741_824,
+        }.get(unit)
+        return value * multiplier if multiplier else value
 
+    # -------------------------------------------------------------------------
+    @staticmethod
+    def _get_available_memory_proc() -> int:
         try:
             with open("/proc/meminfo", "r", encoding="utf-8") as handle:
                 for line in handle:
-                    parsed = parse_meminfo_line(line)
+                    parsed = OllamaClient._parse_meminfo_line(line)
                     if parsed is not None:
                         return parsed
         except (FileNotFoundError, PermissionError, ValueError):
