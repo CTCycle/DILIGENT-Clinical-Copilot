@@ -41,8 +41,8 @@ from DILIGENT.server.services.clinical.parser import DrugsParser
 from DILIGENT.server.services.retrieval.query import DILIQueryBuilder
 from DILIGENT.server.services.text.normalization import normalize_drug_query_name
 
-drugs_parser = DrugsParser()
-disease_extractor = DiseaseExtractor()
+drugs_parser = DrugsParser(timeout_s=server_settings.external_data.parser_llm_timeout)
+disease_extractor = DiseaseExtractor(timeout_s=server_settings.external_data.disease_llm_timeout)
 pattern_analyzer = HepatotoxicityPatternAnalyzer()
 input_preparator = ClinicalKnowledgePreparation()
 router = APIRouter(tags=["session"])
@@ -90,6 +90,27 @@ class ClinicalConsultationProgressCallback:
             self.progress_callback("llm_analysis", 62.0 + (bounded_fraction * 24.0))
         elif stage == "report_composition":
             self.progress_callback("report_composition", 86.0 + (bounded_fraction * 8.0))
+
+
+# -----------------------------------------------------------------------------
+class StageProgressFractionCallback:
+    def __init__(
+        self,
+        *,
+        progress_callback: Callable[[str, float], None],
+        stage: str,
+        start_value: float,
+        end_value: float,
+    ) -> None:
+        self.progress_callback = progress_callback
+        self.stage = stage
+        self.lower = min(start_value, end_value)
+        self.span = max(0.0, end_value - self.lower)
+
+    # -------------------------------------------------------------------------
+    def __call__(self, fraction: float) -> None:
+        bounded_fraction = min(1.0, max(0.0, float(fraction)))
+        self.progress_callback(self.stage, self.lower + (self.span * bounded_fraction))
 
 
 # -----------------------------------------------------------------------------
@@ -309,6 +330,24 @@ class ClinicalSessionEndpoint:
         if progress_callback is None:
             return
         progress_callback(stage, value)
+
+    # -------------------------------------------------------------------------
+    @staticmethod
+    def build_stage_progress_callback(
+        progress_callback: Callable[[str, float], None] | None,
+        *,
+        stage: str,
+        start_value: float,
+        end_value: float,
+    ) -> Callable[[float], None] | None:
+        if progress_callback is None:
+            return None
+        return StageProgressFractionCallback(
+            progress_callback=progress_callback,
+            stage=stage,
+            start_value=start_value,
+            end_value=end_value,
+        )
 
     # -------------------------------------------------------------------------
     @staticmethod
@@ -534,9 +573,21 @@ class ClinicalSessionEndpoint:
             )
             raise ClinicalPipelineValidationError(issues=[issue], message=issue.message)
 
+        self.emit_progress(
+            progress_callback,
+            stage="therapy_extraction",
+            value=22.0,
+        )
+        therapy_progress_callback = self.build_stage_progress_callback(
+            progress_callback,
+            stage="therapy_extraction",
+            start_value=22.0,
+            end_value=30.0,
+        )
         start_time = time.perf_counter()
         therapy_drugs = await self.drugs_parser.extract_drugs_from_therapy(
-            cleaned_therapy_text
+            cleaned_therapy_text,
+            progress_callback=therapy_progress_callback,
         )
         elapsed = time.perf_counter() - start_time
         logger.info("Therapy drugs extraction required %.4f seconds", elapsed)
@@ -555,9 +606,21 @@ class ClinicalSessionEndpoint:
             )
             raise ClinicalPipelineValidationError(issues=[issue], message=issue.message)
 
+        self.emit_progress(
+            progress_callback,
+            stage="anamnesis_extraction",
+            value=30.0,
+        )
+        anamnesis_progress_callback = self.build_stage_progress_callback(
+            progress_callback,
+            stage="anamnesis_extraction",
+            start_value=30.0,
+            end_value=42.0,
+        )
         start_time = time.perf_counter()
         anamnesis_drugs = await self.drugs_parser.extract_drugs_from_anamnesis(
-            payload.anamnesis
+            payload.anamnesis,
+            progress_callback=anamnesis_progress_callback,
         )
         elapsed = time.perf_counter() - start_time
         logger.info("Anamnesis drugs extraction required %.4f seconds", elapsed)
@@ -568,9 +631,21 @@ class ClinicalSessionEndpoint:
             value=42.0,
         )
 
+        self.emit_progress(
+            progress_callback,
+            stage="anamnesis_disease_extraction",
+            value=42.0,
+        )
+        disease_progress_callback = self.build_stage_progress_callback(
+            progress_callback,
+            stage="anamnesis_disease_extraction",
+            start_value=42.0,
+            end_value=48.0,
+        )
         start_time = time.perf_counter()
         disease_context = await self.disease_extractor.extract_diseases_from_anamnesis(
-            payload.anamnesis
+            payload.anamnesis,
+            progress_callback=disease_progress_callback,
         )
         elapsed = time.perf_counter() - start_time
         logger.info("Anamnesis disease extraction required %.4f seconds", elapsed)
@@ -597,6 +672,11 @@ class ClinicalSessionEndpoint:
             pattern_score=pattern_score,
         )
 
+        self.emit_progress(
+            progress_callback,
+            stage="rag_query_building",
+            value=48.0,
+        )
         rag_query: dict[str, str] | None = None
         if payload.use_rag:
             query_builder = DILIQueryBuilder(analysis_drugs)
@@ -612,10 +692,22 @@ class ClinicalSessionEndpoint:
             value=50.0,
         )
 
+        self.emit_progress(
+            progress_callback,
+            stage="livertox_lookup",
+            value=50.0,
+        )
+        livertox_progress_callback = self.build_stage_progress_callback(
+            progress_callback,
+            stage="livertox_lookup",
+            start_value=50.0,
+            end_value=62.0,
+        )
         prepared_inputs = await input_preparator.prepare_inputs(
             all_detected_drugs,
             clinical_context=structured_context,
             pattern_score=pattern_score,
+            progress_callback=livertox_progress_callback,
         )
         self.emit_progress(
             progress_callback,

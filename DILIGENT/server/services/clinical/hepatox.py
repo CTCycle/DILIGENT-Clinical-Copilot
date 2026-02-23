@@ -221,7 +221,7 @@ class HepatoxConsultation:
         drugs: PatientDrugs,
         *,
         patient_name: str | None = None,
-        timeout_s: float = server_settings.external_data.default_llm_timeout,
+        timeout_s: float = server_settings.external_data.clinical_llm_timeout,
     ) -> None:
         self.drugs = drugs
         self.timeout_s = timeout_s

@@ -605,7 +605,7 @@ class OllamaClient:
     async def start_server(
         self,
         *,
-        wait_timeout_s: float = 15.0,
+        wait_timeout_s: float = server_settings.external_data.ollama_server_start_timeout,
         poll_interval_s: float = server_settings.jobs.polling_interval,
     ) -> Literal["started", "already_running"]:
         if await self.is_server_online():
