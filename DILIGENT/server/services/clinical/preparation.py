@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import asyncio
+from collections.abc import Callable
 from dataclasses import dataclass
 from typing import Any
 
@@ -38,24 +39,30 @@ class ClinicalKnowledgePreparation:
         *,
         clinical_context: str | None,
         pattern_score: HepatotoxicityPatternScore | None,
+        progress_callback: Callable[[float], None] | None = None,
     ) -> HepatoxPreparedInputs | None:
+        self.emit_progress(progress_callback, 0.0)
         drug_candidates = self.build_drug_candidates(drugs)
         if not drug_candidates:
             logger.info("No drugs detected for input preparation")
             return None
+        self.emit_progress(progress_callback, 0.2)
         if not await self.ensure_livertox_matcher() or self.livertox_matcher is None:
             return None
+        self.emit_progress(progress_callback, 0.35)
 
         patient_drugs = [candidate["canonical_name"] for candidate in drug_candidates]
         matches = await asyncio.to_thread(
             self.livertox_matcher.match_drug_names,
             patient_drugs,
         )
+        self.emit_progress(progress_callback, 0.65)
         livertox_information = await asyncio.to_thread(
             self.livertox_matcher.build_drugs_to_excerpt_mapping,
             patient_drugs,
             matches,
         )
+        self.emit_progress(progress_callback, 0.9)
 
         resolved_drugs = self.normalize_livertox_mapping(livertox_information)
         self.attach_candidate_metadata(resolved_drugs, drug_candidates)
@@ -67,6 +74,17 @@ class ClinicalKnowledgePreparation:
             pattern_prompt=pattern_prompt,
             clinical_context=normalized_context,
         )
+
+    # -------------------------------------------------------------------------
+    @staticmethod
+    def emit_progress(
+        progress_callback: Callable[[float], None] | None,
+        fraction: float,
+    ) -> None:
+        if progress_callback is None:
+            return
+        bounded_fraction = min(1.0, max(0.0, float(fraction)))
+        progress_callback(bounded_fraction)
 
     # -------------------------------------------------------------------------
     async def ensure_livertox_matcher(self) -> bool:

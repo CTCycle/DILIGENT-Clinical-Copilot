@@ -4,6 +4,7 @@ import asyncio
 import contextlib
 import re
 import unicodedata
+from collections.abc import Callable
 from typing import Any
 
 from DILIGENT.common.utils.logger import logger
@@ -23,7 +24,7 @@ class DiseaseExtractor:
         *,
         client: Any | None = None,
         temperature: float = 0.0,
-        timeout_s: float = server_settings.external_data.default_llm_timeout,
+        timeout_s: float = server_settings.external_data.disease_llm_timeout,
     ) -> None:
         self.temperature = float(temperature)
         self.timeout_s = float(timeout_s)
@@ -68,6 +69,17 @@ class DiseaseExtractor:
                 and hasattr(self.client, "default_model")
             ):
                 self.client.default_model = model  # type: ignore[attr-defined]
+
+    # -------------------------------------------------------------------------
+    @staticmethod
+    def emit_progress(
+        progress_callback: Callable[[float], None] | None,
+        fraction: float,
+    ) -> None:
+        if progress_callback is None:
+            return
+        bounded_fraction = min(1.0, max(0.0, float(fraction)))
+        progress_callback(bounded_fraction)
 
     # -------------------------------------------------------------------------
     def clean_text(self, text: str | None) -> str:
@@ -167,6 +179,8 @@ class DiseaseExtractor:
     async def extract_diseases_from_anamnesis(
         self,
         anamnesis: str | None,
+        *,
+        progress_callback: Callable[[float], None] | None = None,
     ) -> PatientDiseaseContext:
         cleaned = self.clean_text(anamnesis)
         if not cleaned:
@@ -178,6 +192,7 @@ class DiseaseExtractor:
 
         chunks = self.chunk_text(cleaned)
         raw_entries: list[DiseaseContextEntry] = []
+        self.emit_progress(progress_callback, 0.0)
         for index, chunk in enumerate(chunks, start=1):
             user_prompt = (
                 "Extract diseases from this anamnesis chunk, with temporal and hepatic metadata.\n"
@@ -196,6 +211,10 @@ class DiseaseExtractor:
             except Exception as exc:
                 raise RuntimeError("Failed to extract diseases from anamnesis") from exc
             raw_entries.extend(parsed.entries)
+            self.emit_progress(
+                progress_callback,
+                (index / max(len(chunks), 1)) * 0.9,
+            )
 
         normalized_entries: list[DiseaseContextEntry] = []
         for entry in raw_entries:
@@ -209,4 +228,5 @@ class DiseaseExtractor:
             len(deduplicated),
             len(raw_entries),
         )
+        self.emit_progress(progress_callback, 1.0)
         return PatientDiseaseContext(entries=deduplicated)

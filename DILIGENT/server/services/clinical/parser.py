@@ -4,6 +4,7 @@ import asyncio
 import contextlib
 import re
 import unicodedata
+from collections.abc import Callable
 from datetime import date
 from typing import Any, Literal
 
@@ -76,7 +77,7 @@ class DrugsParser:
         *,
         client: Any | None = None,
         temperature: float = 0.0,
-        timeout_s: float = server_settings.external_data.default_llm_timeout,
+        timeout_s: float = server_settings.external_data.parser_llm_timeout,
     ) -> None:
         self.temperature = float(temperature)
         self.timeout_s = float(timeout_s)
@@ -123,6 +124,17 @@ class DrugsParser:
                 self.client.default_model = model  # type: ignore[attr-defined]
 
     # -------------------------------------------------------------------------
+    @staticmethod
+    def emit_progress(
+        progress_callback: Callable[[float], None] | None,
+        fraction: float,
+    ) -> None:
+        if progress_callback is None:
+            return
+        bounded_fraction = min(1.0, max(0.0, float(fraction)))
+        progress_callback(bounded_fraction)
+
+    # -------------------------------------------------------------------------
     def clean_text(self, text: str | None) -> str:
         if not text:
             return ""
@@ -151,7 +163,12 @@ class DrugsParser:
         )
 
     # -------------------------------------------------------------------------
-    async def extract_drugs_from_therapy(self, text: str | None) -> PatientDrugs:
+    async def extract_drugs_from_therapy(
+        self,
+        text: str | None,
+        *,
+        progress_callback: Callable[[float], None] | None = None,
+    ) -> PatientDrugs:
         cleaned = self.clean_text(text)
         if not cleaned:
             return PatientDrugs(entries=[])
@@ -161,6 +178,9 @@ class DrugsParser:
             if segment
         ]
         grouped_lines = self.group_lines_for_llm(lines)
+        total_chunks = max(len(grouped_lines), 1)
+        processed_chunks = 0
+        self.emit_progress(progress_callback, 0.0)
         parsed_chunks, fallback_chunks = self.rule_based_parse(grouped_lines)
         ordered_entries: list[DrugEntry | None] = [None] * len(grouped_lines)
         for index, entry in parsed_chunks:
@@ -170,15 +190,23 @@ class DrugsParser:
                 historical_flag=False,
             )
             ordered_entries[index] = normalized
+            processed_chunks += 1
+            self.emit_progress(progress_callback, processed_chunks / total_chunks)
 
         if fallback_chunks:
             await self.ensure_client()
             if self.client is None:
                 raise RuntimeError("LLM client is not initialized for drug extraction")
             try:
+                fallback_start = processed_chunks / total_chunks
+                fallback_span = len(fallback_chunks) / total_chunks
+
                 # Ask the LLM for structured entries only for lines with true rule failures.
                 structured = await self.llm_extract_drugs(
-                    [line for _, line in fallback_chunks]
+                    [line for _, line in fallback_chunks],
+                    progress_callback=progress_callback,
+                    progress_start=fallback_start,
+                    progress_span=fallback_span,
                 )
             except Exception as exc:  # pragma: no cover - passthrough for visibility
                 raise RuntimeError("Failed to extract drugs via LLM") from exc
@@ -193,6 +221,7 @@ class DrugsParser:
                     historical_flag=False,
                 )
                 ordered_entries[target_index] = normalized
+                processed_chunks += 1
             for entry in llm_entries[len(fallback_chunks) :]:
                 normalized = self.normalize_entry(
                     entry,
@@ -202,10 +231,18 @@ class DrugsParser:
                 ordered_entries.append(normalized)
 
         combined = [entry for entry in ordered_entries if entry is not None]
+        self.emit_progress(progress_callback, 1.0)
         return PatientDrugs(entries=combined)
 
     # -------------------------------------------------------------------------
-    async def llm_extract_drugs(self, lines: list[str]) -> PatientDrugs:
+    async def llm_extract_drugs(
+        self,
+        lines: list[str],
+        *,
+        progress_callback: Callable[[float], None] | None = None,
+        progress_start: float = 0.0,
+        progress_span: float = 1.0,
+    ) -> PatientDrugs:
         if self.client is None:
             raise RuntimeError("LLM client is not initialized for drug extraction")
 
@@ -221,7 +258,10 @@ class DrugsParser:
         grouped_lines = self.group_lines_for_llm(lines)
 
         entries: list[DrugEntry] = []
-        for line in grouped_lines:
+        total_lines = max(len(grouped_lines), 1)
+        bounded_start = min(1.0, max(0.0, float(progress_start)))
+        bounded_span = max(0.0, float(progress_span))
+        for index, line in enumerate(grouped_lines, start=1):
             # Request a deterministic parse for each drug-sized chunk
             parsed = await self.client.llm_structured_call(
                 model=self.model,
@@ -236,6 +276,10 @@ class DrugsParser:
                 max_repair_attempts=2,
             )
             entries.extend(parsed.entries)
+            self.emit_progress(
+                progress_callback,
+                bounded_start + ((index / total_lines) * bounded_span),
+            )
 
         return PatientDrugs(entries=entries)
 
@@ -330,7 +374,12 @@ class DrugsParser:
         return score
 
     # -------------------------------------------------------------------------
-    async def extract_drugs_from_anamnesis(self, anamnesis: str | None) -> PatientDrugs:
+    async def extract_drugs_from_anamnesis(
+        self,
+        anamnesis: str | None,
+        *,
+        progress_callback: Callable[[float], None] | None = None,
+    ) -> PatientDrugs:
         """
         Extract drug mentions from free-text anamnesis using the LLM.
 
@@ -347,6 +396,7 @@ class DrugsParser:
 
         cleaned_anamnesis = self.clean_text(anamnesis)
         chunks = self.chunk_anamnesis_text(cleaned_anamnesis)
+        self.emit_progress(progress_callback, 0.0)
         try:
             parsed_entries: list[DrugEntry] = []
             for index, chunk in enumerate(chunks, start=1):
@@ -363,6 +413,10 @@ class DrugsParser:
                     max_repair_attempts=2,
                 )
                 parsed_entries.extend(parsed.entries)
+                self.emit_progress(
+                    progress_callback,
+                    (index / max(len(chunks), 1)) * 0.85,
+                )
         except Exception as exc:
             raise RuntimeError("Failed to extract drugs from anamnesis via LLM") from exc
 
@@ -376,6 +430,7 @@ class DrugsParser:
             if normalized is not None:
                 entries.append(normalized)
         fallback_entries = self.extract_drugs_from_anamnesis_rule_based(cleaned_anamnesis)
+        self.emit_progress(progress_callback, 0.95)
         merged_entries = self.deduplicate_drug_entries([*entries, *fallback_entries])
         logger.info(
             "Anamnesis extraction produced %s normalized drugs (%s raw LLM entries, %s fallback candidates)",
@@ -383,6 +438,7 @@ class DrugsParser:
             len(parsed_entries),
             len(fallback_entries),
         )
+        self.emit_progress(progress_callback, 1.0)
         return PatientDrugs(entries=merged_entries)
 
     # -------------------------------------------------------------------------

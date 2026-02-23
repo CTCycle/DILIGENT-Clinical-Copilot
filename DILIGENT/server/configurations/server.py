@@ -297,7 +297,11 @@ class RagSettings:
 @dataclass(frozen=True)
 class ExternalDataSettings:
     default_llm_timeout: float
+    parser_llm_timeout: float
+    disease_llm_timeout: float
+    clinical_llm_timeout: float
     livertox_llm_timeout: float
+    ollama_server_start_timeout: float
     livertox_archive: str
     livertox_yield_interval: int
     livertox_skip_deterministic_ratio: float
@@ -532,14 +536,40 @@ def build_external_data_settings(
     *,
     fallback_timeout: float,
 ) -> ExternalDataSettings:
-    default_llm_timeout = coerce_float(data.get("default_llm_timeout"), fallback_timeout)
-    livertox_timeout = coerce_float(
-        data.get("livertox_llm_timeout"),
-        default_llm_timeout,
+    default_llm_timeout = max(
+        coerce_float(data.get("default_llm_timeout"), fallback_timeout),
+        1.0,
+    )
+    parser_timeout = max(
+        coerce_float(data.get("parser_llm_timeout"), default_llm_timeout),
+        1.0,
+    )
+    disease_timeout = max(
+        coerce_float(data.get("disease_llm_timeout"), parser_timeout),
+        1.0,
+    )
+    clinical_timeout = max(
+        coerce_float(data.get("clinical_llm_timeout"), default_llm_timeout),
+        1.0,
+    )
+    livertox_timeout = max(
+        coerce_float(
+            data.get("livertox_llm_timeout"),
+            default_llm_timeout,
+        ),
+        1.0,
+    )
+    ollama_server_start_timeout = max(
+        coerce_float(data.get("ollama_server_start_timeout"), 15.0),
+        1.0,
     )
     return ExternalDataSettings(
         default_llm_timeout=default_llm_timeout,
+        parser_llm_timeout=parser_timeout,
+        disease_llm_timeout=disease_timeout,
+        clinical_llm_timeout=clinical_timeout,
         livertox_llm_timeout=livertox_timeout,
+        ollama_server_start_timeout=ollama_server_start_timeout,
         livertox_archive=coerce_str(data.get("livertox_archive"), "livertox_NBK547852.tar.gz"),
         livertox_yield_interval=coerce_positive_int(data.get("livertox_yield_interval"), 25),
         livertox_skip_deterministic_ratio=coerce_float(
