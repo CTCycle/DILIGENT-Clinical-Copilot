@@ -8,27 +8,15 @@ import pytest
 from sqlalchemy import create_engine, select
 from sqlalchemy.orm import sessionmaker
 
-try:
-    from DILIGENT.server.repositories.serialization.data import DataSerializer
-    from DILIGENT.server.repositories.schemas.models import (
-        Base,
-        Drug,
-        DrugAlias,
-        DrugRxnormCode,
-        LiverToxMonograph,
-    )
-except ModuleNotFoundError:
-    DataSerializer = None  # type: ignore[assignment]
-    Base = None  # type: ignore[assignment]
-    Drug = None  # type: ignore[assignment]
-    DrugAlias = None  # type: ignore[assignment]
-    DrugRxnormCode = None  # type: ignore[assignment]
-    LiverToxMonograph = None  # type: ignore[assignment]
-
-try:
-    from DILIGENT.server.services.updater.livertox import LiverToxUpdater
-except ModuleNotFoundError:
-    LiverToxUpdater = None  # type: ignore[assignment]
+from DILIGENT.server.repositories.serialization.data import DataSerializer
+from DILIGENT.server.repositories.schemas.models import (
+    Base,
+    Drug,
+    DrugAlias,
+    DrugRxnormCode,
+    LiverToxMonograph,
+)
+from DILIGENT.server.services.updater.livertox import LiverToxUpdater
 
 
 ###############################################################################
@@ -39,8 +27,6 @@ class QueryStub:
 
 # -----------------------------------------------------------------------------
 def build_serializer() -> tuple[Any, Any]:
-    if DataSerializer is None or Base is None:
-        raise RuntimeError("Serialization dependencies are not available")
     engine = create_engine("sqlite+pysqlite:///:memory:", future=True)
     Base.metadata.create_all(engine)
     serializer = DataSerializer(queries=QueryStub(engine))
@@ -59,7 +45,6 @@ def fetch_counts(engine: Any) -> tuple[int, int, int, int]:
 
 
 # -----------------------------------------------------------------------------
-@pytest.mark.skipif(DataSerializer is None, reason="Serialization optional dependencies missing")
 def test_rxnav_upsert_idempotent_twice() -> None:
     serializer, engine = build_serializer()
     payload = [
@@ -90,7 +75,6 @@ def test_rxnav_upsert_idempotent_twice() -> None:
 
 
 # -----------------------------------------------------------------------------
-@pytest.mark.skipif(DataSerializer is None, reason="Serialization optional dependencies missing")
 def test_rxnav_upsert_allows_multiple_rxcui_for_same_canonical() -> None:
     serializer, engine = build_serializer()
     payload = [
@@ -124,7 +108,6 @@ def test_rxnav_upsert_allows_multiple_rxcui_for_same_canonical() -> None:
 
 
 # -----------------------------------------------------------------------------
-@pytest.mark.skipif(DataSerializer is None, reason="Serialization optional dependencies missing")
 def test_rxnav_upsert_commits_by_interval() -> None:
     serializer, engine = build_serializer()
     factory = sessionmaker(bind=engine, future=True)
@@ -175,7 +158,6 @@ def test_rxnav_upsert_commits_by_interval() -> None:
 
 
 # -----------------------------------------------------------------------------
-@pytest.mark.skipif(DataSerializer is None, reason="Serialization optional dependencies missing")
 def test_livertox_upsert_idempotent_twice() -> None:
     serializer, engine = build_serializer()
     frame = pd.DataFrame(
@@ -210,10 +192,6 @@ def test_livertox_upsert_idempotent_twice() -> None:
 
 
 # -----------------------------------------------------------------------------
-@pytest.mark.skipif(
-    DataSerializer is None or LiverToxUpdater is None,
-    reason="Serialization/updater optional dependencies missing",
-)
 def test_livertox_duplicate_nbk_is_nulled() -> None:
     serializer, _ = build_serializer()
     updater = LiverToxUpdater(sources_path=".", redownload=False, serializer=serializer)
@@ -250,7 +228,6 @@ def test_livertox_duplicate_nbk_is_nulled() -> None:
 
 
 # -----------------------------------------------------------------------------
-@pytest.mark.skipif(DataSerializer is None, reason="Serialization optional dependencies missing")
 def test_livertox_does_not_match_by_nbk() -> None:
     serializer, engine = build_serializer()
     factory = sessionmaker(bind=engine, future=True)
@@ -285,7 +262,6 @@ def test_livertox_does_not_match_by_nbk() -> None:
 
 
 # -----------------------------------------------------------------------------
-@pytest.mark.skipif(DataSerializer is None, reason="Serialization optional dependencies missing")
 def test_ensure_drug_conflict_raises() -> None:
     serializer, engine = build_serializer()
     factory = sessionmaker(bind=engine, future=True)

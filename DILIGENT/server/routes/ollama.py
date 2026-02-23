@@ -1,5 +1,4 @@
 from __future__ import annotations
-from __future__ import annotations
 
 import asyncio
 from typing import Any
@@ -69,11 +68,6 @@ class OllamaEndpoint:
                     status="success", pulled=(not already), model=name
                 )
         except Exception as exc:
-            from DILIGENT.server.models.providers import (
-                OllamaError,
-                OllamaTimeout,
-            )
-
             if isinstance(exc, OllamaTimeout):
                 raise HTTPException(status_code=504, detail=str(exc))
             if isinstance(exc, OllamaError):
