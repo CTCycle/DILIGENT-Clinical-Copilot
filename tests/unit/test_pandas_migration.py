@@ -4,24 +4,13 @@ from types import SimpleNamespace
 from typing import Any
 
 import pandas as pd
-import pytest
 from sqlalchemy import create_engine, select
 from sqlalchemy.orm import sessionmaker
 
 from DILIGENT.server.services.clinical.livertox import LiverToxData
-
-try:
-    from DILIGENT.server.repositories.serialization.data import DataSerializer
-    from DILIGENT.server.repositories.schemas.models import Base, ClinicalSession
-except ModuleNotFoundError:
-    DataSerializer = None  # type: ignore[assignment]
-    Base = None  # type: ignore[assignment]
-    ClinicalSession = None  # type: ignore[assignment]
-
-try:
-    from DILIGENT.server.services.updater.livertox import LiverToxUpdater
-except ModuleNotFoundError:
-    LiverToxUpdater = None  # type: ignore[assignment]
+from DILIGENT.server.repositories.serialization.data import DataSerializer
+from DILIGENT.server.repositories.schemas.models import Base, ClinicalSession
+from DILIGENT.server.services.updater.livertox import LiverToxUpdater
 
 
 ###############################################################################
@@ -51,8 +40,6 @@ class LookupStub:
 
 # -----------------------------------------------------------------------------
 def build_serializer() -> tuple[Any, Any]:
-    if DataSerializer is None or Base is None:
-        raise RuntimeError("Serialization dependencies are not available")
     engine = create_engine("sqlite+pysqlite:///:memory:", future=True)
     Base.metadata.create_all(engine)
     serializer = DataSerializer(queries=QueryStub(engine))
@@ -60,7 +47,6 @@ def build_serializer() -> tuple[Any, Any]:
 
 
 # -----------------------------------------------------------------------------
-@pytest.mark.skipif(DataSerializer is None, reason="Serialization optional dependencies missing")
 def test_normalize_date_uses_explicit_units_for_numeric_timestamps() -> None:
     serializer, _ = build_serializer()
     assert serializer.normalize_date("1735689600") == "2025-01-01"
@@ -69,7 +55,6 @@ def test_normalize_date_uses_explicit_units_for_numeric_timestamps() -> None:
 
 
 # -----------------------------------------------------------------------------
-@pytest.mark.skipif(DataSerializer is None, reason="Serialization optional dependencies missing")
 def test_save_clinical_session_preserves_row_append_order() -> None:
     serializer, engine = build_serializer()
     serializer.save_clinical_session(
@@ -130,10 +115,6 @@ def test_livertox_data_keeps_internal_dataframe_copies_isolated() -> None:
 
 
 # -----------------------------------------------------------------------------
-@pytest.mark.skipif(
-    LiverToxUpdater is None,
-    reason="Updater optional dependencies missing",
-)
 def test_master_list_sanitization_handles_string_dtype_inputs() -> None:
     updater = LiverToxUpdater(sources_path=".", redownload=False)
     raw = pd.DataFrame(
