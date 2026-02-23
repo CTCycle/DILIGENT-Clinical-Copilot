@@ -289,12 +289,6 @@ class HepatoxConsultation:
         entries: list[DrugClinicalAssessment] = []
         llm_jobs: list[tuple[int, Any]] = []
 
-        def emit_progress(stage: str, fraction: float) -> None:
-            if progress_callback is None:
-                return
-            bounded_fraction = min(1.0, max(0.0, float(fraction)))
-            progress_callback(stage, bounded_fraction)
-
         # iterate over all drugs to identify those with LiverTox excerpts and those without
         for idx, drug_entry in enumerate(self.drugs.entries):
             entry, job = await self.prepare_drug_assessment(
@@ -310,18 +304,10 @@ class HepatoxConsultation:
             if job:
                 llm_jobs.append(job)
 
-        emit_progress("llm_analysis", 0.0)
+        self.emit_progress(progress_callback, stage="llm_analysis", fraction=0.0)
         if llm_jobs:
-            async def execute_indexed_job(
-                index: int, coroutine: Any
-            ) -> tuple[int, Any]:
-                try:
-                    return index, await coroutine
-                except Exception as exc:  # noqa: BLE001
-                    return index, exc
-
             pending_tasks = [
-                asyncio.create_task(execute_indexed_job(idx, task))
+                asyncio.create_task(self.execute_indexed_job(idx, task))
                 for idx, task in llm_jobs
             ]
             completed = 0
@@ -339,19 +325,44 @@ class HepatoxConsultation:
                 else:
                     entry.paragraph = outcome
                 completed += 1
-                emit_progress("llm_analysis", completed / total if total else 1.0)
+                self.emit_progress(
+                    progress_callback,
+                    stage="llm_analysis",
+                    fraction=completed / total if total else 1.0,
+                )
         else:
-            emit_progress("llm_analysis", 1.0)
+            self.emit_progress(progress_callback, stage="llm_analysis", fraction=1.0)
 
         logger.info("Composing final clinical report for current patient")
-        emit_progress("report_composition", 0.0)
+        self.emit_progress(progress_callback, stage="report_composition", fraction=0.0)
         final_report = await self.finalize_patient_report(
             entries,
             clinical_context=normalized_context,
         )
-        emit_progress("report_composition", 1.0)
+        self.emit_progress(progress_callback, stage="report_composition", fraction=1.0)
 
         return PatientDrugClinicalReport(entries=entries, final_report=final_report)
+
+    # -------------------------------------------------------------------------
+    @staticmethod
+    def emit_progress(
+        progress_callback: Callable[[str, float], None] | None,
+        *,
+        stage: str,
+        fraction: float,
+    ) -> None:
+        if progress_callback is None:
+            return
+        bounded_fraction = min(1.0, max(0.0, float(fraction)))
+        progress_callback(stage, bounded_fraction)
+
+    # -------------------------------------------------------------------------
+    @staticmethod
+    async def execute_indexed_job(index: int, coroutine: Any) -> tuple[int, Any]:
+        try:
+            return index, await coroutine
+        except Exception as exc:  # noqa: BLE001
+            return index, exc
 
     # -------------------------------------------------------------------------
     async def prepare_drug_assessment(
@@ -434,6 +445,7 @@ class HepatoxConsultation:
             rag_documents=rag_documents or None,
             clinical_context=normalized_context,
             suspension=suspension,
+            visit_date=visit_date,
             pattern_summary=pattern_summary,
             metadata=entry.matched_livertox_row,
         )
@@ -551,11 +563,18 @@ class HepatoxConsultation:
         interval_days: int | None = None
         if not suspended:
             # No suspension means we track exposure but keep contextual notes
+            if entry.source == "anamnesis" or bool(entry.historical_flag):
+                exposure_note = (
+                    "Historical mention from anamnesis without explicit active regimen; "
+                    "treat current exposure as uncertain unless confirmed in therapy."
+                )
+            else:
+                exposure_note = "Active therapy; no suspension reported."
             combined_note = " ".join(
                 part
                 for part in (
                     start_note,
-                    "Active therapy; no suspension reported.",
+                    exposure_note,
                 )
                 if part
             )
@@ -742,6 +761,13 @@ class HepatoxConsultation:
         return "No therapy start information was detected; treat the exposure window as chronic unless contradicted."
 
     # -------------------------------------------------------------------------
+    @staticmethod
+    def format_visit_date_anchor(visit_date: date | None) -> str:
+        if visit_date is None:
+            return "Not provided."
+        return visit_date.isoformat()
+
+    # -------------------------------------------------------------------------
     def resolve_livertox_score(self, metadata: dict[str, Any] | None) -> str:
         if not metadata:
             return NOT_AVAILABLE_TEXT
@@ -806,11 +832,17 @@ class HepatoxConsultation:
         rag_documents: str | None,
         clinical_context: str,
         suspension: DrugSuspensionContext,
+        visit_date: date | None,
         pattern_summary: str,
         metadata: dict[str, Any] | None,
     ) -> str:
         start_details = self.format_start_prompt(suspension)
         suspension_details = self.format_suspension_prompt(suspension)
+        timeline_note = (
+            suspension.note
+            or "No explicit timeline notes were available from extraction metadata."
+        )
+        visit_date_anchor = self.format_visit_date_anchor(visit_date)
         score, metadata_block = self.prepare_metadata_prompt(metadata)
         rag_documents = rag_documents or "No additional documents provided."
         origin_block = ", ".join(origins) if origins else "unknown"
@@ -829,8 +861,10 @@ class HepatoxConsultation:
             excerpt=self.escape_braces(excerpt),
             documents=self.escape_braces(rag_documents),
             clinical_context=self.escape_braces(clinical_context),
+            visit_date_anchor=self.escape_braces(visit_date_anchor),
             therapy_start_details=self.escape_braces(start_details),
             suspension_details=self.escape_braces(suspension_details),
+            timeline_note=self.escape_braces(timeline_note),
             pattern_summary=self.escape_braces(pattern_summary),
             metadata_block=self.escape_braces(metadata_block),
             livertox_score=self.escape_braces(score),

@@ -398,6 +398,28 @@ class PatientDrugs(BaseModel):
 
 
 ###############################################################################
+class DiseaseContextEntry(BaseModel):
+    name: str = Field(..., min_length=1, max_length=200)
+    occurrence_time: str | None = Field(default=None, max_length=120)
+    chronic: bool | None = Field(default=None)
+    hepatic_related: bool | None = Field(default=None)
+    evidence: str | None = Field(default=None, max_length=500)
+
+    @field_validator("name", "occurrence_time", "evidence", mode="before")
+    @classmethod
+    def strip_text_fields(cls, value: str | None) -> str | None:
+        if value is None:
+            return None
+        stripped = str(value).strip()
+        return stripped or None
+
+
+###############################################################################
+class PatientDiseaseContext(BaseModel):
+    entries: list[DiseaseContextEntry] = Field(default_factory=list)
+
+
+###############################################################################
 class LiverToxMatchInfo(BaseModel):
     nbk_id: str = Field(..., min_length=1, max_length=50)
     matched_name: str = Field(..., min_length=1, max_length=200)

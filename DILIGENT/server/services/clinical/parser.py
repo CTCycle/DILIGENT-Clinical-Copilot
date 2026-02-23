@@ -18,6 +18,7 @@ from DILIGENT.server.entities.clinical import (
 )
 from DILIGENT.server.configurations import LLMRuntimeConfig, server_settings
 from DILIGENT.server.services.text.normalization import normalize_token
+from DILIGENT.common.utils.logger import logger
 from DILIGENT.common.utils.patterns import (
     DRUG_BRACKET_TRAIL_RE,
     DRUG_BULLET_RE,
@@ -64,6 +65,11 @@ class DrugsParser:
         ),
         ("topical", re.compile(r"\b(?:topical|topic[ao]|cutane[ao])\b", re.IGNORECASE)),
     )
+    DOSE_CUE_RE = re.compile(
+        r"\b\d+(?:[.,]\d+)?\s*(?:mg|g|mcg|ug|ml|u|ui|units?)\b",
+        re.IGNORECASE,
+    )
+    ANAMNESIS_CHUNK_MAX_CHARS = 2400
 
     def __init__(
         self,
@@ -233,14 +239,104 @@ class DrugsParser:
 
         return PatientDrugs(entries=entries)
 
+    def chunk_anamnesis_text(self, text: str) -> list[str]:
+        normalized = self.clean_text(text)
+        if not normalized:
+            return []
+        lines = [line.strip() for line in normalized.split("\n") if line.strip()]
+        chunks: list[str] = []
+        current_lines: list[str] = []
+        current_size = 0
+        for line in lines:
+            line_size = len(line) + 1
+            if current_lines and current_size + line_size > self.ANAMNESIS_CHUNK_MAX_CHARS:
+                chunks.append("\n".join(current_lines))
+                current_lines = [line]
+                current_size = line_size
+                continue
+            current_lines.append(line)
+            current_size += line_size
+        if current_lines:
+            chunks.append("\n".join(current_lines))
+        return chunks or [normalized]
+
+    # -------------------------------------------------------------------------
+    def extract_drugs_from_anamnesis_rule_based(self, anamnesis: str) -> list[DrugEntry]:
+        lines = [line.strip() for line in anamnesis.split("\n") if line.strip()]
+        entries: list[DrugEntry] = []
+        for line in lines:
+            if not self.is_likely_medication_line(line):
+                continue
+            candidate = self.parse_line(line)
+            normalized = self.normalize_entry(
+                candidate,
+                source="anamnesis",
+                historical_flag=True,
+            )
+            if normalized is not None:
+                entries.append(normalized)
+        return entries
+
+    # -------------------------------------------------------------------------
+    def is_likely_medication_line(self, line: str) -> bool:
+        lowered = line.lower()
+        if self.SCHEDULE_RE.search(line):
+            return True
+        if self.DOSE_CUE_RE.search(line):
+            return True
+        if self.SUSPENSION_RE.search(line):
+            return True
+        if self.START_DATE_RE.search(line):
+            return True
+        if self.detect_route(line):
+            return True
+        if any(token in lowered for token in (" mg", " ml", " mcg", " cpr", " caps", " fiala", " sir ")):
+            return True
+        return False
+
+    # -------------------------------------------------------------------------
+    def deduplicate_drug_entries(self, entries: list[DrugEntry]) -> list[DrugEntry]:
+        selected: dict[str, DrugEntry] = {}
+        order: list[str] = []
+        for entry in entries:
+            normalized_name = normalize_token(entry.name)
+            if not normalized_name:
+                continue
+            existing = selected.get(normalized_name)
+            if existing is None:
+                selected[normalized_name] = entry
+                order.append(normalized_name)
+                continue
+            if self.entry_information_score(entry) > self.entry_information_score(existing):
+                selected[normalized_name] = entry
+        return [selected[key] for key in order if key in selected]
+
+    # -------------------------------------------------------------------------
+    def entry_information_score(self, entry: DrugEntry) -> int:
+        score = 1
+        for field_name in (
+            "dosage",
+            "administration_mode",
+            "route",
+            "administration_pattern",
+            "suspension_status",
+            "suspension_date",
+            "therapy_start_status",
+            "therapy_start_date",
+        ):
+            value = getattr(entry, field_name, None)
+            if value is not None and value != []:
+                score += 1
+        return score
+
     # -------------------------------------------------------------------------
     async def extract_drugs_from_anamnesis(self, anamnesis: str | None) -> PatientDrugs:
         """
         Extract drug mentions from free-text anamnesis using the LLM.
 
         Unlike the therapy list extraction (which uses rules first),
-        anamnesis extraction is fully LLM-based due to the unstructured nature
-        of clinical narrative text.
+        anamnesis extraction is primarily LLM-based with a deterministic
+        fallback for medication-like lines.
         """
         if not anamnesis or not anamnesis.strip():
             return PatientDrugs(entries=[])
@@ -249,24 +345,29 @@ class DrugsParser:
         if self.client is None:
             raise RuntimeError("LLM client is not initialized for drug extraction")
 
+        cleaned_anamnesis = self.clean_text(anamnesis)
+        chunks = self.chunk_anamnesis_text(cleaned_anamnesis)
         try:
-            parsed = await self.client.llm_structured_call(
-                model=self.model,
-                system_prompt=ANAMNESIS_DRUG_EXTRACTION_PROMPT.strip(),
-                user_prompt=(
-                    "Extract all drugs mentioned in the following patient anamnesis:\n\n"
-                    f"{anamnesis.strip()}"
-                ),
-                schema=PatientDrugs,
-                temperature=self.temperature,
-                use_json_mode=True,
-                max_repair_attempts=2,
-            )
+            parsed_entries: list[DrugEntry] = []
+            for index, chunk in enumerate(chunks, start=1):
+                parsed = await self.client.llm_structured_call(
+                    model=self.model,
+                    system_prompt=ANAMNESIS_DRUG_EXTRACTION_PROMPT.strip(),
+                    user_prompt=(
+                        "Extract all drugs mentioned in the following patient anamnesis chunk:\n\n"
+                        f"[Chunk {index}/{len(chunks)}]\n{chunk}"
+                    ),
+                    schema=PatientDrugs,
+                    temperature=self.temperature,
+                    use_json_mode=True,
+                    max_repair_attempts=2,
+                )
+                parsed_entries.extend(parsed.entries)
         except Exception as exc:
             raise RuntimeError("Failed to extract drugs from anamnesis via LLM") from exc
 
         entries: list[DrugEntry] = []
-        for entry in parsed.entries:
+        for entry in parsed_entries:
             normalized = self.normalize_entry(
                 entry,
                 source="anamnesis",
@@ -274,7 +375,15 @@ class DrugsParser:
             )
             if normalized is not None:
                 entries.append(normalized)
-        return PatientDrugs(entries=entries)
+        fallback_entries = self.extract_drugs_from_anamnesis_rule_based(cleaned_anamnesis)
+        merged_entries = self.deduplicate_drug_entries([*entries, *fallback_entries])
+        logger.info(
+            "Anamnesis extraction produced %s normalized drugs (%s raw LLM entries, %s fallback candidates)",
+            len(merged_entries),
+            len(parsed_entries),
+            len(fallback_entries),
+        )
+        return PatientDrugs(entries=merged_entries)
 
     # -------------------------------------------------------------------------
     def group_lines_for_llm(self, lines: list[str]) -> list[str]:
