@@ -231,14 +231,6 @@ class RxNavClient:
         )
         collected: dict[str, str] = {}
 
-        def store(term: str) -> None:
-            normalized = self.standardize_term(term)
-            if not normalized:
-                return
-            key = normalized.casefold()
-            if key not in collected:
-                collected[key] = normalized
-
         if payload is not None:
             drug_group = payload.get("drugGroup")
             if isinstance(drug_group, dict):
@@ -255,11 +247,11 @@ class RxNavClient:
                                 continue
                             for value in self.gather_property_values(prop):
                                 for term in self.extract_core_names(value):
-                                    store(term)
+                                    self.store_term(collected, term)
 
         for term in self.extract_core_names(raw_name):
-            store(term)
-        store(raw_name)
+            self.store_term(collected, term)
+        self.store_term(collected, raw_name)
         return sorted(collected.values(), key=str.casefold)
 
     # -------------------------------------------------------------------------
@@ -327,6 +319,25 @@ class RxNavClient:
         return values
 
     # -------------------------------------------------------------------------
+    def store_term(self, collected: dict[str, str], term: str) -> None:
+        normalized = self.standardize_term(term)
+        if not normalized:
+            return
+        key = normalized.casefold()
+        if key not in collected:
+            collected[key] = normalized
+
+    # -------------------------------------------------------------------------
+    @staticmethod
+    def flush_extracted_tokens(tokens: list[str], extracted: set[str]) -> None:
+        if not tokens:
+            return
+        term = " ".join(tokens).strip()
+        if term:
+            extracted.add(term)
+        tokens.clear()
+
+    # -------------------------------------------------------------------------
     def extract_core_names(self, raw_value: str | None) -> set[str]:
         if not isinstance(raw_value, str):
             return set()
@@ -343,32 +354,24 @@ class RxNavClient:
                 continue
             tokens: list[str] = []
 
-            def flush() -> None:
-                if not tokens:
-                    return
-                term = " ".join(tokens).strip()
-                if term:
-                    extracted.add(term)
-                tokens.clear()
-
             for match in self.TERM_PATTERN.finditer(cleaned):
                 token = match.group(0)
                 if not any(char.isalpha() for char in token):
-                    flush()
+                    self.flush_extracted_tokens(tokens, extracted)
                     continue
                 normalized = token.lower().strip("-'")
                 base = re.sub(r"[^a-z0-9]", "", normalized)
                 if not base:
-                    flush()
+                    self.flush_extracted_tokens(tokens, extracted)
                     continue
                 if (
                     base in self.NAME_STOPWORDS
                     or base.rstrip("s") in self.NAME_STOPWORDS
                 ):
-                    flush()
+                    self.flush_extracted_tokens(tokens, extracted)
                     continue
                 tokens.append(token.strip("-'").strip())
-            flush()
+            self.flush_extracted_tokens(tokens, extracted)
 
         standardized = {
             self.standardize_term(term) for term in extracted if term.strip()
@@ -994,52 +997,61 @@ class RxNavDrugCatalogBuilder:
     ) -> tuple[dict[str, list[str]], list[str]]:
         if not pending_alias_queries and pending_synonym_identifier is None:
             return {}, []
+        return asyncio.run(
+            self.fetch_pending_queries_async(
+                pending_alias_queries,
+                pending_synonym_identifier,
+            )
+        )
 
-        async def runner() -> tuple[dict[str, list[str]], list[str]]:
-            alias_results: dict[str, list[str]] = {}
-            synonym_results: list[str] = []
-            async with httpx.AsyncClient(
-                timeout=self.rx_client.timeout,
-                limits=self.rx_client._build_limits(),
-            ) as client:
-                alias_tasks = {
-                    cache_key: asyncio.create_task(
-                        self.rx_client.fetch_drug_terms_async(stripped, client=client)
-                    )
-                    for cache_key, stripped in pending_alias_queries.items()
-                }
-                synonym_task = (
-                    asyncio.create_task(
-                        self.rx_client.fetch_rxcui_synonyms_async(
-                            pending_synonym_identifier, client=client
-                        )
-                    )
-                    if pending_synonym_identifier
-                    else None
+    # -------------------------------------------------------------------------
+    async def fetch_pending_queries_async(
+        self,
+        pending_alias_queries: dict[str, str],
+        pending_synonym_identifier: str | None,
+    ) -> tuple[dict[str, list[str]], list[str]]:
+        alias_results: dict[str, list[str]] = {}
+        synonym_results: list[str] = []
+        async with httpx.AsyncClient(
+            timeout=self.rx_client.timeout,
+            limits=self.rx_client._build_limits(),
+        ) as client:
+            alias_tasks = {
+                cache_key: asyncio.create_task(
+                    self.rx_client.fetch_drug_terms_async(stripped, client=client)
                 )
-                for cache_key, task in alias_tasks.items():
-                    try:
-                        alias_results[cache_key] = await task
-                    except Exception as exc:  # noqa: BLE001
-                        logger.warning(
-                            "Failed to fetch RxNav aliases for '%s': %s",
-                            pending_alias_queries.get(cache_key),
-                            exc,
-                        )
-                        alias_results[cache_key] = []
-                if synonym_task is not None:
-                    try:
-                        synonym_results = await synonym_task
-                    except Exception as exc:  # noqa: BLE001
-                        logger.warning(
-                            "Failed to fetch RxNav synonyms for '%s': %s",
-                            pending_synonym_identifier,
-                            exc,
-                        )
-                        synonym_results = []
-            return alias_results, synonym_results
-
-        return asyncio.run(runner())
+                for cache_key, stripped in pending_alias_queries.items()
+            }
+            synonym_task = (
+                asyncio.create_task(
+                    self.rx_client.fetch_rxcui_synonyms_async(
+                        pending_synonym_identifier, client=client
+                    )
+                )
+                if pending_synonym_identifier
+                else None
+            )
+            for cache_key, task in alias_tasks.items():
+                try:
+                    alias_results[cache_key] = await task
+                except Exception as exc:  # noqa: BLE001
+                    logger.warning(
+                        "Failed to fetch RxNav aliases for '%s': %s",
+                        pending_alias_queries.get(cache_key),
+                        exc,
+                    )
+                    alias_results[cache_key] = []
+            if synonym_task is not None:
+                try:
+                    synonym_results = await synonym_task
+                except Exception as exc:  # noqa: BLE001
+                    logger.warning(
+                        "Failed to fetch RxNav synonyms for '%s': %s",
+                        pending_synonym_identifier,
+                        exc,
+                    )
+                    synonym_results = []
+        return alias_results, synonym_results
 
     # -------------------------------------------------------------------------
     def expand_synonym_variants(self, candidate: str) -> list[str]:

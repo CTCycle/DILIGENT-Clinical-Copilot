@@ -58,6 +58,15 @@ def coerce_bool(value: Any, default: bool) -> bool:
 
 
 # -----------------------------------------------------------------------------
+def coerce_bool_or_unknown(value: bool | None) -> str:
+    if value is True:
+        return "yes"
+    if value is False:
+        return "no"
+    return "unknown"
+
+
+# -----------------------------------------------------------------------------
 def coerce_int(
     value: Any, default: int, minimum: int | None = None, maximum: int | None = None
 ) -> int:
@@ -173,6 +182,7 @@ def coerce_string_tuple(value: Any) -> tuple[str, ...]:
 
 __all__ = [
     "coerce_bool",
+    "coerce_bool_or_unknown",
     "coerce_float",
     "coerce_int",
     "coerce_positive_int",

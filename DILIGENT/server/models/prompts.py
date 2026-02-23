@@ -54,6 +54,26 @@ Return:
 - Ensure the output strictly adheres to the schema.
 """
 
+ANAMNESIS_DISEASE_EXTRACTION_PROMPT = """
+You are a clinical hepatology assistant that extracts structured disease information
+from free-text anamnesis (medical history), including non-English notes.
+
+Instructions:
+- Extract clinically relevant diseases and conditions explicitly mentioned in the text.
+- For each condition, return:
+  - `name`: disease/condition name as written (normalized spacing only).
+  - `occurrence_time`: time clue if available (date, year, relative timing).
+  - `chronic`: true if clearly chronic/longstanding, false if clearly acute/transient, null if unclear.
+  - `hepatic_related`: true when the condition is hepatic/liver-related, false when clearly non-hepatic, null if unclear.
+  - `evidence`: short snippet from the anamnesis supporting extraction.
+- Prefer specificity (e.g., "metastatic lung adenocarcinoma") over generic labels (e.g., "cancer").
+- Do not invent diseases that are not in the text.
+
+Return:
+- A JSON object matching the `PatientDiseaseContext` schema with an `entries` array.
+- Ensure the output strictly adheres to the schema.
+"""
+
 DILI_RAG_QUERY_PROMPT = (
     "{name} drug induced liver injury (DILI) {classification} pattern "
     "Pattern of hepatotoxicity - {r_part} "
@@ -90,10 +110,13 @@ You are a **clinical hepatologist** with expertise in assessing **drug-induced l
 
 # Assessment Principles
 - **Chronology:** Integrate the clinical narrative with laboratory data when available, emphasizing their temporal relationship to each therapy.
+- **Temporal precedence:** Prioritize whether hepatic disease evidence appears before exposure, during exposure, after suspension, or after re-exposure.
 - **Pattern matching:**
   - Strong alignment between the patient's injury pattern and the drug's typical pattern = **strong supporting evidence**.
   - Clear mismatch = **weakened causality**.
 - **Drug suspension:** When a therapy was recently discontinued, assess whether the suspension-to-onset interval fits the **latency ranges** in the LiverTox excerpt, rather than applying rigid cutoffs.
+- **Dechallenge/Rechallenge:** If restart/rechallenge clues are present, explicitly discuss whether recurrence timing supports causality.
+- **Structured disease focus:** Use the structured disease timeline section in the provided clinical context to distinguish hepatic baseline disease from potential drug-induced events.
 
 # Output
 Provide **succinct, evidence-based reasoning** consistent with the above principles while adhering to the requested narrative structure.
@@ -130,8 +153,10 @@ LIVERTOX_CLINICAL_USER_PROMPT = """
 {pattern_summary}
 
 # Therapy Timeline
+- Visit date: {visit_date_anchor}
 - Start details: {therapy_start_details}
 - Suspension details: {suspension_details}
+- Timeline interpretation note: {timeline_note}
 
 # Output Requirements
 Write a clinician-facing assessment (≤500 words) for this drug by **reproducing the template below exactly**. Do not rearrange, rename, or omit headings; when a heading lacks data, state "Not reported" immediately after it. Always end with "Bibliography source: LiverTox".
@@ -143,6 +168,8 @@ Guidelines:
 - Use quantitative data from the excerpt whenever available (e.g., incidence rates, case counts, study sizes) and cite the referenced study or report if mentioned.
 - Compare the findings with closely related agents when the excerpt mentions them; otherwise, briefly reference the agent or class listed in the metadata.
 - Provide monitoring or clinical management recommendations that align with the excerpt and the patient context, explicitly linking the advice to patient chronology or lab trends.
+- Explicitly reason about temporal order using visit date, start/suspension timing, and the structured disease timeline from the clinical context.
+- If rechallenge/restart evidence exists in metadata or context, state whether it strengthens or weakens causality.
 - Reference only the supplied LiverTox excerpt, metadata, and optional retrieved documents; do not cite other sources.
 - Do not invent data or cite sources other than those provided.
 """
