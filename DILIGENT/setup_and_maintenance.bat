@@ -21,7 +21,6 @@ set "UV_CACHE_DIR=%runtimes_dir%\uv_cache"
 set "pyproject=%root_folder%pyproject.toml"
 set "update_script=%project_folder%tools\update_project.py"
 set "log_path=%project_folder%resources\logs"
-set "uv_lock=%root_folder%uv.lock"
 set "venv_dir=%root_folder%.venv"
 set "client_dir=%project_folder%client"
 set "nodejs_dir=%runtimes_dir%\nodejs"
@@ -98,12 +97,7 @@ if /i not "%confirm%"=="YES" (
   pause
   goto :setup_menu
 )
-if exist "%uv_lock%" (
-  del /q "%uv_lock%"
-  echo [INFO] Removed "%uv_lock%".
-) else (
-  echo [INFO] No uv.lock file found to remove.
-)
+echo [INFO] Preserving committed lockfile "%root_folder%uv.lock".
 if exist "%uv_dir%" (
   rd /s /q "%uv_dir%"
   echo [INFO] Removed uv directory "%uv_dir%".
@@ -146,12 +140,7 @@ if exist "%client_dir%\dist" (
 ) else (
   echo [INFO] No frontend build directory found to remove.
 )
-if exist "%client_dir%\package-lock.json" (
-  del /q "%client_dir%\package-lock.json"
-  echo [INFO] Removed frontend package-lock.json at "%client_dir%\package-lock.json".
-) else (
-  echo [INFO] No frontend package-lock.json found to remove.
-)
+echo [INFO] Preserving committed lockfile "%client_dir%\package-lock.json".
 if not exist "%runtimes_dir%" md "%runtimes_dir%" >nul 2>&1
 if exist "%runtimes_dir%" (
   for /f "delims=" %%F in ('dir /b "%runtimes_dir%"') do (
