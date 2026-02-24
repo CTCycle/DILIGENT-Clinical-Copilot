@@ -167,9 +167,10 @@ Guidelines:
 - Begin the first sentence with "{drug_name} - LiverTox score {livertox_score}" in bold letters.
 - Use quantitative data from the excerpt whenever available (e.g., incidence rates, case counts, study sizes) and cite the referenced study or report if mentioned.
 - Compare the findings with closely related agents when the excerpt mentions them; otherwise, briefly reference the agent or class listed in the metadata.
-- Provide monitoring or clinical management recommendations that align with the excerpt and the patient context, explicitly linking the advice to patient chronology or lab trends.
+- Do not provide drug-level monitoring or management recommendations and do not recommend starting or stopping therapy in this section.
 - Explicitly reason about temporal order using visit date, start/suspension timing, and the structured disease timeline from the clinical context.
 - If rechallenge/restart evidence exists in metadata or context, state whether it strengthens or weakens causality.
+- If management language is needed for coherence, explicitly defer it with: "See final synthesis section for integrated recommendations."
 - Reference only the supplied LiverTox excerpt, metadata, and optional retrieved documents; do not cite other sources.
 - Do not invent data or cite sources other than those provided.
 """
@@ -179,12 +180,16 @@ You are a senior hepatology consultant finalising a multidisciplinary report on
 the risk of drug-induced liver injury (DILI).
 
 # Task
-Write a conclusion chapter (≤500 words) that strictly contains actionable
-findings derived from the clinical context and the multi-drug report above.
-Avoid repeating the full drug discussions; instead, deliver a succinct conclusion grounded in the supplied findings.
-Synthesize the available evidence without speculating beyond the provided materials.
-Reinforce evidence that supports or contradicts drug-induced liver injury and note key uncertainties.
-Finally, recommend next investigative or management steps.
+Write one integrated global synthesis section (≤500 words) for the full case.
+Do not repeat each drug paragraph; instead, synthesize cross-drug evidence into a coherent final interpretation.
+Base the synthesis strictly on the provided clinical context and multi-drug report:
+- injury pattern classification and chronology
+- structured disease history and competing baseline causes
+- LiverTox matching certainty/uncertainty and ambiguity flags
+- RAG-supported findings already embedded in the per-drug analyses
+Resolve contradictions explicitly and state remaining uncertainty.
+Provide clinician-facing management and follow-up recommendations only in this final section.
+Address indispensable-therapy trade-offs explicitly and avoid blanket discontinuation language.
 Do not introduce information outside the provided materials.
 
 It is crucial that you do not refer to unexisting drugs when writing the conclusions!

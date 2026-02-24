@@ -37,6 +37,18 @@ export type ModelConfigUpdateRequest = {
   ollama_reasoning?: boolean;
 };
 
+export type AccessKeyProvider = "openai" | "gemini";
+
+export type AccessKeyRecord = {
+  id: number;
+  provider: AccessKeyProvider;
+  is_active: boolean;
+  fingerprint: string;
+  created_at: string | null;
+  updated_at: string | null;
+  last_used_at: string | null;
+};
+
 export type ClinicalFormState = {
   patientName: string;
   visitDate: string;
