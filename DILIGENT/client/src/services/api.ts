@@ -1,5 +1,7 @@
 import { API_BASE_URL, HTTP_TIMEOUT_SECONDS } from "../constants";
 import {
+  AccessKeyProvider,
+  AccessKeyRecord,
   ApiResult,
   ClinicalRequestPayload,
   JobCancelResponse,
@@ -289,4 +291,47 @@ export async function pullModels(models: string[]): Promise<ApiResult> {
     message: `[INFO] Models available locally: ${selected.join(", ")}.`,
     json: null,
   };
+}
+
+export async function fetchAccessKeys(
+  provider: AccessKeyProvider,
+): Promise<AccessKeyRecord[]> {
+  const encodedProvider = encodeURIComponent(provider);
+  return requestJson<AccessKeyRecord[]>(
+    `${API_BASE_URL}/access-keys?provider=${encodedProvider}`,
+    {
+      method: "GET",
+    },
+  );
+}
+
+export async function createAccessKey(
+  provider: AccessKeyProvider,
+  accessKey: string,
+): Promise<AccessKeyRecord> {
+  return requestJson<AccessKeyRecord>(`${API_BASE_URL}/access-keys`, {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify({ provider, access_key: accessKey }),
+  });
+}
+
+export async function activateAccessKey(id: number): Promise<AccessKeyRecord> {
+  return requestJson<AccessKeyRecord>(
+    `${API_BASE_URL}/access-keys/${encodeURIComponent(String(id))}/activate`,
+    {
+      method: "PUT",
+    },
+  );
+}
+
+export async function deleteAccessKey(id: number): Promise<void> {
+  await requestJson<{ status: string; deleted: boolean }>(
+    `${API_BASE_URL}/access-keys/${encodeURIComponent(String(id))}`,
+    {
+      method: "DELETE",
+    },
+  );
 }

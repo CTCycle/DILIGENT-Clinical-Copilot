@@ -24,10 +24,8 @@ from DILIGENT.common.constants import (
 )
 from DILIGENT.common.utils.logger import logger
 from DILIGENT.common.utils.types import extract_positive_int
-from DILIGENT.common.utils.variables import env_variables
-
-OPENAI_API_KEY = env_variables.get("OPENAI_API_KEY")
-GEMINI_API_KEY = env_variables.get("GEMINI_API_KEY")
+from DILIGENT.server.repositories.serialization.accesskeys import AccessKeySerializer
+from DILIGENT.server.services.keys.cryptography import decrypt as decrypt_access_key
 
 # Type variable for typed schema returns
 T = TypeVar("T", bound=BaseModel)
@@ -1453,20 +1451,25 @@ class CloudLLMClient:
     ) -> None:
         self.provider: ProviderName = provider
         self.default_model = default_model
+        self.access_key_serializer = AccessKeySerializer()
+        provider_access_key = self.resolve_provider_access_key(provider)
 
         if provider == "openai":
-            if not OPENAI_API_KEY:
-                raise LLMError("OPENAI_API_KEY is not set")
+            if not provider_access_key:
+                raise LLMError("No active OpenAI access key configured")
             self.base_url = (base_url or OPENAI_API_BASE).rstrip("/")
             headers = {
-                "Authorization": f"Bearer {OPENAI_API_KEY}",
+                "Authorization": f"Bearer {provider_access_key}",
                 "Content-Type": "application/json",
             }
         elif provider == "gemini":
-            if not GEMINI_API_KEY:
-                raise LLMError("GEMINI_API_KEY is not set")
+            if not provider_access_key:
+                raise LLMError("No active Gemini access key configured")
             self.base_url = (base_url or GEMINI_API_BASE).rstrip("/")
-            headers = {"Content-Type": "application/json"}
+            headers = {
+                "Content-Type": "application/json",
+                "x-goog-api-key": provider_access_key,
+            }
         elif provider in ("azure-openai", "anthropic"):
             # Stub: add credentials via environment variables and default bases
             # when these providers are added.
@@ -1482,6 +1485,23 @@ class CloudLLMClient:
         self.client = httpx.AsyncClient(
             base_url=self.base_url, timeout=timeout, limits=limits, headers=headers
         )
+
+    # ---------------------------------------------------------------------
+    def resolve_provider_access_key(self, provider: ProviderName) -> str | None:
+        if provider not in {"openai", "gemini"}:
+            return None
+        try:
+            row = self.access_key_serializer.get_active_key(provider, mark_used=True)
+        except Exception as exc:  # noqa: BLE001
+            provider_label = "OpenAI" if provider == "openai" else "Gemini"
+            raise LLMError(f"Failed to load active {provider_label} access key") from exc
+        if row is None:
+            return None
+        try:
+            return decrypt_access_key(row.encrypted_value)
+        except Exception as exc:  # noqa: BLE001
+            provider_label = "OpenAI" if provider == "openai" else "Gemini"
+            raise LLMError(f"Failed to decrypt active {provider_label} access key") from exc
 
     # ---------------------------------------------------------------------
     async def close(self) -> None:
@@ -1624,8 +1644,7 @@ class CloudLLMClient:
         self, *, model: str, messages: list[dict[str, str]]
     ) -> dict[str, Any] | str:
         contents, system_text = self.to_gemini_contents(messages)
-        params = f"?key={GEMINI_API_KEY}"
-        path = f"/models/{model or self.default_model}:generateContent{params}"
+        path = f"/models/{model or self.default_model}:generateContent"
 
         body: dict[str, Any] = {"contents": contents}
         if system_text:
@@ -1698,7 +1717,7 @@ class CloudLLMClient:
             {"content": {"parts": [{"text": text}]}} for text in input_texts
         ]
         body = {"requests": requests_payload}
-        path = f"/models/{model or self.default_model}:batchEmbedContents?key={GEMINI_API_KEY}"
+        path = f"/models/{model or self.default_model}:batchEmbedContents"
 
         try:
             resp = await self.client.post(path, json=body)

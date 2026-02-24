@@ -985,7 +985,9 @@ class HepatoxConsultation:
             multi_drug_report=combined_report,
         )
         if conclusion:
-            combined_report = f"{combined_report}\n\n## Conclusion\n\n{conclusion}"
+            combined_report = (
+                f"{combined_report}\n\n## Global Synthesis and Clinical Recommendations\n\n{conclusion}"
+            )
         return combined_report
 
     # -------------------------------------------------------------------------

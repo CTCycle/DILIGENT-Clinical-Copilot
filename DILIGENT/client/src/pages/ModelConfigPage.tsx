@@ -1,5 +1,6 @@
 import React, { useEffect, useMemo, useState } from "react";
 
+import { AccessKeyModal } from "../components/AccessKeyModal";
 import { CLOUD_MODEL_CHOICES, DEFAULT_SETTINGS } from "../constants";
 import { useAppState } from "../context/AppStateContext";
 import {
@@ -7,7 +8,7 @@ import {
     pullModels,
     updateModelConfigState,
 } from "../services/api";
-import { ModelConfigStateResponse, ModelConfigUpdateRequest, RuntimeSettings } from "../types";
+import { AccessKeyProvider, ModelConfigStateResponse, ModelConfigUpdateRequest, RuntimeSettings } from "../types";
 
 const PROVIDER_LABELS: Record<string, string> = {
     openai: "OpenAI",
@@ -29,6 +30,10 @@ const PullIcon = () => (
         <path d="M5 21h14" />
     </svg>
 );
+
+function isAccessKeyProvider(provider: string): provider is AccessKeyProvider {
+    return provider === "openai" || provider === "gemini";
+}
 
 function resolveProvider(
     provider: string | null | undefined,
@@ -81,7 +86,7 @@ export function ModelConfigPage(): React.JSX.Element {
     const [cloudChoices, setCloudChoices] = useState<Record<string, string[]>>(CLOUD_MODEL_CHOICES);
     const [modelSearchQuery, setModelSearchQuery] = useState("");
     const [statusMessage, setStatusMessage] = useState("");
-    const [openProviderMenu, setOpenProviderMenu] = useState<string | null>(null);
+    const [openProviderModal, setOpenProviderModal] = useState<AccessKeyProvider | null>(null);
 
     const cloudEnabled = settings.useCloudServices;
     const localSelectionDisabled = cloudEnabled || isSaving || isLoading;
@@ -352,7 +357,7 @@ export function ModelConfigPage(): React.JSX.Element {
                             <span className="field-label">Use Cloud Models</span>
                         </label>
 
-                        <div className={`model-config-provider-grid ${cloudEnabled ? "" : "is-disabled"}`}>
+                        <div className="model-config-provider-grid">
                             <div className="model-config-provider-list">
                                 {providerOptions.map((provider) => (
                                     <div
@@ -370,22 +375,16 @@ export function ModelConfigPage(): React.JSX.Element {
                                         <button
                                             className="model-config-provider-key"
                                             type="button"
-                                            aria-haspopup="menu"
-                                            aria-expanded={openProviderMenu === provider}
-                                            onClick={() =>
-                                                setOpenProviderMenu((current) => (
-                                                    current === provider ? null : provider
-                                                ))
-                                            }
-                                            disabled={!cloudEnabled || isSaving || isLoading}
+                                            onClick={() => {
+                                                if (isAccessKeyProvider(provider)) {
+                                                    setOpenProviderModal(provider);
+                                                }
+                                            }}
+                                            disabled={isSaving || isLoading}
+                                            aria-label={`Manage ${PROVIDER_LABELS[provider] || provider} access keys`}
                                         >
                                             <KeyIcon />
                                         </button>
-                                        {openProviderMenu === provider && (
-                                            <div className="model-config-provider-menu" role="menu">
-                                                API key management placeholder.
-                                            </div>
-                                        )}
                                     </div>
                                 ))}
                             </div>
@@ -443,6 +442,12 @@ export function ModelConfigPage(): React.JSX.Element {
             </div>
 
             {statusMessage && <p className="model-config-status-message">{statusMessage}</p>}
+            <AccessKeyModal
+                isOpen={openProviderModal !== null}
+                provider={openProviderModal ?? "openai"}
+                providerLabel={PROVIDER_LABELS[openProviderModal ?? "openai"] || (openProviderModal ?? "openai")}
+                onClose={() => setOpenProviderModal(null)}
+            />
         </main>
     );
 }

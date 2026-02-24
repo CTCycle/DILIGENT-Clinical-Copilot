@@ -8,3 +8,4 @@ from DILIGENT.server.repositories.serialization.modelconfig import (
     ModelConfigSerializer,
     ModelConfigSnapshot,
 )
+from DILIGENT.server.repositories.serialization.accesskeys import AccessKeySerializer

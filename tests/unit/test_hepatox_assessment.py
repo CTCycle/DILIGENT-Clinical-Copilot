@@ -2,9 +2,11 @@ from __future__ import annotations
 
 import asyncio
 from datetime import date
+from types import SimpleNamespace
 
 import pytest
 
+from DILIGENT.server.models.prompts import LIVERTOX_CLINICAL_USER_PROMPT
 from DILIGENT.server.entities.clinical import (
     ClinicalPipelineValidationError,
     DrugEntry,
@@ -138,3 +140,28 @@ def test_request_drug_analysis_retries_on_transient_failure() -> None:
 
     assert result == "Recovered clinical paragraph."
     assert consultation.llm_client.calls == 2
+
+
+def test_livertox_prompt_removes_per_drug_management_recommendation_directive() -> None:
+    assert "Provide monitoring or clinical management recommendations" not in LIVERTOX_CLINICAL_USER_PROMPT
+    assert "Do not provide drug-level monitoring or management recommendations" in LIVERTOX_CLINICAL_USER_PROMPT
+
+
+def test_finalize_patient_report_uses_global_synthesis_section_header() -> None:
+    consultation = HepatoxConsultation.__new__(HepatoxConsultation)
+
+    async def fake_generate_conclusion(**kwargs):  # type: ignore[no-untyped-def]
+        _ = kwargs
+        return "Integrated recommendations."
+
+    consultation.generate_conclusion = fake_generate_conclusion  # type: ignore[method-assign]
+    report = asyncio.run(
+        consultation.finalize_patient_report(
+            [SimpleNamespace(paragraph="Per-drug assessment.")],
+            clinical_context="Clinical context",
+        )
+    )
+
+    assert report is not None
+    assert "## Global Synthesis and Clinical Recommendations" in report
+    assert "## Conclusion" not in report
