@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import asyncio
 from datetime import date
 
 import pytest
@@ -7,12 +8,29 @@ import pytest
 from DILIGENT.server.entities.clinical import (
     ClinicalPipelineValidationError,
     DrugEntry,
+    DrugSuspensionContext,
     PatientData,
 )
 from DILIGENT.server.services.clinical.hepatox import (
     HepatotoxicityPatternAnalyzer,
     HepatoxConsultation,
 )
+
+
+###############################################################################
+class FlakyChatClient:
+    def __init__(self, *, fail_count: int, response: object) -> None:
+        self.fail_count = max(int(fail_count), 0)
+        self.response = response
+        self.calls = 0
+
+    # -------------------------------------------------------------------------
+    async def chat(self, **kwargs):  # type: ignore[no-untyped-def]
+        _ = kwargs
+        self.calls += 1
+        if self.calls <= self.fail_count:
+            raise RuntimeError("temporary provider failure")
+        return self.response
 
 
 def test_assess_payload_returns_determined_score_when_labs_present() -> None:
@@ -88,3 +106,35 @@ def test_format_visit_date_anchor_handles_missing_and_present_values() -> None:
         HepatoxConsultation.format_visit_date_anchor(date(2025, 4, 14))
         == "2025-04-14"
     )
+
+
+def test_request_drug_analysis_retries_on_transient_failure() -> None:
+    consultation = HepatoxConsultation.__new__(HepatoxConsultation)
+    consultation.llm_client = FlakyChatClient(
+        fail_count=1,
+        response={"content": "Recovered clinical paragraph."},
+    )
+    consultation.llm_model = "test-model"
+    consultation.chat_supports_temperature = True
+    consultation.temperature = 0.0
+    consultation.analysis_retry_attempts = 2
+
+    result = asyncio.run(
+        consultation.request_drug_analysis(
+            drug_name="Acetaminophen",
+            canonical_name="acetaminophen",
+            origins=["therapy"],
+            extraction_metadata=[],
+            livertox_status="matched",
+            excerpt="Acetaminophen can cause dose-related liver injury.",
+            rag_documents=None,
+            clinical_context="No additional context.",
+            suspension=DrugSuspensionContext(suspended=False),
+            visit_date=date(2025, 4, 14),
+            pattern_summary="Observed liver injury pattern: hepatocellular.",
+            metadata={"likelihood_score": "A"},
+        )
+    )
+
+    assert result == "Recovered clinical paragraph."
+    assert consultation.llm_client.calls == 2
