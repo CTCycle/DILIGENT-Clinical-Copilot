@@ -87,6 +87,7 @@ TABLE_DRUG_RXNORM_CODES = "drug_rxnorm_codes"
 TABLE_DRUG_ALIASES = "drug_aliases"
 TABLE_LIVERTOX_MONOGRAPHS = "livertox_monographs"
 TABLE_MODEL_SELECTIONS = "model_selections"
+TABLE_ACCESS_KEYS = "access_keys"
 
 RXNORM_CATALOG_COLUMNS = [
     "rxcui",

@@ -2,6 +2,7 @@ from __future__ import annotations
 
 from sqlalchemy import (
     Boolean,
+    CheckConstraint,
     Column,
     DateTime,
     Enum,
@@ -213,6 +214,38 @@ class ModelSelection(Base):
         Index(
             "uq_model_selections_active_role_type",
             "role_type",
+            unique=True,
+            sqlite_where=text("is_active = 1"),
+            postgresql_where=text("is_active = true"),
+        ),
+    )
+
+
+###############################################################################
+class AccessKey(Base):
+    __tablename__ = "access_keys"
+    id = Column(Integer, primary_key=True, autoincrement=True)
+    provider = Column(String, nullable=False)
+    encrypted_value = Column(Text, nullable=False)
+    fingerprint = Column(String, nullable=False)
+    is_active = Column(Boolean, nullable=False, server_default=text("false"))
+    created_at = Column(DateTime, nullable=False, server_default=text("CURRENT_TIMESTAMP"))
+    updated_at = Column(
+        DateTime,
+        nullable=False,
+        server_default=text("CURRENT_TIMESTAMP"),
+        server_onupdate=text("CURRENT_TIMESTAMP"),
+    )
+    last_used_at = Column(DateTime, nullable=True)
+    __table_args__ = (
+        CheckConstraint(
+            "provider IN ('openai', 'gemini')",
+            name="ck_access_keys_provider",
+        ),
+        Index("ix_access_keys_provider", "provider"),
+        Index(
+            "uq_access_keys_active_provider",
+            "provider",
             unique=True,
             sqlite_where=text("is_active = 1"),
             postgresql_where=text("is_active = true"),
