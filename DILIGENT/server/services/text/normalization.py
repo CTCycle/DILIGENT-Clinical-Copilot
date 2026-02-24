@@ -28,6 +28,7 @@ _FORMULATION_STOPWORDS = (
         "cp",
         "cps",
         "cpr",
+        "die",
         "dosi",
         "dose",
         "fiala",
@@ -84,6 +85,23 @@ _MANUFACTURER_SUFFIXES = (
     "biotech",
     "therapeutics",
 )
+_TRAILING_TEMPORAL_TOKENS = {
+    "da",
+    "dal",
+    "dall",
+    "dalla",
+    "dalle",
+    "dallo",
+    "dei",
+    "degli",
+    "del",
+    "della",
+    "delle",
+    "dello",
+    "di",
+    "from",
+    "since",
+}
 _KNOWN_QUERY_ALIASES = {
     "acido folico": "folic acid",
     "acido folico streuli": "folic acid",
@@ -100,6 +118,7 @@ _KNOWN_QUERY_ALIASES = {
 }
 _TOKEN_VARIANT_MAP = {
     "amlodipin": "amlodipine",
+    "morfina": "morphine",
     "morphin": "morphine",
 }
 
@@ -148,6 +167,7 @@ def canonicalize_drug_query(value: str | None) -> str:
             kept_tokens.append(token)
 
     kept_tokens = strip_manufacturer_suffix_tokens(kept_tokens)
+    kept_tokens = strip_trailing_temporal_tokens(kept_tokens)
     if not kept_tokens:
         fallback = normalize_drug_name(normalized)
         return resolve_known_query_alias(fallback)
@@ -218,6 +238,20 @@ def strip_manufacturer_suffix_tokens(tokens: list[str]) -> list[str]:
             trimmed.pop()
             continue
         if normalized in _MANUFACTURER_TOKENS or normalized.endswith(_MANUFACTURER_SUFFIXES):
+            trimmed.pop()
+            continue
+        break
+    return trimmed
+
+
+# -----------------------------------------------------------------------------
+def strip_trailing_temporal_tokens(tokens: list[str]) -> list[str]:
+    if not tokens:
+        return []
+    trimmed = list(tokens)
+    while trimmed:
+        normalized = normalize_drug_name(trimmed[-1])
+        if normalized in _TRAILING_TEMPORAL_TOKENS:
             trimmed.pop()
             continue
         break

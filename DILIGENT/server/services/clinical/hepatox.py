@@ -240,6 +240,26 @@ class HepatoxConsultation:
         self.temperature = LLMRuntimeConfig.get_ollama_temperature()
         self.similarity_search: SimilaritySearch | None = None
         self.rag_top_k = server_settings.rag.top_k_documents
+        self.max_parallel_analyses = max(
+            1,
+            int(
+                getattr(
+                    server_settings.external_data,
+                    "clinical_llm_max_concurrency",
+                    3,
+                )
+            ),
+        )
+        self.analysis_retry_attempts = max(
+            1,
+            int(
+                getattr(
+                    server_settings.external_data,
+                    "clinical_llm_retry_attempts",
+                    2,
+                )
+            ),
+        )
 
     # -------------------------------------------------------------------------
     async def run_analysis(
@@ -306,8 +326,9 @@ class HepatoxConsultation:
 
         self.emit_progress(progress_callback, stage="llm_analysis", fraction=0.0)
         if llm_jobs:
+            semaphore = asyncio.Semaphore(self.max_parallel_analyses)
             pending_tasks = [
-                asyncio.create_task(self.execute_indexed_job(idx, task))
+                asyncio.create_task(self.execute_bounded_job(idx, task, semaphore))
                 for idx, task in llm_jobs
             ]
             completed = 0
@@ -323,7 +344,14 @@ class HepatoxConsultation:
                     )
                     entry.paragraph = self.build_error_paragraph(entry)
                 else:
-                    entry.paragraph = outcome
+                    normalized_outcome = (
+                        outcome.strip() if isinstance(outcome, str) else str(outcome).strip()
+                    )
+                    entry.paragraph = (
+                        normalized_outcome
+                        if normalized_outcome
+                        else self.build_error_paragraph(entry)
+                    )
                 completed += 1
                 self.emit_progress(
                     progress_callback,
@@ -363,6 +391,16 @@ class HepatoxConsultation:
             return index, await coroutine
         except Exception as exc:  # noqa: BLE001
             return index, exc
+
+    # -------------------------------------------------------------------------
+    async def execute_bounded_job(
+        self,
+        index: int,
+        coroutine: Any,
+        semaphore: asyncio.Semaphore,
+    ) -> tuple[int, Any]:
+        async with semaphore:
+            return await self.execute_indexed_job(index, coroutine)
 
     # -------------------------------------------------------------------------
     async def prepare_drug_assessment(
@@ -882,11 +920,25 @@ class HepatoxConsultation:
             chat_kwargs["temperature"] = self.temperature
         else:
             chat_kwargs["options"] = {"temperature": self.temperature}
-        try:
-            # Ask the clinical model to synthesise findings for this drug
-            raw_response = await self.llm_client.chat(**chat_kwargs)
-        except Exception as exc:  # noqa: BLE001
-            raise RuntimeError(f"LLM analysis failed for {drug_name}: {exc}") from exc
+        for attempt in range(1, self.analysis_retry_attempts + 1):
+            try:
+                # Ask the clinical model to synthesise findings for this drug
+                raw_response = await self.llm_client.chat(**chat_kwargs)
+                break
+            except Exception as exc:  # noqa: BLE001
+                if attempt >= self.analysis_retry_attempts:
+                    raise RuntimeError(
+                        f"LLM analysis failed for {drug_name}: {exc}"
+                    ) from exc
+                delay = self.retry_backoff_seconds(attempt)
+                logger.warning(
+                    "Retrying LLM analysis for '%s' after error (attempt %d/%d): %s",
+                    drug_name,
+                    attempt,
+                    self.analysis_retry_attempts,
+                    exc,
+                )
+                await asyncio.sleep(delay)
         return self.coerce_chat_text(raw_response)
 
     # -------------------------------------------------------------------------
@@ -906,6 +958,11 @@ class HepatoxConsultation:
                     return value.strip()
             return json.dumps(raw_response, ensure_ascii=False)
         return str(raw_response).strip()
+
+    # -------------------------------------------------------------------------
+    def retry_backoff_seconds(self, attempt: int) -> float:
+        normalized_attempt = max(int(attempt), 1)
+        return min(2.0, 0.35 * normalized_attempt)
 
     # -------------------------------------------------------------------------
     async def finalize_patient_report(
@@ -986,7 +1043,16 @@ class HepatoxConsultation:
     def build_missing_excerpt_paragraph(self, entry: DrugClinicalAssessment) -> str:
         score = self.resolve_livertox_score(entry.matched_livertox_row)
         heading = self.format_drug_heading(entry.drug_name, score)
-        note = "No LiverTox excerpt was available for this drug, so its hepatotoxic potential in this patient could not be evaluated automatically."
+        if entry.matched_livertox_row:
+            note = (
+                "A LiverTox monograph was matched for this drug, but the local excerpt "
+                "text was empty in the current knowledge base snapshot."
+            )
+        else:
+            note = (
+                "No LiverTox excerpt was available for this drug, so its hepatotoxic "
+                "potential in this patient could not be evaluated automatically."
+            )
         guidance = "Consider consulting the LiverTox monograph manually or alternative references before attributing causality."
         return f"{heading}\n{note} {guidance}\nBibliography source: LiverTox"
 

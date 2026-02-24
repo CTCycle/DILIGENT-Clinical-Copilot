@@ -160,8 +160,45 @@ def test_matcher_keeps_matching_when_nbk_id_is_missing() -> None:
     assert result.nbk_id == "synthetic::diazepam"
 
 
+def test_related_excerpt_is_used_when_matched_monograph_excerpt_is_missing() -> None:
+    frame = pd.DataFrame(
+        [
+            {
+                "nbk_id": "NBK0010",
+                "drug_name": "ursodiol",
+                "excerpt": None,
+                "synonyms": "De-Ursil",
+                "ingredient": "ursodiol",
+                "brand_name": "De-Ursil",
+            },
+            {
+                "nbk_id": "NBK0011",
+                "drug_name": "Ursodiol (Ursodeoxycholic Acid)",
+                "excerpt": "Ursodiol is generally safe and is not linked to severe DILI.",
+                "synonyms": "",
+                "ingredient": "ursodiol",
+                "brand_name": "",
+            },
+        ]
+    )
+    matcher = LiverToxMatcher(frame)
+
+    matches = matcher.match_drug_names(["De-Ursil"])
+    mapping = matcher.build_drugs_to_excerpt_mapping(["De-Ursil"], matches)
+
+    entry = mapping[0]
+    assert entry["match_status"] == "matched"
+    assert entry["missing_livertox"] is False
+    assert entry["extracted_excerpts"]
+    assert "ursodiol is generally safe" in entry["extracted_excerpts"][0].lower()
+    assert "fallback_excerpt_from_related_monograph" in entry["match_notes"]
+
+
 def test_query_normalization_handles_brands_and_manufacturers() -> None:
     assert normalize_drug_query_name("Levetiracetam Desitin 500 mg cpr") == "levetiracetam"
     assert normalize_drug_query_name("Amlodipin axapharm cpr 5 mg") == "amlodipine"
     assert normalize_drug_query_name("Acido folico Streuli 5 mg cpr") == "folic acid"
     assert normalize_drug_query_name("Pantozol 20 mg cpr") == "pantoprazole"
+    assert normalize_drug_query_name("Levetiracetam dal 27.08.2024") == "levetiracetam"
+    assert normalize_drug_query_name("Nozinan dal 11.09.2024") == "levomepromazine"
+    assert normalize_drug_query_name("Morfina gtt 5 3/die") == "morphine"
