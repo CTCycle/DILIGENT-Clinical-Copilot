@@ -198,11 +198,20 @@ class LiverToxData:
                 if row_excerpt:
                     excerpt_candidates.append(row_excerpt)
             unique_excerpts = list(dict.fromkeys(excerpt_candidates))
-            missing_livertox = match_status != "matched" or not unique_excerpts
-            ambiguous_match = match_status == "ambiguous"
             notes = list(getattr(match, "notes", []) or [])
             if match_status == "matched" and not unique_excerpts:
-                notes = list(dict.fromkeys([*notes, "matched_record_missing_excerpt"]))
+                fallback_excerpt = self.find_related_excerpt(
+                    normalized_query=str(getattr(match, "normalized_query", "") or ""),
+                )
+                if fallback_excerpt:
+                    unique_excerpts.append(fallback_excerpt)
+                    notes = list(
+                        dict.fromkeys([*notes, "fallback_excerpt_from_related_monograph"])
+                    )
+                else:
+                    notes = list(dict.fromkeys([*notes, "matched_record_missing_excerpt"]))
+            missing_livertox = match_status != "matched" or not unique_excerpts
+            ambiguous_match = match_status == "ambiguous"
             entries.append(
                 {
                     "drug_name": original,
@@ -220,6 +229,53 @@ class LiverToxData:
                 }
             )
         return entries
+
+    # -------------------------------------------------------------------------
+    def find_related_excerpt(self, normalized_query: str) -> str | None:
+        query = self.lookup.normalize_name(normalized_query)
+        if not query:
+            return None
+        if self.livertox_df is None or self.livertox_df.empty:
+            return None
+        best_score: tuple[int, int] | None = None
+        best_excerpt: str | None = None
+        for row in self.livertox_df.to_dict(orient="records"):
+            drug_name = coerce_text(row.get("drug_name"))
+            if drug_name is None:
+                continue
+            excerpt = coerce_text(row.get("excerpt"))
+            if excerpt is None:
+                continue
+            normalized_name = self.lookup.normalize_name(drug_name)
+            score = self.build_related_excerpt_score(
+                normalized_query=query,
+                normalized_name=normalized_name,
+            )
+            if score is None:
+                continue
+            if best_score is None or score > best_score:
+                best_score = score
+                best_excerpt = excerpt
+        return best_excerpt
+
+    # -------------------------------------------------------------------------
+    def build_related_excerpt_score(
+        self,
+        *,
+        normalized_query: str,
+        normalized_name: str,
+    ) -> tuple[int, int] | None:
+        if not normalized_query or not normalized_name:
+            return None
+        if normalized_name == normalized_query:
+            return (3, -abs(len(normalized_name) - len(normalized_query)))
+        if normalized_name.startswith(f"{normalized_query} "):
+            return (2, -abs(len(normalized_name) - len(normalized_query)))
+        query_tokens = set(normalized_query.split())
+        name_tokens = set(normalized_name.split())
+        if query_tokens and query_tokens.issubset(name_tokens):
+            return (1, -abs(len(normalized_name) - len(normalized_query)))
+        return None
 
     # -------------------------------------------------------------------------
     def ensure_row_index(self) -> dict[str, dict[str, Any]]:
