@@ -31,7 +31,7 @@ export function ConfigModal({ isOpen, onClose, children }: ConfigModalProps): Re
             <dialog className="modal-container" aria-modal="true" aria-labelledby="modal-title" open>
                 <div className="modal-header">
                     <div className="modal-header-content">
-                        <p className="modal-title" id="modal-title">Model Configurations</p>
+                        <h2 className="modal-title" id="modal-title">Model Configurations</h2>
                         <p className="modal-subtitle">Adjust runtime preferences for DILI analysis</p>
                     </div>
                     <button

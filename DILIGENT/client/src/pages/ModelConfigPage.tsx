@@ -76,6 +76,20 @@ function resolveAvailabilityLabel(modelAvailableInOllama: boolean | undefined): 
     return modelAvailableInOllama ? "Installed" : "Not installed";
 }
 
+function resolveStatusTone(statusMessage: string): "is-error" | "is-info" | "is-success" {
+    const normalized = statusMessage.trim().toUpperCase();
+    if (!normalized) {
+        return "is-info";
+    }
+    if (normalized.startsWith("[ERROR]")) {
+        return "is-error";
+    }
+    if (normalized.startsWith("[INFO]")) {
+        return "is-info";
+    }
+    return "is-success";
+}
+
 export function ModelConfigPage(): React.JSX.Element {
     const { state, updateDiluAgent } = useAppState();
     const { settings, isPulling } = state.diluAgent;
@@ -164,6 +178,7 @@ export function ModelConfigPage(): React.JSX.Element {
     const activeProvider = resolveProvider(settings.provider, cloudChoices);
     const activeCloudModel = resolveCloudModel(activeProvider, settings.cloudModel, cloudChoices);
     const activeCloudModels = cloudChoices[activeProvider] || [];
+    const statusTone = resolveStatusTone(statusMessage);
     const selectedClinicalModel = useMemo(
         () => localModels.find((model) => model.name === settings.clinicalModel) || null,
         [localModels, settings.clinicalModel],
@@ -241,7 +256,7 @@ export function ModelConfigPage(): React.JSX.Element {
                         <div className="model-config-row-header">
                             <div className="model-config-row-header-top">
                                 <div>
-                                    <p className="modal-section-title">Local Model Catalog</p>
+                                    <h2 className="modal-section-title">Local Model Catalog</h2>
                                     <p className="helper">
                                         Select one clinical model and one text extraction model from the full catalog.
                                         {` ${availableLocalModelCount} installed in Ollama.`}
@@ -331,7 +346,7 @@ export function ModelConfigPage(): React.JSX.Element {
                     </div>
 
                     <div className={`model-config-ollama-row ${ollamaControlsDisabled ? "is-disabled" : ""}`} aria-disabled={ollamaControlsDisabled}>
-                        <p className="modal-section-title">Ollama Settings</p>
+                        <h2 className="modal-section-title">Ollama Settings</h2>
                         <label className="field checkbox">
                             <input
                                 type="checkbox"
@@ -346,7 +361,7 @@ export function ModelConfigPage(): React.JSX.Element {
 
                 <section className="model-config-right-column">
                     <div className="model-config-cloud-row">
-                        <p className="modal-section-title">Cloud Model Control</p>
+                        <h2 className="modal-section-title">Cloud Model Control</h2>
                         <label className="field checkbox">
                             <input
                                 type="checkbox"
@@ -408,7 +423,7 @@ export function ModelConfigPage(): React.JSX.Element {
                     </div>
 
                     <div className="model-config-right-footer-row">
-                        <p className="modal-section-title">Current Selection Summary</p>
+                        <h2 className="modal-section-title">Current Selection Summary</h2>
                         <table className="model-config-summary-table" aria-label="Current selection summary">
                             <tbody>
                                 <tr>
@@ -441,7 +456,15 @@ export function ModelConfigPage(): React.JSX.Element {
                 </section>
             </div>
 
-            {statusMessage && <p className="model-config-status-message">{statusMessage}</p>}
+            {statusMessage && (
+                <p
+                    className={`model-config-status-message ${statusTone}`}
+                    role={statusTone === "is-error" ? "alert" : "status"}
+                    aria-live={statusTone === "is-error" ? "assertive" : "polite"}
+                >
+                    {statusMessage}
+                </p>
+            )}
             <AccessKeyModal
                 isOpen={openProviderModal !== null}
                 provider={openProviderModal ?? "openai"}
