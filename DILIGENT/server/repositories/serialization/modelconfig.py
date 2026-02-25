@@ -7,7 +7,6 @@ from typing import Literal
 from sqlalchemy import select
 from sqlalchemy.orm import Session, sessionmaker
 
-from DILIGENT.common.utils.logger import logger
 from DILIGENT.server.repositories.queries.data import DataRepositoryQueries
 from DILIGENT.server.repositories.schemas.models import ModelSelection
 
@@ -38,7 +37,6 @@ class ModelConfigSerializer:
 
     # -------------------------------------------------------------------------
     def load_snapshot(self) -> ModelConfigSnapshot:
-        self.ensure_table()
         db_session = self.session_factory()
         try:
             rows = db_session.execute(select(ModelSelection)).scalars().all()
@@ -56,7 +54,6 @@ class ModelConfigSerializer:
         cloud_provider: str | None | object = UNSET,
         cloud_model: str | None | object = UNSET,
     ) -> ModelConfigSnapshot:
-        self.ensure_table()
         db_session = self.session_factory()
         now = datetime.now()
         try:
@@ -163,11 +160,3 @@ class ModelConfigSerializer:
             return None
         normalized = str(value).strip()
         return normalized or None
-
-    # -------------------------------------------------------------------------
-    def ensure_table(self) -> None:
-        try:
-            ModelSelection.__table__.create(bind=self.engine, checkfirst=True)
-        except Exception:
-            logger.exception("Failed to ensure model_selections table exists")
-            raise

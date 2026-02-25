@@ -70,20 +70,26 @@ export function DiluAgentPage(): React.JSX.Element {
     } = state.diluAgent;
 
     const pollerRef = useRef<{ stop: () => void } | null>(null);
+    const exportUrlRef = useRef<string | null>(null);
     const [isMissingLabsModalOpen, setIsMissingLabsModalOpen] = useState(false);
 
-    // Cleanup export URL on unmount
+    useEffect(() => {
+        exportUrlRef.current = exportUrl;
+    }, [exportUrl]);
+
+    // Cleanup resources on unmount
     useEffect(() => {
         return () => {
-            if (exportUrl) {
-                URL.revokeObjectURL(exportUrl);
-            }
             if (pollerRef.current) {
                 pollerRef.current.stop();
                 pollerRef.current = null;
             }
+            if (exportUrlRef.current) {
+                URL.revokeObjectURL(exportUrlRef.current);
+                exportUrlRef.current = null;
+            }
         };
-    }, [exportUrl]);
+    }, []);
 
     // ---------------------------------------------------------------------------
     // Handlers
@@ -91,6 +97,7 @@ export function DiluAgentPage(): React.JSX.Element {
     const resetOutputs = () => {
         if (exportUrl) {
             URL.revokeObjectURL(exportUrl);
+            exportUrlRef.current = null;
         }
         updateDiluAgent({
             message: "",
@@ -144,8 +151,10 @@ export function DiluAgentPage(): React.JSX.Element {
                         status.result && typeof status.result.progress_message === "string"
                             ? status.result.progress_message
                             : null;
+                    const resolvedProgress =
+                        typeof status.progress === "number" ? status.progress : 0;
                     updateDiluAgent({
-                        jobProgress: status.progress ?? 0,
+                        jobProgress: terminalStatus ? 100 : resolvedProgress,
                         jobStatus: status.status,
                         jobStage: stage,
                         jobStageMessage: stageMessage,
@@ -270,6 +279,7 @@ export function DiluAgentPage(): React.JSX.Element {
     const handleClear = () => {
         if (exportUrl) {
             URL.revokeObjectURL(exportUrl);
+            exportUrlRef.current = null;
         }
         updateDiluAgent({
             settings: DEFAULT_SETTINGS,
@@ -321,7 +331,7 @@ export function DiluAgentPage(): React.JSX.Element {
     // Render
     // ---------------------------------------------------------------------------
     const spinner = (
-        <div className="session-spinner">
+        <div className="session-spinner" role="status" aria-live="polite">
             <div className="spinner-wheel" />
             <p className="spinner-label">
                 {`${jobStageMessage || "Generating report"}${
@@ -405,7 +415,7 @@ export function DiluAgentPage(): React.JSX.Element {
 
                         {/* Section 2: Lab Values */}
                         <div className="clinical-section">
-                            <p className="section-title">Lab values</p>
+                            <h3 className="section-title">Lab values</h3>
                             <div className="lab-layout">
                                 <div className="lab-widget">
                                     <div className="lab-row">
@@ -536,10 +546,7 @@ export function DiluAgentPage(): React.JSX.Element {
 
                     {/* Report Output Section */}
                     <section className="report-section">
-                        <div
-                            className="report-shell"
-                            style={isExpanded ? { maxHeight: "none" } : undefined}
-                        >
+                        <div className="report-shell">
                             <div className="report-header">
                                 <p className="report-eyebrow">Session output</p>
                                 <h2>Report Output</h2>
@@ -579,10 +586,7 @@ export function DiluAgentPage(): React.JSX.Element {
                                 </button>
                             </div>
 
-                            <div
-                                className="report-content"
-                                style={isExpanded ? { maxHeight: "none" } : undefined}
-                            >
+                            <div className={`report-content ${isExpanded ? "is-expanded" : ""}`}>
                                 {reportContent}
                             </div>
                         </div>

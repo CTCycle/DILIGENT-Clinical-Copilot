@@ -31,8 +31,6 @@ class SQLiteRepository:
         self.insert_batch_size = settings.insert_batch_size
         self.insert_commit_interval = settings.insert_commit_interval
         self.select_page_size = settings.select_page_size
-        if self.db_path is not None and not os.path.exists(self.db_path):
-            Base.metadata.create_all(self.engine)
 
     # -------------------------------------------------------------------------
     @staticmethod

@@ -6,6 +6,8 @@
 :root {
   color-scheme: light;
   font-family: "Manrope", "Segoe UI", "Helvetica Neue", Arial, sans-serif;
+  --focus-ring: 2px solid var(--color-brand);
+  --focus-ring-offset: 2px;
 
   /* Colors */
   --color-brand: #16a34a;
@@ -21,6 +23,15 @@
   --color-border-subtle: rgba(206, 190, 165, 0.35);
   --color-divider: #e2e8f0;
   --color-overlay: rgba(15, 23, 42, 0.45);
+  --color-status-info-text: #1d4ed8;
+  --color-status-info-bg: rgba(219, 234, 254, 0.7);
+  --color-status-info-border: rgba(96, 165, 250, 0.5);
+  --color-status-success-text: #166534;
+  --color-status-success-bg: rgba(220, 252, 231, 0.65);
+  --color-status-success-border: rgba(74, 222, 128, 0.5);
+  --color-status-error-text: #991b1b;
+  --color-status-error-bg: rgba(254, 226, 226, 0.72);
+  --color-status-error-border: rgba(248, 113, 113, 0.55);
 
   /* Typography */
   --font-xs: 11px;
@@ -72,6 +83,7 @@ body {
   height: 100%;
   min-height: 100%;
   background: inherit;
+  line-height: 1.5;
 }
 
 html,
@@ -256,11 +268,11 @@ html,
 
 .model-config-search input {
   width: 100%;
-  min-height: 34px;
+  min-height: 40px;
   border-radius: var(--radius-sm);
   border: 1px solid rgba(148, 163, 184, 0.55);
   background: rgba(255, 255, 255, 0.82);
-  padding: 7px 10px;
+  padding: var(--space-sm) var(--space-md);
   font-size: var(--font-sm);
   color: var(--color-text-primary);
 }
@@ -293,13 +305,13 @@ html,
 .model-config-local-card {
   display: flex;
   flex-direction: column;
-  gap: 6px;
+  gap: var(--space-sm);
   min-height: 172px;
   border: 1px solid rgba(148, 163, 184, 0.35);
   border-left: 4px solid rgba(148, 163, 184, 0.45);
   border-radius: var(--radius-lg);
   background: rgba(255, 255, 255, 0.65);
-  padding: 10px 11px 9px;
+  padding: var(--space-sm) var(--space-md);
 }
 
 .model-config-local-card.is-available {
@@ -319,12 +331,12 @@ html,
 .model-config-local-card-actions {
   display: inline-flex;
   align-items: center;
-  gap: 6px;
+  gap: var(--space-sm);
 }
 
 .model-config-card-pull {
-  width: 26px;
-  height: 26px;
+  width: 36px;
+  height: 36px;
   border-radius: var(--radius-sm);
   border: 1px solid rgba(148, 163, 184, 0.5);
   background: rgba(255, 255, 255, 0.88);
@@ -457,8 +469,8 @@ html,
 }
 
 .model-config-provider-key {
-  width: 34px;
-  height: 34px;
+  width: 40px;
+  height: 40px;
   border: 1px solid var(--color-border-subtle);
   border-radius: var(--radius-sm);
   background: #fff;
@@ -500,7 +512,26 @@ html,
   border-radius: var(--radius-md);
   border: 1px solid var(--color-border-subtle);
   background: rgba(255, 255, 255, 0.6);
+  color: var(--color-text-primary);
   font-size: var(--font-sm);
+}
+
+.model-config-status-message.is-info {
+  color: var(--color-status-info-text);
+  border-color: var(--color-status-info-border);
+  background: var(--color-status-info-bg);
+}
+
+.model-config-status-message.is-success {
+  color: var(--color-status-success-text);
+  border-color: var(--color-status-success-border);
+  background: var(--color-status-success-bg);
+}
+
+.model-config-status-message.is-error {
+  color: var(--color-status-error-text);
+  border-color: var(--color-status-error-border);
+  background: var(--color-status-error-bg);
 }
 
 .model-config-summary-ok {
@@ -529,7 +560,7 @@ html,
 
 .model-config-summary-table th,
 .model-config-summary-table td {
-  padding: 7px 0;
+  padding: var(--space-sm) 0;
   text-align: left;
   line-height: 1.25;
   vertical-align: middle;
@@ -784,7 +815,7 @@ html,
 }
 
 .compact-field .field-helper {
-  font-size: 10px;
+  font-size: var(--font-xs);
 }
 
 .lab-controls-panel {
@@ -1041,6 +1072,10 @@ html,
   max-height: var(--report-max-height);
   overflow-y: auto;
   background: var(--color-surface-alt);
+}
+
+.report-content.is-expanded {
+  max-height: none;
 }
 
 .report-placeholder {
@@ -1393,13 +1428,32 @@ html,
 .btn:focus-visible,
 .toolbar-btn:focus-visible,
 .drawer-close:focus-visible,
-.drawer-toggle:focus-visible {
-  outline: 2px solid var(--color-brand);
-  outline-offset: 2px;
+.drawer-toggle:focus-visible,
+.nav-item:focus-visible,
+.model-config-card-pull:focus-visible,
+.model-config-provider-button:focus-visible,
+.model-config-provider-key:focus-visible,
+.access-key-action:focus-visible,
+.modal-close:focus-visible {
+  outline: var(--focus-ring);
+  outline-offset: var(--focus-ring-offset);
 }
 
 .toggle-switch:focus-within .toggle-track {
   box-shadow: 0 0 0 2px rgba(34, 197, 94, 0.3);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
+
+  .btn:hover:not(:disabled) {
+    transform: none;
+  }
 }
 
 .visually-hidden {
@@ -1745,12 +1799,12 @@ input[type="date"]::-webkit-calendar-picker-indicator:hover {
 .access-key-actions {
   display: inline-flex;
   align-items: center;
-  gap: 6px;
+  gap: var(--space-sm);
 }
 
 .access-key-action {
-  width: 30px;
-  height: 30px;
+  width: 36px;
+  height: 36px;
   border-radius: var(--radius-sm);
   border: 1px solid rgba(148, 163, 184, 0.5);
   background: #fff;
@@ -1779,6 +1833,12 @@ input[type="date"]::-webkit-calendar-picker-indicator:hover {
 .access-key-action:disabled {
   opacity: 0.5;
   cursor: not-allowed;
+}
+
+.access-key-action:hover:not(:disabled),
+.model-config-provider-key:hover:not(:disabled) {
+  background: rgba(241, 245, 249, 0.95);
+  border-color: rgba(100, 116, 139, 0.55);
 }
 
 @media (max-width: 768px) {

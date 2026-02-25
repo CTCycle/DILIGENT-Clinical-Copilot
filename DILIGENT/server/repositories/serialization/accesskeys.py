@@ -37,13 +37,8 @@ class AccessKeySerializer:
         )
 
     # -------------------------------------------------------------------------
-    def ensure_table(self) -> None:
-        AccessKey.__table__.create(bind=self.engine, checkfirst=True)
-
-    # -------------------------------------------------------------------------
     def list_keys(self, provider: str) -> list[AccessKey]:
         normalized_provider = self.normalize_provider(provider)
-        self.ensure_table()
         db_session = self.session_factory()
         try:
             stmt = (
@@ -65,7 +60,6 @@ class AccessKeySerializer:
             fingerprint=build_fingerprint(ciphertext),
             is_active=False,
         )
-        self.ensure_table()
         db_session = self.session_factory()
         try:
             db_session.add(row)
@@ -80,7 +74,6 @@ class AccessKeySerializer:
 
     # -------------------------------------------------------------------------
     def activate_key(self, key_id: int) -> AccessKey:
-        self.ensure_table()
         db_session = self.session_factory()
         now = datetime.now()
         try:
@@ -106,7 +99,6 @@ class AccessKeySerializer:
 
     # -------------------------------------------------------------------------
     def delete_key(self, key_id: int) -> bool:
-        self.ensure_table()
         db_session = self.session_factory()
         try:
             target = db_session.get(AccessKey, key_id)
@@ -124,7 +116,6 @@ class AccessKeySerializer:
     # -------------------------------------------------------------------------
     def get_active_key(self, provider: str, *, mark_used: bool = False) -> AccessKey | None:
         normalized_provider = self.normalize_provider(provider)
-        self.ensure_table()
         db_session = self.session_factory()
         try:
             stmt = (
