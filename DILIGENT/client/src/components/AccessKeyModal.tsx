@@ -176,7 +176,7 @@ export function AccessKeyModal({
             <dialog className="modal-container access-key-modal" aria-modal="true" aria-labelledby="access-key-modal-title" open>
                 <div className="modal-header">
                     <div className="modal-header-content">
-                        <p className="modal-title" id="access-key-modal-title">{providerLabel} Access Keys</p>
+                        <h2 className="modal-title" id="access-key-modal-title">{providerLabel} Access Keys</h2>
                         <p className="modal-subtitle">Stored encrypted at rest. Activate one key at a time for this provider.</p>
                     </div>
                     <button
@@ -191,9 +191,11 @@ export function AccessKeyModal({
 
                 <div className="modal-body">
                     <section className="modal-section">
-                        <p className="modal-section-title">Add New Key</p>
+                        <h3 className="modal-section-title">Add New Key</h3>
                         <div className="access-key-input-row">
+                            <label className="visually-hidden" htmlFor="new-access-key-input">Access key</label>
                             <input
+                                id="new-access-key-input"
                                 className="access-key-input"
                                 type="password"
                                 placeholder="Paste access key"
@@ -208,7 +210,7 @@ export function AccessKeyModal({
                     </section>
 
                     <section className="modal-section">
-                        <p className="modal-section-title">Stored Keys</p>
+                        <h3 className="modal-section-title">Stored Keys</h3>
                         {isLoading && <p className="access-key-empty">Loading keys...</p>}
                         {!isLoading && !hasKeys && <p className="access-key-empty">No keys stored for this provider.</p>}
                         {!isLoading && hasKeys && (
@@ -259,7 +261,11 @@ export function AccessKeyModal({
                         )}
                     </section>
 
-                    {!!errorMessage && <p className="model-config-status-message">[ERROR] {errorMessage}</p>}
+                    {!!errorMessage && (
+                        <p className="model-config-status-message is-error" role="alert" aria-live="assertive">
+                            [ERROR] {errorMessage}
+                        </p>
+                    )}
                 </div>
             </dialog>
         </div>

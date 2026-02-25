@@ -25,11 +25,17 @@ export function ConfirmModal({
 
     return (
         <div className="modal-overlay">
-            <dialog className="modal-container" aria-modal="true" aria-labelledby="confirm-modal-title" open>
+            <dialog
+                className="modal-container"
+                aria-modal="true"
+                aria-labelledby="confirm-modal-title"
+                aria-describedby="confirm-modal-message"
+                open
+            >
                 <div className="modal-header">
                     <div className="modal-header-content">
-                        <p className="modal-title" id="confirm-modal-title">{title}</p>
-                        <p className="modal-subtitle">{message}</p>
+                        <h2 className="modal-title" id="confirm-modal-title">{title}</h2>
+                        <p className="modal-subtitle" id="confirm-modal-message">{message}</p>
                     </div>
                 </div>
                 <div className="modal-footer">
