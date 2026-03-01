@@ -1,5 +1,7 @@
 # Project-specific generated/runtime artifacts
-DILIGENT/resources/sources/**
+DILIGENT/resources/sources/archives/**
+DILIGENT/resources/sources/documents/**
+DILIGENT/resources/sources/vectors/**
 DILIGENT/resources/runtimes/**
 DILIGENT/resources/runtimes/uv_cache/**
 DILIGENT/resources/logs/**
@@ -17,7 +19,6 @@ DILIGENT/client/*.local
 !DILIGENT/resources/templates/.env
 
 # Python
-__pycache__/
 *.py[cod]
 *.egg-info/
 .venv/
@@ -48,7 +49,7 @@ lerna-debug.log*
 Thumbs.db
 
 # Agents
-.agent/**
+.agent/skills/**
 
 # Misc
 *.lock
@@ -57,7 +58,7 @@ Thumbs.db
 *.sqlite*
 *.exe
 *.gz
-rules/
+
 
 !.gitkeep
 
