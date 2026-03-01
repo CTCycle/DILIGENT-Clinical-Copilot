@@ -29,7 +29,6 @@
     "embedding_batch_size": 64,
     "top_k_documents": 6,
     "embedding_backend": "ollama",
-    "ollama_base_url": "http://localhost:11434",
     "ollama_embedding_model": "nomic-embed-text:latest",
     "hf_embedding_model": "",
     "vector_index_metric": "cosine",
@@ -92,8 +91,7 @@
     "cloud_model": "gpt-4o-mini",
     "use_cloud_services": false,
     "ollama_temperature": 0.7,
-    "ollama_reasoning": false,
-    "ollama_host_default": "http://localhost:11434"  
+    "ollama_reasoning": false
   }
 }  
 

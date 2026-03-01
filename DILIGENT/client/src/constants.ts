@@ -7,6 +7,17 @@ const selectedBase =
   import.meta.env.DEV && absoluteBase ? devBase : apiBaseEnv || devBase;
 export const API_BASE_URL = selectedBase.replace(/\/+$/, "");
 
+const ollamaUrlEnv = (import.meta.env.VITE_OLLAMA_URL || "").trim();
+const ollamaHostEnv = (import.meta.env.VITE_OLLAMA_HOST || "localhost").trim() || "localhost";
+const parsedOllamaPort = Number.parseInt(import.meta.env.VITE_OLLAMA_PORT || "11434", 10);
+export const OLLAMA_PORT = Number.isFinite(parsedOllamaPort) && parsedOllamaPort > 0
+  ? parsedOllamaPort
+  : 11434;
+export const OLLAMA_HOST = ollamaHostEnv;
+export const OLLAMA_BASE_URL = (
+  ollamaUrlEnv || `http://${OLLAMA_HOST}:${OLLAMA_PORT}`
+).replace(/\/+$/, "");
+
 export const PARSING_MODEL_CHOICES = [
   "qwen3:1.7b",
   "qwen3:8b",

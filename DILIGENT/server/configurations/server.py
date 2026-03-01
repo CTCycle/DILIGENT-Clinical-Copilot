@@ -1,7 +1,5 @@
 from __future__ import annotations
 
-import json
-import os
 from dataclasses import dataclass
 from typing import Any, Literal
 
@@ -13,6 +11,7 @@ from DILIGENT.common.constants import (
     PARSING_MODEL_CHOICES,
     CONFIGURATIONS_FILE,
 )
+from DILIGENT.common.utils.variables import env_variables
 
 from DILIGENT.common.utils.types import (
     coerce_bool,
@@ -23,6 +22,10 @@ from DILIGENT.common.utils.types import (
     coerce_str_or_none,
     coerce_string_tuple
 )
+
+OLLAMA_DEFAULT_HOST = "localhost"
+OLLAMA_DEFAULT_PORT = 11434
+OLLAMA_DEFAULT_SCHEME = "http"
 
 
 # [LLM RUNTIME CONFIGURATION]
@@ -345,9 +348,53 @@ class ServerSettings:
 # [BUILDER FUNCTIONS]
 ###############################################################################
 def resolve_env_value(env_key: str, fallback: Any) -> Any:
-    if env_key in os.environ:
-        return os.environ.get(env_key)
+    env_value = env_variables.get(env_key)
+    if env_value is not None:
+        return env_value
     return fallback
+
+# -----------------------------------------------------------------------------
+def resolve_ollama_base_url(
+    fallback: str = f"{OLLAMA_DEFAULT_SCHEME}://{OLLAMA_DEFAULT_HOST}:{OLLAMA_DEFAULT_PORT}",
+) -> str:
+    url_value = coerce_str_or_none(resolve_env_value("OLLAMA_URL", None))
+    host_value = coerce_str_or_none(resolve_env_value("OLLAMA_HOST", None))
+    port_raw = resolve_env_value("OLLAMA_PORT", None)
+
+    if url_value:
+        return url_value.rstrip("/")
+
+    port_value: int | None = None
+    if port_raw is not None and str(port_raw).strip():
+        port_value = coerce_int(
+            port_raw,
+            OLLAMA_DEFAULT_PORT,
+            minimum=1,
+            maximum=65535,
+        )
+
+    if host_value:
+        normalized_host = host_value.strip().rstrip("/")
+        if "://" in normalized_host:
+            scheme, host_port = normalized_host.split("://", maxsplit=1)
+            if ":" in host_port:
+                host_only = host_port.split(":", maxsplit=1)[0]
+                parsed_port = host_port.split(":", maxsplit=1)[1]
+                resolved_port = (
+                    port_value
+                    if port_value is not None
+                    else coerce_int(parsed_port, OLLAMA_DEFAULT_PORT, minimum=1, maximum=65535)
+                )
+                return f"{scheme}://{host_only}:{resolved_port}"
+            resolved_port = port_value if port_value is not None else OLLAMA_DEFAULT_PORT
+            return f"{scheme}://{host_port}:{resolved_port}"
+        resolved_port = port_value if port_value is not None else OLLAMA_DEFAULT_PORT
+        return f"{OLLAMA_DEFAULT_SCHEME}://{normalized_host}:{resolved_port}"
+
+    if port_value is not None:
+        return f"{OLLAMA_DEFAULT_SCHEME}://{OLLAMA_DEFAULT_HOST}:{port_value}"
+
+    return fallback.rstrip("/")
 
 
 ###############################################################################
@@ -510,7 +557,9 @@ def build_rag_settings(
         ),
         top_k_documents=coerce_positive_int(data.get("top_k_documents"), 3),
         embedding_backend=embedding_backend,
-        ollama_base_url=coerce_str(data.get("ollama_base_url"), default_ollama_host),
+        ollama_base_url=resolve_ollama_base_url(
+            coerce_str(data.get("ollama_base_url"), default_ollama_host)
+        ),
         ollama_embedding_model=coerce_str(data.get("ollama_embedding_model"), ""),
         hf_embedding_model=coerce_str(data.get("hf_embedding_model"), ""),
         vector_index_metric=coerce_str(data.get("vector_index_metric"), "cosine"),
@@ -619,7 +668,12 @@ def build_llm_runtime_defaults(data: dict[str, Any]) -> LLMRuntimeDefaults:
         use_cloud_services=coerce_bool(data.get("use_cloud_services"), False),
         ollama_temperature=coerce_float(data.get("ollama_temperature"), 0.7),
         ollama_reasoning=coerce_bool(data.get("ollama_reasoning"), False),
-        ollama_host_default=coerce_str(data.get("ollama_host_default"), "http://localhost:11434"),
+        ollama_host_default=resolve_ollama_base_url(
+            coerce_str(
+                data.get("ollama_host_default"),
+                f"{OLLAMA_DEFAULT_SCHEME}://{OLLAMA_DEFAULT_HOST}:{OLLAMA_DEFAULT_PORT}",
+            )
+        ),
     )
 
 # -----------------------------------------------------------------------------
@@ -635,10 +689,17 @@ def build_server_settings(data: dict[str, Any] | Any) -> ServerSettings:
     llm_defaults_payload = ensure_mapping(
         payload.get("llm_defaults") or payload.get("llm_runtime_defaults")
     )
+    fallback_ollama_host = coerce_str(
+        rag_payload.get("ollama_base_url"),
+        coerce_str(
+            llm_defaults_payload.get("ollama_host_default"),
+            f"{OLLAMA_DEFAULT_SCHEME}://{OLLAMA_DEFAULT_HOST}:{OLLAMA_DEFAULT_PORT}",
+        ),
+    )
+    default_ollama_host = resolve_ollama_base_url(fallback_ollama_host)
     llm_defaults = build_llm_runtime_defaults(llm_defaults_payload)
     default_provider = llm_defaults.llm_provider
     default_cloud_model = llm_defaults.cloud_model
-    default_ollama_host = coerce_str(payload.get("ollama_base_url"), "http://localhost:11434")    
 
     rag_settings = build_rag_settings(
         rag_payload,
