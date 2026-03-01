@@ -97,7 +97,12 @@ if /i not "%confirm%"=="YES" (
   pause
   goto :setup_menu
 )
-echo [INFO] Preserving committed lockfile "%root_folder%uv.lock".
+if exist "%uv_lock%" (
+  del /q "%uv_lock%"
+  echo [INFO] Removed "%uv_lock%".
+) else (
+  echo [INFO] No uv.lock file found to remove.
+)
 if exist "%uv_dir%" (
   rd /s /q "%uv_dir%"
   echo [INFO] Removed uv directory "%uv_dir%".
@@ -140,7 +145,12 @@ if exist "%client_dir%\dist" (
 ) else (
   echo [INFO] No frontend build directory found to remove.
 )
-echo [INFO] Preserving committed lockfile "%client_dir%\package-lock.json".
+if exist "%client_dir%\package-lock.json" (
+  del /q "%client_dir%\package-lock.json"
+  echo [INFO] Removed frontend package-lock.json at "%client_dir%\package-lock.json".
+) else (
+  echo [INFO] No frontend package-lock.json found to remove.
+)
 if not exist "%runtimes_dir%" md "%runtimes_dir%" >nul 2>&1
 if exist "%runtimes_dir%" (
   for /f "delims=" %%F in ('dir /b "%runtimes_dir%"') do (

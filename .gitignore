@@ -10,14 +10,6 @@ DILIGENT/client/dist/
 DILIGENT/client/dist-ssr/
 DILIGENT/client/logs/
 
-# Environment files (keep templates)
-DILIGENT/settings/.env
-DILIGENT/client/.env
-DILIGENT/client/*.local
-!.env.example
-!.env.sample
-!DILIGENT/resources/templates/.env
-
 # Python
 *.py[cod]
 *.egg-info/
