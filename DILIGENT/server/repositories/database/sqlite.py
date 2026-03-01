@@ -22,11 +22,18 @@ from DILIGENT.common.utils.logger import logger
 class SQLiteRepository:
     def __init__(self, settings: DatabaseSettings) -> None:
         self.db_path: str | None = os.path.join(RESOURCES_PATH, DATABASE_FILENAME)
+        should_initialize_schema = bool(self.db_path and not os.path.exists(self.db_path))
         os.makedirs(os.path.dirname(self.db_path), exist_ok=True)
         self.engine: Engine = sqlalchemy.create_engine(
             f"sqlite:///{self.db_path}", echo=False, future=True
         )
         event.listen(self.engine, "connect", self._enable_foreign_keys)
+        if should_initialize_schema:
+            Base.metadata.create_all(self.engine)
+            logger.info(
+                "SQLite DB file was missing; created and initialized schema at %s",
+                self.db_path,
+            )
         self.session_factory = sessionmaker(bind=self.engine, future=True)
         self.insert_batch_size = settings.insert_batch_size
         self.insert_commit_interval = settings.insert_commit_interval
