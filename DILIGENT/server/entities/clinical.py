@@ -2,11 +2,17 @@ from __future__ import annotations
 
 from collections.abc import Mapping
 from datetime import date, datetime
+import math
+import re
 from typing import Any, Literal
 
-from pydantic import BaseModel, Field, field_validator, model_validator
+from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
 
 Comparator = Literal["<=", "<", ">=", ">"]
+CONTROL_CHARACTERS_RE = re.compile(r"[\x00-\x08\x0B\x0C\x0E-\x1F\x7F]")
+SAFE_PROVIDER_RE = re.compile(r"^[a-z][a-z0-9-]{1,31}$")
+SAFE_MODEL_NAME_RE = re.compile(r"^[A-Za-z0-9][A-Za-z0-9._:/+\-]{0,199}$")
+MAX_LAB_TEXT_LENGTH = 100
 
 
 ###############################################################################
@@ -17,6 +23,7 @@ class PatientData(BaseModel):
     - Normalizes whitespace and keeps compat with legacy single-text payloads.
 
     """
+    model_config = ConfigDict(extra="forbid")
 
     name: str | None = Field(
         None,
@@ -42,21 +49,25 @@ class PatientData(BaseModel):
     )
     alt: str | None = Field(
         None,
+        max_length=MAX_LAB_TEXT_LENGTH,
         description="ALT laboratory value.",
         examples=["189", "189 U/L"],
     )
     alt_max: str | None = Field(
         None,
+        max_length=MAX_LAB_TEXT_LENGTH,
         description="Reference maximum for ALT.",
         examples=["47", "47 U/L"],
     )
     alp: str | None = Field(
         None,
+        max_length=MAX_LAB_TEXT_LENGTH,
         description="ALP laboratory value.",
         examples=["140", "140 U/L"],
     )
     alp_max: str | None = Field(
         None,
+        max_length=MAX_LAB_TEXT_LENGTH,
         description="Reference maximum for ALP.",
         examples=["150", "150 U/L"],
     )
@@ -82,7 +93,8 @@ class PatientData(BaseModel):
     def _strip_optional_text(value: Any) -> str | None:
         if value is None:
             return None
-        stripped = str(value).strip()
+        without_controls = CONTROL_CHARACTERS_RE.sub(" ", str(value))
+        stripped = without_controls.strip()
         return stripped or None
 
     # -------------------------------------------------------------------------
@@ -250,24 +262,83 @@ class PatientData(BaseModel):
 
 ###############################################################################
 class ClinicalSessionRequest(BaseModel):
-    name: str | None = None
+    model_config = ConfigDict(extra="forbid")
+
+    name: str | None = Field(default=None, max_length=200)
     visit_date: date | dict[str, int] | str | None = None
-    anamnesis: str | None = None
+    anamnesis: str | None = Field(default=None, max_length=20000)
     has_hepatic_diseases: bool = False
     use_rag: bool = False
-    drugs: str | None = None
-    alt: str | None = None
-    alt_max: str | None = None
-    alp: str | None = None
-    alp_max: str | None = None
+    drugs: str | None = Field(default=None, max_length=20000)
+    alt: str | None = Field(default=None, max_length=MAX_LAB_TEXT_LENGTH)
+    alt_max: str | None = Field(default=None, max_length=MAX_LAB_TEXT_LENGTH)
+    alp: str | None = Field(default=None, max_length=MAX_LAB_TEXT_LENGTH)
+    alp_max: str | None = Field(default=None, max_length=MAX_LAB_TEXT_LENGTH)
     allow_missing_labs: bool | None = None
     use_cloud_services: bool | None = None
-    llm_provider: str | None = None
-    cloud_model: str | None = None
-    parsing_model: str | None = None
-    clinical_model: str | None = None
+    llm_provider: str | None = Field(default=None, max_length=32)
+    cloud_model: str | None = Field(default=None, max_length=200)
+    parsing_model: str | None = Field(default=None, max_length=200)
+    clinical_model: str | None = Field(default=None, max_length=200)
     ollama_temperature: float | None = None
     ollama_reasoning: bool | None = None
+
+    # -------------------------------------------------------------------------
+    @field_validator(
+        "name",
+        "anamnesis",
+        "drugs",
+        "alt",
+        "alt_max",
+        "alp",
+        "alp_max",
+        "llm_provider",
+        "cloud_model",
+        "parsing_model",
+        "clinical_model",
+        mode="before",
+    )
+    @classmethod
+    def strip_text_fields(cls, value: Any) -> str | None:
+        if value is None:
+            return None
+        without_controls = CONTROL_CHARACTERS_RE.sub(" ", str(value))
+        stripped = without_controls.strip()
+        return stripped or None
+
+    # -------------------------------------------------------------------------
+    @field_validator("llm_provider")
+    @classmethod
+    def validate_provider_name(cls, value: str | None) -> str | None:
+        if value is None:
+            return None
+        normalized = value.strip().lower()
+        if not SAFE_PROVIDER_RE.fullmatch(normalized):
+            raise ValueError("Invalid provider value")
+        return normalized
+
+    # -------------------------------------------------------------------------
+    @field_validator("cloud_model", "parsing_model", "clinical_model")
+    @classmethod
+    def validate_model_name(cls, value: str | None) -> str | None:
+        if value is None:
+            return None
+        normalized = value.strip()
+        if not normalized:
+            return None
+        if not SAFE_MODEL_NAME_RE.fullmatch(normalized):
+            raise ValueError("Invalid model name")
+        return normalized
+
+    # -------------------------------------------------------------------------
+    @field_validator("ollama_temperature")
+    @classmethod
+    def validate_ollama_temperature(cls, value: float | None) -> float | None:
+        if value is None:
+            return None
+        if not math.isfinite(value):
+            raise ValueError("ollama_temperature must be finite")
+        return round(max(0.0, min(2.0, float(value))), 2)
 
 
 ###############################################################################

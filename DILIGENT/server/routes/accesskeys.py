@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from typing import Literal
 
-from fastapi import APIRouter, Body, HTTPException, Query, status
+from fastapi import APIRouter, Body, HTTPException, Path, Query, status
 
 from DILIGENT.server.entities.accesskeys import (
     AccessKeyCreateRequest,
@@ -67,7 +67,9 @@ def create_access_key(
     response_model=AccessKeyResponse,
     status_code=status.HTTP_200_OK,
 )
-def activate_access_key(key_id: int) -> AccessKeyResponse:
+def activate_access_key(
+    key_id: int = Path(..., ge=1),
+) -> AccessKeyResponse:
     try:
         row = serializer.activate_key(key_id)
     except ValueError as exc:
@@ -84,7 +86,9 @@ def activate_access_key(key_id: int) -> AccessKeyResponse:
     response_model=AccessKeyDeleteResponse,
     status_code=status.HTTP_200_OK,
 )
-def delete_access_key(key_id: int) -> AccessKeyDeleteResponse:
+def delete_access_key(
+    key_id: int = Path(..., ge=1),
+) -> AccessKeyDeleteResponse:
     deleted = serializer.delete_key(key_id)
     if not deleted:
         raise HTTPException(
