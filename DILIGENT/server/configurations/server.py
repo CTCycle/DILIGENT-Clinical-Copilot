@@ -26,6 +26,9 @@ from DILIGENT.common.utils.types import (
 OLLAMA_DEFAULT_HOST = "localhost"
 OLLAMA_DEFAULT_PORT = 11434
 OLLAMA_DEFAULT_SCHEME = "http"
+FASTAPI_TITLE = "DILIGENT Clinical Copilot Backend"
+FASTAPI_VERSION = "1.0.0"
+FASTAPI_DESCRIPTION = "FastAPI backend"
 
 
 # [LLM RUNTIME CONFIGURATION]
@@ -398,12 +401,11 @@ def resolve_ollama_base_url(
 
 
 ###############################################################################
-def build_fastapi_settings(data: dict[str, Any]) -> FastAPISettings:
-    payload = ensure_mapping(data)
+def build_fastapi_settings() -> FastAPISettings:
     return FastAPISettings(
-        title=coerce_str(payload.get("title"), "DILIGENT Geospatial Search Backend"),
-        version=coerce_str(payload.get("version"), "0.1.0"),
-        description=coerce_str(payload.get("description"), "FastAPI backend"),        
+        title=FASTAPI_TITLE,
+        version=FASTAPI_VERSION,
+        description=FASTAPI_DESCRIPTION,
     )
 
 # -----------------------------------------------------------------------------
@@ -677,7 +679,6 @@ def build_llm_runtime_defaults(data: dict[str, Any]) -> LLMRuntimeDefaults:
 # -----------------------------------------------------------------------------
 def build_server_settings(data: dict[str, Any] | Any) -> ServerSettings:
     payload = ensure_mapping(data)
-    fastapi_payload = ensure_mapping(payload.get("fastapi"))
     jobs_payload = ensure_mapping(payload.get("jobs"))
     database_payload = ensure_mapping(payload.get("database"))
     drugs_matcher_payload = ensure_mapping(payload.get("drugs_matcher"))
@@ -712,7 +713,7 @@ def build_server_settings(data: dict[str, Any] | Any) -> ServerSettings:
     )
 
     return ServerSettings(
-        fastapi=build_fastapi_settings(fastapi_payload),
+        fastapi=build_fastapi_settings(),
         jobs=build_jobs_settings(jobs_payload),
         database=build_database_settings(database_payload),
         drugs_matcher=build_drugs_matcher_settings(drugs_matcher_payload),

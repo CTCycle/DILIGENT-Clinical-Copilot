@@ -86,6 +86,7 @@ Detailed behavior is documented in [BACKGROUND_JOBS.md](./BACKGROUND_JOBS.md).
 Operational scripts under `DILIGENT/scripts/`:
 - `initialize_database.py`: initializes SQL schema for active DB mode.
 - `update_drugs_catalog.py`: refreshes RxNav-derived drug catalog.
+  - `RxNavDrugCatalogBuilder` prefetches missing RxNav alias/synonym queries per DB batch with async concurrency bounded by `external_data.rxnav_max_concurrency`.
 - `update_livertox_data.py`: ingests/refreshes LiverTox data.
 - `update_RAG.py`: re-embeds documents and refreshes vector index.
 
