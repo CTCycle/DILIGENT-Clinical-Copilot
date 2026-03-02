@@ -14,6 +14,7 @@ from DILIGENT.server.configurations import DatabaseSettings
 from DILIGENT.server.repositories.database.utils import (
     MISSING_TABLE_MESSAGE,
     normalize_postgres_engine,
+    validate_sql_identifier,
 )
 from DILIGENT.server.repositories.schemas.models import Base
 from DILIGENT.common.utils.logger import logger
@@ -65,6 +66,12 @@ class PostgresRepository:
         raise ValueError(f"No table class found for name {table_name}")
 
     # -------------------------------------------------------------------------
+    def sanitize_table_name(self, table_name: str) -> str:
+        normalized_name = validate_sql_identifier(table_name, label="table name")
+        self.get_table_class(normalized_name)
+        return normalized_name
+
+    # -------------------------------------------------------------------------
     def upsert_dataframe(self, df: pd.DataFrame, table_cls) -> None:
         table = table_cls.__table__
         session = self.session_factory()
@@ -106,48 +113,53 @@ class PostgresRepository:
 
     # -------------------------------------------------------------------------
     def load_from_database(self, table_name: str) -> pd.DataFrame:
+        safe_table_name = self.sanitize_table_name(table_name)
         with self.engine.connect() as conn:
             inspector = inspect(conn)
-            if not inspector.has_table(table_name):
-                logger.warning(MISSING_TABLE_MESSAGE, table_name)
+            if not inspector.has_table(safe_table_name):
+                logger.warning(MISSING_TABLE_MESSAGE, safe_table_name)
                 return pd.DataFrame()
-            data = pd.read_sql_table(table_name, conn)
+            data = pd.read_sql_table(safe_table_name, conn)
         return data
 
     # -------------------------------------------------------------------------
     def save_into_database(self, df: pd.DataFrame, table_name: str) -> None:
+        safe_table_name = self.sanitize_table_name(table_name)
         with self.engine.begin() as conn:
             inspector = inspect(conn)
-            if inspector.has_table(table_name):
-                conn.execute(sqlalchemy.text(f'DELETE FROM "{table_name}"'))
-            df.to_sql(table_name, conn, if_exists="append", index=False)
+            if inspector.has_table(safe_table_name):
+                conn.execute(sqlalchemy.text(f'DELETE FROM "{safe_table_name}"'))
+            df.to_sql(safe_table_name, conn, if_exists="append", index=False)
 
     # -------------------------------------------------------------------------
     def upsert_into_database(self, df: pd.DataFrame, table_name: str) -> None:
-        table_cls = self.get_table_class(table_name)
+        safe_table_name = self.sanitize_table_name(table_name)
+        table_cls = self.get_table_class(safe_table_name)
         self.upsert_dataframe(df, table_cls)
 
     # -------------------------------------------------------------------------
     def count_rows(self, table_name: str) -> int:
+        safe_table_name = self.sanitize_table_name(table_name)
         with self.engine.connect() as conn:
             result = conn.execute(
-                sqlalchemy.text(f'SELECT COUNT(*) FROM "{table_name}"')
+                sqlalchemy.text(f'SELECT COUNT(*) FROM "{safe_table_name}"')
             )
             value = result.scalar() or 0
         return int(value)
 
     # -------------------------------------------------------------------------
     def stream_rows(self, table_name: str, page_size: int) -> Iterator[pd.DataFrame]:
+        safe_table_name = self.sanitize_table_name(table_name)
         chunk_size = page_size if page_size > 0 else self.select_page_size
         if chunk_size <= 0:
-            yield self.load_from_database(table_name)
+            yield self.load_from_database(safe_table_name)
             return
         with self.engine.connect() as conn:
             inspector = inspect(conn)
-            if not inspector.has_table(table_name):
-                logger.warning(MISSING_TABLE_MESSAGE, table_name)
+            if not inspector.has_table(safe_table_name):
+                logger.warning(MISSING_TABLE_MESSAGE, safe_table_name)
                 return
-            query = sqlalchemy.text(f'SELECT * FROM "{table_name}"')
+            query = sqlalchemy.text(f'SELECT * FROM "{safe_table_name}"')
             for chunk in pd.read_sql_query(query, conn, chunksize=chunk_size):
                 yield chunk
 
@@ -155,16 +167,19 @@ class PostgresRepository:
     def load_paginated(
         self, table_name: str, offset: int, limit: int
     ) -> pd.DataFrame:
+        safe_table_name = self.sanitize_table_name(table_name)
+        safe_offset = max(int(offset), 0)
+        safe_limit = max(int(limit), 1)
         with self.engine.connect() as conn:
             inspector = inspect(conn)
-            if not inspector.has_table(table_name):
-                logger.warning(MISSING_TABLE_MESSAGE, table_name)
+            if not inspector.has_table(safe_table_name):
+                logger.warning(MISSING_TABLE_MESSAGE, safe_table_name)
                 return pd.DataFrame()
             query = sqlalchemy.text(
-                f'SELECT * FROM "{table_name}" LIMIT :limit OFFSET :offset'
+                f'SELECT * FROM "{safe_table_name}" LIMIT :limit OFFSET :offset'
             )
             data = pd.read_sql_query(
-                query, conn, params={"limit": limit, "offset": offset}
+                query, conn, params={"limit": safe_limit, "offset": safe_offset}
             )
         return data
 

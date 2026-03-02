@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import asyncio
+import re
 from typing import Any
 
 from fastapi import APIRouter, HTTPException, Query, status
@@ -17,6 +18,23 @@ from DILIGENT.server.services.jobs import job_manager
 from DILIGENT.common.utils.logger import logger
 
 router = APIRouter(prefix="/models", tags=["models"])
+SAFE_OLLAMA_MODEL_RE = re.compile(r"^[A-Za-z0-9][A-Za-z0-9._:/+\-]{0,199}$")
+
+
+###############################################################################
+def sanitize_model_name(name: str) -> str:
+    normalized = str(name or "").strip()
+    if not normalized:
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+            detail="Model name must not be empty.",
+        )
+    if not SAFE_OLLAMA_MODEL_RE.fullmatch(normalized):
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+            detail="Invalid model name.",
+        )
+    return normalized
 
 
 ###############################################################################
@@ -50,6 +68,8 @@ class OllamaEndpoint:
         self,
         name: str = Query(
             ...,
+            min_length=1,
+            max_length=200,
             description="Exact Ollama model name, e.g. 'llama3.1:8b'",
         ),
         stream: bool = Query(
@@ -57,15 +77,16 @@ class OllamaEndpoint:
             description="If True, stream pull from Ollama. Endpoint returns only final status (no SSE).",
         ),
     ) -> ModelPullResponse:
+        model_name = sanitize_model_name(name)
         try:
             async with OllamaClient() as client:
                 local = set(await client.list_models())
-                already = name in local
+                already = model_name in local
                 if not already:
-                    logger.info(f"Downloading model {name} from Ollama library")
-                    await client.pull(name, stream=stream)
+                    logger.info(f"Downloading model {model_name} from Ollama library")
+                    await client.pull(model_name, stream=stream)
                 return ModelPullResponse(
-                    status="success", pulled=(not already), model=name
+                    status="success", pulled=(not already), model=model_name
                 )
         except Exception as exc:
             if isinstance(exc, OllamaTimeout):
@@ -81,6 +102,8 @@ class OllamaEndpoint:
         self,
         name: str = Query(
             ...,
+            min_length=1,
+            max_length=200,
             description="Exact Ollama model name, e.g. 'llama3.1:8b'",
         ),
         stream: bool = Query(
@@ -88,6 +111,7 @@ class OllamaEndpoint:
             description="If True, stream pull from Ollama. Job returns only final status.",
         ),
     ) -> JobStartResponse:
+        model_name = sanitize_model_name(name)
         if job_manager.is_job_running(self.JOB_TYPE):
             raise HTTPException(
                 status_code=status.HTTP_409_CONFLICT,
@@ -98,7 +122,7 @@ class OllamaEndpoint:
             job_type=self.JOB_TYPE,
             runner=run_model_pull_job,
             kwargs={
-                "name": name,
+                "name": model_name,
                 "stream": stream,
             },
         )

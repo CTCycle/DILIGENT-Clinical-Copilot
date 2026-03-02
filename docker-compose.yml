@@ -9,7 +9,7 @@ services:
       FASTAPI_HOST: 0.0.0.0
       FASTAPI_PORT: 8000
     ports:
-      - "${FASTAPI_PORT:-8000}:8000"
+      - "127.0.0.1:${FASTAPI_PORT:-8000}:8000"
     volumes:
       - diligent_resources:/app/DILIGENT/resources
     healthcheck:

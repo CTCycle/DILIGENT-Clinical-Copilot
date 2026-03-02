@@ -58,9 +58,10 @@ Local mode does not require Docker.
    - `docker compose --env-file DILIGENT/settings/.env down`
 
 Cloud topology:
-- `backend`: FastAPI/Uvicorn on internal `:8000`, host-mapped from `${FASTAPI_PORT}`.
+- `backend`: FastAPI/Uvicorn on internal `:8000`, host-mapped to loopback only (`127.0.0.1:${FASTAPI_PORT}`) to avoid direct public exposure.
 - `frontend`: Nginx static hosting on internal `:80`, host-mapped from `${UI_PORT}`.
 - Frontend `/api` is reverse-proxied to `http://backend:8000/`.
+- Nginx proxies only the application API surface used by the frontend and blocks `/api/docs`, `/api/redoc`, and `/api/openapi.json` in cloud mode.
 - `diligent_resources` Docker volume persists runtime data under `/app/DILIGENT/resources`.
 
 ## 6. Deterministic Build Notes
