@@ -1,9 +1,4 @@
 {  
-  "fastapi": {
-    "title": "DILIGENT Clinical Copilot Backend",
-    "version": "1.0.0",
-    "description": "FastAPI backend"      
-  },   
   "jobs": {
     "polling_interval": 1
   },
@@ -54,7 +49,7 @@
     "livertox_monograph_max_workers": 4,
     "max_excerpt_length": 8000,
     "rxnav_request_timeout": 12.0,
-    "rxnav_max_concurrency": 16
+    "rxnav_max_concurrency": 10
   },
   "ingestion": {
     "drug_name_min_length": 3,
