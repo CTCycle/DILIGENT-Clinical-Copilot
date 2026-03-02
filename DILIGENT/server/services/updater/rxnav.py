@@ -754,23 +754,129 @@ class RxNavDrugCatalogBuilder:
     # -------------------------------------------------------------------------
     def persist_catalog(self, chunks: Iterator[bytes]) -> dict[str, Any]:
         count = 0
-        batch: list[dict[str, Any]] = []
+        concepts_batch: list[dict[str, Any]] = []
         for concept in self.stream_min_concepts(chunks):
-            payload = self.sanitize_concept(concept)
-            if payload is None:
-                continue
-            batch.append(payload)
-            if len(batch) >= self.BATCH_SIZE:
-                self.persist_batch(batch)
-                count += len(batch)
-                batch.clear()
+            concepts_batch.append(concept)
+            if len(concepts_batch) >= self.BATCH_SIZE:
+                persisted = self.persist_concept_batch(concepts_batch)
+                count += persisted
+                concepts_batch.clear()
                 logger.info('Total records upserted into database: %d', count)
-        if batch:
-            self.persist_batch(batch)
-            count += len(batch)
+        if concepts_batch:
+            persisted = self.persist_concept_batch(concepts_batch)
+            count += persisted
             logger.info('Total records upserted into database: %d', count)
             
         return {"table_name": self.TABLE_NAME, "count": count}
+
+    # -------------------------------------------------------------------------
+    def persist_concept_batch(self, concepts: list[dict[str, Any]]) -> int:
+        if not concepts:
+            return 0
+        self.prefetch_concept_queries(concepts)
+        payload_batch: list[dict[str, Any]] = []
+        for concept in concepts:
+            payload = self.sanitize_concept(concept)
+            if payload is None:
+                continue
+            payload_batch.append(payload)
+        if not payload_batch:
+            return 0
+        self.persist_batch(payload_batch)
+        return len(payload_batch)
+
+    # -------------------------------------------------------------------------
+    def prefetch_concept_queries(self, concepts: list[dict[str, Any]]) -> None:
+        pending_alias_queries: dict[str, str] = {}
+        pending_synonym_identifiers: dict[str, str] = {}
+        for concept in concepts:
+            if not isinstance(concept, dict):
+                continue
+            full_name = concept.get("fullName")
+            if isinstance(full_name, str):
+                stripped_full_name = full_name.strip()
+                if stripped_full_name:
+                    full_name_key = stripped_full_name.casefold()
+                    if full_name_key not in self.alias_cache:
+                        pending_alias_queries[full_name_key] = stripped_full_name
+                    sanitized_name = self.sanitize_name(stripped_full_name)
+                    if sanitized_name:
+                        sanitized_key = sanitized_name.casefold()
+                        if sanitized_key not in self.alias_cache:
+                            pending_alias_queries[sanitized_key] = sanitized_name
+            rxcui = concept.get("rxcui")
+            rxcui_identifier = str(rxcui).strip()
+            if rxcui_identifier and rxcui_identifier not in self.rxcui_cache:
+                pending_synonym_identifiers[rxcui_identifier] = rxcui_identifier
+        if not pending_alias_queries and not pending_synonym_identifiers:
+            return
+        alias_results, synonym_results = self.fetch_bulk_pending_queries(
+            pending_alias_queries,
+            pending_synonym_identifiers,
+        )
+        self.alias_cache.update(alias_results)
+        self.rxcui_cache.update(synonym_results)
+
+    # -------------------------------------------------------------------------
+    def fetch_bulk_pending_queries(
+        self,
+        pending_alias_queries: dict[str, str],
+        pending_synonym_identifiers: dict[str, str],
+    ) -> tuple[dict[str, list[str]], dict[str, list[str]]]:
+        if not pending_alias_queries and not pending_synonym_identifiers:
+            return {}, {}
+        return asyncio.run(
+            self.fetch_bulk_pending_queries_async(
+                pending_alias_queries,
+                pending_synonym_identifiers,
+            )
+        )
+
+    # -------------------------------------------------------------------------
+    async def fetch_bulk_pending_queries_async(
+        self,
+        pending_alias_queries: dict[str, str],
+        pending_synonym_identifiers: dict[str, str],
+    ) -> tuple[dict[str, list[str]], dict[str, list[str]]]:
+        alias_results: dict[str, list[str]] = {}
+        synonym_results: dict[str, list[str]] = {}
+        async with httpx.AsyncClient(
+            timeout=self.rx_client.timeout,
+            limits=self.rx_client._build_limits(),
+        ) as client:
+            alias_tasks = {
+                cache_key: asyncio.create_task(
+                    self.rx_client.fetch_drug_terms_async(query, client=client)
+                )
+                for cache_key, query in pending_alias_queries.items()
+            }
+            synonym_tasks = {
+                identifier: asyncio.create_task(
+                    self.rx_client.fetch_rxcui_synonyms_async(identifier, client=client)
+                )
+                for identifier in pending_synonym_identifiers
+            }
+            for cache_key, task in alias_tasks.items():
+                try:
+                    alias_results[cache_key] = await task
+                except Exception as exc:  # noqa: BLE001
+                    logger.warning(
+                        "Failed to prefetch RxNav aliases for '%s': %s",
+                        pending_alias_queries.get(cache_key),
+                        exc,
+                    )
+                    alias_results[cache_key] = []
+            for identifier, task in synonym_tasks.items():
+                try:
+                    synonym_results[identifier] = await task
+                except Exception as exc:  # noqa: BLE001
+                    logger.warning(
+                        "Failed to prefetch RxNav synonyms for '%s': %s",
+                        identifier,
+                        exc,
+                    )
+                    synonym_results[identifier] = []
+        return alias_results, synonym_results
 
     # -------------------------------------------------------------------------
     def persist_batch(self, batch: list[dict[str, Any]]) -> None:
