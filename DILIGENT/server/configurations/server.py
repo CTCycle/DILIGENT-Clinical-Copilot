@@ -468,9 +468,7 @@ def build_database_settings(payload: dict[str, Any] | Any) -> DatabaseSettings:
         username=coerce_str_or_none(
             resolve_env_value("DB_USER", payload.get("username"))
         ),
-        password=coerce_str_or_none(
-            resolve_env_value("DB_PASSWORD", payload.get("password"))
-        ),
+        password=coerce_str_or_none(env_variables.get("DB_PASSWORD")),
         ssl=coerce_bool(resolve_env_value("DB_SSL", payload.get("ssl", False)), False),
         ssl_ca=coerce_str_or_none(
             resolve_env_value("DB_SSL_CA", payload.get("ssl_ca"))

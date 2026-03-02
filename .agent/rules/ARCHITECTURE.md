@@ -21,6 +21,7 @@ DILIGENT Clinical Copilot is a local-first web application for Drug-Induced Live
 - Backend: Uvicorn/FastAPI (`DILIGENT.server.app:app`) on `FASTAPI_HOST:FASTAPI_PORT` (default `127.0.0.1:8000`).
 - Frontend: Vite preview server locally on `UI_HOST:UI_PORT` (default `127.0.0.1:7861`) and Nginx in Docker.
 - API path contract: frontend calls `/api/*`, then proxy rewrites to backend root endpoints.
+- Cloud hardening: Docker backend host publishing is loopback-only and Nginx acts as the required API gateway for browser clients.
 - Root behavior: backend `/` redirects to `/docs` (OpenAPI UI).
 
 ---
