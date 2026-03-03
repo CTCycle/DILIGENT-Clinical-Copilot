@@ -12,6 +12,7 @@ import {
     pollClinicalJobStatus,
     startClinicalJob,
 } from "../services/api";
+import { JobStatus } from "../types";
 import {
     buildClinicalPayload,
     createDownloadUrl,
@@ -47,7 +48,7 @@ const DownloadIcon = () => (
     </svg>
 );
 
-function isTerminalJobStatus(status: string | null): boolean {
+function isTerminalJobStatus(status: JobStatus | null): boolean {
     return status === "completed" || status === "failed" || status === "cancelled";
 }
 
