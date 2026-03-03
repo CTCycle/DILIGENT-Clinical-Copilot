@@ -1,10 +1,10 @@
 import React, { createContext, useContext, useState, useCallback, useMemo, useEffect } from "react";
 import {
-    CLOUD_MODEL_CHOICES,
     DEFAULT_FORM_STATE,
     DEFAULT_SETTINGS,
 } from "../constants";
-import { ClinicalFormState, RuntimeSettings } from "../types";
+import { buildRuntimeSettingsFromConfig } from "../modelConfig";
+import { ClinicalFormState, JobStatus, RuntimeSettings } from "../types";
 import { fetchModelConfigState } from "../services/api";
 
 // ---------------------------------------------------------------------------
@@ -47,7 +47,7 @@ export interface DiluAgentState {
     exportUrl: string | null;
     jobId: string | null;
     jobProgress: number;
-    jobStatus: string | null;
+    jobStatus: JobStatus | null;
     jobStage: string | null;
     jobStageMessage: string | null;
     isRunning: boolean;
@@ -121,25 +121,11 @@ export function AppStateProvider({ children }: AppStateProviderProps): React.JSX
                 if (cancelled) {
                     return;
                 }
-                const providerRaw = (payload.llm_provider || "").trim().toLowerCase();
-                const cloudChoices = payload.cloud_model_choices || CLOUD_MODEL_CHOICES;
-                const provider = cloudChoices[providerRaw] ? providerRaw : DEFAULT_SETTINGS.provider;
-                const providerModels = cloudChoices[provider] || [];
-                const cloudModel = (
-                    payload.cloud_model && providerModels.includes(payload.cloud_model)
-                        ? payload.cloud_model
-                        : providerModels[0] ?? null
-                );
                 setState((prev) => {
-                    const nextSettings: RuntimeSettings = {
-                        ...prev.diluAgent.settings,
-                        useCloudServices: payload.use_cloud_services,
-                        provider,
-                        cloudModel,
-                        parsingModel: payload.text_extraction_model || prev.diluAgent.settings.parsingModel,
-                        clinicalModel: payload.clinical_model || prev.diluAgent.settings.clinicalModel,
-                        reasoning: payload.ollama_reasoning,
-                    };
+                    const nextSettings: RuntimeSettings = buildRuntimeSettingsFromConfig(
+                        payload,
+                        prev.diluAgent.settings,
+                    );
                     return {
                         ...prev,
                         diluAgent: {

@@ -1,12 +1,8 @@
-import React, { useEffect, useMemo, useState } from "react";
+import React from "react";
 
-import {
-    activateAccessKey,
-    createAccessKey,
-    deleteAccessKey,
-    fetchAccessKeys,
-} from "../services/api";
-import { AccessKeyProvider, AccessKeyRecord } from "../types";
+import { useAccessKeyManager } from "../hooks/useAccessKeyManager";
+import { StatusMessage } from "./StatusMessage";
+import { AccessKeyProvider } from "../types";
 
 const MASKED_KEY_LABEL = "********************";
 
@@ -71,101 +67,23 @@ export function AccessKeyModal({
     providerLabel,
     onClose,
 }: AccessKeyModalProps): React.JSX.Element | null {
-    const [keys, setKeys] = useState<AccessKeyRecord[]>([]);
-    const [isLoading, setIsLoading] = useState(false);
-    const [isSaving, setIsSaving] = useState(false);
-    const [newKeyValue, setNewKeyValue] = useState("");
-    const [errorMessage, setErrorMessage] = useState("");
-    const [visibleRows, setVisibleRows] = useState<Record<number, boolean>>({});
-
-    const hasKeys = keys.length > 0;
-    const sortedKeys = useMemo(
-        () => [...keys].sort((left, right) => Number(right.is_active) - Number(left.is_active) || right.id - left.id),
-        [keys],
-    );
-
-    const loadKeys = async () => {
-        setIsLoading(true);
-        setErrorMessage("");
-        try {
-            const payload = await fetchAccessKeys(provider);
-            setKeys(payload);
-        } catch (error) {
-            const message = error instanceof Error ? error.message : "Unable to load access keys.";
-            setErrorMessage(message);
-        } finally {
-            setIsLoading(false);
-        }
-    };
-
-    useEffect(() => {
-        if (!isOpen) {
-            return;
-        }
-        void loadKeys();
-    }, [isOpen, provider]);
-
-    const handleAdd = async () => {
-        const candidate = newKeyValue.trim();
-        if (!candidate) {
-            setErrorMessage("Please paste a key before adding.");
-            return;
-        }
-        setIsSaving(true);
-        setErrorMessage("");
-        try {
-            await createAccessKey(provider, candidate);
-            setNewKeyValue("");
-            await loadKeys();
-        } catch (error) {
-            const message = error instanceof Error ? error.message : "Unable to add access key.";
-            setErrorMessage(message);
-        } finally {
-            setIsSaving(false);
-        }
-    };
-
-    const handleActivate = async (keyId: number) => {
-        setIsSaving(true);
-        setErrorMessage("");
-        try {
-            const activated = await activateAccessKey(keyId);
-            setKeys((current) => current.map((item) => ({
-                ...item,
-                is_active: item.id === activated.id,
-                updated_at: item.id === activated.id ? activated.updated_at : item.updated_at,
-                last_used_at: item.id === activated.id ? activated.last_used_at : item.last_used_at,
-            })));
-        } catch (error) {
-            const message = error instanceof Error ? error.message : "Unable to activate access key.";
-            setErrorMessage(message);
-        } finally {
-            setIsSaving(false);
-        }
-    };
-
-    const handleDelete = async (keyId: number) => {
-        setIsSaving(true);
-        setErrorMessage("");
-        try {
-            await deleteAccessKey(keyId);
-            setKeys((current) => current.filter((item) => item.id !== keyId));
-            setVisibleRows((current) => {
-                const next = { ...current };
-                delete next[keyId];
-                return next;
-            });
-        } catch (error) {
-            const message = error instanceof Error ? error.message : "Unable to delete access key.";
-            setErrorMessage(message);
-        } finally {
-            setIsSaving(false);
-        }
-    };
-
-    const toggleVisibility = (keyId: number) => {
-        setVisibleRows((current) => ({ ...current, [keyId]: !current[keyId] }));
-    };
+    const { state, actions } = useAccessKeyManager(provider, isOpen);
+    const {
+        sortedKeys,
+        isLoading,
+        isSaving,
+        newKeyValue,
+        errorMessage,
+        visibleRows,
+        hasKeys,
+    } = state;
+    const {
+        setNewKeyValue,
+        handleAdd,
+        handleActivate,
+        handleDelete,
+        toggleVisibility,
+    } = actions;
 
     if (!isOpen) {
         return null;
@@ -261,11 +179,10 @@ export function AccessKeyModal({
                         )}
                     </section>
 
-                    {!!errorMessage && (
-                        <p className="model-config-status-message is-error" role="alert" aria-live="assertive">
-                            [ERROR] {errorMessage}
-                        </p>
-                    )}
+                    <StatusMessage
+                        message={errorMessage ? `[ERROR] ${errorMessage}` : ""}
+                        tone="is-error"
+                    />
                 </div>
             </dialog>
         </div>

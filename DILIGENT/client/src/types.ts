@@ -86,20 +86,36 @@ export type ApiResult = {
   json: unknown;
 };
 
+export type JobType = "clinical" | "ollama_pull";
+
+export type JobStatus =
+  | "pending"
+  | "running"
+  | "completed"
+  | "failed"
+  | "cancelled";
+
+export type ClinicalJobResult = {
+  report?: string;
+  progress_stage?: string;
+  progress_message?: string;
+  [key: string]: unknown;
+};
+
 export type JobStartResponse = {
   job_id: string;
-  job_type: string;
-  status: string;
+  job_type: JobType;
+  status: JobStatus;
   message: string;
   poll_interval: number;
 };
 
-export type JobStatusResponse = {
+export type JobStatusResponse<TJobResult extends Record<string, unknown> = ClinicalJobResult> = {
   job_id: string;
-  job_type: string;
-  status: string;
+  job_type: JobType;
+  status: JobStatus;
   progress: number;
-  result: Record<string, unknown> | null;
+  result: TJobResult | null;
   error: string | null;
 };
 
