@@ -3,7 +3,7 @@
 ## 1. Project Overview
 DILIGENT Clinical Copilot supports clinicians during Drug-Induced Liver Injury (DILI) evaluations with a FastAPI backend and a React + TypeScript (Vite) frontend. The frontend collects anamnesis, medications, and lab values, while the backend coordinates drug parsing and LLM-assisted clinical analysis. Optional Retrieval-Augmented Generation (RAG) grounds outputs on a local LiverTox archive, and sessions can be stored for review and auditing.
 
-> **Work in Progress**: This project is still under active development. You may encounter bugs or incomplete features.
+> **Work in Progress**: This project is still under active development. It will be updated regularly, but you may encounter bugs, issues, or incomplete features.
 
 ## 2. Dual-Mode Runtime Model
 DILIGENT is configuration-first and uses one active runtime file: `DILIGENT/settings/.env`.

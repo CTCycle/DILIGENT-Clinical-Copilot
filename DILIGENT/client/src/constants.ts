@@ -49,14 +49,55 @@ export const CLOUD_MODEL_CHOICES: Record<string, string[]> = {
 
 export const CLOUD_PROVIDERS = Object.keys(CLOUD_MODEL_CHOICES);
 
+export type LLMRuntimeDefaults = {
+  parsing_model: string;
+  clinical_model: string;
+  llm_provider: string;
+  cloud_model: string;
+  use_cloud_services: boolean;
+  ollama_temperature: number;
+  ollama_reasoning: boolean;
+};
+
+export const LLM_RUNTIME_DEFAULTS: Readonly<LLMRuntimeDefaults> = {
+  parsing_model: "qwen3:1.7b",
+  clinical_model: "gpt-oss:20b",
+  llm_provider: "openai",
+  cloud_model: "gpt-4o-mini",
+  use_cloud_services: false,
+  ollama_temperature: 0.7,
+  ollama_reasoning: false,
+};
+
+function resolveDefaultProvider(provider: string): string {
+  const normalized = provider.trim().toLowerCase();
+  if (normalized && CLOUD_MODEL_CHOICES[normalized]) {
+    return normalized;
+  }
+  return "openai";
+}
+
+function resolveDefaultCloudModel(provider: string, cloudModel: string): string | null {
+  const models = CLOUD_MODEL_CHOICES[provider] || [];
+  if (!models.length) {
+    return null;
+  }
+  if (cloudModel && models.includes(cloudModel)) {
+    return cloudModel;
+  }
+  return models[0];
+}
+
+const DEFAULT_PROVIDER = resolveDefaultProvider(LLM_RUNTIME_DEFAULTS.llm_provider);
+
 export const DEFAULT_SETTINGS: RuntimeSettings = {
-  useCloudServices: false,
-  provider: "openai",
-  cloudModel: "gpt-5.2",
-  parsingModel: "qwen3:1.7b",
-  clinicalModel: "gpt-oss:20b",
-  temperature: 0.7,
-  reasoning: false,
+  useCloudServices: LLM_RUNTIME_DEFAULTS.use_cloud_services,
+  provider: DEFAULT_PROVIDER,
+  cloudModel: resolveDefaultCloudModel(DEFAULT_PROVIDER, LLM_RUNTIME_DEFAULTS.cloud_model),
+  parsingModel: LLM_RUNTIME_DEFAULTS.parsing_model,
+  clinicalModel: LLM_RUNTIME_DEFAULTS.clinical_model,
+  temperature: LLM_RUNTIME_DEFAULTS.ollama_temperature,
+  reasoning: LLM_RUNTIME_DEFAULTS.ollama_reasoning,
 };
 
 export const DEFAULT_FORM_STATE: ClinicalFormState = {
