@@ -53,6 +53,11 @@ def create_access_key(
 ) -> AccessKeyResponse:
     try:
         created = serializer.create_key(payload.provider, payload.access_key)
+    except RuntimeError as exc:
+        raise HTTPException(
+            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+            detail=str(exc),
+        ) from exc
     except ValueError as exc:
         raise HTTPException(
             status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
