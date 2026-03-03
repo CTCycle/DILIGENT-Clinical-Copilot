@@ -1,8 +1,16 @@
 import React, { useEffect, useMemo, useState } from "react";
 
 import { AccessKeyModal } from "../components/AccessKeyModal";
-import { CLOUD_MODEL_CHOICES, DEFAULT_SETTINGS } from "../constants";
+import { StatusMessage, resolveStatusTone } from "../components/StatusMessage";
+import { CLOUD_MODEL_CHOICES } from "../constants";
 import { useAppState } from "../context/AppStateContext";
+import {
+    CloudModelChoices,
+    buildRuntimeSettingsFromConfig,
+    resolveCloudChoices,
+    resolveCloudModel,
+    resolveProvider,
+} from "../modelConfig";
 import {
     fetchModelConfigState,
     pullModels,
@@ -35,36 +43,6 @@ function isAccessKeyProvider(provider: string): provider is AccessKeyProvider {
     return provider === "openai" || provider === "gemini";
 }
 
-function resolveProvider(
-    provider: string | null | undefined,
-    cloudChoices: Record<string, string[]>,
-): string {
-    const normalized = (provider || "").trim().toLowerCase();
-    if (normalized && cloudChoices[normalized]) {
-        return normalized;
-    }
-    if (cloudChoices.openai) {
-        return "openai";
-    }
-    const fallback = Object.keys(cloudChoices)[0];
-    return fallback || DEFAULT_SETTINGS.provider;
-}
-
-function resolveCloudModel(
-    provider: string,
-    cloudModel: string | null,
-    cloudChoices: Record<string, string[]>,
-): string | null {
-    const options = cloudChoices[provider] || [];
-    if (!options.length) {
-        return null;
-    }
-    if (cloudModel && options.includes(cloudModel)) {
-        return cloudModel;
-    }
-    return options[0];
-}
-
 function resolveAvailabilityBadgeClass(modelAvailableInOllama: boolean | undefined): string {
     return modelAvailableInOllama ? "model-config-summary-ok" : "model-config-summary-muted";
 }
@@ -76,20 +54,6 @@ function resolveAvailabilityLabel(modelAvailableInOllama: boolean | undefined): 
     return modelAvailableInOllama ? "Installed" : "Not installed";
 }
 
-function resolveStatusTone(statusMessage: string): "is-error" | "is-info" | "is-success" {
-    const normalized = statusMessage.trim().toUpperCase();
-    if (!normalized) {
-        return "is-info";
-    }
-    if (normalized.startsWith("[ERROR]")) {
-        return "is-error";
-    }
-    if (normalized.startsWith("[INFO]")) {
-        return "is-info";
-    }
-    return "is-success";
-}
-
 export function ModelConfigPage(): React.JSX.Element {
     const { state, updateDiluAgent } = useAppState();
     const { settings, isPulling } = state.diluAgent;
@@ -97,7 +61,7 @@ export function ModelConfigPage(): React.JSX.Element {
     const [isLoading, setIsLoading] = useState(true);
     const [isSaving, setIsSaving] = useState(false);
     const [localModels, setLocalModels] = useState<ModelConfigStateResponse["local_models"]>([]);
-    const [cloudChoices, setCloudChoices] = useState<Record<string, string[]>>(CLOUD_MODEL_CHOICES);
+    const [cloudChoices, setCloudChoices] = useState<CloudModelChoices>(CLOUD_MODEL_CHOICES);
     const [modelSearchQuery, setModelSearchQuery] = useState("");
     const [statusMessage, setStatusMessage] = useState("");
     const [openProviderModal, setOpenProviderModal] = useState<AccessKeyProvider | null>(null);
@@ -119,19 +83,10 @@ export function ModelConfigPage(): React.JSX.Element {
 
     const applyConfigToState = (payload: ModelConfigStateResponse) => {
         setLocalModels(payload.local_models || []);
-        setCloudChoices(payload.cloud_model_choices || CLOUD_MODEL_CHOICES);
+        const choices = resolveCloudChoices(payload.cloud_model_choices);
+        setCloudChoices(choices);
 
-        const provider = resolveProvider(payload.llm_provider, payload.cloud_model_choices);
-        const cloudModel = resolveCloudModel(provider, payload.cloud_model, payload.cloud_model_choices);
-        const nextSettings: RuntimeSettings = {
-            ...settings,
-            useCloudServices: payload.use_cloud_services,
-            provider,
-            cloudModel,
-            parsingModel: payload.text_extraction_model || settings.parsingModel,
-            clinicalModel: payload.clinical_model || settings.clinicalModel,
-            reasoning: payload.ollama_reasoning,
-        };
+        const nextSettings: RuntimeSettings = buildRuntimeSettingsFromConfig(payload, settings);
         updateDiluAgent({ settings: nextSettings });
     };
 
@@ -456,15 +411,7 @@ export function ModelConfigPage(): React.JSX.Element {
                 </section>
             </div>
 
-            {statusMessage && (
-                <p
-                    className={`model-config-status-message ${statusTone}`}
-                    role={statusTone === "is-error" ? "alert" : "status"}
-                    aria-live={statusTone === "is-error" ? "assertive" : "polite"}
-                >
-                    {statusMessage}
-                </p>
-            )}
+            <StatusMessage message={statusMessage} tone={statusTone} />
             <AccessKeyModal
                 isOpen={openProviderModal !== null}
                 provider={openProviderModal ?? "openai"}
