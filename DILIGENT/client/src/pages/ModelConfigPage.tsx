@@ -130,11 +130,19 @@ export function ModelConfigPage(): React.JSX.Element {
         }
         return ["openai", "gemini"];
     }, [cloudChoices]);
+    const cloudProviderOptions = useMemo(() => {
+        const providers = providerOptions.filter((provider) => provider === "openai" || provider === "gemini");
+        if (providers.length) {
+            return providers;
+        }
+        return ["openai", "gemini"];
+    }, [providerOptions]);
 
     const activeProvider = resolveProvider(settings.provider, cloudChoices);
     const activeCloudModel = resolveCloudModel(activeProvider, settings.cloudModel, cloudChoices);
     const activeCloudModels = cloudChoices[activeProvider] || [];
     const statusTone = resolveStatusTone(statusMessage);
+    const extraControlsDisabled = isSaving || isLoading;
     const selectedClinicalModel = useMemo(
         () => localModels.find((model) => model.name === settings.clinicalModel) || null,
         [localModels, settings.clinicalModel],
@@ -207,130 +215,115 @@ export function ModelConfigPage(): React.JSX.Element {
             </header>
 
             <div className="model-config-layout">
-                <section className="model-config-left-column">
-                    <div className={`model-config-local-row ${localSelectionDisabled ? "is-disabled" : ""}`} aria-disabled={localSelectionDisabled}>
-                        <div className="model-config-row-header">
-                            <div className="model-config-row-header-top">
-                                <div>
-                                    <h2 className="modal-section-title">Local Model Catalog</h2>
-                                    <p className="helper">
-                                        Select one clinical model and one text extraction model from the full catalog.
-                                        {` ${availableLocalModelCount} installed in Ollama.`}
-                                    </p>
-                                </div>
-                                <div className="model-config-search">
-                                    <label className="visually-hidden" htmlFor="model-search-by-name">Search model by name</label>
-                                    <input
-                                        id="model-search-by-name"
-                                        type="text"
-                                        value={modelSearchQuery}
-                                        placeholder="Search by name..."
-                                        onChange={(event) => setModelSearchQuery(event.target.value)}
-                                        disabled={isLoading}
-                                    />
-                                </div>
+                <section className={`model-config-local-row ${localSelectionDisabled ? "is-disabled" : ""}`} aria-disabled={localSelectionDisabled}>
+                    <div className="model-config-row-header">
+                        <div className="model-config-row-header-top">
+                            <div>
+                                <h2 className="modal-section-title">Local Model Catalog</h2>
+                                <p className="helper">
+                                    Select one clinical model and one text extraction model from the full catalog.
+                                    {` ${availableLocalModelCount} installed in Ollama.`}
+                                </p>
+                            </div>
+                            <div className="model-config-search">
+                                <label className="visually-hidden" htmlFor="model-search-by-name">Search model by name</label>
+                                <input
+                                    id="model-search-by-name"
+                                    type="text"
+                                    value={modelSearchQuery}
+                                    placeholder="Search by name..."
+                                    onChange={(event) => setModelSearchQuery(event.target.value)}
+                                    disabled={isLoading}
+                                />
                             </div>
                         </div>
+                    </div>
 
-                        <ul className="model-config-local-cards">
-                            {!localModels.length && (
-                                <li className="model-config-empty-note">
-                                    {isLoading ? "Loading local model catalog..." : "No local model catalog entries available."}
-                                </li>
-                            )}
+                    <ul className="model-config-local-cards">
+                        {!localModels.length && (
+                            <li className="model-config-empty-note">
+                                {isLoading ? "Loading local model catalog..." : "No local model catalog entries available."}
+                            </li>
+                        )}
 
-                            {!!localModels.length && !filteredLocalModels.length && (
-                                <li className="model-config-empty-note">
-                                    No models match "{modelSearchQuery.trim()}".
-                                </li>
-                            )}
+                        {!!localModels.length && !filteredLocalModels.length && (
+                            <li className="model-config-empty-note">
+                                No models match "{modelSearchQuery.trim()}".
+                            </li>
+                        )}
 
-                            {filteredLocalModels.map((model) => (
-                                <li
-                                    key={model.name}
-                                    className={`model-config-local-card ${model.available_in_ollama ? "is-available" : ""}`}
-                                >
-                                    <div className="model-config-local-card-header">
-                                        <h3>{model.name}</h3>
-                                        <div className="model-config-local-card-actions">
-                                            <span
-                                                className={`model-config-availability-pill ${model.available_in_ollama ? "is-available" : "is-unavailable"}`}
+                        {filteredLocalModels.map((model) => (
+                            <li
+                                key={model.name}
+                                className={`model-config-local-card ${model.available_in_ollama ? "is-available" : ""}`}
+                            >
+                                <div className="model-config-local-card-header">
+                                    <h3>{model.name}</h3>
+                                    <div className="model-config-local-card-actions">
+                                        <span
+                                            className={`model-config-availability-pill ${model.available_in_ollama ? "is-available" : "is-unavailable"}`}
+                                        >
+                                            {model.available_in_ollama ? "Available in Ollama" : "Not installed"}
+                                        </span>
+                                        {!model.available_in_ollama && (
+                                            <button
+                                                className="model-config-card-pull"
+                                                type="button"
+                                                onClick={() => { void handlePullModel(model.name); }}
+                                                disabled={isPulling || ollamaControlsDisabled}
+                                                aria-label={`Pull ${model.name} from Ollama`}
+                                                title={`Pull ${model.name}`}
                                             >
-                                                {model.available_in_ollama ? "Available in Ollama" : "Not installed"}
-                                            </span>
-                                            {!model.available_in_ollama && (
-                                                <button
-                                                    className="model-config-card-pull"
-                                                    type="button"
-                                                    onClick={() => { void handlePullModel(model.name); }}
-                                                    disabled={isPulling || ollamaControlsDisabled}
-                                                    aria-label={`Pull ${model.name} from Ollama`}
-                                                    title={`Pull ${model.name}`}
-                                                >
-                                                    <PullIcon />
-                                                </button>
-                                            )}
-                                        </div>
+                                                <PullIcon />
+                                            </button>
+                                        )}
                                     </div>
-                                    <p className="model-config-family">Family: {model.family}</p>
-                                    <p>{model.description}</p>
-                                    <div className="model-config-role-controls">
-                                        <label className="field checkbox">
-                                            <input
-                                                type="radio"
-                                                name="clinical-role"
-                                                checked={settings.clinicalModel === model.name}
-                                                onChange={() => { void handleRoleSelection("clinical", model.name); }}
-                                                disabled={localSelectionDisabled}
-                                            />
-                                            <span className="field-label">Clinical Model</span>
-                                        </label>
-                                        <label className="field checkbox">
-                                            <input
-                                                type="radio"
-                                                name="text-extraction-role"
-                                                checked={settings.parsingModel === model.name}
-                                                onChange={() => { void handleRoleSelection("text_extraction", model.name); }}
-                                                disabled={localSelectionDisabled}
-                                            />
-                                            <span className="field-label">Text Extraction</span>
-                                        </label>
-                                    </div>
-                                </li>
-                            ))}
-                        </ul>
-                    </div>
-
-                    <div className={`model-config-ollama-row ${ollamaControlsDisabled ? "is-disabled" : ""}`} aria-disabled={ollamaControlsDisabled}>
-                        <h2 className="modal-section-title">Ollama Settings</h2>
-                        <label className="field checkbox">
-                            <input
-                                type="checkbox"
-                                checked={settings.reasoning}
-                                onChange={(e) => { void handleReasoningChange(e.target.checked); }}
-                                disabled={ollamaControlsDisabled}
-                            />
-                            <span className="field-label">Enable SDL/Reasoning</span>
-                        </label>
-                    </div>
+                                </div>
+                                <p className="model-config-family">Family: {model.family}</p>
+                                <p>{model.description}</p>
+                                <div className="model-config-role-controls">
+                                    <label className="field checkbox">
+                                        <input
+                                            type="radio"
+                                            name="clinical-role"
+                                            checked={settings.clinicalModel === model.name}
+                                            onChange={() => { void handleRoleSelection("clinical", model.name); }}
+                                            disabled={localSelectionDisabled}
+                                        />
+                                        <span className="field-label">Clinical Model</span>
+                                    </label>
+                                    <label className="field checkbox">
+                                        <input
+                                            type="radio"
+                                            name="text-extraction-role"
+                                            checked={settings.parsingModel === model.name}
+                                            onChange={() => { void handleRoleSelection("text_extraction", model.name); }}
+                                            disabled={localSelectionDisabled}
+                                        />
+                                        <span className="field-label">Text Extraction</span>
+                                    </label>
+                                </div>
+                            </li>
+                        ))}
+                    </ul>
                 </section>
 
-                <section className="model-config-right-column">
-                    <div className="model-config-cloud-row">
-                        <h2 className="modal-section-title">Cloud Model Control</h2>
-                        <label className="field checkbox">
-                            <input
-                                type="checkbox"
-                                checked={cloudEnabled}
-                                onChange={(e) => { void handleCloudSwitchChange(e.target.checked); }}
-                                disabled={isSaving || isLoading}
-                            />
-                            <span className="field-label">Use Cloud Models</span>
-                        </label>
+                <section className="model-config-cloud-row">
+                    <h2 className="modal-section-title">Cloud Model Selection</h2>
+                    <label className="field checkbox">
+                        <input
+                            type="checkbox"
+                            checked={cloudEnabled}
+                            onChange={(e) => { void handleCloudSwitchChange(e.target.checked); }}
+                            disabled={isSaving || isLoading}
+                        />
+                        <span className="field-label">Use Cloud Models</span>
+                    </label>
 
-                        <div className="model-config-provider-grid">
+                    <div className="model-config-cloud-layout">
+                        <div className="model-config-cloud-controls">
                             <div className="model-config-provider-list">
-                                {providerOptions.map((provider) => (
+                                {cloudProviderOptions.map((provider) => (
                                     <div
                                         key={provider}
                                         className={`model-config-provider-card ${activeProvider === provider ? "is-active" : ""}`}
@@ -358,29 +351,9 @@ export function ModelConfigPage(): React.JSX.Element {
                                         </button>
                                     </div>
                                 ))}
-                                <div className="model-config-provider-card">
-                                    <button
-                                        className="model-config-provider-button"
-                                        type="button"
-                                        onClick={() => setOpenProviderModal("tavily")}
-                                        disabled={isSaving || isLoading}
-                                    >
-                                        <span>Research provider</span>
-                                        <span className="model-config-provider-hint">Tavily API key</span>
-                                    </button>
-                                    <button
-                                        className="model-config-provider-key"
-                                        type="button"
-                                        onClick={() => setOpenProviderModal("tavily")}
-                                        disabled={isSaving || isLoading}
-                                        aria-label="Manage Tavily access keys"
-                                    >
-                                        <KeyIcon />
-                                    </button>
-                                </div>
                             </div>
 
-                            <div className="field">
+                            <div className="field model-config-cloud-model-field">
                                 <label className="field-label" htmlFor="cloud-model-select">Cloud Model</label>
                                 <select
                                     id="cloud-model-select"
@@ -396,39 +369,79 @@ export function ModelConfigPage(): React.JSX.Element {
                                 </select>
                             </div>
                         </div>
-                    </div>
 
-                    <div className="model-config-right-footer-row">
-                        <h2 className="modal-section-title">Current Selection Summary</h2>
-                        <table className="model-config-summary-table" aria-label="Current selection summary">
-                            <tbody>
-                                <tr>
-                                    <th scope="row">Clinical</th>
-                                    <td>{settings.clinicalModel || "Not set"}</td>
-                                    <td className={clinicalAvailabilityClassName}>
-                                        {clinicalAvailabilityLabel}
-                                    </td>
-                                </tr>
-                                <tr>
-                                    <th scope="row">Text Extraction</th>
-                                    <td>{settings.parsingModel || "Not set"}</td>
-                                    <td className={extractionAvailabilityClassName}>
-                                        {extractionAvailabilityLabel}
-                                    </td>
-                                </tr>
-                                <tr>
-                                    <th scope="row">Provider</th>
-                                    <td>{PROVIDER_LABELS[activeProvider] || activeProvider}</td>
-                                    <td>{cloudEnabled ? "Cloud active" : "Cloud disabled"}</td>
-                                </tr>
-                                <tr>
-                                    <th scope="row">Cloud Model</th>
-                                    <td>{activeCloudModel || "Not set"}</td>
-                                    <td>{cloudEnabled ? "In use" : "Standby"}</td>
-                                </tr>
-                            </tbody>
-                        </table>
+                        <p className="model-config-cloud-description">
+                            Keep an active provider key and model pairing so cloud inference remains predictable and reproducible.
+                        </p>
                     </div>
+                </section>
+
+                <section className={`model-config-extra-row ${extraControlsDisabled ? "is-disabled" : ""}`} aria-disabled={extraControlsDisabled}>
+                    <h2 className="modal-section-title">Extra Parameters (Search and RAG)</h2>
+                    <div className="model-config-extra-stack">
+                        <div className="model-config-provider-card model-config-provider-card-compact">
+                            <button
+                                className="model-config-provider-button"
+                                type="button"
+                                onClick={() => setOpenProviderModal("tavily")}
+                                disabled={extraControlsDisabled}
+                            >
+                                <span>Tavily</span>
+                                <span className="model-config-provider-hint">Research API key</span>
+                            </button>
+                            <button
+                                className="model-config-provider-key"
+                                type="button"
+                                onClick={() => setOpenProviderModal("tavily")}
+                                disabled={extraControlsDisabled}
+                                aria-label="Manage Tavily access keys"
+                            >
+                                <KeyIcon />
+                            </button>
+                        </div>
+
+                        <label className="field checkbox">
+                            <input
+                                type="checkbox"
+                                checked={settings.reasoning}
+                                onChange={(e) => { void handleReasoningChange(e.target.checked); }}
+                                disabled={extraControlsDisabled}
+                            />
+                            <span className="field-label">Enable SDL/Reasoning</span>
+                        </label>
+                    </div>
+                </section>
+
+                <section className="model-config-right-footer-row">
+                    <h2 className="modal-section-title">Parameters Summary</h2>
+                    <table className="model-config-summary-table" aria-label="Current selection summary">
+                        <tbody>
+                            <tr>
+                                <th scope="row">Clinical</th>
+                                <td>{settings.clinicalModel || "Not set"}</td>
+                                <td className={clinicalAvailabilityClassName}>
+                                    {clinicalAvailabilityLabel}
+                                </td>
+                            </tr>
+                            <tr>
+                                <th scope="row">Text Extraction</th>
+                                <td>{settings.parsingModel || "Not set"}</td>
+                                <td className={extractionAvailabilityClassName}>
+                                    {extractionAvailabilityLabel}
+                                </td>
+                            </tr>
+                            <tr>
+                                <th scope="row">Provider</th>
+                                <td>{PROVIDER_LABELS[activeProvider] || activeProvider}</td>
+                                <td>{cloudEnabled ? "Cloud active" : "Cloud disabled"}</td>
+                            </tr>
+                            <tr>
+                                <th scope="row">Cloud Model</th>
+                                <td>{activeCloudModel || "Not set"}</td>
+                                <td>{cloudEnabled ? "In use" : "Standby"}</td>
+                            </tr>
+                        </tbody>
+                    </table>
                 </section>
             </div>
 

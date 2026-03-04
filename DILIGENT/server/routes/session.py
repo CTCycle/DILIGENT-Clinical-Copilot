@@ -812,6 +812,27 @@ class ClinicalSessionEndpoint:
             )
         serialized_issues = self.serialize_pipeline_issues(issues)
         pattern_strings = self.pattern_analyzer.stringify_scores(pattern_score)
+        narrative = NarrativeBuilder.build_patient_narrative(
+            patient_label=patient_label,
+            visit_label=visit_label,
+            anamnesis=payload.anamnesis,
+            drugs_text=payload.drugs,
+            pattern_score=pattern_score,
+            pattern_strings=pattern_strings,
+            detected_drugs=detected_drugs,
+            anamnesis_detected_drugs=anamnesis_detected_drugs,
+            issues=issues,
+            final_report=final_report,
+        )
+        result_payload = {
+            "report": narrative,
+            "issues": serialized_issues,
+            "pattern_status": pattern_assessment.status,
+            "detected_drugs": detected_drugs,
+            "anamnesis_drugs": anamnesis_detected_drugs,
+            "anamnesis_diseases": anamnesis_detected_diseases,
+            "matched_drugs": matched_drugs_payload,
+        }
         self.emit_progress(
             progress_callback,
             stage="finalization",
@@ -836,6 +857,7 @@ class ClinicalSessionEndpoint:
                 "detected_drugs": detected_drugs,
                 "matched_drugs": matched_drugs_payload,
                 "issues": serialized_issues,
+                "session_result_payload": result_payload,
             },
         )
         self.emit_progress(
@@ -844,28 +866,7 @@ class ClinicalSessionEndpoint:
             value=99.0,
         )
 
-        narrative = NarrativeBuilder.build_patient_narrative(
-            patient_label=patient_label,
-            visit_label=visit_label,
-            anamnesis=payload.anamnesis,
-            drugs_text=payload.drugs,
-            pattern_score=pattern_score,
-            pattern_strings=pattern_strings,
-            detected_drugs=detected_drugs,
-            anamnesis_detected_drugs=anamnesis_detected_drugs,
-            issues=issues,
-            final_report=final_report,
-        )
-
-        return {
-            "report": narrative,
-            "issues": serialized_issues,
-            "pattern_status": pattern_assessment.status,
-            "detected_drugs": detected_drugs,
-            "anamnesis_drugs": anamnesis_detected_drugs,
-            "anamnesis_diseases": anamnesis_detected_diseases,
-            "matched_drugs": matched_drugs_payload,
-        }
+        return result_payload
 
     # -------------------------------------------------------------------------
     async def start_clinical_session(

@@ -47,7 +47,6 @@ export interface DiliAgentState {
     settings: RuntimeSettings;
     form: ClinicalFormState;
     message: string;
-    jsonPayload: unknown;
     exportUrl: string | null;
     jobId: string | null;
     jobProgress: number;
@@ -77,7 +76,6 @@ const DEFAULT_DILI_AGENT_STATE: DiliAgentState = {
     settings: DEFAULT_SETTINGS,
     form: DEFAULT_FORM_STATE,
     message: "",
-    jsonPayload: null,
     exportUrl: null,
     jobId: null,
     jobProgress: 0,
