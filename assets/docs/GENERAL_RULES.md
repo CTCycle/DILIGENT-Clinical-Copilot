@@ -2,7 +2,7 @@
 Use web search to verify facts and stay current on tools, frameworks, and industry standards when it improves accuracy.
 
 ## REQUIRED DOCUMENTATION REVIEW
-Before any task, review the relevant files in `.agent/`:
+Before any task, review the relevant files in `assets/docs`:
 
 - `GENERAL_RULES.md`, mandatory for every task
 - `GUIDELINES_PYTHON.md`, when using Python
@@ -16,7 +16,7 @@ Before any task, review the relevant files in `.agent/`:
 When task-specific reusable workflows or capabilities are needed, check skills repository and use the relevant skill guidance.
 
 ## DOCUMENTATION UPDATES
-If changes materially affect behavior, architecture, or usage, update the relevant `.agent/` files and notify the user.
+If changes materially affect behavior, architecture, or usage, update the relevant `assets/docs` files and notify the user.
 
 ## CROSS-LANGUAGE PRINCIPLES
 
