@@ -516,105 +516,52 @@ export function ModelConfigPage(): React.JSX.Element {
 
                             <div className="model-config-selection-section">
                                 <div className="model-config-selection-header">
-                                    <h3 className="modal-section-title">Clinical Model</h3>
-                                    <p className="model-config-selected-line">
-                                        <span>Selected: <strong>{draftConfig.clinicalModel || "Not set"}</strong></span>
-                                        <span className={clinicalAvailabilityClassName}>{clinicalAvailabilityLabel}</span>
-                                    </p>
+                                    <h3 className="modal-section-title">Model Roles</h3>
+                                    <p className="model-config-caption">Choose both roles from the same model list.</p>
+                                </div>
+                                <div className="model-config-selection-summary" role="group" aria-label="Selected local model roles">
+                                    <div className="model-config-selected-card">
+                                        <p className="model-config-selected-card-label">Clinical Model</p>
+                                        <p className="model-config-selected-line">
+                                            <span>Selected: <strong>{draftConfig.clinicalModel || "Not set"}</strong></span>
+                                            <span className={clinicalAvailabilityClassName}>{clinicalAvailabilityLabel}</span>
+                                        </p>
+                                    </div>
+                                    <div className="model-config-selected-card">
+                                        <p className="model-config-selected-card-label">Text Extraction Model</p>
+                                        <p className="model-config-selected-line">
+                                            <span>Selected: <strong>{draftConfig.parsingModel || "Not set"}</strong></span>
+                                            <span className={extractionAvailabilityClassName}>{extractionAvailabilityLabel}</span>
+                                        </p>
+                                    </div>
                                 </div>
                                 <ul className="model-config-model-list">
                                     {noLocalModelMessage && (
                                         <li className="model-config-empty-note">{noLocalModelMessage}</li>
                                     )}
                                     {!noLocalModelMessage && filteredLocalModels.map((model) => {
-                                        const isSelected = draftConfig.clinicalModel === model.name;
+                                        const isClinicalSelected = draftConfig.clinicalModel === model.name;
+                                        const isTextExtractionSelected = draftConfig.parsingModel === model.name;
+                                        const isSelected = isClinicalSelected || isTextExtractionSelected;
                                         return (
                                             <li
-                                                key={`clinical-${model.name}`}
+                                                key={model.name}
                                                 className={`model-config-model-item ${isSelected ? "is-selected" : ""}`}
                                             >
-                                                <label className="model-config-model-radio">
-                                                    <input
-                                                        type="radio"
-                                                        name="clinical-role"
-                                                        checked={isSelected}
-                                                        onChange={() => handleRoleSelection("clinical", model.name)}
-                                                        disabled={localSelectionDisabled}
-                                                    />
-                                                    <span className="model-config-model-copy">
-                                                        <span className="model-config-model-name">{model.name}</span>
-                                                        <span className="model-config-model-description" title={model.description}>
-                                                            {model.description}
-                                                        </span>
+                                                <div className="model-config-model-details">
+                                                    <span className="model-config-model-name">{model.name}</span>
+                                                    <span className="model-config-model-description" title={model.description}>
+                                                        {model.description}
                                                     </span>
-                                                </label>
-                                                <div className="model-config-model-item-side">
-                                                    <span
-                                                        className={`model-config-availability-pill ${model.available_in_ollama ? "is-available" : "is-unavailable"}`}
-                                                    >
-                                                        {model.available_in_ollama ? "Installed" : "Not installed"}
-                                                    </span>
-                                                    <div className="model-config-model-action-row">
-                                                        {!model.available_in_ollama && (
-                                                            <button
-                                                                className="btn btn-secondary model-config-inline-btn"
-                                                                type="button"
-                                                                onClick={() => { void handlePullModel(model.name); }}
-                                                                disabled={ollamaControlsDisabled}
-                                                            >
-                                                                Install
-                                                            </button>
+                                                    <div className="model-config-role-pill-row" aria-live="polite">
+                                                        {isClinicalSelected && (
+                                                            <span className="model-config-role-pill">Clinical</span>
                                                         )}
-                                                        <button
-                                                            className={`btn ${isSelected ? "btn-tertiary" : "btn-secondary"} model-config-inline-btn`}
-                                                            type="button"
-                                                            onClick={() => handleRoleSelection("clinical", model.name)}
-                                                            disabled={localSelectionDisabled || isSelected}
-                                                        >
-                                                            {isSelected ? "Selected" : "Select"}
-                                                        </button>
+                                                        {isTextExtractionSelected && (
+                                                            <span className="model-config-role-pill">Text extraction</span>
+                                                        )}
                                                     </div>
                                                 </div>
-                                            </li>
-                                        );
-                                    })}
-                                </ul>
-                            </div>
-
-                            <div className="model-config-selection-section">
-                                <div className="model-config-selection-header">
-                                    <h3 className="modal-section-title">Text Extraction Model</h3>
-                                    <p className="model-config-selected-line">
-                                        <span>Selected: <strong>{draftConfig.parsingModel || "Not set"}</strong></span>
-                                        <span className={extractionAvailabilityClassName}>{extractionAvailabilityLabel}</span>
-                                    </p>
-                                </div>
-                                <ul className="model-config-model-list">
-                                    {noLocalModelMessage && (
-                                        <li className="model-config-empty-note">{noLocalModelMessage}</li>
-                                    )}
-                                    {!noLocalModelMessage && filteredLocalModels.map((model) => {
-                                        const isSelected = draftConfig.parsingModel === model.name;
-                                        return (
-                                            <li
-                                                key={`extraction-${model.name}`}
-                                                className={`model-config-model-item ${isSelected ? "is-selected" : ""}`}
-                                            >
-                                                <label className="model-config-model-radio">
-                                                    <input
-                                                        type="radio"
-                                                        name="text-extraction-role"
-                                                        checked={isSelected}
-                                                        onChange={() => handleRoleSelection("text_extraction", model.name)}
-                                                        disabled={localSelectionDisabled}
-                                                    />
-                                                    <span className="model-config-model-copy">
-                                                        <span className="model-config-model-name">{model.name}</span>
-                                                        <span className="model-config-model-description" title={model.description}>
-                                                            {model.description}
-                                                        </span>
-                                                    </span>
-                                                </label>
                                                 <div className="model-config-model-item-side">
                                                     <span
                                                         className={`model-config-availability-pill ${model.available_in_ollama ? "is-available" : "is-unavailable"}`}
@@ -633,12 +580,22 @@ export function ModelConfigPage(): React.JSX.Element {
                                                             </button>
                                                         )}
                                                         <button
-                                                            className={`btn ${isSelected ? "btn-tertiary" : "btn-secondary"} model-config-inline-btn`}
+                                                            className={`btn ${isClinicalSelected ? "btn-tertiary" : "btn-secondary"} model-config-inline-btn`}
+                                                            type="button"
+                                                            onClick={() => handleRoleSelection("clinical", model.name)}
+                                                            disabled={localSelectionDisabled || isClinicalSelected}
+                                                            aria-pressed={isClinicalSelected}
+                                                        >
+                                                            {isClinicalSelected ? "Clinical selected" : "Set clinical"}
+                                                        </button>
+                                                        <button
+                                                            className={`btn ${isTextExtractionSelected ? "btn-tertiary" : "btn-secondary"} model-config-inline-btn`}
                                                             type="button"
                                                             onClick={() => handleRoleSelection("text_extraction", model.name)}
-                                                            disabled={localSelectionDisabled || isSelected}
+                                                            disabled={localSelectionDisabled || isTextExtractionSelected}
+                                                            aria-pressed={isTextExtractionSelected}
                                                         >
-                                                            {isSelected ? "Selected" : "Select"}
+                                                            {isTextExtractionSelected ? "Extraction selected" : "Set extraction"}
                                                         </button>
                                                     </div>
                                                 </div>
