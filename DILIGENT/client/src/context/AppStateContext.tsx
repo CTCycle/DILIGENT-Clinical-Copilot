@@ -43,7 +43,7 @@ export function resolvePathFromPage(page: PageId): string {
     return PAGE_PATHS[page] || PAGE_PATHS[DEFAULT_PAGE];
 }
 
-export interface DiluAgentState {
+export interface DiliAgentState {
     settings: RuntimeSettings;
     form: ClinicalFormState;
     message: string;
@@ -61,19 +61,19 @@ export interface DiluAgentState {
 
 export interface AppState {
     activePage: PageId;
-    diluAgent: DiluAgentState;
+    diliAgent: DiliAgentState;
 }
 
 interface AppStateContextValue {
     state: AppState;
     setActivePage: (page: PageId) => void;
-    updateDiluAgent: (updates: Partial<DiluAgentState>) => void;
+    updateDiliAgent: (updates: Partial<DiliAgentState>) => void;
 }
 
 // ---------------------------------------------------------------------------
 // Default State
 // ---------------------------------------------------------------------------
-const DEFAULT_DILU_AGENT_STATE: DiluAgentState = {
+const DEFAULT_DILI_AGENT_STATE: DiliAgentState = {
     settings: DEFAULT_SETTINGS,
     form: DEFAULT_FORM_STATE,
     message: "",
@@ -91,7 +91,7 @@ const DEFAULT_DILU_AGENT_STATE: DiluAgentState = {
 
 const DEFAULT_APP_STATE: AppState = {
     activePage: resolvePageIdFromPath(globalThis.location?.pathname ?? "/"),
-    diluAgent: DEFAULT_DILU_AGENT_STATE,
+    diliAgent: DEFAULT_DILI_AGENT_STATE,
 };
 
 // ---------------------------------------------------------------------------
@@ -128,12 +128,12 @@ export function AppStateProvider({ children }: AppStateProviderProps): React.JSX
                 setState((prev) => {
                     const nextSettings: RuntimeSettings = buildRuntimeSettingsFromConfig(
                         payload,
-                        prev.diluAgent.settings,
+                        prev.diliAgent.settings,
                     );
                     return {
                         ...prev,
-                        diluAgent: {
-                            ...prev.diluAgent,
+                        diliAgent: {
+                            ...prev.diliAgent,
                             settings: nextSettings,
                         },
                     };
@@ -152,10 +152,10 @@ export function AppStateProvider({ children }: AppStateProviderProps): React.JSX
         setState((prev) => ({ ...prev, activePage: page }));
     }, []);
 
-    const updateDiluAgent = useCallback((updates: Partial<DiluAgentState>) => {
+    const updateDiliAgent = useCallback((updates: Partial<DiliAgentState>) => {
         setState((prev) => ({
             ...prev,
-            diluAgent: { ...prev.diluAgent, ...updates },
+            diliAgent: { ...prev.diliAgent, ...updates },
         }));
     }, []);
 
@@ -163,9 +163,9 @@ export function AppStateProvider({ children }: AppStateProviderProps): React.JSX
         () => ({
             state,
             setActivePage,
-            updateDiluAgent,
+            updateDiliAgent,
         }),
-        [state, setActivePage, updateDiluAgent],
+        [state, setActivePage, updateDiliAgent],
     );
 
     return (

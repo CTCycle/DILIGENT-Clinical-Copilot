@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useRef, useState } from "react";
+import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
 
@@ -13,7 +13,7 @@ import {
     pollClinicalJobStatus,
     startClinicalJob,
 } from "../services/api";
-import { JobStatus } from "../types";
+import { JobStatus, JobStatusResponse } from "../types";
 import {
     buildClinicalPayload,
     createDownloadUrl,
@@ -21,6 +21,7 @@ import {
 } from "../utils";
 
 const todayIso = new Date().toISOString().slice(0, 10);
+const DEFAULT_POLL_INTERVAL_MS = 1000;
 
 // ---------------------------------------------------------------------------
 // Icons
@@ -54,22 +55,23 @@ function isTerminalJobStatus(status: JobStatus | null): boolean {
 }
 
 // ---------------------------------------------------------------------------
-// DiluAgentPage
+// DiliAgentPage
 // ---------------------------------------------------------------------------
-export function DiluAgentPage(): React.JSX.Element {
-    const { state, updateDiluAgent } = useAppState();
+export function DiliAgentPage(): React.JSX.Element {
+    const { state, updateDiliAgent } = useAppState();
     const {
         settings,
         form,
         message,
         jsonPayload,
         exportUrl,
+        jobId,
         jobProgress,
         jobStatus,
         jobStageMessage,
         isRunning,
         isExpanded,
-    } = state.diluAgent;
+    } = state.diliAgent;
 
     const pollerRef = useRef<{ stop: () => void } | null>(null);
     const exportUrlRef = useRef<string | null>(null);
@@ -101,7 +103,7 @@ export function DiluAgentPage(): React.JSX.Element {
             URL.revokeObjectURL(exportUrl);
             exportUrlRef.current = null;
         }
-        updateDiluAgent({
+        updateDiliAgent({
             message: "",
             jsonPayload: null,
             exportUrl: null,
@@ -114,24 +116,122 @@ export function DiluAgentPage(): React.JSX.Element {
     };
 
     const handleFormChange = <K extends keyof typeof form>(key: K, value: (typeof form)[K]) => {
-        updateDiluAgent({ form: { ...form, [key]: value } });
+        updateDiliAgent({ form: { ...form, [key]: value } });
     };
 
     const handleVisitDateChange = (value: string) => {
         handleFormChange("visitDate", normalizeVisitDateInput(value));
     };
 
-    const executeRunSession = async (allowMissingLabs: boolean | null) => {
-        updateDiluAgent({ isRunning: true });
-        resetOutputs();
+    const stopPoller = useCallback(() => {
         if (pollerRef.current) {
             pollerRef.current.stop();
             pollerRef.current = null;
         }
+    }, []);
+
+    const handlePollingError = useCallback(
+        (pollError: string) => {
+            stopPoller();
+            updateDiliAgent({
+                message: `[ERROR] ${pollError}`,
+                jsonPayload: null,
+                exportUrl: null,
+                jobStage: null,
+                jobStageMessage: null,
+                isRunning: false,
+            });
+        },
+        [stopPoller, updateDiliAgent],
+    );
+
+    const handleJobStatusUpdate = useCallback(
+        (status: JobStatusResponse) => {
+            const terminalStatus = isTerminalJobStatus(status.status);
+            const stage =
+                status.result && typeof status.result.progress_stage === "string"
+                    ? status.result.progress_stage
+                    : null;
+            const stageMessage =
+                status.result && typeof status.result.progress_message === "string"
+                    ? status.result.progress_message
+                    : null;
+            const resolvedProgress =
+                typeof status.progress === "number" ? status.progress : 0;
+            updateDiliAgent({
+                jobProgress: terminalStatus ? 100 : resolvedProgress,
+                jobStatus: status.status,
+                jobStage: stage,
+                jobStageMessage: stageMessage,
+                isRunning: !terminalStatus,
+            });
+
+            if (!terminalStatus) {
+                return;
+            }
+
+            stopPoller();
+
+            if (status.status === "completed") {
+                const report =
+                    typeof status.result?.report === "string"
+                        ? status.result.report
+                        : "";
+                const newExportUrl = report
+                    ? createDownloadUrl(report, REPORT_EXPORT_FILENAME)
+                    : null;
+                updateDiliAgent({
+                    message: report || "[INFO] Clinical analysis completed.",
+                    jsonPayload: status.result,
+                    exportUrl: newExportUrl,
+                    jobStage: null,
+                    jobStageMessage: null,
+                });
+            } else if (status.status === "failed") {
+                const errorMessage = status.error
+                    ? `[ERROR] ${status.error}`
+                    : "[ERROR] Clinical analysis failed.";
+                updateDiliAgent({
+                    message: errorMessage,
+                    jsonPayload: status.result,
+                    exportUrl: null,
+                    jobStage: null,
+                    jobStageMessage: null,
+                });
+            } else if (status.status === "cancelled") {
+                updateDiliAgent({
+                    message: "[INFO] Clinical analysis cancelled.",
+                    jsonPayload: status.result,
+                    exportUrl: null,
+                    jobStage: null,
+                    jobStageMessage: null,
+                });
+            }
+        },
+        [stopPoller, updateDiliAgent],
+    );
+
+    const startPolling = useCallback(
+        (jobIdToPoll: string, intervalMs: number) => {
+            stopPoller();
+            pollerRef.current = pollClinicalJobStatus(
+                jobIdToPoll,
+                intervalMs,
+                handleJobStatusUpdate,
+                handlePollingError,
+            );
+        },
+        [handleJobStatusUpdate, handlePollingError, stopPoller],
+    );
+
+    const executeRunSession = async (allowMissingLabs: boolean | null) => {
+        updateDiliAgent({ isRunning: true });
+        resetOutputs();
+        stopPoller();
         try {
             const payload = buildClinicalPayload(form, settings, allowMissingLabs);
             const startResult = await startClinicalJob(payload);
-            updateDiluAgent({
+            updateDiliAgent({
                 jobId: startResult.job_id,
                 jobProgress: 0,
                 jobStatus: startResult.status,
@@ -139,96 +239,11 @@ export function DiluAgentPage(): React.JSX.Element {
                 jobStageMessage: "Initializing clinical session",
             });
             const intervalMs = startResult.poll_interval * 1000;
-
-            pollerRef.current = pollClinicalJobStatus(
-                startResult.job_id,
-                intervalMs,
-                (status) => {
-                    const terminalStatus = isTerminalJobStatus(status.status);
-                    const stage =
-                        status.result && typeof status.result.progress_stage === "string"
-                            ? status.result.progress_stage
-                            : null;
-                    const stageMessage =
-                        status.result && typeof status.result.progress_message === "string"
-                            ? status.result.progress_message
-                            : null;
-                    const resolvedProgress =
-                        typeof status.progress === "number" ? status.progress : 0;
-                    updateDiluAgent({
-                        jobProgress: terminalStatus ? 100 : resolvedProgress,
-                        jobStatus: status.status,
-                        jobStage: stage,
-                        jobStageMessage: stageMessage,
-                        isRunning: !terminalStatus,
-                    });
-
-                    if (terminalStatus) {
-                        if (pollerRef.current) {
-                            pollerRef.current.stop();
-                            pollerRef.current = null;
-                        }
-                    }
-
-                    if (!terminalStatus) {
-                        return;
-                    }
-
-                    if (status.status === "completed") {
-                        const report =
-                            typeof status.result?.report === "string"
-                                ? status.result.report
-                                : "";
-                        const newExportUrl = report
-                            ? createDownloadUrl(report, REPORT_EXPORT_FILENAME)
-                            : null;
-                        updateDiluAgent({
-                            message: report || "[INFO] Clinical analysis completed.",
-                            jsonPayload: status.result,
-                            exportUrl: newExportUrl,
-                            jobStage: null,
-                            jobStageMessage: null,
-                        });
-                    } else if (status.status === "failed") {
-                        const errorMessage = status.error
-                            ? `[ERROR] ${status.error}`
-                            : "[ERROR] Clinical analysis failed.";
-                        updateDiluAgent({
-                            message: errorMessage,
-                            jsonPayload: status.result,
-                            exportUrl: null,
-                            jobStage: null,
-                            jobStageMessage: null,
-                        });
-                    } else if (status.status === "cancelled") {
-                        updateDiluAgent({
-                            message: "[INFO] Clinical analysis cancelled.",
-                            jsonPayload: status.result,
-                            exportUrl: null,
-                            jobStage: null,
-                            jobStageMessage: null,
-                        });
-                    }
-                },
-                (pollError) => {
-                    if (pollerRef.current) {
-                        pollerRef.current.stop();
-                        pollerRef.current = null;
-                    }
-                    updateDiluAgent({
-                        message: `[ERROR] ${pollError}`,
-                        jsonPayload: null,
-                        exportUrl: null,
-                        jobStage: null,
-                        jobStageMessage: null,
-                        isRunning: false,
-                    });
-                },
-            );
+            startPolling(startResult.job_id, intervalMs);
         } catch (error) {
             const description =
                 error instanceof Error ? error.message : "Unexpected error";
-            updateDiluAgent({
+            updateDiliAgent({
                 message: `[ERROR] ${description}`,
                 jsonPayload: null,
                 exportUrl: null,
@@ -238,16 +253,23 @@ export function DiluAgentPage(): React.JSX.Element {
             });
         } finally {
             if (!pollerRef.current) {
-                updateDiluAgent({ isRunning: false });
+                updateDiliAgent({ isRunning: false });
             }
         }
     };
+
+    useEffect(() => {
+        if (!isRunning || !jobId || isTerminalJobStatus(jobStatus) || pollerRef.current) {
+            return;
+        }
+        startPolling(jobId, DEFAULT_POLL_INTERVAL_MS);
+    }, [isRunning, jobId, jobStatus, startPolling]);
 
     const handleRunSession = async () => {
         const cleanedDrugs = form.drugs.trim();
         if (!cleanedDrugs) {
             resetOutputs();
-            updateDiluAgent({
+            updateDiliAgent({
                 isRunning: false,
                 message: "[ERROR] At least one therapy drug is required for DILI analysis.",
                 jsonPayload: null,
@@ -283,7 +305,7 @@ export function DiluAgentPage(): React.JSX.Element {
             URL.revokeObjectURL(exportUrl);
             exportUrlRef.current = null;
         }
-        updateDiluAgent({
+        updateDiliAgent({
             settings: DEFAULT_SETTINGS,
             form: { ...DEFAULT_FORM_STATE },
             message: "",
@@ -316,7 +338,7 @@ export function DiluAgentPage(): React.JSX.Element {
     };
 
     const handleToggleExpand = () => {
-        updateDiluAgent({ isExpanded: !isExpanded });
+        updateDiliAgent({ isExpanded: !isExpanded });
     };
 
     // ---------------------------------------------------------------------------
