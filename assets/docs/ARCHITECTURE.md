@@ -66,7 +66,7 @@ DILIGENT Clinical Copilot is a local-first web application for Drug-Induced Live
 
 - Root shell (`client/src/App.tsx`) uses `AppStateContext` for shared runtime/form/job state.
 - Page routing is path-based:
-  - `/`: `DiluAgentPage` (clinical input, job progress polling, markdown report rendering/export).
+  - `/`: `DiliAgentPage` (clinical input, job progress polling, markdown report rendering/export).
   - `/model-config`: `ModelConfigPage` (local model selection, cloud provider/model selection, key management access).
 - Navigation is split between a compact left sidebar and settings entry.
 - API client logic is centralized in `client/src/services/api.ts` and includes timeout handling and polling helpers.

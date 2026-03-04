@@ -56,8 +56,8 @@ function resolveAvailabilityLabel(modelAvailableInOllama: boolean | undefined): 
 }
 
 export function ModelConfigPage(): React.JSX.Element {
-    const { state, updateDiluAgent } = useAppState();
-    const { settings, isPulling } = state.diluAgent;
+    const { state, updateDiliAgent } = useAppState();
+    const { settings, isPulling } = state.diliAgent;
 
     const [isLoading, setIsLoading] = useState(true);
     const [isSaving, setIsSaving] = useState(false);
@@ -88,7 +88,7 @@ export function ModelConfigPage(): React.JSX.Element {
         setCloudChoices(choices);
 
         const nextSettings: RuntimeSettings = buildRuntimeSettingsFromConfig(payload, settings);
-        updateDiluAgent({ settings: nextSettings });
+        updateDiliAgent({ settings: nextSettings });
     };
 
     const loadModelConfig = async () => {
@@ -187,14 +187,14 @@ export function ModelConfigPage(): React.JSX.Element {
             return;
         }
 
-        updateDiluAgent({ isPulling: true });
+        updateDiliAgent({ isPulling: true });
         setStatusMessage(`[INFO] Pulling '${candidate}' from Ollama...`);
         try {
             const result = await pullModels([candidate]);
             setStatusMessage(result.message);
             await loadModelConfig();
         } finally {
-            updateDiluAgent({ isPulling: false });
+            updateDiliAgent({ isPulling: false });
         }
     };
 
