@@ -39,7 +39,9 @@ def test_access_keys_crud_returns_metadata_only(api_context: APIRequestContext) 
         assert all("access_key" not in row for row in keys_payload)
         assert all(plaintext_key not in str(row) for row in keys_payload)
 
-        activate_response = api_context.put(f"/access-keys/{created_id}/activate")
+        activate_response = api_context.put(
+            f"/access-keys/{created_id}/activate?provider={provider}"
+        )
         assert activate_response.status == 200
         activated_payload = activate_response.json()
         assert activated_payload.get("id") == created_id
@@ -47,4 +49,4 @@ def test_access_keys_crud_returns_metadata_only(api_context: APIRequestContext) 
         assert "access_key" not in activated_payload
     finally:
         if created_id is not None:
-            api_context.delete(f"/access-keys/{created_id}")
+            api_context.delete(f"/access-keys/{created_id}?provider={provider}")

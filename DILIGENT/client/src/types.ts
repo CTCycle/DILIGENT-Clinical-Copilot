@@ -37,7 +37,7 @@ export type ModelConfigUpdateRequest = {
   ollama_reasoning?: boolean;
 };
 
-export type AccessKeyProvider = "openai" | "gemini";
+export type AccessKeyProvider = "openai" | "gemini" | "tavily";
 
 export type AccessKeyRecord = {
   id: number;
@@ -59,6 +59,7 @@ export type ClinicalFormState = {
   alp: string;
   alpMax: string;
   useRag: boolean;
+  useWebSearch: boolean;
 };
 
 export type ClinicalRequestPayload = {
@@ -72,6 +73,7 @@ export type ClinicalRequestPayload = {
   alp_max: string | null;
   allow_missing_labs?: boolean | null;
   use_rag: boolean;
+  use_web_search: boolean;
   use_cloud_services: boolean;
   llm_provider: string | null;
   cloud_model: string | null;

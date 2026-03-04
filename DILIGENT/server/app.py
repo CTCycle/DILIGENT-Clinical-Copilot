@@ -11,6 +11,7 @@ from DILIGENT.server.routes.session import router as session_router
 from DILIGENT.server.routes.ollama import router as ollama_router
 from DILIGENT.server.routes.modelconfig import router as modelconfig_router
 from DILIGENT.server.routes.accesskeys import router as accesskeys_router
+from DILIGENT.server.routes.research import router as research_router
 from DILIGENT.server.configurations import server_settings
 
 
@@ -25,6 +26,7 @@ app.include_router(session_router)
 app.include_router(ollama_router)
 app.include_router(modelconfig_router)
 app.include_router(accesskeys_router)
+app.include_router(research_router)
 
 @app.get("/")
 def redirect_to_docs() -> RedirectResponse:

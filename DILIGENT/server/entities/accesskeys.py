@@ -7,7 +7,7 @@ import re
 from pydantic import BaseModel, ConfigDict, Field, field_validator
 
 
-ProviderName = Literal["openai", "gemini"]
+ProviderName = Literal["openai", "gemini", "tavily"]
 CONTROL_CHARACTERS_RE = re.compile(r"[\x00-\x08\x0B\x0C\x0E-\x1F\x7F]")
 
 

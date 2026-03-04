@@ -251,3 +251,35 @@ class AccessKey(Base):
             postgresql_where=text("is_active = true"),
         ),
     )
+
+
+###############################################################################
+class ResearchAccessKey(Base):
+    __tablename__ = "research_access_keys"
+    id = Column(Integer, primary_key=True, autoincrement=True)
+    provider = Column(String, nullable=False, server_default=text("'tavily'"))
+    encrypted_value = Column(Text, nullable=False)
+    fingerprint = Column(String, nullable=False)
+    is_active = Column(Boolean, nullable=False, server_default=text("false"))
+    created_at = Column(DateTime, nullable=False, server_default=text("CURRENT_TIMESTAMP"))
+    updated_at = Column(
+        DateTime,
+        nullable=False,
+        server_default=text("CURRENT_TIMESTAMP"),
+        server_onupdate=text("CURRENT_TIMESTAMP"),
+    )
+    last_used_at = Column(DateTime, nullable=True)
+    __table_args__ = (
+        CheckConstraint(
+            "provider = 'tavily'",
+            name="ck_research_access_keys_provider",
+        ),
+        Index("ix_research_access_keys_provider", "provider"),
+        Index(
+            "uq_research_access_keys_active_provider",
+            "provider",
+            unique=True,
+            sqlite_where=text("is_active = 1"),
+            postgresql_where=text("is_active = true"),
+        ),
+    )
