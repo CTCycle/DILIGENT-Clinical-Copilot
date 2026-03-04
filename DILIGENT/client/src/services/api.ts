@@ -15,6 +15,10 @@ const HTTP_TIMEOUT =
   Number.parseFloat(import.meta.env.VITE_HTTP_TIMEOUT ?? "") ||
   HTTP_TIMEOUT_SECONDS;
 
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return typeof value === "object" && value !== null && !Array.isArray(value);
+}
+
 function extractTextFromResult(data: unknown): string {
   if (!data) {
     return "";
@@ -32,10 +36,10 @@ function extractTextFromResult(data: unknown): string {
     }
   }
 
-  if (typeof data === "object") {
+  if (isRecord(data)) {
     const candidates = ["output", "result", "text", "message", "response"];
     for (const key of candidates) {
-      const value = (data as Record<string, unknown>)[key];
+      const value = data[key];
       if (typeof value === "string" && value.trim()) {
         return value;
       }
