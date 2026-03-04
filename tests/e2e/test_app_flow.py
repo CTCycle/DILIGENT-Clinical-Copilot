@@ -1,6 +1,8 @@
 """
 E2E tests for UI navigation and key UI workflows.
 """
+import re
+
 from playwright.sync_api import Page, expect
 
 
@@ -26,3 +28,12 @@ def test_model_config_modal_opens_and_closes(page: Page, base_url: str):
 
     page.get_by_role("button", name="Close configuration modal").click()
     expect(page.locator(".modal-container")).to_have_count(0)
+
+
+def test_data_inspection_navigation(page: Page, base_url: str):
+    page.goto(base_url)
+
+    data_button = page.get_by_role("button", name="Data Inspection")
+    expect(data_button).to_be_visible()
+    data_button.click()
+    expect(page).to_have_url(re.compile(r"/data/?$"))

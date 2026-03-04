@@ -10,11 +10,12 @@ import { fetchModelConfigState } from "../services/api";
 // ---------------------------------------------------------------------------
 // Types
 // ---------------------------------------------------------------------------
-export type PageId = "dili-agent" | "model-config";
+export type PageId = "dili-agent" | "data-inspection" | "model-config";
 
 const DEFAULT_PAGE: PageId = "dili-agent";
 const PAGE_PATHS: Record<PageId, string> = {
     "dili-agent": "/",
+    "data-inspection": "/data",
     "model-config": "/model-config",
 };
 
@@ -29,6 +30,9 @@ function normalizePathname(pathname: string): string {
 
 export function resolvePageIdFromPath(pathname: string): PageId {
     const normalized = normalizePathname(pathname);
+    if (normalized === PAGE_PATHS["data-inspection"]) {
+        return "data-inspection";
+    }
     if (normalized === PAGE_PATHS["model-config"]) {
         return "model-config";
     }

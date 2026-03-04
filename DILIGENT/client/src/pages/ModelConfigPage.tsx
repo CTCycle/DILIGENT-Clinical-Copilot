@@ -21,6 +21,7 @@ import { AccessKeyProvider, ModelConfigStateResponse, ModelConfigUpdateRequest, 
 const PROVIDER_LABELS: Record<string, string> = {
     openai: "OpenAI",
     gemini: "Gemini",
+    tavily: "Tavily",
 };
 
 const KeyIcon = () => (
@@ -40,7 +41,7 @@ const PullIcon = () => (
 );
 
 function isAccessKeyProvider(provider: string): provider is AccessKeyProvider {
-    return provider === "openai" || provider === "gemini";
+    return provider === "openai" || provider === "gemini" || provider === "tavily";
 }
 
 function resolveAvailabilityBadgeClass(modelAvailableInOllama: boolean | undefined): string {
@@ -357,6 +358,26 @@ export function ModelConfigPage(): React.JSX.Element {
                                         </button>
                                     </div>
                                 ))}
+                                <div className="model-config-provider-card">
+                                    <button
+                                        className="model-config-provider-button"
+                                        type="button"
+                                        onClick={() => setOpenProviderModal("tavily")}
+                                        disabled={isSaving || isLoading}
+                                    >
+                                        <span>Research provider</span>
+                                        <span className="model-config-provider-hint">Tavily API key</span>
+                                    </button>
+                                    <button
+                                        className="model-config-provider-key"
+                                        type="button"
+                                        onClick={() => setOpenProviderModal("tavily")}
+                                        disabled={isSaving || isLoading}
+                                        aria-label="Manage Tavily access keys"
+                                    >
+                                        <KeyIcon />
+                                    </button>
+                                </div>
                             </div>
 
                             <div className="field">

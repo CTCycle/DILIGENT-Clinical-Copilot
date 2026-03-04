@@ -38,6 +38,7 @@ from DILIGENT.common.utils.logger import logger
 from DILIGENT.server.services.retrieval.embeddings import SimilaritySearch
 from DILIGENT.server.services.clinical.preparation import HepatoxPreparedInputs
 from DILIGENT.server.services.text.normalization import normalize_drug_query_name
+from DILIGENT.server.services.research.tavily import tavily_research_service
 
 
 ###############################################################################
@@ -268,6 +269,7 @@ class HepatoxConsultation:
         prepared_inputs: HepatoxPreparedInputs | None,
         visit_date: date | None = None,
         rag_query: dict[str, str] | None = None,
+        use_web_search: bool = False,
         progress_callback: Callable[[str, float], None] | None = None,
     ) -> dict[str, Any] | None:
         if prepared_inputs is None:
@@ -286,6 +288,7 @@ class HepatoxConsultation:
             visit_date=visit_date,
             pattern_prompt=prepared_inputs.pattern_prompt,
             rag_query=rag_query,
+            use_web_search=use_web_search,
             progress_callback=progress_callback,
         )
         return report.model_dump()
@@ -297,8 +300,9 @@ class HepatoxConsultation:
         *,
         clinical_context: str | None,
         visit_date: date | None,
-        pattern_prompt: str, 
+        pattern_prompt: str,
         rag_query: dict[str, str] | None = None,
+        use_web_search: bool = False,
         progress_callback: Callable[[str, float], None] | None = None,
     ) -> PatientDrugClinicalReport:
         normalized_context = clinical_context.strip() if clinical_context else ""
@@ -319,6 +323,7 @@ class HepatoxConsultation:
                 normalized_context=normalized_context,
                 pattern_summary=pattern_summary,
                 rag_query=rag_query,
+                use_web_search=use_web_search,
             )
             entries.append(entry)
             if job:
@@ -413,6 +418,7 @@ class HepatoxConsultation:
         normalized_context: str,
         pattern_summary: str,
         rag_query: dict[str, str] | None,
+        use_web_search: bool,
     ) -> tuple[DrugClinicalAssessment, tuple[int, Any] | None]:
         raw_name = drug_entry.name or ""
         normalized_drug_key = normalize_drug_query_name(raw_name)
@@ -467,6 +473,11 @@ class HepatoxConsultation:
             return entry, None
 
         rag_documents = await self.fetch_rag_documents(rag_query, raw_name)
+        web_evidence = self.web_evidence_disabled_text()
+        if use_web_search:
+            web_evidence = await self.fetch_web_evidence_for_drug(
+                drug_name=drug_entry.name,
+            )
         job = self.request_drug_analysis(
             drug_name=drug_entry.name,
             canonical_name=entry.canonical_name or drug_entry.name,
@@ -486,6 +497,7 @@ class HepatoxConsultation:
             visit_date=visit_date,
             pattern_summary=pattern_summary,
             metadata=entry.matched_livertox_row,
+            web_evidence=web_evidence,
         )
         return entry, (idx, job)
 
@@ -508,6 +520,30 @@ class HepatoxConsultation:
             self.search_supporting_documents,
             drug_rag_query,
             self.rag_top_k,
+        )
+
+    # -------------------------------------------------------------------------
+    @staticmethod
+    def web_evidence_disabled_text() -> str:
+        return "No web evidence available (reason: web search disabled for this session)."
+
+    # -------------------------------------------------------------------------
+    async def fetch_web_evidence_for_drug(self, *, drug_name: str) -> str:
+        normalized_name = (drug_name or "").strip()
+        if not normalized_name:
+            return "No web evidence available (reason: missing drug name)."
+        try:
+            outcome = await tavily_research_service.search_sources(
+                question=f"{normalized_name} drug induced liver injury evidence",
+                mode="fast",
+                allowed_domains=None,
+                blocked_domains=None,
+            )
+        except Exception as exc:  # noqa: BLE001
+            return f"No web evidence available (reason: {exc})."
+        return tavily_research_service.format_clinical_evidence_block(
+            sources=outcome.sources,
+            message=outcome.message,
         )
 
     # -------------------------------------------------------------------------
@@ -873,6 +909,7 @@ class HepatoxConsultation:
         visit_date: date | None,
         pattern_summary: str,
         metadata: dict[str, Any] | None,
+        web_evidence: str,
     ) -> str:
         start_details = self.format_start_prompt(suspension)
         suspension_details = self.format_suspension_prompt(suspension)
@@ -898,6 +935,7 @@ class HepatoxConsultation:
             livertox_status=self.escape_braces(livertox_status),
             excerpt=self.escape_braces(excerpt),
             documents=self.escape_braces(rag_documents),
+            web_evidence=self.escape_braces(web_evidence),
             clinical_context=self.escape_braces(clinical_context),
             visit_date_anchor=self.escape_braces(visit_date_anchor),
             therapy_start_details=self.escape_braces(start_details),

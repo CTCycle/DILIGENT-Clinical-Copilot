@@ -10,16 +10,16 @@ from DILIGENT.server.entities.accesskeys import (
     AccessKeyResponse,
 )
 from DILIGENT.server.repositories.serialization.accesskeys import AccessKeySerializer
-from DILIGENT.server.repositories.schemas.models import AccessKey
+from DILIGENT.server.repositories.schemas.models import AccessKey, ResearchAccessKey
 
-ProviderName = Literal["openai", "gemini"]
+ProviderName = Literal["openai", "gemini", "tavily"]
 
 router = APIRouter(prefix="/access-keys", tags=["access-keys"])
 serializer = AccessKeySerializer()
 
 
 ###############################################################################
-def to_response(row: AccessKey) -> AccessKeyResponse:
+def to_response(row: AccessKey | ResearchAccessKey) -> AccessKeyResponse:
     return AccessKeyResponse(
         id=int(row.id),
         provider=str(row.provider),  # type: ignore[arg-type]
@@ -34,7 +34,7 @@ def to_response(row: AccessKey) -> AccessKeyResponse:
 ###############################################################################
 @router.get("", response_model=list[AccessKeyResponse], status_code=status.HTTP_200_OK)
 def list_access_keys(
-    provider: ProviderName = Query(..., description="openai or gemini"),
+    provider: ProviderName = Query(..., description="openai, gemini, or tavily"),
 ) -> list[AccessKeyResponse]:
     try:
         rows = serializer.list_keys(provider)
@@ -74,9 +74,10 @@ def create_access_key(
 )
 def activate_access_key(
     key_id: int = Path(..., ge=1),
+    provider: ProviderName | None = Query(default=None),
 ) -> AccessKeyResponse:
     try:
-        row = serializer.activate_key(key_id)
+        row = serializer.activate_key(key_id, provider=provider)
     except ValueError as exc:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
@@ -93,8 +94,9 @@ def activate_access_key(
 )
 def delete_access_key(
     key_id: int = Path(..., ge=1),
+    provider: ProviderName | None = Query(default=None),
 ) -> AccessKeyDeleteResponse:
-    deleted = serializer.delete_key(key_id)
+    deleted = serializer.delete_key(key_id, provider=provider)
     if not deleted:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,

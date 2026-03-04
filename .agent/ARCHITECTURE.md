@@ -38,6 +38,7 @@ DILIGENT Clinical Copilot is a local-first web application for Drug-Induced Live
 ### 3.2 Core API Surface
 - `POST /clinical`: synchronous report generation.
 - `POST /clinical/jobs`, `GET /clinical/jobs/{job_id}`, `DELETE /clinical/jobs/{job_id}`: async clinical analysis with polling/cancel.
+- `POST /research` and alias `POST /api/research`: Tavily-backed web research with structured citations.
 - `GET /models/list`, `GET /models/pull`, `POST /models/pull/jobs`, `GET/DELETE /models/jobs/{job_id}`: local Ollama model management.
 - `GET/PUT /model-config`: runtime model/provider settings and catalog exposure.
 - `GET/POST /access-keys`, `PUT /access-keys/{id}/activate`, `DELETE /access-keys/{id}`: encrypted cloud API key lifecycle.
@@ -48,9 +49,10 @@ DILIGENT Clinical Copilot is a local-first web application for Drug-Induced Live
 3. Extract therapy drugs and anamnesis drugs.
 4. Extract structured disease context from anamnesis.
 5. Optionally build RAG queries if `use_rag=true`.
-6. Resolve LiverTox/RxNorm evidence and run LLM consultation.
-7. Compose markdown report + structured JSON payload.
-8. Persist session artifacts and match metadata in SQL tables.
+6. Optionally enrich per-drug prompts with web evidence if `use_web_search=true`.
+7. Resolve LiverTox/RxNorm evidence and run LLM consultation.
+8. Compose markdown report + structured JSON payload.
+9. Persist session artifacts and match metadata in SQL tables.
 
 ### 3.4 Persistence and Retrieval
 - DB mode is runtime-selectable: embedded SQLite (`DB_EMBEDDED=true`) or external PostgreSQL (`DB_EMBEDDED=false`).

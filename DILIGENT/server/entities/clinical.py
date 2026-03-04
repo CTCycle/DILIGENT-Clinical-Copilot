@@ -79,6 +79,10 @@ class PatientData(BaseModel):
         default=False,
         description="Enables retrieval augmented generation during analysis.",
     )
+    use_web_search: bool = Field(
+        default=False,
+        description="Enables Tavily-backed web evidence retrieval per analyzed drug.",
+    )
 
     # -------------------------------------------------------------------------
     @field_validator(
@@ -269,6 +273,7 @@ class ClinicalSessionRequest(BaseModel):
     anamnesis: str | None = Field(default=None, max_length=20000)
     has_hepatic_diseases: bool = False
     use_rag: bool = False
+    use_web_search: bool = False
     drugs: str | None = Field(default=None, max_length=20000)
     alt: str | None = Field(default=None, max_length=MAX_LAB_TEXT_LENGTH)
     alt_max: str | None = Field(default=None, max_length=MAX_LAB_TEXT_LENGTH)

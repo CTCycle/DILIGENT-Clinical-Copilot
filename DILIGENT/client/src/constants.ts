@@ -110,6 +110,7 @@ export const DEFAULT_FORM_STATE: ClinicalFormState = {
   alp: "",
   alpMax: "",
   useRag: false,
+  useWebSearch: false,
 };
 
 export const REPORT_EXPORT_FILENAME = "clinical_report.md";
