@@ -37,6 +37,7 @@ from DILIGENT.server.repositories.schemas.models import (
     ClinicalSession,
     ClinicalSessionDrug,
     ClinicalSessionLab,
+    ClinicalSessionResult,
     ClinicalSessionSection,
     Drug,
     DrugAlias,
@@ -60,8 +61,9 @@ class Document:
 class _RepositorySerializationService:
     def __init__(self, queries: DataRepositoryQueries | None = None) -> None:
         self.queries = queries or DataRepositoryQueries()
+        self.engine = self.queries.database.backend.engine  # type: ignore[attr-defined]
         self.session_factory = sessionmaker(
-            bind=self.queries.database.backend.engine,  # type: ignore[attr-defined]
+            bind=self.engine,
             future=True,
         )
 
@@ -70,6 +72,7 @@ class _RepositorySerializationService:
         if not session_data:
             logger.warning("Skipping clinical session save; payload is empty")
             return
+        self.ensure_session_result_table()
         db_session = self.session_factory()
         try:
             persisted_session = ClinicalSession(
@@ -88,12 +91,17 @@ class _RepositorySerializationService:
             self.persist_session_sections(db_session, session_id, session_data)
             self.persist_session_labs(db_session, session_id, session_data)
             self.persist_session_drugs(db_session, session_id, session_data)
+            self.persist_session_result_payload(db_session, session_id, session_data)
             db_session.commit()
         except Exception:
             db_session.rollback()
             raise
         finally:
             db_session.close()
+
+    # -----------------------------------------------------------------------------
+    def ensure_session_result_table(self) -> None:
+        ClinicalSessionResult.__table__.create(bind=self.engine, checkfirst=True)
 
     # -----------------------------------------------------------------------------
     def save_livertox_records(self, records: pd.DataFrame) -> None:
@@ -806,6 +814,32 @@ class _RepositorySerializationService:
                     match_notes=notes_value,
                 )
             )
+
+    # -----------------------------------------------------------------------------
+    def persist_session_result_payload(
+        self, db_session: Session, session_id: int, session_data: dict[str, Any]
+    ) -> None:
+        payload = session_data.get("session_result_payload")
+        serialized_payload = self.serialize_json_payload(payload)
+        if serialized_payload is None:
+            return
+        db_session.add(
+            ClinicalSessionResult(
+                session_id=session_id,
+                payload_json=serialized_payload,
+            )
+        )
+
+    # -----------------------------------------------------------------------------
+    def serialize_json_payload(self, payload: Any) -> str | None:
+        if payload is None:
+            return None
+        if isinstance(payload, str):
+            return self.normalize_string(payload)
+        try:
+            return json.dumps(payload, ensure_ascii=False, default=str)
+        except (TypeError, ValueError):
+            return self.normalize_string(payload)
 
     # -----------------------------------------------------------------------------
     def resolve_drug_id(
