@@ -1,9 +1,11 @@
 import React, { useEffect, useMemo, useState } from "react";
 
 import { AccessKeyModal } from "../components/AccessKeyModal";
+import { ProviderAccessCard } from "../components/ProviderAccessCard";
 import { StatusMessage, resolveStatusTone } from "../components/StatusMessage";
 import { CLOUD_MODEL_CHOICES } from "../constants";
 import { useAppState } from "../context/AppStateContext";
+import { useModelPullActions } from "../hooks/useModelPullActions";
 import {
     CloudModelChoices,
     buildRuntimeSettingsFromConfig,
@@ -13,7 +15,6 @@ import {
 } from "../modelConfig";
 import {
     fetchModelConfigState,
-    pullModels,
     updateModelConfigState,
 } from "../services/api";
 import {
@@ -24,7 +25,11 @@ import {
     RuntimeSettings,
 } from "../types";
 
-const PROVIDER_LABELS: Record<string, string> = {
+type CloudProvider = "openai" | "gemini";
+
+const DEFAULT_CLOUD_PROVIDERS: readonly CloudProvider[] = ["openai", "gemini"];
+
+const PROVIDER_LABELS: Record<AccessKeyProvider, string> = {
     openai: "OpenAI",
     gemini: "Gemini",
     tavily: "Tavily",
@@ -52,16 +57,19 @@ const MODEL_FILTERS: Array<{ key: ModelFilterKey; label: string }> = [
     { key: "extraction", label: "Extraction" },
 ];
 
-const KeyIcon = () => (
-    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-        <circle cx="8" cy="15" r="3" />
-        <path d="M11 15h10" />
-        <path d="M18 12v6" />
-    </svg>
-);
+function isCloudProvider(provider: string): provider is CloudProvider {
+    return provider === "openai" || provider === "gemini";
+}
 
 function isAccessKeyProvider(provider: string): provider is AccessKeyProvider {
     return provider === "openai" || provider === "gemini" || provider === "tavily";
+}
+
+function resolveProviderLabel(provider: string): string {
+    if (isAccessKeyProvider(provider)) {
+        return PROVIDER_LABELS[provider];
+    }
+    return provider;
 }
 
 function resolveAvailabilityBadgeClass(modelAvailableInOllama: boolean | undefined): string {
@@ -230,15 +238,15 @@ export function ModelConfigPage(): React.JSX.Element {
         if (values.length) {
             return values;
         }
-        return ["openai", "gemini"];
+        return [...DEFAULT_CLOUD_PROVIDERS];
     }, [cloudChoices]);
 
-    const cloudProviderOptions = useMemo(() => {
-        const providers = providerOptions.filter((provider) => provider === "openai" || provider === "gemini");
+    const cloudProviderOptions = useMemo<CloudProvider[]>(() => {
+        const providers = providerOptions.filter(isCloudProvider);
         if (providers.length) {
             return providers;
         }
-        return ["openai", "gemini"];
+        return [...DEFAULT_CLOUD_PROVIDERS];
     }, [providerOptions]);
 
     const draftProvider = resolveProvider(draftConfig.provider, cloudChoices);
@@ -305,6 +313,12 @@ export function ModelConfigPage(): React.JSX.Element {
         return Array.from(missing);
     }, [draftConfig.clinicalModel, draftConfig.parsingModel, draftConfig.useCloudServices, localModels]);
 
+    const { pullModelByName, installRequiredModels } = useModelPullActions({
+        setPulling: (nextValue) => updateDiliAgent({ isPulling: nextValue }),
+        setStatusMessage,
+        loadModelConfig,
+    });
+
     const savedProvider = resolveProvider(settings.provider, cloudChoices);
     const savedCloudModel = resolveCloudModel(savedProvider, settings.cloudModel, cloudChoices);
 
@@ -353,40 +367,6 @@ export function ModelConfigPage(): React.JSX.Element {
         );
     };
 
-    const handlePullModel = async (requestedModelName: string) => {
-        const candidate = requestedModelName.trim();
-        if (!candidate) {
-            setStatusMessage("[ERROR] Enter a model name to pull from Ollama.");
-            return;
-        }
-
-        updateDiliAgent({ isPulling: true });
-        setStatusMessage(`[INFO] Pulling '${candidate}' from Ollama...`);
-        try {
-            const result = await pullModels([candidate]);
-            setStatusMessage(result.message);
-            await loadModelConfig({ syncDraft: false });
-        } finally {
-            updateDiliAgent({ isPulling: false });
-        }
-    };
-
-    const handleInstallRequiredModels = async () => {
-        if (!missingRequiredModels.length) {
-            return;
-        }
-
-        updateDiliAgent({ isPulling: true });
-        setStatusMessage(`[INFO] Installing required models: ${missingRequiredModels.join(", ")}.`);
-        try {
-            const result = await pullModels(missingRequiredModels);
-            setStatusMessage(result.message);
-            await loadModelConfig({ syncDraft: false });
-        } finally {
-            updateDiliAgent({ isPulling: false });
-        }
-    };
-
     const handleSaveConfiguration = async () => {
         await persistConfigPatch(
             {
@@ -417,7 +397,7 @@ export function ModelConfigPage(): React.JSX.Element {
     }, [filteredLocalModels.length, isLoading, localModels.length, modelSearchQuery]);
 
     const runtimeLabel = draftConfig.useCloudServices
-        ? `Cloud (${PROVIDER_LABELS[draftProvider] || draftProvider})`
+        ? `Cloud (${resolveProviderLabel(draftProvider)})`
         : "Local (Ollama)";
 
     const localInstallSummary = availableLocalModelCount
@@ -573,7 +553,7 @@ export function ModelConfigPage(): React.JSX.Element {
                                                             <button
                                                                 className="btn btn-secondary model-config-inline-btn"
                                                                 type="button"
-                                                                onClick={() => { void handlePullModel(model.name); }}
+                                                                onClick={() => { void pullModelByName(model.name); }}
                                                                 disabled={ollamaControlsDisabled}
                                                             >
                                                                 Install
@@ -614,32 +594,16 @@ export function ModelConfigPage(): React.JSX.Element {
                                 <div className="model-config-cloud-controls">
                                     <div className="model-config-provider-list">
                                         {cloudProviderOptions.map((provider) => (
-                                            <div
+                                            <ProviderAccessCard
                                                 key={provider}
-                                                className={`model-config-provider-card ${draftProvider === provider ? "is-active" : ""}`}
-                                            >
-                                                <button
-                                                    className="model-config-provider-button"
-                                                    type="button"
-                                                    onClick={() => handleProviderChange(provider)}
-                                                    disabled={isSaving || isLoading}
-                                                >
-                                                    <span>{PROVIDER_LABELS[provider] || provider}</span>
-                                                </button>
-                                                <button
-                                                    className="model-config-provider-key"
-                                                    type="button"
-                                                    onClick={() => {
-                                                        if (isAccessKeyProvider(provider)) {
-                                                            setOpenProviderModal(provider);
-                                                        }
-                                                    }}
-                                                    disabled={isSaving || isLoading}
-                                                    aria-label={`Manage ${PROVIDER_LABELS[provider] || provider} access keys`}
-                                                >
-                                                    <KeyIcon />
-                                                </button>
-                                            </div>
+                                                variant="selectable"
+                                                label={PROVIDER_LABELS[provider]}
+                                                isActive={draftProvider === provider}
+                                                disabled={isSaving || isLoading}
+                                                onSelect={() => handleProviderChange(provider)}
+                                                onManageKeys={() => setOpenProviderModal(provider)}
+                                                manageKeyAriaLabel={`Manage ${PROVIDER_LABELS[provider]} access keys`}
+                                            />
                                         ))}
                                     </div>
 
@@ -670,26 +634,14 @@ export function ModelConfigPage(): React.JSX.Element {
                     <section className={`model-config-extra-row ${extraControlsDisabled ? "is-disabled" : ""}`} aria-disabled={extraControlsDisabled}>
                         <h2 className="modal-section-title">Extra Parameters (Search and RAG)</h2>
                         <div className="model-config-extra-stack">
-                            <div className="model-config-provider-card model-config-provider-card-compact">
-                                <button
-                                    className="model-config-provider-button"
-                                    type="button"
-                                    onClick={() => setOpenProviderModal("tavily")}
-                                    disabled={extraControlsDisabled}
-                                >
-                                    <span>Tavily</span>
-                                    <span className="model-config-provider-hint">Research API key</span>
-                                </button>
-                                <button
-                                    className="model-config-provider-key"
-                                    type="button"
-                                    onClick={() => setOpenProviderModal("tavily")}
-                                    disabled={extraControlsDisabled}
-                                    aria-label="Manage Tavily access keys"
-                                >
-                                    <KeyIcon />
-                                </button>
-                            </div>
+                            <ProviderAccessCard
+                                variant="compact"
+                                label={PROVIDER_LABELS.tavily}
+                                hint="Research API key"
+                                disabled={extraControlsDisabled}
+                                onManageKeys={() => setOpenProviderModal("tavily")}
+                                manageKeyAriaLabel="Manage Tavily access keys"
+                            />
 
                             <label className="field checkbox">
                                 <input
@@ -747,7 +699,7 @@ export function ModelConfigPage(): React.JSX.Element {
                             <button
                                 className="btn btn-secondary"
                                 type="button"
-                                onClick={() => { void handleInstallRequiredModels(); }}
+                                onClick={() => { void installRequiredModels(missingRequiredModels); }}
                                 disabled={isLoading || isSaving || isPulling}
                             >
                                 {isPulling ? "Installing..." : "Install Required Models"}
@@ -769,7 +721,7 @@ export function ModelConfigPage(): React.JSX.Element {
             <AccessKeyModal
                 isOpen={openProviderModal !== null}
                 provider={openProviderModal ?? "openai"}
-                providerLabel={PROVIDER_LABELS[openProviderModal ?? "openai"] || (openProviderModal ?? "openai")}
+                providerLabel={resolveProviderLabel(openProviderModal ?? "openai")}
                 onClose={() => setOpenProviderModal(null)}
             />
         </main>

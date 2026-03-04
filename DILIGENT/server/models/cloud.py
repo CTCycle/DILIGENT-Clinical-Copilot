@@ -9,6 +9,10 @@ from DILIGENT.common.constants import GEMINI_API_BASE, OPENAI_API_BASE
 from DILIGENT.common.utils.logger import logger
 from DILIGENT.server.configurations import server_settings
 from DILIGENT.server.models.structured import StructuredOutputParser, parse_json_dict, T
+from DILIGENT.server.repositories.serialization.accesskeys import AccessKeySerializer
+from DILIGENT.server.services.keys.cryptography import (
+    decrypt as decrypt_access_key,
+)
 
 ProviderName = Literal["openai", "azure-openai", "anthropic", "gemini"]
 
@@ -81,12 +85,6 @@ class CloudLLMClient:
     def resolve_provider_access_key(self, provider: ProviderName) -> str | None:
         if provider not in {"openai", "gemini"}:
             return None
-        from DILIGENT.server.repositories.serialization.accesskeys import (
-            AccessKeySerializer,
-        )
-        from DILIGENT.server.services.keys.cryptography import (
-            decrypt as decrypt_access_key,
-        )
 
         access_key_serializer = AccessKeySerializer()
         try:
