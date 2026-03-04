@@ -1085,15 +1085,14 @@ class HepatoxConsultation:
         heading = self.format_drug_heading(entry.drug_name, score)
         if entry.matched_livertox_row:
             note = (
-                "A LiverTox monograph was matched for this drug, but the local excerpt "
-                "text was empty in the current knowledge base snapshot."
+                "Automated assessment unavailable: a LiverTox monograph was matched, "
+                "but no local excerpt text is available in the current knowledge-base snapshot."
             )
         else:
             note = (
-                "No LiverTox excerpt was available for this drug, so its hepatotoxic "
-                "potential in this patient could not be evaluated automatically."
+                "Automated assessment unavailable: no local LiverTox excerpt is available for this drug."
             )
-        guidance = "Consider consulting the LiverTox monograph manually or alternative references before attributing causality."
+        guidance = "Review the LiverTox monograph manually before attributing causality."
         return f"{heading}\n{note} {guidance}\nBibliography source: LiverTox"
 
     # -------------------------------------------------------------------------

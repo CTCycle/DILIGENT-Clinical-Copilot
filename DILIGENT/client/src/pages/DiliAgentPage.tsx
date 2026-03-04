@@ -1,4 +1,4 @@
-import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import React, { useCallback, useEffect, useRef, useState } from "react";
 import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
 
@@ -63,7 +63,6 @@ export function DiliAgentPage(): React.JSX.Element {
         settings,
         form,
         message,
-        jsonPayload,
         exportUrl,
         jobId,
         jobProgress,
@@ -105,7 +104,6 @@ export function DiliAgentPage(): React.JSX.Element {
         }
         updateDiliAgent({
             message: "",
-            jsonPayload: null,
             exportUrl: null,
             jobId: null,
             jobProgress: 0,
@@ -135,7 +133,6 @@ export function DiliAgentPage(): React.JSX.Element {
             stopPoller();
             updateDiliAgent({
                 message: `[ERROR] ${pollError}`,
-                jsonPayload: null,
                 exportUrl: null,
                 jobStage: null,
                 jobStageMessage: null,
@@ -182,7 +179,6 @@ export function DiliAgentPage(): React.JSX.Element {
                     : null;
                 updateDiliAgent({
                     message: report || "[INFO] Clinical analysis completed.",
-                    jsonPayload: status.result,
                     exportUrl: newExportUrl,
                     jobStage: null,
                     jobStageMessage: null,
@@ -193,7 +189,6 @@ export function DiliAgentPage(): React.JSX.Element {
                     : "[ERROR] Clinical analysis failed.";
                 updateDiliAgent({
                     message: errorMessage,
-                    jsonPayload: status.result,
                     exportUrl: null,
                     jobStage: null,
                     jobStageMessage: null,
@@ -201,7 +196,6 @@ export function DiliAgentPage(): React.JSX.Element {
             } else if (status.status === "cancelled") {
                 updateDiliAgent({
                     message: "[INFO] Clinical analysis cancelled.",
-                    jsonPayload: status.result,
                     exportUrl: null,
                     jobStage: null,
                     jobStageMessage: null,
@@ -245,7 +239,6 @@ export function DiliAgentPage(): React.JSX.Element {
                 error instanceof Error ? error.message : "Unexpected error";
             updateDiliAgent({
                 message: `[ERROR] ${description}`,
-                jsonPayload: null,
                 exportUrl: null,
                 jobStage: null,
                 jobStageMessage: null,
@@ -272,7 +265,6 @@ export function DiliAgentPage(): React.JSX.Element {
             updateDiliAgent({
                 isRunning: false,
                 message: "[ERROR] At least one therapy drug is required for DILI analysis.",
-                jsonPayload: null,
                 exportUrl: null,
                 jobStage: null,
                 jobStageMessage: null,
@@ -309,7 +301,6 @@ export function DiliAgentPage(): React.JSX.Element {
             settings: DEFAULT_SETTINGS,
             form: { ...DEFAULT_FORM_STATE },
             message: "",
-            jsonPayload: null,
             exportUrl: null,
             jobId: null,
             jobProgress: 0,
@@ -354,15 +345,6 @@ export function DiliAgentPage(): React.JSX.Element {
             </p>
         </div>
     );
-
-    const jsonText = useMemo(() => {
-        if (jsonPayload === null || jsonPayload === undefined) return "";
-        try {
-            return JSON.stringify(jsonPayload, null, 2);
-        } catch {
-            return `${jsonPayload}`;
-        }
-    }, [jsonPayload]);
 
     const reportContent = (() => {
         if (isRunning && !isTerminalJobStatus(jobStatus)) {
@@ -622,15 +604,6 @@ export function DiliAgentPage(): React.JSX.Element {
                     </section>
                 </div>
 
-                {jsonPayload !== null && (
-                    <section className="card json-card">
-                        <div className="card-header">
-                            <h2>JSON Response</h2>
-                            <p className="helper">Raw payload returned by the backend for troubleshooting.</p>
-                        </div>
-                        <pre className="code-block">{jsonText}</pre>
-                    </section>
-                )}
             </main>
             <ConfirmModal
                 isOpen={isMissingLabsModalOpen}

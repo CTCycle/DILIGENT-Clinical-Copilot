@@ -57,6 +57,7 @@ DILIGENT Clinical Copilot is a local-first web application for Drug-Induced Live
 ### 3.4 Persistence and Retrieval
 - DB mode is runtime-selectable: embedded SQLite (`DB_EMBEDDED=true`) or external PostgreSQL (`DB_EMBEDDED=false`).
 - Clinical session outputs are persisted across normalized tables (sessions, sections, labs, drugs).
+- The full structured clinical job result payload is persisted per session in `clinical_session_results` for future resume/audit workflows.
 - Drug catalog and LiverTox monographs are stored in relational tables and used during matching.
 - RAG vectors are stored via LanceDB under `DILIGENT/resources/sources/vectors`.
 

@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import json
 from types import SimpleNamespace
 from typing import Any
 
@@ -9,7 +10,11 @@ from sqlalchemy.orm import sessionmaker
 
 from DILIGENT.server.services.clinical.livertox import LiverToxData
 from DILIGENT.server.repositories.serialization.data import DataSerializer
-from DILIGENT.server.repositories.schemas.models import Base, ClinicalSession
+from DILIGENT.server.repositories.schemas.models import (
+    Base,
+    ClinicalSession,
+    ClinicalSessionResult,
+)
 from DILIGENT.server.services.updater.livertox import LiverToxUpdater
 
 
@@ -81,6 +86,44 @@ def test_save_clinical_session_preserves_row_append_order() -> None:
     assert len(rows) == 2
     assert rows[0].patient_name == "existing"
     assert rows[1].patient_name == "incoming"
+
+
+# -----------------------------------------------------------------------------
+def test_save_clinical_session_persists_raw_result_payload() -> None:
+    serializer, engine = build_serializer()
+    raw_payload = {
+        "report": "# Clinical Visit Summary",
+        "issues": [{"severity": "warning", "message": "Example issue"}],
+        "matched_drugs": [{"raw_drug_name": "acetaminophen"}],
+    }
+
+    serializer.save_clinical_session(
+        {
+            "patient_name": "payload-patient",
+            "session_timestamp": "2025-01-03T00:00:00",
+            "session_result_payload": raw_payload,
+        }
+    )
+
+    factory = sessionmaker(bind=engine, future=True)
+    with factory() as db_session:
+        session_row = (
+            db_session.execute(select(ClinicalSession).order_by(ClinicalSession.id.desc()))
+            .scalars()
+            .first()
+        )
+        result_row = (
+            db_session.execute(
+                select(ClinicalSessionResult).order_by(ClinicalSessionResult.id.desc())
+            )
+            .scalars()
+            .first()
+        )
+
+    assert session_row is not None
+    assert result_row is not None
+    assert result_row.session_id == session_row.id
+    assert json.loads(result_row.payload_json) == raw_payload
 
 
 # -----------------------------------------------------------------------------

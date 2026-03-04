@@ -35,7 +35,26 @@ class ClinicalSession(Base):
     sections = relationship("ClinicalSessionSection", back_populates="session")
     labs = relationship("ClinicalSessionLab", back_populates="session")
     drugs = relationship("ClinicalSessionDrug", back_populates="session")
+    result_payload = relationship(
+        "ClinicalSessionResult",
+        back_populates="session",
+        uselist=False,
+    )
     __table_args__ = (Index("ix_clinical_sessions_timestamp", "session_timestamp"),)
+
+
+###############################################################################
+class ClinicalSessionResult(Base):
+    __tablename__ = "clinical_session_results"
+    id = Column(Integer, primary_key=True, autoincrement=True)
+    session_id = Column(Integer, ForeignKey(CLINICAL_SESSIONS_ID_FK), nullable=False)
+    payload_json = Column(Text, nullable=False)
+    created_at = Column(DateTime, nullable=False, server_default=text("CURRENT_TIMESTAMP"))
+    session = relationship("ClinicalSession", back_populates="result_payload")
+    __table_args__ = (
+        UniqueConstraint("session_id", name="uq_clinical_session_results_session_id"),
+        Index("ix_clinical_session_results_session_id", "session_id"),
+    )
 
 
 ###############################################################################
