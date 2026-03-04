@@ -512,6 +512,7 @@ class ClinicalSessionEndpoint:
                 "anamnesis": request_payload.anamnesis,
                 "has_hepatic_diseases": request_payload.has_hepatic_diseases,
                 "use_rag": request_payload.use_rag,
+                "use_web_search": request_payload.use_web_search,
                 "drugs": request_payload.drugs,
                 "alt": request_payload.alt,
                 "alt_max": request_payload.alt_max,
@@ -725,6 +726,7 @@ class ClinicalSessionEndpoint:
             prepared_inputs=prepared_inputs,
             visit_date=payload.visit_date,
             rag_query=rag_query,
+            use_web_search=payload.use_web_search,
             progress_callback=consultation_progress_callback,
         )
         elapsed = time.perf_counter() - start_time

@@ -99,7 +99,7 @@ export function useAccessKeyManager(
     setIsSaving(true);
     setErrorMessage("");
     try {
-      const activated = await activateAccessKey(keyId);
+      const activated = await activateAccessKey(keyId, provider);
       setKeys((current) =>
         current.map((item) => ({
           ...item,
@@ -116,13 +116,13 @@ export function useAccessKeyManager(
     } finally {
       setIsSaving(false);
     }
-  }, []);
+  }, [provider]);
 
   const handleDelete = useCallback(async (keyId: number): Promise<void> => {
     setIsSaving(true);
     setErrorMessage("");
     try {
-      await deleteAccessKey(keyId);
+      await deleteAccessKey(keyId, provider);
       setKeys((current) => current.filter((item) => item.id !== keyId));
       setVisibleRows((current) => {
         const next = { ...current };
@@ -136,7 +136,7 @@ export function useAccessKeyManager(
     } finally {
       setIsSaving(false);
     }
-  }, []);
+  }, [provider]);
 
   const toggleVisibility = useCallback((keyId: number): void => {
     setVisibleRows((current) => ({ ...current, [keyId]: !current[keyId] }));

@@ -23,6 +23,7 @@ from DILIGENT.server.configurations import server_settings
 from DILIGENT.common.constants import LIVERTOX_BASE_URL, ARCHIVES_PATH
 from DILIGENT.common.utils.logger import logger
 from DILIGENT.server.services.text.normalization import normalize_whitespace
+from DILIGENT.server.services.updater.livertoxsanitizer import LiverToxExcerptSanitizer
 from DILIGENT.server.repositories.serialization.data import DataSerializer
 from DILIGENT.server.repositories.database.backend import database
 
@@ -116,6 +117,7 @@ class LiverToxUpdater:
         self.redownload = redownload
         self.serializer = serializer or DataSerializer()
         self.database = database_client
+        self.excerpt_sanitizer = LiverToxExcerptSanitizer()
         self.header_row = 1
 
         self.base_url = LIVERTOX_BASE_URL
@@ -1062,7 +1064,7 @@ class LiverToxUpdater:
         sanitized = sanitized[sanitized["drug_name"] != ""]
         numeric_mask = sanitized["drug_name"].str.fullmatch(r"\d+")
         sanitized = sanitized[~numeric_mask]
-        sanitized["excerpt"] = sanitized["excerpt"].astype(str).str.strip()
+        sanitized["excerpt"] = sanitized["excerpt"].apply(self.sanitize_excerpt)
         sanitized.loc[sanitized["excerpt"] == "", "excerpt"] = pd.NA
         if "synonyms" not in sanitized.columns:
             sanitized["synonyms"] = pd.NA
@@ -1070,6 +1072,18 @@ class LiverToxUpdater:
             pd.notnull(sanitized["synonyms"]), pd.NA
         )
         return sanitized.reset_index(drop=True)
+
+    # -------------------------------------------------------------------------
+    def sanitize_excerpt(self, value: Any) -> str | Any:
+        if value is None or pd.isna(value):
+            return pd.NA
+        text = str(value).strip()
+        if not text or text.lower() in {"nan", "none", "<na>"}:
+            return pd.NA
+        cleaned = self.excerpt_sanitizer.sanitize(text)
+        if not cleaned:
+            return pd.NA
+        return cleaned
 
     # -------------------------------------------------------------------------
     def finalize_dataset(self, frame: pd.DataFrame) -> pd.DataFrame:

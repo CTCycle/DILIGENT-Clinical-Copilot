@@ -8,6 +8,7 @@ import {
 } from "./context/AppStateContext";
 import { NavSidebar } from "./components/NavSidebar";
 import { DiluAgentPage } from "./pages/DiluAgentPage";
+import { DataInspectionPage } from "./pages/DataInspectionPage";
 import { ModelConfigPage } from "./pages/ModelConfigPage";
 
 // ---------------------------------------------------------------------------
@@ -39,6 +40,7 @@ function AppContent(): React.JSX.Element {
       <NavSidebar onNavigate={navigateToPage} />
       <div className="app-main">
         {state.activePage === "dili-agent" && <DiluAgentPage />}
+        {state.activePage === "data-inspection" && <DataInspectionPage />}
         {state.activePage === "model-config" && <ModelConfigPage />}
       </div>
     </div>

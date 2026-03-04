@@ -315,6 +315,13 @@ class ExternalDataSettings:
     max_excerpt_length: int
     rxnav_request_timeout: float
     rxnav_max_concurrency: int
+    tavily_request_timeout_s: float
+    tavily_search_cache_ttl_s: int
+    tavily_extract_cache_ttl_s: int
+    tavily_rate_limit_per_minute: int
+    tavily_fast_max_results: int
+    tavily_thorough_max_results: int
+    tavily_extract_top_urls: int
 
 # -----------------------------------------------------------------------------
 @dataclass(frozen=True)
@@ -612,6 +619,37 @@ def build_external_data_settings(
         coerce_float(data.get("ollama_server_start_timeout"), 15.0),
         1.0,
     )
+    tavily_request_timeout_s = max(
+        coerce_float(data.get("tavily_request_timeout_s"), 20.0),
+        1.0,
+    )
+    tavily_search_cache_ttl_s = coerce_positive_int(
+        data.get("tavily_search_cache_ttl_s"),
+        6 * 60 * 60,
+    )
+    tavily_extract_cache_ttl_s = coerce_positive_int(
+        data.get("tavily_extract_cache_ttl_s"),
+        3 * 24 * 60 * 60,
+    )
+    tavily_rate_limit_per_minute = coerce_positive_int(
+        data.get("tavily_rate_limit_per_minute"),
+        30,
+    )
+    tavily_fast_max_results = coerce_positive_int(
+        data.get("tavily_fast_max_results"),
+        5,
+    )
+    tavily_thorough_max_results = coerce_positive_int(
+        data.get("tavily_thorough_max_results"),
+        10,
+    )
+    if tavily_thorough_max_results < tavily_fast_max_results:
+        tavily_thorough_max_results = tavily_fast_max_results
+    tavily_extract_top_urls = min(
+        coerce_positive_int(data.get("tavily_extract_top_urls"), 3),
+        5,
+    )
+
     return ExternalDataSettings(
         default_llm_timeout=default_llm_timeout,
         parser_llm_timeout=parser_timeout,
@@ -638,6 +676,13 @@ def build_external_data_settings(
             data.get("rxnav_max_concurrency"),
             16,
         ),
+        tavily_request_timeout_s=tavily_request_timeout_s,
+        tavily_search_cache_ttl_s=tavily_search_cache_ttl_s,
+        tavily_extract_cache_ttl_s=tavily_extract_cache_ttl_s,
+        tavily_rate_limit_per_minute=tavily_rate_limit_per_minute,
+        tavily_fast_max_results=tavily_fast_max_results,
+        tavily_thorough_max_results=tavily_thorough_max_results,
+        tavily_extract_top_urls=tavily_extract_top_urls,
     )
 
 # -----------------------------------------------------------------------------

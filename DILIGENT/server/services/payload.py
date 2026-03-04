@@ -79,6 +79,7 @@ def sanitize_dili_payload(
     alp: str | None,
     alp_max: str | None,
     use_rag: bool,
+    use_web_search: bool = False,
 ) -> dict[str, Any]:
     if anamnesis is None or drugs is None:
         raise HTTPException(
@@ -106,4 +107,5 @@ def sanitize_dili_payload(
         "alp": sanitize_field(alp),
         "alp_max": sanitize_field(alp_max),
         "use_rag": bool(use_rag),
+        "use_web_search": bool(use_web_search),
     }

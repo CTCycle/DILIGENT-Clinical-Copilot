@@ -135,6 +135,7 @@ def test_request_drug_analysis_retries_on_transient_failure() -> None:
             visit_date=date(2025, 4, 14),
             pattern_summary="Observed liver injury pattern: hepatocellular.",
             metadata={"likelihood_score": "A"},
+            web_evidence="No web evidence available (reason: web search disabled for this session).",
         )
     )
 

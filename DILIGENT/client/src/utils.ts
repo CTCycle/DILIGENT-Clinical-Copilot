@@ -98,6 +98,7 @@ export function buildClinicalPayload(
     alp: sanitizeField(form.alp),
     alp_max: sanitizeField(form.alpMax),
     use_rag: form.useRag,
+    use_web_search: form.useWebSearch,
     use_cloud_services: settings.useCloudServices,
     llm_provider: settings.provider,
     cloud_model: settings.cloudModel,

@@ -4,6 +4,7 @@ import remarkGfm from "remark-gfm";
 
 import { ConfirmModal } from "../components/ConfirmModal";
 import {
+    DEFAULT_FORM_STATE,
     DEFAULT_SETTINGS,
     REPORT_EXPORT_FILENAME,
 } from "../constants";
@@ -284,17 +285,7 @@ export function DiluAgentPage(): React.JSX.Element {
         }
         updateDiluAgent({
             settings: DEFAULT_SETTINGS,
-            form: {
-                patientName: "",
-                visitDate: "",
-                anamnesis: "",
-                drugs: "",
-                alt: "",
-                altMax: "",
-                alp: "",
-                alpMax: "",
-                useRag: false,
-            },
+            form: { ...DEFAULT_FORM_STATE },
             message: "",
             jsonPayload: null,
             exportUrl: null,
@@ -478,6 +469,21 @@ export function DiluAgentPage(): React.JSX.Element {
                                                     id="use-rag"
                                                     checked={form.useRag}
                                                     onChange={(e) => handleFormChange("useRag", e.target.checked)}
+                                                />
+                                                <span className="toggle-track" aria-hidden="true">
+                                                    <span className="toggle-thumb" />
+                                                </span>
+                                            </label>
+                                        </div>
+                                        <div className="toggle-row">
+                                            <span className="toggle-label">Enable web search for supporting evidence</span>
+                                            <label className="toggle-switch">
+                                                <span className="visually-hidden">Enable web search for supporting evidence</span>
+                                                <input
+                                                    type="checkbox"
+                                                    id="use-web-search"
+                                                    checked={form.useWebSearch}
+                                                    onChange={(e) => handleFormChange("useWebSearch", e.target.checked)}
                                                 />
                                                 <span className="toggle-track" aria-hidden="true">
                                                     <span className="toggle-thumb" />

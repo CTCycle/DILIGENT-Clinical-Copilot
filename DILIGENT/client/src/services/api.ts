@@ -318,18 +318,30 @@ export async function createAccessKey(
   });
 }
 
-export async function activateAccessKey(id: number): Promise<AccessKeyRecord> {
+export async function activateAccessKey(
+  id: number,
+  provider?: AccessKeyProvider,
+): Promise<AccessKeyRecord> {
+  const providerQuery = provider
+    ? `?provider=${encodeURIComponent(provider)}`
+    : "";
   return requestJson<AccessKeyRecord>(
-    `${API_BASE_URL}/access-keys/${encodeURIComponent(String(id))}/activate`,
+    `${API_BASE_URL}/access-keys/${encodeURIComponent(String(id))}/activate${providerQuery}`,
     {
       method: "PUT",
     },
   );
 }
 
-export async function deleteAccessKey(id: number): Promise<void> {
+export async function deleteAccessKey(
+  id: number,
+  provider?: AccessKeyProvider,
+): Promise<void> {
+  const providerQuery = provider
+    ? `?provider=${encodeURIComponent(provider)}`
+    : "";
   await requestJson<{ status: string; deleted: boolean }>(
-    `${API_BASE_URL}/access-keys/${encodeURIComponent(String(id))}`,
+    `${API_BASE_URL}/access-keys/${encodeURIComponent(String(id))}${providerQuery}`,
     {
       method: "DELETE",
     },

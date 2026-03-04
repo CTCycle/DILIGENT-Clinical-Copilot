@@ -47,7 +47,14 @@
     "livertox_monograph_max_workers": 4,
     "max_excerpt_length": 8000,
     "rxnav_request_timeout": 12.0,
-    "rxnav_max_concurrency": 10
+    "rxnav_max_concurrency": 10,
+    "tavily_request_timeout_s": 20.0,
+    "tavily_search_cache_ttl_s": 21600,
+    "tavily_extract_cache_ttl_s": 259200,
+    "tavily_rate_limit_per_minute": 30,
+    "tavily_fast_max_results": 5,
+    "tavily_thorough_max_results": 10,
+    "tavily_extract_top_urls": 3
   },
   "ingestion": {
     "drug_name_min_length": 3,
