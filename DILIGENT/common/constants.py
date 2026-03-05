@@ -33,7 +33,7 @@ REPORT_EXPORT_FILENAME = "clinical_report.md"
 ###############################################################################
 # Cloud provider API bases
 OPENAI_API_BASE = "https://api.openai.com/v1"
-GEMINI_API_BASE = "https://generativelanguage.googleapis.com/v1beta"
+GEMINI_API_BASE = "https://generativelanguage.googleapis.com/v1"
 
 PARSING_MODEL_CHOICES = [
     "qwen3:1.7b",
