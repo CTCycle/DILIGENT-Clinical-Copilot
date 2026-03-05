@@ -368,7 +368,6 @@ export function DiliAgentPage(): React.JSX.Element {
         <>
             <main className="page-container">
                 <header className="page-header">
-                    <p className="eyebrow">DILIGENT Clinical Copilot</p>
                     <h1>Drug-Induced Liver Injury analysis</h1>
                     <p className="lede">
                         Provide clinical context and lab data to generate a structured hepatotoxicity assessment.

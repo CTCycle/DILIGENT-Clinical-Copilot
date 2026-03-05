@@ -33,6 +33,4 @@ If changes materially affect behavior, architecture, or usage, update the releva
 ## EXECUTION RULES
 - Use PowerShell by default for terminal commands in this repository.
 - Use `cmd /c` only when invoking `.bat` scripts or CMD-specific syntax.
-
-
-
+- For frontend Node workflows, run `npm` through `runtimes` when `npm` is not directly available in PATH.
