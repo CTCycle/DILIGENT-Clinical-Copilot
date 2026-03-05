@@ -159,7 +159,7 @@ class SimilaritySearch:
             cloud_embedding_model=server_settings.rag.cloud_embedding_model,
         )
         try:
-            self.vector_database.initialize(False)
+            self.vector_database.initialize()
         except Exception as exc:  # noqa: BLE001
             logger.error("Failed to initialize vector database: %s", exc)
 
@@ -225,4 +225,5 @@ class SimilaritySearch:
 
 
 __all__ = ["EmbeddingGenerator", "SimilaritySearch"]
+
 

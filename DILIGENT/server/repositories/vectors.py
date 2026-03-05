@@ -7,7 +7,7 @@ from typing import Any, Iterator, Literal, cast
 import lancedb
 import pyarrow as pa
 from lancedb.db import DBConnection
-from lancedb.table import LanceTable, Table
+from lancedb.table import Table
 
 from DILIGENT.common.utils.logger import logger
 
@@ -62,18 +62,8 @@ class LanceVectorDatabase:
         return self.connection
 
     # -------------------------------------------------------------------------
-    def initialize(self, reset_table: bool = False) -> None:
-        connection = self.connect()
-        if reset_table and self.collection_name in connection.table_names():
-            logger.info(
-                "Dropping existing LanceDB table '%s'", self.collection_name
-            )
-            connection.drop_table(self.collection_name)
-        if reset_table:
-            self.table = None
-            self.index_ready = False
-            self.index_creation_attempted = False
-            self.embedding_size = None
+    def initialize(self) -> None:
+        self.connect()
 
     # -------------------------------------------------------------------------
     def get_table(self) -> Table:
@@ -113,6 +103,19 @@ class LanceVectorDatabase:
             embedding_length = len(first_embedding)
         if embedding_length > 0:
             self.configure_embedding_size(embedding_length)
+        if self.embedding_size is not None and self.embedding_size > 0:
+            records, discarded = self._filter_records_by_embedding_size(
+                records,
+                self.embedding_size,
+            )
+            if discarded:
+                logger.warning(
+                    "Discarded %d embeddings with unexpected dimension (expected %d)",
+                    discarded,
+                    self.embedding_size,
+                )
+            if not records:
+                return
         table = self.get_table()
         table.add(records)
         self.ensure_vector_index(table)
@@ -121,41 +124,29 @@ class LanceVectorDatabase:
     def configure_embedding_size(self, embedding_size: int) -> None:
         if embedding_size <= 0:
             return
-        if self.embedding_size == embedding_size:
-            return
-        current_field = self._get_embedding_field()
-        if current_field is None:
-            return
-        if isinstance(current_field.type, pa.FixedSizeListType):
-            if current_field.type.list_size == embedding_size:
-                self.embedding_size = embedding_size
-                return
-        new_schema = self._schema_with_embedding_size(embedding_size)
-        if new_schema == self.schema and self.embedding_size == embedding_size:
-            return
-        existing_records = self._load_existing_records()
-        connection = self.connect()
-        if self.collection_name in connection.table_names():
-            logger.info(
-                "Recreating LanceDB table '%s' with embedding size %d",
-                self.collection_name,
-                embedding_size,
-            )
-            connection.drop_table(self.collection_name)
-        self._reset_table_state(new_schema, embedding_size)
-        table = self.get_table()
-        if existing_records:
-            valid_records, discarded = self._filter_records_by_embedding_size(
-                existing_records, embedding_size
-            )
-            if discarded:
+        persisted_size = self._read_existing_embedding_size()
+        if persisted_size is not None:
+            self.embedding_size = persisted_size
+            if embedding_size != persisted_size:
                 logger.warning(
-                    "Discarded %d embeddings that did not match new dimension %d during LanceDB schema update",
-                    discarded,
+                    "Skipping embeddings with dimension %d because LanceDB table '%s' uses dimension %d",
                     embedding_size,
+                    self.collection_name,
+                    persisted_size,
                 )
-            if valid_records:
-                table.add(valid_records)
+            return
+        if self.embedding_size is None:
+            self.embedding_size = embedding_size
+        elif self.embedding_size != embedding_size:
+            logger.warning(
+                "Skipping embeddings with dimension %d because active dataset uses dimension %d",
+                embedding_size,
+                self.embedding_size,
+            )
+            return
+        connection = self.connect()
+        if self.table is None and self.collection_name not in connection.table_names():
+            self.schema = self._schema_with_embedding_size(self.embedding_size)
 
     # -------------------------------------------------------------------------
     def ensure_vector_index(self, table: Table | None = None) -> None:
@@ -202,11 +193,24 @@ class LanceVectorDatabase:
             self.index_ready = False
 
     # -------------------------------------------------------------------------
-    def _get_embedding_field(self) -> pa.Field | None:
+    def _read_existing_embedding_size(self) -> int | None:
+        table = self.table
+        if table is None:
+            connection = self.connect()
+            if self.collection_name not in connection.table_names():
+                return None
+            try:
+                table = connection.open_table(self.collection_name)
+            except ValueError:
+                return None
+            self.table = table
         try:
-            return self.schema.field("embedding")
+            embedding_field = table.schema.field("embedding")
         except KeyError:
             return None
+        if isinstance(embedding_field.type, pa.FixedSizeListType):
+            return int(embedding_field.type.list_size)
+        return None
 
     def _schema_with_embedding_size(self, embedding_size: int) -> pa.Schema:
         desired_type = pa.list_(pa.float32(), embedding_size)
@@ -217,31 +221,6 @@ class LanceVectorDatabase:
             else:
                 fields.append(field)
         return pa.schema(fields)
-
-    def _load_existing_records(self) -> list[dict[str, Any]]:
-        if self.table is None:
-            return []
-        try:
-            row_count = self.table.count_rows()
-        except Exception:  # noqa: BLE001
-            return []
-        if row_count <= 0:
-            return []
-        try:
-            return self.table.to_arrow().to_pylist()
-        except Exception as exc:  # noqa: BLE001
-            logger.warning(
-                "Unable to cache existing embeddings while updating LanceDB schema: %s",
-                exc,
-            )
-            return []
-
-    def _reset_table_state(self, schema: pa.Schema, embedding_size: int) -> None:
-        self.schema = schema
-        self.table = None
-        self.index_ready = False
-        self.index_creation_attempted = False
-        self.embedding_size = embedding_size
 
     def _filter_records_by_embedding_size(
         self, records: list[dict[str, Any]], embedding_size: int
@@ -334,21 +313,9 @@ class LanceVectorDatabase:
         return data.to_pylist()
 
     # -------------------------------------------------------------------------
-    def drop(self) -> None:
-        connection = self.connect()
-        if self.collection_name in connection.table_names():
-            logger.info("Dropping LanceDB table '%s'", self.collection_name)
-            connection.drop_table(self.collection_name)
-        self.table = None
-        self.index_ready = False
-        self.index_creation_attempted = False
-
-    # -------------------------------------------------------------------------
     def to_json(self, limit: int | None = None) -> str:
         records = self.load_embeddings(limit=limit)
         return json.dumps(records, ensure_ascii=False, indent=2)
 
 
 VectorDatabase = LanceVectorDatabase
-
-

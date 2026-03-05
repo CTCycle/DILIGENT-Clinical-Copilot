@@ -14,14 +14,10 @@ from DILIGENT.common.utils.logger import logger
 ###############################################################################
 class DatabaseBackend(Protocol):
     db_path: str | None
-    engine: Any   
+    engine: Any
 
     # -------------------------------------------------------------------------
     def load_from_database(self, table_name: str) -> pd.DataFrame:
-        ...
-
-    # -------------------------------------------------------------------------
-    def save_into_database(self, df: pd.DataFrame, table_name: str) -> None:
         ...
 
     # -------------------------------------------------------------------------
@@ -49,6 +45,7 @@ BackendFactory = Callable[[DatabaseSettings], DatabaseBackend]
 # -----------------------------------------------------------------------------
 def build_sqlite_backend(settings: DatabaseSettings) -> DatabaseBackend:
     return SQLiteRepository(settings)
+
 
 # -----------------------------------------------------------------------------
 def build_postgres_backend(settings: DatabaseSettings) -> DatabaseBackend:
@@ -82,14 +79,10 @@ class DILIGENTDatabase:
     @property
     def db_path(self) -> str | None:
         return getattr(self.backend, "db_path", None)
-    
+
     # -------------------------------------------------------------------------
     def load_from_database(self, table_name: str) -> pd.DataFrame:
         return self.backend.load_from_database(table_name)
-
-    # -------------------------------------------------------------------------
-    def save_into_database(self, df: pd.DataFrame, table_name: str) -> None:
-        self.backend.save_into_database(df, table_name)
 
     # -------------------------------------------------------------------------
     def upsert_into_database(self, df: pd.DataFrame, table_name: str) -> None:
@@ -112,6 +105,5 @@ class DILIGENTDatabase:
     ) -> pd.DataFrame:
         return self.backend.load_paginated(table_name, offset, limit)
 
-    
-database = DILIGENTDatabase()
 
+database = DILIGENTDatabase()

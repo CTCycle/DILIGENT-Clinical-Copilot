@@ -17,10 +17,6 @@ class DataRepositoryQueries:
         return self.database.load_from_database(table_name)
 
     # -------------------------------------------------------------------------
-    def save_table(self, dataset: pd.DataFrame, table_name: str) -> None:
-        self.database.save_into_database(dataset, table_name)
-
-    # -------------------------------------------------------------------------
     def upsert_table(self, dataset: pd.DataFrame, table_name: str) -> None:
         self.database.upsert_into_database(dataset, table_name)
 
@@ -39,4 +35,3 @@ class DataRepositoryQueries:
         self, table_name: str, offset: int, limit: int
     ) -> pd.DataFrame:
         return self.database.load_paginated(table_name, offset, limit)
-
