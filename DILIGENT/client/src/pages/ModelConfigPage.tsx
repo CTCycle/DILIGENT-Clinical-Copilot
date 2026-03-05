@@ -135,6 +135,21 @@ function isExtractionModel(model: LocalModelCard): boolean {
     return extractionKeywords.some((keyword) => value.includes(keyword)) || isSmallModel(model);
 }
 
+const ClinicalRoleIcon = () => (
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+        <path d="M12 21s-6.8-4.9-9-8a4.8 4.8 0 0 1 7-6l2 2 2-2a4.8 4.8 0 0 1 7 6c-2.2 3.1-9 8-9 8Z" />
+    </svg>
+);
+
+const TextExtractionRoleIcon = () => (
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+        <path d="M14 3H6a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V9z" />
+        <path d="M14 3v6h6" />
+        <path d="M8 13h8" />
+        <path d="M8 17h5" />
+    </svg>
+);
+
 export function ModelConfigPage(): React.JSX.Element {
     const { state, updateDiliAgent } = useAppState();
     const { settings, isPulling } = state.diliAgent;
@@ -407,7 +422,6 @@ export function ModelConfigPage(): React.JSX.Element {
     return (
         <main className="page-container model-config-page">
             <header className="page-header">
-                <p className="eyebrow">DILIGENT Clinical Copilot</p>
                 <h1>Model Configurations</h1>
                 <p className="lede">Adjust runtime preferences for DILI analysis.</p>
             </header>
@@ -497,7 +511,7 @@ export function ModelConfigPage(): React.JSX.Element {
                             <div className="model-config-selection-section">
                                 <div className="model-config-selection-header">
                                     <h3 className="modal-section-title">Model Roles</h3>
-                                    <p className="model-config-caption">Choose both roles from the same model list.</p>
+                                    <p className="model-config-caption">Use row icons to assign clinical and extraction roles.</p>
                                 </div>
                                 <div className="model-config-selection-summary" role="group" aria-label="Selected local model roles">
                                     <div className="model-config-selected-card">
@@ -529,7 +543,14 @@ export function ModelConfigPage(): React.JSX.Element {
                                                 className={`model-config-model-item ${isSelected ? "is-selected" : ""}`}
                                             >
                                                 <div className="model-config-model-details">
-                                                    <span className="model-config-model-name">{model.name}</span>
+                                                    <div className="model-config-model-name-row">
+                                                        <span className="model-config-model-name">{model.name}</span>
+                                                        <span
+                                                            className={`model-config-availability-pill ${model.available_in_ollama ? "is-available" : "is-unavailable"}`}
+                                                        >
+                                                            {model.available_in_ollama ? "Installed" : "Not installed"}
+                                                        </span>
+                                                    </div>
                                                     <span className="model-config-model-description" title={model.description}>
                                                         {model.description}
                                                     </span>
@@ -543,11 +564,6 @@ export function ModelConfigPage(): React.JSX.Element {
                                                     </div>
                                                 </div>
                                                 <div className="model-config-model-item-side">
-                                                    <span
-                                                        className={`model-config-availability-pill ${model.available_in_ollama ? "is-available" : "is-unavailable"}`}
-                                                    >
-                                                        {model.available_in_ollama ? "Installed" : "Not installed"}
-                                                    </span>
                                                     <div className="model-config-model-action-row">
                                                         {!model.available_in_ollama && (
                                                             <button
@@ -560,22 +576,26 @@ export function ModelConfigPage(): React.JSX.Element {
                                                             </button>
                                                         )}
                                                         <button
-                                                            className={`btn ${isClinicalSelected ? "btn-tertiary" : "btn-secondary"} model-config-inline-btn`}
+                                                            className={`access-key-action model-config-role-action ${isClinicalSelected ? "is-active" : ""}`}
                                                             type="button"
                                                             onClick={() => handleRoleSelection("clinical", model.name)}
                                                             disabled={localSelectionDisabled || isClinicalSelected}
                                                             aria-pressed={isClinicalSelected}
+                                                            aria-label={isClinicalSelected ? "Clinical model selected" : `Set ${model.name} as clinical model`}
+                                                            title={isClinicalSelected ? "Clinical model selected" : "Set as clinical model"}
                                                         >
-                                                            {isClinicalSelected ? "Clinical selected" : "Set clinical"}
+                                                            <ClinicalRoleIcon />
                                                         </button>
                                                         <button
-                                                            className={`btn ${isTextExtractionSelected ? "btn-tertiary" : "btn-secondary"} model-config-inline-btn`}
+                                                            className={`access-key-action model-config-role-action ${isTextExtractionSelected ? "is-active" : ""}`}
                                                             type="button"
                                                             onClick={() => handleRoleSelection("text_extraction", model.name)}
                                                             disabled={localSelectionDisabled || isTextExtractionSelected}
                                                             aria-pressed={isTextExtractionSelected}
+                                                            aria-label={isTextExtractionSelected ? "Text extraction model selected" : `Set ${model.name} as text extraction model`}
+                                                            title={isTextExtractionSelected ? "Text extraction model selected" : "Set as text extraction model"}
                                                         >
-                                                            {isTextExtractionSelected ? "Extraction selected" : "Set extraction"}
+                                                            <TextExtractionRoleIcon />
                                                         </button>
                                                     </div>
                                                 </div>

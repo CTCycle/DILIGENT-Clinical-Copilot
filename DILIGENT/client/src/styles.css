@@ -2226,6 +2226,13 @@ input[type="date"]::-webkit-calendar-picker-indicator:hover {
   word-break: break-word;
 }
 
+.model-config-model-name-row {
+  display: inline-flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: var(--space-xs);
+}
+
 .model-config-model-description {
   margin: 0;
   color: var(--color-text-secondary);
@@ -2255,6 +2262,17 @@ input[type="date"]::-webkit-calendar-picker-indicator:hover {
   padding: 8px 12px;
   border-radius: var(--radius-md);
   font-size: var(--font-sm);
+}
+
+.model-config-role-action {
+  width: 34px;
+  height: 34px;
+  flex-shrink: 0;
+}
+
+.model-config-role-action svg {
+  width: 15px;
+  height: 15px;
 }
 
 .model-config-availability-pill {
