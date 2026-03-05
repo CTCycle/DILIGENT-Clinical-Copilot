@@ -1,22 +1,7 @@
-{  
+{
   "jobs": {
     "polling_interval": 1
   },
-  "database": {
-    "embedded_database": true,
-    "engine": "postgres",
-    "host": "localhost",
-    "port": 5432,
-    "database_name": "DILIGENT",
-    "username": "postgres",
-    "password": "",
-    "ssl": false,
-    "ssl_ca": null,
-    "connect_timeout": 30,
-    "insert_batch_size": 1000,
-    "insert_commit_interval": 5,
-    "select_page_size": 2000
-  },    
   "rag": {
     "vector_collection_name": "documents",
     "chunk_size": 1024,
@@ -84,6 +69,5 @@
     "catalog_index_limit": 75000,
     "catalog_candidate_limit": 750
   }
-}  
-
+}
 
