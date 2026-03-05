@@ -26,7 +26,7 @@ from DILIGENT.common.utils.types import (
 OLLAMA_DEFAULT_HOST = "localhost"
 OLLAMA_DEFAULT_PORT = 11434
 OLLAMA_DEFAULT_SCHEME = "http"
-FASTAPI_TITLE = "DILIGENT Clinical Copilot Backend"
+FASTAPI_TITLE = "DILI Backend"
 FASTAPI_VERSION = "1.0.0"
 FASTAPI_DESCRIPTION = "FastAPI backend"
 

@@ -10,7 +10,7 @@ const DiligentLogo = () => (
         role="img"
         aria-labelledby="diligent-logo-title"
     >
-        <title id="diligent-logo-title">DILIGENT Clinical Copilot</title>
+        <title id="diligent-logo-title">Application logo</title>
         <rect x="2" y="2" width="32" height="32" rx="8" fill="rgba(22, 163, 74, 0.24)" />
         <path
             d="M10 26V10h6.5c6 0 9.5 3.1 9.5 8s-3.5 8-9.5 8H10zm5-4h1.2c3.2 0 5-1.3 5-4s-1.8-4-5-4H15v8z"
@@ -89,7 +89,7 @@ export function NavSidebar({ onNavigate }: NavSidebarProps): React.JSX.Element {
 
     return (
         <nav className="nav-sidebar" aria-label="Main navigation">
-            <div className="nav-brand" aria-label="DILIGENT Clinical Copilot">
+            <div className="nav-brand">
                 <span className="nav-brand-logo">
                     <DiligentLogo />
                 </span>
