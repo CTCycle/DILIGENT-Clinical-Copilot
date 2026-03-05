@@ -239,18 +239,30 @@ class CloudLLMClient:
         return contents, system_text
 
     # ---------------------------------------------------------------------
+    @staticmethod
+    def resolve_gemini_model_resource(model: str | None) -> str:
+        model_name = (model or "").strip()
+        if not model_name:
+            raise LLMError("Gemini model is required")
+        if model_name.startswith("models/"):
+            return model_name
+        return f"models/{model_name}"
+
+    # ---------------------------------------------------------------------
     async def chat_gemini(
         self,
         *,
         model: str,
         messages: list[dict[str, str]],
     ) -> dict[str, Any] | str:
+        resolved_model = model or self.default_model
+        model_resource = self.resolve_gemini_model_resource(resolved_model)
         contents, system_text = self.to_gemini_contents(messages)
-        path = f"/models/{model or self.default_model}:generateContent"
+        path = f"/{model_resource}:generateContent"
 
         body: dict[str, Any] = {"contents": contents}
         if system_text:
-            body["system_instruction"] = {"parts": [{"text": system_text}]}
+            body["systemInstruction"] = {"parts": [{"text": system_text}]}
 
         try:
             resp = await self.client.post(path, json=body)
@@ -314,11 +326,17 @@ class CloudLLMClient:
         model: str,
         input_texts: list[str],
     ) -> list[list[float]]:
+        resolved_model = model or self.default_model
+        model_resource = self.resolve_gemini_model_resource(resolved_model)
         requests_payload = [
-            {"content": {"parts": [{"text": text}]}} for text in input_texts
+            {
+                "model": model_resource,
+                "content": {"parts": [{"text": text}]},
+            }
+            for text in input_texts
         ]
         body = {"requests": requests_payload}
-        path = f"/models/{model or self.default_model}:batchEmbedContents"
+        path = f"/{model_resource}:batchEmbedContents"
 
         try:
             resp = await self.client.post(path, json=body)
