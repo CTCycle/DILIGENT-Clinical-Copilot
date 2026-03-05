@@ -122,14 +122,6 @@ class PostgresRepository:
             data = pd.read_sql_table(safe_table_name, conn)
         return data
 
-    # -------------------------------------------------------------------------
-    def save_into_database(self, df: pd.DataFrame, table_name: str) -> None:
-        safe_table_name = self.sanitize_table_name(table_name)
-        with self.engine.begin() as conn:
-            inspector = inspect(conn)
-            if inspector.has_table(safe_table_name):
-                conn.execute(sqlalchemy.text(f'DELETE FROM "{safe_table_name}"'))
-            df.to_sql(safe_table_name, conn, if_exists="append", index=False)
 
     # -------------------------------------------------------------------------
     def upsert_into_database(self, df: pd.DataFrame, table_name: str) -> None:
@@ -182,5 +174,6 @@ class PostgresRepository:
                 query, conn, params={"limit": safe_limit, "offset": safe_offset}
             )
         return data
+
 
 

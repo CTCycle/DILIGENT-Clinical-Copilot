@@ -16,7 +16,6 @@ class RagEmbeddingUpdater:
         use_cloud_embeddings: bool | None = None,
         cloud_provider: str | None = None,
         cloud_embedding_model: str | None = None,
-        reset_collection: bool | None = None,
     ) -> None:
         self.documents_path = documents_path or DOCS_PATH
         default_use_cloud = server_settings.rag.use_cloud_embeddings
@@ -25,9 +24,6 @@ class RagEmbeddingUpdater:
         )
         resolved_provider = cloud_provider or server_settings.rag.cloud_provider
         resolved_model = cloud_embedding_model or server_settings.rag.cloud_embedding_model
-        self.reset_collection = (
-            server_settings.rag.reset_vector_collection if reset_collection is None else reset_collection
-        )
         os.makedirs(self.documents_path, exist_ok=True)
         self.vector_database = LanceVectorDatabase(
             database_path=VECTOR_DB_PATH,
@@ -53,17 +49,13 @@ class RagEmbeddingUpdater:
         )
 
     # -------------------------------------------------------------------------
-    def prepare_vector_database(self, reset_collection: bool | None = None) -> None:
-        should_reset = self.reset_collection if reset_collection is None else reset_collection
-        self.vector_database.initialize(False)
+    def prepare_vector_database(self) -> None:
+        self.vector_database.initialize()
         self.vector_database.get_table()
-        if should_reset != self.reset_collection:
-            self.reset_collection = should_reset
 
     # -------------------------------------------------------------------------
-    def refresh_embeddings(self, reset_collection: bool | None = None) -> dict[str, int]:
-        should_reset = self.reset_collection if reset_collection is None else reset_collection
-        summary = self.serializer.serialize(reset_collection=should_reset)
+    def refresh_embeddings(self) -> dict[str, int]:
+        summary = self.serializer.serialize()
         backend_label = "cloud" if self.use_cloud_embeddings else "local"
         logger.info(
             "RAG embeddings refreshed using %s backend (%d documents, %d chunks)",
@@ -75,4 +67,3 @@ class RagEmbeddingUpdater:
 
 
 __all__ = ["RagEmbeddingUpdater"]
-
