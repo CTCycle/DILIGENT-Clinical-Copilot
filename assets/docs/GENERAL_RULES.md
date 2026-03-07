@@ -33,4 +33,7 @@ If changes materially affect behavior, architecture, or usage, update the releva
 ## EXECUTION RULES
 - Use PowerShell by default for terminal commands in this repository.
 - Use `cmd /c` only when invoking `.bat` scripts or CMD-specific syntax.
-- For frontend Node workflows, run `npm` through `runtimes` when `npm` is not directly available in PATH.
+- Frontend Node runtime is bundled under `DILIGENT/resources/runtimes/nodejs`.
+- For changes under `DILIGENT/client`, always run a frontend validation build before finalizing: `npm run build`.
+- If `npm` is not directly available in PATH, run it through the bundled runtime (`DILIGENT/resources/runtimes/nodejs/node.exe DILIGENT/resources/runtimes/nodejs/node_modules/npm/bin/npm-cli.js run build`).
+
