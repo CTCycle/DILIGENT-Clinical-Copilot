@@ -1,12 +1,11 @@
-# --- file: embeddings.py (replace entire file) ---
 from __future__ import annotations
 
 import asyncio
 import json
+import math
 from collections.abc import Coroutine
 from typing import Any, Literal, cast
 
-from DILIGENT.server.models.providers import CloudLLMClient, OllamaClient
 from DILIGENT.server.configurations import server_settings
 from DILIGENT.common.constants import CLOUD_MODEL_CHOICES, VECTOR_DB_PATH
 from DILIGENT.common.utils.logger import logger
@@ -23,7 +22,7 @@ class EmbeddingGenerator:
         *,
         backend: str,
         ollama_base_url: str | None = None,
-        ollama_model: str | None = None,        
+        ollama_model: str | None = None,
         use_cloud_embeddings: bool = False,
         cloud_provider: str | None = None,
         cloud_embedding_model: str | None = None,
@@ -117,6 +116,8 @@ class EmbeddingGenerator:
     async def embed_with_ollama(
         self, texts: list[str], model: str
     ) -> list[list[float]]:
+        from DILIGENT.server.models.providers import OllamaClient
+
         async with OllamaClient(
             base_url=self.ollama_base_url,
             default_model=model,
@@ -127,6 +128,8 @@ class EmbeddingGenerator:
     async def embed_with_cloud(
         self, texts: list[str], provider: ProviderName, model: str
     ) -> list[list[float]]:
+        from DILIGENT.server.models.cloud import CloudLLMClient
+
         async with CloudLLMClient(
             provider=provider, default_model=model
         ) as client:
@@ -140,7 +143,7 @@ class SimilaritySearch:
         *,
         vector_database: LanceVectorDatabase | None = None,
         embedding_generator: EmbeddingGenerator | None = None,
-        default_top_k: int = server_settings.rag.top_k_documents,
+        default_top_k: int = server_settings.rag.rerank_candidate_k,
     ) -> None:
         self.default_top_k = max(int(default_top_k), 1)
         self.vector_database = vector_database or LanceVectorDatabase(
@@ -223,7 +226,118 @@ class SimilaritySearch:
             )
         return documents
 
+    # -------------------------------------------------------------------------
+    def search_with_reranking(
+        self,
+        query: str,
+        *,
+        candidate_k: int | None = None,
+        final_top_n: int | None = None,
+        use_reranking: bool | None = None,
+    ) -> list[dict[str, Any]]:
+        if not isinstance(query, str):
+            return []
+        normalized = query.strip()
+        if not normalized:
+            return []
+
+        resolved_top_n = (
+            max(int(final_top_n), 1)
+            if final_top_n is not None
+            else max(int(server_settings.rag.rerank_top_n), 1)
+        )
+        resolved_candidate_k = (
+            max(int(candidate_k), 1)
+            if candidate_k is not None
+            else max(int(self.default_top_k), 1)
+        )
+        if resolved_candidate_k < resolved_top_n:
+            resolved_candidate_k = resolved_top_n
+
+        candidates = self.search(normalized, top_k=resolved_candidate_k)
+        if not candidates:
+            return []
+
+        should_rerank = (
+            server_settings.rag.use_reranking
+            if use_reranking is None
+            else bool(use_reranking)
+        )
+        if not should_rerank:
+            return candidates[:resolved_top_n]
+
+        return self.rerank_candidates(normalized, candidates, top_n=resolved_top_n)
+
+    # -------------------------------------------------------------------------
+    def rerank_candidates(
+        self,
+        query: str,
+        candidates: list[dict[str, Any]],
+        *,
+        top_n: int,
+    ) -> list[dict[str, Any]]:
+        if not candidates:
+            return []
+        if top_n <= 0:
+            return []
+
+        texts = [str(item.get("text") or "").strip() for item in candidates]
+        try:
+            vectors = self.embedding_generator.embed_texts([query, *texts])
+        except Exception as exc:  # noqa: BLE001
+            logger.warning("Reranking fallback to retrieval order due to embedding error: %s", exc)
+            return candidates[:top_n]
+
+        expected_vectors = len(candidates) + 1
+        if len(vectors) != expected_vectors:
+            logger.warning(
+                "Reranking fallback: expected %d vectors but got %d",
+                expected_vectors,
+                len(vectors),
+            )
+            return candidates[:top_n]
+
+        query_vector = vectors[0]
+        scored: list[dict[str, Any]] = []
+        for candidate, candidate_vector in zip(candidates, vectors[1:], strict=False):
+            score = self.cosine_similarity(query_vector, candidate_vector)
+            if score is None:
+                logger.warning("Reranking fallback due to invalid vector shape or norm")
+                return candidates[:top_n]
+            enriched = dict(candidate)
+            enriched["rerank_score"] = score
+            scored.append(enriched)
+
+        scored.sort(key=self.rerank_sort_key, reverse=True)
+        return scored[:top_n]
+
+    # -------------------------------------------------------------------------
+    @staticmethod
+    def rerank_sort_key(document: dict[str, Any]) -> float:
+        raw_score = document.get("rerank_score")
+        if isinstance(raw_score, (int, float)):
+            return float(raw_score)
+        return float("-inf")
+
+    # -------------------------------------------------------------------------
+    @staticmethod
+    def cosine_similarity(left: list[float], right: list[float]) -> float | None:
+        if not left or not right or len(left) != len(right):
+            return None
+        dot_product = 0.0
+        left_norm_sq = 0.0
+        right_norm_sq = 0.0
+        for left_value, right_value in zip(left, right, strict=False):
+            dot_product += left_value * right_value
+            left_norm_sq += left_value * left_value
+            right_norm_sq += right_value * right_value
+        if left_norm_sq <= 0.0 or right_norm_sq <= 0.0:
+            return None
+        denominator = math.sqrt(left_norm_sq) * math.sqrt(right_norm_sq)
+        if denominator <= 0.0:
+            return None
+        return dot_product / denominator
+
 
 __all__ = ["EmbeddingGenerator", "SimilaritySearch"]
-
 
