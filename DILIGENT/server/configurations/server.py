@@ -284,7 +284,9 @@ class RagSettings:
     chunk_size: int
     chunk_overlap: int
     embedding_batch_size: int
-    top_k_documents: int
+    use_reranking: bool
+    rerank_candidate_k: int
+    rerank_top_n: int
     embedding_backend: str
     ollama_base_url: str
     ollama_embedding_model: str
@@ -554,6 +556,10 @@ def build_rag_settings(
     default_ollama_host: str,
 ) -> RagSettings:
     embedding_backend = coerce_str(data.get("embedding_backend"), "ollama")
+    rerank_top_n = coerce_positive_int(data.get("rerank_top_n"), 10)
+    rerank_candidate_k = coerce_positive_int(data.get("rerank_candidate_k"), 100)
+    if rerank_candidate_k < rerank_top_n:
+        rerank_candidate_k = rerank_top_n
     return RagSettings(
         vector_collection_name=coerce_str(data.get("vector_collection_name"), "documents"),
         chunk_size=coerce_positive_int(data.get("chunk_size"), 1_024),
@@ -562,7 +568,9 @@ def build_rag_settings(
             data.get("embedding_batch_size"),
             DEFAULT_EMBEDDING_BATCH_SIZE,
         ),
-        top_k_documents=coerce_positive_int(data.get("top_k_documents"), 3),
+        use_reranking=coerce_bool(data.get("use_reranking"), True),
+        rerank_candidate_k=rerank_candidate_k,
+        rerank_top_n=rerank_top_n,
         embedding_backend=embedding_backend,
         ollama_base_url=resolve_ollama_base_url(
             coerce_str(data.get("ollama_base_url"), default_ollama_host)
@@ -780,5 +788,4 @@ def get_server_settings(config_path: str | None = None) -> ServerSettings:
 
 
 server_settings = get_server_settings()
-
 

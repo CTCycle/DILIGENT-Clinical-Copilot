@@ -48,11 +48,12 @@ DILIGENT Clinical Copilot is a local-first web application for Drug-Induced Live
 2. Compute hepatotoxicity pattern (ALT/ALP multiples and R score).
 3. Extract therapy drugs and anamnesis drugs.
 4. Extract structured disease context from anamnesis.
-5. Optionally build RAG queries if `use_rag=true`.
-6. Optionally enrich per-drug prompts with web evidence if `use_web_search=true`.
-7. Resolve LiverTox/RxNorm evidence and run LLM consultation.
-8. Compose markdown report + structured JSON payload.
-9. Persist session artifacts and match metadata in SQL tables.
+5. Optionally build RAG queries if `use_rag=true` and retrieve supporting vector candidates.
+6. Optionally rerank retrieved candidates and select top N documents for LLM context injection.
+7. Optionally enrich per-drug prompts with web evidence if `use_web_search=true`.
+8. Resolve LiverTox/RxNorm evidence and run LLM consultation.
+9. Compose markdown report + structured JSON payload.
+10. Persist session artifacts and match metadata in SQL tables.
 
 ### 3.4 Persistence and Retrieval
 - DB mode is runtime-selectable: embedded SQLite (`DB_EMBEDDED=true`) or external PostgreSQL (`DB_EMBEDDED=false`).
@@ -69,7 +70,7 @@ DILIGENT Clinical Copilot is a local-first web application for Drug-Induced Live
 - Page routing is path-based:
   - `/`: `DiliAgentPage` (clinical input, job progress polling, markdown report rendering/export).
   - `/model-config`: `ModelConfigPage` (local model selection, cloud provider/model selection, key management access).
-- Navigation is split between a compact left sidebar and settings entry.
+- Global navigation is rendered as a page header with a tab bar (icon + label tabs) beneath it.
 - API client logic is centralized in `client/src/services/api.ts` and includes timeout handling and polling helpers.
 
 ---
@@ -94,3 +95,5 @@ Operational scripts under `DILIGENT/scripts/`:
 - `update_RAG.py`: re-embeds documents and refreshes vector index.
 
 Windows operators can run these via `DILIGENT/setup_and_maintenance.bat`.
+
+

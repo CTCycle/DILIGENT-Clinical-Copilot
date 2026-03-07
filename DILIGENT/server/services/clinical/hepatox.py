@@ -240,7 +240,9 @@ class HepatoxConsultation:
         )
         self.temperature = LLMRuntimeConfig.get_ollama_temperature()
         self.similarity_search: SimilaritySearch | None = None
-        self.rag_top_k = server_settings.rag.top_k_documents
+        self.rag_use_reranking = bool(server_settings.rag.use_reranking)
+        self.rag_top_n = max(int(server_settings.rag.rerank_top_n), 1)
+        self.rag_candidate_k = max(int(server_settings.rag.rerank_candidate_k), self.rag_top_n)
         self.max_parallel_analyses = max(
             1,
             int(
@@ -519,7 +521,6 @@ class HepatoxConsultation:
         return await asyncio.to_thread(
             self.search_supporting_documents,
             drug_rag_query,
-            self.rag_top_k,
         )
 
     # -------------------------------------------------------------------------
@@ -574,9 +575,7 @@ class HepatoxConsultation:
         return truncated.strip()
 
     # -------------------------------------------------------------------------
-    def search_supporting_documents(
-        self, query_text: str | Any, top_k: int | None = None
-    ) -> str | None:
+    def search_supporting_documents(self, query_text: str | Any) -> str | None:
         if not isinstance(query_text, str):
             return None
         normalized = query_text.strip()
@@ -584,7 +583,12 @@ class HepatoxConsultation:
             return None
 
         results = (
-            self.similarity_search.search(normalized, top_k=top_k)
+            self.similarity_search.search_with_reranking(
+                normalized,
+                candidate_k=self.rag_candidate_k,
+                final_top_n=self.rag_top_n,
+                use_reranking=self.rag_use_reranking,
+            )
             if self.similarity_search
             else None
         )
@@ -604,15 +608,27 @@ class HepatoxConsultation:
         text = str(record.get("text", "")).strip()
         if not text:
             return None
-        header = self.format_similarity_header(index, record.get("distance"))
+        header = self.format_similarity_header(
+            index,
+            distance=record.get("distance"),
+            rerank_score=record.get("rerank_score"),
+        )
         return f"{header}\n{text}"
 
     # -------------------------------------------------------------------------
     @staticmethod
-    def format_similarity_header(index: int, distance: Any) -> str:
+    def format_similarity_header(
+        index: int,
+        *,
+        distance: Any,
+        rerank_score: Any = None,
+    ) -> str:
+        segments = [f"Document {index}"]
+        if isinstance(rerank_score, (int, float)):
+            segments.append(f"Rerank: {float(rerank_score):.4f}")
         if isinstance(distance, (int, float)):
-            return f"[Document {index} | Distance: {distance:.4f}]"
-        return f"[Document {index}]"
+            segments.append(f"Distance: {float(distance):.4f}")
+        return f"[{' | '.join(segments)}]"
 
     # -------------------------------------------------------------------------
     def evaluate_suspension(
