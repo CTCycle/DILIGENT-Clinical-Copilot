@@ -130,3 +130,6 @@ Key fixtures:
   - Ensure `ACCESS_KEY_ENCRYPTION_KEY` is set in `DILIGENT/settings/.env`.
 - Model endpoint tests fail with 502/504:
   - Ensure Ollama is reachable and running.
+
+- Clinical endpoint tests return a report without LLM synthesis:
+  - This is expected when no active cloud key is configured; the response includes baseline pattern/drug sections and a `clinical_llm_unavailable` warning in pipeline issues.

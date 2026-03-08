@@ -18,16 +18,15 @@ def test_dilu_agent_page_loads(page: Page, base_url: str):
     expect(page.get_by_role("button", name="Run DILI analysis")).to_be_visible()
 
 
-def test_model_config_modal_opens_and_closes(page: Page, base_url: str):
+def test_model_config_navigation(page: Page, base_url: str):
     page.goto(base_url)
 
-    page.get_by_role("button", name="Model Configurations").click()
-    modal = page.locator(".modal-container")
-    expect(modal).to_be_visible()
-    expect(modal.get_by_text("Model Configurations")).to_be_visible()
+    model_button = page.get_by_role("button", name="Model Configurations")
+    expect(model_button).to_be_visible()
+    model_button.click()
 
-    page.get_by_role("button", name="Close configuration modal").click()
-    expect(page.locator(".modal-container")).to_have_count(0)
+    expect(page).to_have_url(re.compile(r"/model-config/?$"))
+    expect(page.get_by_role("heading", name="Model Configurations")).to_be_visible()
 
 
 def test_data_inspection_navigation(page: Page, base_url: str):

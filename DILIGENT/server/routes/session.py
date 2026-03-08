@@ -11,6 +11,8 @@ from fastapi.responses import PlainTextResponse
 from pydantic import ValidationError
 from pydantic_core import ErrorDetails
 
+from DILIGENT.server.models.cloud import LLMError
+
 from DILIGENT.server.entities.clinical import (
     ClinicalPipelineValidationError,
     ClinicalSessionRequest,
@@ -717,24 +719,42 @@ class ClinicalSessionEndpoint:
         )
 
         start_time = time.perf_counter()
-        clinical_session = HepatoxConsultation(analysis_drugs, patient_name=payload.name)
-        consultation_progress_callback = ClinicalConsultationProgressCallback(
-            progress_callback=progress_callback,
-        )
-
-        drug_assessment = await clinical_session.run_analysis(
-            prepared_inputs=prepared_inputs,
-            visit_date=payload.visit_date,
-            rag_query=rag_query,
-            use_web_search=payload.use_web_search,
-            progress_callback=consultation_progress_callback,
-        )
-        elapsed = time.perf_counter() - start_time
-        logger.info("Hepato-toxicity consultation required %.4f seconds", elapsed)
-
+        clinical_session: HepatoxConsultation | None = None
         final_report: str | None = None
-        if isinstance(drug_assessment, dict):
-            final_report = drug_assessment.get("final_report", "").strip()
+        try:
+            clinical_session = HepatoxConsultation(analysis_drugs, patient_name=payload.name)
+            consultation_progress_callback = ClinicalConsultationProgressCallback(
+                progress_callback=progress_callback,
+            )
+
+            drug_assessment = await clinical_session.run_analysis(
+                prepared_inputs=prepared_inputs,
+                visit_date=payload.visit_date,
+                rag_query=rag_query,
+                use_web_search=payload.use_web_search,
+                progress_callback=consultation_progress_callback,
+            )
+            elapsed = time.perf_counter() - start_time
+            logger.info("Hepato-toxicity consultation required %.4f seconds", elapsed)
+
+            if isinstance(drug_assessment, dict):
+                final_report = drug_assessment.get("final_report", "").strip()
+        except LLMError as exc:
+            issues.append(
+                PipelineIssue(
+                    severity="warning",
+                    code="clinical_llm_unavailable",
+                    message=(
+                        "Clinical LLM analysis is unavailable; report generated without "
+                        "per-drug synthesis."
+                    ),
+                )
+            )
+            logger.warning(
+                "Clinical LLM unavailable for patient '%s': %s",
+                payload.name or "unknown",
+                exc,
+            )
 
         patient_label = payload.name or "Unknown patient"
         visit_label = (
@@ -895,7 +915,7 @@ class ClinicalSessionEndpoint:
                 detail=self.serialize_pipeline_issues(exc.issues),
             ) from exc
         report = str(single_result.get("report", "")).strip()
-        return PlainTextResponse(content=report)
+        return PlainTextResponse(content=report, status_code=status.HTTP_202_ACCEPTED)
 
     # -------------------------------------------------------------------------
     def start_clinical_job(
