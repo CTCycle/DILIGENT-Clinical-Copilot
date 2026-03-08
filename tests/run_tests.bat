@@ -109,18 +109,19 @@ if not defined E2E_BROWSER set "E2E_BROWSER=chromium"
 if not defined E2E_SLOWMO set "E2E_SLOWMO=0"
 if not defined E2E_PWDEBUG set "E2E_PWDEBUG=0"
 
-set "PYTEST_ARGS=tests -v --tb=short"
-if defined E2E_BROWSER set "PYTEST_ARGS=!PYTEST_ARGS! --browser !E2E_BROWSER!"
-if /i "!E2E_HEADLESS!"=="false" set "PYTEST_ARGS=!PYTEST_ARGS! --headed"
-if /i "!E2E_HEADLESS!"=="0" set "PYTEST_ARGS=!PYTEST_ARGS! --headed"
-if not "!E2E_SLOWMO!"=="0" set "PYTEST_ARGS=!PYTEST_ARGS! --slowmo !E2E_SLOWMO!"
-if /i "!E2E_PWDEBUG!"=="1" set "PWDEBUG=1" & set "PYTEST_ARGS=!PYTEST_ARGS! --headed"
-if /i "!E2E_PWDEBUG!"=="true" set "PWDEBUG=1" & set "PYTEST_ARGS=!PYTEST_ARGS! --headed"
+set "UNIT_PYTEST_ARGS=tests\unit -v --tb=short"
+set "E2E_PYTEST_ARGS=tests\e2e -v --tb=short"
+if defined E2E_BROWSER set "E2E_PYTEST_ARGS=!E2E_PYTEST_ARGS! --browser !E2E_BROWSER!"
+if /i "!E2E_HEADLESS!"=="false" set "E2E_PYTEST_ARGS=!E2E_PYTEST_ARGS! --headed"
+if /i "!E2E_HEADLESS!"=="0" set "E2E_PYTEST_ARGS=!E2E_PYTEST_ARGS! --headed"
+if not "!E2E_SLOWMO!"=="0" set "E2E_PYTEST_ARGS=!E2E_PYTEST_ARGS! --slowmo !E2E_SLOWMO!"
+if /i "!E2E_PWDEBUG!"=="1" set "PWDEBUG=1" & set "E2E_PYTEST_ARGS=!E2E_PYTEST_ARGS! --headed"
+if /i "!E2E_PWDEBUG!"=="true" set "PWDEBUG=1" & set "E2E_PYTEST_ARGS=!E2E_PYTEST_ARGS! --headed"
 
 REM ============================================================================
 REM == Install Playwright browsers if needed
 REM ============================================================================
-echo [STEP 1/4] Checking Playwright browsers...
+echo [STEP 1/5] Checking Playwright browsers...
 "%uv_exe%" run --python "%python_exe%" python -m playwright install chromium >nul 2>&1
 if %ERRORLEVEL% NEQ 0 (
     echo [INFO] Installing Playwright browsers...
@@ -131,7 +132,7 @@ echo [OK] Playwright browsers ready.
 REM ============================================================================
 REM == Start backend
 REM ============================================================================
-echo [STEP 2/4] Starting backend server...
+echo [STEP 2/5] Starting backend server...
 call :kill_port %FASTAPI_PORT%
 start "" /b "%uv_exe%" run --python "%python_exe%" python -m uvicorn %UVICORN_MODULE% --host %FASTAPI_HOST% --port %FASTAPI_PORT% --log-level warning
 
@@ -142,7 +143,7 @@ call :wait_for_url "%APP_TEST_BACKEND_URL%/docs" 120
 REM ============================================================================
 REM == Start frontend
 REM ============================================================================
-echo [STEP 3/4] Starting frontend server...
+echo [STEP 3/5] Starting frontend server...
 
 if not exist "%FRONTEND_DIR%\node_modules" (
     echo [INFO] Installing frontend dependencies...
@@ -179,13 +180,26 @@ call :wait_for_url "%APP_TEST_FRONTEND_URL%" 120
 REM ============================================================================
 REM == Run tests
 REM ============================================================================
-echo [STEP 4/4] Running E2E tests...
+echo [STEP 4/5] Running unit tests...
 echo.
 echo ============================================================================
 
 pushd "%root_folder%" >nul
-"%uv_exe%" run --python "%python_exe%" python -m pytest %PYTEST_ARGS%
-set "test_result=%ERRORLEVEL%"
+"%uv_exe%" run --python "%python_exe%" python -m pytest %UNIT_PYTEST_ARGS%
+set "unit_result=%ERRORLEVEL%"
+
+echo.
+echo ============================================================================
+echo [STEP 5/5] Running E2E tests...
+echo.
+echo ============================================================================
+
+"%uv_exe%" run --python "%python_exe%" python -m pytest %E2E_PYTEST_ARGS%
+set "e2e_result=%ERRORLEVEL%"
+
+set "test_result=0"
+if not "!unit_result!"=="0" set "test_result=!unit_result!"
+if "!test_result!"=="0" if not "!e2e_result!"=="0" set "test_result=!e2e_result!"
 popd >nul
 
 echo.
