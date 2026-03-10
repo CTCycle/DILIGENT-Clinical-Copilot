@@ -5,16 +5,18 @@ DILIGENT Clinical Copilot supports clinicians during Drug-Induced Liver Injury (
 
 > **Work in Progress**: This project is still under active development. It will be updated regularly, but you may encounter bugs, issues, or incomplete features.
 
-## 2. Dual-Mode Runtime Model
+## 2. Runtime Model
 DILIGENT is configuration-first and uses one active runtime file: `DILIGENT/settings/.env`.
 
 - Local mode is the default workflow for developers (no Docker required).
 - Cloud mode is provided through Docker (`backend` + `frontend`) using the same `.env` contract.
+- Packaged desktop mode uses Tauri with a local Python backend started by the desktop shell.
 - Mode switching is done by replacing `.env` values only.
 
 Runtime profiles:
 - `DILIGENT/settings/.env.local.example`
 - `DILIGENT/settings/.env.cloud.example`
+- `DILIGENT/settings/.env.local.tauri.example`
 - Active runtime file: `DILIGENT/settings/.env`
 
 Exact mode switch procedure:
@@ -25,8 +27,12 @@ or
 ```cmd
 copy /Y DILIGENT\settings\.env.cloud.example DILIGENT\settings\.env
 ```
+or
+```cmd
+copy /Y DILIGENT\settings\.env.local.tauri.example DILIGENT\settings\.env
+```
 
-Detailed packaging notes: `docs/PACKAGING_AND_RUNTIME_MODES.md`.
+Detailed packaging notes: `assets/docs/PACKAGING_AND_RUNTIME_MODES.md`.
 
 ## 3. Local Mode (Default)
 
@@ -87,12 +93,44 @@ Cloud topology:
 - `frontend`: Nginx static hosting.
 - Frontend proxies `/api` to `backend:8000` for same-origin API calls.
 
-## 5. Deterministic Dependencies
+## 5. Packaged Desktop Mode (Tauri)
+Prepare the desktop profile:
+```cmd
+copy /Y DILIGENT\settings\.env.local.tauri.example DILIGENT\settings\.env
+```
+
+Ensure the portable build runtimes are present:
+```cmd
+DILIGENT\start_on_windows.bat
+```
+
+Build the Windows desktop artifacts:
+```cmd
+release\tauri\build_with_tauri.bat
+```
+
+Public outputs are exported to:
+- `release/windows/installers`
+- `release/windows/portable`
+
+Regenerate desktop icon assets from the shared web favicon source:
+```cmd
+cd DILIGENT\client
+npm run tauri:icon
+```
+
+Clean previous desktop build outputs:
+```cmd
+cd DILIGENT\client
+npm run tauri:clean
+```
+
+## 6. Deterministic Dependencies
 - Backend is lockfile-backed by `uv.lock` and installed with `uv sync --frozen` in Docker.
 - Frontend is lockfile-backed by `DILIGENT/client/package-lock.json` and installed with `npm ci` in Docker.
 - Docker base images are pinned in `docker/backend.Dockerfile` and `docker/frontend.Dockerfile`.
 
-## 6. Using the Application
+## 7. Using the Application
 - Enter anamnesis, exam notes, current medications, and ALT/ALP values.
 - Choose inference path (Ollama or cloud), select parsing/clinical models, and toggle RAG.
 - Run the analysis and review/export the report.
@@ -100,7 +138,7 @@ Cloud topology:
 - ![Clinical intake form](assets/figures/session_page.png)
 - ![Analysis results](assets/figures/database_browser.png)
 
-## 7. Configuration Reference
+## 8. Configuration Reference
 Runtime values are read from `DILIGENT/settings/.env`.
 
 | Variable | Description |
@@ -117,7 +155,7 @@ Runtime values are read from `DILIGENT/settings/.env`.
 | `MPLBACKEND`, `KERAS_BACKEND` | Runtime plotting/ML backend settings. |
 | `OPENAI_API_KEY`, `GEMINI_API_KEY` | Cloud provider API keys. |
 
-## 8. Setup and Maintenance
+## 9. Setup and Maintenance
 Run `DILIGENT/setup_and_maintenance.bat` for maintenance operations:
 - Remove logs
 - Uninstall app (local runtimes/artifacts)
@@ -125,6 +163,7 @@ Run `DILIGENT/setup_and_maintenance.bat` for maintenance operations:
 - Update RxNav catalog
 - Update LiverTox data
 - Vectorize RAG documents
+- Clean desktop build artifacts
 
-## 9. License
+## 10. License
 Non-commercial use is covered by the Polyform Noncommercial License 1.0.0; commercial licensing is available separately. See `LICENSE`.

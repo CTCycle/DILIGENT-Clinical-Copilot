@@ -9,6 +9,10 @@ DILIGENT/client/node_modules/
 DILIGENT/client/dist/
 DILIGENT/client/dist-ssr/
 DILIGENT/client/logs/
+DILIGENT/client/src-tauri/r/
+DILIGENT/client/src-tauri/target/
+DILIGENT/client/src-tauri/gen/
+release/windows/
 
 # Python
 *.py[cod]
@@ -55,6 +59,3 @@ Thumbs.db
 
 
 !.gitkeep
-
-
-

@@ -8,6 +8,7 @@ DILIGENT uses a single active runtime file:
 Runtime switching is configuration-only:
 - Local mode: host runtime (default developer flow).
 - Cloud mode: Docker Compose (`backend` + `frontend`).
+- Packaged desktop mode: Tauri desktop shell + bundled Python/uv runtime + backend-served SPA.
 - Switch mode by copying the desired profile into `DILIGENT/settings/.env`.
 
 No code changes are required when switching modes.
@@ -16,6 +17,7 @@ No code changes are required when switching modes.
 
 - `DILIGENT/settings/.env.local.example`
 - `DILIGENT/settings/.env.cloud.example`
+- `DILIGENT/settings/.env.local.tauri.example`
 - `DILIGENT/settings/.env` (active runtime configuration)
 - `DILIGENT/settings/configurations.json` (non-secret defaults and service tuning)
 
@@ -64,7 +66,60 @@ Cloud topology:
 - Nginx proxies only the application API surface used by the frontend and blocks `/api/docs`, `/api/redoc`, and `/api/openapi.json` in cloud mode.
 - `diligent_resources` Docker volume persists runtime data under `/app/DILIGENT/resources`.
 
-## 6. Deterministic Build Notes
+## 6. Packaged Desktop Mode (Tauri)
+
+Desktop packaging is launched from the repository root helper:
+- `release\tauri\build_with_tauri.bat`
+
+Preparation sequence:
+1. Activate the desktop profile:
+   - `copy /Y DILIGENT\settings\.env.local.tauri.example DILIGENT\settings\.env`
+2. Provision portable runtimes if needed:
+   - `DILIGENT\start_on_windows.bat`
+3. Build:
+   - `release\tauri\build_with_tauri.bat`
+
+Desktop packaging model:
+- Tauri is only the shell.
+- The packaged app starts a local Python backend automatically.
+- FastAPI serves the packaged SPA from `DILIGENT/client/dist`.
+- API routes are available both at their original paths and under `/api`.
+- User-facing Windows artifacts are exported to:
+  - `release/windows/installers`
+  - `release/windows/portable`
+
+Bundled runtime payload:
+- `pyproject.toml`
+- `uv.lock`
+- `DILIGENT/common`
+- `DILIGENT/server`
+- `DILIGENT/scripts`
+- `DILIGENT/settings`
+- `DILIGENT/client/dist`
+- `DILIGENT/resources/models`
+- `DILIGENT/resources/sources`
+- `DILIGENT/resources/runtimes/python`
+- `DILIGENT/resources/runtimes/uv`
+
+Desktop startup behavior:
+- Tauri starts at `about:blank` and renders a Rust-driven startup screen immediately.
+- Rust resolves the packaged workspace, prefers a reusable `.venv`, and otherwise runs `uv sync --frozen`.
+- If the installed bundle directory is not writable, the launcher mirrors the packaged workspace into a writable per-user runtime root before starting the backend.
+- Once the backend is reachable on loopback, the window redirects to `http://127.0.0.1:<FASTAPI_PORT>/`.
+- On exit, the desktop app terminates the backend process tree.
+
+Desktop icon model:
+- Canonical icon source: `DILIGENT/client/public/favicon.png`
+- Regeneration command:
+  - `cd DILIGENT\client`
+  - `npm run tauri:icon`
+- Generated mobile icon folders are removed so the repository stays desktop-only.
+
+Cleanup:
+- `cd DILIGENT\client && npm run tauri:clean`
+- or `DILIGENT/setup_and_maintenance.bat` -> `Clean desktop build artifacts`
+
+## 7. Deterministic Build Notes
 
 - Backend dependencies are lockfile-backed by `uv.lock` (`uv sync --frozen` in Docker).
 - Frontend dependencies are lockfile-backed by `DILIGENT/client/package-lock.json` (`npm ci` in Docker).
