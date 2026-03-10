@@ -9,6 +9,8 @@ from typing import Any, Literal, cast
 from DILIGENT.server.configurations import server_settings
 from DILIGENT.common.constants import CLOUD_MODEL_CHOICES, VECTOR_DB_PATH
 from DILIGENT.common.utils.logger import logger
+from DILIGENT.server.models.cloud import CloudLLMClient
+from DILIGENT.server.models.providers import OllamaClient
 from DILIGENT.server.repositories.vectors import LanceVectorDatabase
 
 ProviderName = Literal["openai", "azure-openai", "anthropic", "gemini"]
@@ -116,8 +118,6 @@ class EmbeddingGenerator:
     async def embed_with_ollama(
         self, texts: list[str], model: str
     ) -> list[list[float]]:
-        from DILIGENT.server.models.providers import OllamaClient
-
         async with OllamaClient(
             base_url=self.ollama_base_url,
             default_model=model,
@@ -128,8 +128,6 @@ class EmbeddingGenerator:
     async def embed_with_cloud(
         self, texts: list[str], provider: ProviderName, model: str
     ) -> list[list[float]]:
-        from DILIGENT.server.models.cloud import CloudLLMClient
-
         async with CloudLLMClient(
             provider=provider, default_model=model
         ) as client:

@@ -1,6 +1,8 @@
+export type CloudProvider = "openai" | "gemini";
+
 export type RuntimeSettings = {
   useCloudServices: boolean;
-  provider: string;
+  provider: CloudProvider;
   cloudModel: string | null;
   parsingModel: string;
   clinicalModel: string;
@@ -18,9 +20,9 @@ export type LocalModelCard = {
 export type ModelConfigStateResponse = {
   status: "success";
   local_models: LocalModelCard[];
-  cloud_model_choices: Record<string, string[]>;
+  cloud_model_choices: Partial<Record<CloudProvider, string[]>>;
   use_cloud_services: boolean;
-  llm_provider: string;
+  llm_provider: CloudProvider;
   cloud_model: string | null;
   clinical_model: string | null;
   text_extraction_model: string | null;
@@ -30,7 +32,7 @@ export type ModelConfigStateResponse = {
 
 export type ModelConfigUpdateRequest = {
   use_cloud_services?: boolean;
-  llm_provider?: string;
+  llm_provider?: CloudProvider;
   cloud_model?: string | null;
   clinical_model?: string | null;
   text_extraction_model?: string | null;
@@ -75,7 +77,7 @@ export type ClinicalRequestPayload = {
   use_rag: boolean;
   use_web_search: boolean;
   use_cloud_services: boolean;
-  llm_provider: string | null;
+  llm_provider: CloudProvider | null;
   cloud_model: string | null;
   parsing_model: string;
   clinical_model: string;
@@ -126,3 +128,4 @@ export type JobCancelResponse = {
   success: boolean;
   message: string;
 };
+
