@@ -1,4 +1,4 @@
-import { ClinicalFormState, RuntimeSettings } from "./types";
+import { ClinicalFormState, CloudProvider, RuntimeSettings } from "./types";
 
 const apiBaseEnv = (import.meta.env.VITE_API_BASE_URL || "").trim();
 const devBase = "/api";
@@ -30,7 +30,7 @@ export const CLINICAL_MODEL_CHOICES = [
   "gemma3:27b",
 ];
 
-export const CLOUD_MODEL_CHOICES: Record<string, string[]> = {
+export const CLOUD_MODEL_CHOICES: Record<CloudProvider, string[]> = {
   openai: [
     "gpt-5.2",
     "gpt-5.2-pro",
@@ -47,12 +47,14 @@ export const CLOUD_MODEL_CHOICES: Record<string, string[]> = {
   ],
 };
 
-export const CLOUD_PROVIDERS = Object.keys(CLOUD_MODEL_CHOICES);
+export const CLOUD_PROVIDERS: CloudProvider[] = Object.keys(
+  CLOUD_MODEL_CHOICES,
+) as CloudProvider[];
 
 export type LLMRuntimeDefaults = {
   parsing_model: string;
   clinical_model: string;
-  llm_provider: string;
+  llm_provider: CloudProvider;
   cloud_model: string;
   use_cloud_services: boolean;
   ollama_temperature: number;
@@ -69,15 +71,22 @@ export const LLM_RUNTIME_DEFAULTS: Readonly<LLMRuntimeDefaults> = {
   ollama_reasoning: false,
 };
 
-function resolveDefaultProvider(provider: string): string {
+function isCloudProvider(provider: string): provider is CloudProvider {
+  return provider === "openai" || provider === "gemini";
+}
+
+function resolveDefaultProvider(provider: string): CloudProvider {
   const normalized = provider.trim().toLowerCase();
-  if (normalized && CLOUD_MODEL_CHOICES[normalized]) {
+  if (isCloudProvider(normalized) && CLOUD_MODEL_CHOICES[normalized]) {
     return normalized;
   }
   return "openai";
 }
 
-function resolveDefaultCloudModel(provider: string, cloudModel: string): string | null {
+function resolveDefaultCloudModel(
+  provider: CloudProvider,
+  cloudModel: string,
+): string | null {
   const models = CLOUD_MODEL_CHOICES[provider] || [];
   if (!models.length) {
     return null;
@@ -93,7 +102,10 @@ const DEFAULT_PROVIDER = resolveDefaultProvider(LLM_RUNTIME_DEFAULTS.llm_provide
 export const DEFAULT_SETTINGS: RuntimeSettings = {
   useCloudServices: LLM_RUNTIME_DEFAULTS.use_cloud_services,
   provider: DEFAULT_PROVIDER,
-  cloudModel: resolveDefaultCloudModel(DEFAULT_PROVIDER, LLM_RUNTIME_DEFAULTS.cloud_model),
+  cloudModel: resolveDefaultCloudModel(
+    DEFAULT_PROVIDER,
+    LLM_RUNTIME_DEFAULTS.cloud_model,
+  ),
   parsingModel: LLM_RUNTIME_DEFAULTS.parsing_model,
   clinicalModel: LLM_RUNTIME_DEFAULTS.clinical_model,
   temperature: LLM_RUNTIME_DEFAULTS.ollama_temperature,
@@ -116,3 +128,4 @@ export const DEFAULT_FORM_STATE: ClinicalFormState = {
 export const REPORT_EXPORT_FILENAME = "clinical_report.md";
 
 export const HTTP_TIMEOUT_SECONDS = 3600;
+

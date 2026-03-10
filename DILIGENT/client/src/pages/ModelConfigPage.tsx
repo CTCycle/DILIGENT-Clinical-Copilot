@@ -19,13 +19,12 @@ import {
 } from "../services/api";
 import {
     AccessKeyProvider,
+    CloudProvider,
     LocalModelCard,
     ModelConfigStateResponse,
     ModelConfigUpdateRequest,
     RuntimeSettings,
 } from "../types";
-
-type CloudProvider = "openai" | "gemini";
 
 const DEFAULT_CLOUD_PROVIDERS: readonly CloudProvider[] = ["openai", "gemini"];
 
@@ -39,7 +38,7 @@ type ModelFilterKey = "installed" | "reasoning" | "small" | "extraction";
 
 type DraftRuntimeConfig = {
     useCloudServices: boolean;
-    provider: string;
+    provider: CloudProvider;
     cloudModel: string | null;
     clinicalModel: string;
     parsingModel: string;
@@ -361,7 +360,7 @@ export function ModelConfigPage(): React.JSX.Element {
         setDraftConfig((previous) => ({ ...previous, useCloudServices: value }));
     };
 
-    const handleProviderChange = (provider: string) => {
+    const handleProviderChange = (provider: CloudProvider) => {
         const resolvedProvider = resolveProvider(provider, cloudChoices);
         const cloudModel = resolveCloudModel(resolvedProvider, null, cloudChoices);
         setDraftConfig((previous) => ({
@@ -747,3 +746,4 @@ export function ModelConfigPage(): React.JSX.Element {
         </main>
     );
 }
+
