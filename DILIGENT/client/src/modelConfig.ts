@@ -1,34 +1,43 @@
 import { CLOUD_MODEL_CHOICES, DEFAULT_SETTINGS } from "./constants";
-import { ModelConfigStateResponse, RuntimeSettings } from "./types";
+import {
+  CloudProvider,
+  ModelConfigStateResponse,
+  RuntimeSettings,
+} from "./types";
 
-export type CloudModelChoices = Record<string, string[]>;
+export type CloudModelChoices = Record<CloudProvider, string[]>;
+
+type IncomingCloudModelChoices = Partial<Record<CloudProvider, string[]>>;
+
+function isCloudProvider(provider: string): provider is CloudProvider {
+  return provider === "openai" || provider === "gemini";
+}
 
 export function resolveCloudChoices(
-  cloudChoices: CloudModelChoices | null | undefined,
+  cloudChoices: IncomingCloudModelChoices | null | undefined,
 ): CloudModelChoices {
-  if (!cloudChoices) {
-    return CLOUD_MODEL_CHOICES;
-  }
-  return cloudChoices;
+  return {
+    ...CLOUD_MODEL_CHOICES,
+    ...(cloudChoices || {}),
+  };
 }
 
 export function resolveProvider(
   provider: string | null | undefined,
   cloudChoices: CloudModelChoices,
-): string {
+): CloudProvider {
   const normalized = (provider || "").trim().toLowerCase();
-  if (normalized && cloudChoices[normalized]) {
+  if (isCloudProvider(normalized) && cloudChoices[normalized]) {
     return normalized;
   }
   if (cloudChoices.openai) {
     return "openai";
   }
-  const fallback = Object.keys(cloudChoices)[0];
-  return fallback || DEFAULT_SETTINGS.provider;
+  return DEFAULT_SETTINGS.provider;
 }
 
 export function resolveCloudModel(
-  provider: string,
+  provider: CloudProvider,
   cloudModel: string | null | undefined,
   cloudChoices: CloudModelChoices,
 ): string | null {
@@ -63,3 +72,4 @@ export function buildRuntimeSettingsFromConfig(
     reasoning: payload.ollama_reasoning,
   };
 }
+

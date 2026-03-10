@@ -2,6 +2,7 @@ import React, { useCallback, useEffect, useRef, useState } from "react";
 import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
 
+import { BooleanToggle } from "../components/BooleanToggle";
 import { ConfirmModal } from "../components/ConfirmModal";
 import {
     DEFAULT_FORM_STATE,
@@ -9,6 +10,7 @@ import {
     REPORT_EXPORT_FILENAME,
 } from "../constants";
 import { useAppState } from "../context/AppStateContext";
+import { useObjectUrlLifecycle } from "../hooks/useObjectUrlLifecycle";
 import {
     pollClinicalJobStatus,
     startClinicalJob,
@@ -73,23 +75,15 @@ export function DiliAgentPage(): React.JSX.Element {
     } = state.diliAgent;
 
     const pollerRef = useRef<{ stop: () => void } | null>(null);
-    const exportUrlRef = useRef<string | null>(null);
     const [isMissingLabsModalOpen, setIsMissingLabsModalOpen] = useState(false);
+    const { revokeObjectUrl } = useObjectUrlLifecycle(exportUrl);
 
-    useEffect(() => {
-        exportUrlRef.current = exportUrl;
-    }, [exportUrl]);
-
-    // Cleanup resources on unmount
+    // Cleanup poller on unmount
     useEffect(() => {
         return () => {
             if (pollerRef.current) {
                 pollerRef.current.stop();
                 pollerRef.current = null;
-            }
-            if (exportUrlRef.current) {
-                URL.revokeObjectURL(exportUrlRef.current);
-                exportUrlRef.current = null;
             }
         };
     }, []);
@@ -98,10 +92,7 @@ export function DiliAgentPage(): React.JSX.Element {
     // Handlers
     // ---------------------------------------------------------------------------
     const resetOutputs = () => {
-        if (exportUrl) {
-            URL.revokeObjectURL(exportUrl);
-            exportUrlRef.current = null;
-        }
+        revokeObjectUrl(exportUrl);
         updateDiliAgent({
             message: "",
             exportUrl: null,
@@ -293,10 +284,7 @@ export function DiliAgentPage(): React.JSX.Element {
     };
 
     const handleClear = () => {
-        if (exportUrl) {
-            URL.revokeObjectURL(exportUrl);
-            exportUrlRef.current = null;
-        }
+        revokeObjectUrl(exportUrl);
         updateDiliAgent({
             settings: DEFAULT_SETTINGS,
             form: { ...DEFAULT_FORM_STATE },
@@ -463,36 +451,18 @@ export function DiliAgentPage(): React.JSX.Element {
                                 <div className="lab-controls-panel">
                                     <div className="advanced-options">
                                         <p className="advanced-options-header">Evidence Retrieval</p>
-                                        <div className="toggle-row">
-                                            <span className="toggle-label">Enable RAG for supporting evidence</span>
-                                            <label className="toggle-switch">
-                                                <span className="visually-hidden">Enable RAG for supporting evidence</span>
-                                                <input
-                                                    type="checkbox"
-                                                    id="use-rag"
-                                                    checked={form.useRag}
-                                                    onChange={(e) => handleFormChange("useRag", e.target.checked)}
-                                                />
-                                                <span className="toggle-track" aria-hidden="true">
-                                                    <span className="toggle-thumb" />
-                                                </span>
-                                            </label>
-                                        </div>
-                                        <div className="toggle-row">
-                                            <span className="toggle-label">Enable web search for supporting evidence</span>
-                                            <label className="toggle-switch">
-                                                <span className="visually-hidden">Enable web search for supporting evidence</span>
-                                                <input
-                                                    type="checkbox"
-                                                    id="use-web-search"
-                                                    checked={form.useWebSearch}
-                                                    onChange={(e) => handleFormChange("useWebSearch", e.target.checked)}
-                                                />
-                                                <span className="toggle-track" aria-hidden="true">
-                                                    <span className="toggle-thumb" />
-                                                </span>
-                                            </label>
-                                        </div>
+                                        <BooleanToggle
+                                            id="use-rag"
+                                            label="Enable RAG for supporting evidence"
+                                            checked={form.useRag}
+                                            onChange={(checked) => handleFormChange("useRag", checked)}
+                                        />
+                                        <BooleanToggle
+                                            id="use-web-search"
+                                            label="Enable web search for supporting evidence"
+                                            checked={form.useWebSearch}
+                                            onChange={(checked) => handleFormChange("useWebSearch", checked)}
+                                        />
                                     </div>
                                     <div className="lab-controls-future" aria-hidden="true" />
                                 </div>
@@ -616,3 +586,4 @@ export function DiliAgentPage(): React.JSX.Element {
         </>
     );
 }
+
