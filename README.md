@@ -135,8 +135,25 @@ npm run tauri:clean
 - Choose inference path (Ollama or cloud), select parsing/clinical models, and toggle RAG.
 - Run the analysis and review/export the report.
 
-- ![Clinical intake form](assets/figures/session_page.png)
-- ![Analysis results](assets/figures/database_browser.png)
+### Screenshots
+
+#### Landing Page
+![Landing page](assets/figures/home.png)
+
+#### Dashboard / Report Output
+![Dashboard view](assets/figures/dashboard.png)
+
+#### Model Configuration (Settings)
+![Model settings](assets/figures/settings.png)
+
+#### Local Model Catalog (List)
+![Model list](assets/figures/models-list.png)
+
+#### Provider Access Key (Detail Modal)
+![Provider key detail](assets/figures/model-detail.png)
+
+#### Data Inspection
+![Data inspection](assets/figures/data-inspection.png)
 
 ## 8. Configuration Reference
 Runtime values are read from `DILIGENT/settings/.env`.
@@ -167,3 +184,5 @@ Run `DILIGENT/setup_and_maintenance.bat` for maintenance operations:
 
 ## 10. License
 Non-commercial use is covered by the Polyform Noncommercial License 1.0.0; commercial licensing is available separately. See `LICENSE`.
+
+
