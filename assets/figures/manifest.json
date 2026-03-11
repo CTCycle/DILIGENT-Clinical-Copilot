@@ -1,0 +1,125 @@
+{
+  "generated_at": "2026-03-11T15:45:33.219262+00:00",
+  "base_url": "http://127.0.0.1:7861",
+  "captures": [
+    {
+      "page_title": "DILI Agent (Home)",
+      "route": "/",
+      "url": "http://127.0.0.1:7861/",
+      "outputs": [
+        {
+          "filename": "home.png",
+          "viewport": {
+            "width": 1600,
+            "height": 900
+          },
+          "full_page": true
+        }
+      ],
+      "notes": [
+        "Landing page capture.",
+        "Increased viewport width for multi-column or wide content."
+      ]
+    },
+    {
+      "page_title": "DILI Agent (Dashboard View)",
+      "route": "/",
+      "url": "http://127.0.0.1:7861/",
+      "outputs": [
+        {
+          "filename": "dashboard.png",
+          "viewport": {
+            "width": 1600,
+            "height": 900
+          },
+          "full_page": false
+        }
+      ],
+      "notes": [
+        "Focused on report/output region below the fold.",
+        "Increased viewport width for multi-column or wide content."
+      ]
+    },
+    {
+      "page_title": "Model Configurations (Settings)",
+      "route": "/model-config",
+      "url": "http://127.0.0.1:7861/model-config",
+      "outputs": [
+        {
+          "filename": "settings.png",
+          "viewport": {
+            "width": 1600,
+            "height": 900
+          },
+          "full_page": false
+        }
+      ],
+      "notes": [
+        "Settings page capture with summary panel visible.",
+        "Increased viewport width for multi-column or wide content."
+      ]
+    },
+    {
+      "page_title": "Model Configurations (Models List)",
+      "route": "/model-config",
+      "url": "http://127.0.0.1:7861/model-config",
+      "outputs": [
+        {
+          "filename": "models-list.png",
+          "viewport": {
+            "width": 1680,
+            "height": 1320
+          },
+          "full_page": false
+        }
+      ],
+      "notes": [
+        "List-focused capture with local model catalog state.",
+        "Increased viewport width for multi-column or wide content.",
+        "Increased viewport height for long or scrollable content."
+      ]
+    },
+    {
+      "page_title": "Access Key Detail (Modal)",
+      "route": "/model-config",
+      "url": "http://127.0.0.1:7861/model-config",
+      "outputs": [
+        {
+          "filename": "model-detail.png",
+          "viewport": {
+            "width": 1600,
+            "height": 1320
+          },
+          "full_page": false
+        }
+      ],
+      "notes": [
+        "Detail-state capture using provider access key modal.",
+        "Increased viewport width for multi-column or wide content.",
+        "Increased viewport height for long or scrollable content."
+      ]
+    },
+    {
+      "page_title": "Data Inspection",
+      "route": "/data",
+      "url": "http://127.0.0.1:7861/data",
+      "outputs": [
+        {
+          "filename": "data-inspection.png",
+          "viewport": {
+            "width": 1600,
+            "height": 900
+          },
+          "full_page": false
+        }
+      ],
+      "notes": [
+        "Route currently renders minimal placeholder content.",
+        "Increased viewport width for multi-column or wide content."
+      ]
+    }
+  ],
+  "failures": [],
+  "console_issues": [],
+  "network_issues": []
+}
