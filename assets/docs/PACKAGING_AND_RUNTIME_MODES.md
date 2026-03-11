@@ -29,6 +29,7 @@ No code changes are required when switching modes.
 | `UI_HOST`, `UI_PORT` | Frontend host and port for local preview and cloud publish mapping. |
 | `VITE_API_BASE_URL` | Frontend API base path. Keep `/api` for proxy compatibility. |
 | `RELOAD` | Enables backend reload in local workflow. |
+| `DILIGENT_CLOUD_MODE` | Enables cloud hardening on backend (`true` disables direct non-`/api` routes and OpenAPI docs endpoints). |
 | `OPTIONAL_DEPENDENCIES` | Enables optional dependency branch in launcher flow. |
 | `DB_EMBEDDED` | `true` for SQLite, `false` for external DB mode. |
 | `DB_ENGINE`, `DB_HOST`, `DB_PORT`, `DB_NAME`, `DB_USER`, `DB_PASSWORD` | External DB connection values. |
@@ -64,6 +65,7 @@ Cloud topology:
 - `frontend`: Nginx static hosting on internal `:80`, host-mapped from `${UI_PORT}`.
 - Frontend `/api` is reverse-proxied to `http://backend:8000/`.
 - Nginx proxies only the application API surface used by the frontend and blocks `/api/docs`, `/api/redoc`, and `/api/openapi.json` in cloud mode.
+- Backend cloud mode (`DILIGENT_CLOUD_MODE=true`) serves only `/api/*` routes and disables direct docs/openapi endpoints.
 - `diligent_resources` Docker volume persists runtime data under `/app/DILIGENT/resources`.
 
 ## 6. Packaged Desktop Mode (Tauri)

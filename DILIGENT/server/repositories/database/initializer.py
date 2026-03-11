@@ -9,7 +9,10 @@ from sqlalchemy.sql.elements import TextClause
 from DILIGENT.server.configurations import DatabaseSettings, server_settings
 from DILIGENT.server.repositories.database.postgres import PostgresRepository
 from DILIGENT.server.repositories.database.sqlite import SQLiteRepository
-from DILIGENT.server.repositories.database.utils import normalize_postgres_engine
+from DILIGENT.server.repositories.database.utils import (
+    normalize_postgres_engine,
+    validate_postgres_database_name,
+)
 from DILIGENT.server.repositories.schemas.models import Base
 from DILIGENT.common.utils.logger import logger
 
@@ -31,9 +34,10 @@ def build_postgres_url(settings: DatabaseSettings, database_name: str) -> str:
     engine_name = normalize_postgres_engine(settings.engine)
     safe_username = urllib.parse.quote_plus(settings.username or "")
     safe_password = urllib.parse.quote_plus(settings.password or "")
+    safe_database_name = validate_postgres_database_name(database_name)
     return (
         f"{engine_name}://{safe_username}:{safe_password}"
-        f"@{settings.host}:{port}/{database_name}"
+        f"@{settings.host}:{port}/{safe_database_name}"
     )
 
 
@@ -41,12 +45,13 @@ def build_postgres_url(settings: DatabaseSettings, database_name: str) -> str:
 def clone_settings_with_database(
     settings: DatabaseSettings, database_name: str
 ) -> DatabaseSettings:
+    safe_database_name = validate_postgres_database_name(database_name)
     return DatabaseSettings(
         embedded_database=False,
         engine=settings.engine,
         host=settings.host,
         port=settings.port,
-        database_name=database_name,
+        database_name=safe_database_name,
         username=settings.username,
         password=settings.password,
         ssl=settings.ssl,
@@ -61,9 +66,9 @@ def clone_settings_with_database(
 def build_postgres_create_database_sql(
     database_name: str,
 ) -> TextClause:
-    safe_database = database_name.replace('"', '""')
+    safe_database_name = validate_postgres_database_name(database_name)
     return sqlalchemy.text(
-        f'CREATE DATABASE "{safe_database}" WITH ENCODING \'UTF8\' TEMPLATE template0'
+        f'CREATE DATABASE "{safe_database_name}" WITH ENCODING \'UTF8\' TEMPLATE template0'
     )
 
 # -----------------------------------------------------------------------------
@@ -82,7 +87,7 @@ def ensure_postgres_database(settings: DatabaseSettings) -> str:
     if not settings.database_name:
         raise ValueError("Database name is required for PostgreSQL initialization.")
 
-    target_database = settings.database_name
+    target_database = validate_postgres_database_name(settings.database_name)
     connect_args = build_postgres_connect_args(settings)
 
     admin_url = build_postgres_url(settings, "postgres")
@@ -143,4 +148,3 @@ def initialize_database() -> None:
     except Exception as exc:
         logger.exception("Unexpected error during database initialization.")
         raise SystemExit(1) from exc
-
