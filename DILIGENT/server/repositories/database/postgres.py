@@ -14,6 +14,7 @@ from DILIGENT.server.configurations import DatabaseSettings
 from DILIGENT.server.repositories.database.utils import (
     MISSING_TABLE_MESSAGE,
     normalize_postgres_engine,
+    validate_postgres_database_name,
     validate_sql_identifier,
 )
 from DILIGENT.server.repositories.schemas.models import Base
@@ -45,9 +46,10 @@ class PostgresRepository:
 
         safe_username = urllib.parse.quote_plus(settings.username)
         safe_password = urllib.parse.quote_plus(password)
+        safe_database_name = validate_postgres_database_name(settings.database_name)
         self.db_path: str | None = None
         self.engine: Engine = sqlalchemy.create_engine(
-            f"{engine_name}://{safe_username}:{safe_password}@{settings.host}:{port}/{settings.database_name}",
+            f"{engine_name}://{safe_username}:{safe_password}@{settings.host}:{port}/{safe_database_name}",
             echo=False,
             future=True,
             connect_args=connect_args,
@@ -174,6 +176,3 @@ class PostgresRepository:
                 query, conn, params={"limit": safe_limit, "offset": safe_offset}
             )
         return data
-
-
-

@@ -55,13 +55,6 @@ class ResearchEndpoint:
             response_model=ResearchResponse,
             status_code=status.HTTP_200_OK,
         )
-        self.router.add_api_route(
-            "/api/research",
-            self.run_research,
-            methods=["POST"],
-            response_model=ResearchResponse,
-            status_code=status.HTTP_200_OK,
-        )
 
 
 endpoint = ResearchEndpoint(router=router)
