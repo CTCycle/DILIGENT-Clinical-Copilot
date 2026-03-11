@@ -59,3 +59,7 @@ Thumbs.db
 
 
 !.gitkeep
+
+# Local runtime env (contains secrets)
+DILIGENT/settings/.env
+

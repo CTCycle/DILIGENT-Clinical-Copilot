@@ -8,12 +8,13 @@ services:
     environment:
       FASTAPI_HOST: 0.0.0.0
       FASTAPI_PORT: 8000
+      DILIGENT_CLOUD_MODE: "${DILIGENT_CLOUD_MODE:-true}"
     ports:
       - "127.0.0.1:${FASTAPI_PORT:-8000}:8000"
     volumes:
       - diligent_resources:/app/DILIGENT/resources
     healthcheck:
-      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8000/docs', timeout=3)"]
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8000/api/model-config', timeout=3)"]
       interval: 15s
       timeout: 5s
       retries: 5
