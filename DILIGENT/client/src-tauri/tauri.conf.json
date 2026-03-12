@@ -42,8 +42,8 @@
       "r/client/dist": "DILIGENT/client/dist",
       "r/resources/models": "DILIGENT/resources/models",
       "r/resources/sources": "DILIGENT/resources/sources",
-      "r/resources/runtimes/python": "DILIGENT/resources/runtimes/python",
-      "r/resources/runtimes/uv": "DILIGENT/resources/runtimes/uv"
+      "r/runtimes/python": "runtimes/python",
+      "r/runtimes/uv": "runtimes/uv"
     }
   }
 }

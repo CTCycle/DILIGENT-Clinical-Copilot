@@ -402,8 +402,8 @@ fn sync_workspace_payload(workspace_root: &Path, runtime_root: &Path) -> Result<
         "DILIGENT/client/dist",
         "DILIGENT/resources/models",
         "DILIGENT/resources/sources",
-        "DILIGENT/resources/runtimes/python",
-        "DILIGENT/resources/runtimes/uv",
+        "runtimes/python",
+        "runtimes/uv",
     ];
 
     for relative_path in directory_payloads {
@@ -463,13 +463,11 @@ fn spawn_backend(app_handle: &tauri::AppHandle, state: &BackendChildState) -> Re
         let project_dir = active_root.join(APP_FOLDER);
         let env_path = project_dir.join("settings").join(".env");
         let backend_config = resolve_backend_launch_config(&env_path);
-        let uv_exe = project_dir
-            .join("resources")
+        let uv_exe = active_root
             .join("runtimes")
             .join("uv")
             .join("uv.exe");
-        let python_exe = project_dir
-            .join("resources")
+        let python_exe = active_root
             .join("runtimes")
             .join("python")
             .join("python.exe");
