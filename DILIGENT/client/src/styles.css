@@ -1548,7 +1548,7 @@ input[type="date"]::-webkit-calendar-picker-indicator:hover {
 }
 
 .app-header {
-  padding: var(--space-md) var(--space-xl);
+  padding: var(--space-sm) var(--space-xl);
   border-bottom: 1px solid rgba(148, 163, 184, 0.34);
   background: rgba(255, 255, 255, 0.88);
   backdrop-filter: blur(8px);
@@ -1585,6 +1585,10 @@ input[type="date"]::-webkit-calendar-picker-indicator:hover {
 }
 
 .tab-bar {
+  display: flex;
+  align-items: stretch;
+  justify-content: flex-start;
+  padding: 0 var(--space-md);
   background: linear-gradient(90deg, #2b72bb 0%, #2567ad 100%);
   border-bottom: 1px solid rgba(15, 23, 42, 0.2);
   box-shadow: var(--shadow-sm);
@@ -1592,8 +1596,8 @@ input[type="date"]::-webkit-calendar-picker-indicator:hover {
 
 .tab-items {
   display: flex;
-  flex-wrap: wrap;
-  width: 100%;
+  flex-wrap: nowrap;
+  width: clamp(560px, 40%, 760px);
 }
 
 .tab-item {
@@ -1601,8 +1605,8 @@ input[type="date"]::-webkit-calendar-picker-indicator:hover {
   align-items: center;
   justify-content: center;
   gap: var(--space-sm);
-  flex: 1 1 220px;
-  min-height: 56px;
+  flex: 1 1 0;
+  min-height: 50px;
   border: none;
   border-bottom: 3px solid transparent;
   background: transparent;
@@ -1668,7 +1672,7 @@ input[type="date"]::-webkit-calendar-picker-indicator:hover {
   }
 
   .app-header {
-    padding: var(--space-sm) var(--space-md);
+    padding: var(--space-xs) var(--space-md);
   }
 
   .app-header-logo {
@@ -1679,9 +1683,15 @@ input[type="date"]::-webkit-calendar-picker-indicator:hover {
     font-size: var(--font-sm);
   }
 
+  .tab-items {
+    width: 100%;
+    min-width: 0;
+    flex-wrap: wrap;
+  }
+
   .tab-item {
     flex-basis: 50%;
-    min-height: 52px;
+    min-height: 48px;
   }
 
   .tab-label {
