@@ -35,15 +35,16 @@
     "resources": {
       "r/pyproject.toml": "pyproject.toml",
       "r/uv.lock": "uv.lock",
-      "r/common": "DILIGENT/common",
       "r/server": "DILIGENT/server",
       "r/scripts": "DILIGENT/scripts",
       "r/settings": "DILIGENT/settings",
       "r/client/dist": "DILIGENT/client/dist",
       "r/resources/models": "DILIGENT/resources/models",
       "r/resources/sources": "DILIGENT/resources/sources",
+      "r/runtimes/uv.lock": "runtimes/uv.lock",
       "r/runtimes/python": "runtimes/python",
-      "r/runtimes/uv": "runtimes/uv"
+      "r/runtimes/uv": "runtimes/uv",
+      "r/runtimes/nodejs": "runtimes/nodejs"
     }
   }
 }

@@ -174,6 +174,7 @@ fn is_workspace_root(candidate: &Path) -> bool {
 
 fn has_workspace_venv(candidate: &Path) -> bool {
     candidate
+        .join("runtimes")
         .join(".venv")
         .join("Scripts")
         .join("python.exe")
@@ -188,17 +189,28 @@ fn push_with_ancestors(base: &Path, candidates: &mut Vec<PathBuf>) {
     }
 }
 
-fn find_workspace_root(app_handle: &tauri::AppHandle) -> Option<PathBuf> {
-    let mut candidates: Vec<PathBuf> = Vec::new();
-
-    if let Ok(resource_dir) = app_handle.path().resource_dir() {
-        push_with_ancestors(&resource_dir, &mut candidates);
+fn format_checked_roots(candidates: &[PathBuf]) -> String {
+    if candidates.is_empty() {
+        return String::from(" - (none)");
     }
+
+    let mut lines: Vec<String> = candidates
+        .iter()
+        .take(12)
+        .map(|path| format!(" - {}", path.display()))
+        .collect();
+    if candidates.len() > 12 {
+        lines.push(format!(" - ... ({} more)", candidates.len() - 12));
+    }
+    lines.join("\n")
+}
+
+fn find_workspace_root(app_handle: &tauri::AppHandle) -> Result<PathBuf, String> {
+    let mut candidates: Vec<PathBuf> = Vec::new();
 
     if let Ok(exe_path) = std::env::current_exe() {
         if let Some(exe_dir) = exe_path.parent() {
             push_with_ancestors(exe_dir, &mut candidates);
-            push_with_ancestors(&exe_dir.join("resources"), &mut candidates);
         }
     }
 
@@ -206,11 +218,25 @@ fn find_workspace_root(app_handle: &tauri::AppHandle) -> Option<PathBuf> {
         push_with_ancestors(&current_dir, &mut candidates);
     }
 
+    if let Ok(resource_dir) = app_handle.path().resource_dir() {
+        push_with_ancestors(&resource_dir, &mut candidates);
+    }
+
+    if let Ok(exe_path) = std::env::current_exe() {
+        if let Some(exe_dir) = exe_path.parent() {
+            push_with_ancestors(&exe_dir.join("resources"), &mut candidates);
+        }
+    }
+
     let mut seen: HashSet<PathBuf> = HashSet::new();
+    let mut unique_candidates: Vec<PathBuf> = Vec::new();
     let mut workspace_candidates: Vec<PathBuf> = Vec::new();
     for candidate in candidates {
-        if seen.insert(candidate.clone()) && is_workspace_root(&candidate) {
-            workspace_candidates.push(candidate);
+        if seen.insert(candidate.clone()) {
+            if is_workspace_root(&candidate) {
+                workspace_candidates.push(candidate.clone());
+            }
+            unique_candidates.push(candidate);
         }
     }
 
@@ -218,10 +244,17 @@ fn find_workspace_root(app_handle: &tauri::AppHandle) -> Option<PathBuf> {
         .iter()
         .find(|candidate| has_workspace_venv(candidate))
     {
-        return Some(with_venv.clone());
+        return Ok(with_venv.clone());
     }
 
-    workspace_candidates.into_iter().next()
+    if let Some(first_workspace) = workspace_candidates.into_iter().next() {
+        return Ok(first_workspace);
+    }
+
+    Err(format!(
+        "Cannot resolve packaged backend workspace (missing pyproject.toml and DILIGENT/server/app.py).\nChecked candidate roots:\n{}",
+        format_checked_roots(&unique_candidates)
+    ))
 }
 
 fn directory_is_writable(path: &Path) -> bool {
@@ -320,6 +353,7 @@ fn should_sync_workspace(workspace_root: &Path, runtime_root: &Path) -> bool {
 
     for candidate in [
         workspace_root.join("pyproject.toml"),
+        workspace_root.join("runtimes").join("uv.lock"),
         workspace_root.join("uv.lock"),
         workspace_root.join(APP_FOLDER).join("settings").join(".env"),
     ] {
@@ -380,6 +414,47 @@ fn copy_dir_recursive(source: &Path, destination: &Path) -> Result<(), String> {
     Ok(())
 }
 
+fn ensure_runtime_lockfile(active_root: &Path, workspace_root: &Path) -> Result<(), String> {
+    let runtime_lock = active_root.join("runtimes").join("uv.lock");
+    if runtime_lock.is_file() {
+        return Ok(());
+    }
+
+    let source_candidates = vec![
+        workspace_root.join("runtimes").join("uv.lock"),
+        workspace_root.join("uv.lock"),
+        active_root.join("uv.lock"),
+    ];
+
+    for source in &source_candidates {
+        if source.is_file() {
+            if let Some(parent) = runtime_lock.parent() {
+                fs::create_dir_all(parent).map_err(|error| {
+                    format!(
+                        "Cannot create runtime lockfile directory {}: {error}",
+                        parent.display()
+                    )
+                })?;
+            }
+            fs::copy(source, &runtime_lock).map_err(|error| {
+                format!(
+                    "Cannot copy runtime lockfile from {} to {}: {error}",
+                    source.display(),
+                    runtime_lock.display()
+                )
+            })?;
+            return Ok(());
+        }
+    }
+
+    let mut checked = vec![runtime_lock];
+    checked.extend(source_candidates);
+    Err(format!(
+        "Runtime lockfile missing.\nChecked paths:\n{}",
+        format_checked_files(&checked)
+    ))
+}
+
 fn sync_workspace_payload(workspace_root: &Path, runtime_root: &Path) -> Result<(), String> {
     if !should_sync_workspace(workspace_root, runtime_root) {
         return Ok(());
@@ -392,10 +467,9 @@ fn sync_workspace_payload(workspace_root: &Path, runtime_root: &Path) -> Result<
         &workspace_root.join("pyproject.toml"),
         &runtime_root.join("pyproject.toml"),
     )?;
-    copy_file_if_exists(&workspace_root.join("uv.lock"), &runtime_root.join("uv.lock"))?;
+    ensure_runtime_lockfile(runtime_root, workspace_root)?;
 
     let directory_payloads = [
-        "DILIGENT/common",
         "DILIGENT/server",
         "DILIGENT/scripts",
         "DILIGENT/settings",
@@ -404,6 +478,7 @@ fn sync_workspace_payload(workspace_root: &Path, runtime_root: &Path) -> Result<
         "DILIGENT/resources/sources",
         "runtimes/python",
         "runtimes/uv",
+        "runtimes/nodejs",
     ];
 
     for relative_path in directory_payloads {
@@ -432,6 +507,38 @@ fn sync_workspace_payload(workspace_root: &Path, runtime_root: &Path) -> Result<
     Ok(())
 }
 
+fn format_checked_files(candidates: &[PathBuf]) -> String {
+    if candidates.is_empty() {
+        return String::from(" - (none)");
+    }
+    candidates
+        .iter()
+        .map(|path| format!(" - {}", path.display()))
+        .collect::<Vec<_>>()
+        .join("\n")
+}
+
+fn stage_runtime_lockfile(active_root: &Path) -> Result<(), String> {
+    let runtime_lock = active_root.join("runtimes").join("uv.lock");
+    let workspace_lock = active_root.join("uv.lock");
+    if !runtime_lock.is_file() {
+        let checked = vec![runtime_lock.clone(), workspace_lock.clone()];
+        return Err(format!(
+            "Runtime lockfile missing before uv sync staging.\nChecked paths:\n{}",
+            format_checked_files(&checked)
+        ));
+    }
+
+    fs::copy(&runtime_lock, &workspace_lock).map_err(|error| {
+        format!(
+            "Cannot stage runtime lockfile from {} to {}: {error}",
+            runtime_lock.display(),
+            workspace_lock.display()
+        )
+    })?;
+    Ok(())
+}
+
 fn spawn_backend(app_handle: &tauri::AppHandle, state: &BackendChildState) -> Result<(), String> {
     #[cfg(not(target_os = "windows"))]
     {
@@ -444,11 +551,7 @@ fn spawn_backend(app_handle: &tauri::AppHandle, state: &BackendChildState) -> Re
 
     #[cfg(target_os = "windows")]
     {
-        let workspace_root = find_workspace_root(app_handle).ok_or_else(|| {
-            String::from(
-                "Cannot resolve packaged backend workspace (missing pyproject.toml/DILIGENT).",
-            )
-        })?;
+        let workspace_root = find_workspace_root(app_handle)?;
         let runtime_root = resolve_runtime_root(app_handle, &workspace_root)?;
 
         if runtime_root != workspace_root {
@@ -463,31 +566,35 @@ fn spawn_backend(app_handle: &tauri::AppHandle, state: &BackendChildState) -> Re
         let project_dir = active_root.join(APP_FOLDER);
         let env_path = project_dir.join("settings").join(".env");
         let backend_config = resolve_backend_launch_config(&env_path);
-        let uv_exe = active_root
-            .join("runtimes")
-            .join("uv")
-            .join("uv.exe");
-        let python_exe = active_root
-            .join("runtimes")
-            .join("python")
-            .join("python.exe");
-        let venv_dir = active_root.join(".venv");
+        let runtimes_root = active_root.join("runtimes");
+        let uv_exe = runtimes_root.join("uv").join("uv.exe");
+        let python_exe = runtimes_root.join("python").join("python.exe");
+        let venv_dir = runtimes_root.join(".venv");
         let venv_python_exe = venv_dir.join("Scripts").join("python.exe");
-        let uv_cache_dir = active_root.join(".uv-cache");
+        let uv_cache_dir = runtimes_root.join(".uv-cache");
+
+        ensure_runtime_lockfile(&active_root, &workspace_root)?;
 
         if !uv_exe.is_file() {
+            let checked = vec![
+                uv_exe.clone(),
+                workspace_root.join("runtimes").join("uv").join("uv.exe"),
+            ];
             return Err(format!(
-                "Bundled uv runtime not found at {}",
-                uv_exe.display()
+                "Bundled uv runtime not found.\nChecked paths:\n{}",
+                format_checked_files(&checked)
             ));
         }
         if !python_exe.is_file() {
+            let checked = vec![
+                python_exe.clone(),
+                workspace_root.join("runtimes").join("python").join("python.exe"),
+            ];
             return Err(format!(
-                "Bundled python runtime not found at {}",
-                python_exe.display()
+                "Bundled python runtime not found.\nChecked paths:\n{}",
+                format_checked_files(&checked)
             ));
         }
-
         let python_exe_str = python_exe.to_string_lossy().to_string();
         let uv_cache_dir_str = uv_cache_dir.to_string_lossy().to_string();
         let venv_dir_str = venv_dir.to_string_lossy().to_string();
@@ -508,6 +615,8 @@ fn spawn_backend(app_handle: &tauri::AppHandle, state: &BackendChildState) -> Re
         sync_with_embedded_args.push(String::from("--frozen"));
 
         if !venv_python_exe.is_file() {
+            stage_runtime_lockfile(&active_root)?;
+
             fs::create_dir_all(&uv_cache_dir).map_err(|error| {
                 format!(
                     "Cannot create uv cache directory at {}: {error}",

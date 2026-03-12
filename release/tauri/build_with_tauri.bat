@@ -12,6 +12,7 @@ set "bundle_dir=%tauri_dir%\target\release\bundle"
 set "release_export_dir=%repo_root%\release\windows"
 set "runtime_python_exe=%repo_root%\runtimes\python\python.exe"
 set "runtime_uv_exe=%repo_root%\runtimes\uv\uv.exe"
+set "runtime_uv_lock=%repo_root%\runtimes\uv.lock"
 set "runtime_node_dir=%repo_root%\runtimes\nodejs"
 set "node_cmd=%runtime_node_dir%\node.exe"
 set "npm_cmd=%runtime_node_dir%\npm.cmd"
@@ -22,6 +23,7 @@ call :require_file "%runtime_python_exe%" "embedded Python runtime" || goto buil
 call :require_file "%runtime_uv_exe%" "embedded uv runtime" || goto build_error
 call :require_file "%node_cmd%" "embedded Node.js runtime" || goto build_error
 call :require_file "%npm_cmd%" "embedded npm runtime" || goto build_error
+call :require_file "%runtime_uv_lock%" "runtime lockfile" || goto build_error
 
 echo [CHECK] Preparing short Tauri bundle sources...
 call :prepare_bundle_sources || goto build_error
@@ -44,6 +46,7 @@ if /I not "%cargo_cmd%"=="cargo" (
   for %%I in ("%cargo_cmd%") do set "PATH=%%~dpI;%PATH%"
 )
 set "CARGO=%cargo_cmd%"
+call :ensure_default_rust_toolchain "%cargo_cmd%" || goto build_error
 
 if /I not "%node_cmd%"=="node" (
   for %%I in ("%node_cmd%") do set "PATH=%%~dpI;%PATH%"
@@ -136,13 +139,18 @@ if errorlevel 1 (
   echo [FATAL] Failed to stage pyproject.toml for Tauri bundling.
   exit /b 1
 )
-copy /y "%repo_root%\uv.lock" "%bundle_source_dir%\uv.lock" >nul
+copy /y "%runtime_uv_lock%" "%bundle_source_dir%\uv.lock" >nul
 if errorlevel 1 (
-  echo [FATAL] Failed to stage uv.lock for Tauri bundling.
+  echo [FATAL] Failed to stage runtime lockfile "%runtime_uv_lock%" as bundle uv.lock.
   exit /b 1
 )
+copy /y "%runtime_uv_lock%" "%bundle_source_dir%\runtimes\uv.lock" >nul
+if errorlevel 1 (
+  echo [FATAL] Failed to stage runtime lockfile "%runtime_uv_lock%" at bundle runtimes\uv.lock.
+  exit /b 1
+)
+echo [OK] Staged runtime lockfile for bundle root and runtimes\uv.lock.
 
-call :make_junction "%bundle_source_dir%\common" "%project_folder%common" || exit /b 1
 call :make_junction "%bundle_source_dir%\server" "%project_folder%server" || exit /b 1
 call :make_junction "%bundle_source_dir%\scripts" "%project_folder%scripts" || exit /b 1
 call :make_junction "%bundle_source_dir%\settings" "%project_folder%settings" || exit /b 1
@@ -151,6 +159,45 @@ call :make_junction "%bundle_source_dir%\resources\models" "%project_folder%reso
 call :make_junction "%bundle_source_dir%\resources\sources" "%project_folder%resources\sources" || exit /b 1
 call :make_junction "%bundle_source_dir%\runtimes\python" "%repo_root%\runtimes\python" || exit /b 1
 call :make_junction "%bundle_source_dir%\runtimes\uv" "%repo_root%\runtimes\uv" || exit /b 1
+call :make_junction "%bundle_source_dir%\runtimes\nodejs" "%repo_root%\runtimes\nodejs" || exit /b 1
+exit /b 0
+
+:ensure_default_rust_toolchain
+set "detected_cargo=%~1"
+set "rustup_cmd="
+set "active_toolchain="
+if exist "%USERPROFILE%\.cargo\bin\rustup.exe" set "rustup_cmd=%USERPROFILE%\.cargo\bin\rustup.exe"
+if not defined rustup_cmd (
+  rustup --version >nul 2>&1
+  if not errorlevel 1 set "rustup_cmd=rustup"
+)
+if not defined rustup_cmd (
+  "%detected_cargo%" --version >nul 2>&1
+  if errorlevel 1 (
+    echo [FATAL] Cargo was found at "%detected_cargo%" but no default Rust toolchain could be verified.
+    echo [FIX] Install rustup and run:
+    echo       rustup toolchain install stable-x86_64-pc-windows-msvc
+    echo       rustup default stable-x86_64-pc-windows-msvc
+    exit /b 1
+  )
+  echo [WARN] rustup not found; cargo is callable so default toolchain check was skipped.
+  exit /b 0
+)
+for /f "delims=" %%V in ('"%rustup_cmd%" show active-toolchain 2^>nul') do (
+  if not defined active_toolchain set "active_toolchain=%%V"
+)
+if defined active_toolchain (
+  echo !active_toolchain! | findstr /I "no active toolchain" >nul
+  if not errorlevel 1 set "active_toolchain="
+)
+if not defined active_toolchain (
+  echo [FATAL] Cargo was found at "%detected_cargo%" but no default Rust toolchain is configured.
+  echo [FIX] Run the following commands, then retry:
+  echo       "%rustup_cmd%" toolchain install stable-x86_64-pc-windows-msvc
+  echo       "%rustup_cmd%" default stable-x86_64-pc-windows-msvc
+  exit /b 1
+)
+echo [INFO] Active Rust toolchain: !active_toolchain!
 exit /b 0
 
 :make_junction
@@ -167,6 +214,12 @@ exit /b 0
 
 :build_error
 call :cleanup_bundle_sources
+if /I "%CI%"=="1" (
+  endlocal & exit /b 1
+)
+if /I "%CI%"=="true" (
+  endlocal & exit /b 1
+)
 echo.
 echo Press any key to close this build script...
 pause >nul

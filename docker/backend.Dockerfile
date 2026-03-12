@@ -4,7 +4,8 @@ WORKDIR /app
 
 ENV UV_LINK_MODE=copy
 
-COPY pyproject.toml uv.lock ./
+COPY pyproject.toml ./
+COPY runtimes/uv.lock ./uv.lock
 COPY DILIGENT ./DILIGENT
 
 RUN uv sync --frozen --no-dev
