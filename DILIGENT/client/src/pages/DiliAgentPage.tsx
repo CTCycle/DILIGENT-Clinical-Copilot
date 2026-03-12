@@ -355,13 +355,6 @@ export function DiliAgentPage(): React.JSX.Element {
     return (
         <>
             <main className="page-container">
-                <header className="page-header">
-                    <h1>Drug-Induced Liver Injury analysis</h1>
-                    <p className="lede">
-                        Provide clinical context and lab data to generate a structured hepatotoxicity assessment.
-                    </p>
-                </header>
-
                 <div className="main-form-grid">
                     {/* Clinical Inputs Column */}
                     <section className="card clinical-inputs">
