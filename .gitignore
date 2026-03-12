@@ -2,8 +2,8 @@
 DILIGENT/resources/sources/archives/**
 DILIGENT/resources/sources/documents/**
 DILIGENT/resources/sources/vectors/**
-DILIGENT/resources/runtimes/**
-DILIGENT/resources/runtimes/uv_cache/**
+runtimes/**
+runtimes/uv_cache/**
 DILIGENT/resources/logs/**
 DILIGENT/client/node_modules/
 DILIGENT/client/dist/

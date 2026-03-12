@@ -100,8 +100,8 @@ Bundled runtime payload:
 - `DILIGENT/client/dist`
 - `DILIGENT/resources/models`
 - `DILIGENT/resources/sources`
-- `DILIGENT/resources/runtimes/python`
-- `DILIGENT/resources/runtimes/uv`
+- `runtimes/python`
+- `runtimes/uv`
 
 Desktop startup behavior:
 - Tauri starts at `about:blank` and renders a Rust-driven startup screen immediately.

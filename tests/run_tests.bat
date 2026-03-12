@@ -9,7 +9,7 @@ REM ============================================================================
 set "tests_folder=%~dp0"
 set "project_folder=%tests_folder%..\DILIGENT\"
 set "root_folder=%tests_folder%..\"
-set "runtimes_dir=%project_folder%resources\runtimes"
+set "runtimes_dir=%root_folder%runtimes"
 set "settings_dir=%project_folder%settings"
 
 set "python_dir=%runtimes_dir%\python"
