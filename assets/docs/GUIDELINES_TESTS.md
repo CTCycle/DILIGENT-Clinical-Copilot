@@ -48,7 +48,7 @@ tests\run_tests.bat
 ```
 
 This script:
-1. Validates portable runtimes from `DILIGENT/resources/runtimes`.
+1. Validates portable runtimes from `runtimes/`.
 2. Ensures Playwright browsers are available.
 3. Starts backend and frontend.
 4. Runs pytest suite.
