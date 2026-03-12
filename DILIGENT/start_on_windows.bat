@@ -16,7 +16,11 @@ set "env_marker=%python_dir%\.is_installed"
 set "uv_dir=%runtimes_dir%\uv"
 set "uv_exe=%uv_dir%\uv.exe"
 set "uv_zip_path=%uv_dir%\uv.zip"
-set "UV_CACHE_DIR=%runtimes_dir%\uv_cache"
+set "UV_CACHE_DIR=%runtimes_dir%\.uv-cache"
+set "venv_dir=%runtimes_dir%\.venv"
+set "UV_PROJECT_ENVIRONMENT=%venv_dir%"
+set "runtime_uv_lock=%runtimes_dir%\uv.lock"
+set "uv_lock_file=%root_folder%uv.lock"
 
 set "py_version=3.14.2"
 set "python_zip_filename=python-%py_version%-embed-amd64.zip"
@@ -48,7 +52,6 @@ set "TMPEXP=%TEMP%\app_expand.ps1"
 set "TMPTXT=%TEMP%\app_txt.ps1"
 set "TMPFIND=%TEMP%\app_find_uv.ps1"
 set "TMPVER=%TEMP%\app_pyver.ps1"
-set "TMPFINDNODE=%TEMP%\app_find_node.ps1"
 
 set "UV_LINK_MODE=copy"
 
@@ -73,7 +76,6 @@ echo $ErrorActionPreference='Stop'; Expand-Archive -LiteralPath $args[0] -Destin
 echo $ErrorActionPreference='Stop'; (Get-Content -LiteralPath $args[0]) -replace '#import site','import site' ^| Set-Content -LiteralPath $args[0] > "%TMPTXT%"
 echo $ErrorActionPreference='Stop'; (Get-ChildItem -LiteralPath $args[0] -Recurse -Filter 'uv.exe' ^| Select-Object -First 1).FullName > "%TMPFIND%"
 echo $ErrorActionPreference='Stop'; ^& $args[0] -c "import platform;print(platform.python_version())" > "%TMPVER%"
-echo $ErrorActionPreference='Stop'; (Get-ChildItem -LiteralPath $args[0] -Recurse -Filter 'node.exe' ^| Select-Object -First 1).FullName > "%TMPFINDNODE%"
 
 REM ============================================================================
 REM == Step 1: Ensure Python (embeddable)
@@ -137,19 +139,6 @@ if exist "%node_archive_dir%\node.exe" (
   if errorlevel 1 goto error
 )
 
-for /f "delims=" %%F in ('powershell -NoLogo -NoProfile -ExecutionPolicy Bypass -File "%TMPFINDNODE%" "%nodejs_dir%"') do set "found_node=%%F"
-if not defined found_node (
-  echo [FATAL] node.exe not found after extraction.
-  goto error
-)
-
-if /i not "!found_node!"=="%node_exe%" (
-  for %%D in ("!found_node!") do set "node_parent=%%~dpD"
-  if "!node_parent:~-1!"=="\" set "node_parent=!node_parent:~0,-1!"
-  call :promote_node_runtime "!node_parent!"
-  if errorlevel 1 goto error
-)
-
 if exist "%node_exe%" (
   for /f "delims=" %%V in ('"%node_exe%" --version') do echo [OK] Node.js ready: %%V
   set "NPM_CMD=%npm_cmd%"
@@ -157,7 +146,8 @@ if exist "%node_exe%" (
   set "PATH=%nodejs_dir%;%PATH%"
 
 ) else (
-  echo [FATAL] node.exe not found at expected location.
+  echo [FATAL] node.exe not found in "%nodejs_dir%".
+  echo [INFO] Expected file: "%node_exe%"
   goto error
 )
 
@@ -168,21 +158,21 @@ REM ============================================================================
 set "FASTAPI_HOST=127.0.0.1"
 set "FASTAPI_PORT=8000"
 set "UI_HOST=127.0.0.1"
-set "UI_PORT=7861"
-set "RELOAD=false"
-set "VITE_API_BASE_URL=/api"
+set "UI_PORT=8001"
+set "RELOAD=true"
 set "OPTIONAL_DEPENDENCIES=false"
 
 if exist "%DOTENV%" (
   for /f "usebackq tokens=* delims=" %%L in ("%DOTENV%") do (
     set "line=%%L"
     if not "!line!"=="" if "!line:~0,1!" NEQ "#" if "!line:~0,1!" NEQ ";" (
-      for /f "tokens=1* delims==" %%K in ("!line!") do (
-        set "k=%%K"
-        set "v=%%L"
+      for /f "tokens=1,* delims==" %%A in ("!line!") do (
+        set "k=%%A"
+        set "v=%%B"
         if defined v (
-          if "!v:~0,1!"=="\"" set "v=!v:~1,-1!"
-          if "!v:~0,1!"=="'" set "v=!v:~1,-1!"
+          for /f "tokens=* delims= " %%Q in ("!v!") do set "v=%%Q"
+          set "v=!v:"=!"
+          if "!v:~0,1!"=="'" if "!v:~-1!"=="'" set "v=!v:~1,-1!"
         )
         set "!k!=!v!"
       )
@@ -213,6 +203,17 @@ if not exist "%pyproject%" (
   echo [FATAL] Missing pyproject: "%pyproject%"
   goto error
 )
+if not exist "%runtime_uv_lock%" (
+  echo [FATAL] Missing runtime lockfile: "%runtime_uv_lock%"
+  echo [INFO] The backend lockfile must exist at runtimes\uv.lock.
+  goto error
+)
+echo [INFO] Using runtime lockfile: "%runtime_uv_lock%"
+copy /y "%runtime_uv_lock%" "%uv_lock_file%" >nul
+if errorlevel 1 (
+  echo [WARN] Failed to copy runtime lockfile to "%uv_lock_file%".
+  goto error
+)
 
 pushd "%root_folder%" >nul
 set "uv_extras_flag="
@@ -228,6 +229,16 @@ popd >nul
 if not "%sync_ec%"=="0" (
   echo [FATAL] uv sync failed with code %sync_ec%.
   goto error
+)
+if exist "%uv_lock_file%" (
+  copy /y "%uv_lock_file%" "%runtime_uv_lock%" >nul
+  if errorlevel 1 (
+    echo [WARN] Failed to update runtime lockfile at "%runtime_uv_lock%".
+  ) else (
+    echo [INFO] Updated runtime lockfile: "%runtime_uv_lock%"
+  )
+) else (
+  echo [WARN] Workspace uv.lock not found after sync; runtime lockfile was not updated.
 )
 
 > "%env_marker%" echo setup_completed
@@ -256,11 +267,6 @@ if not exist "%FRONTEND_DIR%\node_modules" (
   pushd "%FRONTEND_DIR%" >nul
   if exist "%FRONTEND_LOCKFILE%" (
     call "%NPM_CMD%" ci
-    set "npm_ec=!ERRORLEVEL!"
-    if not "!npm_ec!"=="0" (
-      echo [WARN] npm ci failed with code !npm_ec!. Falling back to npm install.
-      call "%NPM_CMD%" install
-    )
   ) else (
     call "%NPM_CMD%" install
   )
@@ -308,11 +314,27 @@ start "" "%UI_URL%"
 echo [SUCCESS] Backend and frontend correctly launched
 goto cleanup
 
+:promote_node_runtime
+set "node_source_dir=%~1"
+if not defined node_source_dir exit /b 1
+for %%D in ("%~1") do set "node_source_dir=%%~fD"
+if /i "!node_source_dir!"=="%nodejs_dir%" exit /b 0
+
+robocopy "!node_source_dir!" "%nodejs_dir%" /MOVE /E /R:2 /W:1 /NFL /NDL /NJH /NJS /NC /NS >nul
+set "node_move_ec=!ERRORLEVEL!"
+if !node_move_ec! geq 8 (
+  echo [FATAL] Failed to flatten portable Node.js runtime from "!node_source_dir!".
+  exit /b !node_move_ec!
+)
+
+if exist "!node_source_dir!" rd /s /q "!node_source_dir!" >nul 2>&1
+exit /b 0
+
 REM ============================================================================
 REM Cleanup temp helpers
 REM ============================================================================
 :cleanup
-del /q "%TMPDL%" "%TMPEXP%" "%TMPTXT%" "%TMPFIND%" "%TMPVER%" "%TMPFINDNODE%" >nul 2>&1
+del /q "%TMPDL%" "%TMPEXP%" "%TMPTXT%" "%TMPFIND%" "%TMPVER%" >nul 2>&1
 endlocal & exit /b 0
 
 REM ============================================================================
@@ -322,25 +344,8 @@ REM ============================================================================
 echo.
 echo !!! An error occurred during execution. !!!
 pause
-del /q "%TMPDL%" "%TMPEXP%" "%TMPTXT%" "%TMPFIND%" "%TMPVER%" "%TMPFINDNODE%" >nul 2>&1
+del /q "%TMPDL%" "%TMPEXP%" "%TMPTXT%" "%TMPFIND%" "%TMPVER%" >nul 2>&1
 endlocal & exit /b 1
-
-:promote_node_runtime
-set "source_dir=%~1"
-if not defined source_dir exit /b 1
-if /i "%source_dir%"=="%nodejs_dir%" exit /b 0
-if not exist "%source_dir%\node.exe" (
-  echo [FATAL] Portable Node.js source folder is invalid: "%source_dir%"
-  exit /b 1
-)
-echo [INFO] Normalizing portable Node.js runtime layout...
-for /f "delims=" %%F in ('dir /b /a "%source_dir%"') do (
-  if exist "%nodejs_dir%\%%F\" rd /s /q "%nodejs_dir%\%%F" >nul 2>&1
-  if exist "%nodejs_dir%\%%F" del /q "%nodejs_dir%\%%F" >nul 2>&1
-  move /Y "%source_dir%\%%F" "%nodejs_dir%\" >nul
-)
-if exist "%source_dir%" rd /s /q "%source_dir%" >nul 2>&1
-exit /b 0
 
 :kill_port
 set "target_port=%~1"
@@ -349,4 +354,3 @@ for /f "tokens=5" %%P in ('netstat -ano ^| findstr /R ":!target_port!"') do (
   taskkill /PID %%P /F >nul 2>&1
 )
 goto :eof
-
