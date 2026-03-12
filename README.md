@@ -55,8 +55,8 @@ Prerequisites:
 
 Backend:
 ```bash
-python -m venv .venv
-source .venv/bin/activate
+python -m venv runtimes/.venv
+source runtimes/.venv/bin/activate
 pip install --upgrade pip
 pip install -e .
 uvicorn DILIGENT.server.app:app --host 127.0.0.1 --port 8000
@@ -104,6 +104,18 @@ Ensure the portable build runtimes are present:
 DILIGENT\start_on_windows.bat
 ```
 
+Required root runtime layout:
+- `runtimes/python/python.exe`
+- `runtimes/uv/uv.exe`
+- `runtimes/nodejs/node.exe`
+- `runtimes/nodejs/npm.cmd`
+- `runtimes/.venv`
+- `runtimes/uv.lock`
+
+Rust prerequisite for Tauri packaging (build machines):
+- Install Rust via `rustup` (`https://rustup.rs/`).
+- Ensure a default toolchain is configured (for example `stable-x86_64-pc-windows-msvc`).
+
 Build the Windows desktop artifacts:
 ```cmd
 release\tauri\build_with_tauri.bat
@@ -126,7 +138,7 @@ npm run tauri:clean
 ```
 
 ## 6. Deterministic Dependencies
-- Backend is lockfile-backed by `uv.lock` and installed with `uv sync --frozen` in Docker.
+- Backend is lockfile-backed by `runtimes/uv.lock` and installed with `uv sync --frozen` in Docker.
 - Frontend is lockfile-backed by `DILIGENT/client/package-lock.json` and installed with `npm ci` in Docker.
 - Docker base images are pinned in `docker/backend.Dockerfile` and `docker/frontend.Dockerfile`.
 

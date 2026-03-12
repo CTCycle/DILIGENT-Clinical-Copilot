@@ -53,14 +53,20 @@ if (Test-Path $msiDir) {
 $portableExeCandidates = Get-ChildItem -Path $releaseDir -Filter "*.exe" -File |
   Where-Object { $_.Name -notmatch "(?i)(setup|installer|uninstall|updater)" }
 
+if ($portableExeCandidates.Count -eq 0) {
+  throw "No portable desktop executable found in release directory: $releaseDir"
+}
+
 foreach ($file in $portableExeCandidates) {
   Copy-Item -Path $file.FullName -Destination $portableDir -Force
 }
 
 $portableResourceEntries = @(
   "DILIGENT",
+  "runtimes",
   "pyproject.toml",
   "uv.lock",
+  "resources",
   "_up_"
 )
 
@@ -69,6 +75,23 @@ foreach ($entry in $portableResourceEntries) {
   if (Test-Path $sourcePath) {
     $destinationPath = Join-Path $portableDir $entry
     Copy-Item -Path $sourcePath -Destination $destinationPath -Recurse -Force
+  }
+}
+
+$requiredPortablePaths = @(
+  (Join-Path $portableDir "DILIGENT"),
+  (Join-Path $portableDir "runtimes\uv\uv.exe"),
+  (Join-Path $portableDir "runtimes\python\python.exe"),
+  (Join-Path $portableDir "runtimes\nodejs\node.exe"),
+  (Join-Path $portableDir "runtimes\nodejs\npm.cmd"),
+  (Join-Path $portableDir "runtimes\uv.lock"),
+  (Join-Path $portableDir "pyproject.toml"),
+  (Join-Path $portableDir "uv.lock")
+)
+
+foreach ($requiredPath in $requiredPortablePaths) {
+  if (-not (Test-Path $requiredPath)) {
+    throw "Portable export is incomplete. Missing required payload path: $requiredPath"
   }
 }
 

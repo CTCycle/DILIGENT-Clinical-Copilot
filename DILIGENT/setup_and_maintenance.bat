@@ -16,12 +16,16 @@ set "env_marker=%python_dir%\.is_installed"
 set "uv_dir=%runtimes_dir%\uv"
 set "uv_exe=%uv_dir%\uv.exe"
 set "uv_zip_path=%uv_dir%\uv.zip"
-set "UV_CACHE_DIR=%runtimes_dir%\uv_cache"
+set "UV_CACHE_DIR=%runtimes_dir%\.uv-cache"
+set "LEGACY_UV_CACHE_DIR=%runtimes_dir%\uv_cache"
+set "uv_lock=%runtimes_dir%\uv.lock"
+set "uv_lock_file=%root_folder%uv.lock"
 
 set "pyproject=%root_folder%pyproject.toml"
 set "update_script=%project_folder%tools\update_project.py"
 set "log_path=%project_folder%resources\logs"
-set "venv_dir=%root_folder%.venv"
+set "venv_dir=%runtimes_dir%\.venv"
+set "UV_PROJECT_ENVIRONMENT=%venv_dir%"
 set "client_dir=%project_folder%client"
 set "nodejs_dir=%runtimes_dir%\nodejs"
 set "server_dir=%project_folder%server"
@@ -88,10 +92,8 @@ goto :setup_menu
 
 :uninstall
 echo --------------------------------------------------------------------------
-echo This operation will remove uv artifacts, caches, local Python files in
-echo runtimes, the portable Node.js installation, and the .venv
-echo directory. The embedded Python folder will be cleaned but the folder
-echo structure will be preserved.
+echo This operation will remove runtime-local uv artifacts, caches, lockfile,
+echo embedded Python, portable Node.js, and runtimes\.venv.
 echo.
 set /p confirm="Type YES to continue: "
 if /i not "%confirm%"=="YES" (
@@ -101,9 +103,9 @@ if /i not "%confirm%"=="YES" (
 )
 if exist "%uv_lock%" (
   del /q "%uv_lock%"
-  echo [INFO] Removed "%uv_lock%".
+  echo [INFO] Removed runtime lockfile "%uv_lock%".
 ) else (
-  echo [INFO] No uv.lock file found to remove.
+  echo [INFO] No runtime lockfile found to remove at "%uv_lock%".
 )
 if exist "%uv_dir%" (
   rd /s /q "%uv_dir%"
@@ -117,6 +119,12 @@ if exist "%UV_CACHE_DIR%" (
 ) else (
   echo [INFO] No uv cache directory found to remove.
 )
+if exist "%LEGACY_UV_CACHE_DIR%" (
+  rd /s /q "%LEGACY_UV_CACHE_DIR%"
+  echo [INFO] Removed legacy uv cache "%LEGACY_UV_CACHE_DIR%".
+) else (
+  echo [INFO] No legacy uv cache directory found to remove.
+)
 if exist "%python_dir%" (
   rd /s /q "%python_dir%"
   echo [INFO] Removed python directory "%python_dir%".
@@ -127,7 +135,7 @@ if exist "%venv_dir%" (
   rd /s /q "%venv_dir%"
   echo [INFO] Removed virtual environment "%venv_dir%".
 ) else (
-  echo [INFO] No .venv directory found to remove.
+  echo [INFO] No runtime virtual environment found to remove at "%venv_dir%".
 )
 if exist "%client_dir%\node_modules" (
   rd /s /q "%client_dir%\node_modules"
@@ -221,6 +229,17 @@ if not exist "%script_path%" (
   set "run_script_ec=1"
   goto :run_server_script_end
 )
+if not exist "%uv_lock%" (
+  echo [ERROR] Runtime lockfile not found at "%uv_lock%".
+  set "run_script_ec=1"
+  goto :run_server_script_end
+)
+copy /y "%uv_lock%" "%uv_lock_file%" >nul
+if errorlevel 1 (
+  echo [WARN] Failed to copy runtime lockfile to "%uv_lock_file%".
+  set "run_script_ec=1"
+  goto :run_server_script_end
+)
 echo [RUN] !script_label!
 pushd "%root_folder%" >nul
 if "%script_module%"=="" (
@@ -230,6 +249,10 @@ if "%script_module%"=="" (
 )
 set "run_script_ec=!ERRORLEVEL!"
 popd >nul
+if exist "%uv_lock_file%" (
+  copy /y "%uv_lock_file%" "%uv_lock%" >nul
+  if errorlevel 1 echo [WARN] Failed to update runtime lockfile "%uv_lock%".
+)
 if "!run_script_ec!"=="0" (
   echo [SUCCESS] !script_label! completed successfully.
 ) else (

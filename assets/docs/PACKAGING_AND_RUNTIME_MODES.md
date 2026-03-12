@@ -78,7 +78,10 @@ Preparation sequence:
    - `copy /Y DILIGENT\settings\.env.local.tauri.example DILIGENT\settings\.env`
 2. Provision portable runtimes if needed:
    - `DILIGENT\start_on_windows.bat`
-3. Build:
+3. Ensure Rust is available for desktop packaging:
+   - Install `rustup` from `https://rustup.rs/`
+   - Configure a default toolchain (for example `stable-x86_64-pc-windows-msvc`)
+4. Build:
    - `release\tauri\build_with_tauri.bat`
 
 Desktop packaging model:
@@ -92,8 +95,8 @@ Desktop packaging model:
 
 Bundled runtime payload:
 - `pyproject.toml`
-- `uv.lock`
-- `DILIGENT/common`
+- `runtimes/uv.lock` (canonical backend lockfile)
+- `uv.lock` (workspace lock staged from `runtimes/uv.lock` for `uv sync`)
 - `DILIGENT/server`
 - `DILIGENT/scripts`
 - `DILIGENT/settings`
@@ -102,10 +105,11 @@ Bundled runtime payload:
 - `DILIGENT/resources/sources`
 - `runtimes/python`
 - `runtimes/uv`
+- `runtimes/nodejs`
 
 Desktop startup behavior:
 - Tauri starts at `about:blank` and renders a Rust-driven startup screen immediately.
-- Rust resolves the packaged workspace, prefers a reusable `.venv`, and otherwise runs `uv sync --frozen`.
+- Rust resolves the packaged workspace, prefers a reusable `runtimes/.venv`, and otherwise runs `uv sync --frozen`.
 - If the installed bundle directory is not writable, the launcher mirrors the packaged workspace into a writable per-user runtime root before starting the backend.
 - Once the backend is reachable on loopback, the window redirects to `http://127.0.0.1:<FASTAPI_PORT>/`.
 - On exit, the desktop app terminates the backend process tree.
@@ -123,7 +127,7 @@ Cleanup:
 
 ## 7. Deterministic Build Notes
 
-- Backend dependencies are lockfile-backed by `uv.lock` (`uv sync --frozen` in Docker).
+- Backend dependencies are lockfile-backed by `runtimes/uv.lock` (`uv sync --frozen` in Docker).
 - Frontend dependencies are lockfile-backed by `DILIGENT/client/package-lock.json` (`npm ci` in Docker).
 - Base images are pinned:
   - Backend: `ghcr.io/astral-sh/uv:0.8.22-python3.14-bookworm`

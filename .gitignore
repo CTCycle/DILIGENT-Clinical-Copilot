@@ -3,6 +3,9 @@ DILIGENT/resources/sources/archives/**
 DILIGENT/resources/sources/documents/**
 DILIGENT/resources/sources/vectors/**
 runtimes/**
+!runtimes/.gitkeep
+!runtimes/uv.lock
+runtimes/.uv-cache/**
 runtimes/uv_cache/**
 DILIGENT/resources/logs/**
 DILIGENT/client/node_modules/
@@ -51,6 +54,7 @@ Thumbs.db
 
 # Misc
 *.lock
+!runtimes/uv.lock
 *.log
 *.db
 *.sqlite*
