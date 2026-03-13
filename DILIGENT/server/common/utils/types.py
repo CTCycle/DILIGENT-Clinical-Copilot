@@ -14,7 +14,6 @@ def _extract_int_from_str(value: str) -> int | None:
     match = re.search(r"\d+", stripped)
     return int(match.group(0)) if match else None
 
-
 # -----------------------------------------------------------------------------
 def extract_positive_int(value: Any) -> int | None:
     if isinstance(value, bool) or value is None:
@@ -34,12 +33,10 @@ def extract_positive_int(value: Any) -> int | None:
         return None
     return candidate
 
-
 # -----------------------------------------------------------------------------
 def coerce_positive_int(value: Any, default: int = 1) -> int:
     candidate = extract_positive_int(value)
     return candidate if candidate is not None else default
-
 
 # -----------------------------------------------------------------------------
 def coerce_bool(value: Any, default: bool) -> bool:
@@ -56,7 +53,6 @@ def coerce_bool(value: Any, default: bool) -> bool:
         return bool(value)
     return default
 
-
 # -----------------------------------------------------------------------------
 def coerce_bool_or_unknown(value: bool | None) -> str:
     if value is True:
@@ -64,7 +60,6 @@ def coerce_bool_or_unknown(value: bool | None) -> str:
     if value is False:
         return "no"
     return "unknown"
-
 
 # -----------------------------------------------------------------------------
 def coerce_int(
@@ -117,13 +112,12 @@ def coerce_str_or_none(value: Any) -> str | None:
         return stripped or None
     return None
 
-
 # -----------------------------------------------------------------------------
 def coerce_str_sequence(value: Any, default: Iterable[str]) -> tuple[str, ...]:
     candidates, default_items = _coerce_str_sequence_candidates(value, default)
     return _coerce_str_sequence_unique(candidates, default_items)
 
-
+# -----------------------------------------------------------------------------
 def _coerce_str_sequence_candidates(
     value: Any, default: Iterable[str]
 ) -> tuple[list[str], list[str]]:
@@ -145,7 +139,7 @@ def _coerce_str_sequence_candidates(
         return candidates, default_items
     return default_items, default_items
 
-
+# -----------------------------------------------------------------------------
 def _coerce_str_sequence_unique(
     candidates: list[str], default_items: list[str]
 ) -> tuple[str, ...]:

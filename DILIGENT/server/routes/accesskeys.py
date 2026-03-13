@@ -4,7 +4,7 @@ from typing import Literal
 
 from fastapi import APIRouter, Body, HTTPException, Path, Query, status
 
-from DILIGENT.server.entities.accesskeys import (
+from DILIGENT.server.entities.keys import (
     AccessKeyCreateRequest,
     AccessKeyDeleteResponse,
     AccessKeyResponse,
