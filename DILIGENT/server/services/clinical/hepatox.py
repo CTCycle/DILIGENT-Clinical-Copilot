@@ -29,12 +29,12 @@ from DILIGENT.server.entities.clinical import (
     PipelineIssue,
 )
 from DILIGENT.server.configurations import LLMRuntimeConfig, server_settings
-from DILIGENT.common.constants import (
+from DILIGENT.server.common.constants import (
     DEFAULT_DILI_CLASSIFICATION,
     R_SCORE_CHOLESTATIC_THRESHOLD,
     R_SCORE_HEPATOCELLULAR_THRESHOLD,
 )
-from DILIGENT.common.utils.logger import logger
+from DILIGENT.server.common.utils.logger import logger
 from DILIGENT.server.services.retrieval.embeddings import SimilaritySearch
 from DILIGENT.server.services.clinical.preparation import HepatoxPreparedInputs
 from DILIGENT.server.services.text.normalization import normalize_drug_query_name

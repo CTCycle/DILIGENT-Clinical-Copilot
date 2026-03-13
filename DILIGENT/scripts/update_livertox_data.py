@@ -1,7 +1,7 @@
 from __future__ import annotations
 
-from DILIGENT.common.constants import ARCHIVES_PATH
-from DILIGENT.common.utils.logger import logger
+from DILIGENT.server.common.constants import ARCHIVES_PATH
+from DILIGENT.server.common.utils.logger import logger
 from DILIGENT.server.services.updater.livertox import LiverToxUpdater
 
 REDOWNLOAD = True

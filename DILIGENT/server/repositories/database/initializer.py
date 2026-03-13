@@ -14,7 +14,7 @@ from DILIGENT.server.repositories.database.utils import (
     validate_postgres_database_name,
 )
 from DILIGENT.server.repositories.schemas.models import Base
-from DILIGENT.common.utils.logger import logger
+from DILIGENT.server.common.utils.logger import logger
 
 # -----------------------------------------------------------------------------
 def build_postgres_connect_args(settings: DatabaseSettings) -> dict[str, str | int]:

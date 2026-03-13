@@ -7,7 +7,7 @@ import unicodedata
 from collections.abc import Callable
 from typing import Any
 
-from DILIGENT.common.utils.logger import logger
+from DILIGENT.server.common.utils.logger import logger
 from DILIGENT.server.configurations import LLMRuntimeConfig, server_settings
 from DILIGENT.server.entities.clinical import DiseaseContextEntry, PatientDiseaseContext
 from DILIGENT.server.models.prompts import ANAMNESIS_DISEASE_EXTRACTION_PROMPT

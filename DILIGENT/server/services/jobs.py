@@ -9,7 +9,7 @@ from typing import Any
 
 from collections.abc import Callable
 
-from DILIGENT.common.utils.logger import logger
+from DILIGENT.server.common.utils.logger import logger
 
 
 ###############################################################################

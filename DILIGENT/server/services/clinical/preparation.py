@@ -10,7 +10,7 @@ from DILIGENT.server.entities.clinical import (
     HepatotoxicityPatternScore,
     PatientDrugs,
 )
-from DILIGENT.common.utils.logger import logger
+from DILIGENT.server.common.utils.logger import logger
 from DILIGENT.server.repositories.serialization.data import DataSerializer
 from DILIGENT.server.services.clinical.matches import LiverToxMatcher
 from DILIGENT.server.services.text.normalization import (

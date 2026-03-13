@@ -9,8 +9,8 @@ import pandas as pd
 from rapidfuzz import fuzz
 
 from DILIGENT.server.configurations import server_settings
-from DILIGENT.common.constants import MATCHING_STOPWORDS
-from DILIGENT.common.utils.logger import logger
+from DILIGENT.server.common.constants import MATCHING_STOPWORDS
+from DILIGENT.server.common.utils.logger import logger
 from DILIGENT.server.services.text.normalization import (
     canonicalize_drug_query,
     coerce_text,
