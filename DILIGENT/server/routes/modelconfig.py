@@ -8,7 +8,7 @@ from fastapi import APIRouter, Body, HTTPException, status
 from DILIGENT.server.common.constants import CLOUD_MODEL_CHOICES
 from DILIGENT.server.common.utils.logger import logger
 from DILIGENT.server.configurations import LLMRuntimeConfig
-from DILIGENT.server.entities.modelconfig import (
+from DILIGENT.server.entities.model_configs import (
     LocalModelCard,
     ModelConfigStateResponse,
     ModelConfigUpdateRequest,
