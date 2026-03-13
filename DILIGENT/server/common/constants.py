@@ -1,24 +1,24 @@
 from __future__ import annotations
 
-from os.path import abspath, join
+from pathlib import Path
 
 # [PATHS]
 ###############################################################################
-ROOT_DIR = abspath(join(__file__, "../../.."))
-PROJECT_DIR = join(ROOT_DIR, "DILIGENT")
-SETTING_PATH = join(PROJECT_DIR, "settings")
-RESOURCES_PATH = join(PROJECT_DIR, "resources")
-MODELS_PATH = join(RESOURCES_PATH, "models")
-SOURCES_PATH = join(RESOURCES_PATH, "sources")
-ARCHIVES_PATH = join(SOURCES_PATH, "archives")
-DOCS_PATH = join(SOURCES_PATH, "documents")
-LOGS_PATH = join(RESOURCES_PATH, "logs")
-VECTOR_DB_PATH = join(SOURCES_PATH, "vectors")
-ENV_FILE_PATH = join(SETTING_PATH, ".env")
+PROJECT_DIR = str(Path(__file__).resolve().parents[2])
+ROOT_DIR = str(Path(PROJECT_DIR).parent)
+SETTING_PATH = str(Path(PROJECT_DIR) / "settings")
+RESOURCES_PATH = str(Path(PROJECT_DIR) / "resources")
+MODELS_PATH = str(Path(RESOURCES_PATH) / "models")
+SOURCES_PATH = str(Path(RESOURCES_PATH) / "sources")
+ARCHIVES_PATH = str(Path(SOURCES_PATH) / "archives")
+DOCS_PATH = str(Path(SOURCES_PATH) / "documents")
+LOGS_PATH = str(Path(RESOURCES_PATH) / "logs")
+VECTOR_DB_PATH = str(Path(SOURCES_PATH) / "vectors")
+ENV_FILE_PATH = str(Path(SETTING_PATH) / ".env")
 DATABASE_FILENAME = "database.db"
 
 ###############################################################################
-CONFIGURATIONS_FILE = join(SETTING_PATH, "configurations.json")
+CONFIGURATIONS_FILE = str(Path(SETTING_PATH) / "configurations.json")
 
 # [ENDPOINTS]
 ###############################################################################

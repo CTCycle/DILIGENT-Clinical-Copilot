@@ -16,8 +16,8 @@ from DILIGENT.server.repositories.database.utils import (
     validate_sql_identifier,
 )
 from DILIGENT.server.repositories.schemas.models import Base
-from DILIGENT.common.constants import DATABASE_FILENAME, RESOURCES_PATH
-from DILIGENT.common.utils.logger import logger
+from DILIGENT.server.common.constants import DATABASE_FILENAME, RESOURCES_PATH
+from DILIGENT.server.common.utils.logger import logger
 
 
 # [SQLITE DATABASE]

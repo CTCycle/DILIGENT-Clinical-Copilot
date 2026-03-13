@@ -6,8 +6,8 @@ from typing import Any
 
 import pandas as pd
 
-from DILIGENT.common.constants import MATCHING_STOPWORDS
-from DILIGENT.common.utils.patterns import FORM_DESCRIPTORS, FORM_TOKENS, UNIT_TOKENS
+from DILIGENT.server.common.constants import MATCHING_STOPWORDS
+from DILIGENT.server.common.utils.patterns import FORM_DESCRIPTORS, FORM_TOKENS, UNIT_TOKENS
 
 # ---------------------------------------------------------------------------
 _SCHEDULE_TOKEN_RE = re.compile(r"^\d+(?:[.,]\d+)?(?:-\d+(?:[.,]\d+)?){1,3}$")

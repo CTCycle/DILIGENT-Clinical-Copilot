@@ -9,7 +9,7 @@ from fastapi import FastAPI
 from fastapi.responses import FileResponse, RedirectResponse
 from fastapi.staticfiles import StaticFiles
 
-from DILIGENT.common.utils.variables import env_variables  # noqa: F401
+from DILIGENT.server.common.utils.variables import env_variables  # noqa: F401
 from DILIGENT.server.routes.session import router as session_router
 from DILIGENT.server.routes.ollama import router as ollama_router
 from DILIGENT.server.routes.modelconfig import router as modelconfig_router
