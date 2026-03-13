@@ -4,10 +4,10 @@ from dataclasses import dataclass
 from datetime import datetime
 from typing import Literal
 
-from sqlalchemy import select
 from sqlalchemy.orm import Session, sessionmaker
 
 from DILIGENT.server.repositories.queries.data import DataRepositoryQueries
+from DILIGENT.server.repositories.queries.model_config import ModelConfigRepositoryQueries
 from DILIGENT.server.repositories.schemas.models import ModelSelection
 
 ModelRoleType = Literal["clinical", "text_extraction", "cloud"]
@@ -39,7 +39,7 @@ class ModelConfigSerializer:
     def load_snapshot(self) -> ModelConfigSnapshot:
         db_session = self.session_factory()
         try:
-            rows = db_session.execute(select(ModelSelection)).scalars().all()
+            rows = db_session.execute(ModelConfigRepositoryQueries.select_all()).scalars().all()
             return self.build_snapshot(rows)
         finally:
             db_session.close()
@@ -57,7 +57,7 @@ class ModelConfigSerializer:
         db_session = self.session_factory()
         now = datetime.now()
         try:
-            rows = db_session.execute(select(ModelSelection)).scalars().all()
+            rows = db_session.execute(ModelConfigRepositoryQueries.select_all()).scalars().all()
             role_map = {str(row.role_type): row for row in rows}
 
             if clinical_model is not UNSET:
@@ -95,7 +95,9 @@ class ModelConfigSerializer:
                 cloud_row.updated_at = now
 
             db_session.commit()
-            refreshed_rows = db_session.execute(select(ModelSelection)).scalars().all()
+            refreshed_rows = (
+                db_session.execute(ModelConfigRepositoryQueries.select_all()).scalars().all()
+            )
             return self.build_snapshot(refreshed_rows)
         except Exception:
             db_session.rollback()

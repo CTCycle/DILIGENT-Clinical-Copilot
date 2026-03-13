@@ -12,7 +12,6 @@ from xml.etree import ElementTree
 
 import pandas as pd
 from pypdf import PdfReader
-from sqlalchemy import select
 from sqlalchemy.orm import Session, sessionmaker
 
 from DILIGENT.server.configurations import server_settings
@@ -33,6 +32,7 @@ from DILIGENT.server.common.constants import (
 )
 from DILIGENT.server.common.utils.logger import logger
 from DILIGENT.server.repositories.queries.data import DataRepositoryQueries
+from DILIGENT.server.repositories.queries.drugs import DrugRepositoryQueries
 from DILIGENT.server.repositories.schemas.models import (
     ClinicalSession,
     ClinicalSessionDrug,
@@ -240,7 +240,7 @@ class _RepositorySerializationService:
         if normalized is None:
             return
         existing = (
-            db_session.execute(select(Drug).where(Drug.livertox_nbk_id == normalized))
+            db_session.execute(DrugRepositoryQueries.by_livertox_nbk_id(normalized))
             .scalars()
             .first()
         )
@@ -977,9 +977,7 @@ class _RepositorySerializationService:
         if normalized_rxcui is None:
             return
         existing = (
-            db_session.execute(
-                select(DrugRxnormCode).where(DrugRxnormCode.rxcui == normalized_rxcui)
-            )
+            db_session.execute(DrugRepositoryQueries.drug_rxcui_mapping(normalized_rxcui))
             .scalars()
             .first()
         )
@@ -1002,18 +1000,14 @@ class _RepositorySerializationService:
         if normalized_rxcui is None:
             return None
         mapped = (
-            db_session.execute(
-                select(Drug)
-                .join(DrugRxnormCode)
-                .where(DrugRxnormCode.rxcui == normalized_rxcui)
-            )
+            db_session.execute(DrugRepositoryQueries.drug_by_joined_rxcui(normalized_rxcui))
             .scalars()
             .first()
         )
         if mapped is not None:
             return mapped
         return (
-            db_session.execute(select(Drug).where(Drug.rxnorm_rxcui == normalized_rxcui))
+            db_session.execute(DrugRepositoryQueries.drug_by_rxnorm_rxcui(normalized_rxcui))
             .scalars()
             .first()
         )
@@ -1027,7 +1021,7 @@ class _RepositorySerializationService:
         if livertox_nbk_id is None:
             return None
         return (
-            db_session.execute(select(Drug).where(Drug.livertox_nbk_id == livertox_nbk_id))
+            db_session.execute(DrugRepositoryQueries.by_livertox_nbk_id(livertox_nbk_id))
             .scalars()
             .first()
         )
@@ -1042,7 +1036,7 @@ class _RepositorySerializationService:
             return None
         return (
             db_session.execute(
-                select(Drug).where(Drug.canonical_name_norm == canonical_name_norm)
+                DrugRepositoryQueries.drug_by_canonical_name_norm(canonical_name_norm)
             )
             .scalars()
             .first()
@@ -1057,7 +1051,7 @@ class _RepositorySerializationService:
         if alias_norm is None:
             return None
         return (
-            db_session.execute(select(DrugAlias).where(DrugAlias.alias_norm == alias_norm))
+            db_session.execute(DrugRepositoryQueries.alias_by_norm(alias_norm))
             .scalars()
             .first()
         )
@@ -1069,7 +1063,7 @@ class _RepositorySerializationService:
         drug_id: int,
     ) -> LiverToxMonograph | None:
         return (
-            db_session.execute(select(LiverToxMonograph).where(LiverToxMonograph.drug_id == drug_id))
+            db_session.execute(DrugRepositoryQueries.monograph_by_drug_id(drug_id))
             .scalars()
             .first()
         )
@@ -1093,11 +1087,11 @@ class _RepositorySerializationService:
             return
         existing = (
             db_session.execute(
-                select(DrugAlias).where(
-                    DrugAlias.drug_id == drug_id,
-                    DrugAlias.alias_norm == alias_norm,
-                    DrugAlias.alias_kind == alias_kind,
-                    DrugAlias.source == source,
+                DrugRepositoryQueries.alias_for_drug(
+                    drug_id=drug_id,
+                    alias_norm=alias_norm,
+                    alias_kind=alias_kind,
+                    source=source,
                 )
             )
             .scalars()

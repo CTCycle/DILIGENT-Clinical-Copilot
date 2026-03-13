@@ -3,10 +3,10 @@ from __future__ import annotations
 from datetime import datetime
 from typing import Literal
 
-from sqlalchemy import select, update
 from sqlalchemy.engine import Engine
 from sqlalchemy.orm import sessionmaker
 
+from DILIGENT.server.repositories.queries.keys import AccessKeyRepositoryQueries
 from DILIGENT.server.repositories.queries.data import DataRepositoryQueries
 from DILIGENT.server.repositories.schemas.models import AccessKey, ResearchAccessKey
 from DILIGENT.server.services.keys.cryptography import (
@@ -84,11 +84,7 @@ class AccessKeySerializer:
         table = self.resolve_table(normalized_provider)
         db_session = self.session_factory()
         try:
-            stmt = (
-                select(table)
-                .where(table.provider == normalized_provider)
-                .order_by(table.is_active.desc(), table.created_at.desc(), table.id.desc())
-            )
+            stmt = AccessKeyRepositoryQueries.list_for_provider(table, normalized_provider)
             return db_session.execute(stmt).scalars().all()
         finally:
             db_session.close()
@@ -136,9 +132,9 @@ class AccessKeySerializer:
             table = self.resolve_table_from_row(target)
 
             db_session.execute(
-                update(table)
-                .where(table.provider == target.provider)
-                .values(is_active=False, updated_at=now)
+                AccessKeyRepositoryQueries.deactivate_provider_keys(
+                    table, target.provider, now=now
+                )
             )
             target.is_active = True
             target.updated_at = now
@@ -182,14 +178,7 @@ class AccessKeySerializer:
         table = self.resolve_table(normalized_provider)
         db_session = self.session_factory()
         try:
-            stmt = (
-                select(table)
-                .where(
-                    table.provider == normalized_provider,
-                    table.is_active.is_(True),
-                )
-                .order_by(table.updated_at.desc(), table.id.desc())
-            )
+            stmt = AccessKeyRepositoryQueries.active_for_provider(table, normalized_provider)
             row = db_session.execute(stmt).scalars().first()
             if row is None:
                 return None
