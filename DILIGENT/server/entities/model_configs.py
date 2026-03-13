@@ -38,7 +38,7 @@ class ModelConfigStateResponse(BaseModel):
 class ModelConfigUpdateRequest(BaseModel):
     model_config = ConfigDict(extra="forbid")
     use_cloud_services: bool | None = None
-    llm_provider: str | None = Field(default=None, max_length=32)
+    llm_provider: str | None = Field(default=None, max_length=64)
     cloud_model: str | None = Field(default=None, max_length=200)
     clinical_model: str | None = Field(default=None, max_length=200)
     text_extraction_model: str | None = Field(default=None, max_length=200)
