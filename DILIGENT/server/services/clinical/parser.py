@@ -19,8 +19,8 @@ from DILIGENT.server.entities.clinical import (
 )
 from DILIGENT.server.configurations import LLMRuntimeConfig, server_settings
 from DILIGENT.server.services.text.normalization import normalize_token
-from DILIGENT.common.utils.logger import logger
-from DILIGENT.common.utils.patterns import (
+from DILIGENT.server.common.utils.logger import logger
+from DILIGENT.server.common.utils.patterns import (
     DRUG_BRACKET_TRAIL_RE,
     DRUG_BULLET_RE,
     DRUG_SCHEDULE_RE,

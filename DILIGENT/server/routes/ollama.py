@@ -15,7 +15,7 @@ from DILIGENT.server.entities.jobs import (
 from DILIGENT.server.entities.models import ModelListResponse, ModelPullResponse
 from DILIGENT.server.configurations import server_settings
 from DILIGENT.server.services.jobs import job_manager
-from DILIGENT.common.utils.logger import logger
+from DILIGENT.server.common.utils.logger import logger
 
 router = APIRouter(prefix="/models", tags=["models"])
 SAFE_OLLAMA_MODEL_RE = re.compile(r"^[A-Za-z0-9][A-Za-z0-9._:/+\-]{0,199}$")

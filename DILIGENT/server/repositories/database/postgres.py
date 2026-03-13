@@ -18,7 +18,7 @@ from DILIGENT.server.repositories.database.utils import (
     validate_sql_identifier,
 )
 from DILIGENT.server.repositories.schemas.models import Base
-from DILIGENT.common.utils.logger import logger
+from DILIGENT.server.common.utils.logger import logger
 
 
 ###############################################################################

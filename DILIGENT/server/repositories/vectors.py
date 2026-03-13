@@ -9,7 +9,7 @@ import pyarrow as pa
 from lancedb.db import DBConnection
 from lancedb.table import Table
 
-from DILIGENT.common.utils.logger import logger
+from DILIGENT.server.common.utils.logger import logger
 
 VECTOR_TABLE_SCHEMA = pa.schema(
     [

@@ -20,8 +20,8 @@ from pypdf import PdfReader
 from tqdm import tqdm
 
 from DILIGENT.server.configurations import server_settings
-from DILIGENT.common.constants import LIVERTOX_BASE_URL, ARCHIVES_PATH
-from DILIGENT.common.utils.logger import logger
+from DILIGENT.server.common.constants import LIVERTOX_BASE_URL, ARCHIVES_PATH
+from DILIGENT.server.common.utils.logger import logger
 from DILIGENT.server.services.text.normalization import normalize_whitespace
 from DILIGENT.server.services.updater.livertoxsanitizer import LiverToxExcerptSanitizer
 from DILIGENT.server.repositories.serialization.data import DataSerializer

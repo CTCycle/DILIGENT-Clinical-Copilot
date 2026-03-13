@@ -6,7 +6,7 @@ import time
 
 from DILIGENT.server.configurations import server_settings
 from DILIGENT.server.repositories.database.initializer import initialize_database
-from DILIGENT.common.utils.logger import logger
+from DILIGENT.server.common.utils.logger import logger
 
 
 ###############################################################################

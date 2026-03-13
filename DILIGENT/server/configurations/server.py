@@ -4,16 +4,16 @@ from dataclasses import dataclass
 from typing import Any, Literal
 
 from DILIGENT.server.configurations import ensure_mapping, load_configuration_data
-from DILIGENT.common.constants import (
+from DILIGENT.server.common.constants import (
     CLINICAL_MODEL_CHOICES,
     CLOUD_MODEL_CHOICES, 
     DEFAULT_EMBEDDING_BATCH_SIZE,
     PARSING_MODEL_CHOICES,
     CONFIGURATIONS_FILE,
 )
-from DILIGENT.common.utils.variables import env_variables
+from DILIGENT.server.common.utils.variables import env_variables
 
-from DILIGENT.common.utils.types import (
+from DILIGENT.server.common.utils.types import (
     coerce_bool,
     coerce_float,
     coerce_int,

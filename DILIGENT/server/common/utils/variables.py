@@ -3,8 +3,8 @@ from __future__ import annotations
 import os
 
 from dotenv import load_dotenv
-from DILIGENT.common.constants import ENV_FILE_PATH
-from DILIGENT.common.utils.logger import logger
+from DILIGENT.server.common.constants import ENV_FILE_PATH
+from DILIGENT.server.common.utils.logger import logger
 
 
 # [LOAD ENVIRONMENT VARIABLES]

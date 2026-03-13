@@ -14,8 +14,8 @@ import httpx
 import pandas as pd
 
 from DILIGENT.server.configurations import server_settings
-from DILIGENT.common.utils.logger import logger
-from DILIGENT.common.constants import RXNAV_SYNONYM_STOPWORDS
+from DILIGENT.server.common.utils.logger import logger
+from DILIGENT.server.common.constants import RXNAV_SYNONYM_STOPWORDS
 from DILIGENT.server.repositories.serialization.data import DataSerializer
 
 

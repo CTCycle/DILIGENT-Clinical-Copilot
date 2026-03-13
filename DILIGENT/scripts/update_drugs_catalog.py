@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from DILIGENT.common.utils.logger import logger
+from DILIGENT.server.common.utils.logger import logger
 from DILIGENT.server.services.updater.rxnav import RxNavDrugCatalogBuilder
 
 REDOWNLOAD = True

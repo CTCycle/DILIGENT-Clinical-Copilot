@@ -16,7 +16,7 @@ from sqlalchemy import select
 from sqlalchemy.orm import Session, sessionmaker
 
 from DILIGENT.server.configurations import server_settings
-from DILIGENT.common.constants import (
+from DILIGENT.server.common.constants import (
     DEFAULT_EMBEDDING_BATCH_SIZE,
     DRUG_NAME_ALLOWED_PATTERN,
     DOCUMENT_SUPPORTED_EXTENSIONS,
@@ -31,7 +31,7 @@ from DILIGENT.common.constants import (
     TABLE_LIVERTOX_MONOGRAPHS,
     TEXT_FILE_FALLBACK_ENCODINGS,
 )
-from DILIGENT.common.utils.logger import logger
+from DILIGENT.server.common.utils.logger import logger
 from DILIGENT.server.repositories.queries.data import DataRepositoryQueries
 from DILIGENT.server.repositories.schemas.models import (
     ClinicalSession,

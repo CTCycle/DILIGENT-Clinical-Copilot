@@ -4,7 +4,7 @@ import hashlib
 
 from cryptography.fernet import Fernet, InvalidToken
 
-from DILIGENT.common.utils.variables import env_variables
+from DILIGENT.server.common.utils.variables import env_variables
 
 
 ###############################################################################

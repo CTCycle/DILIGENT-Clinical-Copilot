@@ -11,7 +11,7 @@ from urllib.parse import urlparse
 import httpx
 from pydantic import BaseModel, Field
 
-from DILIGENT.common.utils.logger import logger
+from DILIGENT.server.common.utils.logger import logger
 from DILIGENT.server.configurations import server_settings
 from DILIGENT.server.entities.research import ResearchCitation, ResearchSource
 from DILIGENT.server.models.providers import initialize_llm_client

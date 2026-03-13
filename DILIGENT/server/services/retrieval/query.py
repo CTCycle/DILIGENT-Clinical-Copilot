@@ -4,7 +4,7 @@ from collections import defaultdict
 
 from DILIGENT.server.models.prompts import DILI_RAG_QUERY_PROMPT
 from DILIGENT.server.entities.clinical import PatientDrugs
-from DILIGENT.common.constants import (
+from DILIGENT.server.common.constants import (
     DEFAULT_DILI_CLASSIFICATION,
     NO_CLINICAL_CONTEXT_FALLBACK,
     UNKNOWN_R_SCORE_TOKEN,
