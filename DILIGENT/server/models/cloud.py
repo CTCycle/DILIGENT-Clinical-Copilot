@@ -9,7 +9,7 @@ from DILIGENT.server.common.constants import GEMINI_API_BASE, OPENAI_API_BASE
 from DILIGENT.server.common.utils.logger import logger
 from DILIGENT.server.configurations import server_settings
 from DILIGENT.server.models.structured import StructuredOutputParser, parse_json_dict, T
-from DILIGENT.server.repositories.serialization.accesskeys import AccessKeySerializer
+from DILIGENT.server.repositories.serialization.access_keys import AccessKeySerializer
 from DILIGENT.server.services.keys.cryptography import (
     decrypt as decrypt_access_key,
 )
