@@ -204,9 +204,18 @@ if not exist "%pyproject%" (
   goto error
 )
 if not exist "%runtime_uv_lock%" (
-  echo [FATAL] Missing runtime lockfile: "%runtime_uv_lock%"
-  echo [INFO] The backend lockfile must exist at runtimes\uv.lock.
-  goto error
+  if exist "%uv_lock_file%" (
+    copy /y "%uv_lock_file%" "%runtime_uv_lock%" >nul
+    if errorlevel 1 (
+      echo [FATAL] Missing runtime lockfile and failed to seed from "%uv_lock_file%".
+      goto error
+    )
+    echo [INFO] Seeded runtime lockfile from workspace lockfile: "%runtime_uv_lock%"
+  ) else (
+    echo [FATAL] Missing runtime lockfile: "%runtime_uv_lock%"
+    echo [INFO] The backend lockfile must exist at runtimes\uv.lock or workspace uv.lock.
+    goto error
+  )
 )
 echo [INFO] Using runtime lockfile: "%runtime_uv_lock%"
 copy /y "%runtime_uv_lock%" "%uv_lock_file%" >nul
