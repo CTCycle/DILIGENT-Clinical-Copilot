@@ -195,13 +195,13 @@ This section is intended as the "where to edit what" map so agents do not need t
 - `DILIGENT/server/repositories/schemas/models.py`: SQLAlchemy ORM schema definitions (clinical sessions/results/sections/labs/drugs, monographs, aliases, model selections, access keys).
 - `DILIGENT/server/repositories/schemas/types.py`: custom SQLAlchemy type helpers.
 - `DILIGENT/server/repositories/serialization/__init__.py`: package marker.
-- `DILIGENT/server/repositories/serialization/accesskeys.py`: encrypted key persistence, provider activation semantics, key lookup CRUD.
+- `DILIGENT/server/repositories/serialization/access_keys.py`: encrypted key persistence, provider activation semantics, key lookup CRUD.
 - `DILIGENT/server/repositories/serialization/data.py`: high-volume persistence service for clinical sessions, LiverTox and RxNav upsert logic, alias linking, document loading/chunking/vector serialization.
-- `DILIGENT/server/repositories/serialization/modelconfig.py`: model config persistence/snapshot serializer.
+- `DILIGENT/server/repositories/serialization/model_config.py`: model config persistence/snapshot serializer.
 - `DILIGENT/server/repositories/vectors.py`: LanceDB wrapper (table init, dimensionality checks, index creation, record load/stream).
 - `DILIGENT/server/routes/__init__.py`: package marker.
-- `DILIGENT/server/routes/accesskeys.py`: `/access-keys` CRUD + activate endpoints.
-- `DILIGENT/server/routes/modelconfig.py`: `/model-config` GET/PUT endpoint class; resolves provider/model defaults and local model availability cards.
+- `DILIGENT/server/routes/access_keys.py`: `/access-keys` CRUD + activate endpoints.
+- `DILIGENT/server/routes/model_config.py`: `/model-config` GET/PUT endpoint class; resolves provider/model defaults and local model availability cards.
 - `DILIGENT/server/routes/ollama.py`: `/models/list`, `/models/pull`, pull job start/status/cancel endpoints.
 - `DILIGENT/server/routes/research.py`: `/research` endpoint class for Tavily-backed evidence response.
 - `DILIGENT/server/routes/session.py`: `/clinical` and clinical job endpoints; progress callbacks; payload build/merge/validation; per-patient pipeline orchestration.
@@ -228,7 +228,7 @@ This section is intended as the "where to edit what" map so agents do not need t
 - `DILIGENT/server/services/updater/__init__.py`: package marker.
 - `DILIGENT/server/services/updater/embeddings.py`: orchestrates corpus chunking + embedding refresh into vector DB.
 - `DILIGENT/server/services/updater/livertox.py`: LiverTox archive/masterlist download, metadata validation, parsing/sanitization into unified dataset.
-- `DILIGENT/server/services/updater/livertoxsanitizer.py`: LiverTox excerpt cleaning rules.
+- `DILIGENT/server/services/updater/livertox_sanitizer.py`: LiverTox excerpt cleaning rules.
 - `DILIGENT/server/services/updater/rxnav.py`: RxNav client + catalog builder with async prefetch, synonym/brand expansion, batch DB upserts.
 
 ### 4.7 Operational Scripts and Containers
@@ -236,7 +236,7 @@ This section is intended as the "where to edit what" map so agents do not need t
 - `DILIGENT/scripts/initialize_database.py`: initializes DB schema for active backend mode.
 - `DILIGENT/scripts/update_drugs_catalog.py`: runs RxNav catalog refresh pipeline.
 - `DILIGENT/scripts/update_livertox_data.py`: runs LiverTox ingestion/update pipeline.
-- `DILIGENT/scripts/update_RAG.py`: runs RAG document vectorization refresh.
+- `DILIGENT/scripts/update_rag.py`: runs RAG document vectorization refresh.
 - `docker/backend.Dockerfile`: uv-based Python image; frozen sync from lockfile; FastAPI startup.
 - `docker/frontend.Dockerfile`: Node build stage + Nginx runtime stage for static frontend.
 - `docker/nginx/default.conf`: strict route whitelist for proxied APIs; blocks docs/openapi endpoints in cloud mode.
@@ -288,9 +288,9 @@ This section is intended as the "where to edit what" map so agents do not need t
 
 - Clinical output bug: start at `server/routes/session.py`, then `services/clinical/hepatox.py`, `services/clinical/preparation.py`, `services/clinical/matches.py`.
 - Drug parsing issue: `services/clinical/parser.py`, `services/text/normalization.py`, tests `test_drugs_parser.py` and `test_anamnesis_drug_extraction.py`.
-- Model/provider config issue: backend `routes/modelconfig.py` + `repositories/serialization/modelconfig.py`; frontend `pages/ModelConfigPage.tsx`, `modelConfig.ts`, `constants.ts`.
-- Access key issue: backend `routes/accesskeys.py`, `repositories/serialization/accesskeys.py`, `services/keys/cryptography.py`; frontend `useAccessKeyManager.ts`, `AccessKeyModal.tsx`.
-- RAG/vector issue: `services/updater/embeddings.py`, `services/retrieval/embeddings.py`, `repositories/vectors.py`, `scripts/update_RAG.py`.
+- Model/provider config issue: backend `routes/model_config.py` + `repositories/serialization/model_config.py`; frontend `pages/ModelConfigPage.tsx`, `modelConfig.ts`, `constants.ts`.
+- Access key issue: backend `routes/access_keys.py`, `repositories/serialization/access_keys.py`, `services/keys/cryptography.py`; frontend `useAccessKeyManager.ts`, `AccessKeyModal.tsx`.
+- RAG/vector issue: `services/updater/embeddings.py`, `services/retrieval/embeddings.py`, `repositories/vectors.py`, `scripts/update_rag.py`.
 - LiverTox/RxNav ingestion issue: `services/updater/livertox.py`, `services/updater/rxnav.py`, `scripts/update_livertox_data.py`, `scripts/update_drugs_catalog.py`.
 - Docker/API gateway issue: `docker-compose.yml`, `docker/nginx/default.conf`, `docker/backend.Dockerfile`, `docker/frontend.Dockerfile`.
 - Desktop packaging/runtime issue: `client/src-tauri/src/main.rs`, `release/tauri/build_with_tauri.bat`, `release/tauri/scripts/*.ps1`.

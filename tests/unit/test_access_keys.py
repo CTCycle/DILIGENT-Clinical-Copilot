@@ -5,7 +5,7 @@ from sqlalchemy import create_engine, select
 from sqlalchemy.orm import sessionmaker
 
 from DILIGENT.server.repositories.schemas.models import AccessKey, Base, ResearchAccessKey
-from DILIGENT.server.repositories.serialization.accesskeys import AccessKeySerializer
+from DILIGENT.server.repositories.serialization.access_keys import AccessKeySerializer
 from DILIGENT.server.services.keys.cryptography import decrypt, encrypt
 
 

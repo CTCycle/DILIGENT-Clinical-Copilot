@@ -12,8 +12,8 @@ from fastapi.staticfiles import StaticFiles
 from DILIGENT.server.common.utils.variables import env_variables  # noqa: F401
 from DILIGENT.server.routes.session import router as session_router
 from DILIGENT.server.routes.ollama import router as ollama_router
-from DILIGENT.server.routes.modelconfig import router as modelconfig_router
-from DILIGENT.server.routes.accesskeys import router as accesskeys_router
+from DILIGENT.server.routes.model_config import router as model_config_router
+from DILIGENT.server.routes.access_keys import router as access_keys_router
 from DILIGENT.server.routes.research import router as research_router
 from DILIGENT.server.configurations import server_settings
 
@@ -70,8 +70,8 @@ app = FastAPI(
 routers = [
     session_router,
     ollama_router,
-    modelconfig_router,
-    accesskeys_router,
+    model_config_router,
+    access_keys_router,
     research_router,
 ]
 

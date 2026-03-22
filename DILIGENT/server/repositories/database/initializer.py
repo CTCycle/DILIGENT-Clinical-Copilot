@@ -3,6 +3,7 @@ from __future__ import annotations
 import urllib.parse
 
 import sqlalchemy
+from sqlalchemy import column, literal, select, table
 from sqlalchemy.exc import SQLAlchemyError
 from sqlalchemy.sql.elements import TextClause
 
@@ -99,12 +100,16 @@ def ensure_postgres_database(settings: DatabaseSettings) -> str:
         isolation_level="AUTOCOMMIT",
         pool_pre_ping=True,
     )
+    pg_database = table("pg_database", column("datname"))
+    exists_stmt = (
+        select(literal(1))
+        .select_from(pg_database)
+        .where(pg_database.c.datname == target_database)
+        .limit(1)
+    )
 
     with admin_engine.connect() as conn:
-        exists = conn.execute(
-            sqlalchemy.text("SELECT 1 FROM pg_database WHERE datname=:name"),
-            {"name": target_database},
-        ).scalar()
+        exists = conn.execute(exists_stmt).scalar()
         if exists:
             logger.info("PostgreSQL database %s already exists", target_database)
         else:

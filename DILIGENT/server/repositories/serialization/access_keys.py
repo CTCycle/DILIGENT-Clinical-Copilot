@@ -6,7 +6,7 @@ from typing import Literal
 from sqlalchemy.engine import Engine
 from sqlalchemy.orm import sessionmaker
 
-from DILIGENT.server.repositories.queries.keys import AccessKeyRepositoryQueries
+from DILIGENT.server.repositories.queries.access_keys import AccessKeyRepositoryQueries
 from DILIGENT.server.repositories.queries.data import DataRepositoryQueries
 from DILIGENT.server.repositories.schemas.models import AccessKey, ResearchAccessKey
 from DILIGENT.server.services.keys.cryptography import (
