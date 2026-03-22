@@ -230,9 +230,20 @@ if not exist "%script_path%" (
   goto :run_server_script_end
 )
 if not exist "%uv_lock%" (
-  echo [ERROR] Runtime lockfile not found at "%uv_lock%".
-  set "run_script_ec=1"
-  goto :run_server_script_end
+  if exist "%uv_lock_file%" (
+    copy /y "%uv_lock_file%" "%uv_lock%" >nul
+    if errorlevel 1 (
+      echo [ERROR] Runtime lockfile not found at "%uv_lock%" and seeding from "%uv_lock_file%" failed.
+      set "run_script_ec=1"
+      goto :run_server_script_end
+    )
+    echo [INFO] Seeded runtime lockfile from workspace lockfile: "%uv_lock%".
+  ) else (
+    echo [ERROR] Runtime lockfile not found at "%uv_lock%".
+    echo [INFO] Expected lockfile at runtimes\uv.lock or workspace uv.lock.
+    set "run_script_ec=1"
+    goto :run_server_script_end
+  )
 )
 copy /y "%uv_lock%" "%uv_lock_file%" >nul
 if errorlevel 1 (

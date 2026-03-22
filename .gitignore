@@ -54,16 +54,11 @@ Thumbs.db
 
 # Misc
 *.lock
-!runtimes/uv.lock
 *.log
 *.db
 *.sqlite*
 *.exe
 *.gz
 
-
 !.gitkeep
-
-# Local runtime env (contains secrets)
-DILIGENT/settings/.env
 
