@@ -5,10 +5,10 @@ from typing import Any, Iterator
 
 import pandas as pd
 import sqlalchemy
-from sqlalchemy import UniqueConstraint, event, inspect, text
+from sqlalchemy import UniqueConstraint, event, func, inspect, select
 from sqlalchemy.dialects.sqlite import insert
 from sqlalchemy.engine import Engine
-from sqlalchemy.orm import sessionmaker
+from sqlalchemy.orm import Session, sessionmaker
 
 from DILIGENT.server.configurations import DatabaseSettings
 from DILIGENT.server.repositories.database.utils import (
@@ -65,6 +65,34 @@ class SQLiteRepository:
         return normalized_name
 
     # -------------------------------------------------------------------------
+    def table_exists(self, table_name: str) -> bool:
+        inspector = inspect(self.engine)
+        return bool(inspector.has_table(table_name))
+
+    # -------------------------------------------------------------------------
+    @staticmethod
+    def ordered_select_for_table(table_cls):
+        stmt = select(table_cls)
+        primary_keys = list(table_cls.__mapper__.primary_key)
+        if primary_keys:
+            stmt = stmt.order_by(*primary_keys)
+        return stmt
+
+    # -------------------------------------------------------------------------
+    @staticmethod
+    def rows_to_dataframe(rows: list[Any], table_cls) -> pd.DataFrame:
+        columns = [column.name for column in table_cls.__table__.columns]
+        if not rows:
+            return pd.DataFrame(columns=columns)
+        payload = [{column: getattr(row, column) for column in columns} for row in rows]
+        return pd.DataFrame(payload, columns=columns)
+
+    # -------------------------------------------------------------------------
+    def load_rows(self, db_session: Session, table_cls, *, offset: int, limit: int) -> list[Any]:
+        stmt = self.ordered_select_for_table(table_cls).offset(offset).limit(limit)
+        return db_session.execute(stmt).scalars().all()
+
+    # -------------------------------------------------------------------------
     def upsert_dataframe(self, df: pd.DataFrame, table_cls) -> None:
         table = table_cls.__table__
         session = self.session_factory()
@@ -107,13 +135,16 @@ class SQLiteRepository:
     # -------------------------------------------------------------------------
     def load_from_database(self, table_name: str) -> pd.DataFrame:
         safe_table_name = self.sanitize_table_name(table_name)
-        with self.engine.connect() as conn:
-            inspector = inspect(conn)
-            if not inspector.has_table(safe_table_name):
-                logger.warning(MISSING_TABLE_MESSAGE, safe_table_name)
-                return pd.DataFrame()
-            data = pd.read_sql_table(safe_table_name, conn)
-        return data
+        if not self.table_exists(safe_table_name):
+            logger.warning(MISSING_TABLE_MESSAGE, safe_table_name)
+            return pd.DataFrame()
+        table_cls = self.get_table_class(safe_table_name)
+        db_session = self.session_factory()
+        try:
+            rows = db_session.execute(self.ordered_select_for_table(table_cls)).scalars().all()
+            return self.rows_to_dataframe(rows, table_cls)
+        finally:
+            db_session.close()
 
 
     # -------------------------------------------------------------------------
@@ -125,12 +156,15 @@ class SQLiteRepository:
     # -----------------------------------------------------------------------------
     def count_rows(self, table_name: str) -> int:
         safe_table_name = self.sanitize_table_name(table_name)
-        with self.engine.connect() as conn:
-            result = conn.execute(
-                sqlalchemy.text(f'SELECT COUNT(*) FROM "{safe_table_name}"')
-            )
-            value = result.scalar() or 0
-        return int(value)
+        table_cls = self.get_table_class(safe_table_name)
+        db_session = self.session_factory()
+        try:
+            value = db_session.execute(
+                select(func.count()).select_from(table_cls)
+            ).scalar_one()
+            return int(value)
+        finally:
+            db_session.close()
 
     # -------------------------------------------------------------------------
     def stream_rows(self, table_name: str, page_size: int) -> Iterator[pd.DataFrame]:
@@ -139,14 +173,28 @@ class SQLiteRepository:
         if chunk_size <= 0:
             yield self.load_from_database(safe_table_name)
             return
-        with self.engine.connect() as conn:
-            inspector = inspect(conn)
-            if not inspector.has_table(safe_table_name):
-                logger.warning(MISSING_TABLE_MESSAGE, safe_table_name)
-                return
-            query = text(f'SELECT * FROM "{safe_table_name}"')
-            for chunk in pd.read_sql_query(query, conn, chunksize=chunk_size):
-                yield chunk
+        if not self.table_exists(safe_table_name):
+            logger.warning(MISSING_TABLE_MESSAGE, safe_table_name)
+            return
+        table_cls = self.get_table_class(safe_table_name)
+        db_session = self.session_factory()
+        try:
+            offset = 0
+            while True:
+                rows = self.load_rows(
+                    db_session,
+                    table_cls,
+                    offset=offset,
+                    limit=chunk_size,
+                )
+                if not rows:
+                    break
+                yield self.rows_to_dataframe(rows, table_cls)
+                offset += len(rows)
+                if len(rows) < chunk_size:
+                    break
+        finally:
+            db_session.close()
 
     # -------------------------------------------------------------------------
     def load_paginated(
@@ -155,18 +203,21 @@ class SQLiteRepository:
         safe_table_name = self.sanitize_table_name(table_name)
         safe_offset = max(int(offset), 0)
         safe_limit = max(int(limit), 1)
-        with self.engine.connect() as conn:
-            inspector = inspect(conn)
-            if not inspector.has_table(safe_table_name):
-                logger.warning(MISSING_TABLE_MESSAGE, safe_table_name)
-                return pd.DataFrame()
-            query = text(f'SELECT * FROM "{safe_table_name}" LIMIT :limit OFFSET :offset')
-            data = pd.read_sql_query(
-                query,
-                conn,
-                params={"limit": safe_limit, "offset": safe_offset},
+        if not self.table_exists(safe_table_name):
+            logger.warning(MISSING_TABLE_MESSAGE, safe_table_name)
+            return pd.DataFrame()
+        table_cls = self.get_table_class(safe_table_name)
+        db_session = self.session_factory()
+        try:
+            rows = self.load_rows(
+                db_session,
+                table_cls,
+                offset=safe_offset,
+                limit=safe_limit,
             )
-        return data
+            return self.rows_to_dataframe(rows, table_cls)
+        finally:
+            db_session.close()
 
 
 
