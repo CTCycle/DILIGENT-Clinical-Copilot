@@ -1589,7 +1589,7 @@ input[type="date"]::-webkit-calendar-picker-indicator:hover {
   align-items: stretch;
   justify-content: flex-start;
   padding: 0 var(--space-md);
-  background: linear-gradient(90deg, #2b72bb 0%, #2567ad 100%);
+  background: linear-gradient(120deg, var(--color-brand), var(--color-brand-light));
   border-bottom: 1px solid rgba(15, 23, 42, 0.2);
   box-shadow: var(--shadow-sm);
 }
