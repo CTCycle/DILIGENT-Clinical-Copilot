@@ -4,7 +4,7 @@ import asyncio
 
 import pandas as pd
 
-from DILIGENT.server.entities.clinical import DrugEntry, PatientDrugs
+from DILIGENT.server.domain.clinical import DrugEntry, PatientDrugs
 from DILIGENT.server.services.clinical.matches import LiverToxMatcher
 from DILIGENT.server.services.clinical.preparation import ClinicalKnowledgePreparation
 from DILIGENT.server.services.text.normalization import normalize_drug_query_name

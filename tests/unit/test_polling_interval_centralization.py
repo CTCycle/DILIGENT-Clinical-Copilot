@@ -3,7 +3,7 @@ from __future__ import annotations
 from typing import Any
 
 from DILIGENT.server.configurations import server_settings
-from DILIGENT.server.entities.clinical import ClinicalSessionRequest
+from DILIGENT.server.domain.clinical import ClinicalSessionRequest
 from DILIGENT.server.routes import ollama as ollama_routes
 from DILIGENT.server.routes import session as session_routes
 

@@ -110,6 +110,16 @@ export type ClinicalJobResult = {
   [key: string]: unknown;
 };
 
+export type OllamaPullJobResult = {
+  model?: string;
+  pulled?: boolean;
+  progress_status?: string;
+  progress_message?: string;
+  total_bytes?: number;
+  completed_bytes?: number;
+  [key: string]: unknown;
+};
+
 export type JobStartResponse = {
   job_id: string;
   job_type: JobType;
