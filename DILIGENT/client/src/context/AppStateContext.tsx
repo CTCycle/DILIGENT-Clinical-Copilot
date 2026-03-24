@@ -11,6 +11,7 @@ import { fetchModelConfigState } from "../services/api";
 // Types
 // ---------------------------------------------------------------------------
 export type PageId = "dili-agent" | "data-inspection" | "model-config";
+export type ThemeMode = "light" | "dark";
 
 const DEFAULT_PAGE: PageId = "dili-agent";
 const PAGE_PATHS: Record<PageId, string> = {
@@ -60,12 +61,15 @@ export interface DiliAgentState {
 
 export interface AppState {
     activePage: PageId;
+    theme: ThemeMode;
     diliAgent: DiliAgentState;
 }
 
 interface AppStateContextValue {
     state: AppState;
     setActivePage: (page: PageId) => void;
+    setTheme: (theme: ThemeMode) => void;
+    toggleTheme: () => void;
     updateDiliAgent: (updates: Partial<DiliAgentState>) => void;
 }
 
@@ -89,6 +93,7 @@ const DEFAULT_DILI_AGENT_STATE: DiliAgentState = {
 
 const DEFAULT_APP_STATE: AppState = {
     activePage: resolvePageIdFromPath(globalThis.location?.pathname ?? "/"),
+    theme: globalThis.matchMedia?.("(prefers-color-scheme: dark)")?.matches ? "dark" : "light",
     diliAgent: DEFAULT_DILI_AGENT_STATE,
 };
 
@@ -146,8 +151,21 @@ export function AppStateProvider({ children }: AppStateProviderProps): React.JSX
         };
     }, []);
 
+    useEffect(() => {
+        document.documentElement.dataset.theme = state.theme;
+        document.documentElement.style.colorScheme = state.theme;
+    }, [state.theme]);
+
     const setActivePage = useCallback((page: PageId) => {
         setState((prev) => ({ ...prev, activePage: page }));
+    }, []);
+
+    const setTheme = useCallback((theme: ThemeMode) => {
+        setState((prev) => ({ ...prev, theme }));
+    }, []);
+
+    const toggleTheme = useCallback(() => {
+        setState((prev) => ({ ...prev, theme: prev.theme === "dark" ? "light" : "dark" }));
     }, []);
 
     const updateDiliAgent = useCallback((updates: Partial<DiliAgentState>) => {
@@ -161,9 +179,11 @@ export function AppStateProvider({ children }: AppStateProviderProps): React.JSX
         () => ({
             state,
             setActivePage,
+            setTheme,
+            toggleTheme,
             updateDiliAgent,
         }),
-        [state, setActivePage, updateDiliAgent],
+        [state, setActivePage, setTheme, toggleTheme, updateDiliAgent],
     );
 
     return (
