@@ -129,6 +129,48 @@ def report_clinical_job_progress(job_id: str, *, stage: str, progress: float) ->
     )
 
 
+# -----------------------------------------------------------------------------
+def build_failed_session_payload(
+    *,
+    payload: PatientData,
+    runtime_overrides: dict[str, Any],
+    issues: list[dict[str, Any]],
+    error_message: str,
+    elapsed_seconds: float,
+) -> dict[str, Any]:
+    return {
+        "patient_name": payload.name,
+        "session_timestamp": datetime.now(),
+        "alt_value": payload.alt,
+        "alt_upper_limit": payload.alt_max,
+        "alp_value": payload.alp,
+        "alp_upper_limit": payload.alp_max,
+        "hepatic_pattern": "indeterminate",
+        "anamnesis": payload.anamnesis,
+        "drugs": payload.drugs,
+        "parsing_model": runtime_overrides.get("parsing_model")
+        or LLMRuntimeConfig.get_parsing_model(),
+        "clinical_model": runtime_overrides.get("clinical_model")
+        or LLMRuntimeConfig.get_clinical_model(),
+        "total_duration": elapsed_seconds,
+        "final_report": None,
+        "detected_drugs": [],
+        "matched_drugs": [],
+        "issues": issues,
+        "session_status": "failed",
+        "session_result_payload": {
+            "report": "",
+            "issues": issues,
+            "error": error_message,
+            "pattern_status": "failed",
+            "detected_drugs": [],
+            "anamnesis_drugs": [],
+            "anamnesis_diseases": [],
+            "matched_drugs": [],
+        },
+    }
+
+
 ###############################################################################
 class NarrativeBuilder:
     
@@ -269,6 +311,7 @@ async def execute_clinical_job(
         progress=5.0,
     )
     progress_callback = ClinicalJobProgressCallback(job_id=job_id)
+    job_started_at = time.perf_counter()
 
     try:
         result = await endpoint.process_single_patient(
@@ -277,12 +320,40 @@ async def execute_clinical_job(
             progress_callback=progress_callback,
         )
     except ClinicalPipelineValidationError as exc:
+        serialized_issues = [issue.model_dump() for issue in exc.issues]
+        await asyncio.to_thread(
+            serializer.save_clinical_session,
+            build_failed_session_payload(
+                payload=payload,
+                runtime_overrides=runtime_overrides,
+                issues=serialized_issues,
+                error_message=str(exc),
+                elapsed_seconds=(time.perf_counter() - job_started_at),
+            ),
+        )
         job_manager.update_result(
             job_id,
             {
                 "validation_error": str(exc),
-                "issues": [issue.model_dump() for issue in exc.issues],
+                "issues": serialized_issues,
             },
+        )
+        raise
+    except Exception as exc:
+        failure_issue = PipelineIssue(
+            severity="error",
+            code="clinical_job_failed",
+            message=str(exc).strip() or "Clinical analysis failed unexpectedly.",
+        ).model_dump()
+        await asyncio.to_thread(
+            serializer.save_clinical_session,
+            build_failed_session_payload(
+                payload=payload,
+                runtime_overrides=runtime_overrides,
+                issues=[failure_issue],
+                error_message=str(exc),
+                elapsed_seconds=(time.perf_counter() - job_started_at),
+            ),
         )
         raise
     return result
@@ -877,6 +948,7 @@ class ClinicalSessionEndpoint:
                 "detected_drugs": detected_drugs,
                 "matched_drugs": matched_drugs_payload,
                 "issues": serialized_issues,
+                "session_status": "successful",
                 "session_result_payload": result_payload,
             },
         )

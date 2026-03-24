@@ -31,6 +31,7 @@ DILIGENT Clinical Copilot is a local-first DILI assessment system:
 Core endpoints:
 - `/clinical`
 - `/clinical/jobs`, `/clinical/jobs/{job_id}`
+- `/inspection/*` (sessions catalog/report, RxNav catalog/aliases/update jobs, LiverTox catalog/excerpt/update jobs)
 - `/models/list`, `/models/pull`, `/models/pull/jobs`, `/models/jobs/{job_id}`
 - `/model-config`
 - `/access-keys`, `/access-keys/{id}/activate`
@@ -119,7 +120,7 @@ This section is intended as the "where to edit what" map so agents do not need t
 - `DILIGENT/client/src/services/api.ts`: request wrappers, timeout + response parsing, clinical job poller, model/access-key APIs.
 - `DILIGENT/client/src/pages/DiliAgentPage.tsx`: main workflow UI; starts clinical job, polls status, handles missing-labs confirmation, renders markdown output.
 - `DILIGENT/client/src/pages/ModelConfigPage.tsx`: local model role assignment, provider/cloud model controls, pull actions, access key integrations.
-- `DILIGENT/client/src/pages/DataInspectionPage.tsx`: lightweight page wrapper for data inspection surface.
+- `DILIGENT/client/src/pages/DataInspectionPage.tsx`: full inspection UI (sessions catalog + report view, RxNav/LiverTox searchable previews, updater controls, modals).
 - `DILIGENT/client/src/components/AccessKeyModal.tsx`: key create/list/activate/delete modal UI.
 - `DILIGENT/client/src/components/BooleanToggle.tsx`: reusable toggle control.
 - `DILIGENT/client/src/components/ConfigModal.tsx`: generic config modal wrapper.
@@ -205,6 +206,7 @@ This section is intended as the "where to edit what" map so agents do not need t
 - `DILIGENT/server/routes/ollama.py`: `/models/list`, `/models/pull`, pull job start/status/cancel endpoints.
 - `DILIGENT/server/routes/research.py`: `/research` endpoint class for Tavily-backed evidence response.
 - `DILIGENT/server/routes/session.py`: `/clinical` and clinical job endpoints; progress callbacks; payload build/merge/validation; per-patient pipeline orchestration.
+- `DILIGENT/server/routes/data_inspection.py`: `/inspection` endpoints for sessions/RxNav/LiverTox catalogs, detail views, deletes, and updater job lifecycle.
 - `DILIGENT/server/services/__init__.py`: package marker.
 - `DILIGENT/server/services/jobs.py`: in-memory thread-backed `JobManager` and lifecycle/status tracking.
 - `DILIGENT/server/services/payload.py`: incoming payload sanitization and visit-date normalization.
@@ -230,6 +232,7 @@ This section is intended as the "where to edit what" map so agents do not need t
 - `DILIGENT/server/services/updater/livertox.py`: LiverTox archive/masterlist download, metadata validation, parsing/sanitization into unified dataset.
 - `DILIGENT/server/services/updater/livertox_sanitizer.py`: LiverTox excerpt cleaning rules.
 - `DILIGENT/server/services/updater/rxnav.py`: RxNav client + catalog builder with async prefetch, synonym/brand expansion, batch DB upserts.
+- `DILIGENT/server/services/inspection.py`: inspection-layer orchestration for list/detail/delete operations and RxNav/LiverTox update jobs.
 
 ### 4.7 Operational Scripts and Containers
 

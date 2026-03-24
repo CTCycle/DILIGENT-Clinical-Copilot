@@ -36,6 +36,14 @@ Each job is represented by a thread-safe `JobState`:
 - `ollama_pull`:
   - Started by `POST /models/pull/jobs`.
   - Runner pulls models from Ollama and reports completion state.
+- `rxnav_update`:
+  - Started by `POST /inspection/rxnav/jobs`.
+  - Runner executes in-app RxNav catalog refresh with cooperative cancellation checks.
+  - Progress/result metadata include update-stage messages (for UI progress bars).
+- `livertox_update`:
+  - Started by `POST /inspection/livertox/jobs`.
+  - Runner executes in-app LiverTox refresh with cooperative cancellation checks.
+  - Progress/result metadata include update-stage messages (for UI progress bars).
 
 ## API Contract Pattern
 

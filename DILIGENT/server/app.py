@@ -10,6 +10,7 @@ from DILIGENT.server.common.utils.variables import env_variables  # noqa: F401
 from DILIGENT.server.configurations import server_settings
 from DILIGENT.server.configurations.runtime import cloud_mode_enabled, tauri_mode_enabled
 from DILIGENT.server.routes.access_keys import router as access_keys_router
+from DILIGENT.server.routes.data_inspection import router as data_inspection_router
 from DILIGENT.server.routes.model_config import router as model_config_router
 from DILIGENT.server.routes.session import router as session_router
 from DILIGENT.server.routes.ollama import router as ollama_router
@@ -30,6 +31,7 @@ app = FastAPI(
 
 routers = [
     session_router,
+    data_inspection_router,
     ollama_router,
     model_config_router,
     access_keys_router,
