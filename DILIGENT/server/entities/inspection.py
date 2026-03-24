@@ -2,13 +2,16 @@ from __future__ import annotations
 
 from datetime import date as DateValue
 from datetime import datetime
-from typing import Literal
+import re
+from typing import Any, Literal
 
-from pydantic import BaseModel, ConfigDict, Field
+from pydantic import BaseModel, ConfigDict, Field, field_validator
 
 
 SessionStatus = Literal["successful", "failed"]
 DateFilterMode = Literal["before", "after", "exact"]
+CONTROL_CHARACTERS_RE = re.compile(r"[\x00-\x08\x0B\x0C\x0E-\x1F\x7F]")
+MAX_SEARCH_LENGTH = 256
 
 
 ###############################################################################
@@ -111,17 +114,35 @@ class DeleteEntityResponse(BaseModel):
 ###############################################################################
 class SessionListFilters(BaseModel):
     model_config = ConfigDict(extra="forbid")
-    search: str | None = None
+    search: str | None = Field(default=None, max_length=MAX_SEARCH_LENGTH)
     status: SessionStatus | None = None
     date_mode: DateFilterMode | None = None
     date: DateValue | None = None
     offset: int = Field(default=0, ge=0)
     limit: int = Field(default=10, ge=1, le=100)
 
+    # -------------------------------------------------------------------------
+    @field_validator("search", mode="before")
+    @classmethod
+    def normalize_search(cls, value: Any) -> str | None:
+        if value is None:
+            return None
+        normalized = CONTROL_CHARACTERS_RE.sub(" ", str(value)).strip()
+        return normalized or None
+
 
 ###############################################################################
 class CatalogListFilters(BaseModel):
     model_config = ConfigDict(extra="forbid")
-    search: str | None = None
+    search: str | None = Field(default=None, max_length=MAX_SEARCH_LENGTH)
     offset: int = Field(default=0, ge=0)
     limit: int = Field(default=10, ge=1, le=100)
+
+    # -------------------------------------------------------------------------
+    @field_validator("search", mode="before")
+    @classmethod
+    def normalize_search(cls, value: Any) -> str | None:
+        if value is None:
+            return None
+        normalized = CONTROL_CHARACTERS_RE.sub(" ", str(value)).strip()
+        return normalized or None
