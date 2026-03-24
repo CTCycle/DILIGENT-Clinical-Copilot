@@ -38,6 +38,7 @@ class ClinicalSession(Base):
     parsing_model: Mapped[str | None] = mapped_column(String)
     clinical_model: Mapped[str | None] = mapped_column(String)
     total_duration: Mapped[float | None] = mapped_column(Float)
+    session_status: Mapped[str | None] = mapped_column(String, nullable=True)
 
     sections: Mapped[list["ClinicalSessionSection"]] = relationship(
         "ClinicalSessionSection",
@@ -57,7 +58,10 @@ class ClinicalSession(Base):
         uselist=False,
     )
 
-    __table_args__ = (Index("ix_clinical_sessions_timestamp", "session_timestamp"),)
+    __table_args__ = (
+        Index("ix_clinical_sessions_timestamp", "session_timestamp"),
+        Index("ix_clinical_sessions_status", "session_status"),
+    )
 
 
 ###############################################################################
@@ -97,6 +101,7 @@ class Drug(Base):
     canonical_name_norm: Mapped[str] = mapped_column(String, nullable=False)
     rxnorm_rxcui: Mapped[str | None] = mapped_column(String, nullable=True)
     livertox_nbk_id: Mapped[str | None] = mapped_column(String, nullable=True)
+    rxnav_last_update: Mapped[str | None] = mapped_column(String, nullable=True)
 
     rxnorm_codes: Mapped[list["DrugRxnormCode"]] = relationship(
         "DrugRxnormCode",

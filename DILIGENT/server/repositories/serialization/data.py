@@ -7,11 +7,13 @@ import re
 import zipfile
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from dataclasses import dataclass, field
+from datetime import date, datetime, timedelta
 from typing import Any, Iterator, cast
 from xml.etree import ElementTree
 
 import pandas as pd
 from pypdf import PdfReader
+from sqlalchemy import and_, delete, exists, func, inspect, or_, select, text, update
 from sqlalchemy.orm import Session, sessionmaker
 
 from DILIGENT.server.configurations import server_settings
@@ -66,6 +68,7 @@ class _RepositorySerializationService:
             bind=self.engine,
             future=True,
         )
+        self.ensure_session_result_table()
 
     # -------------------------------------------------------------------------
     def save_clinical_session(self, session_data: dict[str, Any]) -> None:
@@ -84,6 +87,9 @@ class _RepositorySerializationService:
                 parsing_model=self.normalize_string(session_data.get("parsing_model")),
                 clinical_model=self.normalize_string(session_data.get("clinical_model")),
                 total_duration=self.to_float(session_data.get("total_duration")),
+                session_status=self.normalize_session_status(
+                    session_data.get("session_status")
+                ),
             )
             db_session.add(persisted_session)
             db_session.flush()
@@ -101,10 +107,42 @@ class _RepositorySerializationService:
 
     # -----------------------------------------------------------------------------
     def ensure_session_result_table(self) -> None:
-        ClinicalSessionResult.__table__.create(bind=self.engine, checkfirst=True)
+        inspector = inspect(self.engine)
+        if inspector.has_table(ClinicalSession.__tablename__):
+            ClinicalSessionResult.__table__.create(bind=self.engine, checkfirst=True)
+        self.ensure_nullable_string_column("clinical_sessions", "session_status")
+        self.ensure_nullable_string_column("drugs", "rxnav_last_update")
+
+    # -----------------------------------------------------------------------------
+    def ensure_nullable_string_column(self, table_name: str, column_name: str) -> None:
+        inspector = inspect(self.engine)
+        if not inspector.has_table(table_name):
+            return
+        existing_columns = {
+            str(column.get("name"))
+            for column in inspector.get_columns(table_name)
+        }
+        if column_name in existing_columns:
+            return
+        statement = text(
+            f"ALTER TABLE {table_name} ADD COLUMN {column_name} VARCHAR"
+        )
+        with self.engine.begin() as connection:
+            connection.execute(statement)
+
+    # -----------------------------------------------------------------------------
+    def normalize_session_status(self, value: Any) -> str:
+        normalized = self.normalize_string(value)
+        if normalized is None:
+            return "successful"
+        lowered = normalized.casefold()
+        if lowered == "failed":
+            return "failed"
+        return "successful"
 
     # -----------------------------------------------------------------------------
     def save_livertox_records(self, records: pd.DataFrame) -> None:
+        self.ensure_session_result_table()
         prepared_rows = self.prepare_livertox_rows(records)
         if not prepared_rows:
             return
@@ -271,10 +309,12 @@ class _RepositorySerializationService:
         *,
         commit_interval: int | None = None,
     ) -> None:
+        self.ensure_session_result_table()
         prepared_rows = self.prepare_rxnav_rows(records)
         if not prepared_rows:
             return
         effective_commit_interval = self.resolve_commit_interval(commit_interval)
+        today_marker = date.today().isoformat()
         db_session = self.session_factory()
         try:
             pending = 0
@@ -291,6 +331,7 @@ class _RepositorySerializationService:
                     canonical_name_norm=canonical_name_norm,
                     rxnorm_rxcui=rxcui,
                     livertox_nbk_id=None,
+                    rxnav_last_update=today_marker,
                 )
                 drug_id = int(drug.id)
                 self.upsert_drug_alias(
@@ -461,6 +502,7 @@ class _RepositorySerializationService:
 
     # -----------------------------------------------------------------------------
     def get_livertox_records(self) -> pd.DataFrame:
+        self.ensure_session_result_table()
         drugs_frame = self.queries.load_table(TABLE_DRUGS)
         monographs_frame = self.queries.load_table(TABLE_LIVERTOX_MONOGRAPHS)
         aliases_frame = self.queries.load_table(TABLE_DRUG_ALIASES)
@@ -528,6 +570,7 @@ class _RepositorySerializationService:
 
     # -----------------------------------------------------------------------------
     def get_drugs_catalog(self) -> pd.DataFrame:
+        self.ensure_session_result_table()
         drugs_frame = self.queries.load_table(TABLE_DRUGS)
         rxcui_frame = self.queries.load_table(TABLE_DRUG_RXNORM_CODES)
         aliases_frame = self.queries.load_table(TABLE_DRUG_ALIASES)
@@ -599,6 +642,427 @@ class _RepositorySerializationService:
             chunk = frame.iloc[start : start + chunk_size]
             if not chunk.empty:
                 yield chunk.reset_index(drop=True)
+
+    # -----------------------------------------------------------------------------
+    def build_search_pattern(self, search: str | None) -> str | None:
+        normalized = self.normalize_string(search)
+        if normalized is None:
+            return None
+        return f"%{normalized.casefold()}%"
+
+    # -----------------------------------------------------------------------------
+    def list_sessions(
+        self,
+        *,
+        search: str | None,
+        status_filter: str | None,
+        date_mode: str | None,
+        filter_date: date | None,
+        offset: int,
+        limit: int,
+    ) -> tuple[list[dict[str, Any]], int]:
+        self.ensure_session_result_table()
+        safe_offset = max(int(offset), 0)
+        safe_limit = max(int(limit), 1)
+        conditions: list[Any] = []
+        search_pattern = self.build_search_pattern(search)
+        if search_pattern is not None:
+            section_match = exists(
+                select(1).where(
+                    ClinicalSessionSection.session_id == ClinicalSession.id,
+                    func.lower(func.coalesce(ClinicalSessionSection.content, "")).like(
+                        search_pattern
+                    ),
+                )
+            )
+            result_payload_match = exists(
+                select(1).where(
+                    ClinicalSessionResult.session_id == ClinicalSession.id,
+                    func.lower(
+                        func.coalesce(ClinicalSessionResult.payload_json, "")
+                    ).like(search_pattern),
+                )
+            )
+            conditions.append(
+                or_(
+                    func.lower(func.coalesce(ClinicalSession.patient_name, "")).like(
+                        search_pattern
+                    ),
+                    section_match,
+                    result_payload_match,
+                )
+            )
+        normalized_status_filter = (
+            status_filter.casefold() if isinstance(status_filter, str) else None
+        )
+        if normalized_status_filter in {"successful", "failed"}:
+            conditions.append(
+                func.lower(
+                    func.coalesce(ClinicalSession.session_status, "successful")
+                )
+                == normalized_status_filter
+            )
+        if filter_date is not None and date_mode in {"before", "after", "exact"}:
+            day_start = datetime.combine(filter_date, datetime.min.time())
+            next_day = day_start + timedelta(days=1)
+            if date_mode == "before":
+                conditions.append(ClinicalSession.session_timestamp < day_start)
+            elif date_mode == "after":
+                conditions.append(ClinicalSession.session_timestamp >= next_day)
+            elif date_mode == "exact":
+                conditions.append(ClinicalSession.session_timestamp >= day_start)
+                conditions.append(ClinicalSession.session_timestamp < next_day)
+
+        db_session = self.session_factory()
+        try:
+            sessions_stmt = select(ClinicalSession)
+            count_stmt = select(func.count()).select_from(ClinicalSession)
+            if conditions:
+                combined = and_(*conditions)
+                sessions_stmt = sessions_stmt.where(combined)
+                count_stmt = count_stmt.where(combined)
+            total_rows = int(db_session.execute(count_stmt).scalar_one())
+            rows = (
+                db_session.execute(
+                    sessions_stmt.order_by(
+                        ClinicalSession.session_timestamp.desc(),
+                        ClinicalSession.id.desc(),
+                    )
+                    .offset(safe_offset)
+                    .limit(safe_limit)
+                )
+                .scalars()
+                .all()
+            )
+            items = [
+                {
+                    "session_id": int(row.id),
+                    "patient_name": self.normalize_string(row.patient_name),
+                    "session_timestamp": row.session_timestamp,
+                    "status": self.normalize_session_status(row.session_status),
+                    "total_duration": self.to_float(row.total_duration),
+                }
+                for row in rows
+            ]
+            return items, total_rows
+        finally:
+            db_session.close()
+
+    # -----------------------------------------------------------------------------
+    def get_session_report(self, session_id: int) -> str | None:
+        self.ensure_session_result_table()
+        safe_session_id = int(session_id)
+        db_session = self.session_factory()
+        try:
+            payload_json = db_session.execute(
+                select(ClinicalSessionResult.payload_json).where(
+                    ClinicalSessionResult.session_id == safe_session_id
+                )
+            ).scalar_one_or_none()
+            if payload_json is not None:
+                normalized_payload = self.normalize_string(payload_json)
+                if normalized_payload is not None:
+                    try:
+                        parsed = json.loads(normalized_payload)
+                    except json.JSONDecodeError:
+                        parsed = None
+                    if isinstance(parsed, dict):
+                        report = self.normalize_string(parsed.get("report"))
+                        if report is not None:
+                            return report
+                    elif isinstance(parsed, str):
+                        report = self.normalize_string(parsed)
+                        if report is not None:
+                            return report
+            section_report = db_session.execute(
+                select(ClinicalSessionSection.content).where(
+                    ClinicalSessionSection.session_id == safe_session_id,
+                    ClinicalSessionSection.section_kind == "final_report",
+                )
+            ).scalar_one_or_none()
+            return self.normalize_string(section_report)
+        finally:
+            db_session.close()
+
+    # -----------------------------------------------------------------------------
+    def delete_session(self, session_id: int) -> bool:
+        self.ensure_session_result_table()
+        safe_session_id = int(session_id)
+        db_session = self.session_factory()
+        try:
+            existing = db_session.get(ClinicalSession, safe_session_id)
+            if existing is None:
+                return False
+            db_session.execute(
+                delete(ClinicalSessionResult).where(
+                    ClinicalSessionResult.session_id == safe_session_id
+                )
+            )
+            db_session.execute(
+                delete(ClinicalSessionSection).where(
+                    ClinicalSessionSection.session_id == safe_session_id
+                )
+            )
+            db_session.execute(
+                delete(ClinicalSessionLab).where(
+                    ClinicalSessionLab.session_id == safe_session_id
+                )
+            )
+            db_session.execute(
+                delete(ClinicalSessionDrug).where(
+                    ClinicalSessionDrug.session_id == safe_session_id
+                )
+            )
+            db_session.execute(
+                delete(ClinicalSession).where(ClinicalSession.id == safe_session_id)
+            )
+            db_session.commit()
+            return True
+        except Exception:
+            db_session.rollback()
+            raise
+        finally:
+            db_session.close()
+
+    # -----------------------------------------------------------------------------
+    def list_rxnav_catalog(
+        self,
+        *,
+        search: str | None,
+        offset: int,
+        limit: int,
+    ) -> tuple[list[dict[str, Any]], int]:
+        self.ensure_session_result_table()
+        safe_offset = max(int(offset), 0)
+        safe_limit = max(int(limit), 1)
+        search_pattern = self.build_search_pattern(search)
+        has_rxnav_data = or_(
+            Drug.rxnorm_rxcui.is_not(None),
+            exists(
+                select(1).where(
+                    DrugRxnormCode.drug_id == Drug.id,
+                )
+            ),
+            exists(
+                select(1).where(
+                    DrugAlias.drug_id == Drug.id,
+                    func.lower(func.coalesce(DrugAlias.source, "")) == "rxnorm",
+                )
+            ),
+        )
+        conditions: list[Any] = [has_rxnav_data]
+        if search_pattern is not None:
+            alias_match = exists(
+                select(1).where(
+                    DrugAlias.drug_id == Drug.id,
+                    func.lower(func.coalesce(DrugAlias.alias, "")).like(search_pattern),
+                )
+            )
+            conditions.append(
+                or_(
+                    func.lower(func.coalesce(Drug.canonical_name, "")).like(
+                        search_pattern
+                    ),
+                    alias_match,
+                )
+            )
+        db_session = self.session_factory()
+        try:
+            filtered = and_(*conditions)
+            count_stmt = select(func.count()).select_from(Drug).where(filtered)
+            total_rows = int(db_session.execute(count_stmt).scalar_one())
+            rows = db_session.execute(
+                select(Drug.id, Drug.canonical_name, Drug.rxnav_last_update)
+                .where(filtered)
+                .order_by(
+                    func.lower(func.coalesce(Drug.canonical_name, "")),
+                    Drug.id.asc(),
+                )
+                .offset(safe_offset)
+                .limit(safe_limit)
+            ).all()
+            items = [
+                {
+                    "drug_id": int(row.id),
+                    "drug_name": row.canonical_name,
+                    "last_update": self.normalize_date(row.rxnav_last_update),
+                }
+                for row in rows
+            ]
+            return items, total_rows
+        finally:
+            db_session.close()
+
+    # -----------------------------------------------------------------------------
+    def get_rxnav_alias_groups(self, drug_id: int) -> dict[str, Any] | None:
+        self.ensure_session_result_table()
+        safe_drug_id = int(drug_id)
+        db_session = self.session_factory()
+        try:
+            drug = db_session.get(Drug, safe_drug_id)
+            if drug is None:
+                return None
+            alias_rows = db_session.execute(
+                select(DrugAlias.source, DrugAlias.alias, DrugAlias.alias_kind).where(
+                    DrugAlias.drug_id == safe_drug_id
+                )
+            ).all()
+            grouped: dict[str, list[dict[str, str]]] = {}
+            seen: dict[str, set[str]] = {}
+            for source_value, alias_value, alias_kind_value in alias_rows:
+                source = self.normalize_string(source_value) or "unknown"
+                alias = self.normalize_string(alias_value)
+                alias_kind = self.normalize_string(alias_kind_value) or "unknown"
+                if alias is None:
+                    continue
+                dedupe_key = f"{alias.casefold()}::{alias_kind.casefold()}"
+                source_seen = seen.setdefault(source, set())
+                if dedupe_key in source_seen:
+                    continue
+                source_seen.add(dedupe_key)
+                grouped.setdefault(source, []).append(
+                    {"alias": alias, "alias_kind": alias_kind}
+                )
+            groups = [
+                {"source": source, "aliases": aliases}
+                for source, aliases in sorted(grouped.items(), key=lambda item: item[0])
+            ]
+            return {
+                "drug_id": safe_drug_id,
+                "drug_name": drug.canonical_name,
+                "groups": groups,
+            }
+        finally:
+            db_session.close()
+
+    # -----------------------------------------------------------------------------
+    def list_livertox_catalog(
+        self,
+        *,
+        search: str | None,
+        offset: int,
+        limit: int,
+    ) -> tuple[list[dict[str, Any]], int]:
+        self.ensure_session_result_table()
+        safe_offset = max(int(offset), 0)
+        safe_limit = max(int(limit), 1)
+        search_pattern = self.build_search_pattern(search)
+        join_condition = Drug.id == LiverToxMonograph.drug_id
+        conditions: list[Any] = []
+        if search_pattern is not None:
+            alias_match = exists(
+                select(1).where(
+                    DrugAlias.drug_id == Drug.id,
+                    func.lower(func.coalesce(DrugAlias.alias, "")).like(search_pattern),
+                )
+            )
+            conditions.append(
+                or_(
+                    func.lower(func.coalesce(Drug.canonical_name, "")).like(
+                        search_pattern
+                    ),
+                    func.lower(func.coalesce(LiverToxMonograph.excerpt, "")).like(
+                        search_pattern
+                    ),
+                    alias_match,
+                )
+            )
+        db_session = self.session_factory()
+        try:
+            records_stmt = select(
+                Drug.id,
+                Drug.canonical_name,
+                LiverToxMonograph.last_update,
+            ).join(LiverToxMonograph, join_condition)
+            count_stmt = (
+                select(func.count())
+                .select_from(Drug)
+                .join(LiverToxMonograph, join_condition)
+            )
+            if conditions:
+                combined = and_(*conditions)
+                records_stmt = records_stmt.where(combined)
+                count_stmt = count_stmt.where(combined)
+            total_rows = int(db_session.execute(count_stmt).scalar_one())
+            rows = db_session.execute(
+                records_stmt.order_by(
+                    func.lower(func.coalesce(Drug.canonical_name, "")),
+                    Drug.id.asc(),
+                )
+                .offset(safe_offset)
+                .limit(safe_limit)
+            ).all()
+            items = [
+                {
+                    "drug_id": int(row.id),
+                    "drug_name": row.canonical_name,
+                    "last_update": self.normalize_date(row.last_update),
+                }
+                for row in rows
+            ]
+            return items, total_rows
+        finally:
+            db_session.close()
+
+    # -----------------------------------------------------------------------------
+    def get_livertox_excerpt(self, drug_id: int) -> dict[str, Any] | None:
+        self.ensure_session_result_table()
+        safe_drug_id = int(drug_id)
+        db_session = self.session_factory()
+        try:
+            row = db_session.execute(
+                select(
+                    Drug.id,
+                    Drug.canonical_name,
+                    LiverToxMonograph.excerpt,
+                    LiverToxMonograph.last_update,
+                )
+                .join(LiverToxMonograph, Drug.id == LiverToxMonograph.drug_id)
+                .where(Drug.id == safe_drug_id)
+            ).one_or_none()
+            if row is None:
+                return None
+            excerpt = self.normalize_string(row.excerpt)
+            if excerpt is None:
+                return None
+            return {
+                "drug_id": int(row.id),
+                "drug_name": row.canonical_name,
+                "excerpt": excerpt,
+                "last_update": self.normalize_date(row.last_update),
+            }
+        finally:
+            db_session.close()
+
+    # -----------------------------------------------------------------------------
+    def delete_drug_with_cleanup(self, drug_id: int) -> bool:
+        self.ensure_session_result_table()
+        safe_drug_id = int(drug_id)
+        db_session = self.session_factory()
+        try:
+            existing = db_session.get(Drug, safe_drug_id)
+            if existing is None:
+                return False
+            db_session.execute(
+                update(ClinicalSessionDrug)
+                .where(ClinicalSessionDrug.drug_id == safe_drug_id)
+                .values(drug_id=None)
+            )
+            db_session.execute(delete(DrugAlias).where(DrugAlias.drug_id == safe_drug_id))
+            db_session.execute(
+                delete(DrugRxnormCode).where(DrugRxnormCode.drug_id == safe_drug_id)
+            )
+            db_session.execute(
+                delete(LiverToxMonograph).where(LiverToxMonograph.drug_id == safe_drug_id)
+            )
+            db_session.execute(delete(Drug).where(Drug.id == safe_drug_id))
+            db_session.commit()
+            return True
+        except Exception:
+            db_session.rollback()
+            raise
+        finally:
+            db_session.close()
 
     # -----------------------------------------------------------------------------
     def normalize_string(self, value: Any) -> str | None:
@@ -878,6 +1342,7 @@ class _RepositorySerializationService:
         canonical_name_norm: str,
         rxnorm_rxcui: str | None,
         livertox_nbk_id: str | None,
+        rxnav_last_update: str | None = None,
         use_livertox_nbk_lookup: bool = True,
     ) -> Drug:
         candidate_by_rxcui = self.get_drug_by_rxcui(db_session, rxnorm_rxcui)
@@ -907,6 +1372,7 @@ class _RepositorySerializationService:
                 canonical_name_norm=canonical_name_norm,
                 rxnorm_rxcui=rxnorm_rxcui,
                 livertox_nbk_id=livertox_nbk_id if use_livertox_nbk_lookup else None,
+                rxnav_last_update=self.normalize_date(rxnav_last_update),
             )
             db_session.add(candidate)
             db_session.flush()
@@ -931,6 +1397,9 @@ class _RepositorySerializationService:
                 field_name="livertox_nbk_id",
                 incoming_value=livertox_nbk_id,
             )
+        normalized_rxnav_last_update = self.normalize_date(rxnav_last_update)
+        if normalized_rxnav_last_update is not None:
+            candidate.rxnav_last_update = normalized_rxnav_last_update
         return candidate
 
     # -----------------------------------------------------------------------------

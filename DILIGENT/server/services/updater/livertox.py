@@ -12,6 +12,7 @@ import unicodedata
 from concurrent.futures import ProcessPoolExecutor, as_completed
 from datetime import UTC, datetime
 from typing import Any
+from collections.abc import Callable
 
 import httpx
 import pandas as pd
@@ -130,6 +131,25 @@ class LiverToxUpdater:
         self.archive_metadata_path = os.path.join(
             ARCHIVES_PATH, "livertox_archive.metadata.json"
         )
+
+    # -------------------------------------------------------------------------
+    def emit_progress(
+        self,
+        progress_callback: Callable[[float, str], None] | None,
+        *,
+        progress: float,
+        message: str,
+    ) -> None:
+        if progress_callback is None:
+            return
+        bounded_progress = min(100.0, max(0.0, float(progress)))
+        progress_callback(bounded_progress, message)
+
+    # -------------------------------------------------------------------------
+    def should_cancel(self, should_stop: Callable[[], bool] | None) -> bool:
+        if should_stop is None:
+            return False
+        return bool(should_stop())
 
     # -------------------------------------------------------------------------
     def sanitize_livertox_master_list(self, data: pd.DataFrame) -> pd.DataFrame | None:
@@ -613,11 +633,30 @@ class LiverToxUpdater:
         return response
 
     # -----------------------------------------------------------------------------
-    def update_from_livertox(self) -> dict[str, Any]:
+    def update_from_livertox(
+        self,
+        *,
+        progress_callback: Callable[[float, str], None] | None = None,
+        should_stop: Callable[[], bool] | None = None,
+    ) -> dict[str, Any]:
         logger.info("Starting LiverTox update")
+        if self.should_cancel(should_stop):
+            raise RuntimeError("LiverTox update cancelled by user request")
+        self.emit_progress(
+            progress_callback,
+            progress=5.0,
+            message="Refreshing LiverTox master list",
+        )
         master_metadata, master_frame = self.refresh_master_list()
 
         logger.info("Checking LiverTox archive metadata")
+        if self.should_cancel(should_stop):
+            raise RuntimeError("LiverTox update cancelled by user request")
+        self.emit_progress(
+            progress_callback,
+            progress=20.0,
+            message="Downloading LiverTox archive metadata",
+        )
         archive_metadata = asyncio.run(self.download_bulk_data(self.sources_path))
         archive_path = archive_metadata.get("file_path") or os.path.join(
             self.sources_path, server_settings.external_data.livertox_archive
@@ -625,24 +664,62 @@ class LiverToxUpdater:
 
         local_info = self.collect_local_archive_info(archive_path)
         logger.info("Extracting LiverTox monographs from %s", archive_path)
-        extracted = self.collect_monographs(archive_path)
+        self.emit_progress(
+            progress_callback,
+            progress=35.0,
+            message="Extracting LiverTox monographs",
+        )
+        extracted = self.collect_monographs(
+            archive_path,
+            should_stop=should_stop,
+            progress_callback=progress_callback,
+        )
+        if self.should_cancel(should_stop):
+            raise RuntimeError("LiverTox update cancelled by user request")
         logger.info("Sanitizing %d extracted entries", len(extracted))
+        self.emit_progress(
+            progress_callback,
+            progress=70.0,
+            message="Sanitizing extracted LiverTox entries",
+        )
         monograph_df = self.sanitize_records(extracted)
         logger.info("Combining LiverTox datasets")
+        self.emit_progress(
+            progress_callback,
+            progress=80.0,
+            message="Combining master list and monograph excerpts",
+        )
         unified = self.build_unified_dataset(
             monograph_df,
             master_frame,
             master_metadata,
         )
         logger.info("Finalizing sanitized dataset")
+        self.emit_progress(
+            progress_callback,
+            progress=88.0,
+            message="Finalizing LiverTox dataset",
+        )
         final_dataset = self.finalize_dataset(unified)
         logger.info("Persisting finalized records to database")
+        if self.should_cancel(should_stop):
+            raise RuntimeError("LiverTox update cancelled by user request")
+        self.emit_progress(
+            progress_callback,
+            progress=95.0,
+            message="Persisting LiverTox records",
+        )
         self.serializer.save_livertox_records(final_dataset)
 
         payload = {**master_metadata, **archive_metadata, **local_info}
         payload["processed_entries"] = len(final_dataset.index)
         payload["records"] = len(final_dataset.index)
         logger.info("LiverTox update completed successfully")
+        self.emit_progress(
+            progress_callback,
+            progress=99.0,
+            message="LiverTox update completed",
+        )
 
         return payload
 
@@ -785,7 +862,11 @@ class LiverToxUpdater:
 
     # -----------------------------------------------------------------------------
     def collect_monographs(
-        self, archive_path: str | None = None
+        self,
+        archive_path: str | None = None,
+        *,
+        should_stop: Callable[[], bool] | None = None,
+        progress_callback: Callable[[float, str], None] | None = None,
     ) -> list[dict[str, str]]:
         tar_path = archive_path or self.tar_file_path
         normalized_path = os.path.abspath(tar_path)
@@ -829,6 +910,9 @@ class LiverToxUpdater:
         if not payloads:
             return collected
 
+        total_payloads = len(payloads)
+        processed_count = 0
+
         worker_budget = min(max_workers, len(payloads)) or 1
         if worker_budget == 1:
             for member_name, data in tqdm(
@@ -836,14 +920,25 @@ class LiverToxUpdater:
                 desc="Processing LiverTox files",
                 total=len(payloads),
             ):
+                if self.should_cancel(should_stop):
+                    raise RuntimeError("LiverTox update cancelled by user request")
                 base_name = os.path.basename(member_name).lower()
                 if base_name in processed_files:
+                    processed_count += 1
                     continue
                 record = LiverToxUpdater.process_monograph_member(member_name, data)
                 if not record:
+                    processed_count += 1
                     continue
                 collected.append(record)
                 processed_files.add(base_name)
+                processed_count += 1
+                ratio = min(1.0, max(0.0, processed_count / total_payloads))
+                self.emit_progress(
+                    progress_callback,
+                    progress=35.0 + (ratio * 33.0),
+                    message=f"Processed {processed_count}/{total_payloads} LiverTox files",
+                )
             return self.sort_monograph_records(collected)
 
         ctx = multiprocessing.get_context("spawn")
@@ -859,6 +954,8 @@ class LiverToxUpdater:
                 desc="Processing LiverTox files",
                 total=len(futures),
             ):
+                if self.should_cancel(should_stop):
+                    raise RuntimeError("LiverTox update cancelled by user request")
                 member_name = futures[future]
                 base_name = os.path.basename(member_name).lower()
                 try:
@@ -869,11 +966,32 @@ class LiverToxUpdater:
                         base_name,
                         exc,
                     )
+                    processed_count += 1
+                    ratio = min(1.0, max(0.0, processed_count / total_payloads))
+                    self.emit_progress(
+                        progress_callback,
+                        progress=35.0 + (ratio * 33.0),
+                        message=f"Processed {processed_count}/{total_payloads} LiverTox files",
+                    )
                     continue
                 if not record or base_name in processed_files:
+                    processed_count += 1
+                    ratio = min(1.0, max(0.0, processed_count / total_payloads))
+                    self.emit_progress(
+                        progress_callback,
+                        progress=35.0 + (ratio * 33.0),
+                        message=f"Processed {processed_count}/{total_payloads} LiverTox files",
+                    )
                     continue
                 collected.append(record)
                 processed_files.add(base_name)
+                processed_count += 1
+                ratio = min(1.0, max(0.0, processed_count / total_payloads))
+                self.emit_progress(
+                    progress_callback,
+                    progress=35.0 + (ratio * 33.0),
+                    message=f"Processed {processed_count}/{total_payloads} LiverTox files",
+                )
         return self.sort_monograph_records(collected)
 
     # -------------------------------------------------------------------------
