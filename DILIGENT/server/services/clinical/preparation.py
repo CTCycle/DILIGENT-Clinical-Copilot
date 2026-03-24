@@ -5,7 +5,7 @@ from collections.abc import Callable
 from dataclasses import dataclass
 from typing import Any
 
-from DILIGENT.server.entities.clinical import (
+from DILIGENT.server.domain.clinical import (
     DrugEntry,
     HepatotoxicityPatternScore,
     PatientDrugs,
