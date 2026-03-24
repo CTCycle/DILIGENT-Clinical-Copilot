@@ -16,7 +16,7 @@ from DILIGENT.server.models.prompts import (
     LIVERTOX_REPORT_EXAMPLE,
 )
 from DILIGENT.server.models.providers import initialize_llm_client
-from DILIGENT.server.entities.clinical import (
+from DILIGENT.server.domain.clinical import (
     ClinicalPipelineValidationError,
     DrugEntry,
     DrugClinicalAssessment,

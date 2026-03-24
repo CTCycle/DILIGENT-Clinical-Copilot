@@ -5,7 +5,7 @@ from datetime import date
 from fastapi import APIRouter, HTTPException, Query, status
 
 from DILIGENT.server.configurations import server_settings
-from DILIGENT.server.entities.inspection import (
+from DILIGENT.server.domain.inspection import (
     CatalogListFilters,
     DeleteEntityResponse,
     DateFilterMode,
@@ -18,7 +18,7 @@ from DILIGENT.server.entities.inspection import (
     SessionListFilters,
     SessionStatus,
 )
-from DILIGENT.server.entities.jobs import (
+from DILIGENT.server.domain.jobs import (
     JobCancelResponse,
     JobStartResponse,
     JobStatusResponse,

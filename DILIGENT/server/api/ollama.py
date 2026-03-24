@@ -7,12 +7,12 @@ from typing import Any
 from fastapi import APIRouter, HTTPException, Query, status
 
 from DILIGENT.server.models.providers import OllamaClient, OllamaError, OllamaTimeout
-from DILIGENT.server.entities.jobs import (
+from DILIGENT.server.domain.jobs import (
     JobCancelResponse,
     JobStartResponse,
     JobStatusResponse,
 )
-from DILIGENT.server.entities.models import ModelListResponse, ModelPullResponse
+from DILIGENT.server.domain.models import ModelListResponse, ModelPullResponse
 from DILIGENT.server.configurations import server_settings
 from DILIGENT.server.services.jobs import job_manager
 from DILIGENT.server.common.utils.logger import logger
