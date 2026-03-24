@@ -81,7 +81,7 @@ interface NavTabsProps {
 }
 
 export function NavTabs({ onNavigate }: NavTabsProps): React.JSX.Element {
-    const { state } = useAppState();
+    const { state, toggleTheme } = useAppState();
 
     const navItems: { pageId: PageId; icon: React.ReactNode; label: string }[] = [
         { pageId: "dili-agent", icon: <AgentIcon />, label: "DILI Agent" },
@@ -96,7 +96,21 @@ export function NavTabs({ onNavigate }: NavTabsProps): React.JSX.Element {
                     <span className="app-header-logo">
                         <DiligentLogo />
                     </span>
-                    <p className="app-header-title">Drug Induced Liver Injury (DILI)</p>
+                    <div className="app-theme-toggle">
+                        <span className="app-theme-toggle-label">Dark mode</span>
+                        <label className="toggle-switch">
+                            <span className="visually-hidden">Toggle dark mode</span>
+                            <input
+                                type="checkbox"
+                                checked={state.theme === "dark"}
+                                onChange={toggleTheme}
+                                aria-label="Toggle dark mode"
+                            />
+                            <span className="toggle-track" aria-hidden="true">
+                                <span className="toggle-thumb" />
+                            </span>
+                        </label>
+                    </div>
                 </div>
             </header>
             <nav className="tab-bar" aria-label="Main navigation">
