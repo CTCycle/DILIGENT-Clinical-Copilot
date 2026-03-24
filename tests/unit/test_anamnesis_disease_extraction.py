@@ -4,7 +4,7 @@ import asyncio
 from datetime import date
 from typing import Any
 
-from DILIGENT.server.entities.clinical import (
+from DILIGENT.server.domain.clinical import (
     DiseaseContextEntry,
     DrugEntry,
     HepatotoxicityPatternScore,
@@ -12,7 +12,7 @@ from DILIGENT.server.entities.clinical import (
     PatientDiseaseContext,
     PatientDrugs,
 )
-from DILIGENT.server.routes.session import ClinicalSessionEndpoint
+from DILIGENT.server.api.session import ClinicalSessionEndpoint
 from DILIGENT.server.services.clinical.disease import DiseaseExtractor
 
 

@@ -1,11 +1,11 @@
-import React, { useEffect, useMemo, useState } from "react";
+import React, { useCallback, useEffect, useMemo, useState } from "react";
 
 import { AccessKeyModal } from "../components/AccessKeyModal";
 import { ProviderAccessCard } from "../components/ProviderAccessCard";
 import { StatusMessage, resolveStatusTone } from "../components/StatusMessage";
 import { CLOUD_MODEL_CHOICES } from "../constants";
 import { useAppState } from "../context/AppStateContext";
-import { useModelPullActions } from "../hooks/useModelPullActions";
+import { ModelPullProgressState, useModelPullActions } from "../hooks/useModelPullActions";
 import {
     CloudModelChoices,
     buildRuntimeSettingsFromConfig,
@@ -160,6 +160,7 @@ export function ModelConfigPage(): React.JSX.Element {
     const [modelSearchQuery, setModelSearchQuery] = useState("");
     const [statusMessage, setStatusMessage] = useState("");
     const [openProviderModal, setOpenProviderModal] = useState<AccessKeyProvider | null>(null);
+    const [modelPullProgress, setModelPullProgress] = useState<Record<string, ModelPullProgressState>>({});
     const [activeFilters, setActiveFilters] = useState<Record<ModelFilterKey, boolean>>({
         installed: false,
         reasoning: false,
@@ -327,10 +328,40 @@ export function ModelConfigPage(): React.JSX.Element {
         return Array.from(missing);
     }, [draftConfig.clinicalModel, draftConfig.parsingModel, draftConfig.useCloudServices, localModels]);
 
+    const handleModelPullProgress = useCallback(
+        (modelName: string, progress: ModelPullProgressState | null) => {
+            setModelPullProgress((previous) => {
+                if (progress === null) {
+                    if (!(modelName in previous)) {
+                        return previous;
+                    }
+                    const { [modelName]: removedModel, ...rest } = previous;
+                    void removedModel;
+                    return rest;
+                }
+                const current = previous[modelName];
+                if (
+                    current
+                    && current.progress === progress.progress
+                    && current.status === progress.status
+                    && current.message === progress.message
+                ) {
+                    return previous;
+                }
+                return {
+                    ...previous,
+                    [modelName]: progress,
+                };
+            });
+        },
+        [],
+    );
+
     const { pullModelByName, installRequiredModels } = useModelPullActions({
         setPulling: (nextValue) => updateDiliAgent({ isPulling: nextValue }),
         setStatusMessage,
         loadModelConfig,
+        setModelPullProgress: handleModelPullProgress,
     });
 
     const savedProvider = resolveProvider(settings.provider, cloudChoices);
@@ -536,6 +567,7 @@ export function ModelConfigPage(): React.JSX.Element {
                                         const isClinicalSelected = draftConfig.clinicalModel === model.name;
                                         const isTextExtractionSelected = draftConfig.parsingModel === model.name;
                                         const isSelected = isClinicalSelected || isTextExtractionSelected;
+                                        const pullProgress = modelPullProgress[model.name] || null;
                                         return (
                                             <li
                                                 key={model.name}
@@ -553,6 +585,19 @@ export function ModelConfigPage(): React.JSX.Element {
                                                     <span className="model-config-model-description" title={model.description}>
                                                         {model.description}
                                                     </span>
+                                                    {pullProgress && (
+                                                        <div className="model-config-pull-progress" role="status" aria-live="polite">
+                                                            <div className="model-config-pull-progress-track" aria-hidden="true">
+                                                                <div
+                                                                    className="model-config-pull-progress-fill"
+                                                                    style={{
+                                                                        width: `${Math.max(0, Math.min(100, pullProgress.progress))}%`,
+                                                                    }}
+                                                                />
+                                                            </div>
+                                                            <p className="model-config-pull-progress-label">{pullProgress.message}</p>
+                                                        </div>
+                                                    )}
                                                     <div className="model-config-role-pill-row" aria-live="polite">
                                                         {isClinicalSelected && (
                                                             <span className="model-config-role-pill">Clinical</span>
@@ -571,7 +616,7 @@ export function ModelConfigPage(): React.JSX.Element {
                                                                 onClick={() => { void pullModelByName(model.name); }}
                                                                 disabled={ollamaControlsDisabled}
                                                             >
-                                                                Install
+                                                                {pullProgress ? "Installing..." : "Install"}
                                                             </button>
                                                         )}
                                                         <button

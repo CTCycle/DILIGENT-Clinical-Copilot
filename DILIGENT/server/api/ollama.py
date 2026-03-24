@@ -38,22 +38,157 @@ def sanitize_model_name(name: str) -> str:
 
 
 ###############################################################################
-async def pull_model_async(name: str, stream: bool) -> dict[str, Any]:
+def clamp_progress(value: float) -> float:
+    return max(0.0, min(100.0, value))
+
+
+###############################################################################
+def coerce_positive_float(value: Any) -> float | None:
+    if isinstance(value, bool):
+        return None
+    if isinstance(value, (int, float)):
+        number = float(value)
+    elif isinstance(value, str):
+        try:
+            number = float(value.strip())
+        except ValueError:
+            return None
+    else:
+        return None
+    if number <= 0:
+        return None
+    return number
+
+
+###############################################################################
+def resolve_pull_progress(current_progress: float, event: dict[str, Any]) -> float:
+    status_text = str(event.get("status", "")).strip().lower()
+    if status_text == "success":
+        return 100.0
+
+    total = coerce_positive_float(event.get("total"))
+    completed = coerce_positive_float(event.get("completed"))
+    if total is not None and completed is not None:
+        computed = (completed / total) * 100.0
+        bounded = clamp_progress(computed)
+        # Keep room for final verification and completion phases.
+        return max(current_progress, min(97.0, bounded))
+
+    if "pulling manifest" in status_text:
+        return max(current_progress, 12.0)
+    if "verifying" in status_text:
+        return max(current_progress, 98.0)
+    if "writing manifest" in status_text:
+        return max(current_progress, 99.0)
+    if "removing any unused layers" in status_text:
+        return max(current_progress, 99.5)
+    if "pulling" in status_text:
+        return max(current_progress, 8.0)
+
+    return current_progress
+
+
+###############################################################################
+def resolve_pull_progress_message(name: str, event: dict[str, Any]) -> str:
+    total = coerce_positive_float(event.get("total"))
+    completed = coerce_positive_float(event.get("completed"))
+    status_text = str(event.get("status", "")).strip()
+
+    if total is not None and completed is not None:
+        percentage = clamp_progress((completed / total) * 100.0)
+        return f"Pulling '{name}'... {percentage:.1f}%"
+
+    if status_text:
+        return status_text
+    return f"Pulling '{name}' from Ollama."
+
+
+###############################################################################
+async def pull_model_async(name: str, stream: bool, job_id: str | None = None) -> dict[str, Any]:
     async with OllamaClient() as client:
         local = set(await client.list_models())
         already = name in local
+        if job_id is not None:
+            job_manager.update_result(
+                job_id,
+                {
+                    "model": name,
+                    "progress_status": "ready" if already else "running",
+                    "progress_message": (
+                        f"Model '{name}' is already installed."
+                        if already
+                        else f"Pulling '{name}' from Ollama."
+                    ),
+                },
+            )
         if not already:
             logger.info("Downloading model %s from Ollama library", name)
-            await client.pull(name, stream=stream)
-        return {"model": name, "pulled": not already}
+            current_progress = 6.0
+            if job_id is not None:
+                job_manager.update_progress(job_id, current_progress)
+
+                async def update_pull_progress(event: dict[str, Any]) -> None:
+                    nonlocal current_progress
+                    if job_manager.should_stop(job_id):
+                        raise RuntimeError("Model pull stop requested.")
+
+                    current_progress = resolve_pull_progress(current_progress, event)
+                    job_manager.update_progress(job_id, current_progress)
+
+                    total = coerce_positive_float(event.get("total"))
+                    completed = coerce_positive_float(event.get("completed"))
+                    progress_patch: dict[str, Any] = {
+                        "progress_status": str(event.get("status", "")).strip().lower() or "running",
+                        "progress_message": resolve_pull_progress_message(name, event),
+                    }
+                    if total is not None:
+                        progress_patch["total_bytes"] = int(total)
+                    if completed is not None:
+                        progress_patch["completed_bytes"] = int(completed)
+                    job_manager.update_result(job_id, progress_patch)
+
+                await client.pull(
+                    name,
+                    stream=stream,
+                    progress_callback=update_pull_progress,
+                )
+            else:
+                await client.pull(name, stream=stream)
+
+        if job_id is not None:
+            job_manager.update_progress(job_id, 100.0)
+            job_manager.update_result(
+                job_id,
+                {
+                    "model": name,
+                    "pulled": not already,
+                    "progress_status": "success",
+                    "progress_message": f"Model '{name}' is available locally.",
+                },
+            )
+
+        return {
+            "model": name,
+            "pulled": not already,
+            "progress_status": "success",
+            "progress_message": f"Model '{name}' is available locally.",
+        }
 
 
 ###############################################################################
 def run_model_pull_job(name: str, stream: bool, job_id: str) -> dict[str, Any]:
     if job_manager.should_stop(job_id):
+        job_manager.update_result(
+            job_id,
+            {
+                "model": name,
+                "progress_status": "cancelled",
+                "progress_message": "Pull cancelled before execution.",
+            },
+        )
         return {}
-    job_manager.update_progress(job_id, 5.0)
-    return asyncio.run(pull_model_async(name=name, stream=stream))
+    job_manager.update_progress(job_id, 2.0)
+    return asyncio.run(pull_model_async(name=name, stream=stream, job_id=job_id))
 
 
 ###############################################################################
@@ -107,8 +242,8 @@ class OllamaEndpoint:
             description="Exact Ollama model name, e.g. 'llama3.1:8b'",
         ),
         stream: bool = Query(
-            False,
-            description="If True, stream pull from Ollama. Job returns only final status.",
+            True,
+            description="If True, stream pull from Ollama to expose incremental progress.",
         ),
     ) -> JobStartResponse:
         model_name = sanitize_model_name(name)
