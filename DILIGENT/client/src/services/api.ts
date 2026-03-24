@@ -18,6 +18,7 @@ import {
   JobStatusResponse,
   ModelConfigStateResponse,
   ModelConfigUpdateRequest,
+  OllamaPullJobResult,
 } from "../types";
 
 const HTTP_TIMEOUT =
@@ -435,6 +436,31 @@ export async function updateModelConfigState(
     },
     body: JSON.stringify(payload),
   });
+}
+
+export async function startModelPullJob(
+  modelName: string,
+): Promise<JobStartResponse> {
+  const candidate = modelName.trim();
+  if (!candidate) {
+    throw new Error("[ERROR] Enter a model name to pull from Ollama.");
+  }
+  const queryString = buildQueryString({ name: candidate, stream: "true" });
+  return requestJson<JobStartResponse>(
+    `${API_BASE_URL}/models/pull/jobs${queryString}`,
+    { method: "POST" },
+  );
+}
+
+export async function fetchModelPullJobStatus(
+  jobId: string,
+  timeoutSeconds: number = HTTP_TIMEOUT,
+): Promise<JobStatusResponse<OllamaPullJobResult>> {
+  return requestJson<JobStatusResponse<OllamaPullJobResult>>(
+    `${API_BASE_URL}/models/jobs/${encodeURIComponent(jobId)}`,
+    { method: "GET" },
+    timeoutSeconds,
+  );
 }
 
 export async function pullModels(models: string[]): Promise<ApiResult> {

@@ -4,7 +4,7 @@ import pytest
 from pydantic import ValidationError
 from sqlalchemy import create_engine
 
-from DILIGENT.server.entities.inspection import (
+from DILIGENT.server.domain.inspection import (
     CatalogListFilters,
     MAX_SEARCH_LENGTH,
     SessionListFilters,

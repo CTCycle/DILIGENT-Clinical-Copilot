@@ -4,7 +4,7 @@ import asyncio
 from collections.abc import Sequence
 from typing import Any
 
-from DILIGENT.server.entities.clinical import DrugEntry, PatientDrugs
+from DILIGENT.server.domain.clinical import DrugEntry, PatientDrugs
 from DILIGENT.server.services.clinical.parser import DrugsParser
 
 

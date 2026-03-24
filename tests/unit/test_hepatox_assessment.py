@@ -7,7 +7,7 @@ from types import SimpleNamespace
 import pytest
 
 from DILIGENT.server.models.prompts import LIVERTOX_CLINICAL_USER_PROMPT
-from DILIGENT.server.entities.clinical import (
+from DILIGENT.server.domain.clinical import (
     ClinicalPipelineValidationError,
     DrugEntry,
     DrugSuspensionContext,
