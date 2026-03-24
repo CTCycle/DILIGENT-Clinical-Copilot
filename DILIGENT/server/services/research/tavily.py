@@ -13,7 +13,7 @@ from pydantic import BaseModel, Field
 
 from DILIGENT.server.common.utils.logger import logger
 from DILIGENT.server.configurations import server_settings
-from DILIGENT.server.entities.research import ResearchCitation, ResearchSource
+from DILIGENT.server.domain.research import ResearchCitation, ResearchSource
 from DILIGENT.server.models.providers import initialize_llm_client
 from DILIGENT.server.repositories.serialization.access_keys import AccessKeySerializer
 from DILIGENT.server.services.keys.cryptography import decrypt as decrypt_access_key

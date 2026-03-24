@@ -13,7 +13,7 @@ from DILIGENT.server.models.prompts import (
     DRUG_EXTRACTION_PROMPT,
 )
 from DILIGENT.server.models.providers import initialize_llm_client
-from DILIGENT.server.entities.clinical import (
+from DILIGENT.server.domain.clinical import (
     DrugEntry,
     PatientDrugs,
 )

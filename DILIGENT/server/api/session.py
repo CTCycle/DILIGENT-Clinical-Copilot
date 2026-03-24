@@ -13,7 +13,7 @@ from pydantic_core import ErrorDetails
 
 from DILIGENT.server.models.cloud import LLMError
 
-from DILIGENT.server.entities.clinical import (
+from DILIGENT.server.domain.clinical import (
     ClinicalPipelineValidationError,
     ClinicalSessionRequest,
     DiseaseContextEntry,
@@ -23,7 +23,7 @@ from DILIGENT.server.entities.clinical import (
     PatientDrugs,
     PipelineIssue,
 )
-from DILIGENT.server.entities.jobs import (
+from DILIGENT.server.domain.jobs import (
     JobCancelResponse,
     JobStartResponse,
     JobStatusResponse,

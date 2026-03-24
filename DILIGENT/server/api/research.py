@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from fastapi import APIRouter, Body, HTTPException, status
 
-from DILIGENT.server.entities.research import (
+from DILIGENT.server.domain.research import (
     ResearchRequest,
     ResearchResponse,
 )
