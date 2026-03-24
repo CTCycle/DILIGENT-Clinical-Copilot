@@ -8,7 +8,7 @@ import time
 import unicodedata
 from dataclasses import dataclass
 from typing import Any
-from collections.abc import Iterator
+from collections.abc import Callable, Iterator
 
 import httpx
 import pandas as pd
@@ -636,7 +636,12 @@ class RxNavDrugCatalogBuilder:
     SINGLE_TOKEN_DIGIT_PATTERN = re.compile(r"^\d+(?:\.\d+)?$")
     SHORT_TOKEN_EXCEPTIONS = {"id"}
 
-    def __init__(self, rx_client: RxNavClient | None = None) -> None:
+    def __init__(
+        self,
+        rx_client: RxNavClient | None = None,
+        *,
+        serializer: DataSerializer | None = None,
+    ) -> None:
         combined: set[str] = set()
         for attr in ("SALT_STOPWORDS", "FORM_STOPWORDS", "UNIT_STOPWORDS"):
             values = getattr(RxNavClient, attr, set())
@@ -665,17 +670,49 @@ class RxNavDrugCatalogBuilder:
         self.rxcui_cache: dict[str, list[str]] = {}
         self.total_records: int | None = None
         self.last_logged_count = 0
-        self.serializer = DataSerializer()
+        self.serializer = serializer or DataSerializer()
 
     # -------------------------------------------------------------------------
-    def update_drug_catalog(self, *, total_records: int | None = None) -> dict[str, Any]:
+    def emit_progress(
+        self,
+        progress_callback: Callable[[float, str], None] | None,
+        *,
+        progress: float,
+        message: str,
+    ) -> None:
+        if progress_callback is None:
+            return
+        bounded_progress = min(100.0, max(0.0, float(progress)))
+        progress_callback(bounded_progress, message)
+
+    # -------------------------------------------------------------------------
+    def should_cancel(self, should_stop: Callable[[], bool] | None) -> bool:
+        if should_stop is None:
+            return False
+        return bool(should_stop())
+
+    # -------------------------------------------------------------------------
+    def update_drug_catalog(
+        self,
+        *,
+        total_records: int | None = None,
+        progress_callback: Callable[[float, str], None] | None = None,
+        should_stop: Callable[[], bool] | None = None,
+    ) -> dict[str, Any]:
         self.total_records = total_records
         self.last_logged_count = 0
         attempt = 0
         last_error: Exception | None = None
+        self.emit_progress(
+            progress_callback,
+            progress=2.0,
+            message="Downloading RxNav catalog payload",
+        )
         while attempt < self.MAX_RETRIES:
             try:
                 with httpx.stream("GET", self.TERMS_URL, timeout=self.TIMEOUT) as response:
+                    if self.should_cancel(should_stop):
+                        raise RuntimeError("RxNav update cancelled by user request")
                     if (
                         response.status_code in self.RETRY_STATUS
                         and attempt + 1 < self.MAX_RETRIES
@@ -685,8 +722,22 @@ class RxNavDrugCatalogBuilder:
                         continue
                     response.raise_for_status()
                     started = time.perf_counter()
-                    result = self.persist_catalog(response.iter_bytes(self.CHUNK_SIZE))
+                    self.emit_progress(
+                        progress_callback,
+                        progress=8.0,
+                        message="Processing RxNav records",
+                    )
+                    result = self.persist_catalog(
+                        response.iter_bytes(self.CHUNK_SIZE),
+                        progress_callback=progress_callback,
+                        should_stop=should_stop,
+                    )
                     elapsed = time.perf_counter() - started
+                    self.emit_progress(
+                        progress_callback,
+                        progress=98.0,
+                        message="Finalizing RxNav catalog refresh",
+                    )
                     return self.compose_catalog_payload(
                         response,
                         result,
@@ -752,22 +803,52 @@ class RxNavDrugCatalogBuilder:
         return payload
 
     # -------------------------------------------------------------------------
-    def persist_catalog(self, chunks: Iterator[bytes]) -> dict[str, Any]:
+    def persist_catalog(
+        self,
+        chunks: Iterator[bytes],
+        *,
+        progress_callback: Callable[[float, str], None] | None = None,
+        should_stop: Callable[[], bool] | None = None,
+    ) -> dict[str, Any]:
         count = 0
         concepts_batch: list[dict[str, Any]] = []
         for concept in self.stream_min_concepts(chunks):
+            if self.should_cancel(should_stop):
+                raise RuntimeError("RxNav update cancelled by user request")
             concepts_batch.append(concept)
             if len(concepts_batch) >= self.BATCH_SIZE:
                 persisted = self.persist_concept_batch(concepts_batch)
                 count += persisted
                 concepts_batch.clear()
                 logger.info('Total records upserted into database: %d', count)
+                self.emit_catalog_progress(progress_callback, count=count)
         if concepts_batch:
+            if self.should_cancel(should_stop):
+                raise RuntimeError("RxNav update cancelled by user request")
             persisted = self.persist_concept_batch(concepts_batch)
             count += persisted
             logger.info('Total records upserted into database: %d', count)
-            
+            self.emit_catalog_progress(progress_callback, count=count)
+
         return {"table_name": self.TABLE_NAME, "count": count}
+
+    # -------------------------------------------------------------------------
+    def emit_catalog_progress(
+        self,
+        progress_callback: Callable[[float, str], None] | None,
+        *,
+        count: int,
+    ) -> None:
+        if progress_callback is None:
+            return
+        denominator = float(self.total_records or 50_000)
+        ratio = min(1.0, max(0.0, count / denominator))
+        progress = 8.0 + (ratio * 87.0)
+        self.emit_progress(
+            progress_callback,
+            progress=progress,
+            message=f"Upserted {count} RxNav records",
+        )
 
     # -------------------------------------------------------------------------
     def persist_concept_batch(self, concepts: list[dict[str, Any]]) -> int:

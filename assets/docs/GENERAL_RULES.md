@@ -33,6 +33,7 @@ If changes materially affect behavior, architecture, or usage, update the releva
 ## EXECUTION RULES
 - Use PowerShell by default for terminal commands in this repository.
 - Use `cmd /c` only when invoking `.bat` scripts or CMD-specific syntax.
+- In project documentation, always reference the virtual environment path as `runtimes/.venv`.
 - Frontend Node runtime is bundled under `runtimes/nodejs`.
 - For changes under `DILIGENT/client`, always run a frontend validation build before finalizing: `npm run build`.
 - If `npm` is not directly available in PATH, run it through the bundled runtime (`runtimes/nodejs/node.exe runtimes/nodejs/node_modules/npm/bin/npm-cli.js run build`).

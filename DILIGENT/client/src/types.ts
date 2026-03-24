@@ -90,7 +90,11 @@ export type ApiResult = {
   json: unknown;
 };
 
-export type JobType = "clinical" | "ollama_pull";
+export type JobType =
+  | "clinical"
+  | "ollama_pull"
+  | "rxnav_update"
+  | "livertox_update";
 
 export type JobStatus =
   | "pending"
@@ -127,5 +131,93 @@ export type JobCancelResponse = {
   job_id: string;
   success: boolean;
   message: string;
+};
+
+export type InspectionSessionStatus = "successful" | "failed";
+export type InspectionDateFilterMode = "before" | "after" | "exact";
+
+export type InspectionSessionItem = {
+  session_id: number;
+  patient_name: string | null;
+  session_timestamp: string | null;
+  status: InspectionSessionStatus;
+  total_duration: number | null;
+};
+
+export type InspectionSessionCatalogResponse = {
+  items: InspectionSessionItem[];
+  total: number;
+  offset: number;
+  limit: number;
+};
+
+export type InspectionSessionReportResponse = {
+  session_id: number;
+  report: string;
+};
+
+export type InspectionCatalogQuery = {
+  search?: string;
+  offset?: number;
+  limit?: number;
+};
+
+export type InspectionSessionQuery = InspectionCatalogQuery & {
+  status?: InspectionSessionStatus;
+  date_mode?: InspectionDateFilterMode;
+  date?: string;
+};
+
+export type InspectionRxNavItem = {
+  drug_id: number;
+  drug_name: string;
+  last_update: string | null;
+};
+
+export type InspectionRxNavCatalogResponse = {
+  items: InspectionRxNavItem[];
+  total: number;
+  offset: number;
+  limit: number;
+};
+
+export type InspectionAliasEntry = {
+  alias: string;
+  alias_kind: string;
+};
+
+export type InspectionAliasGroup = {
+  source: string;
+  aliases: InspectionAliasEntry[];
+};
+
+export type InspectionDrugAliasesResponse = {
+  drug_id: number;
+  drug_name: string;
+  groups: InspectionAliasGroup[];
+};
+
+export type InspectionLiverToxItem = {
+  drug_id: number;
+  drug_name: string;
+  last_update: string | null;
+};
+
+export type InspectionLiverToxCatalogResponse = {
+  items: InspectionLiverToxItem[];
+  total: number;
+  offset: number;
+  limit: number;
+};
+
+export type InspectionLiverToxExcerptResponse = {
+  drug_id: number;
+  drug_name: string;
+  excerpt: string;
+  last_update: string | null;
+};
+
+export type InspectionDeleteResponse = {
+  deleted: boolean;
 };
 

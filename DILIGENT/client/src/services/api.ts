@@ -4,6 +4,15 @@ import {
   AccessKeyRecord,
   ApiResult,
   ClinicalRequestPayload,
+  InspectionCatalogQuery,
+  InspectionDeleteResponse,
+  InspectionDrugAliasesResponse,
+  InspectionLiverToxCatalogResponse,
+  InspectionLiverToxExcerptResponse,
+  InspectionRxNavCatalogResponse,
+  InspectionSessionCatalogResponse,
+  InspectionSessionQuery,
+  InspectionSessionReportResponse,
   JobCancelResponse,
   JobStartResponse,
   JobStatusResponse,
@@ -133,6 +142,24 @@ async function requestJson<T>(
   return result.json as T;
 }
 
+function buildQueryString(
+  params: Record<string, string | number | null | undefined>,
+): string {
+  const searchParams = new URLSearchParams();
+  for (const [key, value] of Object.entries(params)) {
+    if (value === undefined || value === null) {
+      continue;
+    }
+    const serialized = `${value}`.trim();
+    if (!serialized) {
+      continue;
+    }
+    searchParams.set(key, serialized);
+  }
+  const queryString = searchParams.toString();
+  return queryString ? `?${queryString}` : "";
+}
+
 export async function runClinicalSession(
   payload: ClinicalRequestPayload,
 ): Promise<ApiResult> {
@@ -243,6 +270,153 @@ export function pollClinicalJobStatus(
       }
     },
   };
+}
+
+export async function fetchInspectionSessions(
+  query: InspectionSessionQuery,
+): Promise<InspectionSessionCatalogResponse> {
+  const queryString = buildQueryString({
+    search: query.search,
+    status: query.status,
+    date_mode: query.date_mode,
+    date: query.date,
+    offset: query.offset ?? 0,
+    limit: query.limit ?? 10,
+  });
+  return requestJson<InspectionSessionCatalogResponse>(
+    `${API_BASE_URL}/inspection/sessions${queryString}`,
+    { method: "GET" },
+  );
+}
+
+export async function fetchInspectionSessionReport(
+  sessionId: number,
+): Promise<InspectionSessionReportResponse> {
+  return requestJson<InspectionSessionReportResponse>(
+    `${API_BASE_URL}/inspection/sessions/${encodeURIComponent(String(sessionId))}/report`,
+    { method: "GET" },
+  );
+}
+
+export async function deleteInspectionSession(
+  sessionId: number,
+): Promise<InspectionDeleteResponse> {
+  return requestJson<InspectionDeleteResponse>(
+    `${API_BASE_URL}/inspection/sessions/${encodeURIComponent(String(sessionId))}`,
+    { method: "DELETE" },
+  );
+}
+
+export async function fetchInspectionRxNavCatalog(
+  query: InspectionCatalogQuery,
+): Promise<InspectionRxNavCatalogResponse> {
+  const queryString = buildQueryString({
+    search: query.search,
+    offset: query.offset ?? 0,
+    limit: query.limit ?? 10,
+  });
+  return requestJson<InspectionRxNavCatalogResponse>(
+    `${API_BASE_URL}/inspection/rxnav${queryString}`,
+    { method: "GET" },
+  );
+}
+
+export async function fetchInspectionRxNavAliases(
+  drugId: number,
+): Promise<InspectionDrugAliasesResponse> {
+  return requestJson<InspectionDrugAliasesResponse>(
+    `${API_BASE_URL}/inspection/rxnav/${encodeURIComponent(String(drugId))}/aliases`,
+    { method: "GET" },
+  );
+}
+
+export async function deleteInspectionRxNavDrug(
+  drugId: number,
+): Promise<InspectionDeleteResponse> {
+  return requestJson<InspectionDeleteResponse>(
+    `${API_BASE_URL}/inspection/rxnav/${encodeURIComponent(String(drugId))}`,
+    { method: "DELETE" },
+  );
+}
+
+export async function startInspectionRxNavUpdateJob(): Promise<JobStartResponse> {
+  return requestJson<JobStartResponse>(`${API_BASE_URL}/inspection/rxnav/jobs`, {
+    method: "POST",
+  });
+}
+
+export async function fetchInspectionRxNavUpdateJobStatus(
+  jobId: string,
+): Promise<JobStatusResponse> {
+  return requestJson<JobStatusResponse>(
+    `${API_BASE_URL}/inspection/rxnav/jobs/${encodeURIComponent(jobId)}`,
+    { method: "GET" },
+  );
+}
+
+export async function cancelInspectionRxNavUpdateJob(
+  jobId: string,
+): Promise<JobCancelResponse> {
+  return requestJson<JobCancelResponse>(
+    `${API_BASE_URL}/inspection/rxnav/jobs/${encodeURIComponent(jobId)}`,
+    { method: "DELETE" },
+  );
+}
+
+export async function fetchInspectionLiverToxCatalog(
+  query: InspectionCatalogQuery,
+): Promise<InspectionLiverToxCatalogResponse> {
+  const queryString = buildQueryString({
+    search: query.search,
+    offset: query.offset ?? 0,
+    limit: query.limit ?? 10,
+  });
+  return requestJson<InspectionLiverToxCatalogResponse>(
+    `${API_BASE_URL}/inspection/livertox${queryString}`,
+    { method: "GET" },
+  );
+}
+
+export async function fetchInspectionLiverToxExcerpt(
+  drugId: number,
+): Promise<InspectionLiverToxExcerptResponse> {
+  return requestJson<InspectionLiverToxExcerptResponse>(
+    `${API_BASE_URL}/inspection/livertox/${encodeURIComponent(String(drugId))}/excerpt`,
+    { method: "GET" },
+  );
+}
+
+export async function deleteInspectionLiverToxDrug(
+  drugId: number,
+): Promise<InspectionDeleteResponse> {
+  return requestJson<InspectionDeleteResponse>(
+    `${API_BASE_URL}/inspection/livertox/${encodeURIComponent(String(drugId))}`,
+    { method: "DELETE" },
+  );
+}
+
+export async function startInspectionLiverToxUpdateJob(): Promise<JobStartResponse> {
+  return requestJson<JobStartResponse>(`${API_BASE_URL}/inspection/livertox/jobs`, {
+    method: "POST",
+  });
+}
+
+export async function fetchInspectionLiverToxUpdateJobStatus(
+  jobId: string,
+): Promise<JobStatusResponse> {
+  return requestJson<JobStatusResponse>(
+    `${API_BASE_URL}/inspection/livertox/jobs/${encodeURIComponent(jobId)}`,
+    { method: "GET" },
+  );
+}
+
+export async function cancelInspectionLiverToxUpdateJob(
+  jobId: string,
+): Promise<JobCancelResponse> {
+  return requestJson<JobCancelResponse>(
+    `${API_BASE_URL}/inspection/livertox/jobs/${encodeURIComponent(jobId)}`,
+    { method: "DELETE" },
+  );
 }
 
 export async function fetchModelConfigState(): Promise<ModelConfigStateResponse> {
