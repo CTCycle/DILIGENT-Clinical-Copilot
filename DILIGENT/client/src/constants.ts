@@ -2,9 +2,12 @@ import { ClinicalFormState, CloudProvider, RuntimeSettings } from "./types";
 
 const apiBaseEnv = (import.meta.env.VITE_API_BASE_URL || "").trim();
 const devBase = "/api";
+const normalizedApiBase = apiBaseEnv.replace(/\/+$/, "");
 const selectedBase =
-  apiBaseEnv.startsWith("/") && apiBaseEnv.length > 1 ? apiBaseEnv : devBase;
-export const API_BASE_URL = selectedBase.replace(/\/+$/, "");
+  normalizedApiBase === "/api" || normalizedApiBase.startsWith("/api/")
+    ? normalizedApiBase
+    : devBase;
+export const API_BASE_URL = selectedBase;
 
 export const PARSING_MODEL_CHOICES = [
   "qwen3:1.7b",

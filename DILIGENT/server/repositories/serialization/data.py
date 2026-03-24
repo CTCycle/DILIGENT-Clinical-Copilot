@@ -13,7 +13,7 @@ from xml.etree import ElementTree
 
 import pandas as pd
 from pypdf import PdfReader
-from sqlalchemy import and_, delete, exists, func, inspect, or_, select, text, update
+from sqlalchemy import and_, delete, exists, func, inspect, or_, select, update
 from sqlalchemy.orm import Session, sessionmaker
 
 from DILIGENT.server.configurations import server_settings
@@ -108,27 +108,33 @@ class _RepositorySerializationService:
     # -----------------------------------------------------------------------------
     def ensure_session_result_table(self) -> None:
         inspector = inspect(self.engine)
-        if inspector.has_table(ClinicalSession.__tablename__):
-            ClinicalSessionResult.__table__.create(bind=self.engine, checkfirst=True)
-        self.ensure_nullable_string_column("clinical_sessions", "session_status")
-        self.ensure_nullable_string_column("drugs", "rxnav_last_update")
-
-    # -----------------------------------------------------------------------------
-    def ensure_nullable_string_column(self, table_name: str, column_name: str) -> None:
-        inspector = inspect(self.engine)
-        if not inspector.has_table(table_name):
-            return
-        existing_columns = {
-            str(column.get("name"))
-            for column in inspector.get_columns(table_name)
-        }
-        if column_name in existing_columns:
-            return
-        statement = text(
-            f"ALTER TABLE {table_name} ADD COLUMN {column_name} VARCHAR"
+        required_tables = (
+            ClinicalSession.__tablename__,
+            ClinicalSessionResult.__tablename__,
+            Drug.__tablename__,
         )
-        with self.engine.begin() as connection:
-            connection.execute(statement)
+        missing_tables = [
+            table_name for table_name in required_tables if not inspector.has_table(table_name)
+        ]
+        if missing_tables:
+            joined = ", ".join(missing_tables)
+            raise RuntimeError(
+                f"Database schema mismatch: missing required table(s): {joined}"
+            )
+
+        required_columns = {
+            ClinicalSession.__tablename__: {"session_status"},
+            Drug.__tablename__: {"rxnav_last_update"},
+        }
+        for table_name, columns in required_columns.items():
+            existing = {str(item.get("name")) for item in inspector.get_columns(table_name)}
+            missing = sorted(columns - existing)
+            if missing:
+                joined = ", ".join(missing)
+                raise RuntimeError(
+                    "Database schema mismatch: "
+                    f"missing required column(s) in {table_name}: {joined}"
+                )
 
     # -----------------------------------------------------------------------------
     def normalize_session_status(self, value: Any) -> str:
@@ -648,7 +654,13 @@ class _RepositorySerializationService:
         normalized = self.normalize_string(search)
         if normalized is None:
             return None
-        return f"%{normalized.casefold()}%"
+        escaped = (
+            normalized.casefold()
+            .replace("\\", "\\\\")
+            .replace("%", "\\%")
+            .replace("_", "\\_")
+        )
+        return f"%{escaped}%"
 
     # -----------------------------------------------------------------------------
     def list_sessions(
@@ -671,7 +683,8 @@ class _RepositorySerializationService:
                 select(1).where(
                     ClinicalSessionSection.session_id == ClinicalSession.id,
                     func.lower(func.coalesce(ClinicalSessionSection.content, "")).like(
-                        search_pattern
+                        search_pattern,
+                        escape="\\",
                     ),
                 )
             )
@@ -680,13 +693,14 @@ class _RepositorySerializationService:
                     ClinicalSessionResult.session_id == ClinicalSession.id,
                     func.lower(
                         func.coalesce(ClinicalSessionResult.payload_json, "")
-                    ).like(search_pattern),
+                    ).like(search_pattern, escape="\\"),
                 )
             )
             conditions.append(
                 or_(
                     func.lower(func.coalesce(ClinicalSession.patient_name, "")).like(
-                        search_pattern
+                        search_pattern,
+                        escape="\\",
                     ),
                     section_match,
                     result_payload_match,
@@ -855,13 +869,17 @@ class _RepositorySerializationService:
             alias_match = exists(
                 select(1).where(
                     DrugAlias.drug_id == Drug.id,
-                    func.lower(func.coalesce(DrugAlias.alias, "")).like(search_pattern),
+                    func.lower(func.coalesce(DrugAlias.alias, "")).like(
+                        search_pattern,
+                        escape="\\",
+                    ),
                 )
             )
             conditions.append(
                 or_(
                     func.lower(func.coalesce(Drug.canonical_name, "")).like(
-                        search_pattern
+                        search_pattern,
+                        escape="\\",
                     ),
                     alias_match,
                 )
@@ -953,16 +971,21 @@ class _RepositorySerializationService:
             alias_match = exists(
                 select(1).where(
                     DrugAlias.drug_id == Drug.id,
-                    func.lower(func.coalesce(DrugAlias.alias, "")).like(search_pattern),
+                    func.lower(func.coalesce(DrugAlias.alias, "")).like(
+                        search_pattern,
+                        escape="\\",
+                    ),
                 )
             )
             conditions.append(
                 or_(
                     func.lower(func.coalesce(Drug.canonical_name, "")).like(
-                        search_pattern
+                        search_pattern,
+                        escape="\\",
                     ),
                     func.lower(func.coalesce(LiverToxMonograph.excerpt, "")).like(
-                        search_pattern
+                        search_pattern,
+                        escape="\\",
                     ),
                     alias_match,
                 )
