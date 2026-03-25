@@ -48,24 +48,24 @@ cls
 echo ==========================================================================
 echo                         Setup and Maintenance
 echo ==========================================================================
-echo 1. Remove logs
-echo 2. Uninstall app
-echo 3. Initialize database
-echo 4. Update RxNav drugs catalog
-echo 5. Update LiverTox data
-echo 6. Update RAG documents
-echo 7. Clean desktop build artifacts
+echo 1. Initialize database
+echo 2. Update RxNav drugs catalog
+echo 3. Update LiverTox data
+echo 4. Update RAG documents
+echo 5. Remove logs
+echo 6. Clean desktop build artifacts
+echo 7. Uninstall app
 echo 8. Exit
 echo.
 set /p sub_choice="Select an option (1-8): "
 
-if "%sub_choice%"=="1" goto :logs
-if "%sub_choice%"=="2" goto :uninstall
-if "%sub_choice%"=="3" goto :run_init_db
-if "%sub_choice%"=="4" goto :run_drugs
-if "%sub_choice%"=="5" goto :run_livertox
-if "%sub_choice%"=="6" goto :run_rag
-if "%sub_choice%"=="7" goto :clean_desktop_build
+if "%sub_choice%"=="1" goto :run_init_db
+if "%sub_choice%"=="2" goto :run_drugs
+if "%sub_choice%"=="3" goto :run_livertox
+if "%sub_choice%"=="4" goto :run_rag
+if "%sub_choice%"=="5" goto :logs
+if "%sub_choice%"=="6" goto :clean_desktop_build
+if "%sub_choice%"=="7" goto :uninstall
 if "%sub_choice%"=="8" goto :exit
 echo Invalid option, try again.
 pause

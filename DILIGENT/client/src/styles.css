@@ -70,6 +70,7 @@
   --container-max: 1200px;
   --drawer-width: 360px;
   --report-max-height: 480px;
+  --app-top-nav-height: 86px;
 
   /* Background */
   background: linear-gradient(180deg, #edf4ea 0%, #eaf1e7 100%);
@@ -1580,8 +1581,11 @@ input[type="date"]::-webkit-calendar-picker-indicator:hover {
    Navigation Header & Tabs
    ============================================ */
 .app-top-nav {
-  position: sticky;
+  position: fixed;
   top: 0;
+  left: 0;
+  right: 0;
+  width: 100%;
   z-index: 120;
 }
 
@@ -1707,9 +1711,14 @@ input[type="date"]::-webkit-calendar-picker-indicator:hover {
   display: flex;
   flex-direction: column;
   flex: 1;
+  padding-top: var(--app-top-nav-height);
 }
 
 @media (max-width: 768px) {
+  :root {
+    --app-top-nav-height: 126px;
+  }
+
   .lab-layout {
     grid-template-columns: 1fr;
   }
