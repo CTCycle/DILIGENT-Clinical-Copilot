@@ -43,6 +43,10 @@ from DILIGENT.server.services.research.tavily import tavily_research_service
 
 ###############################################################################
 NOT_AVAILABLE_TEXT = "Not available"
+REDUNDANT_REPORT_LINE_RE = re.compile(
+    r"generated\s+report.*?(drug[- ]induced\s+liver\s+injury|\bdili\b)",
+    re.IGNORECASE,
+)
 
 
 ###############################################################################
@@ -353,6 +357,9 @@ class HepatoxConsultation:
                 else:
                     normalized_outcome = (
                         outcome.strip() if isinstance(outcome, str) else str(outcome).strip()
+                    )
+                    normalized_outcome = self.remove_redundant_report_sentence(
+                        normalized_outcome
                     )
                     entry.paragraph = (
                         normalized_outcome
@@ -1019,6 +1026,20 @@ class HepatoxConsultation:
         return min(2.0, 0.35 * normalized_attempt)
 
     # -------------------------------------------------------------------------
+    @staticmethod
+    def remove_redundant_report_sentence(text: str) -> str:
+        if not text:
+            return ""
+        cleaned_lines: list[str] = []
+        for raw_line in text.splitlines():
+            compact = re.sub(r"[\s*_`#:\-]+", " ", raw_line).strip()
+            if compact and REDUNDANT_REPORT_LINE_RE.search(compact):
+                continue
+            cleaned_lines.append(raw_line)
+        cleaned = "\n".join(cleaned_lines).strip()
+        return re.sub(r"\n{3,}", "\n\n", cleaned)
+
+    # -------------------------------------------------------------------------
     async def finalize_patient_report(
         self,
         entries: list[DrugClinicalAssessment],
@@ -1097,19 +1118,8 @@ class HepatoxConsultation:
 
     # -------------------------------------------------------------------------
     def build_missing_excerpt_paragraph(self, entry: DrugClinicalAssessment) -> str:
-        score = self.resolve_livertox_score(entry.matched_livertox_row)
-        heading = self.format_drug_heading(entry.drug_name, score)
-        if entry.matched_livertox_row:
-            note = (
-                "Automated assessment unavailable: a LiverTox monograph was matched, "
-                "but no local excerpt text is available in the current knowledge-base snapshot."
-            )
-        else:
-            note = (
-                "Automated assessment unavailable: no local LiverTox excerpt is available for this drug."
-            )
-        guidance = "Review the LiverTox monograph manually before attributing causality."
-        return f"{heading}\n{note} {guidance}\nBibliography source: LiverTox"
+        normalized_name = entry.drug_name.strip() if entry.drug_name else "Unnamed drug"
+        return f"{normalized_name}: local LiverTox excerpt not available."
 
     # -------------------------------------------------------------------------
     def build_ambiguous_match_paragraph(self, entry: DrugClinicalAssessment) -> str:

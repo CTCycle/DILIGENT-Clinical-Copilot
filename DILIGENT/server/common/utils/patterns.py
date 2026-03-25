@@ -15,7 +15,9 @@ PATIENT_SECTION_HEADER_RE = re.compile(
 DRUG_SCHEDULE_RE = re.compile(
     r"(?P<schedule>\d+(?:[.,]\d+)?(?:\s*-\s*\d+(?:[.,]\d+)?){1,3})"
 )
-DRUG_BULLET_RE = re.compile(r"^[\-\u2022\u2023\u2043\*]+\s*")
+DRUG_BULLET_RE = re.compile(
+    r"^[\-\u2022\u2023\u2043\u25A0\u25AA\u25CF\u25E6\u2219\u00B7\*]+\s*"
+)
 DRUG_BRACKET_TRAIL_RE = re.compile(r"\[(?P<content>[^\]]+)\]\s*$")
 DRUG_SUSPENSION_RE = re.compile(
     r"\b(?:sospes[oaie]|interrott[aoie]|suspend(?:ed|ere|ing)?|stopp?ed|discontinued?)\b",
