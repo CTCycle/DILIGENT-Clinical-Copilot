@@ -137,6 +137,14 @@ export type JobStatusResponse<TJobResult extends Record<string, unknown> = Clini
   error: string | null;
 };
 
+export type InspectionUpdateJobResult = {
+  progress_message?: string;
+  summary?: Record<string, unknown>;
+  [key: string]: unknown;
+};
+
+export type InspectionUpdateJobStatusResponse = JobStatusResponse<InspectionUpdateJobResult>;
+
 export type JobCancelResponse = {
   job_id: string;
   success: boolean;

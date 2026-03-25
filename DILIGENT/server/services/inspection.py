@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from datetime import date
+from functools import partial
 from typing import Any
 
 from DILIGENT.server.common.constants import ARCHIVES_PATH
@@ -9,6 +10,21 @@ from DILIGENT.server.repositories.serialization.data import DataSerializer
 from DILIGENT.server.services.jobs import JobManager, job_manager
 from DILIGENT.server.services.updater.livertox import LiverToxUpdater
 from DILIGENT.server.services.updater.rxnav import RxNavDrugCatalogBuilder
+
+
+###############################################################################
+class DataInspectionProgressReporter:
+    def __init__(self, *, service: "DataInspectionService", job_id: str) -> None:
+        self.service = service
+        self.job_id = job_id
+
+    # -------------------------------------------------------------------------
+    def __call__(self, progress: float, message: str) -> None:
+        self.service.report_job_progress(
+            job_id=self.job_id,
+            progress=progress,
+            message=message,
+        )
 
 
 ###############################################################################
@@ -119,10 +135,8 @@ class DataInspectionService:
 
     # -------------------------------------------------------------------------
     def run_rxnav_update_job(self, job_id: str) -> dict[str, Any]:
-        stop_check = lambda: self.jobs.should_stop(job_id)
-
-        def progress_callback(progress: float, message: str) -> None:
-            self.report_job_progress(job_id=job_id, progress=progress, message=message)
+        stop_check = partial(self.jobs.should_stop, job_id)
+        progress_callback = DataInspectionProgressReporter(service=self, job_id=job_id)
 
         if stop_check():
             return {}
@@ -145,10 +159,8 @@ class DataInspectionService:
 
     # -------------------------------------------------------------------------
     def run_livertox_update_job(self, job_id: str) -> dict[str, Any]:
-        stop_check = lambda: self.jobs.should_stop(job_id)
-
-        def progress_callback(progress: float, message: str) -> None:
-            self.report_job_progress(job_id=job_id, progress=progress, message=message)
+        stop_check = partial(self.jobs.should_stop, job_id)
+        progress_callback = DataInspectionProgressReporter(service=self, job_id=job_id)
 
         if stop_check():
             return {}
