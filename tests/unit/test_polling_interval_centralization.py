@@ -4,8 +4,8 @@ from typing import Any
 
 from DILIGENT.server.configurations import server_settings
 from DILIGENT.server.domain.clinical import ClinicalSessionRequest
-from DILIGENT.server.routes import ollama as ollama_routes
-from DILIGENT.server.routes import session as session_routes
+from DILIGENT.server.api import ollama as ollama_routes
+from DILIGENT.server.api import session as session_routes
 
 
 ###############################################################################

@@ -1,4 +1,4 @@
-import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import React, { useCallback, useEffect, useMemo, useState } from "react";
 import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
 
@@ -19,6 +19,8 @@ import {
   startInspectionLiverToxUpdateJob,
   startInspectionRxNavUpdateJob,
 } from "../services/api";
+import { InspectionJobPanel } from "../components/InspectionJobPanel";
+import { useInspectionUpdateJob } from "../hooks/useInspectionUpdateJob";
 import {
   InspectionDateFilterMode,
   InspectionDrugAliasesResponse,
@@ -27,29 +29,10 @@ import {
   InspectionRxNavItem,
   InspectionSessionItem,
   InspectionSessionStatus,
-  JobStatus,
 } from "../types";
 
 const PAGE_LIMIT = 10;
 const SEARCH_DEBOUNCE_MS = 250;
-
-type UpdateJobState = {
-  jobId: string | null;
-  running: boolean;
-  progress: number;
-  status: JobStatus | null;
-  message: string | null;
-  error: string | null;
-};
-
-const DEFAULT_JOB_STATE: UpdateJobState = {
-  jobId: null,
-  running: false,
-  progress: 0,
-  status: null,
-  message: null,
-  error: null,
-};
 
 function useDebouncedValue<T>(value: T, delayMs: number): T {
   const [debouncedValue, setDebouncedValue] = useState(value);
@@ -156,24 +139,6 @@ export function DataInspectionPage(): React.JSX.Element {
   const [excerptData, setExcerptData] = useState<InspectionLiverToxExcerptResponse | null>(null);
   const [excerptLoading, setExcerptLoading] = useState(false);
   const [excerptError, setExcerptError] = useState<string | null>(null);
-
-  const [rxnavJob, setRxnavJob] = useState<UpdateJobState>(DEFAULT_JOB_STATE);
-  const [livertoxJob, setLivertoxJob] = useState<UpdateJobState>(DEFAULT_JOB_STATE);
-  const rxnavTimer = useRef<ReturnType<typeof globalThis.setTimeout> | null>(null);
-  const livertoxTimer = useRef<ReturnType<typeof globalThis.setTimeout> | null>(null);
-
-  const stopRxnavPolling = useCallback(() => {
-    if (rxnavTimer.current !== null) {
-      globalThis.clearTimeout(rxnavTimer.current);
-      rxnavTimer.current = null;
-    }
-  }, []);
-  const stopLivertoxPolling = useCallback(() => {
-    if (livertoxTimer.current !== null) {
-      globalThis.clearTimeout(livertoxTimer.current);
-      livertoxTimer.current = null;
-    }
-  }, []);
   const closeAliasModal = useCallback(() => {
     setAliasData(null);
     setAliasError(null);
@@ -240,63 +205,37 @@ export function DataInspectionPage(): React.JSX.Element {
     }
   }, [livertoxOffset, livertoxSearch]);
 
+  const rxnavUpdateJob = useInspectionUpdateJob({
+    startJob: startInspectionRxNavUpdateJob,
+    fetchStatus: fetchInspectionRxNavUpdateJobStatus,
+    cancelJob: cancelInspectionRxNavUpdateJob,
+    onCompleted: loadRxnav,
+    startMessage: "Initializing RxNav update",
+    startErrorMessage: "Failed to start RxNav update.",
+    cancelErrorMessage: "Failed to request cancellation.",
+    pollErrorMessage: "RxNav polling failed.",
+  });
+
+  const livertoxUpdateJob = useInspectionUpdateJob({
+    startJob: startInspectionLiverToxUpdateJob,
+    fetchStatus: fetchInspectionLiverToxUpdateJobStatus,
+    cancelJob: cancelInspectionLiverToxUpdateJob,
+    onCompleted: loadLivertox,
+    startMessage: "Initializing LiverTox update",
+    startErrorMessage: "Failed to start LiverTox update.",
+    cancelErrorMessage: "Failed to request cancellation.",
+    pollErrorMessage: "LiverTox polling failed.",
+  });
+
+  const rxnavJob = rxnavUpdateJob.state;
+  const livertoxJob = livertoxUpdateJob.state;
+
   useEffect(() => setSessionOffset(0), [sessionSearch, sessionStatusFilter, sessionDateMode, sessionDate]);
   useEffect(() => setRxnavOffset(0), [rxnavSearch]);
   useEffect(() => setLivertoxOffset(0), [livertoxSearch]);
   useEffect(() => { void loadSessions(); }, [loadSessions]);
   useEffect(() => { void loadRxnav(); }, [loadRxnav]);
   useEffect(() => { void loadLivertox(); }, [loadLivertox]);
-  useEffect(() => () => { stopRxnavPolling(); stopLivertoxPolling(); }, [stopLivertoxPolling, stopRxnavPolling]);
-
-  const pollRxnav = useCallback(async (jobId: string, intervalMs: number) => {
-    try {
-      const payload = await fetchInspectionRxNavUpdateJobStatus(jobId);
-      const running = payload.status === "pending" || payload.status === "running";
-      const progressMessage = payload.result && typeof payload.result.progress_message === "string" ? payload.result.progress_message : null;
-      setRxnavJob({
-        jobId,
-        running,
-        progress: payload.progress,
-        status: payload.status,
-        message: progressMessage,
-        error: payload.status === "failed" ? payload.error : null,
-      });
-      if (running) {
-        rxnavTimer.current = globalThis.setTimeout(() => { void pollRxnav(jobId, intervalMs); }, intervalMs);
-      } else {
-        stopRxnavPolling();
-        if (payload.status === "completed") void loadRxnav();
-      }
-    } catch (error) {
-      stopRxnavPolling();
-      setRxnavJob((prev) => ({ ...prev, running: false, status: "failed", error: error instanceof Error ? error.message : "RxNav polling failed." }));
-    }
-  }, [loadRxnav, stopRxnavPolling]);
-
-  const pollLivertox = useCallback(async (jobId: string, intervalMs: number) => {
-    try {
-      const payload = await fetchInspectionLiverToxUpdateJobStatus(jobId);
-      const running = payload.status === "pending" || payload.status === "running";
-      const progressMessage = payload.result && typeof payload.result.progress_message === "string" ? payload.result.progress_message : null;
-      setLivertoxJob({
-        jobId,
-        running,
-        progress: payload.progress,
-        status: payload.status,
-        message: progressMessage,
-        error: payload.status === "failed" ? payload.error : null,
-      });
-      if (running) {
-        livertoxTimer.current = globalThis.setTimeout(() => { void pollLivertox(jobId, intervalMs); }, intervalMs);
-      } else {
-        stopLivertoxPolling();
-        if (payload.status === "completed") void loadLivertox();
-      }
-    } catch (error) {
-      stopLivertoxPolling();
-      setLivertoxJob((prev) => ({ ...prev, running: false, status: "failed", error: error instanceof Error ? error.message : "LiverTox polling failed." }));
-    }
-  }, [loadLivertox, stopLivertoxPolling]);
 
   const sessionStatusClass = useMemo(() => (status: InspectionSessionStatus) => (status === "failed" ? "is-failed" : "is-successful"), []);
 
@@ -400,26 +339,10 @@ export function DataInspectionPage(): React.JSX.Element {
               <div><h2>RxNav Data</h2><p>Canonical catalog with aliases and alternative names</p></div>
               <div className="inspection-controls inspection-controls-knowledge">
                 <input type="search" className="inspection-search" placeholder="Search RxNav..." value={rxnavSearchInput} onChange={(event) => setRxnavSearchInput(event.target.value)} aria-label="Search RxNav data" />
-                <button type="button" className="btn btn-primary inspection-mini-btn" onClick={() => {
-                  if (rxnavJob.running && rxnavJob.jobId) {
-                    void cancelInspectionRxNavUpdateJob(rxnavJob.jobId).then(() => setRxnavJob((prev) => ({ ...prev, message: "Cancellation requested", error: null }))).catch((error) => setRxnavJob((prev) => ({ ...prev, error: error instanceof Error ? error.message : "Failed to request cancellation." })));
-                    return;
-                  }
-                  void startInspectionRxNavUpdateJob().then((start) => {
-                    const intervalMs = Math.max(250, Math.round(start.poll_interval * 1000));
-                    setRxnavJob({ jobId: start.job_id, running: true, progress: 1, status: start.status, message: "Initializing RxNav update", error: null });
-                    stopRxnavPolling();
-                    void pollRxnav(start.job_id, intervalMs);
-                  }).catch((error) => setRxnavJob((prev) => ({ ...prev, running: false, error: error instanceof Error ? error.message : "Failed to start RxNav update." })));
-                }}>{rxnavJob.running ? "Stop" : "Update"}</button>
+                <button type="button" className="btn btn-primary inspection-mini-btn" onClick={() => { void rxnavUpdateJob.triggerUpdate(); }}>{rxnavJob.running ? "Stop" : "Update"}</button>
               </div>
             </div>
-            {(rxnavJob.running || rxnavJob.message || rxnavJob.error) && (
-              <div className="inspection-job-panel">
-                <div className="inspection-job-bar-track"><div className="inspection-job-bar-fill" style={{ width: `${Math.max(0, Math.min(100, rxnavJob.progress))}%` }} /></div>
-                <p className="inspection-job-message">{rxnavJob.error || rxnavJob.message || "Updating RxNav..."}</p>
-              </div>
-            )}
+            <InspectionJobPanel job={rxnavJob} fallbackMessage="Updating RxNav..." />
             <div className="inspection-scroll-frame inspection-scroll-frame-compact">
               <table className="inspection-table inspection-table-dense">
                 <thead><tr><th>Drug</th><th>Last update</th><th aria-label="Actions" /></tr></thead>
@@ -449,26 +372,10 @@ export function DataInspectionPage(): React.JSX.Element {
               <div><h2>LiverTox Data</h2><p>Monograph excerpts and update metadata</p></div>
               <div className="inspection-controls inspection-controls-knowledge">
                 <input type="search" className="inspection-search" placeholder="Search LiverTox..." value={livertoxSearchInput} onChange={(event) => setLivertoxSearchInput(event.target.value)} aria-label="Search LiverTox data" />
-                <button type="button" className="btn btn-primary inspection-mini-btn" onClick={() => {
-                  if (livertoxJob.running && livertoxJob.jobId) {
-                    void cancelInspectionLiverToxUpdateJob(livertoxJob.jobId).then(() => setLivertoxJob((prev) => ({ ...prev, message: "Cancellation requested", error: null }))).catch((error) => setLivertoxJob((prev) => ({ ...prev, error: error instanceof Error ? error.message : "Failed to request cancellation." })));
-                    return;
-                  }
-                  void startInspectionLiverToxUpdateJob().then((start) => {
-                    const intervalMs = Math.max(250, Math.round(start.poll_interval * 1000));
-                    setLivertoxJob({ jobId: start.job_id, running: true, progress: 1, status: start.status, message: "Initializing LiverTox update", error: null });
-                    stopLivertoxPolling();
-                    void pollLivertox(start.job_id, intervalMs);
-                  }).catch((error) => setLivertoxJob((prev) => ({ ...prev, running: false, error: error instanceof Error ? error.message : "Failed to start LiverTox update." })));
-                }}>{livertoxJob.running ? "Stop" : "Update"}</button>
+                <button type="button" className="btn btn-primary inspection-mini-btn" onClick={() => { void livertoxUpdateJob.triggerUpdate(); }}>{livertoxJob.running ? "Stop" : "Update"}</button>
               </div>
             </div>
-            {(livertoxJob.running || livertoxJob.message || livertoxJob.error) && (
-              <div className="inspection-job-panel">
-                <div className="inspection-job-bar-track"><div className="inspection-job-bar-fill" style={{ width: `${Math.max(0, Math.min(100, livertoxJob.progress))}%` }} /></div>
-                <p className="inspection-job-message">{livertoxJob.error || livertoxJob.message || "Updating LiverTox..."}</p>
-              </div>
-            )}
+            <InspectionJobPanel job={livertoxJob} fallbackMessage="Updating LiverTox..." />
             <div className="inspection-scroll-frame inspection-scroll-frame-compact">
               <table className="inspection-table inspection-table-dense">
                 <thead><tr><th>Drug</th><th>Last update</th><th aria-label="Actions" /></tr></thead>

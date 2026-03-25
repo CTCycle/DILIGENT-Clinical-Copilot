@@ -12,6 +12,7 @@ import {
   InspectionRxNavCatalogResponse,
   InspectionSessionCatalogResponse,
   InspectionSessionQuery,
+  InspectionUpdateJobStatusResponse,
   InspectionSessionReportResponse,
   JobCancelResponse,
   JobStartResponse,
@@ -348,8 +349,8 @@ export async function startInspectionRxNavUpdateJob(): Promise<JobStartResponse>
 
 export async function fetchInspectionRxNavUpdateJobStatus(
   jobId: string,
-): Promise<JobStatusResponse> {
-  return requestJson<JobStatusResponse>(
+): Promise<InspectionUpdateJobStatusResponse> {
+  return requestJson<InspectionUpdateJobStatusResponse>(
     `${API_BASE_URL}/inspection/rxnav/jobs/${encodeURIComponent(jobId)}`,
     { method: "GET" },
   );
@@ -404,8 +405,8 @@ export async function startInspectionLiverToxUpdateJob(): Promise<JobStartRespon
 
 export async function fetchInspectionLiverToxUpdateJobStatus(
   jobId: string,
-): Promise<JobStatusResponse> {
-  return requestJson<JobStatusResponse>(
+): Promise<InspectionUpdateJobStatusResponse> {
+  return requestJson<InspectionUpdateJobStatusResponse>(
     `${API_BASE_URL}/inspection/livertox/jobs/${encodeURIComponent(jobId)}`,
     { method: "GET" },
   );

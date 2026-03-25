@@ -171,13 +171,13 @@ This section is intended as the "where to edit what" map so agents do not need t
 - `DILIGENT/server/configurations/__init__.py`: configuration API re-exports.
 - `DILIGENT/server/configurations/base.py`: JSON configuration file loading with mapping validation.
 - `DILIGENT/server/configurations/server.py`: full runtime settings model; env override resolution; settings builders for fastapi/jobs/db/matcher/rag/external data/LLM defaults.
-- `DILIGENT/server/entities/__init__.py`: package marker.
-- `DILIGENT/server/entities/clinical.py`: core Pydantic clinical pipeline schemas (request payload, drug entries, disease context, hepatotoxicity scores, match metadata, final report structures).
-- `DILIGENT/server/entities/jobs.py`: background job API response schemas.
-- `DILIGENT/server/entities/keys.py`: access key request/response schemas.
-- `DILIGENT/server/entities/model_configs.py`: model config response/update DTOs and local model card schema.
-- `DILIGENT/server/entities/models.py`: model listing/pull API DTOs.
-- `DILIGENT/server/entities/research.py`: research request/citation/source/response DTOs.
+- `DILIGENT/server/domain/__init__.py`: package marker.
+- `DILIGENT/server/domain/clinical.py`: core Pydantic clinical pipeline schemas (request payload, drug entries, disease context, hepatotoxicity scores, match metadata, final report structures).
+- `DILIGENT/server/domain/jobs.py`: background job API response schemas.
+- `DILIGENT/server/domain/keys.py`: access key request/response schemas.
+- `DILIGENT/server/domain/model_configs.py`: model config response/update DTOs and local model card schema.
+- `DILIGENT/server/domain/models.py`: model listing/pull API DTOs.
+- `DILIGENT/server/domain/research.py`: research request/citation/source/response DTOs.
 - `DILIGENT/server/models/__init__.py`: package marker.
 - `DILIGENT/server/models/cloud.py`: cloud LLM client abstraction (OpenAI/Gemini), model listing, chat, embeddings, structured output repair loop.
 - `DILIGENT/server/models/prompts.py`: prompt templates for drug extraction, disease extraction, RAG query generation, per-drug analysis, and final conclusion synthesis.
@@ -200,13 +200,13 @@ This section is intended as the "where to edit what" map so agents do not need t
 - `DILIGENT/server/repositories/serialization/data.py`: high-volume persistence service for clinical sessions, LiverTox and RxNav upsert logic, alias linking, document loading/chunking/vector serialization.
 - `DILIGENT/server/repositories/serialization/model_config.py`: model config persistence/snapshot serializer.
 - `DILIGENT/server/repositories/vectors.py`: LanceDB wrapper (table init, dimensionality checks, index creation, record load/stream).
-- `DILIGENT/server/routes/__init__.py`: package marker.
-- `DILIGENT/server/routes/access_keys.py`: `/access-keys` CRUD + activate endpoints.
-- `DILIGENT/server/routes/model_config.py`: `/model-config` GET/PUT endpoint class; resolves provider/model defaults and local model availability cards.
-- `DILIGENT/server/routes/ollama.py`: `/models/list`, `/models/pull`, pull job start/status/cancel endpoints.
-- `DILIGENT/server/routes/research.py`: `/research` endpoint class for Tavily-backed evidence response.
-- `DILIGENT/server/routes/session.py`: `/clinical` and clinical job endpoints; progress callbacks; payload build/merge/validation; per-patient pipeline orchestration.
-- `DILIGENT/server/routes/data_inspection.py`: `/inspection` endpoints for sessions/RxNav/LiverTox catalogs, detail views, deletes, and updater job lifecycle.
+- `DILIGENT/server/api/__init__.py`: package marker.
+- `DILIGENT/server/api/access_keys.py`: `/access-keys` CRUD + activate endpoints.
+- `DILIGENT/server/api/model_config.py`: `/model-config` GET/PUT endpoint class; resolves provider/model defaults and local model availability cards.
+- `DILIGENT/server/api/ollama.py`: `/models/list`, `/models/pull`, pull job start/status/cancel endpoints.
+- `DILIGENT/server/api/research.py`: `/research` endpoint class for Tavily-backed evidence response.
+- `DILIGENT/server/api/session.py`: `/clinical` and clinical job endpoints; progress callbacks; payload build/merge/validation; per-patient pipeline orchestration.
+- `DILIGENT/server/api/data_inspection.py`: `/inspection` endpoints for sessions/RxNav/LiverTox catalogs, detail views, deletes, and updater job lifecycle.
 - `DILIGENT/server/services/__init__.py`: package marker.
 - `DILIGENT/server/services/jobs.py`: in-memory thread-backed `JobManager` and lifecycle/status tracking.
 - `DILIGENT/server/services/payload.py`: incoming payload sanitization and visit-date normalization.
@@ -289,7 +289,7 @@ This section is intended as the "where to edit what" map so agents do not need t
 
 ## 5. Fast Navigation by Change Type
 
-- Clinical output bug: start at `server/routes/session.py`, then `services/clinical/hepatox.py`, `services/clinical/preparation.py`, `services/clinical/matches.py`.
+- Clinical output bug: start at `server/api/session.py`, then `services/clinical/hepatox.py`, `services/clinical/preparation.py`, `services/clinical/matches.py`.
 - Drug parsing issue: `services/clinical/parser.py`, `services/text/normalization.py`, tests `test_drugs_parser.py` and `test_anamnesis_drug_extraction.py`.
 - Model/provider config issue: backend `routes/model_config.py` + `repositories/serialization/model_config.py`; frontend `pages/ModelConfigPage.tsx`, `modelConfig.ts`, `constants.ts`.
 - Access key issue: backend `routes/access_keys.py`, `repositories/serialization/access_keys.py`, `services/keys/cryptography.py`; frontend `useAccessKeyManager.ts`, `AccessKeyModal.tsx`.
