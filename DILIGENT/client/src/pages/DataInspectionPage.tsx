@@ -77,6 +77,12 @@ function statusLabel(value: InspectionSessionStatus): string {
   return value === "failed" ? "Failed" : "Successful";
 }
 
+function sessionFilterLabel(value: "all" | "successful" | "failed"): string {
+  if (value === "all") return "All";
+  if (value === "successful") return "Successful";
+  return "Failed";
+}
+
 function resolveExcerptFallbackMessage(error: unknown): string {
   const description =
     error instanceof Error ? error.message.toLowerCase() : "";
@@ -343,10 +349,10 @@ export function DataInspectionPage(): React.JSX.Element {
             </div>
             <div className="inspection-controls inspection-controls-sessions">
               <input type="search" className="inspection-search" placeholder="Search sessions..." value={sessionSearchInput} onChange={(event) => setSessionSearchInput(event.target.value)} aria-label="Search sessions" />
-              <div className="inspection-toggle-group" role="group" aria-label="Status filter">
+              <div className="inspection-toggle-group">
                 {(["all", "successful", "failed"] as const).map((value) => (
                   <button key={value} type="button" className={`inspection-toggle-pill ${sessionStatusFilter === value ? "is-active" : ""}`} onClick={() => setSessionStatusFilter(value)}>
-                    {value === "all" ? "All" : value === "successful" ? "Successful" : "Failed"}
+                    {sessionFilterLabel(value)}
                   </button>
                 ))}
               </div>
@@ -372,7 +378,7 @@ export function DataInspectionPage(): React.JSX.Element {
                     <td>{formatDuration(row.total_duration)}</td>
                     <td className="inspection-actions-cell">
                       <button type="button" className="inspection-icon-button is-primary" onClick={() => { setReportLoading(true); setReportSession(row); setReportError(null); setReportContent(""); void fetchInspectionSessionReport(row.session_id).then((payload) => setReportContent(payload.report)).catch((error) => setReportError(error instanceof Error ? error.message : "Failed to load report.")).finally(() => setReportLoading(false)); }} aria-label={`View report for session ${row.session_id}`} title={`View report for session ${row.session_id}`}><ViewIcon /></button>
-                      <button type="button" className="inspection-icon-button is-danger" onClick={() => { if (!globalThis.confirm("Delete this recorded session and report data?")) return; void deleteInspectionSession(row.session_id).then(() => { if (sessionItems.length === 1 && sessionOffset > 0) setSessionOffset(Math.max(0, sessionOffset - PAGE_LIMIT)); else void loadSessions(); }).catch((error) => setSessionError(error instanceof Error ? error.message : "Failed to delete session.")); }} aria-label={`Delete session ${row.session_id}`} title={`Delete session ${row.session_id}`}><DeleteIcon /></button>
+                      <button type="button" className="inspection-icon-button is-danger" onClick={() => { if (!globalThis.confirm("Delete this recorded session and report data?")) return; void deleteInspectionSession(row.session_id).then(() => { if (sessionItems.length === 1 && sessionOffset > 0) { setSessionOffset(Math.max(0, sessionOffset - PAGE_LIMIT)); } else { void loadSessions(); } }).catch((error) => setSessionError(error instanceof Error ? error.message : "Failed to delete session.")); }} aria-label={`Delete session ${row.session_id}`} title={`Delete session ${row.session_id}`}><DeleteIcon /></button>
                       <button type="button" className="inspection-icon-button" disabled aria-label="Modify session (not implemented)" title="Modify session (not implemented)"><ModifyIcon /></button>
                     </td>
                   </tr>
@@ -424,7 +430,7 @@ export function DataInspectionPage(): React.JSX.Element {
                       <td>{row.last_update || "N/A"}</td>
                       <td className="inspection-actions-cell">
                         <button type="button" className="inspection-icon-button is-primary" onClick={() => { setAliasLoading(true); setAliasError(null); setAliasData(null); void fetchInspectionRxNavAliases(row.drug_id).then((payload) => setAliasData(payload)).catch((error) => setAliasError(error instanceof Error ? error.message : "Failed to load aliases.")).finally(() => setAliasLoading(false)); }} aria-label={`View aliases for ${row.drug_name}`} title={`View aliases for ${row.drug_name}`}><ViewIcon /></button>
-                        <button type="button" className="inspection-icon-button is-danger" onClick={() => { if (!globalThis.confirm("Delete this drug and unlink historical references?")) return; void deleteInspectionRxNavDrug(row.drug_id).then(() => { if (rxnavItems.length === 1 && rxnavOffset > 0) setRxnavOffset(Math.max(0, rxnavOffset - PAGE_LIMIT)); else void loadRxnav(); }).catch((error) => setRxnavError(error instanceof Error ? error.message : "Failed to delete RxNav entry.")); }} aria-label={`Delete ${row.drug_name}`} title={`Delete ${row.drug_name}`}><DeleteIcon /></button>
+                        <button type="button" className="inspection-icon-button is-danger" onClick={() => { if (!globalThis.confirm("Delete this drug and unlink historical references?")) return; void deleteInspectionRxNavDrug(row.drug_id).then(() => { if (rxnavItems.length === 1 && rxnavOffset > 0) { setRxnavOffset(Math.max(0, rxnavOffset - PAGE_LIMIT)); } else { void loadRxnav(); } }).catch((error) => setRxnavError(error instanceof Error ? error.message : "Failed to delete RxNav entry.")); }} aria-label={`Delete ${row.drug_name}`} title={`Delete ${row.drug_name}`}><DeleteIcon /></button>
                         <button type="button" className="inspection-icon-button" disabled aria-label="Modify RxNav entry (not implemented)" title="Modify RxNav entry (not implemented)"><ModifyIcon /></button>
                       </td>
                     </tr>
@@ -489,7 +495,7 @@ export function DataInspectionPage(): React.JSX.Element {
                         >
                           <ViewIcon />
                         </button>
-                        <button type="button" className="inspection-icon-button is-danger" onClick={() => { if (!globalThis.confirm("Delete this LiverTox entry and unlink historical references?")) return; void deleteInspectionLiverToxDrug(row.drug_id).then(() => { if (livertoxItems.length === 1 && livertoxOffset > 0) setLivertoxOffset(Math.max(0, livertoxOffset - PAGE_LIMIT)); else void loadLivertox(); }).catch((error) => setLivertoxError(error instanceof Error ? error.message : "Failed to delete LiverTox entry.")); }} aria-label={`Delete ${row.drug_name}`} title={`Delete ${row.drug_name}`}><DeleteIcon /></button>
+                        <button type="button" className="inspection-icon-button is-danger" onClick={() => { if (!globalThis.confirm("Delete this LiverTox entry and unlink historical references?")) return; void deleteInspectionLiverToxDrug(row.drug_id).then(() => { if (livertoxItems.length === 1 && livertoxOffset > 0) { setLivertoxOffset(Math.max(0, livertoxOffset - PAGE_LIMIT)); } else { void loadLivertox(); } }).catch((error) => setLivertoxError(error instanceof Error ? error.message : "Failed to delete LiverTox entry.")); }} aria-label={`Delete ${row.drug_name}`} title={`Delete ${row.drug_name}`}><DeleteIcon /></button>
                         <button type="button" className="inspection-icon-button" disabled aria-label="Modify LiverTox entry (not implemented)" title="Modify LiverTox entry (not implemented)"><ModifyIcon /></button>
                       </td>
                     </tr>
@@ -506,8 +512,8 @@ export function DataInspectionPage(): React.JSX.Element {
       </section>
 
       {(aliasData || aliasLoading || aliasError) && (
-        <div className="modal-overlay" onClick={closeAliasModal}>
-          <dialog className="modal-container inspection-modal" open onClick={(event) => event.stopPropagation()} aria-modal="true" aria-label="RxNav aliases modal">
+        <div className="modal-overlay">
+          <dialog className="modal-container inspection-modal" open aria-modal="true" aria-label="RxNav aliases modal">
             <div className="modal-header">
               <div className="modal-header-content"><h2 className="modal-title">RxNav Aliases</h2><p className="modal-subtitle">{aliasData?.drug_name || "Loading aliases..."}</p></div>
               <button type="button" className="modal-close" onClick={closeAliasModal} aria-label="Close aliases modal">X</button>
@@ -515,7 +521,7 @@ export function DataInspectionPage(): React.JSX.Element {
             <div className="modal-body">
               {aliasLoading && <p className="inspection-loading-note">Loading aliases...</p>}
               {!aliasLoading && aliasError && <p className="inspection-error-text">{aliasError}</p>}
-              {!aliasLoading && !aliasError && aliasData && aliasData.groups.map((group) => (
+              {!aliasLoading && !aliasError && aliasData?.groups.map((group) => (
                 <section key={group.source} className="inspection-alias-group">
                   <h3>{group.source}</h3>
                   <ul>{group.aliases.map((entry) => <li key={`${group.source}-${entry.alias}-${entry.alias_kind}`}><span className="inspection-alias-label">{entry.alias}</span><span className="inspection-alias-kind">{entry.alias_kind}</span></li>)}</ul>
@@ -527,8 +533,8 @@ export function DataInspectionPage(): React.JSX.Element {
       )}
 
       {(excerptData || excerptLoading || excerptError) && (
-        <div className="modal-overlay" onClick={closeExcerptModal}>
-          <dialog className="modal-container inspection-modal inspection-modal-large" open onClick={(event) => event.stopPropagation()} aria-modal="true" aria-label="LiverTox excerpt modal">
+        <div className="modal-overlay">
+          <dialog className="modal-container inspection-modal inspection-modal-large" open aria-modal="true" aria-label="LiverTox excerpt modal">
             <div className="modal-header">
               <div className="modal-header-content"><h2 className="modal-title">LiverTox Excerpt</h2><p className="modal-subtitle">{excerptData?.drug_name || (excerptError ? "Excerpt unavailable" : "Loading excerpt...")}</p></div>
               <button type="button" className="modal-close" onClick={closeExcerptModal} aria-label="Close excerpt modal">X</button>
