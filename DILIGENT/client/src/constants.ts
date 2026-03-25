@@ -35,6 +35,10 @@ export const CLINICAL_MODEL_CHOICES = [
 
 export const CLOUD_MODEL_CHOICES: Record<CloudProvider, string[]> = {
   openai: [
+    "gpt-5.4",
+    "gpt-5.4-pro",
+    "gpt-5.4-mini",
+    "gpt-5.4-nano",
     "gpt-5.2",
     "gpt-5.2-pro",
     "gpt-5",
