@@ -90,9 +90,9 @@ The drug report MUST follow the structure below. Keep every heading even if no d
 **Drug name - LiverTox score X**
 
 **Report**
-The generated report about Drug-Induced Liver Injury (DILI) 
+Provide a concise, evidence-based DILI assessment based only on the supplied context.
 
-**Bibliography source**: Cite LiverTox or other referenced documents as the bibliography source
+**Bibliography source**: LiverTox
 
 """
 

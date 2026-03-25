@@ -77,6 +77,15 @@ function statusLabel(value: InspectionSessionStatus): string {
   return value === "failed" ? "Failed" : "Successful";
 }
 
+function resolveExcerptFallbackMessage(error: unknown): string {
+  const description =
+    error instanceof Error ? error.message.toLowerCase() : "";
+  if (description.includes("status 404") || description.includes("not found")) {
+    return "No LiverTox excerpt is available for this drug.";
+  }
+  return "Unable to load this LiverTox excerpt right now.";
+}
+
 function ViewIcon(): React.JSX.Element {
   return (
     <svg className="inspection-icon" viewBox="0 0 24 24" aria-hidden="true">
@@ -463,7 +472,23 @@ export function DataInspectionPage(): React.JSX.Element {
                       <td>{row.drug_name}</td>
                       <td>{row.last_update || "N/A"}</td>
                       <td className="inspection-actions-cell">
-                        <button type="button" className="inspection-icon-button is-primary" onClick={() => { setExcerptLoading(true); setExcerptError(null); setExcerptData(null); void fetchInspectionLiverToxExcerpt(row.drug_id).then((payload) => setExcerptData(payload)).catch((error) => setExcerptError(error instanceof Error ? error.message : "Failed to load excerpt.")).finally(() => setExcerptLoading(false)); }} aria-label={`View excerpt for ${row.drug_name}`} title={`View excerpt for ${row.drug_name}`}><ViewIcon /></button>
+                        <button
+                          type="button"
+                          className="inspection-icon-button is-primary"
+                          onClick={() => {
+                            setExcerptLoading(true);
+                            setExcerptError(null);
+                            setExcerptData(null);
+                            void fetchInspectionLiverToxExcerpt(row.drug_id)
+                              .then((payload) => setExcerptData(payload))
+                              .catch((error) => setExcerptError(resolveExcerptFallbackMessage(error)))
+                              .finally(() => setExcerptLoading(false));
+                          }}
+                          aria-label={`View excerpt for ${row.drug_name}`}
+                          title={`View excerpt for ${row.drug_name}`}
+                        >
+                          <ViewIcon />
+                        </button>
                         <button type="button" className="inspection-icon-button is-danger" onClick={() => { if (!globalThis.confirm("Delete this LiverTox entry and unlink historical references?")) return; void deleteInspectionLiverToxDrug(row.drug_id).then(() => { if (livertoxItems.length === 1 && livertoxOffset > 0) setLivertoxOffset(Math.max(0, livertoxOffset - PAGE_LIMIT)); else void loadLivertox(); }).catch((error) => setLivertoxError(error instanceof Error ? error.message : "Failed to delete LiverTox entry.")); }} aria-label={`Delete ${row.drug_name}`} title={`Delete ${row.drug_name}`}><DeleteIcon /></button>
                         <button type="button" className="inspection-icon-button" disabled aria-label="Modify LiverTox entry (not implemented)" title="Modify LiverTox entry (not implemented)"><ModifyIcon /></button>
                       </td>
@@ -505,12 +530,12 @@ export function DataInspectionPage(): React.JSX.Element {
         <div className="modal-overlay" onClick={closeExcerptModal}>
           <dialog className="modal-container inspection-modal inspection-modal-large" open onClick={(event) => event.stopPropagation()} aria-modal="true" aria-label="LiverTox excerpt modal">
             <div className="modal-header">
-              <div className="modal-header-content"><h2 className="modal-title">LiverTox Excerpt</h2><p className="modal-subtitle">{excerptData?.drug_name || "Loading excerpt..."}</p></div>
+              <div className="modal-header-content"><h2 className="modal-title">LiverTox Excerpt</h2><p className="modal-subtitle">{excerptData?.drug_name || (excerptError ? "Excerpt unavailable" : "Loading excerpt...")}</p></div>
               <button type="button" className="modal-close" onClick={closeExcerptModal} aria-label="Close excerpt modal">X</button>
             </div>
             <div className="modal-body inspection-excerpt-body">
               {excerptLoading && <p className="inspection-loading-note">Loading excerpt...</p>}
-              {!excerptLoading && excerptError && <p className="inspection-error-text">{excerptError}</p>}
+              {!excerptLoading && excerptError && <p className="inspection-empty-note">{excerptError}</p>}
               {!excerptLoading && !excerptError && excerptData && <pre className="inspection-excerpt-text">{excerptData.excerpt}</pre>}
             </div>
           </dialog>

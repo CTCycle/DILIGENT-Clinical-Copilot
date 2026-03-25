@@ -40,6 +40,7 @@ from DILIGENT.server.services.clinical.hepatox import (
 from DILIGENT.server.services.clinical.preparation import ClinicalKnowledgePreparation
 from DILIGENT.server.services.clinical.disease import DiseaseExtractor
 from DILIGENT.server.services.clinical.parser import DrugsParser
+from DILIGENT.server.services.payload import PayloadSanitizationService
 from DILIGENT.server.services.retrieval.query import DILIQueryBuilder
 from DILIGENT.server.services.text.normalization import normalize_drug_query_name
 
@@ -49,6 +50,7 @@ pattern_analyzer = HepatotoxicityPatternAnalyzer()
 input_preparator = ClinicalKnowledgePreparation()
 router = APIRouter(tags=["session"])
 serializer = DataSerializer()
+payload_sanitization_service = PayloadSanitizationService()
 NOT_AVAILABLE = "Not available"
 CLINICAL_PROGRESS_MESSAGES: dict[str, str] = {
     "session_initialization": "Initializing clinical session",
@@ -385,12 +387,14 @@ class ClinicalSessionEndpoint:
         disease_extractor: DiseaseExtractor,
         pattern_analyzer: HepatotoxicityPatternAnalyzer,
         serializer: DataSerializer,
+        payload_sanitizer: PayloadSanitizationService,
     ) -> None:
         self.router = router
         self.drugs_parser = drugs_parser
         self.disease_extractor = disease_extractor
         self.pattern_analyzer = pattern_analyzer
-        self.serializer = serializer        
+        self.serializer = serializer
+        self.payload_sanitizer = payload_sanitizer
 
     # -------------------------------------------------------------------------
     @staticmethod
@@ -579,19 +583,23 @@ class ClinicalSessionEndpoint:
         request_payload: ClinicalSessionRequest,
     ) -> PatientData:
         try:
-            payload_data: dict[str, Any] = {
-                "name": request_payload.name,
-                "visit_date": request_payload.visit_date,
-                "anamnesis": request_payload.anamnesis,
-                "has_hepatic_diseases": request_payload.has_hepatic_diseases,
-                "use_rag": request_payload.use_rag,
-                "use_web_search": request_payload.use_web_search,
-                "drugs": request_payload.drugs,
-                "alt": request_payload.alt,
-                "alt_max": request_payload.alt_max,
-                "alp": request_payload.alp,
-                "alp_max": request_payload.alp_max,
-            }
+            payload_data = self.payload_sanitizer.sanitize_dili_payload(
+                patient_name=request_payload.name,
+                visit_date=request_payload.visit_date,
+                anamnesis=request_payload.anamnesis,
+                drugs=request_payload.drugs,
+                alt=request_payload.alt,
+                alt_max=request_payload.alt_max,
+                alp=request_payload.alp,
+                alp_max=request_payload.alp_max,
+                use_rag=request_payload.use_rag,
+                use_web_search=request_payload.use_web_search,
+            )
+            payload_data.update(
+                {
+                    "has_hepatic_diseases": request_payload.has_hepatic_diseases,
+                }
+            )
             return PatientData.model_validate(payload_data)
         except ValidationError as exc:
             raise HTTPException(
@@ -1102,6 +1110,7 @@ endpoint = ClinicalSessionEndpoint(
     disease_extractor=disease_extractor,
     pattern_analyzer=pattern_analyzer,
     serializer=serializer,
+    payload_sanitizer=payload_sanitization_service,
 )
 endpoint.add_routes()
 
