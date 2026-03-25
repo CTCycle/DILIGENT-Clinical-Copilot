@@ -6,7 +6,7 @@ DILIGENT uses a centralized thread-based job system for long-running API tasks (
 
 - Manager location: `DILIGENT/server/services/jobs.py`
 - Shared singleton: `job_manager`
-- Response models: `DILIGENT/server/entities/jobs.py`
+- Response models: `DILIGENT/server/domain/jobs.py`
 
 ## Job Model
 
