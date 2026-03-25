@@ -1,8 +1,17 @@
 from __future__ import annotations
 
+import html
+import re
+import unicodedata
 from typing import Any
 from datetime import datetime, date
-from fastapi import HTTPException, status
+
+
+HTML_TAG_RE = re.compile(r"<[^>]+>")
+MULTISPACE_RE = re.compile(r"[ \t]+")
+DRUG_BULLET_PREFIX_RE = re.compile(r"^[\-\u2022\u2023\u2043\*\u25A0\u25AA\u25CF\u25E6\u2219\u00B7]+\s*")
+DRUG_ALLOWED_SYMBOLS_RE = re.compile(r"[^\w\s.,;:/()\-+%[\]'\"<>=]")
+ANAMNESIS_ALLOWED_SYMBOLS_RE = re.compile(r"[^\w\s.,;:/()\-+%[\]'\"<>=]")
 
 
 # HELPERS
@@ -12,6 +21,57 @@ def sanitize_field(value: str | None) -> str | None:
         return None
     stripped = value.strip()
     return stripped or None
+
+
+# -----------------------------------------------------------------------------
+def strip_html(value: str) -> str:
+    unescaped = html.unescape(value)
+    return HTML_TAG_RE.sub(" ", unescaped)
+
+
+# -----------------------------------------------------------------------------
+def sanitize_drug_line(value: str) -> str:
+    stripped_html = strip_html(value)
+    without_bullet = DRUG_BULLET_PREFIX_RE.sub("", stripped_html)
+    without_marks = without_bullet.replace("!", " ").replace("?", " ")
+    without_symbols = DRUG_ALLOWED_SYMBOLS_RE.sub(" ", without_marks)
+    compact = MULTISPACE_RE.sub(" ", without_symbols).strip(" \t,;:-")
+    return compact
+
+
+# -----------------------------------------------------------------------------
+def sanitize_drugs_text(value: str | None) -> str | None:
+    if value is None:
+        return None
+    normalized = unicodedata.normalize("NFKC", value)
+    normalized = normalized.replace("\r\n", "\n").replace("\r", "\n")
+    lines: list[str] = []
+    for raw_line in normalized.split("\n"):
+        cleaned = sanitize_drug_line(raw_line)
+        if cleaned:
+            lines.append(cleaned)
+    if not lines:
+        return None
+    return "\n".join(lines)
+
+
+# -----------------------------------------------------------------------------
+def sanitize_anamnesis_text(value: str | None) -> str | None:
+    if value is None:
+        return None
+    normalized = unicodedata.normalize("NFKC", value)
+    normalized = normalized.replace("\r\n", "\n").replace("\r", "\n")
+    stripped_html = strip_html(normalized)
+    without_marks = stripped_html.replace("!", " ").replace("?", " ")
+    without_symbols = ANAMNESIS_ALLOWED_SYMBOLS_RE.sub(" ", without_marks)
+    cleaned_lines: list[str] = []
+    for raw_line in without_symbols.split("\n"):
+        compact = MULTISPACE_RE.sub(" ", raw_line).strip()
+        if compact:
+            cleaned_lines.append(compact)
+    if not cleaned_lines:
+        return None
+    return "\n".join(cleaned_lines)
 
 # -----------------------------------------------------------------------------
 def normalize_visit_date(
@@ -81,12 +141,6 @@ def sanitize_dili_payload(
     use_rag: bool,
     use_web_search: bool = False,
 ) -> dict[str, Any]:
-    if anamnesis is None or drugs is None:
-        raise HTTPException(
-            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
-            detail="Both anamnesis and drugs fields are required.",
-        )
-
     normalized_visit_date = normalize_visit_date(visit_date)
 
     return {
@@ -100,8 +154,8 @@ def sanitize_dili_payload(
             if normalized_visit_date
             else None
         ),
-        "anamnesis": sanitize_field(anamnesis),
-        "drugs": sanitize_field(drugs),
+        "anamnesis": sanitize_anamnesis_text(anamnesis),
+        "drugs": sanitize_drugs_text(drugs),
         "alt": sanitize_field(alt),
         "alt_max": sanitize_field(alt_max),
         "alp": sanitize_field(alp),
@@ -109,3 +163,34 @@ def sanitize_dili_payload(
         "use_rag": bool(use_rag),
         "use_web_search": bool(use_web_search),
     }
+
+
+##############################################################################
+class PayloadSanitizationService:
+    # -------------------------------------------------------------------------
+    @staticmethod
+    def sanitize_dili_payload(
+        *,
+        patient_name: str | None,
+        visit_date: datetime | date | dict[str, Any] | str | None,
+        anamnesis: str | None,
+        drugs: str | None,
+        alt: str | None,
+        alt_max: str | None,
+        alp: str | None,
+        alp_max: str | None,
+        use_rag: bool,
+        use_web_search: bool = False,
+    ) -> dict[str, Any]:
+        return sanitize_dili_payload(
+            patient_name=patient_name,
+            visit_date=visit_date,
+            anamnesis=anamnesis,
+            drugs=drugs,
+            alt=alt,
+            alt_max=alt_max,
+            alp=alp,
+            alp_max=alp_max,
+            use_rag=use_rag,
+            use_web_search=use_web_search,
+        )

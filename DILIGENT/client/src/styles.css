@@ -80,8 +80,8 @@
   color-scheme: dark;
   --color-brand: #22c55e;
   --color-brand-light: #4ade80;
-  --color-brand-ui: #15803d;
-  --color-brand-ui-light: #16a34a;
+  --color-brand-ui: #0e6c47;
+  --color-brand-ui-light: #14945f;
   --color-brand-bg: rgba(34, 197, 94, 0.14);
   --color-text-primary: #e2e8f0;
   --color-text-secondary: #cbd5e1;
@@ -1080,9 +1080,9 @@ html,
 }
 
 .report-shell {
-  border: 1px solid #dbe7db;
+  border: 1px solid var(--color-border-subtle);
   border-radius: var(--radius-xl);
-  background: linear-gradient(180deg, #ffffff 0%, #f7fbf6 100%);
+  background: linear-gradient(180deg, var(--color-surface) 0%, var(--color-surface-alt) 100%);
   box-shadow: var(--shadow-lg);
   overflow: hidden;
 }
@@ -1145,7 +1145,7 @@ html,
 }
 
 .toolbar-btn:hover:not(:disabled) {
-  background: rgba(0, 0, 0, 0.05);
+  background: var(--color-brand-bg);
   color: var(--color-text-primary);
 }
 
@@ -1214,7 +1214,7 @@ html,
 }
 
 .markdown code {
-  background: rgba(0, 0, 0, 0.06);
+  background: rgba(15, 23, 42, 0.08);
   padding: 2px 6px;
   border-radius: 4px;
   font-size: 0.9em;
@@ -1586,7 +1586,7 @@ input[type="date"]::-webkit-calendar-picker-indicator:hover {
 }
 
 .app-header {
-  padding: var(--space-sm) var(--space-xl);
+  padding: 6px var(--space-lg);
   border-bottom: 1px solid rgba(148, 163, 184, 0.34);
   background: rgba(255, 255, 255, 0.88);
   backdrop-filter: blur(8px);
@@ -1602,7 +1602,7 @@ input[type="date"]::-webkit-calendar-picker-indicator:hover {
 
 .app-header-logo {
   display: inline-flex;
-  width: 120px;
+  width: 108px;
   max-width: 100%;
 }
 
@@ -1642,7 +1642,7 @@ input[type="date"]::-webkit-calendar-picker-indicator:hover {
   display: flex;
   align-items: stretch;
   justify-content: flex-start;
-  padding: 0 var(--space-md);
+  padding: 0 var(--space-sm);
   background: linear-gradient(120deg, var(--color-brand-ui), var(--color-brand-ui-light));
   border-bottom: 1px solid rgba(15, 23, 42, 0.2);
   box-shadow: var(--shadow-sm);
@@ -1660,7 +1660,7 @@ input[type="date"]::-webkit-calendar-picker-indicator:hover {
   justify-content: center;
   gap: var(--space-sm);
   flex: 1 1 0;
-  min-height: 50px;
+  min-height: 42px;
   border: none;
   border-bottom: 3px solid transparent;
   background: transparent;
@@ -1685,8 +1685,8 @@ input[type="date"]::-webkit-calendar-picker-indicator:hover {
 }
 
 .tab-icon {
-  width: 16px;
-  height: 16px;
+  width: 14px;
+  height: 14px;
   display: inline-flex;
 }
 
@@ -1726,7 +1726,7 @@ input[type="date"]::-webkit-calendar-picker-indicator:hover {
   }
 
   .app-header {
-    padding: var(--space-xs) var(--space-md);
+    padding: 4px var(--space-md);
   }
 
   .app-header-logo {
@@ -1749,7 +1749,7 @@ input[type="date"]::-webkit-calendar-picker-indicator:hover {
 
   .tab-item {
     flex-basis: 50%;
-    min-height: 48px;
+    min-height: 42px;
   }
 
   .tab-label {
@@ -2752,6 +2752,12 @@ input[type="date"]::-webkit-calendar-picker-indicator:hover {
   color: #b91c1c;
 }
 
+.inspection-empty-note {
+  margin: var(--space-sm) 0;
+  font-size: var(--font-sm);
+  color: var(--color-text-secondary);
+}
+
 .inspection-pager {
   display: flex;
   justify-content: space-between;
@@ -2906,26 +2912,26 @@ input[type="date"]::-webkit-calendar-picker-indicator:hover {
    Dark Mode Overrides
    ============================================ */
 :root[data-theme="dark"] .app-header {
-  background: rgba(11, 18, 32, 0.88);
+  background: rgba(6, 14, 30, 0.94);
   border-bottom-color: rgba(71, 85, 105, 0.58);
 }
 
 :root[data-theme="dark"] .tab-bar {
-  background: linear-gradient(120deg, #14532d, #166534);
+  background: linear-gradient(120deg, #0e3f2f, #0f5a41);
   border-bottom-color: rgba(15, 23, 42, 0.62);
 }
 
 :root[data-theme="dark"] .tab-item {
-  color: rgba(226, 232, 240, 0.8);
+  color: rgba(226, 232, 240, 0.92);
 }
 
 :root[data-theme="dark"] .tab-item:hover {
-  background: rgba(15, 23, 42, 0.28);
+  background: rgba(2, 6, 23, 0.34);
 }
 
 :root[data-theme="dark"] .tab-item.active {
-  background: rgba(15, 23, 42, 0.4);
-  border-bottom-color: rgba(226, 232, 240, 0.88);
+  background: rgba(2, 6, 23, 0.5);
+  border-bottom-color: rgba(241, 245, 249, 0.96);
 }
 
 :root[data-theme="dark"] .card,
@@ -2939,9 +2945,19 @@ input[type="date"]::-webkit-calendar-picker-indicator:hover {
 :root[data-theme="dark"] .model-config-model-item,
 :root[data-theme="dark"] .model-config-selected-card,
 :root[data-theme="dark"] .model-config-provider-card,
-:root[data-theme="dark"] .model-config-provider-menu {
+:root[data-theme="dark"] .model-config-provider-menu,
+:root[data-theme="dark"] .report-shell {
   background: rgba(15, 23, 42, 0.72);
   border-color: rgba(71, 85, 105, 0.58);
+}
+
+:root[data-theme="dark"] .report-toolbar,
+:root[data-theme="dark"] .report-content {
+  background: rgba(15, 23, 42, 0.86);
+}
+
+:root[data-theme="dark"] .toolbar-btn:hover:not(:disabled) {
+  background: rgba(34, 197, 94, 0.2);
 }
 
 :root[data-theme="dark"] .field input[type="text"],
@@ -2957,6 +2973,33 @@ input[type="date"]::-webkit-calendar-picker-indicator:hover {
   background: rgba(15, 23, 42, 0.9);
   border-color: rgba(71, 85, 105, 0.72);
   color: var(--color-text-primary);
+}
+
+:root[data-theme="dark"] .model-config-runtime-option,
+:root[data-theme="dark"] .model-config-filter-pill,
+:root[data-theme="dark"] .model-config-summary-table,
+:root[data-theme="dark"] .model-config-empty-note,
+:root[data-theme="dark"] .model-config-status-message {
+  background: rgba(15, 23, 42, 0.86);
+  border-color: rgba(71, 85, 105, 0.72);
+  color: var(--color-text-secondary);
+}
+
+:root[data-theme="dark"] .model-config-runtime-option.is-active,
+:root[data-theme="dark"] .model-config-filter-pill.is-active {
+  background: rgba(21, 128, 61, 0.32);
+  border-color: rgba(74, 222, 128, 0.68);
+  color: #dcfce7;
+}
+
+:root[data-theme="dark"] .model-config-summary-ok,
+:root[data-theme="dark"] .access-key-action.is-active {
+  color: #bbf7d0;
+}
+
+:root[data-theme="dark"] .inspection-toggle-pill.is-active {
+  background: rgba(21, 128, 61, 0.34);
+  color: #dcfce7;
 }
 
 :root[data-theme="dark"] .btn-secondary,
@@ -2987,5 +3030,24 @@ input[type="date"]::-webkit-calendar-picker-indicator:hover {
 
 :root[data-theme="dark"] .inspection-table td {
   border-bottom-color: rgba(71, 85, 105, 0.45);
+}
+
+:root[data-theme="dark"] .inspection-status-chip.is-successful {
+  color: #bbf7d0;
+  background: rgba(21, 128, 61, 0.35);
+}
+
+:root[data-theme="dark"] .inspection-status-chip.is-failed,
+:root[data-theme="dark"] .inspection-error-text {
+  color: #fca5a5;
+  background: transparent;
+}
+
+:root[data-theme="dark"] .inspection-empty-note {
+  color: var(--color-text-secondary);
+}
+
+:root[data-theme="dark"] .markdown code {
+  background: rgba(148, 163, 184, 0.22);
 }
 
