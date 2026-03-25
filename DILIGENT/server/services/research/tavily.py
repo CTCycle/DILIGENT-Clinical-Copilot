@@ -16,7 +16,7 @@ from DILIGENT.server.configurations import server_settings
 from DILIGENT.server.domain.research import ResearchCitation, ResearchSource
 from DILIGENT.server.models.providers import initialize_llm_client
 from DILIGENT.server.repositories.serialization.access_keys import AccessKeySerializer
-from DILIGENT.server.services.keys.cryptography import decrypt as decrypt_access_key
+from DILIGENT.server.services.cryptography import decrypt as decrypt_access_key
 
 
 TAVILY_SEARCH_URL = "https://api.tavily.com/search"

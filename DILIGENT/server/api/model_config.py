@@ -14,7 +14,7 @@ from DILIGENT.server.domain.model_configs import (
     ModelConfigUpdateRequest,
 )
 from DILIGENT.server.models.providers import OllamaClient, OllamaError, OllamaTimeout
-from DILIGENT.server.repositories.serialization.model_config import (
+from DILIGENT.server.repositories.serialization.model_configs import (
     ModelConfigSerializer,
     ModelConfigSnapshot,
 )

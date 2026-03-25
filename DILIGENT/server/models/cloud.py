@@ -10,7 +10,7 @@ from DILIGENT.server.common.utils.logger import logger
 from DILIGENT.server.configurations import server_settings
 from DILIGENT.server.models.structured import StructuredOutputParser, parse_json_dict, T
 from DILIGENT.server.repositories.serialization.access_keys import AccessKeySerializer
-from DILIGENT.server.services.keys.cryptography import (
+from DILIGENT.server.services.cryptography import (
     decrypt as decrypt_access_key,
 )
 
