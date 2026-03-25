@@ -9,7 +9,7 @@ from sqlalchemy.orm import sessionmaker
 from DILIGENT.server.repositories.queries.access_keys import AccessKeyRepositoryQueries
 from DILIGENT.server.repositories.queries.data import DataRepositoryQueries
 from DILIGENT.server.repositories.schemas.models import AccessKey, ResearchAccessKey
-from DILIGENT.server.services.keys.cryptography import (
+from DILIGENT.server.services.cryptography import (
     encrypt as encrypt_access_key,
     fingerprint as build_fingerprint,
 )
