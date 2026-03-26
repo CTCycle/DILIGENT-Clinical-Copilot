@@ -3277,3 +3277,506 @@ input[type="date"]::-webkit-calendar-picker-indicator:hover {
   background: rgba(148, 163, 184, 0.22);
 }
 
+/* ============================================
+   DILI Agent Refresh (First Page)
+   ============================================ */
+.dili-workspace {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-lg);
+}
+
+.dili-sticky-header {
+  position: sticky;
+  top: var(--space-sm);
+  z-index: 30;
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: var(--space-lg);
+  padding: var(--space-md) var(--space-lg);
+  border: 1px solid rgba(148, 163, 184, 0.35);
+  border-radius: var(--radius-xl);
+  background: rgba(255, 255, 255, 0.92);
+  backdrop-filter: blur(10px);
+  box-shadow: var(--shadow-sm);
+}
+
+.dili-sticky-header-main h1 {
+  margin: 0;
+  font-size: clamp(24px, 2.2vw, 32px);
+  line-height: 1.08;
+}
+
+.dili-sticky-header-main p {
+  margin: 6px 0 0;
+  color: var(--color-text-secondary);
+  font-size: var(--font-sm);
+}
+
+.dili-sticky-header-meta {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  gap: var(--space-sm);
+}
+
+.dili-header-chip {
+  display: inline-flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 140px;
+  padding: 6px 10px;
+  border: 1px solid rgba(148, 163, 184, 0.34);
+  border-radius: var(--radius-md);
+  background: rgba(248, 250, 252, 0.92);
+}
+
+.dili-header-chip-label {
+  font-size: var(--font-xs);
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: var(--color-text-muted);
+}
+
+.dili-header-chip strong {
+  color: var(--color-text-primary);
+  font-size: var(--font-sm);
+}
+
+.dili-layout {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: var(--space-lg);
+  align-items: start;
+}
+
+@media (min-width: 1200px) {
+  .dili-layout {
+    grid-template-columns: minmax(320px, 40%) minmax(0, 60%);
+  }
+}
+
+.dili-input-panel {
+  gap: var(--space-md);
+}
+
+.dili-panel-header h2 {
+  margin: 0;
+  font-size: var(--font-xl);
+}
+
+.dili-panel-header p {
+  margin: 4px 0 0;
+  color: var(--color-text-secondary);
+  font-size: var(--font-sm);
+}
+
+.dili-input-group {
+  border: 1px solid rgba(148, 163, 184, 0.28);
+  border-radius: var(--radius-lg);
+  background: rgba(248, 250, 252, 0.72);
+  padding: var(--space-md);
+}
+
+.dili-input-group h3 {
+  margin: 0 0 var(--space-sm);
+  font-size: var(--font-md);
+  line-height: 1.2;
+}
+
+.dili-inline-error {
+  color: #b91c1c;
+  font-size: var(--font-xs);
+  font-weight: 600;
+}
+
+.dili-drug-selector {
+  margin-top: var(--space-sm);
+}
+
+.dili-drug-selector-label {
+  margin: 0 0 6px;
+  font-size: var(--font-xs);
+  font-weight: 700;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+  color: var(--color-text-muted);
+}
+
+.dili-drug-selector-grid {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.dili-drug-item {
+  border: 1px solid rgba(148, 163, 184, 0.45);
+  border-radius: 999px;
+  background: #fff;
+  color: var(--color-text-secondary);
+  padding: 6px 10px;
+  font-size: var(--font-sm);
+  cursor: pointer;
+}
+
+.dili-drug-item:hover {
+  border-color: rgba(34, 197, 94, 0.7);
+  color: var(--color-text-primary);
+}
+
+.dili-drug-item.is-selected {
+  background: linear-gradient(120deg, rgba(34, 197, 94, 0.22), rgba(16, 185, 129, 0.16));
+  border-color: rgba(22, 163, 74, 0.75);
+  color: #14532d;
+  font-weight: 700;
+}
+
+.dili-lab-grid {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: var(--space-sm);
+}
+
+@media (min-width: 720px) {
+  .dili-lab-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+
+.dili-lab-card {
+  border: 1px solid rgba(148, 163, 184, 0.35);
+  border-radius: var(--radius-md);
+  background: rgba(255, 255, 255, 0.8);
+  padding: var(--space-sm);
+}
+
+.dili-lab-card.is-abnormal {
+  border-color: rgba(185, 28, 28, 0.5);
+  box-shadow: inset 0 0 0 1px rgba(239, 68, 68, 0.2);
+}
+
+.dili-lab-ratio {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-sm);
+  margin: 0;
+  color: var(--color-text-secondary);
+  font-size: var(--font-xs);
+}
+
+.dili-toggle-stack {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-sm);
+}
+
+.dili-actions {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.dili-action-helper {
+  margin: 0;
+  color: var(--color-text-muted);
+  font-size: var(--font-xs);
+}
+
+.dili-report-panel {
+  min-width: 0;
+}
+
+.dili-report-shell {
+  border: 1px solid rgba(148, 163, 184, 0.35);
+  border-radius: var(--radius-xl);
+  background: linear-gradient(180deg, rgba(255, 255, 255, 0.95), rgba(248, 250, 252, 0.95));
+  box-shadow: var(--shadow-lg);
+  overflow: hidden;
+}
+
+.dili-report-header {
+  padding: var(--space-lg) var(--space-lg) var(--space-sm);
+  border-bottom: 1px solid var(--color-divider);
+}
+
+.dili-report-header h2 {
+  margin: 0;
+  font-size: var(--font-xl);
+}
+
+.dili-report-header .report-subtitle {
+  margin-top: 6px;
+}
+
+.dili-report-toolbar {
+  position: sticky;
+  top: 0;
+  z-index: 8;
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-xs);
+  padding: var(--space-sm) var(--space-lg);
+  border-bottom: 1px solid var(--color-divider);
+  background: rgba(248, 250, 252, 0.98);
+}
+
+.dili-toolbar-main {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.dili-toolbar-btn {
+  border: 1px solid rgba(148, 163, 184, 0.35);
+  border-radius: var(--radius-sm);
+  background: #fff;
+  color: var(--color-text-secondary);
+  min-height: 34px;
+  padding: 6px 10px;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-size: var(--font-sm);
+  cursor: pointer;
+}
+
+.dili-toolbar-btn svg {
+  width: 14px;
+  height: 14px;
+}
+
+.dili-toolbar-btn:hover {
+  border-color: rgba(34, 197, 94, 0.74);
+  color: var(--color-text-primary);
+}
+
+.dili-anchor-nav {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.dili-anchor-link {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  border: 1px solid rgba(148, 163, 184, 0.3);
+  border-radius: 999px;
+  padding: 4px 8px;
+  color: var(--color-text-secondary);
+  background: rgba(255, 255, 255, 0.85);
+  text-decoration: none;
+  font-size: var(--font-xs);
+  font-weight: 600;
+}
+
+.dili-anchor-link svg {
+  width: 12px;
+  height: 12px;
+}
+
+.dili-anchor-link:hover {
+  color: #166534;
+  border-color: rgba(34, 197, 94, 0.62);
+}
+
+.dili-loading-state {
+  border-bottom: 1px solid var(--color-divider);
+}
+
+.dili-report-content {
+  padding: var(--space-md) var(--space-lg) var(--space-lg);
+  max-height: calc(100vh - 280px);
+  overflow: auto;
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-sm);
+}
+
+.dili-report-section {
+  border: 1px solid rgba(148, 163, 184, 0.3);
+  border-radius: var(--radius-md);
+  background: rgba(255, 255, 255, 0.9);
+  padding: var(--space-md);
+  scroll-margin-top: 88px;
+}
+
+.dili-section-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-sm);
+  margin-bottom: 6px;
+}
+
+.dili-section-header h3 {
+  margin: 0;
+  font-size: var(--font-lg);
+}
+
+.dili-section-toggle {
+  border: 1px solid rgba(148, 163, 184, 0.35);
+  border-radius: var(--radius-sm);
+  background: #fff;
+  color: var(--color-text-secondary);
+  min-height: 30px;
+  padding: 4px 8px;
+  font-size: var(--font-xs);
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.dili-section-toggle:hover {
+  border-color: rgba(34, 197, 94, 0.74);
+  color: var(--color-text-primary);
+}
+
+.dili-risk-badge {
+  display: inline-flex;
+  align-items: center;
+  border-radius: 999px;
+  border: 1px solid rgba(148, 163, 184, 0.4);
+  padding: 2px 8px;
+  font-size: var(--font-xs);
+  font-weight: 700;
+}
+
+.dili-risk-badge.high {
+  color: #991b1b;
+  background: rgba(254, 202, 202, 0.56);
+  border-color: rgba(248, 113, 113, 0.68);
+}
+
+.dili-risk-badge.possible {
+  color: #92400e;
+  background: rgba(254, 215, 170, 0.56);
+  border-color: rgba(251, 146, 60, 0.58);
+}
+
+.dili-risk-badge.unlikely {
+  color: #14532d;
+  background: rgba(187, 247, 208, 0.6);
+  border-color: rgba(74, 222, 128, 0.62);
+}
+
+.dili-inline-highlight {
+  border-radius: var(--radius-sm);
+  background: rgba(254, 202, 202, 0.45);
+  padding: 2px 6px;
+  font-weight: 700;
+}
+
+.dili-inline-explainer,
+.dili-reasoning {
+  margin-top: var(--space-sm);
+}
+
+.dili-inline-explainer summary,
+.dili-reasoning summary {
+  cursor: pointer;
+  font-weight: 600;
+  color: var(--color-text-secondary);
+}
+
+.dili-inline-explainer p,
+.dili-reasoning p {
+  margin: 6px 0 0;
+  color: var(--color-text-secondary);
+}
+
+.dili-ranking-list {
+  margin: var(--space-sm) 0 0;
+  padding-left: 20px;
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-xs);
+}
+
+.dili-ranking-list li p {
+  margin: 4px 0 0;
+  color: var(--color-text-secondary);
+  font-size: var(--font-sm);
+}
+
+.dili-ranking-name {
+  font-weight: 700;
+  margin-right: 6px;
+}
+
+.dili-ranking-score {
+  color: var(--color-text-muted);
+  margin-left: 6px;
+  font-size: var(--font-xs);
+}
+
+.dili-empty-note,
+.dili-empty-value {
+  color: var(--color-text-muted);
+  font-size: var(--font-sm);
+}
+
+@media (max-width: 1199px) {
+  .dili-sticky-header {
+    position: static;
+  }
+
+  .dili-report-content {
+    max-height: none;
+  }
+}
+
+@media (max-width: 880px) {
+  .dili-sticky-header {
+    flex-direction: column;
+    align-items: stretch;
+  }
+
+  .dili-sticky-header-meta {
+    justify-content: flex-start;
+  }
+
+  .dili-toolbar-main {
+    width: 100%;
+  }
+
+  .dili-toolbar-btn {
+    flex: 1 1 calc(50% - 6px);
+    justify-content: center;
+  }
+}
+
+:root[data-theme="dark"] .dili-sticky-header {
+  background: rgba(15, 23, 42, 0.92);
+  border-color: rgba(71, 85, 105, 0.62);
+}
+
+:root[data-theme="dark"] .dili-header-chip,
+:root[data-theme="dark"] .dili-input-group,
+:root[data-theme="dark"] .dili-lab-card,
+:root[data-theme="dark"] .dili-report-section {
+  background: rgba(15, 23, 42, 0.78);
+  border-color: rgba(71, 85, 105, 0.66);
+}
+
+:root[data-theme="dark"] .dili-drug-item,
+:root[data-theme="dark"] .dili-toolbar-btn,
+:root[data-theme="dark"] .dili-section-toggle,
+:root[data-theme="dark"] .dili-anchor-link {
+  background: rgba(15, 23, 42, 0.88);
+  border-color: rgba(71, 85, 105, 0.72);
+  color: var(--color-text-secondary);
+}
+
+:root[data-theme="dark"] .dili-report-shell {
+  background: rgba(15, 23, 42, 0.8);
+  border-color: rgba(71, 85, 105, 0.65);
+}
+
+:root[data-theme="dark"] .dili-report-toolbar {
+  background: rgba(15, 23, 42, 0.94);
+}
+

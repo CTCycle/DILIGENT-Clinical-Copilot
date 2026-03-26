@@ -15,7 +15,7 @@ def test_dilu_agent_page_loads(page: Page, base_url: str):
     expect(page.get_by_label("Anamnesis")).to_be_visible()
     expect(page.get_by_label("Current Drugs")).to_be_visible()
     expect(page.get_by_label("Patient Name")).to_be_visible()
-    expect(page.get_by_role("button", name="Run DILI analysis")).to_be_visible()
+    expect(page.get_by_role("button", name="Generate / Refresh Report")).to_be_visible()
 
 
 def test_model_config_navigation(page: Page, base_url: str):
