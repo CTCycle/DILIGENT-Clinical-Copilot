@@ -33,6 +33,22 @@ import {
 
 const PAGE_LIMIT = 10;
 const SEARCH_DEBOUNCE_MS = 250;
+type InspectionViewId = "sessions" | "rxnav" | "livertox";
+
+const INSPECTION_VIEW_CONFIG: Record<InspectionViewId, { label: string; description: string }> = {
+  sessions: {
+    label: "Sessions",
+    description: "Review recorded DILI sessions, patient metadata, runtime status, and generated reports.",
+  },
+  rxnav: {
+    label: "drug catalog",
+    description: "Inspect the canonical RxNav catalog, aliases, and update progress for indexed drugs.",
+  },
+  livertox: {
+    label: "LiverTox data",
+    description: "Browse LiverTox monograph excerpts and recency data used by the clinical copilot.",
+  },
+};
 
 function useDebouncedValue<T>(value: T, delayMs: number): T {
   const [debouncedValue, setDebouncedValue] = useState(value);
@@ -99,6 +115,30 @@ function ModifyIcon(): React.JSX.Element {
   );
 }
 
+function SessionsNavIcon(): React.JSX.Element {
+  return (
+    <svg className="inspection-nav-icon" viewBox="0 0 24 24" aria-hidden="true">
+      <path d="M4 5h16v3H4V5Zm0 5h16v3H4v-3Zm0 5h10v3H4v-3Z" />
+    </svg>
+  );
+}
+
+function RxNavNavIcon(): React.JSX.Element {
+  return (
+    <svg className="inspection-nav-icon" viewBox="0 0 24 24" aria-hidden="true">
+      <path d="M4 6h16v2H4V6Zm0 5h10v2H4v-2Zm0 5h8v2H4v-2Zm13.4-1.4 2.6 2.6-1.4 1.4-2.6-2.6V15h-1.4v-2h3v1.6Z" />
+    </svg>
+  );
+}
+
+function LiverToxNavIcon(): React.JSX.Element {
+  return (
+    <svg className="inspection-nav-icon" viewBox="0 0 24 24" aria-hidden="true">
+      <path d="M12 3c4.42 0 8 3.13 8 7 0 3.4-2.75 6.24-6.4 6.88-.27 2.16-1.61 3.72-3.6 4.12v-4.14C6.6 16.45 4 13.53 4 10c0-3.87 3.58-7 8-7Zm0 2c-3.31 0-6 2.24-6 5s2.69 5 6 5 6-2.24 6-5-2.69-5-6-5Z" />
+    </svg>
+  );
+}
+
 export function DataInspectionPage(): React.JSX.Element {
   const [sessionItems, setSessionItems] = useState<InspectionSessionItem[]>([]);
   const [sessionTotal, setSessionTotal] = useState(0);
@@ -139,6 +179,7 @@ export function DataInspectionPage(): React.JSX.Element {
   const [excerptData, setExcerptData] = useState<InspectionLiverToxExcerptResponse | null>(null);
   const [excerptLoading, setExcerptLoading] = useState(false);
   const [excerptError, setExcerptError] = useState<string | null>(null);
+  const [activeView, setActiveView] = useState<InspectionViewId>("sessions");
   const closeAliasModal = useCallback(() => {
     setAliasData(null);
     setAliasError(null);
@@ -229,6 +270,7 @@ export function DataInspectionPage(): React.JSX.Element {
 
   const rxnavJob = rxnavUpdateJob.state;
   const livertoxJob = livertoxUpdateJob.state;
+  const activeViewConfig = INSPECTION_VIEW_CONFIG[activeView];
 
   useEffect(() => setSessionOffset(0), [sessionSearch, sessionStatusFilter, sessionDateMode, sessionDate]);
   useEffect(() => setRxnavOffset(0), [rxnavSearch]);
@@ -253,7 +295,7 @@ export function DataInspectionPage(): React.JSX.Element {
 
   if (reportSession !== null) {
     return (
-      <main className="page-container inspection-page">
+      <main className="page-container inspection-page inspection-page-report">
         <section className="inspection-report-view">
           <div className="inspection-report-header">
             <div>
@@ -276,17 +318,12 @@ export function DataInspectionPage(): React.JSX.Element {
     );
   }
 
-  return (
-    <main className="page-container inspection-page">
-      <header className="page-header"><p className="eyebrow">Data Inspection</p><h1>Session and Knowledge Catalog</h1><p className="lede">Review recorded DILI sessions alongside RxNav and LiverTox knowledge records.</p></header>
-      <section className="inspection-layout">
-        <div className="inspection-column inspection-column-left">
-          <div className="inspection-widget-header">
-            <div>
-              <h2>Sessions</h2>
-              <p>Dense catalog of recorded DILI sessions</p>
-            </div>
-            <div className="inspection-controls inspection-controls-sessions">
+  const renderSessionsView = (): React.JSX.Element => (
+    <section className="inspection-view-content">
+      <div className="inspection-widget">
+        <div className="inspection-widget-header inspection-widget-header-controls-only">
+          <div className="inspection-controls inspection-controls-sessions">
+            <div className="inspection-controls-sessions-main">
               <input type="search" className="inspection-search" placeholder="Search sessions..." value={sessionSearchInput} onChange={(event) => setSessionSearchInput(event.target.value)} aria-label="Search sessions" />
               <div className="inspection-toggle-group">
                 {(["all", "successful", "failed"] as const).map((value) => (
@@ -301,121 +338,162 @@ export function DataInspectionPage(): React.JSX.Element {
                 <option value="after">After</option>
                 <option value="exact">Exact</option>
               </select>
+            </div>
+            <div className="inspection-controls-sessions-date">
               <input type="date" className="inspection-date" value={sessionDate} onChange={(event) => setSessionDate(event.target.value)} disabled={sessionDateMode === "none"} aria-label="Session date filter" />
             </div>
           </div>
-          <div className="inspection-scroll-frame">
-            <table className="inspection-table inspection-table-dense">
-              <thead><tr><th>#</th><th>Patient</th><th>Date</th><th>Status</th><th>Total time</th><th aria-label="Actions" /></tr></thead>
-              <tbody>
-                {sessionItems.map((row, index) => (
-                  <tr key={row.session_id}>
-                    <td>{sessionOffset + index + 1}</td>
-                    <td>{row.patient_name || "Unknown"}</td>
-                    <td>{formatDateTime(row.session_timestamp)}</td>
-                    <td><span className={`inspection-status-chip ${sessionStatusClass(row.status)}`}>{statusLabel(row.status)}</span></td>
-                    <td>{formatDuration(row.total_duration)}</td>
-                    <td className="inspection-actions-cell">
-                      <button type="button" className="inspection-icon-button is-primary" onClick={() => { setReportLoading(true); setReportSession(row); setReportError(null); setReportContent(""); void fetchInspectionSessionReport(row.session_id).then((payload) => setReportContent(payload.report)).catch((error) => setReportError(error instanceof Error ? error.message : "Failed to load report.")).finally(() => setReportLoading(false)); }} aria-label={`View report for session ${row.session_id}`} title={`View report for session ${row.session_id}`}><ViewIcon /></button>
-                      <button type="button" className="inspection-icon-button is-danger" onClick={() => { if (!globalThis.confirm("Delete this recorded session and report data?")) return; void deleteInspectionSession(row.session_id).then(() => { if (sessionItems.length === 1 && sessionOffset > 0) { setSessionOffset(Math.max(0, sessionOffset - PAGE_LIMIT)); } else { void loadSessions(); } }).catch((error) => setSessionError(error instanceof Error ? error.message : "Failed to delete session.")); }} aria-label={`Delete session ${row.session_id}`} title={`Delete session ${row.session_id}`}><DeleteIcon /></button>
-                      <button type="button" className="inspection-icon-button" disabled aria-label="Modify session (not implemented)" title="Modify session (not implemented)"><ModifyIcon /></button>
-                    </td>
-                  </tr>
-                ))}
-                {!sessionLoading && sessionItems.length === 0 && <tr><td colSpan={6} className="inspection-empty-row">No sessions found.</td></tr>}
-              </tbody>
-            </table>
-            {sessionLoading && <p className="inspection-loading-note">Loading sessions...</p>}
-            {sessionError && <p className="inspection-error-text">{sessionError}</p>}
-          </div>
-          {renderPager(sessionTotal, sessionOffset, setSessionOffset)}
         </div>
+        <div className="inspection-scroll-frame">
+          <table className="inspection-table inspection-table-dense">
+            <thead><tr><th>#</th><th>Patient</th><th>Date</th><th>Status</th><th>Total time</th><th aria-label="Actions" /></tr></thead>
+            <tbody>
+              {sessionItems.map((row, index) => (
+                <tr key={row.session_id}>
+                  <td>{sessionOffset + index + 1}</td>
+                  <td>{row.patient_name || "Unknown"}</td>
+                  <td>{formatDateTime(row.session_timestamp)}</td>
+                  <td><span className={`inspection-status-chip ${sessionStatusClass(row.status)}`}>{statusLabel(row.status)}</span></td>
+                  <td>{formatDuration(row.total_duration)}</td>
+                  <td className="inspection-actions-cell">
+                    <button type="button" className="inspection-icon-button is-primary" onClick={() => { setReportLoading(true); setReportSession(row); setReportError(null); setReportContent(""); void fetchInspectionSessionReport(row.session_id).then((payload) => setReportContent(payload.report)).catch((error) => setReportError(error instanceof Error ? error.message : "Failed to load report.")).finally(() => setReportLoading(false)); }} aria-label={`View report for session ${row.session_id}`} title={`View report for session ${row.session_id}`}><ViewIcon /></button>
+                    <button type="button" className="inspection-icon-button is-danger" onClick={() => { if (!globalThis.confirm("Delete this recorded session and report data?")) return; void deleteInspectionSession(row.session_id).then(() => { if (sessionItems.length === 1 && sessionOffset > 0) { setSessionOffset(Math.max(0, sessionOffset - PAGE_LIMIT)); } else { void loadSessions(); } }).catch((error) => setSessionError(error instanceof Error ? error.message : "Failed to delete session.")); }} aria-label={`Delete session ${row.session_id}`} title={`Delete session ${row.session_id}`}><DeleteIcon /></button>
+                    <button type="button" className="inspection-icon-button" disabled aria-label="Modify session (not implemented)" title="Modify session (not implemented)"><ModifyIcon /></button>
+                  </td>
+                </tr>
+              ))}
+              {!sessionLoading && sessionItems.length === 0 && <tr><td colSpan={6} className="inspection-empty-row">No sessions found.</td></tr>}
+            </tbody>
+          </table>
+          {sessionLoading && <p className="inspection-loading-note">Loading sessions...</p>}
+          {sessionError && <p className="inspection-error-text">{sessionError}</p>}
+        </div>
+        {renderPager(sessionTotal, sessionOffset, setSessionOffset)}
+      </div>
+    </section>
+  );
 
-        <div className="inspection-vertical-separator" aria-hidden="true" />
-
-        <div className="inspection-column inspection-column-right">
-          <div className="inspection-widget">
-            <div className="inspection-widget-header">
-              <div><h2>RxNav Data</h2><p>Canonical catalog with aliases and alternative names</p></div>
-              <div className="inspection-controls inspection-controls-knowledge">
-                <input type="search" className="inspection-search" placeholder="Search RxNav..." value={rxnavSearchInput} onChange={(event) => setRxnavSearchInput(event.target.value)} aria-label="Search RxNav data" />
-                <button type="button" className="btn btn-primary inspection-mini-btn" onClick={() => { void rxnavUpdateJob.triggerUpdate(); }}>{rxnavJob.running ? "Stop" : "Update"}</button>
-              </div>
-            </div>
-            <InspectionJobPanel job={rxnavJob} fallbackMessage="Updating RxNav..." />
-            <div className="inspection-scroll-frame inspection-scroll-frame-compact">
-              <table className="inspection-table inspection-table-dense">
-                <thead><tr><th>Drug</th><th>Last update</th><th aria-label="Actions" /></tr></thead>
-                <tbody>
-                  {rxnavItems.map((row) => (
-                    <tr key={row.drug_id}>
-                      <td>{row.drug_name}</td>
-                      <td>{row.last_update || "N/A"}</td>
-                      <td className="inspection-actions-cell">
-                        <button type="button" className="inspection-icon-button is-primary" onClick={() => { setAliasLoading(true); setAliasError(null); setAliasData(null); void fetchInspectionRxNavAliases(row.drug_id).then((payload) => setAliasData(payload)).catch((error) => setAliasError(error instanceof Error ? error.message : "Failed to load aliases.")).finally(() => setAliasLoading(false)); }} aria-label={`View aliases for ${row.drug_name}`} title={`View aliases for ${row.drug_name}`}><ViewIcon /></button>
-                        <button type="button" className="inspection-icon-button is-danger" onClick={() => { if (!globalThis.confirm("Delete this drug and unlink historical references?")) return; void deleteInspectionRxNavDrug(row.drug_id).then(() => { if (rxnavItems.length === 1 && rxnavOffset > 0) { setRxnavOffset(Math.max(0, rxnavOffset - PAGE_LIMIT)); } else { void loadRxnav(); } }).catch((error) => setRxnavError(error instanceof Error ? error.message : "Failed to delete RxNav entry.")); }} aria-label={`Delete ${row.drug_name}`} title={`Delete ${row.drug_name}`}><DeleteIcon /></button>
-                        <button type="button" className="inspection-icon-button" disabled aria-label="Modify RxNav entry (not implemented)" title="Modify RxNav entry (not implemented)"><ModifyIcon /></button>
-                      </td>
-                    </tr>
-                  ))}
-                  {!rxnavLoading && rxnavItems.length === 0 && <tr><td colSpan={3} className="inspection-empty-row">No RxNav rows found.</td></tr>}
-                </tbody>
-              </table>
-              {rxnavLoading && <p className="inspection-loading-note">Loading RxNav data...</p>}
-              {rxnavError && <p className="inspection-error-text">{rxnavError}</p>}
-            </div>
-            {renderPager(rxnavTotal, rxnavOffset, setRxnavOffset)}
-          </div>
-
-          <div className="inspection-widget">
-            <div className="inspection-widget-header">
-              <div><h2>LiverTox Data</h2><p>Monograph excerpts and update metadata</p></div>
-              <div className="inspection-controls inspection-controls-knowledge">
-                <input type="search" className="inspection-search" placeholder="Search LiverTox..." value={livertoxSearchInput} onChange={(event) => setLivertoxSearchInput(event.target.value)} aria-label="Search LiverTox data" />
-                <button type="button" className="btn btn-primary inspection-mini-btn" onClick={() => { void livertoxUpdateJob.triggerUpdate(); }}>{livertoxJob.running ? "Stop" : "Update"}</button>
-              </div>
-            </div>
-            <InspectionJobPanel job={livertoxJob} fallbackMessage="Updating LiverTox..." />
-            <div className="inspection-scroll-frame inspection-scroll-frame-compact">
-              <table className="inspection-table inspection-table-dense">
-                <thead><tr><th>Drug</th><th>Last update</th><th aria-label="Actions" /></tr></thead>
-                <tbody>
-                  {livertoxItems.map((row) => (
-                    <tr key={row.drug_id}>
-                      <td>{row.drug_name}</td>
-                      <td>{row.last_update || "N/A"}</td>
-                      <td className="inspection-actions-cell">
-                        <button
-                          type="button"
-                          className="inspection-icon-button is-primary"
-                          onClick={() => {
-                            setExcerptLoading(true);
-                            setExcerptError(null);
-                            setExcerptData(null);
-                            void fetchInspectionLiverToxExcerpt(row.drug_id)
-                              .then((payload) => setExcerptData(payload))
-                              .catch((error) => setExcerptError(resolveExcerptFallbackMessage(error)))
-                              .finally(() => setExcerptLoading(false));
-                          }}
-                          aria-label={`View excerpt for ${row.drug_name}`}
-                          title={`View excerpt for ${row.drug_name}`}
-                        >
-                          <ViewIcon />
-                        </button>
-                        <button type="button" className="inspection-icon-button is-danger" onClick={() => { if (!globalThis.confirm("Delete this LiverTox entry and unlink historical references?")) return; void deleteInspectionLiverToxDrug(row.drug_id).then(() => { if (livertoxItems.length === 1 && livertoxOffset > 0) { setLivertoxOffset(Math.max(0, livertoxOffset - PAGE_LIMIT)); } else { void loadLivertox(); } }).catch((error) => setLivertoxError(error instanceof Error ? error.message : "Failed to delete LiverTox entry.")); }} aria-label={`Delete ${row.drug_name}`} title={`Delete ${row.drug_name}`}><DeleteIcon /></button>
-                        <button type="button" className="inspection-icon-button" disabled aria-label="Modify LiverTox entry (not implemented)" title="Modify LiverTox entry (not implemented)"><ModifyIcon /></button>
-                      </td>
-                    </tr>
-                  ))}
-                  {!livertoxLoading && livertoxItems.length === 0 && <tr><td colSpan={3} className="inspection-empty-row">No LiverTox rows found.</td></tr>}
-                </tbody>
-              </table>
-              {livertoxLoading && <p className="inspection-loading-note">Loading LiverTox data...</p>}
-              {livertoxError && <p className="inspection-error-text">{livertoxError}</p>}
-            </div>
-            {renderPager(livertoxTotal, livertoxOffset, setLivertoxOffset)}
+  const renderRxnavView = (): React.JSX.Element => (
+    <section className="inspection-view-content">
+      <div className="inspection-widget">
+        <div className="inspection-widget-header inspection-widget-header-controls-only">
+          <div className="inspection-controls inspection-controls-knowledge">
+            <input type="search" className="inspection-search" placeholder="Search RxNav..." value={rxnavSearchInput} onChange={(event) => setRxnavSearchInput(event.target.value)} aria-label="Search RxNav data" />
+            <button type="button" className="btn btn-primary inspection-mini-btn" onClick={() => { void rxnavUpdateJob.triggerUpdate(); }}>{rxnavJob.running ? "Stop" : "Update"}</button>
           </div>
         </div>
+        <InspectionJobPanel job={rxnavJob} fallbackMessage="Updating RxNav..." />
+        <div className="inspection-scroll-frame inspection-scroll-frame-compact">
+          <table className="inspection-table inspection-table-dense">
+            <thead><tr><th>Drug</th><th>Last update</th><th aria-label="Actions" /></tr></thead>
+            <tbody>
+              {rxnavItems.map((row) => (
+                <tr key={row.drug_id}>
+                  <td>{row.drug_name}</td>
+                  <td>{row.last_update || "N/A"}</td>
+                  <td className="inspection-actions-cell">
+                    <button type="button" className="inspection-icon-button is-primary" onClick={() => { setAliasLoading(true); setAliasError(null); setAliasData(null); void fetchInspectionRxNavAliases(row.drug_id).then((payload) => setAliasData(payload)).catch((error) => setAliasError(error instanceof Error ? error.message : "Failed to load aliases.")).finally(() => setAliasLoading(false)); }} aria-label={`View aliases for ${row.drug_name}`} title={`View aliases for ${row.drug_name}`}><ViewIcon /></button>
+                    <button type="button" className="inspection-icon-button is-danger" onClick={() => { if (!globalThis.confirm("Delete this drug and unlink historical references?")) return; void deleteInspectionRxNavDrug(row.drug_id).then(() => { if (rxnavItems.length === 1 && rxnavOffset > 0) { setRxnavOffset(Math.max(0, rxnavOffset - PAGE_LIMIT)); } else { void loadRxnav(); } }).catch((error) => setRxnavError(error instanceof Error ? error.message : "Failed to delete RxNav entry.")); }} aria-label={`Delete ${row.drug_name}`} title={`Delete ${row.drug_name}`}><DeleteIcon /></button>
+                    <button type="button" className="inspection-icon-button" disabled aria-label="Modify RxNav entry (not implemented)" title="Modify RxNav entry (not implemented)"><ModifyIcon /></button>
+                  </td>
+                </tr>
+              ))}
+              {!rxnavLoading && rxnavItems.length === 0 && <tr><td colSpan={3} className="inspection-empty-row">No RxNav rows found.</td></tr>}
+            </tbody>
+          </table>
+          {rxnavLoading && <p className="inspection-loading-note">Loading RxNav data...</p>}
+          {rxnavError && <p className="inspection-error-text">{rxnavError}</p>}
+        </div>
+        {renderPager(rxnavTotal, rxnavOffset, setRxnavOffset)}
+      </div>
+    </section>
+  );
+
+  const renderLivertoxView = (): React.JSX.Element => (
+    <section className="inspection-view-content">
+      <div className="inspection-widget">
+        <div className="inspection-widget-header inspection-widget-header-controls-only">
+          <div className="inspection-controls inspection-controls-knowledge">
+            <input type="search" className="inspection-search" placeholder="Search LiverTox..." value={livertoxSearchInput} onChange={(event) => setLivertoxSearchInput(event.target.value)} aria-label="Search LiverTox data" />
+            <button type="button" className="btn btn-primary inspection-mini-btn" onClick={() => { void livertoxUpdateJob.triggerUpdate(); }}>{livertoxJob.running ? "Stop" : "Update"}</button>
+          </div>
+        </div>
+        <InspectionJobPanel job={livertoxJob} fallbackMessage="Updating LiverTox..." />
+        <div className="inspection-scroll-frame inspection-scroll-frame-compact">
+          <table className="inspection-table inspection-table-dense">
+            <thead><tr><th>Drug</th><th>Last update</th><th aria-label="Actions" /></tr></thead>
+            <tbody>
+              {livertoxItems.map((row) => (
+                <tr key={row.drug_id}>
+                  <td>{row.drug_name}</td>
+                  <td>{row.last_update || "N/A"}</td>
+                  <td className="inspection-actions-cell">
+                    <button
+                      type="button"
+                      className="inspection-icon-button is-primary"
+                      onClick={() => {
+                        setExcerptLoading(true);
+                        setExcerptError(null);
+                        setExcerptData(null);
+                        void fetchInspectionLiverToxExcerpt(row.drug_id)
+                          .then((payload) => setExcerptData(payload))
+                          .catch((error) => setExcerptError(resolveExcerptFallbackMessage(error)))
+                          .finally(() => setExcerptLoading(false));
+                      }}
+                      aria-label={`View excerpt for ${row.drug_name}`}
+                      title={`View excerpt for ${row.drug_name}`}
+                    >
+                      <ViewIcon />
+                    </button>
+                    <button type="button" className="inspection-icon-button is-danger" onClick={() => { if (!globalThis.confirm("Delete this LiverTox entry and unlink historical references?")) return; void deleteInspectionLiverToxDrug(row.drug_id).then(() => { if (livertoxItems.length === 1 && livertoxOffset > 0) { setLivertoxOffset(Math.max(0, livertoxOffset - PAGE_LIMIT)); } else { void loadLivertox(); } }).catch((error) => setLivertoxError(error instanceof Error ? error.message : "Failed to delete LiverTox entry.")); }} aria-label={`Delete ${row.drug_name}`} title={`Delete ${row.drug_name}`}><DeleteIcon /></button>
+                    <button type="button" className="inspection-icon-button" disabled aria-label="Modify LiverTox entry (not implemented)" title="Modify LiverTox entry (not implemented)"><ModifyIcon /></button>
+                  </td>
+                </tr>
+              ))}
+              {!livertoxLoading && livertoxItems.length === 0 && <tr><td colSpan={3} className="inspection-empty-row">No LiverTox rows found.</td></tr>}
+            </tbody>
+          </table>
+          {livertoxLoading && <p className="inspection-loading-note">Loading LiverTox data...</p>}
+          {livertoxError && <p className="inspection-error-text">{livertoxError}</p>}
+        </div>
+        {renderPager(livertoxTotal, livertoxOffset, setLivertoxOffset)}
+      </div>
+    </section>
+  );
+
+  return (
+    <main className="page-container inspection-page inspection-page-workbench">
+      <header className="page-header"><p className="eyebrow">Data Inspection</p><h1>Session and Knowledge Catalog</h1><p className="lede">Review recorded DILI sessions alongside RxNav and LiverTox knowledge records.</p></header>
+      <section className="inspection-layout">
+        <aside className="inspection-toolbar" aria-label="Data inspection views">
+          <p className="inspection-toolbar-eyebrow">Views</p>
+          <div className="inspection-toolbar-list" role="tablist" aria-label="Inspection datasets">
+            <button type="button" className={`inspection-toolbar-item ${activeView === "sessions" ? "is-active" : ""}`} onClick={() => setActiveView("sessions")} role="tab" aria-selected={activeView === "sessions"} aria-controls="inspection-active-view-panel">
+              <SessionsNavIcon />
+              <span>{INSPECTION_VIEW_CONFIG.sessions.label}</span>
+            </button>
+            <button type="button" className={`inspection-toolbar-item ${activeView === "rxnav" ? "is-active" : ""}`} onClick={() => setActiveView("rxnav")} role="tab" aria-selected={activeView === "rxnav"} aria-controls="inspection-active-view-panel">
+              <RxNavNavIcon />
+              <span>{INSPECTION_VIEW_CONFIG.rxnav.label}</span>
+            </button>
+            <button type="button" className={`inspection-toolbar-item ${activeView === "livertox" ? "is-active" : ""}`} onClick={() => setActiveView("livertox")} role="tab" aria-selected={activeView === "livertox"} aria-controls="inspection-active-view-panel">
+              <LiverToxNavIcon />
+              <span>{INSPECTION_VIEW_CONFIG.livertox.label}</span>
+            </button>
+          </div>
+        </aside>
+
+        <section id="inspection-active-view-panel" className="inspection-active-view" role="tabpanel" aria-label={`${activeViewConfig.label} panel`}>
+          <div className="inspection-active-view-header">
+            <h2>{activeViewConfig.label}</h2>
+            <p>{activeViewConfig.description}</p>
+          </div>
+          <div className="inspection-view-stage">
+            {activeView === "sessions" && renderSessionsView()}
+            {activeView === "rxnav" && renderRxnavView()}
+            {activeView === "livertox" && renderLivertoxView()}
+          </div>
+        </section>
       </section>
 
       {(aliasData || aliasLoading || aliasError) && (
