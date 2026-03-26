@@ -53,6 +53,7 @@ Thumbs.db
 .agent/skills/**
 
 # Misc
+Cargo.toml
 *.lock
 *.log
 *.db
