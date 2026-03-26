@@ -41,7 +41,7 @@ const INSPECTION_VIEW_CONFIG: Record<InspectionViewId, { label: string; descript
     description: "Review recorded DILI sessions, patient metadata, runtime status, and generated reports.",
   },
   rxnav: {
-    label: "drug catalog",
+    label: "Drug Catalog",
     description: "Inspect the canonical RxNav catalog, aliases, and update progress for indexed drugs.",
   },
   livertox: {
@@ -49,6 +49,7 @@ const INSPECTION_VIEW_CONFIG: Record<InspectionViewId, { label: string; descript
     description: "Browse LiverTox monograph excerpts and recency data used by the clinical copilot.",
   },
 };
+const INSPECTION_VIEW_ORDER: readonly InspectionViewId[] = ["sessions", "rxnav", "livertox"];
 
 function useDebouncedValue<T>(value: T, delayMs: number): T {
   const [debouncedValue, setDebouncedValue] = useState(value);
@@ -135,6 +136,14 @@ function LiverToxNavIcon(): React.JSX.Element {
   return (
     <svg className="inspection-nav-icon" viewBox="0 0 24 24" aria-hidden="true">
       <path d="M12 3c4.42 0 8 3.13 8 7 0 3.4-2.75 6.24-6.4 6.88-.27 2.16-1.61 3.72-3.6 4.12v-4.14C6.6 16.45 4 13.53 4 10c0-3.87 3.58-7 8-7Zm0 2c-3.31 0-6 2.24-6 5s2.69 5 6 5 6-2.24 6-5-2.69-5-6-5Z" />
+    </svg>
+  );
+}
+
+function CloseIcon(): React.JSX.Element {
+  return (
+    <svg className="inspection-icon" viewBox="0 0 24 24" aria-hidden="true">
+      <path d="M18.3 5.7a1 1 0 0 0-1.4 0L12 10.6 7.1 5.7a1 1 0 1 0-1.4 1.4l4.9 4.9-4.9 4.9a1 1 0 1 0 1.4 1.4l4.9-4.9 4.9 4.9a1 1 0 0 0 1.4-1.4L13.4 12l4.9-4.9a1 1 0 0 0 0-1.4Z" />
     </svg>
   );
 }
@@ -271,6 +280,52 @@ export function DataInspectionPage(): React.JSX.Element {
   const rxnavJob = rxnavUpdateJob.state;
   const livertoxJob = livertoxUpdateJob.state;
   const activeViewConfig = INSPECTION_VIEW_CONFIG[activeView];
+  const activeTabId = `inspection-tab-${activeView}`;
+
+  const focusInspectionTab = (view: InspectionViewId) => {
+    globalThis.requestAnimationFrame(() => {
+      const element = globalThis.document.getElementById(`inspection-tab-${view}`);
+      if (element instanceof HTMLButtonElement) {
+        element.focus();
+      }
+    });
+  };
+
+  const handleTabKeyDown = (event: React.KeyboardEvent<HTMLButtonElement>, view: InspectionViewId) => {
+    const currentIndex = INSPECTION_VIEW_ORDER.indexOf(view);
+    if (currentIndex < 0) {
+      return;
+    }
+    if (event.key === "ArrowRight" || event.key === "ArrowDown") {
+      event.preventDefault();
+      const nextIndex = (currentIndex + 1) % INSPECTION_VIEW_ORDER.length;
+      const nextView = INSPECTION_VIEW_ORDER[nextIndex];
+      setActiveView(nextView);
+      focusInspectionTab(nextView);
+      return;
+    }
+    if (event.key === "ArrowLeft" || event.key === "ArrowUp") {
+      event.preventDefault();
+      const previousIndex = (currentIndex - 1 + INSPECTION_VIEW_ORDER.length) % INSPECTION_VIEW_ORDER.length;
+      const previousView = INSPECTION_VIEW_ORDER[previousIndex];
+      setActiveView(previousView);
+      focusInspectionTab(previousView);
+      return;
+    }
+    if (event.key === "Home") {
+      event.preventDefault();
+      const firstView = INSPECTION_VIEW_ORDER[0];
+      setActiveView(firstView);
+      focusInspectionTab(firstView);
+      return;
+    }
+    if (event.key === "End") {
+      event.preventDefault();
+      const lastView = INSPECTION_VIEW_ORDER[INSPECTION_VIEW_ORDER.length - 1];
+      setActiveView(lastView);
+      focusInspectionTab(lastView);
+    }
+  };
 
   useEffect(() => setSessionOffset(0), [sessionSearch, sessionStatusFilter, sessionDateMode, sessionDate]);
   useEffect(() => setRxnavOffset(0), [rxnavSearch]);
@@ -379,7 +434,15 @@ export function DataInspectionPage(): React.JSX.Element {
         <div className="inspection-widget-header inspection-widget-header-controls-only">
           <div className="inspection-controls inspection-controls-knowledge">
             <input type="search" className="inspection-search" placeholder="Search RxNav..." value={rxnavSearchInput} onChange={(event) => setRxnavSearchInput(event.target.value)} aria-label="Search RxNav data" />
-            <button type="button" className="btn btn-primary inspection-mini-btn" onClick={() => { void rxnavUpdateJob.triggerUpdate(); }}>{rxnavJob.running ? "Stop" : "Update"}</button>
+            <button
+              type="button"
+              className="btn btn-primary inspection-mini-btn"
+              onClick={() => { void rxnavUpdateJob.triggerUpdate(); }}
+              aria-pressed={rxnavJob.running}
+              aria-label={rxnavJob.running ? "Stop RxNav update" : "Start RxNav update"}
+            >
+              {rxnavJob.running ? "Stop" : "Update"}
+            </button>
           </div>
         </div>
         <InspectionJobPanel job={rxnavJob} fallbackMessage="Updating RxNav..." />
@@ -415,7 +478,15 @@ export function DataInspectionPage(): React.JSX.Element {
         <div className="inspection-widget-header inspection-widget-header-controls-only">
           <div className="inspection-controls inspection-controls-knowledge">
             <input type="search" className="inspection-search" placeholder="Search LiverTox..." value={livertoxSearchInput} onChange={(event) => setLivertoxSearchInput(event.target.value)} aria-label="Search LiverTox data" />
-            <button type="button" className="btn btn-primary inspection-mini-btn" onClick={() => { void livertoxUpdateJob.triggerUpdate(); }}>{livertoxJob.running ? "Stop" : "Update"}</button>
+            <button
+              type="button"
+              className="btn btn-primary inspection-mini-btn"
+              onClick={() => { void livertoxUpdateJob.triggerUpdate(); }}
+              aria-pressed={livertoxJob.running}
+              aria-label={livertoxJob.running ? "Stop LiverTox update" : "Start LiverTox update"}
+            >
+              {livertoxJob.running ? "Stop" : "Update"}
+            </button>
           </div>
         </div>
         <InspectionJobPanel job={livertoxJob} fallbackMessage="Updating LiverTox..." />
@@ -468,22 +539,57 @@ export function DataInspectionPage(): React.JSX.Element {
         <aside className="inspection-toolbar" aria-label="Data inspection views">
           <p className="inspection-toolbar-eyebrow">Views</p>
           <div className="inspection-toolbar-list" role="tablist" aria-label="Inspection datasets">
-            <button type="button" className={`inspection-toolbar-item ${activeView === "sessions" ? "is-active" : ""}`} onClick={() => setActiveView("sessions")} role="tab" aria-selected={activeView === "sessions"} aria-controls="inspection-active-view-panel">
+            <button
+              id="inspection-tab-sessions"
+              type="button"
+              className={`inspection-toolbar-item ${activeView === "sessions" ? "is-active" : ""}`}
+              onClick={() => setActiveView("sessions")}
+              onKeyDown={(event) => handleTabKeyDown(event, "sessions")}
+              role="tab"
+              aria-selected={activeView === "sessions"}
+              aria-controls="inspection-active-view-panel"
+              tabIndex={activeView === "sessions" ? 0 : -1}
+            >
               <SessionsNavIcon />
               <span>{INSPECTION_VIEW_CONFIG.sessions.label}</span>
             </button>
-            <button type="button" className={`inspection-toolbar-item ${activeView === "rxnav" ? "is-active" : ""}`} onClick={() => setActiveView("rxnav")} role="tab" aria-selected={activeView === "rxnav"} aria-controls="inspection-active-view-panel">
+            <button
+              id="inspection-tab-rxnav"
+              type="button"
+              className={`inspection-toolbar-item ${activeView === "rxnav" ? "is-active" : ""}`}
+              onClick={() => setActiveView("rxnav")}
+              onKeyDown={(event) => handleTabKeyDown(event, "rxnav")}
+              role="tab"
+              aria-selected={activeView === "rxnav"}
+              aria-controls="inspection-active-view-panel"
+              tabIndex={activeView === "rxnav" ? 0 : -1}
+            >
               <RxNavNavIcon />
               <span>{INSPECTION_VIEW_CONFIG.rxnav.label}</span>
             </button>
-            <button type="button" className={`inspection-toolbar-item ${activeView === "livertox" ? "is-active" : ""}`} onClick={() => setActiveView("livertox")} role="tab" aria-selected={activeView === "livertox"} aria-controls="inspection-active-view-panel">
+            <button
+              id="inspection-tab-livertox"
+              type="button"
+              className={`inspection-toolbar-item ${activeView === "livertox" ? "is-active" : ""}`}
+              onClick={() => setActiveView("livertox")}
+              onKeyDown={(event) => handleTabKeyDown(event, "livertox")}
+              role="tab"
+              aria-selected={activeView === "livertox"}
+              aria-controls="inspection-active-view-panel"
+              tabIndex={activeView === "livertox" ? 0 : -1}
+            >
               <LiverToxNavIcon />
               <span>{INSPECTION_VIEW_CONFIG.livertox.label}</span>
             </button>
           </div>
         </aside>
 
-        <section id="inspection-active-view-panel" className="inspection-active-view" role="tabpanel" aria-label={`${activeViewConfig.label} panel`}>
+        <section
+          id="inspection-active-view-panel"
+          className="inspection-active-view"
+          role="tabpanel"
+          aria-labelledby={activeTabId}
+        >
           <div className="inspection-active-view-header">
             <h2>{activeViewConfig.label}</h2>
             <p>{activeViewConfig.description}</p>
@@ -501,7 +607,7 @@ export function DataInspectionPage(): React.JSX.Element {
           <dialog className="modal-container inspection-modal" open aria-modal="true" aria-label="RxNav aliases modal">
             <div className="modal-header">
               <div className="modal-header-content"><h2 className="modal-title">RxNav Aliases</h2><p className="modal-subtitle">{aliasData?.drug_name || "Loading aliases..."}</p></div>
-              <button type="button" className="modal-close" onClick={closeAliasModal} aria-label="Close aliases modal">X</button>
+              <button type="button" className="modal-close" onClick={closeAliasModal} aria-label="Close aliases modal"><CloseIcon /></button>
             </div>
             <div className="modal-body">
               {aliasLoading && <p className="inspection-loading-note">Loading aliases...</p>}
@@ -522,7 +628,7 @@ export function DataInspectionPage(): React.JSX.Element {
           <dialog className="modal-container inspection-modal inspection-modal-large" open aria-modal="true" aria-label="LiverTox excerpt modal">
             <div className="modal-header">
               <div className="modal-header-content"><h2 className="modal-title">LiverTox Excerpt</h2><p className="modal-subtitle">{excerptData?.drug_name || (excerptError ? "Excerpt unavailable" : "Loading excerpt...")}</p></div>
-              <button type="button" className="modal-close" onClick={closeExcerptModal} aria-label="Close excerpt modal">X</button>
+              <button type="button" className="modal-close" onClick={closeExcerptModal} aria-label="Close excerpt modal"><CloseIcon /></button>
             </div>
             <div className="modal-body inspection-excerpt-body">
               {excerptLoading && <p className="inspection-loading-note">Loading excerpt...</p>}
