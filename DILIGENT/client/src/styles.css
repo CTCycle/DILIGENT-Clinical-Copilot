@@ -13,15 +13,15 @@
   --color-brand: #16a34a;
   --color-brand-light: #22c55e;
   --color-brand-ui: #229960;
-  --color-brand-ui-light: #5dc98e;
+  --color-brand-ui-light: #86daac;
   --color-brand-bg: rgba(22, 163, 74, 0.05);
   --color-text-primary: #0f172a;
   --color-text-secondary: #475569;
   --color-text-muted: #64748b;
   --color-text-subtle: #94a3b8;
-  --color-surface: #ffffff;
-  --color-surface-alt: #f8fafc;
-  --color-border: #d0d7e2;
+  --color-surface: #f4f8f3;
+  --color-surface-alt: #edf4ec;
+  --color-border: #c6d6c8;
   --color-border-subtle: rgba(206, 190, 165, 0.35);
   --color-divider: #e2e8f0;
   --color-overlay: rgba(15, 23, 42, 0.45);
@@ -63,7 +63,7 @@
   /* Shadows */
   --shadow-sm: 0 4px 12px -6px rgba(15, 23, 42, 0.15);
   --shadow-md: 0 10px 30px -18px rgba(15, 23, 42, 0.28);
-  --shadow-lg: 0 18px 45px -25px rgba(15, 23, 42, 0.28);
+  --shadow-lg: 0 16px 38px -26px rgba(15, 23, 42, 0.2);
   --shadow-brand: 0 10px 30px -18px rgba(34, 153, 96, 0.58);
 
   /* Layout */
@@ -74,9 +74,9 @@
 
   /* Background */
   --app-background:
-    radial-gradient(138% 102% at -8% -16%, rgba(34, 197, 94, 0.44) 0%, rgba(34, 197, 94, 0.14) 34%, rgba(34, 197, 94, 0) 66%),
-    radial-gradient(124% 96% at 108% 2%, rgba(16, 185, 129, 0.33) 0%, rgba(16, 185, 129, 0.12) 36%, rgba(16, 185, 129, 0) 68%),
-    linear-gradient(156deg, #e5f2e8 0%, #d5e9db 40%, #bfdcc9 72%, #acd0bc 100%);
+    radial-gradient(138% 102% at -8% -16%, rgba(98, 191, 102, 0.36) 0%, rgba(98, 191, 102, 0.12) 34%, rgba(98, 191, 102, 0) 66%),
+    radial-gradient(124% 96% at 108% 2%, rgba(74, 177, 121, 0.28) 0%, rgba(74, 177, 121, 0.1) 36%, rgba(74, 177, 121, 0) 68%),
+    linear-gradient(156deg, #e7f3e2 0%, #d9ebd6 40%, #c6e0c5 72%, #b4d6b8 100%);
   color: var(--color-text-primary);
 }
 
@@ -827,7 +827,7 @@ html,
   border-radius: var(--radius-md);
   border: 1px solid var(--color-border);
   padding: 10px 12px;
-  background: rgba(255, 255, 255, 0.9);
+  background: var(--color-surface-alt);
   font-size: var(--font-base);
   color: var(--color-text-primary);
   font-family: inherit;
@@ -906,8 +906,8 @@ html,
 }
 
 .compact-field input[type="text"] {
-  min-height: 34px;
-  padding: 8px 10px;
+  min-height: 30px;
+  padding: 6px 10px;
   font-size: var(--font-sm);
 }
 
@@ -934,6 +934,67 @@ html,
   background: rgba(248, 250, 252, 0.6);
 }
 
+.lab-ratio-panel {
+  margin-top: 2px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.lab-ratio-title {
+  margin: 0;
+  font-size: var(--font-xs);
+  letter-spacing: 0.02em;
+  text-transform: uppercase;
+  font-weight: 600;
+  color: var(--color-text-secondary);
+}
+
+.lab-ratio-pattern {
+  margin: 0;
+  font-size: var(--font-base);
+  font-weight: 600;
+  color: var(--color-text-primary);
+}
+
+.ratio-meter {
+  display: flex;
+  flex-direction: column;
+  gap: 7px;
+}
+
+.ratio-meter-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  font-size: var(--font-xs);
+  color: var(--color-text-secondary);
+}
+
+.ratio-meter-header strong {
+  color: var(--color-text-primary);
+  font-size: var(--font-xs);
+  font-weight: 700;
+}
+
+.ratio-slider-track {
+  position: relative;
+  height: 6px;
+  border-radius: 999px;
+  background: linear-gradient(90deg, #f97316 0%, #facc15 50%, #22c55e 100%);
+}
+
+.ratio-slider-thumb {
+  position: absolute;
+  top: 50%;
+  width: 5px;
+  height: 16px;
+  border-radius: 999px;
+  background: #0f172a;
+  transform: translate(-50%, -50%);
+  box-shadow: 0 1px 3px rgba(15, 23, 42, 0.28);
+}
+
 /* ============================================
    Patient Information - Advanced Options
    ============================================ */
@@ -942,6 +1003,19 @@ html,
   border: 1px solid rgba(22, 163, 74, 0.15);
   border-radius: var(--radius-lg);
   padding: var(--space-md) var(--space-lg);
+  margin-bottom: var(--space-lg);
+}
+
+.advanced-options-inline {
+  background: transparent;
+  border: none;
+  border-radius: 0;
+  padding: 0;
+  margin: 0 0 var(--space-lg);
+}
+
+.patient-info .action-stack {
+  margin-top: 0;
   margin-bottom: var(--space-lg);
 }
 
@@ -1026,6 +1100,11 @@ html,
   flex-direction: column;
   gap: var(--space-sm);
   margin-top: var(--space-lg);
+}
+
+.action-stack .btn {
+  min-height: 38px;
+  padding: 8px 14px;
 }
 
 .btn {
