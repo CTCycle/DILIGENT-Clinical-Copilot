@@ -24,6 +24,53 @@ import {
 
 const todayIso = new Date().toISOString().slice(0, 10);
 const DEFAULT_POLL_INTERVAL_MS = 1000;
+const MAX_RATIO_DISPLAY = 6;
+
+function parseLabNumber(value: string): number | null {
+    const normalized = value.replace(",", ".").trim();
+    if (!normalized) {
+        return null;
+    }
+    const parsed = Number(normalized);
+    return Number.isFinite(parsed) && parsed > 0 ? parsed : null;
+}
+
+function computeRatio(value: string, maxValue: string): number | null {
+    const current = parseLabNumber(value);
+    const upperLimit = parseLabNumber(maxValue);
+    if (current === null || upperLimit === null || upperLimit <= 0) {
+        return null;
+    }
+    return current / upperLimit;
+}
+
+function formatRatio(ratio: number | null): string {
+    if (ratio === null) {
+        return "N/A";
+    }
+    return `${ratio.toFixed(2)}x`;
+}
+
+function getRatioPercent(ratio: number | null): number {
+    if (ratio === null) {
+        return 0;
+    }
+    return Math.min((ratio / MAX_RATIO_DISPLAY) * 100, 100);
+}
+
+function resolvePattern(altRatio: number | null, alpRatio: number | null): string {
+    if (altRatio === null || alpRatio === null || alpRatio <= 0) {
+        return "Undetermined";
+    }
+    const rRatio = altRatio / alpRatio;
+    if (rRatio >= 5) {
+        return "Hepatocellular pattern";
+    }
+    if (rRatio <= 2) {
+        return "Cholestatic pattern";
+    }
+    return "Mixed pattern";
+}
 
 // ---------------------------------------------------------------------------
 // Icons
@@ -351,6 +398,9 @@ export function DiliAgentPage(): React.JSX.Element {
             </div>
         );
     })();
+    const altRatio = computeRatio(form.alt, form.altMax);
+    const alpRatio = computeRatio(form.alp, form.alpMax);
+    const hepatotoxicityPattern = resolvePattern(altRatio, alpRatio);
 
     return (
         <>
@@ -442,22 +492,35 @@ export function DiliAgentPage(): React.JSX.Element {
                                     </div>
                                 </div>
                                 <div className="lab-controls-panel">
-                                    <div className="advanced-options">
-                                        <p className="advanced-options-header">Evidence Retrieval</p>
-                                        <BooleanToggle
-                                            id="use-rag"
-                                            label="Enable RAG for supporting evidence"
-                                            checked={form.useRag}
-                                            onChange={(checked) => handleFormChange("useRag", checked)}
-                                        />
-                                        <BooleanToggle
-                                            id="use-web-search"
-                                            label="Enable web search for supporting evidence"
-                                            checked={form.useWebSearch}
-                                            onChange={(checked) => handleFormChange("useWebSearch", checked)}
-                                        />
+                                    <div className="lab-ratio-panel" aria-live="polite">
+                                        <p className="lab-ratio-pattern">{hepatotoxicityPattern}</p>
+
+                                        <div className="ratio-meter">
+                                            <div className="ratio-meter-header">
+                                                <span>ALT ratio</span>
+                                                <strong>{formatRatio(altRatio)}</strong>
+                                            </div>
+                                            <div className="ratio-slider-track">
+                                                <div
+                                                    className="ratio-slider-thumb"
+                                                    style={{ left: `${getRatioPercent(altRatio)}%` }}
+                                                />
+                                            </div>
+                                        </div>
+
+                                        <div className="ratio-meter">
+                                            <div className="ratio-meter-header">
+                                                <span>ALP ratio</span>
+                                                <strong>{formatRatio(alpRatio)}</strong>
+                                            </div>
+                                            <div className="ratio-slider-track">
+                                                <div
+                                                    className="ratio-slider-thumb"
+                                                    style={{ left: `${getRatioPercent(alpRatio)}%` }}
+                                                />
+                                            </div>
+                                        </div>
                                     </div>
-                                    <div className="lab-controls-future" aria-hidden="true" />
                                 </div>
                             </div>
                         </div>
@@ -493,6 +556,22 @@ export function DiliAgentPage(): React.JSX.Element {
                             />
                         </div>
 
+                        <div className="advanced-options advanced-options-inline">
+                            <p className="advanced-options-header">Evidence Retrieval</p>
+                            <BooleanToggle
+                                id="use-rag"
+                                label="Enable RAG for supporting evidence"
+                                checked={form.useRag}
+                                onChange={(checked) => handleFormChange("useRag", checked)}
+                            />
+                            <BooleanToggle
+                                id="use-web-search"
+                                label="Enable web search for supporting evidence"
+                                checked={form.useWebSearch}
+                                onChange={(checked) => handleFormChange("useWebSearch", checked)}
+                            />
+                        </div>
+
                         {/* Action Buttons */}
                         <div className="action-stack">
                             <button
@@ -503,18 +582,11 @@ export function DiliAgentPage(): React.JSX.Element {
                             >
                                 {isRunning ? "Running..." : "Run DILI analysis"}
                             </button>
-                            <button
-                                className="btn btn-secondary"
-                                type="button"
-                                disabled={!exportUrl}
-                                onClick={handleDownload}
-                            >
-                                Download report
-                            </button>
                             <button className="btn btn-tertiary" type="button" onClick={handleClear}>
                                 Clear all
                             </button>
                         </div>
+
                     </section>
 
                     {/* Report Output Section */}
