@@ -16,10 +16,10 @@ const DiligentLogo = () => (
             d="M10 26V10h6.5c6 0 9.5 3.1 9.5 8s-3.5 8-9.5 8H10zm5-4h1.2c3.2 0 5-1.3 5-4s-1.8-4-5-4H15v8z"
             fill="#4ade80"
         />
-        <text x="42" y="16" fill="#0f172a" fontSize="10" fontWeight="800" letterSpacing="0.14em">
+        <text x="42" y="16" fill="currentColor" fontSize="10" fontWeight="800" letterSpacing="0.14em">
             DILIGENT
         </text>
-        <text x="42" y="27" fill="rgba(15,23,42,0.74)" fontSize="7.5" fontWeight="600" letterSpacing="0.08em">
+        <text x="42" y="27" fill="currentColor" fillOpacity="0.78" fontSize="7.5" fontWeight="600" letterSpacing="0.08em">
             CLINICAL COPILOT
         </text>
     </svg>
