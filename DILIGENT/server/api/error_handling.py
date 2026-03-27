@@ -52,7 +52,7 @@ class RequestIdMiddleware(BaseHTTPMiddleware):
 
 
 ###############################################################################
-async def request_validation_error_handler(
+def request_validation_error_handler(
     request: Request,
     exc: RequestValidationError,
 ) -> JSONResponse:
@@ -77,7 +77,7 @@ async def request_validation_error_handler(
 
 
 ###############################################################################
-async def timeout_error_handler(
+def timeout_error_handler(
     request: Request,
     exc: Exception,
 ) -> JSONResponse:
@@ -102,7 +102,7 @@ async def timeout_error_handler(
 
 
 ###############################################################################
-async def dependency_error_handler(
+def dependency_error_handler(
     request: Request,
     exc: httpx.RequestError,
 ) -> JSONResponse:
@@ -127,7 +127,7 @@ async def dependency_error_handler(
 
 
 ###############################################################################
-async def missing_resource_error_handler(
+def missing_resource_error_handler(
     request: Request,
     exc: FileNotFoundError,
 ) -> JSONResponse:
@@ -152,7 +152,7 @@ async def missing_resource_error_handler(
 
 
 ###############################################################################
-async def unhandled_error_handler(
+def unhandled_error_handler(
     request: Request,
     exc: Exception,
 ) -> JSONResponse:
