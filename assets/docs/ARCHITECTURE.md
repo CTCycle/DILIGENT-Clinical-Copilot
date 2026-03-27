@@ -37,6 +37,11 @@ Core endpoints:
 - `/access-keys`, `/access-keys/{id}/activate`
 - `/research`
 
+Boundary error policy:
+- Centralized API exception handling is registered in `server/api/error_handling.py`.
+- Every request receives a correlation header `X-Request-ID`.
+- Unhandled exceptions are logged with request context and returned as safe, non-sensitive error payloads.
+
 ---
 
 ## 3. Frontend Structure
@@ -202,6 +207,7 @@ This section is intended as the "where to edit what" map so agents do not need t
 - `DILIGENT/server/repositories/vectors.py`: LanceDB wrapper (table init, dimensionality checks, index creation, record load/stream).
 - `DILIGENT/server/api/__init__.py`: package marker.
 - `DILIGENT/server/api/access_keys.py`: `/access-keys` CRUD + activate endpoints.
+- `DILIGENT/server/api/error_handling.py`: global API error boundaries, request-ID middleware, safe exception-to-response mapping.
 - `DILIGENT/server/api/model_config.py`: `/model-config` GET/PUT endpoint class; resolves provider/model defaults and local model availability cards.
 - `DILIGENT/server/api/ollama.py`: `/models/list`, `/models/pull`, pull job start/status/cancel endpoints.
 - `DILIGENT/server/api/research.py`: `/research` endpoint class for Tavily-backed evidence response.

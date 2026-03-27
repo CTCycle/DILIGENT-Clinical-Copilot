@@ -2,6 +2,8 @@
 
 These rules apply to `DILIGENT/client` (React 18 + Vite + TypeScript 5).
 
+Also mandatory: apply `assets/docs/ERROR_HANDLING.md` for explicit error handling, timeouts, retries, and safe user-facing error states.
+
 ## 1. Type Safety
 
 - Keep `tsconfig` strictness enabled (`"strict": true`).

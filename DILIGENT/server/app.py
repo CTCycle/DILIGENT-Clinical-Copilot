@@ -16,6 +16,7 @@ from DILIGENT.server.api.session import router as session_router
 from DILIGENT.server.api.ollama import router as ollama_router
 from DILIGENT.server.api.research import router as research_router
 from DILIGENT.server.api.root import RootEndpoint
+from DILIGENT.server.api.error_handling import register_error_handling
 
 
 ###############################################################################
@@ -28,6 +29,7 @@ app = FastAPI(
     redoc_url=None if cloud_mode else "/redoc",
     openapi_url=None if cloud_mode else "/openapi.json",
 )
+register_error_handling(app)
 
 routers = [
     session_router,
