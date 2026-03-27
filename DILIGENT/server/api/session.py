@@ -817,7 +817,13 @@ class ClinicalSessionEndpoint:
             logger.info("Hepato-toxicity consultation required %.4f seconds", elapsed)
 
             if isinstance(drug_assessment, dict):
-                final_report = drug_assessment.get("final_report", "").strip()
+                raw_final_report = drug_assessment.get("final_report")
+                if isinstance(raw_final_report, str):
+                    final_report = raw_final_report.strip()
+                elif raw_final_report is None:
+                    final_report = None
+                else:
+                    final_report = str(raw_final_report).strip()
         except LLMError as exc:
             issues.append(
                 PipelineIssue(

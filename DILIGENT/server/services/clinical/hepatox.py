@@ -47,6 +47,20 @@ REDUNDANT_REPORT_LINE_RE = re.compile(
     r"generated\s+report.*?(drug[- ]induced\s+liver\s+injury|\bdili\b)",
     re.IGNORECASE,
 )
+LIVERTOX_TITLE_LINE_RE = re.compile(
+    r"^\s*\*{0,2}[^*\n]+?\s*-\s*LiverTox score\b.*\*{0,2}\s*$",
+    re.IGNORECASE,
+)
+REPORT_LABEL_LINE_RE = re.compile(r"^\s*\*{0,2}\s*Report\s*\*{0,2}\s*$", re.IGNORECASE)
+BIBLIOGRAPHY_LINE_RE = re.compile(
+    r"^\s*\*{0,2}\s*Bibliography source\s*\*{0,2}\s*:\s*LiverTox\s*$",
+    re.IGNORECASE,
+)
+DRIFT_SECTION_LINE_RE = re.compile(r"^\s*(medication|assessment|plan)\s*$", re.IGNORECASE)
+STRUCTURED_DILI_SECTION_LINE_RE = re.compile(
+    r"^\s*#{0,6}\s*\*{0,2}\s*Structured\s+DILI\s+Assessment\s+Report\s*\*{0,2}\s*$",
+    re.IGNORECASE,
+)
 
 
 ###############################################################################
@@ -446,6 +460,10 @@ class HepatoxConsultation:
         extraction_metadata = livertox_data.get("extraction_metadata", [])
         missing_livertox = bool(livertox_data.get("missing_livertox"))
         ambiguous_match = bool(livertox_data.get("ambiguous_match"))
+        raw_match_status = livertox_data.get("match_status")
+        match_status = (
+            str(raw_match_status).strip().lower() if raw_match_status is not None else None
+        )
         match_candidates = [
             str(candidate).strip()
             for candidate in livertox_data.get("match_candidates", [])
@@ -463,6 +481,7 @@ class HepatoxConsultation:
             extracted_excerpts=excerpts_list,
             missing_livertox=missing_livertox,
             ambiguous_match=ambiguous_match,
+            match_status=match_status,
             match_candidates=match_candidates,
             suspension=suspension,
         )
@@ -1032,6 +1051,8 @@ class HepatoxConsultation:
             return ""
         cleaned_lines: list[str] = []
         for raw_line in text.splitlines():
+            if STRUCTURED_DILI_SECTION_LINE_RE.match(raw_line.strip()):
+                break
             compact = re.sub(r"[\s*_`#:\-]+", " ", raw_line).strip()
             if compact and REDUNDANT_REPORT_LINE_RE.search(compact):
                 continue
@@ -1046,24 +1067,137 @@ class HepatoxConsultation:
         *,
         clinical_context: str | None,
     ) -> str | None:
-        paragraphs = [
-            entry.paragraph.strip()
-            for entry in entries
-            if entry.paragraph and entry.paragraph.strip()
-        ]
-        if not paragraphs:
+        matched_entries: list[DrugClinicalAssessment] = []
+        unresolved_entries: list[DrugClinicalAssessment] = []
+        for entry in entries:
+            if self.should_render_as_matched_drug(entry):
+                matched_entries.append(entry)
+                continue
+            unresolved_entries.append(entry)
+
+        matched_sections = [self.render_matched_drug_section(entry) for entry in matched_entries]
+        matched_sections = [section for section in matched_sections if section]
+        unresolved_section = self.render_unresolved_mentions_section(unresolved_entries)
+        sections: list[str] = []
+        if matched_sections:
+            sections.append("\n\n---\n\n".join(matched_sections))
+        if unresolved_section:
+            sections.append(unresolved_section)
+        if not sections:
             return None
-        separator = "\n\n---\n\n" if len(paragraphs) > 1 else "\n\n"
-        combined_report = separator.join(paragraphs)
-        conclusion = await self.generate_conclusion(
-            clinical_context=clinical_context or "",
-            multi_drug_report=combined_report,
-        )
-        if conclusion:
-            combined_report = (
-                f"{combined_report}\n\n## Global Synthesis and Clinical Recommendations\n\n{conclusion}"
+
+        combined_report = "\n\n---\n\n".join(sections)
+        if matched_sections:
+            conclusion = await self.generate_conclusion(
+                clinical_context=clinical_context or "",
+                multi_drug_report="\n\n---\n\n".join(matched_sections),
             )
+            if conclusion:
+                combined_report = (
+                    f"{combined_report}\n\n## Global Synthesis and Clinical Recommendations\n\n{conclusion}"
+                )
         return combined_report
+
+    # -------------------------------------------------------------------------
+    @staticmethod
+    def should_render_as_matched_drug(entry: DrugClinicalAssessment) -> bool:
+        status = (entry.match_status or "").strip().lower()
+        return status == "matched"
+
+    # -------------------------------------------------------------------------
+    def render_matched_drug_section(self, entry: DrugClinicalAssessment) -> str:
+        score = self.resolve_livertox_score(entry.matched_livertox_row)
+        title = self.format_drug_heading(entry.drug_name, score)
+        body = self.sanitize_renderable_body(entry)
+        if not body:
+            body = self.build_fallback_technical_note(entry)
+        return (
+            f"**{title}**\n\n"
+            f"**Report**\n\n"
+            f"{body}\n\n"
+            f"**Bibliography source**: LiverTox"
+        ).strip()
+
+    # -------------------------------------------------------------------------
+    def sanitize_renderable_body(self, entry: DrugClinicalAssessment) -> str:
+        text = entry.paragraph.strip() if entry.paragraph else ""
+        if not text:
+            return ""
+        expected_name = (entry.drug_name or "").strip().lower()
+        lines: list[str] = []
+        for raw_line in text.splitlines():
+            stripped = raw_line.strip()
+            if not stripped:
+                if lines and lines[-1]:
+                    lines.append("")
+                continue
+            if REDUNDANT_REPORT_LINE_RE.search(
+                re.sub(r"[\s*_`#:\-]+", " ", stripped).strip()
+            ):
+                continue
+            if REPORT_LABEL_LINE_RE.match(stripped):
+                continue
+            if BIBLIOGRAPHY_LINE_RE.match(stripped):
+                continue
+            if stripped == "---":
+                continue
+            if stripped.lower().startswith("## global synthesis"):
+                break
+            if DRIFT_SECTION_LINE_RE.match(stripped):
+                break
+            if STRUCTURED_DILI_SECTION_LINE_RE.match(stripped):
+                break
+            title_match = LIVERTOX_TITLE_LINE_RE.match(stripped)
+            if title_match:
+                if expected_name and expected_name not in stripped.lower():
+                    continue
+                continue
+            lines.append(raw_line.rstrip())
+        sanitized = "\n".join(lines).strip()
+        sanitized = re.sub(r"\n{3,}", "\n\n", sanitized).strip()
+        normalized = re.sub(r"\s+", " ", sanitized).strip().lower()
+        if "local livertox excerpt not available" in normalized:
+            return ""
+        return sanitized
+
+    # -------------------------------------------------------------------------
+    def build_fallback_technical_note(self, entry: DrugClinicalAssessment) -> str:
+        if entry.suspension.excluded:
+            return self.build_excluded_paragraph(entry)
+        if entry.ambiguous_match:
+            return self.build_ambiguous_match_paragraph(entry)
+        if entry.missing_livertox:
+            return self.build_missing_excerpt_paragraph(entry)
+        return self.build_error_paragraph(entry)
+
+    # -------------------------------------------------------------------------
+    def render_unresolved_mentions_section(
+        self, entries: list[DrugClinicalAssessment]
+    ) -> str | None:
+        if not entries:
+            return None
+        lines: list[str] = ["## Unresolved Drug Mentions", ""]
+        for entry in entries:
+            label = (entry.drug_name or "").strip() or "Unnamed drug"
+            reason = self.describe_unresolved_entry(entry)
+            lines.append(f"- **{label}**: {reason}")
+        return "\n".join(lines).strip()
+
+    # -------------------------------------------------------------------------
+    def describe_unresolved_entry(self, entry: DrugClinicalAssessment) -> str:
+        status = (entry.match_status or "").strip().lower()
+        if status == "ambiguous" or entry.ambiguous_match:
+            candidates = (
+                ", ".join(entry.match_candidates)
+                if entry.match_candidates
+                else "not available"
+            )
+            return f"Ambiguous match in local knowledge base (candidates: {candidates})."
+        if status == "missing":
+            return "No matching drug record found in the local knowledge base."
+        if entry.missing_livertox:
+            return "Matched record found, but no local LiverTox excerpt is available."
+        return "Could not produce a deterministic matched-drug section."
 
     # -------------------------------------------------------------------------
     async def generate_conclusion(
@@ -1104,39 +1238,48 @@ class HepatoxConsultation:
 
     # -------------------------------------------------------------------------
     def build_excluded_paragraph(self, entry: DrugClinicalAssessment) -> str:
-        score = self.resolve_livertox_score(entry.matched_livertox_row)
-        heading = self.format_drug_heading(entry.drug_name, score)
         suspension = entry.suspension
         if suspension.suspension_date is not None:
-            detail = f"The therapy was suspended on {suspension.suspension_date.isoformat()} well before the visit, so the drug was excluded from this DILI assessment."
+            detail = (
+                f"The therapy was suspended on {suspension.suspension_date.isoformat()} "
+                "well before the visit, so this exposure was excluded from active DILI "
+                "causality assessment."
+            )
         else:
-            detail = "The therapy was reported as suspended well before the visit and was excluded from the current DILI assessment."
-        recommendation = "Manual verification of latency is suggested if the exposure history becomes relevant again."
-        return (
-            f"{heading}\n{detail} {recommendation}\nBibliography source: LiverTox"
+            detail = (
+                "The therapy was reported as suspended well before the visit and was "
+                "excluded from active DILI causality assessment."
+            )
+        recommendation = (
+            "Manual latency verification is suggested if the exposure history becomes "
+            "clinically relevant again."
         )
+        return f"{detail} {recommendation}"
 
     # -------------------------------------------------------------------------
     def build_missing_excerpt_paragraph(self, entry: DrugClinicalAssessment) -> str:
-        normalized_name = entry.drug_name.strip() if entry.drug_name else "Unnamed drug"
-        return f"{normalized_name}: local LiverTox excerpt not available."
+        _ = entry
+        return (
+            "No local LiverTox excerpt is currently available for this matched drug, "
+            "so automated causality narration could not be generated."
+        )
 
     # -------------------------------------------------------------------------
     def build_ambiguous_match_paragraph(self, entry: DrugClinicalAssessment) -> str:
-        heading = self.format_drug_heading(entry.drug_name, NOT_AVAILABLE_TEXT)
-        candidates = ", ".join(entry.match_candidates) if entry.match_candidates else "Not available"
+        candidates = (
+            ", ".join(entry.match_candidates) if entry.match_candidates else "not available"
+        )
         note = (
             "Drug matching was ambiguous; no LiverTox excerpt was injected to avoid an "
             "incorrect attribution."
         )
         details = f"Candidate matches: {candidates}."
         guidance = "Manual curation is required before causality assessment."
-        return f"{heading}\n{note} {details} {guidance}\nBibliography source: LiverTox"
+        return f"{note} {details} {guidance}"
 
     # -------------------------------------------------------------------------
     def build_error_paragraph(self, entry: DrugClinicalAssessment) -> str:
-        score = self.resolve_livertox_score(entry.matched_livertox_row)
-        heading = self.format_drug_heading(entry.drug_name, score)
+        _ = entry
         message = "Automated analysis was unavailable due to a technical issue; a clinician should review the LiverTox documentation manually."
-        return f"{heading}\n{message}\nBibliography source: LiverTox"
+        return message
 
