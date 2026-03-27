@@ -10,7 +10,12 @@ import httpx
 from fastapi import FastAPI
 from fastapi.testclient import TestClient
 
+from DILIGENT.server import app as server_app_module
+from DILIGENT.server.api import access_keys as access_keys_api
+from DILIGENT.server.api import data_inspection as data_inspection_api
+from DILIGENT.server.api import ollama as ollama_api
 from DILIGENT.server.api.error_handling import REQUEST_ID_HEADER, register_error_handling
+from DILIGENT.server.models.providers import OllamaError
 from DILIGENT.server.services.jobs import JobManager
 from DILIGENT.server.services.research import tavily as tavily_module
 from DILIGENT.server.services.research.tavily import TavilyResearchService
@@ -130,6 +135,68 @@ def test_job_manager_reports_timeout_message() -> None:
 
     assert payload["status"] == "failed"
     assert payload["error"] == "Operation timed out. Please retry."
+
+
+# -----------------------------------------------------------------------------
+def test_access_key_endpoint_sanitizes_dependency_failure(monkeypatch) -> None:
+    def fake_create_key(provider: str, access_key: str):
+        raise RuntimeError("ACCESS_KEY_ENCRYPTION_KEY missing token=abc123")
+
+    monkeypatch.setattr(access_keys_api.serializer, "create_key", fake_create_key)
+
+    with TestClient(server_app_module.app, raise_server_exceptions=False) as client:
+        response = client.post(
+            "/access-keys",
+            json={"provider": "openai", "access_key": "sk-test-value"},
+        )
+
+    assert response.status_code == 503
+    payload = response.json()
+    assert payload["detail"] == "Access key service is unavailable. Please retry shortly."
+
+
+# -----------------------------------------------------------------------------
+def test_data_inspection_endpoint_sanitizes_runtime_failure(monkeypatch) -> None:
+    def fake_start_update_job(job_type: str):
+        raise RuntimeError("traceback secret=value")
+
+    monkeypatch.setattr(
+        data_inspection_api.service,
+        "start_update_job",
+        fake_start_update_job,
+    )
+
+    with TestClient(server_app_module.app, raise_server_exceptions=False) as client:
+        response = client.post("/inspection/rxnav/jobs")
+
+    assert response.status_code == 500
+    payload = response.json()
+    assert payload["detail"] == "Update job could not start. Please retry."
+
+
+# -----------------------------------------------------------------------------
+def test_ollama_endpoint_sanitizes_provider_error(monkeypatch) -> None:
+    class FakeOllamaClient:
+        async def __aenter__(self):
+            return self
+
+        async def __aexit__(self, exc_type, exc, tb) -> None:
+            return None
+
+        async def list_models(self):
+            raise OllamaError("stack trace token=internal")
+
+    monkeypatch.setattr(ollama_api, "OllamaClient", FakeOllamaClient)
+
+    with TestClient(server_app_module.app, raise_server_exceptions=False) as client:
+        response = client.get("/models/list")
+
+    assert response.status_code == 502
+    payload = response.json()
+    assert (
+        payload["detail"]
+        == "Ollama service is unavailable. Verify Ollama is running and retry."
+    )
 
 
 # -----------------------------------------------------------------------------
