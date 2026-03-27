@@ -29,6 +29,28 @@ class FakeDiseaseClient:
         return schema(entries=[])
 
 
+class FlakyDiseaseClient:
+    def __init__(self, *, failures_before_success: int) -> None:
+        self.failures_before_success = max(failures_before_success, 0)
+        self.call_count = 0
+
+    async def llm_structured_call(self, **kwargs: Any) -> PatientDiseaseContext:
+        self.call_count += 1
+        if self.call_count <= self.failures_before_success:
+            raise RuntimeError(
+                "HTTP 429: Please try again in 0.01s. rate_limit_exceeded"
+            )
+        return PatientDiseaseContext(
+            entries=[
+                DiseaseContextEntry(
+                    name="Steatosi epatica",
+                    chronic=True,
+                    hepatic_related=True,
+                )
+            ]
+        )
+
+
 def test_extract_diseases_from_anamnesis_deduplicates_and_keeps_rich_entry() -> None:
     client = FakeDiseaseClient(
         [
@@ -71,6 +93,19 @@ def test_extract_diseases_from_anamnesis_deduplicates_and_keeps_rich_entry() -> 
     assert steatosis.occurrence_time == "2021"
     assert steatosis.chronic is True
     assert steatosis.hepatic_related is True
+
+
+def test_extract_diseases_from_anamnesis_retries_transient_failures() -> None:
+    client = FlakyDiseaseClient(failures_before_success=1)
+    extractor = DiseaseExtractor(client=client)
+    extractor.extraction_retry_attempts = 2
+
+    parsed = asyncio.run(
+        extractor.extract_diseases_from_anamnesis("Steatosi epatica cronica.")
+    )
+
+    assert client.call_count == 2
+    assert [entry.name for entry in parsed.entries] == ["Steatosi epatica"]
 
 
 def test_build_structured_clinical_context_includes_disease_timeline() -> None:

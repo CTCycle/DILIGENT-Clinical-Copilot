@@ -61,6 +61,10 @@ STRUCTURED_DILI_SECTION_LINE_RE = re.compile(
     r"^\s*#{0,6}\s*\*{0,2}\s*Structured\s+DILI\s+Assessment\s+Report\s*\*{0,2}\s*$",
     re.IGNORECASE,
 )
+RATE_LIMIT_WAIT_HINT_RE = re.compile(
+    r"please\s+try\s+again\s+in\s+([0-9]+(?:\.[0-9]+)?)s",
+    re.IGNORECASE,
+)
 
 
 ###############################################################################
@@ -247,7 +251,7 @@ class HepatoxConsultation:
         self.llm_client = initialize_llm_client(purpose="clinical", timeout_s=timeout_s)
         self.MAX_EXCERPT_LENGTH = server_settings.external_data.max_excerpt_length
         self.patient_name = (patient_name or "").strip() or None
-        _, model_candidate = LLMRuntimeConfig.resolve_provider_and_model("clinical")
+        provider, model_candidate = LLMRuntimeConfig.resolve_provider_and_model("clinical")
         self.llm_model = model_candidate or LLMRuntimeConfig.get_clinical_model()
         try:
             chat_signature = inspect.signature(self.llm_client.chat)
@@ -261,23 +265,25 @@ class HepatoxConsultation:
         self.rag_use_reranking = bool(server_settings.rag.use_reranking)
         self.rag_top_n = max(int(server_settings.rag.rerank_top_n), 1)
         self.rag_candidate_k = max(int(server_settings.rag.rerank_candidate_k), self.rag_top_n)
+        default_parallel_analyses = 3 if provider == "ollama" else 1
         self.max_parallel_analyses = max(
             1,
             int(
                 getattr(
                     server_settings.external_data,
                     "clinical_llm_max_concurrency",
-                    3,
+                    default_parallel_analyses,
                 )
             ),
         )
+        default_retry_attempts = 2 if provider == "ollama" else 4
         self.analysis_retry_attempts = max(
             1,
             int(
                 getattr(
                     server_settings.external_data,
                     "clinical_llm_retry_attempts",
-                    2,
+                    default_retry_attempts,
                 )
             ),
         )
@@ -1010,12 +1016,13 @@ class HepatoxConsultation:
                     raise RuntimeError(
                         f"LLM analysis failed for {drug_name}: {exc}"
                     ) from exc
-                delay = self.retry_backoff_seconds(attempt)
+                delay = self.retry_backoff_seconds(attempt, exc=exc)
                 logger.warning(
-                    "Retrying LLM analysis for '%s' after error (attempt %d/%d): %s",
+                    "Retrying LLM analysis for '%s' after error (attempt %d/%d, delay %.2fs): %s",
                     drug_name,
                     attempt,
                     self.analysis_retry_attempts,
+                    delay,
                     exc,
                 )
                 await asyncio.sleep(delay)
@@ -1040,9 +1047,29 @@ class HepatoxConsultation:
         return str(raw_response).strip()
 
     # -------------------------------------------------------------------------
-    def retry_backoff_seconds(self, attempt: int) -> float:
+    @staticmethod
+    def extract_rate_limit_wait_hint_seconds(exc: Exception) -> float | None:
+        message = str(exc)
+        match = RATE_LIMIT_WAIT_HINT_RE.search(message)
+        if match is None:
+            return None
+        try:
+            parsed = float(match.group(1))
+        except (TypeError, ValueError):
+            return None
+        if parsed <= 0:
+            return None
+        # Add a small safety margin to avoid retrying too early.
+        return min(parsed + 0.25, 30.0)
+
+    # -------------------------------------------------------------------------
+    def retry_backoff_seconds(self, attempt: int, *, exc: Exception | None = None) -> float:
+        if exc is not None:
+            hinted_wait = self.extract_rate_limit_wait_hint_seconds(exc)
+            if hinted_wait is not None:
+                return hinted_wait
         normalized_attempt = max(int(attempt), 1)
-        return min(2.0, 0.35 * normalized_attempt)
+        return min(8.0, 0.75 * (2 ** (normalized_attempt - 1)))
 
     # -------------------------------------------------------------------------
     @staticmethod
@@ -1228,11 +1255,23 @@ class HepatoxConsultation:
             chat_kwargs["temperature"] = self.temperature
         else:
             chat_kwargs["options"] = {"temperature": self.temperature}
-        try:
-            raw_response = await self.llm_client.chat(**chat_kwargs)
-        except Exception as exc:  # noqa: BLE001
-            logger.error("Failed to generate clinical conclusion: %s", exc)
-            return None
+        for attempt in range(1, self.analysis_retry_attempts + 1):
+            try:
+                raw_response = await self.llm_client.chat(**chat_kwargs)
+                break
+            except Exception as exc:  # noqa: BLE001
+                if attempt >= self.analysis_retry_attempts:
+                    logger.error("Failed to generate clinical conclusion: %s", exc)
+                    return None
+                delay = self.retry_backoff_seconds(attempt, exc=exc)
+                logger.warning(
+                    "Retrying clinical conclusion generation after error (attempt %d/%d, delay %.2fs): %s",
+                    attempt,
+                    self.analysis_retry_attempts,
+                    delay,
+                    exc,
+                )
+                await asyncio.sleep(delay)
         conclusion = self.coerce_chat_text(raw_response).strip()
         return conclusion or None
 
