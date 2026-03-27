@@ -671,6 +671,7 @@ class DrugClinicalAssessment(BaseModel):
     canonical_name: str | None = Field(default=None, max_length=200)
     origins: list[str] = Field(default_factory=list)
     extraction_metadata: list[dict[str, Any]] = Field(default_factory=list)
+    match_status: str | None = Field(default=None, max_length=32)
     matched_livertox_row: dict[str, Any] | None = Field(default=None)
     extracted_excerpts: list[str] = Field(default_factory=list)
     missing_livertox: bool = Field(default=False)

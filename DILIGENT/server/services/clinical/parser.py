@@ -71,6 +71,36 @@ class DrugsParser:
         re.IGNORECASE,
     )
     ANAMNESIS_CHUNK_MAX_CHARS = 2400
+    NON_DRUG_EXACT_NAMES = {
+        "in riserva",
+        "al bisogno",
+        "se necessario",
+    }
+    NON_DRUG_PREFIXES = (
+        "ulteriore ciclo",
+        "eventuale inizio",
+    )
+    NON_DRUG_CONTAINS = (
+        "originariamente previsto",
+    )
+    WEEKDAY_TOKENS = {
+        "il",
+        "la",
+        "lunedi",
+        "martedi",
+        "mercoledi",
+        "giovedi",
+        "venerdi",
+        "sabato",
+        "domenica",
+        "monday",
+        "tuesday",
+        "wednesday",
+        "thursday",
+        "friday",
+        "saturday",
+        "sunday",
+    }
 
     def __init__(
         self,
@@ -687,6 +717,31 @@ class DrugsParser:
         return normalized or None
 
     # -------------------------------------------------------------------------
+    @staticmethod
+    def normalize_filter_key(value: str) -> str:
+        normalized = unicodedata.normalize("NFKD", value)
+        normalized = normalized.encode("ascii", "ignore").decode("ascii")
+        normalized = normalized.lower()
+        normalized = re.sub(r"[^a-z0-9\s]", " ", normalized)
+        return re.sub(r"\s+", " ", normalized).strip()
+
+    # -------------------------------------------------------------------------
+    def is_non_drug_fragment_name(self, value: str) -> bool:
+        normalized = self.normalize_filter_key(value)
+        if not normalized:
+            return True
+        if normalized in self.NON_DRUG_EXACT_NAMES:
+            return True
+        if any(normalized.startswith(prefix) for prefix in self.NON_DRUG_PREFIXES):
+            return True
+        if any(fragment in normalized for fragment in self.NON_DRUG_CONTAINS):
+            return True
+        tokens = normalized.split()
+        if tokens and all(token in self.WEEKDAY_TOKENS for token in tokens):
+            return True
+        return False
+
+    # -------------------------------------------------------------------------
     def derive_temporal_classification(self, entry: DrugEntry) -> str:
         schedule_present = bool(entry.administration_pattern) or bool(
             entry.daytime_administration
@@ -713,6 +768,8 @@ class DrugsParser:
             return None
         name = self.sanitize_name(entry.name)
         if name is None:
+            return None
+        if self.is_non_drug_fragment_name(name):
             return None
         normalized = entry.model_copy(deep=True)
         normalized.name = name
