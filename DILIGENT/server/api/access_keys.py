@@ -4,6 +4,7 @@ from typing import Literal
 
 from fastapi import APIRouter, Body, HTTPException, Path, Query, status
 
+from DILIGENT.server.common.utils.logger import logger
 from DILIGENT.server.domain.keys import (
     AccessKeyCreateRequest,
     AccessKeyDeleteResponse,
@@ -39,9 +40,10 @@ def list_access_keys(
     try:
         rows = serializer.list_keys(provider)
     except ValueError as exc:
+        logger.warning("Access key listing rejected: %s", exc)
         raise HTTPException(
             status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
-            detail=str(exc),
+            detail="Invalid access key provider.",
         ) from exc
     return [to_response(row) for row in rows]
 
@@ -54,14 +56,16 @@ def create_access_key(
     try:
         created = serializer.create_key(payload.provider, payload.access_key)
     except RuntimeError as exc:
+        logger.warning("Access key creation failed due to dependency/config issue: %s", exc)
         raise HTTPException(
             status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
-            detail=str(exc),
+            detail="Access key service is unavailable. Please retry shortly.",
         ) from exc
     except ValueError as exc:
+        logger.warning("Access key creation rejected: %s", exc)
         raise HTTPException(
             status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
-            detail=str(exc),
+            detail="Invalid access key input.",
         ) from exc
     return to_response(created)
 
@@ -79,9 +83,10 @@ def activate_access_key(
     try:
         row = serializer.activate_key(key_id, provider=provider)
     except ValueError as exc:
+        logger.warning("Access key activation rejected for id=%s provider=%s: %s", key_id, provider, exc)
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
-            detail=str(exc),
+            detail="Access key not found.",
         ) from exc
     return to_response(row)
 

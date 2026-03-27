@@ -1079,7 +1079,7 @@ class ClinicalSessionEndpoint:
         if job_status is None:
             raise HTTPException(
                 status_code=status.HTTP_404_NOT_FOUND,
-                detail=f"Job not found: {job_id}",
+                detail="Job not found.",
             )
         return JobStatusResponse(**job_status)
 
@@ -1089,7 +1089,7 @@ class ClinicalSessionEndpoint:
         if job_status is None:
             raise HTTPException(
                 status_code=status.HTTP_404_NOT_FOUND,
-                detail=f"Job not found: {job_id}",
+                detail="Job not found.",
             )
         success = job_manager.cancel_job(job_id)
         if success:

@@ -212,6 +212,24 @@ class OllamaEndpoint:
         self.router = router        
 
     # -------------------------------------------------------------------------
+    @staticmethod
+    def raise_ollama_http_exception(exc: Exception, *, action: str) -> None:
+        if isinstance(exc, OllamaTimeout):
+            raise HTTPException(
+                status_code=status.HTTP_504_GATEWAY_TIMEOUT,
+                detail="Ollama request timed out. Please retry.",
+            ) from exc
+        if isinstance(exc, OllamaError):
+            raise HTTPException(
+                status_code=status.HTTP_502_BAD_GATEWAY,
+                detail="Ollama service is unavailable. Verify Ollama is running and retry.",
+            ) from exc
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Unexpected error while {action}.",
+        ) from exc
+
+    # -------------------------------------------------------------------------
     async def pull_model(
         self,
         name: str = Query(
@@ -236,14 +254,12 @@ class OllamaEndpoint:
                 return ModelPullResponse(
                     status="success", pulled=(not already), model=model_name
                 )
+        except OllamaTimeout as exc:
+            self.raise_ollama_http_exception(exc, action="pulling model")
+        except OllamaError as exc:
+            self.raise_ollama_http_exception(exc, action="pulling model")
         except Exception as exc:
-            if isinstance(exc, OllamaTimeout):
-                raise HTTPException(status_code=504, detail=str(exc))
-            if isinstance(exc, OllamaError):
-                raise HTTPException(status_code=502, detail=str(exc))
-            raise HTTPException(
-                status_code=500, detail="Unexpected error while pulling model"
-            )
+            self.raise_ollama_http_exception(exc, action="pulling model")
 
     # -------------------------------------------------------------------------
     def start_pull_job(
@@ -296,7 +312,7 @@ class OllamaEndpoint:
         if job_status is None:
             raise HTTPException(
                 status_code=status.HTTP_404_NOT_FOUND,
-                detail=f"Job not found: {job_id}",
+                detail="Job not found.",
             )
         return JobStatusResponse(**job_status)
 
@@ -306,7 +322,7 @@ class OllamaEndpoint:
         if job_status is None:
             raise HTTPException(
                 status_code=status.HTTP_404_NOT_FOUND,
-                detail=f"Job not found: {job_id}",
+                detail="Job not found.",
             )
         success = job_manager.cancel_job(job_id)
         if success:
@@ -323,14 +339,12 @@ class OllamaEndpoint:
             async with OllamaClient() as client:
                 models = await client.list_models()
             return ModelListResponse(models=models, count=len(models))
+        except OllamaTimeout as exc:
+            self.raise_ollama_http_exception(exc, action="listing models")
+        except OllamaError as exc:
+            self.raise_ollama_http_exception(exc, action="listing models")
         except Exception as exc:
-            if isinstance(exc, OllamaTimeout):
-                raise HTTPException(status_code=504, detail=str(exc))
-            if isinstance(exc, OllamaError):
-                raise HTTPException(status_code=502, detail=str(exc))
-            raise HTTPException(
-                status_code=500, detail="Unexpected error while listing models"
-            )
+            self.raise_ollama_http_exception(exc, action="listing models")
         
     # -------------------------------------------------------------------------
     def add_routes(self) -> None:
