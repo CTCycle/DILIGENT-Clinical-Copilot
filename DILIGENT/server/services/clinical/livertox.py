@@ -284,25 +284,68 @@ class LiverToxData:
         if self.livertox_df is None or self.livertox_df.empty:
             return {}
         index: dict[str, dict[str, Any]] = {}
-        rows = sorted(
-            self.livertox_df.to_dict(orient="records"),
-            key=lambda row: (
-                self.lookup.normalize_name(str(row.get("drug_name", ""))),
-                str(row.get("nbk_id", "")).casefold(),
-            ),
-        )
-        for row in rows:
+        for row in self.livertox_df.to_dict(orient="records"):
             drug_name = coerce_text(row.get("drug_name"))
             if drug_name is None:
                 continue
             normalized = self.lookup.normalize_name(drug_name)
             if not normalized:
                 continue
-            if normalized in index:
-                continue
-            index[normalized] = row # type: ignore
+            existing = index.get(normalized)
+            if existing is None or self.is_preferred_row(row, existing):
+                index[normalized] = row
         self.rows_by_name = index
         return self.rows_by_name
+
+    # -------------------------------------------------------------------------
+    def is_preferred_row(self, candidate: dict[str, Any], current: dict[str, Any]) -> bool:
+        candidate_score = self.row_quality_score(candidate)
+        current_score = self.row_quality_score(current)
+        if candidate_score != current_score:
+            return candidate_score > current_score
+        return self.row_tie_break_key(candidate) < self.row_tie_break_key(current)
+
+    # -------------------------------------------------------------------------
+    def row_quality_score(self, row: dict[str, Any]) -> tuple[int, int, int, int]:
+        has_excerpt = 1 if coerce_text(row.get("excerpt")) else 0
+        include_in_livertox = 1 if self.coerce_boolish(row.get("include_in_livertox")) else 0
+        reference_count = self.coerce_int(row.get("reference_count"))
+        year_approved = self.coerce_int(row.get("year_approved"))
+        return (
+            has_excerpt,
+            include_in_livertox,
+            reference_count,
+            year_approved,
+        )
+
+    # -------------------------------------------------------------------------
+    @staticmethod
+    def row_tie_break_key(row: dict[str, Any]) -> tuple[str, str]:
+        nbk_id = (coerce_text(row.get("nbk_id")) or "~").casefold()
+        drug_name = (coerce_text(row.get("drug_name")) or "~").casefold()
+        return nbk_id, drug_name
+
+    # -------------------------------------------------------------------------
+    @staticmethod
+    def coerce_int(value: Any) -> int:
+        if value is None:
+            return -1
+        try:
+            return int(value)
+        except (TypeError, ValueError):
+            return -1
+
+    # -------------------------------------------------------------------------
+    @staticmethod
+    def coerce_boolish(value: Any) -> bool:
+        if isinstance(value, bool):
+            return value
+        if isinstance(value, (int, float)):
+            return bool(value)
+        if value is None:
+            return False
+        lowered = str(value).strip().lower()
+        return lowered in {"1", "true", "yes", "y", "t"}
 
     # -------------------------------------------------------------------------
     def derive_master_alias_source(

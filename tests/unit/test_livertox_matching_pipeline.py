@@ -202,3 +202,47 @@ def test_query_normalization_handles_brands_and_manufacturers() -> None:
     assert normalize_drug_query_name("Levetiracetam dal 27.08.2024") == "levetiracetam"
     assert normalize_drug_query_name("Nozinan dal 11.09.2024") == "levomepromazine"
     assert normalize_drug_query_name("Morfina gtt 5 3/die") == "morphine"
+
+
+def test_mapping_prefers_excerpt_row_for_duplicate_normalized_drug() -> None:
+    frame = pd.DataFrame(
+        [
+            {
+                "nbk_id": "NBK0001",
+                "drug_name": "Diazepam",
+                "excerpt": None,
+                "synonyms": "Valium",
+                "ingredient": "Diazepam",
+                "brand_name": "Valium",
+                "include_in_livertox": False,
+                "reference_count": 900,
+            },
+            {
+                "nbk_id": "NBK0002",
+                "drug_name": "diazepam",
+                "excerpt": "Useful diazepam excerpt from preferred row.",
+                "synonyms": "Valium",
+                "ingredient": "Diazepam",
+                "brand_name": "Valium",
+                "include_in_livertox": False,
+                "reference_count": 1,
+            },
+        ]
+    )
+    matcher = LiverToxMatcher(frame)
+
+    record = matcher.data.records[0]
+    match = matcher.lookup.create_match(
+        record=record,
+        confidence=1.0,
+        reason="exact_canonical",
+        notes=[],
+    )
+    mapping = matcher.build_drugs_to_excerpt_mapping(["Valium"], [match])
+
+    entry = mapping[0]
+    assert entry["match_status"] == "matched"
+    assert entry["missing_livertox"] is False
+    assert entry["matched_livertox_row"] is not None
+    assert entry["matched_livertox_row"]["nbk_id"] == "NBK0002"
+    assert "useful diazepam excerpt" in entry["extracted_excerpts"][0].lower()

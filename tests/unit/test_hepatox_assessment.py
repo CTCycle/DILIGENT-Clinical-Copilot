@@ -2,13 +2,13 @@ from __future__ import annotations
 
 import asyncio
 from datetime import date
-from types import SimpleNamespace
 
 import pytest
 
 from DILIGENT.server.models.prompts import LIVERTOX_CLINICAL_USER_PROMPT
 from DILIGENT.server.domain.clinical import (
     ClinicalPipelineValidationError,
+    DrugClinicalAssessment,
     DrugEntry,
     DrugSuspensionContext,
     PatientData,
@@ -146,6 +146,8 @@ def test_request_drug_analysis_retries_on_transient_failure() -> None:
 def test_livertox_prompt_removes_per_drug_management_recommendation_directive() -> None:
     assert "Provide monitoring or clinical management recommendations" not in LIVERTOX_CLINICAL_USER_PROMPT
     assert "Do not provide drug-level monitoring or management recommendations" in LIVERTOX_CLINICAL_USER_PROMPT
+    assert "Do not add any appendix or extra section after the bibliography line." in LIVERTOX_CLINICAL_USER_PROMPT
+    assert "Do not output JSON, YAML, XML, tables, or fenced code blocks" in LIVERTOX_CLINICAL_USER_PROMPT
 
 
 def test_finalize_patient_report_uses_global_synthesis_section_header() -> None:
@@ -158,7 +160,14 @@ def test_finalize_patient_report_uses_global_synthesis_section_header() -> None:
     consultation.generate_conclusion = fake_generate_conclusion  # type: ignore[method-assign]
     report = asyncio.run(
         consultation.finalize_patient_report(
-            [SimpleNamespace(paragraph="Per-drug assessment.")],
+            [
+                DrugClinicalAssessment(
+                    drug_name="Acetaminophen",
+                    match_status="matched",
+                    matched_livertox_row={"likelihood_score": "A"},
+                    paragraph="Per-drug assessment.",
+                )
+            ],
             clinical_context="Clinical context",
         )
     )
@@ -166,3 +175,115 @@ def test_finalize_patient_report_uses_global_synthesis_section_header() -> None:
     assert report is not None
     assert "## Global Synthesis and Clinical Recommendations" in report
     assert "## Conclusion" not in report
+
+
+def test_finalize_patient_report_renders_deterministic_matched_and_unresolved_sections() -> None:
+    consultation = HepatoxConsultation.__new__(HepatoxConsultation)
+
+    async def fake_generate_conclusion(**kwargs):  # type: ignore[no-untyped-def]
+        _ = kwargs
+        return None
+
+    consultation.generate_conclusion = fake_generate_conclusion  # type: ignore[method-assign]
+    report = asyncio.run(
+        consultation.finalize_patient_report(
+            [
+                DrugClinicalAssessment(
+                    drug_name="Pantozol",
+                    match_status="matched",
+                    matched_livertox_row={"likelihood_score": "C"},
+                    paragraph=(
+                        "**Pantozol - LiverTox score C**\n\n"
+                        "**Report**\n\n"
+                        "**Pantozol - LiverTox score C**\n"
+                        "Core clinical narrative.\n"
+                        "**Bibliography source**: LiverTox\n"
+                        "medication\n"
+                        "- **Simvastatin** - 20 mg orally."
+                    ),
+                ),
+                DrugClinicalAssessment(
+                    drug_name="Carboplatin",
+                    match_status="matched",
+                    matched_livertox_row={"likelihood_score": "D"},
+                    paragraph="Carboplatin narrative.",
+                ),
+                DrugClinicalAssessment(
+                    drug_name="ulteriore ciclo (originariamente previsto il",
+                    match_status="missing",
+                    missing_livertox=True,
+                    paragraph="Ignored unresolved paragraph.",
+                ),
+            ],
+            clinical_context="Clinical context",
+        )
+    )
+
+    assert report is not None
+    assert report.count("**Pantozol - LiverTox score C**") == 1
+    assert report.count("**Carboplatin - LiverTox score D**") == 1
+    assert report.count("**Report**") == 2
+    assert "Simvastatin" not in report
+    assert "## Unresolved Drug Mentions" in report
+    assert "ulteriore ciclo (originariamente previsto il" in report
+    assert "No matching drug record found in the local knowledge base." in report
+
+
+def test_finalize_patient_report_keeps_matched_drug_without_excerpt() -> None:
+    consultation = HepatoxConsultation.__new__(HepatoxConsultation)
+
+    async def fake_generate_conclusion(**kwargs):  # type: ignore[no-untyped-def]
+        _ = kwargs
+        return None
+
+    consultation.generate_conclusion = fake_generate_conclusion  # type: ignore[method-assign]
+    report = asyncio.run(
+        consultation.finalize_patient_report(
+            [
+                DrugClinicalAssessment(
+                    drug_name="Valium",
+                    match_status="matched",
+                    missing_livertox=True,
+                    matched_livertox_row={"likelihood_score": "D"},
+                    paragraph="Valium: local LiverTox excerpt not available.",
+                )
+            ],
+            clinical_context="Clinical context",
+        )
+    )
+
+    assert report is not None
+    assert "**Valium - LiverTox score D**" in report
+    assert "No local LiverTox excerpt is currently available" in report
+
+
+def test_sanitize_renderable_body_removes_structured_dili_section() -> None:
+    consultation = HepatoxConsultation.__new__(HepatoxConsultation)
+    entry = DrugClinicalAssessment(
+        drug_name="Pembrolizumab",
+        paragraph=(
+            "Clinical narrative before appendix.\n\n"
+            "### Structured DILI Assessment Report\n\n"
+            "```json\n"
+            '{"liver_injury_probable":"High"}\n'
+            "```\n"
+        ),
+    )
+
+    sanitized = consultation.sanitize_renderable_body(entry)
+
+    assert sanitized == "Clinical narrative before appendix."
+
+
+def test_remove_redundant_report_sentence_truncates_structured_dili_section() -> None:
+    raw = (
+        "Clinical narrative before appendix.\n\n"
+        "### Structured DILI Assessment Report\n\n"
+        "```json\n"
+        '{"liver_injury_probable":"High"}\n'
+        "```\n"
+    )
+
+    cleaned = HepatoxConsultation.remove_redundant_report_sentence(raw)
+
+    assert cleaned == "Clinical narrative before appendix."
