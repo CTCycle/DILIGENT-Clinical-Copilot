@@ -132,6 +132,12 @@ class CloudLLMClient:
 
     # ---------------------------------------------------------------------
     @staticmethod
+    def is_gpt5_family_model(model: str | None) -> bool:
+        normalized = (model or "").strip().lower()
+        return normalized.startswith("gpt-5")
+
+    # ---------------------------------------------------------------------
+    @staticmethod
     def raise_for_status(resp: httpx.Response) -> None:
         try:
             resp.raise_for_status()
@@ -184,15 +190,17 @@ class CloudLLMClient:
         format: str | None,
         options: dict[str, Any] | None,
     ) -> dict[str, Any] | str:
+        resolved_model = model or self.default_model
         body: dict[str, Any] = {
-            "model": model or self.default_model,
+            "model": resolved_model,
             "messages": messages,
             "stream": False,
         }
         if options:
-            if "temperature" in options:
+            supports_sampling = not self.is_gpt5_family_model(resolved_model)
+            if supports_sampling and "temperature" in options:
                 body["temperature"] = options["temperature"]
-            if "top_p" in options:
+            if supports_sampling and "top_p" in options:
                 body["top_p"] = options["top_p"]
         if format == "json":
             body["response_format"] = {"type": "json_object"}
@@ -383,7 +391,11 @@ class CloudLLMClient:
             model=resolved_model,
             messages=messages,
             format="json" if use_json_mode else None,
-            options={"temperature": temperature},
+            options=(
+                None
+                if self.is_gpt5_family_model(resolved_model)
+                else {"temperature": temperature}
+            ),
         )
         text = json.dumps(raw) if isinstance(raw, dict) else str(raw)
         return await self.parse_with_repairs(
@@ -465,7 +477,11 @@ class CloudLLMClient:
                     model=model,
                     messages=repair_messages,
                     format="json" if use_json_mode else None,
-                    options={"temperature": 0.0},
+                    options=(
+                        None
+                        if self.is_gpt5_family_model(model)
+                        else {"temperature": 0.0}
+                    ),
                 )
                 text = json.dumps(raw) if isinstance(raw, dict) else str(raw)
 

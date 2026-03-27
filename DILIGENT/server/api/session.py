@@ -725,13 +725,36 @@ class ClinicalSessionEndpoint:
             end_value=48.0,
         )
         start_time = time.perf_counter()
-        disease_context = await self.disease_extractor.extract_diseases_from_anamnesis(
-            payload.anamnesis,
-            progress_callback=disease_progress_callback,
-        )
-        elapsed = time.perf_counter() - start_time
-        logger.info("Anamnesis disease extraction required %.4f seconds", elapsed)
-        logger.info("Detected %s diseases from anamnesis", len(disease_context.entries))
+        try:
+            disease_context = await self.disease_extractor.extract_diseases_from_anamnesis(
+                payload.anamnesis,
+                progress_callback=disease_progress_callback,
+            )
+            elapsed = time.perf_counter() - start_time
+            logger.info("Anamnesis disease extraction required %.4f seconds", elapsed)
+            logger.info("Detected %s diseases from anamnesis", len(disease_context.entries))
+        except Exception as exc:
+            elapsed = time.perf_counter() - start_time
+            logger.warning(
+                (
+                    "Anamnesis disease extraction failed after %.4f seconds; "
+                    "continuing without structured disease timeline: %s"
+                ),
+                elapsed,
+                exc,
+            )
+            issues.append(
+                PipelineIssue(
+                    severity="warning",
+                    code="anamnesis_disease_extraction_failed",
+                    message=(
+                        "Disease extraction from anamnesis was unavailable; "
+                        "the analysis continued without structured disease timeline."
+                    ),
+                    field="anamnesis",
+                )
+            )
+            disease_context = PatientDiseaseContext(entries=[])
         self.emit_progress(
             progress_callback,
             stage="anamnesis_disease_extraction",
