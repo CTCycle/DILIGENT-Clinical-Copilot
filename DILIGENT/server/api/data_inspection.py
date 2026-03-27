@@ -4,6 +4,7 @@ from datetime import date
 
 from fastapi import APIRouter, HTTPException, Query, status
 
+from DILIGENT.server.common.utils.logger import logger
 from DILIGENT.server.configurations import server_settings
 from DILIGENT.server.domain.inspection import (
     CatalogListFilters,
@@ -67,11 +68,18 @@ class DataInspectionEndpoint:
                 if "already running" in detail
                 else status.HTTP_422_UNPROCESSABLE_ENTITY
             )
-            raise HTTPException(status_code=error_status, detail=detail) from exc
+            logger.warning("Inspection update job rejected type=%s detail=%s", job_type, detail)
+            safe_detail = (
+                "An update job is already running."
+                if error_status == status.HTTP_409_CONFLICT
+                else "Invalid update request."
+            )
+            raise HTTPException(status_code=error_status, detail=safe_detail) from exc
         except RuntimeError as exc:
+            logger.warning("Inspection update job failed to start type=%s error=%s", job_type, exc)
             raise HTTPException(
                 status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-                detail=str(exc),
+                detail="Update job could not start. Please retry.",
             ) from exc
         return self.build_job_start_response(payload=payload, message=message)
 
@@ -81,7 +89,7 @@ class DataInspectionEndpoint:
         if payload is None:
             raise HTTPException(
                 status_code=status.HTTP_404_NOT_FOUND,
-                detail=f"Job not found: {job_id}",
+                detail="Job not found.",
             )
         return JobStatusResponse(**payload)
 
@@ -91,7 +99,7 @@ class DataInspectionEndpoint:
         if not success:
             raise HTTPException(
                 status_code=status.HTTP_404_NOT_FOUND,
-                detail=f"Job not found: {job_id}",
+                detail="Job not found.",
             )
         return JobCancelResponse(
             job_id=job_id,
@@ -133,7 +141,7 @@ class DataInspectionEndpoint:
         if report is None:
             raise HTTPException(
                 status_code=status.HTTP_404_NOT_FOUND,
-                detail=f"Session report not found: {session_id}",
+                detail="Session report not found.",
             )
         return SessionReportResponse(session_id=session_id, report=report)
 
@@ -143,7 +151,7 @@ class DataInspectionEndpoint:
         if not deleted:
             raise HTTPException(
                 status_code=status.HTTP_404_NOT_FOUND,
-                detail=f"Session not found: {session_id}",
+                detail="Session not found.",
             )
         return DeleteEntityResponse(deleted=True)
 
@@ -168,7 +176,7 @@ class DataInspectionEndpoint:
         if payload is None:
             raise HTTPException(
                 status_code=status.HTTP_404_NOT_FOUND,
-                detail=f"Drug not found: {drug_id}",
+                detail="Drug not found.",
             )
         return DrugAliasesResponse(**payload)
 
@@ -178,7 +186,7 @@ class DataInspectionEndpoint:
         if not deleted:
             raise HTTPException(
                 status_code=status.HTTP_404_NOT_FOUND,
-                detail=f"Drug not found: {drug_id}",
+                detail="Drug not found.",
             )
         return DeleteEntityResponse(deleted=True)
 
@@ -224,7 +232,7 @@ class DataInspectionEndpoint:
         if payload is None:
             raise HTTPException(
                 status_code=status.HTTP_404_NOT_FOUND,
-                detail=f"LiverTox excerpt not found for drug: {drug_id}",
+                detail="LiverTox excerpt not found.",
             )
         return LiverToxExcerptResponse(**payload)
 
@@ -234,7 +242,7 @@ class DataInspectionEndpoint:
         if not deleted:
             raise HTTPException(
                 status_code=status.HTTP_404_NOT_FOUND,
-                detail=f"Drug not found: {drug_id}",
+                detail="Drug not found.",
             )
         return DeleteEntityResponse(deleted=True)
 
