@@ -119,6 +119,17 @@ Key fixtures:
 - Prefer deterministic assertions over timing-sensitive checks.
 - For external dependencies (Ollama, encryption keys), skip with explicit reason when preconditions are not met.
 
+## Error-Path Coverage Requirements
+
+Test suites must enforce `assets/docs/ERROR_HANDLING.md` by covering:
+
+- invalid inputs and malformed payloads
+- dependency failures and unavailable services
+- timeout behavior
+- retry limits and stop conditions
+- partial failure and fallback paths
+- clean, non-technical user-facing error messages
+
 ## Troubleshooting
 
 - Backend/frontend unavailable:

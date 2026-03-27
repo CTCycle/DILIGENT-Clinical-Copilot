@@ -16,7 +16,7 @@ Each job is represented by a thread-safe `JobState`:
 - `status`: `pending`, `running`, `completed`, `failed`, `cancelled`.
 - `progress`: 0.0 to 100.0.
 - `result`: optional JSON-serializable payload.
-- `error`: compact failure message.
+- `error`: compact, user-safe failure message (sensitive internals are not exposed).
 - `created_at` / `completed_at`: monotonic timestamps.
 - `stop_requested`: cooperative cancellation flag.
 
@@ -26,6 +26,7 @@ Each job is represented by a thread-safe `JobState`:
 - `start_job` can inject `job_id` into runners automatically when supported.
 - Completion merges partial `result` patches with final runner output.
 - Exceptions mark the job as `failed` unless cancellation was requested.
+- Exception details are still fully logged server-side (`exc_info=True`) for diagnostics.
 
 ## Current Job Types in DILIGENT
 

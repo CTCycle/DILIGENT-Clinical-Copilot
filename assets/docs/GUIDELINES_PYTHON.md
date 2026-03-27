@@ -2,6 +2,8 @@
 
 Mandatory standards for Python 3.12+ projects, covering backend services, FastAPI apps, and ML pipelines.
 
+Also mandatory: apply `assets/docs/ERROR_HANDLING.md` for exception boundaries, timeout usage, fallback behavior, and safe user-facing failures.
+
 ---
 
 ## 1. Python version and scope

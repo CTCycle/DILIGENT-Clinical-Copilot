@@ -3,6 +3,7 @@ from __future__ import annotations
 import inspect
 import threading
 import uuid
+import asyncio
 from dataclasses import dataclass, field
 from time import monotonic
 from typing import Any
@@ -10,6 +11,49 @@ from typing import Any
 from collections.abc import Callable
 
 from DILIGENT.server.common.utils.logger import logger
+
+
+SENSITIVE_ERROR_TOKENS: tuple[str, ...] = (
+    "traceback",
+    "stack",
+    "token",
+    "secret",
+    "password",
+    "authorization",
+    "api key",
+    "access key",
+)
+
+
+###############################################################################
+def can_show_exception_message(message: str) -> bool:
+    candidate = message.strip()
+    if not candidate:
+        return False
+    if len(candidate) > 180:
+        return False
+    lowered = candidate.casefold()
+    return not any(token in lowered for token in SENSITIVE_ERROR_TOKENS)
+
+
+###############################################################################
+def build_safe_job_error_message(exc: Exception) -> str:
+    if isinstance(exc, (TimeoutError, asyncio.TimeoutError)):
+        return "Operation timed out. Please retry."
+    if isinstance(exc, FileNotFoundError):
+        return "A required file was not found. Check configuration and retry."
+    if isinstance(exc, ConnectionError):
+        return "A dependency could not be reached. Please retry shortly."
+    if isinstance(exc, ValueError):
+        candidate = str(exc).split("\n")[0]
+        if can_show_exception_message(candidate):
+            return candidate
+        return "Input validation failed. Review the request and retry."
+
+    candidate = str(exc).split("\n")[0]
+    if can_show_exception_message(candidate):
+        return candidate
+    return "Operation failed unexpectedly. Please retry."
 
 
 ###############################################################################
@@ -194,9 +238,14 @@ class JobManager:
                 state.update(status="cancelled", completed_at=monotonic())
                 logger.info("Job %s cancelled during execution", job_id)
                 return
-            error_msg = str(exc).split("\n")[0][:200]
+            error_msg = build_safe_job_error_message(exc)
             state.update(status="failed", error=error_msg, completed_at=monotonic())
-            logger.error("Job %s failed: %s", job_id, error_msg)
+            logger.error(
+                "Job %s failed type=%s message=%s",
+                job_id,
+                type(exc).__name__,
+                error_msg,
+            )
             logger.debug("Job %s error details", job_id, exc_info=True)
 
     # -------------------------------------------------------------------------

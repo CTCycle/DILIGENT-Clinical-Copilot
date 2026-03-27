@@ -5,6 +5,7 @@ Use web search to verify facts and stay current on tools, frameworks, and indust
 Before any task, review the relevant files in `assets/docs`:
 
 - `GENERAL_RULES.md`, mandatory for every task
+- `ERROR_HANDLING.md`, mandatory for every task
 - `GUIDELINES_PYTHON.md`, when using Python
 - `GUIDELINES_TYPESCRIPT.md`, when using TypeScript
 - `GUIDELINES_TESTS.md`, when writing tests
