@@ -1,41 +1,50 @@
-## WEB SEARCH
-Use web search to verify facts and stay current on tools, frameworks, and industry standards when it improves accuracy.
+# General Rules
 
-## REQUIRED DOCUMENTATION REVIEW
-Before any task, review the relevant files in `assets/docs`:
+This file is the entrypoint for all work in this repository.
 
-- `GENERAL_RULES.md`, mandatory for every task
-- `ERROR_HANDLING.md`, mandatory for every task
-- `GUIDELINES_PYTHON.md`, when using Python
-- `GUIDELINES_TYPESCRIPT.md`, when using TypeScript
-- `GUIDELINES_TESTS.md`, when writing tests
-- `ARCHITECTURE.md`, system structure and APIs
-- `BACKGROUND_JOBS.md`, background job management
-- `README_WRITING.md`, required README structure and standards
+## 1. Required doc review
 
-## SKILLS REFERENCE
-When task-specific reusable workflows or capabilities are needed, check skills repository and use the relevant skill guidance.
+Always read:
+- `assets/docs/GENERAL_RULES.md`
+- `assets/docs/ERROR_HANDLING.md`
 
-## DOCUMENTATION UPDATES
-If changes materially affect behavior, architecture, or usage, update the relevant `assets/docs` files and notify the user.
+Read as needed by task:
+- `assets/docs/ARCHITECTURE.md`: backend/frontend structure, API surface, data flow.
+- `assets/docs/BACKGROUND_JOBS.md`: job lifecycle, polling, cancellation.
+- `assets/docs/GUIDELINES_PYTHON.md`: Python standards and backend conventions.
+- `assets/docs/GUIDELINES_TYPESCRIPT.md`: frontend standards for `DILIGENT/client`.
+- `assets/docs/GUIDELINES_TESTS.md`: test layout and execution.
+- `assets/docs/PACKAGING_AND_RUNTIME_MODES.md`: local/cloud/desktop runtime behavior.
+- `assets/docs/README_WRITING.md`: README format and required sections.
+- `assets/docs/UI_STANDARDS.md`: frontend design system rules.
+- `assets/docs/UI_AUDIT_REPORT.md`: current UI debt and known gaps.
 
-## CROSS-LANGUAGE PRINCIPLES
+## 2. Documentation responsibilities
 
-### Code quality
-- Prefer consistent style, clear naming, and small single-purpose components.
-- Optimize for readability, testability, and low coupling.
+- If you change behavior, architecture, runtime contracts, or test strategy, update the corresponding docs in `assets/docs`.
+- Keep cross-references coherent: endpoint names, path names, and runtime/version statements must not conflict across files.
+- Prefer concise, stable documentation over exhaustive file inventories that quickly become stale.
 
-### Testing and automation
-- Enforce CI checks: formatting, linting, type checks, tests, and security scans.
+## 3. Cross-language engineering principles
 
-### Security
-- Apply standard secure coding practices: input validation, correct auth handling, secret protection, minimal attack surface.
+- Favor clear naming, low coupling, and small focused units.
+- Use explicit contracts at boundaries (API schema, typed payloads, structured errors).
+- Prioritize deterministic behavior and testability.
+- Keep security defaults strict: input validation, least privilege, and no secret leakage.
 
-## EXECUTION RULES
-- Use PowerShell by default for terminal commands in this repository.
-- Use `cmd /c` only when invoking `.bat` scripts or CMD-specific syntax.
-- In project documentation, always reference the virtual environment path as `runtimes/.venv`.
-- Frontend Node runtime is bundled under `runtimes/nodejs`.
-- For changes under `DILIGENT/client`, always run a frontend validation build before finalizing: `npm run build`.
-- If `npm` is not directly available in PATH, run it through the bundled runtime (`runtimes/nodejs/node.exe runtimes/nodejs/node_modules/npm/bin/npm-cli.js run build`).
+## 4. Execution rules
+
+- Use PowerShell by default in this repository.
+- Use `cmd /c` only for `.bat` scripts or CMD-specific syntax.
+- In docs, always reference the project virtual environment as `runtimes/.venv`.
+- Bundled frontend runtime is `runtimes/nodejs`.
+- For changes under `DILIGENT/client`, run a validation build before finalizing:
+  - `npm run build`
+  - If `npm` is unavailable in PATH, run:
+    - `runtimes/nodejs/node.exe runtimes/nodejs/node_modules/npm/bin/npm-cli.js run build`
+
+## 5. Skills and external references
+
+- Use relevant skills when the task matches a reusable workflow.
+- Use web search only when it improves factual accuracy (for example evolving external tooling or standards).
 

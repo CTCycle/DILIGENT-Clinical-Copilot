@@ -1,78 +1,74 @@
 # Background Job Management
 
-DILIGENT uses a centralized thread-based job system for long-running API tasks (clinical analysis and model pulls) so request handlers stay responsive.
+Last updated: 2026-03-28
 
-## Core Components
+DILIGENT uses a centralized thread-based job manager for long-running operations.
 
-- Manager location: `DILIGENT/server/services/jobs.py`
+## 1. Core components
+
+- Manager: `DILIGENT/server/services/jobs.py`
 - Shared singleton: `job_manager`
-- Response models: `DILIGENT/server/domain/jobs.py`
+- API models: `DILIGENT/server/domain/jobs.py`
 
-## Job Model
+## 2. Job state contract
 
-Each job is represented by a thread-safe `JobState`:
-- `job_id`: 8-char UUID prefix.
-- `job_type`: logical group (`clinical`, `ollama_pull`, etc.).
-- `status`: `pending`, `running`, `completed`, `failed`, `cancelled`.
-- `progress`: 0.0 to 100.0.
-- `result`: optional JSON-serializable payload.
-- `error`: compact, user-safe failure message (sensitive internals are not exposed).
-- `created_at` / `completed_at`: monotonic timestamps.
-- `stop_requested`: cooperative cancellation flag.
+Each job tracks:
+- `job_id` (short UUID prefix)
+- `job_type`
+- `status`: `pending` | `running` | `completed` | `failed` | `cancelled`
+- `progress` (0-100)
+- `result` (optional JSON payload)
+- `error` (sanitized user-safe message)
+- `created_at`, `completed_at`
+- `stop_requested` (cooperative cancellation flag)
 
-## Threading Behavior
+## 3. Execution behavior
 
-- Jobs are executed in daemon threads (`threading.Thread(..., daemon=True)`).
-- `start_job` can inject `job_id` into runners automatically when supported.
-- Completion merges partial `result` patches with final runner output.
-- Exceptions mark the job as `failed` unless cancellation was requested.
-- Exception details are still fully logged server-side (`exc_info=True`) for diagnostics.
+- Jobs run in daemon threads.
+- `start_job` can auto-inject `job_id` into runners.
+- `update_result` merges interim patches with final payload.
+- Unhandled runner exceptions mark job `failed` unless cancellation was requested.
+- Detailed exception traces remain server logs only.
 
-## Current Job Types in DILIGENT
+## 4. Active job types and endpoints
 
-- `clinical`:
-  - Started by `POST /clinical/jobs`.
-  - Runner performs async clinical pipeline via `asyncio.run(...)`.
-  - Progress stage metadata is updated incrementally (e.g., extraction, RAG lookup, report composition).
-- `ollama_pull`:
-  - Started by `POST /models/pull/jobs`.
-  - Runner pulls models from Ollama and reports completion state.
-- `rxnav_update`:
-  - Started by `POST /inspection/rxnav/jobs`.
-  - Runner executes in-app RxNav catalog refresh with cooperative cancellation checks.
-  - Progress/result metadata include update-stage messages (for UI progress bars).
-- `livertox_update`:
-  - Started by `POST /inspection/livertox/jobs`.
-  - Runner executes in-app LiverTox refresh with cooperative cancellation checks.
-  - Progress/result metadata include update-stage messages (for UI progress bars).
+- `clinical`
+  - Start: `POST /clinical/jobs`
+  - Poll/cancel: `GET|DELETE /clinical/jobs/{job_id}`
+- `ollama_pull`
+  - Start: `POST /models/pull/jobs`
+  - Poll/cancel: `GET|DELETE /models/jobs/{job_id}`
+- `rxnav_update`
+  - Start: `POST /inspection/rxnav/jobs`
+  - Poll/cancel: `GET|DELETE /inspection/rxnav/jobs/{job_id}`
+- `livertox_update`
+  - Start: `POST /inspection/livertox/jobs`
+  - Poll/cancel: `GET|DELETE /inspection/livertox/jobs/{job_id}`
 
-## API Contract Pattern
+Equivalent `/api/*` prefixed routes are always available.
 
-1. Start: endpoint returns `JobStartResponse` (`job_id`, `status`, `poll_interval`).
-2. Poll: `GET .../jobs/{job_id}` returns `JobStatusResponse`.
-3. Cancel: `DELETE .../jobs/{job_id}` sets stop request and returns `JobCancelResponse`.
+## 5. Polling pattern
 
-The frontend (`client/src/services/api.ts`) polls using the server-provided interval and stops when status is terminal (`completed`, `failed`, `cancelled`).
+Standard contract:
+1. Start endpoint returns `JobStartResponse` (`job_id`, `status`, `poll_interval`).
+2. Status endpoint returns `JobStatusResponse`.
+3. Cancel endpoint returns `JobCancelResponse`.
 
-## Cancellation Rules
+Frontend polling is implemented in `DILIGENT/client/src/services/api.ts` and stops on terminal states.
+
+## 6. Cancellation rules
 
 Cancellation is cooperative:
-- Pending jobs can be marked `cancelled` immediately.
+- Pending jobs can be set to `cancelled` immediately.
 - Running jobs receive `stop_requested=True`.
 - Runner code must check `job_manager.should_stop(job_id)` at safe checkpoints.
 
-If your runner ignores stop checks, cancellation will be delayed until completion/failure.
+If a runner does not check stop requests, cancellation is delayed.
 
-## Implementation Pattern for New Jobs
+## 7. New job implementation checklist
 
-1. Add a synchronous runner that returns `dict[str, Any]`.
-2. Make runner periodically check `job_manager.should_stop(job_id)`.
-3. Use `job_manager.update_progress(...)` and `job_manager.update_result(...)` for interim updates.
+1. Add runner function returning `dict[str, Any]`.
+2. Check `job_manager.should_stop(job_id)` during long steps.
+3. Publish interim progress/result updates.
 4. Expose start/poll/cancel routes.
-5. Guard duplicates with `job_manager.is_job_running(job_type)` when needed.
-
-Minimal import example:
-
-```python
-from DILIGENT.server.services.jobs import job_manager
-```
+5. Prevent conflicting duplicates where needed (`is_job_running(job_type)`).
