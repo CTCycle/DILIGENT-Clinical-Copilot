@@ -1,149 +1,68 @@
 # Error Handling Principles
 
-All code must implement explicit, structured error handling that prioritizes reliability and safety.
+Apply these rules across backend and frontend code.
 
----
+## 1. Exception boundaries
 
-## Exception Strategy
+- Handle failures at clear boundaries (API handlers, integration clients, background runners).
+- Catch specific exception types where possible.
+- Avoid broad `except Exception` unless converting to a safe boundary response.
+- Never silently swallow exceptions.
 
-- Wrap risky operations in targeted `try/except` blocks.
-- Catch specific exception types whenever possible.
-- Do not broadly swallow exceptions except at top-level safety boundaries.
+## 2. Required failure classes
 
----
+Every external interaction must consider:
+- invalid input or schema mismatch
+- timeout
+- network/dependency unavailability
+- malformed upstream responses
+- missing files/resources
 
-## Failure Handling
+Retries are allowed only for transient failures and must define:
+- max attempts
+- backoff policy
+- hard stop condition
 
-Provide safe handling and fallback behavior for:
+## 3. Timeouts and cancellation
 
-- network failures
-- missing files
-- invalid inputs
-- timeout conditions
-- dependency failures
-- malformed external responses
+- Use explicit timeouts for all I/O and network calls.
+- In async/threaded workflows, propagate cancellation signals and stop safely.
+- Long-running jobs must be cancellable at safe checkpoints.
 
-Retries are allowed only for transient failures and must include:
+## 4. User-safe failures
 
-- retry limits
-- backoff strategy
-- clear stop conditions
+- User-facing errors must be concise and non-technical.
+- Never expose stack traces, secrets, access keys, or internal infrastructure details.
+- Prefer degraded/partial output over total failure when safe.
 
----
+## 5. Logging and diagnostics
 
-## Timeouts
-
-Always use explicit timeouts for:
-
-- I/O operations
-- network requests
-- external service calls
-
-Operations without timeouts are considered unsafe.
-
----
-
-## Resource Safety
-
-Always guarantee proper cleanup of resources:
-
-- files
-- sockets
-- locks
-- temporary data
-- database connections
-
-Prefer context managers or structured cleanup logic.
-
----
-
-## Application Stability
-
-Unhandled exceptions must never:
-
-- reach the user interface
-- crash the application process
-
-Instead:
-
-- return structured error states
-- fail gracefully
-- stop invalid states early using guard clauses and precondition checks
-
----
-
-## User-Facing Error Messages
-
-User-visible errors must:
-
-- be short and calm
-- use clear, plain language
-- never expose technical details or internals
-
-Messages should explain:
-
-- what happened
-- what the user can try next
-- whether retrying may resolve the issue
-
-When safe, provide partial results instead of failing completely.
-
----
-
-## Logging and Diagnostics
-
-On failure, log sufficient diagnostic context for debugging:
-
-- error type
-- relevant state
-- correlation or request IDs when applicable
+Log enough context to debug:
+- error class
+- operation/context name
+- request/job correlation ID when available
 
 Never log:
-
-- secrets
-- authentication tokens
+- secrets or tokens
+- raw provider keys
 - sensitive personal data
 
-Comments should only be added when they clarify:
+## 6. Resource cleanup
 
-- safeguards
-- recovery paths
-- non-obvious defensive logic
+Always clean up resources on success and failure:
+- files and temp artifacts
+- DB/network handles
+- thread/async control state
 
----
+Prefer context managers and explicit finalization paths.
 
-## Architectural Expectations
+## 7. Test expectations
 
-Error handling should be centralized at system boundaries.
-
-System design should ensure:
-
-- failures in one component do not crash the entire system
-- operations degrade safely when dependencies fail
-- safe defaults or fallback values exist where possible
-
-Concurrency and asynchronous code must safely handle:
-
-- cancellation
-- timeouts
-- race conditions
-- shared-state protection
-
----
-
-## Testing Requirements for Errors
-
-Tests must explicitly cover failure scenarios, including:
-
-- invalid inputs
-- malformed data
+Tests must cover failure paths for:
+- validation errors
 - dependency failures
-- retries and backoff behavior
-- timeouts
-- partial failures and fallback behavior
+- timeout and retry behavior
+- cancellation behavior (for background jobs)
+- safe user-visible error messaging
 
-Tests must verify:
-
-- the system does not crash under expected failures
-- user-facing error messages remain clean and safe
-- recovery and rollback behavior functions correctly
+Expected result: failure does not crash the app and does not leak internal details.
