@@ -1,73 +1,62 @@
 # UI Standards (Frontend)
 
-Scope: `DILIGENT/client/src`.
-Goal: Preserve current product design while enforcing consistency, accessibility, and maintainability.
+Last updated: 2026-03-28
 
-## Spacing Scale
-- Base rhythm: `4px` step, prefer `8px` cadence for layout spacing.
-- Tokens:
-  - `--space-xs: 4px`
-  - `--space-sm: 8px`
-  - `--space-md: 12px`
-  - `--space-lg: 16px`
-  - `--space-xl: 20px`
-  - `--space-2xl: 24px`
-  - `--space-3xl: 32px`
-- Rules:
-  - Use token spacing in paddings/gaps/margins before introducing raw pixel values.
-  - Keep inter-control spacing at `--space-xs`/`--space-sm` and section spacing at `--space-md`+.
+Scope: `DILIGENT/client/src` and `DILIGENT/client/src/styles.css`.
+Goal: keep UI coherent, accessible, and maintainable.
 
-## Typography Scale
-- Font tokens:
-  - `--font-xs: 11px`
-  - `--font-sm: 12px`
-  - `--font-base: 14px`
-  - `--font-md: 16px`
-  - `--font-lg: 18px`
-  - `--font-xl: 20px`
-  - `--font-2xl: 28px`
-  - `--font-3xl: 32px`
-- Rules:
-  - Headings: page `h1` uses `--font-2xl` (responsive downshift on small screens), section `h2` uses `--font-xl`.
-  - Body text should default to `--font-base`; helper/meta text should use `--font-sm` or `--font-xs`.
-  - Keep mixed-case labels consistent (title-case for navigation items).
+## 1. Design token usage
 
-## Color System
-- Primary brand:
-  - `--color-brand`, `--color-brand-light`, `--color-brand-ui`, `--color-brand-ui-light`
-- Text hierarchy:
-  - `--color-text-primary`, `--color-text-secondary`, `--color-text-muted`, `--color-text-subtle`
-- Surfaces and separators:
-  - `--color-surface`, `--color-surface-alt`, `--color-border`, `--color-border-subtle`, `--color-divider`
-- Semantic status colors:
-  - Info: `--color-status-info-*`
-  - Success: `--color-status-success-*`
-  - Error: `--color-status-error-*`
-- Rules:
-  - Prefer semantic tokens over hardcoded hex values in component styling.
-  - Do not rely on color alone for state; pair with text/icon/state labels.
+- Use existing CSS variables in `styles.css` before adding raw values.
+- Prefer tokenized spacing, typography, colors, control sizes, and focus ring values.
+- New tokens must be reusable across at least two UI areas.
 
-## Component Usage Rules
+## 2. Layout and spacing
+
+- Maintain the current spacing rhythm (`4px` base, `8px` preferred cadence).
+- Use consistent section spacing and avoid ad-hoc one-off margins/paddings.
+- Keep responsive behavior explicit in media-query blocks.
+
+## 3. Typography and labels
+
+- Use the existing font-size tokens and heading scale.
+- Keep UI labels and navigation naming consistent across pages.
+- Avoid mixed conventions for similar controls.
+
+## 4. Color and status semantics
+
+- Use semantic color tokens, not hardcoded hex values.
+- Do not communicate state with color only; include text/icons where relevant.
+- Ensure contrast remains acceptable in both light and dark themes.
+
+## 5. Component rules
+
 - Buttons:
-  - Use `.btn` + variant (`.btn-primary`, `.btn-secondary`, `.btn-tertiary`).
-  - Control heights: `--control-height-sm`, `--control-height-md`, `--control-height-lg`.
-  - Icon-only actions should keep minimum target size at least `--icon-action-size`.
+  - use shared button classes/variants,
+  - keep accessible touch/click target size,
+  - preserve disabled/loading states.
 - Inputs/selects/textarea:
-  - Keep focus rings visible and consistent with `--focus-ring`.
-  - Use tokenized control heights and paddings.
+  - keep consistent control heights and paddings,
+  - keep visible `:focus-visible` styling.
 - Tabs:
-  - If using `role="tablist"/"tab"/"tabpanel"`, include `aria-controls`, `aria-labelledby`, keyboard arrow/Home/End behavior, and active `tabIndex` management.
+  - implement complete ARIA semantics (`tablist`, `tab`, `tabpanel`, keyboard nav).
 - Modals:
-  - Use consistent close affordance (`.modal-close` with icon) and clear labels.
+  - use consistent close affordance and labeling.
 
-## Do and Don’t
-- Do:
-  - Use existing tokens and shared classes before adding new one-off values.
-  - Keep responsive behavior explicit in breakpoint blocks.
-  - Preserve visible focus states for keyboard users.
-  - Keep diffs small and scoped to specific UI problems.
-- Don’t:
-  - Introduce duplicate selectors for the same component without clear intent.
-  - Shrink interactive targets below accessible touch/click sizes.
-  - Add decorative style variance that changes product identity.
-  - Hide important state only behind color differences.
+## 6. Accessibility baseline
+
+- Keyboard navigation must work for all interactive controls.
+- Preserve visible focus states.
+- Use meaningful `aria-*` attributes for dynamic state and tab/modal patterns.
+- Keep icon-only controls labelled for assistive technology.
+
+## 7. Maintainability rules
+
+- Keep diffs scoped to task intent.
+- Avoid duplicating selector blocks for the same component.
+- When redesigning a section, consolidate legacy CSS instead of layering conflicting overrides.
+
+## 8. Relationship to audit report
+
+`assets/docs/UI_AUDIT_REPORT.md` tracks current debt and concrete remediation items.
+This standards file defines the target quality bar for new work.
