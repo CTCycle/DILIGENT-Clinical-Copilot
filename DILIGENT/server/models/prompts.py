@@ -74,6 +74,40 @@ Return:
 - Ensure the output strictly adheres to the schema.
 """
 
+ANAMNESIS_LAB_EXTRACTION_PROMPT = """
+You are a clinical hepatology extraction assistant.
+Extract longitudinal liver-related laboratory data and onset clues from free-text anamnesis.
+Always return data matching the provided JSON schema.
+
+Instructions:
+- Extract only labs explicitly present in the text.
+- Capture at minimum these markers when present: ALT, AST, ALP, total bilirubin.
+- Optionally include GGT when present.
+- For each lab entry return:
+  - marker_name: original marker text from anamnesis.
+  - value: numeric value if present, otherwise null.
+  - value_text: raw value text when numeric parsing is unclear.
+  - unit: reported unit if present.
+  - upper_limit_normal: numeric ULN if explicitly reported.
+  - upper_limit_text: raw ULN text when numeric parsing is unclear.
+  - sample_date: date in original text, ISO when explicit.
+  - relative_time: relative timing phrase when absolute date is absent.
+  - evidence: short supporting snippet from text.
+  - source: "anamnesis".
+- Extract onset clues when present:
+  - onset_date: date linked to first symptom or first abnormal liver test.
+  - onset_basis: one of first_symptom, first_abnormal_lab, visit_proxy, unknown.
+  - evidence: supporting snippet.
+- If information is not present, return null/empty structures. Do not invent values.
+
+Return:
+- A JSON object matching this shape:
+  {
+    "entries": [ClinicalLabEntry...],
+    "onset_context": LiverInjuryOnsetContext | null
+  }
+"""
+
 DILI_RAG_QUERY_PROMPT = (
     "{name} drug induced liver injury (DILI) {classification} pattern "
     "Pattern of hepatotoxicity - {r_part} "
@@ -155,6 +189,9 @@ LIVERTOX_CLINICAL_USER_PROMPT = """
 # Patient Liver Injury Pattern
 {pattern_summary}
 
+# Estimated RUCAM
+{rucam_block}
+
 # Therapy Timeline
 - Visit date: {visit_date_anchor}
 - Start details: {therapy_start_details}
@@ -172,6 +209,8 @@ Guidelines:
 - Compare the findings with closely related agents when the excerpt mentions them; otherwise, briefly reference the agent or class listed in the metadata.
 - Do not provide drug-level monitoring or management recommendations and do not recommend starting or stopping therapy in this section.
 - Explicitly reason about temporal order using visit date, start/suspension timing, and the structured disease timeline from the clinical context.
+- Integrate the supplied estimated RUCAM into causality reasoning.
+- Do not overstate certainty when RUCAM confidence is low or when components are not assessable.
 - If rechallenge/restart evidence exists in metadata or context, state whether it strengthens or weakens causality.
 - If management language is needed for coherence, explicitly defer it with: "See final synthesis section for integrated recommendations."
 - Reference only the supplied LiverTox excerpt, metadata, and optional retrieved documents; do not cite other sources.

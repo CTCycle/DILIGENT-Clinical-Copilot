@@ -10,6 +10,8 @@ from DILIGENT.server.domain.clinical import (
     ClinicalPipelineValidationError,
     DrugClinicalAssessment,
     DrugEntry,
+    DrugRucamAssessment,
+    RucamComponentAssessment,
     DrugSuspensionContext,
     PatientData,
 )
@@ -136,6 +138,23 @@ def test_request_drug_analysis_retries_on_transient_failure() -> None:
             pattern_summary="Observed liver injury pattern: hepatocellular.",
             metadata={"likelihood_score": "A"},
             web_evidence="No web evidence available (reason: web search disabled for this session).",
+            rucam=DrugRucamAssessment(
+                drug_name="Acetaminophen",
+                injury_type_for_rucam="hepatocellular",
+                total_score=7,
+                causality_category="probable",
+                confidence="moderate",
+                components=[
+                    RucamComponentAssessment(
+                        component_key="time_to_onset",
+                        label="Time to onset",
+                        score=2,
+                        status="scored",
+                    )
+                ],
+                limitations=["Sparse follow-up"],
+                summary="Estimated RUCAM summary.",
+            ),
         )
     )
 
@@ -148,6 +167,41 @@ def test_livertox_prompt_removes_per_drug_management_recommendation_directive() 
     assert "Do not provide drug-level monitoring or management recommendations" in LIVERTOX_CLINICAL_USER_PROMPT
     assert "Do not add any appendix or extra section after the bibliography line." in LIVERTOX_CLINICAL_USER_PROMPT
     assert "Do not output JSON, YAML, XML, tables, or fenced code blocks" in LIVERTOX_CLINICAL_USER_PROMPT
+    assert "# Estimated RUCAM" in LIVERTOX_CLINICAL_USER_PROMPT
+    assert "Integrate the supplied estimated RUCAM" in LIVERTOX_CLINICAL_USER_PROMPT
+
+
+def test_render_matched_drug_section_contains_deterministic_rucam_summary() -> None:
+    consultation = HepatoxConsultation.__new__(HepatoxConsultation)
+    entry = DrugClinicalAssessment(
+        drug_name="Pantozol",
+        match_status="matched",
+        matched_livertox_row={"likelihood_score": "C"},
+        paragraph="Core clinical narrative.",
+        rucam=DrugRucamAssessment(
+            drug_name="Pantozol",
+            injury_type_for_rucam="cholestatic",
+            total_score=6,
+            causality_category="probable",
+            confidence="moderate",
+            components=[
+                RucamComponentAssessment(
+                    component_key="course",
+                    label="Course after withdrawal",
+                    score=2,
+                    status="scored",
+                )
+            ],
+            limitations=["No confirmed rechallenge"],
+            summary="Estimated RUCAM for Pantozol.",
+        ),
+    )
+
+    rendered = consultation.render_matched_drug_section(entry)
+
+    assert "**Estimated RUCAM**: 6, probable, confidence moderate" in rendered
+    assert "**RUCAM component summary**:" in rendered
+    assert "**RUCAM limitations**:" in rendered
 
 
 def test_finalize_patient_report_uses_global_synthesis_section_header() -> None:
@@ -255,6 +309,34 @@ def test_finalize_patient_report_keeps_matched_drug_without_excerpt() -> None:
     assert report is not None
     assert "**Valium - LiverTox score D**" in report
     assert "No local LiverTox excerpt is currently available" in report
+
+
+def test_unresolved_mentions_include_rucam_summary_when_available() -> None:
+    consultation = HepatoxConsultation.__new__(HepatoxConsultation)
+    section = consultation.render_unresolved_mentions_section(
+        [
+            DrugClinicalAssessment(
+                drug_name="UnknownX",
+                match_status="missing",
+                missing_livertox=True,
+                rucam=DrugRucamAssessment(
+                    drug_name="UnknownX",
+                    injury_type_for_rucam="indeterminate",
+                    total_score=3,
+                    causality_category="possible",
+                    confidence="low",
+                    components=[],
+                    limitations=["Missing serial labs"],
+                    summary="Estimated RUCAM only.",
+                ),
+            )
+        ]
+    )
+
+    assert section is not None
+    assert "UnknownX" in section
+    assert "No matching drug record found in the local knowledge base." in section
+    assert "RUCAM 3 (possible, confidence low)" in section
 
 
 def test_sanitize_renderable_body_removes_structured_dili_section() -> None:

@@ -14,13 +14,18 @@ from pydantic_core import ErrorDetails
 from DILIGENT.server.models.cloud import LLMError
 
 from DILIGENT.server.domain.clinical import (
+    ClinicalLabEntry,
     ClinicalPipelineValidationError,
     ClinicalSessionRequest,
     DiseaseContextEntry,
     DrugEntry,
+    DrugRucamAssessment,
+    LiverInjuryOnsetContext,
+    PatientLabTimeline,
     PatientData,
     PatientDiseaseContext,
     PatientDrugs,
+    PatientRucamAssessmentBundle,
     PipelineIssue,
 )
 from DILIGENT.server.domain.jobs import (
@@ -39,14 +44,18 @@ from DILIGENT.server.services.clinical.hepatox import (
 )
 from DILIGENT.server.services.clinical.preparation import ClinicalKnowledgePreparation
 from DILIGENT.server.services.clinical.disease import DiseaseExtractor
+from DILIGENT.server.services.clinical.labs import ClinicalLabExtractor
 from DILIGENT.server.services.clinical.parser import DrugsParser
+from DILIGENT.server.services.clinical.rucam import RucamScoreEstimator
 from DILIGENT.server.services.payload import PayloadSanitizationService
 from DILIGENT.server.services.retrieval.query import DILIQueryBuilder
 from DILIGENT.server.services.text.normalization import normalize_drug_query_name
 
 drugs_parser = DrugsParser(timeout_s=server_settings.external_data.parser_llm_timeout)
 disease_extractor = DiseaseExtractor(timeout_s=server_settings.external_data.disease_llm_timeout)
+lab_extractor = ClinicalLabExtractor(timeout_s=server_settings.external_data.disease_llm_timeout)
 pattern_analyzer = HepatotoxicityPatternAnalyzer()
+rucam_estimator = RucamScoreEstimator()
 input_preparator = ClinicalKnowledgePreparation()
 router = APIRouter(tags=["session"])
 serializer = DataSerializer()
@@ -58,20 +67,22 @@ CLINICAL_PROGRESS_MESSAGES: dict[str, str] = {
     "therapy_extraction": "Extracting drugs from therapy",
     "anamnesis_extraction": "Extracting drugs from anamnesis",
     "anamnesis_disease_extraction": "Extracting diseases from anamnesis",
+    "anamnesis_lab_extraction": "Extracting longitudinal labs from anamnesis",
     "rag_query_building": "Building RAG queries",
     "livertox_lookup": "Consulting LiverTox knowledge base",
+    "rucam_estimation": "Estimating per-drug RUCAM",
     "llm_analysis": "Running LLM drug-by-drug assessment",
     "report_composition": "Composing final clinical report",
     "finalization": "Finalizing and persisting session",
 }
 
 
-# -----------------------------------------------------------------------------
+###############################################################################
 class ClinicalJobCancelled(Exception):
     pass
 
 
-# -----------------------------------------------------------------------------
+###############################################################################
 class ClinicalJobProgressCallback:
     def __init__(self, *, job_id: str) -> None:
         self.job_id = job_id
@@ -81,7 +92,7 @@ class ClinicalJobProgressCallback:
         report_clinical_job_progress(self.job_id, stage=stage, progress=progress)
 
 
-# -----------------------------------------------------------------------------
+###############################################################################
 class ClinicalConsultationProgressCallback:
     def __init__(
         self,
@@ -101,7 +112,7 @@ class ClinicalConsultationProgressCallback:
             self.progress_callback("report_composition", 86.0 + (bounded_fraction * 8.0))
 
 
-# -----------------------------------------------------------------------------
+###############################################################################
 class StageProgressFractionCallback:
     def __init__(
         self,
@@ -121,8 +132,7 @@ class StageProgressFractionCallback:
         bounded_fraction = min(1.0, max(0.0, float(fraction)))
         self.progress_callback(self.stage, self.lower + (self.span * bounded_fraction))
 
-
-# -----------------------------------------------------------------------------
+###############################################################################
 def report_clinical_job_progress(job_id: str, *, stage: str, progress: float) -> None:
     if job_manager.should_stop(job_id):
         raise ClinicalJobCancelled("Clinical job stop requested.")
@@ -138,7 +148,7 @@ def report_clinical_job_progress(job_id: str, *, stage: str, progress: float) ->
     )
 
 
-# -----------------------------------------------------------------------------
+###############################################################################
 def build_failed_session_payload(
     *,
     payload: PatientData,
@@ -176,6 +186,9 @@ def build_failed_session_payload(
             "anamnesis_drugs": [],
             "anamnesis_diseases": [],
             "matched_drugs": [],
+            "rucam_assessments": [],
+            "lab_timeline": [],
+            "onset_context": None,
         },
     }
 
@@ -407,14 +420,18 @@ class ClinicalSessionEndpoint:
         router: APIRouter,
         drugs_parser: DrugsParser,
         disease_extractor: DiseaseExtractor,
+        lab_extractor: ClinicalLabExtractor,
         pattern_analyzer: HepatotoxicityPatternAnalyzer,
+        rucam_estimator: RucamScoreEstimator,
         serializer: DataSerializer,
         payload_sanitizer: PayloadSanitizationService,
     ) -> None:
         self.router = router
         self.drugs_parser = drugs_parser
         self.disease_extractor = disease_extractor
+        self.lab_extractor = lab_extractor
         self.pattern_analyzer = pattern_analyzer
+        self.rucam_estimator = rucam_estimator
         self.serializer = serializer
         self.payload_sanitizer = payload_sanitizer
 
@@ -536,12 +553,46 @@ class ClinicalSessionEndpoint:
 
     # -------------------------------------------------------------------------
     @staticmethod
+    def format_lab_timeline(lab_timeline: PatientLabTimeline) -> list[str]:
+        if not lab_timeline.entries:
+            return ["- None extracted."]
+        lines: list[str] = []
+        for entry in lab_timeline.entries:
+            if not isinstance(entry, ClinicalLabEntry):
+                continue
+            date_token = entry.sample_date or entry.relative_time or "unknown_time"
+            value_token = entry.value if entry.value is not None else (entry.value_text or "n/a")
+            uln_token = (
+                entry.upper_limit_normal
+                if entry.upper_limit_normal is not None
+                else (entry.upper_limit_text or "n/a")
+            )
+            lines.append(
+                f"- {date_token} | {entry.marker_name}: {value_token} (ULN: {uln_token}) | source: {entry.source}"
+            )
+        return lines or ["- None extracted."]
+
+    # -------------------------------------------------------------------------
+    @staticmethod
+    def format_onset_context(onset_context: LiverInjuryOnsetContext | None) -> list[str]:
+        if onset_context is None:
+            return ["- Onset anchor unavailable."]
+        return [
+            f"- Onset date: {onset_context.onset_date or 'Not available'}",
+            f"- Onset basis: {onset_context.onset_basis}",
+            f"- Evidence: {onset_context.evidence or 'Not reported.'}",
+        ]
+
+    # -------------------------------------------------------------------------
+    @staticmethod
     def build_structured_clinical_context(
         payload: PatientData,
         *,
         therapy_drugs: PatientDrugs,
         anamnesis_drugs: PatientDrugs,
         disease_context: PatientDiseaseContext,
+        lab_timeline: PatientLabTimeline,
+        onset_context: LiverInjuryOnsetContext | None,
         pattern_score: Any,
     ) -> str:
         therapy_mentions = [
@@ -567,6 +618,12 @@ class ClinicalSessionEndpoint:
             "",
             "# Structured Disease Timeline (from Anamnesis)",
             *ClinicalSessionEndpoint.format_structured_diseases(disease_context),
+            "",
+            "# Longitudinal Laboratory Timeline",
+            *ClinicalSessionEndpoint.format_lab_timeline(lab_timeline),
+            "",
+            "# Estimated Liver Injury Onset Anchor",
+            *ClinicalSessionEndpoint.format_onset_context(onset_context),
             "",
             "# Visit Date Anchor",
             (
@@ -874,6 +931,59 @@ class ClinicalSessionEndpoint:
         if stop_check is not None:
             stop_check()
 
+        self.emit_progress(
+            progress_callback,
+            stage="anamnesis_lab_extraction",
+            value=48.0,
+        )
+        lab_progress_callback = self.build_stage_progress_callback(
+            progress_callback,
+            stage="anamnesis_lab_extraction",
+            start_value=48.0,
+            end_value=52.0,
+        )
+        start_time = time.perf_counter()
+        try:
+            lab_timeline, onset_context = await self.lab_extractor.extract_from_payload(
+                payload,
+                progress_callback=lab_progress_callback,
+            )
+            if stop_check is not None:
+                stop_check()
+            elapsed = time.perf_counter() - start_time
+            logger.info("Anamnesis lab extraction required %.4f seconds", elapsed)
+            logger.info("Detected %s timeline lab entries", len(lab_timeline.entries))
+        except Exception as exc:
+            elapsed = time.perf_counter() - start_time
+            logger.warning(
+                (
+                    "Anamnesis lab extraction failed after %.4f seconds; "
+                    "continuing without structured lab timeline: %s"
+                ),
+                elapsed,
+                exc,
+            )
+            issues.append(
+                PipelineIssue(
+                    severity="warning",
+                    code="anamnesis_lab_extraction_failed",
+                    message=(
+                        "Longitudinal lab extraction from anamnesis was unavailable; "
+                        "the analysis continued without timeline enrichment."
+                    ),
+                    field="anamnesis",
+                )
+            )
+            lab_timeline = PatientLabTimeline(entries=[])
+            onset_context = None
+        self.emit_progress(
+            progress_callback,
+            stage="anamnesis_lab_extraction",
+            value=52.0,
+        )
+        if stop_check is not None:
+            stop_check()
+
         all_detected_drugs = PatientDrugs(
             entries=[*therapy_drugs.entries, *anamnesis_drugs.entries]
         )
@@ -882,18 +992,66 @@ class ClinicalSessionEndpoint:
             "Using %s deduplicated drugs for matching/consultation",
             len(analysis_drugs.entries),
         )
+
+        self.emit_progress(
+            progress_callback,
+            stage="rucam_estimation",
+            value=52.0,
+        )
+        start_time = time.perf_counter()
+        try:
+            rucam_bundle = self.rucam_estimator.estimate(
+                payload=payload,
+                analysis_drugs=analysis_drugs,
+                anamnesis_drugs=anamnesis_drugs,
+                disease_context=disease_context,
+                lab_timeline=lab_timeline,
+                onset_context=onset_context,
+                pattern_score=pattern_score,
+                resolved_drugs=None,
+            )
+            elapsed = time.perf_counter() - start_time
+            logger.info("RUCAM estimation required %.4f seconds", elapsed)
+        except Exception as exc:
+            elapsed = time.perf_counter() - start_time
+            logger.warning(
+                "RUCAM estimation failed after %.4f seconds; continuing without RUCAM: %s",
+                elapsed,
+                exc,
+            )
+            issues.append(
+                PipelineIssue(
+                    severity="warning",
+                    code="rucam_estimation_failed",
+                    message=(
+                        "RUCAM estimation was unavailable; the analysis continued without "
+                        "per-drug estimated RUCAM."
+                    ),
+                )
+            )
+            rucam_bundle = PatientRucamAssessmentBundle(entries=[])
+        self.emit_progress(
+            progress_callback,
+            stage="rucam_estimation",
+            value=54.0,
+        )
+        if stop_check is not None:
+            stop_check()
+
         structured_context = self.build_structured_clinical_context(
             payload,
             therapy_drugs=therapy_drugs,
             anamnesis_drugs=anamnesis_drugs,
             disease_context=disease_context,
+            lab_timeline=lab_timeline,
+            onset_context=onset_context,
             pattern_score=pattern_score,
         )
 
         self.emit_progress(
             progress_callback,
             stage="rag_query_building",
-            value=48.0,
+            value=54.0,
         )
         rag_query: dict[str, str] | None = None
         if payload.use_rag:
@@ -907,7 +1065,7 @@ class ClinicalSessionEndpoint:
         self.emit_progress(
             progress_callback,
             stage="rag_query_building",
-            value=50.0,
+            value=56.0,
         )
         if stop_check is not None:
             stop_check()
@@ -915,12 +1073,12 @@ class ClinicalSessionEndpoint:
         self.emit_progress(
             progress_callback,
             stage="livertox_lookup",
-            value=50.0,
+            value=56.0,
         )
         livertox_progress_callback = self.build_stage_progress_callback(
             progress_callback,
             stage="livertox_lookup",
-            start_value=50.0,
+            start_value=56.0,
             end_value=62.0,
         )
         prepared_inputs = await input_preparator.prepare_inputs(
@@ -937,6 +1095,30 @@ class ClinicalSessionEndpoint:
             value=62.0,
         )
 
+        try:
+            rucam_bundle = self.rucam_estimator.estimate(
+                payload=payload,
+                analysis_drugs=analysis_drugs,
+                anamnesis_drugs=anamnesis_drugs,
+                disease_context=disease_context,
+                lab_timeline=lab_timeline,
+                onset_context=onset_context,
+                pattern_score=pattern_score,
+                resolved_drugs=prepared_inputs.resolved_drugs if prepared_inputs else None,
+            )
+        except Exception as exc:
+            logger.warning("RUCAM re-estimation with LiverTox metadata failed: %s", exc)
+            issues.append(
+                PipelineIssue(
+                    severity="warning",
+                    code="rucam_reestimate_failed",
+                    message=(
+                        "RUCAM refinement with matched LiverTox metadata failed; "
+                        "using preliminary estimates."
+                    ),
+                )
+            )
+
         start_time = time.perf_counter()
         clinical_session: HepatoxConsultation | None = None
         final_report: str | None = None
@@ -951,6 +1133,7 @@ class ClinicalSessionEndpoint:
                 visit_date=payload.visit_date,
                 rag_query=rag_query,
                 use_web_search=payload.use_web_search,
+                rucam_bundle=rucam_bundle,
                 progress_callback=consultation_progress_callback,
             )
             if stop_check is not None:
@@ -1009,6 +1192,11 @@ class ClinicalSessionEndpoint:
                 normalized_key = normalize_drug_query_name(key)
                 if normalized_key:
                     resolved_drug_map[normalized_key] = value
+        rucam_by_name: dict[str, DrugRucamAssessment] = {}
+        for item in rucam_bundle.entries:
+            normalized_key = normalize_drug_query_name(item.drug_name)
+            if normalized_key:
+                rucam_by_name[normalized_key] = item
         matched_drugs_payload: list[dict[str, Any]] = []
         for detected_name in detected_drugs:
             normalized_name = normalize_drug_query_name(detected_name)
@@ -1067,6 +1255,9 @@ class ClinicalSessionEndpoint:
                     "raw_mentions": resolved.get("raw_mentions")
                     if isinstance(resolved, dict)
                     else [],
+                    "rucam": rucam_by_name.get(normalized_name).model_dump()
+                    if normalized_name in rucam_by_name
+                    else None,
                 }
             )
         serialized_issues = self.serialize_pipeline_issues(issues)
@@ -1091,6 +1282,9 @@ class ClinicalSessionEndpoint:
             "anamnesis_drugs": anamnesis_detected_drugs,
             "anamnesis_diseases": anamnesis_detected_diseases,
             "matched_drugs": matched_drugs_payload,
+            "rucam_assessments": [item.model_dump() for item in rucam_bundle.entries],
+            "lab_timeline": [entry.model_dump() for entry in lab_timeline.entries],
+            "onset_context": onset_context.model_dump() if onset_context else None,
         }
         self.emit_progress(
             progress_callback,
@@ -1272,7 +1466,9 @@ endpoint = ClinicalSessionEndpoint(
     router=router,
     drugs_parser=drugs_parser,
     disease_extractor=disease_extractor,
+    lab_extractor=lab_extractor,
     pattern_analyzer=pattern_analyzer,
+    rucam_estimator=rucam_estimator,
     serializer=serializer,
     payload_sanitizer=payload_sanitization_service,
 )
