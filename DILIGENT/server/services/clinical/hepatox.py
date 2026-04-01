@@ -20,12 +20,14 @@ from DILIGENT.server.domain.clinical import (
     ClinicalPipelineValidationError,
     DrugEntry,
     DrugClinicalAssessment,
+    DrugRucamAssessment,
     DrugSuspensionContext,
     HepatotoxicityPatternAssessment,
     HepatotoxicityPatternScore,
     PatientData,
     PatientDrugClinicalReport,
     PatientDrugs,
+    PatientRucamAssessmentBundle,
     PipelineIssue,
 )
 from DILIGENT.server.configurations import LLMRuntimeConfig, server_settings
@@ -296,6 +298,7 @@ class HepatoxConsultation:
         visit_date: date | None = None,
         rag_query: dict[str, str] | None = None,
         use_web_search: bool = False,
+        rucam_bundle: PatientRucamAssessmentBundle | None = None,
         progress_callback: Callable[[str, float], None] | None = None,
     ) -> dict[str, Any] | None:
         if prepared_inputs is None:
@@ -315,6 +318,7 @@ class HepatoxConsultation:
             pattern_prompt=prepared_inputs.pattern_prompt,
             rag_query=rag_query,
             use_web_search=use_web_search,
+            rucam_bundle=rucam_bundle,
             progress_callback=progress_callback,
         )
         return report.model_dump()
@@ -329,6 +333,7 @@ class HepatoxConsultation:
         pattern_prompt: str,
         rag_query: dict[str, str] | None = None,
         use_web_search: bool = False,
+        rucam_bundle: PatientRucamAssessmentBundle | None = None,
         progress_callback: Callable[[str, float], None] | None = None,
     ) -> PatientDrugClinicalReport:
         normalized_context = clinical_context.strip() if clinical_context else ""
@@ -338,6 +343,12 @@ class HepatoxConsultation:
         )
         entries: list[DrugClinicalAssessment] = []
         llm_jobs: list[tuple[int, Any]] = []
+        rucam_by_key: dict[str, DrugRucamAssessment] = {}
+        if rucam_bundle is not None:
+            for item in rucam_bundle.entries:
+                normalized_key = normalize_drug_query_name(item.drug_name)
+                if normalized_key:
+                    rucam_by_key[normalized_key] = item
 
         # iterate over all drugs to identify those with LiverTox excerpts and those without
         for idx, drug_entry in enumerate(self.drugs.entries):
@@ -350,6 +361,7 @@ class HepatoxConsultation:
                 pattern_summary=pattern_summary,
                 rag_query=rag_query,
                 use_web_search=use_web_search,
+                rucam_by_key=rucam_by_key,
             )
             entries.append(entry)
             if job:
@@ -448,6 +460,7 @@ class HepatoxConsultation:
         pattern_summary: str,
         rag_query: dict[str, str] | None,
         use_web_search: bool,
+        rucam_by_key: dict[str, DrugRucamAssessment],
     ) -> tuple[DrugClinicalAssessment, tuple[int, Any] | None]:
         raw_name = drug_entry.name or ""
         normalized_drug_key = normalize_drug_query_name(raw_name)
@@ -478,6 +491,7 @@ class HepatoxConsultation:
 
         suspension = self.evaluate_suspension(drug_entry, visit_date)
         matched_lvt_row = matched_row if isinstance(matched_row, dict) else None
+        rucam = rucam_by_key.get(normalized_drug_key)
         entry = DrugClinicalAssessment(
             drug_name=drug_entry.name,
             canonical_name=canonical_name,
@@ -490,6 +504,7 @@ class HepatoxConsultation:
             match_status=match_status,
             match_candidates=match_candidates,
             suspension=suspension,
+            rucam=rucam,
         )
 
         if suspension.excluded:
@@ -532,6 +547,7 @@ class HepatoxConsultation:
             pattern_summary=pattern_summary,
             metadata=entry.matched_livertox_row,
             web_evidence=web_evidence,
+            rucam=entry.rucam,
         )
         return entry, (idx, job)
 
@@ -942,6 +958,39 @@ class HepatoxConsultation:
         return f"{normalized_name} - LiverTox score {normalized_score}"
 
     # -------------------------------------------------------------------------
+    def summarize_rucam_components(
+        self,
+        rucam: DrugRucamAssessment | None,
+    ) -> str:
+        if rucam is None or not rucam.components:
+            return "Not available."
+        pieces: list[str] = []
+        for component in rucam.components:
+            pieces.append(
+                f"{component.label}: {component.score} ({component.status})"
+            )
+        return "; ".join(pieces)
+
+    # -------------------------------------------------------------------------
+    def format_rucam_limitations(self, rucam: DrugRucamAssessment | None) -> str:
+        if rucam is None or not rucam.limitations:
+            return "None documented."
+        return "; ".join(item for item in rucam.limitations if item)
+
+    # -------------------------------------------------------------------------
+    def format_rucam_prompt_block(self, rucam: DrugRucamAssessment | None) -> str:
+        if rucam is None:
+            return "Estimated RUCAM not available."
+        return (
+            f"- Score: {rucam.total_score}\n"
+            f"- Category: {rucam.causality_category}\n"
+            f"- Confidence: {rucam.confidence}\n"
+            f"- Injury type used: {rucam.injury_type_for_rucam}\n"
+            f"- Components: {self.summarize_rucam_components(rucam)}\n"
+            f"- Limitations: {self.format_rucam_limitations(rucam)}"
+        )
+
+    # -------------------------------------------------------------------------
     async def request_drug_analysis(
         self,
         *,
@@ -958,6 +1007,7 @@ class HepatoxConsultation:
         pattern_summary: str,
         metadata: dict[str, Any] | None,
         web_evidence: str,
+        rucam: DrugRucamAssessment | None,
     ) -> str:
         start_details = self.format_start_prompt(suspension)
         suspension_details = self.format_suspension_prompt(suspension)
@@ -975,6 +1025,7 @@ class HepatoxConsultation:
             if isinstance(item, dict) and item
         ]
         extraction_block = "\n".join(metadata_items) if metadata_items else "- Not available"
+        rucam_block = self.format_rucam_prompt_block(rucam)
         user_prompt = LIVERTOX_CLINICAL_USER_PROMPT.format(
             drug_name=self.escape_braces(drug_name.strip() or drug_name),
             canonical_name=self.escape_braces(canonical_name.strip() or canonical_name),
@@ -990,6 +1041,7 @@ class HepatoxConsultation:
             suspension_details=self.escape_braces(suspension_details),
             timeline_note=self.escape_braces(timeline_note),
             pattern_summary=self.escape_braces(pattern_summary),
+            rucam_block=self.escape_braces(rucam_block),
             metadata_block=self.escape_braces(metadata_block),
             livertox_score=self.escape_braces(score),
             example_block=self.escape_braces(LIVERTOX_REPORT_EXAMPLE),
@@ -1138,8 +1190,17 @@ class HepatoxConsultation:
         body = self.sanitize_renderable_body(entry)
         if not body:
             body = self.build_fallback_technical_note(entry)
+        rucam = entry.rucam
+        rucam_score = rucam.total_score if rucam is not None else "n/a"
+        rucam_category = rucam.causality_category if rucam is not None else "not available"
+        rucam_confidence = rucam.confidence if rucam is not None else "low"
+        component_summary = self.summarize_rucam_components(rucam)
+        limitations = self.format_rucam_limitations(rucam)
         return (
             f"**{title}**\n\n"
+            f"**Estimated RUCAM**: {rucam_score}, {rucam_category}, confidence {rucam_confidence}\n\n"
+            f"**RUCAM component summary**: {component_summary}\n\n"
+            f"**RUCAM limitations**: {limitations}\n\n"
             f"**Report**\n\n"
             f"{body}\n\n"
             f"**Bibliography source**: LiverTox"
@@ -1207,7 +1268,12 @@ class HepatoxConsultation:
         for entry in entries:
             label = (entry.drug_name or "").strip() or "Unnamed drug"
             reason = self.describe_unresolved_entry(entry)
-            lines.append(f"- **{label}**: {reason}")
+            rucam_summary = (
+                f"RUCAM {entry.rucam.total_score} ({entry.rucam.causality_category}, confidence {entry.rucam.confidence})"
+                if entry.rucam is not None
+                else "RUCAM not available"
+            )
+            lines.append(f"- **{label}**: {reason} {rucam_summary}.")
         return "\n".join(lines).strip()
 
     # -------------------------------------------------------------------------

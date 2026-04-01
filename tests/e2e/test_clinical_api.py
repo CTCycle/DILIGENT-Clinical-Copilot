@@ -121,3 +121,28 @@ def test_clinical_missing_labs_allows_continue_when_overridden(
     text = response.text()
     assert "## Hepato-toxicity Pattern" in text
     assert "Classification:** indeterminate" in text
+
+
+def test_clinical_report_includes_estimated_rucam(api_context: APIRequestContext):
+    payload = build_minimal_payload()
+    payload["anamnesis"] = (
+        "ALT 320 U/L (ULN 40) on 2025-01-10, ALT 150 U/L on 2025-01-20. "
+        "Jaundice started on 2025-01-11."
+    )
+
+    response = api_context.post("/clinical", data=payload)
+    assert response.status == 202
+    text = response.text()
+    assert "RUCAM" in text
+
+
+def test_clinical_endpoint_stable_without_usable_longitudinal_labs(
+    api_context: APIRequestContext,
+):
+    payload = build_minimal_payload()
+    payload["anamnesis"] = "Patient reports fatigue but no explicit longitudinal labs."
+
+    response = api_context.post("/clinical", data=payload)
+    assert response.status == 202
+    text = response.text()
+    assert "# Clinical Visit Summary" in text

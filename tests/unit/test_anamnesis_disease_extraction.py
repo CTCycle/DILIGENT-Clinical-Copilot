@@ -5,9 +5,11 @@ from datetime import date
 from typing import Any
 
 from DILIGENT.server.domain.clinical import (
+    LiverInjuryOnsetContext,
     DiseaseContextEntry,
     DrugEntry,
     HepatotoxicityPatternScore,
+    PatientLabTimeline,
     PatientData,
     PatientDiseaseContext,
     PatientDrugs,
@@ -144,6 +146,8 @@ def test_build_structured_clinical_context_includes_disease_timeline() -> None:
         therapy_drugs=therapy_drugs,
         anamnesis_drugs=anamnesis_drugs,
         disease_context=disease_context,
+        lab_timeline=PatientLabTimeline(entries=[]),
+        onset_context=LiverInjuryOnsetContext(onset_basis="unknown"),
         pattern_score=pattern_score,
     )
 

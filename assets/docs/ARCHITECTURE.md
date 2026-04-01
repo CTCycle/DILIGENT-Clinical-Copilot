@@ -1,6 +1,6 @@
 # DILIGENT Clinical Copilot Architecture
 
-Last updated: 2026-03-28
+Last updated: 2026-04-01
 
 This document describes the current architecture at module level.
 For runtime profile details, see `assets/docs/PACKAGING_AND_RUNTIME_MODES.md`.
@@ -31,6 +31,9 @@ DILIGENT is a local-first clinical application for DILI assessment with:
   - Typed payload models for clinical, jobs, models, keys, inspection, research.
 - `DILIGENT/server/services/*`
   - Business logic: clinical analysis, updater flows, inspection orchestration, jobs.
+  - Clinical pipeline now includes dedicated longitudinal lab extraction
+    (`services/clinical/labs.py`) and deterministic per-drug RUCAM estimation
+    (`services/clinical/rucam.py`) wired before final hepatotoxicity synthesis.
 - `DILIGENT/server/repositories/*`
   - DB and serialization boundaries (SQLite/Postgres, vector serialization, queries).
 - `DILIGENT/server/models/*`

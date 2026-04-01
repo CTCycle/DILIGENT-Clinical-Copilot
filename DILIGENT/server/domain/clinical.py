@@ -496,6 +496,133 @@ class PatientDiseaseContext(BaseModel):
 
 
 ###############################################################################
+class ClinicalLabEntry(BaseModel):
+    marker_name: str = Field(..., min_length=1, max_length=40)
+    value: float | None = Field(default=None)
+    value_text: str | None = Field(default=None, max_length=100)
+    unit: str | None = Field(default=None, max_length=50)
+    upper_limit_normal: float | None = Field(default=None)
+    upper_limit_text: str | None = Field(default=None, max_length=100)
+    sample_date: str | None = Field(default=None, max_length=40)
+    relative_time: str | None = Field(default=None, max_length=120)
+    evidence: str | None = Field(default=None, max_length=500)
+    source: Literal["manual", "anamnesis"] = Field(default="anamnesis")
+
+    @field_validator(
+        "marker_name",
+        "value_text",
+        "unit",
+        "upper_limit_text",
+        "sample_date",
+        "relative_time",
+        "evidence",
+        mode="before",
+    )
+    @classmethod
+    def strip_optional_text_fields(cls, value: str | None) -> str | None:
+        if value is None:
+            return None
+        stripped = str(value).strip()
+        return stripped or None
+
+
+###############################################################################
+class PatientLabTimeline(BaseModel):
+    entries: list[ClinicalLabEntry] = Field(default_factory=list)
+
+
+###############################################################################
+class LiverInjuryOnsetContext(BaseModel):
+    onset_date: str | None = Field(default=None, max_length=40)
+    onset_basis: Literal[
+        "first_symptom",
+        "first_abnormal_lab",
+        "visit_proxy",
+        "unknown",
+    ] = Field(default="unknown")
+    evidence: str | None = Field(default=None, max_length=500)
+
+    @field_validator("onset_date", "evidence", mode="before")
+    @classmethod
+    def strip_text_fields(cls, value: str | None) -> str | None:
+        if value is None:
+            return None
+        stripped = str(value).strip()
+        return stripped or None
+
+
+###############################################################################
+class RucamComponentAssessment(BaseModel):
+    component_key: str = Field(..., min_length=1, max_length=60)
+    label: str = Field(..., min_length=1, max_length=200)
+    score: int = Field(default=0)
+    status: Literal["scored", "not_assessable", "excluded"] = Field(default="scored")
+    evidence: str | None = Field(default=None, max_length=1000)
+    rationale: str | None = Field(default=None, max_length=2000)
+
+    @field_validator("component_key", "label", "evidence", "rationale", mode="before")
+    @classmethod
+    def strip_component_fields(cls, value: str | None) -> str | None:
+        if value is None:
+            return None
+        stripped = str(value).strip()
+        return stripped or None
+
+
+###############################################################################
+class DrugRucamAssessment(BaseModel):
+    drug_name: str = Field(..., min_length=1, max_length=200)
+    injury_type_for_rucam: Literal[
+        "hepatocellular",
+        "cholestatic",
+        "mixed",
+        "indeterminate",
+    ] = Field(default="indeterminate")
+    total_score: int = Field(default=0)
+    causality_category: Literal[
+        "excluded",
+        "unlikely",
+        "possible",
+        "probable",
+        "highly probable",
+    ] = Field(default="excluded")
+    confidence: Literal["low", "moderate", "high"] = Field(default="low")
+    estimated: bool = Field(default=True)
+    components: list[RucamComponentAssessment] = Field(default_factory=list)
+    limitations: list[str] = Field(default_factory=list)
+    summary: str | None = Field(default=None, max_length=2000)
+
+    @field_validator("drug_name", "summary", mode="before")
+    @classmethod
+    def strip_rucam_fields(cls, value: str | None) -> str | None:
+        if value is None:
+            return None
+        stripped = str(value).strip()
+        return stripped or None
+
+    @field_validator("limitations", mode="before")
+    @classmethod
+    def normalize_limitations(cls, value: Any) -> list[str]:
+        if value is None:
+            return []
+        if not isinstance(value, list):
+            return []
+        cleaned: list[str] = []
+        for item in value:
+            if item is None:
+                continue
+            text = str(item).strip()
+            if text:
+                cleaned.append(text)
+        return cleaned
+
+
+###############################################################################
+class PatientRucamAssessmentBundle(BaseModel):
+    entries: list[DrugRucamAssessment] = Field(default_factory=list)
+
+
+###############################################################################
 class LiverToxMatchInfo(BaseModel):
     nbk_id: str = Field(..., min_length=1, max_length=50)
     matched_name: str = Field(..., min_length=1, max_length=200)
@@ -680,6 +807,7 @@ class DrugClinicalAssessment(BaseModel):
     suspension: DrugSuspensionContext = Field(
         default_factory=create_drug_suspension_context,
     )
+    rucam: DrugRucamAssessment | None = Field(default=None)
     paragraph: str | None = Field(default=None)
 
     @field_validator("paragraph", mode="before")
