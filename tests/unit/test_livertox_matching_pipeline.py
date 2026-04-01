@@ -100,10 +100,12 @@ def test_excerpt_attached_only_for_valid_match_confidence() -> None:
     assert matched["ambiguous_match"] is False
     assert matched["extracted_excerpts"]
 
+    assert ambiguous["match_status"] == "ambiguous_match"
     assert ambiguous["ambiguous_match"] is True
     assert ambiguous["missing_livertox"] is True
     assert ambiguous["extracted_excerpts"] == []
 
+    assert missing["match_status"] == "missing_match"
     assert missing["missing_livertox"] is True
     assert missing["extracted_excerpts"] == []
 
@@ -187,7 +189,7 @@ def test_related_excerpt_is_used_when_matched_monograph_excerpt_is_missing() -> 
     mapping = matcher.build_drugs_to_excerpt_mapping(["De-Ursil"], matches)
 
     entry = mapping[0]
-    assert entry["match_status"] == "matched"
+    assert entry["match_status"] == "matched_with_excerpt"
     assert entry["missing_livertox"] is False
     assert entry["extracted_excerpts"]
     assert "ursodiol is generally safe" in entry["extracted_excerpts"][0].lower()
@@ -241,8 +243,164 @@ def test_mapping_prefers_excerpt_row_for_duplicate_normalized_drug() -> None:
     mapping = matcher.build_drugs_to_excerpt_mapping(["Valium"], [match])
 
     entry = mapping[0]
-    assert entry["match_status"] == "matched"
+    assert entry["match_status"] == "matched_with_excerpt"
     assert entry["missing_livertox"] is False
     assert entry["matched_livertox_row"] is not None
     assert entry["matched_livertox_row"]["nbk_id"] == "NBK0002"
     assert "useful diazepam excerpt" in entry["extracted_excerpts"][0].lower()
+
+
+def test_query_normalization_high_value_aliases_are_deterministic() -> None:
+    assert normalize_drug_query_name("Co-amoxi 1g") == "amoxicillin clavulanate"
+    assert normalize_drug_query_name("Metformina 1000 mg") == "metformin"
+    assert normalize_drug_query_name("Bactrim") == "trimethoprim sulfamethoxazole"
+    assert normalize_drug_query_name("Quetiapina") == "quetiapine"
+    assert normalize_drug_query_name("Fluvastatina") == "fluvastatin"
+    assert normalize_drug_query_name("amoxicillin/clavulanate") == "amoxicillin clavulanate"
+
+
+def test_matcher_prefers_combo_for_bactrim_brand_disambiguation() -> None:
+    frame = pd.DataFrame(
+        [
+            {
+                "nbk_id": "NBK0101",
+                "drug_name": "Trimethoprim-Sulfamethoxazole",
+                "excerpt": "Combination can cause cholestatic injury in rare cases.",
+                "synonyms": "Bactrim",
+                "ingredient": "Trimethoprim-Sulfamethoxazole",
+                "brand_name": "Bactrim",
+            },
+            {
+                "nbk_id": "NBK0102",
+                "drug_name": "Trimethoprim",
+                "excerpt": "Trimethoprim monotherapy excerpt.",
+                "synonyms": "",
+                "ingredient": "Trimethoprim",
+                "brand_name": "",
+            },
+            {
+                "nbk_id": "NBK0103",
+                "drug_name": "Sulfamethoxazole",
+                "excerpt": "Sulfamethoxazole monotherapy excerpt.",
+                "synonyms": "",
+                "ingredient": "Sulfamethoxazole",
+                "brand_name": "",
+            },
+        ]
+    )
+    matcher = LiverToxMatcher(frame)
+
+    result = matcher.match_drug_names(["Bactrim"])[0]
+
+    assert result.status == "matched"
+    assert result.matched_name == "Trimethoprim-Sulfamethoxazole"
+    assert result.reason in {"exact_canonical", "exact_alias_ranked", "exact_alias"}
+    assert not result.rejected_candidate_names or "Trimethoprim-Sulfamethoxazole" not in result.rejected_candidate_names
+
+
+def test_matcher_handles_known_italian_aliases_without_fuzzy() -> None:
+    frame = pd.DataFrame(
+        [
+            {
+                "nbk_id": "NBK0201",
+                "drug_name": "Metformin",
+                "excerpt": "Metformin has rare hepatotoxicity reports.",
+                "synonyms": "",
+                "ingredient": "Metformin",
+                "brand_name": "",
+            },
+            {
+                "nbk_id": "NBK0202",
+                "drug_name": "Quetiapine",
+                "excerpt": "Quetiapine excerpt.",
+                "synonyms": "",
+                "ingredient": "Quetiapine",
+                "brand_name": "",
+            },
+            {
+                "nbk_id": "NBK0203",
+                "drug_name": "Fluvastatin",
+                "excerpt": "Fluvastatin excerpt.",
+                "synonyms": "",
+                "ingredient": "Fluvastatin",
+                "brand_name": "",
+            },
+            {
+                "nbk_id": "NBK0204",
+                "drug_name": "Amoxicillin clavulanate",
+                "excerpt": "Combination beta-lactam excerpt.",
+                "synonyms": "Co-amoxi",
+                "ingredient": "Amoxicillin clavulanate",
+                "brand_name": "Co-amoxi",
+            },
+        ]
+    )
+    matcher = LiverToxMatcher(frame)
+
+    metformina = matcher.match_drug_names(["Metformina"])[0]
+    quetiapina = matcher.match_drug_names(["Quetiapina"])[0]
+    fluvastatina = matcher.match_drug_names(["Fluvastatina"])[0]
+    co_amoxi = matcher.match_drug_names(["Co-amoxi"])[0]
+
+    assert metformina.status == "matched"
+    assert metformina.matched_name == "Metformin"
+    assert metformina.reason != "fuzzy"
+    assert quetiapina.status == "matched"
+    assert quetiapina.matched_name == "Quetiapine"
+    assert quetiapina.reason != "fuzzy"
+    assert fluvastatina.status == "matched"
+    assert fluvastatina.matched_name == "Fluvastatin"
+    assert fluvastatina.reason != "fuzzy"
+    assert co_amoxi.status == "matched"
+    assert co_amoxi.matched_name == "Amoxicillin clavulanate"
+    assert co_amoxi.reason != "fuzzy"
+
+
+def test_mapping_classifies_matched_no_excerpt_separately_from_missing_match() -> None:
+    frame = pd.DataFrame(
+        [
+            {
+                "nbk_id": "NBK0301",
+                "drug_name": "Piperacillin Tazobactam",
+                "excerpt": None,
+                "synonyms": "Piperacillin-Tazobactam",
+                "ingredient": "Piperacillin Tazobactam",
+                "brand_name": "",
+            }
+        ]
+    )
+    matcher = LiverToxMatcher(frame)
+
+    queries = ["Piperacillin-Tazobactam", "UnknownDrugZZ"]
+    mapping = matcher.build_drugs_to_excerpt_mapping(queries, matcher.match_drug_names(queries))
+
+    no_excerpt = mapping[0]
+    missing = mapping[1]
+    assert no_excerpt["match_status"] == "matched_no_excerpt"
+    assert no_excerpt["missing_livertox"] is True
+    assert no_excerpt["chosen_candidate"] == "Piperacillin Tazobactam"
+    assert missing["match_status"] == "missing_match"
+    assert missing["missing_livertox"] is True
+
+
+def test_preparation_expands_regimen_into_multiple_components() -> None:
+    preparation = ClinicalKnowledgePreparation()
+    drugs = PatientDrugs(
+        entries=[
+            DrugEntry(name="Encorafenib + Binimetinib", source="therapy"),
+            DrugEntry(name="Dabrafenib + Trametinib", source="therapy"),
+        ]
+    )
+
+    candidates = preparation.build_drug_candidates(drugs)
+    canonical_names = {candidate["canonical_name"] for candidate in candidates}
+
+    assert "encorafenib" in canonical_names
+    assert "binimetinib" in canonical_names
+    assert "dabrafenib" in canonical_names
+    assert "trametinib" in canonical_names
+    for candidate in candidates:
+        if candidate["canonical_name"] in {"encorafenib", "binimetinib"}:
+            assert "binimetinib|encorafenib" in candidate["regimen_group_ids"]
+        if candidate["canonical_name"] in {"dabrafenib", "trametinib"}:
+            assert "dabrafenib|trametinib" in candidate["regimen_group_ids"]

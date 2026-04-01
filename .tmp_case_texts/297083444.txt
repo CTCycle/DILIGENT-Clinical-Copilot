@@ -1,0 +1,176 @@
+
+
+===== PAGE 1 =====
+
+Istituto di Scienze Farmacologiche della 
+Svizzera Italiana (ISFSI)
+ 
+Farmacologia e Tossicologia Clinica
+& Farmacia clinica
+ 
+Segretariato:
+Tel. +41 (0)91 811 66 22
+Email: Segretariato.ISFSI@eoc.ch
+ 
+62
+Istituto Oncologico della Svizzera 
+Italiana, IOSI
+Dr.ssa med. Vittoria Espeli
+viceprimario Oncologia medica
+Via P. Capelli
+6962 Viganello
+Lugano, 07 agosto 2025  
+CURTI Ivano - 27.05.1959
+Via Campione 54, 6816 Bissone / Cell.: +41 79 445 13 87
+Ns. rif.: 8121460 Avs: 756.8360.3302.10
+Prof. Dr. med. Alessandro Ceschi
+MSc, EuCP, FEAPCCT, FRCP Edin
+Spec. Farmacologia e tossicologia 
+clinica
+Spec. Medicina interna generale
+Primario e Direttore medico e 
+scientifico ISFSI
+ 
+Dr.ssa med. Francesca Bedussi
+Spec. Farmacologia e tossicologia 
+clinica
+Medico specialista 
+ 
+Raffaela Bertoli, MSc
+Resp. operativa Centro Farmaco
+ 
+Ottavia Eberhardt-Gianella, MSc
+Farmacista clinica FPH
+ 
+Sara Ghidossi, MSc
+Farmacista clinica FPH
+ 
+Saida Imelli, MSc
+Farmacista clinica FPH
+ 
+Nicole Lazzeri, MSc
+Farmacista clinica FPH
+ 
+Laura Müller. MSc
+Farmacista
+ 
+Michela Pironi, MSc
+Farmacista clinica FPH
+ 
+Gentile Dr.ssa med Espeli, 
+ringraziandola per il suo consulto le riportiamo la nostra valutazione.
+Anamnesi
+Per anamnesi completa vedere precedenti consulti. 
+ 
+Attuale:
+Paziente in terapia con Mektovi e Braftovi come segue:
+- 15.05 re-introduzione della terapia a 450mg + 45mgx2 
+- 06.06 rialzo ALT 151 U/L 
+- 10.06 riduzione dosaggio a 300 mg + 30mgx2
+- 13.07 rialzo ALT 142 U/L
+- 23.07 riduzione ulteriore a 225mg + 30mgx2
+- 01.08 ALT persistentemente alti (92 U/L) ed episodi di piressia (>38)
+- 02.08 sospesi entrambi i farmaci 
+- 06.08 ALT 80 U/L
+ 
+Il paziente ha presentato quindi febbre di grado 1 e rialzo delle 
+transaminasi di grado 2. 
+Da protocollo NHS per un grado due sarebbe necessario mantenere la 
+dose per 2 settimane, se non miglioramento interrompere il trattamento 
+fino a risoluzione e poi ricominciare il trattamento con la medesima dose. 
+Tuttavia per recidive di grado due se intollerabili si raccomanda la 
+sospensione.
+ 
+Quesito: presenza di controindicazioni allo switch a Dabrafenib + 
+Trametinib (D+T)?
+Valutazione
+Via Tesserete 46 - CH 6903 Lugano - telefono +41 (0) 91 811 66 22
+Segretariato.ISFSI@eoc.ch - www.eoc.ch 
+Versione 1 validata da eoc27396 il 07.08.2025 14:02:12
+
+===== PAGE 2 =====
+
+Riportiamo gli eventi avversi descritti in scheda tecnica Swissmedic per i farmaci presi in esame:
+ 
+Encorafenib +Binimitinib: Molto comune: aumento delle transaminasi di tutti i gradi 15.7%. Molto 
+comune: piressia di tutti i gradi 17.2%. [1]
+ 
+Dabrafenib+ Trametinib: Molto comune: alanina aminotransferasi aumentata (14%), aspartato 
+aminotransferasi aumentata (13%). Comune: fosfatasi alcalina ematica aumentata, concentrazione 
+della gamma-glutamiltransferasi aumentata. Piressia (30%). Inoltre si riporta quanto segue per il 
+trattamento della piressia "L'incidenza e la gravità della piressia sono aumentate con la terapia 
+combinata. La maggior parte degli eventi di piressia si è verificata entro il primo mese di terapia. 
+Circa un terzo dei pazienti trattati con terapia combinata in cui si è verificata la piressia, 
+presentavano tre o più eventi. La terapia deve essere sospesa (Tafinlar se somministrato come 
+monoterapia, o Tafinlar più trametinib se usati in combinazione) se la temperatura corporea di un 
+paziente è ≥38°C (≥100.4°F). In caso di recidiva, è possibile sospendere la terapia già al primo 
+sintomo di piressia. Deve essere iniziato un trattamento antipiretico, ad es. con ibuprofene o 
+paracetamolo. I pazienti devono essere monitorati per segni e sintomi di infezione. Il trattamento con 
+Tafinlar, o con Tafinlar e trametinib somministrati in combinazione, deve essere ripreso quando il 
+paziente non presenta sintomi da almeno 24 ore, nelle modalità che seguono: allo stesso livello di 
+dose oppure ridotto di un livello di dose se la piressia è ricorrente e/o è accompagnata da altri 
+sintomi gravi come disidratazione, ipotensione o insufficienza renale. Deve essere considerato l'uso 
+di corticosteroidi nel caso in cui gli antipiretici risultino insufficienti." [1]
+ 
+Come mostrato da una recente systematic review del 2022 che indagava la tossicità delle tre 
+combinazioni commercializzate per il trattamento del melanoma metastatico si evince che la 
+combinazione D+T presenterebbe minor rischio di tossicità epatica (1-5% vs 5-10% ) e minor impatto 
+cardiaco (riduzione FE). [2]
+ 
+Alcune fonti indicano una possibile superiorità del regime Encorafenib + Binimetinib (E+B) rispetto 
+alle altre possibili associazioni approvate. Viene suggerito inoltre che la combinazione non 
+convenzionale sia più efficace Encorafenib + Trametinib (studio in vitro su linee di cellule tumorali 
+con BRAF mut). [3]
+In un'altra pubblicazione, una systematic review sull'efficacia e la tossicità delle diverse terapia, non 
+si evince una differenza significativa in termini di OS, PFS e ORR tra i i due regimi. La stessa review 
+mette in evidenza che per quanto riguarda la piressia, la scelta migliore ricadrebbe sulla E+B. Non è 
+stata indagata in particolar modo la tossicità epatica. [4]
+Conclusioni
+Dal momento che il paziente ha:
+- persistentemente manifestato un rialzo degli enzimi epatici nonostante le riduzioni della 
+combinazione di farmaci
+- tratto beneficio clinico non trascurabile dalla terapia con BRAF/MEK inibitori
+- la combinazione a cui si vorrebbe passare, D+T, è riportata in letteratura avere un miglior profilo 
+di sicurezza, in particolar modo per quanto riguarda la tossicità epatica. 
+E' valutabile lo switch terapeutico dal punto di vista farmacologico, non ci sono controindicazioni al 
+cambio di terapia per quanto riguarda il profilo di tossicità. Tuttavia bisogna tenere conto che:
+- uno studio ha riportato un maggior rischio di piressia per la combinazione D+T, qualora dovesse 
+manifestarsi attenersi alle indicazioni della scheda tecnica come sopra riportate,
+CURTI Ivano
+27.05.1959, 8121460
+2/3
+Via Tesserete 46 - CH 6903 Lugano - telefono +41 (0) 91 811 66 22
+Segretariato.ISFSI@eoc.ch - www.eoc.ch 
+Versione 1 validata da eoc27396 il 07.08.2025 14:02:12
+
+===== PAGE 3 =====
+
+- avendo manifestato persistentemente una tossicità, benché di grado 1-2 alla combinazione E+B, 
+è ottimale prevedere un controllo della funzionalità epatica a stretto giro quando verrà introdotta 
+la nuova terapia, non è infatti escludibile un'eventuale epatotossicità anche dalle nuove molecole, 
+benché sia descritto un rischio minore.
+ 
+Caso discusso con Dr.ssa med Bedussi.
+ 
+Restiamo a disposizione.
+Bibliografia
+1. Swissmedic
+2. Garutti M, Bergnach M, Polesel J, Palmero L, Pizzichetta MA, Puglisi F. BRAF and MEK 
+Inhibitors and Their Toxicities: A Meta-Analysis. Cancers (Basel). 2022 Dec 26;15(1):141. doi: 
+10.3390/cancers15010141. PMID: 36612138; PMCID: PMC9818023
+3. Schulz A, Raetz J, Karitzky PC, Dinter L, Tietze JK, Kolbe I, Käubler T, Renner B, Beissert S, 
+Meier F, Westphal D. Head-to-Head Comparison of BRAF/MEK Inhibitor Combinations Proposes 
+Superiority of Encorafenib Plus Trametinib in Melanoma. Cancers (Basel). 2022 Oct 
+8;14(19):4930. doi: 10.3390/cancers14194930. PMID: 36230853; PMCID: PMC9564158.
+4. Efficacy and Adverse Events in Metastatic Melanoma Patients Treated with Combination BRAF 
+Plus MEK Inhibitors Versus BRAF Inhibitors: A Systematic Review Austin Greco https:// 
+doi.org/10.3390/cancers11121950
+Dr.ssa med. Alice Schianchi
+Medico Assistente
+Documento senza firma validato elettronicamente.
+CURTI Ivano
+27.05.1959, 8121460
+3/3
+Via Tesserete 46 - CH 6903 Lugano - telefono +41 (0) 91 811 66 22
+Segretariato.ISFSI@eoc.ch - www.eoc.ch 
+Versione 1 validata da eoc27396 il 07.08.2025 14:02:12

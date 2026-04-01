@@ -99,14 +99,8 @@ export function buildClinicalPayload(
     alp_max: sanitizeField(form.alpMax),
     use_rag: form.useRag,
     use_web_search: form.useWebSearch,
-    use_cloud_services: settings.useCloudServices,
-    llm_provider: settings.provider,
-    cloud_model: settings.cloudModel,
-    parsing_model: settings.parsingModel,
-    clinical_model: settings.clinicalModel,
-    ollama_temperature: settings.temperature,
-    ollama_reasoning: settings.reasoning,
   };
+  void settings;
   if (allowMissingLabs !== null) {
     payload.allow_missing_labs = allowMissingLabs;
   }

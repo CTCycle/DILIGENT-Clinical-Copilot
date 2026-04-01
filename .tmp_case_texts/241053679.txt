@@ -1,0 +1,238 @@
+
+
+===== PAGE 1 =====
+
+Istituto di Scienze Farmacologiche della 
+Svizzera Italiana (ISFSI)
+ 
+Farmacologia e Tossicologia Clinica
+& Farmacia clinica
+ 
+Segretariato:
+Tel. +41 (0)91 811 66 22
+Email: Segretariato.ISFSI@eoc.ch
+ 
+62
+Istituto Oncologico della Svizzera 
+Italiana, IOSI
+Dr. med. Fabio Turco
+capoclinica Oncologia medica
+Via P. Capelli
+6962 Viganello
+Lugano, 21 febbraio 2025  
+BERZIGOTTI  Massimo - 30.05.1964
+Via Clemente Maraini 15, 6900 Lugano / Cell.: +4179 927 05 64
+Ns. rif.: 8097245 Avs: 756.2144.1773.12
+Prof. Dr. med. Alessandro Ceschi
+MSc, EuCP, FEAPCCT, FRCP Edin
+Spec. Farmacologia e tossicologia 
+clinica
+Spec. Medicina interna generale
+Primario e Direttore medico e 
+scientifico ISFSI
+ 
+Dr.ssa med. Francesca Bedussi
+Spec. Farmacologia e tossicologia 
+clinica
+Medico capoclinica
+ 
+Raffaela Bertoli, MSc
+Resp. operativa Centro Farmaco
+ 
+Ottavia Eberhardt-Gianella, MSc
+Farmacista clinica FPH
+ 
+Sara Ghidossi, MSc
+Farmacista clinica
+ 
+Saida Imelli, MSc
+Farmacista clinica FPH
+ 
+Nicole Lazzeri, MSc
+Farmacista clinica FPH
+ 
+Laura Müller. MSc
+Farmacista
+ 
+Michela Pironi, MSc
+Farmacista clinica FPH
+ 
+Gentile Dr. med Turco, 
+Ringraziandola per il suo quesito le riportiamo la nostra valutazione.
+Anamnesi
+Paziente di 60 aa noto per:
+1. Adenocarcinoma acinare della prostata, HSPC, Gleason 9 (5+4), 
+localmente avanzato (05.2024) cT2b (mrT3a) cN1 cM1b con/su:    
+- terapia di deprivazione androgenica con leuprorelina dal 
+15.04.2024
+- terapia con abiraterone-prendisone dal 31.05.2024
+ 
+Labor 18.02.2025: bilirubina tot 43,9µmol/L, bilirubina dir 11.1µmol/L. Dal 
+25.06.2024 valori sempre leggermente rialzati. Picco raggiunto con l'ultimo 
+labor.
+Ecografia addome 23.08.2024 risultata nella norma. 
+Ecografia addome 18.02.2025 risulta stabile, evidenziando solamente una 
+colecistolitiasi. 
+ 
+Attualmente: il paziente ha avuto degli episodi di diarrea nell’ultima 
+settimana che si sono autorisolti da circa 2 giorni. Altrimenti asintomatico.
+ 
+Sospetto clinico: sindrome di Gilbert.
+ 
+Quesito: terapia con Abiraterone e sindrome di Gilbert, possibile 
+peggioramento?
+Terapia farmacologica
+■ Prednison Spirig HC cpr 5 mg  1-0-0-0 per os
+ dal 31.05.2024  
+Via Tesserete 46 - CH 6903 Lugano - telefono +41 (0) 91 811 66 22
+Segretariato.ISFSI@eoc.ch - www.eoc.ch 
+Versione 1 validata da eoc20379 il 21.02.2025 15:58:47
+
+===== PAGE 2 =====
+
+■ Pradif T cpr ret 400 mcg  0-0-1-0 per os
+■ Abirateron Sandoz cpr rivestite 500 mg  2-0-0-0 per os
+ dal 31.05.2024  
+■ Vi-De3 4'500 IU/ml gtt orali 10 ml [gtt] 4-0-0-0 per os
+■ Calcimagon D3 cpr da masticare 500/800 
+Orange
+ 1-0-0-0 per os
+ dal 15.04.2024  
+Valutazione
+La malattia di Gilbert è una condizione ereditaria con pattern autosomico dominante e penetranza 
+incompleta, manifestata dal 3-10% della popolazione e caratterizzata da un polimorfismo genetico a 
+carico della uridina difosfato 5-glucuronil transferasi (UDP glucuroniltransferasi o UGT); nello 
+specifico vengono coinvolti il gene UGT1A1 e l'allele UGT1A1*28. [1] 
+Gli individui portatori di tale polimorfismo possono manifestare fino ad un 30% di riduzione dell'attività 
+di UGT1A1. [2] 
+Data la funzione detossificante di substrati endogeni o esogeni di natura lipofila attraverso 
+glucuronazione, una ridotta efficacia di UGT, influenza negativamente questo processo. Ne deriva 
+una ridotta coniugazione della bilirubina con conseguente aumento della bilirubina sierica totale e 
+della forma non coniugata.  [1] In caso di deficit di UGT, inoltre, farmaci e bilirubina competono per 
+l'enzima e questo giustifica l'ulteriore aumento della bilirubina indiretta nel circolo. [3] 
+Da un punto di vista clinico questo può tradursi in ittero, dolore addominale, dispepsia, sindrome 
+astenovegetativa. Può inoltre verificarsi un intermittente ittero sclerale e cutaneo a seguito di fattori 
+esogeni ed endogeni come digiuno, disidratazione, malattie infettive, stress emotivo o fisico, 
+consumo di alcol etc. Infine, una complicanza possibile della malattia di Gilbert è la calcolosi biliare.    
+Si sottolinea, in virtù del meccanismo patogenetico sopra delucidato, come il metabolismo di alcuni 
+farmaci possa dunque risultare alterato; ad esempio per: androgeni, rifampicina, cimetidina, 
+streptomicina, ampicillina, paracetamolo, ibuprofene, etc. [3]
+Altri meccanismi che possono contribuire all'alterato metabolismo farmacologico sono: lo sviluppo di 
+metaboliti tossici dei farmaci che possono danneggiare le proteine della famiglia BSEP, ovvero 
+proteine carrier che esportano gli acidi biliari, o le proteine trasportatrici della famiglia MRP2, 
+coinvolte nella secrezione di bilirubina e altre molecole dall'epatocita al dotto biliare; o ancora l'azione 
+inibitoria su UGT1A1 posseduta intrinsecamente da alcuni farmaci o sostanze, come gli ormoni 
+steroidei estrogeno e testosterone. [3]
+ 
+Viene riportato un possibile effetto peggiorativo dell'iperbilirubinemia in pazienti affetti da sindrome di 
+Gilbert, anche in caso di assunzione di farmaci chemioterapici. Viene sottolineato come non sia 
+considerato appropriato uno screening per malattia di Gilbert in tutti i pazienti ma che, in caso di 
+riscontro di iperbilirubinemia, è indicato eseguire indagini diagnostiche per confermare la malattia in 
+modo da evitare modifiche terapeutiche non necessarie. [4]
+ 
+Nella fattispecie, risulta interessante citare come, secondo indicazioni dell'Agenzia Italiana del 
+Farmaco (AIFA), la sindrome di Gilbert non venga riportata tra i criteri di esclusione della terapia con 
+Abiraterone.  [5]
+BERZIGOTTI  Massimo
+30.05.1964, 8097245
+2/4
+Via Tesserete 46 - CH 6903 Lugano - telefono +41 (0) 91 811 66 22
+Segretariato.ISFSI@eoc.ch - www.eoc.ch 
+Versione 1 validata da eoc20379 il 21.02.2025 15:58:47
+
+===== PAGE 3 =====
+
+Per quanto riguarda gli effetti indesiderati a carico del tratto gastrointestinale e del fegato riportati in 
+scheda tecnica di Abiraterone, ovvero diarrea (molto comune), dispepsia (comune), aumento 
+dell'ALT e/o dell'AST (13%; di grado 3: 4% e di grado 4: <1%, molto comune), epatite fulminante 
+(raro), insufficienza epatica acuta (raro), si sottolinea infatti come l'alterazione della bilirubina non sia 
+segnalata. [6]
+Inoltre, si riporta un metabolismo a carico primariamente di CYP3A4 e SULT2A1 con una descritta 
+attività inibitoria su CYP1A2, CYP2D6, CYP2C8, CYP2C9, CYP2C19 e CYP3A4/5. [7]
+ 
+L'Abiraterone è un inibitore steroide selettivo che blocca la biosintesi degli androgeni. Va incontro a 
+estensiva biotrasformazione attraverso il pathway degli steroidi, andando a formare metaboliti attivi. 
+L'Abiraterone va incontro a metabolismo secondario formando un glucoronide nel fegato umano. 
+UGT1A4 è l'enzima maggiormente coinvolto nel processo di glucuronidazione. [9]
+In un recente studio (2024) in vivo si è dimostrato che i polimorfismi del UGT1A4 non impattano la 
+farmacocinetica né di Abiraterone né dei suoi metaboliti. [10]
+ 
+Per quanto non esistano terapie specifiche per questo tipo di pazienti, fonti in letteratura segnalano 
+come la somministrazione di corticosteroidi, potenzialmente in grado di indurre UGT, o la 
+somministrazione di induttori di enzimi epatici (come fenobarbital e clofibrato) possano normalizzare 
+le concentrazioni plasmatiche di bilirubina entro una o due settimane [8].
+ 
+I pazienti affetti da Sindrome di Gilbert, inoltre, presentano una grande eterogenità circa il 
+funzionamento della glucuronidazione, pertanto non è prevedibile con precisione come verrà 
+metabolizzato un farmaco. [12]
+Conclusioni
+Alla luce delle considerazioni effettuate, riteniamo:
+- Il metabolismo dell'Abiraterone comprende anche un meccanismo di glucuronidazione ad opera 
+dell'UGT1A4. Benché l'UGT1A1 interessato dalla sindrome di Gilbert non sia coinvolto nel 
+metabolismo dell'Abiraterone non è escluso un suo potenziale coinvolgimento minore nel 
+processo che porta ad iperbilirubinemia, soprattutto anche tenendo conto della grande 
+eterogeneità che presentano gli individui affetti da S. Gilbert nel metabolizzare i farmaci.
+- La presenza di Sindrome di Gilbert non costituisce una controindicazione alla terapia con 
+Abiraterone, e pertanto qualora le indagini portassero a tale diagnosi, sarebbe comunque 
+possibile la prosecuzione della terapia con Abiraterone.
+- Necessario effettuare la valutazione genetica per confermare il sospetto diagnostico di malattia di 
+Gilbert, non tanto ai fini della terapia attuale (ritenuta adeguata) quanto in previsione di eventuali 
+ulteriori terapie;
+- Opportuna la valutazione di fattori esogeni che potrebbero aver contribuito al rialzo della 
+bilirubina (stato di idratazione, stress, consumo di alcol etc).
+ 
+Caso discusso con Dr.ssa med Bedussi.
+ 
+Rimaniamo a disposizione.
+Bibliografia
+1. Ha, V., Jupp, J., & Tsang, R. (2017). Oncology Drug Dosing in Gilbert Syndrome Associated with 
+UGT1A1: A Summary of the Literature. Pharmacotherapy: The Journal of Human Pharmacology 
+and Drug Therapy, 37. https://doi.org/10.1002/phar.1946.
+2. Fretzayas A, Moustaki M, Liapi O, Karpathios T. Gilbert syndrome. Eur J Pediatr. 2012 
+Jan;171(1):11-5. doi: 10.1007/s00431-011-1641-0. Epub 2011 Dec 9. PMID: 22160004.
+BERZIGOTTI  Massimo
+30.05.1964, 8097245
+3/4
+Via Tesserete 46 - CH 6903 Lugano - telefono +41 (0) 91 811 66 22
+Segretariato.ISFSI@eoc.ch - www.eoc.ch 
+Versione 1 validata da eoc20379 il 21.02.2025 15:58:47
+
+===== PAGE 4 =====
+
+3. Khaitovych , M., & Turchak , D. (2020). JILBER’S SYNDROME: CLINICAL AND 
+PHARMACOLOGICAL ASPECTS. Review. Medical Science of Ukraine (MSU), 16(4), 58-64. 
+https://doi.org/10.32345/2664-4738.4.2020.9
+4. Berrueco R, Alonso-Saladrigues A, Martorell-Sampol L, Català-Temprano A, Ruiz-Llobet A, Toll T, 
+Torrebadell M, Naudó M, Camós M, Rives S. Outcome and toxicities associated to chemotherapy 
+in children with acute lymphoblastic leukemia and Gilbert syndrome. Usefulness of UGT1A1 
+mutational screening. Pediatr Blood Cancer. 2015 Jul;62(7):1195-201. doi: 10.1002/pbc.25457. 
+Epub 2015 Apr 8. PMID: 25855413
+5. AIFA
+6. Swissmedic
+7. Micromedex
+8. UpToDate
+9. Effect of food and polymorphisms in SLCO2B1, CYP3A4 and UGTm1A4 on pharmacokinetics of 
+abiraterone and its metabolites in Chinese volunteers - Hu Yixin, Wu Jianyuan, British journal of 
+clinical pharmacology. 2024. PMID:37574850
+10. Vaillancourt J, Turcotte V, Caron P, Villeneuve L, Lacombe L, Pouliot F, Lévesque É, Guillemette 
+C. Glucuronidation of Abiraterone and Its Pharmacologically Active Metabolites by UGT1A4, 
+Influence of Polymorphic Variants and Their Potential as Inhibitors of Steroid Glucuronidation. 
+Drug Metab Dispos. 2020 Feb;48(2):75-84. doi: 10.1124/dmd.119.088229. Epub 2019 Nov 14. 
+PMID: 31727674
+11. PharmaGKB
+12. Esteban A, Pérez-Mateo M. Heterogeneity of paracetamol metabolism in Gilbert's syndrome. Eur 
+J Drug Metab Pharmacokinet. 1999 Jan-Mar;24(1):9-13. doi: 10.1007/BF03190005. PMID: 
+10412886.
+Dr.ssa med. Francesca Capitanini
+Medico Assistente
+Dr.ssa med. Alice Schianchi
+Medico Assistente
+Documento senza firma validato elettronicamente.
+Copia: - Ospedale Regionale di Lugano, Civico, Dr.ssa med. Benedetta Terziroli Beretta-Piccoli, 
+caposervizio Epatologia, Via Tesserete 46, 6900 Lugano
+BERZIGOTTI  Massimo
+30.05.1964, 8097245
+4/4
+Via Tesserete 46 - CH 6903 Lugano - telefono +41 (0) 91 811 66 22
+Segretariato.ISFSI@eoc.ch - www.eoc.ch 
+Versione 1 validata da eoc20379 il 21.02.2025 15:58:47

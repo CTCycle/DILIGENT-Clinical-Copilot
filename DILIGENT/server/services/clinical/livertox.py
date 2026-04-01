@@ -210,8 +210,18 @@ class LiverToxData:
                     )
                 else:
                     notes = list(dict.fromkeys([*notes, "matched_record_missing_excerpt"]))
-            missing_livertox = match_status != "matched" or not unique_excerpts
-            ambiguous_match = match_status == "ambiguous"
+            resolved_status = self.resolve_entry_match_status(
+                match_status=match_status,
+                excerpts=unique_excerpts,
+            )
+            missing_livertox = resolved_status != "matched_with_excerpt"
+            ambiguous_match = resolved_status == "ambiguous_match"
+            chosen_candidate = coerce_text(getattr(match, "matched_name", None))
+            rejected_candidates = [
+                str(candidate).strip()
+                for candidate in list(getattr(match, "rejected_candidate_names", []) or [])
+                if str(candidate).strip()
+            ]
             entries.append(
                 {
                     "drug_name": original,
@@ -222,13 +232,26 @@ class LiverToxData:
                     "match_confidence": getattr(match, "confidence", None),
                     "match_reason": getattr(match, "reason", None),
                     "match_notes": notes,
-                    "match_status": match_status,
+                    "match_status": resolved_status,
                     "match_candidates": list(getattr(match, "candidate_names", []) or []),
+                    "chosen_candidate": chosen_candidate,
+                    "rejected_candidates": rejected_candidates,
                     "missing_livertox": missing_livertox,
                     "ambiguous_match": ambiguous_match,
                 }
             )
         return entries
+
+    # -------------------------------------------------------------------------
+    @staticmethod
+    def resolve_entry_match_status(*, match_status: str, excerpts: list[str]) -> str:
+        if match_status == "ambiguous":
+            return "ambiguous_match"
+        if match_status != "matched":
+            return "missing_match"
+        if excerpts:
+            return "matched_with_excerpt"
+        return "matched_no_excerpt"
 
     # -------------------------------------------------------------------------
     def find_related_excerpt(self, normalized_query: str) -> str | None:

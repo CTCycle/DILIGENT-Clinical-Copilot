@@ -92,6 +92,7 @@ class LiverToxMatch:
     reason: str
     notes: list[str]
     candidate_names: list[str]
+    rejected_candidate_names: list[str]
     record: MonographRecord | None = None
 
 
@@ -122,6 +123,12 @@ class DrugsLookup:
     )
     CATALOG_INDEX_LIMIT = server_settings.drugs_matcher.catalog_index_limit
     CATALOG_CANDIDATE_LIMIT = server_settings.drugs_matcher.catalog_candidate_limit
+    REGIMEN_SPLIT_RE = re.compile(r"(?:\s*\+\s*|\s*/\s*|\s+\bplus\b\s+)", re.IGNORECASE)
+    BRAND_COMBO_PREFERENCES: dict[str, str] = {
+        "bactrim": "trimethoprim sulfamethoxazole",
+        "co amoxi": "amoxicillin clavulanate",
+        "coamoxi": "amoxicillin clavulanate",
+    }
 
     # -------------------------------------------------------------------------
     def __init__(self) -> None:
@@ -334,6 +341,7 @@ class DrugsLookup:
             reason=match.reason,
             notes=list(match.notes),
             candidate_names=list(match.candidate_names),
+            rejected_candidate_names=list(match.rejected_candidate_names),
             record=match.record,
         )
 
@@ -389,8 +397,15 @@ class DrugsLookup:
     ) -> LiverToxMatch | None:
         if not stage_matches:
             return None
-        if len(stage_matches) == 1:
-            record, confidence, notes = stage_matches[0]
+        preferred_combo = self.preferred_combo_name(raw_name, canonical_query, normalized_query)
+        ranked = self.rank_stage_matches(
+            stage_matches=stage_matches,
+            raw_name=raw_name,
+            canonical_query=canonical_query,
+            normalized_query=normalized_query,
+        )
+        if len(ranked) == 1:
+            record, confidence, notes = ranked[0]
             return self.create_matched_result(
                 raw_name=raw_name,
                 canonical_query=canonical_query,
@@ -400,13 +415,128 @@ class DrugsLookup:
                 reason=stage_name,
                 notes=notes,
             )
+        if self.has_strict_rank_winner(
+            stage_matches=ranked,
+            normalized_query=normalized_query,
+            preferred_combo=preferred_combo,
+        ):
+            best_record, best_confidence, best_notes = ranked[0]
+            rejected = [record.drug_name for record, _, _ in ranked[1:]]
+            combined_notes = list(
+                dict.fromkeys([*best_notes, "deterministic_disambiguation_applied"])
+            )
+            return self.create_matched_result(
+                raw_name=raw_name,
+                canonical_query=canonical_query,
+                normalized_query=normalized_query,
+                record=best_record,
+                confidence=best_confidence,
+                reason=f"{stage_name}_ranked",
+                notes=combined_notes,
+                rejected_candidate_names=rejected,
+            )
         return self.create_ambiguous_result(
             raw_name=raw_name,
             canonical_query=canonical_query,
             normalized_query=normalized_query,
             reason=f"ambiguous_{stage_name}",
-            stage_matches=stage_matches,
+            stage_matches=ranked,
         )
+
+    # -------------------------------------------------------------------------
+    def rank_stage_matches(
+        self,
+        *,
+        stage_matches: list[tuple[MonographRecord, float, list[str]]],
+        raw_name: str,
+        canonical_query: str,
+        normalized_query: str,
+    ) -> list[tuple[MonographRecord, float, list[str]]]:
+        preferred_combo = self.preferred_combo_name(raw_name, canonical_query, normalized_query)
+        ranked = sorted(
+            stage_matches,
+            key=lambda item: self.stage_match_score(
+                item=item,
+                normalized_query=normalized_query,
+                preferred_combo=preferred_combo,
+            ),
+            reverse=True,
+        )
+        return ranked
+
+    # -------------------------------------------------------------------------
+    def has_strict_rank_winner(
+        self,
+        *,
+        stage_matches: list[tuple[MonographRecord, float, list[str]]],
+        normalized_query: str,
+        preferred_combo: str | None,
+    ) -> bool:
+        if len(stage_matches) <= 1:
+            return True
+        top_score = self.stage_match_score(
+            item=stage_matches[0],
+            normalized_query=normalized_query,
+            preferred_combo=preferred_combo,
+        )
+        next_score = self.stage_match_score(
+            item=stage_matches[1],
+            normalized_query=normalized_query,
+            preferred_combo=preferred_combo,
+        )
+        return top_score > next_score
+
+    # -------------------------------------------------------------------------
+    def stage_match_score(
+        self,
+        *,
+        item: tuple[MonographRecord, float, list[str]],
+        normalized_query: str,
+        preferred_combo: str | None,
+    ) -> tuple[int, int, int, int, float, int]:
+        record, confidence, notes = item
+        normalized_record_name = self.normalize_name(record.drug_name)
+        has_excerpt = int(bool(coerce_text(record.excerpt)))
+        is_combo = int(len(normalized_record_name.split()) > 1)
+        is_preferred_combo = int(
+            preferred_combo is not None and normalized_record_name == preferred_combo
+        )
+        normalized_notes = [note.casefold() for note in notes]
+        alias_priority = 0
+        if any(note.startswith("synonym=") for note in normalized_notes):
+            alias_priority = 2
+        if any(note.startswith("brand=") for note in normalized_notes):
+            alias_priority = 3
+        if any(note.startswith("ingredient=") for note in normalized_notes):
+            alias_priority = max(alias_priority, 1)
+        exact_name = int(bool(normalized_query) and normalized_record_name == normalized_query)
+        return (
+            is_preferred_combo,
+            exact_name,
+            has_excerpt,
+            is_combo,
+            float(confidence),
+            alias_priority,
+        )
+
+    # -------------------------------------------------------------------------
+    def preferred_combo_name(
+        self,
+        raw_name: str,
+        canonical_query: str,
+        normalized_query: str,
+    ) -> str | None:
+        normalized_raw = self.normalize_name(raw_name)
+        for candidate in (normalized_raw, normalized_query, self.normalize_name(canonical_query)):
+            preferred = self.BRAND_COMBO_PREFERENCES.get(candidate)
+            if preferred is None:
+                continue
+            normalized_preferred = self.normalize_name(preferred)
+            if normalized_preferred:
+                return normalized_preferred
+        if self.REGIMEN_SPLIT_RE.search(raw_name) and len(normalized_query.split()) > 1:
+            return normalized_query
+        return None
 
     # -------------------------------------------------------------------------
     def match_primary_all(
@@ -535,6 +665,7 @@ class DrugsLookup:
         confidence: float,
         reason: str,
         notes: list[str],
+        rejected_candidate_names: list[str] | None = None,
     ) -> LiverToxMatch:
         normalized_confidence = round(min(max(confidence, self.MIN_CONFIDENCE), 1.0), 2)
         cleaned_notes = list(dict.fromkeys(note for note in notes if note))
@@ -549,6 +680,9 @@ class DrugsLookup:
             reason=reason,
             notes=cleaned_notes,
             candidate_names=[record.drug_name],
+            rejected_candidate_names=list(
+                dict.fromkeys(rejected_candidate_names or [])
+            ),
             record=record,
         )
 
@@ -573,6 +707,7 @@ class DrugsLookup:
             reason=reason,
             notes=list(dict.fromkeys(note for note in notes if note)),
             candidate_names=[],
+            rejected_candidate_names=[],
             record=None,
         )
 
@@ -604,6 +739,7 @@ class DrugsLookup:
             reason=reason,
             notes=list(dict.fromkeys(note for note in notes if note)),
             candidate_names=candidate_names,
+            rejected_candidate_names=[],
             record=None,
         )
 
