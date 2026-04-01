@@ -65,3 +65,22 @@ def test_start_pull_job_uses_centralized_poll_interval(monkeypatch) -> None:
     )
 
     assert response.poll_interval == server_settings.jobs.polling_interval
+
+
+# -----------------------------------------------------------------------------
+def test_clinical_progress_callback_raises_when_stop_requested(monkeypatch) -> None:
+    class StopRequestedJobManagerStub:
+        def should_stop(self, job_id: str) -> bool:
+            return True
+
+    monkeypatch.setattr(session_routes, "job_manager", StopRequestedJobManagerStub())
+
+    try:
+        session_routes.report_clinical_job_progress(
+            "job-cancelled",
+            stage="llm_analysis",
+            progress=75.0,
+        )
+    except session_routes.ClinicalJobCancelled:
+        return
+    raise AssertionError("Expected ClinicalJobCancelled when stop is requested.")
