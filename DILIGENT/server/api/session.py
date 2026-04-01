@@ -468,6 +468,32 @@ class ClinicalSessionEndpoint:
 
     # -------------------------------------------------------------------------
     @staticmethod
+    def build_fallback_therapy_drugs(raw_text: str | None) -> PatientDrugs:
+        if not raw_text:
+            return PatientDrugs(entries=[])
+
+        candidates = raw_text.replace(";", "\n").splitlines()
+        entries: list[DrugEntry] = []
+        seen_keys: set[str] = set()
+        for candidate in candidates:
+            normalized = candidate.strip().lstrip("-*• ").strip()
+            if not normalized:
+                continue
+            lookup_key = normalize_drug_query_name(normalized)
+            if not lookup_key or lookup_key in seen_keys:
+                continue
+            seen_keys.add(lookup_key)
+            entries.append(
+                DrugEntry(
+                    name=normalized,
+                    source="therapy",
+                    historical_flag=False,
+                )
+            )
+        return PatientDrugs(entries=entries)
+
+    # -------------------------------------------------------------------------
+    @staticmethod
     def format_structured_diseases(disease_context: PatientDiseaseContext) -> list[str]:
         if not disease_context.entries:
             return ["- None detected."]
@@ -667,13 +693,36 @@ class ClinicalSessionEndpoint:
             end_value=30.0,
         )
         start_time = time.perf_counter()
-        therapy_drugs = await self.drugs_parser.extract_drugs_from_therapy(
-            cleaned_therapy_text,
-            progress_callback=therapy_progress_callback,
-        )
-        elapsed = time.perf_counter() - start_time
-        logger.info("Therapy drugs extraction required %.4f seconds", elapsed)
-        logger.info("Detected %s drugs from therapy list", len(therapy_drugs.entries))
+        try:
+            therapy_drugs = await self.drugs_parser.extract_drugs_from_therapy(
+                cleaned_therapy_text,
+                progress_callback=therapy_progress_callback,
+            )
+            elapsed = time.perf_counter() - start_time
+            logger.info("Therapy drugs extraction required %.4f seconds", elapsed)
+            logger.info("Detected %s drugs from therapy list", len(therapy_drugs.entries))
+        except Exception as exc:
+            elapsed = time.perf_counter() - start_time
+            logger.warning(
+                (
+                    "Therapy drugs extraction failed after %.4f seconds; "
+                    "falling back to line-based parsing: %s"
+                ),
+                elapsed,
+                exc,
+            )
+            issues.append(
+                PipelineIssue(
+                    severity="warning",
+                    code="therapy_extraction_fallback",
+                    message=(
+                        "Therapy extraction via LLM was unavailable; "
+                        "the analysis continued using the raw therapy list."
+                    ),
+                    field="drugs",
+                )
+            )
+            therapy_drugs = self.build_fallback_therapy_drugs(cleaned_therapy_text)
         self.emit_progress(
             progress_callback,
             stage="therapy_extraction",
@@ -700,13 +749,36 @@ class ClinicalSessionEndpoint:
             end_value=42.0,
         )
         start_time = time.perf_counter()
-        anamnesis_drugs = await self.drugs_parser.extract_drugs_from_anamnesis(
-            payload.anamnesis,
-            progress_callback=anamnesis_progress_callback,
-        )
-        elapsed = time.perf_counter() - start_time
-        logger.info("Anamnesis drugs extraction required %.4f seconds", elapsed)
-        logger.info("Detected %s drugs from anamnesis", len(anamnesis_drugs.entries))
+        try:
+            anamnesis_drugs = await self.drugs_parser.extract_drugs_from_anamnesis(
+                payload.anamnesis,
+                progress_callback=anamnesis_progress_callback,
+            )
+            elapsed = time.perf_counter() - start_time
+            logger.info("Anamnesis drugs extraction required %.4f seconds", elapsed)
+            logger.info("Detected %s drugs from anamnesis", len(anamnesis_drugs.entries))
+        except Exception as exc:
+            elapsed = time.perf_counter() - start_time
+            logger.warning(
+                (
+                    "Anamnesis drugs extraction failed after %.4f seconds; "
+                    "continuing without historical drug mentions: %s"
+                ),
+                elapsed,
+                exc,
+            )
+            issues.append(
+                PipelineIssue(
+                    severity="warning",
+                    code="anamnesis_extraction_failed",
+                    message=(
+                        "Drug extraction from anamnesis was unavailable; "
+                        "the analysis continued without historical drug mentions."
+                    ),
+                    field="anamnesis",
+                )
+            )
+            anamnesis_drugs = PatientDrugs(entries=[])
         self.emit_progress(
             progress_callback,
             stage="anamnesis_extraction",
@@ -926,12 +998,24 @@ class ClinicalSessionEndpoint:
                     "match_candidates": resolved.get("match_candidates")
                     if isinstance(resolved, dict)
                     else [],
+                    "chosen_candidate": resolved.get("chosen_candidate")
+                    if isinstance(resolved, dict)
+                    else None,
+                    "rejected_candidates": resolved.get("rejected_candidates")
+                    if isinstance(resolved, dict)
+                    else [],
                     "missing_livertox": resolved.get("missing_livertox")
                     if isinstance(resolved, dict)
                     else True,
                     "ambiguous_match": resolved.get("ambiguous_match")
                     if isinstance(resolved, dict)
                     else False,
+                    "regimen_group_ids": resolved.get("regimen_group_ids")
+                    if isinstance(resolved, dict)
+                    else [],
+                    "regimen_components": resolved.get("regimen_components")
+                    if isinstance(resolved, dict)
+                    else [],
                     "origins": resolved.get("origins") if isinstance(resolved, dict) else [],
                     "raw_mentions": resolved.get("raw_mentions")
                     if isinstance(resolved, dict)

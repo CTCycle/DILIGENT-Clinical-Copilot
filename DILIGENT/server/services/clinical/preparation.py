@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import asyncio
+import re
 from collections.abc import Callable
 from dataclasses import dataclass
 from typing import Any
@@ -28,6 +29,8 @@ class HepatoxPreparedInputs:
 
 ###############################################################################
 class ClinicalKnowledgePreparation:
+    REGIMEN_SEPARATOR_RE = re.compile(r"(?:\s*\+\s*|\s*/\s*|\s+\bplus\b\s+|\s+\band\b\s+)", re.IGNORECASE)
+
     def __init__(self) -> None:
         self.serializer = DataSerializer()
         self.livertox_matcher: LiverToxMatcher | None = None
@@ -175,11 +178,15 @@ class ClinicalKnowledgePreparation:
             "match_status": payload.get("match_status"),
             "match_notes": payload.get("match_notes", []),
             "match_candidates": payload.get("match_candidates", []),
+            "chosen_candidate": payload.get("chosen_candidate"),
+            "rejected_candidates": payload.get("rejected_candidates", []),
             "missing_livertox": bool(payload.get("missing_livertox")),
             "ambiguous_match": bool(payload.get("ambiguous_match")),
             "origins": [],
             "raw_mentions": [],
             "extraction_metadata": [],
+            "regimen_group_ids": [],
+            "regimen_components": [],
         }
 
     # -------------------------------------------------------------------------
@@ -187,29 +194,42 @@ class ClinicalKnowledgePreparation:
         ordered: list[dict[str, Any]] = []
         by_key: dict[str, dict[str, Any]] = {}
         for entry in drugs.entries:
-            candidate = self.normalize_drug_entry(entry)
-            if candidate is None:
+            base_candidate = self.normalize_drug_entry(entry)
+            if base_candidate is None:
                 continue
-            key = candidate["lookup_key"]
-            existing = by_key.get(key)
-            if existing is None:
-                by_key[key] = candidate
-                ordered.append(candidate)
-                continue
-            for origin in candidate["origins"]:
-                if origin not in existing["origins"]:
-                    existing["origins"].append(origin)
-            for raw_mention in candidate["raw_mentions"]:
-                if raw_mention not in existing["raw_mentions"]:
-                    existing["raw_mentions"].append(raw_mention)
-            if candidate["extraction_metadata"]:
-                existing["extraction_metadata"].extend(candidate["extraction_metadata"])
+            for candidate in self.expand_regimen_candidate(base_candidate):
+                key = candidate["lookup_key"]
+                existing = by_key.get(key)
+                if existing is None:
+                    by_key[key] = candidate
+                    ordered.append(candidate)
+                    continue
+                for origin in candidate["origins"]:
+                    if origin not in existing["origins"]:
+                        existing["origins"].append(origin)
+                for raw_mention in candidate["raw_mentions"]:
+                    if raw_mention not in existing["raw_mentions"]:
+                        existing["raw_mentions"].append(raw_mention)
+                for regimen_group in candidate.get("regimen_group_ids", []):
+                    if regimen_group not in existing["regimen_group_ids"]:
+                        existing["regimen_group_ids"].append(regimen_group)
+                for regimen_component in candidate.get("regimen_components", []):
+                    if regimen_component not in existing["regimen_components"]:
+                        existing["regimen_components"].append(regimen_component)
+                if candidate["extraction_metadata"]:
+                    existing["extraction_metadata"].extend(candidate["extraction_metadata"])
         for candidate in ordered:
             candidate["origins"] = sorted(
                 dict.fromkeys(candidate["origins"]),
                 key=lambda item: (item != "therapy", item),
             )
             candidate["raw_mentions"] = list(dict.fromkeys(candidate["raw_mentions"]))
+            candidate["regimen_group_ids"] = list(
+                dict.fromkeys(candidate.get("regimen_group_ids", []))
+            )
+            candidate["regimen_components"] = list(
+                dict.fromkeys(candidate.get("regimen_components", []))
+            )
             candidate["extraction_metadata"] = self.compact_entry_metadata(
                 candidate["extraction_metadata"]
             )
@@ -250,7 +270,55 @@ class ClinicalKnowledgePreparation:
             "origins": [origin],
             "raw_mentions": [raw_name],
             "extraction_metadata": [metadata] if metadata else [],
+            "regimen_group_ids": [],
+            "regimen_components": [],
         }
+
+    # -------------------------------------------------------------------------
+    def expand_regimen_candidate(self, candidate: dict[str, Any]) -> list[dict[str, Any]]:
+        canonical_name = str(candidate.get("canonical_name") or "").strip()
+        raw_mentions = [
+            mention for mention in candidate.get("raw_mentions", []) if isinstance(mention, str)
+        ]
+        source_text = raw_mentions[0] if raw_mentions else canonical_name
+        components = self.split_regimen_components(source_text)
+        if len(components) <= 1:
+            return [candidate]
+        canonical_components: list[str] = []
+        for component in components:
+            normalized_component = canonicalize_drug_query(component)
+            if normalized_component and normalized_component not in canonical_components:
+                canonical_components.append(normalized_component)
+        if len(canonical_components) <= 1:
+            return [candidate]
+        regimen_group_id = "|".join(sorted(canonical_components))
+        expanded: list[dict[str, Any]] = []
+        for component in canonical_components:
+            normalized_component = normalize_drug_query_name(component)
+            if not normalized_component:
+                continue
+            expanded.append(
+                {
+                    **candidate,
+                    "lookup_key": normalized_component,
+                    "canonical_name": component,
+                    "normalized_name": normalized_component,
+                    "regimen_group_ids": [regimen_group_id],
+                    "regimen_components": canonical_components[:],
+                }
+            )
+        return expanded or [candidate]
+
+    # -------------------------------------------------------------------------
+    def split_regimen_components(self, value: str) -> list[str]:
+        text = (value or "").strip()
+        if not text:
+            return []
+        if not self.REGIMEN_SEPARATOR_RE.search(text):
+            return [text]
+        parts = [part.strip(" \t,;:.") for part in self.REGIMEN_SEPARATOR_RE.split(text)]
+        components = [part for part in parts if part]
+        return components or [text]
 
     # -------------------------------------------------------------------------
     def compact_entry_metadata(self, metadata: list[dict[str, Any]]) -> list[dict[str, Any]]:
@@ -287,25 +355,37 @@ class ClinicalKnowledgePreparation:
                     "extracted_excerpts": [],
                     "match_confidence": None,
                     "match_reason": "no_match",
-                    "match_status": "missing",
+                    "match_status": "missing_match",
                     "match_notes": ["No LiverTox match for candidate."],
                     "match_candidates": [],
+                    "chosen_candidate": None,
+                    "rejected_candidates": [],
                     "missing_livertox": True,
                     "ambiguous_match": False,
                     "origins": [],
                     "raw_mentions": [],
                     "extraction_metadata": [],
+                    "regimen_group_ids": [],
+                    "regimen_components": [],
                 }
                 resolved_drugs[lookup_key] = payload
             payload.setdefault("origins", [])
             payload.setdefault("raw_mentions", [])
             payload.setdefault("extraction_metadata", [])
+            payload.setdefault("regimen_group_ids", [])
+            payload.setdefault("regimen_components", [])
             for origin in candidate.get("origins", []):
                 if origin not in payload["origins"]:
                     payload["origins"].append(origin)
             for raw_mention in candidate.get("raw_mentions", []):
                 if raw_mention not in payload["raw_mentions"]:
                     payload["raw_mentions"].append(raw_mention)
+            for regimen_group in candidate.get("regimen_group_ids", []):
+                if regimen_group not in payload["regimen_group_ids"]:
+                    payload["regimen_group_ids"].append(regimen_group)
+            for regimen_component in candidate.get("regimen_components", []):
+                if regimen_component not in payload["regimen_components"]:
+                    payload["regimen_components"].append(regimen_component)
             payload["extraction_metadata"] = self.compact_entry_metadata(
                 payload.get("extraction_metadata", [])
                 + candidate.get("extraction_metadata", [])

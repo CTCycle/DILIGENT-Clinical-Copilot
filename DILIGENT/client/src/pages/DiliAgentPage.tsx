@@ -333,7 +333,6 @@ export function DiliAgentPage(): React.JSX.Element {
     const handleClear = () => {
         revokeObjectUrl(exportUrl);
         updateDiliAgent({
-            settings: DEFAULT_SETTINGS,
             form: { ...DEFAULT_FORM_STATE },
             message: "",
             exportUrl: null,
