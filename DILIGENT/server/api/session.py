@@ -67,6 +67,11 @@ CLINICAL_PROGRESS_MESSAGES: dict[str, str] = {
 
 
 # -----------------------------------------------------------------------------
+class ClinicalJobCancelled(Exception):
+    pass
+
+
+# -----------------------------------------------------------------------------
 class ClinicalJobProgressCallback:
     def __init__(self, *, job_id: str) -> None:
         self.job_id = job_id
@@ -119,6 +124,8 @@ class StageProgressFractionCallback:
 
 # -----------------------------------------------------------------------------
 def report_clinical_job_progress(job_id: str, *, stage: str, progress: float) -> None:
+    if job_manager.should_stop(job_id):
+        raise ClinicalJobCancelled("Clinical job stop requested.")
     bounded = min(100.0, max(0.0, float(progress)))
     message = CLINICAL_PROGRESS_MESSAGES.get(stage, stage.replace("_", " ").strip())
     job_manager.update_progress(job_id, bounded)
@@ -294,6 +301,10 @@ async def execute_clinical_job(
     runtime_overrides: dict[str, Any],
     job_id: str,
 ) -> dict[str, Any]:
+    def ensure_not_cancelled() -> None:
+        if job_manager.should_stop(job_id):
+            raise ClinicalJobCancelled("Clinical job stop requested.")
+
     endpoint.apply_runtime_overrides(
         use_cloud_services=runtime_overrides.get("use_cloud_services"),
         llm_provider=runtime_overrides.get("llm_provider"),
@@ -304,8 +315,7 @@ async def execute_clinical_job(
         ollama_reasoning=runtime_overrides.get("ollama_reasoning"),
     )
 
-    if job_manager.should_stop(job_id):
-        return ""
+    ensure_not_cancelled()
 
     report_clinical_job_progress(
         job_id,
@@ -320,7 +330,17 @@ async def execute_clinical_job(
             payload,
             allow_missing_labs=bool(runtime_overrides.get("allow_missing_labs")),
             progress_callback=progress_callback,
+            stop_check=ensure_not_cancelled,
         )
+    except ClinicalJobCancelled:
+        job_manager.update_result(
+            job_id,
+            {
+                "progress_status": "cancelled",
+                "progress_message": "Clinical analysis cancelled.",
+            },
+        )
+        return {}
     except ClinicalPipelineValidationError as exc:
         serialized_issues = [issue.model_dump() for issue in exc.issues]
         await asyncio.to_thread(
@@ -342,6 +362,8 @@ async def execute_clinical_job(
         )
         raise
     except Exception as exc:
+        if job_manager.should_stop(job_id):
+            return {}
         failure_issue = PipelineIssue(
             severity="error",
             code="clinical_job_failed",
@@ -640,7 +662,10 @@ class ClinicalSessionEndpoint:
         *,
         allow_missing_labs: bool = False,
         progress_callback: Callable[[str, float], None] | None = None,
+        stop_check: Callable[[], None] | None = None,
     ) -> dict[str, Any]:
+        if stop_check is not None:
+            stop_check()
         logger.info(
             "Starting Drug-Induced Liver Injury (DILI) analysis for patient: %s",
             payload.name,
@@ -652,6 +677,8 @@ class ClinicalSessionEndpoint:
             stage="session_initialization",
             value=5.0,
         )
+        if stop_check is not None:
+            stop_check()
         issues: list[PipelineIssue] = []
         pattern_assessment = self.pattern_analyzer.assess_payload(
             payload,
@@ -670,6 +697,8 @@ class ClinicalSessionEndpoint:
             stage="hepatotoxicity_pattern",
             value=15.0,
         )
+        if stop_check is not None:
+            stop_check()
 
         cleaned_therapy_text = self.drugs_parser.clean_text(payload.drugs or "")
         if not cleaned_therapy_text:
@@ -698,6 +727,8 @@ class ClinicalSessionEndpoint:
                 cleaned_therapy_text,
                 progress_callback=therapy_progress_callback,
             )
+            if stop_check is not None:
+                stop_check()
             elapsed = time.perf_counter() - start_time
             logger.info("Therapy drugs extraction required %.4f seconds", elapsed)
             logger.info("Detected %s drugs from therapy list", len(therapy_drugs.entries))
@@ -728,6 +759,8 @@ class ClinicalSessionEndpoint:
             stage="therapy_extraction",
             value=30.0,
         )
+        if stop_check is not None:
+            stop_check()
         if not therapy_drugs.entries:
             issue = PipelineIssue(
                 severity="error",
@@ -754,6 +787,8 @@ class ClinicalSessionEndpoint:
                 payload.anamnesis,
                 progress_callback=anamnesis_progress_callback,
             )
+            if stop_check is not None:
+                stop_check()
             elapsed = time.perf_counter() - start_time
             logger.info("Anamnesis drugs extraction required %.4f seconds", elapsed)
             logger.info("Detected %s drugs from anamnesis", len(anamnesis_drugs.entries))
@@ -784,6 +819,8 @@ class ClinicalSessionEndpoint:
             stage="anamnesis_extraction",
             value=42.0,
         )
+        if stop_check is not None:
+            stop_check()
 
         self.emit_progress(
             progress_callback,
@@ -802,6 +839,8 @@ class ClinicalSessionEndpoint:
                 payload.anamnesis,
                 progress_callback=disease_progress_callback,
             )
+            if stop_check is not None:
+                stop_check()
             elapsed = time.perf_counter() - start_time
             logger.info("Anamnesis disease extraction required %.4f seconds", elapsed)
             logger.info("Detected %s diseases from anamnesis", len(disease_context.entries))
@@ -832,6 +871,8 @@ class ClinicalSessionEndpoint:
             stage="anamnesis_disease_extraction",
             value=48.0,
         )
+        if stop_check is not None:
+            stop_check()
 
         all_detected_drugs = PatientDrugs(
             entries=[*therapy_drugs.entries, *anamnesis_drugs.entries]
@@ -868,6 +909,8 @@ class ClinicalSessionEndpoint:
             stage="rag_query_building",
             value=50.0,
         )
+        if stop_check is not None:
+            stop_check()
 
         self.emit_progress(
             progress_callback,
@@ -886,6 +929,8 @@ class ClinicalSessionEndpoint:
             pattern_score=pattern_score,
             progress_callback=livertox_progress_callback,
         )
+        if stop_check is not None:
+            stop_check()
         self.emit_progress(
             progress_callback,
             stage="livertox_lookup",
@@ -908,6 +953,8 @@ class ClinicalSessionEndpoint:
                 use_web_search=payload.use_web_search,
                 progress_callback=consultation_progress_callback,
             )
+            if stop_check is not None:
+                stop_check()
             elapsed = time.perf_counter() - start_time
             logger.info("Hepato-toxicity consultation required %.4f seconds", elapsed)
 
@@ -1050,6 +1097,8 @@ class ClinicalSessionEndpoint:
             stage="finalization",
             value=96.0,
         )
+        if stop_check is not None:
+            stop_check()
         await asyncio.to_thread(
             self.serializer.save_clinical_session,
             {
@@ -1078,6 +1127,8 @@ class ClinicalSessionEndpoint:
             stage="finalization",
             value=99.0,
         )
+        if stop_check is not None:
+            stop_check()
 
         return result_payload
 

@@ -12,6 +12,7 @@ import {
 import { useAppState } from "../context/AppStateContext";
 import { useObjectUrlLifecycle } from "../hooks/useObjectUrlLifecycle";
 import {
+    cancelClinicalJob,
     pollClinicalJobStatus,
     startClinicalJob,
 } from "../services/api";
@@ -122,6 +123,7 @@ export function DiliAgentPage(): React.JSX.Element {
     } = state.diliAgent;
 
     const pollerRef = useRef<{ stop: () => void } | null>(null);
+    const [isCancelling, setIsCancelling] = useState(false);
     const [isMissingLabsModalOpen, setIsMissingLabsModalOpen] = useState(false);
     const { revokeObjectUrl } = useObjectUrlLifecycle(exportUrl);
 
@@ -169,6 +171,7 @@ export function DiliAgentPage(): React.JSX.Element {
     const handlePollingError = useCallback(
         (pollError: string) => {
             stopPoller();
+            setIsCancelling(false);
             updateDiliAgent({
                 message: `[ERROR] ${pollError}`,
                 exportUrl: null,
@@ -206,6 +209,7 @@ export function DiliAgentPage(): React.JSX.Element {
             }
 
             stopPoller();
+            setIsCancelling(false);
 
             if (status.status === "completed") {
                 const report =
@@ -257,6 +261,7 @@ export function DiliAgentPage(): React.JSX.Element {
     );
 
     const executeRunSession = async (allowMissingLabs: boolean | null) => {
+        setIsCancelling(false);
         updateDiliAgent({ isRunning: true });
         resetOutputs();
         stopPoller();
@@ -319,6 +324,27 @@ export function DiliAgentPage(): React.JSX.Element {
         }
 
         await executeRunSession(null);
+    };
+
+    const handleStopSession = async () => {
+        if (!jobId) {
+            return;
+        }
+        setIsCancelling(true);
+        try {
+            await cancelClinicalJob(jobId);
+            updateDiliAgent({
+                message: "[INFO] Cancellation requested. Waiting for worker shutdown...",
+            });
+        } catch (error) {
+            const description =
+                error instanceof Error ? error.message : "Failed to request cancellation.";
+            updateDiliAgent({
+                message: `[ERROR] ${description}`,
+            });
+        } finally {
+            setIsCancelling(false);
+        }
     };
 
     const handleConfirmMissingLabs = async () => {
@@ -576,12 +602,12 @@ export function DiliAgentPage(): React.JSX.Element {
                             <button
                                 className="btn btn-primary"
                                 type="button"
-                                disabled={isRunning}
-                                onClick={handleRunSession}
+                                disabled={isCancelling}
+                                onClick={() => { void (isRunning ? handleStopSession() : handleRunSession()); }}
                             >
-                                {isRunning ? "Running..." : "Run DILI analysis"}
+                                {isRunning ? (isCancelling ? "Stopping..." : "Stop analysis") : "Run DILI analysis"}
                             </button>
-                            <button className="btn btn-tertiary" type="button" onClick={handleClear}>
+                            <button className="btn btn-tertiary" type="button" onClick={handleClear} disabled={isRunning}>
                                 Clear all
                             </button>
                         </div>
