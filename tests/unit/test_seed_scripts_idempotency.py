@@ -108,6 +108,50 @@ def test_rxnav_upsert_allows_multiple_rxcui_for_same_canonical() -> None:
 
 
 # -----------------------------------------------------------------------------
+def test_rxnav_upsert_persists_curated_aliases_with_separate_provenance() -> None:
+    serializer, engine = build_serializer()
+    payload = [
+        {
+            "rxcui": "860975",
+            "raw_name": "Metformin 500 MG Tablet",
+            "term_type": "SCD",
+            "name": "Metformin",
+            "brand_names": None,
+            "synonyms": "[]",
+        }
+    ]
+    curated_aliases = {
+        "metformin": [
+            ("Metformina", "synonym"),
+            ("Glucophage", "brand"),
+        ]
+    }
+
+    serializer.upsert_drugs_catalog_records(
+        payload,
+        curated_aliases_by_canonical=curated_aliases,
+    )
+
+    factory = sessionmaker(bind=engine, future=True)
+    with factory() as db_session:
+        aliases = db_session.execute(
+            select(DrugAlias).order_by(DrugAlias.alias_kind, DrugAlias.alias)
+        ).scalars().all()
+
+    curated = [
+        alias
+        for alias in aliases
+        if alias.source == "curated"
+    ]
+    assert len(curated) == 2
+    assert {(row.alias, row.alias_kind) for row in curated} == {
+        ("Glucophage", "brand"),
+        ("Metformina", "synonym"),
+    }
+    assert all(row.source == "curated" for row in curated)
+
+
+# -----------------------------------------------------------------------------
 def test_rxnav_upsert_commits_by_interval() -> None:
     serializer, engine = build_serializer()
     factory = sessionmaker(bind=engine, future=True)

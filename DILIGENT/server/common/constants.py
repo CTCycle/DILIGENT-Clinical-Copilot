@@ -14,6 +14,7 @@ ARCHIVES_PATH = str(Path(SOURCES_PATH) / "archives")
 DOCS_PATH = str(Path(SOURCES_PATH) / "documents")
 LOGS_PATH = str(Path(RESOURCES_PATH) / "logs")
 VECTOR_DB_PATH = str(Path(SOURCES_PATH) / "vectors")
+RXNAV_CURATED_ALIASES_PATH = str(Path(SOURCES_PATH) / "rxnav_curated_aliases.json")
 ENV_FILE_PATH = str(Path(SETTING_PATH) / ".env")
 DATABASE_FILENAME = "database.db"
 
