@@ -1,4 +1,4 @@
-import React, { useCallback, useEffect, useMemo, useState } from "react";
+import React, { Dispatch, SetStateAction, useCallback, useEffect, useMemo, useState } from "react";
 import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
 
@@ -19,7 +19,9 @@ import {
   startInspectionLiverToxUpdateJob,
   startInspectionRxNavUpdateJob,
 } from "../services/api";
+import { InspectionIconActionButton } from "../components/InspectionIconActionButton";
 import { InspectionJobPanel } from "../components/InspectionJobPanel";
+import { useDebouncedValue } from "../hooks/useDebouncedValue";
 import { useInspectionUpdateJob } from "../hooks/useInspectionUpdateJob";
 import {
   InspectionDateFilterMode,
@@ -50,15 +52,6 @@ const INSPECTION_VIEW_CONFIG: Record<InspectionViewId, { label: string; descript
   },
 };
 const INSPECTION_VIEW_ORDER: readonly InspectionViewId[] = ["sessions", "rxnav", "livertox"];
-
-function useDebouncedValue<T>(value: T, delayMs: number): T {
-  const [debouncedValue, setDebouncedValue] = useState(value);
-  useEffect(() => {
-    const timeoutId = globalThis.setTimeout(() => setDebouncedValue(value), delayMs);
-    return () => globalThis.clearTimeout(timeoutId);
-  }, [value, delayMs]);
-  return debouncedValue;
-}
 
 function formatDateTime(value: string | null): string {
   if (!value) return "N/A";
@@ -336,7 +329,11 @@ export function DataInspectionPage(): React.JSX.Element {
 
   const sessionStatusClass = useMemo(() => (status: InspectionSessionStatus) => (status === "failed" ? "is-failed" : "is-successful"), []);
 
-  const renderPager = (total: number, offset: number, setOffset: (value: number) => void) => (
+  const renderPager = (
+    total: number,
+    offset: number,
+    setOffset: Dispatch<SetStateAction<number>>,
+  ) => (
     <div className="inspection-pager">
       <span className="inspection-pager-range">
         {total > 0 ? offset + 1 : 0}-{total > 0 ? Math.min(total, offset + PAGE_LIMIT) : 0} of {total}
@@ -411,9 +408,9 @@ export function DataInspectionPage(): React.JSX.Element {
                   <td><span className={`inspection-status-chip ${sessionStatusClass(row.status)}`}>{statusLabel(row.status)}</span></td>
                   <td>{formatDuration(row.total_duration)}</td>
                   <td className="inspection-actions-cell">
-                    <button type="button" className="inspection-icon-button is-primary" onClick={() => { setReportLoading(true); setReportSession(row); setReportError(null); setReportContent(""); void fetchInspectionSessionReport(row.session_id).then((payload) => setReportContent(payload.report)).catch((error) => setReportError(error instanceof Error ? error.message : "Failed to load report.")).finally(() => setReportLoading(false)); }} aria-label={`View report for session ${row.session_id}`} title={`View report for session ${row.session_id}`}><ViewIcon /></button>
-                    <button type="button" className="inspection-icon-button is-danger" onClick={() => { if (!globalThis.confirm("Delete this recorded session and report data?")) return; void deleteInspectionSession(row.session_id).then(() => { if (sessionItems.length === 1 && sessionOffset > 0) { setSessionOffset(Math.max(0, sessionOffset - PAGE_LIMIT)); } else { void loadSessions(); } }).catch((error) => setSessionError(error instanceof Error ? error.message : "Failed to delete session.")); }} aria-label={`Delete session ${row.session_id}`} title={`Delete session ${row.session_id}`}><DeleteIcon /></button>
-                    <button type="button" className="inspection-icon-button" disabled aria-label="Modify session (not implemented)" title="Modify session (not implemented)"><ModifyIcon /></button>
+                    <InspectionIconActionButton variant="primary" onClick={() => { setReportLoading(true); setReportSession(row); setReportError(null); setReportContent(""); void fetchInspectionSessionReport(row.session_id).then((payload) => setReportContent(payload.report)).catch((error) => setReportError(error instanceof Error ? error.message : "Failed to load report.")).finally(() => setReportLoading(false)); }} ariaLabel={`View report for session ${row.session_id}`} title={`View report for session ${row.session_id}`}><ViewIcon /></InspectionIconActionButton>
+                    <InspectionIconActionButton variant="danger" onClick={() => { if (!globalThis.confirm("Delete this recorded session and report data?")) return; void deleteInspectionSession(row.session_id).then(() => { if (sessionItems.length === 1 && sessionOffset > 0) { setSessionOffset(Math.max(0, sessionOffset - PAGE_LIMIT)); } else { void loadSessions(); } }).catch((error) => setSessionError(error instanceof Error ? error.message : "Failed to delete session.")); }} ariaLabel={`Delete session ${row.session_id}`} title={`Delete session ${row.session_id}`}><DeleteIcon /></InspectionIconActionButton>
+                    <InspectionIconActionButton disabled ariaLabel="Modify session (not implemented)" title="Modify session (not implemented)"><ModifyIcon /></InspectionIconActionButton>
                   </td>
                 </tr>
               ))}
@@ -455,9 +452,9 @@ export function DataInspectionPage(): React.JSX.Element {
                   <td>{row.drug_name}</td>
                   <td>{row.last_update || "N/A"}</td>
                   <td className="inspection-actions-cell">
-                    <button type="button" className="inspection-icon-button is-primary" onClick={() => { setAliasLoading(true); setAliasError(null); setAliasData(null); void fetchInspectionRxNavAliases(row.drug_id).then((payload) => setAliasData(payload)).catch((error) => setAliasError(error instanceof Error ? error.message : "Failed to load aliases.")).finally(() => setAliasLoading(false)); }} aria-label={`View aliases for ${row.drug_name}`} title={`View aliases for ${row.drug_name}`}><ViewIcon /></button>
-                    <button type="button" className="inspection-icon-button is-danger" onClick={() => { if (!globalThis.confirm("Delete this drug and unlink historical references?")) return; void deleteInspectionRxNavDrug(row.drug_id).then(() => { if (rxnavItems.length === 1 && rxnavOffset > 0) { setRxnavOffset(Math.max(0, rxnavOffset - PAGE_LIMIT)); } else { void loadRxnav(); } }).catch((error) => setRxnavError(error instanceof Error ? error.message : "Failed to delete RxNav entry.")); }} aria-label={`Delete ${row.drug_name}`} title={`Delete ${row.drug_name}`}><DeleteIcon /></button>
-                    <button type="button" className="inspection-icon-button" disabled aria-label="Modify RxNav entry (not implemented)" title="Modify RxNav entry (not implemented)"><ModifyIcon /></button>
+                    <InspectionIconActionButton variant="primary" onClick={() => { setAliasLoading(true); setAliasError(null); setAliasData(null); void fetchInspectionRxNavAliases(row.drug_id).then((payload) => setAliasData(payload)).catch((error) => setAliasError(error instanceof Error ? error.message : "Failed to load aliases.")).finally(() => setAliasLoading(false)); }} ariaLabel={`View aliases for ${row.drug_name}`} title={`View aliases for ${row.drug_name}`}><ViewIcon /></InspectionIconActionButton>
+                    <InspectionIconActionButton variant="danger" onClick={() => { if (!globalThis.confirm("Delete this drug and unlink historical references?")) return; void deleteInspectionRxNavDrug(row.drug_id).then(() => { if (rxnavItems.length === 1 && rxnavOffset > 0) { setRxnavOffset(Math.max(0, rxnavOffset - PAGE_LIMIT)); } else { void loadRxnav(); } }).catch((error) => setRxnavError(error instanceof Error ? error.message : "Failed to delete RxNav entry.")); }} ariaLabel={`Delete ${row.drug_name}`} title={`Delete ${row.drug_name}`}><DeleteIcon /></InspectionIconActionButton>
+                    <InspectionIconActionButton disabled ariaLabel="Modify RxNav entry (not implemented)" title="Modify RxNav entry (not implemented)"><ModifyIcon /></InspectionIconActionButton>
                   </td>
                 </tr>
               ))}
@@ -499,25 +496,17 @@ export function DataInspectionPage(): React.JSX.Element {
                   <td>{row.drug_name}</td>
                   <td>{row.last_update || "N/A"}</td>
                   <td className="inspection-actions-cell">
-                    <button
-                      type="button"
-                      className="inspection-icon-button is-primary"
-                      onClick={() => {
-                        setExcerptLoading(true);
-                        setExcerptError(null);
-                        setExcerptData(null);
-                        void fetchInspectionLiverToxExcerpt(row.drug_id)
-                          .then((payload) => setExcerptData(payload))
-                          .catch((error) => setExcerptError(resolveExcerptFallbackMessage(error)))
-                          .finally(() => setExcerptLoading(false));
-                      }}
-                      aria-label={`View excerpt for ${row.drug_name}`}
-                      title={`View excerpt for ${row.drug_name}`}
-                    >
-                      <ViewIcon />
-                    </button>
-                    <button type="button" className="inspection-icon-button is-danger" onClick={() => { if (!globalThis.confirm("Delete this LiverTox entry and unlink historical references?")) return; void deleteInspectionLiverToxDrug(row.drug_id).then(() => { if (livertoxItems.length === 1 && livertoxOffset > 0) { setLivertoxOffset(Math.max(0, livertoxOffset - PAGE_LIMIT)); } else { void loadLivertox(); } }).catch((error) => setLivertoxError(error instanceof Error ? error.message : "Failed to delete LiverTox entry.")); }} aria-label={`Delete ${row.drug_name}`} title={`Delete ${row.drug_name}`}><DeleteIcon /></button>
-                    <button type="button" className="inspection-icon-button" disabled aria-label="Modify LiverTox entry (not implemented)" title="Modify LiverTox entry (not implemented)"><ModifyIcon /></button>
+                    <InspectionIconActionButton variant="primary" onClick={() => {
+                      setExcerptLoading(true);
+                      setExcerptError(null);
+                      setExcerptData(null);
+                      void fetchInspectionLiverToxExcerpt(row.drug_id)
+                        .then((payload) => setExcerptData(payload))
+                        .catch((error) => setExcerptError(resolveExcerptFallbackMessage(error)))
+                        .finally(() => setExcerptLoading(false));
+                    }} ariaLabel={`View excerpt for ${row.drug_name}`} title={`View excerpt for ${row.drug_name}`}><ViewIcon /></InspectionIconActionButton>
+                    <InspectionIconActionButton variant="danger" onClick={() => { if (!globalThis.confirm("Delete this LiverTox entry and unlink historical references?")) return; void deleteInspectionLiverToxDrug(row.drug_id).then(() => { if (livertoxItems.length === 1 && livertoxOffset > 0) { setLivertoxOffset(Math.max(0, livertoxOffset - PAGE_LIMIT)); } else { void loadLivertox(); } }).catch((error) => setLivertoxError(error instanceof Error ? error.message : "Failed to delete LiverTox entry.")); }} ariaLabel={`Delete ${row.drug_name}`} title={`Delete ${row.drug_name}`}><DeleteIcon /></InspectionIconActionButton>
+                    <InspectionIconActionButton disabled ariaLabel="Modify LiverTox entry (not implemented)" title="Modify LiverTox entry (not implemented)"><ModifyIcon /></InspectionIconActionButton>
                   </td>
                 </tr>
               ))}

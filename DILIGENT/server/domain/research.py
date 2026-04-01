@@ -1,7 +1,7 @@
 from __future__ import annotations
 
-from typing import Any, Literal
 import re
+from typing import Any, Literal
 from urllib.parse import urlparse
 
 from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
@@ -100,6 +100,12 @@ class ResearchSource(BaseModel):
 class ResearchCitation(BaseModel):
     claim: str = Field(..., min_length=1, max_length=1000)
     urls: list[str] = Field(default_factory=list)
+
+
+###############################################################################
+class ResearchAnswerPayload(BaseModel):
+    answer: str = Field(..., min_length=1)
+    citations: list[ResearchCitation] = Field(default_factory=list)
 
 
 ###############################################################################
