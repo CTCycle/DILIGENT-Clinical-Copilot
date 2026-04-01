@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import json
+from pathlib import Path
 from typing import Any
 
 import httpx
@@ -42,6 +43,21 @@ class RxClientStub:
     ) -> list[str]:
         self.synonym_calls.append(rxcui)
         return [f"Synonym-{rxcui}"]
+
+
+###############################################################################
+class SerializerStub:
+    def __init__(self) -> None:
+        self.calls: list[dict[str, Any]] = []
+
+    # -------------------------------------------------------------------------
+    def upsert_drugs_catalog_records(self, records: Any, **kwargs: Any) -> None:
+        self.calls.append(
+            {
+                "records_type": type(records).__name__,
+                "kwargs": kwargs,
+            }
+        )
 
 
 # -----------------------------------------------------------------------------
@@ -106,3 +122,62 @@ def test_persist_catalog_prefetches_by_batch() -> None:
     assert result["count"] == 3
     assert prefetch_batch_sizes == [2, 1]
     assert persisted_batch_sizes == [2, 1]
+
+
+# -----------------------------------------------------------------------------
+def test_curated_aliases_are_loaded_and_forwarded_to_serializer(
+    tmp_path: Path,
+) -> None:
+    curated_file = tmp_path / "curated_aliases.json"
+    curated_file.write_text(
+        json.dumps(
+            {
+                "aliases": [
+                    {
+                        "canonical_name": "Metformin",
+                        "alias_kind": "synonym",
+                        "aliases": ["Metformina"],
+                    },
+                    {
+                        "canonical_name": "Trimethoprim Sulfamethoxazole",
+                        "alias_kind": "brand",
+                        "aliases": ["Bactrim"],
+                    },
+                ]
+            }
+        ),
+        encoding="utf-8",
+    )
+
+    serializer_stub = SerializerStub()
+    builder = RxNavDrugCatalogBuilder(
+        rx_client=RxClientStub(),
+        serializer=serializer_stub,  # type: ignore[arg-type]
+        curated_aliases_path=str(curated_file),
+    )
+    assert builder.curated_aliases_by_canonical["metformin"] == [
+        ("Metformina", "synonym")
+    ]
+    assert builder.curated_aliases_by_canonical["trimethoprim sulfamethoxazole"] == [
+        ("Bactrim", "brand")
+    ]
+
+    builder.persist_batch(
+        [
+            {
+                "rxcui": "860975",
+                "term_type": "SCD",
+                "raw_name": "Metformin 500 MG Tablet",
+                "name": "Metformin",
+                "brand_names": None,
+                "synonyms": [],
+            }
+        ]
+    )
+
+    assert len(serializer_stub.calls) == 1
+    kwargs = serializer_stub.calls[0]["kwargs"]
+    assert "curated_aliases_by_canonical" in kwargs
+    assert kwargs["curated_aliases_by_canonical"]["metformin"] == [
+        ("Metformina", "synonym")
+    ]

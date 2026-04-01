@@ -3,6 +3,7 @@ from __future__ import annotations
 import asyncio
 import codecs
 import json
+import os
 import re
 import time
 import unicodedata
@@ -15,8 +16,12 @@ import pandas as pd
 
 from DILIGENT.server.configurations import server_settings
 from DILIGENT.server.common.utils.logger import logger
-from DILIGENT.server.common.constants import RXNAV_SYNONYM_STOPWORDS
+from DILIGENT.server.common.constants import (
+    RXNAV_CURATED_ALIASES_PATH,
+    RXNAV_SYNONYM_STOPWORDS,
+)
 from DILIGENT.server.repositories.serialization.data import DataSerializer
+from DILIGENT.server.services.text.normalization import normalize_drug_name
 
 
 
@@ -641,6 +646,7 @@ class RxNavDrugCatalogBuilder:
         rx_client: RxNavClient | None = None,
         *,
         serializer: DataSerializer | None = None,
+        curated_aliases_path: str | None = None,
     ) -> None:
         combined: set[str] = set()
         for attr in ("SALT_STOPWORDS", "FORM_STOPWORDS", "UNIT_STOPWORDS"):
@@ -671,6 +677,77 @@ class RxNavDrugCatalogBuilder:
         self.total_records: int | None = None
         self.last_logged_count = 0
         self.serializer = serializer or DataSerializer()
+        resolved_path = curated_aliases_path or RXNAV_CURATED_ALIASES_PATH
+        self.curated_aliases_path = os.path.abspath(resolved_path)
+        self.curated_aliases_by_canonical = self.load_curated_aliases()
+
+    # -------------------------------------------------------------------------
+    def load_curated_aliases(self) -> dict[str, list[tuple[str, str]]]:
+        path = self.curated_aliases_path
+        if not os.path.exists(path):
+            logger.info("RxNav curated alias file not found at '%s'; skipping", path)
+            return {}
+        try:
+            with open(path, "r", encoding="utf-8") as handle:
+                payload = json.load(handle)
+        except (OSError, json.JSONDecodeError) as exc:
+            logger.warning(
+                "Failed to read RxNav curated alias file '%s': %s",
+                path,
+                exc,
+            )
+            return {}
+
+        records: list[Any]
+        if isinstance(payload, dict):
+            candidate_records = payload.get("aliases")
+            records = candidate_records if isinstance(candidate_records, list) else []
+        elif isinstance(payload, list):
+            records = payload
+        else:
+            records = []
+
+        curated: dict[str, dict[tuple[str, str], tuple[str, str]]] = {}
+        for record in records:
+            if not isinstance(record, dict):
+                continue
+            canonical_name = record.get("canonical_name")
+            if not isinstance(canonical_name, str):
+                continue
+            canonical_norm = normalize_drug_name(canonical_name)
+            if not canonical_norm:
+                continue
+            raw_kind = record.get("alias_kind")
+            alias_kind = (
+                str(raw_kind).strip().lower()
+                if isinstance(raw_kind, str) and str(raw_kind).strip()
+                else "synonym"
+            )
+            aliases: list[str] = []
+            alias_single = record.get("alias")
+            if isinstance(alias_single, str):
+                aliases.append(alias_single)
+            alias_list = record.get("aliases")
+            if isinstance(alias_list, list):
+                for value in alias_list:
+                    if isinstance(value, str):
+                        aliases.append(value)
+            for raw_alias in aliases:
+                alias = raw_alias.strip()
+                if not alias:
+                    continue
+                alias_norm = normalize_drug_name(alias)
+                if not alias_norm:
+                    continue
+                by_alias = curated.setdefault(canonical_norm, {})
+                key = (alias_norm, alias_kind)
+                if key not in by_alias:
+                    by_alias[key] = (alias, alias_kind)
+
+        return {
+            canonical: sorted(values.values(), key=lambda item: item[0].casefold())
+            for canonical, values in curated.items()
+        }
 
     # -------------------------------------------------------------------------
     def emit_progress(
@@ -964,7 +1041,10 @@ class RxNavDrugCatalogBuilder:
         frame = pd.DataFrame(batch)
         if frame.empty:
             return
-        self.serializer.upsert_drugs_catalog_records(frame)
+        self.serializer.upsert_drugs_catalog_records(
+            frame,
+            curated_aliases_by_canonical=self.curated_aliases_by_canonical,
+        )
 
     # -------------------------------------------------------------------------
     def stream_min_concepts(self, chunks: Iterator[bytes]) -> Iterator[dict[str, Any]]:

@@ -314,6 +314,7 @@ class _RepositorySerializationService:
         records: pd.DataFrame | list[dict[str, Any]],
         *,
         commit_interval: int | None = None,
+        curated_aliases_by_canonical: dict[str, list[tuple[str, str]]] | None = None,
     ) -> None:
         self.ensure_session_result_table()
         prepared_rows = self.prepare_rxnav_rows(records)
@@ -384,6 +385,20 @@ class _RepositorySerializationService:
                         source="rxnorm",
                         term_type=term_type,
                     )
+                if curated_aliases_by_canonical:
+                    curated_entries = curated_aliases_by_canonical.get(
+                        canonical_name_norm,
+                        [],
+                    )
+                    for curated_alias, curated_kind in curated_entries:
+                        self.upsert_drug_alias(
+                            db_session,
+                            drug_id=drug_id,
+                            alias=curated_alias,
+                            alias_kind=curated_kind,
+                            source="curated",
+                            term_type=term_type,
+                        )
                 pending += 1
                 if pending >= effective_commit_interval:
                     db_session.commit()
