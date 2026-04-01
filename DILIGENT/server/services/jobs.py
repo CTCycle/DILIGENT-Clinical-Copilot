@@ -26,34 +26,37 @@ SENSITIVE_ERROR_TOKENS: tuple[str, ...] = (
 
 
 ###############################################################################
-def can_show_exception_message(message: str) -> bool:
-    candidate = message.strip()
-    if not candidate:
-        return False
-    if len(candidate) > 180:
-        return False
-    lowered = candidate.casefold()
-    return not any(token in lowered for token in SENSITIVE_ERROR_TOKENS)
+class JobErrorSanitizer:
+    # -------------------------------------------------------------------------
+    @staticmethod
+    def can_show_exception_message(message: str) -> bool:
+        candidate = message.strip()
+        if not candidate:
+            return False
+        if len(candidate) > 180:
+            return False
+        lowered = candidate.casefold()
+        return not any(token in lowered for token in SENSITIVE_ERROR_TOKENS)
 
+    # -------------------------------------------------------------------------
+    @classmethod
+    def build_safe_job_error_message(cls, exc: Exception) -> str:
+        if isinstance(exc, (TimeoutError, asyncio.TimeoutError)):
+            return "Operation timed out. Please retry."
+        if isinstance(exc, FileNotFoundError):
+            return "A required file was not found. Check configuration and retry."
+        if isinstance(exc, ConnectionError):
+            return "A dependency could not be reached. Please retry shortly."
+        if isinstance(exc, ValueError):
+            candidate = str(exc).split("\n")[0]
+            if cls.can_show_exception_message(candidate):
+                return candidate
+            return "Input validation failed. Review the request and retry."
 
-###############################################################################
-def build_safe_job_error_message(exc: Exception) -> str:
-    if isinstance(exc, (TimeoutError, asyncio.TimeoutError)):
-        return "Operation timed out. Please retry."
-    if isinstance(exc, FileNotFoundError):
-        return "A required file was not found. Check configuration and retry."
-    if isinstance(exc, ConnectionError):
-        return "A dependency could not be reached. Please retry shortly."
-    if isinstance(exc, ValueError):
         candidate = str(exc).split("\n")[0]
-        if can_show_exception_message(candidate):
+        if cls.can_show_exception_message(candidate):
             return candidate
-        return "Input validation failed. Review the request and retry."
-
-    candidate = str(exc).split("\n")[0]
-    if can_show_exception_message(candidate):
-        return candidate
-    return "Operation failed unexpectedly. Please retry."
+        return "Operation failed unexpectedly. Please retry."
 
 
 ###############################################################################
@@ -238,7 +241,7 @@ class JobManager:
                 state.update(status="cancelled", completed_at=monotonic())
                 logger.info("Job %s cancelled during execution", job_id)
                 return
-            error_msg = build_safe_job_error_message(exc)
+            error_msg = JobErrorSanitizer.build_safe_job_error_message(exc)
             state.update(status="failed", error=error_msg, completed_at=monotonic())
             logger.error(
                 "Job %s failed type=%s message=%s",
