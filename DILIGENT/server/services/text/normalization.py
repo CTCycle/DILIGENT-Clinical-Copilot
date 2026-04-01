@@ -106,20 +106,29 @@ _KNOWN_QUERY_ALIASES = {
     "acido folico": "folic acid",
     "acido folico streuli": "folic acid",
     "amlodipin": "amlodipine",
+    "bactrim": "trimethoprim sulfamethoxazole",
     "clexane": "enoxaparin",
+    "co amoxi": "amoxicillin clavulanate",
+    "coamoxi": "amoxicillin clavulanate",
     "de ursil": "ursodiol",
     "fortecortin": "dexamethasone",
     "laxoberon": "picosulfate",
+    "metformina": "metformin",
     "mycostatin": "nystatin",
     "nozinan": "levomepromazine",
     "pantozol": "pantoprazole",
+    "quetiapina": "quetiapine",
+    "fluvastatina": "fluvastatin",
     "valium": "diazepam",
     "xanax": "alprazolam",
 }
 _TOKEN_VARIANT_MAP = {
     "amlodipin": "amlodipine",
+    "fluvastatina": "fluvastatin",
+    "metformina": "metformin",
     "morfina": "morphine",
     "morphin": "morphine",
+    "quetiapina": "quetiapine",
 }
 
 
@@ -130,6 +139,7 @@ def canonicalize_drug_query(value: str | None) -> str:
     normalized = unicodedata.normalize("NFKC", value).lower()
     normalized = normalized.replace("\r\n", " ").replace("\r", " ").replace("\n", " ")
     normalized = re.sub(r"\[[^\]]*\]", " ", normalized)
+    normalized = re.sub(r"(?<=\w)\s*(?:\+|/|&)\s*(?=\w)", " ", normalized)
     normalized = re.sub(r"[\(\)\{\},;:]+", " ", normalized)
     normalized = _STRENGTH_FRAGMENT_RE.sub(" ", normalized)
     normalized = re.sub(r"\s+", " ", normalized).strip()

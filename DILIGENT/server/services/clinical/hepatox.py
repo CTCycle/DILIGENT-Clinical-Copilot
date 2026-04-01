@@ -1129,7 +1129,7 @@ class HepatoxConsultation:
     @staticmethod
     def should_render_as_matched_drug(entry: DrugClinicalAssessment) -> bool:
         status = (entry.match_status or "").strip().lower()
-        return status == "matched"
+        return status in {"matched", "matched_with_excerpt", "matched_no_excerpt"}
 
     # -------------------------------------------------------------------------
     def render_matched_drug_section(self, entry: DrugClinicalAssessment) -> str:
@@ -1213,15 +1213,17 @@ class HepatoxConsultation:
     # -------------------------------------------------------------------------
     def describe_unresolved_entry(self, entry: DrugClinicalAssessment) -> str:
         status = (entry.match_status or "").strip().lower()
-        if status == "ambiguous" or entry.ambiguous_match:
+        if status in {"ambiguous", "ambiguous_match"} or entry.ambiguous_match:
             candidates = (
                 ", ".join(entry.match_candidates)
                 if entry.match_candidates
                 else "not available"
             )
             return f"Ambiguous match in local knowledge base (candidates: {candidates})."
-        if status == "missing":
+        if status in {"missing", "missing_match"}:
             return "No matching drug record found in the local knowledge base."
+        if status == "matched_no_excerpt":
+            return "Matched drug record found, but no local LiverTox excerpt is available."
         if entry.missing_livertox:
             return "Matched record found, but no local LiverTox excerpt is available."
         return "Could not produce a deterministic matched-drug section."

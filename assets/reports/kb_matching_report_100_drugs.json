@@ -1,0 +1,7466 @@
+{
+  "summary": {
+    "drugs_tested": 100,
+    "drugs_with_livertox_excerpt": 100,
+    "total_inputs": 300,
+    "successful_matches": 231,
+    "overall_match_rate": 77.0,
+    "match_rate_by_type": {
+      "canonical": {
+        "total": 100,
+        "success": 100,
+        "rate": 100.0
+      },
+      "real_alias": {
+        "total": 100,
+        "success": 82,
+        "rate": 82.0
+      },
+      "malformed_alias": {
+        "total": 100,
+        "success": 49,
+        "rate": 49.0
+      }
+    },
+    "excerpt_subset": {
+      "inputs": 300,
+      "successes": 231,
+      "match_rate": 77.0
+    }
+  },
+  "cases": [
+    {
+      "drug_id": 982,
+      "canonical": "abacavir",
+      "has_livertox_excerpt": true,
+      "real_alias": "Ziagen",
+      "malformed_aliases": [
+        "Zigen"
+      ]
+    },
+    {
+      "drug_id": 56,
+      "canonical": "abatacept",
+      "has_livertox_excerpt": true,
+      "real_alias": "Orencia",
+      "malformed_aliases": [
+        "Orncia"
+      ]
+    },
+    {
+      "drug_id": 1027,
+      "canonical": "abemaciclib",
+      "has_livertox_excerpt": true,
+      "real_alias": "Verzenio",
+      "malformed_aliases": [
+        "Vezenio"
+      ]
+    },
+    {
+      "drug_id": 1004,
+      "canonical": "abiraterone",
+      "has_livertox_excerpt": true,
+      "real_alias": "abiraterone acetate 250 MG Oral Tablet",
+      "malformed_aliases": [
+        "abrateroneacetate250MGOralTablet"
+      ]
+    },
+    {
+      "drug_id": 1033,
+      "canonical": "abrocitinib",
+      "has_livertox_excerpt": true,
+      "real_alias": "Cibinqo",
+      "malformed_aliases": [
+        "Ciinqo"
+      ]
+    },
+    {
+      "drug_id": 1029,
+      "canonical": "acalabrutinib",
+      "has_livertox_excerpt": true,
+      "real_alias": "Calquence",
+      "malformed_aliases": [
+        "Caquence"
+      ]
+    },
+    {
+      "drug_id": 1043,
+      "canonical": "acamprosate",
+      "has_livertox_excerpt": true,
+      "real_alias": "acamprosate calcium 333 MG Delayed Release Oral Tablet",
+      "malformed_aliases": [
+        "acmprosatecalcium333MGDelayedReleaseOralTablet"
+      ]
+    },
+    {
+      "drug_id": 1030,
+      "canonical": "acarbose",
+      "has_livertox_excerpt": true,
+      "real_alias": "Precose",
+      "malformed_aliases": [
+        "Prcose"
+      ]
+    },
+    {
+      "drug_id": 1047,
+      "canonical": "acebutolol",
+      "has_livertox_excerpt": true,
+      "real_alias": "HCTZ",
+      "malformed_aliases": [
+        "HCT"
+      ]
+    },
+    {
+      "drug_id": 476,
+      "canonical": "acetaminophen",
+      "has_livertox_excerpt": true,
+      "real_alias": "Acephen",
+      "malformed_aliases": [
+        "Acphen"
+      ]
+    },
+    {
+      "drug_id": 885,
+      "canonical": "acetylcysteine",
+      "has_livertox_excerpt": true,
+      "real_alias": "Acetadote",
+      "malformed_aliases": [
+        "Actadote"
+      ]
+    },
+    {
+      "drug_id": 1094,
+      "canonical": "acitretin",
+      "has_livertox_excerpt": true,
+      "real_alias": "Soriatane",
+      "malformed_aliases": [
+        "Soiatane"
+      ]
+    },
+    {
+      "drug_id": 5297,
+      "canonical": "Aclidinium",
+      "has_livertox_excerpt": true,
+      "real_alias": "Tudorza Pressair",
+      "malformed_aliases": [
+        "TuorzaPressair"
+      ]
+    },
+    {
+      "drug_id": 1102,
+      "canonical": "acoramidis",
+      "has_livertox_excerpt": true,
+      "real_alias": "Attruby",
+      "malformed_aliases": [
+        "Atruby"
+      ]
+    },
+    {
+      "drug_id": 5298,
+      "canonical": "Acrivastine",
+      "has_livertox_excerpt": true,
+      "real_alias": "Semprex-D",
+      "malformed_aliases": [
+        "Seprex-D"
+      ]
+    },
+    {
+      "drug_id": 365,
+      "canonical": "acyclovir",
+      "has_livertox_excerpt": true,
+      "real_alias": "Acyclovir equivalent",
+      "malformed_aliases": [
+        "Acclovirequivalent"
+      ]
+    },
+    {
+      "drug_id": 1099,
+      "canonical": "adagrasib",
+      "has_livertox_excerpt": true,
+      "real_alias": "Krazati",
+      "malformed_aliases": [
+        "Krzati"
+      ]
+    },
+    {
+      "drug_id": 7,
+      "canonical": "adalimumab",
+      "has_livertox_excerpt": true,
+      "real_alias": "Abrilada",
+      "malformed_aliases": [
+        "Abilada"
+      ]
+    },
+    {
+      "drug_id": 5302,
+      "canonical": "Adefovir",
+      "has_livertox_excerpt": true,
+      "real_alias": "Hepsera",
+      "malformed_aliases": [
+        "Hesera"
+      ]
+    },
+    {
+      "drug_id": 5303,
+      "canonical": "Aducanumab",
+      "has_livertox_excerpt": true,
+      "real_alias": "Aduhelm",
+      "malformed_aliases": [
+        "Adhelm"
+      ]
+    },
+    {
+      "drug_id": 5304,
+      "canonical": "Afamelanotide",
+      "has_livertox_excerpt": true,
+      "real_alias": "Scenesse",
+      "malformed_aliases": [
+        "Scnesse"
+      ]
+    },
+    {
+      "drug_id": 1086,
+      "canonical": "afatinib",
+      "has_livertox_excerpt": true,
+      "real_alias": "Afatinib Dimaleate",
+      "malformed_aliases": [
+        "AftinibDimaleate"
+      ]
+    },
+    {
+      "drug_id": 1148,
+      "canonical": "albendazole",
+      "has_livertox_excerpt": true,
+      "real_alias": "Albenza",
+      "malformed_aliases": [
+        "Alenza"
+      ]
+    },
+    {
+      "drug_id": 5306,
+      "canonical": "Albiglutide",
+      "has_livertox_excerpt": true,
+      "real_alias": "Tanzeum",
+      "malformed_aliases": [
+        "Tazeum"
+      ]
+    },
+    {
+      "drug_id": 5307,
+      "canonical": "Aldesleukin",
+      "has_livertox_excerpt": true,
+      "real_alias": "Proleukin",
+      "malformed_aliases": [
+        "Prleukin"
+      ]
+    },
+    {
+      "drug_id": 1143,
+      "canonical": "alectinib",
+      "has_livertox_excerpt": true,
+      "real_alias": "Alecensa",
+      "malformed_aliases": [
+        "Alcensa"
+      ]
+    },
+    {
+      "drug_id": 5308,
+      "canonical": "Alefacept",
+      "has_livertox_excerpt": true,
+      "real_alias": "Amevive",
+      "malformed_aliases": [
+        "Amvive"
+      ]
+    },
+    {
+      "drug_id": 206,
+      "canonical": "alemtuzumab",
+      "has_livertox_excerpt": true,
+      "real_alias": "Campath",
+      "malformed_aliases": [
+        "Capath"
+      ]
+    },
+    {
+      "drug_id": 761,
+      "canonical": "alfuzosin",
+      "has_livertox_excerpt": true,
+      "real_alias": "24 HR alfuzosin hydrochloride 10 MG Extended Release Oral Tablet",
+      "malformed_aliases": [
+        "24Ralfuzosinhydrochloride10MGExtendedReleaseOralTablet"
+      ]
+    },
+    {
+      "drug_id": 191,
+      "canonical": "alirocumab",
+      "has_livertox_excerpt": true,
+      "real_alias": "1 ML alirocumab 150 MG/ML Auto-Injector",
+      "malformed_aliases": [
+        "1Malirocumab150MG/MLAuto-Injector"
+      ]
+    },
+    {
+      "drug_id": 1120,
+      "canonical": "aliskiren",
+      "has_livertox_excerpt": true,
+      "real_alias": "Amlodipine",
+      "malformed_aliases": [
+        "Amodipine"
+      ]
+    },
+    {
+      "drug_id": 5310,
+      "canonical": "Alkylating Agents",
+      "has_livertox_excerpt": true,
+      "real_alias": "Estramustine",
+      "malformed_aliases": [
+        "Esramustine"
+      ]
+    },
+    {
+      "drug_id": 1147,
+      "canonical": "allopurinol",
+      "has_livertox_excerpt": true,
+      "real_alias": "Aloprim",
+      "malformed_aliases": [
+        "Alprim"
+      ]
+    },
+    {
+      "drug_id": 5311,
+      "canonical": "Aloe Vera",
+      "has_livertox_excerpt": true,
+      "real_alias": "Alcortin",
+      "malformed_aliases": [
+        "Alortin"
+      ]
+    },
+    {
+      "drug_id": 1132,
+      "canonical": "alogliptin",
+      "has_livertox_excerpt": true,
+      "real_alias": "Alogliptin Benzoate",
+      "malformed_aliases": [
+        "AlgliptinBenzoate"
+      ]
+    },
+    {
+      "drug_id": 1150,
+      "canonical": "alpelisib",
+      "has_livertox_excerpt": true,
+      "real_alias": "Daily",
+      "malformed_aliases": [
+        "Daliy"
+      ]
+    },
+    {
+      "drug_id": 755,
+      "canonical": "alprazolam",
+      "has_livertox_excerpt": true,
+      "real_alias": "24 HR alprazolam 0.5 MG Extended Release Oral Tablet",
+      "malformed_aliases": [
+        "24Ralprazolam0.5MGExtendedReleaseOralTablet"
+      ]
+    },
+    {
+      "drug_id": 5317,
+      "canonical": "Altretamine",
+      "has_livertox_excerpt": true,
+      "real_alias": "Hexalen",
+      "malformed_aliases": [
+        "Healen"
+      ]
+    },
+    {
+      "drug_id": 744,
+      "canonical": "amantadine",
+      "has_livertox_excerpt": true,
+      "real_alias": "24 HR amantadine 137 MG Extended Release Oral Capsule",
+      "malformed_aliases": [
+        "24Ramantadine137MGExtendedReleaseOralCapsule"
+      ]
+    },
+    {
+      "drug_id": 1207,
+      "canonical": "ambrisentan",
+      "has_livertox_excerpt": true,
+      "real_alias": "Letairis",
+      "malformed_aliases": [
+        "Leairis"
+      ]
+    },
+    {
+      "drug_id": 5319,
+      "canonical": "Amide Local Anesthetics",
+      "has_livertox_excerpt": true,
+      "real_alias": "Artecaine",
+      "malformed_aliases": [
+        "Arecaine"
+      ]
+    },
+    {
+      "drug_id": 1194,
+      "canonical": "amifampridine",
+      "has_livertox_excerpt": true,
+      "real_alias": "Firdapse",
+      "malformed_aliases": [
+        "Fidapse"
+      ]
+    },
+    {
+      "drug_id": 616,
+      "canonical": "amikacin",
+      "has_livertox_excerpt": true,
+      "real_alias": "Amikacin Liposomal",
+      "malformed_aliases": [
+        "AmkacinLiposomal"
+      ]
+    },
+    {
+      "drug_id": 1221,
+      "canonical": "amiloride",
+      "has_livertox_excerpt": true,
+      "real_alias": "Atenolol",
+      "malformed_aliases": [
+        "Atnolol"
+      ]
+    },
+    {
+      "drug_id": 484,
+      "canonical": "amiodarone",
+      "has_livertox_excerpt": true,
+      "real_alias": "Cordarone",
+      "malformed_aliases": [
+        "Codarone"
+      ]
+    },
+    {
+      "drug_id": 629,
+      "canonical": "amisulpride",
+      "has_livertox_excerpt": true,
+      "real_alias": "Barhemsys",
+      "malformed_aliases": [
+        "Bahemsys"
+      ]
+    },
+    {
+      "drug_id": 1215,
+      "canonical": "amitriptyline",
+      "has_livertox_excerpt": true,
+      "real_alias": "Chlordiazepoxide",
+      "malformed_aliases": [
+        "Chordiazepoxide"
+      ]
+    },
+    {
+      "drug_id": 5321,
+      "canonical": "Amivantamab",
+      "has_livertox_excerpt": true,
+      "real_alias": "Rybrevant",
+      "malformed_aliases": [
+        "Ryrevant"
+      ]
+    },
+    {
+      "drug_id": 1196,
+      "canonical": "amlodipine",
+      "has_livertox_excerpt": true,
+      "real_alias": "Norvasc",
+      "malformed_aliases": [
+        "Novasc"
+      ]
+    },
+    {
+      "drug_id": 5322,
+      "canonical": "Amodiaquine",
+      "has_livertox_excerpt": true,
+      "real_alias": "Camoquine",
+      "malformed_aliases": [
+        "Caoquine"
+      ]
+    },
+    {
+      "drug_id": 1235,
+      "canonical": "amoxapine",
+      "has_livertox_excerpt": true,
+      "real_alias": "Asendin",
+      "malformed_aliases": [
+        "Asndin"
+      ]
+    },
+    {
+      "drug_id": 1240,
+      "canonical": "amoxicillin",
+      "has_livertox_excerpt": true,
+      "real_alias": "Amoxi Drop",
+      "malformed_aliases": [
+        "AmxiDrop"
+      ]
+    },
+    {
+      "drug_id": 543,
+      "canonical": "amoxicillin clavulanate",
+      "has_livertox_excerpt": true,
+      "real_alias": "12 HR amoxicillin 1000 MG / clavulanate 62.5 MG Extended Release Oral Tablet",
+      "malformed_aliases": [
+        "12Ramoxicillin1000MG/clavulanate62.5MGExtendedReleaseOralTablet"
+      ]
+    },
+    {
+      "drug_id": 5323,
+      "canonical": "Amphetamines",
+      "has_livertox_excerpt": true,
+      "real_alias": "Lisdexamfetamine",
+      "malformed_aliases": [
+        "Lidexamfetamine"
+      ]
+    },
+    {
+      "drug_id": 1232,
+      "canonical": "ampicillin",
+      "has_livertox_excerpt": true,
+      "real_alias": "Ampicillin Sulbactam",
+      "malformed_aliases": [
+        "AmicillinSulbactam"
+      ]
+    },
+    {
+      "drug_id": 1231,
+      "canonical": "ampicillin sulbactam",
+      "has_livertox_excerpt": true,
+      "real_alias": "Ampicillin",
+      "malformed_aliases": [
+        "Amicillin"
+      ]
+    },
+    {
+      "drug_id": 1245,
+      "canonical": "anagrelide",
+      "has_livertox_excerpt": true,
+      "real_alias": "Agrylin",
+      "malformed_aliases": [
+        "Agylin"
+      ]
+    },
+    {
+      "drug_id": 186,
+      "canonical": "anakinra",
+      "has_livertox_excerpt": true,
+      "real_alias": "Kineret",
+      "malformed_aliases": [
+        "Kieret"
+      ]
+    },
+    {
+      "drug_id": 1229,
+      "canonical": "anastrozole",
+      "has_livertox_excerpt": true,
+      "real_alias": "Arimidex",
+      "malformed_aliases": [
+        "Armidex"
+      ]
+    },
+    {
+      "drug_id": 5325,
+      "canonical": "Androgenic steroids",
+      "has_livertox_excerpt": true,
+      "real_alias": "Group name",
+      "malformed_aliases": [
+        "Grupname"
+      ]
+    },
+    {
+      "drug_id": 5327,
+      "canonical": "Anesthetics, General",
+      "has_livertox_excerpt": true,
+      "real_alias": "Thiopental",
+      "malformed_aliases": [
+        "Thopental"
+      ]
+    },
+    {
+      "drug_id": 5330,
+      "canonical": "Anifrolumab",
+      "has_livertox_excerpt": true,
+      "real_alias": "Saphnelo",
+      "malformed_aliases": [
+        "Sahnelo"
+      ]
+    },
+    {
+      "drug_id": 5332,
+      "canonical": "Anthrax Antitoxins",
+      "has_livertox_excerpt": true,
+      "real_alias": "Obiltoxaximab",
+      "malformed_aliases": [
+        "Obltoxaximab"
+      ]
+    },
+    {
+      "drug_id": 5335,
+      "canonical": "Antiasthmatic Agents",
+      "has_livertox_excerpt": true,
+      "real_alias": "Cromolyn",
+      "malformed_aliases": [
+        "Crmolyn"
+      ]
+    },
+    {
+      "drug_id": 5337,
+      "canonical": "Anticholinergic Agents",
+      "has_livertox_excerpt": true,
+      "real_alias": "Belladonna",
+      "malformed_aliases": [
+        "Beladonna"
+      ]
+    },
+    {
+      "drug_id": 5346,
+      "canonical": "Antilipemic Agents",
+      "has_livertox_excerpt": true,
+      "real_alias": "Mipomersen",
+      "malformed_aliases": [
+        "Miomersen"
+      ]
+    },
+    {
+      "drug_id": 5355,
+      "canonical": "Antiulcer Agents",
+      "has_livertox_excerpt": true,
+      "real_alias": "Sucralfate",
+      "malformed_aliases": [
+        "Suralfate"
+      ]
+    },
+    {
+      "drug_id": 1272,
+      "canonical": "apalutamide",
+      "has_livertox_excerpt": true,
+      "real_alias": "Erleada",
+      "malformed_aliases": [
+        "Ereada"
+      ]
+    },
+    {
+      "drug_id": 1261,
+      "canonical": "apixaban",
+      "has_livertox_excerpt": true,
+      "real_alias": "Apixaban Starter",
+      "malformed_aliases": [
+        "ApxabanStarter"
+      ]
+    },
+    {
+      "drug_id": 5357,
+      "canonical": "Apoaequorin",
+      "has_livertox_excerpt": true,
+      "real_alias": "Prevagen",
+      "malformed_aliases": [
+        "Prvagen"
+      ]
+    },
+    {
+      "drug_id": 5358,
+      "canonical": "Apomorphine",
+      "has_livertox_excerpt": true,
+      "real_alias": "Apokyn",
+      "malformed_aliases": [
+        "Apkyn"
+      ]
+    },
+    {
+      "drug_id": 752,
+      "canonical": "apremilast",
+      "has_livertox_excerpt": true,
+      "real_alias": "24 HR apremilast 75 MG Extended Release Oral Tablet",
+      "malformed_aliases": [
+        "24Rapremilast75MGExtendedReleaseOralTablet"
+      ]
+    },
+    {
+      "drug_id": 623,
+      "canonical": "aprepitant",
+      "has_livertox_excerpt": true,
+      "real_alias": "Aponvie",
+      "malformed_aliases": [
+        "Apnvie"
+      ]
+    },
+    {
+      "drug_id": 298,
+      "canonical": "aripiprazole",
+      "has_livertox_excerpt": true,
+      "real_alias": "Abilify",
+      "malformed_aliases": [
+        "Ablify"
+      ]
+    },
+    {
+      "drug_id": 5365,
+      "canonical": "Artemisinin",
+      "has_livertox_excerpt": true,
+      "real_alias": "Coartem",
+      "malformed_aliases": [
+        "Cortem"
+      ]
+    },
+    {
+      "drug_id": 1279,
+      "canonical": "asciminib",
+      "has_livertox_excerpt": true,
+      "real_alias": "Asciminib equivalent HCl",
+      "malformed_aliases": [
+        "AsiminibequivalentHCl"
+      ]
+    },
+    {
+      "drug_id": 5366,
+      "canonical": "Asenapine",
+      "has_livertox_excerpt": true,
+      "real_alias": "Saphris",
+      "malformed_aliases": [
+        "Sahris"
+      ]
+    },
+    {
+      "drug_id": 5367,
+      "canonical": "Ashwagandha",
+      "has_livertox_excerpt": true,
+      "real_alias": "Generic",
+      "malformed_aliases": [
+        "Geeric"
+      ]
+    },
+    {
+      "drug_id": 5368,
+      "canonical": "Asparaginase",
+      "has_livertox_excerpt": true,
+      "real_alias": "Pegaspargase",
+      "malformed_aliases": [
+        "Peaspargase"
+      ]
+    },
+    {
+      "drug_id": 740,
+      "canonical": "aspirin",
+      "has_livertox_excerpt": true,
+      "real_alias": "24 HR aspirin 162.5 MG Extended Release Oral Capsule",
+      "malformed_aliases": [
+        "24Raspirin162.5MGExtendedReleaseOralCapsule"
+      ]
+    },
+    {
+      "drug_id": 1328,
+      "canonical": "atazanavir",
+      "has_livertox_excerpt": true,
+      "real_alias": "Cobicistat",
+      "malformed_aliases": [
+        "Coicistat"
+      ]
+    },
+    {
+      "drug_id": 1320,
+      "canonical": "atenolol",
+      "has_livertox_excerpt": true,
+      "real_alias": "Tenormin",
+      "malformed_aliases": [
+        "Teormin"
+      ]
+    },
+    {
+      "drug_id": 626,
+      "canonical": "atezolizumab",
+      "has_livertox_excerpt": true,
+      "real_alias": "Atezolizumab hyaluronidase tqjs",
+      "malformed_aliases": [
+        "Atzolizumabhyaluronidasetqjs"
+      ]
+    },
+    {
+      "drug_id": 1340,
+      "canonical": "atogepant",
+      "has_livertox_excerpt": true,
+      "real_alias": "Qulipta",
+      "malformed_aliases": [
+        "Quipta"
+      ]
+    },
+    {
+      "drug_id": 1345,
+      "canonical": "atomoxetine",
+      "has_livertox_excerpt": true,
+      "real_alias": "Strattera",
+      "malformed_aliases": [
+        "Stattera"
+      ]
+    },
+    {
+      "drug_id": 1398,
+      "canonical": "atorvastatin",
+      "has_livertox_excerpt": true,
+      "real_alias": "Amlodipine",
+      "malformed_aliases": [
+        "Amodipine"
+      ]
+    },
+    {
+      "drug_id": 1391,
+      "canonical": "atovaquone",
+      "has_livertox_excerpt": true,
+      "real_alias": "Mepron",
+      "malformed_aliases": [
+        "Meron"
+      ]
+    },
+    {
+      "drug_id": 1401,
+      "canonical": "atrasentan",
+      "has_livertox_excerpt": true,
+      "real_alias": "Atrasentan equivalent",
+      "malformed_aliases": [
+        "Atasentanequivalent"
+      ]
+    },
+    {
+      "drug_id": 187,
+      "canonical": "atropine",
+      "has_livertox_excerpt": true,
+      "real_alias": "0.7 ML atropine sulfate 0.714 MG/ML Auto-Injector",
+      "malformed_aliases": [
+        "0.MLatropinesulfate0.714MG/MLAuto-Injector"
+      ]
+    },
+    {
+      "drug_id": 1397,
+      "canonical": "avacopan",
+      "has_livertox_excerpt": true,
+      "real_alias": "Tavneos",
+      "malformed_aliases": [
+        "Taneos"
+      ]
+    },
+    {
+      "drug_id": 1376,
+      "canonical": "avanafil",
+      "has_livertox_excerpt": true,
+      "real_alias": "Stendra",
+      "malformed_aliases": [
+        "Stndra"
+      ]
+    },
+    {
+      "drug_id": 1394,
+      "canonical": "avapritinib",
+      "has_livertox_excerpt": true,
+      "real_alias": "Ayvakit",
+      "malformed_aliases": [
+        "Ayakit"
+      ]
+    },
+    {
+      "drug_id": 371,
+      "canonical": "avelumab",
+      "has_livertox_excerpt": true,
+      "real_alias": "Bavencio",
+      "malformed_aliases": [
+        "Baencio"
+      ]
+    },
+    {
+      "drug_id": 5377,
+      "canonical": "Axatilimab",
+      "has_livertox_excerpt": true,
+      "real_alias": "Niktimvo",
+      "malformed_aliases": [
+        "Nitimvo"
+      ]
+    },
+    {
+      "drug_id": 1375,
+      "canonical": "axitinib",
+      "has_livertox_excerpt": true,
+      "real_alias": "Inlyta",
+      "malformed_aliases": [
+        "Inyta"
+      ]
+    },
+    {
+      "drug_id": 1395,
+      "canonical": "azacitidine",
+      "has_livertox_excerpt": true,
+      "real_alias": "Onureg",
+      "malformed_aliases": [
+        "Onreg"
+      ]
+    },
+    {
+      "drug_id": 1364,
+      "canonical": "azathioprine",
+      "has_livertox_excerpt": true,
+      "real_alias": "Imuran",
+      "malformed_aliases": [
+        "Imran"
+      ]
+    },
+    {
+      "drug_id": 5378,
+      "canonical": "Azilsartan",
+      "has_livertox_excerpt": true,
+      "real_alias": "Edarbi",
+      "malformed_aliases": [
+        "Edrbi"
+      ]
+    },
+    {
+      "drug_id": 1363,
+      "canonical": "azithromycin",
+      "has_livertox_excerpt": true,
+      "real_alias": "Zithromax",
+      "malformed_aliases": [
+        "Zihromax"
+      ]
+    },
+    {
+      "drug_id": 1384,
+      "canonical": "aztreonam",
+      "has_livertox_excerpt": true,
+      "real_alias": "Avibactam",
+      "malformed_aliases": [
+        "Avbactam"
+      ]
+    }
+  ],
+  "runs": [
+    {
+      "drug_id": 982,
+      "canonical": "abacavir",
+      "has_livertox_excerpt": true,
+      "input_type": "canonical",
+      "input": "abacavir",
+      "status": "matched",
+      "matched_name": "abacavir",
+      "reason": "exact_canonical",
+      "confidence": 1.0,
+      "candidate_names": [
+        "abacavir"
+      ],
+      "success": true
+    },
+    {
+      "drug_id": 982,
+      "canonical": "abacavir",
+      "has_livertox_excerpt": true,
+      "input_type": "real_alias",
+      "input": "Ziagen",
+      "status": "matched",
+      "matched_name": "abacavir",
+      "reason": "exact_alias",
+      "confidence": 0.92,
+      "candidate_names": [
+        "abacavir"
+      ],
+      "success": true
+    },
+    {
+      "drug_id": 982,
+      "canonical": "abacavir",
+      "has_livertox_excerpt": true,
+      "input_type": "malformed_alias",
+      "input": "Zigen",
+      "status": "matched",
+      "matched_name": "abacavir",
+      "reason": "fuzzy",
+      "confidence": 0.91,
+      "candidate_names": [
+        "abacavir"
+      ],
+      "success": true
+    },
+    {
+      "drug_id": 56,
+      "canonical": "abatacept",
+      "has_livertox_excerpt": true,
+      "input_type": "canonical",
+      "input": "abatacept",
+      "status": "matched",
+      "matched_name": "abatacept",
+      "reason": "exact_canonical",
+      "confidence": 1.0,
+      "candidate_names": [
+        "abatacept"
+      ],
+      "success": true
+    },
+    {
+      "drug_id": 56,
+      "canonical": "abatacept",
+      "has_livertox_excerpt": true,
+      "input_type": "real_alias",
+      "input": "Orencia",
+      "status": "matched",
+      "matched_name": "abatacept",
+      "reason": "exact_alias",
+      "confidence": 0.92,
+      "candidate_names": [
+        "abatacept"
+      ],
+      "success": true
+    },
+    {
+      "drug_id": 56,
+      "canonical": "abatacept",
+      "has_livertox_excerpt": true,
+      "input_type": "malformed_alias",
+      "input": "Orncia",
+      "status": "matched",
+      "matched_name": "abatacept",
+      "reason": "fuzzy",
+      "confidence": 0.92,
+      "candidate_names": [
+        "abatacept"
+      ],
+      "success": true
+    },
+    {
+      "drug_id": 1027,
+      "canonical": "abemaciclib",
+      "has_livertox_excerpt": true,
+      "input_type": "canonical",
+      "input": "abemaciclib",
+      "status": "matched",
+      "matched_name": "abemaciclib",
+      "reason": "exact_canonical",
+      "confidence": 1.0,
+      "candidate_names": [
+        "abemaciclib"
+      ],
+      "success": true
+    },
+    {
+      "drug_id": 1027,
+      "canonical": "abemaciclib",
+      "has_livertox_excerpt": true,
+      "input_type": "real_alias",
+      "input": "Verzenio",
+      "status": "matched",
+      "matched_name": "abemaciclib",
+      "reason": "exact_alias",
+      "confidence": 0.92,
+      "candidate_names": [
+        "abemaciclib"
+      ],
+      "success": true
+    },
+    {
+      "drug_id": 1027,
+      "canonical": "abemaciclib",
+      "has_livertox_excerpt": true,
+      "input_type": "malformed_alias",
+      "input": "Vezenio",
+      "status": "matched",
+      "matched_name": "abemaciclib",
+      "reason": "fuzzy",
+      "confidence": 0.93,
+      "candidate_names": [
+        "abemaciclib"
+      ],
+      "success": true
+    },
+    {
+      "drug_id": 1004,
+      "canonical": "abiraterone",
+      "has_livertox_excerpt": true,
+      "input_type": "canonical",
+      "input": "abiraterone",
+      "status": "matched",
+      "matched_name": "abiraterone",
+      "reason": "exact_canonical",
+      "confidence": 1.0,
+      "candidate_names": [
+        "abiraterone"
+      ],
+      "success": true
+    },
+    {
+      "drug_id": 1004,
+      "canonical": "abiraterone",
+      "has_livertox_excerpt": true,
+      "input_type": "real_alias",
+      "input": "abiraterone acetate 250 MG Oral Tablet",
+      "status": "ambiguous",
+      "matched_name": null,
+      "reason": "ambiguous_exact_alias",
+      "confidence": null,
+      "candidate_names": [
+        "abiraterone",
+        "dolutegravir",
+        "fostamatinib",
+        "fostemsavir",
+        "gepirone",
+        "imatinib",
+        "inclisiran",
+        "melphalan",
+        "metoprolol",
+        "momelotinib",
+        "niraparib",
+        "oxybate",
+        "quizartinib",
+        "rilpivirine",
+        "seladelpar",
+        "tazemetostat",
+        "zolpidem"
+      ],
+      "success": false
+    },
+    {
+      "drug_id": 1004,
+      "canonical": "abiraterone",
+      "has_livertox_excerpt": true,
+      "input_type": "malformed_alias",
+      "input": "abrateroneacetate250MGOralTablet",
+      "status": "missing",
+      "matched_name": null,
+      "reason": "no_match",
+      "confidence": null,
+      "candidate_names": [],
+      "success": false
+    },
+    {
+      "drug_id": 1033,
+      "canonical": "abrocitinib",
+      "has_livertox_excerpt": true,
+      "input_type": "canonical",
+      "input": "abrocitinib",
+      "status": "matched",
+      "matched_name": "abrocitinib",
+      "reason": "exact_canonical",
+      "confidence": 1.0,
+      "candidate_names": [
+        "abrocitinib"
+      ],
+      "success": true
+    },
+    {
+      "drug_id": 1033,
+      "canonical": "abrocitinib",
+      "has_livertox_excerpt": true,
+      "input_type": "real_alias",
+      "input": "Cibinqo",
+      "status": "matched",
+      "matched_name": "abrocitinib",
+      "reason": "exact_alias",
+      "confidence": 0.92,
+      "candidate_names": [
+        "abrocitinib"
+      ],
+      "success": true
+    },
+    {
+      "drug_id": 1033,
+      "canonical": "abrocitinib",
+      "has_livertox_excerpt": true,
+      "input_type": "malformed_alias",
+      "input": "Ciinqo",
+      "status": "matched",
+      "matched_name": "abrocitinib",
+      "reason": "fuzzy",
+      "confidence": 0.92,
+      "candidate_names": [
+        "abrocitinib"
+      ],
+      "success": true
+    },
+    {
+      "drug_id": 1029,
+      "canonical": "acalabrutinib",
+      "has_livertox_excerpt": true,
+      "input_type": "canonical",
+      "input": "acalabrutinib",
+      "status": "matched",
+      "matched_name": "acalabrutinib",
+      "reason": "exact_canonical",
+      "confidence": 1.0,
+      "candidate_names": [
+        "acalabrutinib"
+      ],
+      "success": true
+    },
+    {
+      "drug_id": 1029,
+      "canonical": "acalabrutinib",
+      "has_livertox_excerpt": true,
+      "input_type": "real_alias",
+      "input": "Calquence",
+      "status": "matched",
+      "matched_name": "acalabrutinib",
+      "reason": "exact_alias",
+      "confidence": 0.92,
+      "candidate_names": [
+        "acalabrutinib"
+      ],
+      "success": true
+    },
+    {
+      "drug_id": 1029,
+      "canonical": "acalabrutinib",
+      "has_livertox_excerpt": true,
+      "input_type": "malformed_alias",
+      "input": "Caquence",
+      "status": "matched",
+      "matched_name": "acalabrutinib",
+      "reason": "fuzzy",
+      "confidence": 0.94,
+      "candidate_names": [
+        "acalabrutinib"
+      ],
+      "success": true
+    },
+    {
+      "drug_id": 1043,
+      "canonical": "acamprosate",
+      "has_livertox_excerpt": true,
+      "input_type": "canonical",
+      "input": "acamprosate",
+      "status": "matched",
+      "matched_name": "acamprosate",
+      "reason": "exact_canonical",
+      "confidence": 1.0,
+      "candidate_names": [
+        "acamprosate"
+      ],
+      "success": true
+    },
+    {
+      "drug_id": 1043,
+      "canonical": "acamprosate",
+      "has_livertox_excerpt": true,
+      "input_type": "real_alias",
+      "input": "acamprosate calcium 333 MG Delayed Release Oral Tablet",
+      "status": "matched",
+      "matched_name": "acamprosate",
+      "reason": "exact_alias",
+      "confidence": 0.92,
+      "candidate_names": [
+        "acamprosate"
+      ],
+      "success": true
+    },
+    {
+      "drug_id": 1043,
+      "canonical": "acamprosate",
+      "has_livertox_excerpt": true,
+      "input_type": "malformed_alias",
+      "input": "acmprosatecalcium333MGDelayedReleaseOralTablet",
+      "status": "missing",
+      "matched_name": null,
+      "reason": "no_match",
+      "confidence": null,
+      "candidate_names": [],
+      "success": false
+    },
+    {
+      "drug_id": 1030,
+      "canonical": "acarbose",
+      "has_livertox_excerpt": true,
+      "input_type": "canonical",
+      "input": "acarbose",
+      "status": "matched",
+      "matched_name": "acarbose",
+      "reason": "exact_canonical",
+      "confidence": 1.0,
+      "candidate_names": [
+        "acarbose"
+      ],
+      "success": true
+    },
+    {
+      "drug_id": 1030,
+      "canonical": "acarbose",
+      "has_livertox_excerpt": true,
+      "input_type": "real_alias",
+      "input": "Precose",
+      "status": "matched",
+      "matched_name": "acarbose",
+      "reason": "exact_alias",
+      "confidence": 0.92,
+      "candidate_names": [
+        "acarbose"
+      ],
+      "success": true
+    },
+    {
+      "drug_id": 1030,
+      "canonical": "acarbose",
+      "has_livertox_excerpt": true,
+      "input_type": "malformed_alias",
+      "input": "Prcose",
+      "status": "matched",
+      "matched_name": "acarbose",
+      "reason": "fuzzy",
+      "confidence": 0.92,
+      "candidate_names": [
+        "acarbose"
+      ],
+      "success": true
+    },
+    {
+      "drug_id": 1047,
+      "canonical": "acebutolol",
+      "has_livertox_excerpt": true,
+      "input_type": "canonical",
+      "input": "acebutolol",
+      "status": "matched",
+      "matched_name": "acebutolol",
+      "reason": "exact_canonical",
+      "confidence": 1.0,
+      "candidate_names": [
+        "acebutolol"
+      ],
+      "success": true
+    },
+    {
+      "drug_id": 1047,
+      "canonical": "acebutolol",
+      "has_livertox_excerpt": true,
+      "input_type": "real_alias",
+      "input": "HCTZ",
+      "status": "ambiguous",
+      "matched_name": null,
+      "reason": "ambiguous_exact_alias",
+      "confidence": null,
+      "candidate_names": [
+        "acebutolol",
+        "aliskiren",
+        "amiloride",
+        "amlodipine",
+        "atenolol",
+        "benazepril",
+        "bisoprolol",
+        "captopril",
+        "enalapril",
+        "eprosartan",
+        "fosinopril",
+        "hydralazine",
+        "irbesartan",
+        "labetalol",
+        "lisinopril",
+        "losartan",
+        "methyldopa",
+        "metoprolol",
+        "moexipril",
+        "propranolol",
+        "quinapril",
+        "spironolactone",
+        "telmisartan",
+        "timolol",
+        "triamterene",
+        "valsartan"
+      ],
+      "success": false
+    },
+    {
+      "drug_id": 1047,
+      "canonical": "acebutolol",
+      "has_livertox_excerpt": true,
+      "input_type": "malformed_alias",
+      "input": "HCT",
+      "status": "missing",
+      "matched_name": null,
+      "reason": "no_match",
+      "confidence": null,
+      "candidate_names": [],
+      "success": false
+    },
+    {
+      "drug_id": 476,
+      "canonical": "acetaminophen",
+      "has_livertox_excerpt": true,
+      "input_type": "canonical",
+      "input": "acetaminophen",
+      "status": "matched",
+      "matched_name": "acetaminophen",
+      "reason": "exact_canonical",
+      "confidence": 1.0,
+      "candidate_names": [
+        "acetaminophen"
+      ],
+      "success": true
+    },
+    {
+      "drug_id": 476,
+      "canonical": "acetaminophen",
+      "has_livertox_excerpt": true,
+      "input_type": "real_alias",
+      "input": "Acephen",
+      "status": "matched",
+      "matched_name": "acetaminophen",
+      "reason": "exact_alias",
+      "confidence": 0.9,
+      "candidate_names": [
+        "acetaminophen"
+      ],
+      "success": true
+    },
+    {
+      "drug_id": 476,
+      "canonical": "acetaminophen",
+      "has_livertox_excerpt": true,
+      "input_type": "malformed_alias",
+      "input": "Acphen",
+      "status": "matched",
+      "matched_name": "acetaminophen",
+      "reason": "fuzzy",
+      "confidence": 0.92,
+      "candidate_names": [
+        "acetaminophen"
+      ],
+      "success": true
+    },
+    {
+      "drug_id": 885,
+      "canonical": "acetylcysteine",
+      "has_livertox_excerpt": true,
+      "input_type": "canonical",
+      "input": "acetylcysteine",
+      "status": "matched",
+      "matched_name": "acetylcysteine",
+      "reason": "exact_canonical",
+      "confidence": 1.0,
+      "candidate_names": [
+        "acetylcysteine"
+      ],
+      "success": true
+    },
+    {
+      "drug_id": 885,
+      "canonical": "acetylcysteine",
+      "has_livertox_excerpt": true,
+      "input_type": "real_alias",
+      "input": "Acetadote",
+      "status": "matched",
+      "matched_name": "acetylcysteine",
+      "reason": "exact_alias",
+      "confidence": 0.92,
+      "candidate_names": [
+        "acetylcysteine"
+      ],
+      "success": true
+    },
+    {
+      "drug_id": 885,
+      "canonical": "acetylcysteine",
+      "has_livertox_excerpt": true,
+      "input_type": "malformed_alias",
+      "input": "Actadote",
+      "status": "matched",
+      "matched_name": "acetylcysteine",
+      "reason": "fuzzy",
+      "confidence": 0.94,
+      "candidate_names": [
+        "acetylcysteine"
+      ],
+      "success": true
+    },
+    {
+      "drug_id": 1094,
+      "canonical": "acitretin",
+      "has_livertox_excerpt": true,
+      "input_type": "canonical",
+      "input": "acitretin",
+      "status": "matched",
+      "matched_name": "acitretin",
+      "reason": "exact_canonical",
+      "confidence": 1.0,
+      "candidate_names": [
+        "acitretin"
+      ],
+      "success": true
+    },
+    {
+      "drug_id": 1094,
+      "canonical": "acitretin",
+      "has_livertox_excerpt": true,
+      "input_type": "real_alias",
+      "input": "Soriatane",
+      "status": "matched",
+      "matched_name": "acitretin",
+      "reason": "exact_alias",
+      "confidence": 0.92,
+      "candidate_names": [
+        "acitretin"
+      ],
+      "success": true
+    },
+    {
+      "drug_id": 1094,
+      "canonical": "acitretin",
+      "has_livertox_excerpt": true,
+      "input_type": "malformed_alias",
+      "input": "Soiatane",
+      "status": "matched",
+      "matched_name": "acitretin",
+      "reason": "fuzzy",
+      "confidence": 0.94,
+      "candidate_names": [
+        "acitretin"
+      ],
+      "success": true
+    },
+    {
+      "drug_id": 5297,
+      "canonical": "Aclidinium",
+      "has_livertox_excerpt": true,
+      "input_type": "canonical",
+      "input": "Aclidinium",
+      "status": "matched",
+      "matched_name": "Aclidinium",
+      "reason": "exact_canonical",
+      "confidence": 1.0,
+      "candidate_names": [
+        "Aclidinium"
+      ],
+      "success": true
+    },
+    {
+      "drug_id": 5297,
+      "canonical": "Aclidinium",
+      "has_livertox_excerpt": true,
+      "input_type": "real_alias",
+      "input": "Tudorza Pressair",
+      "status": "matched",
+      "matched_name": "Aclidinium",
+      "reason": "exact_alias",
+      "confidence": 0.92,
+      "candidate_names": [
+        "Aclidinium"
+      ],
+      "success": true
+    },
+    {
+      "drug_id": 5297,
+      "canonical": "Aclidinium",
+      "has_livertox_excerpt": true,
+      "input_type": "malformed_alias",
+      "input": "TuorzaPressair",
+      "status": "missing",
+      "matched_name": null,
+      "reason": "no_match",
+      "confidence": null,
+      "candidate_names": [],
+      "success": false
+    },
+    {
+      "drug_id": 1102,
+      "canonical": "acoramidis",
+      "has_livertox_excerpt": true,
+      "input_type": "canonical",
+      "input": "acoramidis",
+      "status": "matched",
+      "matched_name": "acoramidis",
+      "reason": "exact_canonical",
+      "confidence": 1.0,
+      "candidate_names": [
+        "acoramidis"
+      ],
+      "success": true
+    },
+    {
+      "drug_id": 1102,
+      "canonical": "acoramidis",
+      "has_livertox_excerpt": true,
+      "input_type": "real_alias",
+      "input": "Attruby",
+      "status": "matched",
+      "matched_name": "Attruby",
+      "reason": "exact_canonical",
+      "confidence": 1.0,
+      "candidate_names": [
+        "Attruby"
+      ],
+      "success": false
+    },
+    {
+      "drug_id": 1102,
+      "canonical": "acoramidis",
+      "has_livertox_excerpt": true,
+      "input_type": "malformed_alias",
+      "input": "Atruby",
+      "status": "ambiguous",
+      "matched_name": null,
+      "reason": "ambiguous_fuzzy",
+      "confidence": null,
+      "candidate_names": [
+        "acoramidis",
+        "Attruby"
+      ],
+      "success": false
+    },
+    {
+      "drug_id": 5298,
+      "canonical": "Acrivastine",
+      "has_livertox_excerpt": true,
+      "input_type": "canonical",
+      "input": "Acrivastine",
+      "status": "matched",
+      "matched_name": "Acrivastine",
+      "reason": "exact_canonical",
+      "confidence": 1.0,
+      "candidate_names": [
+        "Acrivastine"
+      ],
+      "success": true
+    },
+    {
+      "drug_id": 5298,
+      "canonical": "Acrivastine",
+      "has_livertox_excerpt": true,
+      "input_type": "real_alias",
+      "input": "Semprex-D",
+      "status": "matched",
+      "matched_name": "Acrivastine",
+      "reason": "exact_alias",
+      "confidence": 0.92,
+      "candidate_names": [
+        "Acrivastine"
+      ],
+      "success": true
+    },
+    {
+      "drug_id": 5298,
+      "canonical": "Acrivastine",
+      "has_livertox_excerpt": true,
+      "input_type": "malformed_alias",
+      "input": "Seprex-D",
+      "status": "missing",
+      "matched_name": null,
+      "reason": "no_match",
+      "confidence": null,
+      "candidate_names": [],
+      "success": false
+    },
+    {
+      "drug_id": 365,
+      "canonical": "acyclovir",
+      "has_livertox_excerpt": true,
+      "input_type": "canonical",
+      "input": "acyclovir",
+      "status": "matched",
+      "matched_name": "acyclovir",
+      "reason": "exact_canonical",
+      "confidence": 1.0,
+      "candidate_names": [
+        "acyclovir"
+      ],
+      "success": true
+    },
+    {
+      "drug_id": 365,
+      "canonical": "acyclovir",
+      "has_livertox_excerpt": true,
+      "input_type": "real_alias",
+      "input": "Acyclovir equivalent",
+      "status": "matched",
+      "matched_name": "acyclovir",
+      "reason": "exact_alias",
+      "confidence": 0.9,
+      "candidate_names": [
+        "acyclovir"
+      ],
+      "success": true
+    },
+    {
+      "drug_id": 365,
+      "canonical": "acyclovir",
+      "has_livertox_excerpt": true,
+      "input_type": "malformed_alias",
+      "input": "Acclovirequivalent",
+      "status": "matched",
+      "matched_name": "acyclovir",
+      "reason": "fuzzy",
+      "confidence": 0.95,
+      "candidate_names": [
+        "acyclovir"
+      ],
+      "success": true
+    },
+    {
+      "drug_id": 1099,
+      "canonical": "adagrasib",
+      "has_livertox_excerpt": true,
+      "input_type": "canonical",
+      "input": "adagrasib",
+      "status": "matched",
+      "matched_name": "adagrasib",
+      "reason": "exact_canonical",
+      "confidence": 1.0,
+      "candidate_names": [
+        "adagrasib"
+      ],
+      "success": true
+    },
+    {
+      "drug_id": 1099,
+      "canonical": "adagrasib",
+      "has_livertox_excerpt": true,
+      "input_type": "real_alias",
+      "input": "Krazati",
+      "status": "matched",
+      "matched_name": "adagrasib",
+      "reason": "exact_alias",
+      "confidence": 0.92,
+      "candidate_names": [
+        "adagrasib"
+      ],
+      "success": true
+    },
+    {
+      "drug_id": 1099,
+      "canonical": "adagrasib",
+      "has_livertox_excerpt": true,
+      "input_type": "malformed_alias",
+      "input": "Krzati",
+      "status": "matched",
+      "matched_name": "adagrasib",
+      "reason": "fuzzy",
+      "confidence": 0.92,
+      "candidate_names": [
+        "adagrasib"
+      ],
+      "success": true
+    },
+    {
+      "drug_id": 7,
+      "canonical": "adalimumab",
+      "has_livertox_excerpt": true,
+      "input_type": "canonical",
+      "input": "adalimumab",
+      "status": "matched",
+      "matched_name": "adalimumab",
+      "reason": "exact_canonical",
+      "confidence": 1.0,
+      "candidate_names": [
+        "adalimumab"
+      ],
+      "success": true
+    },
+    {
+      "drug_id": 7,
+      "canonical": "adalimumab",
+      "has_livertox_excerpt": true,
+      "input_type": "real_alias",
+      "input": "Abrilada",
+      "status": "matched",
+      "matched_name": "adalimumab",
+      "reason": "exact_alias",
+      "confidence": 0.9,
+      "candidate_names": [
+        "adalimumab"
+      ],
+      "success": true
+    },
+    {
+      "drug_id": 7,
+      "canonical": "adalimumab",
+      "has_livertox_excerpt": true,
+      "input_type": "malformed_alias",
+      "input": "Abilada",
+      "status": "matched",
+      "matched_name": "adalimumab",
+      "reason": "fuzzy",
+      "confidence": 0.93,
+      "candidate_names": [
+        "adalimumab"
+      ],
+      "success": true
+    },
+    {
+      "drug_id": 5302,
+      "canonical": "Adefovir",
+      "has_livertox_excerpt": true,
+      "input_type": "canonical",
+      "input": "Adefovir",
+      "status": "matched",
+      "matched_name": "Adefovir",
+      "reason": "exact_canonical",
+      "confidence": 1.0,
+      "candidate_names": [
+        "Adefovir"
+      ],
+      "success": true
+    },
+    {
+      "drug_id": 5302,
+      "canonical": "Adefovir",
+      "has_livertox_excerpt": true,
+      "input_type": "real_alias",
+      "input": "Hepsera",
+      "status": "matched",
+      "matched_name": "Adefovir",
+      "reason": "exact_alias",
+      "confidence": 0.92,
+      "candidate_names": [
+        "Adefovir"
+      ],
+      "success": true
+    },
+    {
+      "drug_id": 5302,
+      "canonical": "Adefovir",
+      "has_livertox_excerpt": true,
+      "input_type": "malformed_alias",
+      "input": "Hesera",
+      "status": "missing",
+      "matched_name": null,
+      "reason": "no_match",
+      "confidence": null,
+      "candidate_names": [],
+      "success": false
+    },
+    {
+      "drug_id": 5303,
+      "canonical": "Aducanumab",
+      "has_livertox_excerpt": true,
+      "input_type": "canonical",
+      "input": "Aducanumab",
+      "status": "matched",
+      "matched_name": "Aducanumab",
+      "reason": "exact_canonical",
+      "confidence": 1.0,
+      "candidate_names": [
+        "Aducanumab"
+      ],
+      "success": true
+    },
+    {
+      "drug_id": 5303,
+      "canonical": "Aducanumab",
+      "has_livertox_excerpt": true,
+      "input_type": "real_alias",
+      "input": "Aduhelm",
+      "status": "matched",
+      "matched_name": "Aducanumab",
+      "reason": "exact_alias",
+      "confidence": 0.92,
+      "candidate_names": [
+        "Aducanumab"
+      ],
+      "success": true
+    },
+    {
+      "drug_id": 5303,
+      "canonical": "Aducanumab",
+      "has_livertox_excerpt": true,
+      "input_type": "malformed_alias",
+      "input": "Adhelm",
+      "status": "missing",
+      "matched_name": null,
+      "reason": "no_match",
+      "confidence": null,
+      "candidate_names": [],
+      "success": false
+    },
+    {
+      "drug_id": 5304,
+      "canonical": "Afamelanotide",
+      "has_livertox_excerpt": true,
+      "input_type": "canonical",
+      "input": "Afamelanotide",
+      "status": "matched",
+      "matched_name": "Afamelanotide",
+      "reason": "exact_canonical",
+      "confidence": 1.0,
+      "candidate_names": [
+        "Afamelanotide"
+      ],
+      "success": true
+    },
+    {
+      "drug_id": 5304,
+      "canonical": "Afamelanotide",
+      "has_livertox_excerpt": true,
+      "input_type": "real_alias",
+      "input": "Scenesse",
+      "status": "matched",
+      "matched_name": "Afamelanotide",
+      "reason": "exact_alias",
+      "confidence": 0.92,
+      "candidate_names": [
+        "Afamelanotide"
+      ],
+      "success": true
+    },
+    {
+      "drug_id": 5304,
+      "canonical": "Afamelanotide",
+      "has_livertox_excerpt": true,
+      "input_type": "malformed_alias",
+      "input": "Scnesse",
+      "status": "missing",
+      "matched_name": null,
+      "reason": "no_match",
+      "confidence": null,
+      "candidate_names": [],
+      "success": false
+    },
+    {
+      "drug_id": 1086,
+      "canonical": "afatinib",
+      "has_livertox_excerpt": true,
+      "input_type": "canonical",
+      "input": "afatinib",
+      "status": "matched",
+      "matched_name": "afatinib",
+      "reason": "exact_canonical",
+      "confidence": 1.0,
+      "candidate_names": [
+        "afatinib"
+      ],
+      "success": true
+    },
+    {
+      "drug_id": 1086,
+      "canonical": "afatinib",
+      "has_livertox_excerpt": true,
+      "input_type": "real_alias",
+      "input": "Afatinib Dimaleate",
+      "status": "matched",
+      "matched_name": "afatinib",
+      "reason": "exact_alias",
+      "confidence": 0.9,
+      "candidate_names": [
+        "afatinib"
+      ],
+      "success": true
+    },
+    {
+      "drug_id": 1086,
+      "canonical": "afatinib",
+      "has_livertox_excerpt": true,
+      "input_type": "malformed_alias",
+      "input": "AftinibDimaleate",
+      "status": "matched",
+      "matched_name": "afatinib",
+      "reason": "fuzzy",
+      "confidence": 0.94,
+      "candidate_names": [
+        "afatinib"
+      ],
+      "success": true
+    },
+    {
+      "drug_id": 1148,
+      "canonical": "albendazole",
+      "has_livertox_excerpt": true,
+      "input_type": "canonical",
+      "input": "albendazole",
+      "status": "matched",
+      "matched_name": "albendazole",
+      "reason": "exact_canonical",
+      "confidence": 1.0,
+      "candidate_names": [
+        "albendazole"
+      ],
+      "success": true
+    },
+    {
+      "drug_id": 1148,
+      "canonical": "albendazole",
+      "has_livertox_excerpt": true,
+      "input_type": "real_alias",
+      "input": "Albenza",
+      "status": "matched",
+      "matched_name": "albendazole",
+      "reason": "exact_alias",
+      "confidence": 0.92,
+      "candidate_names": [
+        "albendazole"
+      ],
+      "success": true
+    },
+    {
+      "drug_id": 1148,
+      "canonical": "albendazole",
+      "has_livertox_excerpt": true,
+      "input_type": "malformed_alias",
+      "input": "Alenza",
+      "status": "matched",
+      "matched_name": "albendazole",
+      "reason": "fuzzy",
+      "confidence": 0.92,
+      "candidate_names": [
+        "albendazole"
+      ],
+      "success": true
+    },
+    {
+      "drug_id": 5306,
+      "canonical": "Albiglutide",
+      "has_livertox_excerpt": true,
+      "input_type": "canonical",
+      "input": "Albiglutide",
+      "status": "matched",
+      "matched_name": "Albiglutide",
+      "reason": "exact_canonical",
+      "confidence": 1.0,
+      "candidate_names": [
+        "Albiglutide"
+      ],
+      "success": true
+    },
+    {
+      "drug_id": 5306,
+      "canonical": "Albiglutide",
+      "has_livertox_excerpt": true,
+      "input_type": "real_alias",
+      "input": "Tanzeum",
+      "status": "matched",
+      "matched_name": "Albiglutide",
+      "reason": "exact_alias",
+      "confidence": 0.92,
+      "candidate_names": [
+        "Albiglutide"
+      ],
+      "success": true
+    },
+    {
+      "drug_id": 5306,
+      "canonical": "Albiglutide",
+      "has_livertox_excerpt": true,
+      "input_type": "malformed_alias",
+      "input": "Tazeum",
+      "status": "missing",
+      "matched_name": null,
+      "reason": "no_match",
+      "confidence": null,
+      "candidate_names": [],
+      "success": false
+    },
+    {
+      "drug_id": 5307,
+      "canonical": "Aldesleukin",
+      "has_livertox_excerpt": true,
+      "input_type": "canonical",
+      "input": "Aldesleukin",
+      "status": "matched",
+      "matched_name": "Aldesleukin",
+      "reason": "exact_canonical",
+      "confidence": 1.0,
+      "candidate_names": [
+        "Aldesleukin"
+      ],
+      "success": true
+    },
+    {
+      "drug_id": 5307,
+      "canonical": "Aldesleukin",
+      "has_livertox_excerpt": true,
+      "input_type": "real_alias",
+      "input": "Proleukin",
+      "status": "matched",
+      "matched_name": "Aldesleukin",
+      "reason": "exact_alias",
+      "confidence": 0.92,
+      "candidate_names": [
+        "Aldesleukin"
+      ],
+      "success": true
+    },
+    {
+      "drug_id": 5307,
+      "canonical": "Aldesleukin",
+      "has_livertox_excerpt": true,
+      "input_type": "malformed_alias",
+      "input": "Prleukin",
+      "status": "missing",
+      "matched_name": null,
+      "reason": "no_match",
+      "confidence": null,
+      "candidate_names": [],
+      "success": false
+    },
+    {
+      "drug_id": 1143,
+      "canonical": "alectinib",
+      "has_livertox_excerpt": true,
+      "input_type": "canonical",
+      "input": "alectinib",
+      "status": "matched",
+      "matched_name": "alectinib",
+      "reason": "exact_canonical",
+      "confidence": 1.0,
+      "candidate_names": [
+        "alectinib"
+      ],
+      "success": true
+    },
+    {
+      "drug_id": 1143,
+      "canonical": "alectinib",
+      "has_livertox_excerpt": true,
+      "input_type": "real_alias",
+      "input": "Alecensa",
+      "status": "matched",
+      "matched_name": "alectinib",
+      "reason": "exact_alias",
+      "confidence": 0.92,
+      "candidate_names": [
+        "alectinib"
+      ],
+      "success": true
+    },
+    {
+      "drug_id": 1143,
+      "canonical": "alectinib",
+      "has_livertox_excerpt": true,
+      "input_type": "malformed_alias",
+      "input": "Alcensa",
+      "status": "matched",
+      "matched_name": "alectinib",
+      "reason": "fuzzy",
+      "confidence": 0.93,
+      "candidate_names": [
+        "alectinib"
+      ],
+      "success": true
+    },
+    {
+      "drug_id": 5308,
+      "canonical": "Alefacept",
+      "has_livertox_excerpt": true,
+      "input_type": "canonical",
+      "input": "Alefacept",
+      "status": "matched",
+      "matched_name": "Alefacept",
+      "reason": "exact_canonical",
+      "confidence": 1.0,
+      "candidate_names": [
+        "Alefacept"
+      ],
+      "success": true
+    },
+    {
+      "drug_id": 5308,
+      "canonical": "Alefacept",
+      "has_livertox_excerpt": true,
+      "input_type": "real_alias",
+      "input": "Amevive",
+      "status": "matched",
+      "matched_name": "Alefacept",
+      "reason": "exact_alias",
+      "confidence": 0.92,
+      "candidate_names": [
+        "Alefacept"
+      ],
+      "success": true
+    },
+    {
+      "drug_id": 5308,
+      "canonical": "Alefacept",
+      "has_livertox_excerpt": true,
+      "input_type": "malformed_alias",
+      "input": "Amvive",
+      "status": "missing",
+      "matched_name": null,
+      "reason": "no_match",
+      "confidence": null,
+      "candidate_names": [],
+      "success": false
+    },
+    {
+      "drug_id": 206,
+      "canonical": "alemtuzumab",
+      "has_livertox_excerpt": true,
+      "input_type": "canonical",
+      "input": "alemtuzumab",
+      "status": "matched",
+      "matched_name": "alemtuzumab",
+      "reason": "exact_canonical",
+      "confidence": 1.0,
+      "candidate_names": [
+        "alemtuzumab"
+      ],
+      "success": true
+    },
+    {
+      "drug_id": 206,
+      "canonical": "alemtuzumab",
+      "has_livertox_excerpt": true,
+      "input_type": "real_alias",
+      "input": "Campath",
+      "status": "matched",
+      "matched_name": "alemtuzumab",
+      "reason": "exact_alias",
+      "confidence": 0.92,
+      "candidate_names": [
+        "alemtuzumab"
+      ],
+      "success": true
+    },
+    {
+      "drug_id": 206,
+      "canonical": "alemtuzumab",
+      "has_livertox_excerpt": true,
+      "input_type": "malformed_alias",
+      "input": "Capath",
+      "status": "matched",
+      "matched_name": "alemtuzumab",
+      "reason": "fuzzy",
+      "confidence": 0.92,
+      "candidate_names": [
+        "alemtuzumab"
+      ],
+      "success": true
+    },
+    {
+      "drug_id": 761,
+      "canonical": "alfuzosin",
+      "has_livertox_excerpt": true,
+      "input_type": "canonical",
+      "input": "alfuzosin",
+      "status": "matched",
+      "matched_name": "alfuzosin",
+      "reason": "exact_canonical",
+      "confidence": 1.0,
+      "candidate_names": [
+        "alfuzosin"
+      ],
+      "success": true
+    },
+    {
+      "drug_id": 761,
+      "canonical": "alfuzosin",
+      "has_livertox_excerpt": true,
+      "input_type": "real_alias",
+      "input": "24 HR alfuzosin hydrochloride 10 MG Extended Release Oral Tablet",
+      "status": "matched",
+      "matched_name": "alfuzosin",
+      "reason": "fuzzy",
+      "confidence": 0.86,
+      "candidate_names": [
+        "alfuzosin"
+      ],
+      "success": true
+    },
+    {
+      "drug_id": 761,
+      "canonical": "alfuzosin",
+      "has_livertox_excerpt": true,
+      "input_type": "malformed_alias",
+      "input": "24Ralfuzosinhydrochloride10MGExtendedReleaseOralTablet",
+      "status": "missing",
+      "matched_name": null,
+      "reason": "no_match",
+      "confidence": null,
+      "candidate_names": [],
+      "success": false
+    },
+    {
+      "drug_id": 191,
+      "canonical": "alirocumab",
+      "has_livertox_excerpt": true,
+      "input_type": "canonical",
+      "input": "alirocumab",
+      "status": "matched",
+      "matched_name": "alirocumab",
+      "reason": "exact_canonical",
+      "confidence": 1.0,
+      "candidate_names": [
+        "alirocumab"
+      ],
+      "success": true
+    },
+    {
+      "drug_id": 191,
+      "canonical": "alirocumab",
+      "has_livertox_excerpt": true,
+      "input_type": "real_alias",
+      "input": "1 ML alirocumab 150 MG/ML Auto-Injector",
+      "status": "matched",
+      "matched_name": "alirocumab",
+      "reason": "exact_alias",
+      "confidence": 0.92,
+      "candidate_names": [
+        "alirocumab"
+      ],
+      "success": true
+    },
+    {
+      "drug_id": 191,
+      "canonical": "alirocumab",
+      "has_livertox_excerpt": true,
+      "input_type": "malformed_alias",
+      "input": "1Malirocumab150MG/MLAuto-Injector",
+      "status": "matched",
+      "matched_name": "alirocumab",
+      "reason": "exact_alias",
+      "confidence": 0.92,
+      "candidate_names": [
+        "alirocumab"
+      ],
+      "success": true
+    },
+    {
+      "drug_id": 1120,
+      "canonical": "aliskiren",
+      "has_livertox_excerpt": true,
+      "input_type": "canonical",
+      "input": "aliskiren",
+      "status": "matched",
+      "matched_name": "aliskiren",
+      "reason": "exact_canonical",
+      "confidence": 1.0,
+      "candidate_names": [
+        "aliskiren"
+      ],
+      "success": true
+    },
+    {
+      "drug_id": 1120,
+      "canonical": "aliskiren",
+      "has_livertox_excerpt": true,
+      "input_type": "real_alias",
+      "input": "Amlodipine",
+      "status": "matched",
+      "matched_name": "amlodipine",
+      "reason": "exact_canonical",
+      "confidence": 1.0,
+      "candidate_names": [
+        "amlodipine"
+      ],
+      "success": false
+    },
+    {
+      "drug_id": 1120,
+      "canonical": "aliskiren",
+      "has_livertox_excerpt": true,
+      "input_type": "malformed_alias",
+      "input": "Amodipine",
+      "status": "ambiguous",
+      "matched_name": null,
+      "reason": "ambiguous_fuzzy",
+      "confidence": null,
+      "candidate_names": [
+        "aliskiren",
+        "amlodipine",
+        "atorvastatin",
+        "benazepril",
+        "celecoxib",
+        "telmisartan",
+        "valsartan"
+      ],
+      "success": false
+    },
+    {
+      "drug_id": 5310,
+      "canonical": "Alkylating Agents",
+      "has_livertox_excerpt": true,
+      "input_type": "canonical",
+      "input": "Alkylating Agents",
+      "status": "matched",
+      "matched_name": "Alkylating Agents",
+      "reason": "exact_canonical",
+      "confidence": 1.0,
+      "candidate_names": [
+        "Alkylating Agents"
+      ],
+      "success": true
+    },
+    {
+      "drug_id": 5310,
+      "canonical": "Alkylating Agents",
+      "has_livertox_excerpt": true,
+      "input_type": "real_alias",
+      "input": "Estramustine",
+      "status": "matched",
+      "matched_name": "Alkylating Agents",
+      "reason": "exact_alias",
+      "confidence": 0.92,
+      "candidate_names": [
+        "Alkylating Agents"
+      ],
+      "success": true
+    },
+    {
+      "drug_id": 5310,
+      "canonical": "Alkylating Agents",
+      "has_livertox_excerpt": true,
+      "input_type": "malformed_alias",
+      "input": "Esramustine",
+      "status": "missing",
+      "matched_name": null,
+      "reason": "no_match",
+      "confidence": null,
+      "candidate_names": [],
+      "success": false
+    },
+    {
+      "drug_id": 1147,
+      "canonical": "allopurinol",
+      "has_livertox_excerpt": true,
+      "input_type": "canonical",
+      "input": "allopurinol",
+      "status": "matched",
+      "matched_name": "allopurinol",
+      "reason": "exact_canonical",
+      "confidence": 1.0,
+      "candidate_names": [
+        "allopurinol"
+      ],
+      "success": true
+    },
+    {
+      "drug_id": 1147,
+      "canonical": "allopurinol",
+      "has_livertox_excerpt": true,
+      "input_type": "real_alias",
+      "input": "Aloprim",
+      "status": "matched",
+      "matched_name": "allopurinol",
+      "reason": "exact_alias",
+      "confidence": 0.92,
+      "candidate_names": [
+        "allopurinol"
+      ],
+      "success": true
+    },
+    {
+      "drug_id": 1147,
+      "canonical": "allopurinol",
+      "has_livertox_excerpt": true,
+      "input_type": "malformed_alias",
+      "input": "Alprim",
+      "status": "matched",
+      "matched_name": "allopurinol",
+      "reason": "fuzzy",
+      "confidence": 0.92,
+      "candidate_names": [
+        "allopurinol"
+      ],
+      "success": true
+    },
+    {
+      "drug_id": 5311,
+      "canonical": "Aloe Vera",
+      "has_livertox_excerpt": true,
+      "input_type": "canonical",
+      "input": "Aloe Vera",
+      "status": "matched",
+      "matched_name": "Aloe Vera",
+      "reason": "exact_canonical",
+      "confidence": 1.0,
+      "candidate_names": [
+        "Aloe Vera"
+      ],
+      "success": true
+    },
+    {
+      "drug_id": 5311,
+      "canonical": "Aloe Vera",
+      "has_livertox_excerpt": true,
+      "input_type": "real_alias",
+      "input": "Alcortin",
+      "status": "matched",
+      "matched_name": "Aloe Vera",
+      "reason": "exact_alias",
+      "confidence": 0.92,
+      "candidate_names": [
+        "Aloe Vera"
+      ],
+      "success": true
+    },
+    {
+      "drug_id": 5311,
+      "canonical": "Aloe Vera",
+      "has_livertox_excerpt": true,
+      "input_type": "malformed_alias",
+      "input": "Alortin",
+      "status": "missing",
+      "matched_name": null,
+      "reason": "no_match",
+      "confidence": null,
+      "candidate_names": [],
+      "success": false
+    },
+    {
+      "drug_id": 1132,
+      "canonical": "alogliptin",
+      "has_livertox_excerpt": true,
+      "input_type": "canonical",
+      "input": "alogliptin",
+      "status": "matched",
+      "matched_name": "alogliptin",
+      "reason": "exact_canonical",
+      "confidence": 1.0,
+      "candidate_names": [
+        "alogliptin"
+      ],
+      "success": true
+    },
+    {
+      "drug_id": 1132,
+      "canonical": "alogliptin",
+      "has_livertox_excerpt": true,
+      "input_type": "real_alias",
+      "input": "Alogliptin Benzoate",
+      "status": "ambiguous",
+      "matched_name": null,
+      "reason": "ambiguous_exact_alias",
+      "confidence": null,
+      "candidate_names": [
+        "alogliptin",
+        "metformin",
+        "pioglitazone"
+      ],
+      "success": false
+    },
+    {
+      "drug_id": 1132,
+      "canonical": "alogliptin",
+      "has_livertox_excerpt": true,
+      "input_type": "malformed_alias",
+      "input": "AlgliptinBenzoate",
+      "status": "ambiguous",
+      "matched_name": null,
+      "reason": "ambiguous_fuzzy",
+      "confidence": null,
+      "candidate_names": [
+        "alogliptin",
+        "metformin",
+        "pioglitazone"
+      ],
+      "success": false
+    },
+    {
+      "drug_id": 1150,
+      "canonical": "alpelisib",
+      "has_livertox_excerpt": true,
+      "input_type": "canonical",
+      "input": "alpelisib",
+      "status": "matched",
+      "matched_name": "alpelisib",
+      "reason": "exact_canonical",
+      "confidence": 1.0,
+      "candidate_names": [
+        "alpelisib"
+      ],
+      "success": true
+    },
+    {
+      "drug_id": 1150,
+      "canonical": "alpelisib",
+      "has_livertox_excerpt": true,
+      "input_type": "real_alias",
+      "input": "Daily",
+      "status": "ambiguous",
+      "matched_name": null,
+      "reason": "ambiguous_exact_alias",
+      "confidence": null,
+      "candidate_names": [
+        "alpelisib",
+        "amantadine",
+        "cabozantinib",
+        "futibatinib",
+        "infigratinib",
+        "lenvatinib",
+        "letrozole",
+        "ribociclib",
+        "ritonavir",
+        "tobramycin"
+      ],
+      "success": false
+    },
+    {
+      "drug_id": 1150,
+      "canonical": "alpelisib",
+      "has_livertox_excerpt": true,
+      "input_type": "malformed_alias",
+      "input": "Daliy",
+      "status": "missing",
+      "matched_name": null,
+      "reason": "no_match",
+      "confidence": null,
+      "candidate_names": [],
+      "success": false
+    },
+    {
+      "drug_id": 755,
+      "canonical": "alprazolam",
+      "has_livertox_excerpt": true,
+      "input_type": "canonical",
+      "input": "alprazolam",
+      "status": "matched",
+      "matched_name": "alprazolam",
+      "reason": "exact_canonical",
+      "confidence": 1.0,
+      "candidate_names": [
+        "alprazolam"
+      ],
+      "success": true
+    },
+    {
+      "drug_id": 755,
+      "canonical": "alprazolam",
+      "has_livertox_excerpt": true,
+      "input_type": "real_alias",
+      "input": "24 HR alprazolam 0.5 MG Extended Release Oral Tablet",
+      "status": "matched",
+      "matched_name": "alprazolam",
+      "reason": "fuzzy",
+      "confidence": 0.87,
+      "candidate_names": [
+        "alprazolam"
+      ],
+      "success": true
+    },
+    {
+      "drug_id": 755,
+      "canonical": "alprazolam",
+      "has_livertox_excerpt": true,
+      "input_type": "malformed_alias",
+      "input": "24Ralprazolam0.5MGExtendedReleaseOralTablet",
+      "status": "missing",
+      "matched_name": null,
+      "reason": "no_match",
+      "confidence": null,
+      "candidate_names": [],
+      "success": false
+    },
+    {
+      "drug_id": 5317,
+      "canonical": "Altretamine",
+      "has_livertox_excerpt": true,
+      "input_type": "canonical",
+      "input": "Altretamine",
+      "status": "matched",
+      "matched_name": "Altretamine",
+      "reason": "exact_canonical",
+      "confidence": 1.0,
+      "candidate_names": [
+        "Altretamine"
+      ],
+      "success": true
+    },
+    {
+      "drug_id": 5317,
+      "canonical": "Altretamine",
+      "has_livertox_excerpt": true,
+      "input_type": "real_alias",
+      "input": "Hexalen",
+      "status": "matched",
+      "matched_name": "Altretamine",
+      "reason": "exact_alias",
+      "confidence": 0.92,
+      "candidate_names": [
+        "Altretamine"
+      ],
+      "success": true
+    },
+    {
+      "drug_id": 5317,
+      "canonical": "Altretamine",
+      "has_livertox_excerpt": true,
+      "input_type": "malformed_alias",
+      "input": "Healen",
+      "status": "missing",
+      "matched_name": null,
+      "reason": "no_match",
+      "confidence": null,
+      "candidate_names": [],
+      "success": false
+    },
+    {
+      "drug_id": 744,
+      "canonical": "amantadine",
+      "has_livertox_excerpt": true,
+      "input_type": "canonical",
+      "input": "amantadine",
+      "status": "matched",
+      "matched_name": "amantadine",
+      "reason": "exact_canonical",
+      "confidence": 1.0,
+      "candidate_names": [
+        "amantadine"
+      ],
+      "success": true
+    },
+    {
+      "drug_id": 744,
+      "canonical": "amantadine",
+      "has_livertox_excerpt": true,
+      "input_type": "real_alias",
+      "input": "24 HR amantadine 137 MG Extended Release Oral Capsule",
+      "status": "matched",
+      "matched_name": "amantadine",
+      "reason": "fuzzy",
+      "confidence": 0.87,
+      "candidate_names": [
+        "amantadine"
+      ],
+      "success": true
+    },
+    {
+      "drug_id": 744,
+      "canonical": "amantadine",
+      "has_livertox_excerpt": true,
+      "input_type": "malformed_alias",
+      "input": "24Ramantadine137MGExtendedReleaseOralCapsule",
+      "status": "missing",
+      "matched_name": null,
+      "reason": "no_match",
+      "confidence": null,
+      "candidate_names": [],
+      "success": false
+    },
+    {
+      "drug_id": 1207,
+      "canonical": "ambrisentan",
+      "has_livertox_excerpt": true,
+      "input_type": "canonical",
+      "input": "ambrisentan",
+      "status": "matched",
+      "matched_name": "ambrisentan",
+      "reason": "exact_canonical",
+      "confidence": 1.0,
+      "candidate_names": [
+        "ambrisentan"
+      ],
+      "success": true
+    },
+    {
+      "drug_id": 1207,
+      "canonical": "ambrisentan",
+      "has_livertox_excerpt": true,
+      "input_type": "real_alias",
+      "input": "Letairis",
+      "status": "matched",
+      "matched_name": "ambrisentan",
+      "reason": "exact_alias",
+      "confidence": 0.92,
+      "candidate_names": [
+        "ambrisentan"
+      ],
+      "success": true
+    },
+    {
+      "drug_id": 1207,
+      "canonical": "ambrisentan",
+      "has_livertox_excerpt": true,
+      "input_type": "malformed_alias",
+      "input": "Leairis",
+      "status": "matched",
+      "matched_name": "ambrisentan",
+      "reason": "fuzzy",
+      "confidence": 0.93,
+      "candidate_names": [
+        "ambrisentan"
+      ],
+      "success": true
+    },
+    {
+      "drug_id": 5319,
+      "canonical": "Amide Local Anesthetics",
+      "has_livertox_excerpt": true,
+      "input_type": "canonical",
+      "input": "Amide Local Anesthetics",
+      "status": "matched",
+      "matched_name": "Amide Local Anesthetics",
+      "reason": "exact_canonical",
+      "confidence": 1.0,
+      "candidate_names": [
+        "Amide Local Anesthetics"
+      ],
+      "success": true
+    },
+    {
+      "drug_id": 5319,
+      "canonical": "Amide Local Anesthetics",
+      "has_livertox_excerpt": true,
+      "input_type": "real_alias",
+      "input": "Artecaine",
+      "status": "matched",
+      "matched_name": "Amide Local Anesthetics",
+      "reason": "exact_alias",
+      "confidence": 0.92,
+      "candidate_names": [
+        "Amide Local Anesthetics"
+      ],
+      "success": true
+    },
+    {
+      "drug_id": 5319,
+      "canonical": "Amide Local Anesthetics",
+      "has_livertox_excerpt": true,
+      "input_type": "malformed_alias",
+      "input": "Arecaine",
+      "status": "missing",
+      "matched_name": null,
+      "reason": "no_match",
+      "confidence": null,
+      "candidate_names": [],
+      "success": false
+    },
+    {
+      "drug_id": 1194,
+      "canonical": "amifampridine",
+      "has_livertox_excerpt": true,
+      "input_type": "canonical",
+      "input": "amifampridine",
+      "status": "matched",
+      "matched_name": "amifampridine",
+      "reason": "exact_canonical",
+      "confidence": 1.0,
+      "candidate_names": [
+        "amifampridine"
+      ],
+      "success": true
+    },
+    {
+      "drug_id": 1194,
+      "canonical": "amifampridine",
+      "has_livertox_excerpt": true,
+      "input_type": "real_alias",
+      "input": "Firdapse",
+      "status": "matched",
+      "matched_name": "amifampridine",
+      "reason": "exact_alias",
+      "confidence": 0.92,
+      "candidate_names": [
+        "amifampridine"
+      ],
+      "success": true
+    },
+    {
+      "drug_id": 1194,
+      "canonical": "amifampridine",
+      "has_livertox_excerpt": true,
+      "input_type": "malformed_alias",
+      "input": "Fidapse",
+      "status": "matched",
+      "matched_name": "amifampridine",
+      "reason": "fuzzy",
+      "confidence": 0.93,
+      "candidate_names": [
+        "amifampridine"
+      ],
+      "success": true
+    },
+    {
+      "drug_id": 616,
+      "canonical": "amikacin",
+      "has_livertox_excerpt": true,
+      "input_type": "canonical",
+      "input": "amikacin",
+      "status": "matched",
+      "matched_name": "amikacin",
+      "reason": "exact_canonical",
+      "confidence": 1.0,
+      "candidate_names": [
+        "amikacin"
+      ],
+      "success": true
+    },
+    {
+      "drug_id": 616,
+      "canonical": "amikacin",
+      "has_livertox_excerpt": true,
+      "input_type": "real_alias",
+      "input": "Amikacin Liposomal",
+      "status": "matched",
+      "matched_name": "amikacin",
+      "reason": "exact_alias",
+      "confidence": 0.9,
+      "candidate_names": [
+        "amikacin"
+      ],
+      "success": true
+    },
+    {
+      "drug_id": 616,
+      "canonical": "amikacin",
+      "has_livertox_excerpt": true,
+      "input_type": "malformed_alias",
+      "input": "AmkacinLiposomal",
+      "status": "matched",
+      "matched_name": "amikacin",
+      "reason": "fuzzy",
+      "confidence": 0.94,
+      "candidate_names": [
+        "amikacin"
+      ],
+      "success": true
+    },
+    {
+      "drug_id": 1221,
+      "canonical": "amiloride",
+      "has_livertox_excerpt": true,
+      "input_type": "canonical",
+      "input": "amiloride",
+      "status": "matched",
+      "matched_name": "amiloride",
+      "reason": "exact_canonical",
+      "confidence": 1.0,
+      "candidate_names": [
+        "amiloride"
+      ],
+      "success": true
+    },
+    {
+      "drug_id": 1221,
+      "canonical": "amiloride",
+      "has_livertox_excerpt": true,
+      "input_type": "real_alias",
+      "input": "Atenolol",
+      "status": "matched",
+      "matched_name": "atenolol",
+      "reason": "exact_canonical",
+      "confidence": 1.0,
+      "candidate_names": [
+        "atenolol"
+      ],
+      "success": false
+    },
+    {
+      "drug_id": 1221,
+      "canonical": "amiloride",
+      "has_livertox_excerpt": true,
+      "input_type": "malformed_alias",
+      "input": "Atnolol",
+      "status": "ambiguous",
+      "matched_name": null,
+      "reason": "ambiguous_fuzzy",
+      "confidence": null,
+      "candidate_names": [
+        "amiloride",
+        "atenolol",
+        "nifedipine"
+      ],
+      "success": false
+    },
+    {
+      "drug_id": 484,
+      "canonical": "amiodarone",
+      "has_livertox_excerpt": true,
+      "input_type": "canonical",
+      "input": "amiodarone",
+      "status": "matched",
+      "matched_name": "amiodarone",
+      "reason": "exact_canonical",
+      "confidence": 1.0,
+      "candidate_names": [
+        "amiodarone"
+      ],
+      "success": true
+    },
+    {
+      "drug_id": 484,
+      "canonical": "amiodarone",
+      "has_livertox_excerpt": true,
+      "input_type": "real_alias",
+      "input": "Cordarone",
+      "status": "matched",
+      "matched_name": "amiodarone",
+      "reason": "exact_alias",
+      "confidence": 0.92,
+      "candidate_names": [
+        "amiodarone"
+      ],
+      "success": true
+    },
+    {
+      "drug_id": 484,
+      "canonical": "amiodarone",
+      "has_livertox_excerpt": true,
+      "input_type": "malformed_alias",
+      "input": "Codarone",
+      "status": "matched",
+      "matched_name": "amiodarone",
+      "reason": "fuzzy",
+      "confidence": 0.94,
+      "candidate_names": [
+        "amiodarone"
+      ],
+      "success": true
+    },
+    {
+      "drug_id": 629,
+      "canonical": "amisulpride",
+      "has_livertox_excerpt": true,
+      "input_type": "canonical",
+      "input": "amisulpride",
+      "status": "matched",
+      "matched_name": "amisulpride",
+      "reason": "exact_canonical",
+      "confidence": 1.0,
+      "candidate_names": [
+        "amisulpride"
+      ],
+      "success": true
+    },
+    {
+      "drug_id": 629,
+      "canonical": "amisulpride",
+      "has_livertox_excerpt": true,
+      "input_type": "real_alias",
+      "input": "Barhemsys",
+      "status": "matched",
+      "matched_name": "amisulpride",
+      "reason": "exact_alias",
+      "confidence": 0.92,
+      "candidate_names": [
+        "amisulpride"
+      ],
+      "success": true
+    },
+    {
+      "drug_id": 629,
+      "canonical": "amisulpride",
+      "has_livertox_excerpt": true,
+      "input_type": "malformed_alias",
+      "input": "Bahemsys",
+      "status": "matched",
+      "matched_name": "amisulpride",
+      "reason": "fuzzy",
+      "confidence": 0.94,
+      "candidate_names": [
+        "amisulpride"
+      ],
+      "success": true
+    },
+    {
+      "drug_id": 1215,
+      "canonical": "amitriptyline",
+      "has_livertox_excerpt": true,
+      "input_type": "canonical",
+      "input": "amitriptyline",
+      "status": "matched",
+      "matched_name": "amitriptyline",
+      "reason": "exact_canonical",
+      "confidence": 1.0,
+      "candidate_names": [
+        "amitriptyline"
+      ],
+      "success": true
+    },
+    {
+      "drug_id": 1215,
+      "canonical": "amitriptyline",
+      "has_livertox_excerpt": true,
+      "input_type": "real_alias",
+      "input": "Chlordiazepoxide",
+      "status": "matched",
+      "matched_name": "chlordiazepoxide",
+      "reason": "exact_canonical",
+      "confidence": 1.0,
+      "candidate_names": [
+        "chlordiazepoxide"
+      ],
+      "success": false
+    },
+    {
+      "drug_id": 1215,
+      "canonical": "amitriptyline",
+      "has_livertox_excerpt": true,
+      "input_type": "malformed_alias",
+      "input": "Chordiazepoxide",
+      "status": "ambiguous",
+      "matched_name": null,
+      "reason": "ambiguous_fuzzy",
+      "confidence": null,
+      "candidate_names": [
+        "amitriptyline",
+        "chlordiazepoxide"
+      ],
+      "success": false
+    },
+    {
+      "drug_id": 5321,
+      "canonical": "Amivantamab",
+      "has_livertox_excerpt": true,
+      "input_type": "canonical",
+      "input": "Amivantamab",
+      "status": "matched",
+      "matched_name": "Amivantamab",
+      "reason": "exact_canonical",
+      "confidence": 1.0,
+      "candidate_names": [
+        "Amivantamab"
+      ],
+      "success": true
+    },
+    {
+      "drug_id": 5321,
+      "canonical": "Amivantamab",
+      "has_livertox_excerpt": true,
+      "input_type": "real_alias",
+      "input": "Rybrevant",
+      "status": "matched",
+      "matched_name": "Amivantamab",
+      "reason": "exact_alias",
+      "confidence": 0.92,
+      "candidate_names": [
+        "Amivantamab"
+      ],
+      "success": true
+    },
+    {
+      "drug_id": 5321,
+      "canonical": "Amivantamab",
+      "has_livertox_excerpt": true,
+      "input_type": "malformed_alias",
+      "input": "Ryrevant",
+      "status": "missing",
+      "matched_name": null,
+      "reason": "no_match",
+      "confidence": null,
+      "candidate_names": [],
+      "success": false
+    },
+    {
+      "drug_id": 1196,
+      "canonical": "amlodipine",
+      "has_livertox_excerpt": true,
+      "input_type": "canonical",
+      "input": "amlodipine",
+      "status": "matched",
+      "matched_name": "amlodipine",
+      "reason": "exact_canonical",
+      "confidence": 1.0,
+      "candidate_names": [
+        "amlodipine"
+      ],
+      "success": true
+    },
+    {
+      "drug_id": 1196,
+      "canonical": "amlodipine",
+      "has_livertox_excerpt": true,
+      "input_type": "real_alias",
+      "input": "Norvasc",
+      "status": "matched",
+      "matched_name": "amlodipine",
+      "reason": "exact_alias",
+      "confidence": 0.92,
+      "candidate_names": [
+        "amlodipine"
+      ],
+      "success": true
+    },
+    {
+      "drug_id": 1196,
+      "canonical": "amlodipine",
+      "has_livertox_excerpt": true,
+      "input_type": "malformed_alias",
+      "input": "Novasc",
+      "status": "matched",
+      "matched_name": "amlodipine",
+      "reason": "fuzzy",
+      "confidence": 0.92,
+      "candidate_names": [
+        "amlodipine"
+      ],
+      "success": true
+    },
+    {
+      "drug_id": 5322,
+      "canonical": "Amodiaquine",
+      "has_livertox_excerpt": true,
+      "input_type": "canonical",
+      "input": "Amodiaquine",
+      "status": "matched",
+      "matched_name": "Amodiaquine",
+      "reason": "exact_canonical",
+      "confidence": 1.0,
+      "candidate_names": [
+        "Amodiaquine"
+      ],
+      "success": true
+    },
+    {
+      "drug_id": 5322,
+      "canonical": "Amodiaquine",
+      "has_livertox_excerpt": true,
+      "input_type": "real_alias",
+      "input": "Camoquine",
+      "status": "matched",
+      "matched_name": "Amodiaquine",
+      "reason": "exact_alias",
+      "confidence": 0.92,
+      "candidate_names": [
+        "Amodiaquine"
+      ],
+      "success": true
+    },
+    {
+      "drug_id": 5322,
+      "canonical": "Amodiaquine",
+      "has_livertox_excerpt": true,
+      "input_type": "malformed_alias",
+      "input": "Caoquine",
+      "status": "missing",
+      "matched_name": null,
+      "reason": "no_match",
+      "confidence": null,
+      "candidate_names": [],
+      "success": false
+    },
+    {
+      "drug_id": 1235,
+      "canonical": "amoxapine",
+      "has_livertox_excerpt": true,
+      "input_type": "canonical",
+      "input": "amoxapine",
+      "status": "matched",
+      "matched_name": "amoxapine",
+      "reason": "exact_canonical",
+      "confidence": 1.0,
+      "candidate_names": [
+        "amoxapine"
+      ],
+      "success": true
+    },
+    {
+      "drug_id": 1235,
+      "canonical": "amoxapine",
+      "has_livertox_excerpt": true,
+      "input_type": "real_alias",
+      "input": "Asendin",
+      "status": "matched",
+      "matched_name": "amoxapine",
+      "reason": "exact_alias",
+      "confidence": 0.92,
+      "candidate_names": [
+        "amoxapine"
+      ],
+      "success": true
+    },
+    {
+      "drug_id": 1235,
+      "canonical": "amoxapine",
+      "has_livertox_excerpt": true,
+      "input_type": "malformed_alias",
+      "input": "Asndin",
+      "status": "missing",
+      "matched_name": null,
+      "reason": "no_match",
+      "confidence": null,
+      "candidate_names": [],
+      "success": false
+    },
+    {
+      "drug_id": 1240,
+      "canonical": "amoxicillin",
+      "has_livertox_excerpt": true,
+      "input_type": "canonical",
+      "input": "amoxicillin",
+      "status": "matched",
+      "matched_name": "amoxicillin",
+      "reason": "exact_canonical",
+      "confidence": 1.0,
+      "candidate_names": [
+        "amoxicillin"
+      ],
+      "success": true
+    },
+    {
+      "drug_id": 1240,
+      "canonical": "amoxicillin",
+      "has_livertox_excerpt": true,
+      "input_type": "real_alias",
+      "input": "Amoxi Drop",
+      "status": "matched",
+      "matched_name": "amoxicillin",
+      "reason": "exact_alias",
+      "confidence": 0.9,
+      "candidate_names": [
+        "amoxicillin"
+      ],
+      "success": true
+    },
+    {
+      "drug_id": 1240,
+      "canonical": "amoxicillin",
+      "has_livertox_excerpt": true,
+      "input_type": "malformed_alias",
+      "input": "AmxiDrop",
+      "status": "matched",
+      "matched_name": "amoxicillin",
+      "reason": "fuzzy",
+      "confidence": 0.89,
+      "candidate_names": [
+        "amoxicillin"
+      ],
+      "success": true
+    },
+    {
+      "drug_id": 543,
+      "canonical": "amoxicillin clavulanate",
+      "has_livertox_excerpt": true,
+      "input_type": "canonical",
+      "input": "amoxicillin clavulanate",
+      "status": "matched",
+      "matched_name": "amoxicillin clavulanate",
+      "reason": "exact_canonical",
+      "confidence": 1.0,
+      "candidate_names": [
+        "amoxicillin clavulanate"
+      ],
+      "success": true
+    },
+    {
+      "drug_id": 543,
+      "canonical": "amoxicillin clavulanate",
+      "has_livertox_excerpt": true,
+      "input_type": "real_alias",
+      "input": "12 HR amoxicillin 1000 MG / clavulanate 62.5 MG Extended Release Oral Tablet",
+      "status": "matched",
+      "matched_name": "amoxicillin clavulanate",
+      "reason": "fuzzy",
+      "confidence": 0.94,
+      "candidate_names": [
+        "amoxicillin clavulanate"
+      ],
+      "success": true
+    },
+    {
+      "drug_id": 543,
+      "canonical": "amoxicillin clavulanate",
+      "has_livertox_excerpt": true,
+      "input_type": "malformed_alias",
+      "input": "12Ramoxicillin1000MG/clavulanate62.5MGExtendedReleaseOralTablet",
+      "status": "missing",
+      "matched_name": null,
+      "reason": "no_match",
+      "confidence": null,
+      "candidate_names": [],
+      "success": false
+    },
+    {
+      "drug_id": 5323,
+      "canonical": "Amphetamines",
+      "has_livertox_excerpt": true,
+      "input_type": "canonical",
+      "input": "Amphetamines",
+      "status": "matched",
+      "matched_name": "Amphetamines",
+      "reason": "exact_canonical",
+      "confidence": 1.0,
+      "candidate_names": [
+        "Amphetamines"
+      ],
+      "success": true
+    },
+    {
+      "drug_id": 5323,
+      "canonical": "Amphetamines",
+      "has_livertox_excerpt": true,
+      "input_type": "real_alias",
+      "input": "Lisdexamfetamine",
+      "status": "matched",
+      "matched_name": "Amphetamines",
+      "reason": "exact_alias",
+      "confidence": 0.92,
+      "candidate_names": [
+        "Amphetamines"
+      ],
+      "success": true
+    },
+    {
+      "drug_id": 5323,
+      "canonical": "Amphetamines",
+      "has_livertox_excerpt": true,
+      "input_type": "malformed_alias",
+      "input": "Lidexamfetamine",
+      "status": "missing",
+      "matched_name": null,
+      "reason": "no_match",
+      "confidence": null,
+      "candidate_names": [],
+      "success": false
+    },
+    {
+      "drug_id": 1232,
+      "canonical": "ampicillin",
+      "has_livertox_excerpt": true,
+      "input_type": "canonical",
+      "input": "ampicillin",
+      "status": "matched",
+      "matched_name": "ampicillin",
+      "reason": "exact_canonical",
+      "confidence": 1.0,
+      "candidate_names": [
+        "ampicillin"
+      ],
+      "success": true
+    },
+    {
+      "drug_id": 1232,
+      "canonical": "ampicillin",
+      "has_livertox_excerpt": true,
+      "input_type": "real_alias",
+      "input": "Ampicillin Sulbactam",
+      "status": "matched",
+      "matched_name": "ampicillin sulbactam",
+      "reason": "exact_canonical",
+      "confidence": 1.0,
+      "candidate_names": [
+        "ampicillin sulbactam"
+      ],
+      "success": false
+    },
+    {
+      "drug_id": 1232,
+      "canonical": "ampicillin",
+      "has_livertox_excerpt": true,
+      "input_type": "malformed_alias",
+      "input": "AmicillinSulbactam",
+      "status": "ambiguous",
+      "matched_name": null,
+      "reason": "ambiguous_fuzzy",
+      "confidence": null,
+      "candidate_names": [
+        "ampicillin",
+        "ampicillin sulbactam"
+      ],
+      "success": false
+    },
+    {
+      "drug_id": 1231,
+      "canonical": "ampicillin sulbactam",
+      "has_livertox_excerpt": true,
+      "input_type": "canonical",
+      "input": "ampicillin sulbactam",
+      "status": "matched",
+      "matched_name": "ampicillin sulbactam",
+      "reason": "exact_canonical",
+      "confidence": 1.0,
+      "candidate_names": [
+        "ampicillin sulbactam"
+      ],
+      "success": true
+    },
+    {
+      "drug_id": 1231,
+      "canonical": "ampicillin sulbactam",
+      "has_livertox_excerpt": true,
+      "input_type": "real_alias",
+      "input": "Ampicillin",
+      "status": "matched",
+      "matched_name": "ampicillin",
+      "reason": "exact_canonical",
+      "confidence": 1.0,
+      "candidate_names": [
+        "ampicillin"
+      ],
+      "success": false
+    },
+    {
+      "drug_id": 1231,
+      "canonical": "ampicillin sulbactam",
+      "has_livertox_excerpt": true,
+      "input_type": "malformed_alias",
+      "input": "Amicillin",
+      "status": "ambiguous",
+      "matched_name": null,
+      "reason": "ambiguous_fuzzy",
+      "confidence": null,
+      "candidate_names": [
+        "amoxicillin",
+        "amoxicillin clavulanate",
+        "ampicillin",
+        "ampicillin sulbactam",
+        "clarithromycin",
+        "lansoprazole",
+        "omeprazole",
+        "rifabutin",
+        "vonoprazan"
+      ],
+      "success": false
+    },
+    {
+      "drug_id": 1245,
+      "canonical": "anagrelide",
+      "has_livertox_excerpt": true,
+      "input_type": "canonical",
+      "input": "anagrelide",
+      "status": "matched",
+      "matched_name": "anagrelide",
+      "reason": "exact_canonical",
+      "confidence": 1.0,
+      "candidate_names": [
+        "anagrelide"
+      ],
+      "success": true
+    },
+    {
+      "drug_id": 1245,
+      "canonical": "anagrelide",
+      "has_livertox_excerpt": true,
+      "input_type": "real_alias",
+      "input": "Agrylin",
+      "status": "matched",
+      "matched_name": "anagrelide",
+      "reason": "exact_alias",
+      "confidence": 0.92,
+      "candidate_names": [
+        "anagrelide"
+      ],
+      "success": true
+    },
+    {
+      "drug_id": 1245,
+      "canonical": "anagrelide",
+      "has_livertox_excerpt": true,
+      "input_type": "malformed_alias",
+      "input": "Agylin",
+      "status": "matched",
+      "matched_name": "anagrelide",
+      "reason": "fuzzy",
+      "confidence": 0.92,
+      "candidate_names": [
+        "anagrelide"
+      ],
+      "success": true
+    },
+    {
+      "drug_id": 186,
+      "canonical": "anakinra",
+      "has_livertox_excerpt": true,
+      "input_type": "canonical",
+      "input": "anakinra",
+      "status": "matched",
+      "matched_name": "anakinra",
+      "reason": "exact_canonical",
+      "confidence": 1.0,
+      "candidate_names": [
+        "anakinra"
+      ],
+      "success": true
+    },
+    {
+      "drug_id": 186,
+      "canonical": "anakinra",
+      "has_livertox_excerpt": true,
+      "input_type": "real_alias",
+      "input": "Kineret",
+      "status": "matched",
+      "matched_name": "anakinra",
+      "reason": "exact_alias",
+      "confidence": 0.92,
+      "candidate_names": [
+        "anakinra"
+      ],
+      "success": true
+    },
+    {
+      "drug_id": 186,
+      "canonical": "anakinra",
+      "has_livertox_excerpt": true,
+      "input_type": "malformed_alias",
+      "input": "Kieret",
+      "status": "matched",
+      "matched_name": "anakinra",
+      "reason": "fuzzy",
+      "confidence": 0.92,
+      "candidate_names": [
+        "anakinra"
+      ],
+      "success": true
+    },
+    {
+      "drug_id": 1229,
+      "canonical": "anastrozole",
+      "has_livertox_excerpt": true,
+      "input_type": "canonical",
+      "input": "anastrozole",
+      "status": "matched",
+      "matched_name": "anastrozole",
+      "reason": "exact_canonical",
+      "confidence": 1.0,
+      "candidate_names": [
+        "anastrozole"
+      ],
+      "success": true
+    },
+    {
+      "drug_id": 1229,
+      "canonical": "anastrozole",
+      "has_livertox_excerpt": true,
+      "input_type": "real_alias",
+      "input": "Arimidex",
+      "status": "matched",
+      "matched_name": "anastrozole",
+      "reason": "exact_alias",
+      "confidence": 0.92,
+      "candidate_names": [
+        "anastrozole"
+      ],
+      "success": true
+    },
+    {
+      "drug_id": 1229,
+      "canonical": "anastrozole",
+      "has_livertox_excerpt": true,
+      "input_type": "malformed_alias",
+      "input": "Armidex",
+      "status": "matched",
+      "matched_name": "anastrozole",
+      "reason": "fuzzy",
+      "confidence": 0.93,
+      "candidate_names": [
+        "anastrozole"
+      ],
+      "success": true
+    },
+    {
+      "drug_id": 5325,
+      "canonical": "Androgenic steroids",
+      "has_livertox_excerpt": true,
+      "input_type": "canonical",
+      "input": "Androgenic steroids",
+      "status": "matched",
+      "matched_name": "Androgenic steroids",
+      "reason": "exact_canonical",
+      "confidence": 1.0,
+      "candidate_names": [
+        "Androgenic steroids"
+      ],
+      "success": true
+    },
+    {
+      "drug_id": 5325,
+      "canonical": "Androgenic steroids",
+      "has_livertox_excerpt": true,
+      "input_type": "real_alias",
+      "input": "Group name",
+      "status": "ambiguous",
+      "matched_name": null,
+      "reason": "ambiguous_exact_alias",
+      "confidence": null,
+      "candidate_names": [
+        "Androgenic steroids",
+        "Estrogens",
+        "Progestins"
+      ],
+      "success": false
+    },
+    {
+      "drug_id": 5325,
+      "canonical": "Androgenic steroids",
+      "has_livertox_excerpt": true,
+      "input_type": "malformed_alias",
+      "input": "Grupname",
+      "status": "missing",
+      "matched_name": null,
+      "reason": "no_match",
+      "confidence": null,
+      "candidate_names": [],
+      "success": false
+    },
+    {
+      "drug_id": 5327,
+      "canonical": "Anesthetics, General",
+      "has_livertox_excerpt": true,
+      "input_type": "canonical",
+      "input": "Anesthetics, General",
+      "status": "matched",
+      "matched_name": "Anesthetics, General",
+      "reason": "exact_canonical",
+      "confidence": 1.0,
+      "candidate_names": [
+        "Anesthetics, General"
+      ],
+      "success": true
+    },
+    {
+      "drug_id": 5327,
+      "canonical": "Anesthetics, General",
+      "has_livertox_excerpt": true,
+      "input_type": "real_alias",
+      "input": "Thiopental",
+      "status": "matched",
+      "matched_name": "Anesthetics, General",
+      "reason": "exact_alias",
+      "confidence": 0.92,
+      "candidate_names": [
+        "Anesthetics, General"
+      ],
+      "success": true
+    },
+    {
+      "drug_id": 5327,
+      "canonical": "Anesthetics, General",
+      "has_livertox_excerpt": true,
+      "input_type": "malformed_alias",
+      "input": "Thopental",
+      "status": "missing",
+      "matched_name": null,
+      "reason": "no_match",
+      "confidence": null,
+      "candidate_names": [],
+      "success": false
+    },
+    {
+      "drug_id": 5330,
+      "canonical": "Anifrolumab",
+      "has_livertox_excerpt": true,
+      "input_type": "canonical",
+      "input": "Anifrolumab",
+      "status": "matched",
+      "matched_name": "Anifrolumab",
+      "reason": "exact_canonical",
+      "confidence": 1.0,
+      "candidate_names": [
+        "Anifrolumab"
+      ],
+      "success": true
+    },
+    {
+      "drug_id": 5330,
+      "canonical": "Anifrolumab",
+      "has_livertox_excerpt": true,
+      "input_type": "real_alias",
+      "input": "Saphnelo",
+      "status": "matched",
+      "matched_name": "Anifrolumab",
+      "reason": "exact_alias",
+      "confidence": 0.92,
+      "candidate_names": [
+        "Anifrolumab"
+      ],
+      "success": true
+    },
+    {
+      "drug_id": 5330,
+      "canonical": "Anifrolumab",
+      "has_livertox_excerpt": true,
+      "input_type": "malformed_alias",
+      "input": "Sahnelo",
+      "status": "missing",
+      "matched_name": null,
+      "reason": "no_match",
+      "confidence": null,
+      "candidate_names": [],
+      "success": false
+    },
+    {
+      "drug_id": 5332,
+      "canonical": "Anthrax Antitoxins",
+      "has_livertox_excerpt": true,
+      "input_type": "canonical",
+      "input": "Anthrax Antitoxins",
+      "status": "matched",
+      "matched_name": "Anthrax Antitoxins",
+      "reason": "exact_canonical",
+      "confidence": 1.0,
+      "candidate_names": [
+        "Anthrax Antitoxins"
+      ],
+      "success": true
+    },
+    {
+      "drug_id": 5332,
+      "canonical": "Anthrax Antitoxins",
+      "has_livertox_excerpt": true,
+      "input_type": "real_alias",
+      "input": "Obiltoxaximab",
+      "status": "matched",
+      "matched_name": "Anthrax Antitoxins",
+      "reason": "exact_alias",
+      "confidence": 0.92,
+      "candidate_names": [
+        "Anthrax Antitoxins"
+      ],
+      "success": true
+    },
+    {
+      "drug_id": 5332,
+      "canonical": "Anthrax Antitoxins",
+      "has_livertox_excerpt": true,
+      "input_type": "malformed_alias",
+      "input": "Obltoxaximab",
+      "status": "missing",
+      "matched_name": null,
+      "reason": "no_match",
+      "confidence": null,
+      "candidate_names": [],
+      "success": false
+    },
+    {
+      "drug_id": 5335,
+      "canonical": "Antiasthmatic Agents",
+      "has_livertox_excerpt": true,
+      "input_type": "canonical",
+      "input": "Antiasthmatic Agents",
+      "status": "matched",
+      "matched_name": "Antiasthmatic Agents",
+      "reason": "exact_canonical",
+      "confidence": 1.0,
+      "candidate_names": [
+        "Antiasthmatic Agents"
+      ],
+      "success": true
+    },
+    {
+      "drug_id": 5335,
+      "canonical": "Antiasthmatic Agents",
+      "has_livertox_excerpt": true,
+      "input_type": "real_alias",
+      "input": "Cromolyn",
+      "status": "matched",
+      "matched_name": "Antiasthmatic Agents",
+      "reason": "exact_alias",
+      "confidence": 0.92,
+      "candidate_names": [
+        "Antiasthmatic Agents"
+      ],
+      "success": true
+    },
+    {
+      "drug_id": 5335,
+      "canonical": "Antiasthmatic Agents",
+      "has_livertox_excerpt": true,
+      "input_type": "malformed_alias",
+      "input": "Crmolyn",
+      "status": "missing",
+      "matched_name": null,
+      "reason": "no_match",
+      "confidence": null,
+      "candidate_names": [],
+      "success": false
+    },
+    {
+      "drug_id": 5337,
+      "canonical": "Anticholinergic Agents",
+      "has_livertox_excerpt": true,
+      "input_type": "canonical",
+      "input": "Anticholinergic Agents",
+      "status": "matched",
+      "matched_name": "Anticholinergic Agents",
+      "reason": "exact_canonical",
+      "confidence": 1.0,
+      "candidate_names": [
+        "Anticholinergic Agents"
+      ],
+      "success": true
+    },
+    {
+      "drug_id": 5337,
+      "canonical": "Anticholinergic Agents",
+      "has_livertox_excerpt": true,
+      "input_type": "real_alias",
+      "input": "Belladonna",
+      "status": "matched",
+      "matched_name": "Anticholinergic Agents",
+      "reason": "exact_alias",
+      "confidence": 0.92,
+      "candidate_names": [
+        "Anticholinergic Agents"
+      ],
+      "success": true
+    },
+    {
+      "drug_id": 5337,
+      "canonical": "Anticholinergic Agents",
+      "has_livertox_excerpt": true,
+      "input_type": "malformed_alias",
+      "input": "Beladonna",
+      "status": "missing",
+      "matched_name": null,
+      "reason": "no_match",
+      "confidence": null,
+      "candidate_names": [],
+      "success": false
+    },
+    {
+      "drug_id": 5346,
+      "canonical": "Antilipemic Agents",
+      "has_livertox_excerpt": true,
+      "input_type": "canonical",
+      "input": "Antilipemic Agents",
+      "status": "matched",
+      "matched_name": "Antilipemic Agents",
+      "reason": "exact_canonical",
+      "confidence": 1.0,
+      "candidate_names": [
+        "Antilipemic Agents"
+      ],
+      "success": true
+    },
+    {
+      "drug_id": 5346,
+      "canonical": "Antilipemic Agents",
+      "has_livertox_excerpt": true,
+      "input_type": "real_alias",
+      "input": "Mipomersen",
+      "status": "matched",
+      "matched_name": "Antilipemic Agents",
+      "reason": "exact_alias",
+      "confidence": 0.92,
+      "candidate_names": [
+        "Antilipemic Agents"
+      ],
+      "success": true
+    },
+    {
+      "drug_id": 5346,
+      "canonical": "Antilipemic Agents",
+      "has_livertox_excerpt": true,
+      "input_type": "malformed_alias",
+      "input": "Miomersen",
+      "status": "missing",
+      "matched_name": null,
+      "reason": "no_match",
+      "confidence": null,
+      "candidate_names": [],
+      "success": false
+    },
+    {
+      "drug_id": 5355,
+      "canonical": "Antiulcer Agents",
+      "has_livertox_excerpt": true,
+      "input_type": "canonical",
+      "input": "Antiulcer Agents",
+      "status": "matched",
+      "matched_name": "Antiulcer Agents",
+      "reason": "exact_canonical",
+      "confidence": 1.0,
+      "candidate_names": [
+        "Antiulcer Agents"
+      ],
+      "success": true
+    },
+    {
+      "drug_id": 5355,
+      "canonical": "Antiulcer Agents",
+      "has_livertox_excerpt": true,
+      "input_type": "real_alias",
+      "input": "Sucralfate",
+      "status": "matched",
+      "matched_name": "Antiulcer Agents",
+      "reason": "exact_alias",
+      "confidence": 0.92,
+      "candidate_names": [
+        "Antiulcer Agents"
+      ],
+      "success": true
+    },
+    {
+      "drug_id": 5355,
+      "canonical": "Antiulcer Agents",
+      "has_livertox_excerpt": true,
+      "input_type": "malformed_alias",
+      "input": "Suralfate",
+      "status": "missing",
+      "matched_name": null,
+      "reason": "no_match",
+      "confidence": null,
+      "candidate_names": [],
+      "success": false
+    },
+    {
+      "drug_id": 1272,
+      "canonical": "apalutamide",
+      "has_livertox_excerpt": true,
+      "input_type": "canonical",
+      "input": "apalutamide",
+      "status": "matched",
+      "matched_name": "apalutamide",
+      "reason": "exact_canonical",
+      "confidence": 1.0,
+      "candidate_names": [
+        "apalutamide"
+      ],
+      "success": true
+    },
+    {
+      "drug_id": 1272,
+      "canonical": "apalutamide",
+      "has_livertox_excerpt": true,
+      "input_type": "real_alias",
+      "input": "Erleada",
+      "status": "matched",
+      "matched_name": "apalutamide",
+      "reason": "exact_alias",
+      "confidence": 0.92,
+      "candidate_names": [
+        "apalutamide"
+      ],
+      "success": true
+    },
+    {
+      "drug_id": 1272,
+      "canonical": "apalutamide",
+      "has_livertox_excerpt": true,
+      "input_type": "malformed_alias",
+      "input": "Ereada",
+      "status": "matched",
+      "matched_name": "apalutamide",
+      "reason": "fuzzy",
+      "confidence": 0.92,
+      "candidate_names": [
+        "apalutamide"
+      ],
+      "success": true
+    },
+    {
+      "drug_id": 1261,
+      "canonical": "apixaban",
+      "has_livertox_excerpt": true,
+      "input_type": "canonical",
+      "input": "apixaban",
+      "status": "matched",
+      "matched_name": "apixaban",
+      "reason": "exact_canonical",
+      "confidence": 1.0,
+      "candidate_names": [
+        "apixaban"
+      ],
+      "success": true
+    },
+    {
+      "drug_id": 1261,
+      "canonical": "apixaban",
+      "has_livertox_excerpt": true,
+      "input_type": "real_alias",
+      "input": "Apixaban Starter",
+      "status": "matched",
+      "matched_name": "apixaban",
+      "reason": "exact_alias",
+      "confidence": 0.9,
+      "candidate_names": [
+        "apixaban"
+      ],
+      "success": true
+    },
+    {
+      "drug_id": 1261,
+      "canonical": "apixaban",
+      "has_livertox_excerpt": true,
+      "input_type": "malformed_alias",
+      "input": "ApxabanStarter",
+      "status": "matched",
+      "matched_name": "apixaban",
+      "reason": "fuzzy",
+      "confidence": 0.93,
+      "candidate_names": [
+        "apixaban"
+      ],
+      "success": true
+    },
+    {
+      "drug_id": 5357,
+      "canonical": "Apoaequorin",
+      "has_livertox_excerpt": true,
+      "input_type": "canonical",
+      "input": "Apoaequorin",
+      "status": "matched",
+      "matched_name": "Apoaequorin",
+      "reason": "exact_canonical",
+      "confidence": 1.0,
+      "candidate_names": [
+        "Apoaequorin"
+      ],
+      "success": true
+    },
+    {
+      "drug_id": 5357,
+      "canonical": "Apoaequorin",
+      "has_livertox_excerpt": true,
+      "input_type": "real_alias",
+      "input": "Prevagen",
+      "status": "matched",
+      "matched_name": "Apoaequorin",
+      "reason": "exact_alias",
+      "confidence": 0.92,
+      "candidate_names": [
+        "Apoaequorin"
+      ],
+      "success": true
+    },
+    {
+      "drug_id": 5357,
+      "canonical": "Apoaequorin",
+      "has_livertox_excerpt": true,
+      "input_type": "malformed_alias",
+      "input": "Prvagen",
+      "status": "missing",
+      "matched_name": null,
+      "reason": "no_match",
+      "confidence": null,
+      "candidate_names": [],
+      "success": false
+    },
+    {
+      "drug_id": 5358,
+      "canonical": "Apomorphine",
+      "has_livertox_excerpt": true,
+      "input_type": "canonical",
+      "input": "Apomorphine",
+      "status": "matched",
+      "matched_name": "Apomorphine",
+      "reason": "exact_canonical",
+      "confidence": 1.0,
+      "candidate_names": [
+        "Apomorphine"
+      ],
+      "success": true
+    },
+    {
+      "drug_id": 5358,
+      "canonical": "Apomorphine",
+      "has_livertox_excerpt": true,
+      "input_type": "real_alias",
+      "input": "Apokyn",
+      "status": "matched",
+      "matched_name": "Apomorphine",
+      "reason": "exact_alias",
+      "confidence": 0.92,
+      "candidate_names": [
+        "Apomorphine"
+      ],
+      "success": true
+    },
+    {
+      "drug_id": 5358,
+      "canonical": "Apomorphine",
+      "has_livertox_excerpt": true,
+      "input_type": "malformed_alias",
+      "input": "Apkyn",
+      "status": "missing",
+      "matched_name": null,
+      "reason": "no_match",
+      "confidence": null,
+      "candidate_names": [],
+      "success": false
+    },
+    {
+      "drug_id": 752,
+      "canonical": "apremilast",
+      "has_livertox_excerpt": true,
+      "input_type": "canonical",
+      "input": "apremilast",
+      "status": "matched",
+      "matched_name": "apremilast",
+      "reason": "exact_canonical",
+      "confidence": 1.0,
+      "candidate_names": [
+        "apremilast"
+      ],
+      "success": true
+    },
+    {
+      "drug_id": 752,
+      "canonical": "apremilast",
+      "has_livertox_excerpt": true,
+      "input_type": "real_alias",
+      "input": "24 HR apremilast 75 MG Extended Release Oral Tablet",
+      "status": "matched",
+      "matched_name": "apremilast",
+      "reason": "fuzzy",
+      "confidence": 0.87,
+      "candidate_names": [
+        "apremilast"
+      ],
+      "success": true
+    },
+    {
+      "drug_id": 752,
+      "canonical": "apremilast",
+      "has_livertox_excerpt": true,
+      "input_type": "malformed_alias",
+      "input": "24Rapremilast75MGExtendedReleaseOralTablet",
+      "status": "missing",
+      "matched_name": null,
+      "reason": "no_match",
+      "confidence": null,
+      "candidate_names": [],
+      "success": false
+    },
+    {
+      "drug_id": 623,
+      "canonical": "aprepitant",
+      "has_livertox_excerpt": true,
+      "input_type": "canonical",
+      "input": "aprepitant",
+      "status": "matched",
+      "matched_name": "aprepitant",
+      "reason": "exact_canonical",
+      "confidence": 1.0,
+      "candidate_names": [
+        "aprepitant"
+      ],
+      "success": true
+    },
+    {
+      "drug_id": 623,
+      "canonical": "aprepitant",
+      "has_livertox_excerpt": true,
+      "input_type": "real_alias",
+      "input": "Aponvie",
+      "status": "matched",
+      "matched_name": "aprepitant",
+      "reason": "exact_alias",
+      "confidence": 0.92,
+      "candidate_names": [
+        "aprepitant"
+      ],
+      "success": true
+    },
+    {
+      "drug_id": 623,
+      "canonical": "aprepitant",
+      "has_livertox_excerpt": true,
+      "input_type": "malformed_alias",
+      "input": "Apnvie",
+      "status": "matched",
+      "matched_name": "aprepitant",
+      "reason": "fuzzy",
+      "confidence": 0.92,
+      "candidate_names": [
+        "aprepitant"
+      ],
+      "success": true
+    },
+    {
+      "drug_id": 298,
+      "canonical": "aripiprazole",
+      "has_livertox_excerpt": true,
+      "input_type": "canonical",
+      "input": "aripiprazole",
+      "status": "matched",
+      "matched_name": "aripiprazole",
+      "reason": "exact_canonical",
+      "confidence": 1.0,
+      "candidate_names": [
+        "aripiprazole"
+      ],
+      "success": true
+    },
+    {
+      "drug_id": 298,
+      "canonical": "aripiprazole",
+      "has_livertox_excerpt": true,
+      "input_type": "real_alias",
+      "input": "Abilify",
+      "status": "matched",
+      "matched_name": "aripiprazole",
+      "reason": "exact_alias",
+      "confidence": 0.92,
+      "candidate_names": [
+        "aripiprazole"
+      ],
+      "success": true
+    },
+    {
+      "drug_id": 298,
+      "canonical": "aripiprazole",
+      "has_livertox_excerpt": true,
+      "input_type": "malformed_alias",
+      "input": "Ablify",
+      "status": "matched",
+      "matched_name": "aripiprazole",
+      "reason": "fuzzy",
+      "confidence": 0.92,
+      "candidate_names": [
+        "aripiprazole"
+      ],
+      "success": true
+    },
+    {
+      "drug_id": 5365,
+      "canonical": "Artemisinin",
+      "has_livertox_excerpt": true,
+      "input_type": "canonical",
+      "input": "Artemisinin",
+      "status": "matched",
+      "matched_name": "Artemisinin",
+      "reason": "exact_canonical",
+      "confidence": 1.0,
+      "candidate_names": [
+        "Artemisinin"
+      ],
+      "success": true
+    },
+    {
+      "drug_id": 5365,
+      "canonical": "Artemisinin",
+      "has_livertox_excerpt": true,
+      "input_type": "real_alias",
+      "input": "Coartem",
+      "status": "ambiguous",
+      "matched_name": null,
+      "reason": "ambiguous_exact_alias",
+      "confidence": null,
+      "candidate_names": [
+        "Arteminisinin",
+        "Artemisinin"
+      ],
+      "success": false
+    },
+    {
+      "drug_id": 5365,
+      "canonical": "Artemisinin",
+      "has_livertox_excerpt": true,
+      "input_type": "malformed_alias",
+      "input": "Cortem",
+      "status": "missing",
+      "matched_name": null,
+      "reason": "no_match",
+      "confidence": null,
+      "candidate_names": [],
+      "success": false
+    },
+    {
+      "drug_id": 1279,
+      "canonical": "asciminib",
+      "has_livertox_excerpt": true,
+      "input_type": "canonical",
+      "input": "asciminib",
+      "status": "matched",
+      "matched_name": "asciminib",
+      "reason": "exact_canonical",
+      "confidence": 1.0,
+      "candidate_names": [
+        "asciminib"
+      ],
+      "success": true
+    },
+    {
+      "drug_id": 1279,
+      "canonical": "asciminib",
+      "has_livertox_excerpt": true,
+      "input_type": "real_alias",
+      "input": "Asciminib equivalent HCl",
+      "status": "matched",
+      "matched_name": "asciminib",
+      "reason": "exact_alias",
+      "confidence": 0.9,
+      "candidate_names": [
+        "asciminib"
+      ],
+      "success": true
+    },
+    {
+      "drug_id": 1279,
+      "canonical": "asciminib",
+      "has_livertox_excerpt": true,
+      "input_type": "malformed_alias",
+      "input": "AsiminibequivalentHCl",
+      "status": "matched",
+      "matched_name": "asciminib",
+      "reason": "fuzzy",
+      "confidence": 0.88,
+      "candidate_names": [
+        "asciminib"
+      ],
+      "success": true
+    },
+    {
+      "drug_id": 5366,
+      "canonical": "Asenapine",
+      "has_livertox_excerpt": true,
+      "input_type": "canonical",
+      "input": "Asenapine",
+      "status": "matched",
+      "matched_name": "Asenapine",
+      "reason": "exact_canonical",
+      "confidence": 1.0,
+      "candidate_names": [
+        "Asenapine"
+      ],
+      "success": true
+    },
+    {
+      "drug_id": 5366,
+      "canonical": "Asenapine",
+      "has_livertox_excerpt": true,
+      "input_type": "real_alias",
+      "input": "Saphris",
+      "status": "matched",
+      "matched_name": "Asenapine",
+      "reason": "exact_alias",
+      "confidence": 0.92,
+      "candidate_names": [
+        "Asenapine"
+      ],
+      "success": true
+    },
+    {
+      "drug_id": 5366,
+      "canonical": "Asenapine",
+      "has_livertox_excerpt": true,
+      "input_type": "malformed_alias",
+      "input": "Sahris",
+      "status": "missing",
+      "matched_name": null,
+      "reason": "no_match",
+      "confidence": null,
+      "candidate_names": [],
+      "success": false
+    },
+    {
+      "drug_id": 5367,
+      "canonical": "Ashwagandha",
+      "has_livertox_excerpt": true,
+      "input_type": "canonical",
+      "input": "Ashwagandha",
+      "status": "matched",
+      "matched_name": "Ashwagandha",
+      "reason": "exact_canonical",
+      "confidence": 1.0,
+      "candidate_names": [
+        "Ashwagandha"
+      ],
+      "success": true
+    },
+    {
+      "drug_id": 5367,
+      "canonical": "Ashwagandha",
+      "has_livertox_excerpt": true,
+      "input_type": "real_alias",
+      "input": "Generic",
+      "status": "matched",
+      "matched_name": "Generic",
+      "reason": "exact_canonical",
+      "confidence": 1.0,
+      "candidate_names": [
+        "Generic"
+      ],
+      "success": false
+    },
+    {
+      "drug_id": 5367,
+      "canonical": "Ashwagandha",
+      "has_livertox_excerpt": true,
+      "input_type": "malformed_alias",
+      "input": "Geeric",
+      "status": "matched",
+      "matched_name": "Generic",
+      "reason": "fuzzy",
+      "confidence": 0.92,
+      "candidate_names": [
+        "Generic"
+      ],
+      "success": true
+    },
+    {
+      "drug_id": 5368,
+      "canonical": "Asparaginase",
+      "has_livertox_excerpt": true,
+      "input_type": "canonical",
+      "input": "Asparaginase",
+      "status": "matched",
+      "matched_name": "Asparaginase",
+      "reason": "exact_canonical",
+      "confidence": 1.0,
+      "candidate_names": [
+        "Asparaginase"
+      ],
+      "success": true
+    },
+    {
+      "drug_id": 5368,
+      "canonical": "Asparaginase",
+      "has_livertox_excerpt": true,
+      "input_type": "real_alias",
+      "input": "Pegaspargase",
+      "status": "matched",
+      "matched_name": "Asparaginase",
+      "reason": "exact_alias",
+      "confidence": 0.92,
+      "candidate_names": [
+        "Asparaginase"
+      ],
+      "success": true
+    },
+    {
+      "drug_id": 5368,
+      "canonical": "Asparaginase",
+      "has_livertox_excerpt": true,
+      "input_type": "malformed_alias",
+      "input": "Peaspargase",
+      "status": "missing",
+      "matched_name": null,
+      "reason": "no_match",
+      "confidence": null,
+      "candidate_names": [],
+      "success": false
+    },
+    {
+      "drug_id": 740,
+      "canonical": "aspirin",
+      "has_livertox_excerpt": true,
+      "input_type": "canonical",
+      "input": "aspirin",
+      "status": "matched",
+      "matched_name": "aspirin",
+      "reason": "exact_canonical",
+      "confidence": 1.0,
+      "candidate_names": [
+        "aspirin"
+      ],
+      "success": true
+    },
+    {
+      "drug_id": 740,
+      "canonical": "aspirin",
+      "has_livertox_excerpt": true,
+      "input_type": "real_alias",
+      "input": "24 HR aspirin 162.5 MG Extended Release Oral Capsule",
+      "status": "ambiguous",
+      "matched_name": null,
+      "reason": "ambiguous_exact_alias",
+      "confidence": null,
+      "candidate_names": [
+        "acetaminophen",
+        "alprazolam",
+        "amlodipine",
+        "amoxicillin",
+        "aripiprazole",
+        "aspirin",
+        "atropine",
+        "baclofen",
+        "Barbiturates",
+        "bisacodyl",
+        "brompheniramine",
+        "bupropion",
+        "caffeine",
+        "carbamazepine",
+        "carbinoxamine",
+        "carisoprodol",
+        "cetirizine",
+        "chlorpromazine",
+        "cimetidine",
+        "citalopram",
+        "clarithromycin",
+        "clemastine",
+        "clonazepam",
+        "clozapine",
+        "codeine",
+        "diclofenac",
+        "diphenhydramine",
+        "dipyridamole",
+        "donepezil",
+        "doxylamine",
+        "famotidine",
+        "fexofenadine",
+        "fingolimod",
+        "flurbiprofen",
+        "folic acid",
+        "glycopyrrolate",
+        "hydrocodone",
+        "hydromorphone",
+        "hyoscyamine",
+        "ibuprofen",
+        "indomethacin",
+        "ketoprofen",
+        "lamivudine",
+        "lamotrigine",
+        "lansoprazole",
+        "levodopa",
+        "loratadine",
+        "meclizine",
+        "melatonin",
+        "meloxicam",
+        "meprobamate",
+        "mesalamine",
+        "methocarbamol",
+        "methylphenidate",
+        "metoclopramide",
+        "metronidazole",
+        "mirtazapine",
+        "morphine",
+        "naproxen",
+        "nevirapine",
+        "niacin",
+        "nicotine",
+        "olanzapine",
+        "omeprazole",
+        "orphenadrine",
+        "oxybate",
+        "oxycodone",
+        "piroxicam",
+        "pravastatin",
+        "prochlorperazine",
+        "promethazine",
+        "quinidine",
+        "ranitidine",
+        "rifabutin",
+        "risperidone",
+        "selegiline",
+        "simvastatin",
+        "stavudine",
+        "sulfasalazine",
+        "Trace Elements and Metals",
+        "tramadol",
+        "trimethobenzamide",
+        "triprolidine",
+        "vardenafil",
+        "zolpidem"
+      ],
+      "success": false
+    },
+    {
+      "drug_id": 740,
+      "canonical": "aspirin",
+      "has_livertox_excerpt": true,
+      "input_type": "malformed_alias",
+      "input": "24Raspirin162.5MGExtendedReleaseOralCapsule",
+      "status": "missing",
+      "matched_name": null,
+      "reason": "no_match",
+      "confidence": null,
+      "candidate_names": [],
+      "success": false
+    },
+    {
+      "drug_id": 1328,
+      "canonical": "atazanavir",
+      "has_livertox_excerpt": true,
+      "input_type": "canonical",
+      "input": "atazanavir",
+      "status": "matched",
+      "matched_name": "atazanavir",
+      "reason": "exact_canonical",
+      "confidence": 1.0,
+      "candidate_names": [
+        "atazanavir"
+      ],
+      "success": true
+    },
+    {
+      "drug_id": 1328,
+      "canonical": "atazanavir",
+      "has_livertox_excerpt": true,
+      "input_type": "real_alias",
+      "input": "Cobicistat",
+      "status": "ambiguous",
+      "matched_name": null,
+      "reason": "ambiguous_exact_alias",
+      "confidence": null,
+      "candidate_names": [
+        "atazanavir",
+        "darunavir",
+        "Elvitegravir",
+        "emtricitabine"
+      ],
+      "success": false
+    },
+    {
+      "drug_id": 1328,
+      "canonical": "atazanavir",
+      "has_livertox_excerpt": true,
+      "input_type": "malformed_alias",
+      "input": "Coicistat",
+      "status": "ambiguous",
+      "matched_name": null,
+      "reason": "ambiguous_fuzzy",
+      "confidence": null,
+      "candidate_names": [
+        "atazanavir",
+        "darunavir",
+        "emtricitabine"
+      ],
+      "success": false
+    },
+    {
+      "drug_id": 1320,
+      "canonical": "atenolol",
+      "has_livertox_excerpt": true,
+      "input_type": "canonical",
+      "input": "atenolol",
+      "status": "matched",
+      "matched_name": "atenolol",
+      "reason": "exact_canonical",
+      "confidence": 1.0,
+      "candidate_names": [
+        "atenolol"
+      ],
+      "success": true
+    },
+    {
+      "drug_id": 1320,
+      "canonical": "atenolol",
+      "has_livertox_excerpt": true,
+      "input_type": "real_alias",
+      "input": "Tenormin",
+      "status": "matched",
+      "matched_name": "atenolol",
+      "reason": "exact_alias",
+      "confidence": 0.92,
+      "candidate_names": [
+        "atenolol"
+      ],
+      "success": true
+    },
+    {
+      "drug_id": 1320,
+      "canonical": "atenolol",
+      "has_livertox_excerpt": true,
+      "input_type": "malformed_alias",
+      "input": "Teormin",
+      "status": "matched",
+      "matched_name": "atenolol",
+      "reason": "fuzzy",
+      "confidence": 0.93,
+      "candidate_names": [
+        "atenolol"
+      ],
+      "success": true
+    },
+    {
+      "drug_id": 626,
+      "canonical": "atezolizumab",
+      "has_livertox_excerpt": true,
+      "input_type": "canonical",
+      "input": "atezolizumab",
+      "status": "matched",
+      "matched_name": "atezolizumab",
+      "reason": "exact_canonical",
+      "confidence": 1.0,
+      "candidate_names": [
+        "atezolizumab"
+      ],
+      "success": true
+    },
+    {
+      "drug_id": 626,
+      "canonical": "atezolizumab",
+      "has_livertox_excerpt": true,
+      "input_type": "real_alias",
+      "input": "Atezolizumab hyaluronidase tqjs",
+      "status": "matched",
+      "matched_name": "atezolizumab",
+      "reason": "exact_alias",
+      "confidence": 0.9,
+      "candidate_names": [
+        "atezolizumab"
+      ],
+      "success": true
+    },
+    {
+      "drug_id": 626,
+      "canonical": "atezolizumab",
+      "has_livertox_excerpt": true,
+      "input_type": "malformed_alias",
+      "input": "Atzolizumabhyaluronidasetqjs",
+      "status": "matched",
+      "matched_name": "atezolizumab",
+      "reason": "fuzzy",
+      "confidence": 0.95,
+      "candidate_names": [
+        "atezolizumab"
+      ],
+      "success": true
+    },
+    {
+      "drug_id": 1340,
+      "canonical": "atogepant",
+      "has_livertox_excerpt": true,
+      "input_type": "canonical",
+      "input": "atogepant",
+      "status": "matched",
+      "matched_name": "atogepant",
+      "reason": "exact_canonical",
+      "confidence": 1.0,
+      "candidate_names": [
+        "atogepant"
+      ],
+      "success": true
+    },
+    {
+      "drug_id": 1340,
+      "canonical": "atogepant",
+      "has_livertox_excerpt": true,
+      "input_type": "real_alias",
+      "input": "Qulipta",
+      "status": "matched",
+      "matched_name": "atogepant",
+      "reason": "exact_alias",
+      "confidence": 0.92,
+      "candidate_names": [
+        "atogepant"
+      ],
+      "success": true
+    },
+    {
+      "drug_id": 1340,
+      "canonical": "atogepant",
+      "has_livertox_excerpt": true,
+      "input_type": "malformed_alias",
+      "input": "Quipta",
+      "status": "matched",
+      "matched_name": "atogepant",
+      "reason": "fuzzy",
+      "confidence": 0.92,
+      "candidate_names": [
+        "atogepant"
+      ],
+      "success": true
+    },
+    {
+      "drug_id": 1345,
+      "canonical": "atomoxetine",
+      "has_livertox_excerpt": true,
+      "input_type": "canonical",
+      "input": "atomoxetine",
+      "status": "matched",
+      "matched_name": "atomoxetine",
+      "reason": "exact_canonical",
+      "confidence": 1.0,
+      "candidate_names": [
+        "atomoxetine"
+      ],
+      "success": true
+    },
+    {
+      "drug_id": 1345,
+      "canonical": "atomoxetine",
+      "has_livertox_excerpt": true,
+      "input_type": "real_alias",
+      "input": "Strattera",
+      "status": "matched",
+      "matched_name": "atomoxetine",
+      "reason": "exact_alias",
+      "confidence": 0.92,
+      "candidate_names": [
+        "atomoxetine"
+      ],
+      "success": true
+    },
+    {
+      "drug_id": 1345,
+      "canonical": "atomoxetine",
+      "has_livertox_excerpt": true,
+      "input_type": "malformed_alias",
+      "input": "Stattera",
+      "status": "matched",
+      "matched_name": "atomoxetine",
+      "reason": "fuzzy",
+      "confidence": 0.94,
+      "candidate_names": [
+        "atomoxetine"
+      ],
+      "success": true
+    },
+    {
+      "drug_id": 1398,
+      "canonical": "atorvastatin",
+      "has_livertox_excerpt": true,
+      "input_type": "canonical",
+      "input": "atorvastatin",
+      "status": "matched",
+      "matched_name": "atorvastatin",
+      "reason": "exact_canonical",
+      "confidence": 1.0,
+      "candidate_names": [
+        "atorvastatin"
+      ],
+      "success": true
+    },
+    {
+      "drug_id": 1398,
+      "canonical": "atorvastatin",
+      "has_livertox_excerpt": true,
+      "input_type": "real_alias",
+      "input": "Amlodipine",
+      "status": "matched",
+      "matched_name": "amlodipine",
+      "reason": "exact_canonical",
+      "confidence": 1.0,
+      "candidate_names": [
+        "amlodipine"
+      ],
+      "success": false
+    },
+    {
+      "drug_id": 1398,
+      "canonical": "atorvastatin",
+      "has_livertox_excerpt": true,
+      "input_type": "malformed_alias",
+      "input": "Amodipine",
+      "status": "ambiguous",
+      "matched_name": null,
+      "reason": "ambiguous_fuzzy",
+      "confidence": null,
+      "candidate_names": [
+        "aliskiren",
+        "amlodipine",
+        "atorvastatin",
+        "benazepril",
+        "celecoxib",
+        "telmisartan",
+        "valsartan"
+      ],
+      "success": false
+    },
+    {
+      "drug_id": 1391,
+      "canonical": "atovaquone",
+      "has_livertox_excerpt": true,
+      "input_type": "canonical",
+      "input": "atovaquone",
+      "status": "matched",
+      "matched_name": "atovaquone",
+      "reason": "exact_canonical",
+      "confidence": 1.0,
+      "candidate_names": [
+        "atovaquone"
+      ],
+      "success": true
+    },
+    {
+      "drug_id": 1391,
+      "canonical": "atovaquone",
+      "has_livertox_excerpt": true,
+      "input_type": "real_alias",
+      "input": "Mepron",
+      "status": "matched",
+      "matched_name": "atovaquone",
+      "reason": "exact_alias",
+      "confidence": 0.92,
+      "candidate_names": [
+        "atovaquone"
+      ],
+      "success": true
+    },
+    {
+      "drug_id": 1391,
+      "canonical": "atovaquone",
+      "has_livertox_excerpt": true,
+      "input_type": "malformed_alias",
+      "input": "Meron",
+      "status": "matched",
+      "matched_name": "atovaquone",
+      "reason": "fuzzy",
+      "confidence": 0.91,
+      "candidate_names": [
+        "atovaquone"
+      ],
+      "success": true
+    },
+    {
+      "drug_id": 1401,
+      "canonical": "atrasentan",
+      "has_livertox_excerpt": true,
+      "input_type": "canonical",
+      "input": "atrasentan",
+      "status": "matched",
+      "matched_name": "atrasentan",
+      "reason": "exact_canonical",
+      "confidence": 1.0,
+      "candidate_names": [
+        "atrasentan"
+      ],
+      "success": true
+    },
+    {
+      "drug_id": 1401,
+      "canonical": "atrasentan",
+      "has_livertox_excerpt": true,
+      "input_type": "real_alias",
+      "input": "Atrasentan equivalent",
+      "status": "matched",
+      "matched_name": "atrasentan",
+      "reason": "exact_alias",
+      "confidence": 0.9,
+      "candidate_names": [
+        "atrasentan"
+      ],
+      "success": true
+    },
+    {
+      "drug_id": 1401,
+      "canonical": "atrasentan",
+      "has_livertox_excerpt": true,
+      "input_type": "malformed_alias",
+      "input": "Atasentanequivalent",
+      "status": "matched",
+      "matched_name": "atrasentan",
+      "reason": "fuzzy",
+      "confidence": 0.95,
+      "candidate_names": [
+        "atrasentan"
+      ],
+      "success": true
+    },
+    {
+      "drug_id": 187,
+      "canonical": "atropine",
+      "has_livertox_excerpt": true,
+      "input_type": "canonical",
+      "input": "atropine",
+      "status": "matched",
+      "matched_name": "atropine",
+      "reason": "exact_canonical",
+      "confidence": 1.0,
+      "candidate_names": [
+        "atropine"
+      ],
+      "success": true
+    },
+    {
+      "drug_id": 187,
+      "canonical": "atropine",
+      "has_livertox_excerpt": true,
+      "input_type": "real_alias",
+      "input": "0.7 ML atropine sulfate 0.714 MG/ML Auto-Injector",
+      "status": "ambiguous",
+      "matched_name": null,
+      "reason": "ambiguous_exact_alias",
+      "confidence": null,
+      "candidate_names": [
+        "acetaminophen",
+        "aspirin",
+        "atropine",
+        "brompheniramine",
+        "caffeine",
+        "carbinoxamine",
+        "cetirizine",
+        "codeine",
+        "diphenhydramine",
+        "Diphenoxylate",
+        "doxylamine",
+        "fexofenadine",
+        "hydrocodone",
+        "hyoscyamine",
+        "ibuprofen",
+        "lamotrigine",
+        "loratadine",
+        "naproxen",
+        "phenobarbital",
+        "Scopolamine",
+        "triprolidine"
+      ],
+      "success": false
+    },
+    {
+      "drug_id": 187,
+      "canonical": "atropine",
+      "has_livertox_excerpt": true,
+      "input_type": "malformed_alias",
+      "input": "0.MLatropinesulfate0.714MG/MLAuto-Injector",
+      "status": "ambiguous",
+      "matched_name": null,
+      "reason": "ambiguous_exact_alias",
+      "confidence": null,
+      "candidate_names": [
+        "acetaminophen",
+        "aspirin",
+        "atropine",
+        "brompheniramine",
+        "caffeine",
+        "carbinoxamine",
+        "cetirizine",
+        "codeine",
+        "diphenhydramine",
+        "Diphenoxylate",
+        "doxylamine",
+        "fexofenadine",
+        "hydrocodone",
+        "hyoscyamine",
+        "ibuprofen",
+        "lamotrigine",
+        "loratadine",
+        "naproxen",
+        "phenobarbital",
+        "Scopolamine",
+        "triprolidine"
+      ],
+      "success": false
+    },
+    {
+      "drug_id": 1397,
+      "canonical": "avacopan",
+      "has_livertox_excerpt": true,
+      "input_type": "canonical",
+      "input": "avacopan",
+      "status": "matched",
+      "matched_name": "avacopan",
+      "reason": "exact_canonical",
+      "confidence": 1.0,
+      "candidate_names": [
+        "avacopan"
+      ],
+      "success": true
+    },
+    {
+      "drug_id": 1397,
+      "canonical": "avacopan",
+      "has_livertox_excerpt": true,
+      "input_type": "real_alias",
+      "input": "Tavneos",
+      "status": "matched",
+      "matched_name": "avacopan",
+      "reason": "exact_alias",
+      "confidence": 0.92,
+      "candidate_names": [
+        "avacopan"
+      ],
+      "success": true
+    },
+    {
+      "drug_id": 1397,
+      "canonical": "avacopan",
+      "has_livertox_excerpt": true,
+      "input_type": "malformed_alias",
+      "input": "Taneos",
+      "status": "matched",
+      "matched_name": "avacopan",
+      "reason": "fuzzy",
+      "confidence": 0.92,
+      "candidate_names": [
+        "avacopan"
+      ],
+      "success": true
+    },
+    {
+      "drug_id": 1376,
+      "canonical": "avanafil",
+      "has_livertox_excerpt": true,
+      "input_type": "canonical",
+      "input": "avanafil",
+      "status": "matched",
+      "matched_name": "avanafil",
+      "reason": "exact_canonical",
+      "confidence": 1.0,
+      "candidate_names": [
+        "avanafil"
+      ],
+      "success": true
+    },
+    {
+      "drug_id": 1376,
+      "canonical": "avanafil",
+      "has_livertox_excerpt": true,
+      "input_type": "real_alias",
+      "input": "Stendra",
+      "status": "matched",
+      "matched_name": "avanafil",
+      "reason": "exact_alias",
+      "confidence": 0.92,
+      "candidate_names": [
+        "avanafil"
+      ],
+      "success": true
+    },
+    {
+      "drug_id": 1376,
+      "canonical": "avanafil",
+      "has_livertox_excerpt": true,
+      "input_type": "malformed_alias",
+      "input": "Stndra",
+      "status": "matched",
+      "matched_name": "avanafil",
+      "reason": "fuzzy",
+      "confidence": 0.92,
+      "candidate_names": [
+        "avanafil"
+      ],
+      "success": true
+    },
+    {
+      "drug_id": 1394,
+      "canonical": "avapritinib",
+      "has_livertox_excerpt": true,
+      "input_type": "canonical",
+      "input": "avapritinib",
+      "status": "matched",
+      "matched_name": "avapritinib",
+      "reason": "exact_canonical",
+      "confidence": 1.0,
+      "candidate_names": [
+        "avapritinib"
+      ],
+      "success": true
+    },
+    {
+      "drug_id": 1394,
+      "canonical": "avapritinib",
+      "has_livertox_excerpt": true,
+      "input_type": "real_alias",
+      "input": "Ayvakit",
+      "status": "matched",
+      "matched_name": "avapritinib",
+      "reason": "exact_alias",
+      "confidence": 0.92,
+      "candidate_names": [
+        "avapritinib"
+      ],
+      "success": true
+    },
+    {
+      "drug_id": 1394,
+      "canonical": "avapritinib",
+      "has_livertox_excerpt": true,
+      "input_type": "malformed_alias",
+      "input": "Ayakit",
+      "status": "matched",
+      "matched_name": "avapritinib",
+      "reason": "fuzzy",
+      "confidence": 0.92,
+      "candidate_names": [
+        "avapritinib"
+      ],
+      "success": true
+    },
+    {
+      "drug_id": 371,
+      "canonical": "avelumab",
+      "has_livertox_excerpt": true,
+      "input_type": "canonical",
+      "input": "avelumab",
+      "status": "matched",
+      "matched_name": "avelumab",
+      "reason": "exact_canonical",
+      "confidence": 1.0,
+      "candidate_names": [
+        "avelumab"
+      ],
+      "success": true
+    },
+    {
+      "drug_id": 371,
+      "canonical": "avelumab",
+      "has_livertox_excerpt": true,
+      "input_type": "real_alias",
+      "input": "Bavencio",
+      "status": "matched",
+      "matched_name": "avelumab",
+      "reason": "exact_alias",
+      "confidence": 0.92,
+      "candidate_names": [
+        "avelumab"
+      ],
+      "success": true
+    },
+    {
+      "drug_id": 371,
+      "canonical": "avelumab",
+      "has_livertox_excerpt": true,
+      "input_type": "malformed_alias",
+      "input": "Baencio",
+      "status": "matched",
+      "matched_name": "avelumab",
+      "reason": "fuzzy",
+      "confidence": 0.93,
+      "candidate_names": [
+        "avelumab"
+      ],
+      "success": true
+    },
+    {
+      "drug_id": 5377,
+      "canonical": "Axatilimab",
+      "has_livertox_excerpt": true,
+      "input_type": "canonical",
+      "input": "Axatilimab",
+      "status": "matched",
+      "matched_name": "Axatilimab",
+      "reason": "exact_canonical",
+      "confidence": 1.0,
+      "candidate_names": [
+        "Axatilimab"
+      ],
+      "success": true
+    },
+    {
+      "drug_id": 5377,
+      "canonical": "Axatilimab",
+      "has_livertox_excerpt": true,
+      "input_type": "real_alias",
+      "input": "Niktimvo",
+      "status": "matched",
+      "matched_name": "Axatilimab",
+      "reason": "exact_alias",
+      "confidence": 0.92,
+      "candidate_names": [
+        "Axatilimab"
+      ],
+      "success": true
+    },
+    {
+      "drug_id": 5377,
+      "canonical": "Axatilimab",
+      "has_livertox_excerpt": true,
+      "input_type": "malformed_alias",
+      "input": "Nitimvo",
+      "status": "missing",
+      "matched_name": null,
+      "reason": "no_match",
+      "confidence": null,
+      "candidate_names": [],
+      "success": false
+    },
+    {
+      "drug_id": 1375,
+      "canonical": "axitinib",
+      "has_livertox_excerpt": true,
+      "input_type": "canonical",
+      "input": "axitinib",
+      "status": "matched",
+      "matched_name": "axitinib",
+      "reason": "exact_canonical",
+      "confidence": 1.0,
+      "candidate_names": [
+        "axitinib"
+      ],
+      "success": true
+    },
+    {
+      "drug_id": 1375,
+      "canonical": "axitinib",
+      "has_livertox_excerpt": true,
+      "input_type": "real_alias",
+      "input": "Inlyta",
+      "status": "matched",
+      "matched_name": "axitinib",
+      "reason": "exact_alias",
+      "confidence": 0.92,
+      "candidate_names": [
+        "axitinib"
+      ],
+      "success": true
+    },
+    {
+      "drug_id": 1375,
+      "canonical": "axitinib",
+      "has_livertox_excerpt": true,
+      "input_type": "malformed_alias",
+      "input": "Inyta",
+      "status": "matched",
+      "matched_name": "axitinib",
+      "reason": "fuzzy",
+      "confidence": 0.91,
+      "candidate_names": [
+        "axitinib"
+      ],
+      "success": true
+    },
+    {
+      "drug_id": 1395,
+      "canonical": "azacitidine",
+      "has_livertox_excerpt": true,
+      "input_type": "canonical",
+      "input": "azacitidine",
+      "status": "matched",
+      "matched_name": "azacitidine",
+      "reason": "exact_canonical",
+      "confidence": 1.0,
+      "candidate_names": [
+        "azacitidine"
+      ],
+      "success": true
+    },
+    {
+      "drug_id": 1395,
+      "canonical": "azacitidine",
+      "has_livertox_excerpt": true,
+      "input_type": "real_alias",
+      "input": "Onureg",
+      "status": "matched",
+      "matched_name": "azacitidine",
+      "reason": "exact_alias",
+      "confidence": 0.92,
+      "candidate_names": [
+        "azacitidine"
+      ],
+      "success": true
+    },
+    {
+      "drug_id": 1395,
+      "canonical": "azacitidine",
+      "has_livertox_excerpt": true,
+      "input_type": "malformed_alias",
+      "input": "Onreg",
+      "status": "matched",
+      "matched_name": "azacitidine",
+      "reason": "fuzzy",
+      "confidence": 0.91,
+      "candidate_names": [
+        "azacitidine"
+      ],
+      "success": true
+    },
+    {
+      "drug_id": 1364,
+      "canonical": "azathioprine",
+      "has_livertox_excerpt": true,
+      "input_type": "canonical",
+      "input": "azathioprine",
+      "status": "matched",
+      "matched_name": "azathioprine",
+      "reason": "exact_canonical",
+      "confidence": 1.0,
+      "candidate_names": [
+        "azathioprine"
+      ],
+      "success": true
+    },
+    {
+      "drug_id": 1364,
+      "canonical": "azathioprine",
+      "has_livertox_excerpt": true,
+      "input_type": "real_alias",
+      "input": "Imuran",
+      "status": "matched",
+      "matched_name": "azathioprine",
+      "reason": "exact_alias",
+      "confidence": 0.92,
+      "candidate_names": [
+        "azathioprine"
+      ],
+      "success": true
+    },
+    {
+      "drug_id": 1364,
+      "canonical": "azathioprine",
+      "has_livertox_excerpt": true,
+      "input_type": "malformed_alias",
+      "input": "Imran",
+      "status": "matched",
+      "matched_name": "azathioprine",
+      "reason": "fuzzy",
+      "confidence": 0.91,
+      "candidate_names": [
+        "azathioprine"
+      ],
+      "success": true
+    },
+    {
+      "drug_id": 5378,
+      "canonical": "Azilsartan",
+      "has_livertox_excerpt": true,
+      "input_type": "canonical",
+      "input": "Azilsartan",
+      "status": "matched",
+      "matched_name": "Azilsartan",
+      "reason": "exact_canonical",
+      "confidence": 1.0,
+      "candidate_names": [
+        "Azilsartan"
+      ],
+      "success": true
+    },
+    {
+      "drug_id": 5378,
+      "canonical": "Azilsartan",
+      "has_livertox_excerpt": true,
+      "input_type": "real_alias",
+      "input": "Edarbi",
+      "status": "matched",
+      "matched_name": "Azilsartan",
+      "reason": "exact_alias",
+      "confidence": 0.92,
+      "candidate_names": [
+        "Azilsartan"
+      ],
+      "success": true
+    },
+    {
+      "drug_id": 5378,
+      "canonical": "Azilsartan",
+      "has_livertox_excerpt": true,
+      "input_type": "malformed_alias",
+      "input": "Edrbi",
+      "status": "missing",
+      "matched_name": null,
+      "reason": "no_match",
+      "confidence": null,
+      "candidate_names": [],
+      "success": false
+    },
+    {
+      "drug_id": 1363,
+      "canonical": "azithromycin",
+      "has_livertox_excerpt": true,
+      "input_type": "canonical",
+      "input": "azithromycin",
+      "status": "matched",
+      "matched_name": "azithromycin",
+      "reason": "exact_canonical",
+      "confidence": 1.0,
+      "candidate_names": [
+        "azithromycin"
+      ],
+      "success": true
+    },
+    {
+      "drug_id": 1363,
+      "canonical": "azithromycin",
+      "has_livertox_excerpt": true,
+      "input_type": "real_alias",
+      "input": "Zithromax",
+      "status": "matched",
+      "matched_name": "azithromycin",
+      "reason": "exact_alias",
+      "confidence": 0.92,
+      "candidate_names": [
+        "azithromycin"
+      ],
+      "success": true
+    },
+    {
+      "drug_id": 1363,
+      "canonical": "azithromycin",
+      "has_livertox_excerpt": true,
+      "input_type": "malformed_alias",
+      "input": "Zihromax",
+      "status": "matched",
+      "matched_name": "azithromycin",
+      "reason": "fuzzy",
+      "confidence": 0.94,
+      "candidate_names": [
+        "azithromycin"
+      ],
+      "success": true
+    },
+    {
+      "drug_id": 1384,
+      "canonical": "aztreonam",
+      "has_livertox_excerpt": true,
+      "input_type": "canonical",
+      "input": "aztreonam",
+      "status": "matched",
+      "matched_name": "aztreonam",
+      "reason": "exact_canonical",
+      "confidence": 1.0,
+      "candidate_names": [
+        "aztreonam"
+      ],
+      "success": true
+    },
+    {
+      "drug_id": 1384,
+      "canonical": "aztreonam",
+      "has_livertox_excerpt": true,
+      "input_type": "real_alias",
+      "input": "Avibactam",
+      "status": "ambiguous",
+      "matched_name": null,
+      "reason": "ambiguous_exact_alias",
+      "confidence": null,
+      "candidate_names": [
+        "aztreonam",
+        "Pharmacokinetic Enhancers"
+      ],
+      "success": false
+    },
+    {
+      "drug_id": 1384,
+      "canonical": "aztreonam",
+      "has_livertox_excerpt": true,
+      "input_type": "malformed_alias",
+      "input": "Avbactam",
+      "status": "matched",
+      "matched_name": "aztreonam",
+      "reason": "fuzzy",
+      "confidence": 0.94,
+      "candidate_names": [
+        "aztreonam"
+      ],
+      "success": true
+    }
+  ],
+  "failed": [
+    {
+      "drug_id": 1004,
+      "canonical": "abiraterone",
+      "has_livertox_excerpt": true,
+      "input_type": "real_alias",
+      "input": "abiraterone acetate 250 MG Oral Tablet",
+      "status": "ambiguous",
+      "matched_name": null,
+      "reason": "ambiguous_exact_alias",
+      "confidence": null,
+      "candidate_names": [
+        "abiraterone",
+        "dolutegravir",
+        "fostamatinib",
+        "fostemsavir",
+        "gepirone",
+        "imatinib",
+        "inclisiran",
+        "melphalan",
+        "metoprolol",
+        "momelotinib",
+        "niraparib",
+        "oxybate",
+        "quizartinib",
+        "rilpivirine",
+        "seladelpar",
+        "tazemetostat",
+        "zolpidem"
+      ],
+      "success": false
+    },
+    {
+      "drug_id": 1004,
+      "canonical": "abiraterone",
+      "has_livertox_excerpt": true,
+      "input_type": "malformed_alias",
+      "input": "abrateroneacetate250MGOralTablet",
+      "status": "missing",
+      "matched_name": null,
+      "reason": "no_match",
+      "confidence": null,
+      "candidate_names": [],
+      "success": false
+    },
+    {
+      "drug_id": 1043,
+      "canonical": "acamprosate",
+      "has_livertox_excerpt": true,
+      "input_type": "malformed_alias",
+      "input": "acmprosatecalcium333MGDelayedReleaseOralTablet",
+      "status": "missing",
+      "matched_name": null,
+      "reason": "no_match",
+      "confidence": null,
+      "candidate_names": [],
+      "success": false
+    },
+    {
+      "drug_id": 1047,
+      "canonical": "acebutolol",
+      "has_livertox_excerpt": true,
+      "input_type": "real_alias",
+      "input": "HCTZ",
+      "status": "ambiguous",
+      "matched_name": null,
+      "reason": "ambiguous_exact_alias",
+      "confidence": null,
+      "candidate_names": [
+        "acebutolol",
+        "aliskiren",
+        "amiloride",
+        "amlodipine",
+        "atenolol",
+        "benazepril",
+        "bisoprolol",
+        "captopril",
+        "enalapril",
+        "eprosartan",
+        "fosinopril",
+        "hydralazine",
+        "irbesartan",
+        "labetalol",
+        "lisinopril",
+        "losartan",
+        "methyldopa",
+        "metoprolol",
+        "moexipril",
+        "propranolol",
+        "quinapril",
+        "spironolactone",
+        "telmisartan",
+        "timolol",
+        "triamterene",
+        "valsartan"
+      ],
+      "success": false
+    },
+    {
+      "drug_id": 1047,
+      "canonical": "acebutolol",
+      "has_livertox_excerpt": true,
+      "input_type": "malformed_alias",
+      "input": "HCT",
+      "status": "missing",
+      "matched_name": null,
+      "reason": "no_match",
+      "confidence": null,
+      "candidate_names": [],
+      "success": false
+    },
+    {
+      "drug_id": 5297,
+      "canonical": "Aclidinium",
+      "has_livertox_excerpt": true,
+      "input_type": "malformed_alias",
+      "input": "TuorzaPressair",
+      "status": "missing",
+      "matched_name": null,
+      "reason": "no_match",
+      "confidence": null,
+      "candidate_names": [],
+      "success": false
+    },
+    {
+      "drug_id": 1102,
+      "canonical": "acoramidis",
+      "has_livertox_excerpt": true,
+      "input_type": "real_alias",
+      "input": "Attruby",
+      "status": "matched",
+      "matched_name": "Attruby",
+      "reason": "exact_canonical",
+      "confidence": 1.0,
+      "candidate_names": [
+        "Attruby"
+      ],
+      "success": false
+    },
+    {
+      "drug_id": 1102,
+      "canonical": "acoramidis",
+      "has_livertox_excerpt": true,
+      "input_type": "malformed_alias",
+      "input": "Atruby",
+      "status": "ambiguous",
+      "matched_name": null,
+      "reason": "ambiguous_fuzzy",
+      "confidence": null,
+      "candidate_names": [
+        "acoramidis",
+        "Attruby"
+      ],
+      "success": false
+    },
+    {
+      "drug_id": 5298,
+      "canonical": "Acrivastine",
+      "has_livertox_excerpt": true,
+      "input_type": "malformed_alias",
+      "input": "Seprex-D",
+      "status": "missing",
+      "matched_name": null,
+      "reason": "no_match",
+      "confidence": null,
+      "candidate_names": [],
+      "success": false
+    },
+    {
+      "drug_id": 5302,
+      "canonical": "Adefovir",
+      "has_livertox_excerpt": true,
+      "input_type": "malformed_alias",
+      "input": "Hesera",
+      "status": "missing",
+      "matched_name": null,
+      "reason": "no_match",
+      "confidence": null,
+      "candidate_names": [],
+      "success": false
+    },
+    {
+      "drug_id": 5303,
+      "canonical": "Aducanumab",
+      "has_livertox_excerpt": true,
+      "input_type": "malformed_alias",
+      "input": "Adhelm",
+      "status": "missing",
+      "matched_name": null,
+      "reason": "no_match",
+      "confidence": null,
+      "candidate_names": [],
+      "success": false
+    },
+    {
+      "drug_id": 5304,
+      "canonical": "Afamelanotide",
+      "has_livertox_excerpt": true,
+      "input_type": "malformed_alias",
+      "input": "Scnesse",
+      "status": "missing",
+      "matched_name": null,
+      "reason": "no_match",
+      "confidence": null,
+      "candidate_names": [],
+      "success": false
+    },
+    {
+      "drug_id": 5306,
+      "canonical": "Albiglutide",
+      "has_livertox_excerpt": true,
+      "input_type": "malformed_alias",
+      "input": "Tazeum",
+      "status": "missing",
+      "matched_name": null,
+      "reason": "no_match",
+      "confidence": null,
+      "candidate_names": [],
+      "success": false
+    },
+    {
+      "drug_id": 5307,
+      "canonical": "Aldesleukin",
+      "has_livertox_excerpt": true,
+      "input_type": "malformed_alias",
+      "input": "Prleukin",
+      "status": "missing",
+      "matched_name": null,
+      "reason": "no_match",
+      "confidence": null,
+      "candidate_names": [],
+      "success": false
+    },
+    {
+      "drug_id": 5308,
+      "canonical": "Alefacept",
+      "has_livertox_excerpt": true,
+      "input_type": "malformed_alias",
+      "input": "Amvive",
+      "status": "missing",
+      "matched_name": null,
+      "reason": "no_match",
+      "confidence": null,
+      "candidate_names": [],
+      "success": false
+    },
+    {
+      "drug_id": 761,
+      "canonical": "alfuzosin",
+      "has_livertox_excerpt": true,
+      "input_type": "malformed_alias",
+      "input": "24Ralfuzosinhydrochloride10MGExtendedReleaseOralTablet",
+      "status": "missing",
+      "matched_name": null,
+      "reason": "no_match",
+      "confidence": null,
+      "candidate_names": [],
+      "success": false
+    },
+    {
+      "drug_id": 1120,
+      "canonical": "aliskiren",
+      "has_livertox_excerpt": true,
+      "input_type": "real_alias",
+      "input": "Amlodipine",
+      "status": "matched",
+      "matched_name": "amlodipine",
+      "reason": "exact_canonical",
+      "confidence": 1.0,
+      "candidate_names": [
+        "amlodipine"
+      ],
+      "success": false
+    },
+    {
+      "drug_id": 1120,
+      "canonical": "aliskiren",
+      "has_livertox_excerpt": true,
+      "input_type": "malformed_alias",
+      "input": "Amodipine",
+      "status": "ambiguous",
+      "matched_name": null,
+      "reason": "ambiguous_fuzzy",
+      "confidence": null,
+      "candidate_names": [
+        "aliskiren",
+        "amlodipine",
+        "atorvastatin",
+        "benazepril",
+        "celecoxib",
+        "telmisartan",
+        "valsartan"
+      ],
+      "success": false
+    },
+    {
+      "drug_id": 5310,
+      "canonical": "Alkylating Agents",
+      "has_livertox_excerpt": true,
+      "input_type": "malformed_alias",
+      "input": "Esramustine",
+      "status": "missing",
+      "matched_name": null,
+      "reason": "no_match",
+      "confidence": null,
+      "candidate_names": [],
+      "success": false
+    },
+    {
+      "drug_id": 5311,
+      "canonical": "Aloe Vera",
+      "has_livertox_excerpt": true,
+      "input_type": "malformed_alias",
+      "input": "Alortin",
+      "status": "missing",
+      "matched_name": null,
+      "reason": "no_match",
+      "confidence": null,
+      "candidate_names": [],
+      "success": false
+    },
+    {
+      "drug_id": 1132,
+      "canonical": "alogliptin",
+      "has_livertox_excerpt": true,
+      "input_type": "real_alias",
+      "input": "Alogliptin Benzoate",
+      "status": "ambiguous",
+      "matched_name": null,
+      "reason": "ambiguous_exact_alias",
+      "confidence": null,
+      "candidate_names": [
+        "alogliptin",
+        "metformin",
+        "pioglitazone"
+      ],
+      "success": false
+    },
+    {
+      "drug_id": 1132,
+      "canonical": "alogliptin",
+      "has_livertox_excerpt": true,
+      "input_type": "malformed_alias",
+      "input": "AlgliptinBenzoate",
+      "status": "ambiguous",
+      "matched_name": null,
+      "reason": "ambiguous_fuzzy",
+      "confidence": null,
+      "candidate_names": [
+        "alogliptin",
+        "metformin",
+        "pioglitazone"
+      ],
+      "success": false
+    },
+    {
+      "drug_id": 1150,
+      "canonical": "alpelisib",
+      "has_livertox_excerpt": true,
+      "input_type": "real_alias",
+      "input": "Daily",
+      "status": "ambiguous",
+      "matched_name": null,
+      "reason": "ambiguous_exact_alias",
+      "confidence": null,
+      "candidate_names": [
+        "alpelisib",
+        "amantadine",
+        "cabozantinib",
+        "futibatinib",
+        "infigratinib",
+        "lenvatinib",
+        "letrozole",
+        "ribociclib",
+        "ritonavir",
+        "tobramycin"
+      ],
+      "success": false
+    },
+    {
+      "drug_id": 1150,
+      "canonical": "alpelisib",
+      "has_livertox_excerpt": true,
+      "input_type": "malformed_alias",
+      "input": "Daliy",
+      "status": "missing",
+      "matched_name": null,
+      "reason": "no_match",
+      "confidence": null,
+      "candidate_names": [],
+      "success": false
+    },
+    {
+      "drug_id": 755,
+      "canonical": "alprazolam",
+      "has_livertox_excerpt": true,
+      "input_type": "malformed_alias",
+      "input": "24Ralprazolam0.5MGExtendedReleaseOralTablet",
+      "status": "missing",
+      "matched_name": null,
+      "reason": "no_match",
+      "confidence": null,
+      "candidate_names": [],
+      "success": false
+    },
+    {
+      "drug_id": 5317,
+      "canonical": "Altretamine",
+      "has_livertox_excerpt": true,
+      "input_type": "malformed_alias",
+      "input": "Healen",
+      "status": "missing",
+      "matched_name": null,
+      "reason": "no_match",
+      "confidence": null,
+      "candidate_names": [],
+      "success": false
+    },
+    {
+      "drug_id": 744,
+      "canonical": "amantadine",
+      "has_livertox_excerpt": true,
+      "input_type": "malformed_alias",
+      "input": "24Ramantadine137MGExtendedReleaseOralCapsule",
+      "status": "missing",
+      "matched_name": null,
+      "reason": "no_match",
+      "confidence": null,
+      "candidate_names": [],
+      "success": false
+    },
+    {
+      "drug_id": 5319,
+      "canonical": "Amide Local Anesthetics",
+      "has_livertox_excerpt": true,
+      "input_type": "malformed_alias",
+      "input": "Arecaine",
+      "status": "missing",
+      "matched_name": null,
+      "reason": "no_match",
+      "confidence": null,
+      "candidate_names": [],
+      "success": false
+    },
+    {
+      "drug_id": 1221,
+      "canonical": "amiloride",
+      "has_livertox_excerpt": true,
+      "input_type": "real_alias",
+      "input": "Atenolol",
+      "status": "matched",
+      "matched_name": "atenolol",
+      "reason": "exact_canonical",
+      "confidence": 1.0,
+      "candidate_names": [
+        "atenolol"
+      ],
+      "success": false
+    },
+    {
+      "drug_id": 1221,
+      "canonical": "amiloride",
+      "has_livertox_excerpt": true,
+      "input_type": "malformed_alias",
+      "input": "Atnolol",
+      "status": "ambiguous",
+      "matched_name": null,
+      "reason": "ambiguous_fuzzy",
+      "confidence": null,
+      "candidate_names": [
+        "amiloride",
+        "atenolol",
+        "nifedipine"
+      ],
+      "success": false
+    },
+    {
+      "drug_id": 1215,
+      "canonical": "amitriptyline",
+      "has_livertox_excerpt": true,
+      "input_type": "real_alias",
+      "input": "Chlordiazepoxide",
+      "status": "matched",
+      "matched_name": "chlordiazepoxide",
+      "reason": "exact_canonical",
+      "confidence": 1.0,
+      "candidate_names": [
+        "chlordiazepoxide"
+      ],
+      "success": false
+    },
+    {
+      "drug_id": 1215,
+      "canonical": "amitriptyline",
+      "has_livertox_excerpt": true,
+      "input_type": "malformed_alias",
+      "input": "Chordiazepoxide",
+      "status": "ambiguous",
+      "matched_name": null,
+      "reason": "ambiguous_fuzzy",
+      "confidence": null,
+      "candidate_names": [
+        "amitriptyline",
+        "chlordiazepoxide"
+      ],
+      "success": false
+    },
+    {
+      "drug_id": 5321,
+      "canonical": "Amivantamab",
+      "has_livertox_excerpt": true,
+      "input_type": "malformed_alias",
+      "input": "Ryrevant",
+      "status": "missing",
+      "matched_name": null,
+      "reason": "no_match",
+      "confidence": null,
+      "candidate_names": [],
+      "success": false
+    },
+    {
+      "drug_id": 5322,
+      "canonical": "Amodiaquine",
+      "has_livertox_excerpt": true,
+      "input_type": "malformed_alias",
+      "input": "Caoquine",
+      "status": "missing",
+      "matched_name": null,
+      "reason": "no_match",
+      "confidence": null,
+      "candidate_names": [],
+      "success": false
+    },
+    {
+      "drug_id": 1235,
+      "canonical": "amoxapine",
+      "has_livertox_excerpt": true,
+      "input_type": "malformed_alias",
+      "input": "Asndin",
+      "status": "missing",
+      "matched_name": null,
+      "reason": "no_match",
+      "confidence": null,
+      "candidate_names": [],
+      "success": false
+    },
+    {
+      "drug_id": 543,
+      "canonical": "amoxicillin clavulanate",
+      "has_livertox_excerpt": true,
+      "input_type": "malformed_alias",
+      "input": "12Ramoxicillin1000MG/clavulanate62.5MGExtendedReleaseOralTablet",
+      "status": "missing",
+      "matched_name": null,
+      "reason": "no_match",
+      "confidence": null,
+      "candidate_names": [],
+      "success": false
+    },
+    {
+      "drug_id": 5323,
+      "canonical": "Amphetamines",
+      "has_livertox_excerpt": true,
+      "input_type": "malformed_alias",
+      "input": "Lidexamfetamine",
+      "status": "missing",
+      "matched_name": null,
+      "reason": "no_match",
+      "confidence": null,
+      "candidate_names": [],
+      "success": false
+    },
+    {
+      "drug_id": 1232,
+      "canonical": "ampicillin",
+      "has_livertox_excerpt": true,
+      "input_type": "real_alias",
+      "input": "Ampicillin Sulbactam",
+      "status": "matched",
+      "matched_name": "ampicillin sulbactam",
+      "reason": "exact_canonical",
+      "confidence": 1.0,
+      "candidate_names": [
+        "ampicillin sulbactam"
+      ],
+      "success": false
+    },
+    {
+      "drug_id": 1232,
+      "canonical": "ampicillin",
+      "has_livertox_excerpt": true,
+      "input_type": "malformed_alias",
+      "input": "AmicillinSulbactam",
+      "status": "ambiguous",
+      "matched_name": null,
+      "reason": "ambiguous_fuzzy",
+      "confidence": null,
+      "candidate_names": [
+        "ampicillin",
+        "ampicillin sulbactam"
+      ],
+      "success": false
+    },
+    {
+      "drug_id": 1231,
+      "canonical": "ampicillin sulbactam",
+      "has_livertox_excerpt": true,
+      "input_type": "real_alias",
+      "input": "Ampicillin",
+      "status": "matched",
+      "matched_name": "ampicillin",
+      "reason": "exact_canonical",
+      "confidence": 1.0,
+      "candidate_names": [
+        "ampicillin"
+      ],
+      "success": false
+    },
+    {
+      "drug_id": 1231,
+      "canonical": "ampicillin sulbactam",
+      "has_livertox_excerpt": true,
+      "input_type": "malformed_alias",
+      "input": "Amicillin",
+      "status": "ambiguous",
+      "matched_name": null,
+      "reason": "ambiguous_fuzzy",
+      "confidence": null,
+      "candidate_names": [
+        "amoxicillin",
+        "amoxicillin clavulanate",
+        "ampicillin",
+        "ampicillin sulbactam",
+        "clarithromycin",
+        "lansoprazole",
+        "omeprazole",
+        "rifabutin",
+        "vonoprazan"
+      ],
+      "success": false
+    },
+    {
+      "drug_id": 5325,
+      "canonical": "Androgenic steroids",
+      "has_livertox_excerpt": true,
+      "input_type": "real_alias",
+      "input": "Group name",
+      "status": "ambiguous",
+      "matched_name": null,
+      "reason": "ambiguous_exact_alias",
+      "confidence": null,
+      "candidate_names": [
+        "Androgenic steroids",
+        "Estrogens",
+        "Progestins"
+      ],
+      "success": false
+    },
+    {
+      "drug_id": 5325,
+      "canonical": "Androgenic steroids",
+      "has_livertox_excerpt": true,
+      "input_type": "malformed_alias",
+      "input": "Grupname",
+      "status": "missing",
+      "matched_name": null,
+      "reason": "no_match",
+      "confidence": null,
+      "candidate_names": [],
+      "success": false
+    },
+    {
+      "drug_id": 5327,
+      "canonical": "Anesthetics, General",
+      "has_livertox_excerpt": true,
+      "input_type": "malformed_alias",
+      "input": "Thopental",
+      "status": "missing",
+      "matched_name": null,
+      "reason": "no_match",
+      "confidence": null,
+      "candidate_names": [],
+      "success": false
+    },
+    {
+      "drug_id": 5330,
+      "canonical": "Anifrolumab",
+      "has_livertox_excerpt": true,
+      "input_type": "malformed_alias",
+      "input": "Sahnelo",
+      "status": "missing",
+      "matched_name": null,
+      "reason": "no_match",
+      "confidence": null,
+      "candidate_names": [],
+      "success": false
+    },
+    {
+      "drug_id": 5332,
+      "canonical": "Anthrax Antitoxins",
+      "has_livertox_excerpt": true,
+      "input_type": "malformed_alias",
+      "input": "Obltoxaximab",
+      "status": "missing",
+      "matched_name": null,
+      "reason": "no_match",
+      "confidence": null,
+      "candidate_names": [],
+      "success": false
+    },
+    {
+      "drug_id": 5335,
+      "canonical": "Antiasthmatic Agents",
+      "has_livertox_excerpt": true,
+      "input_type": "malformed_alias",
+      "input": "Crmolyn",
+      "status": "missing",
+      "matched_name": null,
+      "reason": "no_match",
+      "confidence": null,
+      "candidate_names": [],
+      "success": false
+    },
+    {
+      "drug_id": 5337,
+      "canonical": "Anticholinergic Agents",
+      "has_livertox_excerpt": true,
+      "input_type": "malformed_alias",
+      "input": "Beladonna",
+      "status": "missing",
+      "matched_name": null,
+      "reason": "no_match",
+      "confidence": null,
+      "candidate_names": [],
+      "success": false
+    },
+    {
+      "drug_id": 5346,
+      "canonical": "Antilipemic Agents",
+      "has_livertox_excerpt": true,
+      "input_type": "malformed_alias",
+      "input": "Miomersen",
+      "status": "missing",
+      "matched_name": null,
+      "reason": "no_match",
+      "confidence": null,
+      "candidate_names": [],
+      "success": false
+    },
+    {
+      "drug_id": 5355,
+      "canonical": "Antiulcer Agents",
+      "has_livertox_excerpt": true,
+      "input_type": "malformed_alias",
+      "input": "Suralfate",
+      "status": "missing",
+      "matched_name": null,
+      "reason": "no_match",
+      "confidence": null,
+      "candidate_names": [],
+      "success": false
+    },
+    {
+      "drug_id": 5357,
+      "canonical": "Apoaequorin",
+      "has_livertox_excerpt": true,
+      "input_type": "malformed_alias",
+      "input": "Prvagen",
+      "status": "missing",
+      "matched_name": null,
+      "reason": "no_match",
+      "confidence": null,
+      "candidate_names": [],
+      "success": false
+    },
+    {
+      "drug_id": 5358,
+      "canonical": "Apomorphine",
+      "has_livertox_excerpt": true,
+      "input_type": "malformed_alias",
+      "input": "Apkyn",
+      "status": "missing",
+      "matched_name": null,
+      "reason": "no_match",
+      "confidence": null,
+      "candidate_names": [],
+      "success": false
+    },
+    {
+      "drug_id": 752,
+      "canonical": "apremilast",
+      "has_livertox_excerpt": true,
+      "input_type": "malformed_alias",
+      "input": "24Rapremilast75MGExtendedReleaseOralTablet",
+      "status": "missing",
+      "matched_name": null,
+      "reason": "no_match",
+      "confidence": null,
+      "candidate_names": [],
+      "success": false
+    },
+    {
+      "drug_id": 5365,
+      "canonical": "Artemisinin",
+      "has_livertox_excerpt": true,
+      "input_type": "real_alias",
+      "input": "Coartem",
+      "status": "ambiguous",
+      "matched_name": null,
+      "reason": "ambiguous_exact_alias",
+      "confidence": null,
+      "candidate_names": [
+        "Arteminisinin",
+        "Artemisinin"
+      ],
+      "success": false
+    },
+    {
+      "drug_id": 5365,
+      "canonical": "Artemisinin",
+      "has_livertox_excerpt": true,
+      "input_type": "malformed_alias",
+      "input": "Cortem",
+      "status": "missing",
+      "matched_name": null,
+      "reason": "no_match",
+      "confidence": null,
+      "candidate_names": [],
+      "success": false
+    },
+    {
+      "drug_id": 5366,
+      "canonical": "Asenapine",
+      "has_livertox_excerpt": true,
+      "input_type": "malformed_alias",
+      "input": "Sahris",
+      "status": "missing",
+      "matched_name": null,
+      "reason": "no_match",
+      "confidence": null,
+      "candidate_names": [],
+      "success": false
+    },
+    {
+      "drug_id": 5367,
+      "canonical": "Ashwagandha",
+      "has_livertox_excerpt": true,
+      "input_type": "real_alias",
+      "input": "Generic",
+      "status": "matched",
+      "matched_name": "Generic",
+      "reason": "exact_canonical",
+      "confidence": 1.0,
+      "candidate_names": [
+        "Generic"
+      ],
+      "success": false
+    },
+    {
+      "drug_id": 5368,
+      "canonical": "Asparaginase",
+      "has_livertox_excerpt": true,
+      "input_type": "malformed_alias",
+      "input": "Peaspargase",
+      "status": "missing",
+      "matched_name": null,
+      "reason": "no_match",
+      "confidence": null,
+      "candidate_names": [],
+      "success": false
+    },
+    {
+      "drug_id": 740,
+      "canonical": "aspirin",
+      "has_livertox_excerpt": true,
+      "input_type": "real_alias",
+      "input": "24 HR aspirin 162.5 MG Extended Release Oral Capsule",
+      "status": "ambiguous",
+      "matched_name": null,
+      "reason": "ambiguous_exact_alias",
+      "confidence": null,
+      "candidate_names": [
+        "acetaminophen",
+        "alprazolam",
+        "amlodipine",
+        "amoxicillin",
+        "aripiprazole",
+        "aspirin",
+        "atropine",
+        "baclofen",
+        "Barbiturates",
+        "bisacodyl",
+        "brompheniramine",
+        "bupropion",
+        "caffeine",
+        "carbamazepine",
+        "carbinoxamine",
+        "carisoprodol",
+        "cetirizine",
+        "chlorpromazine",
+        "cimetidine",
+        "citalopram",
+        "clarithromycin",
+        "clemastine",
+        "clonazepam",
+        "clozapine",
+        "codeine",
+        "diclofenac",
+        "diphenhydramine",
+        "dipyridamole",
+        "donepezil",
+        "doxylamine",
+        "famotidine",
+        "fexofenadine",
+        "fingolimod",
+        "flurbiprofen",
+        "folic acid",
+        "glycopyrrolate",
+        "hydrocodone",
+        "hydromorphone",
+        "hyoscyamine",
+        "ibuprofen",
+        "indomethacin",
+        "ketoprofen",
+        "lamivudine",
+        "lamotrigine",
+        "lansoprazole",
+        "levodopa",
+        "loratadine",
+        "meclizine",
+        "melatonin",
+        "meloxicam",
+        "meprobamate",
+        "mesalamine",
+        "methocarbamol",
+        "methylphenidate",
+        "metoclopramide",
+        "metronidazole",
+        "mirtazapine",
+        "morphine",
+        "naproxen",
+        "nevirapine",
+        "niacin",
+        "nicotine",
+        "olanzapine",
+        "omeprazole",
+        "orphenadrine",
+        "oxybate",
+        "oxycodone",
+        "piroxicam",
+        "pravastatin",
+        "prochlorperazine",
+        "promethazine",
+        "quinidine",
+        "ranitidine",
+        "rifabutin",
+        "risperidone",
+        "selegiline",
+        "simvastatin",
+        "stavudine",
+        "sulfasalazine",
+        "Trace Elements and Metals",
+        "tramadol",
+        "trimethobenzamide",
+        "triprolidine",
+        "vardenafil",
+        "zolpidem"
+      ],
+      "success": false
+    },
+    {
+      "drug_id": 740,
+      "canonical": "aspirin",
+      "has_livertox_excerpt": true,
+      "input_type": "malformed_alias",
+      "input": "24Raspirin162.5MGExtendedReleaseOralCapsule",
+      "status": "missing",
+      "matched_name": null,
+      "reason": "no_match",
+      "confidence": null,
+      "candidate_names": [],
+      "success": false
+    },
+    {
+      "drug_id": 1328,
+      "canonical": "atazanavir",
+      "has_livertox_excerpt": true,
+      "input_type": "real_alias",
+      "input": "Cobicistat",
+      "status": "ambiguous",
+      "matched_name": null,
+      "reason": "ambiguous_exact_alias",
+      "confidence": null,
+      "candidate_names": [
+        "atazanavir",
+        "darunavir",
+        "Elvitegravir",
+        "emtricitabine"
+      ],
+      "success": false
+    },
+    {
+      "drug_id": 1328,
+      "canonical": "atazanavir",
+      "has_livertox_excerpt": true,
+      "input_type": "malformed_alias",
+      "input": "Coicistat",
+      "status": "ambiguous",
+      "matched_name": null,
+      "reason": "ambiguous_fuzzy",
+      "confidence": null,
+      "candidate_names": [
+        "atazanavir",
+        "darunavir",
+        "emtricitabine"
+      ],
+      "success": false
+    },
+    {
+      "drug_id": 1398,
+      "canonical": "atorvastatin",
+      "has_livertox_excerpt": true,
+      "input_type": "real_alias",
+      "input": "Amlodipine",
+      "status": "matched",
+      "matched_name": "amlodipine",
+      "reason": "exact_canonical",
+      "confidence": 1.0,
+      "candidate_names": [
+        "amlodipine"
+      ],
+      "success": false
+    },
+    {
+      "drug_id": 1398,
+      "canonical": "atorvastatin",
+      "has_livertox_excerpt": true,
+      "input_type": "malformed_alias",
+      "input": "Amodipine",
+      "status": "ambiguous",
+      "matched_name": null,
+      "reason": "ambiguous_fuzzy",
+      "confidence": null,
+      "candidate_names": [
+        "aliskiren",
+        "amlodipine",
+        "atorvastatin",
+        "benazepril",
+        "celecoxib",
+        "telmisartan",
+        "valsartan"
+      ],
+      "success": false
+    },
+    {
+      "drug_id": 187,
+      "canonical": "atropine",
+      "has_livertox_excerpt": true,
+      "input_type": "real_alias",
+      "input": "0.7 ML atropine sulfate 0.714 MG/ML Auto-Injector",
+      "status": "ambiguous",
+      "matched_name": null,
+      "reason": "ambiguous_exact_alias",
+      "confidence": null,
+      "candidate_names": [
+        "acetaminophen",
+        "aspirin",
+        "atropine",
+        "brompheniramine",
+        "caffeine",
+        "carbinoxamine",
+        "cetirizine",
+        "codeine",
+        "diphenhydramine",
+        "Diphenoxylate",
+        "doxylamine",
+        "fexofenadine",
+        "hydrocodone",
+        "hyoscyamine",
+        "ibuprofen",
+        "lamotrigine",
+        "loratadine",
+        "naproxen",
+        "phenobarbital",
+        "Scopolamine",
+        "triprolidine"
+      ],
+      "success": false
+    },
+    {
+      "drug_id": 187,
+      "canonical": "atropine",
+      "has_livertox_excerpt": true,
+      "input_type": "malformed_alias",
+      "input": "0.MLatropinesulfate0.714MG/MLAuto-Injector",
+      "status": "ambiguous",
+      "matched_name": null,
+      "reason": "ambiguous_exact_alias",
+      "confidence": null,
+      "candidate_names": [
+        "acetaminophen",
+        "aspirin",
+        "atropine",
+        "brompheniramine",
+        "caffeine",
+        "carbinoxamine",
+        "cetirizine",
+        "codeine",
+        "diphenhydramine",
+        "Diphenoxylate",
+        "doxylamine",
+        "fexofenadine",
+        "hydrocodone",
+        "hyoscyamine",
+        "ibuprofen",
+        "lamotrigine",
+        "loratadine",
+        "naproxen",
+        "phenobarbital",
+        "Scopolamine",
+        "triprolidine"
+      ],
+      "success": false
+    },
+    {
+      "drug_id": 5377,
+      "canonical": "Axatilimab",
+      "has_livertox_excerpt": true,
+      "input_type": "malformed_alias",
+      "input": "Nitimvo",
+      "status": "missing",
+      "matched_name": null,
+      "reason": "no_match",
+      "confidence": null,
+      "candidate_names": [],
+      "success": false
+    },
+    {
+      "drug_id": 5378,
+      "canonical": "Azilsartan",
+      "has_livertox_excerpt": true,
+      "input_type": "malformed_alias",
+      "input": "Edrbi",
+      "status": "missing",
+      "matched_name": null,
+      "reason": "no_match",
+      "confidence": null,
+      "candidate_names": [],
+      "success": false
+    },
+    {
+      "drug_id": 1384,
+      "canonical": "aztreonam",
+      "has_livertox_excerpt": true,
+      "input_type": "real_alias",
+      "input": "Avibactam",
+      "status": "ambiguous",
+      "matched_name": null,
+      "reason": "ambiguous_exact_alias",
+      "confidence": null,
+      "candidate_names": [
+        "aztreonam",
+        "Pharmacokinetic Enhancers"
+      ],
+      "success": false
+    }
+  ],
+  "failure_patterns": [
+    {
+      "input_type": "malformed_alias",
+      "status": "missing",
+      "reason": "no_match",
+      "count": 41
+    },
+    {
+      "input_type": "real_alias",
+      "status": "ambiguous",
+      "reason": "ambiguous_exact_alias",
+      "count": 10
+    },
+    {
+      "input_type": "malformed_alias",
+      "status": "ambiguous",
+      "reason": "ambiguous_fuzzy",
+      "count": 9
+    },
+    {
+      "input_type": "real_alias",
+      "status": "matched",
+      "reason": "exact_canonical",
+      "count": 8
+    },
+    {
+      "input_type": "malformed_alias",
+      "status": "ambiguous",
+      "reason": "ambiguous_exact_alias",
+      "count": 1
+    }
+  ],
+  "rates_by_drug": [
+    {
+      "canonical": "abacavir",
+      "has_livertox_excerpt": true,
+      "total": 3,
+      "success": 3,
+      "rate": 100.0
+    },
+    {
+      "canonical": "abatacept",
+      "has_livertox_excerpt": true,
+      "total": 3,
+      "success": 3,
+      "rate": 100.0
+    },
+    {
+      "canonical": "abemaciclib",
+      "has_livertox_excerpt": true,
+      "total": 3,
+      "success": 3,
+      "rate": 100.0
+    },
+    {
+      "canonical": "abiraterone",
+      "has_livertox_excerpt": true,
+      "total": 3,
+      "success": 1,
+      "rate": 33.33
+    },
+    {
+      "canonical": "abrocitinib",
+      "has_livertox_excerpt": true,
+      "total": 3,
+      "success": 3,
+      "rate": 100.0
+    },
+    {
+      "canonical": "acalabrutinib",
+      "has_livertox_excerpt": true,
+      "total": 3,
+      "success": 3,
+      "rate": 100.0
+    },
+    {
+      "canonical": "acamprosate",
+      "has_livertox_excerpt": true,
+      "total": 3,
+      "success": 2,
+      "rate": 66.67
+    },
+    {
+      "canonical": "acarbose",
+      "has_livertox_excerpt": true,
+      "total": 3,
+      "success": 3,
+      "rate": 100.0
+    },
+    {
+      "canonical": "acebutolol",
+      "has_livertox_excerpt": true,
+      "total": 3,
+      "success": 1,
+      "rate": 33.33
+    },
+    {
+      "canonical": "acetaminophen",
+      "has_livertox_excerpt": true,
+      "total": 3,
+      "success": 3,
+      "rate": 100.0
+    },
+    {
+      "canonical": "acetylcysteine",
+      "has_livertox_excerpt": true,
+      "total": 3,
+      "success": 3,
+      "rate": 100.0
+    },
+    {
+      "canonical": "acitretin",
+      "has_livertox_excerpt": true,
+      "total": 3,
+      "success": 3,
+      "rate": 100.0
+    },
+    {
+      "canonical": "Aclidinium",
+      "has_livertox_excerpt": true,
+      "total": 3,
+      "success": 2,
+      "rate": 66.67
+    },
+    {
+      "canonical": "acoramidis",
+      "has_livertox_excerpt": true,
+      "total": 3,
+      "success": 1,
+      "rate": 33.33
+    },
+    {
+      "canonical": "Acrivastine",
+      "has_livertox_excerpt": true,
+      "total": 3,
+      "success": 2,
+      "rate": 66.67
+    },
+    {
+      "canonical": "acyclovir",
+      "has_livertox_excerpt": true,
+      "total": 3,
+      "success": 3,
+      "rate": 100.0
+    },
+    {
+      "canonical": "adagrasib",
+      "has_livertox_excerpt": true,
+      "total": 3,
+      "success": 3,
+      "rate": 100.0
+    },
+    {
+      "canonical": "adalimumab",
+      "has_livertox_excerpt": true,
+      "total": 3,
+      "success": 3,
+      "rate": 100.0
+    },
+    {
+      "canonical": "Adefovir",
+      "has_livertox_excerpt": true,
+      "total": 3,
+      "success": 2,
+      "rate": 66.67
+    },
+    {
+      "canonical": "Aducanumab",
+      "has_livertox_excerpt": true,
+      "total": 3,
+      "success": 2,
+      "rate": 66.67
+    },
+    {
+      "canonical": "Afamelanotide",
+      "has_livertox_excerpt": true,
+      "total": 3,
+      "success": 2,
+      "rate": 66.67
+    },
+    {
+      "canonical": "afatinib",
+      "has_livertox_excerpt": true,
+      "total": 3,
+      "success": 3,
+      "rate": 100.0
+    },
+    {
+      "canonical": "albendazole",
+      "has_livertox_excerpt": true,
+      "total": 3,
+      "success": 3,
+      "rate": 100.0
+    },
+    {
+      "canonical": "Albiglutide",
+      "has_livertox_excerpt": true,
+      "total": 3,
+      "success": 2,
+      "rate": 66.67
+    },
+    {
+      "canonical": "Aldesleukin",
+      "has_livertox_excerpt": true,
+      "total": 3,
+      "success": 2,
+      "rate": 66.67
+    },
+    {
+      "canonical": "alectinib",
+      "has_livertox_excerpt": true,
+      "total": 3,
+      "success": 3,
+      "rate": 100.0
+    },
+    {
+      "canonical": "Alefacept",
+      "has_livertox_excerpt": true,
+      "total": 3,
+      "success": 2,
+      "rate": 66.67
+    },
+    {
+      "canonical": "alemtuzumab",
+      "has_livertox_excerpt": true,
+      "total": 3,
+      "success": 3,
+      "rate": 100.0
+    },
+    {
+      "canonical": "alfuzosin",
+      "has_livertox_excerpt": true,
+      "total": 3,
+      "success": 2,
+      "rate": 66.67
+    },
+    {
+      "canonical": "alirocumab",
+      "has_livertox_excerpt": true,
+      "total": 3,
+      "success": 3,
+      "rate": 100.0
+    },
+    {
+      "canonical": "aliskiren",
+      "has_livertox_excerpt": true,
+      "total": 3,
+      "success": 1,
+      "rate": 33.33
+    },
+    {
+      "canonical": "Alkylating Agents",
+      "has_livertox_excerpt": true,
+      "total": 3,
+      "success": 2,
+      "rate": 66.67
+    },
+    {
+      "canonical": "allopurinol",
+      "has_livertox_excerpt": true,
+      "total": 3,
+      "success": 3,
+      "rate": 100.0
+    },
+    {
+      "canonical": "Aloe Vera",
+      "has_livertox_excerpt": true,
+      "total": 3,
+      "success": 2,
+      "rate": 66.67
+    },
+    {
+      "canonical": "alogliptin",
+      "has_livertox_excerpt": true,
+      "total": 3,
+      "success": 1,
+      "rate": 33.33
+    },
+    {
+      "canonical": "alpelisib",
+      "has_livertox_excerpt": true,
+      "total": 3,
+      "success": 1,
+      "rate": 33.33
+    },
+    {
+      "canonical": "alprazolam",
+      "has_livertox_excerpt": true,
+      "total": 3,
+      "success": 2,
+      "rate": 66.67
+    },
+    {
+      "canonical": "Altretamine",
+      "has_livertox_excerpt": true,
+      "total": 3,
+      "success": 2,
+      "rate": 66.67
+    },
+    {
+      "canonical": "amantadine",
+      "has_livertox_excerpt": true,
+      "total": 3,
+      "success": 2,
+      "rate": 66.67
+    },
+    {
+      "canonical": "ambrisentan",
+      "has_livertox_excerpt": true,
+      "total": 3,
+      "success": 3,
+      "rate": 100.0
+    },
+    {
+      "canonical": "Amide Local Anesthetics",
+      "has_livertox_excerpt": true,
+      "total": 3,
+      "success": 2,
+      "rate": 66.67
+    },
+    {
+      "canonical": "amifampridine",
+      "has_livertox_excerpt": true,
+      "total": 3,
+      "success": 3,
+      "rate": 100.0
+    },
+    {
+      "canonical": "amikacin",
+      "has_livertox_excerpt": true,
+      "total": 3,
+      "success": 3,
+      "rate": 100.0
+    },
+    {
+      "canonical": "amiloride",
+      "has_livertox_excerpt": true,
+      "total": 3,
+      "success": 1,
+      "rate": 33.33
+    },
+    {
+      "canonical": "amiodarone",
+      "has_livertox_excerpt": true,
+      "total": 3,
+      "success": 3,
+      "rate": 100.0
+    },
+    {
+      "canonical": "amisulpride",
+      "has_livertox_excerpt": true,
+      "total": 3,
+      "success": 3,
+      "rate": 100.0
+    },
+    {
+      "canonical": "amitriptyline",
+      "has_livertox_excerpt": true,
+      "total": 3,
+      "success": 1,
+      "rate": 33.33
+    },
+    {
+      "canonical": "Amivantamab",
+      "has_livertox_excerpt": true,
+      "total": 3,
+      "success": 2,
+      "rate": 66.67
+    },
+    {
+      "canonical": "amlodipine",
+      "has_livertox_excerpt": true,
+      "total": 3,
+      "success": 3,
+      "rate": 100.0
+    },
+    {
+      "canonical": "Amodiaquine",
+      "has_livertox_excerpt": true,
+      "total": 3,
+      "success": 2,
+      "rate": 66.67
+    },
+    {
+      "canonical": "amoxapine",
+      "has_livertox_excerpt": true,
+      "total": 3,
+      "success": 2,
+      "rate": 66.67
+    },
+    {
+      "canonical": "amoxicillin",
+      "has_livertox_excerpt": true,
+      "total": 3,
+      "success": 3,
+      "rate": 100.0
+    },
+    {
+      "canonical": "amoxicillin clavulanate",
+      "has_livertox_excerpt": true,
+      "total": 3,
+      "success": 2,
+      "rate": 66.67
+    },
+    {
+      "canonical": "Amphetamines",
+      "has_livertox_excerpt": true,
+      "total": 3,
+      "success": 2,
+      "rate": 66.67
+    },
+    {
+      "canonical": "ampicillin",
+      "has_livertox_excerpt": true,
+      "total": 3,
+      "success": 1,
+      "rate": 33.33
+    },
+    {
+      "canonical": "ampicillin sulbactam",
+      "has_livertox_excerpt": true,
+      "total": 3,
+      "success": 1,
+      "rate": 33.33
+    },
+    {
+      "canonical": "anagrelide",
+      "has_livertox_excerpt": true,
+      "total": 3,
+      "success": 3,
+      "rate": 100.0
+    },
+    {
+      "canonical": "anakinra",
+      "has_livertox_excerpt": true,
+      "total": 3,
+      "success": 3,
+      "rate": 100.0
+    },
+    {
+      "canonical": "anastrozole",
+      "has_livertox_excerpt": true,
+      "total": 3,
+      "success": 3,
+      "rate": 100.0
+    },
+    {
+      "canonical": "Androgenic steroids",
+      "has_livertox_excerpt": true,
+      "total": 3,
+      "success": 1,
+      "rate": 33.33
+    },
+    {
+      "canonical": "Anesthetics, General",
+      "has_livertox_excerpt": true,
+      "total": 3,
+      "success": 2,
+      "rate": 66.67
+    },
+    {
+      "canonical": "Anifrolumab",
+      "has_livertox_excerpt": true,
+      "total": 3,
+      "success": 2,
+      "rate": 66.67
+    },
+    {
+      "canonical": "Anthrax Antitoxins",
+      "has_livertox_excerpt": true,
+      "total": 3,
+      "success": 2,
+      "rate": 66.67
+    },
+    {
+      "canonical": "Antiasthmatic Agents",
+      "has_livertox_excerpt": true,
+      "total": 3,
+      "success": 2,
+      "rate": 66.67
+    },
+    {
+      "canonical": "Anticholinergic Agents",
+      "has_livertox_excerpt": true,
+      "total": 3,
+      "success": 2,
+      "rate": 66.67
+    },
+    {
+      "canonical": "Antilipemic Agents",
+      "has_livertox_excerpt": true,
+      "total": 3,
+      "success": 2,
+      "rate": 66.67
+    },
+    {
+      "canonical": "Antiulcer Agents",
+      "has_livertox_excerpt": true,
+      "total": 3,
+      "success": 2,
+      "rate": 66.67
+    },
+    {
+      "canonical": "apalutamide",
+      "has_livertox_excerpt": true,
+      "total": 3,
+      "success": 3,
+      "rate": 100.0
+    },
+    {
+      "canonical": "apixaban",
+      "has_livertox_excerpt": true,
+      "total": 3,
+      "success": 3,
+      "rate": 100.0
+    },
+    {
+      "canonical": "Apoaequorin",
+      "has_livertox_excerpt": true,
+      "total": 3,
+      "success": 2,
+      "rate": 66.67
+    },
+    {
+      "canonical": "Apomorphine",
+      "has_livertox_excerpt": true,
+      "total": 3,
+      "success": 2,
+      "rate": 66.67
+    },
+    {
+      "canonical": "apremilast",
+      "has_livertox_excerpt": true,
+      "total": 3,
+      "success": 2,
+      "rate": 66.67
+    },
+    {
+      "canonical": "aprepitant",
+      "has_livertox_excerpt": true,
+      "total": 3,
+      "success": 3,
+      "rate": 100.0
+    },
+    {
+      "canonical": "aripiprazole",
+      "has_livertox_excerpt": true,
+      "total": 3,
+      "success": 3,
+      "rate": 100.0
+    },
+    {
+      "canonical": "Artemisinin",
+      "has_livertox_excerpt": true,
+      "total": 3,
+      "success": 1,
+      "rate": 33.33
+    },
+    {
+      "canonical": "asciminib",
+      "has_livertox_excerpt": true,
+      "total": 3,
+      "success": 3,
+      "rate": 100.0
+    },
+    {
+      "canonical": "Asenapine",
+      "has_livertox_excerpt": true,
+      "total": 3,
+      "success": 2,
+      "rate": 66.67
+    },
+    {
+      "canonical": "Ashwagandha",
+      "has_livertox_excerpt": true,
+      "total": 3,
+      "success": 2,
+      "rate": 66.67
+    },
+    {
+      "canonical": "Asparaginase",
+      "has_livertox_excerpt": true,
+      "total": 3,
+      "success": 2,
+      "rate": 66.67
+    },
+    {
+      "canonical": "aspirin",
+      "has_livertox_excerpt": true,
+      "total": 3,
+      "success": 1,
+      "rate": 33.33
+    },
+    {
+      "canonical": "atazanavir",
+      "has_livertox_excerpt": true,
+      "total": 3,
+      "success": 1,
+      "rate": 33.33
+    },
+    {
+      "canonical": "atenolol",
+      "has_livertox_excerpt": true,
+      "total": 3,
+      "success": 3,
+      "rate": 100.0
+    },
+    {
+      "canonical": "atezolizumab",
+      "has_livertox_excerpt": true,
+      "total": 3,
+      "success": 3,
+      "rate": 100.0
+    },
+    {
+      "canonical": "atogepant",
+      "has_livertox_excerpt": true,
+      "total": 3,
+      "success": 3,
+      "rate": 100.0
+    },
+    {
+      "canonical": "atomoxetine",
+      "has_livertox_excerpt": true,
+      "total": 3,
+      "success": 3,
+      "rate": 100.0
+    },
+    {
+      "canonical": "atorvastatin",
+      "has_livertox_excerpt": true,
+      "total": 3,
+      "success": 1,
+      "rate": 33.33
+    },
+    {
+      "canonical": "atovaquone",
+      "has_livertox_excerpt": true,
+      "total": 3,
+      "success": 3,
+      "rate": 100.0
+    },
+    {
+      "canonical": "atrasentan",
+      "has_livertox_excerpt": true,
+      "total": 3,
+      "success": 3,
+      "rate": 100.0
+    },
+    {
+      "canonical": "atropine",
+      "has_livertox_excerpt": true,
+      "total": 3,
+      "success": 1,
+      "rate": 33.33
+    },
+    {
+      "canonical": "avacopan",
+      "has_livertox_excerpt": true,
+      "total": 3,
+      "success": 3,
+      "rate": 100.0
+    },
+    {
+      "canonical": "avanafil",
+      "has_livertox_excerpt": true,
+      "total": 3,
+      "success": 3,
+      "rate": 100.0
+    },
+    {
+      "canonical": "avapritinib",
+      "has_livertox_excerpt": true,
+      "total": 3,
+      "success": 3,
+      "rate": 100.0
+    },
+    {
+      "canonical": "avelumab",
+      "has_livertox_excerpt": true,
+      "total": 3,
+      "success": 3,
+      "rate": 100.0
+    },
+    {
+      "canonical": "Axatilimab",
+      "has_livertox_excerpt": true,
+      "total": 3,
+      "success": 2,
+      "rate": 66.67
+    },
+    {
+      "canonical": "axitinib",
+      "has_livertox_excerpt": true,
+      "total": 3,
+      "success": 3,
+      "rate": 100.0
+    },
+    {
+      "canonical": "azacitidine",
+      "has_livertox_excerpt": true,
+      "total": 3,
+      "success": 3,
+      "rate": 100.0
+    },
+    {
+      "canonical": "azathioprine",
+      "has_livertox_excerpt": true,
+      "total": 3,
+      "success": 3,
+      "rate": 100.0
+    },
+    {
+      "canonical": "Azilsartan",
+      "has_livertox_excerpt": true,
+      "total": 3,
+      "success": 2,
+      "rate": 66.67
+    },
+    {
+      "canonical": "azithromycin",
+      "has_livertox_excerpt": true,
+      "total": 3,
+      "success": 3,
+      "rate": 100.0
+    },
+    {
+      "canonical": "aztreonam",
+      "has_livertox_excerpt": true,
+      "total": 3,
+      "success": 2,
+      "rate": 66.67
+    }
+  ]
+}
