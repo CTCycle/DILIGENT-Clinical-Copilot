@@ -395,6 +395,7 @@ class ModelConfigEndpoint:
         snapshot = self.serializer.load_snapshot()
         updates: dict[str, Any] = {}
         runtime_provider = self.resolve_provider(LLMRuntimeConfig.get_llm_provider())
+        snapshot_provider = self.resolve_provider(snapshot.cloud_provider)
         runtime_cloud_model = self.resolve_cloud_model(
             provider=runtime_provider,
             model_name=LLMRuntimeConfig.get_cloud_model(),
@@ -411,8 +412,11 @@ class ModelConfigEndpoint:
         if snapshot.cloud_provider is None:
             updates["cloud_provider"] = runtime_provider
         if snapshot.cloud_model is None:
-            updates["cloud_model"] = runtime_cloud_model
-        if snapshot.cloud_provider is None and snapshot.cloud_model is None:
+            updates["cloud_model"] = self.resolve_cloud_model(
+                provider=snapshot_provider,
+                model_name=runtime_cloud_model,
+            )
+        if snapshot.cloud_provider is None and snapshot.cloud_model is None and snapshot.updated_at is None:
             updates["use_cloud_models"] = LLMRuntimeConfig.is_cloud_enabled()
 
         if updates:

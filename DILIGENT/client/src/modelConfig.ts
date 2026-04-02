@@ -56,19 +56,21 @@ export function buildRuntimeSettingsFromConfig(
   previous: RuntimeSettings,
 ): RuntimeSettings {
   const cloudChoices = resolveCloudChoices(payload.cloud_model_choices);
-  const provider = resolveProvider(payload.llm_provider, cloudChoices);
+  const provider = resolveProvider(payload.llm_provider ?? DEFAULT_SETTINGS.provider, cloudChoices);
   const cloudModel = resolveCloudModel(
     provider,
     payload.cloud_model,
     cloudChoices,
   );
+  const resolvedClinicalModel = payload.clinical_model || DEFAULT_SETTINGS.clinicalModel;
+  const resolvedParsingModel = payload.text_extraction_model || DEFAULT_SETTINGS.parsingModel;
   return {
     ...previous,
     useCloudServices: payload.use_cloud_services,
     provider,
     cloudModel,
-    parsingModel: payload.text_extraction_model || previous.parsingModel,
-    clinicalModel: payload.clinical_model || previous.clinicalModel,
+    parsingModel: resolvedParsingModel,
+    clinicalModel: resolvedClinicalModel,
     reasoning: payload.ollama_reasoning,
   };
 }

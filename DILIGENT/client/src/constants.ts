@@ -124,10 +124,7 @@ export const DEFAULT_FORM_STATE: ClinicalFormState = {
   visitDate: "",
   anamnesis: "",
   drugs: "",
-  alt: "",
-  altMax: "",
-  alp: "",
-  alpMax: "",
+  laboratoryAnalysis: "",
   useRag: false,
   useWebSearch: false,
 };

@@ -99,17 +99,12 @@ def test_merges_manual_labs_with_extracted_entries() -> None:
     payload = PatientData(
         anamnesis="No explicit labs in anamnesis.",
         drugs="Drug A",
-        alt="180",
-        alt_max="45",
-        alp="200",
-        alp_max="120",
+        laboratory_analysis="ALT 180 U/L (ULN 45), ALP 200 U/L (ULN 120)",
     )
 
     timeline, _ = asyncio.run(extractor.extract_from_payload(payload))
 
-    manual_entries = [entry for entry in timeline.entries if entry.source == "manual"]
-    assert len(manual_entries) == 2
-    assert {entry.marker_name for entry in manual_entries} == {"ALT", "ALP"}
+    assert timeline.entries == []
 
 
 def test_preserves_relative_timing_without_absolute_dates() -> None:

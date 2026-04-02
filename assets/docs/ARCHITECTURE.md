@@ -31,9 +31,11 @@ DILIGENT is a local-first clinical application for DILI assessment with:
   - Typed payload models for clinical, jobs, models, keys, inspection, research.
 - `DILIGENT/server/services/*`
   - Business logic: clinical analysis, updater flows, inspection orchestration, jobs.
-  - Clinical pipeline now includes dedicated longitudinal lab extraction
-    (`services/clinical/labs.py`) and deterministic per-drug RUCAM estimation
-    (`services/clinical/rucam.py`) wired before final hepatotoxicity synthesis.
+  - Active clinical pipeline is request-driven from `api/session.py` and uses:
+    - free-text laboratory parsing from `services/clinical/labs.py` (`laboratory_analysis` + supplemental anamnesis),
+    - pattern derivation from parsed timelines in `services/clinical/hepatox.py`,
+    - deterministic per-drug RUCAM estimation in `services/clinical/rucam.py`,
+    - language detection and localized validation/report scaffolding.
 - `DILIGENT/server/repositories/*`
   - DB and serialization boundaries (SQLite/Postgres, vector serialization, queries).
 - `DILIGENT/server/models/*`
@@ -125,3 +127,24 @@ Runtime/config files:
   - `server/api/access_keys.py`, `server/repositories/serialization/access_keys.py`, `client/src/components/AccessKeyModal.tsx`.
 - Runtime/deployment behavior:
   - `docker/*`, `DILIGENT/start_on_windows.bat`, `release/tauri/*`, `.env profiles`.
+
+## 10. Clinical request contract (active)
+
+Current DILI request payload (high-level):
+- `name`
+- `visit_date`
+- `anamnesis`
+- `drugs`
+- `laboratory_analysis`
+- `use_rag`
+- `use_web_search`
+- optional runtime overrides (`use_cloud_services`, provider/model overrides)
+
+Hard blockers in active pipeline:
+- missing anamnesis
+- missing visit date
+- no drug with usable timing information
+- insufficient laboratory data to determine hepatotoxicity pattern
+
+Soft degradation:
+- non-critical gaps are preserved as warnings in `issues` and do not block if core clinical inference is still possible.

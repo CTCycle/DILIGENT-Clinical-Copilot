@@ -116,10 +116,7 @@ def test_build_structured_clinical_context_includes_disease_timeline() -> None:
         visit_date=date(2025, 4, 14),
         anamnesis="History of steatosis and hypertension.",
         drugs="Ursodeoxycholic acid 300 mg",
-        alt="100",
-        alt_max="50",
-        alp="120",
-        alp_max="100",
+        laboratory_analysis="ALT 100 U/L (ULN 50) on 2025-04-14; ALP 120 U/L (ULN 100)",
     )
     therapy_drugs = PatientDrugs(entries=[DrugEntry(name="Ursodeoxycholic acid")])
     anamnesis_drugs = PatientDrugs(entries=[DrugEntry(name="Metformin")])

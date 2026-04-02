@@ -3,10 +3,8 @@ import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
 
 import { BooleanToggle } from "../components/BooleanToggle";
-import { ConfirmModal } from "../components/ConfirmModal";
 import {
     DEFAULT_FORM_STATE,
-    DEFAULT_SETTINGS,
     REPORT_EXPORT_FILENAME,
 } from "../constants";
 import { useAppState } from "../context/AppStateContext";
@@ -25,53 +23,6 @@ import {
 
 const todayIso = new Date().toISOString().slice(0, 10);
 const DEFAULT_POLL_INTERVAL_MS = 1000;
-const MAX_RATIO_DISPLAY = 6;
-
-function parseLabNumber(value: string): number | null {
-    const normalized = value.replace(",", ".").trim();
-    if (!normalized) {
-        return null;
-    }
-    const parsed = Number(normalized);
-    return Number.isFinite(parsed) && parsed > 0 ? parsed : null;
-}
-
-function computeRatio(value: string, maxValue: string): number | null {
-    const current = parseLabNumber(value);
-    const upperLimit = parseLabNumber(maxValue);
-    if (current === null || upperLimit === null || upperLimit <= 0) {
-        return null;
-    }
-    return current / upperLimit;
-}
-
-function formatRatio(ratio: number | null): string {
-    if (ratio === null) {
-        return "N/A";
-    }
-    return `${ratio.toFixed(2)}x`;
-}
-
-function getRatioPercent(ratio: number | null): number {
-    if (ratio === null) {
-        return 0;
-    }
-    return Math.min((ratio / MAX_RATIO_DISPLAY) * 100, 100);
-}
-
-function resolvePattern(altRatio: number | null, alpRatio: number | null): string {
-    if (altRatio === null || alpRatio === null || alpRatio <= 0) {
-        return "Undetermined";
-    }
-    const rRatio = altRatio / alpRatio;
-    if (rRatio >= 5) {
-        return "Hepatocellular pattern";
-    }
-    if (rRatio <= 2) {
-        return "Cholestatic pattern";
-    }
-    return "Mixed pattern";
-}
 
 // ---------------------------------------------------------------------------
 // Icons
@@ -124,7 +75,6 @@ export function DiliAgentPage(): React.JSX.Element {
 
     const pollerRef = useRef<{ stop: () => void } | null>(null);
     const [isCancelling, setIsCancelling] = useState(false);
-    const [isMissingLabsModalOpen, setIsMissingLabsModalOpen] = useState(false);
     const { revokeObjectUrl } = useObjectUrlLifecycle(exportUrl);
 
     // Cleanup poller on unmount
@@ -260,13 +210,13 @@ export function DiliAgentPage(): React.JSX.Element {
         [handleJobStatusUpdate, handlePollingError, stopPoller],
     );
 
-    const executeRunSession = async (allowMissingLabs: boolean | null) => {
+    const executeRunSession = async () => {
         setIsCancelling(false);
         updateDiliAgent({ isRunning: true });
         resetOutputs();
         stopPoller();
         try {
-            const payload = buildClinicalPayload(form, settings, allowMissingLabs);
+            const payload = buildClinicalPayload(form, settings);
             const startResult = await startClinicalJob(payload);
             updateDiliAgent({
                 jobId: startResult.job_id,
@@ -302,28 +252,30 @@ export function DiliAgentPage(): React.JSX.Element {
     }, [isRunning, jobId, jobStatus, startPolling]);
 
     const handleRunSession = async () => {
-        const cleanedDrugs = form.drugs.trim();
-        if (!cleanedDrugs) {
+        const missingMessageByField: Array<[keyof typeof form, string]> = [
+            ["anamnesis", "[ERROR] Provide the anamnesis."],
+            ["visitDate", "[ERROR] Provide the visit date."],
+            ["drugs", "[ERROR] Provide current drugs."],
+            [
+                "laboratoryAnalysis",
+                "[ERROR] Provide laboratory data sufficient to determine hepatotoxicity pattern, ideally dated ALT or AST, ALP, and bilirubin.",
+            ],
+        ];
+        const firstMissing = missingMessageByField.find(
+            ([field]) => !String(form[field]).trim(),
+        );
+        if (firstMissing) {
             resetOutputs();
             updateDiliAgent({
                 isRunning: false,
-                message: "[ERROR] At least one therapy drug is required for DILI analysis.",
+                message: firstMissing[1],
                 exportUrl: null,
                 jobStage: null,
                 jobStageMessage: null,
             });
             return;
         }
-
-        const missingLabs = [form.alt, form.altMax, form.alp, form.alpMax].some(
-            (value) => !value.trim(),
-        );
-        if (missingLabs) {
-            setIsMissingLabsModalOpen(true);
-            return;
-        }
-
-        await executeRunSession(null);
+        await executeRunSession();
     };
 
     const handleStopSession = async () => {
@@ -345,15 +297,6 @@ export function DiliAgentPage(): React.JSX.Element {
         } finally {
             setIsCancelling(false);
         }
-    };
-
-    const handleConfirmMissingLabs = async () => {
-        setIsMissingLabsModalOpen(false);
-        await executeRunSession(true);
-    };
-
-    const handleCancelMissingLabs = () => {
-        setIsMissingLabsModalOpen(false);
     };
 
     const handleClear = () => {
@@ -423,10 +366,6 @@ export function DiliAgentPage(): React.JSX.Element {
             </div>
         );
     })();
-    const altRatio = computeRatio(form.alt, form.altMax);
-    const alpRatio = computeRatio(form.alp, form.alpMax);
-    const hepatotoxicityPattern = resolvePattern(altRatio, alpRatio);
-
     return (
         <>
             <main className="page-container">
@@ -435,7 +374,7 @@ export function DiliAgentPage(): React.JSX.Element {
                     <section className="card clinical-inputs">
                         <div className="card-header">
                             <h2>Clinical Context</h2>
-                            <p className="helper">Summarize history, current therapy, and key liver labs for this visit.</p>
+                            <p className="helper">Summarize history, current therapy, and laboratory analysis for this visit.</p>
                         </div>
 
                         {/* Section 1: Clinical Context */}
@@ -449,7 +388,7 @@ export function DiliAgentPage(): React.JSX.Element {
                                     onChange={(e) => handleFormChange("anamnesis", e.target.value)}
                                 />
                                 <span className="field-helper">
-                                    Include relevant exams and previous lab results when available.
+                                    Include relevant exams, comorbidities, and prior clinical context.
                                 </span>
                             </div>
                             <div className="field">
@@ -460,93 +399,17 @@ export function DiliAgentPage(): React.JSX.Element {
                                     value={form.drugs}
                                     onChange={(e) => handleFormChange("drugs", e.target.value)}
                                 />
-                                <span className="field-helper">List current therapies, dosage and schedule.</span>
+                                <span className="field-helper">Include start, stop, suspension, or other timing information when known.</span>
                             </div>
-                        </div>
-
-                        {/* Section 2: Lab Values */}
-                        <div className="clinical-section">
-                            <h3 className="section-title">Lab values</h3>
-                            <div className="lab-layout">
-                                <div className="lab-widget">
-                                    <div className="lab-row">
-                                        <div className="field compact-field">
-                                            <label className="field-label" htmlFor="alt">ALT (U/L)</label>
-                                            <input
-                                                id="alt"
-                                                type="text"
-                                                placeholder="189"
-                                                value={form.alt}
-                                                onChange={(e) => handleFormChange("alt", e.target.value)}
-                                            />
-                                        </div>
-                                        <div className="field compact-field">
-                                            <label className="field-label" htmlFor="alt-max">ALT Max (U/L)</label>
-                                            <input
-                                                id="alt-max"
-                                                type="text"
-                                                placeholder="47"
-                                                value={form.altMax}
-                                                onChange={(e) => handleFormChange("altMax", e.target.value)}
-                                            />
-                                            <span className="field-helper">Upper limit of normal</span>
-                                        </div>
-                                    </div>
-                                    <div className="lab-row">
-                                        <div className="field compact-field">
-                                            <label className="field-label" htmlFor="alp">ALP (U/L)</label>
-                                            <input
-                                                id="alp"
-                                                type="text"
-                                                placeholder="140"
-                                                value={form.alp}
-                                                onChange={(e) => handleFormChange("alp", e.target.value)}
-                                            />
-                                        </div>
-                                        <div className="field compact-field">
-                                            <label className="field-label" htmlFor="alp-max">ALP Max (U/L)</label>
-                                            <input
-                                                id="alp-max"
-                                                type="text"
-                                                placeholder="150"
-                                                value={form.alpMax}
-                                                onChange={(e) => handleFormChange("alpMax", e.target.value)}
-                                            />
-                                            <span className="field-helper">Upper limit of normal</span>
-                                        </div>
-                                    </div>
-                                </div>
-                                <div className="lab-controls-panel">
-                                    <div className="lab-ratio-panel" aria-live="polite">
-                                        <p className="lab-ratio-pattern">{hepatotoxicityPattern}</p>
-
-                                        <div className="ratio-meter">
-                                            <div className="ratio-meter-header">
-                                                <span>ALT ratio</span>
-                                                <strong>{formatRatio(altRatio)}</strong>
-                                            </div>
-                                            <div className="ratio-slider-track">
-                                                <div
-                                                    className="ratio-slider-thumb"
-                                                    style={{ left: `${getRatioPercent(altRatio)}%` }}
-                                                />
-                                            </div>
-                                        </div>
-
-                                        <div className="ratio-meter">
-                                            <div className="ratio-meter-header">
-                                                <span>ALP ratio</span>
-                                                <strong>{formatRatio(alpRatio)}</strong>
-                                            </div>
-                                            <div className="ratio-slider-track">
-                                                <div
-                                                    className="ratio-slider-thumb"
-                                                    style={{ left: `${getRatioPercent(alpRatio)}%` }}
-                                                />
-                                            </div>
-                                        </div>
-                                    </div>
-                                </div>
+                            <div className="field">
+                                <label className="field-label" htmlFor="laboratory-analysis">Laboratory Analysis</label>
+                                <textarea
+                                    id="laboratory-analysis"
+                                    placeholder="Paste raw laboratory text with dates and values..."
+                                    value={form.laboratoryAnalysis}
+                                    onChange={(e) => handleFormChange("laboratoryAnalysis", e.target.value)}
+                                />
+                                <span className="field-helper">Paste raw laboratory text, including dated values when available.</span>
                             </div>
                         </div>
                     </section>
@@ -579,6 +442,7 @@ export function DiliAgentPage(): React.JSX.Element {
                                 value={form.visitDate}
                                 onChange={(e) => handleVisitDateChange(e.target.value)}
                             />
+                            <span className="field-helper">Required visit anchor for chronology analysis.</span>
                         </div>
 
                         <div className="advanced-options advanced-options-inline">
@@ -664,15 +528,6 @@ export function DiliAgentPage(): React.JSX.Element {
                 </div>
 
             </main>
-            <ConfirmModal
-                isOpen={isMissingLabsModalOpen}
-                title="Missing ALT/ALP labs"
-                message="ALT/ALP values are missing; pattern will be undetermined. Continue anyway?"
-                confirmLabel="Continue anyway"
-                cancelLabel="Cancel"
-                onConfirm={() => { void handleConfirmMissingLabs(); }}
-                onCancel={handleCancelMissingLabs}
-            />
         </>
     );
 }

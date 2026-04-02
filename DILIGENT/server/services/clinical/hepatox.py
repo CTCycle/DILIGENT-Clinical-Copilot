@@ -17,6 +17,7 @@ from DILIGENT.server.models.prompts import (
 )
 from DILIGENT.server.models.providers import initialize_llm_client
 from DILIGENT.server.domain.clinical import (
+    ClinicalLabEntry,
     ClinicalPipelineValidationError,
     DrugEntry,
     DrugClinicalAssessment,
@@ -27,6 +28,7 @@ from DILIGENT.server.domain.clinical import (
     PatientData,
     PatientDrugClinicalReport,
     PatientDrugs,
+    PatientLabTimeline,
     PatientRucamAssessmentBundle,
     PipelineIssue,
 )
@@ -122,18 +124,23 @@ class HepatotoxicityPatternAnalyzer:
 
     # -------------------------------------------------------------------------
     def calculate_hepatotoxicity_pattern(
-        self, payload: PatientData
+        self, lab_timeline: PatientLabTimeline
     ) -> HepatotoxicityPatternScore:
-        alt_value = self.parse_marker_value(payload.alt)
-        alt_max_value = self.parse_marker_value(payload.alt_max)
-        alp_value = self.parse_marker_value(payload.alp)
-        alp_max_value = self.parse_marker_value(payload.alp_max)
-
+        anchor = self.select_anchor_pair(lab_timeline)
+        if anchor is None:
+            score = HepatotoxicityPatternScore(
+                alt_multiple=None,
+                alp_multiple=None,
+                r_score=None,
+                classification=DEFAULT_DILI_CLASSIFICATION,
+            )
+            self.r_score = None
+            return score
         score = self.calculator.calculate(
-            alt_value=alt_value,
-            alt_uln=alt_max_value,
-            alp_value=alp_value,
-            alp_uln=alp_max_value,
+            alt_value=anchor["alt_value"],
+            alt_uln=anchor["alt_uln"],
+            alp_value=anchor["alp_value"],
+            alp_uln=anchor["alp_uln"],
         )
         self.r_score = score.r_score
         return score
@@ -141,67 +148,109 @@ class HepatotoxicityPatternAnalyzer:
     # -------------------------------------------------------------------------
     def assess_payload(
         self,
-        payload: PatientData,
-        *,
-        allow_missing_labs: bool = False,
+        lab_timeline: PatientLabTimeline,
     ) -> HepatotoxicityPatternAssessment:
-        field_mapping = [
-            ("alt", "ALT"),
-            ("alt_max", "ALT upper limit"),
-            ("alp", "ALP"),
-            ("alp_max", "ALP upper limit"),
-        ]
-        parsed_values: dict[str, float] = {}
-        issues: list[PipelineIssue] = []
-        for field_name, label in field_mapping:
-            raw_value = getattr(payload, field_name, None)
-            parsed = self.parse_marker_value(raw_value)
-            if parsed is None:
-                issues.append(
-                    PipelineIssue(
-                        severity="warning",
-                        code="missing_labs",
-                        message=(
-                            f"{label} is missing or invalid. ALT, ALT max, ALP, and ALP max "
-                            "are required for a determined hepatotoxicity pattern."
-                        ),
-                        field=field_name,
-                    )
-                )
-                continue
-            parsed_values[field_name] = parsed
-
-        if issues:
-            if not allow_missing_labs:
-                raise ClinicalPipelineValidationError(
-                    issues=issues,
-                    message="Missing laboratory values required for hepatotoxicity pattern assessment.",
-                )
-            indeterminate = HepatotoxicityPatternScore(
-                alt_multiple=None,
-                alp_multiple=None,
-                r_score=None,
-                classification=DEFAULT_DILI_CLASSIFICATION,
+        score = self.calculate_hepatotoxicity_pattern(lab_timeline)
+        if score.r_score is None:
+            issue = PipelineIssue(
+                severity="error",
+                code="missing_hepatotoxicity_inputs",
+                message=(
+                    "Provide laboratory data sufficient to determine hepatotoxicity pattern, "
+                    "ideally dated ALT or AST, ALP, and bilirubin."
+                ),
+                field="laboratory_analysis",
             )
-            self.r_score = indeterminate.r_score
-            return HepatotoxicityPatternAssessment(
-                score=indeterminate,
-                status="undetermined_due_to_missing_labs",
-                issues=issues,
-            )
-
-        score = self.calculator.calculate(
-            alt_value=parsed_values["alt"],
-            alt_uln=parsed_values["alt_max"],
-            alp_value=parsed_values["alp"],
-            alp_uln=parsed_values["alp_max"],
-        )
+            raise ClinicalPipelineValidationError(issues=[issue], message=issue.message)
         self.r_score = score.r_score
         return HepatotoxicityPatternAssessment(
             score=score,
             status="ok",
             issues=[],
         )
+
+    # -------------------------------------------------------------------------
+    def select_anchor_pair(self, lab_timeline: PatientLabTimeline) -> dict[str, float] | None:
+        dated_candidates = self.group_entries_by_date(lab_timeline.entries)
+        for sample_date in sorted(dated_candidates):
+            bucket = dated_candidates[sample_date]
+            pair = self.build_anchor_from_bucket(bucket)
+            if pair is not None:
+                return pair
+        undated = self.build_anchor_from_bucket(lab_timeline.entries)
+        return undated
+
+    # -------------------------------------------------------------------------
+    def group_entries_by_date(
+        self,
+        entries: list[ClinicalLabEntry],
+    ) -> dict[str, list[ClinicalLabEntry]]:
+        grouped: dict[str, list[ClinicalLabEntry]] = {}
+        for entry in entries:
+            if not entry.sample_date:
+                continue
+            grouped.setdefault(entry.sample_date, []).append(entry)
+        return grouped
+
+    # -------------------------------------------------------------------------
+    def build_anchor_from_bucket(
+        self,
+        entries: list[ClinicalLabEntry],
+    ) -> dict[str, float] | None:
+        alt_like = self.pick_best_entry(entries, {"ALT", "AST"})
+        alp = self.pick_best_entry(entries, {"ALP"})
+        if alt_like is None or alp is None:
+            return None
+        alt_value = self.parse_entry_value(alt_like)
+        alp_value = self.parse_entry_value(alp)
+        if alt_value is None or alp_value is None:
+            return None
+        alt_uln = self.resolve_uln(alt_like, fallback=40.0)
+        alp_uln = self.resolve_uln(alp, fallback=120.0)
+        if alt_uln <= 0 or alp_uln <= 0:
+            return None
+        return {
+            "alt_value": alt_value,
+            "alt_uln": alt_uln,
+            "alp_value": alp_value,
+            "alp_uln": alp_uln,
+        }
+
+    # -------------------------------------------------------------------------
+    def pick_best_entry(
+        self,
+        entries: list[ClinicalLabEntry],
+        marker_names: set[str],
+    ) -> ClinicalLabEntry | None:
+        selected: ClinicalLabEntry | None = None
+        for entry in entries:
+            if entry.marker_name.upper() not in marker_names:
+                continue
+            if selected is None:
+                selected = entry
+                continue
+            selected_value = self.parse_entry_value(selected)
+            current_value = self.parse_entry_value(entry)
+            if selected_value is None and current_value is not None:
+                selected = entry
+            elif current_value is not None and selected_value is not None and current_value > selected_value:
+                selected = entry
+        return selected
+
+    # -------------------------------------------------------------------------
+    def parse_entry_value(self, entry: ClinicalLabEntry) -> float | None:
+        if entry.value is not None:
+            return float(entry.value)
+        return self.parse_marker_value(entry.value_text)
+
+    # -------------------------------------------------------------------------
+    def resolve_uln(self, entry: ClinicalLabEntry, *, fallback: float) -> float:
+        if entry.upper_limit_normal is not None and entry.upper_limit_normal > 0:
+            return float(entry.upper_limit_normal)
+        parsed = self.parse_marker_value(entry.upper_limit_text)
+        if parsed is not None and parsed > 0:
+            return parsed
+        return fallback
 
     # -------------------------------------------------------------------------
     def parse_marker_value(self, raw: str | None) -> float | None:
@@ -296,6 +345,7 @@ class HepatoxConsultation:
         *,
         prepared_inputs: HepatoxPreparedInputs | None,
         visit_date: date | None = None,
+        report_language: str = "en",
         rag_query: dict[str, str] | None = None,
         use_web_search: bool = False,
         rucam_bundle: PatientRucamAssessmentBundle | None = None,
@@ -315,6 +365,7 @@ class HepatoxConsultation:
             resolved_mapping,
             clinical_context=prepared_inputs.clinical_context,
             visit_date=visit_date,
+            report_language=report_language,
             pattern_prompt=prepared_inputs.pattern_prompt,
             rag_query=rag_query,
             use_web_search=use_web_search,
@@ -330,6 +381,7 @@ class HepatoxConsultation:
         *,
         clinical_context: str | None,
         visit_date: date | None,
+        report_language: str,
         pattern_prompt: str,
         rag_query: dict[str, str] | None = None,
         use_web_search: bool = False,
@@ -357,6 +409,7 @@ class HepatoxConsultation:
                 drug_entry=drug_entry,
                 resolved_drugs=resolved_drugs,
                 visit_date=visit_date,
+                report_language=report_language,
                 normalized_context=normalized_context,
                 pattern_summary=pattern_summary,
                 rag_query=rag_query,
@@ -412,6 +465,7 @@ class HepatoxConsultation:
         final_report = await self.finalize_patient_report(
             entries,
             clinical_context=normalized_context,
+            report_language=report_language,
         )
         self.emit_progress(progress_callback, stage="report_composition", fraction=1.0)
 
@@ -456,6 +510,7 @@ class HepatoxConsultation:
         drug_entry: DrugEntry,
         resolved_drugs: dict[str, dict[str, Any]],
         visit_date: date | None,
+        report_language: str,
         normalized_context: str,
         pattern_summary: str,
         rag_query: dict[str, str] | None,
@@ -548,6 +603,7 @@ class HepatoxConsultation:
             metadata=entry.matched_livertox_row,
             web_evidence=web_evidence,
             rucam=entry.rucam,
+            report_language=report_language,
         )
         return entry, (idx, job)
 
@@ -1008,6 +1064,7 @@ class HepatoxConsultation:
         metadata: dict[str, Any] | None,
         web_evidence: str,
         rucam: DrugRucamAssessment | None,
+        report_language: str,
     ) -> str:
         start_details = self.format_start_prompt(suspension)
         suspension_details = self.format_suspension_prompt(suspension)
@@ -1028,6 +1085,7 @@ class HepatoxConsultation:
         rucam_block = self.format_rucam_prompt_block(rucam)
         user_prompt = LIVERTOX_CLINICAL_USER_PROMPT.format(
             drug_name=self.escape_braces(drug_name.strip() or drug_name),
+            report_language=self.escape_braces(report_language),
             canonical_name=self.escape_braces(canonical_name.strip() or canonical_name),
             origins=self.escape_braces(origin_block),
             extraction_metadata=self.escape_braces(extraction_block),
@@ -1145,6 +1203,7 @@ class HepatoxConsultation:
         entries: list[DrugClinicalAssessment],
         *,
         clinical_context: str | None,
+        report_language: str,
     ) -> str | None:
         matched_entries: list[DrugClinicalAssessment] = []
         unresolved_entries: list[DrugClinicalAssessment] = []
@@ -1170,6 +1229,7 @@ class HepatoxConsultation:
             conclusion = await self.generate_conclusion(
                 clinical_context=clinical_context or "",
                 multi_drug_report="\n\n---\n\n".join(matched_sections),
+                report_language=report_language,
             )
             if conclusion:
                 combined_report = (
@@ -1300,6 +1360,7 @@ class HepatoxConsultation:
         *,
         clinical_context: str,
         multi_drug_report: str,
+        report_language: str,
     ) -> str | None:
         report_body = multi_drug_report.strip()
         if not report_body:
@@ -1308,6 +1369,7 @@ class HepatoxConsultation:
         if not context_body:
             context_body = "No clinical context was provided."
         user_prompt = LIVERTOX_CONCLUSION_USER_PROMPT.format(
+            report_language=self.escape_braces(report_language),
             clinical_context=self.escape_braces(context_body),
             multi_drug_report=self.escape_braces(report_body),
         )

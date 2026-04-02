@@ -56,10 +56,7 @@ export type ClinicalFormState = {
   visitDate: string;
   anamnesis: string;
   drugs: string;
-  alt: string;
-  altMax: string;
-  alp: string;
-  alpMax: string;
+  laboratoryAnalysis: string;
   useRag: boolean;
   useWebSearch: boolean;
 };
@@ -69,11 +66,7 @@ export type ClinicalRequestPayload = {
   visit_date: { day: number; month: number; year: number } | null;
   anamnesis: string | null;
   drugs: string | null;
-  alt: string | null;
-  alt_max: string | null;
-  alp: string | null;
-  alp_max: string | null;
-  allow_missing_labs?: boolean | null;
+  laboratory_analysis: string | null;
   use_rag: boolean;
   use_web_search: boolean;
   use_cloud_services?: boolean;

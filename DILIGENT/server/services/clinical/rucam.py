@@ -133,33 +133,6 @@ class RucamScoreEstimator:
         payload: PatientData,
         lab_timeline: PatientLabTimeline,
     ) -> _Anchor:
-        manual = payload.manual_hepatic_markers()
-        alt_data = manual.get("ALAT", {})
-        alp_data = manual.get("ALP", {})
-        alt_value = self._coerce_float(alt_data.get("value") if isinstance(alt_data, dict) else None)
-        alt_uln = self._coerce_float(alt_data.get("cutoff") if isinstance(alt_data, dict) else None)
-        alp_value = self._coerce_float(alp_data.get("value") if isinstance(alp_data, dict) else None)
-        alp_uln = self._coerce_float(alp_data.get("cutoff") if isinstance(alp_data, dict) else None)
-        if (
-            alt_value is not None
-            and alt_uln is not None
-            and alt_uln > 0
-            and alp_value is not None
-            and alp_uln is not None
-            and alp_uln > 0
-        ):
-            return _Anchor(
-                onset_date=payload.visit_date,
-                used_alt=alt_value,
-                used_alt_uln=alt_uln,
-                used_alp=alp_value,
-                used_alp_uln=alp_uln,
-                rationale=(
-                    "Manual ALT/ALP values used as anchor "
-                    f"(ALT {alt_value}/{alt_uln}; ALP {alp_value}/{alp_uln})."
-                ),
-            )
-
         grouped: dict[date, dict[str, ClinicalLabEntry]] = {}
         for entry in lab_timeline.entries:
             marker = entry.marker_name.upper()
