@@ -12,7 +12,7 @@ Comparator = Literal["<=", "<", ">=", ">"]
 CONTROL_CHARACTERS_RE = re.compile(r"[\x00-\x08\x0B\x0C\x0E-\x1F\x7F]")
 SAFE_PROVIDER_RE = re.compile(r"^[a-z][a-z0-9-]{1,31}$")
 SAFE_MODEL_NAME_RE = re.compile(r"^[A-Za-z0-9][A-Za-z0-9._:/+\-]{0,199}$")
-MAX_LAB_TEXT_LENGTH = 100
+MAX_LAB_TEXT_LENGTH = 20000
 
 
 ###############################################################################
@@ -47,29 +47,10 @@ class PatientData(BaseModel):
         max_length=20000,
         description="Medication list and dosage notes.",
     )
-    alt: str | None = Field(
+    laboratory_analysis: str | None = Field(
         None,
         max_length=MAX_LAB_TEXT_LENGTH,
-        description="ALT laboratory value.",
-        examples=["189", "189 U/L"],
-    )
-    alt_max: str | None = Field(
-        None,
-        max_length=MAX_LAB_TEXT_LENGTH,
-        description="Reference maximum for ALT.",
-        examples=["47", "47 U/L"],
-    )
-    alp: str | None = Field(
-        None,
-        max_length=MAX_LAB_TEXT_LENGTH,
-        description="ALP laboratory value.",
-        examples=["140", "140 U/L"],
-    )
-    alp_max: str | None = Field(
-        None,
-        max_length=MAX_LAB_TEXT_LENGTH,
-        description="Reference maximum for ALP.",
-        examples=["150", "150 U/L"],
+        description="Free-text laboratory section, potentially with dated values and ULN notes.",
     )
     has_hepatic_diseases: bool = Field(
         default=False,
@@ -86,7 +67,7 @@ class PatientData(BaseModel):
 
     # -------------------------------------------------------------------------
     @field_validator(
-        "name", "anamnesis", "drugs", "alt", "alt_max", "alp", "alp_max", mode="before"
+        "name", "anamnesis", "drugs", "laboratory_analysis", mode="before"
     )
     @classmethod
     def strip_text(cls, value: str | None) -> str | None:
@@ -160,54 +141,7 @@ class PatientData(BaseModel):
 
     @model_validator(mode="after")
     def require_sections(self) -> "PatientData":
-        if any((self.anamnesis, self.drugs)):
-            return self
-        raise ValueError("Provide at least one clinical section before submitting.")
-
-    # -------------------------------------------------------------------------
-    @staticmethod
-    def coerce_marker(value: str | None) -> tuple[float | None, str | None]:
-        if value is None:
-            return None, None
-        stripped = str(value).strip()
-        if not stripped:
-            return None, None
-        normalized = stripped.replace(",", ".")
-        try:
-            return float(normalized), None
-        except ValueError:
-            return None, stripped
-
-    # -------------------------------------------------------------------------
-    def manual_hepatic_markers(self) -> dict[str, Any]:
-        markers: dict[str, Any] = {}
-        alt_value, alt_text = self.coerce_marker(self.alt)
-        alt_cutoff, alt_cutoff_text = self.coerce_marker(self.alt_max)
-        if any((alt_value is not None, alt_text, alt_cutoff, alt_cutoff_text)):
-            entry: dict[str, Any] = {
-                "value": alt_value,
-                "value_text": alt_text,
-                "unit": None,
-                "date": None,
-            }
-            if alt_cutoff is not None or alt_cutoff_text is not None:
-                entry["cutoff"] = alt_cutoff
-                entry["cutoff_text"] = alt_cutoff_text
-            markers["ALAT"] = entry
-        alp_value, alp_text = self.coerce_marker(self.alp)
-        alp_cutoff, alp_cutoff_text = self.coerce_marker(self.alp_max)
-        if any((alp_value is not None, alp_text, alp_cutoff, alp_cutoff_text)):
-            entry = {
-                "value": alp_value,
-                "value_text": alp_text,
-                "unit": None,
-                "date": None,
-            }
-            if alp_cutoff is not None or alp_cutoff_text is not None:
-                entry["cutoff"] = alp_cutoff
-                entry["cutoff_text"] = alp_cutoff_text
-            markers["ALP"] = entry
-        return markers
+        return self
 
     # -------------------------------------------------------------------------
     def compose_structured_text(self) -> str | None:
@@ -217,51 +151,21 @@ class PatientData(BaseModel):
             sections.append(f"# ANAMNESIS\n{anamnesis_body}")
         if self.drugs:
             sections.append(f"# DRUGS\n{self.drugs}")
+        if self.laboratory_analysis:
+            sections.append(f"# LABORATORY ANALYSIS\n{self.laboratory_analysis}")
         if not sections:
             return None
         return "\n\n".join(section.strip() for section in sections if section.strip())
 
     # -------------------------------------------------------------------------
     def _compose_anamnesis_body(self) -> str | None:
-        marker_lines = self._build_marker_lines()
         lines: list[str] = []
         if self.anamnesis:
             lines.append(self.anamnesis)
-        if marker_lines:
-            if lines:
-                lines.append("")
-            lines.append("Key laboratory markers:")
-            lines.extend(marker_lines)
         if not lines:
             return None
-        body = "".join(line for line in lines if line.strip())
+        body = "\n".join(line for line in lines if line.strip())
         return body or None
-
-    # -------------------------------------------------------------------------
-    def _build_marker_lines(self) -> list[str]:
-        return [
-            line
-            for line in (
-                self._format_marker_line("ALAT", self.alt, self.alt_max),
-                self._format_marker_line("ALP", self.alp, self.alp_max),
-            )
-            if line
-        ]
-
-    # -------------------------------------------------------------------------
-    @staticmethod
-    def _format_marker_line(
-        marker_name: str, value: str | None, max_value: str | None
-    ) -> str | None:
-        if not value and not max_value:
-            return None
-        tokens: list[str] = []
-        if value:
-            tokens.append(str(value))
-        if max_value:
-            tokens.append(f"(max {max_value})")
-        marker_body = " ".join(tokens).strip()
-        return f"{marker_name}: {marker_body}" if marker_body else None
 
 
 ###############################################################################
@@ -275,11 +179,7 @@ class ClinicalSessionRequest(BaseModel):
     use_rag: bool = False
     use_web_search: bool = False
     drugs: str | None = Field(default=None, max_length=20000)
-    alt: str | None = Field(default=None, max_length=MAX_LAB_TEXT_LENGTH)
-    alt_max: str | None = Field(default=None, max_length=MAX_LAB_TEXT_LENGTH)
-    alp: str | None = Field(default=None, max_length=MAX_LAB_TEXT_LENGTH)
-    alp_max: str | None = Field(default=None, max_length=MAX_LAB_TEXT_LENGTH)
-    allow_missing_labs: bool | None = None
+    laboratory_analysis: str | None = Field(default=None, max_length=MAX_LAB_TEXT_LENGTH)
     use_cloud_services: bool | None = None
     llm_provider: str | None = Field(default=None, max_length=32)
     cloud_model: str | None = Field(default=None, max_length=200)
@@ -293,10 +193,7 @@ class ClinicalSessionRequest(BaseModel):
         "name",
         "anamnesis",
         "drugs",
-        "alt",
-        "alt_max",
-        "alp",
-        "alp_max",
+        "laboratory_analysis",
         "llm_provider",
         "cloud_model",
         "parsing_model",
@@ -506,7 +403,7 @@ class ClinicalLabEntry(BaseModel):
     sample_date: str | None = Field(default=None, max_length=40)
     relative_time: str | None = Field(default=None, max_length=120)
     evidence: str | None = Field(default=None, max_length=500)
-    source: Literal["manual", "anamnesis"] = Field(default="anamnesis")
+    source: Literal["laboratory_analysis", "anamnesis", "merged"] = Field(default="anamnesis")
 
     @field_validator(
         "marker_name",

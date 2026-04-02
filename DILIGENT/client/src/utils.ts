@@ -86,24 +86,17 @@ function buildVisitDatePayload(
 export function buildClinicalPayload(
   form: ClinicalFormState,
   settings: RuntimeSettings,
-  allowMissingLabs: boolean | null = null,
 ): ClinicalRequestPayload {
   const payload: ClinicalRequestPayload = {
     name: sanitizeField(form.patientName),
     visit_date: buildVisitDatePayload(form.visitDate),
     anamnesis: sanitizeField(form.anamnesis),
     drugs: sanitizeField(form.drugs),
-    alt: sanitizeField(form.alt),
-    alt_max: sanitizeField(form.altMax),
-    alp: sanitizeField(form.alp),
-    alp_max: sanitizeField(form.alpMax),
+    laboratory_analysis: sanitizeField(form.laboratoryAnalysis),
     use_rag: form.useRag,
     use_web_search: form.useWebSearch,
   };
   void settings;
-  if (allowMissingLabs !== null) {
-    payload.allow_missing_labs = allowMissingLabs;
-  }
   return payload;
 }
 

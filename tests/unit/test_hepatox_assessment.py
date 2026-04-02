@@ -7,6 +7,7 @@ import pytest
 
 from DILIGENT.server.models.prompts import LIVERTOX_CLINICAL_USER_PROMPT
 from DILIGENT.server.domain.clinical import (
+    ClinicalLabEntry,
     ClinicalPipelineValidationError,
     DrugClinicalAssessment,
     DrugEntry,
@@ -14,6 +15,7 @@ from DILIGENT.server.domain.clinical import (
     RucamComponentAssessment,
     DrugSuspensionContext,
     PatientData,
+    PatientLabTimeline,
 )
 from DILIGENT.server.services.clinical.hepatox import (
     HepatotoxicityPatternAnalyzer,
@@ -39,15 +41,26 @@ class FlakyChatClient:
 
 def test_assess_payload_returns_determined_score_when_labs_present() -> None:
     analyzer = HepatotoxicityPatternAnalyzer()
-    payload = PatientData(
-        drugs="Acetaminophen 500 mg 1-0-0-0",
-        alt="100",
-        alt_max="50",
-        alp="200",
-        alp_max="100",
+    timeline = PatientLabTimeline(
+        entries=[
+            ClinicalLabEntry(
+                marker_name="ALT",
+                value=100.0,
+                upper_limit_normal=50.0,
+                sample_date="2025-01-10",
+                source="laboratory_analysis",
+            ),
+            ClinicalLabEntry(
+                marker_name="ALP",
+                value=200.0,
+                upper_limit_normal=100.0,
+                sample_date="2025-01-10",
+                source="laboratory_analysis",
+            ),
+        ]
     )
 
-    assessment = analyzer.assess_payload(payload, allow_missing_labs=False)
+    assessment = analyzer.assess_payload(timeline)
 
     assert assessment.status == "ok"
     assert assessment.issues == []
@@ -57,35 +70,12 @@ def test_assess_payload_returns_determined_score_when_labs_present() -> None:
 
 def test_assess_payload_raises_when_labs_missing_and_not_overridden() -> None:
     analyzer = HepatotoxicityPatternAnalyzer()
-    payload = PatientData(
-        drugs="Acetaminophen 500 mg 1-0-0-0",
-        alt=None,
-        alt_max="50",
-        alp="200",
-        alp_max="100",
-    )
+    timeline = PatientLabTimeline(entries=[])
 
     with pytest.raises(ClinicalPipelineValidationError) as exc_info:
-        analyzer.assess_payload(payload, allow_missing_labs=False)
+        analyzer.assess_payload(timeline)
 
-    assert any(issue.code == "missing_labs" for issue in exc_info.value.issues)
-
-
-def test_assess_payload_allows_missing_labs_when_overridden() -> None:
-    analyzer = HepatotoxicityPatternAnalyzer()
-    payload = PatientData(
-        drugs="Acetaminophen 500 mg 1-0-0-0",
-        alt=None,
-        alt_max="50",
-        alp="200",
-        alp_max="100",
-    )
-
-    assessment = analyzer.assess_payload(payload, allow_missing_labs=True)
-
-    assert assessment.status == "undetermined_due_to_missing_labs"
-    assert assessment.score.classification == "indeterminate"
-    assert any(issue.code == "missing_labs" for issue in assessment.issues)
+    assert any(issue.code == "missing_hepatotoxicity_inputs" for issue in exc_info.value.issues)
 
 
 def test_evaluate_suspension_marks_anamnesis_mentions_as_uncertain_exposure() -> None:
@@ -155,6 +145,7 @@ def test_request_drug_analysis_retries_on_transient_failure() -> None:
                 limitations=["Sparse follow-up"],
                 summary="Estimated RUCAM summary.",
             ),
+            report_language="en",
         )
     )
 
@@ -223,6 +214,7 @@ def test_finalize_patient_report_uses_global_synthesis_section_header() -> None:
                 )
             ],
             clinical_context="Clinical context",
+            report_language="en",
         )
     )
 
@@ -270,6 +262,7 @@ def test_finalize_patient_report_renders_deterministic_matched_and_unresolved_se
                 ),
             ],
             clinical_context="Clinical context",
+            report_language="en",
         )
     )
 
@@ -303,6 +296,7 @@ def test_finalize_patient_report_keeps_matched_drug_without_excerpt() -> None:
                 )
             ],
             clinical_context="Clinical context",
+            report_language="en",
         )
     )
 
