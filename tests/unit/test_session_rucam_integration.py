@@ -8,6 +8,7 @@ from typing import Any
 from DILIGENT.server.api import session as session_module
 from DILIGENT.server.domain.clinical import (
     ClinicalLabEntry,
+    ClinicalPipelineValidationError,
     DrugEntry,
     DrugRucamAssessment,
     HepatotoxicityPatternScore,
@@ -91,7 +92,14 @@ class FakeLabExtractor:
                         value=300.0,
                         upper_limit_normal=40.0,
                         sample_date="2025-01-10",
-                        source="anamnesis",
+                        source="laboratory_analysis",
+                    ),
+                    ClinicalLabEntry(
+                        marker_name="ALP",
+                        value=130.0,
+                        upper_limit_normal=120.0,
+                        sample_date="2025-01-10",
+                        source="laboratory_analysis",
                     )
                 ]
             ),
@@ -143,7 +151,17 @@ class FakeDrugsParser:
     async def extract_drugs_from_therapy(self, text: str, **kwargs: Any) -> PatientDrugs:
         _ = text
         _ = kwargs
-        return PatientDrugs(entries=[DrugEntry(name="Drug A", source="therapy")])
+        return PatientDrugs(
+            entries=[
+                DrugEntry(
+                    name="Drug A",
+                    source="therapy",
+                    therapy_start_status=True,
+                    therapy_start_date="2024-12-20",
+                    temporal_classification="temporal_known",
+                )
+            ]
+        )
 
     async def extract_drugs_from_anamnesis(self, text: str | None, **kwargs: Any) -> PatientDrugs:
         _ = text
@@ -164,10 +182,7 @@ def _build_payload() -> PatientData:
         visit_date=date(2025, 1, 20),
         anamnesis="ALT rose and then declined.",
         drugs="Drug A 50 mg",
-        alt="120",
-        alt_max="40",
-        alp="110",
-        alp_max="100",
+        laboratory_analysis="Lab 2025-01-10: ALT 300 U/L (ULN 40), ALP 130 U/L (ULN 120)",
     )
 
 
@@ -182,7 +197,7 @@ def test_session_persists_rucam_bundle_and_per_drug_rucam(monkeypatch) -> None:
     monkeypatch.setattr(session_module, "input_preparator", FakeInputPreparator())
     monkeypatch.setattr(session_module, "HepatoxConsultation", FakeHepatoxConsultation)
 
-    result = asyncio.run(endpoint.process_single_patient(_build_payload(), allow_missing_labs=False))
+    result = asyncio.run(endpoint.process_single_patient(_build_payload()))
 
     assert "rucam_assessments" in result
     assert result["rucam_assessments"]
@@ -202,9 +217,8 @@ def test_session_lab_or_rucam_failure_degrades_to_warnings(monkeypatch) -> None:
     monkeypatch.setattr(session_module, "input_preparator", FakeInputPreparator())
     monkeypatch.setattr(session_module, "HepatoxConsultation", FakeHepatoxConsultation)
 
-    result = asyncio.run(endpoint.process_single_patient(_build_payload(), allow_missing_labs=False))
-
-    issue_codes = {issue["code"] for issue in result["issues"]}
-    assert "anamnesis_lab_extraction_failed" in issue_codes
-    assert "rucam_estimation_failed" in issue_codes
-    assert result["report"]
+    try:
+        asyncio.run(endpoint.process_single_patient(_build_payload()))
+        assert False, "Expected validation error for missing hepatotoxicity inputs."
+    except ClinicalPipelineValidationError as exc:
+        assert any(issue.code == "missing_hepatotoxicity_inputs" for issue in exc.issues)

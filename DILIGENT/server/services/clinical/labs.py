@@ -18,7 +18,7 @@ from DILIGENT.server.domain.clinical import (
     PatientData,
     PatientLabTimeline,
 )
-from DILIGENT.server.models.prompts import ANAMNESIS_LAB_EXTRACTION_PROMPT
+from DILIGENT.server.models.prompts import CLINICAL_LAB_EXTRACTION_PROMPT
 from DILIGENT.server.models.providers import initialize_llm_client
 
 
@@ -33,7 +33,10 @@ MARKER_ALIASES: dict[str, tuple[str, ...]] = {
     "AST": ("ast", "asat", "got"),
     "ALP": ("alp", "alkp", "alkaline phosphatase"),
     "TBIL": ("tbil", "total bilirubin", "bilirubin total", "bilirubin"),
+    "DBIL": ("dbil", "direct bilirubin", "bilirubin direct"),
     "GGT": ("ggt", "gamma gt", "gamma-glutamyl transferase"),
+    "INR": ("inr",),
+    "ALB": ("albumin", "alb"),
 }
 
 
@@ -270,47 +273,6 @@ class ClinicalLabExtractor:
         )
 
     # -------------------------------------------------------------------------
-    def build_manual_entries(self, payload: PatientData) -> list[ClinicalLabEntry]:
-        manual = payload.manual_hepatic_markers()
-        entries: list[ClinicalLabEntry] = []
-        marker_map = {"ALAT": "ALT", "ALP": "ALP"}
-        for raw_marker, marker_payload in manual.items():
-            marker = marker_map.get(raw_marker, raw_marker)
-            if not isinstance(marker_payload, dict):
-                continue
-            entries.append(
-                ClinicalLabEntry(
-                    marker_name=marker,
-                    value=self.parse_numeric(marker_payload.get("value")),
-                    value_text=(
-                        str(marker_payload.get("value_text")).strip()
-                        if marker_payload.get("value_text") is not None
-                        else None
-                    ),
-                    unit=(
-                        str(marker_payload.get("unit")).strip()
-                        if marker_payload.get("unit") is not None
-                        else None
-                    ),
-                    upper_limit_normal=self.parse_numeric(marker_payload.get("cutoff")),
-                    upper_limit_text=(
-                        str(marker_payload.get("cutoff_text")).strip()
-                        if marker_payload.get("cutoff_text") is not None
-                        else None
-                    ),
-                    sample_date=(
-                        str(marker_payload.get("date")).strip()
-                        if marker_payload.get("date") is not None
-                        else None
-                    ),
-                    relative_time=None,
-                    evidence="Manual lab marker from structured payload.",
-                    source="manual",
-                )
-            )
-        return entries
-
-    # -------------------------------------------------------------------------
     @staticmethod
     def extract_rate_limit_wait_hint_seconds(exc: Exception) -> float | None:
         message = str(exc)
@@ -341,28 +303,32 @@ class ClinicalLabExtractor:
         *,
         progress_callback: Callable[[float], None] | None = None,
     ) -> tuple[PatientLabTimeline, LiverInjuryOnsetContext | None]:
-        cleaned = self.clean_text(payload.anamnesis)
+        primary_labs_text = self.clean_text(payload.laboratory_analysis)
+        supplemental_anamnesis_text = self.clean_text(payload.anamnesis)
         timeline_entries: list[ClinicalLabEntry] = []
         onset_context: LiverInjuryOnsetContext | None = None
         self.emit_progress(progress_callback, 0.0)
 
-        if cleaned:
+        merged_source_text = "\n\n".join(
+            block for block in (primary_labs_text, supplemental_anamnesis_text) if block
+        )
+        if merged_source_text:
             await self.ensure_client()
             if self.client is None:
                 raise RuntimeError("LLM client is not initialized for lab extraction")
-            chunks = self.chunk_text(cleaned)
+            chunks = self.chunk_text(merged_source_text)
             llm_entries: list[ClinicalLabEntry] = []
             llm_onset: LiverInjuryOnsetContext | None = None
             for index, chunk in enumerate(chunks, start=1):
                 user_prompt = (
-                    "Extract longitudinal liver-related labs and onset clues from this anamnesis chunk.\n"
+                    "Extract longitudinal liver-related labs and onset clues from this clinical chunk.\n"
                     f"[Chunk {index}/{len(chunks)}]\n{chunk}"
                 )
                 for attempt in range(1, self.extraction_retry_attempts + 1):
                     try:
                         parsed = await self.client.llm_structured_call(
                             model=self.model,
-                            system_prompt=ANAMNESIS_LAB_EXTRACTION_PROMPT.strip(),
+                            system_prompt=CLINICAL_LAB_EXTRACTION_PROMPT.strip(),
                             user_prompt=user_prompt,
                             schema=LabExtractionPayload,
                             temperature=self.temperature,
@@ -376,9 +342,9 @@ class ClinicalLabExtractor:
                         delay = self.retry_backoff_seconds(attempt, exc=exc)
                         logger.warning(
                             (
-                                "Retrying anamnesis lab extraction for chunk %d/%d "
-                                "(attempt %d/%d, delay %.2fs): %s"
-                            ),
+                            "Retrying clinical lab extraction for chunk %d/%d "
+                            "(attempt %d/%d, delay %.2fs): %s"
+                        ),
                             index,
                             len(chunks),
                             attempt,
@@ -394,8 +360,6 @@ class ClinicalLabExtractor:
             timeline_entries.extend(llm_entries)
             onset_context = llm_onset
 
-        manual_entries = self.build_manual_entries(payload)
-        timeline_entries = [*manual_entries, *timeline_entries]
         self.emit_progress(progress_callback, 0.85)
 
         normalized: list[ClinicalLabEntry] = []

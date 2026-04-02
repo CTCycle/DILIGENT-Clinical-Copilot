@@ -1225,6 +1225,7 @@ class _RepositorySerializationService:
         payload = {
             "anamnesis": session_data.get("anamnesis"),
             "drugs": session_data.get("drugs"),
+            "laboratory_analysis": session_data.get("laboratory_analysis"),
             "final_report": session_data.get("final_report"),
             "issues": issues_content,
         }
@@ -1244,13 +1245,39 @@ class _RepositorySerializationService:
     def persist_session_labs(
         self, db_session: Session, session_id: int, session_data: dict[str, Any]
     ) -> None:
-        mapping = [
-            ("alt", "alt_value", "alt_upper_limit"),
-            ("alp", "alp_value", "alp_upper_limit"),
-        ]
-        for lab_code, value_key, upper_limit_key in mapping:
-            value_raw = self.normalize_string(session_data.get(value_key))
-            upper_limit_raw = self.normalize_string(session_data.get(upper_limit_key))
+        result_payload = session_data.get("session_result_payload")
+        if not isinstance(result_payload, dict):
+            return
+        timeline_raw = result_payload.get("lab_timeline")
+        if not isinstance(timeline_raw, list):
+            return
+        persisted_codes = {
+            "ALT": "alt",
+            "AST": "ast",
+            "ALP": "alp",
+            "TBIL": "tbil",
+            "DBIL": "dbil",
+            "GGT": "ggt",
+            "INR": "inr",
+            "ALB": "albumin",
+        }
+        seen: set[tuple[str, str, str]] = set()
+        for item in timeline_raw:
+            if not isinstance(item, dict):
+                continue
+            marker_name = self.normalize_string(item.get("marker_name"))
+            if marker_name is None:
+                continue
+            lab_code = persisted_codes.get(marker_name.upper())
+            if lab_code is None:
+                continue
+            sample_date = self.normalize_string(item.get("sample_date")) or ""
+            value_raw = self.normalize_string(item.get("value")) or self.normalize_string(item.get("value_text"))
+            upper_limit_raw = self.normalize_string(item.get("upper_limit_normal")) or self.normalize_string(item.get("upper_limit_text"))
+            dedupe_key = (lab_code, sample_date, value_raw or "")
+            if dedupe_key in seen:
+                continue
+            seen.add(dedupe_key)
             if value_raw is None and upper_limit_raw is None:
                 continue
             db_session.add(
