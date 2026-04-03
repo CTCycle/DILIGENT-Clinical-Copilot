@@ -13,6 +13,7 @@ from DILIGENT.server.repositories.serialization.data import DataSerializer
 from DILIGENT.server.repositories.schemas.models import (
     Base,
     ClinicalSession,
+    ClinicalSessionLab,
     ClinicalSessionResult,
 )
 from DILIGENT.server.services.updater.livertox import LiverToxUpdater
@@ -124,6 +125,52 @@ def test_save_clinical_session_persists_raw_result_payload() -> None:
     assert result_row is not None
     assert result_row.session_id == session_row.id
     assert json.loads(result_row.payload_json) == raw_payload
+
+
+# -----------------------------------------------------------------------------
+def test_save_clinical_session_deduplicates_labs_per_marker() -> None:
+    serializer, engine = build_serializer()
+    serializer.save_clinical_session(
+        {
+            "patient_name": "lab-patient",
+            "session_timestamp": "2025-01-04T00:00:00",
+            "session_result_payload": {
+                "lab_timeline": [
+                    {
+                        "marker_name": "ALT",
+                        "sample_date": "2025-01-01",
+                        "value": "120",
+                        "upper_limit_normal": "40",
+                    },
+                    {
+                        "marker_name": "ALT",
+                        "sample_date": "2025-01-03",
+                        "value": "150",
+                        "upper_limit_normal": "40",
+                    },
+                    {
+                        "marker_name": "AST",
+                        "sample_date": "2025-01-02",
+                        "value": "90",
+                        "upper_limit_normal": "35",
+                    },
+                ],
+            },
+        }
+    )
+
+    factory = sessionmaker(bind=engine, future=True)
+    with factory() as db_session:
+        labs = (
+            db_session.execute(
+                select(ClinicalSessionLab).order_by(ClinicalSessionLab.lab_code)
+            )
+            .scalars()
+            .all()
+        )
+
+    assert len(labs) == 2
+    assert [row.lab_code for row in labs] == ["alt", "ast"]
 
 
 # -----------------------------------------------------------------------------
