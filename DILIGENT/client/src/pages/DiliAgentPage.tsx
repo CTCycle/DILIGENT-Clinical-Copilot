@@ -335,6 +335,15 @@ export function DiliAgentPage(): React.JSX.Element {
         updateDiliAgent({ isExpanded: !isExpanded });
     };
 
+    const recordedDateLabel = form.visitDate
+        ? new Date(`${form.visitDate}T00:00:00`).toLocaleDateString(undefined, {
+            year: "numeric",
+            month: "long",
+            day: "numeric",
+        })
+        : "Not set";
+    const patientNameLabel = form.patientName.trim() || "Unnamed patient";
+
     // ---------------------------------------------------------------------------
     // Render
     // ---------------------------------------------------------------------------
@@ -367,102 +376,104 @@ export function DiliAgentPage(): React.JSX.Element {
         );
     })();
     return (
-        <>
-            <main className="page-container">
-                <div className="main-form-grid">
-                    {/* Clinical Inputs Column */}
-                    <section className="card clinical-inputs">
-                        <div className="card-header">
-                            <h2>Clinical Context</h2>
-                            <p className="helper">Summarize history, current therapy, and laboratory analysis for this visit.</p>
-                        </div>
+        <main className="page-container stitch-dili-page">
+            <header className="stitch-dili-heading">
+                <h1>DILI Clinical Assessment</h1>
+                <p>Patient Intake and Context</p>
+            </header>
 
-                        {/* Section 1: Clinical Context */}
-                        <div className="clinical-section">
-                            <div className="field">
-                                <label className="field-label" htmlFor="anamnesis">Anamnesis</label>
+            <div className="stitch-dili-grid">
+                <div className="stitch-dili-main">
+                    <section className="stitch-dili-card">
+                        <div className="stitch-dili-card-title">
+                            <h2>Clinical Inputs</h2>
+                        </div>
+                        <div className="stitch-dili-input-stack">
+                            <div className="stitch-dili-input-group">
+                                <h3>Anamnesis</h3>
                                 <textarea
                                     id="anamnesis"
-                                    placeholder="Patient history and clinical observations..."
+                                    placeholder="Describe patient history, symptoms onset, and clinical observations..."
                                     value={form.anamnesis}
                                     onChange={(e) => handleFormChange("anamnesis", e.target.value)}
                                 />
-                                <span className="field-helper">
-                                    Include relevant exams, comorbidities, and prior clinical context.
-                                </span>
                             </div>
-                            <div className="field">
-                                <label className="field-label" htmlFor="drugs">Current Drugs</label>
+
+                            <div className="stitch-dili-input-group">
+                                <h3>Current Drugs</h3>
                                 <textarea
                                     id="drugs"
-                                    placeholder="Medication list with dosages..."
+                                    placeholder="List medications, dosages, frequency, and duration of use..."
                                     value={form.drugs}
                                     onChange={(e) => handleFormChange("drugs", e.target.value)}
                                 />
-                                <span className="field-helper">Include start, stop, suspension, or other timing information when known.</span>
                             </div>
-                            <div className="field">
-                                <label className="field-label" htmlFor="laboratory-analysis">Laboratory Analysis</label>
+
+                            <div className="stitch-dili-input-group">
+                                <h3>Laboratory Analysis</h3>
                                 <textarea
                                     id="laboratory-analysis"
-                                    placeholder="Paste raw laboratory text with dates and values..."
+                                    placeholder="Input raw lab results (ALT, AST, ALP, Bilirubin, etc.)..."
                                     value={form.laboratoryAnalysis}
                                     onChange={(e) => handleFormChange("laboratoryAnalysis", e.target.value)}
                                 />
-                                <span className="field-helper">Paste raw laboratory text, including dated values when available.</span>
                             </div>
                         </div>
                     </section>
+                </div>
 
-                    {/* Patient Information Column */}
-                    <section className="card patient-info">
-                        <div className="card-header">
-                            <h2>Patient Information</h2>
-                            <p className="helper">Basic demographics and visit data.</p>
+                <aside className="stitch-dili-sidebar">
+                    <section className="stitch-dili-card stitch-dili-patient">
+                        <div className="stitch-dili-patient-top">
+                            <div className="stitch-dili-avatar" aria-hidden="true">
+                                {patientNameLabel.charAt(0).toUpperCase()}
+                            </div>
+                            <div>
+                                <h3>{patientNameLabel}</h3>
+                                <p>Recorded: {recordedDateLabel}</p>
+                            </div>
                         </div>
 
-                        {/* Basic Fields */}
-                        <div className="field">
-                            <label className="field-label" htmlFor="patient-name">Patient Name</label>
-                            <input
-                                id="patient-name"
-                                type="text"
-                                placeholder="e.g., Marco Rossi"
-                                value={form.patientName}
-                                onChange={(e) => handleFormChange("patientName", e.target.value)}
-                            />
+                        <div className="stitch-dili-inline-fields">
+                            <div className="field">
+                                <label className="field-label" htmlFor="patient-name">Patient Name</label>
+                                <input
+                                    id="patient-name"
+                                    type="text"
+                                    placeholder="e.g., Marco Rossi"
+                                    value={form.patientName}
+                                    onChange={(e) => handleFormChange("patientName", e.target.value)}
+                                />
+                            </div>
+                            <div className="field">
+                                <label className="field-label" htmlFor="visit-date">Visit Date</label>
+                                <input
+                                    id="visit-date"
+                                    type="date"
+                                    max={todayIso}
+                                    value={form.visitDate}
+                                    onChange={(e) => handleVisitDateChange(e.target.value)}
+                                />
+                            </div>
                         </div>
 
-                        <div className="field">
-                            <label className="field-label" htmlFor="visit-date">Visit Date</label>
-                            <input
-                                id="visit-date"
-                                type="date"
-                                max={todayIso}
-                                value={form.visitDate}
-                                onChange={(e) => handleVisitDateChange(e.target.value)}
-                            />
-                            <span className="field-helper">Required visit anchor for chronology analysis.</span>
-                        </div>
-
-                        <div className="advanced-options advanced-options-inline">
-                            <p className="advanced-options-header">Evidence Retrieval</p>
+                        <div className="stitch-dili-controls">
+                            <p>Retrieval Controls</p>
                             <BooleanToggle
                                 id="use-rag"
-                                label="Enable RAG for supporting evidence"
+                                label="Internal RAG"
                                 checked={form.useRag}
                                 onChange={(checked) => handleFormChange("useRag", checked)}
                             />
                             <BooleanToggle
                                 id="use-web-search"
-                                label="Enable web search for supporting evidence"
+                                label="Web Search"
                                 checked={form.useWebSearch}
                                 onChange={(checked) => handleFormChange("useWebSearch", checked)}
                             />
                         </div>
 
-                        {/* Action Buttons */}
-                        <div className="action-stack">
+                        <div className="stitch-dili-actions">
                             <button
                                 className="btn btn-primary"
                                 type="button"
@@ -471,64 +482,63 @@ export function DiliAgentPage(): React.JSX.Element {
                             >
                                 {isRunning ? (isCancelling ? "Stopping..." : "Stop analysis") : "Run DILI analysis"}
                             </button>
-                            <button className="btn btn-tertiary" type="button" onClick={handleClear} disabled={isRunning}>
+                            <button className="stitch-dili-clear" type="button" onClick={handleClear} disabled={isRunning}>
                                 Clear all
                             </button>
                         </div>
-
                     </section>
 
-                    {/* Report Output Section */}
-                    <section className="report-section">
-                        <div className="report-shell">
-                            <div className="report-header">
-                                <p className="report-eyebrow">Session output</p>
-                                <h2>Report Output</h2>
-                                <p className="report-subtitle">Markdown rendering of the clinical report.</p>
-                            </div>
+                    <div className="stitch-dili-tip">
+                        "Ensure laboratory results include units for accurate drug-induced liver injury risk profiling."
+                    </div>
+                </aside>
+            </div>
 
-                            <div className="report-toolbar">
-                                <button
-                                    className="toolbar-btn"
-                                    type="button"
-                                    onClick={handleCopyReport}
-                                    disabled={!message}
-                                    title="Copy to clipboard"
-                                >
-                                    <CopyIcon />
-                                    <span>Copy</span>
-                                </button>
-                                <button
-                                    className="toolbar-btn"
-                                    type="button"
-                                    onClick={handleToggleExpand}
-                                    disabled={!message}
-                                    title={isExpanded ? "Collapse" : "Expand"}
-                                >
-                                    <ExpandIcon />
-                                    <span>{isExpanded ? "Collapse" : "Expand"}</span>
-                                </button>
-                                <button
-                                    className="toolbar-btn"
-                                    type="button"
-                                    onClick={handleDownload}
-                                    disabled={!exportUrl}
-                                    title="Download markdown file"
-                                >
-                                    <DownloadIcon />
-                                    <span>Download markdown</span>
-                                </button>
-                            </div>
+            <section className="report-section stitch-dili-report">
+                <div className="report-shell">
+                    <div className="report-header">
+                        <p className="report-eyebrow">Report Output</p>
+                    </div>
 
-                            <div className={`report-content ${isExpanded ? "is-expanded" : ""}`}>
-                                {reportContent}
-                            </div>
-                        </div>
-                    </section>
+                    <div className="report-toolbar">
+                        <button
+                            className="toolbar-btn"
+                            type="button"
+                            onClick={handleCopyReport}
+                            disabled={!message}
+                            title="Copy to clipboard"
+                        >
+                            <CopyIcon />
+                            <span>Copy</span>
+                        </button>
+                        <button
+                            className="toolbar-btn"
+                            type="button"
+                            onClick={handleToggleExpand}
+                            disabled={!message}
+                            title={isExpanded ? "Collapse" : "Expand"}
+                        >
+                            <ExpandIcon />
+                            <span>{isExpanded ? "Collapse" : "Expand"}</span>
+                        </button>
+                        <button
+                            className="toolbar-btn"
+                            type="button"
+                            onClick={handleDownload}
+                            disabled={!exportUrl}
+                            title="Download markdown file"
+                        >
+                            <DownloadIcon />
+                            <span>Download markdown</span>
+                        </button>
+                    </div>
+
+                    <div className={`report-content ${isExpanded ? "is-expanded" : ""}`}>
+                        {reportContent}
+                    </div>
                 </div>
-
-            </main>
-        </>
+            </section>
+        </main>
     );
 }
 

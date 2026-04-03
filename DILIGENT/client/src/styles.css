@@ -5,25 +5,25 @@
    ============================================ */
 :root {
   color-scheme: light;
-  font-family: "Manrope", "Segoe UI", "Helvetica Neue", Arial, sans-serif;
+  font-family: "Inter", "Segoe UI", "Helvetica Neue", Arial, sans-serif;
   --focus-ring: 2px solid var(--color-brand);
   --focus-ring-offset: 2px;
 
   /* Colors */
-  --color-brand: #16a34a;
-  --color-brand-light: #22c55e;
-  --color-brand-ui: #229960;
-  --color-brand-ui-light: #86daac;
-  --color-brand-bg: rgba(22, 163, 74, 0.05);
-  --color-text-primary: #0f172a;
-  --color-text-secondary: #475569;
-  --color-text-muted: #64748b;
-  --color-text-subtle: #94a3b8;
-  --color-surface: #f4f8f3;
-  --color-surface-alt: #edf4ec;
-  --color-border: #c6d6c8;
-  --color-border-subtle: rgba(206, 190, 165, 0.35);
-  --color-divider: #e2e8f0;
+  --color-brand: #036c55;
+  --color-brand-light: #9ef3d6;
+  --color-brand-ui: #036c55;
+  --color-brand-ui-light: #9ef3d6;
+  --color-brand-bg: rgba(3, 108, 85, 0.08);
+  --color-text-primary: #2d3433;
+  --color-text-secondary: #596060;
+  --color-text-muted: #757c7b;
+  --color-text-subtle: #acb3b2;
+  --color-surface: #ffffff;
+  --color-surface-alt: #f0f4f3;
+  --color-border: #acb3b2;
+  --color-border-subtle: rgba(172, 179, 178, 0.2);
+  --color-divider: #dde4e3;
   --color-overlay: rgba(15, 23, 42, 0.45);
   --color-status-info-text: #1d4ed8;
   --color-status-info-bg: rgba(219, 234, 254, 0.7);
@@ -65,22 +65,20 @@
   --radius-xl: 16px;
 
   /* Shadows */
-  --shadow-sm: 0 4px 12px -6px rgba(15, 23, 42, 0.15);
-  --shadow-md: 0 10px 30px -18px rgba(15, 23, 42, 0.28);
-  --shadow-lg: 0 16px 38px -26px rgba(15, 23, 42, 0.2);
-  --shadow-brand: 0 10px 30px -18px rgba(34, 153, 96, 0.58);
+  --shadow-sm: 0 8px 18px -14px rgba(45, 52, 51, 0.12);
+  --shadow-md: 0 12px 28px -18px rgba(45, 52, 51, 0.12);
+  --shadow-lg: 0 12px 32px -4px rgba(45, 52, 51, 0.04);
+  --shadow-brand: 0 8px 18px -10px rgba(3, 108, 85, 0.35);
 
   /* Layout */
-  --container-max: 1200px;
+  --container-max: 1536px;
   --drawer-width: 360px;
   --report-max-height: 480px;
-  --app-top-nav-height: 86px;
+  --app-top-nav-height: 64px;
 
   /* Background */
   --app-background:
-    radial-gradient(138% 102% at -8% -16%, rgba(98, 191, 102, 0.36) 0%, rgba(98, 191, 102, 0.12) 34%, rgba(98, 191, 102, 0) 66%),
-    radial-gradient(124% 96% at 108% 2%, rgba(74, 177, 121, 0.28) 0%, rgba(74, 177, 121, 0.1) 36%, rgba(74, 177, 121, 0) 68%),
-    linear-gradient(156deg, #e7f3e2 0%, #d9ebd6 40%, #c6e0c5 72%, #b4d6b8 100%);
+    radial-gradient(circle at top left, #f0f4f3 0%, #f8faf9 100%);
   color: var(--color-text-primary);
 }
 
@@ -154,7 +152,220 @@ html,
   width: 100%;
   max-width: none;
   margin: 0;
-  padding: var(--space-2xl) var(--space-xl) var(--space-3xl);
+  padding: 28px 24px 32px;
+}
+
+.stitch-dili-page {
+  max-width: 1440px;
+  margin: 0 auto;
+}
+
+.stitch-dili-heading {
+  margin-bottom: var(--space-xl);
+}
+
+.stitch-dili-heading h1 {
+  margin: 0 0 var(--space-xs);
+  font-family: "Manrope", "Inter", sans-serif;
+  font-size: clamp(34px, 3.4vw, 40px);
+  line-height: 1.08;
+  font-weight: 750;
+  letter-spacing: -0.015em;
+}
+
+.stitch-dili-heading p {
+  margin: 0;
+  font-family: "Inter", sans-serif;
+  text-transform: uppercase;
+  letter-spacing: 0.1em;
+  font-size: var(--font-xs);
+  font-weight: 600;
+  color: var(--color-text-secondary);
+}
+
+.stitch-dili-grid {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: var(--space-2xl);
+  align-items: start;
+}
+
+@media (min-width: 1100px) {
+  .stitch-dili-grid {
+    grid-template-columns: minmax(0, 7fr) minmax(336px, 3fr);
+    gap: 28px;
+  }
+}
+
+.stitch-dili-main,
+.stitch-dili-sidebar {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-lg);
+}
+
+.stitch-dili-card {
+  background: var(--color-surface);
+  border: 1px solid var(--color-border-subtle);
+  border-radius: var(--radius-xl);
+  padding: var(--space-2xl);
+  box-shadow: var(--shadow-md);
+}
+
+.stitch-dili-card-title h2 {
+  margin: 0;
+  font-family: "Manrope", "Inter", sans-serif;
+  font-size: var(--font-xl);
+  font-weight: 700;
+  color: var(--color-text-primary);
+  line-height: 1.2;
+}
+
+.stitch-dili-input-stack {
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+  margin-top: var(--space-lg);
+}
+
+.stitch-dili-input-group h3 {
+  margin: 0 0 var(--space-sm);
+  font-family: "Manrope", "Inter", sans-serif;
+  font-size: var(--font-lg);
+  font-weight: 650;
+  color: var(--color-text-primary);
+}
+
+.stitch-dili-card textarea {
+  width: 100%;
+  min-height: 138px;
+  max-height: 320px;
+  overflow-y: auto;
+  border: none;
+  background: var(--color-surface-alt);
+  border-radius: var(--radius-lg);
+  padding: var(--space-lg);
+  color: var(--color-text-primary);
+  font-size: var(--font-base);
+  line-height: 1.55;
+  resize: vertical;
+}
+
+.stitch-dili-card textarea:focus-visible {
+  outline: none;
+  box-shadow: 0 0 0 2px color-mix(in srgb, var(--color-brand) 28%, transparent);
+}
+
+.stitch-dili-sidebar {
+  position: sticky;
+  top: calc(var(--app-top-nav-height) + var(--space-lg));
+  align-self: start;
+}
+
+.stitch-dili-patient-top {
+  display: flex;
+  align-items: center;
+  gap: var(--space-lg);
+  margin-bottom: var(--space-lg);
+}
+
+.stitch-dili-avatar {
+  width: 56px;
+  height: 56px;
+  border-radius: 999px;
+  background: #9ef3d6;
+  color: #005d49;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  font-family: "Manrope", "Inter", sans-serif;
+  font-weight: 800;
+}
+
+.stitch-dili-patient h3 {
+  margin: 0;
+  font-family: "Manrope", "Inter", sans-serif;
+  font-size: var(--font-lg);
+  line-height: 1.2;
+}
+
+.stitch-dili-patient p {
+  margin: var(--space-xs) 0 0;
+  color: var(--color-text-secondary);
+  font-size: var(--font-sm);
+}
+
+.stitch-dili-inline-fields {
+  display: grid;
+  gap: var(--space-sm);
+  margin-bottom: var(--space-lg);
+}
+
+.stitch-dili-inline-fields .field {
+  margin: 0;
+}
+
+.stitch-dili-inline-fields .field input {
+  background: #f0f4f3;
+  border-color: rgba(172, 179, 178, 0.45);
+}
+
+.stitch-dili-controls {
+  margin-bottom: var(--space-lg);
+}
+
+.stitch-dili-controls > p {
+  margin: 0 0 var(--space-sm);
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  font-size: var(--font-xs);
+  color: var(--color-text-secondary);
+  font-weight: 700;
+}
+
+.stitch-dili-controls .toggle-row {
+  margin-top: var(--space-sm);
+}
+
+.stitch-dili-actions {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-sm);
+}
+
+.stitch-dili-clear {
+  border: none;
+  background: transparent;
+  color: var(--color-text-secondary);
+  font-weight: 600;
+  font-size: var(--font-sm);
+  cursor: pointer;
+}
+
+.stitch-dili-clear:hover:not(:disabled) {
+  color: #a83836;
+}
+
+.stitch-dili-tip {
+  border: 1px solid color-mix(in srgb, var(--color-brand) 22%, var(--color-border-subtle));
+  background: color-mix(in srgb, var(--color-brand-bg) 60%, var(--color-surface));
+  border-radius: var(--radius-lg);
+  padding: var(--space-lg);
+  color: var(--color-text-secondary);
+  font-size: var(--font-sm);
+  line-height: 1.55;
+  font-style: normal;
+}
+
+.stitch-dili-report {
+  margin-top: var(--space-2xl);
+}
+
+@media (max-width: 1099px) {
+  .stitch-dili-sidebar {
+    position: static;
+    top: auto;
+  }
 }
 
 /* ============================================
@@ -1259,7 +1470,9 @@ html,
 }
 
 .report-content.is-expanded {
-  max-height: none;
+  max-height: min(78vh, 820px);
+  min-height: 220px;
+  resize: vertical;
 }
 
 .report-placeholder {
@@ -1686,23 +1899,17 @@ input[type="date"]::-webkit-calendar-picker-indicator:hover {
 }
 
 .app-header {
-  padding: 6px var(--space-lg);
-  border-bottom: 1px solid rgba(148, 163, 184, 0.34);
-  background: rgba(255, 255, 255, 0.88);
-  backdrop-filter: blur(8px);
-}
-
-.app-header-brand {
+  padding: 0 24px;
+  border-bottom: 1px solid rgba(172, 179, 178, 0.2);
+  background: color-mix(in srgb, var(--color-surface) 92%, #f8faf9);
+  height: 64px;
   display: flex;
   align-items: center;
-  justify-content: space-between;
-  gap: var(--space-md);
-  width: 100%;
 }
 
 .app-header-logo {
   display: inline-flex;
-  width: 108px;
+  width: 194px;
   max-width: 100%;
   color: var(--color-text-primary);
 }
@@ -1713,76 +1920,110 @@ input[type="date"]::-webkit-calendar-picker-indicator:hover {
   height: auto;
 }
 
-.app-header-title {
-  margin: 0;
-  margin-left: auto;
-  color: var(--color-text-primary);
-  font-size: var(--font-lg);
-  font-weight: 700;
-  letter-spacing: 0.02em;
-  text-align: right;
+.app-header-content {
+  width: 100%;
+  display: grid;
+  grid-template-columns: auto 1fr auto;
+  align-items: center;
+  gap: 24px;
 }
 
-.app-theme-toggle {
-  margin-left: auto;
+.app-header-brand {
   display: inline-flex;
   align-items: center;
-  gap: var(--space-sm);
+  padding: 6px 8px;
+  border-radius: 12px;
+  border: 1px solid var(--color-border-subtle);
+  background: color-mix(in srgb, var(--color-surface) 84%, var(--color-surface-alt));
 }
 
-.app-theme-toggle-label {
-  margin: 0;
+.app-header-actions {
+  display: inline-flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.app-header-icon-btn {
+  width: 32px;
+  height: 32px;
+  border-radius: 999px;
+  border: none;
+  background: transparent;
   color: var(--color-text-secondary);
-  font-size: var(--font-sm);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+}
+
+.app-header-icon-btn svg {
+  width: 18px;
+  height: 18px;
+}
+
+.app-header-icon-btn:hover {
+  background: #f0f4f3;
+  color: var(--color-text-primary);
+}
+
+.app-header-avatar {
+  width: 32px;
+  height: 32px;
+  border-radius: 999px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  background: #eaefee;
+  border: 2px solid #9ef3d6;
+  color: var(--color-text-primary);
+  font-size: 11px;
   font-weight: 700;
-  letter-spacing: 0.03em;
-  text-transform: uppercase;
 }
 
 .tab-bar {
   display: flex;
-  align-items: stretch;
+  align-items: center;
   justify-content: flex-start;
-  padding: 0 var(--space-sm);
-  background: linear-gradient(120deg, var(--color-brand-ui), var(--color-brand-ui-light));
-  border-bottom: 1px solid rgba(15, 23, 42, 0.2);
-  box-shadow: var(--shadow-sm);
+  padding: 0;
+  background: transparent;
+  border: none;
+  box-shadow: none;
 }
 
 .tab-items {
   display: flex;
   flex-wrap: nowrap;
-  width: min(100%, 760px);
+  width: auto;
+  gap: 20px;
 }
 
 .tab-item {
   display: inline-flex;
   align-items: center;
-  justify-content: center;
-  gap: var(--space-sm);
-  flex: 1 1 0;
-  min-height: 42px;
+  justify-content: flex-start;
+  gap: 8px;
+  min-height: 36px;
   border: none;
-  border-bottom: 3px solid transparent;
+  border-bottom: 2px solid transparent;
   background: transparent;
-  color: rgba(255, 255, 255, 0.84);
+  color: var(--color-text-secondary);
   cursor: pointer;
   font-size: var(--font-sm);
   font-weight: 700;
-  letter-spacing: 0.05em;
-  text-transform: uppercase;
+  letter-spacing: 0;
+  text-transform: none;
   transition: background 0.2s ease, color 0.2s ease, border-color 0.2s ease;
 }
 
 .tab-item:hover {
-  background: rgba(255, 255, 255, 0.12);
-  color: #ffffff;
+  background: transparent;
+  color: var(--color-text-primary);
 }
 
 .tab-item.active {
-  color: #ffffff;
-  background: rgba(255, 255, 255, 0.16);
-  border-bottom-color: #f8fafc;
+  color: var(--color-brand);
+  background: transparent;
+  border-bottom-color: var(--color-brand);
 }
 
 .tab-icon {
@@ -1813,7 +2054,22 @@ input[type="date"]::-webkit-calendar-picker-indicator:hover {
 
 @media (max-width: 768px) {
   :root {
-    --app-top-nav-height: 126px;
+    --app-top-nav-height: 96px;
+  }
+
+  .app-header {
+    padding: 12px 16px;
+    height: auto;
+  }
+
+  .app-header-content {
+    grid-template-columns: 1fr;
+    gap: 12px;
+  }
+
+  .tab-items {
+    gap: 12px;
+    overflow-x: auto;
   }
 
   .lab-layout {
@@ -3349,9 +3605,14 @@ input[type="date"]::-webkit-calendar-picker-indicator:hover {
   border-bottom-color: rgba(71, 85, 105, 0.58);
 }
 
+:root[data-theme="dark"] .app-header-brand {
+  background: rgba(15, 23, 42, 0.78);
+  border-color: rgba(100, 116, 139, 0.62);
+}
+
 :root[data-theme="dark"] .tab-bar {
-  background: linear-gradient(120deg, #0e3f2f, #0f5a41);
-  border-bottom-color: rgba(15, 23, 42, 0.62);
+  background: transparent;
+  border-bottom-color: transparent;
 }
 
 :root[data-theme="dark"] .tab-item {
@@ -3364,7 +3625,44 @@ input[type="date"]::-webkit-calendar-picker-indicator:hover {
 
 :root[data-theme="dark"] .tab-item.active {
   background: rgba(2, 6, 23, 0.5);
-  border-bottom-color: rgba(241, 245, 249, 0.96);
+  border-bottom-color: rgba(110, 231, 183, 0.92);
+}
+
+:root[data-theme="dark"] .stitch-dili-card {
+  background: rgba(15, 23, 42, 0.82);
+  border-color: rgba(100, 116, 139, 0.58);
+  box-shadow: 0 16px 34px -26px rgba(2, 6, 23, 0.9);
+}
+
+:root[data-theme="dark"] .stitch-dili-card textarea {
+  background: rgba(30, 41, 59, 0.84);
+  color: var(--color-text-primary);
+}
+
+:root[data-theme="dark"] .stitch-dili-input-group h3,
+:root[data-theme="dark"] .stitch-dili-patient h3,
+:root[data-theme="dark"] .stitch-dili-controls > p,
+:root[data-theme="dark"] .stitch-dili-patient p {
+  color: var(--color-text-secondary);
+}
+
+:root[data-theme="dark"] .stitch-dili-tip {
+  background: rgba(15, 23, 42, 0.74);
+  border-color: rgba(100, 116, 139, 0.56);
+  color: var(--color-text-secondary);
+}
+
+:root[data-theme="dark"] .stitch-dili-inline-fields .field input {
+  background: rgba(15, 23, 42, 0.9);
+  border-color: rgba(71, 85, 105, 0.72);
+}
+
+:root[data-theme="dark"] .stitch-dili-clear {
+  color: var(--color-text-secondary);
+}
+
+:root[data-theme="dark"] .stitch-dili-clear:hover:not(:disabled) {
+  color: #fca5a5;
 }
 
 :root[data-theme="dark"] .card,
