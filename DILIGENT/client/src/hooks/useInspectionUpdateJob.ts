@@ -7,12 +7,16 @@ export type InspectionUpdateJobState = {
   running: boolean;
   progress: number;
   status: JobStatus | null;
+  phase: string | null;
+  stepIndex: number | null;
+  stepCount: number | null;
   message: string | null;
+  summary: Record<string, unknown> | null;
   error: string | null;
 };
 
 type UseInspectionUpdateJobParams = {
-  startJob: () => Promise<JobStartResponse>;
+  startJob: (payload?: Record<string, unknown>) => Promise<JobStartResponse>;
   fetchStatus: (jobId: string) => Promise<InspectionUpdateJobStatusResponse>;
   cancelJob: (jobId: string) => Promise<JobCancelResponse>;
   onCompleted?: () => Promise<void> | void;
@@ -25,7 +29,7 @@ type UseInspectionUpdateJobParams = {
 type UseInspectionUpdateJobResult = {
   state: InspectionUpdateJobState;
   stopPolling: () => void;
-  triggerUpdate: () => Promise<void>;
+  triggerUpdate: (payload?: Record<string, unknown>) => Promise<void>;
 };
 
 const DEFAULT_INSPECTION_JOB_STATE: InspectionUpdateJobState = {
@@ -33,7 +37,11 @@ const DEFAULT_INSPECTION_JOB_STATE: InspectionUpdateJobState = {
   running: false,
   progress: 0,
   status: null,
+  phase: null,
+  stepIndex: null,
+  stepCount: null,
   message: null,
+  summary: null,
   error: null,
 };
 
@@ -72,13 +80,26 @@ export function useInspectionUpdateJob({
       const payload = await fetchStatus(jobId);
       const running = isRunningStatus(payload.status);
       const progressMessage = payload.result?.progress_message ?? null;
+      const phase = typeof payload.result?.phase === "string" ? payload.result.phase : null;
+      const stepIndex =
+        typeof payload.result?.step_index === "number" ? payload.result.step_index : null;
+      const stepCount =
+        typeof payload.result?.step_count === "number" ? payload.result.step_count : null;
+      const summary =
+        payload.result?.summary && typeof payload.result.summary === "object"
+          ? (payload.result.summary as Record<string, unknown>)
+          : null;
 
       setState({
         jobId,
         running,
         progress: payload.progress,
         status: payload.status,
+        phase,
+        stepIndex,
+        stepCount,
         message: progressMessage,
+        summary,
         error: payload.status === "failed" ? payload.error : null,
       });
 
@@ -104,7 +125,7 @@ export function useInspectionUpdateJob({
     }
   }, [fetchStatus, onCompleted, pollErrorMessage, stopPolling]);
 
-  const triggerUpdate = useCallback(async (): Promise<void> => {
+  const triggerUpdate = useCallback(async (payload?: Record<string, unknown>): Promise<void> => {
     if (state.running && state.jobId) {
       try {
         await cancelJob(state.jobId);
@@ -123,14 +144,18 @@ export function useInspectionUpdateJob({
     }
 
     try {
-      const start = await startJob();
+      const start = await startJob(payload);
       const intervalMs = Math.max(250, Math.round(start.poll_interval * 1000));
       setState({
         jobId: start.job_id,
         running: true,
         progress: 1,
         status: start.status,
+        phase: null,
+        stepIndex: null,
+        stepCount: null,
         message: startMessage,
+        summary: null,
         error: null,
       });
       stopPolling();

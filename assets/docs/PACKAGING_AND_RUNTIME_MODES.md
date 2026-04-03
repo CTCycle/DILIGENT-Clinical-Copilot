@@ -1,6 +1,6 @@
 # Packaging and Runtime Modes
 
-Last updated: 2026-03-28
+Last updated: 2026-04-03
 
 ## 1. Runtime strategy
 
@@ -99,3 +99,12 @@ Windows artifacts:
 - Docker base images are pinned in:
   - `docker/backend.Dockerfile`
   - `docker/frontend.Dockerfile`
+
+## 8. Maintenance boundary
+
+- `DILIGENT/setup_and_maintenance.bat` is for offline maintenance only:
+  - manual database initialization
+  - log cleanup
+  - desktop build cleanup
+  - uninstall cleanup
+- Data update operations (RxNav, LiverTox, RAG embeddings) are managed from the Data Inspection UI wizards.

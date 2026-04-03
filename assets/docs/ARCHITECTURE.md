@@ -1,6 +1,6 @@
 # DILIGENT Clinical Copilot Architecture
 
-Last updated: 2026-04-01
+Last updated: 2026-04-03
 
 This document describes the current architecture at module level.
 For runtime profile details, see `assets/docs/PACKAGING_AND_RUNTIME_MODES.md`.
@@ -78,9 +78,15 @@ Core route groups:
 - Inspection:
   - `/inspection/sessions`
   - `/inspection/rxnav`
+  - `/inspection/rxnav/update-config`
   - `/inspection/rxnav/jobs`
   - `/inspection/livertox`
+  - `/inspection/livertox/update-config`
   - `/inspection/livertox/jobs`
+  - `/inspection/rag/update-config`
+  - `/inspection/rag/documents`
+  - `/inspection/rag/vector-store`
+  - `/inspection/rag/jobs`
 - Research:
   - `/research`
 
@@ -100,6 +106,7 @@ Current managed job types:
 - `ollama_pull`
 - `rxnav_update`
 - `livertox_update`
+- `rag_update`
 
 All follow start/poll/cancel patterns described in `assets/docs/BACKGROUND_JOBS.md`.
 
@@ -114,6 +121,10 @@ Runtime/config files:
 - `DILIGENT/settings/.env` (active profile)
 - `DILIGENT/settings/.env.*.example` (profile templates)
 - `DILIGENT/settings/configurations.json` (non-secret tuning defaults)
+
+Maintenance boundary:
+- `DILIGENT/setup_and_maintenance.bat` is reserved for database initialization and offline maintenance.
+- RxNav/LiverTox/RAG dataset refresh operations are started from inspection UI wizards, not from `.bat` scripts.
 
 ## 9. Change impact map
 

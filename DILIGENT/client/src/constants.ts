@@ -65,6 +65,7 @@ export type LLMRuntimeDefaults = {
   cloud_model: string;
   use_cloud_services: boolean;
   ollama_temperature: number;
+  cloud_temperature: number;
   ollama_reasoning: boolean;
 };
 
@@ -75,6 +76,7 @@ export const LLM_RUNTIME_DEFAULTS: Readonly<LLMRuntimeDefaults> = {
   cloud_model: "gpt-4o-mini",
   use_cloud_services: false,
   ollama_temperature: 0.7,
+  cloud_temperature: 0.7,
   ollama_reasoning: false,
 };
 
@@ -115,7 +117,8 @@ export const DEFAULT_SETTINGS: RuntimeSettings = {
   ),
   parsingModel: LLM_RUNTIME_DEFAULTS.parsing_model,
   clinicalModel: LLM_RUNTIME_DEFAULTS.clinical_model,
-  temperature: LLM_RUNTIME_DEFAULTS.ollama_temperature,
+  ollamaTemperature: LLM_RUNTIME_DEFAULTS.ollama_temperature,
+  cloudTemperature: LLM_RUNTIME_DEFAULTS.cloud_temperature,
   reasoning: LLM_RUNTIME_DEFAULTS.ollama_reasoning,
 };
 

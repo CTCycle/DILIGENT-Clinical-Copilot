@@ -156,11 +156,27 @@ class RxNavClient:
     TERM_PATTERN = re.compile(r"[A-Za-z0-9]+(?:[-'][A-Za-z0-9]+)*")
     BRACKET_PATTERN = re.compile(r"\[([^\]]+)\]")
 
-    def __init__(self, *, enabled: bool | None = None) -> None:
+    def __init__(
+        self,
+        *,
+        enabled: bool | None = None,
+        request_timeout: float | None = None,
+        max_concurrency: int | None = None,
+    ) -> None:
         self.enabled = True
         external_settings = server_settings.external_data
-        self.timeout = max(float(external_settings.rxnav_request_timeout), 1.0)
-        self.max_concurrency = max(int(external_settings.rxnav_max_concurrency), 1)
+        configured_timeout = (
+            float(request_timeout)
+            if request_timeout is not None
+            else float(external_settings.rxnav_request_timeout)
+        )
+        configured_concurrency = (
+            int(max_concurrency)
+            if max_concurrency is not None
+            else int(external_settings.rxnav_max_concurrency)
+        )
+        self.timeout = max(configured_timeout, 1.0)
+        self.max_concurrency = max(configured_concurrency, 1)
         self.cache: dict[str, dict[str, RxNormCandidate]] = {}
         self.synonym_cache: dict[str, list[str]] = {}
 
@@ -998,42 +1014,65 @@ class RxNavDrugCatalogBuilder:
     ) -> tuple[dict[str, list[str]], dict[str, list[str]]]:
         alias_results: dict[str, list[str]] = {}
         synonym_results: dict[str, list[str]] = {}
+        concurrency_limit = max(1, int(self.rx_client.max_concurrency))
+        semaphore = asyncio.Semaphore(concurrency_limit)
+        chunk_size = max(concurrency_limit * 4, concurrency_limit)
+
+        async def run_with_semaphore(task_factory):
+            async with semaphore:
+                return await task_factory()
+
         async with httpx.AsyncClient(
             timeout=self.rx_client.timeout,
             limits=self.rx_client._build_limits(),
         ) as client:
-            alias_tasks = {
-                cache_key: asyncio.create_task(
-                    self.rx_client.fetch_drug_terms_async(query, client=client)
-                )
-                for cache_key, query in pending_alias_queries.items()
-            }
-            synonym_tasks = {
-                identifier: asyncio.create_task(
-                    self.rx_client.fetch_rxcui_synonyms_async(identifier, client=client)
-                )
-                for identifier in pending_synonym_identifiers
-            }
-            for cache_key, task in alias_tasks.items():
-                try:
-                    alias_results[cache_key] = await task
-                except Exception as exc:  # noqa: BLE001
-                    logger.warning(
-                        "Failed to prefetch RxNav aliases for '%s': %s",
-                        pending_alias_queries.get(cache_key),
-                        exc,
+            alias_entries = list(pending_alias_queries.items())
+            for start in range(0, len(alias_entries), chunk_size):
+                chunk = alias_entries[start : start + chunk_size]
+                tasks = {
+                    cache_key: asyncio.create_task(
+                        run_with_semaphore(
+                            lambda query=query: self.rx_client.fetch_drug_terms_async(
+                                query, client=client
+                            )
+                        )
                     )
-                    alias_results[cache_key] = []
-            for identifier, task in synonym_tasks.items():
-                try:
-                    synonym_results[identifier] = await task
-                except Exception as exc:  # noqa: BLE001
-                    logger.warning(
-                        "Failed to prefetch RxNav synonyms for '%s': %s",
-                        identifier,
-                        exc,
+                    for cache_key, query in chunk
+                }
+                for cache_key, task in tasks.items():
+                    try:
+                        alias_results[cache_key] = await task
+                    except Exception as exc:  # noqa: BLE001
+                        logger.warning(
+                            "Failed to prefetch RxNav aliases for '%s': %s",
+                            pending_alias_queries.get(cache_key),
+                            exc,
+                        )
+                        alias_results[cache_key] = []
+
+            synonym_entries = list(pending_synonym_identifiers)
+            for start in range(0, len(synonym_entries), chunk_size):
+                chunk = synonym_entries[start : start + chunk_size]
+                tasks = {
+                    identifier: asyncio.create_task(
+                        run_with_semaphore(
+                            lambda identifier=identifier: self.rx_client.fetch_rxcui_synonyms_async(
+                                identifier, client=client
+                            )
+                        )
                     )
-                    synonym_results[identifier] = []
+                    for identifier in chunk
+                }
+                for identifier, task in tasks.items():
+                    try:
+                        synonym_results[identifier] = await task
+                    except Exception as exc:  # noqa: BLE001
+                        logger.warning(
+                            "Failed to prefetch RxNav synonyms for '%s': %s",
+                            identifier,
+                            exc,
+                        )
+                        synonym_results[identifier] = []
         return alias_results, synonym_results
 
     # -------------------------------------------------------------------------

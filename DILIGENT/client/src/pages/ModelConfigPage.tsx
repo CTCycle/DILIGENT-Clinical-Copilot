@@ -42,6 +42,8 @@ type DraftRuntimeConfig = {
     cloudModel: string | null;
     clinicalModel: string;
     parsingModel: string;
+    ollamaTemperature: number;
+    cloudTemperature: number;
 };
 
 type PersistOptions = {
@@ -94,6 +96,8 @@ function resolveDraftFromSettings(
         cloudModel,
         clinicalModel: runtimeSettings.clinicalModel,
         parsingModel: runtimeSettings.parsingModel,
+        ollamaTemperature: runtimeSettings.ollamaTemperature,
+        cloudTemperature: runtimeSettings.cloudTemperature,
     };
 }
 
@@ -372,7 +376,9 @@ export function ModelConfigPage(): React.JSX.Element {
         || draftProvider !== savedProvider
         || (draftCloudModel || "") !== (savedCloudModel || "")
         || draftConfig.clinicalModel !== settings.clinicalModel
-        || draftConfig.parsingModel !== settings.parsingModel;
+        || draftConfig.parsingModel !== settings.parsingModel
+        || draftConfig.ollamaTemperature !== settings.ollamaTemperature
+        || draftConfig.cloudTemperature !== settings.cloudTemperature;
 
     const saveDisabled = isLoading
         || isSaving
@@ -420,6 +426,8 @@ export function ModelConfigPage(): React.JSX.Element {
                 cloud_model: draftCloudModel,
                 clinical_model: draftConfig.clinicalModel || null,
                 text_extraction_model: draftConfig.parsingModel || null,
+                ollama_temperature: draftConfig.ollamaTemperature,
+                cloud_temperature: draftConfig.cloudTemperature,
             },
             { successMessage: "Configuration saved." },
         );
@@ -716,6 +724,50 @@ export function ModelConfigPage(): React.JSX.Element {
                                 />
                                 <span className="field-label">Enable SDL/Reasoning</span>
                             </label>
+                            <div className="field">
+                                <label className="field-label" htmlFor="ollama-temperature-input">Ollama temperature</label>
+                                <input
+                                    id="ollama-temperature-input"
+                                    type="number"
+                                    min={0}
+                                    max={2}
+                                    step={0.01}
+                                    value={draftConfig.ollamaTemperature}
+                                    onChange={(event) => {
+                                        const value = Number.parseFloat(event.target.value);
+                                        if (!Number.isFinite(value)) {
+                                            return;
+                                        }
+                                        setDraftConfig((previous) => ({
+                                            ...previous,
+                                            ollamaTemperature: Math.max(0, Math.min(2, value)),
+                                        }));
+                                    }}
+                                    disabled={extraControlsDisabled}
+                                />
+                            </div>
+                            <div className="field">
+                                <label className="field-label" htmlFor="cloud-temperature-input">Cloud temperature</label>
+                                <input
+                                    id="cloud-temperature-input"
+                                    type="number"
+                                    min={0}
+                                    max={2}
+                                    step={0.01}
+                                    value={draftConfig.cloudTemperature}
+                                    onChange={(event) => {
+                                        const value = Number.parseFloat(event.target.value);
+                                        if (!Number.isFinite(value)) {
+                                            return;
+                                        }
+                                        setDraftConfig((previous) => ({
+                                            ...previous,
+                                            cloudTemperature: Math.max(0, Math.min(2, value)),
+                                        }));
+                                    }}
+                                    disabled={extraControlsDisabled}
+                                />
+                            </div>
                         </div>
                     </section>
                 </div>
@@ -741,6 +793,14 @@ export function ModelConfigPage(): React.JSX.Element {
                                 <dd>{draftCloudModel || "Not set"}</dd>
                             </div>
                         )}
+                        <div>
+                            <dt>Ollama temperature</dt>
+                            <dd>{draftConfig.ollamaTemperature.toFixed(2)}</dd>
+                        </div>
+                        <div>
+                            <dt>Cloud temperature</dt>
+                            <dd>{draftConfig.cloudTemperature.toFixed(2)}</dd>
+                        </div>
                     </dl>
 
                     {!draftConfig.useCloudServices && (

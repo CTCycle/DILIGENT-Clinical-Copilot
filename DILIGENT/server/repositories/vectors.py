@@ -50,6 +50,11 @@ class LanceVectorDatabase:
         self.embedding_size: int | None = None
 
     # -------------------------------------------------------------------------
+    def has_collection(self) -> bool:
+        connection = self.connect()
+        return self.collection_name in connection.table_names()
+
+    # -------------------------------------------------------------------------
     def connect(self) -> DBConnection:
         if self.connection is None:
             path = self.database_path
@@ -91,6 +96,25 @@ class LanceVectorDatabase:
             self.index_ready = False
             self.index_creation_attempted = False
         return self.table
+
+    # -------------------------------------------------------------------------
+    def clear_collection(self) -> None:
+        connection = self.connect()
+        if self.collection_name not in connection.table_names():
+            return
+        try:
+            connection.drop_table(self.collection_name)
+        except Exception as exc:  # noqa: BLE001
+            logger.error(
+                "Failed to drop LanceDB table '%s': %s",
+                self.collection_name,
+                exc,
+            )
+            raise
+        self.table = None
+        self.index_ready = False
+        self.index_creation_attempted = False
+        self.embedding_size = None
 
     # -------------------------------------------------------------------------
     def upsert_embeddings(self, records: list[dict[str, Any]]) -> None:
@@ -311,6 +335,33 @@ class LanceVectorDatabase:
         if limit is not None:
             data = data.slice(0, limit)
         return data.to_pylist()
+
+    # -------------------------------------------------------------------------
+    def count_embeddings(self) -> int:
+        if not self.has_collection():
+            return 0
+        table = self.get_table()
+        try:
+            return int(table.to_arrow().num_rows)
+        except Exception:  # noqa: BLE001
+            return 0
+
+    # -------------------------------------------------------------------------
+    def count_distinct_documents(self) -> int:
+        if not self.has_collection():
+            return 0
+        table = self.get_table()
+        try:
+            data = table.to_arrow(columns=["document_id"])
+        except Exception:  # noqa: BLE001
+            return 0
+        values = data.column("document_id").to_pylist() if data.num_rows else []
+        distinct = {str(item) for item in values if item}
+        return len(distinct)
+
+    # -------------------------------------------------------------------------
+    def read_embedding_dimension(self) -> int | None:
+        return self._read_existing_embedding_size()
 
     # -------------------------------------------------------------------------
     def to_json(self, limit: int | None = None) -> str:
