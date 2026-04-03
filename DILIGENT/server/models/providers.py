@@ -46,9 +46,11 @@ __all__ = [
 class OllamaError(RuntimeError):
     pass
 
+###############################################################################
 class OllamaTimeout(OllamaError):
     """Raised when requests to Ollama exceed the configured timeout."""
 
+###############################################################################
 class _OllamaChatFallback(Exception):
     """Internal control flow for switching to /api/generate streaming."""
 

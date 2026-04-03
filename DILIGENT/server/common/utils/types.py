@@ -4,7 +4,7 @@ import re
 from collections.abc import Iterable
 from typing import Any
 
-# -----------------------------------------------------------------------------
+###############################################################################
 def _extract_int_from_str(value: str) -> int | None:
     stripped = value.strip()
     if not stripped:
@@ -14,7 +14,7 @@ def _extract_int_from_str(value: str) -> int | None:
     match = re.search(r"\d+", stripped)
     return int(match.group(0)) if match else None
 
-# -----------------------------------------------------------------------------
+###############################################################################
 def extract_positive_int(value: Any) -> int | None:
     if isinstance(value, bool) or value is None:
         return None
@@ -33,12 +33,12 @@ def extract_positive_int(value: Any) -> int | None:
         return None
     return candidate
 
-# -----------------------------------------------------------------------------
+###############################################################################
 def coerce_positive_int(value: Any, default: int = 1) -> int:
     candidate = extract_positive_int(value)
     return candidate if candidate is not None else default
 
-# -----------------------------------------------------------------------------
+###############################################################################
 def coerce_bool(value: Any, default: bool) -> bool:
     if isinstance(value, bool):
         return value
@@ -53,7 +53,7 @@ def coerce_bool(value: Any, default: bool) -> bool:
         return bool(value)
     return default
 
-# -----------------------------------------------------------------------------
+###############################################################################
 def coerce_bool_or_unknown(value: bool | None) -> str:
     if value is True:
         return "yes"
@@ -61,7 +61,7 @@ def coerce_bool_or_unknown(value: bool | None) -> str:
         return "no"
     return "unknown"
 
-# -----------------------------------------------------------------------------
+###############################################################################
 def coerce_int(
     value: Any, default: int, minimum: int | None = None, maximum: int | None = None
 ) -> int:
@@ -80,7 +80,7 @@ def coerce_int(
     return candidate
 
 
-# -----------------------------------------------------------------------------
+###############################################################################
 def coerce_float(
     value: Any, default: float, minimum: float | None = None, maximum: float | None = None
 ) -> float:
@@ -95,7 +95,7 @@ def coerce_float(
     return candidate
 
 
-# -----------------------------------------------------------------------------
+###############################################################################
 def coerce_str(value: Any, default: str) -> str:
     if isinstance(value, str):
         stripped = value.strip()
@@ -105,19 +105,19 @@ def coerce_str(value: Any, default: str) -> str:
     return str(value).strip() or default
 
 
-# -----------------------------------------------------------------------------
+###############################################################################
 def coerce_str_or_none(value: Any) -> str | None:
     if isinstance(value, str):
         stripped = value.strip()
         return stripped or None
     return None
 
-# -----------------------------------------------------------------------------
+###############################################################################
 def coerce_str_sequence(value: Any, default: Iterable[str]) -> tuple[str, ...]:
     candidates, default_items = _coerce_str_sequence_candidates(value, default)
     return _coerce_str_sequence_unique(candidates, default_items)
 
-# -----------------------------------------------------------------------------
+###############################################################################
 def _coerce_str_sequence_candidates(
     value: Any, default: Iterable[str]
 ) -> tuple[list[str], list[str]]:
@@ -139,7 +139,7 @@ def _coerce_str_sequence_candidates(
         return candidates, default_items
     return default_items, default_items
 
-# -----------------------------------------------------------------------------
+###############################################################################
 def _coerce_str_sequence_unique(
     candidates: list[str], default_items: list[str]
 ) -> tuple[str, ...]:
@@ -152,7 +152,7 @@ def _coerce_str_sequence_unique(
             items.append(lowered)
     return tuple(items)
 
-# -----------------------------------------------------------------------------
+###############################################################################
 def _normalize_string_candidate(candidate: Any) -> str | None:
     if candidate is None:
         return None
@@ -160,7 +160,7 @@ def _normalize_string_candidate(candidate: Any) -> str | None:
     return text or None
 
 
-# -----------------------------------------------------------------------------
+###############################################################################
 def coerce_string_tuple(value: Any) -> tuple[str, ...]:
     if isinstance(value, (list, tuple, set)):
         candidates = list(value)

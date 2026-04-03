@@ -240,6 +240,7 @@ export function DataInspectionPage(): React.JSX.Element {
   const [excerptLoading, setExcerptLoading] = useState(false);
   const [excerptError, setExcerptError] = useState<string | null>(null);
   const [activeView, setActiveView] = useState<InspectionViewId>("sessions");
+  const [viewScrollMode, setViewScrollMode] = useState<"contained" | "page">("contained");
   const [activeUpdateTarget, setActiveUpdateTarget] = useState<InspectionUpdateTarget | null>(null);
   const closeAliasModal = useCallback(() => {
     setAliasData(null);
@@ -381,6 +382,7 @@ export function DataInspectionPage(): React.JSX.Element {
   const activeUpdateConfig = activeUpdateTarget ? INSPECTION_UPDATE_CONFIG[activeUpdateTarget] : null;
   const activeViewConfig = INSPECTION_VIEW_CONFIG[activeView];
   const activeTabId = `inspection-tab-${activeView}`;
+  const isPageScrollMode = viewScrollMode === "page";
 
   const focusInspectionTab = (view: InspectionViewId) => {
     globalThis.requestAnimationFrame(() => {
@@ -699,7 +701,11 @@ export function DataInspectionPage(): React.JSX.Element {
   );
 
   return (
-    <main className="page-container inspection-page inspection-page-workbench">
+    <main
+      className={`page-container inspection-page inspection-page-workbench ${
+        isPageScrollMode ? "is-page-scroll" : "is-contained-scroll"
+      }`}
+    >
       <header className="page-header"><p className="eyebrow">Data Inspection</p><h1>Session and Knowledge Catalog</h1><p className="lede">Review recorded DILI sessions alongside RxNav and LiverTox knowledge records.</p></header>
       <section className="inspection-layout">
         <aside className="inspection-toolbar" aria-label="Data inspection views">
@@ -766,13 +772,23 @@ export function DataInspectionPage(): React.JSX.Element {
 
         <section
           id="inspection-active-view-panel"
-          className="inspection-active-view"
+          className={`inspection-active-view ${isPageScrollMode ? "is-page-scroll" : "is-contained-scroll"}`}
           role="tabpanel"
           aria-labelledby={activeTabId}
         >
           <div className="inspection-active-view-header">
-            <h2>{activeViewConfig.label}</h2>
-            <p>{activeViewConfig.description}</p>
+            <div>
+              <h2>{activeViewConfig.label}</h2>
+              <p>{activeViewConfig.description}</p>
+            </div>
+            <button
+              type="button"
+              className="btn btn-secondary inspection-mini-btn inspection-scroll-mode-btn"
+              onClick={() => setViewScrollMode((mode) => (mode === "contained" ? "page" : "contained"))}
+              aria-pressed={isPageScrollMode}
+            >
+              {isPageScrollMode ? "Use View Scroll" : "Expand View"}
+            </button>
           </div>
           <div className="inspection-view-stage">
             {activeView === "sessions" && renderSessionsView()}

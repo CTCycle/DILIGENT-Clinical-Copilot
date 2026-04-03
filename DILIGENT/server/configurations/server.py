@@ -35,7 +35,7 @@ FASTAPI_DESCRIPTION = "FastAPI backend"
 # [LLM RUNTIME CONFIGURATION]
 ###############################################################################
 @dataclass
-class _LLMRuntimeState:
+class LLMRuntimeState:
     parsing_model: str = ""
     clinical_model: str = ""
     llm_provider: str = ""
@@ -49,12 +49,12 @@ class _LLMRuntimeState:
 
 class LLMRuntimeConfig:
     defaults: LLMRuntimeDefaults | None = None
-    _state: _LLMRuntimeState = _LLMRuntimeState()
+    _state: LLMRuntimeState = LLMRuntimeState()
     _lock: RLock = RLock()
 
     # -------------------------------------------------------------------------
     @classmethod
-    def _update_state(cls, **updates: Any) -> _LLMRuntimeState:
+    def _update_state(cls, **updates: Any) -> LLMRuntimeState:
         changed = False
         for field_name, value in updates.items():
             if getattr(cls._state, field_name) != value:
@@ -238,7 +238,7 @@ class LLMRuntimeConfig:
     def reset_defaults(cls) -> None:
         defaults = cls._get_defaults()
         with cls._lock:
-            cls._state = _LLMRuntimeState(
+            cls._state = LLMRuntimeState(
                 parsing_model=defaults.parsing_model,
                 clinical_model=defaults.clinical_model,
                 llm_provider=defaults.llm_provider,
