@@ -338,6 +338,12 @@ class ModelConfigEndpoint:
         if "use_cloud_services" in fields_set:
             updates["use_cloud_models"] = bool(payload.use_cloud_services)
 
+        if "ollama_temperature" in fields_set and payload.ollama_temperature is not None:
+            updates["ollama_temperature"] = payload.ollama_temperature
+
+        if "cloud_temperature" in fields_set and payload.cloud_temperature is not None:
+            updates["cloud_temperature"] = payload.cloud_temperature
+
         if updates:
             snapshot = self.serializer.save_snapshot(**updates)
 
@@ -498,6 +504,8 @@ class ModelConfigEndpoint:
             LLMRuntimeConfig.set_parsing_model(snapshot.text_extraction_model)
         if snapshot.clinical_model:
             LLMRuntimeConfig.set_clinical_model(snapshot.clinical_model)
+        LLMRuntimeConfig.set_ollama_temperature(snapshot.ollama_temperature)
+        LLMRuntimeConfig.set_cloud_temperature(snapshot.cloud_temperature)
 
         provider = self.resolve_provider(snapshot.cloud_provider)
         LLMRuntimeConfig.set_llm_provider(provider)
@@ -529,6 +537,8 @@ class ModelConfigEndpoint:
             cloud_model=cloud_model,
             clinical_model=snapshot.clinical_model,
             text_extraction_model=snapshot.text_extraction_model,
+            ollama_temperature=LLMRuntimeConfig.get_ollama_temperature(),
+            cloud_temperature=LLMRuntimeConfig.get_cloud_temperature(),
             ollama_reasoning=LLMRuntimeConfig.is_ollama_reasoning_enabled(),
             updated_at=snapshot.updated_at,
         )

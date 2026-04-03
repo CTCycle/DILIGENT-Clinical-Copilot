@@ -30,6 +30,8 @@ class ModelConfigStateResponse(BaseModel):
     cloud_model: str | None = None
     clinical_model: str | None = None
     text_extraction_model: str | None = None
+    ollama_temperature: float = Field(default=0.7, ge=0.0, le=2.0)
+    cloud_temperature: float = Field(default=0.7, ge=0.0, le=2.0)
     ollama_reasoning: bool = False
     updated_at: datetime | None = None
 
@@ -42,6 +44,8 @@ class ModelConfigUpdateRequest(BaseModel):
     cloud_model: str | None = Field(default=None, max_length=200)
     clinical_model: str | None = Field(default=None, max_length=200)
     text_extraction_model: str | None = Field(default=None, max_length=200)
+    ollama_temperature: float | None = Field(default=None, ge=0.0, le=2.0)
+    cloud_temperature: float | None = Field(default=None, ge=0.0, le=2.0)
     ollama_reasoning: bool | None = None
 
     # -------------------------------------------------------------------------

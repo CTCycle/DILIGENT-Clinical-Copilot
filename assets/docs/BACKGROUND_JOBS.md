@@ -1,6 +1,6 @@
 # Background Job Management
 
-Last updated: 2026-03-28
+Last updated: 2026-04-03
 
 DILIGENT uses a centralized thread-based job manager for long-running operations.
 
@@ -44,6 +44,10 @@ Each job tracks:
 - `livertox_update`
   - Start: `POST /inspection/livertox/jobs`
   - Poll/cancel: `GET|DELETE /inspection/livertox/jobs/{job_id}`
+- `rag_update`
+  - Start: `POST /inspection/rag/jobs`
+  - Poll: `GET /inspection/rag/jobs/{job_id}`
+  - Cancel: `POST /inspection/rag/jobs/{job_id}/cancel`
 
 Equivalent `/api/*` prefixed routes are always available.
 
@@ -53,6 +57,8 @@ Standard contract:
 1. Start endpoint returns `JobStartResponse` (`job_id`, `status`, `poll_interval`).
 2. Status endpoint returns `JobStatusResponse`.
 3. Cancel endpoint returns `JobCancelResponse`.
+4. Inspection update jobs may include phase-aware result fields:
+   - `phase`, `step_index`, `step_count`, `progress_message`, `summary`.
 
 Frontend polling is implemented in `DILIGENT/client/src/services/api.ts` and stops on terminal states.
 

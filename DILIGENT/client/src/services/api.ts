@@ -6,9 +6,15 @@ import {
   ClinicalRequestPayload,
   InspectionCatalogQuery,
   InspectionDeleteResponse,
+  InspectionLiverToxOverrideRequest,
   InspectionDrugAliasesResponse,
   InspectionLiverToxCatalogResponse,
   InspectionLiverToxExcerptResponse,
+  InspectionRagDocumentsResponse,
+  InspectionRagOverrideRequest,
+  InspectionRagVectorStoreSummary,
+  InspectionRxNavOverrideRequest,
+  InspectionUpdateConfigResponse,
   InspectionRxNavCatalogResponse,
   InspectionSessionCatalogResponse,
   InspectionSessionQuery,
@@ -438,9 +444,21 @@ export async function deleteInspectionRxNavDrug(
   );
 }
 
-export async function startInspectionRxNavUpdateJob(): Promise<JobStartResponse> {
+export async function fetchInspectionRxNavUpdateConfig(): Promise<InspectionUpdateConfigResponse> {
+  return requestJson<InspectionUpdateConfigResponse>(`${API_BASE_URL}/inspection/rxnav/update-config`, {
+    method: "GET",
+  });
+}
+
+export async function startInspectionRxNavUpdateJob(
+  payload: InspectionRxNavOverrideRequest = {},
+): Promise<JobStartResponse> {
   return requestJson<JobStartResponse>(`${API_BASE_URL}/inspection/rxnav/jobs`, {
     method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify(payload),
   });
 }
 
@@ -494,9 +512,21 @@ export async function deleteInspectionLiverToxDrug(
   );
 }
 
-export async function startInspectionLiverToxUpdateJob(): Promise<JobStartResponse> {
+export async function fetchInspectionLiverToxUpdateConfig(): Promise<InspectionUpdateConfigResponse> {
+  return requestJson<InspectionUpdateConfigResponse>(`${API_BASE_URL}/inspection/livertox/update-config`, {
+    method: "GET",
+  });
+}
+
+export async function startInspectionLiverToxUpdateJob(
+  payload: InspectionLiverToxOverrideRequest = {},
+): Promise<JobStartResponse> {
   return requestJson<JobStartResponse>(`${API_BASE_URL}/inspection/livertox/jobs`, {
     method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify(payload),
   });
 }
 
@@ -515,6 +545,54 @@ export async function cancelInspectionLiverToxUpdateJob(
   return requestJson<JobCancelResponse>(
     `${API_BASE_URL}/inspection/livertox/jobs/${encodeURIComponent(jobId)}`,
     { method: "DELETE" },
+  );
+}
+
+export async function fetchInspectionRagUpdateConfig(): Promise<InspectionUpdateConfigResponse> {
+  return requestJson<InspectionUpdateConfigResponse>(`${API_BASE_URL}/inspection/rag/update-config`, {
+    method: "GET",
+  });
+}
+
+export async function fetchInspectionRagDocuments(): Promise<InspectionRagDocumentsResponse> {
+  return requestJson<InspectionRagDocumentsResponse>(`${API_BASE_URL}/inspection/rag/documents`, {
+    method: "GET",
+  });
+}
+
+export async function fetchInspectionRagVectorStore(): Promise<InspectionRagVectorStoreSummary> {
+  return requestJson<InspectionRagVectorStoreSummary>(`${API_BASE_URL}/inspection/rag/vector-store`, {
+    method: "GET",
+  });
+}
+
+export async function startInspectionRagUpdateJob(
+  payload: InspectionRagOverrideRequest = {},
+): Promise<JobStartResponse> {
+  return requestJson<JobStartResponse>(`${API_BASE_URL}/inspection/rag/jobs`, {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify(payload),
+  });
+}
+
+export async function fetchInspectionRagUpdateJobStatus(
+  jobId: string,
+): Promise<InspectionUpdateJobStatusResponse> {
+  return requestJson<InspectionUpdateJobStatusResponse>(
+    `${API_BASE_URL}/inspection/rag/jobs/${encodeURIComponent(jobId)}`,
+    { method: "GET" },
+  );
+}
+
+export async function cancelInspectionRagUpdateJob(
+  jobId: string,
+): Promise<JobCancelResponse> {
+  return requestJson<JobCancelResponse>(
+    `${API_BASE_URL}/inspection/rag/jobs/${encodeURIComponent(jobId)}/cancel`,
+    { method: "POST" },
   );
 }
 

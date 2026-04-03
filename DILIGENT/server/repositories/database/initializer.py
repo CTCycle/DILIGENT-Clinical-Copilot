@@ -75,6 +75,10 @@ def build_postgres_create_database_sql(
 # -----------------------------------------------------------------------------
 def initialize_sqlite_database(settings: DatabaseSettings) -> None:
     repository = SQLiteRepository(settings)
+    db_path = repository.db_path or ""
+    if db_path and sqlalchemy.inspect(repository.engine).has_table("clinical_sessions"):
+        logger.info("SQLite database already initialized at %s; skipping schema creation.", db_path)
+        return
     Base.metadata.create_all(repository.engine)
     logger.info("Initialized SQLite database schema at %s", repository.db_path)
 

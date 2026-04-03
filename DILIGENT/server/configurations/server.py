@@ -42,6 +42,7 @@ class _LLMRuntimeState:
     cloud_model: str = ""
     use_cloud_services: bool = False
     ollama_temperature: float = 0.0
+    cloud_temperature: float = 0.0
     ollama_reasoning: bool = False
     revision: int = 0
 
@@ -163,6 +164,20 @@ class LLMRuntimeConfig:
 
     # -------------------------------------------------------------------------
     @classmethod
+    def set_cloud_temperature(cls, value: float | None) -> float:
+        defaults = cls._get_defaults()
+        with cls._lock:
+            try:
+                parsed = float(value) if value is not None else cls._state.cloud_temperature
+            except (TypeError, ValueError):
+                parsed = defaults.cloud_temperature
+            rounded = round(max(0.0, min(2.0, parsed)), 2)
+            if cls._state.cloud_temperature != rounded:
+                cls._update_state(cloud_temperature=rounded)
+            return cls._state.cloud_temperature
+
+    # -------------------------------------------------------------------------
+    @classmethod
     def set_ollama_reasoning(cls, enabled: bool) -> bool:
         normalized = bool(enabled)
         with cls._lock:
@@ -214,6 +229,12 @@ class LLMRuntimeConfig:
 
     # -------------------------------------------------------------------------
     @classmethod
+    def get_cloud_temperature(cls) -> float:
+        with cls._lock:
+            return cls._state.cloud_temperature
+
+    # -------------------------------------------------------------------------
+    @classmethod
     def reset_defaults(cls) -> None:
         defaults = cls._get_defaults()
         with cls._lock:
@@ -225,6 +246,10 @@ class LLMRuntimeConfig:
                 use_cloud_services=defaults.use_cloud_services,
                 ollama_temperature=round(
                     max(0.0, min(2.0, defaults.ollama_temperature)),
+                    2,
+                ),
+                cloud_temperature=round(
+                    max(0.0, min(2.0, defaults.cloud_temperature)),
                     2,
                 ),
                 ollama_reasoning=defaults.ollama_reasoning,
@@ -380,6 +405,7 @@ class LLMRuntimeDefaults:
     cloud_model: str
     use_cloud_services: bool
     ollama_temperature: float
+    cloud_temperature: float
     ollama_reasoning: bool
     ollama_host_default: str
 
@@ -759,6 +785,7 @@ def build_llm_runtime_defaults(data: dict[str, Any]) -> LLMRuntimeDefaults:
         cloud_model=coerce_str(data.get("cloud_model"), cloud_default),
         use_cloud_services=coerce_bool(data.get("use_cloud_services"), False),
         ollama_temperature=coerce_float(data.get("ollama_temperature"), 0.7),
+        cloud_temperature=coerce_float(data.get("cloud_temperature"), 0.7),
         ollama_reasoning=coerce_bool(data.get("ollama_reasoning"), False),
         ollama_host_default=resolve_ollama_base_url(
             coerce_str(

@@ -7,7 +7,7 @@ import httpx
 
 from DILIGENT.server.common.constants import GEMINI_API_BASE, OPENAI_API_BASE
 from DILIGENT.server.common.utils.logger import logger
-from DILIGENT.server.configurations import server_settings
+from DILIGENT.server.configurations import LLMRuntimeConfig, server_settings
 from DILIGENT.server.models.structured import StructuredOutputParser, parse_json_dict, T
 from DILIGENT.server.repositories.serialization.access_keys import AccessKeySerializer
 from DILIGENT.server.services.cryptography import (
@@ -154,15 +154,22 @@ class CloudLLMClient:
         format: str | None = None,
         options: dict[str, Any] | None = None,
     ) -> dict[str, Any] | str:
+        options_payload = dict(options) if options else {}
+        if "temperature" not in options_payload:
+            options_payload["temperature"] = LLMRuntimeConfig.get_cloud_temperature()
         if self.provider == "openai":
             return await self.chat_openai(
                 model=model,
                 messages=messages,
                 format=format,
-                options=options,
+                options=options_payload,
             )
         if self.provider == "gemini":
-            return await self.chat_gemini(model=model, messages=messages)
+            return await self.chat_gemini(
+                model=model,
+                messages=messages,
+                options=options_payload,
+            )
         raise LLMError(f"Provider '{self.provider}' does not support chat yet")
 
     # ---------------------------------------------------------------------
@@ -262,6 +269,7 @@ class CloudLLMClient:
         *,
         model: str,
         messages: list[dict[str, str]],
+        options: dict[str, Any] | None = None,
     ) -> dict[str, Any] | str:
         resolved_model = model or self.default_model
         model_resource = self.resolve_gemini_model_resource(resolved_model)
@@ -271,6 +279,14 @@ class CloudLLMClient:
         body: dict[str, Any] = {"contents": contents}
         if system_text:
             body["systemInstruction"] = {"parts": [{"text": system_text}]}
+        if options and "temperature" in options:
+            try:
+                temperature = float(options["temperature"])
+            except (TypeError, ValueError):
+                temperature = 0.0
+            body["generationConfig"] = {
+                "temperature": max(0.0, min(2.0, temperature))
+            }
 
         try:
             resp = await self.client.post(path, json=body)

@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from datetime import date
 
-from fastapi import APIRouter, HTTPException, Query, status
+from fastapi import APIRouter, Body, HTTPException, Query, status
 
 from DILIGENT.server.common.utils.logger import logger
 from DILIGENT.server.configurations import server_settings
@@ -11,19 +11,21 @@ from DILIGENT.server.domain.inspection import (
     DeleteEntityResponse,
     DateFilterMode,
     DrugAliasesResponse,
+    InspectionLiverToxOverrideRequest,
+    InspectionRagOverrideRequest,
+    InspectionRxNavOverrideRequest,
+    InspectionUpdateConfigResponse,
+    LanceVectorStoreSummaryResponse,
     LiverToxCatalogResponse,
     LiverToxExcerptResponse,
+    RagDocumentListResponse,
     RxNavCatalogResponse,
     SessionCatalogResponse,
     SessionReportResponse,
     SessionListFilters,
     SessionStatus,
 )
-from DILIGENT.server.domain.jobs import (
-    JobCancelResponse,
-    JobStartResponse,
-    JobStatusResponse,
-)
+from DILIGENT.server.domain.jobs import JobCancelResponse, JobStartResponse, JobStatusResponse
 from DILIGENT.server.services.inspection import DataInspectionService
 
 
@@ -58,9 +60,15 @@ class DataInspectionEndpoint:
         )
 
     # -------------------------------------------------------------------------
-    def start_update_job(self, *, job_type: str, message: str) -> JobStartResponse:
+    def start_update_job(
+        self,
+        *,
+        job_type: str,
+        message: str,
+        overrides: dict[str, object] | None = None,
+    ) -> JobStartResponse:
         try:
-            payload = self.service.start_update_job(job_type)
+            payload = self.service.start_update_job(job_type, overrides=overrides)
         except ValueError as exc:
             detail = str(exc)
             error_status = (
@@ -191,10 +199,19 @@ class DataInspectionEndpoint:
         return DeleteEntityResponse(deleted=True)
 
     # -------------------------------------------------------------------------
-    def start_rxnav_update_job(self) -> JobStartResponse:
+    def get_rxnav_update_config(self) -> InspectionUpdateConfigResponse:
+        payload = self.service.build_update_config_response("rxnav")
+        return InspectionUpdateConfigResponse(**payload)
+
+    # -------------------------------------------------------------------------
+    def start_rxnav_update_job(
+        self,
+        overrides: InspectionRxNavOverrideRequest = Body(default=InspectionRxNavOverrideRequest()),
+    ) -> JobStartResponse:
         return self.start_update_job(
             job_type=self.service.RXNAV_JOB_TYPE,
             message="RxNav update job started",
+            overrides=overrides.model_dump(exclude_none=True),
         )
 
     # -------------------------------------------------------------------------
@@ -247,10 +264,19 @@ class DataInspectionEndpoint:
         return DeleteEntityResponse(deleted=True)
 
     # -------------------------------------------------------------------------
-    def start_livertox_update_job(self) -> JobStartResponse:
+    def get_livertox_update_config(self) -> InspectionUpdateConfigResponse:
+        payload = self.service.build_update_config_response("livertox")
+        return InspectionUpdateConfigResponse(**payload)
+
+    # -------------------------------------------------------------------------
+    def start_livertox_update_job(
+        self,
+        overrides: InspectionLiverToxOverrideRequest = Body(default=InspectionLiverToxOverrideRequest()),
+    ) -> JobStartResponse:
         return self.start_update_job(
             job_type=self.service.LIVERTOX_JOB_TYPE,
             message="LiverTox update job started",
+            overrides=overrides.model_dump(exclude_none=True),
         )
 
     # -------------------------------------------------------------------------
@@ -266,6 +292,38 @@ class DataInspectionEndpoint:
             job_id=job_id,
             job_type=self.service.LIVERTOX_JOB_TYPE,
         )
+
+    # -------------------------------------------------------------------------
+    def get_rag_update_config(self) -> InspectionUpdateConfigResponse:
+        payload = self.service.build_update_config_response("rag")
+        return InspectionUpdateConfigResponse(**payload)
+
+    # -------------------------------------------------------------------------
+    def list_rag_documents(self) -> RagDocumentListResponse:
+        return RagDocumentListResponse(**self.service.list_rag_documents())
+
+    # -------------------------------------------------------------------------
+    def get_rag_vector_store(self) -> LanceVectorStoreSummaryResponse:
+        return LanceVectorStoreSummaryResponse(**self.service.get_rag_vector_store_summary())
+
+    # -------------------------------------------------------------------------
+    def start_rag_update_job(
+        self,
+        overrides: InspectionRagOverrideRequest = Body(default=InspectionRagOverrideRequest()),
+    ) -> JobStartResponse:
+        return self.start_update_job(
+            job_type=self.service.RAG_JOB_TYPE,
+            message="RAG embeddings update job started",
+            overrides=overrides.model_dump(exclude_none=True),
+        )
+
+    # -------------------------------------------------------------------------
+    def get_rag_update_job_status(self, job_id: str) -> JobStatusResponse:
+        return self.get_update_job_status(job_id=job_id, job_type=self.service.RAG_JOB_TYPE)
+
+    # -------------------------------------------------------------------------
+    def cancel_rag_update_job(self, job_id: str) -> JobCancelResponse:
+        return self.cancel_update_job(job_id=job_id, job_type=self.service.RAG_JOB_TYPE)
 
     # -------------------------------------------------------------------------
     def add_routes(self) -> None:
@@ -313,6 +371,13 @@ class DataInspectionEndpoint:
             status_code=status.HTTP_200_OK,
         )
         self.router.add_api_route(
+            "/rxnav/update-config",
+            self.get_rxnav_update_config,
+            methods=["GET"],
+            response_model=InspectionUpdateConfigResponse,
+            status_code=status.HTTP_200_OK,
+        )
+        self.router.add_api_route(
             "/rxnav/jobs",
             self.start_rxnav_update_job,
             methods=["POST"],
@@ -356,6 +421,13 @@ class DataInspectionEndpoint:
             status_code=status.HTTP_200_OK,
         )
         self.router.add_api_route(
+            "/livertox/update-config",
+            self.get_livertox_update_config,
+            methods=["GET"],
+            response_model=InspectionUpdateConfigResponse,
+            status_code=status.HTTP_200_OK,
+        )
+        self.router.add_api_route(
             "/livertox/jobs",
             self.start_livertox_update_job,
             methods=["POST"],
@@ -373,6 +445,49 @@ class DataInspectionEndpoint:
             "/livertox/jobs/{job_id}",
             self.cancel_livertox_update_job,
             methods=["DELETE"],
+            response_model=JobCancelResponse,
+            status_code=status.HTTP_200_OK,
+        )
+
+        self.router.add_api_route(
+            "/rag/update-config",
+            self.get_rag_update_config,
+            methods=["GET"],
+            response_model=InspectionUpdateConfigResponse,
+            status_code=status.HTTP_200_OK,
+        )
+        self.router.add_api_route(
+            "/rag/documents",
+            self.list_rag_documents,
+            methods=["GET"],
+            response_model=RagDocumentListResponse,
+            status_code=status.HTTP_200_OK,
+        )
+        self.router.add_api_route(
+            "/rag/vector-store",
+            self.get_rag_vector_store,
+            methods=["GET"],
+            response_model=LanceVectorStoreSummaryResponse,
+            status_code=status.HTTP_200_OK,
+        )
+        self.router.add_api_route(
+            "/rag/jobs",
+            self.start_rag_update_job,
+            methods=["POST"],
+            response_model=JobStartResponse,
+            status_code=status.HTTP_202_ACCEPTED,
+        )
+        self.router.add_api_route(
+            "/rag/jobs/{job_id}",
+            self.get_rag_update_job_status,
+            methods=["GET"],
+            response_model=JobStatusResponse,
+            status_code=status.HTTP_200_OK,
+        )
+        self.router.add_api_route(
+            "/rag/jobs/{job_id}/cancel",
+            self.cancel_rag_update_job,
+            methods=["POST"],
             response_model=JobCancelResponse,
             status_code=status.HTTP_200_OK,
         )
