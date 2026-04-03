@@ -347,6 +347,31 @@ class ModelSelection(Base):
 
 
 ###############################################################################
+class RuntimeSetting(Base):
+    __tablename__ = "runtime_settings"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
+    setting_key: Mapped[str] = mapped_column(String, nullable=False, unique=True)
+    setting_value: Mapped[str | None] = mapped_column(String, nullable=True)
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime,
+        nullable=False,
+        server_default=text("CURRENT_TIMESTAMP"),
+    )
+    updated_at: Mapped[datetime] = mapped_column(
+        DateTime,
+        nullable=False,
+        server_default=text("CURRENT_TIMESTAMP"),
+        server_onupdate=text("CURRENT_TIMESTAMP"),
+    )
+
+    __table_args__ = (
+        UniqueConstraint("setting_key", name="uq_runtime_settings_setting_key"),
+        Index("ix_runtime_settings_setting_key", "setting_key"),
+    )
+
+
+###############################################################################
 class AccessKey(Base):
     __tablename__ = "access_keys"
 

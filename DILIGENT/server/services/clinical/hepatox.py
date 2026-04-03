@@ -1037,14 +1037,79 @@ class HepatoxConsultation:
     def format_rucam_prompt_block(self, rucam: DrugRucamAssessment | None) -> str:
         if rucam is None:
             return "Estimated RUCAM not available."
+        limitations = ", ".join((rucam.limitations or [])[:3]) or "not specified"
         return (
             f"- Score: {rucam.total_score}\n"
             f"- Category: {rucam.causality_category}\n"
             f"- Confidence: {rucam.confidence}\n"
-            f"- Injury type used: {rucam.injury_type_for_rucam}\n"
-            f"- Components: {self.summarize_rucam_components(rucam)}\n"
-            f"- Limitations: {self.format_rucam_limitations(rucam)}"
+            f"- Estimated due to incomplete clinical data: yes\n"
+            f"- Key limitations: {limitations}"
         )
+
+    # -------------------------------------------------------------------------
+    @staticmethod
+    def is_materially_in_report_language(text: str, report_language: str) -> bool:
+        normalized = (text or "").strip()
+        if not normalized:
+            return True
+        language_key = (report_language or "").strip().lower()[:2]
+        if language_key == "en":
+            return True
+        token_pattern = re.compile(r"[A-Za-zÀ-ÖØ-öø-ÿ]+")
+        language_markers: dict[str, set[str]] = {
+            "it": {"il", "la", "del", "della", "con", "per", "farmaco", "paziente"},
+            "de": {"der", "die", "das", "und", "mit", "für", "patient", "arznei"},
+            "fr": {"le", "la", "les", "des", "avec", "pour", "patient", "médicament"},
+            "es": {"el", "la", "los", "las", "con", "para", "paciente", "fármaco"},
+        }
+        target_markers = language_markers.get(language_key)
+        if not target_markers:
+            return True
+        english_markers = {"the", "and", "with", "for", "patient", "drug", "liver"}
+        target_hits = 0
+        english_hits = 0
+        for match in token_pattern.finditer(normalized):
+            token = match.group(0).casefold()
+            if token in target_markers:
+                target_hits += 1
+            if token in english_markers:
+                english_hits += 1
+        if target_hits == 0:
+            return False
+        return target_hits >= english_hits
+
+    # -------------------------------------------------------------------------
+    async def repair_language_once(
+        self,
+        *,
+        source_text: str,
+        report_language: str,
+    ) -> str:
+        language_map = "en=English, it=Italian, de=German, fr=French, es=Spanish"
+        repair_system = (
+            "You rewrite clinical text into the requested language only. "
+            "Do not add new clinical facts."
+        )
+        repair_user = (
+            f"Target language code: {report_language}\n"
+            f"Language map: {language_map}\n"
+            "Rewrite the text entirely in the target language. "
+            "Do not produce bilingual output. Keep drug names and direct quotes unchanged.\n\n"
+            f"Text:\n{source_text}"
+        )
+        chat_kwargs: dict[str, Any] = {
+            "model": self.llm_model,
+            "messages": [
+                {"role": "system", "content": repair_system},
+                {"role": "user", "content": repair_user},
+            ],
+        }
+        if self.chat_supports_temperature:
+            chat_kwargs["temperature"] = 0.0
+        else:
+            chat_kwargs["options"] = {"temperature": 0.0}
+        repaired = await self.llm_client.chat(**chat_kwargs)
+        return self.coerce_chat_text(repaired).strip()
 
     # -------------------------------------------------------------------------
     async def request_drug_analysis(
@@ -1136,7 +1201,20 @@ class HepatoxConsultation:
                     exc,
                 )
                 await asyncio.sleep(delay)
-        return self.coerce_chat_text(raw_response)
+        response_text = self.coerce_chat_text(raw_response).strip()
+        if not self.is_materially_in_report_language(response_text, report_language):
+            logger.warning(
+                "Language mismatch detected for drug analysis '%s' (target=%s); applying one repair pass",
+                drug_name,
+                report_language,
+            )
+            repaired_text = await self.repair_language_once(
+                source_text=response_text,
+                report_language=report_language,
+            )
+            if repaired_text:
+                response_text = repaired_text
+        return response_text
 
     # -------------------------------------------------------------------------
     @staticmethod
@@ -1253,14 +1331,15 @@ class HepatoxConsultation:
         rucam = entry.rucam
         rucam_score = rucam.total_score if rucam is not None else "n/a"
         rucam_category = rucam.causality_category if rucam is not None else "not available"
-        rucam_confidence = rucam.confidence if rucam is not None else "low"
-        component_summary = self.summarize_rucam_components(rucam)
-        limitations = self.format_rucam_limitations(rucam)
+        limitations = (
+            ", ".join((rucam.limitations or [])[:3])
+            if rucam is not None and rucam.limitations
+            else "incomplete serial labs and/or missing rechallenge data"
+        )
         return (
             f"**{title}**\n\n"
-            f"**Estimated RUCAM**: {rucam_score}, {rucam_category}, confidence {rucam_confidence}\n\n"
-            f"**RUCAM component summary**: {component_summary}\n\n"
-            f"**RUCAM limitations**: {limitations}\n\n"
+            f"**Estimated RUCAM**: {rucam_score}, {rucam_category}. "
+            f"Estimated due to incomplete clinical data; key limitations: {limitations}.\n\n"
             f"**Report**\n\n"
             f"{body}\n\n"
             f"**Bibliography source**: LiverTox"
@@ -1329,9 +1408,9 @@ class HepatoxConsultation:
             label = (entry.drug_name or "").strip() or "Unnamed drug"
             reason = self.describe_unresolved_entry(entry)
             rucam_summary = (
-                f"RUCAM {entry.rucam.total_score} ({entry.rucam.causality_category}, confidence {entry.rucam.confidence})"
+                f"Estimated RUCAM {entry.rucam.total_score} ({entry.rucam.causality_category})"
                 if entry.rucam is not None
-                else "RUCAM not available"
+                else "Estimated RUCAM not available"
             )
             lines.append(f"- **{label}**: {reason} {rucam_summary}.")
         return "\n".join(lines).strip()
@@ -1403,6 +1482,17 @@ class HepatoxConsultation:
                 )
                 await asyncio.sleep(delay)
         conclusion = self.coerce_chat_text(raw_response).strip()
+        if conclusion and not self.is_materially_in_report_language(conclusion, report_language):
+            logger.warning(
+                "Language mismatch detected for global conclusion (target=%s); applying one repair pass",
+                report_language,
+            )
+            repaired = await self.repair_language_once(
+                source_text=conclusion,
+                report_language=report_language,
+            )
+            if repaired:
+                conclusion = repaired
         return conclusion or None
 
     # -------------------------------------------------------------------------

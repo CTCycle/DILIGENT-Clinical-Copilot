@@ -4,23 +4,31 @@ import remarkGfm from "remark-gfm";
 
 import {
   cancelInspectionLiverToxUpdateJob,
+  cancelInspectionRagUpdateJob,
   cancelInspectionRxNavUpdateJob,
   deleteInspectionLiverToxDrug,
   deleteInspectionRxNavDrug,
   deleteInspectionSession,
+  fetchInspectionLiverToxUpdateConfig,
   fetchInspectionLiverToxCatalog,
   fetchInspectionLiverToxExcerpt,
   fetchInspectionLiverToxUpdateJobStatus,
+  fetchInspectionRagDocuments,
+  fetchInspectionRagUpdateConfig,
+  fetchInspectionRagUpdateJobStatus,
+  fetchInspectionRagVectorStore,
+  fetchInspectionRxNavUpdateConfig,
   fetchInspectionRxNavAliases,
   fetchInspectionRxNavCatalog,
   fetchInspectionRxNavUpdateJobStatus,
   fetchInspectionSessionReport,
   fetchInspectionSessions,
+  startInspectionRagUpdateJob,
   startInspectionLiverToxUpdateJob,
   startInspectionRxNavUpdateJob,
 } from "../services/api";
 import { InspectionIconActionButton } from "../components/InspectionIconActionButton";
-import { InspectionJobPanel } from "../components/InspectionJobPanel";
+import { InspectionUpdateWizard } from "../components/InspectionUpdateWizard";
 import { useDebouncedValue } from "../hooks/useDebouncedValue";
 import { useInspectionUpdateJob } from "../hooks/useInspectionUpdateJob";
 import {
@@ -28,6 +36,11 @@ import {
   InspectionDrugAliasesResponse,
   InspectionLiverToxExcerptResponse,
   InspectionLiverToxItem,
+  InspectionRagDocumentRow,
+  InspectionRagVectorStoreSummary,
+  InspectionRagOverrideRequest,
+  InspectionLiverToxOverrideRequest,
+  InspectionRxNavOverrideRequest,
   InspectionRxNavItem,
   InspectionSessionItem,
   InspectionSessionStatus,
@@ -35,7 +48,7 @@ import {
 
 const PAGE_LIMIT = 10;
 const SEARCH_DEBOUNCE_MS = 250;
-type InspectionViewId = "sessions" | "rxnav" | "livertox";
+type InspectionViewId = "sessions" | "rxnav" | "livertox" | "rag";
 
 const INSPECTION_VIEW_CONFIG: Record<InspectionViewId, { label: string; description: string }> = {
   sessions: {
@@ -50,8 +63,12 @@ const INSPECTION_VIEW_CONFIG: Record<InspectionViewId, { label: string; descript
     label: "LiverTox data",
     description: "Browse LiverTox monograph excerpts and recency data used by the clinical copilot.",
   },
+  rag: {
+    label: "RAG",
+    description: "Inspect RAG source documents, LanceDB status, and run embeddings updates.",
+  },
 };
-const INSPECTION_VIEW_ORDER: readonly InspectionViewId[] = ["sessions", "rxnav", "livertox"];
+const INSPECTION_VIEW_ORDER: readonly InspectionViewId[] = ["sessions", "rxnav", "livertox", "rag"];
 
 function formatDateTime(value: string | null): string {
   if (!value) return "N/A";
@@ -133,6 +150,14 @@ function LiverToxNavIcon(): React.JSX.Element {
   );
 }
 
+function RagNavIcon(): React.JSX.Element {
+  return (
+    <svg className="inspection-nav-icon" viewBox="0 0 24 24" aria-hidden="true">
+      <path d="M4 4h16v4H4V4Zm0 6h16v4H4v-4Zm0 6h9v4H4v-4Zm12 0h4v4h-4v-4Z" />
+    </svg>
+  );
+}
+
 function CloseIcon(): React.JSX.Element {
   return (
     <svg className="inspection-icon" viewBox="0 0 24 24" aria-hidden="true">
@@ -168,6 +193,14 @@ export function DataInspectionPage(): React.JSX.Element {
   const [livertoxError, setLivertoxError] = useState<string | null>(null);
   const [livertoxSearchInput, setLivertoxSearchInput] = useState("");
   const livertoxSearch = useDebouncedValue(livertoxSearchInput, SEARCH_DEBOUNCE_MS);
+  const [ragDocuments, setRagDocuments] = useState<InspectionRagDocumentRow[]>([]);
+  const [ragVectorStore, setRagVectorStore] = useState<InspectionRagVectorStoreSummary | null>(null);
+  const [ragTotal, setRagTotal] = useState(0);
+  const [ragOffset, setRagOffset] = useState(0);
+  const [ragLoading, setRagLoading] = useState(false);
+  const [ragError, setRagError] = useState<string | null>(null);
+  const [ragSearchInput, setRagSearchInput] = useState("");
+  const ragSearch = useDebouncedValue(ragSearchInput, SEARCH_DEBOUNCE_MS);
 
   const [reportSession, setReportSession] = useState<InspectionSessionItem | null>(null);
   const [reportContent, setReportContent] = useState("");
@@ -248,8 +281,39 @@ export function DataInspectionPage(): React.JSX.Element {
     }
   }, [livertoxOffset, livertoxSearch]);
 
+  const loadRag = useCallback(async () => {
+    setRagLoading(true);
+    setRagError(null);
+    try {
+      const [documentsPayload, vectorPayload] = await Promise.all([
+        fetchInspectionRagDocuments(),
+        fetchInspectionRagVectorStore(),
+      ]);
+      const normalizedSearch = ragSearch.trim().toLowerCase();
+      const filtered = documentsPayload.items.filter((item) => {
+        if (!normalizedSearch) {
+          return true;
+        }
+        const haystack = `${item.file_name} ${item.path} ${item.extension}`.toLowerCase();
+        return haystack.includes(normalizedSearch);
+      });
+      const paged = filtered.slice(ragOffset, ragOffset + PAGE_LIMIT);
+      setRagDocuments(paged);
+      setRagTotal(filtered.length);
+      setRagVectorStore(vectorPayload);
+    } catch (error) {
+      setRagDocuments([]);
+      setRagTotal(0);
+      setRagVectorStore(null);
+      setRagError(error instanceof Error ? error.message : "Failed to load RAG inspection data.");
+    } finally {
+      setRagLoading(false);
+    }
+  }, [ragOffset, ragSearch]);
+
   const rxnavUpdateJob = useInspectionUpdateJob({
-    startJob: startInspectionRxNavUpdateJob,
+    startJob: (payload) =>
+      startInspectionRxNavUpdateJob((payload || {}) as InspectionRxNavOverrideRequest),
     fetchStatus: fetchInspectionRxNavUpdateJobStatus,
     cancelJob: cancelInspectionRxNavUpdateJob,
     onCompleted: loadRxnav,
@@ -260,7 +324,8 @@ export function DataInspectionPage(): React.JSX.Element {
   });
 
   const livertoxUpdateJob = useInspectionUpdateJob({
-    startJob: startInspectionLiverToxUpdateJob,
+    startJob: (payload) =>
+      startInspectionLiverToxUpdateJob((payload || {}) as InspectionLiverToxOverrideRequest),
     fetchStatus: fetchInspectionLiverToxUpdateJobStatus,
     cancelJob: cancelInspectionLiverToxUpdateJob,
     onCompleted: loadLivertox,
@@ -272,6 +337,18 @@ export function DataInspectionPage(): React.JSX.Element {
 
   const rxnavJob = rxnavUpdateJob.state;
   const livertoxJob = livertoxUpdateJob.state;
+  const ragUpdateJob = useInspectionUpdateJob({
+    startJob: (payload) =>
+      startInspectionRagUpdateJob((payload || {}) as InspectionRagOverrideRequest),
+    fetchStatus: fetchInspectionRagUpdateJobStatus,
+    cancelJob: cancelInspectionRagUpdateJob,
+    onCompleted: loadRag,
+    startMessage: "Initializing RAG embeddings update",
+    startErrorMessage: "Failed to start RAG update.",
+    cancelErrorMessage: "Failed to request cancellation.",
+    pollErrorMessage: "RAG polling failed.",
+  });
+  const ragJob = ragUpdateJob.state;
   const activeViewConfig = INSPECTION_VIEW_CONFIG[activeView];
   const activeTabId = `inspection-tab-${activeView}`;
 
@@ -323,9 +400,11 @@ export function DataInspectionPage(): React.JSX.Element {
   useEffect(() => setSessionOffset(0), [sessionSearch, sessionStatusFilter, sessionDateMode, sessionDate]);
   useEffect(() => setRxnavOffset(0), [rxnavSearch]);
   useEffect(() => setLivertoxOffset(0), [livertoxSearch]);
+  useEffect(() => setRagOffset(0), [ragSearch]);
   useEffect(() => { void loadSessions(); }, [loadSessions]);
   useEffect(() => { void loadRxnav(); }, [loadRxnav]);
   useEffect(() => { void loadLivertox(); }, [loadLivertox]);
+  useEffect(() => { void loadRag(); }, [loadRag]);
 
   const sessionStatusClass = useMemo(() => (status: InspectionSessionStatus) => (status === "failed" ? "is-failed" : "is-successful"), []);
 
@@ -431,18 +510,15 @@ export function DataInspectionPage(): React.JSX.Element {
         <div className="inspection-widget-header inspection-widget-header-controls-only">
           <div className="inspection-controls inspection-controls-knowledge">
             <input type="search" className="inspection-search" placeholder="Search RxNav..." value={rxnavSearchInput} onChange={(event) => setRxnavSearchInput(event.target.value)} aria-label="Search RxNav data" />
-            <button
-              type="button"
-              className="btn btn-primary inspection-mini-btn"
-              onClick={() => { void rxnavUpdateJob.triggerUpdate(); }}
-              aria-pressed={rxnavJob.running}
-              aria-label={rxnavJob.running ? "Stop RxNav update" : "Start RxNav update"}
-            >
-              {rxnavJob.running ? "Stop" : "Update"}
-            </button>
           </div>
         </div>
-        <InspectionJobPanel job={rxnavJob} fallbackMessage="Updating RxNav..." />
+        <InspectionUpdateWizard
+          targetLabel="RxNav catalog"
+          fallbackMessage="Updating RxNav..."
+          loadConfig={fetchInspectionRxNavUpdateConfig}
+          startJob={rxnavUpdateJob.triggerUpdate}
+          job={rxnavJob}
+        />
         <div className="inspection-scroll-frame inspection-scroll-frame-compact">
           <table className="inspection-table inspection-table-dense">
             <thead><tr><th>Drug</th><th>Last update</th><th aria-label="Actions" /></tr></thead>
@@ -475,18 +551,15 @@ export function DataInspectionPage(): React.JSX.Element {
         <div className="inspection-widget-header inspection-widget-header-controls-only">
           <div className="inspection-controls inspection-controls-knowledge">
             <input type="search" className="inspection-search" placeholder="Search LiverTox..." value={livertoxSearchInput} onChange={(event) => setLivertoxSearchInput(event.target.value)} aria-label="Search LiverTox data" />
-            <button
-              type="button"
-              className="btn btn-primary inspection-mini-btn"
-              onClick={() => { void livertoxUpdateJob.triggerUpdate(); }}
-              aria-pressed={livertoxJob.running}
-              aria-label={livertoxJob.running ? "Stop LiverTox update" : "Start LiverTox update"}
-            >
-              {livertoxJob.running ? "Stop" : "Update"}
-            </button>
           </div>
         </div>
-        <InspectionJobPanel job={livertoxJob} fallbackMessage="Updating LiverTox..." />
+        <InspectionUpdateWizard
+          targetLabel="LiverTox monographs"
+          fallbackMessage="Updating LiverTox..."
+          loadConfig={fetchInspectionLiverToxUpdateConfig}
+          startJob={livertoxUpdateJob.triggerUpdate}
+          job={livertoxJob}
+        />
         <div className="inspection-scroll-frame inspection-scroll-frame-compact">
           <table className="inspection-table inspection-table-dense">
             <thead><tr><th>Drug</th><th>Last update</th><th aria-label="Actions" /></tr></thead>
@@ -517,6 +590,86 @@ export function DataInspectionPage(): React.JSX.Element {
           {livertoxError && <p className="inspection-error-text">{livertoxError}</p>}
         </div>
         {renderPager(livertoxTotal, livertoxOffset, setLivertoxOffset)}
+      </div>
+    </section>
+  );
+
+  const renderRagView = (): React.JSX.Element => (
+    <section className="inspection-view-content">
+      <div className="inspection-widget">
+        <div className="inspection-widget-header inspection-widget-header-controls-only">
+          <div className="inspection-controls inspection-controls-knowledge">
+            <input
+              type="search"
+              className="inspection-search"
+              placeholder="Search RAG documents..."
+              value={ragSearchInput}
+              onChange={(event) => setRagSearchInput(event.target.value)}
+              aria-label="Search RAG documents"
+            />
+          </div>
+        </div>
+        <div className="inspection-scroll-frame inspection-scroll-frame-compact">
+          <table className="inspection-table inspection-table-dense">
+            <thead>
+              <tr>
+                <th>LanceDB path</th>
+                <th>Collection</th>
+                <th>Embeddings</th>
+                <th>Documents</th>
+                <th>Dimension</th>
+                <th>Index ready</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr>
+                <td>{ragVectorStore?.vector_db_path || "N/A"}</td>
+                <td>{ragVectorStore?.collection_name || "N/A"}</td>
+                <td>{ragVectorStore?.embedding_count ?? 0}</td>
+                <td>{ragVectorStore?.distinct_document_count ?? 0}</td>
+                <td>{ragVectorStore?.embedding_dimension ?? "N/A"}</td>
+                <td>{ragVectorStore?.index_ready ? "Yes" : "No"}</td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+        <InspectionUpdateWizard
+          targetLabel="RAG embeddings"
+          fallbackMessage="Updating RAG embeddings..."
+          loadConfig={fetchInspectionRagUpdateConfig}
+          startJob={ragUpdateJob.triggerUpdate}
+          job={ragJob}
+        />
+        <div className="inspection-scroll-frame inspection-scroll-frame-compact">
+          <table className="inspection-table inspection-table-dense">
+            <thead>
+              <tr>
+                <th>File</th>
+                <th>Extension</th>
+                <th>Size</th>
+                <th>Last modified</th>
+                <th>Supported</th>
+              </tr>
+            </thead>
+            <tbody>
+              {ragDocuments.map((row) => (
+                <tr key={row.path}>
+                  <td>{row.file_name}</td>
+                  <td>{row.extension}</td>
+                  <td>{row.file_size}</td>
+                  <td>{formatDateTime(row.last_modified)}</td>
+                  <td>{row.supported_for_ingestion ? "Yes" : "No"}</td>
+                </tr>
+              ))}
+              {!ragLoading && ragDocuments.length === 0 && (
+                <tr><td colSpan={5} className="inspection-empty-row">No RAG documents found.</td></tr>
+              )}
+            </tbody>
+          </table>
+          {ragLoading && <p className="inspection-loading-note">Loading RAG data...</p>}
+          {ragError && <p className="inspection-error-text">{ragError}</p>}
+        </div>
+        {renderPager(ragTotal, ragOffset, setRagOffset)}
       </div>
     </section>
   );
@@ -570,6 +723,20 @@ export function DataInspectionPage(): React.JSX.Element {
               <LiverToxNavIcon />
               <span>{INSPECTION_VIEW_CONFIG.livertox.label}</span>
             </button>
+            <button
+              id="inspection-tab-rag"
+              type="button"
+              className={`inspection-toolbar-item ${activeView === "rag" ? "is-active" : ""}`}
+              onClick={() => setActiveView("rag")}
+              onKeyDown={(event) => handleTabKeyDown(event, "rag")}
+              role="tab"
+              aria-selected={activeView === "rag"}
+              aria-controls="inspection-active-view-panel"
+              tabIndex={activeView === "rag" ? 0 : -1}
+            >
+              <RagNavIcon />
+              <span>{INSPECTION_VIEW_CONFIG.rag.label}</span>
+            </button>
           </div>
         </aside>
 
@@ -587,6 +754,7 @@ export function DataInspectionPage(): React.JSX.Element {
             {activeView === "sessions" && renderSessionsView()}
             {activeView === "rxnav" && renderRxnavView()}
             {activeView === "livertox" && renderLivertoxView()}
+            {activeView === "rag" && renderRagView()}
           </div>
         </section>
       </section>

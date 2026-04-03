@@ -27,6 +27,27 @@ def build_validation_bundle(report_language: str) -> ValidationMessageBundle:
             missing_timed_drug="Fornire almeno un farmaco con data di inizio, sospensione o altra informazione temporale.",
             insufficient_labs="Fornire dati laboratoristici sufficienti per determinare il pattern di epatotossicità, idealmente ALT o AST datati, ALP e bilirubina.",
         )
+    if report_language.startswith("de"):
+        return ValidationMessageBundle(
+            missing_anamnesis="Bitte Anamnese angeben.",
+            missing_visit_date="Bitte Besuchsdatum angeben.",
+            missing_timed_drug="Bitte mindestens ein Arzneimittel mit Start-, Stopp- oder anderen Zeitangaben angeben.",
+            insufficient_labs="Bitte ausreichend Laborwerte zur Bestimmung des Hepatotoxizitätsmusters angeben, idealerweise datiertes ALT oder AST, ALP und Bilirubin.",
+        )
+    if report_language.startswith("fr"):
+        return ValidationMessageBundle(
+            missing_anamnesis="Veuillez fournir l’anamnèse.",
+            missing_visit_date="Veuillez fournir la date de visite.",
+            missing_timed_drug="Veuillez fournir au moins un médicament avec une date de début, d’arrêt ou une autre information temporelle.",
+            insufficient_labs="Veuillez fournir des données biologiques suffisantes pour déterminer le profil d’hépatotoxicité, idéalement ALT ou AST datés, PAL et bilirubine.",
+        )
+    if report_language.startswith("es"):
+        return ValidationMessageBundle(
+            missing_anamnesis="Proporcione la anamnesis.",
+            missing_visit_date="Proporcione la fecha de la visita.",
+            missing_timed_drug="Proporcione al menos un fármaco con fecha de inicio, suspensión u otra información temporal.",
+            insufficient_labs="Proporcione datos de laboratorio suficientes para determinar el patrón de hepatotoxicidad, idealmente ALT o AST con fecha, FA y bilirrubina.",
+        )
     return ValidationMessageBundle(
         missing_anamnesis="Provide the anamnesis.",
         missing_visit_date="Provide the visit date.",
@@ -87,4 +108,3 @@ def ensure_timed_therapy_drug(
         field="drugs",
     )
     raise ClinicalPipelineValidationError(issues=[issue], message=issue.message)
-

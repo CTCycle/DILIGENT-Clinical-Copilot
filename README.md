@@ -185,14 +185,16 @@ Runtime values are read from `DILIGENT/settings/.env`.
 | `OPENAI_API_KEY`, `GEMINI_API_KEY` | Cloud provider API keys. |
 
 ## 9. Setup and Maintenance
-Run `DILIGENT/setup_and_maintenance.bat` for maintenance operations:
-- Remove logs
-- Uninstall app (local runtimes/artifacts)
+Run `DILIGENT/setup_and_maintenance.bat` for offline maintenance operations only:
 - Initialize database
-- Update RxNav catalog
-- Update LiverTox data
-- Vectorize RAG documents
+- Remove logs
 - Clean desktop build artifacts
+- Uninstall app (local runtimes/artifacts)
+
+Dataset and indexing updates are owned by the Data Inspection UI:
+- RxNav update wizard
+- LiverTox update wizard
+- RAG embeddings update wizard (in the RAG inspection view)
 
 ## 10. License
 Non-commercial use is covered by the Polyform Noncommercial License 1.0.0; commercial licensing is available separately. See `LICENSE`.

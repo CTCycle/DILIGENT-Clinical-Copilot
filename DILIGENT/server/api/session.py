@@ -165,6 +165,7 @@ def build_failed_session_payload(
     error_message: str,
     elapsed_seconds: float,
 ) -> dict[str, Any]:
+    language_result = detect_clinical_language(payload)
     return {
         "patient_name": payload.name,
         "session_timestamp": datetime.now(),
@@ -194,8 +195,8 @@ def build_failed_session_payload(
             "rucam_assessments": [],
             "lab_timeline": [],
             "onset_context": None,
-            "detected_input_language": "en",
-            "report_language": "en",
+            "detected_input_language": language_result.detected_input_language,
+            "report_language": language_result.report_language,
             "relevant_drugs": [],
             "excluded_drugs": [],
             "unresolved_drugs": [],
@@ -245,11 +246,74 @@ class NarrativeBuilder:
             "no_report": "Nessun report clinico generato.",
             "none_detected": "Nessuno rilevato",
         },
+        "de": {
+            "no_data": "- Keine Daten angegeben.",
+            "summary_title": "# Zusammenfassung des Klinischen Besuchs",
+            "patient": "- **Patient:** {value}",
+            "visit_date": "- **Besuchsdatum:** {value}",
+            "anamnesis_title": "## Anamnese",
+            "no_anamnesis": "_Keine Anamnese angegeben._",
+            "pattern_title": "## Hepatotoxizitätsmuster",
+            "classification": "- **Klassifikation:** {value}",
+            "r_score": "- **R-Score:** {value}",
+            "therapy_title": "## Aktuelle Medikamente",
+            "detected_drugs": "**Erkannte Medikamente ({count}):** {value}",
+            "historical_title": "## Historische Medikamentenerwähnungen",
+            "historical_mentions": "- **Historische Erwähnungen ({count}):** {value}",
+            "warnings_title": "## Warnhinweise",
+            "report_title": "## Klinischer Bericht",
+            "no_report": "Kein klinischer Bericht erstellt.",
+            "none_detected": "Keine erkannt",
+        },
+        "fr": {
+            "no_data": "- Aucune donnée fournie.",
+            "summary_title": "# Résumé de la Visite Clinique",
+            "patient": "- **Patient:** {value}",
+            "visit_date": "- **Date de visite:** {value}",
+            "anamnesis_title": "## Anamnèse",
+            "no_anamnesis": "_Aucune anamnèse fournie._",
+            "pattern_title": "## Profil d’Hépatotoxicité",
+            "classification": "- **Classification:** {value}",
+            "r_score": "- **Score R:** {value}",
+            "therapy_title": "## Médicaments Actuels",
+            "detected_drugs": "**Médicaments détectés ({count}) :** {value}",
+            "historical_title": "## Mentions Médicamenteuses Antérieures",
+            "historical_mentions": "- **Mentions historiques ({count}) :** {value}",
+            "warnings_title": "## Avertissements",
+            "report_title": "## Rapport Clinique",
+            "no_report": "Aucun rapport clinique généré.",
+            "none_detected": "Aucun détecté",
+        },
+        "es": {
+            "no_data": "- No se proporcionaron datos.",
+            "summary_title": "# Resumen de la Visita Clínica",
+            "patient": "- **Paciente:** {value}",
+            "visit_date": "- **Fecha de visita:** {value}",
+            "anamnesis_title": "## Anamnesis",
+            "no_anamnesis": "_No se proporcionó anamnesis._",
+            "pattern_title": "## Patrón de Hepatotoxicidad",
+            "classification": "- **Clasificación:** {value}",
+            "r_score": "- **Puntuación R:** {value}",
+            "therapy_title": "## Fármacos Actuales",
+            "detected_drugs": "**Fármacos detectados ({count}):** {value}",
+            "historical_title": "## Menciones Históricas de Fármacos",
+            "historical_mentions": "- **Menciones históricas ({count}):** {value}",
+            "warnings_title": "## Advertencias",
+            "report_title": "## Informe Clínico",
+            "no_report": "No se generó un informe clínico.",
+            "none_detected": "Ninguno detectado",
+        },
     }
 
     # -------------------------------------------------------------------------
     @staticmethod
     def bundle(report_language: str) -> dict[str, str]:
+        if report_language.startswith("de"):
+            return NarrativeBuilder.BUNDLES["de"]
+        if report_language.startswith("fr"):
+            return NarrativeBuilder.BUNDLES["fr"]
+        if report_language.startswith("es"):
+            return NarrativeBuilder.BUNDLES["es"]
         if report_language.startswith("it"):
             return NarrativeBuilder.BUNDLES["it"]
         return NarrativeBuilder.BUNDLES["en"]
@@ -389,6 +453,7 @@ async def execute_clinical_job(
         parsing_model=runtime_overrides.get("parsing_model"),
         clinical_model=runtime_overrides.get("clinical_model"),
         ollama_temperature=runtime_overrides.get("ollama_temperature"),
+        cloud_temperature=runtime_overrides.get("cloud_temperature"),
         ollama_reasoning=runtime_overrides.get("ollama_reasoning"),
     ):
         ensure_not_cancelled()
@@ -713,6 +778,7 @@ class ClinicalSessionEndpoint:
         parsing_model: str | None,
         clinical_model: str | None,
         ollama_temperature: float | None,
+        cloud_temperature: float | None,
         ollama_reasoning: bool | None,
     ) -> None:
         if use_cloud_services is not None:
@@ -727,13 +793,15 @@ class ClinicalSessionEndpoint:
             LLMRuntimeConfig.set_clinical_model(clinical_model)
         if ollama_temperature is not None:
             LLMRuntimeConfig.set_ollama_temperature(ollama_temperature)
+        if cloud_temperature is not None:
+            LLMRuntimeConfig.set_cloud_temperature(cloud_temperature)
         if ollama_reasoning is not None:
             LLMRuntimeConfig.set_ollama_reasoning(ollama_reasoning)
 
         parser_provider, parser_model = LLMRuntimeConfig.resolve_provider_and_model("parser")
         clinical_provider, clinical_model_resolved = LLMRuntimeConfig.resolve_provider_and_model("clinical")
         logger.info(
-            "Resolved LLM runtime for request: cloud=%s provider=%s cloud_model=%s parsing_provider=%s parsing_model=%s clinical_provider=%s clinical_model=%s temperature=%.2f reasoning=%s",
+            "Resolved LLM runtime for request: cloud=%s provider=%s cloud_model=%s parsing_provider=%s parsing_model=%s clinical_provider=%s clinical_model=%s ollama_temperature=%.2f cloud_temperature=%.2f reasoning=%s",
             LLMRuntimeConfig.is_cloud_enabled(),
             LLMRuntimeConfig.get_llm_provider(),
             LLMRuntimeConfig.get_cloud_model(),
@@ -742,6 +810,7 @@ class ClinicalSessionEndpoint:
             clinical_provider,
             clinical_model_resolved,
             LLMRuntimeConfig.get_ollama_temperature(),
+            LLMRuntimeConfig.get_cloud_temperature(),
             LLMRuntimeConfig.is_ollama_reasoning_enabled(),
         )
 
@@ -755,6 +824,7 @@ class ClinicalSessionEndpoint:
             "parsing_model": LLMRuntimeConfig.get_parsing_model(),
             "clinical_model": LLMRuntimeConfig.get_clinical_model(),
             "ollama_temperature": LLMRuntimeConfig.get_ollama_temperature(),
+            "cloud_temperature": LLMRuntimeConfig.get_cloud_temperature(),
             "ollama_reasoning": LLMRuntimeConfig.is_ollama_reasoning_enabled(),
         }
 
@@ -769,6 +839,7 @@ class ClinicalSessionEndpoint:
         parsing_model: str | None,
         clinical_model: str | None,
         ollama_temperature: float | None,
+        cloud_temperature: float | None,
         ollama_reasoning: bool | None,
     ):
         snapshot = self.capture_runtime_snapshot()
@@ -779,6 +850,7 @@ class ClinicalSessionEndpoint:
             parsing_model=parsing_model,
             clinical_model=clinical_model,
             ollama_temperature=ollama_temperature,
+            cloud_temperature=cloud_temperature,
             ollama_reasoning=ollama_reasoning,
         )
         try:
@@ -791,6 +863,7 @@ class ClinicalSessionEndpoint:
                 parsing_model=str(snapshot["parsing_model"]),
                 clinical_model=str(snapshot["clinical_model"]),
                 ollama_temperature=float(snapshot["ollama_temperature"]),
+                cloud_temperature=float(snapshot["cloud_temperature"]),
                 ollama_reasoning=bool(snapshot["ollama_reasoning"]),
             )
 
@@ -1288,10 +1361,18 @@ class ClinicalSessionEndpoint:
             )
 
         patient_label = payload.name or "Unknown patient"
+        missing_visit_label_by_language = {
+            "en": "Not provided",
+            "it": "Non disponibile",
+            "de": "Nicht angegeben",
+            "fr": "Non renseignée",
+            "es": "No proporcionada",
+        }
+        report_language_key = report_language.strip().lower()[:2]
         visit_label = (
             payload.visit_date.strftime("%d %B %Y")
             if payload.visit_date
-            else ("Non disponibile" if report_language.startswith("it") else "Not provided")
+            else missing_visit_label_by_language.get(report_language_key, "Not provided")
         )
 
         global_elapsed = time.perf_counter() - global_start_time
@@ -1469,6 +1550,7 @@ class ClinicalSessionEndpoint:
                 parsing_model=request_payload.parsing_model,
                 clinical_model=request_payload.clinical_model,
                 ollama_temperature=request_payload.ollama_temperature,
+                cloud_temperature=request_payload.cloud_temperature,
                 ollama_reasoning=request_payload.ollama_reasoning,
             ):
                 single_result = await self.process_single_patient(patient_payload)
@@ -1499,6 +1581,7 @@ class ClinicalSessionEndpoint:
             "parsing_model": request_payload.parsing_model,
             "clinical_model": request_payload.clinical_model,
             "ollama_temperature": request_payload.ollama_temperature,
+            "cloud_temperature": request_payload.cloud_temperature,
             "ollama_reasoning": request_payload.ollama_reasoning,
         }
 

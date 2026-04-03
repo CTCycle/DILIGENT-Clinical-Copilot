@@ -9,7 +9,7 @@ import os
 import re
 import tarfile
 import unicodedata
-from concurrent.futures import ProcessPoolExecutor, as_completed
+from concurrent.futures import ALL_COMPLETED, FIRST_COMPLETED, Future, ProcessPoolExecutor, wait
 from datetime import UTC, datetime
 from typing import Any
 from collections.abc import Callable
@@ -106,6 +106,8 @@ class LiverToxUpdater:
         sources_path: str,
         *,
         redownload: bool,
+        archive_name: str | None = None,
+        monograph_max_workers: int | None = None,
         serializer: DataSerializer | None = None,
         database_client=database,
     ) -> None:
@@ -122,7 +124,15 @@ class LiverToxUpdater:
         self.header_row = 1
 
         self.base_url = LIVERTOX_BASE_URL
-        self.file_name = server_settings.external_data.livertox_archive
+        self.file_name = (archive_name or server_settings.external_data.livertox_archive).strip()
+        self.monograph_max_workers = max(
+            1,
+            int(
+                monograph_max_workers
+                if monograph_max_workers is not None
+                else server_settings.external_data.livertox_monograph_max_workers
+            ),
+        )
         self.tar_file_path = os.path.join(ARCHIVES_PATH, self.file_name)
         self.master_list_path = os.path.join(ARCHIVES_PATH, "LiverTox_Master_List.xlsx")
         self.master_list_metadata_path = os.path.join(
@@ -876,12 +886,15 @@ class LiverToxUpdater:
             raise RuntimeError(f"Invalid LiverTox archive at {normalized_path}")
 
         collected: list[dict[str, str]] = []
-        processed_files: set[str] = set()
-        max_workers = max(1, server_settings.external_data.livertox_monograph_max_workers)
+        max_workers = self.monograph_max_workers
+
+        # Stage 1: scan only archive metadata and keep one member per basename.
+        selected_members: list[tarfile.TarInfo] = []
+        selected_basenames: set[str] = set()
         with tarfile.open(normalized_path, "r:gz") as archive:
-            members = [member for member in archive.getmembers() if member.isfile()]
-            allowed_members: list[tarfile.TarInfo] = []
-            for member in members:
+            for member in archive.getmembers():
+                if not member.isfile():
+                    continue
                 normalized_name = os.path.normpath(member.name)
                 if os.path.isabs(normalized_name) or normalized_name.startswith(".."):
                     logger.warning("Skipping unsafe archive member: %s", member.name)
@@ -889,110 +902,168 @@ class LiverToxUpdater:
                 extension = os.path.splitext(normalized_name.lower())[1]
                 if extension not in self.supported_extensions:
                     continue
-                allowed_members.append(member)
-
-            if not allowed_members:
-                return collected
-
-            payloads: list[tuple[str, bytes]] = []
-            for member in allowed_members:
-                extracted = archive.extractfile(member)
-                if extracted is None:
+                base_name = os.path.basename(member.name).lower()
+                if base_name in selected_basenames:
                     continue
-                try:
-                    data = extracted.read()
-                finally:
-                    extracted.close()
-                if not data:
-                    continue
-                payloads.append((member.name, data))
+                selected_basenames.add(base_name)
+                selected_members.append(member)
 
-        if not payloads:
+        if not selected_members:
             return collected
 
-        total_payloads = len(payloads)
+        total_payloads = len(selected_members)
         processed_count = 0
+        worker_budget = min(max_workers, total_payloads) or 1
 
-        worker_budget = min(max_workers, len(payloads)) or 1
         if worker_budget == 1:
-            for member_name, data in tqdm(
-                payloads,
-                desc="Processing LiverTox files",
-                total=len(payloads),
-            ):
-                if self.should_cancel(should_stop):
-                    raise RuntimeError("LiverTox update cancelled by user request")
-                base_name = os.path.basename(member_name).lower()
-                if base_name in processed_files:
+            with tarfile.open(normalized_path, "r:gz") as archive:
+                for member in tqdm(
+                    selected_members,
+                    desc="Processing LiverTox files",
+                    total=total_payloads,
+                ):
+                    if self.should_cancel(should_stop):
+                        raise RuntimeError("LiverTox update cancelled by user request")
+                    extracted = archive.extractfile(member)
+                    if extracted is None:
+                        processed_count += 1
+                        self.emit_monograph_progress(
+                            progress_callback=progress_callback,
+                            processed_count=processed_count,
+                            total_payloads=total_payloads,
+                        )
+                        continue
+                    try:
+                        data = extracted.read()
+                    finally:
+                        extracted.close()
+                    if data:
+                        record = LiverToxUpdater.process_monograph_member(member.name, data)
+                        if record:
+                            collected.append(record)
                     processed_count += 1
-                    continue
-                record = LiverToxUpdater.process_monograph_member(member_name, data)
-                if not record:
-                    processed_count += 1
-                    continue
-                collected.append(record)
-                processed_files.add(base_name)
-                processed_count += 1
-                ratio = min(1.0, max(0.0, processed_count / total_payloads))
-                self.emit_progress(
-                    progress_callback,
-                    progress=35.0 + (ratio * 33.0),
-                    message=f"Processed {processed_count}/{total_payloads} LiverTox files",
-                )
+                    self.emit_monograph_progress(
+                        progress_callback=progress_callback,
+                        processed_count=processed_count,
+                        total_payloads=total_payloads,
+                    )
             return self.sort_monograph_records(collected)
 
         ctx = multiprocessing.get_context("spawn")
+        max_in_flight = max(1, worker_budget * 2)
         with ProcessPoolExecutor(max_workers=worker_budget, mp_context=ctx) as executor:
-            futures = {
-                executor.submit(
-                    process_monograph_payload, member_name, data
-                ): member_name
-                for member_name, data in payloads
-            }
-            for future in tqdm(
-                as_completed(futures),
-                desc="Processing LiverTox files",
-                total=len(futures),
-            ):
+            in_flight: dict[Future[dict[str, str] | None], str] = {}
+            with tarfile.open(normalized_path, "r:gz") as archive:
+                for member in tqdm(
+                    selected_members,
+                    desc="Reading LiverTox files",
+                    total=total_payloads,
+                ):
+                    if self.should_cancel(should_stop):
+                        raise RuntimeError("LiverTox update cancelled by user request")
+                    extracted = archive.extractfile(member)
+                    if extracted is None:
+                        processed_count += 1
+                        self.emit_monograph_progress(
+                            progress_callback=progress_callback,
+                            processed_count=processed_count,
+                            total_payloads=total_payloads,
+                        )
+                        continue
+                    try:
+                        data = extracted.read()
+                    finally:
+                        extracted.close()
+                    if not data:
+                        processed_count += 1
+                        self.emit_monograph_progress(
+                            progress_callback=progress_callback,
+                            processed_count=processed_count,
+                            total_payloads=total_payloads,
+                        )
+                        continue
+                    future = executor.submit(process_monograph_payload, member.name, data)
+                    in_flight[future] = member.name
+                    if len(in_flight) >= max_in_flight:
+                        processed_count = self.drain_monograph_futures(
+                            in_flight=in_flight,
+                            collected=collected,
+                            processed_count=processed_count,
+                            total_payloads=total_payloads,
+                            progress_callback=progress_callback,
+                            wait_for_one=True,
+                        )
+
+            while in_flight:
                 if self.should_cancel(should_stop):
                     raise RuntimeError("LiverTox update cancelled by user request")
-                member_name = futures[future]
-                base_name = os.path.basename(member_name).lower()
-                try:
-                    record = future.result()
-                except Exception as exc:  # noqa: BLE001
-                    logger.warning(
-                        "Failed to process LiverTox monograph '%s': %s",
-                        base_name,
-                        exc,
-                    )
-                    processed_count += 1
-                    ratio = min(1.0, max(0.0, processed_count / total_payloads))
-                    self.emit_progress(
-                        progress_callback,
-                        progress=35.0 + (ratio * 33.0),
-                        message=f"Processed {processed_count}/{total_payloads} LiverTox files",
-                    )
-                    continue
-                if not record or base_name in processed_files:
-                    processed_count += 1
-                    ratio = min(1.0, max(0.0, processed_count / total_payloads))
-                    self.emit_progress(
-                        progress_callback,
-                        progress=35.0 + (ratio * 33.0),
-                        message=f"Processed {processed_count}/{total_payloads} LiverTox files",
-                    )
-                    continue
-                collected.append(record)
-                processed_files.add(base_name)
-                processed_count += 1
-                ratio = min(1.0, max(0.0, processed_count / total_payloads))
-                self.emit_progress(
-                    progress_callback,
-                    progress=35.0 + (ratio * 33.0),
-                    message=f"Processed {processed_count}/{total_payloads} LiverTox files",
+                processed_count = self.drain_monograph_futures(
+                    in_flight=in_flight,
+                    collected=collected,
+                    processed_count=processed_count,
+                    total_payloads=total_payloads,
+                    progress_callback=progress_callback,
+                    wait_for_one=False,
                 )
         return self.sort_monograph_records(collected)
+
+    # -------------------------------------------------------------------------
+    def emit_monograph_progress(
+        self,
+        *,
+        progress_callback: Callable[[float, str], None] | None,
+        processed_count: int,
+        total_payloads: int,
+    ) -> None:
+        ratio = min(1.0, max(0.0, processed_count / max(total_payloads, 1)))
+        self.emit_progress(
+            progress_callback,
+            progress=35.0 + (ratio * 33.0),
+            message=f"Processed {processed_count}/{total_payloads} LiverTox files",
+        )
+
+    # -------------------------------------------------------------------------
+    def drain_monograph_futures(
+        self,
+        *,
+        in_flight: dict[Future[dict[str, str] | None], str],
+        collected: list[dict[str, str]],
+        processed_count: int,
+        total_payloads: int,
+        progress_callback: Callable[[float, str], None] | None,
+        wait_for_one: bool,
+    ) -> int:
+        if not in_flight:
+            return processed_count
+        return_when = FIRST_COMPLETED if wait_for_one else ALL_COMPLETED
+        done, _ = wait(set(in_flight), return_when=return_when)
+        for future in done:
+            member_name = in_flight.pop(future, "")
+            base_name = os.path.basename(member_name).lower()
+            try:
+                record = future.result()
+            except Exception as exc:  # noqa: BLE001
+                logger.warning(
+                    "Failed to process LiverTox monograph '%s': %s",
+                    base_name or "<unknown>",
+                    exc,
+                )
+                processed_count += 1
+                self.emit_monograph_progress(
+                    progress_callback=progress_callback,
+                    processed_count=processed_count,
+                    total_payloads=total_payloads,
+                )
+                continue
+            if record:
+                collected.append(record)
+            processed_count += 1
+            self.emit_monograph_progress(
+                progress_callback=progress_callback,
+                processed_count=processed_count,
+                total_payloads=total_payloads,
+            )
+        return processed_count
 
     # -------------------------------------------------------------------------
     def sort_monograph_records(

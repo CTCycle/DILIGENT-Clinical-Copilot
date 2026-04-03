@@ -186,6 +186,7 @@ class ClinicalSessionRequest(BaseModel):
     parsing_model: str | None = Field(default=None, max_length=200)
     clinical_model: str | None = Field(default=None, max_length=200)
     ollama_temperature: float | None = None
+    cloud_temperature: float | None = None
     ollama_reasoning: bool | None = None
 
     # -------------------------------------------------------------------------
@@ -240,6 +241,16 @@ class ClinicalSessionRequest(BaseModel):
             return None
         if not math.isfinite(value):
             raise ValueError("ollama_temperature must be finite")
+        return round(max(0.0, min(2.0, float(value))), 2)
+
+    # -------------------------------------------------------------------------
+    @field_validator("cloud_temperature")
+    @classmethod
+    def validate_cloud_temperature(cls, value: float | None) -> float | None:
+        if value is None:
+            return None
+        if not math.isfinite(value):
+            raise ValueError("cloud_temperature must be finite")
         return round(max(0.0, min(2.0, float(value))), 2)
 
 

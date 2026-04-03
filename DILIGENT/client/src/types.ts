@@ -6,7 +6,8 @@ export type RuntimeSettings = {
   cloudModel: string | null;
   parsingModel: string;
   clinicalModel: string;
-  temperature: number;
+  ollamaTemperature: number;
+  cloudTemperature: number;
   reasoning: boolean;
 };
 
@@ -26,6 +27,8 @@ export type ModelConfigStateResponse = {
   cloud_model: string | null;
   clinical_model: string | null;
   text_extraction_model: string | null;
+  ollama_temperature: number;
+  cloud_temperature: number;
   ollama_reasoning: boolean;
   updated_at: string | null;
 };
@@ -36,6 +39,8 @@ export type ModelConfigUpdateRequest = {
   cloud_model?: string | null;
   clinical_model?: string | null;
   text_extraction_model?: string | null;
+  ollama_temperature?: number;
+  cloud_temperature?: number;
   ollama_reasoning?: boolean;
 };
 
@@ -75,6 +80,7 @@ export type ClinicalRequestPayload = {
   parsing_model?: string;
   clinical_model?: string;
   ollama_temperature?: number;
+  cloud_temperature?: number;
   ollama_reasoning?: boolean;
 };
 
@@ -87,7 +93,8 @@ export type JobType =
   | "clinical"
   | "ollama_pull"
   | "rxnav_update"
-  | "livertox_update";
+  | "livertox_update"
+  | "rag_update";
 
 export type JobStatus =
   | "pending"
@@ -131,6 +138,9 @@ export type JobStatusResponse<TJobResult extends Record<string, unknown> = Clini
 };
 
 export type InspectionUpdateJobResult = {
+  phase?: string;
+  step_index?: number;
+  step_count?: number;
   progress_message?: string;
   summary?: Record<string, unknown>;
   [key: string]: unknown;
@@ -230,5 +240,65 @@ export type InspectionLiverToxExcerptResponse = {
 
 export type InspectionDeleteResponse = {
   deleted: boolean;
+};
+
+export type InspectionUpdateTarget = "rxnav" | "livertox" | "rag";
+
+export type InspectionUpdateConfigResponse = {
+  target: InspectionUpdateTarget;
+  defaults: Record<string, unknown>;
+  allowed_fields: string[];
+};
+
+export type InspectionRxNavOverrideRequest = {
+  rxnav_request_timeout?: number;
+  rxnav_max_concurrency?: number;
+};
+
+export type InspectionLiverToxOverrideRequest = {
+  livertox_monograph_max_workers?: number;
+  livertox_archive?: string;
+  redownload?: boolean;
+};
+
+export type InspectionRagOverrideRequest = {
+  chunk_size?: number;
+  chunk_overlap?: number;
+  embedding_batch_size?: number;
+  vector_stream_batch_size?: number;
+  embedding_max_workers?: number;
+  embedding_backend?: string;
+  ollama_embedding_model?: string;
+  hf_embedding_model?: string;
+  cloud_provider?: CloudProvider;
+  cloud_embedding_model?: string;
+  use_cloud_embeddings?: boolean;
+  reset_vector_collection?: boolean;
+};
+
+export type InspectionRagDocumentRow = {
+  path: string;
+  file_name: string;
+  extension: string;
+  file_size: number;
+  last_modified: string;
+  supported_for_ingestion: boolean;
+};
+
+export type InspectionRagDocumentsResponse = {
+  items: InspectionRagDocumentRow[];
+  total: number;
+};
+
+export type InspectionRagVectorStoreSummary = {
+  vector_db_path: string;
+  collection_name: string;
+  collection_exists: boolean;
+  embedding_count: number;
+  distinct_document_count: number;
+  embedding_dimension: number | null;
+  index_ready: boolean;
+  configured_metric: string | null;
+  configured_index_type: string | null;
 };
 

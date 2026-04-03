@@ -273,10 +273,20 @@ class RucamScoreEstimator:
             onset_date=onset_date,
             drug=drug,
         )
-        summary = (
-            f"Estimated RUCAM score {total} ({category}) with {confidence} confidence. "
-            f"Injury type used: {injury_type}. Anchor rationale: {anchor.rationale}"
-        )
+        unique_limitations = list(dict.fromkeys(limitations))
+        condensed_limitations = unique_limitations[:3]
+        if condensed_limitations:
+            limitations_sentence = "; ".join(condensed_limitations)
+            summary = (
+                f"Estimated RUCAM score {total} ({category}). "
+                f"The score is estimated due to incomplete clinical data. "
+                f"Key limitations: {limitations_sentence}."
+            )
+        else:
+            summary = (
+                f"Estimated RUCAM score {total} ({category}). "
+                "The score is estimated due to potential incompleteness in available clinical data."
+            )
         return DrugRucamAssessment(
             drug_name=drug.name,
             injury_type_for_rucam=injury_type,  # type: ignore[arg-type]
@@ -285,7 +295,7 @@ class RucamScoreEstimator:
             confidence=confidence,  # type: ignore[arg-type]
             estimated=True,
             components=components,
-            limitations=list(dict.fromkeys(limitations)),
+            limitations=unique_limitations,
             summary=summary,
         )
 

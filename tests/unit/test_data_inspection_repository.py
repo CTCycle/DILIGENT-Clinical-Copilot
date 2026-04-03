@@ -247,12 +247,20 @@ def test_update_job_lifecycle_with_cooperative_cancel() -> None:
     jobs = JobManager()
     service = DataInspectionService(serializer=serializer, jobs=jobs)
 
-    def fast_rxnav_runner(job_id: str) -> dict[str, Any]:
+    def fast_rxnav_runner(
+        job_id: str,
+        overrides: dict[str, Any] | None = None,
+    ) -> dict[str, Any]:
+        _ = overrides
         jobs.update_progress(job_id, 50)
         jobs.update_result(job_id, {"progress_message": "halfway"})
         return {"summary": {"records": 2}}
 
-    def slow_livertox_runner(job_id: str) -> dict[str, Any]:
+    def slow_livertox_runner(
+        job_id: str,
+        overrides: dict[str, Any] | None = None,
+    ) -> dict[str, Any]:
+        _ = overrides
         for _ in range(120):
             if jobs.should_stop(job_id):
                 return {}

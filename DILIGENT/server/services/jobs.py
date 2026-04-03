@@ -257,10 +257,11 @@ class JobManager:
             signature = inspect.signature(runner)
         except (TypeError, ValueError):
             return False
-        for param in signature.parameters.values():
-            if param.kind == param.VAR_KEYWORD:
+        parameters = list(signature.parameters.values())
+        for param in parameters:
+            if param.kind == inspect.Parameter.VAR_KEYWORD:
                 return True
-        return "job_id" in signature.parameters
+        return any(param.name == "job_id" for param in parameters)
 
 
 ###############################################################################
