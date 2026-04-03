@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import os
 import urllib.parse
 
 import sqlalchemy
@@ -7,7 +8,8 @@ from sqlalchemy import column, literal, select, table
 from sqlalchemy.exc import SQLAlchemyError
 from sqlalchemy.sql.elements import TextClause
 
-from DILIGENT.server.configurations import DatabaseSettings, server_settings
+from DILIGENT.server.configurations.bootstrap import server_settings
+from DILIGENT.server.domain.settings.configuration import DatabaseSettings
 from DILIGENT.server.repositories.database.postgres import PostgresRepository
 from DILIGENT.server.repositories.database.sqlite import SQLiteRepository
 from DILIGENT.server.repositories.database.utils import (
@@ -15,6 +17,7 @@ from DILIGENT.server.repositories.database.utils import (
     validate_postgres_database_name,
 )
 from DILIGENT.server.repositories.schemas.models import Base
+from DILIGENT.server.common.constants import DATABASE_FILENAME, RESOURCES_PATH
 from DILIGENT.server.common.utils.logger import logger
 
 # -----------------------------------------------------------------------------
@@ -74,12 +77,15 @@ def build_postgres_create_database_sql(
 
 # -----------------------------------------------------------------------------
 def initialize_sqlite_database(settings: DatabaseSettings) -> None:
-    repository = SQLiteRepository(settings)
-    db_path = repository.db_path or ""
-    if db_path and sqlalchemy.inspect(repository.engine).has_table("clinical_sessions"):
-        logger.info("SQLite database already initialized at %s; skipping schema creation.", db_path)
+    db_path = os.path.join(RESOURCES_PATH, DATABASE_FILENAME)
+    file_exists = os.path.exists(db_path)
+    if file_exists:
+        logger.info(
+            "SQLite database file already present at %s; skipping initialization.",
+            db_path,
+        )
         return
-    Base.metadata.create_all(repository.engine)
+    repository = SQLiteRepository(settings)
     logger.info("Initialized SQLite database schema at %s", repository.db_path)
 
 

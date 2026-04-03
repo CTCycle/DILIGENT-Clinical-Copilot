@@ -9,7 +9,7 @@ DILIGENT is configuration-first and uses one active runtime file:
 
 Modes:
 - Local mode (default developer workflow)
-- Cloud mode (Docker Compose: backend + frontend)
+- Cloud-hardened API mode (profile-driven runtime behavior)
 - Desktop packaged mode (Tauri shell + local backend runtime)
 
 Switch modes by copying a profile into `DILIGENT/settings/.env`.
@@ -48,25 +48,16 @@ Switch modes by copying a profile into `DILIGENT/settings/.env`.
 3. Optional full test run:
    - `tests\run_tests.bat`
 
-No Docker required.
-
-## 5. Cloud mode (Docker)
+## 5. Cloud-hardened API mode
 
 1. Activate profile:
    - `copy /Y DILIGENT\settings\.env.cloud.example DILIGENT\settings\.env`
-2. Build:
-   - `docker compose --env-file DILIGENT/settings/.env build --no-cache`
-3. Start:
-   - `docker compose --env-file DILIGENT/settings/.env up -d`
-4. Stop:
-   - `docker compose --env-file DILIGENT/settings/.env down`
+2. Run backend/frontend with your standard process for the target environment.
 
-Cloud behavior:
-- `backend` serves FastAPI internally on `:8000`.
-- `frontend` serves static app via Nginx on `:80`.
-- Nginx proxies approved `/api/*` routes to backend.
-- `/api/docs`, `/api/redoc`, `/api/openapi.json` are blocked.
-- `diligent_resources` volume persists app resources.
+Cloud-hardened behavior:
+- FastAPI docs and OpenAPI endpoints are disabled.
+- Non-prefixed API routes are not registered (only `/api/*`).
+- Ingress/proxy/container topology is managed externally and is out of repository scope.
 
 ## 6. Desktop packaged mode (Tauri)
 
@@ -96,9 +87,7 @@ Windows artifacts:
 
 - Backend lockfile: `runtimes/uv.lock`.
 - Frontend lockfile: `DILIGENT/client/package-lock.json`.
-- Docker base images are pinned in:
-  - `docker/backend.Dockerfile`
-  - `docker/frontend.Dockerfile`
+- This repository does not include bundled container build artifacts.
 
 ## 8. Maintenance boundary
 

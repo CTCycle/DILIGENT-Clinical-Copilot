@@ -8,10 +8,10 @@ from collections.abc import Callable
 from datetime import date, datetime
 from typing import Any
 
-from pydantic import BaseModel, Field
-
 from DILIGENT.server.common.utils.logger import logger
-from DILIGENT.server.configurations import LLMRuntimeConfig, server_settings
+from DILIGENT.server.configurations.bootstrap import server_settings
+from DILIGENT.server.configurations.runtime_state import LLMRuntimeConfig
+from DILIGENT.server.domain.clinical_extras import LabExtractionPayload
 from DILIGENT.server.domain.clinical import (
     ClinicalLabEntry,
     LiverInjuryOnsetContext,
@@ -38,13 +38,6 @@ MARKER_ALIASES: dict[str, tuple[str, ...]] = {
     "INR": ("inr",),
     "ALB": ("albumin", "alb"),
 }
-
-
-###############################################################################
-class LabExtractionPayload(BaseModel):
-    entries: list[ClinicalLabEntry] = Field(default_factory=list)
-    onset_context: LiverInjuryOnsetContext | None = Field(default=None)
-
 
 ###############################################################################
 class ClinicalLabExtractor:
@@ -245,6 +238,15 @@ class ClinicalLabExtractor:
         )
 
     # -------------------------------------------------------------------------
+    @classmethod
+    def lab_entry_sort_key(cls, item: ClinicalLabEntry) -> tuple[int, str, str]:
+        if item.sample_date:
+            parsed = cls.try_parse_date(item.sample_date)
+            if parsed is not None:
+                return (0, parsed.isoformat(), item.marker_name)
+        return (1, item.relative_time or "", item.marker_name)
+
+    # -------------------------------------------------------------------------
     def normalize_entry(
         self,
         entry: ClinicalLabEntry,
@@ -374,14 +376,7 @@ class ClinicalLabExtractor:
             seen.add(key)
             normalized.append(prepared)
 
-        def sort_key(item: ClinicalLabEntry) -> tuple[int, str, str]:
-            if item.sample_date:
-                parsed = self.try_parse_date(item.sample_date)
-                if parsed is not None:
-                    return (0, parsed.isoformat(), item.marker_name)
-            return (1, item.relative_time or "", item.marker_name)
-
-        normalized.sort(key=sort_key)
+        normalized.sort(key=self.lab_entry_sort_key)
         self.emit_progress(progress_callback, 1.0)
         return PatientLabTimeline(entries=normalized), onset_context
 

@@ -13,7 +13,8 @@ from DILIGENT.server.common.constants import (
     VECTOR_DB_PATH,
 )
 from DILIGENT.server.common.utils.logger import logger
-from DILIGENT.server.configurations import load_configuration_data, server_settings
+from DILIGENT.server.configurations.bootstrap import server_settings
+from DILIGENT.server.configurations.json_loader import load_configuration_data
 from DILIGENT.server.domain.inspection import InspectionJobPhase
 from DILIGENT.server.repositories.serialization.data import DataSerializer, DocumentSerializer
 from DILIGENT.server.repositories.vectors import LanceVectorDatabase

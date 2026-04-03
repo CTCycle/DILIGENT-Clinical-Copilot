@@ -20,7 +20,7 @@ from pdfminer.high_level import extract_text as pdfminer_extract_text
 from pypdf import PdfReader
 from tqdm import tqdm
 
-from DILIGENT.server.configurations import server_settings
+from DILIGENT.server.configurations.bootstrap import server_settings
 from DILIGENT.server.common.constants import LIVERTOX_BASE_URL, ARCHIVES_PATH
 from DILIGENT.server.common.utils.logger import logger
 from DILIGENT.server.services.text.normalization import normalize_whitespace

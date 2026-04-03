@@ -6,8 +6,7 @@ warnings.filterwarnings("ignore", category=FutureWarning)
 
 from fastapi import FastAPI
 
-from DILIGENT.server.common.utils.variables import env_variables  # noqa: F401
-from DILIGENT.server.configurations import server_settings
+from DILIGENT.server.configurations.bootstrap import server_settings
 from DILIGENT.server.configurations.runtime import cloud_mode_enabled, tauri_mode_enabled
 from DILIGENT.server.api.access_keys import router as access_keys_router
 from DILIGENT.server.api.data_inspection import router as data_inspection_router

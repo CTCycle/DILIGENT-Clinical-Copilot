@@ -5,7 +5,7 @@ from datetime import date
 from fastapi import APIRouter, Body, HTTPException, Query, status
 
 from DILIGENT.server.common.utils.logger import logger
-from DILIGENT.server.configurations import server_settings
+from DILIGENT.server.configurations.bootstrap import server_settings
 from DILIGENT.server.domain.inspection import (
     CatalogListFilters,
     DeleteEntityResponse,

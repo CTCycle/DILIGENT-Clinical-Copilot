@@ -32,7 +32,8 @@ from DILIGENT.server.domain.clinical import (
     PatientRucamAssessmentBundle,
     PipelineIssue,
 )
-from DILIGENT.server.configurations import LLMRuntimeConfig, server_settings
+from DILIGENT.server.configurations.bootstrap import server_settings
+from DILIGENT.server.configurations.runtime_state import LLMRuntimeConfig
 from DILIGENT.server.common.constants import (
     DEFAULT_DILI_CLASSIFICATION,
     R_SCORE_CHOLESTATIC_THRESHOLD,
@@ -1331,6 +1332,18 @@ class HepatoxConsultation:
         rucam = entry.rucam
         rucam_score = rucam.total_score if rucam is not None else "n/a"
         rucam_category = rucam.causality_category if rucam is not None else "not available"
+        rucam_confidence = rucam.confidence if rucam is not None else "not available"
+        component_summary = (
+            ", ".join(
+                f"{component.label}: {component.score}"
+                for component in (rucam.components or [])
+                if component is not None
+            )
+            if rucam is not None
+            else ""
+        )
+        if not component_summary:
+            component_summary = "Not available"
         limitations = (
             ", ".join((rucam.limitations or [])[:3])
             if rucam is not None and rucam.limitations
@@ -1338,8 +1351,10 @@ class HepatoxConsultation:
         )
         return (
             f"**{title}**\n\n"
-            f"**Estimated RUCAM**: {rucam_score}, {rucam_category}. "
+            f"**Estimated RUCAM**: {rucam_score}, {rucam_category}, confidence {rucam_confidence}. "
             f"Estimated due to incomplete clinical data; key limitations: {limitations}.\n\n"
+            f"**RUCAM component summary**: {component_summary}\n\n"
+            f"**RUCAM limitations**: {limitations}\n\n"
             f"**Report**\n\n"
             f"{body}\n\n"
             f"**Bibliography source**: LiverTox"
@@ -1408,7 +1423,7 @@ class HepatoxConsultation:
             label = (entry.drug_name or "").strip() or "Unnamed drug"
             reason = self.describe_unresolved_entry(entry)
             rucam_summary = (
-                f"Estimated RUCAM {entry.rucam.total_score} ({entry.rucam.causality_category})"
+                f"Estimated RUCAM {entry.rucam.total_score} ({entry.rucam.causality_category}, confidence {entry.rucam.confidence})"
                 if entry.rucam is not None
                 else "Estimated RUCAM not available"
             )

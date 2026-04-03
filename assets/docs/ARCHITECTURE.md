@@ -12,7 +12,7 @@ DILIGENT is a local-first clinical application for DILI assessment with:
 - Backend: FastAPI + SQLAlchemy + optional retrieval components.
 - Frontend: React + TypeScript (Vite).
 - Optional desktop shell: Tauri that starts a local backend.
-- Optional cloud deployment: Docker (`backend` + `frontend` via Nginx).
+- Optional cloud-hardened runtime profile enabled from `.env` settings.
 
 ## 2. Runtime request topology
 
@@ -20,7 +20,7 @@ DILIGENT is a local-first clinical application for DILI assessment with:
 - Frontend entrypoint: `DILIGENT/client/src/main.tsx`.
 - Frontend calls backend through `/api/*`.
 - In local dev, Vite proxies `/api/*` to FastAPI.
-- In cloud mode, Nginx serves frontend assets and proxies allowed `/api/*` routes.
+- In cloud-hardened mode, deployment ingress/proxy is external to this repository.
 - In non-cloud mode, FastAPI registers both direct routes and mirrored `/api` routes.
 
 ## 3. Backend module boundaries
@@ -137,7 +137,7 @@ Maintenance boundary:
 - Access key handling:
   - `server/api/access_keys.py`, `server/repositories/serialization/access_keys.py`, `client/src/components/AccessKeyModal.tsx`.
 - Runtime/deployment behavior:
-  - `docker/*`, `DILIGENT/start_on_windows.bat`, `release/tauri/*`, `.env profiles`.
+- `DILIGENT/start_on_windows.bat`, `release/tauri/*`, `.env profiles`.
 
 ## 10. Clinical request contract (active)
 

@@ -4,7 +4,7 @@ from pathlib import Path
 
 import pandas as pd
 
-from DILIGENT.server.configurations.server import DatabaseSettings
+from DILIGENT.server.domain.settings.configuration import DatabaseSettings
 from DILIGENT.server.repositories.database.sqlite import SQLiteRepository
 
 

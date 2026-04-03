@@ -2,8 +2,7 @@ from __future__ import annotations
 
 import os
 
-TRUTHY_ENV_VALUES = {"1", "true", "yes", "on"}
-FALSY_ENV_VALUES = {"0", "false", "no", "off"}
+from DILIGENT.server.common.constants import FALSY_ENV_VALUES, TRUTHY_ENV_VALUES
 
 
 ###############################################################################

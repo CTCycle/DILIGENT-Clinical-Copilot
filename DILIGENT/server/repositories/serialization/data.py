@@ -6,7 +6,6 @@ import os
 import re
 import zipfile
 from concurrent.futures import ThreadPoolExecutor, as_completed
-from dataclasses import dataclass, field
 from datetime import date, datetime, timedelta
 from typing import Any, Iterator, cast
 from xml.etree import ElementTree
@@ -16,7 +15,8 @@ from pypdf import PdfReader
 from sqlalchemy import and_, delete, exists, func, inspect, or_, select, update
 from sqlalchemy.orm import Session, sessionmaker
 
-from DILIGENT.server.configurations import server_settings
+from DILIGENT.server.configurations.bootstrap import server_settings
+from DILIGENT.server.domain.documents import Document
 from DILIGENT.server.common.constants import (
     DEFAULT_EMBEDDING_BATCH_SIZE,
     DRUG_NAME_ALLOWED_PATTERN,
@@ -52,14 +52,6 @@ from DILIGENT.server.services.text.normalization import coerce_text, normalize_d
 from DILIGENT.server.services.text.synonyms import parse_synonym_list, split_synonym_variants
 
 
-###############################################################################
-@dataclass
-class Document:
-    page_content: str
-    metadata: dict[str, Any] = field(default_factory=dict)
-
-
-###############################################################################
 class _RepositorySerializationService:
     def __init__(self, queries: DataRepositoryQueries | None = None) -> None:
         self.queries = queries or DataRepositoryQueries()

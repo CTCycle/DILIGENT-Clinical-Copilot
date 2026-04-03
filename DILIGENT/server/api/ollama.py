@@ -13,7 +13,7 @@ from DILIGENT.server.domain.jobs import (
     JobStatusResponse,
 )
 from DILIGENT.server.domain.models import ModelListResponse, ModelPullResponse
-from DILIGENT.server.configurations import server_settings
+from DILIGENT.server.configurations.bootstrap import server_settings
 from DILIGENT.server.services.jobs import job_manager
 from DILIGENT.server.common.utils.logger import logger
 

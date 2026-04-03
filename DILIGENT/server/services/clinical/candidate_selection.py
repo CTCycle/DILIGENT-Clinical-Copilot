@@ -1,17 +1,9 @@
 from __future__ import annotations
 
-from dataclasses import dataclass
 from datetime import date
 
 from DILIGENT.server.domain.clinical import DrugEntry, PatientDrugs
-
-
-@dataclass(frozen=True)
-class CandidateSelectionResult:
-    relevant: list[dict[str, str]]
-    excluded: list[dict[str, str]]
-    unresolved: list[dict[str, str]]
-    ordered_analysis_drugs: PatientDrugs
+from DILIGENT.server.domain.clinical_extras import CandidateSelectionResult
 
 
 def _score_drug(entry: DrugEntry, visit_date: date | None) -> int:
@@ -73,4 +65,3 @@ def select_relevant_candidates(
         unresolved=unresolved,
         ordered_analysis_drugs=PatientDrugs(entries=selected_entries),
     )
-

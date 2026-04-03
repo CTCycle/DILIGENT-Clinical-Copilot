@@ -157,7 +157,7 @@ def test_access_key_endpoint_sanitizes_dependency_failure(monkeypatch) -> None:
 
 # -----------------------------------------------------------------------------
 def test_data_inspection_endpoint_sanitizes_runtime_failure(monkeypatch) -> None:
-    def fake_start_update_job(job_type: str):
+    def fake_start_update_job(job_type: str, overrides: dict[str, Any] | None = None):
         raise RuntimeError("traceback secret=value")
 
     monkeypatch.setattr(

@@ -34,7 +34,8 @@ from DILIGENT.server.domain.jobs import (
     JobStartResponse,
     JobStatusResponse,
 )
-from DILIGENT.server.configurations import LLMRuntimeConfig, server_settings
+from DILIGENT.server.configurations.bootstrap import server_settings
+from DILIGENT.server.configurations.runtime_state import LLMRuntimeConfig
 from DILIGENT.server.repositories.serialization.data import DataSerializer
 from DILIGENT.server.services.jobs import job_manager
 from DILIGENT.server.common.utils.logger import logger
@@ -141,9 +142,14 @@ class StageProgressFractionCallback:
         self.progress_callback(self.stage, self.lower + (self.span * bounded_fraction))
 
 ###############################################################################
-def report_clinical_job_progress(job_id: str, *, stage: str, progress: float) -> None:
+def ensure_clinical_job_not_cancelled(job_id: str) -> None:
     if job_manager.should_stop(job_id):
         raise ClinicalJobCancelled("Clinical job stop requested.")
+
+
+###############################################################################
+def report_clinical_job_progress(job_id: str, *, stage: str, progress: float) -> None:
+    ensure_clinical_job_not_cancelled(job_id)
     bounded = min(100.0, max(0.0, float(progress)))
     message = CLINICAL_PROGRESS_MESSAGES.get(stage, stage.replace("_", " ").strip())
     job_manager.update_progress(job_id, bounded)
@@ -442,10 +448,6 @@ async def execute_clinical_job(
     runtime_overrides: dict[str, Any],
     job_id: str,
 ) -> dict[str, Any]:
-    def ensure_not_cancelled() -> None:
-        if job_manager.should_stop(job_id):
-            raise ClinicalJobCancelled("Clinical job stop requested.")
-
     with endpoint.runtime_override_context(
         use_cloud_services=runtime_overrides.get("use_cloud_services"),
         llm_provider=runtime_overrides.get("llm_provider"),
@@ -456,7 +458,7 @@ async def execute_clinical_job(
         cloud_temperature=runtime_overrides.get("cloud_temperature"),
         ollama_reasoning=runtime_overrides.get("ollama_reasoning"),
     ):
-        ensure_not_cancelled()
+        ensure_clinical_job_not_cancelled(job_id)
 
         report_clinical_job_progress(
             job_id,

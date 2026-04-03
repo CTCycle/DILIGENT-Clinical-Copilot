@@ -17,7 +17,8 @@ from DILIGENT.server.domain.clinical import (
     DrugEntry,
     PatientDrugs,
 )
-from DILIGENT.server.configurations import LLMRuntimeConfig, server_settings
+from DILIGENT.server.configurations.bootstrap import server_settings
+from DILIGENT.server.configurations.runtime_state import LLMRuntimeConfig
 from DILIGENT.server.services.text.normalization import normalize_token
 from DILIGENT.server.common.utils.logger import logger
 from DILIGENT.server.common.utils.patterns import (
