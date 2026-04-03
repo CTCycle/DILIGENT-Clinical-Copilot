@@ -20,7 +20,7 @@ from DILIGENT.server.repositories.vectors import LanceVectorDatabase
 from DILIGENT.server.services.jobs import JobManager, job_manager
 from DILIGENT.server.services.updater.embeddings import RagEmbeddingUpdater
 from DILIGENT.server.services.updater.livertox import LiverToxUpdater
-from DILIGENT.server.services.updater.rxnav import RxNavDrugCatalogBuilder
+from DILIGENT.server.services.updater.rxnav import RxNavClient, RxNavDrugCatalogBuilder
 
 PhaseStep = tuple[InspectionJobPhase, int, int, str]
 UpdateTarget = Literal["rxnav", "livertox", "rag"]
@@ -418,10 +418,13 @@ class DataInspectionService:
             progress=10.0,
             fallback_message="Downloading source catalog data",
         )
-        builder = RxNavDrugCatalogBuilder(
-            serializer=self.serializer,
+        rx_client = RxNavClient(
             request_timeout=override_values.get("rxnav_request_timeout"),
             max_concurrency=override_values.get("rxnav_max_concurrency"),
+        )
+        builder = RxNavDrugCatalogBuilder(
+            serializer=self.serializer,
+            rx_client=rx_client,
         )
         self.report_phase_by_target(
             job_id=job_id,

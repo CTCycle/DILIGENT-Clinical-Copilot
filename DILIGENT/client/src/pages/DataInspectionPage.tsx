@@ -49,6 +49,7 @@ import {
 const PAGE_LIMIT = 10;
 const SEARCH_DEBOUNCE_MS = 250;
 type InspectionViewId = "sessions" | "rxnav" | "livertox" | "rag";
+type InspectionUpdateTarget = "rxnav" | "livertox" | "rag";
 
 const INSPECTION_VIEW_CONFIG: Record<InspectionViewId, { label: string; description: string }> = {
   sessions: {
@@ -69,6 +70,30 @@ const INSPECTION_VIEW_CONFIG: Record<InspectionViewId, { label: string; descript
   },
 };
 const INSPECTION_VIEW_ORDER: readonly InspectionViewId[] = ["sessions", "rxnav", "livertox", "rag"];
+const INSPECTION_UPDATE_CONFIG: Record<
+  InspectionUpdateTarget,
+  {
+    title: string;
+    targetLabel: string;
+    fallbackMessage: string;
+  }
+> = {
+  rxnav: {
+    title: "Update Drug Catalog",
+    targetLabel: "RxNav catalog",
+    fallbackMessage: "Updating RxNav...",
+  },
+  livertox: {
+    title: "Update LiverTox Base",
+    targetLabel: "LiverTox monographs",
+    fallbackMessage: "Updating LiverTox...",
+  },
+  rag: {
+    title: "Update RAG Embeddings",
+    targetLabel: "RAG embeddings",
+    fallbackMessage: "Updating RAG embeddings...",
+  },
+};
 
 function formatDateTime(value: string | null): string {
   if (!value) return "N/A";
@@ -215,6 +240,7 @@ export function DataInspectionPage(): React.JSX.Element {
   const [excerptLoading, setExcerptLoading] = useState(false);
   const [excerptError, setExcerptError] = useState<string | null>(null);
   const [activeView, setActiveView] = useState<InspectionViewId>("sessions");
+  const [activeUpdateTarget, setActiveUpdateTarget] = useState<InspectionUpdateTarget | null>(null);
   const closeAliasModal = useCallback(() => {
     setAliasData(null);
     setAliasError(null);
@@ -224,6 +250,9 @@ export function DataInspectionPage(): React.JSX.Element {
     setExcerptData(null);
     setExcerptError(null);
     setExcerptLoading(false);
+  }, []);
+  const closeUpdateModal = useCallback(() => {
+    setActiveUpdateTarget(null);
   }, []);
 
   const loadSessions = useCallback(async () => {
@@ -349,6 +378,7 @@ export function DataInspectionPage(): React.JSX.Element {
     pollErrorMessage: "RAG polling failed.",
   });
   const ragJob = ragUpdateJob.state;
+  const activeUpdateConfig = activeUpdateTarget ? INSPECTION_UPDATE_CONFIG[activeUpdateTarget] : null;
   const activeViewConfig = INSPECTION_VIEW_CONFIG[activeView];
   const activeTabId = `inspection-tab-${activeView}`;
 
@@ -507,18 +537,16 @@ export function DataInspectionPage(): React.JSX.Element {
   const renderRxnavView = (): React.JSX.Element => (
     <section className="inspection-view-content">
       <div className="inspection-widget">
-        <div className="inspection-widget-header inspection-widget-header-controls-only">
+        <div className="inspection-widget-header">
           <div className="inspection-controls inspection-controls-knowledge">
             <input type="search" className="inspection-search" placeholder="Search RxNav..." value={rxnavSearchInput} onChange={(event) => setRxnavSearchInput(event.target.value)} aria-label="Search RxNav data" />
           </div>
+          <div className="inspection-widget-header-actions">
+            <button type="button" className="btn btn-secondary inspection-mini-btn" onClick={() => setActiveUpdateTarget("rxnav")}>
+              {rxnavJob.running ? "View Progress" : "Update Catalog"}
+            </button>
+          </div>
         </div>
-        <InspectionUpdateWizard
-          targetLabel="RxNav catalog"
-          fallbackMessage="Updating RxNav..."
-          loadConfig={fetchInspectionRxNavUpdateConfig}
-          startJob={rxnavUpdateJob.triggerUpdate}
-          job={rxnavJob}
-        />
         <div className="inspection-scroll-frame inspection-scroll-frame-compact">
           <table className="inspection-table inspection-table-dense">
             <thead><tr><th>Drug</th><th>Last update</th><th aria-label="Actions" /></tr></thead>
@@ -548,18 +576,16 @@ export function DataInspectionPage(): React.JSX.Element {
   const renderLivertoxView = (): React.JSX.Element => (
     <section className="inspection-view-content">
       <div className="inspection-widget">
-        <div className="inspection-widget-header inspection-widget-header-controls-only">
+        <div className="inspection-widget-header">
           <div className="inspection-controls inspection-controls-knowledge">
             <input type="search" className="inspection-search" placeholder="Search LiverTox..." value={livertoxSearchInput} onChange={(event) => setLivertoxSearchInput(event.target.value)} aria-label="Search LiverTox data" />
           </div>
+          <div className="inspection-widget-header-actions">
+            <button type="button" className="btn btn-secondary inspection-mini-btn" onClick={() => setActiveUpdateTarget("livertox")}>
+              {livertoxJob.running ? "View Progress" : "Update Base"}
+            </button>
+          </div>
         </div>
-        <InspectionUpdateWizard
-          targetLabel="LiverTox monographs"
-          fallbackMessage="Updating LiverTox..."
-          loadConfig={fetchInspectionLiverToxUpdateConfig}
-          startJob={livertoxUpdateJob.triggerUpdate}
-          job={livertoxJob}
-        />
         <div className="inspection-scroll-frame inspection-scroll-frame-compact">
           <table className="inspection-table inspection-table-dense">
             <thead><tr><th>Drug</th><th>Last update</th><th aria-label="Actions" /></tr></thead>
@@ -597,7 +623,7 @@ export function DataInspectionPage(): React.JSX.Element {
   const renderRagView = (): React.JSX.Element => (
     <section className="inspection-view-content">
       <div className="inspection-widget">
-        <div className="inspection-widget-header inspection-widget-header-controls-only">
+        <div className="inspection-widget-header">
           <div className="inspection-controls inspection-controls-knowledge">
             <input
               type="search"
@@ -607,6 +633,11 @@ export function DataInspectionPage(): React.JSX.Element {
               onChange={(event) => setRagSearchInput(event.target.value)}
               aria-label="Search RAG documents"
             />
+          </div>
+          <div className="inspection-widget-header-actions">
+            <button type="button" className="btn btn-secondary inspection-mini-btn" onClick={() => setActiveUpdateTarget("rag")} disabled={ragJob.running}>
+              Update Embeddings
+            </button>
           </div>
         </div>
         <div className="inspection-scroll-frame inspection-scroll-frame-compact">
@@ -633,13 +664,6 @@ export function DataInspectionPage(): React.JSX.Element {
             </tbody>
           </table>
         </div>
-        <InspectionUpdateWizard
-          targetLabel="RAG embeddings"
-          fallbackMessage="Updating RAG embeddings..."
-          loadConfig={fetchInspectionRagUpdateConfig}
-          startJob={ragUpdateJob.triggerUpdate}
-          job={ragJob}
-        />
         <div className="inspection-scroll-frame inspection-scroll-frame-compact">
           <table className="inspection-table inspection-table-dense">
             <thead>
@@ -791,6 +815,49 @@ export function DataInspectionPage(): React.JSX.Element {
               {excerptLoading && <p className="inspection-loading-note">Loading excerpt...</p>}
               {!excerptLoading && excerptError && <p className="inspection-empty-note">{excerptError}</p>}
               {!excerptLoading && !excerptError && excerptData && <pre className="inspection-excerpt-text">{excerptData.excerpt}</pre>}
+            </div>
+          </dialog>
+        </div>
+      )}
+
+      {activeUpdateConfig && (
+        <div className="modal-overlay">
+          <dialog className="modal-container inspection-modal inspection-update-modal" open aria-modal="true" aria-label={activeUpdateConfig.title}>
+            <div className="modal-header">
+              <div className="modal-header-content">
+                <h2 className="modal-title">{activeUpdateConfig.title}</h2>
+                <p className="modal-subtitle">Review and confirm update settings before starting.</p>
+              </div>
+              <button type="button" className="modal-close" onClick={closeUpdateModal} aria-label="Close update configuration modal"><CloseIcon /></button>
+            </div>
+            <div className="modal-body inspection-update-modal-body">
+              {activeUpdateTarget === "rxnav" && (
+                <InspectionUpdateWizard
+                  targetLabel={INSPECTION_UPDATE_CONFIG.rxnav.targetLabel}
+                  fallbackMessage={INSPECTION_UPDATE_CONFIG.rxnav.fallbackMessage}
+                  loadConfig={fetchInspectionRxNavUpdateConfig}
+                  startJob={rxnavUpdateJob.triggerUpdate}
+                  job={rxnavJob}
+                />
+              )}
+              {activeUpdateTarget === "livertox" && (
+                <InspectionUpdateWizard
+                  targetLabel={INSPECTION_UPDATE_CONFIG.livertox.targetLabel}
+                  fallbackMessage={INSPECTION_UPDATE_CONFIG.livertox.fallbackMessage}
+                  loadConfig={fetchInspectionLiverToxUpdateConfig}
+                  startJob={livertoxUpdateJob.triggerUpdate}
+                  job={livertoxJob}
+                />
+              )}
+              {activeUpdateTarget === "rag" && (
+                <InspectionUpdateWizard
+                  targetLabel={INSPECTION_UPDATE_CONFIG.rag.targetLabel}
+                  fallbackMessage={INSPECTION_UPDATE_CONFIG.rag.fallbackMessage}
+                  loadConfig={fetchInspectionRagUpdateConfig}
+                  startJob={ragUpdateJob.triggerUpdate}
+                  job={ragJob}
+                />
+              )}
             </div>
           </dialog>
         </div>
