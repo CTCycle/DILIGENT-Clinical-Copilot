@@ -1261,7 +1261,9 @@ class _RepositorySerializationService:
             "INR": "inr",
             "ALB": "albumin",
         }
-        seen: set[tuple[str, str, str]] = set()
+        # DB schema enforces one lab row per (session_id, lab_code), so collapse
+        # repeated timeline points of the same marker into a single persisted row.
+        rows_by_lab_code: dict[str, tuple[str | None, str | None]] = {}
         for item in timeline_raw:
             if not isinstance(item, dict):
                 continue
@@ -1271,15 +1273,17 @@ class _RepositorySerializationService:
             lab_code = persisted_codes.get(marker_name.upper())
             if lab_code is None:
                 continue
-            sample_date = self.normalize_string(item.get("sample_date")) or ""
             value_raw = self.normalize_string(item.get("value")) or self.normalize_string(item.get("value_text"))
             upper_limit_raw = self.normalize_string(item.get("upper_limit_normal")) or self.normalize_string(item.get("upper_limit_text"))
-            dedupe_key = (lab_code, sample_date, value_raw or "")
-            if dedupe_key in seen:
-                continue
-            seen.add(dedupe_key)
             if value_raw is None and upper_limit_raw is None:
                 continue
+            existing_value_raw, existing_upper_limit_raw = rows_by_lab_code.get(
+                lab_code, (None, None)
+            )
+            merged_value_raw = existing_value_raw or value_raw
+            merged_upper_limit_raw = existing_upper_limit_raw or upper_limit_raw
+            rows_by_lab_code[lab_code] = (merged_value_raw, merged_upper_limit_raw)
+        for lab_code, (value_raw, upper_limit_raw) in rows_by_lab_code.items():
             db_session.add(
                 ClinicalSessionLab(
                     session_id=session_id,
