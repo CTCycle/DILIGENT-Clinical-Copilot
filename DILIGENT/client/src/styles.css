@@ -2607,18 +2607,18 @@ input[type="date"]::-webkit-calendar-picker-indicator:hover {
 .inspection-page {
   display: flex;
   flex-direction: column;
-  gap: var(--space-md);
+  gap: var(--space-sm);
   --inspection-control-height: 32px;
   --inspection-icon-action-size: 30px;
 }
 
 .inspection-page-workbench {
   min-height: calc(100dvh - var(--app-top-nav-height));
-  height: auto;
-  max-height: none;
-  overflow: auto;
+  height: calc(100dvh - var(--app-top-nav-height));
+  max-height: calc(100dvh - var(--app-top-nav-height));
+  overflow: hidden;
   scrollbar-gutter: stable;
-  padding: var(--space-lg) var(--space-xl) var(--space-lg);
+  padding: var(--space-md) var(--space-lg) var(--space-md);
 }
 
 .inspection-page-report {
@@ -2631,8 +2631,8 @@ input[type="date"]::-webkit-calendar-picker-indicator:hover {
 }
 
 .inspection-page-workbench .page-header {
-  padding-bottom: var(--space-md);
-  margin-bottom: var(--space-md);
+  padding-bottom: var(--space-sm);
+  margin-bottom: var(--space-sm);
 }
 
 .inspection-page-workbench .page-header h1 {
@@ -2647,19 +2647,19 @@ input[type="date"]::-webkit-calendar-picker-indicator:hover {
 .inspection-layout {
   display: grid;
   grid-template-columns: 220px minmax(0, 1fr);
-  gap: var(--space-lg);
+  gap: var(--space-md);
   align-items: stretch;
-  min-height: auto;
-  flex: 0 0 auto;
-  overflow: visible;
+  min-height: 0;
+  flex: 1 1 auto;
+  overflow: hidden;
 }
 
 .inspection-active-view {
-  border: 1px solid rgba(148, 163, 184, 0.36);
-  border-radius: var(--radius-xl);
-  background: rgba(255, 255, 255, 0.74);
-  backdrop-filter: blur(10px);
-  box-shadow: var(--shadow-md);
+  border: 0;
+  border-radius: 0;
+  background: transparent;
+  backdrop-filter: none;
+  box-shadow: none;
 }
 
 .inspection-toolbar {
@@ -2726,18 +2726,25 @@ input[type="date"]::-webkit-calendar-picker-indicator:hover {
 
 .inspection-active-view {
   min-width: 0;
-  padding: var(--space-lg);
+  padding: var(--space-sm) 0 0;
   display: flex;
   flex-direction: column;
-  gap: var(--space-md);
-  min-height: auto;
-  overflow: visible;
+  gap: var(--space-sm);
+  min-height: 0;
+  overflow: hidden;
 }
 
 .inspection-active-view-header h2 {
   margin: 0;
   font-size: var(--font-xl);
   color: var(--color-text-primary);
+}
+
+.inspection-active-view-header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: var(--space-sm);
 }
 
 .inspection-active-view-header p {
@@ -2747,18 +2754,30 @@ input[type="date"]::-webkit-calendar-picker-indicator:hover {
   max-width: 780px;
 }
 
-.inspection-view-stage {
-  min-height: auto;
+.inspection-scroll-mode-btn {
   flex: 0 0 auto;
-  overflow: visible;
+  white-space: nowrap;
+}
+
+.inspection-view-stage {
+  min-height: 0;
+  flex: 1 1 auto;
+  overflow: auto;
+  padding-right: 2px;
+  scrollbar-width: none;
+}
+
+.inspection-view-stage::-webkit-scrollbar {
+  width: 0;
+  height: 0;
 }
 
 .inspection-view-content {
   min-width: 0;
-  min-height: auto;
+  min-height: 0;
   display: flex;
   flex-direction: column;
-  height: auto;
+  height: 100%;
 }
 
 .inspection-widget {
@@ -2766,8 +2785,8 @@ input[type="date"]::-webkit-calendar-picker-indicator:hover {
   display: flex;
   flex-direction: column;
   gap: var(--space-sm);
-  min-height: auto;
-  flex: 0 0 auto;
+  min-height: 0;
+  flex: 1 1 auto;
 }
 
 .inspection-widget-header {
@@ -2908,16 +2927,16 @@ input[type="date"]::-webkit-calendar-picker-indicator:hover {
 
 .inspection-scroll-frame {
   min-height: 0;
-  max-height: clamp(220px, 42vh, 440px);
-  flex: 0 1 auto;
-  overflow: auto;
-  border: 1px solid rgba(148, 163, 184, 0.3);
-  border-radius: var(--radius-md);
-  background: rgba(255, 255, 255, 0.55);
+  max-height: none;
+  flex: 0 0 auto;
+  overflow: visible;
+  border: 0;
+  border-radius: 0;
+  background: transparent;
 }
 
 .inspection-scroll-frame-compact {
-  max-height: clamp(180px, 34vh, 340px);
+  max-height: none;
 }
 
 .inspection-table {
@@ -3050,9 +3069,36 @@ input[type="date"]::-webkit-calendar-picker-indicator:hover {
   display: flex;
   justify-content: space-between;
   align-items: center;
-  margin-top: var(--space-xs);
-  padding-top: var(--space-xs);
+  margin-top: 2px;
+  padding-top: 2px;
   border-top: 1px solid rgba(148, 163, 184, 0.24);
+}
+
+.inspection-page-workbench.is-page-scroll {
+  height: auto;
+  max-height: none;
+  overflow: auto;
+  min-height: calc(100dvh - var(--app-top-nav-height) + 140px);
+  scrollbar-width: none;
+}
+
+.inspection-page-workbench.is-page-scroll::-webkit-scrollbar {
+  width: 0;
+  height: 0;
+}
+
+.inspection-page-workbench.is-page-scroll .inspection-layout {
+  overflow: visible;
+  min-height: auto;
+  min-block-size: calc(100dvh - var(--app-top-nav-height) + 120px);
+}
+
+.inspection-active-view.is-page-scroll {
+  overflow: visible;
+}
+
+.inspection-page-workbench.is-page-scroll .inspection-view-stage {
+  overflow: visible;
 }
 
 .inspection-pager-range {
@@ -3207,7 +3253,7 @@ input[type="date"]::-webkit-calendar-picker-indicator:hover {
 @media (max-width: 1080px) {
   .inspection-layout {
     grid-template-columns: 1fr;
-    overflow: visible;
+    overflow: auto;
   }
 
   .inspection-page-workbench {
@@ -3238,7 +3284,12 @@ input[type="date"]::-webkit-calendar-picker-indicator:hover {
 
 @media (max-width: 720px) {
   .inspection-active-view {
-    padding: var(--space-md);
+    padding: var(--space-xs) 0 0;
+  }
+
+  .inspection-active-view-header {
+    flex-direction: column;
+    align-items: stretch;
   }
 
   .inspection-widget-header {
@@ -3283,11 +3334,6 @@ input[type="date"]::-webkit-calendar-picker-indicator:hover {
   .inspection-search {
     width: 100%;
     min-width: 0;
-  }
-
-  .inspection-scroll-frame,
-  .inspection-scroll-frame-compact {
-    max-height: 52vh;
   }
 
   .inspection-actions-cell {
@@ -3385,8 +3431,8 @@ input[type="date"]::-webkit-calendar-picker-indicator:hover {
 }
 
 :root[data-theme="dark"] .inspection-active-view {
-  background: rgba(15, 23, 42, 0.72);
-  border-color: rgba(71, 85, 105, 0.58);
+  background: transparent;
+  border-color: transparent;
 }
 
 :root[data-theme="dark"] .inspection-toolbar-eyebrow {
@@ -3433,8 +3479,8 @@ input[type="date"]::-webkit-calendar-picker-indicator:hover {
 }
 
 :root[data-theme="dark"] .inspection-scroll-frame {
-  border-top-color: rgba(71, 85, 105, 0.5);
-  border-bottom-color: rgba(71, 85, 105, 0.5);
+  border-top-color: transparent;
+  border-bottom-color: transparent;
 }
 
 :root[data-theme="dark"] .inspection-table th {

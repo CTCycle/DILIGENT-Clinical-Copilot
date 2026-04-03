@@ -21,7 +21,7 @@ ProviderName = Literal["openai", "azure-openai", "anthropic", "gemini"]
 class LLMError(RuntimeError):
     pass
 
-
+###############################################################################
 class LLMTimeout(LLMError):
     """Raised when requests exceed the configured timeout."""
 
