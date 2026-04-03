@@ -4,8 +4,8 @@ from datetime import datetime
 
 from DILIGENT.server.api.model_config import ModelConfigEndpoint
 from DILIGENT.server.api.session import endpoint as clinical_endpoint
-from DILIGENT.server.configurations import LLMRuntimeConfig
-from DILIGENT.server.repositories.serialization.model_configs import ModelConfigSnapshot
+from DILIGENT.server.configurations.runtime_state import LLMRuntimeConfig
+from DILIGENT.server.domain.model_configs import ModelConfigSnapshot
 
 
 class InMemorySerializer:
@@ -30,6 +30,8 @@ def test_model_config_roundtrip_preserves_cloud_selection() -> None:
             use_cloud_models=True,
             cloud_provider="openai",
             cloud_model="gpt-5.4-mini",
+            ollama_temperature=0.7,
+            cloud_temperature=0.7,
             updated_at=datetime.now(),
         )
     )
@@ -65,6 +67,7 @@ def test_clinical_runtime_overrides_are_request_scoped() -> None:
         parsing_model=None,
         clinical_model=None,
         ollama_temperature=None,
+        cloud_temperature=None,
         ollama_reasoning=None,
     ):
         assert LLMRuntimeConfig.is_cloud_enabled() is True

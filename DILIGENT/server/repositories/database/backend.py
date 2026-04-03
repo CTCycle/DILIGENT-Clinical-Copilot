@@ -5,7 +5,8 @@ from typing import Any, Protocol
 
 import pandas as pd
 
-from DILIGENT.server.configurations import DatabaseSettings, server_settings
+from DILIGENT.server.configurations.bootstrap import server_settings
+from DILIGENT.server.domain.settings.configuration import DatabaseSettings
 from DILIGENT.server.repositories.database.postgres import PostgresRepository
 from DILIGENT.server.repositories.database.sqlite import SQLiteRepository
 from DILIGENT.server.common.utils.logger import logger

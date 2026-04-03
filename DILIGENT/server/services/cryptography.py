@@ -1,15 +1,14 @@
 from __future__ import annotations
 
 import hashlib
+import os
 
 from cryptography.fernet import Fernet, InvalidToken
-
-from DILIGENT.server.common.utils.variables import env_variables
 
 
 ###############################################################################
 def _load_fernet() -> Fernet:
-    key_value = env_variables.get("ACCESS_KEY_ENCRYPTION_KEY")
+    key_value = os.getenv("ACCESS_KEY_ENCRYPTION_KEY")
     if not isinstance(key_value, str) or not key_value.strip():
         raise RuntimeError("ACCESS_KEY_ENCRYPTION_KEY is not configured")
     try:

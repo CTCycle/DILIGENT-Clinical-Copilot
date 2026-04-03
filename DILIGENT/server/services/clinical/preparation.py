@@ -3,7 +3,6 @@ from __future__ import annotations
 import asyncio
 import re
 from collections.abc import Callable
-from dataclasses import dataclass
 from typing import Any
 
 from DILIGENT.server.domain.clinical import (
@@ -11,6 +10,7 @@ from DILIGENT.server.domain.clinical import (
     HepatotoxicityPatternScore,
     PatientDrugs,
 )
+from DILIGENT.server.domain.clinical_extras import HepatoxPreparedInputs
 from DILIGENT.server.common.utils.logger import logger
 from DILIGENT.server.repositories.serialization.data import DataSerializer
 from DILIGENT.server.services.clinical.matches import LiverToxMatcher
@@ -18,14 +18,6 @@ from DILIGENT.server.services.text.normalization import (
     canonicalize_drug_query,
     normalize_drug_query_name,
 )
-
-
-@dataclass(slots=True)
-class HepatoxPreparedInputs:
-    resolved_drugs: dict[str, dict[str, Any]]
-    pattern_prompt: str
-    clinical_context: str
-
 
 ###############################################################################
 class ClinicalKnowledgePreparation:

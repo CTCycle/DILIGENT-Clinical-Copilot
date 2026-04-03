@@ -1,6 +1,7 @@
 from __future__ import annotations
 
-from DILIGENT.server.configurations.server import build_database_settings
+from DILIGENT.server.configurations.bootstrap import build_database_settings
+from DILIGENT.server.configurations.env_loader import load_environment
 
 
 ###############################################################################
@@ -18,7 +19,7 @@ def test_db_embedded_env_overrides_json_default(monkeypatch) -> None:
 
     monkeypatch.setenv("DB_EMBEDDED", "true")
 
-    settings = build_database_settings(payload)
+    settings = build_database_settings(payload, load_environment())
 
     assert settings.embedded_database is True
     assert settings.engine is None
@@ -57,7 +58,7 @@ def test_external_db_env_fields_are_honored_when_embedded_disabled(monkeypatch) 
     monkeypatch.setenv("DB_CONNECT_TIMEOUT", "25")
     monkeypatch.setenv("DB_INSERT_BATCH_SIZE", "500")
 
-    settings = build_database_settings(payload)
+    settings = build_database_settings(payload, load_environment())
 
     assert settings.embedded_database is False
     assert settings.engine == "postgresql+psycopg"

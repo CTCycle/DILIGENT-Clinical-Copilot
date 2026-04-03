@@ -8,8 +8,8 @@ DILIGENT Clinical Copilot supports clinicians during Drug-Induced Liver Injury (
 ## 2. Runtime Model
 DILIGENT is configuration-first and uses one active runtime file: `DILIGENT/settings/.env`.
 
-- Local mode is the default workflow for developers (no Docker required).
-- Cloud mode is provided through Docker (`backend` + `frontend`) using the same `.env` contract.
+- Local mode is the default workflow for developers.
+- Cloud-hardened API mode is enabled through `.env` settings only (no bundled container orchestration).
 - Packaged desktop mode uses Tauri with a local Python backend started by the desktop shell.
 - Mode switching is done by replacing `.env` values only.
 
@@ -70,28 +70,13 @@ npm run build
 npm run preview -- --host 127.0.0.1 --port 7861
 ```
 
-## 4. Cloud Mode (Docker)
-1. Activate cloud profile:
+## 4. Cloud-Hardened API Mode
+Activate cloud profile:
 ```cmd
 copy /Y DILIGENT\settings\.env.cloud.example DILIGENT\settings\.env
 ```
-2. Build images:
-```cmd
-docker compose --env-file DILIGENT/settings/.env build --no-cache
-```
-3. Start:
-```cmd
-docker compose --env-file DILIGENT/settings/.env up -d
-```
-4. Stop:
-```cmd
-docker compose --env-file DILIGENT/settings/.env down
-```
 
-Cloud topology:
-- `backend`: FastAPI/Uvicorn container on internal port `8000`.
-- `frontend`: Nginx static hosting.
-- Frontend proxies `/api` to `backend:8000` for same-origin API calls.
+This profile enables backend cloud-hardening behavior (for example restricting docs and mirrored routes). Deployment topology is owned externally (for example VM, PaaS, or reverse proxy), and this repository no longer ships bundled container artifacts.
 
 ## 5. Packaged Desktop Mode (Tauri)
 Prepare the desktop profile:
@@ -138,9 +123,8 @@ npm run tauri:clean
 ```
 
 ## 6. Deterministic Dependencies
-- Backend is lockfile-backed by `runtimes/uv.lock` and installed with `uv sync --frozen` in Docker.
-- Frontend is lockfile-backed by `DILIGENT/client/package-lock.json` and installed with `npm ci` in Docker.
-- Docker base images are pinned in `docker/backend.Dockerfile` and `docker/frontend.Dockerfile`.
+- Backend is lockfile-backed by `runtimes/uv.lock` and installed with `uv sync --frozen`.
+- Frontend is lockfile-backed by `DILIGENT/client/package-lock.json` and installed with `npm ci`.
 
 ## 7. Using the Application
 - Enter anamnesis, exam notes, current medications, and ALT/ALP values.

@@ -7,16 +7,16 @@ from fastapi import APIRouter, Body, HTTPException, status
 
 from DILIGENT.server.common.constants import CLOUD_MODEL_CHOICES
 from DILIGENT.server.common.utils.logger import logger
-from DILIGENT.server.configurations import LLMRuntimeConfig
+from DILIGENT.server.configurations.runtime_state import LLMRuntimeConfig
 from DILIGENT.server.domain.model_configs import (
     LocalModelCard,
+    ModelConfigSnapshot,
     ModelConfigStateResponse,
     ModelConfigUpdateRequest,
 )
 from DILIGENT.server.models.providers import OllamaClient, OllamaError, OllamaTimeout
 from DILIGENT.server.repositories.serialization.model_configs import (
     ModelConfigSerializer,
-    ModelConfigSnapshot,
 )
 
 router = APIRouter(prefix="/model-config", tags=["model-config"])
@@ -306,10 +306,8 @@ class ModelConfigEndpoint:
             )
             updates["clinical_model"] = clinical_model
 
-        if "text_extraction_model" in fields_set:
-            text_extraction_model = self.normalize_optional_text(
-                payload.text_extraction_model
-            )
+        if "parsing_model" in fields_set:
+            text_extraction_model = self.normalize_optional_text(payload.parsing_model)
             self.validate_local_selection(
                 role_name="text_extraction",
                 model_name=text_extraction_model,
@@ -536,11 +534,10 @@ class ModelConfigEndpoint:
             llm_provider=provider,
             cloud_model=cloud_model,
             clinical_model=snapshot.clinical_model,
-            text_extraction_model=snapshot.text_extraction_model,
+            parsing_model=snapshot.text_extraction_model,
             ollama_temperature=LLMRuntimeConfig.get_ollama_temperature(),
             cloud_temperature=LLMRuntimeConfig.get_cloud_temperature(),
             ollama_reasoning=LLMRuntimeConfig.is_ollama_reasoning_enabled(),
-            updated_at=snapshot.updated_at,
         )
 
     # -------------------------------------------------------------------------

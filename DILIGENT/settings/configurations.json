@@ -1,4 +1,9 @@
 {
+  "fastapi": {
+    "title": "DILI Backend",
+    "description": "FastAPI backend",
+    "version": "1.0.0"
+  },
   "jobs": {
     "polling_interval": 1
   },

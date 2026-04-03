@@ -2,15 +2,19 @@ from __future__ import annotations
 
 import re
 from collections import OrderedDict
-from dataclasses import dataclass
 from typing import Any, Generic, Iterable, Iterator, Literal, TypeVar
 
 import pandas as pd
 from rapidfuzz import fuzz
 
-from DILIGENT.server.configurations import server_settings
+from DILIGENT.server.configurations.bootstrap import server_settings
 from DILIGENT.server.common.constants import MATCHING_STOPWORDS
 from DILIGENT.server.common.utils.logger import logger
+from DILIGENT.server.domain.matching import (
+    AliasCacheEntry,
+    LiverToxMatch,
+    MonographRecord,
+)
 from DILIGENT.server.services.text.normalization import (
     canonicalize_drug_query,
     coerce_text,
@@ -61,42 +65,6 @@ class BoundedCache(Generic[KT, VT]):
         self.store.clear()
 
 
-###############################################################################
-@dataclass(slots=True)
-class AliasCacheEntry:
-    entries: list[tuple[str, bool]]
-    seen: set[str]
-
-
-###############################################################################
-@dataclass(slots=True)
-class MonographRecord:
-    nbk_id: str
-    drug_name: str
-    normalized_name: str
-    excerpt: str | None
-    synonyms: dict[str, str]
-    tokens: set[str]
-
-
-###############################################################################
-@dataclass(slots=True)
-class LiverToxMatch:
-    status: Literal["matched", "missing", "ambiguous"]
-    query_name: str
-    canonical_query: str
-    normalized_query: str
-    nbk_id: str | None
-    matched_name: str | None
-    confidence: float | None
-    reason: str
-    notes: list[str]
-    candidate_names: list[str]
-    rejected_candidate_names: list[str]
-    record: MonographRecord | None = None
-
-
-###############################################################################
 class DrugsLookup:
     DIRECT_CONFIDENCE = server_settings.drugs_matcher.direct_confidence
     MASTER_CONFIDENCE = server_settings.drugs_matcher.master_confidence

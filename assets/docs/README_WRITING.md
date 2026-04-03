@@ -63,7 +63,7 @@ If you skip a section, renumber remaining sections.
 
 ## 4. Consistency checks before finalizing
 
-- Runtime/version values match repository truth (`pyproject.toml`, package manifests, Dockerfiles).
+- Runtime/version values match repository truth (`pyproject.toml`, package manifests, runtime scripts).
 - Endpoint names and commands match current behavior.
 - Section links and screenshot paths resolve.
 - No contradictions with `assets/docs/GENERAL_RULES.md` or `assets/docs/ARCHITECTURE.md`.

@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from DILIGENT.server.configurations.server import build_external_data_settings
+from DILIGENT.server.configurations.bootstrap import build_external_data_settings
 
 
 # -----------------------------------------------------------------------------

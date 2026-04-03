@@ -6,7 +6,7 @@ import math
 from collections.abc import Coroutine
 from typing import Any, Literal, cast
 
-from DILIGENT.server.configurations import server_settings
+from DILIGENT.server.configurations.bootstrap import server_settings
 from DILIGENT.server.common.constants import CLOUD_MODEL_CHOICES, VECTOR_DB_PATH
 from DILIGENT.server.common.utils.logger import logger
 from DILIGENT.server.models.cloud import CloudLLMClient
