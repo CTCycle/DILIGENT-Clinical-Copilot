@@ -1,16 +1,9 @@
 from __future__ import annotations
 
-from dataclasses import dataclass
 import re
 
 from DILIGENT.server.domain.clinical import PatientData
-
-
-@dataclass(frozen=True)
-class LanguageDetectionResult:
-    detected_input_language: str
-    report_language: str
-    confidence: str
+from DILIGENT.server.domain.language import LanguageDetectionResult
 
 
 SUPPORTED_REPORT_LANGUAGES: tuple[str, ...] = ("en", "it", "de", "fr", "es")

@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from DILIGENT.server.configurations.server import build_rag_settings
+from DILIGENT.server.configurations.bootstrap import build_rag_settings
 
 
 # -----------------------------------------------------------------------------

@@ -281,6 +281,8 @@ NO_CLINICAL_CONTEXT_FALLBACK = "No additional clinical context provided."
 UNKNOWN_R_SCORE_TOKEN = "R=NA"
 R_SCORE_HEPATOCELLULAR_THRESHOLD = 5.0
 R_SCORE_CHOLESTATIC_THRESHOLD = 2.0
+TRUTHY_ENV_VALUES = {"1", "true", "yes", "on"}
+FALSY_ENV_VALUES = {"0", "false", "no", "off"}
 
 __all__ = [
     "MATCHING_STOPWORDS",

@@ -1,7 +1,5 @@
 from __future__ import annotations
 
-from dataclasses import dataclass
-
 from DILIGENT.server.domain.clinical import (
     ClinicalPipelineValidationError,
     DrugEntry,
@@ -9,14 +7,7 @@ from DILIGENT.server.domain.clinical import (
     PatientDrugs,
     PipelineIssue,
 )
-
-
-@dataclass(frozen=True)
-class ValidationMessageBundle:
-    missing_anamnesis: str
-    missing_visit_date: str
-    missing_timed_drug: str
-    insufficient_labs: str
+from DILIGENT.server.domain.validation import ValidationMessageBundle
 
 
 def build_validation_bundle(report_language: str) -> ValidationMessageBundle:

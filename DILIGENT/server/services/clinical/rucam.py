@@ -1,7 +1,6 @@
 from __future__ import annotations
 
 import re
-from dataclasses import dataclass
 from datetime import date, datetime
 from typing import Any
 
@@ -18,6 +17,7 @@ from DILIGENT.server.domain.clinical import (
     PatientRucamAssessmentBundle,
     RucamComponentAssessment,
 )
+from DILIGENT.server.domain.rucam import RucamAnchor
 from DILIGENT.server.services.text.normalization import normalize_drug_query_name
 
 
@@ -33,17 +33,6 @@ RECHALLENGE_RE = re.compile(
 )
 RECURRENCE_RE = re.compile(r"\b(recur|rise|worsen|flare|peggior)\b", re.IGNORECASE)
 AGE_RE = re.compile(r"\b(\d{2})\s*(?:years?|yo|anni)\b", re.IGNORECASE)
-
-
-@dataclass(slots=True)
-class _Anchor:
-    onset_date: date | None
-    used_alt: float | None
-    used_alt_uln: float | None
-    used_alp: float | None
-    used_alp_uln: float | None
-    rationale: str
-
 
 class RucamScoreEstimator:
     def estimate(
@@ -132,7 +121,7 @@ class RucamScoreEstimator:
         *,
         payload: PatientData,
         lab_timeline: PatientLabTimeline,
-    ) -> _Anchor:
+    ) -> RucamAnchor:
         grouped: dict[date, dict[str, ClinicalLabEntry]] = {}
         for entry in lab_timeline.entries:
             marker = entry.marker_name.upper()
@@ -165,7 +154,7 @@ class RucamScoreEstimator:
             )
             if not qualifies:
                 continue
-            return _Anchor(
+                return RucamAnchor(
                 onset_date=sample_date,
                 used_alt=alt_like.value if alt_like else None,
                 used_alt_uln=alt_like.upper_limit_normal if alt_like else None,
@@ -178,7 +167,7 @@ class RucamScoreEstimator:
                 ),
             )
 
-        return _Anchor(
+        return RucamAnchor(
             onset_date=payload.visit_date,
             used_alt=None,
             used_alt_uln=None,
@@ -191,7 +180,7 @@ class RucamScoreEstimator:
         self,
         *,
         pattern_score: HepatotoxicityPatternScore,
-        anchor: _Anchor,
+        anchor: RucamAnchor,
     ) -> str:
         classification = (pattern_score.classification or "indeterminate").strip().lower()
         if classification == "mixed":
@@ -227,7 +216,7 @@ class RucamScoreEstimator:
         lab_timeline: PatientLabTimeline,
         onset_context: LiverInjuryOnsetContext | None,
         injury_type: str,
-        anchor: _Anchor,
+        anchor: RucamAnchor,
         resolved_item: dict[str, Any],
     ) -> DrugRucamAssessment:
         limitations: list[str] = []
@@ -305,7 +294,7 @@ class RucamScoreEstimator:
         payload: PatientData,
         drug: DrugEntry,
         onset_context: LiverInjuryOnsetContext | None,
-        anchor: _Anchor,
+        anchor: RucamAnchor,
         injury_type: str,
     ) -> tuple[RucamComponentAssessment, date | None]:
         start_date = self.try_parse_date(drug.therapy_start_date)

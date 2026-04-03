@@ -1,31 +1,18 @@
 from __future__ import annotations
 
-from dataclasses import dataclass
 from datetime import datetime
 from typing import Literal
 
 from sqlalchemy.orm import Session, sessionmaker
 
-from DILIGENT.server.configurations import LLMRuntimeConfig
+from DILIGENT.server.configurations.runtime_state import LLMRuntimeConfig
+from DILIGENT.server.domain.model_configs import ModelConfigSnapshot
 from DILIGENT.server.repositories.queries.data import DataRepositoryQueries
 from DILIGENT.server.repositories.queries.model_config import ModelConfigRepositoryQueries
 from DILIGENT.server.repositories.schemas.models import ModelSelection, RuntimeSetting
 
 ModelRoleType = Literal["clinical", "text_extraction", "cloud"]
 UNSET = object()
-
-
-###############################################################################
-@dataclass(frozen=True)
-class ModelConfigSnapshot:
-    clinical_model: str | None
-    text_extraction_model: str | None
-    use_cloud_models: bool
-    cloud_provider: str | None
-    cloud_model: str | None
-    ollama_temperature: float
-    cloud_temperature: float
-    updated_at: datetime | None
 
 
 ###############################################################################

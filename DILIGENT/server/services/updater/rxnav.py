@@ -7,29 +7,30 @@ import os
 import re
 import time
 import unicodedata
-from dataclasses import dataclass
 from typing import Any
-from collections.abc import Callable, Iterator
+from collections.abc import Awaitable, Callable, Iterator
 
 import httpx
 import pandas as pd
 
-from DILIGENT.server.configurations import server_settings
+from DILIGENT.server.configurations.bootstrap import server_settings
 from DILIGENT.server.common.utils.logger import logger
 from DILIGENT.server.common.constants import (
     RXNAV_CURATED_ALIASES_PATH,
     RXNAV_SYNONYM_STOPWORDS,
 )
+from DILIGENT.server.domain.rxnav import RxNormCandidate
 from DILIGENT.server.repositories.serialization.data import DataSerializer
 from DILIGENT.server.services.text.normalization import normalize_drug_name
 
 
-
 ###############################################################################
-@dataclass(slots=True)
-class RxNormCandidate:
-    value: str
-    kind: str
+async def run_with_semaphore(
+    semaphore: asyncio.Semaphore,
+    task_factory: Callable[[], Awaitable[Any]],
+):
+    async with semaphore:
+        return await task_factory()
 
 
 ###############################################################################
@@ -1018,10 +1019,6 @@ class RxNavDrugCatalogBuilder:
         semaphore = asyncio.Semaphore(concurrency_limit)
         chunk_size = max(concurrency_limit * 4, concurrency_limit)
 
-        async def run_with_semaphore(task_factory):
-            async with semaphore:
-                return await task_factory()
-
         async with httpx.AsyncClient(
             timeout=self.rx_client.timeout,
             limits=self.rx_client._build_limits(),
@@ -1032,6 +1029,7 @@ class RxNavDrugCatalogBuilder:
                 tasks = {
                     cache_key: asyncio.create_task(
                         run_with_semaphore(
+                            semaphore,
                             lambda query=query: self.rx_client.fetch_drug_terms_async(
                                 query, client=client
                             )
@@ -1056,6 +1054,7 @@ class RxNavDrugCatalogBuilder:
                 tasks = {
                     identifier: asyncio.create_task(
                         run_with_semaphore(
+                            semaphore,
                             lambda identifier=identifier: self.rx_client.fetch_rxcui_synonyms_async(
                                 identifier, client=client
                             )
