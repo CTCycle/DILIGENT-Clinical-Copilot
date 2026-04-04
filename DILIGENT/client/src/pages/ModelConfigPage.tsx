@@ -459,8 +459,7 @@ export function ModelConfigPage(): React.JSX.Element {
 
     return (
         <main className="page-container model-config-page">
-            <header className="page-header">
-                <h1>Model Configurations</h1>
+            <header className="page-header model-config-header-compact">
                 <p className="lede">Adjust runtime preferences for DILI analysis.</p>
             </header>
 
@@ -664,7 +663,7 @@ export function ModelConfigPage(): React.JSX.Element {
                             <h2 className="modal-section-title">Cloud Model Configuration</h2>
                             <div className="model-config-cloud-layout">
                                 <div className="model-config-cloud-controls">
-                                    <div className="model-config-provider-list">
+                                    <div className="model-config-provider-list model-config-provider-list-narrow">
                                         {cloudProviderOptions.map((provider) => (
                                             <ProviderAccessCard
                                                 key={provider}
@@ -679,7 +678,7 @@ export function ModelConfigPage(): React.JSX.Element {
                                         ))}
                                     </div>
 
-                                    <div className="field model-config-cloud-model-field">
+                                    <div className="field model-config-cloud-model-field model-config-cloud-model-field-narrow">
                                         <label className="field-label" htmlFor="cloud-model-select">Cloud Model</label>
                                         <select
                                             id="cloud-model-select"
@@ -705,68 +704,77 @@ export function ModelConfigPage(): React.JSX.Element {
 
                     <section className={`model-config-extra-row ${extraControlsDisabled ? "is-disabled" : ""}`} aria-disabled={extraControlsDisabled}>
                         <h2 className="modal-section-title">Extra Parameters (Search and RAG)</h2>
-                        <div className="model-config-extra-stack">
-                            <ProviderAccessCard
-                                variant="compact"
-                                label={PROVIDER_LABELS.tavily}
-                                hint="Research API key"
-                                disabled={extraControlsDisabled}
-                                onManageKeys={() => setOpenProviderModal("tavily")}
-                                manageKeyAriaLabel="Manage Tavily access keys"
-                            />
-
-                            <label className="field checkbox">
-                                <input
-                                    type="checkbox"
-                                    checked={settings.reasoning}
-                                    onChange={(e) => { void handleReasoningChange(e.target.checked); }}
+                        <div className="model-config-extra-columns">
+                            <div className="model-config-extra-left">
+                                <ProviderAccessCard
+                                    variant="compact"
+                                    label={PROVIDER_LABELS.tavily}
+                                    hint="Research API key"
                                     disabled={extraControlsDisabled}
-                                />
-                                <span className="field-label">Enable SDL/Reasoning</span>
-                            </label>
-                            <div className="field">
-                                <label className="field-label" htmlFor="ollama-temperature-input">Ollama temperature</label>
-                                <input
-                                    id="ollama-temperature-input"
-                                    type="number"
-                                    min={0}
-                                    max={2}
-                                    step={0.01}
-                                    value={draftConfig.ollamaTemperature}
-                                    onChange={(event) => {
-                                        const value = Number.parseFloat(event.target.value);
-                                        if (!Number.isFinite(value)) {
-                                            return;
-                                        }
-                                        setDraftConfig((previous) => ({
-                                            ...previous,
-                                            ollamaTemperature: Math.max(0, Math.min(2, value)),
-                                        }));
-                                    }}
-                                    disabled={extraControlsDisabled}
+                                    onManageKeys={() => setOpenProviderModal("tavily")}
+                                    manageKeyAriaLabel="Manage Tavily access keys"
                                 />
                             </div>
-                            <div className="field">
-                                <label className="field-label" htmlFor="cloud-temperature-input">Cloud temperature</label>
-                                <input
-                                    id="cloud-temperature-input"
-                                    type="number"
-                                    min={0}
-                                    max={2}
-                                    step={0.01}
-                                    value={draftConfig.cloudTemperature}
-                                    onChange={(event) => {
-                                        const value = Number.parseFloat(event.target.value);
-                                        if (!Number.isFinite(value)) {
-                                            return;
-                                        }
-                                        setDraftConfig((previous) => ({
-                                            ...previous,
-                                            cloudTemperature: Math.max(0, Math.min(2, value)),
-                                        }));
-                                    }}
-                                    disabled={extraControlsDisabled}
-                                />
+                            <div className="model-config-extra-right">
+                                <div className="model-config-extra-panel">
+                                    <p className="model-config-extra-panel-title">Model Configuration</p>
+                                    <label className="field checkbox">
+                                        <input
+                                            type="checkbox"
+                                            checked={settings.reasoning}
+                                            onChange={(e) => { void handleReasoningChange(e.target.checked); }}
+                                            disabled={extraControlsDisabled}
+                                        />
+                                        <span className="field-label">Enable SDL/Reasoning</span>
+                                    </label>
+                                </div>
+                                <div className="model-config-extra-panel">
+                                    <p className="model-config-extra-panel-title">RAG Configuration</p>
+                                    <div className="field">
+                                        <label className="field-label" htmlFor="ollama-temperature-input">Ollama temperature</label>
+                                        <input
+                                            id="ollama-temperature-input"
+                                            type="number"
+                                            min={0}
+                                            max={2}
+                                            step={0.01}
+                                            value={draftConfig.ollamaTemperature}
+                                            onChange={(event) => {
+                                                const value = Number.parseFloat(event.target.value);
+                                                if (!Number.isFinite(value)) {
+                                                    return;
+                                                }
+                                                setDraftConfig((previous) => ({
+                                                    ...previous,
+                                                    ollamaTemperature: Math.max(0, Math.min(2, value)),
+                                                }));
+                                            }}
+                                            disabled={extraControlsDisabled}
+                                        />
+                                    </div>
+                                    <div className="field">
+                                        <label className="field-label" htmlFor="cloud-temperature-input">Cloud temperature</label>
+                                        <input
+                                            id="cloud-temperature-input"
+                                            type="number"
+                                            min={0}
+                                            max={2}
+                                            step={0.01}
+                                            value={draftConfig.cloudTemperature}
+                                            onChange={(event) => {
+                                                const value = Number.parseFloat(event.target.value);
+                                                if (!Number.isFinite(value)) {
+                                                    return;
+                                                }
+                                                setDraftConfig((previous) => ({
+                                                    ...previous,
+                                                    cloudTemperature: Math.max(0, Math.min(2, value)),
+                                                }));
+                                            }}
+                                            disabled={extraControlsDisabled}
+                                        />
+                                    </div>
+                                </div>
                             </div>
                         </div>
                     </section>

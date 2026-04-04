@@ -4,34 +4,6 @@ import { PageId, useAppState } from "../context/AppStateContext";
 // ---------------------------------------------------------------------------
 // Icon Components
 // ---------------------------------------------------------------------------
-const DiligentLogo = () => (
-    <svg
-        viewBox="0 0 120 36"
-        role="img"
-        aria-labelledby="diligent-logo-title"
-    >
-        <title id="diligent-logo-title">Application logo</title>
-        <defs>
-            <linearGradient id="diligent-mark-gradient" x1="0%" y1="0%" x2="100%" y2="100%">
-                <stop offset="0%" stopColor="#1f9d76" />
-                <stop offset="100%" stopColor="#14945f" />
-            </linearGradient>
-        </defs>
-        <rect x="2" y="2" width="32" height="32" rx="9" fill="url(#diligent-mark-gradient)" />
-        <rect x="2" y="2" width="32" height="32" rx="9" fill="none" stroke="rgba(15, 23, 42, 0.08)" />
-        <path
-            d="M10 26V10h6.5c6 0 9.5 3.1 9.5 8s-3.5 8-9.5 8H10zm5-4h1.2c3.2 0 5-1.3 5-4s-1.8-4-5-4H15v8z"
-            fill="#effcf6"
-        />
-        <text x="42" y="16" fill="currentColor" fontSize="10.2" fontWeight="800" letterSpacing="0.13em">
-            DILIGENT
-        </text>
-        <text x="42" y="27" fill="currentColor" fillOpacity="0.74" fontSize="7.4" fontWeight="600" letterSpacing="0.09em">
-            CLINICAL COPILOT
-        </text>
-    </svg>
-);
-
 const AgentIcon = () => (
     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
         <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z" />
@@ -102,8 +74,9 @@ export function NavTabs({ onNavigate }: NavTabsProps): React.JSX.Element {
                 <div className="app-header-content">
                     <div className="app-header-brand">
                         <span className="app-header-logo">
-                            <DiligentLogo />
+                            <img src="/diligent-logo.png" alt="Diligent logo" />
                         </span>
+                        <span className="app-header-wordmark">Diligent</span>
                     </div>
                     <nav className="tab-bar" aria-label="Main navigation">
                         <div className="tab-items">
@@ -138,7 +111,6 @@ export function NavTabs({ onNavigate }: NavTabsProps): React.JSX.Element {
                                 <path d="M21 12.79A9 9 0 1 1 11.21 3c0 .28-.01.56-.01.84a8 8 0 0 0 9.8 7.95z" />
                             </svg>
                         </button>
-                        <span className="app-header-avatar" aria-hidden="true">DR</span>
                     </div>
                 </div>
             </header>
