@@ -51,6 +51,32 @@ const DownloadIcon = () => (
     </svg>
 );
 
+const ClinicalInputIcon = ({ kind }: { kind: "anamnesis" | "drugs" | "labs" }) => {
+    if (kind === "anamnesis") {
+        return (
+            <svg viewBox="0 0 24 24" aria-hidden="true">
+                <path d="M6 4h9l3 3v13H6z" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" />
+                <path d="M15 4v3h3" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" />
+                <path d="M9 12h6M9 16h6" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" />
+            </svg>
+        );
+    }
+    if (kind === "drugs") {
+        return (
+            <svg viewBox="0 0 24 24" aria-hidden="true">
+                <rect x="4" y="8" width="16" height="8" rx="4" fill="none" stroke="currentColor" strokeWidth="1.8" />
+                <path d="M12 8v8" fill="none" stroke="currentColor" strokeWidth="1.8" />
+            </svg>
+        );
+    }
+    return (
+        <svg viewBox="0 0 24 24" aria-hidden="true">
+            <path d="M6 4h8l4 4v12H6z" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" />
+            <path d="M14 4v4h4M9 13h6M9 17h4" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" />
+        </svg>
+    );
+};
+
 function isTerminalJobStatus(status: JobStatus | null): boolean {
     return status === "completed" || status === "failed" || status === "cancelled";
 }
@@ -377,20 +403,12 @@ export function DiliAgentPage(): React.JSX.Element {
     })();
     return (
         <main className="page-container stitch-dili-page">
-            <header className="stitch-dili-heading">
-                <h1>DILI Clinical Assessment</h1>
-                <p>Patient Intake and Context</p>
-            </header>
-
             <div className="stitch-dili-grid">
                 <div className="stitch-dili-main">
                     <section className="stitch-dili-card">
-                        <div className="stitch-dili-card-title">
-                            <h2>Clinical Inputs</h2>
-                        </div>
                         <div className="stitch-dili-input-stack">
                             <div className="stitch-dili-input-group">
-                                <h3>Anamnesis</h3>
+                                <h3><ClinicalInputIcon kind="anamnesis" /><span>Anamnesis</span></h3>
                                 <textarea
                                     id="anamnesis"
                                     placeholder="Describe patient history, symptoms onset, and clinical observations..."
@@ -400,7 +418,7 @@ export function DiliAgentPage(): React.JSX.Element {
                             </div>
 
                             <div className="stitch-dili-input-group">
-                                <h3>Current Drugs</h3>
+                                <h3><ClinicalInputIcon kind="drugs" /><span>Current Drugs</span></h3>
                                 <textarea
                                     id="drugs"
                                     placeholder="List medications, dosages, frequency, and duration of use..."
@@ -410,7 +428,7 @@ export function DiliAgentPage(): React.JSX.Element {
                             </div>
 
                             <div className="stitch-dili-input-group">
-                                <h3>Laboratory Analysis</h3>
+                                <h3><ClinicalInputIcon kind="labs" /><span>Laboratory Analysis</span></h3>
                                 <textarea
                                     id="laboratory-analysis"
                                     placeholder="Input raw lab results (ALT, AST, ALP, Bilirubin, etc.)..."

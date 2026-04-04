@@ -191,6 +191,14 @@ function CloseIcon(): React.JSX.Element {
   );
 }
 
+function ExpandViewIcon(): React.JSX.Element {
+  return (
+    <svg className="inspection-icon" viewBox="0 0 24 24" aria-hidden="true">
+      <path d="M15 4h5v5M9 20H4v-5M20 4l-7 7M4 20l7-7" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" />
+    </svg>
+  );
+}
+
 export function DataInspectionPage(): React.JSX.Element {
   const [sessionItems, setSessionItems] = useState<InspectionSessionItem[]>([]);
   const [sessionTotal, setSessionTotal] = useState(0);
@@ -484,27 +492,25 @@ export function DataInspectionPage(): React.JSX.Element {
   const renderSessionsView = (): React.JSX.Element => (
     <section className="inspection-view-content">
       <div className="inspection-widget">
-        <div className="inspection-widget-header inspection-widget-header-controls-only">
-          <div className="inspection-controls inspection-controls-sessions">
-            <div className="inspection-controls-sessions-main">
-              <input type="search" className="inspection-search" placeholder="Search sessions..." value={sessionSearchInput} onChange={(event) => setSessionSearchInput(event.target.value)} aria-label="Search sessions" />
-              <div className="inspection-toggle-group">
-                {(["all", "successful", "failed"] as const).map((value) => (
-                  <button key={value} type="button" className={`inspection-toggle-pill ${sessionStatusFilter === value ? "is-active" : ""}`} onClick={() => setSessionStatusFilter(value)}>
-                    {sessionFilterLabel(value)}
-                  </button>
-                ))}
-              </div>
-              <select className="inspection-select" value={sessionDateMode} onChange={(event) => setSessionDateMode(event.target.value as InspectionDateFilterMode | "none")} aria-label="Date filter mode">
-                <option value="none">Date filter</option>
-                <option value="before">Before</option>
-                <option value="after">After</option>
-                <option value="exact">Exact</option>
-              </select>
+        <div className="inspection-widget-header inspection-widget-header-split">
+          <div className="inspection-controls inspection-controls-half">
+            <input type="search" className="inspection-search" placeholder="Search sessions..." value={sessionSearchInput} onChange={(event) => setSessionSearchInput(event.target.value)} aria-label="Search sessions" />
+          </div>
+          <div className="inspection-widget-header-actions inspection-header-actions-fixed">
+            <div className="inspection-toggle-group">
+              {(["all", "successful", "failed"] as const).map((value) => (
+                <button key={value} type="button" className={`inspection-toggle-pill ${sessionStatusFilter === value ? "is-active" : ""}`} onClick={() => setSessionStatusFilter(value)}>
+                  {sessionFilterLabel(value)}
+                </button>
+              ))}
             </div>
-            <div className="inspection-controls-sessions-date">
-              <input type="date" className="inspection-date" value={sessionDate} onChange={(event) => setSessionDate(event.target.value)} disabled={sessionDateMode === "none"} aria-label="Session date filter" />
-            </div>
+            <select className="inspection-select" value={sessionDateMode} onChange={(event) => setSessionDateMode(event.target.value as InspectionDateFilterMode | "none")} aria-label="Date filter mode">
+              <option value="none">Date filter</option>
+              <option value="before">Before</option>
+              <option value="after">After</option>
+              <option value="exact">Exact</option>
+            </select>
+            <input type="date" className="inspection-date" value={sessionDate} onChange={(event) => setSessionDate(event.target.value)} disabled={sessionDateMode === "none"} aria-label="Session date filter" />
           </div>
         </div>
         <div className="inspection-scroll-frame">
@@ -540,10 +546,10 @@ export function DataInspectionPage(): React.JSX.Element {
     <section className="inspection-view-content">
       <div className="inspection-widget">
         <div className="inspection-widget-header">
-          <div className="inspection-controls inspection-controls-knowledge">
+          <div className="inspection-controls inspection-controls-half inspection-controls-knowledge">
             <input type="search" className="inspection-search" placeholder="Search RxNav..." value={rxnavSearchInput} onChange={(event) => setRxnavSearchInput(event.target.value)} aria-label="Search RxNav data" />
           </div>
-          <div className="inspection-widget-header-actions">
+          <div className="inspection-widget-header-actions inspection-header-actions-fixed">
             <button type="button" className="btn btn-secondary inspection-mini-btn" onClick={() => setActiveUpdateTarget("rxnav")}>
               {rxnavJob.running ? "View Progress" : "Update Catalog"}
             </button>
@@ -579,10 +585,10 @@ export function DataInspectionPage(): React.JSX.Element {
     <section className="inspection-view-content">
       <div className="inspection-widget">
         <div className="inspection-widget-header">
-          <div className="inspection-controls inspection-controls-knowledge">
+          <div className="inspection-controls inspection-controls-half inspection-controls-knowledge">
             <input type="search" className="inspection-search" placeholder="Search LiverTox..." value={livertoxSearchInput} onChange={(event) => setLivertoxSearchInput(event.target.value)} aria-label="Search LiverTox data" />
           </div>
-          <div className="inspection-widget-header-actions">
+          <div className="inspection-widget-header-actions inspection-header-actions-fixed">
             <button type="button" className="btn btn-secondary inspection-mini-btn" onClick={() => setActiveUpdateTarget("livertox")}>
               {livertoxJob.running ? "View Progress" : "Update Base"}
             </button>
@@ -626,7 +632,7 @@ export function DataInspectionPage(): React.JSX.Element {
     <section className="inspection-view-content">
       <div className="inspection-widget">
         <div className="inspection-widget-header">
-          <div className="inspection-controls inspection-controls-knowledge">
+          <div className="inspection-controls inspection-controls-half inspection-controls-knowledge">
             <input
               type="search"
               className="inspection-search"
@@ -636,13 +642,13 @@ export function DataInspectionPage(): React.JSX.Element {
               aria-label="Search RAG documents"
             />
           </div>
-          <div className="inspection-widget-header-actions">
+          <div className="inspection-widget-header-actions inspection-header-actions-fixed">
             <button type="button" className="btn btn-secondary inspection-mini-btn" onClick={() => setActiveUpdateTarget("rag")} disabled={ragJob.running}>
               Update Embeddings
             </button>
           </div>
         </div>
-        <div className="inspection-scroll-frame inspection-scroll-frame-compact">
+        <div className="inspection-scroll-frame inspection-scroll-frame-compact inspection-rag-second-view">
           <table className="inspection-table inspection-table-dense">
             <thead>
               <tr>
@@ -706,7 +712,7 @@ export function DataInspectionPage(): React.JSX.Element {
         isPageScrollMode ? "is-page-scroll" : "is-contained-scroll"
       }`}
     >
-      <header className="page-header"><p className="eyebrow">Data Inspection</p><h1>Session and Knowledge Catalog</h1><p className="lede">Review recorded DILI sessions alongside RxNav and LiverTox knowledge records.</p></header>
+      <header className="page-header inspection-page-intro"><p className="lede">Browse recorded sessions, curated drug knowledge, and RAG indexing details in one unified inspection workspace.</p></header>
       <section className="inspection-layout">
         <aside className="inspection-toolbar" aria-label="Data inspection views">
           <p className="inspection-toolbar-eyebrow">Views</p>
@@ -783,11 +789,13 @@ export function DataInspectionPage(): React.JSX.Element {
             </div>
             <button
               type="button"
-              className="btn btn-secondary inspection-mini-btn inspection-scroll-mode-btn"
+              className="btn btn-secondary inspection-mini-btn inspection-scroll-mode-btn inspection-scroll-icon-btn"
               onClick={() => setViewScrollMode((mode) => (mode === "contained" ? "page" : "contained"))}
               aria-pressed={isPageScrollMode}
+              aria-label={isPageScrollMode ? "Use contained view scroll" : "Expand view"}
+              title={isPageScrollMode ? "Use contained view scroll" : "Expand view"}
             >
-              {isPageScrollMode ? "Use View Scroll" : "Expand View"}
+              <ExpandViewIcon />
             </button>
           </div>
           <div className="inspection-view-stage">
