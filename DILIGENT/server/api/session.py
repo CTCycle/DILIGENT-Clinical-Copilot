@@ -472,7 +472,7 @@ async def execute_clinical_job(
             result = await endpoint.process_single_patient(
                 payload,
                 progress_callback=progress_callback,
-                stop_check=ensure_not_cancelled,
+                stop_check=lambda: ensure_clinical_job_not_cancelled(job_id),
             )
         except ClinicalJobCancelled:
             job_manager.update_result(

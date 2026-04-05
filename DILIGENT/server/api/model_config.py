@@ -306,8 +306,8 @@ class ModelConfigEndpoint:
             )
             updates["clinical_model"] = clinical_model
 
-        if "parsing_model" in fields_set:
-            text_extraction_model = self.normalize_optional_text(payload.parsing_model)
+        if "text_extraction_model" in fields_set:
+            text_extraction_model = self.normalize_optional_text(payload.text_extraction_model)
             self.validate_local_selection(
                 role_name="text_extraction",
                 model_name=text_extraction_model,
@@ -534,7 +534,7 @@ class ModelConfigEndpoint:
             llm_provider=provider,
             cloud_model=cloud_model,
             clinical_model=snapshot.clinical_model,
-            parsing_model=snapshot.text_extraction_model,
+            text_extraction_model=snapshot.text_extraction_model,
             ollama_temperature=LLMRuntimeConfig.get_ollama_temperature(),
             cloud_temperature=LLMRuntimeConfig.get_cloud_temperature(),
             ollama_reasoning=LLMRuntimeConfig.is_ollama_reasoning_enabled(),
