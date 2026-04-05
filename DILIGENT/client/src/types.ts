@@ -77,7 +77,7 @@ export type ClinicalRequestPayload = {
   use_cloud_services?: boolean;
   llm_provider?: CloudProvider | null;
   cloud_model?: string | null;
-  parsing_model?: string;
+  text_extraction_model?: string;
   clinical_model?: string;
   ollama_temperature?: number;
   cloud_temperature?: number;

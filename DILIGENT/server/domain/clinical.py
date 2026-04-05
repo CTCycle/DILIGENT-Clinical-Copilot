@@ -6,7 +6,7 @@ import math
 import re
 from typing import Any, Literal
 
-from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
+from pydantic import AliasChoices, BaseModel, ConfigDict, Field, field_validator, model_validator
 
 Comparator = Literal["<=", "<", ">=", ">"]
 CONTROL_CHARACTERS_RE = re.compile(r"[\x00-\x08\x0B\x0C\x0E-\x1F\x7F]")
@@ -183,7 +183,11 @@ class ClinicalSessionRequest(BaseModel):
     use_cloud_services: bool | None = None
     llm_provider: str | None = Field(default=None, max_length=32)
     cloud_model: str | None = Field(default=None, max_length=200)
-    parsing_model: str | None = Field(default=None, max_length=200)
+    text_extraction_model: str | None = Field(
+        default=None,
+        max_length=200,
+        validation_alias=AliasChoices("text_extraction_model", "parsing_model"),
+    )
     clinical_model: str | None = Field(default=None, max_length=200)
     ollama_temperature: float | None = None
     cloud_temperature: float | None = None
@@ -197,7 +201,7 @@ class ClinicalSessionRequest(BaseModel):
         "laboratory_analysis",
         "llm_provider",
         "cloud_model",
-        "parsing_model",
+        "text_extraction_model",
         "clinical_model",
         mode="before",
     )
@@ -221,7 +225,7 @@ class ClinicalSessionRequest(BaseModel):
         return normalized
 
     # -------------------------------------------------------------------------
-    @field_validator("cloud_model", "parsing_model", "clinical_model")
+    @field_validator("cloud_model", "text_extraction_model", "clinical_model")
     @classmethod
     def validate_model_name(cls, value: str | None) -> str | None:
         if value is None:
@@ -232,6 +236,10 @@ class ClinicalSessionRequest(BaseModel):
         if not SAFE_MODEL_NAME_RE.fullmatch(normalized):
             raise ValueError("Invalid model name")
         return normalized
+
+    @property
+    def parsing_model(self) -> str | None:
+        return self.text_extraction_model
 
     # -------------------------------------------------------------------------
     @field_validator("ollama_temperature")

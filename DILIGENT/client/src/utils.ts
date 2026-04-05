@@ -98,7 +98,7 @@ export function buildClinicalPayload(
     use_cloud_services: settings.useCloudServices,
     llm_provider: settings.provider,
     cloud_model: settings.cloudModel,
-    parsing_model: settings.parsingModel,
+    text_extraction_model: settings.parsingModel,
     clinical_model: settings.clinicalModel,
     ollama_temperature: settings.ollamaTemperature,
     cloud_temperature: settings.cloudTemperature,

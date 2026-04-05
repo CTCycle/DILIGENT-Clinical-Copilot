@@ -3,7 +3,7 @@ from __future__ import annotations
 from dataclasses import dataclass
 from datetime import datetime
 
-from pydantic import BaseModel, ConfigDict, Field
+from pydantic import AliasChoices, BaseModel, ConfigDict, Field
 
 
 @dataclass(frozen=True)
@@ -30,7 +30,10 @@ class ModelConfigUpdateRequest(BaseModel):
     use_cloud_services: bool | None = None
     llm_provider: str | None = None
     cloud_model: str | None = None
-    parsing_model: str | None = None
+    text_extraction_model: str | None = Field(
+        default=None,
+        validation_alias=AliasChoices("text_extraction_model", "parsing_model"),
+    )
     clinical_model: str | None = None
     ollama_temperature: float | None = None
     cloud_temperature: float | None = None
@@ -43,7 +46,7 @@ class ModelConfigStateResponse(BaseModel):
     use_cloud_services: bool
     llm_provider: str
     cloud_model: str | None
-    parsing_model: str | None
+    text_extraction_model: str | None
     clinical_model: str | None
     ollama_temperature: float = Field(ge=0.0, le=2.0)
     cloud_temperature: float = Field(ge=0.0, le=2.0)
