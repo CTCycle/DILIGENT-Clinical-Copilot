@@ -15,17 +15,12 @@ DILIGENT is configuration-first and uses one active runtime file: `DILIGENT/sett
 
 Runtime profiles:
 - `DILIGENT/settings/.env.local.example`
-- `DILIGENT/settings/.env.cloud.example`
 - `DILIGENT/settings/.env.local.tauri.example`
 - Active runtime file: `DILIGENT/settings/.env`
 
 Exact mode switch procedure:
 ```cmd
 copy /Y DILIGENT\settings\.env.local.example DILIGENT\settings\.env
-```
-or
-```cmd
-copy /Y DILIGENT\settings\.env.cloud.example DILIGENT\settings\.env
 ```
 or
 ```cmd
@@ -71,10 +66,7 @@ npm run preview -- --host 127.0.0.1 --port 7861
 ```
 
 ## 4. Cloud-Hardened API Mode
-Activate cloud profile:
-```cmd
-copy /Y DILIGENT\settings\.env.cloud.example DILIGENT\settings\.env
-```
+Enable cloud mode by setting `DILIGENT_CLOUD_MODE=true` in `DILIGENT/settings/.env`.
 
 This profile enables backend cloud-hardening behavior (for example restricting docs and mirrored routes). Deployment topology is owned externally (for example VM, PaaS, or reverse proxy), and this repository no longer ships bundled container artifacts.
 
@@ -165,8 +157,11 @@ Runtime values are read from `DILIGENT/settings/.env`.
 | `DB_SSL`, `DB_SSL_CA` | External DB TLS settings. |
 | `DB_CONNECT_TIMEOUT`, `DB_INSERT_BATCH_SIZE` | DB runtime tuning settings. |
 | `OPTIONAL_DEPENDENCIES` | Enables optional launcher dependency installation path. |
-| `MPLBACKEND`, `KERAS_BACKEND` | Runtime plotting/ML backend settings. |
-| `OPENAI_API_KEY`, `GEMINI_API_KEY` | Cloud provider API keys. |
+
+Provider key handling:
+- Provider API keys are entered in-app (`/model-config`) and stored encrypted in the DB.
+- DB initialization also seeds the encryption-key registry used for provider key encryption/decryption.
+- Key material is versioned in DB and linked from each stored provider key row.
 
 ## 9. Setup and Maintenance
 Run `DILIGENT/setup_and_maintenance.bat` for offline maintenance operations only:

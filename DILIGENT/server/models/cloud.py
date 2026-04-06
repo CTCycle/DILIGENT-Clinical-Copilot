@@ -11,9 +11,6 @@ from DILIGENT.server.configurations.bootstrap import server_settings
 from DILIGENT.server.configurations.runtime_state import LLMRuntimeConfig
 from DILIGENT.server.models.structured import StructuredOutputParser, parse_json_dict, T
 from DILIGENT.server.repositories.serialization.access_keys import AccessKeySerializer
-from DILIGENT.server.services.cryptography import (
-    decrypt as decrypt_access_key,
-)
 
 ProviderName = Literal["openai", "azure-openai", "anthropic", "gemini"]
 
@@ -96,7 +93,7 @@ class CloudLLMClient:
         if row is None:
             return None
         try:
-            return decrypt_access_key(row.encrypted_value)
+            return access_key_serializer.decrypt_key_row(row)
         except Exception as exc:  # noqa: BLE001
             provider_label = "OpenAI" if provider == "openai" else "Gemini"
             raise LLMError(f"Failed to decrypt active {provider_label} access key") from exc

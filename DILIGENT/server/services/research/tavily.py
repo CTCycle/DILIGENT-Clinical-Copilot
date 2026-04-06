@@ -20,7 +20,6 @@ from DILIGENT.server.domain.research import (
 from DILIGENT.server.domain.research_extra import TavilySearchOutcome
 from DILIGENT.server.models.providers import initialize_llm_client
 from DILIGENT.server.repositories.serialization.access_keys import AccessKeySerializer
-from DILIGENT.server.services.cryptography import decrypt as decrypt_access_key
 
 
 TAVILY_SEARCH_URL = "https://api.tavily.com/search"
@@ -80,15 +79,13 @@ class TavilyResearchService:
                 mark_used=mark_used,
             )
         except Exception as exc:  # noqa: BLE001
-            logger.warning("Unable to load active Tavily access key: %s", exc)
-            return None
+            raise RuntimeError("Failed to load active Tavily access key") from exc
         if active_key is None:
             return None
         try:
-            return decrypt_access_key(active_key.encrypted_value)
+            return self.access_key_serializer.decrypt_key_row(active_key)
         except Exception as exc:  # noqa: BLE001
-            logger.warning("Unable to decrypt active Tavily access key: %s", exc)
-            return None
+            raise RuntimeError("Failed to decrypt active Tavily access key") from exc
 
     # -------------------------------------------------------------------------
     def normalize_question(self, question: str) -> str:

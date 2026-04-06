@@ -372,12 +372,66 @@ class RuntimeSetting(Base):
 
 
 ###############################################################################
+class AccessKeyEncryptionMaterial(Base):
+    __tablename__ = "access_key_encryption_materials"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
+    key_purpose: Mapped[str] = mapped_column(String, nullable=False)
+    key_version: Mapped[int] = mapped_column(Integer, nullable=False)
+    key_material: Mapped[str] = mapped_column(Text, nullable=False)
+    is_active: Mapped[bool] = mapped_column(
+        Boolean,
+        nullable=False,
+        server_default=text("false"),
+    )
+    seeded_at: Mapped[datetime] = mapped_column(DateTime, nullable=False)
+    activated_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
+    deactivated_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime,
+        nullable=False,
+        server_default=text("CURRENT_TIMESTAMP"),
+    )
+    updated_at: Mapped[datetime] = mapped_column(
+        DateTime,
+        nullable=False,
+        server_default=text("CURRENT_TIMESTAMP"),
+        server_onupdate=text("CURRENT_TIMESTAMP"),
+    )
+
+    __table_args__ = (
+        CheckConstraint(
+            "key_purpose IN ('provider_access_keys')",
+            name="ck_access_key_encryption_materials_key_purpose",
+        ),
+        UniqueConstraint(
+            "key_purpose",
+            "key_version",
+            name="uq_access_key_encryption_materials_purpose_version",
+        ),
+        Index(
+            "uq_access_key_encryption_materials_active_purpose",
+            "key_purpose",
+            unique=True,
+            sqlite_where=text("is_active = 1"),
+            postgresql_where=text("is_active = true"),
+        ),
+        Index(
+            "ix_access_key_encryption_materials_purpose_version",
+            "key_purpose",
+            "key_version",
+        ),
+    )
+
+
+###############################################################################
 class AccessKey(Base):
     __tablename__ = "access_keys"
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
     provider: Mapped[str] = mapped_column(String, nullable=False)
     encrypted_value: Mapped[str] = mapped_column(Text, nullable=False)
+    encryption_key_version: Mapped[int] = mapped_column(Integer, nullable=False)
     fingerprint: Mapped[str] = mapped_column(String, nullable=False)
     is_active: Mapped[bool] = mapped_column(
         Boolean,
@@ -424,6 +478,7 @@ class ResearchAccessKey(Base):
         server_default=text("'tavily'"),
     )
     encrypted_value: Mapped[str] = mapped_column(Text, nullable=False)
+    encryption_key_version: Mapped[int] = mapped_column(Integer, nullable=False)
     fingerprint: Mapped[str] = mapped_column(String, nullable=False)
     is_active: Mapped[bool] = mapped_column(
         Boolean,

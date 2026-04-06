@@ -140,7 +140,7 @@ def test_job_manager_reports_timeout_message() -> None:
 # -----------------------------------------------------------------------------
 def test_access_key_endpoint_sanitizes_dependency_failure(monkeypatch) -> None:
     def fake_create_key(provider: str, access_key: str):
-        raise RuntimeError("ACCESS_KEY_ENCRYPTION_KEY missing token=abc123")
+        raise RuntimeError("encryption material registry unavailable token=abc123")
 
     monkeypatch.setattr(access_keys_api.serializer, "create_key", fake_create_key)
 
