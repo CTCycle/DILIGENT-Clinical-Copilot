@@ -31,6 +31,7 @@ import { InspectionIconActionButton } from "../components/InspectionIconActionBu
 import { InspectionUpdateWizard } from "../components/InspectionUpdateWizard";
 import { useDebouncedValue } from "../hooks/useDebouncedValue";
 import { useInspectionUpdateJob } from "../hooks/useInspectionUpdateJob";
+import { useResetOffsetOnChange } from "../hooks/useResetOffsetOnChange";
 import {
   InspectionDateFilterMode,
   InspectionDrugAliasesResponse,
@@ -125,6 +126,85 @@ function resolveExcerptFallbackMessage(error: unknown): string {
     return "No LiverTox excerpt is available for this drug.";
   }
   return "Unable to load this LiverTox excerpt right now.";
+}
+
+function toRxNavOverrideRequest(
+  payload?: Record<string, unknown>,
+): InspectionRxNavOverrideRequest {
+  if (!payload) {
+    return {};
+  }
+  const next: InspectionRxNavOverrideRequest = {};
+  if (typeof payload.rxnav_request_timeout === "number") {
+    next.rxnav_request_timeout = payload.rxnav_request_timeout;
+  }
+  if (typeof payload.rxnav_max_concurrency === "number") {
+    next.rxnav_max_concurrency = payload.rxnav_max_concurrency;
+  }
+  return next;
+}
+
+function toLiverToxOverrideRequest(
+  payload?: Record<string, unknown>,
+): InspectionLiverToxOverrideRequest {
+  if (!payload) {
+    return {};
+  }
+  const next: InspectionLiverToxOverrideRequest = {};
+  if (typeof payload.livertox_monograph_max_workers === "number") {
+    next.livertox_monograph_max_workers = payload.livertox_monograph_max_workers;
+  }
+  if (typeof payload.livertox_archive === "string") {
+    next.livertox_archive = payload.livertox_archive;
+  }
+  if (typeof payload.redownload === "boolean") {
+    next.redownload = payload.redownload;
+  }
+  return next;
+}
+
+function toRagOverrideRequest(
+  payload?: Record<string, unknown>,
+): InspectionRagOverrideRequest {
+  if (!payload) {
+    return {};
+  }
+  const next: InspectionRagOverrideRequest = {};
+  const numericFields: (keyof InspectionRagOverrideRequest)[] = [
+    "chunk_size",
+    "chunk_overlap",
+    "embedding_batch_size",
+    "vector_stream_batch_size",
+    "embedding_max_workers",
+  ];
+  for (const field of numericFields) {
+    const value = payload[field];
+    if (typeof value === "number") {
+      next[field] = value;
+    }
+  }
+  if (typeof payload.embedding_backend === "string") {
+    next.embedding_backend = payload.embedding_backend;
+  }
+  if (typeof payload.ollama_embedding_model === "string") {
+    next.ollama_embedding_model = payload.ollama_embedding_model;
+  }
+  if (typeof payload.hf_embedding_model === "string") {
+    next.hf_embedding_model = payload.hf_embedding_model;
+  }
+  if (payload.cloud_provider === "openai" || payload.cloud_provider === "gemini") {
+    next.cloud_provider = payload.cloud_provider;
+  }
+  if (typeof payload.cloud_embedding_model === "string") {
+    next.cloud_embedding_model = payload.cloud_embedding_model;
+  }
+  if (typeof payload.use_cloud_embeddings === "boolean") {
+    next.use_cloud_embeddings = payload.use_cloud_embeddings;
+  }
+  if (typeof payload.reset_vector_collection === "boolean") {
+    next.reset_vector_collection = payload.reset_vector_collection;
+  }
+  return next;
 }
 
 function ViewIcon(): React.JSX.Element {
@@ -351,7 +431,7 @@ export function DataInspectionPage(): React.JSX.Element {
 
   const rxnavUpdateJob = useInspectionUpdateJob({
     startJob: (payload) =>
-      startInspectionRxNavUpdateJob((payload || {}) as InspectionRxNavOverrideRequest),
+      startInspectionRxNavUpdateJob(toRxNavOverrideRequest(payload)),
     fetchStatus: fetchInspectionRxNavUpdateJobStatus,
     cancelJob: cancelInspectionRxNavUpdateJob,
     onCompleted: loadRxnav,
@@ -363,7 +443,7 @@ export function DataInspectionPage(): React.JSX.Element {
 
   const livertoxUpdateJob = useInspectionUpdateJob({
     startJob: (payload) =>
-      startInspectionLiverToxUpdateJob((payload || {}) as InspectionLiverToxOverrideRequest),
+      startInspectionLiverToxUpdateJob(toLiverToxOverrideRequest(payload)),
     fetchStatus: fetchInspectionLiverToxUpdateJobStatus,
     cancelJob: cancelInspectionLiverToxUpdateJob,
     onCompleted: loadLivertox,
@@ -377,7 +457,7 @@ export function DataInspectionPage(): React.JSX.Element {
   const livertoxJob = livertoxUpdateJob.state;
   const ragUpdateJob = useInspectionUpdateJob({
     startJob: (payload) =>
-      startInspectionRagUpdateJob((payload || {}) as InspectionRagOverrideRequest),
+      startInspectionRagUpdateJob(toRagOverrideRequest(payload)),
     fetchStatus: fetchInspectionRagUpdateJobStatus,
     cancelJob: cancelInspectionRagUpdateJob,
     onCompleted: loadRag,
@@ -437,10 +517,10 @@ export function DataInspectionPage(): React.JSX.Element {
     }
   };
 
-  useEffect(() => setSessionOffset(0), [sessionSearch, sessionStatusFilter, sessionDateMode, sessionDate]);
-  useEffect(() => setRxnavOffset(0), [rxnavSearch]);
-  useEffect(() => setLivertoxOffset(0), [livertoxSearch]);
-  useEffect(() => setRagOffset(0), [ragSearch]);
+  useResetOffsetOnChange(setSessionOffset, [sessionSearch, sessionStatusFilter, sessionDateMode, sessionDate]);
+  useResetOffsetOnChange(setRxnavOffset, [rxnavSearch]);
+  useResetOffsetOnChange(setLivertoxOffset, [livertoxSearch]);
+  useResetOffsetOnChange(setRagOffset, [ragSearch]);
   useEffect(() => { void loadSessions(); }, [loadSessions]);
   useEffect(() => { void loadRxnav(); }, [loadRxnav]);
   useEffect(() => { void loadLivertox(); }, [loadLivertox]);

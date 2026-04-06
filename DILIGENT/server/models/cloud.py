@@ -196,19 +196,12 @@ class CloudLLMClient:
         options: dict[str, Any] | None,
     ) -> dict[str, Any] | str:
         resolved_model = model or self.default_model
-        body: dict[str, Any] = {
-            "model": resolved_model,
-            "messages": messages,
-            "stream": False,
-        }
-        if options:
-            supports_sampling = not self.is_gpt5_family_model(resolved_model)
-            if supports_sampling and "temperature" in options:
-                body["temperature"] = options["temperature"]
-            if supports_sampling and "top_p" in options:
-                body["top_p"] = options["top_p"]
-        if format == "json":
-            body["response_format"] = {"type": "json_object"}
+        body = self._build_openai_chat_body(
+            resolved_model=resolved_model,
+            messages=messages,
+            format=format,
+            options=options,
+        )
 
         try:
             resp = await self.client.post("/chat/completions", json=body)
@@ -229,6 +222,29 @@ class CloudLLMClient:
             except json.JSONDecodeError:
                 return content
         return str(content)
+
+    def _build_openai_chat_body(
+        self,
+        *,
+        resolved_model: str,
+        messages: list[dict[str, str]],
+        format: str | None,
+        options: dict[str, Any] | None,
+    ) -> dict[str, Any]:
+        body: dict[str, Any] = {
+            "model": resolved_model,
+            "messages": messages,
+            "stream": False,
+        }
+        if options:
+            supports_sampling = not self.is_gpt5_family_model(resolved_model)
+            if supports_sampling and "temperature" in options:
+                body["temperature"] = options["temperature"]
+            if supports_sampling and "top_p" in options:
+                body["top_p"] = options["top_p"]
+        if format == "json":
+            body["response_format"] = {"type": "json_object"}
+        return body
 
     # ---------------------------------------------------------------------
     @staticmethod

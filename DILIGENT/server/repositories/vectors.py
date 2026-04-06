@@ -352,7 +352,7 @@ class LanceVectorDatabase:
             return 0
         table = self.get_table()
         try:
-            data = table.to_arrow(columns=["document_id"])
+            data = table.to_arrow().select(["document_id"])
         except Exception:  # noqa: BLE001
             return 0
         values = data.column("document_id").to_pylist() if data.num_rows else []

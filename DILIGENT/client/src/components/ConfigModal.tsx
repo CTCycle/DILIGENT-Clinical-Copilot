@@ -1,4 +1,5 @@
 import React from "react";
+import { ModalShell } from "./ModalShell";
 
 // ---------------------------------------------------------------------------
 // Icons
@@ -20,33 +21,18 @@ interface ConfigModalProps {
 }
 
 export function ConfigModal({ isOpen, onClose, children }: ConfigModalProps): React.JSX.Element | null {
-    if (!isOpen) {
-        return null;
-    }
-
     return (
-        <div
-            className="modal-overlay"
+        <ModalShell
+            isOpen={isOpen}
+            ariaLabelledBy="modal-title"
+            title="Model Configurations"
+            subtitle="Adjust runtime preferences for DILI analysis"
+            titleId="modal-title"
+            onClose={onClose}
+            closeLabel="Close configuration modal"
+            closeIcon={<CloseIcon />}
         >
-            <dialog className="modal-container" aria-modal="true" aria-labelledby="modal-title" open>
-                <div className="modal-header">
-                    <div className="modal-header-content">
-                        <h2 className="modal-title" id="modal-title">Model Configurations</h2>
-                        <p className="modal-subtitle">Adjust runtime preferences for DILI analysis</p>
-                    </div>
-                    <button
-                        className="modal-close"
-                        type="button"
-                        onClick={onClose}
-                        aria-label="Close configuration modal"
-                    >
-                        <CloseIcon />
-                    </button>
-                </div>
-                <div className="modal-body">
-                    {children}
-                </div>
-            </dialog>
-        </div>
+            {children}
+        </ModalShell>
     );
 }
