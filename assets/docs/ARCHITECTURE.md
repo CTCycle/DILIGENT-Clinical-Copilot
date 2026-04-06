@@ -126,6 +126,16 @@ Maintenance boundary:
 - `DILIGENT/setup_and_maintenance.bat` is reserved for database initialization and offline maintenance.
 - RxNav/LiverTox/RAG dataset refresh operations are started from inspection UI wizards, not from `.bat` scripts.
 
+Access-key encryption architecture:
+- Provider API keys are encrypted at rest before persistence.
+- Encryption material is stored in `access_key_encryption_materials` (typed purpose registry).
+- Initial material is seeded during database initialization:
+  - SQLite: only when the local DB file is first created.
+  - PostgreSQL: only in explicit DB initialization path (`scripts/initialize_database.py` / setup menu).
+- Every stored provider key row carries `encryption_key_version`; decryption resolves material by that version.
+- Rows missing version metadata or referencing unknown versions fail closed.
+- No `.env` fallback or legacy decrypt path exists.
+
 ## 9. Change impact map
 
 - Clinical behavior change:

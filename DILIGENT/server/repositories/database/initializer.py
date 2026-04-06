@@ -6,6 +6,7 @@ import urllib.parse
 import sqlalchemy
 from sqlalchemy import column, literal, select, table
 from sqlalchemy.exc import SQLAlchemyError
+from sqlalchemy.orm import sessionmaker
 from sqlalchemy.sql.elements import TextClause
 
 from DILIGENT.server.configurations.bootstrap import server_settings
@@ -15,6 +16,9 @@ from DILIGENT.server.repositories.database.sqlite import SQLiteRepository
 from DILIGENT.server.repositories.database.utils import (
     normalize_postgres_engine,
     validate_postgres_database_name,
+)
+from DILIGENT.server.repositories.serialization.access_key_encryption import (
+    AccessKeyEncryptionMaterialSerializer,
 )
 from DILIGENT.server.repositories.schemas.models import Base
 from DILIGENT.server.common.constants import DATABASE_FILENAME, RESOURCES_PATH
@@ -129,6 +133,15 @@ def ensure_postgres_database(settings: DatabaseSettings) -> str:
     normalized_settings = clone_settings_with_database(settings, target_database)
     repository = PostgresRepository(normalized_settings)
     Base.metadata.create_all(repository.engine)
+    material_serializer = AccessKeyEncryptionMaterialSerializer(
+        engine=repository.engine,
+        session_factory=sessionmaker(
+            bind=repository.engine,
+            future=True,
+            expire_on_commit=False,
+        ),
+    )
+    material_serializer.ensure_seeded("provider_access_keys")
     logger.info("Ensured PostgreSQL tables exist in %s", target_database)
 
     return target_database

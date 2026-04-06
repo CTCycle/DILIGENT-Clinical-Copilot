@@ -78,7 +78,7 @@ def create_access_key(
 )
 def activate_access_key(
     key_id: int = Path(..., ge=1),
-    provider: ProviderName | None = Query(default=None),
+    provider: ProviderName = Query(..., description="openai, gemini, or tavily"),
 ) -> AccessKeyResponse:
     try:
         row = serializer.activate_key(key_id, provider=provider)
@@ -99,7 +99,7 @@ def activate_access_key(
 )
 def delete_access_key(
     key_id: int = Path(..., ge=1),
-    provider: ProviderName | None = Query(default=None),
+    provider: ProviderName = Query(..., description="openai, gemini, or tavily"),
 ) -> AccessKeyDeleteResponse:
     deleted = serializer.delete_key(key_id, provider=provider)
     if not deleted:

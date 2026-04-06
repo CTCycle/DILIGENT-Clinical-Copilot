@@ -98,6 +98,6 @@ Tests must enforce `assets/docs/ERROR_HANDLING.md` by covering:
 - Playwright browser issues:
   - `uv run python -m playwright install`
 - Access key failures:
-  - Ensure `ACCESS_KEY_ENCRYPTION_KEY` is configured in `DILIGENT/settings/.env`.
+  - Ensure database initialization has seeded encryption material and provider keys were re-entered in-app.
 - Ollama-dependent failures:
   - Ensure Ollama is running and reachable from configured host/port.

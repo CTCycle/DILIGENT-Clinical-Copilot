@@ -15,6 +15,9 @@ from DILIGENT.server.repositories.database.utils import (
     MISSING_TABLE_MESSAGE,
     validate_sql_identifier,
 )
+from DILIGENT.server.repositories.serialization.access_key_encryption import (
+    AccessKeyEncryptionMaterialSerializer,
+)
 from DILIGENT.server.repositories.schemas.models import Base
 from DILIGENT.server.common.constants import DATABASE_FILENAME, RESOURCES_PATH
 from DILIGENT.server.common.utils.logger import logger
@@ -33,6 +36,15 @@ class SQLiteRepository:
         event.listen(self.engine, "connect", self._enable_foreign_keys)
         if should_initialize_schema:
             Base.metadata.create_all(self.engine)
+            seed_session_factory = sessionmaker(
+                bind=self.engine,
+                future=True,
+                expire_on_commit=False,
+            )
+            AccessKeyEncryptionMaterialSerializer(
+                engine=self.engine,
+                session_factory=seed_session_factory,
+            ).ensure_seeded("provider_access_keys")
             logger.info(
                 "SQLite DB file was missing; created and initialized schema at %s",
                 self.db_path,
