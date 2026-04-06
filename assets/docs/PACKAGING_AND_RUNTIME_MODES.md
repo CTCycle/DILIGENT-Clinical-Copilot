@@ -1,6 +1,6 @@
 # Packaging and Runtime Modes
 
-Last updated: 2026-04-03
+Last updated: 2026-04-06
 
 ## 1. Runtime strategy
 
@@ -17,7 +17,6 @@ Switch modes by copying a profile into `DILIGENT/settings/.env`.
 ## 2. Runtime profile files
 
 - `DILIGENT/settings/.env.local.example`
-- `DILIGENT/settings/.env.cloud.example`
 - `DILIGENT/settings/.env.local.tauri.example`
 - `DILIGENT/settings/.env` (active)
 - `DILIGENT/settings/configurations.json` (non-secret defaults/tuning)
@@ -37,7 +36,13 @@ Switch modes by copying a profile into `DILIGENT/settings/.env`.
 | `DB_CONNECT_TIMEOUT`, `DB_INSERT_BATCH_SIZE` | DB timeout and batching. |
 | `OLLAMA_URL`, `OLLAMA_HOST`, `OLLAMA_PORT` | Ollama endpoint configuration. |
 | `OPTIONAL_DEPENDENCIES` | Optional dependency branch for launcher flow. |
-| `ACCESS_KEY_ENCRYPTION_KEY` | Fernet key for encrypted provider key storage. |
+
+Provider key storage contract:
+- Provider keys are entered in-app and stored encrypted in the database.
+- Encryption registry is seeded in `access_key_encryption_materials`:
+  - SQLite: only on first local DB file creation.
+  - PostgreSQL: only during explicit DB initialization.
+- Provider keys are not provided through environment variables in the active model.
 
 ## 4. Local mode
 
@@ -51,7 +56,7 @@ Switch modes by copying a profile into `DILIGENT/settings/.env`.
 ## 5. Cloud-hardened API mode
 
 1. Activate profile:
-   - `copy /Y DILIGENT\settings\.env.cloud.example DILIGENT\settings\.env`
+   - Set `DILIGENT_CLOUD_MODE=true` in `DILIGENT/settings/.env`
 2. Run backend/frontend with your standard process for the target environment.
 
 Cloud-hardened behavior:

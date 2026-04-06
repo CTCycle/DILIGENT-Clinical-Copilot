@@ -2,16 +2,7 @@ from __future__ import annotations
 
 import time
 
-import pytest
 from playwright.sync_api import APIRequestContext
-
-
-def maybe_skip_for_encryption_config(response) -> None:  # type: ignore[no-untyped-def]
-    if response.status < 500:
-        return
-    detail = response.text()
-    if "ACCESS_KEY_ENCRYPTION_KEY" in detail:
-        pytest.skip("ACCESS_KEY_ENCRYPTION_KEY is not configured for API e2e run.")
 
 
 def test_access_keys_crud_returns_metadata_only(api_context: APIRequestContext) -> None:
@@ -23,7 +14,6 @@ def test_access_keys_crud_returns_metadata_only(api_context: APIRequestContext) 
             "/access-keys",
             data={"provider": provider, "access_key": plaintext_key},
         )
-        maybe_skip_for_encryption_config(create_response)
         assert create_response.status == 201
         created_payload = create_response.json()
         created_id = created_payload.get("id")
@@ -50,3 +40,21 @@ def test_access_keys_crud_returns_metadata_only(api_context: APIRequestContext) 
     finally:
         if created_id is not None:
             api_context.delete(f"/access-keys/{created_id}?provider={provider}")
+
+
+def test_activate_and_delete_require_provider(api_context: APIRequestContext) -> None:
+    provider = "openai"
+    create_response = api_context.post(
+        "/access-keys",
+        data={"provider": provider, "access_key": f"sk-test-{int(time.time())}"},
+    )
+    assert create_response.status == 201
+    key_id = create_response.json()["id"]
+    try:
+        activate_response = api_context.put(f"/access-keys/{key_id}/activate")
+        assert activate_response.status == 422
+
+        delete_response = api_context.delete(f"/access-keys/{key_id}")
+        assert delete_response.status == 422
+    finally:
+        api_context.delete(f"/access-keys/{key_id}?provider={provider}")

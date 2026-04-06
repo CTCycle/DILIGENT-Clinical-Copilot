@@ -1,38 +1,37 @@
 from __future__ import annotations
 
 import hashlib
-import os
 
 from cryptography.fernet import Fernet, InvalidToken
 
 
 ###############################################################################
-def _load_fernet() -> Fernet:
-    key_value = os.getenv("ACCESS_KEY_ENCRYPTION_KEY")
-    if not isinstance(key_value, str) or not key_value.strip():
-        raise RuntimeError("ACCESS_KEY_ENCRYPTION_KEY is not configured")
+def _load_fernet_from_material(key_material: str) -> Fernet:
+    normalized = str(key_material or "").strip()
+    if not normalized:
+        raise RuntimeError("Encryption key material is missing")
     try:
-        return Fernet(key_value.strip().encode("utf-8"))
+        return Fernet(normalized.encode("utf-8"))
     except Exception as exc:  # noqa: BLE001
-        raise RuntimeError("ACCESS_KEY_ENCRYPTION_KEY is invalid") from exc
+        raise RuntimeError("Encryption key material is invalid") from exc
 
 
 ###############################################################################
-def encrypt(plaintext: str) -> str:
+def encrypt_with_key_material(plaintext: str, key_material: str) -> str:
     normalized = str(plaintext or "").strip()
     if not normalized:
         raise ValueError("Access key must not be empty")
-    token = _load_fernet().encrypt(normalized.encode("utf-8"))
+    token = _load_fernet_from_material(key_material).encrypt(normalized.encode("utf-8"))
     return token.decode("utf-8")
 
 
 ###############################################################################
-def decrypt(ciphertext: str) -> str:
+def decrypt_with_key_material(ciphertext: str, key_material: str) -> str:
     normalized = str(ciphertext or "").strip()
     if not normalized:
         raise ValueError("Encrypted access key must not be empty")
     try:
-        decoded = _load_fernet().decrypt(normalized.encode("utf-8"))
+        decoded = _load_fernet_from_material(key_material).decrypt(normalized.encode("utf-8"))
     except InvalidToken as exc:
         raise RuntimeError("Encrypted access key is invalid") from exc
     except Exception as exc:  # noqa: BLE001
@@ -41,8 +40,8 @@ def decrypt(ciphertext: str) -> str:
 
 
 ###############################################################################
-def fingerprint(ciphertext: str) -> str:
-    normalized = str(ciphertext or "").strip()
+def fingerprint_plaintext(plaintext: str) -> str:
+    normalized = str(plaintext or "").strip()
     if not normalized:
-        raise ValueError("Encrypted access key must not be empty")
+        raise ValueError("Access key must not be empty")
     return hashlib.sha256(normalized.encode("utf-8")).hexdigest()
