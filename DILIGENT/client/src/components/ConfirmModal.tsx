@@ -1,4 +1,5 @@
 import React from "react";
+import { ModalShell } from "./ModalShell";
 
 interface ConfirmModalProps {
     readonly isOpen: boolean;
@@ -19,36 +20,28 @@ export function ConfirmModal({
     onConfirm,
     onCancel,
 }: ConfirmModalProps): React.JSX.Element | null {
-    if (!isOpen) {
-        return null;
-    }
-
     return (
-        <div className="modal-overlay">
-            <dialog
-                className="modal-container"
-                aria-modal="true"
-                aria-labelledby="confirm-modal-title"
-                aria-describedby="confirm-modal-message"
-                open
-            >
-                <div className="modal-header">
-                    <div className="modal-header-content">
-                        <h2 className="modal-title" id="confirm-modal-title">{title}</h2>
-                        <p className="modal-subtitle" id="confirm-modal-message">{message}</p>
-                    </div>
+        <ModalShell
+            isOpen={isOpen}
+            ariaLabelledBy="confirm-modal-title"
+            ariaDescribedBy="confirm-modal-message"
+            title={title}
+            subtitle={message}
+            titleId="confirm-modal-title"
+            footer={(
+                <div className="confirm-modal-actions">
+                    <button className="btn btn-secondary" type="button" onClick={onCancel}>
+                        {cancelLabel}
+                    </button>
+                    <button className="btn btn-primary" type="button" onClick={onConfirm}>
+                        {confirmLabel}
+                    </button>
                 </div>
-                <div className="modal-footer">
-                    <div className="confirm-modal-actions">
-                        <button className="btn btn-secondary" type="button" onClick={onCancel}>
-                            {cancelLabel}
-                        </button>
-                        <button className="btn btn-primary" type="button" onClick={onConfirm}>
-                            {confirmLabel}
-                        </button>
-                    </div>
-                </div>
-            </dialog>
-        </div>
+            )}
+        >
+            <span id="confirm-modal-message" className="visually-hidden">
+                {message}
+            </span>
+        </ModalShell>
     );
 }

@@ -16,18 +16,20 @@ DEFAULT_KEY_PURPOSE = "provider_access_keys"
 class AccessKeyEncryptionMaterialSerializer:
     def __init__(
         self,
-        queries=None,
+        queries: "DataRepositoryQueries | None" = None,
         *,
         engine: Engine | None = None,
         session_factory: sessionmaker | None = None,
     ) -> None:
-        resolved_queries = queries
-        if resolved_queries is None and engine is None:
-            from DILIGENT.server.repositories.queries.data import DataRepositoryQueries
+        if queries is None and engine is None:
+            raise ValueError("Either queries or engine must be provided")
 
-            resolved_queries = DataRepositoryQueries()
-        self.queries = resolved_queries
-        resolved_engine = engine or self.queries.database.backend.engine  # type: ignore[attr-defined]
+        self.queries = queries
+        if engine is not None:
+            resolved_engine = engine
+        else:
+            assert queries is not None
+            resolved_engine = queries.database.backend.engine
         self.engine = resolved_engine
         self.session_factory = session_factory or sessionmaker(
             bind=resolved_engine,

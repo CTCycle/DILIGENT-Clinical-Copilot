@@ -3,6 +3,7 @@ import React from "react";
 import { useAccessKeyManager } from "../hooks/useAccessKeyManager";
 import { StatusMessage } from "./StatusMessage";
 import { AccessKeyProvider } from "../types";
+import { ModalShell } from "./ModalShell";
 
 const MASKED_KEY_LABEL = "********************";
 
@@ -90,101 +91,92 @@ export function AccessKeyModal({
     }
 
     return (
-        <div className="modal-overlay">
-            <dialog className="modal-container access-key-modal" aria-modal="true" aria-labelledby="access-key-modal-title" open>
-                <div className="modal-header">
-                    <div className="modal-header-content">
-                        <h2 className="modal-title" id="access-key-modal-title">{providerLabel} Access Keys</h2>
-                        <p className="modal-subtitle">Stored encrypted at rest. Activate one key at a time for this provider.</p>
-                    </div>
-                    <button
-                        className="modal-close"
-                        type="button"
-                        onClick={onClose}
-                        aria-label="Close access key modal"
-                    >
-                        <CloseIcon />
+        <ModalShell
+            isOpen={isOpen}
+            ariaLabelledBy="access-key-modal-title"
+            title={`${providerLabel} Access Keys`}
+            subtitle="Stored encrypted at rest. Activate one key at a time for this provider."
+            titleId="access-key-modal-title"
+            dialogClassName="modal-container access-key-modal"
+            onClose={onClose}
+            closeLabel="Close access key modal"
+            closeIcon={<CloseIcon />}
+        >
+            <section className="modal-section">
+                <h3 className="modal-section-title">Add New Key</h3>
+                <div className="access-key-input-row">
+                    <label className="visually-hidden" htmlFor="new-access-key-input">Access key</label>
+                    <input
+                        id="new-access-key-input"
+                        className="access-key-input"
+                        type="password"
+                        placeholder="Paste access key"
+                        value={newKeyValue}
+                        onChange={(event) => setNewKeyValue(event.target.value)}
+                        disabled={isSaving}
+                    />
+                    <button className="btn btn-primary access-key-add-btn" type="button" onClick={() => { void handleAdd(); }} disabled={isSaving}>
+                        Add
                     </button>
                 </div>
+            </section>
 
-                <div className="modal-body">
-                    <section className="modal-section">
-                        <h3 className="modal-section-title">Add New Key</h3>
-                        <div className="access-key-input-row">
-                            <label className="visually-hidden" htmlFor="new-access-key-input">Access key</label>
-                            <input
-                                id="new-access-key-input"
-                                className="access-key-input"
-                                type="password"
-                                placeholder="Paste access key"
-                                value={newKeyValue}
-                                onChange={(event) => setNewKeyValue(event.target.value)}
-                                disabled={isSaving}
-                            />
-                            <button className="btn btn-primary access-key-add-btn" type="button" onClick={() => { void handleAdd(); }} disabled={isSaving}>
-                                Add
-                            </button>
-                        </div>
-                    </section>
+            <section className="modal-section">
+                <h3 className="modal-section-title">Stored Keys</h3>
+                {isLoading && <p className="access-key-empty">Loading keys...</p>}
+                {!isLoading && !hasKeys && <p className="access-key-empty">No keys stored for this provider.</p>}
+                {!isLoading && hasKeys && (
+                    <ul className="access-key-list">
+                        {sortedKeys.map((item) => (
+                            <li key={item.id} className={`access-key-row ${item.is_active ? "is-active" : ""}`}>
+                                <div className="access-key-meta">
+                                    <p className="access-key-fingerprint">
+                                        {visibleRows[item.id] ? obfuscateFingerprint(item.fingerprint) : MASKED_KEY_LABEL}
+                                    </p>
+                                    <p className="access-key-timestamp">Last used: {formatTimestamp(item.last_used_at)}</p>
+                                </div>
+                                <div className="access-key-actions">
+                                    <button
+                                        className={`access-key-action ${item.is_active ? "is-active" : ""}`}
+                                        type="button"
+                                        onClick={() => { void handleActivate(item.id); }}
+                                        disabled={isSaving}
+                                        title={item.is_active ? "Active key" : "Activate key"}
+                                        aria-label={item.is_active ? "Active key" : "Activate key"}
+                                    >
+                                        <LockIcon />
+                                    </button>
+                                    <button
+                                        className="access-key-action"
+                                        type="button"
+                                        onClick={() => toggleVisibility(item.id)}
+                                        disabled={isSaving}
+                                        title="Toggle fingerprint view"
+                                        aria-label="Toggle fingerprint view"
+                                    >
+                                        <EyeIcon />
+                                    </button>
+                                    <button
+                                        className="access-key-action is-danger"
+                                        type="button"
+                                        onClick={() => { void handleDelete(item.id); }}
+                                        disabled={isSaving}
+                                        title="Delete key"
+                                        aria-label="Delete key"
+                                    >
+                                        <TrashIcon />
+                                    </button>
+                                </div>
+                            </li>
+                        ))}
+                    </ul>
+                )}
+            </section>
 
-                    <section className="modal-section">
-                        <h3 className="modal-section-title">Stored Keys</h3>
-                        {isLoading && <p className="access-key-empty">Loading keys...</p>}
-                        {!isLoading && !hasKeys && <p className="access-key-empty">No keys stored for this provider.</p>}
-                        {!isLoading && hasKeys && (
-                            <ul className="access-key-list">
-                                {sortedKeys.map((item) => (
-                                    <li key={item.id} className={`access-key-row ${item.is_active ? "is-active" : ""}`}>
-                                        <div className="access-key-meta">
-                                            <p className="access-key-fingerprint">
-                                                {visibleRows[item.id] ? obfuscateFingerprint(item.fingerprint) : MASKED_KEY_LABEL}
-                                            </p>
-                                            <p className="access-key-timestamp">Last used: {formatTimestamp(item.last_used_at)}</p>
-                                        </div>
-                                        <div className="access-key-actions">
-                                            <button
-                                                className={`access-key-action ${item.is_active ? "is-active" : ""}`}
-                                                type="button"
-                                                onClick={() => { void handleActivate(item.id); }}
-                                                disabled={isSaving}
-                                                title={item.is_active ? "Active key" : "Activate key"}
-                                                aria-label={item.is_active ? "Active key" : "Activate key"}
-                                            >
-                                                <LockIcon />
-                                            </button>
-                                            <button
-                                                className="access-key-action"
-                                                type="button"
-                                                onClick={() => toggleVisibility(item.id)}
-                                                disabled={isSaving}
-                                                title="Toggle fingerprint view"
-                                                aria-label="Toggle fingerprint view"
-                                            >
-                                                <EyeIcon />
-                                            </button>
-                                            <button
-                                                className="access-key-action is-danger"
-                                                type="button"
-                                                onClick={() => { void handleDelete(item.id); }}
-                                                disabled={isSaving}
-                                                title="Delete key"
-                                                aria-label="Delete key"
-                                            >
-                                                <TrashIcon />
-                                            </button>
-                                        </div>
-                                    </li>
-                                ))}
-                            </ul>
-                        )}
-                    </section>
-
-                    <StatusMessage
-                        message={errorMessage ? `[ERROR] ${errorMessage}` : ""}
-                        tone="is-error"
-                    />
-                </div>
-            </dialog>
-        </div>
+            <StatusMessage
+                message={errorMessage ? `[ERROR] ${errorMessage}` : ""}
+                tone="is-error"
+            />
+        </ModalShell>
     );
 }

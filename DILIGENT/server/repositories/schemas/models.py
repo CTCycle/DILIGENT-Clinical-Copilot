@@ -25,6 +25,8 @@ class Base(DeclarativeBase):
 
 DRUGS_ID_FK = "drugs.id"
 CLINICAL_SESSIONS_ID_FK = "clinical_sessions.id"
+ACTIVE_SQLITE_WHERE = "is_active = 1"
+ACTIVE_POSTGRESQL_WHERE = "is_active = true"
 
 
 ###############################################################################
@@ -340,8 +342,8 @@ class ModelSelection(Base):
             "uq_model_selections_active_role_type",
             "role_type",
             unique=True,
-            sqlite_where=text("is_active = 1"),
-            postgresql_where=text("is_active = true"),
+            sqlite_where=text(ACTIVE_SQLITE_WHERE),
+            postgresql_where=text(ACTIVE_POSTGRESQL_WHERE),
         ),
     )
 

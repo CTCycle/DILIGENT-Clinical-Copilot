@@ -30,6 +30,7 @@ from DILIGENT.server.common.utils.types import extract_positive_int
 
 ProviderName = Literal["openai", "azure-openai", "anthropic", "gemini"]
 RuntimePurpose = Literal["clinical", "parser"]
+OLLAMA_GENERATE_PATH = "/api/generate"
 
 __all__ = [
     "OllamaClient",
@@ -479,48 +480,79 @@ class OllamaClient:
         target_models: list[str],
     ) -> str | None:
         candidates = self.dedupe_models(target_models)
-        if current_model not in candidates:
-            return None
-        if len(candidates) < 2:
+        if current_model not in candidates or len(candidates) < 2:
             return None
 
+        history = self._recent_residency_history(candidates)
+        frequency: dict[str, int] = dict.fromkeys(candidates, 0)
+        self._count_residency_frequency(history, frequency)
+        transitions = self._count_residency_transitions(history)
+
+        selected = self._select_target_model(
+            current_model=current_model,
+            candidates=candidates,
+            history=history,
+            frequency=frequency,
+            transitions=transitions,
+        )
+        if selected is not None:
+            return selected
+
+        return next((candidate for candidate in candidates if candidate != current_model), None)
+
+    def _recent_residency_history(self, candidates: list[str]) -> list[tuple[float, str]]:
         now = time.monotonic()
         cutoff = now - self.residency_usage_window_s
-        history = [
+        return [
             (ts, model)
             for ts, model in self.residency_usage_history
             if ts >= cutoff and model in candidates
         ]
 
-        frequency: dict[str, int] = {model: 0 for model in candidates}
-        transitions: dict[tuple[str, str], int] = {}
+    @staticmethod
+    def _count_residency_frequency(
+        history: list[tuple[float, str]],
+        frequency: dict[str, int],
+    ) -> None:
         for _, model in history:
-            frequency[model] = frequency.get(model, 0) + 1
+            frequency[model] += 1
+
+    def _count_residency_transitions(
+        self,
+        history: list[tuple[float, str]],
+    ) -> dict[tuple[str, str], int]:
+        transitions: dict[tuple[str, str], int] = {}
         for (prev_ts, prev_model), (next_ts, next_model) in zip(history, history[1:]):
             if (next_ts - prev_ts) > self.residency_transition_window_s:
                 continue
             key = (prev_model, next_model)
             transitions[key] = transitions.get(key, 0) + 1
+        return transitions
 
+    @staticmethod
+    def _select_target_model(
+        *,
+        current_model: str,
+        candidates: list[str],
+        history: list[tuple[float, str]],
+        frequency: dict[str, int],
+        transitions: dict[tuple[str, str], int],
+    ) -> str | None:
         selected: str | None = None
         selected_score = -1.0
+        last_model = history[-1][1] if history else None
         for candidate in candidates:
             if candidate == current_model:
                 continue
-            transition_score = transitions.get((current_model, candidate), 0) * 3.0
-            frequency_score = float(frequency.get(candidate, 0))
-            recency_score = 0.5 if history and history[-1][1] == candidate else 0.0
-            score = transition_score + frequency_score + recency_score
+            score = (
+                transitions.get((current_model, candidate), 0) * 3.0
+                + float(frequency.get(candidate, 0))
+                + (0.5 if last_model == candidate else 0.0)
+            )
             if score > selected_score:
                 selected = candidate
                 selected_score = score
-        if selected:
-            return selected
-
-        for candidate in candidates:
-            if candidate != current_model:
-                return candidate
-        return None
+        return selected
 
     # -------------------------------------------------------------------------
     def handle_prefetch_task_done(self, task: asyncio.Task[None]) -> None:
@@ -551,7 +583,7 @@ class OllamaClient:
                 options={"num_predict": 0},
                 keep_alive=keep_alive,
             )
-            resp = await self.client.post("/api/generate", json=payload)
+            resp = await self.client.post(OLLAMA_GENERATE_PATH, json=payload)
             self.raise_for_status(resp)
             logger.debug(
                 "Prefetched Ollama model '%s' with keep_alive='%s'",

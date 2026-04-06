@@ -4,13 +4,13 @@ import json
 import os
 from typing import Any
 
-
+###############################################################################
 def ensure_mapping(value: Any) -> dict[str, Any]:
     if isinstance(value, dict):
         return value
     return {}
 
-
+###############################################################################
 def load_configuration_data(path: str) -> dict[str, Any]:
     if not os.path.exists(path):
         raise RuntimeError(f"Configuration file not found: {path}")
