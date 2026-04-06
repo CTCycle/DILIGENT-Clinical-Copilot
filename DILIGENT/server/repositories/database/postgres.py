@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 import urllib.parse
-from typing import Any, Iterator
+from typing import Any, Iterator, Sequence
 
 import pandas as pd
 import sqlalchemy
@@ -89,7 +89,7 @@ class PostgresRepository:
 
     # -------------------------------------------------------------------------
     @staticmethod
-    def rows_to_dataframe(rows: list[Any], table_cls) -> pd.DataFrame:
+    def rows_to_dataframe(rows: Sequence[Any], table_cls) -> pd.DataFrame:
         columns = [column.name for column in table_cls.__table__.columns]
         if not rows:
             return pd.DataFrame(columns=columns)
@@ -99,7 +99,7 @@ class PostgresRepository:
     # -------------------------------------------------------------------------
     def load_rows(self, db_session: Session, table_cls, *, offset: int, limit: int) -> list[Any]:
         stmt = self.ordered_select_for_table(table_cls).offset(offset).limit(limit)
-        return db_session.execute(stmt).scalars().all()
+        return list(db_session.execute(stmt).scalars().all())
 
     # -------------------------------------------------------------------------
     def upsert_dataframe(self, df: pd.DataFrame, table_cls) -> None:
