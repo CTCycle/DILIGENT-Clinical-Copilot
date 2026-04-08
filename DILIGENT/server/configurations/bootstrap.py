@@ -229,6 +229,26 @@ def build_external_data_settings(data: dict[str, Any], *, fallback_timeout: floa
         max_excerpt_length=coerce_positive_int(data.get("max_excerpt_length"), 8000),
         rxnav_request_timeout=coerce_float(data.get("rxnav_request_timeout"), 12.0),
         rxnav_max_concurrency=coerce_positive_int(data.get("rxnav_max_concurrency"), 16),
+        dili_priors_request_timeout=max(
+            coerce_float(data.get("dili_priors_request_timeout"), 20.0),
+            1.0,
+        ),
+        dailymed_request_timeout=max(
+            coerce_float(data.get("dailymed_request_timeout"), 20.0),
+            1.0,
+        ),
+        dailymed_max_concurrency=coerce_positive_int(
+            data.get("dailymed_max_concurrency"),
+            8,
+        ),
+        dailymed_section_max_length=coerce_positive_int(
+            data.get("dailymed_section_max_length"),
+            4000,
+        ),
+        dailymed_max_sections_per_drug=coerce_positive_int(
+            data.get("dailymed_max_sections_per_drug"),
+            5,
+        ),
         tavily_request_timeout_s=max(coerce_float(data.get("tavily_request_timeout_s"), 20.0), 1.0),
         tavily_search_cache_ttl_s=coerce_positive_int(data.get("tavily_search_cache_ttl_s"), 21600),
         tavily_extract_cache_ttl_s=coerce_positive_int(data.get("tavily_extract_cache_ttl_s"), 259200),

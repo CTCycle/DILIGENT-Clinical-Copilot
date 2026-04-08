@@ -3490,13 +3490,101 @@ input[type="date"]::-webkit-calendar-picker-indicator:hover {
 }
 
 .inspection-update-modal {
-  max-width: 760px;
+  width: min(940px, calc(100vw - 48px));
+  max-width: 940px;
+  max-height: none;
+  overflow: visible;
 }
 
 .inspection-update-modal-body {
   display: flex;
   flex-direction: column;
   gap: var(--space-sm);
+  overflow: visible;
+}
+
+.inspection-update-modal .modal-body {
+  overflow: visible;
+}
+
+.inspection-update-config-step {
+  gap: var(--space-lg);
+}
+
+.inspection-update-config-grid {
+  display: grid;
+  grid-template-columns: minmax(0, 1.1fr) minmax(280px, 0.9fr);
+  gap: var(--space-xl);
+  align-items: start;
+}
+
+.inspection-update-config-column {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-md);
+}
+
+.inspection-update-config-column .field {
+  margin-bottom: 0;
+}
+
+.inspection-update-config-column-secondary {
+  padding-left: var(--space-xl);
+  border-left: 1px solid rgba(148, 163, 184, 0.28);
+}
+
+.inspection-update-provider-select {
+  width: 100%;
+}
+
+.inspection-model-display {
+  gap: var(--space-xs);
+}
+
+.inspection-model-display-value {
+  min-height: var(--control-height-md);
+  display: flex;
+  align-items: center;
+  padding: 10px 12px;
+  border-radius: var(--radius-md);
+  border: 1px solid var(--color-border);
+  background: var(--color-surface-alt);
+  color: var(--color-text-primary);
+  font-size: var(--font-sm);
+}
+
+.inspection-reset-checkbox {
+  margin-top: var(--space-xs);
+}
+
+.inspection-mini-btn-folder {
+  width: var(--control-height-md);
+  min-width: var(--control-height-md);
+  padding: 0;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.inspection-mini-btn-folder .inspection-icon {
+  width: 15px;
+  height: 15px;
+}
+
+.inspection-folder-input {
+  display: none;
+}
+
+.inspection-update-continue {
+  min-width: 128px;
+  font-weight: 700;
+  letter-spacing: 0.01em;
+  text-shadow: 0 1px 1px rgba(0, 0, 0, 0.18);
+  box-shadow: 0 14px 24px -16px rgba(7, 76, 55, 0.62);
+}
+
+.inspection-update-continue:hover:not(:disabled) {
+  box-shadow: 0 16px 26px -16px rgba(7, 76, 55, 0.7);
 }
 
 .inspection-alias-group h3 {
@@ -3624,6 +3712,17 @@ input[type="date"]::-webkit-calendar-picker-indicator:hover {
 
   .inspection-actions-cell {
     width: 118px;
+  }
+
+  .inspection-update-config-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .inspection-update-config-column-secondary {
+    padding-left: 0;
+    padding-top: var(--space-md);
+    border-left: 0;
+    border-top: 1px solid rgba(148, 163, 184, 0.28);
   }
 }
 

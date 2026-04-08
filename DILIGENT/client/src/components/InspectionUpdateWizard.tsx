@@ -1,12 +1,13 @@
 import React, { useEffect, useMemo, useState } from "react";
 
 import { InspectionUpdateJobState } from "../hooks/useInspectionUpdateJob";
-import { InspectionUpdateConfigResponse } from "../types";
-import { InspectionUpdateConfigStep } from "./InspectionUpdateConfigStep";
+import { InspectionUpdateConfigResponse, InspectionUpdateTarget } from "../types";
+import { InspectionUpdateConfigStep, normalizeRagUpdateDefaults } from "./InspectionUpdateConfigStep";
 import { InspectionUpdateConfirmStep } from "./InspectionUpdateConfirmStep";
 import { InspectionUpdateProgressStep } from "./InspectionUpdateProgressStep";
 
 type InspectionUpdateWizardProps = {
+  target: InspectionUpdateTarget;
   targetLabel: string;
   fallbackMessage: string;
   loadConfig: () => Promise<InspectionUpdateConfigResponse>;
@@ -17,6 +18,7 @@ type InspectionUpdateWizardProps = {
 type WizardStep = 1 | 2 | 3;
 
 export function InspectionUpdateWizard({
+  target,
   targetLabel,
   fallbackMessage,
   loadConfig,
@@ -37,7 +39,7 @@ export function InspectionUpdateWizard({
           return;
         }
         setAllowedFields(payload.allowed_fields);
-        setValues(payload.defaults);
+        setValues(target === "rag" ? normalizeRagUpdateDefaults(payload.defaults) : payload.defaults);
         setConfigError(null);
       } catch (error) {
         if (cancelled) {
@@ -50,7 +52,7 @@ export function InspectionUpdateWizard({
     return () => {
       cancelled = true;
     };
-  }, [loadConfig]);
+  }, [loadConfig, target]);
 
   useEffect(() => {
     if (job.running || job.status === "completed" || job.status === "failed" || job.status === "cancelled") {
@@ -83,6 +85,7 @@ export function InspectionUpdateWizard({
   if (step === 1) {
     return (
       <InspectionUpdateConfigStep
+        target={target}
         values={values}
         allowedFields={allowedFields}
         disabled={job.running}
@@ -117,4 +120,3 @@ export function InspectionUpdateWizard({
     />
   );
 }
-

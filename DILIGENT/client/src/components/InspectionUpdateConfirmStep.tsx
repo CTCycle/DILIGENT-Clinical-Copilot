@@ -1,5 +1,7 @@
 import React from "react";
 
+import { humanizeInspectionFieldLabel } from "./InspectionUpdateConfigStep";
+
 type InspectionUpdateConfirmStepProps = {
   targetLabel: string;
   values: Record<string, unknown>;
@@ -30,7 +32,7 @@ export function InspectionUpdateConfirmStep({
           <tbody>
             {Object.entries(values).map(([key, value]) => (
               <tr key={key}>
-                <td>{key}</td>
+                <td>{humanizeInspectionFieldLabel(key)}</td>
                 <td>{String(value)}</td>
               </tr>
             ))}
@@ -48,4 +50,3 @@ export function InspectionUpdateConfirmStep({
     </div>
   );
 }
-

@@ -13,6 +13,7 @@ from DILIGENT.server.domain.clinical import (
 from DILIGENT.server.domain.clinical_extras import HepatoxPreparedInputs
 from DILIGENT.server.common.utils.logger import logger
 from DILIGENT.server.repositories.serialization.data import DataSerializer
+from DILIGENT.server.services.clinical.knowledge import ClinicalKnowledgeComposer
 from DILIGENT.server.services.clinical.matches import LiverToxMatcher
 from DILIGENT.server.services.text.normalization import (
     canonicalize_drug_query,
@@ -25,6 +26,7 @@ class ClinicalKnowledgePreparation:
 
     def __init__(self) -> None:
         self.serializer = DataSerializer()
+        self.knowledge_composer = ClinicalKnowledgeComposer(serializer=self.serializer)
         self.livertox_matcher: LiverToxMatcher | None = None
 
     # -------------------------------------------------------------------------
@@ -61,6 +63,7 @@ class ClinicalKnowledgePreparation:
 
         resolved_drugs = self.normalize_livertox_mapping(livertox_information)
         self.attach_candidate_metadata(resolved_drugs, drug_candidates)
+        self.knowledge_composer.enrich_resolved_drugs(resolved_drugs)
         pattern_prompt = self.build_pattern_prompt(pattern_score)
         normalized_context = (clinical_context or "").strip()
 
