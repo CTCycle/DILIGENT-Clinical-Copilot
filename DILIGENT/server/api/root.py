@@ -13,11 +13,9 @@ class RootEndpoint:
         self,
         *,
         app: FastAPI,
-        cloud_mode: bool,
         tauri_mode: bool,
     ) -> None:
         self.app = app
-        self.cloud_mode = cloud_mode
         self.tauri_mode = tauri_mode
         self.client_dist_path = os.path.abspath(self.get_client_dist_path())
 
@@ -57,7 +55,7 @@ class RootEndpoint:
 
     # -------------------------------------------------------------------------
     def redirect_root(self) -> RedirectResponse:
-        return RedirectResponse(url="/api/model-config" if self.cloud_mode else "/docs")
+        return RedirectResponse(url="/docs")
 
     # -------------------------------------------------------------------------
     def add_routes(self) -> None:

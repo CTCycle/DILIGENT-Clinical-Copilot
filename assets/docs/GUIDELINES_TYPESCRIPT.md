@@ -1,5 +1,8 @@
 # TypeScript Guidelines (DILIGENT Client)
 
+Last updated: 2026-04-08
+
+
 Scope: `DILIGENT/client` (React 18 + Vite + TypeScript 5).
 
 Also mandatory: apply `assets/docs/ERROR_HANDLING.md`.

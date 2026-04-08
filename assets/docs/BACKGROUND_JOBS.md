@@ -1,6 +1,6 @@
 # Background Job Management
 
-Last updated: 2026-04-03
+Last updated: 2026-04-08
 
 DILIGENT uses a centralized thread-based job manager for long-running operations.
 

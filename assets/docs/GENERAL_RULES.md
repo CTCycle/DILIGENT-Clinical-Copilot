@@ -1,5 +1,7 @@
 # General Rules
 
+Last updated: 2026-04-08
+
 This file is the entrypoint for all work in this repository.
 
 ## 1. Required doc review
@@ -14,16 +16,29 @@ Read as needed by task:
 - `assets/docs/GUIDELINES_PYTHON.md`: Python standards and backend conventions.
 - `assets/docs/GUIDELINES_TYPESCRIPT.md`: frontend standards for `DILIGENT/client`.
 - `assets/docs/GUIDELINES_TESTS.md`: test layout and execution.
-- `assets/docs/PACKAGING_AND_RUNTIME_MODES.md`: local/cloud/desktop runtime behavior.
-- `assets/docs/README_WRITING.md`: README format and required sections.
+- `assets/docs/PACKAGING_AND_RUNTIME_MODES.md`: local/desktop runtime behavior.
+- `assets/docs/USER_MANUAL.md`: product usage, user journeys, and commands.
 - `assets/docs/UI_STANDARDS.md`: frontend design system rules.
 - `assets/docs/UI_AUDIT_REPORT.md`: current UI debt and known gaps.
+
+Current documentation inventory (exhaustive):
+- `assets/docs/ARCHITECTURE.md`
+- `assets/docs/BACKGROUND_JOBS.md`
+- `assets/docs/ERROR_HANDLING.md`
+- `assets/docs/GENERAL_RULES.md`
+- `assets/docs/GUIDELINES_PYTHON.md`
+- `assets/docs/GUIDELINES_TESTS.md`
+- `assets/docs/GUIDELINES_TYPESCRIPT.md`
+- `assets/docs/PACKAGING_AND_RUNTIME_MODES.md`
+- `assets/docs/UI_AUDIT_REPORT.md`
+- `assets/docs/UI_STANDARDS.md`
+- `assets/docs/USER_MANUAL.md`
 
 ## 2. Documentation responsibilities
 
 - If you change behavior, architecture, runtime contracts, or test strategy, update the corresponding docs in `assets/docs`.
 - Keep cross-references coherent: endpoint names, path names, and runtime/version statements must not conflict across files.
-- Prefer concise, stable documentation over exhaustive file inventories that quickly become stale.
+- Keep documentation concise, and keep the exhaustive inventory in this file up to date whenever docs are added, removed, or renamed.
 
 ## 3. Cross-language engineering principles
 

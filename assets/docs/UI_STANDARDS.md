@@ -1,6 +1,6 @@
 # UI Standards (Frontend)
 
-Last updated: 2026-03-28
+Last updated: 2026-04-08
 
 Scope: `DILIGENT/client/src` and `DILIGENT/client/src/styles.css`.
 Goal: keep UI coherent, accessible, and maintainable.

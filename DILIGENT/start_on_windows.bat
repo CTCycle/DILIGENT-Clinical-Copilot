@@ -158,7 +158,7 @@ REM ============================================================================
 set "FASTAPI_HOST=127.0.0.1"
 set "FASTAPI_PORT=8000"
 set "UI_HOST=127.0.0.1"
-set "UI_PORT=8001"
+set "UI_PORT=7861"
 set "RELOAD=false"
 set "OPTIONAL_DEPENDENCIES=false"
 

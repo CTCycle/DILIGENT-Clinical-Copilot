@@ -1,5 +1,8 @@
 # Error Handling Principles
 
+Last updated: 2026-04-08
+
+
 Apply these rules across backend and frontend code.
 
 ## 1. Exception boundaries

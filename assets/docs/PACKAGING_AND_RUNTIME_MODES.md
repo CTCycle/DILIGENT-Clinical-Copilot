@@ -1,6 +1,6 @@
 # Packaging and Runtime Modes
 
-Last updated: 2026-04-06
+Last updated: 2026-04-08
 
 ## 1. Runtime strategy
 
@@ -9,7 +9,6 @@ DILIGENT is configuration-first and uses one active runtime file:
 
 Modes:
 - Local mode (default developer workflow)
-- Cloud-hardened API mode (profile-driven runtime behavior)
 - Desktop packaged mode (Tauri shell + local backend runtime)
 
 Switch modes by copying a profile into `DILIGENT/settings/.env`.
@@ -19,7 +18,7 @@ Switch modes by copying a profile into `DILIGENT/settings/.env`.
 - `DILIGENT/settings/.env.local.example`
 - `DILIGENT/settings/.env.local.tauri.example`
 - `DILIGENT/settings/.env` (active)
-- `DILIGENT/settings/configurations.json` (non-secret defaults/tuning)
+- `DILIGENT/settings/configurations.json` (non-secret defaults/tuning, including database settings)
 
 ## 3. Environment contract (core keys)
 
@@ -27,15 +26,20 @@ Switch modes by copying a profile into `DILIGENT/settings/.env`.
 |---|---|
 | `FASTAPI_HOST`, `FASTAPI_PORT` | Backend bind host/port. |
 | `UI_HOST`, `UI_PORT` | Frontend host/port. |
+| `KERAS_BACKEND` | Runtime Keras backend override (optional). |
+| `MPLBACKEND` | Runtime Matplotlib backend override (optional). |
 | `VITE_API_BASE_URL` | Frontend API base path (`/api` recommended). |
 | `RELOAD` | Backend auto-reload toggle for local workflow. |
-| `DILIGENT_CLOUD_MODE` | Enables cloud hardening behavior. |
-| `DB_EMBEDDED` | Embedded SQLite mode toggle. |
-| `DB_ENGINE`, `DB_HOST`, `DB_PORT`, `DB_NAME`, `DB_USER`, `DB_PASSWORD` | External DB connection settings. |
-| `DB_SSL`, `DB_SSL_CA` | External DB TLS settings. |
-| `DB_CONNECT_TIMEOUT`, `DB_INSERT_BATCH_SIZE` | DB timeout and batching. |
 | `OLLAMA_URL`, `OLLAMA_HOST`, `OLLAMA_PORT` | Ollama endpoint configuration. |
 | `OPTIONAL_DEPENDENCIES` | Optional dependency branch for launcher flow. |
+
+Database keys are JSON-only under `configurations.json`:
+- `database.embedded_database`
+- `database.engine`, `database.host`, `database.port`
+- `database.database_name`, `database.username`, `database.password`
+- `database.ssl`, `database.ssl_ca`
+- `database.connect_timeout`
+- `database.insert_batch_size`, `database.insert_commit_interval`, `database.select_page_size`
 
 Provider key storage contract:
 - Provider keys are entered in-app and stored encrypted in the database.
@@ -53,18 +57,7 @@ Provider key storage contract:
 3. Optional full test run:
    - `tests\run_tests.bat`
 
-## 5. Cloud-hardened API mode
-
-1. Activate profile:
-   - Set `DILIGENT_CLOUD_MODE=true` in `DILIGENT/settings/.env`
-2. Run backend/frontend with your standard process for the target environment.
-
-Cloud-hardened behavior:
-- FastAPI docs and OpenAPI endpoints are disabled.
-- Non-prefixed API routes are not registered (only `/api/*`).
-- Ingress/proxy/container topology is managed externally and is out of repository scope.
-
-## 6. Desktop packaged mode (Tauri)
+## 5. Desktop packaged mode (Tauri)
 
 Build entrypoint:
 - `release\tauri\build_with_tauri.bat`
@@ -88,13 +81,12 @@ Windows artifacts:
 - `release/windows/installers`
 - `release/windows/portable`
 
-## 7. Deterministic build notes
+## 6. Deterministic build notes
 
 - Backend lockfile: `runtimes/uv.lock`.
 - Frontend lockfile: `DILIGENT/client/package-lock.json`.
-- This repository does not include bundled container build artifacts.
 
-## 8. Maintenance boundary
+## 7. Maintenance boundary
 
 - `DILIGENT/setup_and_maintenance.bat` is for offline maintenance only:
   - manual database initialization

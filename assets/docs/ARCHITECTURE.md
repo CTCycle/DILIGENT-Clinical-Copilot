@@ -1,105 +1,84 @@
 # DILIGENT Clinical Copilot Architecture
 
-Last updated: 2026-04-03
+Last updated: 2026-04-08
 
 This document describes the current architecture at module level.
-For runtime profile details, see `assets/docs/PACKAGING_AND_RUNTIME_MODES.md`.
-For job semantics, see `assets/docs/BACKGROUND_JOBS.md`.
+For runtime profiles and packaging details, see `assets/docs/PACKAGING_AND_RUNTIME_MODES.md`.
+For background-job semantics, see `assets/docs/BACKGROUND_JOBS.md`.
 
 ## 1. System overview
 
-DILIGENT is a local-first clinical application for DILI assessment with:
-- Backend: FastAPI + SQLAlchemy + optional retrieval components.
+DILIGENT is a local-first clinical application for DILI assessment:
+- Backend: FastAPI + SQLAlchemy + service/repository layers.
 - Frontend: React + TypeScript (Vite).
-- Optional desktop shell: Tauri that starts a local backend.
-- Optional cloud-hardened runtime profile enabled from `.env` settings.
+- Optional desktop shell: Tauri, which starts a local backend process.
 
-## 2. Runtime request topology
+Core workflow:
+- User submits anamnesis, medications, and lab data from the frontend.
+- Backend validates and normalizes inputs.
+- Clinical services execute parsing, hepatotoxicity pattern inference, and RUCAM scoring.
+- Optional retrieval and web-search paths can enrich clinical reasoning when enabled.
+- Results, issues/warnings, and job status are returned to the UI and stored for inspection.
+
+## 2. Runtime and request topology
 
 - Backend entrypoint: `DILIGENT/server/app.py`.
 - Frontend entrypoint: `DILIGENT/client/src/main.tsx`.
-- Frontend calls backend through `/api/*`.
-- In local dev, Vite proxies `/api/*` to FastAPI.
-- In cloud-hardened mode, deployment ingress/proxy is external to this repository.
-- In non-cloud mode, FastAPI registers both direct routes and mirrored `/api` routes.
+- Frontend communicates through `/api/*`.
+- In local mode, Vite proxies `/api/*` to FastAPI.
+- Backend exposes direct routes and mirrored `/api` routes for compatibility.
+- Runtime process values come from `DILIGENT/settings/.env`.
 
-## 3. Backend module boundaries
+## 3. Backend boundaries
 
 - `DILIGENT/server/api/*`
-  - HTTP routes, request/response mapping, job start/poll/cancel endpoints.
+  - HTTP routes and request/response mapping.
+  - Job start/poll/cancel endpoints.
 - `DILIGENT/server/domain/*`
-  - Typed payload models for clinical, jobs, models, keys, inspection, research.
+  - Typed domain payloads and contracts.
 - `DILIGENT/server/services/*`
-  - Business logic: clinical analysis, updater flows, inspection orchestration, jobs.
-  - Active clinical pipeline is request-driven from `api/session.py` and uses:
-    - free-text laboratory parsing from `services/clinical/labs.py` (`laboratory_analysis` + supplemental anamnesis),
-    - pattern derivation from parsed timelines in `services/clinical/hepatox.py`,
-    - deterministic per-drug RUCAM estimation in `services/clinical/rucam.py`,
-    - language detection and localized validation/report scaffolding.
+  - Clinical analysis pipeline, inspection/update orchestration, job orchestration.
 - `DILIGENT/server/repositories/*`
-  - DB and serialization boundaries (SQLite/Postgres, vector serialization, queries).
+  - Persistence boundaries, DB queries, serialization.
 - `DILIGENT/server/models/*`
-  - LLM provider clients, prompt templates, structured-output helpers.
+  - Provider clients, prompt templates, structured-output helpers.
 - `DILIGENT/server/configurations/*`
-  - Runtime settings and environment/config resolution.
+  - Environment and runtime configuration loading.
 - `DILIGENT/server/common/*`
-  - Shared constants and utility functions.
+  - Shared utilities and constants.
+
+Active clinical pipeline (request-driven from session endpoints):
+- laboratory text parsing (`services/clinical/labs.py`)
+- hepatotoxicity pattern derivation (`services/clinical/hepatox.py`)
+- deterministic per-drug RUCAM estimation (`services/clinical/rucam.py`)
+- language-sensitive report scaffolding and validation
 
 ## 4. Frontend boundaries
 
 - `DILIGENT/client/src/pages/*`
-  - Route-level screens (`DiliAgentPage`, `ModelConfigPage`, `DataInspectionPage`).
+  - Main screens (DILI workflow, model configuration, data inspection).
 - `DILIGENT/client/src/components/*`
-  - Reusable UI elements and modals.
+  - Reusable UI components and modals.
 - `DILIGENT/client/src/context/AppStateContext.tsx`
-  - Shared application state.
+  - Shared app-level state.
 - `DILIGENT/client/src/services/api.ts`
-  - API client, response normalization, job polling behavior.
+  - HTTP client, API payload shaping, and job polling integration.
 - `DILIGENT/client/src/types.ts`
   - Shared frontend contract types.
 
-## 5. Current API surface (high level)
+## 5. API surface (high level)
 
-Core route groups:
-- Session and clinical jobs:
-  - `/clinical`
-  - `/clinical/jobs`
-  - `/clinical/jobs/{job_id}`
-- Models and pull jobs:
-  - `/models/list`
-  - `/models/pull`
-  - `/models/pull/jobs`
-  - `/models/jobs/{job_id}`
-- Model config:
-  - `/model-config`
-- Access keys:
-  - `/access-keys`
-  - `/access-keys/{id}/activate`
-- Inspection:
-  - `/inspection/sessions`
-  - `/inspection/rxnav`
-  - `/inspection/rxnav/update-config`
-  - `/inspection/rxnav/jobs`
-  - `/inspection/livertox`
-  - `/inspection/livertox/update-config`
-  - `/inspection/livertox/jobs`
-  - `/inspection/rag/update-config`
-  - `/inspection/rag/documents`
-  - `/inspection/rag/vector-store`
-  - `/inspection/rag/jobs`
-- Research:
-  - `/research`
+Primary route groups:
+- session/clinical analysis and clinical jobs
+- model listing and model pull jobs
+- model configuration
+- access key management and activation
+- data inspection (sessions, RxNav, LiverTox, RAG documents/vector store/update jobs)
+- research endpoints
 
-All are mounted under `/api/*`; non-cloud mode also exposes direct routes.
+All primary route groups are mounted under `/api/*`; direct route aliases are also supported.
 
-## 6. Error and safety boundaries
-
-- Global error handling is registered in `DILIGENT/server/api/error_handling.py`.
-- Request-level correlation IDs are propagated via middleware/headers.
-- Job errors are sanitized before user exposure (`services/jobs.py`).
-- Sensitive internals remain server-side logs only.
-
-## 7. Background jobs in active use
+## 6. Background jobs
 
 Current managed job types:
 - `clinical`
@@ -108,50 +87,42 @@ Current managed job types:
 - `livertox_update`
 - `rag_update`
 
-All follow start/poll/cancel patterns described in `assets/docs/BACKGROUND_JOBS.md`.
+All follow a shared start/poll/cancel lifecycle and shared job-state contract. See `assets/docs/BACKGROUND_JOBS.md`.
 
-## 8. Data and resources
+## 7. Data, resources, and persistence
 
-Project resources live under:
+Resource roots:
 - `DILIGENT/resources/models`
 - `DILIGENT/resources/sources`
 - `DILIGENT/resources/logs`
 
-Runtime/config files:
-- `DILIGENT/settings/.env` (active profile)
-- `DILIGENT/settings/.env.*.example` (profile templates)
-- `DILIGENT/settings/configurations.json` (non-secret tuning defaults)
+Configuration:
+- `DILIGENT/settings/.env` is the active runtime/process configuration.
+- `DILIGENT/settings/.env.*.example` are runtime profile templates.
+- `DILIGENT/settings/configurations.json` stores non-secret app defaults and DB settings.
 
-Maintenance boundary:
-- `DILIGENT/setup_and_maintenance.bat` is reserved for database initialization and offline maintenance.
-- RxNav/LiverTox/RAG dataset refresh operations are started from inspection UI wizards, not from `.bat` scripts.
+Persistence:
+- Embedded SQLite is supported.
+- External PostgreSQL is supported by configuration.
+- Provider access keys are encrypted at rest, with versioned encryption material persisted and resolved by key version.
 
-Access-key encryption architecture:
-- Provider API keys are encrypted at rest before persistence.
-- Encryption material is stored in `access_key_encryption_materials` (typed purpose registry).
-- Initial material is seeded during database initialization:
-  - SQLite: only when the local DB file is first created.
-  - PostgreSQL: only in explicit DB initialization path (`scripts/initialize_database.py` / setup menu).
-- Every stored provider key row carries `encryption_key_version`; decryption resolves material by that version.
-- Rows missing version metadata or referencing unknown versions fail closed.
-- No `.env` fallback or legacy decrypt path exists.
+## 8. Error and safety boundaries
 
-## 9. Change impact map
+- Global API exception handling is centralized in `DILIGENT/server/api/error_handling.py`.
+- Request-level correlation IDs are propagated across middleware and responses.
+- Job errors are sanitized before user-facing exposure.
+- Sensitive internals remain in server-side logs only.
 
-- Clinical behavior change:
-  - `server/api/session.py`, `server/services/clinical/*`, relevant unit/e2e tests.
-- Model/provider behavior:
-  - `server/api/model_config.py`, `server/api/ollama.py`, `client/src/pages/ModelConfigPage.tsx`, `client/src/services/api.ts`.
-- Inspection/data updates:
-  - `server/api/data_inspection.py`, `server/services/inspection.py`, updater services.
-- Access key handling:
-  - `server/api/access_keys.py`, `server/repositories/serialization/access_keys.py`, `client/src/components/AccessKeyModal.tsx`.
-- Runtime/deployment behavior:
-- `DILIGENT/start_on_windows.bat`, `release/tauri/*`, `.env profiles`.
+## 9. Operational boundaries
+
+- `DILIGENT/start_on_windows.bat` is the primary local launcher on Windows.
+- `DILIGENT/setup_and_maintenance.bat` is reserved for offline maintenance operations.
+- `release/tauri/*` contains desktop packaging/build scripts.
+- Data refresh operations (RxNav, LiverTox, RAG updates) are initiated from inspection UI workflows.
 
 ## 10. Clinical request contract (active)
 
-Current DILI request payload (high-level):
+Current high-level request fields:
 - `name`
 - `visit_date`
 - `anamnesis`
@@ -159,13 +130,13 @@ Current DILI request payload (high-level):
 - `laboratory_analysis`
 - `use_rag`
 - `use_web_search`
-- optional runtime overrides (`use_cloud_services`, provider/model overrides)
+- optional runtime overrides (provider/model and cloud/local selection)
 
-Hard blockers in active pipeline:
+Current hard blockers:
 - missing anamnesis
 - missing visit date
 - no drug with usable timing information
-- insufficient laboratory data to determine hepatotoxicity pattern
+- insufficient laboratory evidence to derive hepatotoxicity pattern
 
 Soft degradation:
-- non-critical gaps are preserved as warnings in `issues` and do not block if core clinical inference is still possible.
+- non-critical gaps are retained as warnings (`issues`) and do not block generation if core inference remains possible.
