@@ -95,10 +95,10 @@ def build_jobs_settings(data: dict[str, Any]) -> JobsSettings:
     return JobsSettings(polling_interval=polling_interval)
 
 
-def build_database_settings(payload: dict[str, Any], environment: EnvironmentSettings) -> DatabaseSettings:
-    embedded = coerce_bool(environment.db_embedded, True)
+def build_database_settings(payload: dict[str, Any], _environment: EnvironmentSettings) -> DatabaseSettings:
+    embedded = coerce_bool(payload.get("embedded_database", payload.get("embedded")), True)
     insert_batch_size = coerce_int(
-        environment.db_insert_batch_size if environment.db_insert_batch_size is not None else payload.get("insert_batch_size"),
+        payload.get("insert_batch_size"),
         1000,
         minimum=1,
     )
@@ -115,23 +115,23 @@ def build_database_settings(payload: dict[str, Any], environment: EnvironmentSet
             password=None,
             ssl=False,
             ssl_ca=None,
-            connect_timeout=10,
+            connect_timeout=coerce_int(payload.get("connect_timeout"), 10, minimum=1),
             insert_batch_size=insert_batch_size,
             insert_commit_interval=commit_interval,
             select_page_size=select_page_size,
         )
-    engine_value = coerce_str_or_none(environment.db_engine) or coerce_str_or_none(payload.get("engine")) or "postgres"
+    engine_value = coerce_str_or_none(payload.get("engine")) or "postgres"
     return DatabaseSettings(
         embedded_database=False,
         engine=engine_value.lower(),
-        host=coerce_str_or_none(environment.db_host) or coerce_str_or_none(payload.get("host")),
-        port=coerce_int(environment.db_port if environment.db_port is not None else payload.get("port"), 5432, minimum=1, maximum=65535),
-        database_name=coerce_str_or_none(environment.db_name) or coerce_str_or_none(payload.get("database_name")),
-        username=coerce_str_or_none(environment.db_user) or coerce_str_or_none(payload.get("username")),
-        password=coerce_str_or_none(environment.db_password),
-        ssl=coerce_bool(environment.db_ssl, coerce_bool(payload.get("ssl", False), False)),
-        ssl_ca=coerce_str_or_none(environment.db_ssl_ca) or coerce_str_or_none(payload.get("ssl_ca")),
-        connect_timeout=coerce_int(environment.db_connect_timeout, 10, minimum=1),
+        host=coerce_str_or_none(payload.get("host")),
+        port=coerce_int(payload.get("port"), 5432, minimum=1, maximum=65535),
+        database_name=coerce_str_or_none(payload.get("database_name")),
+        username=coerce_str_or_none(payload.get("username")),
+        password=coerce_str_or_none(payload.get("password")),
+        ssl=coerce_bool(payload.get("ssl", False), False),
+        ssl_ca=coerce_str_or_none(payload.get("ssl_ca")),
+        connect_timeout=coerce_int(payload.get("connect_timeout"), 10, minimum=1),
         insert_batch_size=insert_batch_size,
         insert_commit_interval=commit_interval,
         select_page_size=select_page_size,

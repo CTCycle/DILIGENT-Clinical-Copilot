@@ -1,36 +1,45 @@
-import { defineConfig } from 'vite'
+import * as path from 'node:path'
+import { defineConfig, loadEnv } from 'vite'
 import react from '@vitejs/plugin-react'
 
-// https://vite.dev/config/
-const apiHost = process.env.FASTAPI_HOST || '127.0.0.1'
-const apiPort = process.env.FASTAPI_PORT || '8000'
-const apiTarget = `http://${apiHost}:${apiPort}`
+const defaultHost = '127.0.0.1'
+const defaultUiPort = 7861
+const defaultApiPort = 8000
 
+export default defineConfig(({ mode }) => {
+    const env = loadEnv(mode, path.resolve(__dirname, '../settings'), '')
+    const apiHost = env.FASTAPI_HOST || defaultHost
+    const apiPort = Number.parseInt(env.FASTAPI_PORT || `${defaultApiPort}`, 10) || defaultApiPort
+    const uiHost = env.UI_HOST || defaultHost
+    const uiPort = Number.parseInt(env.UI_PORT || `${defaultUiPort}`, 10) || defaultUiPort
+    const apiTarget = `http://${apiHost}:${apiPort}`
 
-export default defineConfig({
-    plugins: [react()],
-    server: {
-        host: '127.0.0.1',
-        port: 7861,
-        strictPort: false,
-        proxy: {
-            '/api': {
-                target: apiTarget,
-                changeOrigin: true,
-                rewrite: (path) => path.replace(/^\/api/, ''),
+    return {
+        envDir: path.resolve(__dirname, '../settings'),
+        plugins: [react()],
+        server: {
+            host: uiHost,
+            port: uiPort,
+            strictPort: false,
+            proxy: {
+                '/api': {
+                    target: apiTarget,
+                    changeOrigin: true,
+                    rewrite: (proxyPath) => proxyPath.replace(/^\/api/, ''),
+                },
             },
         },
-    },
-    preview: {
-        host: '127.0.0.1',
-        port: 7861,
-        strictPort: false,
-        proxy: {
-            '/api': {
-                target: apiTarget,
-                changeOrigin: true,
-                rewrite: (path) => path.replace(/^\/api/, ''),
+        preview: {
+            host: uiHost,
+            port: uiPort,
+            strictPort: false,
+            proxy: {
+                '/api': {
+                    target: apiTarget,
+                    changeOrigin: true,
+                    rewrite: (proxyPath) => proxyPath.replace(/^\/api/, ''),
+                },
             },
         },
-    },
+    }
 })
