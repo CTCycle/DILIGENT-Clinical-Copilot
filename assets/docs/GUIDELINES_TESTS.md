@@ -1,5 +1,8 @@
 # Testing Guidelines
 
+Last updated: 2026-04-08
+
+
 This document defines the current testing approach for DILIGENT Clinical Copilot.
 
 ## 1. Test layers

@@ -7,6 +7,21 @@
   "jobs": {
     "polling_interval": 1
   },
+  "database": {
+    "embedded_database": true,
+    "engine": "postgres",
+    "host": "127.0.0.1",
+    "port": 5432,
+    "database_name": "diligent",
+    "username": "postgres",
+    "password": "",
+    "ssl": false,
+    "ssl_ca": "",
+    "connect_timeout": 10,
+    "insert_batch_size": 1000,
+    "insert_commit_interval": 5,
+    "select_page_size": 2000
+  },
   "rag": {
     "vector_collection_name": "documents",
     "chunk_size": 1024,

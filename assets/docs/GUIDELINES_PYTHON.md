@@ -1,5 +1,8 @@
 # Python Guidelines (DILIGENT Backend)
 
+Last updated: 2026-04-08
+
+
 Scope: `DILIGENT/server`, backend scripts, and Python tests.
 
 Also mandatory: apply `assets/docs/ERROR_HANDLING.md`.
