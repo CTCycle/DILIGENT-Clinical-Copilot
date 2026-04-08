@@ -92,6 +92,9 @@ TABLE_DRUGS = "drugs"
 TABLE_DRUG_RXNORM_CODES = "drug_rxnorm_codes"
 TABLE_DRUG_ALIASES = "drug_aliases"
 TABLE_LIVERTOX_MONOGRAPHS = "livertox_monographs"
+TABLE_DRUG_DILI_ANNOTATIONS = "drug_dili_annotations"
+TABLE_DRUG_LABEL_DOCUMENTS = "drug_label_documents"
+TABLE_DRUG_LABEL_SECTIONS = "drug_label_sections"
 TABLE_MODEL_SELECTIONS = "model_selections"
 TABLE_RUNTIME_SETTINGS = "runtime_settings"
 TABLE_ACCESS_KEYS = "access_keys"
@@ -150,10 +153,35 @@ LIVERTOX_MASTER_COLUMNS = [
 ###############################################################################
 ATC_BASE_URL = "https://atcddd.fhi.no/atc_ddd_index/"
 LIVERTOX_BASE_URL = "https://ftp.ncbi.nlm.nih.gov/pub/litarch/29/31/"
+DILIRANK_SOURCE_URL = "https://www.fda.gov/science-research/liver-toxicity-knowledge-base-ltkb/drug-induced-liver-injury-rank-dilirank-dataset"
+DILIST_SOURCE_URL = "https://pubmed.ncbi.nlm.nih.gov/30247677/"
+DAILYMED_RXNORM_SETID_MAPPING_URL = "https://dailymed.nlm.nih.gov/dailymed/spl-resources-all-drug-labels.cfm"
+DAILYMED_LABEL_XML_BASE_URL = "https://dailymed.nlm.nih.gov/dailymed/services/v2/spls"
 DOCUMENT_SUPPORTED_EXTENSIONS = {".pdf", ".txt", ".xml", ".docx", ".doc"}
 TEXT_FILE_FALLBACK_ENCODINGS = ("utf-8", "utf-16", "latin-1", "iso-8859-1")
 DRUG_NAME_ALLOWED_PATTERN = r"[A-Za-z0-9\s\-/(),'+\.]+"
 DEFAULT_EMBEDDING_BATCH_SIZE = 64
+DAILYMED_SECTION_WHITELIST = (
+    "boxed_warning",
+    "warnings_and_precautions",
+    "adverse_reactions",
+    "contraindications",
+    "use_in_specific_populations",
+)
+HEPATIC_KEYWORDS = {
+    "liver",
+    "hepatic",
+    "hepatotoxic",
+    "hepatitis",
+    "cholestatic",
+    "bilirubin",
+    "transaminase",
+    "alt",
+    "ast",
+    "alp",
+    "drug induced liver injury",
+    "dili",
+}
 
 HEPATOTOXIC_MEDDRA_TERMS = {
     "hepatotoxicity",

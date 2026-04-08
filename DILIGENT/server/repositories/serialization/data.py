@@ -12,7 +12,7 @@ from xml.etree import ElementTree
 
 import pandas as pd
 from pypdf import PdfReader
-from sqlalchemy import and_, delete, exists, func, inspect, or_, select, update
+from sqlalchemy import and_, case, delete, exists, func, inspect, or_, select, update
 from sqlalchemy.orm import Session, sessionmaker
 
 from DILIGENT.server.configurations.bootstrap import server_settings
@@ -43,6 +43,9 @@ from DILIGENT.server.repositories.schemas.models import (
     ClinicalSessionSection,
     Drug,
     DrugAlias,
+    DrugDiliAnnotation,
+    DrugLabelDocument,
+    DrugLabelSection,
     DrugRxnormCode,
     LiverToxMonograph,
 )
@@ -104,6 +107,9 @@ class _RepositorySerializationService:
             ClinicalSession.__tablename__,
             ClinicalSessionResult.__tablename__,
             Drug.__tablename__,
+            DrugDiliAnnotation.__tablename__,
+            DrugLabelDocument.__tablename__,
+            DrugLabelSection.__tablename__,
         )
         missing_tables = [
             table_name for table_name in required_tables if not inspector.has_table(table_name)
@@ -1065,6 +1071,447 @@ class _RepositorySerializationService:
             db_session.close()
 
     # -----------------------------------------------------------------------------
+    def save_dili_annotations(self, records: pd.DataFrame) -> None:
+        self.ensure_session_result_table()
+        if records.empty:
+            return
+        frame = records.copy().where(pd.notnull(records), cast(Any, None))
+        db_session = self.session_factory()
+        try:
+            for row in frame.to_dict(orient="records"):
+                source_dataset = self.normalize_string(row.get("source_dataset"))
+                source_record_id = self.normalize_string(row.get("source_record_id"))
+                if source_dataset is None or source_record_id is None:
+                    continue
+                existing = db_session.execute(
+                    select(DrugDiliAnnotation).where(
+                        DrugDiliAnnotation.source_dataset == source_dataset,
+                        DrugDiliAnnotation.source_record_id == source_record_id,
+                    )
+                ).scalar_one_or_none()
+                if existing is None:
+                    existing = DrugDiliAnnotation(
+                        source_dataset=source_dataset,
+                        source_record_id=source_record_id,
+                    )
+                    db_session.add(existing)
+                drug_id = self.to_int(row.get("drug_id"))
+                existing.drug_id = drug_id
+                existing.source_name = self.normalize_string(row.get("source_name"))
+                existing.source_name_norm = self.normalize_string(row.get("source_name_norm"))
+                existing.classification = self.normalize_string(row.get("classification"))
+                existing.severity_class = self.normalize_string(row.get("severity_class"))
+                existing.concern_class = self.normalize_string(row.get("concern_class"))
+                existing.label_section = self.normalize_string(row.get("label_section"))
+                existing.routes = self.normalize_string(row.get("routes"))
+                existing.comment = self.normalize_string(row.get("comment"))
+                existing.source_url = self.normalize_string(row.get("source_url"))
+                existing.source_last_modified = self.normalize_string(
+                    row.get("source_last_modified")
+                )
+            db_session.commit()
+        except Exception:
+            db_session.rollback()
+            raise
+        finally:
+            db_session.close()
+
+    # -----------------------------------------------------------------------------
+    def replace_drug_label_documents(self, records: list[dict[str, Any]]) -> None:
+        self.ensure_session_result_table()
+        db_session = self.session_factory()
+        try:
+            db_session.execute(delete(DrugLabelSection))
+            db_session.execute(delete(DrugLabelDocument))
+            db_session.flush()
+            for record in records:
+                drug_id = self.to_int(record.get("drug_id"))
+                source = self.normalize_string(record.get("source"))
+                set_id = self.normalize_string(record.get("set_id"))
+                spl_version = self.to_int(record.get("spl_version"))
+                if drug_id is None or source is None or set_id is None or spl_version is None:
+                    continue
+                document = DrugLabelDocument(
+                    drug_id=drug_id,
+                    source=source,
+                    set_id=set_id,
+                    spl_version=spl_version,
+                    title=self.normalize_string(record.get("title")),
+                    labeler=self.normalize_string(record.get("labeler")),
+                    effective_date=self.normalize_date(record.get("effective_date")),
+                    source_url=self.normalize_string(record.get("source_url")),
+                    source_last_modified=self.normalize_string(
+                        record.get("source_last_modified")
+                    ),
+                )
+                db_session.add(document)
+                db_session.flush()
+                sections = record.get("sections")
+                if not isinstance(sections, list):
+                    continue
+                for index, section in enumerate(sections):
+                    if not isinstance(section, dict):
+                        continue
+                    section_key = self.normalize_string(section.get("section_key"))
+                    text_value = self.normalize_string(section.get("text"))
+                    if section_key is None or text_value is None:
+                        continue
+                    db_session.add(
+                        DrugLabelSection(
+                            document_id=int(document.id),
+                            section_key=section_key,
+                            section_title=self.normalize_string(section.get("section_title")),
+                            text=text_value,
+                            contains_hepatic_keywords=bool(
+                                section.get("contains_hepatic_keywords", False)
+                            ),
+                            display_order=self.to_int(section.get("display_order")) or index,
+                        )
+                    )
+            db_session.commit()
+        except Exception:
+            db_session.rollback()
+            raise
+        finally:
+            db_session.close()
+
+    # -----------------------------------------------------------------------------
+    def list_dili_annotations_catalog(
+        self,
+        *,
+        search: str | None,
+        offset: int,
+        limit: int,
+    ) -> tuple[list[dict[str, Any]], int]:
+        self.ensure_session_result_table()
+        safe_offset = max(int(offset), 0)
+        safe_limit = max(int(limit), 1)
+        search_pattern = self.build_search_pattern(search)
+        db_session = self.session_factory()
+        try:
+            dilirank_class = func.max(
+                case(
+                    (
+                        func.lower(DrugDiliAnnotation.source_dataset) == "dilirank",
+                        DrugDiliAnnotation.classification,
+                    ),
+                    else_=None,
+                )
+            ).label("dilirank_class")
+            dilist_class = func.max(
+                case(
+                    (
+                        func.lower(DrugDiliAnnotation.source_dataset) == "dilist",
+                        DrugDiliAnnotation.classification,
+                    ),
+                    else_=None,
+                )
+            ).label("dilist_class")
+            linked_source_count = func.count(DrugDiliAnnotation.id).label("linked_source_count")
+            base = (
+                select(
+                    Drug.id.label("drug_id"),
+                    Drug.canonical_name.label("drug_name"),
+                    dilirank_class,
+                    dilist_class,
+                    linked_source_count,
+                )
+                .join(DrugDiliAnnotation, Drug.id == DrugDiliAnnotation.drug_id)
+                .group_by(Drug.id, Drug.canonical_name)
+            )
+            if search_pattern is not None:
+                base = base.where(
+                    or_(
+                        func.lower(func.coalesce(Drug.canonical_name, "")).like(
+                            search_pattern,
+                            escape="\\",
+                        ),
+                        exists(
+                            select(1).where(
+                                DrugAlias.drug_id == Drug.id,
+                                func.lower(func.coalesce(DrugAlias.alias, "")).like(
+                                    search_pattern,
+                                    escape="\\",
+                                ),
+                            )
+                        ),
+                    )
+                )
+            wrapped = base.subquery()
+            total_rows = int(
+                db_session.execute(
+                    select(func.count()).select_from(wrapped)
+                ).scalar_one()
+            )
+            rows = db_session.execute(
+                select(wrapped)
+                .order_by(
+                    func.lower(func.coalesce(wrapped.c.drug_name, "")),
+                    wrapped.c.drug_id.asc(),
+                )
+                .offset(safe_offset)
+                .limit(safe_limit)
+            ).all()
+            items = [
+                {
+                    "drug_id": int(row.drug_id),
+                    "drug_name": row.drug_name,
+                    "dilirank_class": self.normalize_string(row.dilirank_class),
+                    "dilist_class": self.normalize_string(row.dilist_class),
+                    "linked_source_count": int(row.linked_source_count or 0),
+                }
+                for row in rows
+            ]
+            return items, total_rows
+        finally:
+            db_session.close()
+
+    # -----------------------------------------------------------------------------
+    def get_dili_annotation_details(self, drug_id: int) -> dict[str, Any] | None:
+        self.ensure_session_result_table()
+        safe_drug_id = int(drug_id)
+        db_session = self.session_factory()
+        try:
+            drug = db_session.get(Drug, safe_drug_id)
+            if drug is None:
+                return None
+            rows = db_session.execute(
+                select(DrugDiliAnnotation).where(DrugDiliAnnotation.drug_id == safe_drug_id)
+            ).scalars().all()
+            annotations: list[dict[str, Any]] = []
+            for item in sorted(
+                rows,
+                key=lambda value: (
+                    self.to_sortable_text(value.source_dataset),
+                    self.to_sortable_text(value.source_record_id),
+                ),
+            ):
+                annotations.append(
+                    {
+                        "source_dataset": item.source_dataset,
+                        "source_record_id": item.source_record_id,
+                        "source_name": item.source_name,
+                        "source_name_norm": item.source_name_norm,
+                        "classification": item.classification,
+                        "severity_class": item.severity_class,
+                        "concern_class": item.concern_class,
+                        "label_section": item.label_section,
+                        "routes": item.routes,
+                        "comment": item.comment,
+                        "source_url": item.source_url,
+                        "source_last_modified": item.source_last_modified,
+                    }
+                )
+            return {
+                "drug_id": int(drug.id),
+                "drug_name": drug.canonical_name,
+                "annotations": annotations,
+            }
+        finally:
+            db_session.close()
+
+    # -----------------------------------------------------------------------------
+    def list_drug_label_catalog(
+        self,
+        *,
+        search: str | None,
+        offset: int,
+        limit: int,
+    ) -> tuple[list[dict[str, Any]], int]:
+        self.ensure_session_result_table()
+        safe_offset = max(int(offset), 0)
+        safe_limit = max(int(limit), 1)
+        search_pattern = self.build_search_pattern(search)
+        db_session = self.session_factory()
+        try:
+            section_count = (
+                select(
+                    DrugLabelSection.document_id,
+                    func.count(DrugLabelSection.id).label("retained_section_count"),
+                )
+                .group_by(DrugLabelSection.document_id)
+                .subquery()
+            )
+            stmt = (
+                select(
+                    Drug.id.label("drug_id"),
+                    Drug.canonical_name.label("drug_name"),
+                    DrugLabelDocument.source,
+                    DrugLabelDocument.effective_date,
+                    func.coalesce(section_count.c.retained_section_count, 0).label(
+                        "retained_section_count"
+                    ),
+                )
+                .join(DrugLabelDocument, DrugLabelDocument.drug_id == Drug.id)
+                .outerjoin(section_count, section_count.c.document_id == DrugLabelDocument.id)
+            )
+            if search_pattern is not None:
+                stmt = stmt.where(
+                    or_(
+                        func.lower(func.coalesce(Drug.canonical_name, "")).like(
+                            search_pattern,
+                            escape="\\",
+                        ),
+                        exists(
+                            select(1).where(
+                                DrugAlias.drug_id == Drug.id,
+                                func.lower(func.coalesce(DrugAlias.alias, "")).like(
+                                    search_pattern,
+                                    escape="\\",
+                                ),
+                            )
+                        ),
+                    )
+                )
+            count_stmt = select(func.count()).select_from(stmt.subquery())
+            total_rows = int(db_session.execute(count_stmt).scalar_one())
+            rows = db_session.execute(
+                stmt.order_by(
+                    func.lower(func.coalesce(Drug.canonical_name, "")),
+                    Drug.id.asc(),
+                )
+                .offset(safe_offset)
+                .limit(safe_limit)
+            ).all()
+            items = [
+                {
+                    "drug_id": int(row.drug_id),
+                    "drug_name": row.drug_name,
+                    "source": row.source,
+                    "effective_date": self.normalize_date(row.effective_date),
+                    "retained_section_count": int(row.retained_section_count or 0),
+                }
+                for row in rows
+            ]
+            return items, total_rows
+        finally:
+            db_session.close()
+
+    # -----------------------------------------------------------------------------
+    def get_drug_label_sections(self, drug_id: int) -> dict[str, Any] | None:
+        self.ensure_session_result_table()
+        safe_drug_id = int(drug_id)
+        db_session = self.session_factory()
+        try:
+            drug = db_session.get(Drug, safe_drug_id)
+            if drug is None:
+                return None
+            document = db_session.execute(
+                select(DrugLabelDocument)
+                .where(DrugLabelDocument.drug_id == safe_drug_id)
+                .order_by(
+                    func.lower(func.coalesce(DrugLabelDocument.source, "")),
+                    DrugLabelDocument.effective_date.desc(),
+                    DrugLabelDocument.spl_version.desc(),
+                    DrugLabelDocument.set_id.asc(),
+                )
+            ).scalars().first()
+            if document is None:
+                return None
+            sections = db_session.execute(
+                select(DrugLabelSection).where(DrugLabelSection.document_id == int(document.id))
+            ).scalars().all()
+            section_rows = [
+                {
+                    "section_key": item.section_key,
+                    "section_title": item.section_title,
+                    "text": item.text,
+                    "contains_hepatic_keywords": bool(item.contains_hepatic_keywords),
+                    "display_order": int(item.display_order),
+                }
+                for item in sorted(sections, key=lambda value: int(value.display_order))
+            ]
+            return {
+                "drug_id": int(drug.id),
+                "drug_name": drug.canonical_name,
+                "source": document.source,
+                "set_id": document.set_id,
+                "spl_version": int(document.spl_version),
+                "effective_date": self.normalize_date(document.effective_date),
+                "sections": section_rows,
+            }
+        finally:
+            db_session.close()
+
+    # -----------------------------------------------------------------------------
+    def get_drug_knowledge_bundle(self, drug_id: int) -> dict[str, Any]:
+        self.ensure_session_result_table()
+        safe_drug_id = int(drug_id)
+        db_session = self.session_factory()
+        try:
+            drug = db_session.get(Drug, safe_drug_id)
+            if drug is None:
+                return {
+                    "drug_id": safe_drug_id,
+                    "drug_name": None,
+                    "livertox_excerpt": None,
+                    "dili_annotations": [],
+                    "label_sections": [],
+                }
+            livertox_excerpt = db_session.execute(
+                select(LiverToxMonograph.excerpt).where(LiverToxMonograph.drug_id == safe_drug_id)
+            ).scalar_one_or_none()
+            annotations = db_session.execute(
+                select(DrugDiliAnnotation).where(DrugDiliAnnotation.drug_id == safe_drug_id)
+            ).scalars().all()
+            documents = db_session.execute(
+                select(DrugLabelDocument).where(DrugLabelDocument.drug_id == safe_drug_id)
+            ).scalars().all()
+            document_ids = [int(item.id) for item in documents]
+            section_rows: list[DrugLabelSection] = []
+            if document_ids:
+                section_rows = db_session.execute(
+                    select(DrugLabelSection).where(DrugLabelSection.document_id.in_(document_ids))
+                ).scalars().all()
+            document_by_id = {int(item.id): item for item in documents}
+            return {
+                "drug_id": int(drug.id),
+                "drug_name": drug.canonical_name,
+                "livertox_excerpt": self.normalize_string(livertox_excerpt),
+                "dili_annotations": [
+                    {
+                        "source_dataset": item.source_dataset,
+                        "classification": item.classification,
+                        "severity_class": item.severity_class,
+                        "concern_class": item.concern_class,
+                        "comment": item.comment,
+                    }
+                    for item in sorted(
+                        annotations,
+                        key=lambda value: (
+                            self.to_sortable_text(value.source_dataset),
+                            self.to_sortable_text(value.source_record_id),
+                        ),
+                    )
+                ],
+                "label_sections": [
+                    {
+                        "source": document_by_id[int(item.document_id)].source
+                        if int(item.document_id) in document_by_id
+                        else "dailymed",
+                        "section_key": item.section_key,
+                        "section_title": item.section_title,
+                        "text": item.text,
+                        "contains_hepatic_keywords": bool(item.contains_hepatic_keywords),
+                        "display_order": int(item.display_order),
+                    }
+                    for item in sorted(
+                        section_rows,
+                        key=lambda value: (
+                            self.to_sortable_text(
+                                document_by_id[int(value.document_id)].source
+                                if int(value.document_id) in document_by_id
+                                else "dailymed"
+                            ),
+                            int(value.display_order),
+                        ),
+                    )
+                ],
+            }
+        finally:
+            db_session.close()
+
+    # -----------------------------------------------------------------------------
     def delete_drug_with_cleanup(self, drug_id: int) -> bool:
         self.ensure_session_result_table()
         safe_drug_id = int(drug_id)
@@ -1084,6 +1531,21 @@ class _RepositorySerializationService:
             )
             db_session.execute(
                 delete(LiverToxMonograph).where(LiverToxMonograph.drug_id == safe_drug_id)
+            )
+            db_session.execute(
+                delete(DrugDiliAnnotation).where(DrugDiliAnnotation.drug_id == safe_drug_id)
+            )
+            label_document_ids = db_session.execute(
+                select(DrugLabelDocument.id).where(DrugLabelDocument.drug_id == safe_drug_id)
+            ).scalars().all()
+            if label_document_ids:
+                db_session.execute(
+                    delete(DrugLabelSection).where(
+                        DrugLabelSection.document_id.in_(list(label_document_ids))
+                    )
+                )
+            db_session.execute(
+                delete(DrugLabelDocument).where(DrugLabelDocument.drug_id == safe_drug_id)
             )
             db_session.execute(delete(Drug).where(Drug.id == safe_drug_id))
             db_session.commit()

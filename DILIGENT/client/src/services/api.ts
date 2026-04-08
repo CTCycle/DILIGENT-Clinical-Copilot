@@ -5,7 +5,13 @@ import {
   ApiResult,
   ClinicalRequestPayload,
   InspectionCatalogQuery,
+  InspectionDiliPriorCatalogResponse,
+  InspectionDiliPriorDetailResponse,
+  InspectionDiliPriorsOverrideRequest,
   InspectionDeleteResponse,
+  InspectionDrugLabelCatalogResponse,
+  InspectionDrugLabelSectionsResponse,
+  InspectionDrugLabelsOverrideRequest,
   InspectionLiverToxOverrideRequest,
   InspectionDrugAliasesResponse,
   InspectionLiverToxCatalogResponse,
@@ -544,6 +550,124 @@ export async function cancelInspectionLiverToxUpdateJob(
 ): Promise<JobCancelResponse> {
   return requestJson<JobCancelResponse>(
     `${API_BASE_URL}/inspection/livertox/jobs/${encodeURIComponent(jobId)}`,
+    { method: "DELETE" },
+  );
+}
+
+export async function fetchInspectionDiliPriorsCatalog(
+  query: InspectionCatalogQuery,
+): Promise<InspectionDiliPriorCatalogResponse> {
+  const queryString = buildQueryString({
+    search: query.search,
+    offset: query.offset ?? 0,
+    limit: query.limit ?? 10,
+  });
+  return requestJson<InspectionDiliPriorCatalogResponse>(
+    `${API_BASE_URL}/inspection/dili-priors${queryString}`,
+    { method: "GET" },
+  );
+}
+
+export async function fetchInspectionDiliPriorDetails(
+  drugId: number,
+): Promise<InspectionDiliPriorDetailResponse> {
+  return requestJson<InspectionDiliPriorDetailResponse>(
+    `${API_BASE_URL}/inspection/dili-priors/${encodeURIComponent(String(drugId))}`,
+    { method: "GET" },
+  );
+}
+
+export async function fetchInspectionDiliPriorsUpdateConfig(): Promise<InspectionUpdateConfigResponse> {
+  return requestJson<InspectionUpdateConfigResponse>(`${API_BASE_URL}/inspection/dili-priors/update-config`, {
+    method: "GET",
+  });
+}
+
+export async function startInspectionDiliPriorsUpdateJob(
+  payload: InspectionDiliPriorsOverrideRequest = {},
+): Promise<JobStartResponse> {
+  return requestJson<JobStartResponse>(`${API_BASE_URL}/inspection/dili-priors/jobs`, {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify(payload),
+  });
+}
+
+export async function fetchInspectionDiliPriorsUpdateJobStatus(
+  jobId: string,
+): Promise<InspectionUpdateJobStatusResponse> {
+  return requestJson<InspectionUpdateJobStatusResponse>(
+    `${API_BASE_URL}/inspection/dili-priors/jobs/${encodeURIComponent(jobId)}`,
+    { method: "GET" },
+  );
+}
+
+export async function cancelInspectionDiliPriorsUpdateJob(
+  jobId: string,
+): Promise<JobCancelResponse> {
+  return requestJson<JobCancelResponse>(
+    `${API_BASE_URL}/inspection/dili-priors/jobs/${encodeURIComponent(jobId)}`,
+    { method: "DELETE" },
+  );
+}
+
+export async function fetchInspectionDrugLabelsCatalog(
+  query: InspectionCatalogQuery,
+): Promise<InspectionDrugLabelCatalogResponse> {
+  const queryString = buildQueryString({
+    search: query.search,
+    offset: query.offset ?? 0,
+    limit: query.limit ?? 10,
+  });
+  return requestJson<InspectionDrugLabelCatalogResponse>(
+    `${API_BASE_URL}/inspection/drug-labels${queryString}`,
+    { method: "GET" },
+  );
+}
+
+export async function fetchInspectionDrugLabelSections(
+  drugId: number,
+): Promise<InspectionDrugLabelSectionsResponse> {
+  return requestJson<InspectionDrugLabelSectionsResponse>(
+    `${API_BASE_URL}/inspection/drug-labels/${encodeURIComponent(String(drugId))}/sections`,
+    { method: "GET" },
+  );
+}
+
+export async function fetchInspectionDrugLabelsUpdateConfig(): Promise<InspectionUpdateConfigResponse> {
+  return requestJson<InspectionUpdateConfigResponse>(`${API_BASE_URL}/inspection/drug-labels/update-config`, {
+    method: "GET",
+  });
+}
+
+export async function startInspectionDrugLabelsUpdateJob(
+  payload: InspectionDrugLabelsOverrideRequest = {},
+): Promise<JobStartResponse> {
+  return requestJson<JobStartResponse>(`${API_BASE_URL}/inspection/drug-labels/jobs`, {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify(payload),
+  });
+}
+
+export async function fetchInspectionDrugLabelsUpdateJobStatus(
+  jobId: string,
+): Promise<InspectionUpdateJobStatusResponse> {
+  return requestJson<InspectionUpdateJobStatusResponse>(
+    `${API_BASE_URL}/inspection/drug-labels/jobs/${encodeURIComponent(jobId)}`,
+    { method: "GET" },
+  );
+}
+
+export async function cancelInspectionDrugLabelsUpdateJob(
+  jobId: string,
+): Promise<JobCancelResponse> {
+  return requestJson<JobCancelResponse>(
+    `${API_BASE_URL}/inspection/drug-labels/jobs/${encodeURIComponent(jobId)}`,
     { method: "DELETE" },
   );
 }

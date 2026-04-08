@@ -10,8 +10,14 @@ from pydantic import BaseModel, ConfigDict, Field, field_validator
 
 SessionStatus = Literal["successful", "failed"]
 DateFilterMode = Literal["before", "after", "exact"]
-InspectionUpdateTarget = Literal["rxnav", "livertox", "rag"]
-InspectionUpdateJobType = Literal["rxnav_update", "livertox_update", "rag_update"]
+InspectionUpdateTarget = Literal["rxnav", "livertox", "dili_priors", "drug_labels", "rag"]
+InspectionUpdateJobType = Literal[
+    "rxnav_update",
+    "livertox_update",
+    "dili_priors_update",
+    "drug_labels_update",
+    "rag_update",
+]
 InspectionJobPhase = Literal[
     "configuration_accepted",
     "update_started",
@@ -120,6 +126,64 @@ class LiverToxExcerptResponse(BaseModel):
 
 
 ###############################################################################
+class DiliPriorCatalogItem(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+    drug_id: int
+    drug_name: str
+    dilirank_class: str | None = None
+    dilist_class: str | None = None
+    linked_source_count: int = 0
+
+
+###############################################################################
+class DiliPriorCatalogResponse(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+    items: list[DiliPriorCatalogItem] = Field(default_factory=list)
+    total: int
+    offset: int
+    limit: int
+
+
+###############################################################################
+class DiliPriorDetailResponse(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+    drug_id: int
+    drug_name: str
+    annotations: list[dict[str, Any]] = Field(default_factory=list)
+
+
+###############################################################################
+class DrugLabelCatalogItem(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+    drug_id: int
+    drug_name: str
+    source: str
+    effective_date: str | None = None
+    retained_section_count: int = 0
+
+
+###############################################################################
+class DrugLabelCatalogResponse(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+    items: list[DrugLabelCatalogItem] = Field(default_factory=list)
+    total: int
+    offset: int
+    limit: int
+
+
+###############################################################################
+class DrugLabelSectionsResponse(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+    drug_id: int
+    drug_name: str
+    source: str
+    set_id: str
+    spl_version: int
+    effective_date: str | None = None
+    sections: list[dict[str, Any]] = Field(default_factory=list)
+
+
+###############################################################################
 class DeleteEntityResponse(BaseModel):
     model_config = ConfigDict(extra="forbid")
     deleted: bool
@@ -199,6 +263,20 @@ class InspectionLiverToxOverrideRequest(BaseModel):
 
 
 ###############################################################################
+class InspectionDiliPriorsOverrideRequest(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+    redownload: bool | None = None
+
+
+###############################################################################
+class InspectionDrugLabelsOverrideRequest(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+    dailymed_request_timeout: float | None = Field(default=None, ge=1.0, le=120.0)
+    dailymed_max_concurrency: int | None = Field(default=None, ge=1, le=64)
+    redownload: bool | None = None
+
+
+###############################################################################
 class InspectionRagOverrideRequest(BaseModel):
     model_config = ConfigDict(extra="forbid")
     chunk_size: int | None = Field(default=None, ge=64, le=8192)
@@ -275,4 +353,3 @@ class RagUpdateJobSummary(BaseModel):
     documents: int = 0
     chunks: int = 0
     backend: str = "local"
-
