@@ -118,6 +118,14 @@ class Drug(Base):
         back_populates="drug",
         uselist=False,
     )
+    dili_annotations: Mapped[list["DrugDiliAnnotation"]] = relationship(
+        "DrugDiliAnnotation",
+        back_populates="drug",
+    )
+    label_documents: Mapped[list["DrugLabelDocument"]] = relationship(
+        "DrugLabelDocument",
+        back_populates="drug",
+    )
     session_drugs: Mapped[list["ClinicalSessionDrug"]] = relationship(
         "ClinicalSessionDrug",
         back_populates="drug",
@@ -204,6 +212,111 @@ class LiverToxMonograph(Base):
     __table_args__ = (
         UniqueConstraint("drug_id", name="uq_livertox_monographs_drug_id"),
         Index("ix_livertox_monographs_drug_id", "drug_id"),
+    )
+
+
+###############################################################################
+class DrugDiliAnnotation(Base):
+    __tablename__ = "drug_dili_annotations"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
+    drug_id: Mapped[int | None] = mapped_column(Integer, ForeignKey(DRUGS_ID_FK), nullable=True)
+    source_dataset: Mapped[str] = mapped_column(String, nullable=False)
+    source_record_id: Mapped[str] = mapped_column(String, nullable=False)
+    source_name: Mapped[str | None] = mapped_column(Text, nullable=True)
+    source_name_norm: Mapped[str | None] = mapped_column(String, nullable=True)
+    classification: Mapped[str | None] = mapped_column(String, nullable=True)
+    severity_class: Mapped[str | None] = mapped_column(String, nullable=True)
+    concern_class: Mapped[str | None] = mapped_column(String, nullable=True)
+    label_section: Mapped[str | None] = mapped_column(String, nullable=True)
+    routes: Mapped[str | None] = mapped_column(Text, nullable=True)
+    comment: Mapped[str | None] = mapped_column(Text, nullable=True)
+    source_url: Mapped[str | None] = mapped_column(String, nullable=True)
+    source_last_modified: Mapped[str | None] = mapped_column(String, nullable=True)
+
+    drug: Mapped["Drug | None"] = relationship("Drug", back_populates="dili_annotations")
+
+    __table_args__ = (
+        UniqueConstraint(
+            "source_dataset",
+            "source_record_id",
+            name="uq_drug_dili_annotations_source_identity",
+        ),
+        Index("ix_drug_dili_annotations_drug_id", "drug_id"),
+        Index(
+            "ix_drug_dili_annotations_source_name_norm",
+            "source_dataset",
+            "source_name_norm",
+        ),
+    )
+
+
+###############################################################################
+class DrugLabelDocument(Base):
+    __tablename__ = "drug_label_documents"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
+    drug_id: Mapped[int] = mapped_column(Integer, ForeignKey(DRUGS_ID_FK), nullable=False)
+    source: Mapped[str] = mapped_column(String, nullable=False)
+    set_id: Mapped[str] = mapped_column(String, nullable=False)
+    spl_version: Mapped[int] = mapped_column(Integer, nullable=False)
+    title: Mapped[str | None] = mapped_column(Text, nullable=True)
+    labeler: Mapped[str | None] = mapped_column(Text, nullable=True)
+    effective_date: Mapped[str | None] = mapped_column(String, nullable=True)
+    source_url: Mapped[str | None] = mapped_column(String, nullable=True)
+    source_last_modified: Mapped[str | None] = mapped_column(String, nullable=True)
+
+    drug: Mapped["Drug"] = relationship("Drug", back_populates="label_documents")
+    sections: Mapped[list["DrugLabelSection"]] = relationship(
+        "DrugLabelSection",
+        back_populates="document",
+    )
+
+    __table_args__ = (
+        UniqueConstraint(
+            "source",
+            "set_id",
+            "spl_version",
+            name="uq_drug_label_documents_source_identity",
+        ),
+        Index("ix_drug_label_documents_drug_id", "drug_id"),
+        Index("ix_drug_label_documents_source_set_id", "source", "set_id"),
+    )
+
+
+###############################################################################
+class DrugLabelSection(Base):
+    __tablename__ = "drug_label_sections"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
+    document_id: Mapped[int] = mapped_column(
+        Integer,
+        ForeignKey("drug_label_documents.id"),
+        nullable=False,
+    )
+    section_key: Mapped[str] = mapped_column(String, nullable=False)
+    section_title: Mapped[str | None] = mapped_column(Text, nullable=True)
+    text: Mapped[str] = mapped_column(Text, nullable=False)
+    contains_hepatic_keywords: Mapped[bool] = mapped_column(Boolean, nullable=False)
+    display_order: Mapped[int] = mapped_column(Integer, nullable=False, server_default="0")
+
+    document: Mapped["DrugLabelDocument"] = relationship(
+        "DrugLabelDocument",
+        back_populates="sections",
+    )
+
+    __table_args__ = (
+        UniqueConstraint(
+            "document_id",
+            "section_key",
+            name="uq_drug_label_sections_document_key",
+        ),
+        Index("ix_drug_label_sections_document_id", "document_id"),
+        Index(
+            "ix_drug_label_sections_key_contains_hepatic",
+            "section_key",
+            "contains_hepatic_keywords",
+        ),
     )
 
 

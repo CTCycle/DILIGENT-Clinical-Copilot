@@ -14,6 +14,9 @@ from DILIGENT.server.repositories.schemas.models import (
     ClinicalSessionDrug,
     Drug,
     DrugAlias,
+    DrugDiliAnnotation,
+    DrugLabelDocument,
+    DrugLabelSection,
     DrugRxnormCode,
     LiverToxMonograph,
 )
@@ -187,6 +190,36 @@ def test_catalog_search_and_drug_delete_cleanup() -> None:
                 last_update="2025-01-06",
             )
         )
+        db_session.add(
+            DrugDiliAnnotation(
+                drug_id=int(drug.id),
+                source_dataset="dilirank",
+                source_record_id="dr-1",
+                source_name="Acetaminophen",
+                source_name_norm="acetaminophen",
+                classification="Most-DILI-Concern",
+            )
+        )
+        label_document = DrugLabelDocument(
+            drug_id=int(drug.id),
+            source="dailymed",
+            set_id="set-1",
+            spl_version=1,
+            title="Acetaminophen Label",
+            effective_date="2025-01-01",
+        )
+        db_session.add(label_document)
+        db_session.flush()
+        db_session.add(
+            DrugLabelSection(
+                document_id=int(label_document.id),
+                section_key="boxed_warning",
+                section_title="Boxed Warning",
+                text="Hepatic warning section",
+                contains_hepatic_keywords=True,
+                display_order=0,
+            )
+        )
         clinical_session = ClinicalSession(
             patient_name="Drug Link",
             session_timestamp=datetime(2025, 1, 4, 10, 0),
@@ -229,6 +262,30 @@ def test_catalog_search_and_drug_delete_cleanup() -> None:
     assert excerpt is not None
     assert "injury" in excerpt["excerpt"]
 
+    dili_catalog, dili_total = serializer.list_dili_annotations_catalog(
+        search="acetaminophen",
+        offset=0,
+        limit=10,
+    )
+    assert dili_total == 1
+    assert dili_catalog[0]["dilirank_class"] == "Most-DILI-Concern"
+
+    dili_detail = serializer.get_dili_annotation_details(rxnav_items[0]["drug_id"])
+    assert dili_detail is not None
+    assert len(dili_detail["annotations"]) == 1
+
+    label_catalog, label_total = serializer.list_drug_label_catalog(
+        search="acetaminophen",
+        offset=0,
+        limit=10,
+    )
+    assert label_total == 1
+    assert label_catalog[0]["retained_section_count"] == 1
+
+    label_sections = serializer.get_drug_label_sections(rxnav_items[0]["drug_id"])
+    assert label_sections is not None
+    assert len(label_sections["sections"]) == 1
+
     assert serializer.delete_drug_with_cleanup(rxnav_items[0]["drug_id"]) is True
 
     with session_factory() as db_session:
@@ -236,6 +293,9 @@ def test_catalog_search_and_drug_delete_cleanup() -> None:
         assert db_session.execute(select(DrugAlias)).scalars().all() == []
         assert db_session.execute(select(DrugRxnormCode)).scalars().all() == []
         assert db_session.execute(select(LiverToxMonograph)).scalars().all() == []
+        assert db_session.execute(select(DrugDiliAnnotation)).scalars().all() == []
+        assert db_session.execute(select(DrugLabelSection)).scalars().all() == []
+        assert db_session.execute(select(DrugLabelDocument)).scalars().all() == []
         session_drugs = db_session.execute(select(ClinicalSessionDrug)).scalars().all()
         assert len(session_drugs) == 1
         assert session_drugs[0].drug_id is None

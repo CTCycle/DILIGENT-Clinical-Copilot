@@ -94,6 +94,11 @@ class ExternalDataSettings(BaseModel):
     max_excerpt_length: int
     rxnav_request_timeout: float
     rxnav_max_concurrency: int
+    dili_priors_request_timeout: float
+    dailymed_request_timeout: float
+    dailymed_max_concurrency: int
+    dailymed_section_max_length: int
+    dailymed_max_sections_per_drug: int
     tavily_request_timeout_s: float
     tavily_search_cache_ttl_s: int
     tavily_extract_cache_ttl_s: int

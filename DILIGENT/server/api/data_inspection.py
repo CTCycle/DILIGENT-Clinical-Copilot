@@ -9,8 +9,14 @@ from DILIGENT.server.configurations.bootstrap import server_settings
 from DILIGENT.server.domain.inspection import (
     CatalogListFilters,
     DeleteEntityResponse,
+    DiliPriorCatalogResponse,
+    DiliPriorDetailResponse,
     DateFilterMode,
     DrugAliasesResponse,
+    DrugLabelCatalogResponse,
+    DrugLabelSectionsResponse,
+    InspectionDiliPriorsOverrideRequest,
+    InspectionDrugLabelsOverrideRequest,
     InspectionLiverToxOverrideRequest,
     InspectionRagOverrideRequest,
     InspectionRxNavOverrideRequest,
@@ -264,6 +270,120 @@ class DataInspectionEndpoint:
         return DeleteEntityResponse(deleted=True)
 
     # -------------------------------------------------------------------------
+    def list_dili_priors_catalog(
+        self,
+        search: str | None = Query(default=None),
+        offset: int = Query(default=0, ge=0),
+        limit: int = Query(default=10, ge=1, le=100),
+    ) -> DiliPriorCatalogResponse:
+        filters = CatalogListFilters(search=search, offset=offset, limit=limit)
+        payload = self.service.list_dili_priors_catalog(
+            search=filters.search,
+            offset=filters.offset,
+            limit=filters.limit,
+        )
+        return DiliPriorCatalogResponse(**payload)
+
+    # -------------------------------------------------------------------------
+    def get_dili_prior_details(self, drug_id: int) -> DiliPriorDetailResponse:
+        payload = self.service.get_dili_prior_details(drug_id)
+        if payload is None:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail="DILI prior details not found.",
+            )
+        return DiliPriorDetailResponse(**payload)
+
+    # -------------------------------------------------------------------------
+    def get_dili_priors_update_config(self) -> InspectionUpdateConfigResponse:
+        payload = self.service.build_update_config_response("dili_priors")
+        return InspectionUpdateConfigResponse(**payload)
+
+    # -------------------------------------------------------------------------
+    def start_dili_priors_update_job(
+        self,
+        overrides: InspectionDiliPriorsOverrideRequest = Body(
+            default=InspectionDiliPriorsOverrideRequest()
+        ),
+    ) -> JobStartResponse:
+        return self.start_update_job(
+            job_type=self.service.DILI_PRIORS_JOB_TYPE,
+            message="DILI priors update job started",
+            overrides=overrides.model_dump(exclude_none=True),
+        )
+
+    # -------------------------------------------------------------------------
+    def get_dili_priors_update_job_status(self, job_id: str) -> JobStatusResponse:
+        return self.get_update_job_status(
+            job_id=job_id,
+            job_type=self.service.DILI_PRIORS_JOB_TYPE,
+        )
+
+    # -------------------------------------------------------------------------
+    def cancel_dili_priors_update_job(self, job_id: str) -> JobCancelResponse:
+        return self.cancel_update_job(
+            job_id=job_id,
+            job_type=self.service.DILI_PRIORS_JOB_TYPE,
+        )
+
+    # -------------------------------------------------------------------------
+    def list_drug_labels_catalog(
+        self,
+        search: str | None = Query(default=None),
+        offset: int = Query(default=0, ge=0),
+        limit: int = Query(default=10, ge=1, le=100),
+    ) -> DrugLabelCatalogResponse:
+        filters = CatalogListFilters(search=search, offset=offset, limit=limit)
+        payload = self.service.list_drug_labels_catalog(
+            search=filters.search,
+            offset=filters.offset,
+            limit=filters.limit,
+        )
+        return DrugLabelCatalogResponse(**payload)
+
+    # -------------------------------------------------------------------------
+    def get_drug_label_sections(self, drug_id: int) -> DrugLabelSectionsResponse:
+        payload = self.service.get_drug_label_sections(drug_id)
+        if payload is None:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail="Drug label sections not found.",
+            )
+        return DrugLabelSectionsResponse(**payload)
+
+    # -------------------------------------------------------------------------
+    def get_drug_labels_update_config(self) -> InspectionUpdateConfigResponse:
+        payload = self.service.build_update_config_response("drug_labels")
+        return InspectionUpdateConfigResponse(**payload)
+
+    # -------------------------------------------------------------------------
+    def start_drug_labels_update_job(
+        self,
+        overrides: InspectionDrugLabelsOverrideRequest = Body(
+            default=InspectionDrugLabelsOverrideRequest()
+        ),
+    ) -> JobStartResponse:
+        return self.start_update_job(
+            job_type=self.service.DRUG_LABELS_JOB_TYPE,
+            message="Drug labels update job started",
+            overrides=overrides.model_dump(exclude_none=True),
+        )
+
+    # -------------------------------------------------------------------------
+    def get_drug_labels_update_job_status(self, job_id: str) -> JobStatusResponse:
+        return self.get_update_job_status(
+            job_id=job_id,
+            job_type=self.service.DRUG_LABELS_JOB_TYPE,
+        )
+
+    # -------------------------------------------------------------------------
+    def cancel_drug_labels_update_job(self, job_id: str) -> JobCancelResponse:
+        return self.cancel_update_job(
+            job_id=job_id,
+            job_type=self.service.DRUG_LABELS_JOB_TYPE,
+        )
+
+    # -------------------------------------------------------------------------
     def get_livertox_update_config(self) -> InspectionUpdateConfigResponse:
         payload = self.service.build_update_config_response("livertox")
         return InspectionUpdateConfigResponse(**payload)
@@ -444,6 +564,90 @@ class DataInspectionEndpoint:
         self.router.add_api_route(
             "/livertox/jobs/{job_id}",
             self.cancel_livertox_update_job,
+            methods=["DELETE"],
+            response_model=JobCancelResponse,
+            status_code=status.HTTP_200_OK,
+        )
+        self.router.add_api_route(
+            "/dili-priors",
+            self.list_dili_priors_catalog,
+            methods=["GET"],
+            response_model=DiliPriorCatalogResponse,
+            status_code=status.HTTP_200_OK,
+        )
+        self.router.add_api_route(
+            "/dili-priors/{drug_id}",
+            self.get_dili_prior_details,
+            methods=["GET"],
+            response_model=DiliPriorDetailResponse,
+            status_code=status.HTTP_200_OK,
+        )
+        self.router.add_api_route(
+            "/dili-priors/update-config",
+            self.get_dili_priors_update_config,
+            methods=["GET"],
+            response_model=InspectionUpdateConfigResponse,
+            status_code=status.HTTP_200_OK,
+        )
+        self.router.add_api_route(
+            "/dili-priors/jobs",
+            self.start_dili_priors_update_job,
+            methods=["POST"],
+            response_model=JobStartResponse,
+            status_code=status.HTTP_202_ACCEPTED,
+        )
+        self.router.add_api_route(
+            "/dili-priors/jobs/{job_id}",
+            self.get_dili_priors_update_job_status,
+            methods=["GET"],
+            response_model=JobStatusResponse,
+            status_code=status.HTTP_200_OK,
+        )
+        self.router.add_api_route(
+            "/dili-priors/jobs/{job_id}",
+            self.cancel_dili_priors_update_job,
+            methods=["DELETE"],
+            response_model=JobCancelResponse,
+            status_code=status.HTTP_200_OK,
+        )
+        self.router.add_api_route(
+            "/drug-labels",
+            self.list_drug_labels_catalog,
+            methods=["GET"],
+            response_model=DrugLabelCatalogResponse,
+            status_code=status.HTTP_200_OK,
+        )
+        self.router.add_api_route(
+            "/drug-labels/{drug_id}/sections",
+            self.get_drug_label_sections,
+            methods=["GET"],
+            response_model=DrugLabelSectionsResponse,
+            status_code=status.HTTP_200_OK,
+        )
+        self.router.add_api_route(
+            "/drug-labels/update-config",
+            self.get_drug_labels_update_config,
+            methods=["GET"],
+            response_model=InspectionUpdateConfigResponse,
+            status_code=status.HTTP_200_OK,
+        )
+        self.router.add_api_route(
+            "/drug-labels/jobs",
+            self.start_drug_labels_update_job,
+            methods=["POST"],
+            response_model=JobStartResponse,
+            status_code=status.HTTP_202_ACCEPTED,
+        )
+        self.router.add_api_route(
+            "/drug-labels/jobs/{job_id}",
+            self.get_drug_labels_update_job_status,
+            methods=["GET"],
+            response_model=JobStatusResponse,
+            status_code=status.HTTP_200_OK,
+        )
+        self.router.add_api_route(
+            "/drug-labels/jobs/{job_id}",
+            self.cancel_drug_labels_update_job,
             methods=["DELETE"],
             response_model=JobCancelResponse,
             status_code=status.HTTP_200_OK,

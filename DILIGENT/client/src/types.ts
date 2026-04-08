@@ -94,6 +94,8 @@ export type JobType =
   | "ollama_pull"
   | "rxnav_update"
   | "livertox_update"
+  | "dili_priors_update"
+  | "drug_labels_update"
   | "rag_update";
 
 export type JobStatus =
@@ -242,7 +244,7 @@ export type InspectionDeleteResponse = {
   deleted: boolean;
 };
 
-export type InspectionUpdateTarget = "rxnav" | "livertox" | "rag";
+export type InspectionUpdateTarget = "rxnav" | "livertox" | "dili_priors" | "drug_labels" | "rag";
 
 export type InspectionUpdateConfigResponse = {
   target: InspectionUpdateTarget;
@@ -258,6 +260,16 @@ export type InspectionRxNavOverrideRequest = {
 export type InspectionLiverToxOverrideRequest = {
   livertox_monograph_max_workers?: number;
   livertox_archive?: string;
+  redownload?: boolean;
+};
+
+export type InspectionDiliPriorsOverrideRequest = {
+  redownload?: boolean;
+};
+
+export type InspectionDrugLabelsOverrideRequest = {
+  dailymed_request_timeout?: number;
+  dailymed_max_concurrency?: number;
   redownload?: boolean;
 };
 
@@ -300,5 +312,57 @@ export type InspectionRagVectorStoreSummary = {
   index_ready: boolean;
   configured_metric: string | null;
   configured_index_type: string | null;
+};
+
+export type InspectionDiliPriorItem = {
+  drug_id: number;
+  drug_name: string;
+  dilirank_class: string | null;
+  dilist_class: string | null;
+  linked_source_count: number;
+};
+
+export type InspectionDiliPriorCatalogResponse = {
+  items: InspectionDiliPriorItem[];
+  total: number;
+  offset: number;
+  limit: number;
+};
+
+export type InspectionDiliPriorDetailResponse = {
+  drug_id: number;
+  drug_name: string;
+  annotations: Record<string, unknown>[];
+};
+
+export type InspectionDrugLabelItem = {
+  drug_id: number;
+  drug_name: string;
+  source: string;
+  effective_date: string | null;
+  retained_section_count: number;
+};
+
+export type InspectionDrugLabelCatalogResponse = {
+  items: InspectionDrugLabelItem[];
+  total: number;
+  offset: number;
+  limit: number;
+};
+
+export type InspectionDrugLabelSectionsResponse = {
+  drug_id: number;
+  drug_name: string;
+  source: string;
+  set_id: string;
+  spl_version: number;
+  effective_date: string | null;
+  sections: {
+    section_key: string;
+    section_title: string | null;
+    text: string;
+    contains_hepatic_keywords: boolean;
+    display_order: number;
+  }[];
 };
 

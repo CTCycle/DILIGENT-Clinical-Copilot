@@ -1,11 +1,21 @@
-import React, { Dispatch, SetStateAction, useCallback, useEffect, useMemo, useState } from "react";
+import React, { Dispatch, SetStateAction, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
 
 import {
+  cancelInspectionDiliPriorsUpdateJob,
   cancelInspectionLiverToxUpdateJob,
+  cancelInspectionDrugLabelsUpdateJob,
   cancelInspectionRagUpdateJob,
   cancelInspectionRxNavUpdateJob,
+  fetchInspectionDiliPriorDetails,
+  fetchInspectionDiliPriorsCatalog,
+  fetchInspectionDiliPriorsUpdateConfig,
+  fetchInspectionDiliPriorsUpdateJobStatus,
+  fetchInspectionDrugLabelSections,
+  fetchInspectionDrugLabelsCatalog,
+  fetchInspectionDrugLabelsUpdateConfig,
+  fetchInspectionDrugLabelsUpdateJobStatus,
   deleteInspectionLiverToxDrug,
   deleteInspectionRxNavDrug,
   deleteInspectionSession,
@@ -23,6 +33,8 @@ import {
   fetchInspectionRxNavUpdateJobStatus,
   fetchInspectionSessionReport,
   fetchInspectionSessions,
+  startInspectionDiliPriorsUpdateJob,
+  startInspectionDrugLabelsUpdateJob,
   startInspectionRagUpdateJob,
   startInspectionLiverToxUpdateJob,
   startInspectionRxNavUpdateJob,
@@ -34,7 +46,13 @@ import { useInspectionUpdateJob } from "../hooks/useInspectionUpdateJob";
 import { useResetOffsetOnChange } from "../hooks/useResetOffsetOnChange";
 import {
   InspectionDateFilterMode,
+  InspectionDiliPriorDetailResponse,
+  InspectionDiliPriorItem,
+  InspectionDiliPriorsOverrideRequest,
   InspectionDrugAliasesResponse,
+  InspectionDrugLabelItem,
+  InspectionDrugLabelSectionsResponse,
+  InspectionDrugLabelsOverrideRequest,
   InspectionLiverToxExcerptResponse,
   InspectionLiverToxItem,
   InspectionRagDocumentRow,
@@ -49,8 +67,8 @@ import {
 
 const PAGE_LIMIT = 10;
 const SEARCH_DEBOUNCE_MS = 250;
-type InspectionViewId = "sessions" | "rxnav" | "livertox" | "rag";
-type InspectionUpdateTarget = "rxnav" | "livertox" | "rag";
+type InspectionViewId = "sessions" | "rxnav" | "livertox" | "dili_priors" | "drug_labels" | "rag";
+type InspectionUpdateTarget = "rxnav" | "livertox" | "dili_priors" | "drug_labels" | "rag";
 
 const INSPECTION_VIEW_CONFIG: Record<InspectionViewId, { label: string; description: string }> = {
   sessions: {
@@ -65,12 +83,20 @@ const INSPECTION_VIEW_CONFIG: Record<InspectionViewId, { label: string; descript
     label: "LiverTox data",
     description: "Browse LiverTox monograph excerpts and recency data used by the clinical copilot.",
   },
+  dili_priors: {
+    label: "DILI priors",
+    description: "Inspect linked DILIrank and DILIst prior-risk annotations for matched drugs.",
+  },
+  drug_labels: {
+    label: "Drug labels",
+    description: "Inspect retained DailyMed label sections keyed to the local RxNorm drug spine.",
+  },
   rag: {
     label: "RAG",
     description: "Inspect RAG source documents, LanceDB status, and run embeddings updates.",
   },
 };
-const INSPECTION_VIEW_ORDER: readonly InspectionViewId[] = ["sessions", "rxnav", "livertox", "rag"];
+const INSPECTION_VIEW_ORDER: readonly InspectionViewId[] = ["sessions", "rxnav", "livertox", "rag", "dili_priors", "drug_labels"];
 const INSPECTION_UPDATE_CONFIG: Record<
   InspectionUpdateTarget,
   {
@@ -88,6 +114,16 @@ const INSPECTION_UPDATE_CONFIG: Record<
     title: "Update LiverTox Base",
     targetLabel: "LiverTox monographs",
     fallbackMessage: "Updating LiverTox...",
+  },
+  dili_priors: {
+    title: "Update DILI Priors",
+    targetLabel: "DILIrank / DILIst priors",
+    fallbackMessage: "Updating DILI priors...",
+  },
+  drug_labels: {
+    title: "Update Drug Labels",
+    targetLabel: "DailyMed official labels",
+    fallbackMessage: "Updating drug labels...",
   },
   rag: {
     title: "Update RAG Embeddings",
@@ -163,6 +199,38 @@ function toLiverToxOverrideRequest(
   return next;
 }
 
+function toDiliPriorsOverrideRequest(
+  payload?: Record<string, unknown>,
+): InspectionDiliPriorsOverrideRequest {
+  if (!payload) {
+    return {};
+  }
+  const next: InspectionDiliPriorsOverrideRequest = {};
+  if (typeof payload.redownload === "boolean") {
+    next.redownload = payload.redownload;
+  }
+  return next;
+}
+
+function toDrugLabelsOverrideRequest(
+  payload?: Record<string, unknown>,
+): InspectionDrugLabelsOverrideRequest {
+  if (!payload) {
+    return {};
+  }
+  const next: InspectionDrugLabelsOverrideRequest = {};
+  if (typeof payload.dailymed_request_timeout === "number") {
+    next.dailymed_request_timeout = payload.dailymed_request_timeout;
+  }
+  if (typeof payload.dailymed_max_concurrency === "number") {
+    next.dailymed_max_concurrency = payload.dailymed_max_concurrency;
+  }
+  if (typeof payload.redownload === "boolean") {
+    next.redownload = payload.redownload;
+  }
+  return next;
+}
+
 function toRagOverrideRequest(
   payload?: Record<string, unknown>,
 ): InspectionRagOverrideRequest {
@@ -189,11 +257,11 @@ function toRagOverrideRequest(
   if (typeof payload.ollama_embedding_model === "string") {
     next.ollama_embedding_model = payload.ollama_embedding_model;
   }
-  if (typeof payload.hf_embedding_model === "string") {
-    next.hf_embedding_model = payload.hf_embedding_model;
-  }
-  if (payload.cloud_provider === "openai" || payload.cloud_provider === "gemini") {
-    next.cloud_provider = payload.cloud_provider;
+  if (typeof payload.cloud_provider === "string") {
+    const normalized = payload.cloud_provider.trim().toLowerCase();
+    if (normalized === "openai" || normalized === "gemini" || normalized === "google") {
+      next.cloud_provider = normalized === "google" ? "gemini" : normalized;
+    }
   }
   if (typeof payload.cloud_embedding_model === "string") {
     next.cloud_embedding_model = payload.cloud_embedding_model;
@@ -205,6 +273,35 @@ function toRagOverrideRequest(
     next.reset_vector_collection = payload.reset_vector_collection;
   }
   return next;
+}
+
+function resolveSelectedFolderPath(files: FileList | null): string | null {
+  if (!files || files.length === 0) {
+    return null;
+  }
+
+  const normalizedPaths = Array.from(files)
+    .map((file) => file.webkitRelativePath || file.name)
+    .map((path) => path.replace(/\\/g, "/"))
+    .filter((path) => path.length > 0);
+
+  if (normalizedPaths.length === 0) {
+    return null;
+  }
+
+  const directorySegments = normalizedPaths.map((path) => path.split("/").slice(0, -1));
+  const [firstDirectory = []] = directorySegments;
+  const sharedSegments = [...firstDirectory];
+
+  for (const segments of directorySegments.slice(1)) {
+    let index = 0;
+    while (index < sharedSegments.length && index < segments.length && sharedSegments[index] === segments[index]) {
+      index += 1;
+    }
+    sharedSegments.splice(index);
+  }
+
+  return sharedSegments.join("/") || normalizedPaths[0].split("/").slice(0, -1).join("/") || null;
 }
 
 function ViewIcon(): React.JSX.Element {
@@ -279,6 +376,14 @@ function ExpandViewIcon(): React.JSX.Element {
   );
 }
 
+function FolderIcon(): React.JSX.Element {
+  return (
+    <svg className="inspection-icon" viewBox="0 0 24 24" aria-hidden="true">
+      <path d="M4 6a2 2 0 0 1 2-2h5l2 2h7a2 2 0 0 1 2 2v8a3 3 0 0 1-3 3H7a3 3 0 0 1-3-3V6Zm2 0v8a1 1 0 0 0 1 1h12a1 1 0 0 0 1-1V8H12.17l-2-2H6Z" />
+    </svg>
+  );
+}
+
 export function DataInspectionPage(): React.JSX.Element {
   const [sessionItems, setSessionItems] = useState<InspectionSessionItem[]>([]);
   const [sessionTotal, setSessionTotal] = useState(0);
@@ -306,6 +411,22 @@ export function DataInspectionPage(): React.JSX.Element {
   const [livertoxError, setLivertoxError] = useState<string | null>(null);
   const [livertoxSearchInput, setLivertoxSearchInput] = useState("");
   const livertoxSearch = useDebouncedValue(livertoxSearchInput, SEARCH_DEBOUNCE_MS);
+
+  const [diliPriorItems, setDiliPriorItems] = useState<InspectionDiliPriorItem[]>([]);
+  const [diliPriorTotal, setDiliPriorTotal] = useState(0);
+  const [diliPriorOffset, setDiliPriorOffset] = useState(0);
+  const [diliPriorLoading, setDiliPriorLoading] = useState(false);
+  const [diliPriorError, setDiliPriorError] = useState<string | null>(null);
+  const [diliPriorSearchInput, setDiliPriorSearchInput] = useState("");
+  const diliPriorSearch = useDebouncedValue(diliPriorSearchInput, SEARCH_DEBOUNCE_MS);
+
+  const [drugLabelItems, setDrugLabelItems] = useState<InspectionDrugLabelItem[]>([]);
+  const [drugLabelTotal, setDrugLabelTotal] = useState(0);
+  const [drugLabelOffset, setDrugLabelOffset] = useState(0);
+  const [drugLabelLoading, setDrugLabelLoading] = useState(false);
+  const [drugLabelError, setDrugLabelError] = useState<string | null>(null);
+  const [drugLabelSearchInput, setDrugLabelSearchInput] = useState("");
+  const drugLabelSearch = useDebouncedValue(drugLabelSearchInput, SEARCH_DEBOUNCE_MS);
   const [ragDocuments, setRagDocuments] = useState<InspectionRagDocumentRow[]>([]);
   const [ragVectorStore, setRagVectorStore] = useState<InspectionRagVectorStoreSummary | null>(null);
   const [ragTotal, setRagTotal] = useState(0);
@@ -314,6 +435,8 @@ export function DataInspectionPage(): React.JSX.Element {
   const [ragError, setRagError] = useState<string | null>(null);
   const [ragSearchInput, setRagSearchInput] = useState("");
   const ragSearch = useDebouncedValue(ragSearchInput, SEARCH_DEBOUNCE_MS);
+  const [selectedRagFolderPath, setSelectedRagFolderPath] = useState<string | null>(null);
+  const ragFolderInputRef = useRef<HTMLInputElement | null>(null);
 
   const [reportSession, setReportSession] = useState<InspectionSessionItem | null>(null);
   const [reportContent, setReportContent] = useState("");
@@ -327,6 +450,12 @@ export function DataInspectionPage(): React.JSX.Element {
   const [excerptData, setExcerptData] = useState<InspectionLiverToxExcerptResponse | null>(null);
   const [excerptLoading, setExcerptLoading] = useState(false);
   const [excerptError, setExcerptError] = useState<string | null>(null);
+  const [diliPriorDetailData, setDiliPriorDetailData] = useState<InspectionDiliPriorDetailResponse | null>(null);
+  const [diliPriorDetailLoading, setDiliPriorDetailLoading] = useState(false);
+  const [diliPriorDetailError, setDiliPriorDetailError] = useState<string | null>(null);
+  const [drugLabelSectionsData, setDrugLabelSectionsData] = useState<InspectionDrugLabelSectionsResponse | null>(null);
+  const [drugLabelSectionsLoading, setDrugLabelSectionsLoading] = useState(false);
+  const [drugLabelSectionsError, setDrugLabelSectionsError] = useState<string | null>(null);
   const [activeView, setActiveView] = useState<InspectionViewId>("sessions");
   const [viewScrollMode, setViewScrollMode] = useState<"contained" | "page">("contained");
   const [activeUpdateTarget, setActiveUpdateTarget] = useState<InspectionUpdateTarget | null>(null);
@@ -339,6 +468,16 @@ export function DataInspectionPage(): React.JSX.Element {
     setExcerptData(null);
     setExcerptError(null);
     setExcerptLoading(false);
+  }, []);
+  const closeDiliPriorDetailModal = useCallback(() => {
+    setDiliPriorDetailData(null);
+    setDiliPriorDetailError(null);
+    setDiliPriorDetailLoading(false);
+  }, []);
+  const closeDrugLabelSectionsModal = useCallback(() => {
+    setDrugLabelSectionsData(null);
+    setDrugLabelSectionsError(null);
+    setDrugLabelSectionsLoading(false);
   }, []);
   const closeUpdateModal = useCallback(() => {
     setActiveUpdateTarget(null);
@@ -399,6 +538,46 @@ export function DataInspectionPage(): React.JSX.Element {
     }
   }, [livertoxOffset, livertoxSearch]);
 
+  const loadDiliPriors = useCallback(async () => {
+    setDiliPriorLoading(true);
+    setDiliPriorError(null);
+    try {
+      const payload = await fetchInspectionDiliPriorsCatalog({
+        search: diliPriorSearch,
+        offset: diliPriorOffset,
+        limit: PAGE_LIMIT,
+      });
+      setDiliPriorItems(payload.items);
+      setDiliPriorTotal(payload.total);
+    } catch (error) {
+      setDiliPriorItems([]);
+      setDiliPriorTotal(0);
+      setDiliPriorError(error instanceof Error ? error.message : "Failed to load DILI priors.");
+    } finally {
+      setDiliPriorLoading(false);
+    }
+  }, [diliPriorOffset, diliPriorSearch]);
+
+  const loadDrugLabels = useCallback(async () => {
+    setDrugLabelLoading(true);
+    setDrugLabelError(null);
+    try {
+      const payload = await fetchInspectionDrugLabelsCatalog({
+        search: drugLabelSearch,
+        offset: drugLabelOffset,
+        limit: PAGE_LIMIT,
+      });
+      setDrugLabelItems(payload.items);
+      setDrugLabelTotal(payload.total);
+    } catch (error) {
+      setDrugLabelItems([]);
+      setDrugLabelTotal(0);
+      setDrugLabelError(error instanceof Error ? error.message : "Failed to load drug labels.");
+    } finally {
+      setDrugLabelLoading(false);
+    }
+  }, [drugLabelOffset, drugLabelSearch]);
+
   const loadRag = useCallback(async () => {
     setRagLoading(true);
     setRagError(null);
@@ -452,9 +631,33 @@ export function DataInspectionPage(): React.JSX.Element {
     cancelErrorMessage: "Failed to request cancellation.",
     pollErrorMessage: "LiverTox polling failed.",
   });
+  const diliPriorsUpdateJob = useInspectionUpdateJob({
+    startJob: (payload) =>
+      startInspectionDiliPriorsUpdateJob(toDiliPriorsOverrideRequest(payload)),
+    fetchStatus: fetchInspectionDiliPriorsUpdateJobStatus,
+    cancelJob: cancelInspectionDiliPriorsUpdateJob,
+    onCompleted: loadDiliPriors,
+    startMessage: "Initializing DILI priors update",
+    startErrorMessage: "Failed to start DILI priors update.",
+    cancelErrorMessage: "Failed to request cancellation.",
+    pollErrorMessage: "DILI priors polling failed.",
+  });
+  const drugLabelsUpdateJob = useInspectionUpdateJob({
+    startJob: (payload) =>
+      startInspectionDrugLabelsUpdateJob(toDrugLabelsOverrideRequest(payload)),
+    fetchStatus: fetchInspectionDrugLabelsUpdateJobStatus,
+    cancelJob: cancelInspectionDrugLabelsUpdateJob,
+    onCompleted: loadDrugLabels,
+    startMessage: "Initializing drug labels update",
+    startErrorMessage: "Failed to start drug labels update.",
+    cancelErrorMessage: "Failed to request cancellation.",
+    pollErrorMessage: "Drug labels polling failed.",
+  });
 
   const rxnavJob = rxnavUpdateJob.state;
   const livertoxJob = livertoxUpdateJob.state;
+  const diliPriorsJob = diliPriorsUpdateJob.state;
+  const drugLabelsJob = drugLabelsUpdateJob.state;
   const ragUpdateJob = useInspectionUpdateJob({
     startJob: (payload) =>
       startInspectionRagUpdateJob(toRagOverrideRequest(payload)),
@@ -471,6 +674,15 @@ export function DataInspectionPage(): React.JSX.Element {
   const activeViewConfig = INSPECTION_VIEW_CONFIG[activeView];
   const activeTabId = `inspection-tab-${activeView}`;
   const isPageScrollMode = viewScrollMode === "page";
+  const displayedRagFolderPath = selectedRagFolderPath || ragVectorStore?.vector_db_path || "N/A";
+
+  useEffect(() => {
+    if (ragFolderInputRef.current) {
+      ragFolderInputRef.current.setAttribute("webkitdirectory", "");
+      ragFolderInputRef.current.setAttribute("directory", "");
+      ragFolderInputRef.current.setAttribute("multiple", "");
+    }
+  }, []);
 
   const focusInspectionTab = (view: InspectionViewId) => {
     globalThis.requestAnimationFrame(() => {
@@ -517,13 +729,29 @@ export function DataInspectionPage(): React.JSX.Element {
     }
   };
 
+  const openRagFolderPicker = useCallback(() => {
+    ragFolderInputRef.current?.click();
+  }, []);
+
+  const handleRagFolderSelection = useCallback((event: React.ChangeEvent<HTMLInputElement>) => {
+    const nextPath = resolveSelectedFolderPath(event.target.files);
+    if (nextPath) {
+      setSelectedRagFolderPath(nextPath);
+    }
+    event.target.value = "";
+  }, []);
+
   useResetOffsetOnChange(setSessionOffset, [sessionSearch, sessionStatusFilter, sessionDateMode, sessionDate]);
   useResetOffsetOnChange(setRxnavOffset, [rxnavSearch]);
   useResetOffsetOnChange(setLivertoxOffset, [livertoxSearch]);
+  useResetOffsetOnChange(setDiliPriorOffset, [diliPriorSearch]);
+  useResetOffsetOnChange(setDrugLabelOffset, [drugLabelSearch]);
   useResetOffsetOnChange(setRagOffset, [ragSearch]);
   useEffect(() => { void loadSessions(); }, [loadSessions]);
   useEffect(() => { void loadRxnav(); }, [loadRxnav]);
   useEffect(() => { void loadLivertox(); }, [loadLivertox]);
+  useEffect(() => { void loadDiliPriors(); }, [loadDiliPriors]);
+  useEffect(() => { void loadDrugLabels(); }, [loadDrugLabels]);
   useEffect(() => { void loadRag(); }, [loadRag]);
 
   const sessionStatusClass = useMemo(() => (status: InspectionSessionStatus) => (status === "failed" ? "is-failed" : "is-successful"), []);
@@ -723,6 +951,21 @@ export function DataInspectionPage(): React.JSX.Element {
             />
           </div>
           <div className="inspection-widget-header-actions inspection-header-actions-fixed">
+            <button
+              type="button"
+              className="btn btn-secondary inspection-mini-btn inspection-mini-btn-folder"
+              onClick={openRagFolderPicker}
+              aria-label="Pick a RAG source folder"
+              title="Pick a RAG source folder"
+            >
+              <FolderIcon />
+            </button>
+            <input
+              ref={ragFolderInputRef}
+              type="file"
+              className="inspection-folder-input"
+              onChange={handleRagFolderSelection}
+            />
             <button type="button" className="btn btn-secondary inspection-mini-btn" onClick={() => setActiveUpdateTarget("rag")} disabled={ragJob.running}>
               Update Embeddings
             </button>
@@ -732,7 +975,7 @@ export function DataInspectionPage(): React.JSX.Element {
           <table className="inspection-table inspection-table-dense">
             <thead>
               <tr>
-                <th>LanceDB path</th>
+                <th>Folder path</th>
                 <th>Collection</th>
                 <th>Embeddings</th>
                 <th>Documents</th>
@@ -742,7 +985,7 @@ export function DataInspectionPage(): React.JSX.Element {
             </thead>
             <tbody>
               <tr>
-                <td>{ragVectorStore?.vector_db_path || "N/A"}</td>
+                <td>{displayedRagFolderPath}</td>
                 <td>{ragVectorStore?.collection_name || "N/A"}</td>
                 <td>{ragVectorStore?.embedding_count ?? 0}</td>
                 <td>{ragVectorStore?.distinct_document_count ?? 0}</td>
@@ -782,6 +1025,100 @@ export function DataInspectionPage(): React.JSX.Element {
           {ragError && <p className="inspection-error-text">{ragError}</p>}
         </div>
         {renderPager(ragTotal, ragOffset, setRagOffset)}
+      </div>
+    </section>
+  );
+
+  const renderDiliPriorsView = (): React.JSX.Element => (
+    <section className="inspection-view-content">
+      <div className="inspection-widget">
+        <div className="inspection-widget-header">
+          <div className="inspection-controls inspection-controls-half inspection-controls-knowledge">
+            <input type="search" className="inspection-search" placeholder="Search DILI priors..." value={diliPriorSearchInput} onChange={(event) => setDiliPriorSearchInput(event.target.value)} aria-label="Search DILI priors data" />
+          </div>
+          <div className="inspection-widget-header-actions inspection-header-actions-fixed">
+            <button type="button" className="btn btn-secondary inspection-mini-btn" onClick={() => setActiveUpdateTarget("dili_priors")}>
+              {diliPriorsJob.running ? "View Progress" : "Update Priors"}
+            </button>
+          </div>
+        </div>
+        <div className="inspection-scroll-frame inspection-scroll-frame-compact">
+          <table className="inspection-table inspection-table-dense">
+            <thead><tr><th>Drug</th><th>DILIrank class</th><th>DILIst class</th><th>Linked sources</th><th aria-label="Actions" /></tr></thead>
+            <tbody>
+              {diliPriorItems.map((row) => (
+                <tr key={row.drug_id}>
+                  <td>{row.drug_name}</td>
+                  <td>{row.dilirank_class || "N/A"}</td>
+                  <td>{row.dilist_class || "N/A"}</td>
+                  <td>{row.linked_source_count}</td>
+                  <td className="inspection-actions-cell">
+                    <InspectionIconActionButton variant="primary" onClick={() => {
+                      setDiliPriorDetailLoading(true);
+                      setDiliPriorDetailError(null);
+                      setDiliPriorDetailData(null);
+                      void fetchInspectionDiliPriorDetails(row.drug_id)
+                        .then((payload) => setDiliPriorDetailData(payload))
+                        .catch((error) => setDiliPriorDetailError(error instanceof Error ? error.message : "Failed to load DILI prior details."))
+                        .finally(() => setDiliPriorDetailLoading(false));
+                    }} ariaLabel={`View DILI priors for ${row.drug_name}`} title={`View DILI priors for ${row.drug_name}`}><ViewIcon /></InspectionIconActionButton>
+                  </td>
+                </tr>
+              ))}
+              {!diliPriorLoading && diliPriorItems.length === 0 && <tr><td colSpan={5} className="inspection-empty-row">No DILI prior rows found.</td></tr>}
+            </tbody>
+          </table>
+          {diliPriorLoading && <p className="inspection-loading-note">Loading DILI priors...</p>}
+          {diliPriorError && <p className="inspection-error-text">{diliPriorError}</p>}
+        </div>
+        {renderPager(diliPriorTotal, diliPriorOffset, setDiliPriorOffset)}
+      </div>
+    </section>
+  );
+
+  const renderDrugLabelsView = (): React.JSX.Element => (
+    <section className="inspection-view-content">
+      <div className="inspection-widget">
+        <div className="inspection-widget-header">
+          <div className="inspection-controls inspection-controls-half inspection-controls-knowledge">
+            <input type="search" className="inspection-search" placeholder="Search drug labels..." value={drugLabelSearchInput} onChange={(event) => setDrugLabelSearchInput(event.target.value)} aria-label="Search drug labels data" />
+          </div>
+          <div className="inspection-widget-header-actions inspection-header-actions-fixed">
+            <button type="button" className="btn btn-secondary inspection-mini-btn" onClick={() => setActiveUpdateTarget("drug_labels")}>
+              {drugLabelsJob.running ? "View Progress" : "Update Labels"}
+            </button>
+          </div>
+        </div>
+        <div className="inspection-scroll-frame inspection-scroll-frame-compact">
+          <table className="inspection-table inspection-table-dense">
+            <thead><tr><th>Drug</th><th>Source</th><th>Effective date</th><th>Retained sections</th><th aria-label="Actions" /></tr></thead>
+            <tbody>
+              {drugLabelItems.map((row) => (
+                <tr key={row.drug_id}>
+                  <td>{row.drug_name}</td>
+                  <td>{row.source}</td>
+                  <td>{row.effective_date || "N/A"}</td>
+                  <td>{row.retained_section_count}</td>
+                  <td className="inspection-actions-cell">
+                    <InspectionIconActionButton variant="primary" onClick={() => {
+                      setDrugLabelSectionsLoading(true);
+                      setDrugLabelSectionsError(null);
+                      setDrugLabelSectionsData(null);
+                      void fetchInspectionDrugLabelSections(row.drug_id)
+                        .then((payload) => setDrugLabelSectionsData(payload))
+                        .catch((error) => setDrugLabelSectionsError(error instanceof Error ? error.message : "Failed to load label sections."))
+                        .finally(() => setDrugLabelSectionsLoading(false));
+                    }} ariaLabel={`View labels for ${row.drug_name}`} title={`View labels for ${row.drug_name}`}><ViewIcon /></InspectionIconActionButton>
+                  </td>
+                </tr>
+              ))}
+              {!drugLabelLoading && drugLabelItems.length === 0 && <tr><td colSpan={5} className="inspection-empty-row">No drug label rows found.</td></tr>}
+            </tbody>
+          </table>
+          {drugLabelLoading && <p className="inspection-loading-note">Loading drug labels...</p>}
+          {drugLabelError && <p className="inspection-error-text">{drugLabelError}</p>}
+        </div>
+        {renderPager(drugLabelTotal, drugLabelOffset, setDrugLabelOffset)}
       </div>
     </section>
   );
@@ -853,6 +1190,34 @@ export function DataInspectionPage(): React.JSX.Element {
               <RagNavIcon />
               <span>{INSPECTION_VIEW_CONFIG.rag.label}</span>
             </button>
+            <button
+              id="inspection-tab-dili_priors"
+              type="button"
+              className={`inspection-toolbar-item ${activeView === "dili_priors" ? "is-active" : ""}`}
+              onClick={() => setActiveView("dili_priors")}
+              onKeyDown={(event) => handleTabKeyDown(event, "dili_priors")}
+              role="tab"
+              aria-selected={activeView === "dili_priors"}
+              aria-controls="inspection-active-view-panel"
+              tabIndex={activeView === "dili_priors" ? 0 : -1}
+            >
+              <LiverToxNavIcon />
+              <span>{INSPECTION_VIEW_CONFIG.dili_priors.label}</span>
+            </button>
+            <button
+              id="inspection-tab-drug_labels"
+              type="button"
+              className={`inspection-toolbar-item ${activeView === "drug_labels" ? "is-active" : ""}`}
+              onClick={() => setActiveView("drug_labels")}
+              onKeyDown={(event) => handleTabKeyDown(event, "drug_labels")}
+              role="tab"
+              aria-selected={activeView === "drug_labels"}
+              aria-controls="inspection-active-view-panel"
+              tabIndex={activeView === "drug_labels" ? 0 : -1}
+            >
+              <RxNavNavIcon />
+              <span>{INSPECTION_VIEW_CONFIG.drug_labels.label}</span>
+            </button>
           </div>
         </aside>
 
@@ -882,6 +1247,8 @@ export function DataInspectionPage(): React.JSX.Element {
             {activeView === "sessions" && renderSessionsView()}
             {activeView === "rxnav" && renderRxnavView()}
             {activeView === "livertox" && renderLivertoxView()}
+            {activeView === "dili_priors" && renderDiliPriorsView()}
+            {activeView === "drug_labels" && renderDrugLabelsView()}
             {activeView === "rag" && renderRagView()}
           </div>
         </section>
@@ -924,6 +1291,47 @@ export function DataInspectionPage(): React.JSX.Element {
         </div>
       )}
 
+      {(diliPriorDetailData || diliPriorDetailLoading || diliPriorDetailError) && (
+        <div className="modal-overlay">
+          <dialog className="modal-container inspection-modal inspection-modal-large" open aria-modal="true" aria-label="DILI prior details modal">
+            <div className="modal-header">
+              <div className="modal-header-content"><h2 className="modal-title">DILI Prior Details</h2><p className="modal-subtitle">{diliPriorDetailData?.drug_name || (diliPriorDetailError ? "Details unavailable" : "Loading details...")}</p></div>
+              <button type="button" className="modal-close" onClick={closeDiliPriorDetailModal} aria-label="Close DILI prior details modal"><CloseIcon /></button>
+            </div>
+            <div className="modal-body inspection-excerpt-body">
+              {diliPriorDetailLoading && <p className="inspection-loading-note">Loading details...</p>}
+              {!diliPriorDetailLoading && diliPriorDetailError && <p className="inspection-empty-note">{diliPriorDetailError}</p>}
+              {!diliPriorDetailLoading && !diliPriorDetailError && diliPriorDetailData && <pre className="inspection-excerpt-text">{JSON.stringify(diliPriorDetailData.annotations, null, 2)}</pre>}
+            </div>
+          </dialog>
+        </div>
+      )}
+
+      {(drugLabelSectionsData || drugLabelSectionsLoading || drugLabelSectionsError) && (
+        <div className="modal-overlay">
+          <dialog className="modal-container inspection-modal inspection-modal-large" open aria-modal="true" aria-label="Drug label sections modal">
+            <div className="modal-header">
+              <div className="modal-header-content"><h2 className="modal-title">Drug Label Sections</h2><p className="modal-subtitle">{drugLabelSectionsData?.drug_name || (drugLabelSectionsError ? "Sections unavailable" : "Loading sections...")}</p></div>
+              <button type="button" className="modal-close" onClick={closeDrugLabelSectionsModal} aria-label="Close drug label sections modal"><CloseIcon /></button>
+            </div>
+            <div className="modal-body inspection-excerpt-body">
+              {drugLabelSectionsLoading && <p className="inspection-loading-note">Loading sections...</p>}
+              {!drugLabelSectionsLoading && drugLabelSectionsError && <p className="inspection-empty-note">{drugLabelSectionsError}</p>}
+              {!drugLabelSectionsLoading && !drugLabelSectionsError && drugLabelSectionsData && (
+                <div>
+                  {drugLabelSectionsData.sections.map((section) => (
+                    <section key={`${section.section_key}-${section.display_order}`} className="inspection-alias-group">
+                      <h3>{section.section_title || section.section_key}</h3>
+                      <pre className="inspection-excerpt-text">{section.text}</pre>
+                    </section>
+                  ))}
+                </div>
+              )}
+            </div>
+          </dialog>
+        </div>
+      )}
+
       {activeUpdateConfig && (
         <div className="modal-overlay">
           <dialog className="modal-container inspection-modal inspection-update-modal" open aria-modal="true" aria-label={activeUpdateConfig.title}>
@@ -937,6 +1345,7 @@ export function DataInspectionPage(): React.JSX.Element {
             <div className="modal-body inspection-update-modal-body">
               {activeUpdateTarget === "rxnav" && (
                 <InspectionUpdateWizard
+                  target="rxnav"
                   targetLabel={INSPECTION_UPDATE_CONFIG.rxnav.targetLabel}
                   fallbackMessage={INSPECTION_UPDATE_CONFIG.rxnav.fallbackMessage}
                   loadConfig={fetchInspectionRxNavUpdateConfig}
@@ -946,6 +1355,7 @@ export function DataInspectionPage(): React.JSX.Element {
               )}
               {activeUpdateTarget === "livertox" && (
                 <InspectionUpdateWizard
+                  target="livertox"
                   targetLabel={INSPECTION_UPDATE_CONFIG.livertox.targetLabel}
                   fallbackMessage={INSPECTION_UPDATE_CONFIG.livertox.fallbackMessage}
                   loadConfig={fetchInspectionLiverToxUpdateConfig}
@@ -955,11 +1365,32 @@ export function DataInspectionPage(): React.JSX.Element {
               )}
               {activeUpdateTarget === "rag" && (
                 <InspectionUpdateWizard
+                  target="rag"
                   targetLabel={INSPECTION_UPDATE_CONFIG.rag.targetLabel}
                   fallbackMessage={INSPECTION_UPDATE_CONFIG.rag.fallbackMessage}
                   loadConfig={fetchInspectionRagUpdateConfig}
                   startJob={ragUpdateJob.triggerUpdate}
                   job={ragJob}
+                />
+              )}
+              {activeUpdateTarget === "dili_priors" && (
+                <InspectionUpdateWizard
+                  target="dili_priors"
+                  targetLabel={INSPECTION_UPDATE_CONFIG.dili_priors.targetLabel}
+                  fallbackMessage={INSPECTION_UPDATE_CONFIG.dili_priors.fallbackMessage}
+                  loadConfig={fetchInspectionDiliPriorsUpdateConfig}
+                  startJob={diliPriorsUpdateJob.triggerUpdate}
+                  job={diliPriorsJob}
+                />
+              )}
+              {activeUpdateTarget === "drug_labels" && (
+                <InspectionUpdateWizard
+                  target="drug_labels"
+                  targetLabel={INSPECTION_UPDATE_CONFIG.drug_labels.targetLabel}
+                  fallbackMessage={INSPECTION_UPDATE_CONFIG.drug_labels.fallbackMessage}
+                  loadConfig={fetchInspectionDrugLabelsUpdateConfig}
+                  startJob={drugLabelsUpdateJob.triggerUpdate}
+                  job={drugLabelsJob}
                 />
               )}
             </div>
