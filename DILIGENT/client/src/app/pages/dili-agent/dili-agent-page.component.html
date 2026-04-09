@@ -1,9 +1,4 @@
 <main class="page-container stitch-dili-page">
-  <header class="stitch-dili-heading">
-    <h1>Drug-Induced Liver Injury analysis</h1>
-    <p>Clinical Copilot</p>
-  </header>
-
   <div class="stitch-dili-grid">
     <div class="stitch-dili-main">
       <section class="stitch-dili-card">
@@ -47,9 +42,26 @@
     <aside class="stitch-dili-sidebar">
       <section class="stitch-dili-card stitch-dili-patient">
         <div class="stitch-dili-patient-top">
-          <div class="stitch-dili-avatar" aria-hidden="true">
-            {{ patientNameLabel.charAt(0).toUpperCase() }}
-          </div>
+          <button
+            type="button"
+            class="stitch-dili-avatar stitch-dili-avatar-button"
+            (click)="openPatientImagePicker()"
+            aria-label="Upload patient profile image"
+            title="Upload patient profile image"
+          >
+            @if (patientImageDataUrl) {
+              <img [src]="patientImageDataUrl" alt="Patient profile preview" class="stitch-dili-avatar-image" />
+            } @else {
+              <span aria-hidden="true">{{ patientNameLabel.charAt(0).toUpperCase() }}</span>
+            }
+          </button>
+          <input
+            #patientImageInput
+            type="file"
+            accept="image/*"
+            class="inspection-folder-input"
+            (change)="handlePatientImageSelection($event)"
+          />
           <div>
             <h3>{{ patientNameLabel }}</h3>
             <p>Recorded: {{ recordedDateLabel }}</p>

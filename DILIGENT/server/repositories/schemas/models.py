@@ -1,16 +1,18 @@
 from __future__ import annotations
 
-from datetime import datetime
+from datetime import date, datetime
 
 from sqlalchemy import (
     Boolean,
     CheckConstraint,
+    Date,
     DateTime,
     Enum,
     Float,
     ForeignKey,
     Index,
     Integer,
+    LargeBinary,
     String,
     Text,
     UniqueConstraint,
@@ -25,8 +27,37 @@ class Base(DeclarativeBase):
 
 DRUGS_ID_FK = "drugs.id"
 CLINICAL_SESSIONS_ID_FK = "clinical_sessions.id"
+PATIENTS_ID_FK = "patients.id"
 ACTIVE_SQLITE_WHERE = "is_active = 1"
 ACTIVE_POSTGRESQL_WHERE = "is_active = true"
+
+
+###############################################################################
+class Patient(Base):
+    __tablename__ = "patients"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
+    name: Mapped[str | None] = mapped_column(String)
+    visit_date: Mapped[date | None] = mapped_column(Date)
+    anamnesis: Mapped[str | None] = mapped_column(Text)
+    drugs: Mapped[str | None] = mapped_column(Text)
+    laboratory_analysis: Mapped[str | None] = mapped_column(Text)
+    image_blob: Mapped[bytes | None] = mapped_column(LargeBinary)
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime,
+        nullable=False,
+        server_default=text("CURRENT_TIMESTAMP"),
+    )
+
+    sessions: Mapped[list["ClinicalSession"]] = relationship(
+        "ClinicalSession",
+        back_populates="patient",
+    )
+
+    __table_args__ = (
+        Index("ix_patients_name", "name"),
+        Index("ix_patients_visit_date", "visit_date"),
+    )
 
 
 ###############################################################################
@@ -34,7 +65,11 @@ class ClinicalSession(Base):
     __tablename__ = "clinical_sessions"
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
-    patient_name: Mapped[str | None] = mapped_column(String)
+    patient_id: Mapped[int] = mapped_column(
+        Integer,
+        ForeignKey(PATIENTS_ID_FK),
+        nullable=False,
+    )
     session_timestamp: Mapped[datetime | None] = mapped_column(DateTime)
     hepatic_pattern: Mapped[str | None] = mapped_column(String)
     parsing_model: Mapped[str | None] = mapped_column(String)
@@ -42,6 +77,10 @@ class ClinicalSession(Base):
     total_duration: Mapped[float | None] = mapped_column(Float)
     session_status: Mapped[str | None] = mapped_column(String, nullable=True)
 
+    patient: Mapped["Patient"] = relationship(
+        "Patient",
+        back_populates="sessions",
+    )
     sections: Mapped[list["ClinicalSessionSection"]] = relationship(
         "ClinicalSessionSection",
         back_populates="session",
@@ -61,6 +100,7 @@ class ClinicalSession(Base):
     )
 
     __table_args__ = (
+        Index("ix_clinical_sessions_patient_id", "patient_id"),
         Index("ix_clinical_sessions_timestamp", "session_timestamp"),
         Index("ix_clinical_sessions_status", "session_status"),
     )

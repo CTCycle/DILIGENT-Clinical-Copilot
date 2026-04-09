@@ -6,8 +6,7 @@ export type RuntimeSettings = {
   cloudModel: string | null;
   parsingModel: string;
   clinicalModel: string;
-  ollamaTemperature: number;
-  cloudTemperature: number;
+  temperature: number;
   reasoning: boolean;
 };
 
@@ -59,6 +58,7 @@ export type AccessKeyRecord = {
 export type ClinicalFormState = {
   patientName: string;
   visitDate: string;
+  patientImageDataUrl: string | null;
   anamnesis: string;
   drugs: string;
   laboratoryAnalysis: string;
@@ -72,6 +72,7 @@ export type ClinicalRequestPayload = {
   anamnesis: string | null;
   drugs: string | null;
   laboratory_analysis: string | null;
+  patient_image_base64?: string | null;
   allow_missing_labs?: boolean | null;
   use_rag: boolean;
   use_web_search: boolean;
@@ -275,6 +276,7 @@ export type InspectionDrugLabelsOverrideRequest = {
 };
 
 export type InspectionRagOverrideRequest = {
+  documents_path?: string;
   chunk_size?: number;
   chunk_overlap?: number;
   embedding_batch_size?: number;
@@ -304,6 +306,7 @@ export type InspectionRagDocumentsResponse = {
 };
 
 export type InspectionRagVectorStoreSummary = {
+  source_documents_path: string;
   vector_db_path: string;
   collection_name: string;
   collection_exists: boolean;

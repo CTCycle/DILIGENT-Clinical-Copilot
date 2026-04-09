@@ -104,6 +104,8 @@ Configuration:
 Persistence:
 - Embedded SQLite is supported.
 - External PostgreSQL is supported by configuration.
+- Clinical requests persist a `patients` table containing raw patient inputs (name, visit date, anamnesis, drugs, laboratory analysis, optional profile image bytes).
+- Clinical sessions persist analysis metadata and reference `patients.id`.
 - Provider access keys are encrypted at rest, with versioned encryption material persisted and resolved by key version.
 
 ## 8. Error and safety boundaries
@@ -125,6 +127,7 @@ Persistence:
 Current high-level request fields:
 - `name`
 - `visit_date`
+- `patient_image_base64`
 - `anamnesis`
 - `drugs`
 - `laboratory_analysis`
