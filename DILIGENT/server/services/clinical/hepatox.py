@@ -1172,10 +1172,10 @@ class HepatoxConsultation:
         metadata: dict[str, Any] | None,
         web_evidence: str,
         rucam: DrugRucamAssessment | None,
-        dili_prior_block: str,
-        official_label_block: str,
-        knowledge_prompt: str,
-        report_language: str,
+        dili_prior_block: str = "No DILI prior annotations available.",
+        official_label_block: str = "No official label excerpts available.",
+        knowledge_prompt: str = "No supplemental knowledge prompt available.",
+        report_language: str = "en",
     ) -> str:
         start_details = self.format_start_prompt(suspension)
         suspension_details = self.format_suspension_prompt(suspension)

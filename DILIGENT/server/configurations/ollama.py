@@ -6,7 +6,7 @@ OLLAMA_DEFAULT_HOST = "localhost"
 OLLAMA_DEFAULT_PORT = 11434
 OLLAMA_DEFAULT_SCHEME = "http"
 
-
+###############################################################################
 def _resolve_ollama_url_with_scheme(
     normalized_host: str,
     *,
@@ -24,7 +24,7 @@ def _resolve_ollama_url_with_scheme(
     resolved_port = port_value if port_value is not None else OLLAMA_DEFAULT_PORT
     return f"{scheme}://{host_port}:{resolved_port}"
 
-
+###############################################################################
 def resolve_ollama_base_url(
     *,
     ollama_url: str | None,

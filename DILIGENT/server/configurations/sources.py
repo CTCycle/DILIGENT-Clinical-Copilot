@@ -18,7 +18,7 @@ from DILIGENT.server.common.utils.types import (
     coerce_str,
     coerce_str_or_none,
 )
-from DILIGENT.server.configurations.environment import get_dotenv_injected_keys
+from DILIGENT.server.configurations.base import ensure_mapping, load_configuration_data
 from DILIGENT.server.configurations.ollama import resolve_ollama_base_url
 from DILIGENT.server.domain.settings.configuration import (
     DatabaseSettings,
@@ -123,27 +123,6 @@ class EnvironmentSnapshot:
         self.ollama_url = ollama_url
         self.ollama_host = ollama_host
         self.ollama_port = ollama_port
-
-
-def ensure_mapping(value: Any) -> dict[str, Any]:
-    if isinstance(value, dict):
-        return value
-    return {}
-
-
-def load_configuration_data(path: str) -> dict[str, Any]:
-    config_path = Path(path)
-    if not config_path.exists():
-        raise RuntimeError(f"Configuration file not found: {path}")
-    try:
-        with config_path.open("r", encoding="utf-8") as handle:
-            data = json.load(handle)
-    except (OSError, json.JSONDecodeError) as exc:
-        raise RuntimeError(f"Unable to load configuration from {path}") from exc
-    if not isinstance(data, dict):
-        raise RuntimeError("Configuration must be a JSON object.")
-    return data
-
 
 def _parse_with_kind(value: str, kind: str) -> Any:
     if kind == "bool":
@@ -465,11 +444,8 @@ def build_settings_payload_from_json(config: dict[str, Any], env: EnvironmentSna
 
 class CuratedEnvironmentSource(PydanticBaseSettingsSource):
     def __call__(self) -> dict[str, Any]:
-        injected = get_dotenv_injected_keys()
         source: dict[str, str] = {}
         for key, value in os.environ.items():
-            if key in injected:
-                continue
             source[str(key)] = str(value)
         return _extract_curated_source_payload("OS environment", source)
 
@@ -487,9 +463,14 @@ class CuratedDotenvSource(PydanticBaseSettingsSource):
 
 
 class JsonConfigurationSource(PydanticBaseSettingsSource):
+    def __init__(self, settings_cls: type[Any]) -> None:
+        super().__init__(settings_cls)
+        raw_path = getattr(settings_cls, "_configuration_file", None) or constants.CONFIGURATIONS_FILE
+        self.configuration_file = str(raw_path)
+
     def __call__(self) -> dict[str, Any]:
         env_snapshot = _resolve_env_snapshot()
-        payload = load_configuration_data(constants.CONFIGURATIONS_FILE)
+        payload = load_configuration_data(self.configuration_file)
         return build_settings_payload_from_json(payload, env_snapshot)
 
     def get_field_value(self, field: Any, field_name: str) -> tuple[Any, str, bool]:
