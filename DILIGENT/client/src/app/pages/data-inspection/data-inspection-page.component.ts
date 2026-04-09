@@ -1,5 +1,5 @@
 import { CommonModule } from '@angular/common';
-import { Component, OnInit, signal } from '@angular/core';
+import { Component, OnDestroy, OnInit, signal } from '@angular/core';
 import { FormsModule } from '@angular/forms';
 
 import {
@@ -120,7 +120,7 @@ function resolveRagDocumentsPath(
   templateUrl: './data-inspection-page.component.html',
   styleUrl: './data-inspection-page.component.scss',
 })
-export class DataInspectionPageComponent implements OnInit {
+export class DataInspectionPageComponent implements OnInit, OnDestroy {
   readonly inspectionViews = INSPECTION_VIEWS;
   readonly activeView = signal<InspectionViewId>('sessions');
 
@@ -201,6 +201,7 @@ export class DataInspectionPageComponent implements OnInit {
   readonly updateProgress = signal(0);
   readonly updateMessage = signal('');
   readonly updateError = signal<string | null>(null);
+  private updatePollToken = 0;
 
   async ngOnInit(): Promise<void> {
     await Promise.all([
@@ -211,6 +212,10 @@ export class DataInspectionPageComponent implements OnInit {
       this.loadDrugLabels(),
       this.loadRag(),
     ]);
+  }
+
+  ngOnDestroy(): void {
+    this.cancelActiveUpdatePolling();
   }
 
   formatDateTime(value: string | null): string {
@@ -404,9 +409,23 @@ export class DataInspectionPageComponent implements OnInit {
     this.reportError.set(null);
   }
 
-  async removeSession(sessionId: number): Promise<void> {
-    await deleteInspectionSession(sessionId);
-    await this.loadSessions();
+  async confirmAndRemoveSession(row: InspectionSessionItem): Promise<void> {
+    const patientLabel = row.patient_name?.trim() || 'Unknown patient';
+    const confirmed = globalThis.confirm(
+      `Delete session #${row.session_id} for ${patientLabel}? This action cannot be undone.`,
+    );
+    if (!confirmed) {
+      return;
+    }
+
+    try {
+      await deleteInspectionSession(row.session_id);
+      await this.loadSessions();
+    } catch (error) {
+      this.sessionError.set(
+        error instanceof Error ? error.message : 'Failed to delete session.',
+      );
+    }
   }
 
   async openAliases(drugId: number): Promise<void> {
@@ -429,8 +448,20 @@ export class DataInspectionPageComponent implements OnInit {
   }
 
   async removeRxNavDrug(drugId: number): Promise<void> {
-    await deleteInspectionRxNavDrug(drugId);
-    await this.loadRxNav();
+    const confirmed = globalThis.confirm(
+      'Delete this drug from the RxNav catalog? This action cannot be undone.',
+    );
+    if (!confirmed) {
+      return;
+    }
+    try {
+      await deleteInspectionRxNavDrug(drugId);
+      await this.loadRxNav();
+    } catch (error) {
+      this.rxnavError.set(
+        error instanceof Error ? error.message : 'Failed to delete drug from RxNav catalog.',
+      );
+    }
   }
 
   async openExcerpt(drugId: number): Promise<void> {
@@ -453,8 +484,20 @@ export class DataInspectionPageComponent implements OnInit {
   }
 
   async removeLiverToxDrug(drugId: number): Promise<void> {
-    await deleteInspectionLiverToxDrug(drugId);
-    await this.loadLiverTox();
+    const confirmed = globalThis.confirm(
+      'Delete this drug from the LiverTox catalog? This action cannot be undone.',
+    );
+    if (!confirmed) {
+      return;
+    }
+    try {
+      await deleteInspectionLiverToxDrug(drugId);
+      await this.loadLiverTox();
+    } catch (error) {
+      this.livertoxError.set(
+        error instanceof Error ? error.message : 'Failed to delete drug from LiverTox catalog.',
+      );
+    }
   }
 
   async openDiliPriorDetails(drugId: number): Promise<void> {
@@ -630,6 +673,7 @@ export class DataInspectionPageComponent implements OnInit {
   }
 
   async openUpdateModal(target: InspectionUpdateTarget): Promise<void> {
+    this.cancelActiveUpdatePolling();
     this.activeUpdateTarget.set(target);
     this.updateLoading.set(true);
     this.updateError.set(null);
@@ -655,6 +699,7 @@ export class DataInspectionPageComponent implements OnInit {
   }
 
   closeUpdateModal(): void {
+    this.cancelActiveUpdatePolling();
     this.activeUpdateTarget.set(null);
     this.updateLoading.set(false);
     this.updateRunning.set(false);
@@ -701,7 +746,8 @@ export class DataInspectionPageComponent implements OnInit {
       const started = await this.startUpdate(target, overrides);
       this.updateJobId.set(started.job_id);
       this.updateMessage.set(started.message || 'Update running...');
-      await this.pollUpdateJob(target, started.job_id);
+      const pollToken = this.beginUpdatePolling();
+      await this.pollUpdateJob(target, started.job_id, pollToken);
     } catch (error) {
       this.updateRunning.set(false);
       this.updateError.set(error instanceof Error ? error.message : 'Failed to start update job.');
@@ -772,9 +818,16 @@ export class DataInspectionPageComponent implements OnInit {
     await cancelInspectionRagUpdateJob(jobId);
   }
 
-  private async pollUpdateJob(target: InspectionUpdateTarget, jobId: string): Promise<void> {
-    while (true) {
+  private async pollUpdateJob(
+    target: InspectionUpdateTarget,
+    jobId: string,
+    pollToken: number,
+  ): Promise<void> {
+    while (this.isUpdatePollingActive(pollToken)) {
       const status = await this.fetchUpdateStatus(target, jobId);
+      if (!this.isUpdatePollingActive(pollToken)) {
+        return;
+      }
       this.updateProgress.set(typeof status.progress === 'number' ? status.progress : 0);
       this.updateMessage.set(
         (status.result?.progress_message as string) ||
@@ -794,6 +847,20 @@ export class DataInspectionPageComponent implements OnInit {
 
       await new Promise((resolve) => globalThis.setTimeout(resolve, 1200));
     }
+  }
+
+  private beginUpdatePolling(): number {
+    this.updatePollToken += 1;
+    return this.updatePollToken;
+  }
+
+  private cancelActiveUpdatePolling(): void {
+    this.updatePollToken += 1;
+    this.updateRunning.set(false);
+  }
+
+  private isUpdatePollingActive(pollToken: number): boolean {
+    return this.updatePollToken === pollToken;
   }
 
   private async refreshTargetAfterUpdate(target: InspectionUpdateTarget): Promise<void> {
