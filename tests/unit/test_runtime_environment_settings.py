@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import json
+import os
 
 import pytest
 
@@ -9,7 +10,7 @@ from DILIGENT.server.configurations import environment, sources
 from DILIGENT.server.configurations.bootstrap import get_app_settings, reset_app_settings_cache
 
 
-def test_initialize_environment_loads_dotenv_without_overriding_existing(tmp_path, monkeypatch) -> None:
+def test_initialize_environment_loads_dotenv_with_override_precedence(tmp_path, monkeypatch) -> None:
     dotenv_path = tmp_path / ".env"
     dotenv_path.write_text("DILIGENT_TAURI_MODE=true\nFASTAPI_HOST=0.0.0.0\n", encoding="utf-8")
     monkeypatch.setattr(environment, "ENV_FILE_PATH", str(dotenv_path))
@@ -21,7 +22,7 @@ def test_initialize_environment_loads_dotenv_without_overriding_existing(tmp_pat
 
     assert environment.get_dotenv_injected_keys()
     assert "DILIGENT_TAURI_MODE" in environment.get_dotenv_injected_keys()
-    assert "FASTAPI_HOST" not in environment.get_dotenv_injected_keys()
+    assert os.environ.get("FASTAPI_HOST") == "0.0.0.0"
 
 
 def test_ui_owned_env_keys_are_rejected(monkeypatch, tmp_path) -> None:

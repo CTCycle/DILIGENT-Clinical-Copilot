@@ -3,8 +3,8 @@ from __future__ import annotations
 import json
 
 from DILIGENT.server.common import constants
+from DILIGENT.server.configurations import bootstrap
 from DILIGENT.server.configurations.bootstrap import get_app_settings, reset_app_settings_cache
-from DILIGENT.server.configurations import sources
 
 
 def _write_config(path, payload) -> None:
@@ -31,28 +31,32 @@ def _base_payload() -> dict:
     }
 
 
-def test_database_env_override_precedence_os_over_dotenv_over_json(tmp_path, monkeypatch) -> None:
+def test_database_env_override_precedence_dotenv_over_os_over_json(tmp_path, monkeypatch) -> None:
     config_path = tmp_path / "configurations.json"
     _write_config(config_path, _base_payload())
+    dotenv_path = tmp_path / ".env"
+    dotenv_path.write_text("DB_HOST=dotenv-host\n", encoding="utf-8")
     monkeypatch.setattr(constants, "CONFIGURATIONS_FILE", str(config_path))
-    monkeypatch.setattr(
-        sources,
-        "_read_dotenv",
-        lambda: {"DB_HOST": "dotenv-host"},
-    )
+    monkeypatch.setattr(constants, "ENV_FILE_PATH", str(dotenv_path))
+    monkeypatch.setattr(bootstrap, "ENV_FILE_PATH", str(dotenv_path))
     monkeypatch.setenv("DB_HOST", "os-host")
 
+    bootstrap.reset_environment_bootstrap_for_tests()
     reset_app_settings_cache()
     settings = get_app_settings()
 
-    assert settings.database.host == "os-host"
+    assert settings.database.host == "dotenv-host"
 
     monkeypatch.delenv("DB_HOST", raising=False)
+    bootstrap.reset_environment_bootstrap_for_tests()
     reset_app_settings_cache()
     settings = get_app_settings()
     assert settings.database.host == "dotenv-host"
 
-    monkeypatch.setattr(sources, "_read_dotenv", lambda: {})
+    monkeypatch.setattr(constants, "ENV_FILE_PATH", str(tmp_path / ".missing.env"))
+    monkeypatch.setattr(bootstrap, "ENV_FILE_PATH", str(tmp_path / ".missing.env"))
+    monkeypatch.delenv("DB_HOST", raising=False)
+    bootstrap.reset_environment_bootstrap_for_tests()
     reset_app_settings_cache()
     settings = get_app_settings()
     assert settings.database.host == "json-host"

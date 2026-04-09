@@ -1,13 +1,12 @@
 from __future__ import annotations
 
-from typing import Any
+from typing import Any, ClassVar
 
 from pydantic import Field
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 from DILIGENT.server.common.constants import ENV_FILE_PATH
 from DILIGENT.server.configurations.sources import (
-    CuratedDotenvSource,
     CuratedEnvironmentSource,
     JsonConfigurationSource,
 )
@@ -20,6 +19,7 @@ from DILIGENT.server.domain.settings.configuration import (
     JobsSettings,
     LLMRuntimeDefaults,
     RagSettings,
+    ServerSettings,
 )
 
 
@@ -29,6 +29,8 @@ class AppSettings(BaseSettings):
         env_file_encoding="utf-8",
         extra="ignore",
     )
+
+    _configuration_file: ClassVar[str | None] = None
 
     fastapi_host: str = Field(default="127.0.0.1", alias="FASTAPI_HOST")
     fastapi_port: int = Field(default=8000, alias="FASTAPI_PORT")
@@ -68,12 +70,24 @@ class AppSettings(BaseSettings):
         dotenv_settings: Any,
         file_secret_settings: Any,
     ) -> tuple[Any, ...]:
+        _ = dotenv_settings
         return (
             init_settings,
             env_settings,
             CuratedEnvironmentSource(settings_cls),
-            dotenv_settings,
-            CuratedDotenvSource(settings_cls),
             JsonConfigurationSource(settings_cls),
             file_secret_settings,
+        )
+
+    # -------------------------------------------------------------------------
+    def to_server_settings(self) -> ServerSettings:
+        return ServerSettings(
+            fastapi=self.fastapi,
+            jobs=self.jobs,
+            database=self.database,
+            drugs_matcher=self.drugs_matcher,
+            rag=self.rag,
+            external_data=self.external_data,
+            ingestion=self.ingestion,
+            llm_defaults=self.llm_defaults,
         )

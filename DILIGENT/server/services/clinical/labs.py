@@ -6,7 +6,7 @@ import re
 import unicodedata
 from collections.abc import Callable
 from datetime import date, datetime
-from typing import Any
+from typing import Any, Literal
 
 from DILIGENT.server.common.utils.logger import logger
 from DILIGENT.server.configurations.bootstrap import server_settings
@@ -28,6 +28,7 @@ RATE_LIMIT_WAIT_HINT_RE = re.compile(
     re.IGNORECASE,
 )
 NUMERIC_RE = re.compile(r"[-+]?\d+(?:[.,]\d+)?")
+DATE_RE = re.compile(r"\b(?:\d{4}[-/.]\d{1,2}[-/.]\d{1,2}|\d{1,2}[-/.]\d{1,2}[-/.]\d{4})\b")
 MARKER_ALIASES: dict[str, tuple[str, ...]] = {
     "ALT": ("alt", "alat", "gpt"),
     "AST": ("ast", "asat", "got"),
@@ -157,6 +158,98 @@ class ClinicalLabExtractor:
             return float(match.group().replace(",", "."))
         except ValueError:
             return None
+
+    # -------------------------------------------------------------------------
+    def extract_entries_from_text(
+        self,
+        *,
+        text: str,
+        source: Literal["laboratory_analysis", "anamnesis", "merged"],
+        visit_date: date | None,
+    ) -> list[ClinicalLabEntry]:
+        if not text:
+            return []
+        entries: list[ClinicalLabEntry] = []
+        for raw_line in text.splitlines():
+            line = raw_line.strip()
+            if not line:
+                continue
+            sample_date = self.extract_date_from_text(line, visit_date=visit_date)
+            entries.extend(
+                self.extract_entries_from_line(
+                    line=line,
+                    source=source,
+                    sample_date=sample_date,
+                )
+            )
+        return entries
+
+    # -------------------------------------------------------------------------
+    def extract_entries_from_line(
+        self,
+        *,
+        line: str,
+        source: Literal["laboratory_analysis", "anamnesis", "merged"],
+        sample_date: str | None,
+    ) -> list[ClinicalLabEntry]:
+        entries: list[ClinicalLabEntry] = []
+        normalized_line = line.casefold()
+        for canonical, aliases in MARKER_ALIASES.items():
+            alias_token = self.find_marker_token(normalized_line, aliases)
+            if alias_token is None:
+                continue
+            marker_position = normalized_line.find(alias_token)
+            if marker_position < 0:
+                continue
+            tail = line[marker_position:]
+            value = self.parse_numeric(tail)
+            if value is None:
+                continue
+            upper_limit = self.extract_upper_limit(tail)
+            entries.append(
+                ClinicalLabEntry(
+                    marker_name=canonical,
+                    value=value,
+                    value_text=str(value),
+                    upper_limit_normal=upper_limit,
+                    upper_limit_text=str(upper_limit) if upper_limit is not None else None,
+                    sample_date=sample_date,
+                    evidence=line[:500],
+                    source=source,
+                )
+            )
+        return entries
+
+    # -------------------------------------------------------------------------
+    @staticmethod
+    def find_marker_token(text: str, aliases: tuple[str, ...]) -> str | None:
+        for alias in aliases:
+            token = alias.casefold()
+            if re.search(rf"\b{re.escape(token)}\b", text):
+                return token
+        return None
+
+    # -------------------------------------------------------------------------
+    def extract_date_from_text(self, text: str, *, visit_date: date | None) -> str | None:
+        match = DATE_RE.search(text)
+        if match is None:
+            return None
+        return self.normalize_date_with_visit_year(match.group(0), visit_date)
+
+    # -------------------------------------------------------------------------
+    def extract_upper_limit(self, text: str) -> float | None:
+        patterns = (
+            r"\bULN\b\s*[:=]?\s*([0-9]+(?:[.,][0-9]+)?)",
+            r"upper\s+limit(?:\s+normal)?\s*[:=]?\s*([0-9]+(?:[.,][0-9]+)?)",
+        )
+        for pattern in patterns:
+            match = re.search(pattern, text, flags=re.IGNORECASE)
+            if match is None:
+                continue
+            parsed = self.parse_numeric(match.group(1))
+            if parsed is not None:
+                return parsed
+        return None
 
     # -------------------------------------------------------------------------
     def normalize_marker_name(self, raw: str | None) -> str:
@@ -307,9 +400,26 @@ class ClinicalLabExtractor:
     ) -> tuple[PatientLabTimeline, LiverInjuryOnsetContext | None]:
         primary_labs_text = self.clean_text(payload.laboratory_analysis)
         supplemental_anamnesis_text = self.clean_text(payload.anamnesis)
+        deterministic_entries: list[ClinicalLabEntry] = []
         timeline_entries: list[ClinicalLabEntry] = []
         onset_context: LiverInjuryOnsetContext | None = None
         self.emit_progress(progress_callback, 0.0)
+
+        deterministic_entries.extend(
+            self.extract_entries_from_text(
+                text=primary_labs_text,
+                source="laboratory_analysis",
+                visit_date=payload.visit_date,
+            )
+        )
+        deterministic_entries.extend(
+            self.extract_entries_from_text(
+                text=supplemental_anamnesis_text,
+                source="anamnesis",
+                visit_date=payload.visit_date,
+            )
+        )
+        self.emit_progress(progress_callback, 0.2)
 
         merged_source_text = "\n\n".join(
             block for block in (primary_labs_text, supplemental_anamnesis_text) if block
@@ -321,11 +431,13 @@ class ClinicalLabExtractor:
             chunks = self.chunk_text(merged_source_text)
             llm_entries: list[ClinicalLabEntry] = []
             llm_onset: LiverInjuryOnsetContext | None = None
+            llm_unavailable = False
             for index, chunk in enumerate(chunks, start=1):
                 user_prompt = (
                     "Extract longitudinal liver-related labs and onset clues from this clinical chunk.\n"
                     f"[Chunk {index}/{len(chunks)}]\n{chunk}"
                 )
+                parsed: LabExtractionPayload | None = None
                 for attempt in range(1, self.extraction_retry_attempts + 1):
                     try:
                         parsed = await self.client.llm_structured_call(
@@ -340,7 +452,19 @@ class ClinicalLabExtractor:
                         break
                     except Exception as exc:
                         if attempt >= self.extraction_retry_attempts:
-                            raise RuntimeError("Failed to extract labs from anamnesis") from exc
+                            logger.warning(
+                                (
+                                    "Clinical lab extraction unavailable for chunk %d/%d "
+                                    "after %d attempts; using deterministic parser output only: %s"
+                                ),
+                                index,
+                                len(chunks),
+                                self.extraction_retry_attempts,
+                                exc,
+                            )
+                            parsed = LabExtractionPayload(entries=[], onset_context=None)
+                            llm_unavailable = True
+                            break
                         delay = self.retry_backoff_seconds(attempt, exc=exc)
                         logger.warning(
                             (
@@ -355,12 +479,19 @@ class ClinicalLabExtractor:
                             exc,
                         )
                         await asyncio.sleep(delay)
+                if parsed is None:
+                    parsed = LabExtractionPayload(entries=[], onset_context=None)
+                    llm_unavailable = True
                 llm_entries.extend(parsed.entries)
                 if llm_onset is None and parsed.onset_context is not None:
                     llm_onset = parsed.onset_context
-                self.emit_progress(progress_callback, (index / max(len(chunks), 1)) * 0.7)
+                self.emit_progress(progress_callback, 0.2 + ((index / max(len(chunks), 1)) * 0.5))
             timeline_entries.extend(llm_entries)
+            if llm_unavailable:
+                timeline_entries.extend(deterministic_entries)
             onset_context = llm_onset
+        else:
+            timeline_entries.extend(deterministic_entries)
 
         self.emit_progress(progress_callback, 0.85)
 

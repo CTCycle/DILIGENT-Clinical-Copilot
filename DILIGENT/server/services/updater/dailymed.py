@@ -252,47 +252,76 @@ class DailyMedLabelUpdater:
         asyncio.set_event_loop(loop)
         semaphore = asyncio.Semaphore(self.max_concurrency)
 
-        async def load_one(target: dict[str, Any]) -> dict[str, Any] | None:
-            best = self.select_best_label_for_drug(target["rxcui"], mapping)
-            if best is None:
-                return None
-            set_id = self.clean_text(best.get("set_id"))
-            if set_id is None:
-                return None
-            async with semaphore:
-                xml_text = await self.download_label_xml(set_id)
-            sections = self.extract_relevant_sections(xml_text)
-            if not sections:
-                return None
-            return {
-                "drug_id": target["drug_id"],
-                "source": "dailymed",
-                "set_id": set_id,
-                "spl_version": int(best.get("spl_version") or 1),
-                "title": self.clean_text(best.get("title")),
-                "labeler": self.clean_text(best.get("labeler")),
-                "effective_date": self.serializer.normalize_date(best.get("effective_date")),
-                "source_url": f"{DAILYMED_LABEL_XML_BASE_URL}/{set_id}.xml",
-                "source_last_modified": None,
-                "sections": sections,
-            }
-
-        async def gather_all() -> list[dict[str, Any]]:
-            tasks = [asyncio.create_task(load_one(target)) for target in targets]
-            rows: list[dict[str, Any]] = []
-            for task in tasks:
-                result = await task
-                if result is not None:
-                    rows.append(result)
-            return rows
-
         try:
-            rows = loop.run_until_complete(gather_all())
+            rows = loop.run_until_complete(
+                self.gather_persistable_rows(
+                    targets=targets,
+                    mapping=mapping,
+                    semaphore=semaphore,
+                )
+            )
         finally:
             loop.close()
             asyncio.set_event_loop(None)
         self.serializer.replace_drug_label_documents(rows)
         return rows
+
+    # -------------------------------------------------------------------------
+    async def gather_persistable_rows(
+        self,
+        *,
+        targets: list[dict[str, Any]],
+        mapping: dict[str, list[dict[str, Any]]],
+        semaphore: asyncio.Semaphore,
+    ) -> list[dict[str, Any]]:
+        tasks = [
+            asyncio.create_task(
+                self.load_document_row(
+                    target=target,
+                    mapping=mapping,
+                    semaphore=semaphore,
+                )
+            )
+            for target in targets
+        ]
+        rows: list[dict[str, Any]] = []
+        for task in tasks:
+            result = await task
+            if result is not None:
+                rows.append(result)
+        return rows
+
+    # -------------------------------------------------------------------------
+    async def load_document_row(
+        self,
+        *,
+        target: dict[str, Any],
+        mapping: dict[str, list[dict[str, Any]]],
+        semaphore: asyncio.Semaphore,
+    ) -> dict[str, Any] | None:
+        best = self.select_best_label_for_drug(target["rxcui"], mapping)
+        if best is None:
+            return None
+        set_id = self.clean_text(best.get("set_id"))
+        if set_id is None:
+            return None
+        async with semaphore:
+            xml_text = await self.download_label_xml(set_id)
+        sections = self.extract_relevant_sections(xml_text)
+        if not sections:
+            return None
+        return {
+            "drug_id": target["drug_id"],
+            "source": "dailymed",
+            "set_id": set_id,
+            "spl_version": int(best.get("spl_version") or 1),
+            "title": self.clean_text(best.get("title")),
+            "labeler": self.clean_text(best.get("labeler")),
+            "effective_date": self.serializer.normalize_date(best.get("effective_date")),
+            "source_url": f"{DAILYMED_LABEL_XML_BASE_URL}/{set_id}.xml",
+            "source_last_modified": None,
+            "sections": sections,
+        }
 
     # -------------------------------------------------------------------------
     def contains_hepatic_keywords(self, text: str) -> bool:

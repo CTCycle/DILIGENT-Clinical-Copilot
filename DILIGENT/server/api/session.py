@@ -230,6 +230,8 @@ class NarrativeBuilder:
             "detected_drugs": "**Detected drugs ({count}):** {value}",
             "historical_title": "## Historical Drug Mentions",
             "historical_mentions": "- **Historical mentions ({count}):** {value}",
+            "rucam_title": "## Estimated RUCAM",
+            "rucam_item": "- **{drug}**: score {score} ({category}, confidence {confidence})",
             "warnings_title": "## Warnings",
             "report_title": "## Clinical Report",
             "no_report": "No clinical report generated.",
@@ -249,6 +251,8 @@ class NarrativeBuilder:
             "detected_drugs": "**Farmaci rilevati ({count}):** {value}",
             "historical_title": "## Menzioni Farmaci Anamnestiche",
             "historical_mentions": "- **Menzioni storiche ({count}):** {value}",
+            "rucam_title": "## RUCAM Stimato",
+            "rucam_item": "- **{drug}**: punteggio {score} ({category}, confidenza {confidence})",
             "warnings_title": "## Avvisi",
             "report_title": "## Report Clinico",
             "no_report": "Nessun report clinico generato.",
@@ -268,6 +272,8 @@ class NarrativeBuilder:
             "detected_drugs": "**Erkannte Medikamente ({count}):** {value}",
             "historical_title": "## Historische Medikamentenerwähnungen",
             "historical_mentions": "- **Historische Erwähnungen ({count}):** {value}",
+            "rucam_title": "## Geschätzter RUCAM",
+            "rucam_item": "- **{drug}**: Score {score} ({category}, Vertrauen {confidence})",
             "warnings_title": "## Warnhinweise",
             "report_title": "## Klinischer Bericht",
             "no_report": "Kein klinischer Bericht erstellt.",
@@ -287,6 +293,8 @@ class NarrativeBuilder:
             "detected_drugs": "**Médicaments détectés ({count}) :** {value}",
             "historical_title": "## Mentions Médicamenteuses Antérieures",
             "historical_mentions": "- **Mentions historiques ({count}) :** {value}",
+            "rucam_title": "## RUCAM Estimé",
+            "rucam_item": "- **{drug}** : score {score} ({category}, confiance {confidence})",
             "warnings_title": "## Avertissements",
             "report_title": "## Rapport Clinique",
             "no_report": "Aucun rapport clinique généré.",
@@ -306,6 +314,8 @@ class NarrativeBuilder:
             "detected_drugs": "**Fármacos detectados ({count}):** {value}",
             "historical_title": "## Menciones Históricas de Fármacos",
             "historical_mentions": "- **Menciones históricas ({count}):** {value}",
+            "rucam_title": "## RUCAM Estimado",
+            "rucam_item": "- **{drug}**: puntuación {score} ({category}, confianza {confidence})",
             "warnings_title": "## Advertencias",
             "report_title": "## Informe Clínico",
             "no_report": "No se generó un informe clínico.",
@@ -368,6 +378,7 @@ class NarrativeBuilder:
         pattern_strings: dict[str, str],
         detected_drugs: list[str],
         anamnesis_detected_drugs: list[str],
+        rucam_assessments: list[DrugRucamAssessment] | None = None,
         report_language: str,
         issues: list[PipelineIssue],
         final_report: str | None,
@@ -428,6 +439,18 @@ class NarrativeBuilder:
                 ]
             )
         )
+        if rucam_assessments:
+            rucam_section = [bundle["rucam_title"], ""]
+            for assessment in rucam_assessments:
+                rucam_section.append(
+                    bundle["rucam_item"].format(
+                        drug=assessment.drug_name,
+                        score=assessment.total_score,
+                        category=assessment.causality_category,
+                        confidence=assessment.confidence,
+                    )
+                )
+            sections.append("\n".join(rucam_section))
 
         if issues:
             warnings_section = [bundle["warnings_title"], ""]
@@ -1478,6 +1501,7 @@ class ClinicalSessionEndpoint:
             pattern_strings=pattern_strings,
             detected_drugs=detected_drugs,
             anamnesis_detected_drugs=anamnesis_detected_drugs,
+            rucam_assessments=rucam_bundle.entries,
             report_language=report_language,
             issues=issues,
             final_report=final_report,

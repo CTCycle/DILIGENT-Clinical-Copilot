@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import importlib
 from functools import lru_cache
 
 from sqlalchemy.engine import Engine
@@ -8,16 +9,23 @@ from sqlalchemy.orm import sessionmaker
 from DILIGENT.server.configurations.bootstrap import server_settings
 
 
+REPOSITORY_CLASS_PATHS = {
+    True: ("DILIGENT.server.repositories.database.sqlite", "SQLiteRepository"),
+    False: ("DILIGENT.server.repositories.database.postgres", "PostgresRepository"),
+}
+
+
+def _resolve_repository_class(embedded_database: bool):
+    module_name, class_name = REPOSITORY_CLASS_PATHS[bool(embedded_database)]
+    module = importlib.import_module(module_name)
+    return getattr(module, class_name)
+
+
 @lru_cache(maxsize=1)
 def get_default_repository():
     settings = server_settings.database
-    if settings.embedded_database:
-        from DILIGENT.server.repositories.database.sqlite import SQLiteRepository
-
-        return SQLiteRepository(settings)
-    from DILIGENT.server.repositories.database.postgres import PostgresRepository
-
-    return PostgresRepository(settings)
+    repository_cls = _resolve_repository_class(settings.embedded_database)
+    return repository_cls(settings)
 
 
 def resolve_engine(engine: Engine | None = None) -> Engine:
