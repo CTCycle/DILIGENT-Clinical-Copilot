@@ -7,6 +7,10 @@ from sqlalchemy import select, update
 from sqlalchemy.engine import Engine
 from sqlalchemy.orm import sessionmaker
 
+from DILIGENT.server.repositories.database.session import (
+    resolve_engine,
+    resolve_session_factory,
+)
 from DILIGENT.server.repositories.schemas.models import AccessKeyEncryptionMaterial
 
 DEFAULT_KEY_PURPOSE = "provider_access_keys"
@@ -16,24 +20,14 @@ DEFAULT_KEY_PURPOSE = "provider_access_keys"
 class AccessKeyEncryptionMaterialSerializer:
     def __init__(
         self,
-        queries: "DataRepositoryQueries | None" = None,
         *,
         engine: Engine | None = None,
         session_factory: sessionmaker | None = None,
     ) -> None:
-        if queries is None and engine is None:
-            raise ValueError("Either queries or engine must be provided")
-
-        self.queries = queries
-        if engine is not None:
-            resolved_engine = engine
-        else:
-            assert queries is not None
-            resolved_engine = queries.database.backend.engine
-        self.engine = resolved_engine
-        self.session_factory = session_factory or sessionmaker(
-            bind=resolved_engine,
-            future=True,
+        self.engine = resolve_engine(engine)
+        self.session_factory = resolve_session_factory(
+            engine=self.engine,
+            session_factory=session_factory,
             expire_on_commit=False,
         )
 
