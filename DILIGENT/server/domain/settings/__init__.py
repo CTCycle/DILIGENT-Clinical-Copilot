@@ -9,10 +9,12 @@ from DILIGENT.server.domain.settings.configuration import (
     RagSettings,
     ServerSettings,
 )
+from DILIGENT.server.domain.settings.app import AppSettings
 from DILIGENT.server.domain.settings.environment import EnvironmentSettings
 from DILIGENT.server.domain.settings.runtime import LLMRuntimeState
 
 __all__ = [
+    "AppSettings",
     "DatabaseSettings",
     "DrugsMatcherSettings",
     "EnvironmentSettings",

@@ -1,11 +1,8 @@
 from __future__ import annotations
 
-import os
-
-from DILIGENT.server.common.constants import TRUTHY_ENV_VALUES
+from DILIGENT.server.configurations.settings import get_app_settings
 
 
 ###############################################################################
 def tauri_mode_enabled() -> bool:
-    value = os.getenv("DILIGENT_TAURI_MODE", "false").strip().lower()
-    return value in TRUTHY_ENV_VALUES
+    return bool(get_app_settings().diligent_tauri_mode)

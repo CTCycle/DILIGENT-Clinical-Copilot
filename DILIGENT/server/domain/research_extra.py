@@ -5,7 +5,7 @@ from typing import Any
 
 from DILIGENT.server.domain.research import ResearchSource
 
-
+###############################################################################
 @dataclass(slots=True)
 class TavilySearchOutcome:
     normalized_query: str

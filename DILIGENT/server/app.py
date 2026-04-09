@@ -6,7 +6,7 @@ warnings.filterwarnings("ignore", category=FutureWarning)
 
 from fastapi import FastAPI
 
-from DILIGENT.server.configurations.bootstrap import server_settings
+from DILIGENT.server.configurations.bootstrap import initialize_settings, server_settings
 from DILIGENT.server.configurations.runtime import tauri_mode_enabled
 from DILIGENT.server.api.access_keys import router as access_keys_router
 from DILIGENT.server.api.data_inspection import router as data_inspection_router
@@ -20,6 +20,8 @@ from DILIGENT.server.repositories.database.initializer import initialize_databas
 
 
 ###############################################################################
+initialize_settings()
+
 app = FastAPI(
     title=server_settings.fastapi.title,
     version=server_settings.fastapi.version,

@@ -20,6 +20,7 @@ import httpx
 from DILIGENT.server.models.cloud import CloudLLMClient, LLMError, LLMTimeout
 from DILIGENT.server.models.structured import StructuredOutputParser, parse_json_dict, T
 from DILIGENT.server.configurations.bootstrap import server_settings
+from DILIGENT.server.configurations.settings import get_app_settings
 from DILIGENT.server.configurations.runtime_state import LLMRuntimeConfig
 from DILIGENT.server.common.constants import (
     PARSING_MODEL_CHOICES,
@@ -114,39 +115,33 @@ class OllamaClient:
         self.residency_lock = asyncio.Lock()
         self.residency_plan_cache: dict[str, Any] | None = None
         self.residency_plan_cache_expiry = 0.0
-        self.residency_usage_window_s = self.resolve_env_float(
-            "OLLAMA_PREFETCH_USAGE_WINDOW_S",
-            default=300.0,
-            minimum=30.0,
+        app_settings = get_app_settings()
+        self.residency_usage_window_s = max(
+            float(app_settings.ollama_prefetch_usage_window_s),
+            30.0,
         )
-        self.residency_transition_window_s = self.resolve_env_float(
-            "OLLAMA_PREFETCH_TRANSITION_WINDOW_S",
-            default=120.0,
-            minimum=5.0,
+        self.residency_transition_window_s = max(
+            float(app_settings.ollama_prefetch_transition_window_s),
+            5.0,
         )
-        self.residency_prefetch_cooldown_s = self.resolve_env_float(
-            "OLLAMA_PREFETCH_COOLDOWN_S",
-            default=15.0,
-            minimum=1.0,
+        self.residency_prefetch_cooldown_s = max(
+            float(app_settings.ollama_prefetch_cooldown_s),
+            1.0,
         )
-        self.residency_ram_safety_ratio = self.resolve_env_float(
-            "OLLAMA_RAM_SAFETY_RATIO",
-            default=0.85,
-            minimum=0.1,
+        self.residency_ram_safety_ratio = max(
+            float(app_settings.ollama_ram_safety_ratio),
+            0.1,
         )
-        self.residency_vram_safety_ratio = self.resolve_env_float(
-            "OLLAMA_VRAM_SAFETY_RATIO",
-            default=0.85,
-            minimum=0.1,
+        self.residency_vram_safety_ratio = max(
+            float(app_settings.ollama_vram_safety_ratio),
+            0.1,
         )
-        self.residency_dual_keep_alive = os.getenv(
-            "OLLAMA_DUAL_RESIDENT_KEEP_ALIVE",
-            "4h",
-        ).strip() or "4h"
-        self.residency_single_keep_alive = os.getenv(
-            "OLLAMA_SINGLE_RESIDENT_KEEP_ALIVE",
-            "30m",
-        ).strip() or "30m"
+        self.residency_dual_keep_alive = (
+            (app_settings.ollama_dual_resident_keep_alive or "").strip() or "4h"
+        )
+        self.residency_single_keep_alive = (
+            (app_settings.ollama_single_resident_keep_alive or "").strip() or "30m"
+        )
         self.residency_usage_history: deque[tuple[float, str]] = deque(maxlen=256)
         self.prefetch_last_run_by_model: dict[str, float] = {}
         self.prefetch_tasks: dict[str, asyncio.Task[None]] = {}
@@ -241,20 +236,6 @@ class OllamaClient:
             if cache_valid:
                 return set(self.model_cache)
         return await self.refresh_model_cache()
-
-    # -------------------------------------------------------------------------
-    @staticmethod
-    def resolve_env_float(name: str, *, default: float, minimum: float = 0.0) -> float:
-        raw = (os.getenv(name) or "").strip()
-        if not raw:
-            return default
-        try:
-            parsed = float(raw)
-        except ValueError:
-            return default
-        if parsed < minimum:
-            return default
-        return parsed
 
     # -------------------------------------------------------------------------
     @staticmethod

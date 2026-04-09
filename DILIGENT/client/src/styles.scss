@@ -4444,3 +4444,31 @@ input[type="date"]::-webkit-calendar-picker-indicator:hover {
     table-layout: auto;
   }
 }
+
+/* ============================================
+   QA Hardening Overrides
+   ============================================ */
+.inspection-actions-cell {
+  gap: 8px;
+  min-width: 148px;
+}
+
+.inspection-icon-button {
+  width: 38px;
+  height: 38px;
+}
+
+.inspection-empty-note {
+  text-align: center;
+  padding: 10px 12px;
+  border: 1px dashed rgba(148, 163, 184, 0.35);
+  border-radius: var(--radius-sm);
+  background: rgba(255, 255, 255, 0.52);
+}
+
+@media (max-width: 720px) {
+  .inspection-empty-note {
+    font-size: var(--font-xs);
+    margin-top: 10px;
+  }
+}
