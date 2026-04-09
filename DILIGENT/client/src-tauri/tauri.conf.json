@@ -33,18 +33,17 @@
       "icons/icon.ico"
     ],
     "resources": {
-      "r/pyproject.toml": "pyproject.toml",
-      "r/uv.lock": "uv.lock",
-      "r/server": "DILIGENT/server",
-      "r/scripts": "DILIGENT/scripts",
-      "r/settings": "DILIGENT/settings",
-      "r/client/dist": "DILIGENT/client/dist",
-      "r/resources/models": "DILIGENT/resources/models",
-      "r/resources/sources": "DILIGENT/resources/sources",
-      "r/runtimes/uv.lock": "runtimes/uv.lock",
-      "r/runtimes/python": "runtimes/python",
-      "r/runtimes/uv": "runtimes/uv",
-      "r/runtimes/nodejs": "runtimes/nodejs"
+      "../../../pyproject.toml": "r/pyproject.toml",
+      "../../server": "r/server",
+      "../../scripts": "r/scripts",
+      "../../settings": "r/settings",
+      "../dist": "r/client/dist",
+      "../../resources/models": "r/resources/models",
+      "../../resources/sources": "r/resources/sources",
+      "../../../runtimes/uv.lock": "r/runtimes/uv.lock",
+      "../../../runtimes/python": "r/runtimes/python",
+      "../../../runtimes/uv": "r/runtimes/uv",
+      "../../../runtimes/nodejs": "r/runtimes/nodejs"
     }
   }
 }

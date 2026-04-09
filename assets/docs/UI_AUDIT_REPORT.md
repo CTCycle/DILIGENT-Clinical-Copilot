@@ -1,10 +1,10 @@
 # UI/UX Audit Report
 
-Last updated: 2026-04-08
+Last updated: 2026-04-09
 
 
 Audit date: 2026-03-28  
-Scope: `DILIGENT/client/src` + `DILIGENT/client/src/styles.css`
+Scope: `DILIGENT/client/src` + `DILIGENT/client/src/styles.scss`
 
 This report captures current UI debt and prioritization.
 Use `assets/docs/UI_STANDARDS.md` as the target standard.
@@ -12,7 +12,7 @@ Use `assets/docs/UI_STANDARDS.md` as the target standard.
 ## 1. High-priority findings
 
 1. Duplicate CSS blocks increase override drift risk
-- Area: Model Config and inspection-related selectors in `styles.css`
+- Area: Model Config and inspection-related selectors in `styles.scss`
 - Impact: hard-to-predict rendering, fragile maintenance
 - Priority: High
 - Recommended action: consolidate duplicated selectors into one canonical block per component

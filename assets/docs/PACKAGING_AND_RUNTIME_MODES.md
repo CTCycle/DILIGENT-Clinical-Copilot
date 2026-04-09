@@ -1,6 +1,6 @@
 # Packaging and Runtime Modes
 
-Last updated: 2026-04-08
+Last updated: 2026-04-09
 
 ## 1. Runtime strategy
 
@@ -28,7 +28,7 @@ Switch modes by copying a profile into `DILIGENT/settings/.env`.
 | `UI_HOST`, `UI_PORT` | Frontend host/port. |
 | `KERAS_BACKEND` | Runtime Keras backend override (optional). |
 | `MPLBACKEND` | Runtime Matplotlib backend override (optional). |
-| `VITE_API_BASE_URL` | Frontend API base path (`/api` recommended). |
+| `API_BASE_URL` | Frontend API base path (fixed to `/api` in Angular client constants). |
 | `RELOAD` | Backend auto-reload toggle for local workflow. |
 | `OLLAMA_URL`, `OLLAMA_HOST`, `OLLAMA_PORT` | Ollama endpoint configuration. |
 | `OPTIONAL_DEPENDENCIES` | Optional dependency branch for launcher flow. |

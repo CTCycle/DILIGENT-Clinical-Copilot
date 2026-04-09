@@ -1,13 +1,13 @@
 # UI Standards (Frontend)
 
-Last updated: 2026-04-08
+Last updated: 2026-04-09
 
-Scope: `DILIGENT/client/src` and `DILIGENT/client/src/styles.css`.
+Scope: `DILIGENT/client/src` and `DILIGENT/client/src/styles.scss`.
 Goal: keep UI coherent, accessible, and maintainable.
 
 ## 1. Design token usage
 
-- Use existing CSS variables in `styles.css` before adding raw values.
+- Use existing CSS variables in `styles.scss` before adding raw values.
 - Prefer tokenized spacing, typography, colors, control sizes, and focus ring values.
 - New tokens must be reusable across at least two UI areas.
 

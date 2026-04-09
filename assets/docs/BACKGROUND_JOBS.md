@@ -1,6 +1,6 @@
 # Background Job Management
 
-Last updated: 2026-04-08
+Last updated: 2026-04-09
 
 DILIGENT uses a centralized thread-based job manager for long-running operations.
 
@@ -60,7 +60,7 @@ Standard contract:
 4. Inspection update jobs may include phase-aware result fields:
    - `phase`, `step_index`, `step_count`, `progress_message`, `summary`.
 
-Frontend polling is implemented in `DILIGENT/client/src/services/api.ts` and stops on terminal states.
+Frontend polling is implemented in `DILIGENT/client/src/app/core/services/api.ts` and stops on terminal states.
 
 ## 6. Cancellation rules
 
