@@ -98,7 +98,7 @@
                         <button class="inspection-icon-button is-primary" type="button" (click)="openSessionReport(row)" [attr.aria-label]="'View report for session ' + row.session_id" [attr.title]="'View report for session ' + row.session_id">
                           <svg class="inspection-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 5C7 5 2.73 8.11 1 12c1.73 3.89 6 7 11 7s9.27-3.11 11-7c-1.73-3.89-6-7-11-7Zm0 11a4 4 0 1 1 0-8 4 4 0 0 1 0 8Z" /></svg>
                         </button>
-                        <button class="inspection-icon-button is-danger" type="button" (click)="removeSession(row.session_id)" [attr.aria-label]="'Delete session ' + row.session_id" [attr.title]="'Delete session ' + row.session_id">
+                        <button class="inspection-icon-button is-danger" type="button" (click)="confirmAndRemoveSession(row)" [attr.aria-label]="'Delete session ' + row.session_id" [attr.title]="'Delete session ' + row.session_id">
                           <svg class="inspection-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M16 9v10H8V9h8Zm-1.5-6h-5l-1 1H5v2h14V4h-3.5l-1-1ZM18 7H6v12c0 1.1.9 2 2 2h8c1.1 0 2-.9 2-2V7Z" /></svg>
                         </button>
                         <button class="inspection-icon-button" type="button" disabled aria-label="Modify session (not implemented)" title="Modify session (not implemented)">
@@ -107,12 +107,10 @@
                       </td>
                     </tr>
                   }
-                  @if (!sessionLoading() && sessionItems().length === 0) {
-                    <tr><td colspan="6" class="inspection-empty-row">No sessions found.</td></tr>
-                  }
                 </tbody>
               </table>
               @if (sessionLoading()) { <p class="inspection-loading-note">Loading sessions...</p> }
+              @if (!sessionLoading() && sessionItems().length === 0) { <p class="inspection-empty-note">No sessions found.</p> }
               @if (sessionError()) { <p class="inspection-error-text">{{ sessionError() }}</p> }
             </div>
 

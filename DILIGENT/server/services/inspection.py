@@ -7,14 +7,13 @@ from typing import Any, Literal
 
 from DILIGENT.server.common.constants import (
     ARCHIVES_PATH,
-    CONFIGURATIONS_FILE,
     DOCS_PATH,
     DOCUMENT_SUPPORTED_EXTENSIONS,
     VECTOR_DB_PATH,
 )
 from DILIGENT.server.common.utils.logger import logger
 from DILIGENT.server.configurations.bootstrap import server_settings
-from DILIGENT.server.configurations.json_loader import load_configuration_data
+from DILIGENT.server.configurations.settings import get_app_settings
 from DILIGENT.server.domain.inspection import InspectionJobPhase
 from DILIGENT.server.repositories.serialization.data import DataSerializer, DocumentSerializer
 from DILIGENT.server.repositories.vectors import LanceVectorDatabase
@@ -110,8 +109,7 @@ class DataInspectionService:
 
     # -------------------------------------------------------------------------
     def load_runtime_config(self) -> dict[str, Any]:
-        payload = load_configuration_data(CONFIGURATIONS_FILE)
-        return payload if isinstance(payload, dict) else {}
+        return get_app_settings().model_dump()
 
     # -------------------------------------------------------------------------
     def build_update_config_response(self, target: UpdateTarget) -> dict[str, Any]:

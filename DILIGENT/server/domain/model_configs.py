@@ -5,7 +5,7 @@ from datetime import datetime
 
 from pydantic import AliasChoices, BaseModel, ConfigDict, Field
 
-
+###############################################################################
 @dataclass(frozen=True)
 class ModelConfigSnapshot:
     clinical_model: str | None
@@ -17,14 +17,14 @@ class ModelConfigSnapshot:
     cloud_temperature: float
     updated_at: datetime | None
 
-
+###############################################################################
 class LocalModelCard(BaseModel):
     name: str
     family: str
     description: str
     available_in_ollama: bool
 
-
+###############################################################################
 class ModelConfigUpdateRequest(BaseModel):
     model_config = ConfigDict(extra="forbid")
     use_cloud_services: bool | None = None
@@ -39,7 +39,7 @@ class ModelConfigUpdateRequest(BaseModel):
     cloud_temperature: float | None = None
     ollama_reasoning: bool | None = None
 
-
+###############################################################################
 class ModelConfigStateResponse(BaseModel):
     local_models: list[LocalModelCard]
     cloud_model_choices: dict[str, list[str]]

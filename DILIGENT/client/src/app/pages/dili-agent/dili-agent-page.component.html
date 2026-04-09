@@ -84,10 +84,13 @@
             <input
               id="visit-date"
               type="date"
+              lang="en-CA"
               [max]="todayIso"
               [ngModel]="vm.form.visitDate"
               (ngModelChange)="handleVisitDateChange($event)"
+              aria-describedby="visit-date-helper"
             />
+            <p id="visit-date-helper" class="field-helper">Use YYYY-MM-DD format or pick a date from the calendar.</p>
           </div>
         </div>
 

@@ -1,38 +1,54 @@
 from __future__ import annotations
 
-from pathlib import Path
+import json
 
-from DILIGENT.server.configurations import env_loader
+import pytest
+
+from DILIGENT.server.common import constants
+from DILIGENT.server.configurations import environment, sources
+from DILIGENT.server.configurations.bootstrap import get_app_settings, reset_app_settings_cache
 
 
-def test_runtime_env_values_are_loaded_from_dotenv(tmp_path, monkeypatch) -> None:
+def test_initialize_environment_loads_dotenv_without_overriding_existing(tmp_path, monkeypatch) -> None:
     dotenv_path = tmp_path / ".env"
-    dotenv_path.write_text(
-        "\n".join(
-            [
-                "FASTAPI_HOST=0.0.0.0",
-                "FASTAPI_PORT=9000",
-                "UI_HOST=127.0.0.1",
-                "UI_PORT=7999",
-                "KERAS_BACKEND=tensorflow",
-                "MPLBACKEND=Agg",
-            ]
-        ),
+    dotenv_path.write_text("DILIGENT_TAURI_MODE=true\nFASTAPI_HOST=0.0.0.0\n", encoding="utf-8")
+    monkeypatch.setattr(environment, "ENV_FILE_PATH", str(dotenv_path))
+    monkeypatch.setenv("FASTAPI_HOST", "127.0.0.1")
+    monkeypatch.setattr(environment, "_ENV_BOOTSTRAPPED", False)
+    monkeypatch.setattr(environment, "_DOTENV_INJECTED_KEYS", set())
+
+    environment.initialize_environment()
+
+    assert environment.get_dotenv_injected_keys()
+    assert "DILIGENT_TAURI_MODE" in environment.get_dotenv_injected_keys()
+    assert "FASTAPI_HOST" not in environment.get_dotenv_injected_keys()
+
+
+def test_ui_owned_env_keys_are_rejected(monkeypatch, tmp_path) -> None:
+    config_path = tmp_path / "configurations.json"
+    config_path.write_text("{}", encoding="utf-8")
+    monkeypatch.setattr(constants, "CONFIGURATIONS_FILE", str(config_path))
+    monkeypatch.setenv("LLM_PROVIDER", "openai")
+
+    reset_app_settings_cache()
+    with pytest.raises(RuntimeError, match="UI-owned runtime keys"):
+        get_app_settings()
+
+    monkeypatch.delenv("LLM_PROVIDER", raising=False)
+    reset_app_settings_cache()
+
+
+def test_ui_owned_json_keys_are_rejected(monkeypatch, tmp_path) -> None:
+    config_path = tmp_path / "configurations.json"
+    config_path.write_text(
+        json.dumps({"llm_defaults": {"cloud_model": "gpt-5-mini"}}),
         encoding="utf-8",
     )
-    monkeypatch.setattr(env_loader, "ENV_FILE_PATH", str(Path(dotenv_path)))
-    monkeypatch.delenv("FASTAPI_HOST", raising=False)
-    monkeypatch.delenv("FASTAPI_PORT", raising=False)
-    monkeypatch.delenv("UI_HOST", raising=False)
-    monkeypatch.delenv("UI_PORT", raising=False)
-    monkeypatch.delenv("KERAS_BACKEND", raising=False)
-    monkeypatch.delenv("MPLBACKEND", raising=False)
+    monkeypatch.setattr(constants, "CONFIGURATIONS_FILE", str(config_path))
+    monkeypatch.setattr(sources, "_read_dotenv", lambda: {})
 
-    settings = env_loader.load_environment()
+    reset_app_settings_cache()
+    with pytest.raises(RuntimeError, match="UI-owned runtime keys"):
+        get_app_settings()
 
-    assert settings.fastapi_host == "0.0.0.0"
-    assert settings.fastapi_port == 9000
-    assert settings.ui_host == "127.0.0.1"
-    assert settings.ui_port == 7999
-    assert settings.keras_backend == "tensorflow"
-    assert settings.mpl_backend == "Agg"
+    reset_app_settings_cache()
