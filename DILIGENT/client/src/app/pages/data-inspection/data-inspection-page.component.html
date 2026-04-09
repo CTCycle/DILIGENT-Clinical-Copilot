@@ -21,7 +21,7 @@
             (click)="changeView(view.id)"
             (keydown)="onInspectionTabKeydown($event, view.id)"
           >
-            {{ view.label }}
+            <span>{{ view.label }}</span>
           </button>
         }
       </div>
@@ -36,49 +36,92 @@
       @if (activeView() === 'sessions') {
         <section class="inspection-view-content">
           <div class="inspection-widget">
-            <div class="inspection-widget-header">
-              <div class="inspection-controls inspection-controls-sessions">
-                <input type="search" class="inspection-search" placeholder="Search sessions" [ngModel]="sessionSearchInput()" (ngModelChange)="updateSessionsSearch($event)" />
-                <select class="inspection-select" [ngModel]="sessionStatusFilter()" (ngModelChange)="updateSessionsStatus($event)">
-                  <option value="all">All statuses</option>
-                  <option value="successful">Successful</option>
-                  <option value="failed">Failed</option>
-                </select>
-                <select class="inspection-select" [ngModel]="sessionDateMode()" (ngModelChange)="updateSessionsDateMode($event)">
-                  <option value="none">No date filter</option>
+            <div class="inspection-widget-header inspection-widget-header-split">
+              <div class="inspection-controls inspection-controls-half">
+                <input
+                  type="search"
+                  class="inspection-search"
+                  placeholder="Search sessions..."
+                  [ngModel]="sessionSearchInput()"
+                  (ngModelChange)="updateSessionsSearch($event)"
+                  aria-label="Search sessions"
+                />
+              </div>
+              <div class="inspection-widget-header-actions inspection-header-actions-fixed">
+                <div class="inspection-toggle-group">
+                  <button type="button" class="inspection-toggle-pill" [class.is-active]="sessionStatusFilter() === 'all'" (click)="updateSessionsStatus('all')">All</button>
+                  <button type="button" class="inspection-toggle-pill" [class.is-active]="sessionStatusFilter() === 'successful'" (click)="updateSessionsStatus('successful')">Successful</button>
+                  <button type="button" class="inspection-toggle-pill" [class.is-active]="sessionStatusFilter() === 'failed'" (click)="updateSessionsStatus('failed')">Failed</button>
+                </div>
+                <select class="inspection-select" [ngModel]="sessionDateMode()" (ngModelChange)="updateSessionsDateMode($event)" aria-label="Date filter mode">
+                  <option value="none">Date filter</option>
                   <option value="before">Before</option>
                   <option value="after">After</option>
                   <option value="exact">Exact</option>
                 </select>
-                <input type="date" class="inspection-date" [ngModel]="sessionDate()" (ngModelChange)="updateSessionsDate($event)" [disabled]="sessionDateMode() === 'none'" />
+                <input
+                  type="date"
+                  class="inspection-date"
+                  [ngModel]="sessionDate()"
+                  (ngModelChange)="updateSessionsDate($event)"
+                  [disabled]="sessionDateMode() === 'none'"
+                  aria-label="Session date filter"
+                />
               </div>
             </div>
+
             <div class="inspection-scroll-frame">
               <table class="inspection-table inspection-table-dense">
-                <thead><tr><th>Session</th><th>Patient</th><th>Timestamp</th><th>Status</th><th>Duration</th><th>Actions</th></tr></thead>
+                <thead>
+                  <tr>
+                    <th>#</th>
+                    <th>Patient</th>
+                    <th>Date</th>
+                    <th>Status</th>
+                    <th>Total time</th>
+                    <th aria-label="Actions"></th>
+                  </tr>
+                </thead>
                 <tbody>
-                  @for (row of sessionItems(); track row.session_id) {
+                  @for (row of sessionItems(); track row.session_id; let i = $index) {
                     <tr>
-                      <td>{{ row.session_id }}</td>
-                      <td>{{ row.patient_name || 'N/A' }}</td>
+                      <td>{{ sessionOffset() + i + 1 }}</td>
+                      <td>{{ row.patient_name || 'Unknown' }}</td>
                       <td>{{ formatDateTime(row.session_timestamp) }}</td>
-                      <td><span class="inspection-status-chip" [class.is-successful]="row.status==='successful'" [class.is-failed]="row.status==='failed'">{{ statusLabel(row.status) }}</span></td>
+                      <td>
+                        <span class="inspection-status-chip" [class.is-successful]="row.status === 'successful'" [class.is-failed]="row.status === 'failed'">
+                          {{ statusLabel(row.status) }}
+                        </span>
+                      </td>
                       <td>{{ formatDuration(row.total_duration) }}</td>
                       <td class="inspection-actions-cell">
-                        <button class="inspection-icon-button is-primary" type="button" (click)="openSessionReport(row)">View</button>
-                        <button class="inspection-icon-button is-danger" type="button" (click)="removeSession(row.session_id)">Delete</button>
+                        <button class="inspection-icon-button is-primary" type="button" (click)="openSessionReport(row)" [attr.aria-label]="'View report for session ' + row.session_id" [attr.title]="'View report for session ' + row.session_id">
+                          <svg class="inspection-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 5C7 5 2.73 8.11 1 12c1.73 3.89 6 7 11 7s9.27-3.11 11-7c-1.73-3.89-6-7-11-7Zm0 11a4 4 0 1 1 0-8 4 4 0 0 1 0 8Z" /></svg>
+                        </button>
+                        <button class="inspection-icon-button is-danger" type="button" (click)="removeSession(row.session_id)" [attr.aria-label]="'Delete session ' + row.session_id" [attr.title]="'Delete session ' + row.session_id">
+                          <svg class="inspection-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M16 9v10H8V9h8Zm-1.5-6h-5l-1 1H5v2h14V4h-3.5l-1-1ZM18 7H6v12c0 1.1.9 2 2 2h8c1.1 0 2-.9 2-2V7Z" /></svg>
+                        </button>
+                        <button class="inspection-icon-button" type="button" disabled aria-label="Modify session (not implemented)" title="Modify session (not implemented)">
+                          <svg class="inspection-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="m3 17.25 9.81-9.82 2.76 2.76L5.76 20H3v-2.75Zm14.71-8.04-2.92-2.92 1.41-1.41a2 2 0 0 1 2.83 0l.09.09a2 2 0 0 1 0 2.83l-1.41 1.41Z" /></svg>
+                        </button>
                       </td>
                     </tr>
+                  }
+                  @if (!sessionLoading() && sessionItems().length === 0) {
+                    <tr><td colspan="6" class="inspection-empty-row">No sessions found.</td></tr>
                   }
                 </tbody>
               </table>
               @if (sessionLoading()) { <p class="inspection-loading-note">Loading sessions...</p> }
               @if (sessionError()) { <p class="inspection-error-text">{{ sessionError() }}</p> }
             </div>
+
             <div class="inspection-pager">
-              <button class="btn btn-secondary inspection-mini-btn" (click)="pageSessions(-1)" [disabled]="sessionOffset()===0">Previous</button>
-              <span class="inspection-pager-range">{{ sessionOffset()+1 }}-{{ rangeEnd(sessionOffset(), sessionTotal()) }} / {{ sessionTotal() }}</span>
-              <button class="btn btn-secondary inspection-mini-btn" (click)="pageSessions(1)" [disabled]="sessionOffset()+10>=sessionTotal()">Next</button>
+              <div class="inspection-pager-actions">
+                <button class="btn btn-secondary inspection-mini-btn" type="button" (click)="pageSessions(-1)" [disabled]="sessionOffset() === 0">Previous</button>
+                <span class="inspection-pager-range">{{ rangeStart(sessionOffset(), sessionTotal()) }}-{{ rangeEnd(sessionOffset(), sessionTotal()) }} / {{ sessionTotal() }}</span>
+                <button class="btn btn-secondary inspection-mini-btn" type="button" (click)="pageSessions(1)" [disabled]="sessionOffset() + 10 >= sessionTotal()">Next</button>
+              </div>
             </div>
           </div>
         </section>
@@ -88,43 +131,305 @@
         <section class="inspection-view-content">
           <div class="inspection-widget">
             <div class="inspection-widget-header">
-              <input type="search" class="inspection-search" placeholder="Search RxNav" [ngModel]="rxnavSearchInput()" (ngModelChange)="updateRxNavSearch($event)" />
-              <button class="btn btn-secondary inspection-mini-btn" type="button" (click)="openUpdateModal('rxnav')">Update Catalog</button>
+              <div class="inspection-controls inspection-controls-half inspection-controls-knowledge">
+                <input type="search" class="inspection-search" placeholder="Search RxNav..." [ngModel]="rxnavSearchInput()" (ngModelChange)="updateRxNavSearch($event)" aria-label="Search RxNav data" />
+              </div>
+              <div class="inspection-widget-header-actions inspection-header-actions-fixed">
+                <button class="btn btn-secondary inspection-mini-btn" type="button" (click)="openUpdateModal('rxnav')">Update Catalog</button>
+              </div>
             </div>
-            <div class="inspection-scroll-frame">
+
+            <div class="inspection-scroll-frame inspection-scroll-frame-compact">
               <table class="inspection-table inspection-table-dense">
-                <thead><tr><th>Drug</th><th>Last update</th><th>Actions</th></tr></thead>
+                <thead><tr><th>Drug</th><th>Last update</th><th aria-label="Actions"></th></tr></thead>
                 <tbody>
                   @for (row of rxnavItems(); track row.drug_id) {
                     <tr>
-                      <td>{{ row.drug_name }}</td><td>{{ formatDateTime(row.last_update) }}</td>
-                      <td class="inspection-actions-cell"><button class="inspection-icon-button is-primary" (click)="openAliases(row.drug_id)">Aliases</button><button class="inspection-icon-button is-danger" (click)="removeRxNavDrug(row.drug_id)">Delete</button></td>
+                      <td>{{ row.drug_name }}</td>
+                      <td>{{ row.last_update || 'N/A' }}</td>
+                      <td class="inspection-actions-cell">
+                        <button class="inspection-icon-button is-primary" type="button" (click)="openAliases(row.drug_id)" [attr.aria-label]="'View aliases for ' + row.drug_name" [attr.title]="'View aliases for ' + row.drug_name">
+                          <svg class="inspection-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 5C7 5 2.73 8.11 1 12c1.73 3.89 6 7 11 7s9.27-3.11 11-7c-1.73-3.89-6-7-11-7Zm0 11a4 4 0 1 1 0-8 4 4 0 0 1 0 8Z" /></svg>
+                        </button>
+                        <button class="inspection-icon-button is-danger" type="button" (click)="removeRxNavDrug(row.drug_id)" [attr.aria-label]="'Delete ' + row.drug_name" [attr.title]="'Delete ' + row.drug_name">
+                          <svg class="inspection-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M16 9v10H8V9h8Zm-1.5-6h-5l-1 1H5v2h14V4h-3.5l-1-1ZM18 7H6v12c0 1.1.9 2 2 2h8c1.1 0 2-.9 2-2V7Z" /></svg>
+                        </button>
+                        <button class="inspection-icon-button" type="button" disabled aria-label="Modify RxNav entry (not implemented)" title="Modify RxNav entry (not implemented)">
+                          <svg class="inspection-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="m3 17.25 9.81-9.82 2.76 2.76L5.76 20H3v-2.75Zm14.71-8.04-2.92-2.92 1.41-1.41a2 2 0 0 1 2.83 0l.09.09a2 2 0 0 1 0 2.83l-1.41 1.41Z" /></svg>
+                        </button>
+                      </td>
                     </tr>
+                  }
+                  @if (!rxnavLoading() && rxnavItems().length === 0) {
+                    <tr><td colspan="3" class="inspection-empty-row">No RxNav rows found.</td></tr>
                   }
                 </tbody>
               </table>
-              @if (rxnavLoading()) { <p class="inspection-loading-note">Loading drug catalog...</p> }
+              @if (rxnavLoading()) { <p class="inspection-loading-note">Loading RxNav data...</p> }
               @if (rxnavError()) { <p class="inspection-error-text">{{ rxnavError() }}</p> }
             </div>
-            <div class="inspection-pager"><button class="btn btn-secondary inspection-mini-btn" (click)="pageRxNav(-1)" [disabled]="rxnavOffset()===0">Previous</button><span class="inspection-pager-range">{{ rxnavOffset()+1 }}-{{ rangeEnd(rxnavOffset(), rxnavTotal()) }} / {{ rxnavTotal() }}</span><button class="btn btn-secondary inspection-mini-btn" (click)="pageRxNav(1)" [disabled]="rxnavOffset()+10>=rxnavTotal()">Next</button></div>
+
+            <div class="inspection-pager">
+              <div class="inspection-pager-actions">
+                <button class="btn btn-secondary inspection-mini-btn" type="button" (click)="pageRxNav(-1)" [disabled]="rxnavOffset() === 0">Previous</button>
+                <span class="inspection-pager-range">{{ rangeStart(rxnavOffset(), rxnavTotal()) }}-{{ rangeEnd(rxnavOffset(), rxnavTotal()) }} / {{ rxnavTotal() }}</span>
+                <button class="btn btn-secondary inspection-mini-btn" type="button" (click)="pageRxNav(1)" [disabled]="rxnavOffset() + 10 >= rxnavTotal()">Next</button>
+              </div>
+            </div>
           </div>
         </section>
       }
 
       @if (activeView() === 'livertox') {
-        <section class="inspection-view-content"><div class="inspection-widget"><div class="inspection-widget-header"><input type="search" class="inspection-search" placeholder="Search LiverTox" [ngModel]="livertoxSearchInput()" (ngModelChange)="updateLiverToxSearch($event)" /><button class="btn btn-secondary inspection-mini-btn" type="button" (click)="openUpdateModal('livertox')">Update LiverTox</button></div><div class="inspection-scroll-frame"><table class="inspection-table inspection-table-dense"><thead><tr><th>Drug</th><th>Last update</th><th>Actions</th></tr></thead><tbody>@for (row of livertoxItems(); track row.drug_id) {<tr><td>{{ row.drug_name }}</td><td>{{ formatDateTime(row.last_update) }}</td><td class="inspection-actions-cell"><button class="inspection-icon-button is-primary" (click)="openExcerpt(row.drug_id)">Excerpt</button><button class="inspection-icon-button is-danger" (click)="removeLiverToxDrug(row.drug_id)">Delete</button></td></tr>}</tbody></table>@if (livertoxLoading()) { <p class="inspection-loading-note">Loading LiverTox...</p> } @if (livertoxError()) { <p class="inspection-error-text">{{ livertoxError() }}</p> }</div><div class="inspection-pager"><button class="btn btn-secondary inspection-mini-btn" (click)="pageLiverTox(-1)" [disabled]="livertoxOffset()===0">Previous</button><span class="inspection-pager-range">{{ livertoxOffset()+1 }}-{{ rangeEnd(livertoxOffset(), livertoxTotal()) }} / {{ livertoxTotal() }}</span><button class="btn btn-secondary inspection-mini-btn" (click)="pageLiverTox(1)" [disabled]="livertoxOffset()+10>=livertoxTotal()">Next</button></div></div></section>
+        <section class="inspection-view-content">
+          <div class="inspection-widget">
+            <div class="inspection-widget-header">
+              <div class="inspection-controls inspection-controls-half inspection-controls-knowledge">
+                <input type="search" class="inspection-search" placeholder="Search LiverTox..." [ngModel]="livertoxSearchInput()" (ngModelChange)="updateLiverToxSearch($event)" aria-label="Search LiverTox data" />
+              </div>
+              <div class="inspection-widget-header-actions inspection-header-actions-fixed">
+                <button class="btn btn-secondary inspection-mini-btn" type="button" (click)="openUpdateModal('livertox')">Update Base</button>
+              </div>
+            </div>
+
+            <div class="inspection-scroll-frame inspection-scroll-frame-compact">
+              <table class="inspection-table inspection-table-dense">
+                <thead><tr><th>Drug</th><th>Last update</th><th aria-label="Actions"></th></tr></thead>
+                <tbody>
+                  @for (row of livertoxItems(); track row.drug_id) {
+                    <tr>
+                      <td>{{ row.drug_name }}</td>
+                      <td>{{ row.last_update || 'N/A' }}</td>
+                      <td class="inspection-actions-cell">
+                        <button class="inspection-icon-button is-primary" type="button" (click)="openExcerpt(row.drug_id)" [attr.aria-label]="'View excerpt for ' + row.drug_name" [attr.title]="'View excerpt for ' + row.drug_name">
+                          <svg class="inspection-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 5C7 5 2.73 8.11 1 12c1.73 3.89 6 7 11 7s9.27-3.11 11-7c-1.73-3.89-6-7-11-7Zm0 11a4 4 0 1 1 0-8 4 4 0 0 1 0 8Z" /></svg>
+                        </button>
+                        <button class="inspection-icon-button is-danger" type="button" (click)="removeLiverToxDrug(row.drug_id)" [attr.aria-label]="'Delete ' + row.drug_name" [attr.title]="'Delete ' + row.drug_name">
+                          <svg class="inspection-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M16 9v10H8V9h8Zm-1.5-6h-5l-1 1H5v2h14V4h-3.5l-1-1ZM18 7H6v12c0 1.1.9 2 2 2h8c1.1 0 2-.9 2-2V7Z" /></svg>
+                        </button>
+                        <button class="inspection-icon-button" type="button" disabled aria-label="Modify LiverTox entry (not implemented)" title="Modify LiverTox entry (not implemented)">
+                          <svg class="inspection-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="m3 17.25 9.81-9.82 2.76 2.76L5.76 20H3v-2.75Zm14.71-8.04-2.92-2.92 1.41-1.41a2 2 0 0 1 2.83 0l.09.09a2 2 0 0 1 0 2.83l-1.41 1.41Z" /></svg>
+                        </button>
+                      </td>
+                    </tr>
+                  }
+                  @if (!livertoxLoading() && livertoxItems().length === 0) {
+                    <tr><td colspan="3" class="inspection-empty-row">No LiverTox rows found.</td></tr>
+                  }
+                </tbody>
+              </table>
+              @if (livertoxLoading()) { <p class="inspection-loading-note">Loading LiverTox data...</p> }
+              @if (livertoxError()) { <p class="inspection-error-text">{{ livertoxError() }}</p> }
+            </div>
+
+            <div class="inspection-pager">
+              <div class="inspection-pager-actions">
+                <button class="btn btn-secondary inspection-mini-btn" type="button" (click)="pageLiverTox(-1)" [disabled]="livertoxOffset() === 0">Previous</button>
+                <span class="inspection-pager-range">{{ rangeStart(livertoxOffset(), livertoxTotal()) }}-{{ rangeEnd(livertoxOffset(), livertoxTotal()) }} / {{ livertoxTotal() }}</span>
+                <button class="btn btn-secondary inspection-mini-btn" type="button" (click)="pageLiverTox(1)" [disabled]="livertoxOffset() + 10 >= livertoxTotal()">Next</button>
+              </div>
+            </div>
+          </div>
+        </section>
       }
 
       @if (activeView() === 'dili_priors') {
-        <section class="inspection-view-content"><div class="inspection-widget"><div class="inspection-widget-header"><input type="search" class="inspection-search" placeholder="Search DILI priors" [ngModel]="diliPriorSearchInput()" (ngModelChange)="updateDiliPriorsSearch($event)" /><button class="btn btn-secondary inspection-mini-btn" type="button" (click)="openUpdateModal('dili_priors')">Update Priors</button></div><div class="inspection-scroll-frame"><table class="inspection-table inspection-table-dense"><thead><tr><th>Drug</th><th>DILIrank</th><th>DILIst</th><th>Sources</th><th>Actions</th></tr></thead><tbody>@for (row of diliPriorItems(); track row.drug_id) {<tr><td>{{ row.drug_name }}</td><td>{{ row.dilirank_class || 'N/A' }}</td><td>{{ row.dilist_class || 'N/A' }}</td><td>{{ row.linked_source_count }}</td><td class="inspection-actions-cell"><button class="inspection-icon-button is-primary" (click)="openDiliPriorDetails(row.drug_id)">View</button></td></tr>}</tbody></table>@if (diliPriorLoading()) { <p class="inspection-loading-note">Loading DILI priors...</p> } @if (diliPriorError()) { <p class="inspection-error-text">{{ diliPriorError() }}</p> }</div><div class="inspection-pager"><button class="btn btn-secondary inspection-mini-btn" (click)="pageDiliPriors(-1)" [disabled]="diliPriorOffset()===0">Previous</button><span class="inspection-pager-range">{{ diliPriorOffset()+1 }}-{{ rangeEnd(diliPriorOffset(), diliPriorTotal()) }} / {{ diliPriorTotal() }}</span><button class="btn btn-secondary inspection-mini-btn" (click)="pageDiliPriors(1)" [disabled]="diliPriorOffset()+10>=diliPriorTotal()">Next</button></div></div></section>
+        <section class="inspection-view-content">
+          <div class="inspection-widget">
+            <div class="inspection-widget-header">
+              <div class="inspection-controls inspection-controls-half inspection-controls-knowledge">
+                <input type="search" class="inspection-search" placeholder="Search DILI priors..." [ngModel]="diliPriorSearchInput()" (ngModelChange)="updateDiliPriorsSearch($event)" aria-label="Search DILI priors data" />
+              </div>
+              <div class="inspection-widget-header-actions inspection-header-actions-fixed">
+                <button class="btn btn-secondary inspection-mini-btn" type="button" (click)="openUpdateModal('dili_priors')">Update Priors</button>
+              </div>
+            </div>
+
+            <div class="inspection-scroll-frame inspection-scroll-frame-compact">
+              <table class="inspection-table inspection-table-dense">
+                <thead><tr><th>Drug</th><th>DILIrank class</th><th>DILIst class</th><th>Linked sources</th><th aria-label="Actions"></th></tr></thead>
+                <tbody>
+                  @for (row of diliPriorItems(); track row.drug_id) {
+                    <tr>
+                      <td>{{ row.drug_name }}</td>
+                      <td>{{ row.dilirank_class || 'N/A' }}</td>
+                      <td>{{ row.dilist_class || 'N/A' }}</td>
+                      <td>{{ row.linked_source_count }}</td>
+                      <td class="inspection-actions-cell">
+                        <button class="inspection-icon-button is-primary" type="button" (click)="openDiliPriorDetails(row.drug_id)" [attr.aria-label]="'View DILI priors for ' + row.drug_name" [attr.title]="'View DILI priors for ' + row.drug_name">
+                          <svg class="inspection-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 5C7 5 2.73 8.11 1 12c1.73 3.89 6 7 11 7s9.27-3.11 11-7c-1.73-3.89-6-7-11-7Zm0 11a4 4 0 1 1 0-8 4 4 0 0 1 0 8Z" /></svg>
+                        </button>
+                        <button class="inspection-icon-button" type="button" disabled aria-label="Modify DILI prior entry (not implemented)" title="Modify DILI prior entry (not implemented)">
+                          <svg class="inspection-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="m3 17.25 9.81-9.82 2.76 2.76L5.76 20H3v-2.75Zm14.71-8.04-2.92-2.92 1.41-1.41a2 2 0 0 1 2.83 0l.09.09a2 2 0 0 1 0 2.83l-1.41 1.41Z" /></svg>
+                        </button>
+                      </td>
+                    </tr>
+                  }
+                  @if (!diliPriorLoading() && diliPriorItems().length === 0) {
+                    <tr><td colspan="5" class="inspection-empty-row">No DILI prior rows found.</td></tr>
+                  }
+                </tbody>
+              </table>
+              @if (diliPriorLoading()) { <p class="inspection-loading-note">Loading DILI priors...</p> }
+              @if (diliPriorError()) { <p class="inspection-error-text">{{ diliPriorError() }}</p> }
+            </div>
+
+            <div class="inspection-pager">
+              <div class="inspection-pager-actions">
+                <button class="btn btn-secondary inspection-mini-btn" type="button" (click)="pageDiliPriors(-1)" [disabled]="diliPriorOffset() === 0">Previous</button>
+                <span class="inspection-pager-range">{{ rangeStart(diliPriorOffset(), diliPriorTotal()) }}-{{ rangeEnd(diliPriorOffset(), diliPriorTotal()) }} / {{ diliPriorTotal() }}</span>
+                <button class="btn btn-secondary inspection-mini-btn" type="button" (click)="pageDiliPriors(1)" [disabled]="diliPriorOffset() + 10 >= diliPriorTotal()">Next</button>
+              </div>
+            </div>
+          </div>
+        </section>
       }
 
       @if (activeView() === 'drug_labels') {
-        <section class="inspection-view-content"><div class="inspection-widget"><div class="inspection-widget-header"><input type="search" class="inspection-search" placeholder="Search drug labels" [ngModel]="drugLabelSearchInput()" (ngModelChange)="updateDrugLabelsSearch($event)" /><button class="btn btn-secondary inspection-mini-btn" type="button" (click)="openUpdateModal('drug_labels')">Update Labels</button></div><div class="inspection-scroll-frame"><table class="inspection-table inspection-table-dense"><thead><tr><th>Drug</th><th>Source</th><th>Effective date</th><th>Sections</th><th>Actions</th></tr></thead><tbody>@for (row of drugLabelItems(); track row.drug_id) {<tr><td>{{ row.drug_name }}</td><td>{{ row.source }}</td><td>{{ row.effective_date || 'N/A' }}</td><td>{{ row.retained_section_count }}</td><td class="inspection-actions-cell"><button class="inspection-icon-button is-primary" (click)="openDrugLabelSections(row.drug_id)">View</button></td></tr>}</tbody></table>@if (drugLabelLoading()) { <p class="inspection-loading-note">Loading drug labels...</p> } @if (drugLabelError()) { <p class="inspection-error-text">{{ drugLabelError() }}</p> }</div><div class="inspection-pager"><button class="btn btn-secondary inspection-mini-btn" (click)="pageDrugLabels(-1)" [disabled]="drugLabelOffset()===0">Previous</button><span class="inspection-pager-range">{{ drugLabelOffset()+1 }}-{{ rangeEnd(drugLabelOffset(), drugLabelTotal()) }} / {{ drugLabelTotal() }}</span><button class="btn btn-secondary inspection-mini-btn" (click)="pageDrugLabels(1)" [disabled]="drugLabelOffset()+10>=drugLabelTotal()">Next</button></div></div></section>
+        <section class="inspection-view-content">
+          <div class="inspection-widget">
+            <div class="inspection-widget-header">
+              <div class="inspection-controls inspection-controls-half inspection-controls-knowledge">
+                <input type="search" class="inspection-search" placeholder="Search drug labels..." [ngModel]="drugLabelSearchInput()" (ngModelChange)="updateDrugLabelsSearch($event)" aria-label="Search drug labels data" />
+              </div>
+              <div class="inspection-widget-header-actions inspection-header-actions-fixed">
+                <button class="btn btn-secondary inspection-mini-btn" type="button" (click)="openUpdateModal('drug_labels')">Update Labels</button>
+              </div>
+            </div>
+
+            <div class="inspection-scroll-frame inspection-scroll-frame-compact">
+              <table class="inspection-table inspection-table-dense">
+                <thead><tr><th>Drug</th><th>Source</th><th>Effective date</th><th>Retained sections</th><th aria-label="Actions"></th></tr></thead>
+                <tbody>
+                  @for (row of drugLabelItems(); track row.drug_id) {
+                    <tr>
+                      <td>{{ row.drug_name }}</td>
+                      <td>{{ row.source }}</td>
+                      <td>{{ row.effective_date || 'N/A' }}</td>
+                      <td>{{ row.retained_section_count }}</td>
+                      <td class="inspection-actions-cell">
+                        <button class="inspection-icon-button is-primary" type="button" (click)="openDrugLabelSections(row.drug_id)" [attr.aria-label]="'View labels for ' + row.drug_name" [attr.title]="'View labels for ' + row.drug_name">
+                          <svg class="inspection-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 5C7 5 2.73 8.11 1 12c1.73 3.89 6 7 11 7s9.27-3.11 11-7c-1.73-3.89-6-7-11-7Zm0 11a4 4 0 1 1 0-8 4 4 0 0 1 0 8Z" /></svg>
+                        </button>
+                        <button class="inspection-icon-button" type="button" disabled aria-label="Modify drug label entry (not implemented)" title="Modify drug label entry (not implemented)">
+                          <svg class="inspection-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="m3 17.25 9.81-9.82 2.76 2.76L5.76 20H3v-2.75Zm14.71-8.04-2.92-2.92 1.41-1.41a2 2 0 0 1 2.83 0l.09.09a2 2 0 0 1 0 2.83l-1.41 1.41Z" /></svg>
+                        </button>
+                      </td>
+                    </tr>
+                  }
+                  @if (!drugLabelLoading() && drugLabelItems().length === 0) {
+                    <tr><td colspan="5" class="inspection-empty-row">No drug label rows found.</td></tr>
+                  }
+                </tbody>
+              </table>
+              @if (drugLabelLoading()) { <p class="inspection-loading-note">Loading drug labels...</p> }
+              @if (drugLabelError()) { <p class="inspection-error-text">{{ drugLabelError() }}</p> }
+            </div>
+
+            <div class="inspection-pager">
+              <div class="inspection-pager-actions">
+                <button class="btn btn-secondary inspection-mini-btn" type="button" (click)="pageDrugLabels(-1)" [disabled]="drugLabelOffset() === 0">Previous</button>
+                <span class="inspection-pager-range">{{ rangeStart(drugLabelOffset(), drugLabelTotal()) }}-{{ rangeEnd(drugLabelOffset(), drugLabelTotal()) }} / {{ drugLabelTotal() }}</span>
+                <button class="btn btn-secondary inspection-mini-btn" type="button" (click)="pageDrugLabels(1)" [disabled]="drugLabelOffset() + 10 >= drugLabelTotal()">Next</button>
+              </div>
+            </div>
+          </div>
+        </section>
       }
 
       @if (activeView() === 'rag') {
-        <section class="inspection-view-content"><div class="inspection-widget"><div class="inspection-widget-header"><h3>RAG Vector Store</h3><button class="btn btn-secondary inspection-mini-btn" type="button" (click)="openUpdateModal('rag')">Update RAG</button></div><div class="inspection-scroll-frame">@if (ragVectorStore()) {<div class="card"><p>Collection: {{ ragVectorStore()!.collection_name }}</p><p>Embeddings: {{ ragVectorStore()!.embedding_count }}</p><p>Documents: {{ ragVectorStore()!.distinct_document_count }}</p></div>}<table class="inspection-table inspection-table-dense"><thead><tr><th>File</th><th>Path</th><th>Size</th><th>Modified</th></tr></thead><tbody>@for (row of ragDocuments(); track row.path) {<tr><td>{{ row.file_name }}</td><td>{{ row.path }}</td><td>{{ row.file_size }}</td><td>{{ formatDateTime(row.last_modified) }}</td></tr>}</tbody></table>@if (ragLoading()) { <p class="inspection-loading-note">Loading RAG data...</p> } @if (ragError()) { <p class="inspection-error-text">{{ ragError() }}</p> }</div></div></section>
+        <section class="inspection-view-content">
+          <div class="inspection-widget">
+            <div class="inspection-widget-header">
+              <div class="inspection-controls inspection-controls-half inspection-controls-knowledge">
+                <input
+                  type="search"
+                  class="inspection-search"
+                  placeholder="Search RAG documents..."
+                  [ngModel]="ragSearchInput()"
+                  (ngModelChange)="updateRagSearch($event)"
+                  aria-label="Search RAG documents"
+                />
+              </div>
+              <div class="inspection-widget-header-actions inspection-header-actions-fixed">
+                <button
+                  type="button"
+                  class="btn btn-secondary inspection-mini-btn inspection-mini-btn-folder"
+                  (click)="openRagFolderPicker()"
+                  aria-label="Pick a RAG source folder"
+                  title="Pick a RAG source folder"
+                >
+                  <svg class="inspection-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M4 6a2 2 0 0 1 2-2h5l2 2h7a2 2 0 0 1 2 2v8a3 3 0 0 1-3 3H7a3 3 0 0 1-3-3V6Zm2 0v8a1 1 0 0 0 1 1h12a1 1 0 0 0 1-1V8H12.17l-2-2H6Z" /></svg>
+                </button>
+                <input #ragFolderInput type="file" class="inspection-folder-input" webkitdirectory directory multiple (change)="onRagFolderSelection($event)" />
+                <button class="btn btn-secondary inspection-mini-btn" type="button" (click)="openUpdateModal('rag')">Update Embeddings</button>
+              </div>
+            </div>
+
+            <div class="inspection-scroll-frame inspection-scroll-frame-compact inspection-rag-second-view">
+              <table class="inspection-table inspection-table-dense">
+                <thead>
+                  <tr>
+                    <th>Folder path</th>
+                    <th>Collection</th>
+                    <th>Embeddings</th>
+                    <th>Documents</th>
+                    <th>Dimension</th>
+                    <th>Index ready</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  <tr>
+                    <td>{{ displayedRagFolderPath }}</td>
+                    <td>{{ ragVectorStore()?.collection_name || 'N/A' }}</td>
+                    <td>{{ ragVectorStore()?.embedding_count ?? 0 }}</td>
+                    <td>{{ ragVectorStore()?.distinct_document_count ?? 0 }}</td>
+                    <td>{{ ragVectorStore()?.embedding_dimension ?? 'N/A' }}</td>
+                    <td>{{ ragVectorStore()?.index_ready ? 'Yes' : 'No' }}</td>
+                  </tr>
+                </tbody>
+              </table>
+            </div>
+
+            <div class="inspection-scroll-frame inspection-scroll-frame-compact">
+              <table class="inspection-table inspection-table-dense">
+                <thead>
+                  <tr>
+                    <th>File</th>
+                    <th>Extension</th>
+                    <th>Size</th>
+                    <th>Last modified</th>
+                    <th>Supported</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  @for (row of ragDocuments(); track row.path) {
+                    <tr>
+                      <td>{{ row.file_name }}</td>
+                      <td>{{ row.extension }}</td>
+                      <td>{{ row.file_size }}</td>
+                      <td>{{ formatDateTime(row.last_modified) }}</td>
+                      <td>{{ row.supported_for_ingestion ? 'Yes' : 'No' }}</td>
+                    </tr>
+                  }
+                  @if (!ragLoading() && ragDocuments().length === 0) {
+                    <tr><td colspan="5" class="inspection-empty-row">No RAG documents found.</td></tr>
+                  }
+                </tbody>
+              </table>
+              @if (ragLoading()) { <p class="inspection-loading-note">Loading RAG data...</p> }
+              @if (ragError()) { <p class="inspection-error-text">{{ ragError() }}</p> }
+            </div>
+
+            <div class="inspection-pager">
+              <div class="inspection-pager-actions">
+                <button class="btn btn-secondary inspection-mini-btn" type="button" (click)="pageRag(-1)" [disabled]="ragOffset() === 0">Previous</button>
+                <span class="inspection-pager-range">{{ rangeStart(ragOffset(), ragTotal()) }}-{{ rangeEnd(ragOffset(), ragTotal()) }} / {{ ragTotal() }}</span>
+                <button class="btn btn-secondary inspection-mini-btn" type="button" (click)="pageRag(1)" [disabled]="ragOffset() + 10 >= ragTotal()">Next</button>
+              </div>
+            </div>
+          </div>
+        </section>
       }
     </section>
   </section>
@@ -181,4 +486,3 @@
     </div>
   }
 </main>
-

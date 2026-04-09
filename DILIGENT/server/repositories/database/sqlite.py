@@ -49,6 +49,11 @@ class SQLiteRepository:
                 "SQLite DB file was missing; created and initialized schema at %s",
                 self.db_path,
             )
+        else:
+            logger.info(
+                "SQLite DB file already present at %s; skipping automatic schema initialization.",
+                self.db_path,
+            )
         self.session_factory = sessionmaker(bind=self.engine, future=True)
         self.insert_batch_size = settings.insert_batch_size
         self.insert_commit_interval = settings.insert_commit_interval

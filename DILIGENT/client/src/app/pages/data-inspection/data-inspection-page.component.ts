@@ -1,5 +1,5 @@
 import { CommonModule } from '@angular/common';
-import { Component, OnInit, signal } from '@angular/core';
+import { Component, ElementRef, OnInit, ViewChild, signal } from '@angular/core';
 import { FormsModule } from '@angular/forms';
 
 import {
@@ -59,7 +59,13 @@ import {
 
 const PAGE_LIMIT = 10;
 
-type InspectionViewId = 'sessions' | 'rxnav' | 'livertox' | 'dili_priors' | 'drug_labels' | 'rag';
+type InspectionViewId =
+  | 'sessions'
+  | 'rxnav'
+  | 'livertox'
+  | 'dili_priors'
+  | 'drug_labels'
+  | 'rag';
 type InspectionUpdateTarget = 'rxnav' | 'livertox' | 'dili_priors' | 'drug_labels' | 'rag';
 
 const INSPECTION_VIEWS: Array<{ id: InspectionViewId; label: string }> = [
@@ -88,6 +94,48 @@ function formatDuration(seconds: number | null): string {
   return `${Math.floor(rounded / 60)}m ${rounded % 60}s`;
 }
 
+function resolveSelectedFolderPath(files: FileList | null): string | null {
+  if (!files || files.length === 0) {
+    return null;
+  }
+
+  const normalizedPaths = Array.from(files)
+    .map((file) => {
+      const maybeWithRelativePath = file as File & { webkitRelativePath?: string };
+      return maybeWithRelativePath.webkitRelativePath || file.name;
+    })
+    .map((path) => path.replace(/\\/g, '/'))
+    .filter((path) => path.length > 0);
+
+  if (normalizedPaths.length === 0) {
+    return null;
+  }
+
+  const directorySegments = normalizedPaths.map((path) => path.split('/').slice(0, -1));
+  const firstDirectory = directorySegments[0] ?? [];
+  const sharedSegments = [...firstDirectory];
+
+  for (const segments of directorySegments.slice(1)) {
+    let index = 0;
+    while (
+      index < sharedSegments.length &&
+      index < segments.length &&
+      sharedSegments[index] === segments[index]
+    ) {
+      index += 1;
+    }
+    sharedSegments.splice(index);
+  }
+
+  const shared = sharedSegments.join('/');
+  if (shared) {
+    return shared;
+  }
+
+  const fallback = normalizedPaths[0]?.split('/').slice(0, -1).join('/');
+  return fallback || null;
+}
+
 @Component({
   selector: 'app-data-inspection-page',
   standalone: true,
@@ -96,6 +144,8 @@ function formatDuration(seconds: number | null): string {
   styleUrl: './data-inspection-page.component.scss',
 })
 export class DataInspectionPageComponent implements OnInit {
+  @ViewChild('ragFolderInput') private ragFolderInput?: ElementRef<HTMLInputElement>;
+
   readonly inspectionViews = INSPECTION_VIEWS;
   readonly activeView = signal<InspectionViewId>('sessions');
 
@@ -144,6 +194,7 @@ export class DataInspectionPageComponent implements OnInit {
   readonly ragLoading = signal(false);
   readonly ragError = signal<string | null>(null);
   readonly ragSearchInput = signal('');
+  readonly selectedRagFolderPath = signal<string | null>(null);
 
   readonly reportSession = signal<InspectionSessionItem | null>(null);
   readonly reportContent = signal('');
@@ -201,6 +252,14 @@ export class DataInspectionPageComponent implements OnInit {
 
   rangeEnd(offset: number, total: number): number {
     return Math.min(offset + PAGE_LIMIT, total);
+  }
+
+  rangeStart(offset: number, total: number): number {
+    return total <= 0 ? 0 : offset + 1;
+  }
+
+  get displayedRagFolderPath(): string {
+    return this.selectedRagFolderPath() || this.ragVectorStore()?.vector_db_path || 'N/A';
   }
 
   async loadSessions(): Promise<void> {
@@ -316,8 +375,24 @@ export class DataInspectionPageComponent implements OnInit {
         fetchInspectionRagDocuments(),
         fetchInspectionRagVectorStore(),
       ]);
-      this.ragDocuments.set(documents.items);
-      this.ragTotal.set(documents.total);
+
+      const normalizedSearch = this.ragSearchInput().trim().toLowerCase();
+      const filtered = documents.items.filter((item) => {
+        if (!normalizedSearch) {
+          return true;
+        }
+        const haystack = `${item.file_name} ${item.path} ${item.extension}`.toLowerCase();
+        return haystack.includes(normalizedSearch);
+      });
+
+      let offset = this.ragOffset();
+      if (offset >= filtered.length && filtered.length > 0) {
+        offset = Math.max(0, filtered.length - PAGE_LIMIT);
+        this.ragOffset.set(offset);
+      }
+
+      this.ragDocuments.set(filtered.slice(offset, offset + PAGE_LIMIT));
+      this.ragTotal.set(filtered.length);
       this.ragVectorStore.set(vectorStore);
     } catch (error) {
       this.ragDocuments.set([]);
@@ -558,6 +633,29 @@ export class DataInspectionPageComponent implements OnInit {
     await this.loadDrugLabels();
   }
 
+  async updateRagSearch(value: string): Promise<void> {
+    this.ragSearchInput.set(value);
+    this.ragOffset.set(0);
+    await this.loadRag();
+  }
+
+  async pageRag(direction: -1 | 1): Promise<void> {
+    const next = this.ragOffset() + direction * PAGE_LIMIT;
+    if (next < 0 || next >= this.ragTotal()) return;
+    this.ragOffset.set(next);
+    await this.loadRag();
+  }
+
+  openRagFolderPicker(): void {
+    this.ragFolderInput?.nativeElement.click();
+  }
+
+  onRagFolderSelection(event: Event): void {
+    const input = event.target as HTMLInputElement | null;
+    const selected = resolveSelectedFolderPath(input?.files ?? null);
+    this.selectedRagFolderPath.set(selected);
+  }
+
   async openUpdateModal(target: InspectionUpdateTarget): Promise<void> {
     this.activeUpdateTarget.set(target);
     this.updateLoading.set(true);
@@ -738,4 +836,3 @@ export class DataInspectionPageComponent implements OnInit {
     await this.loadRag();
   }
 }
-

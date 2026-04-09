@@ -27,4 +27,12 @@ export class NavSidebarComponent {
   toggleTheme(): void {
     this.stateService.toggleTheme();
   }
+
+  get isDarkTheme(): boolean {
+    return this.stateService.state().theme === 'dark';
+  }
+
+  get themeAriaLabel(): string {
+    return this.isDarkTheme ? 'Switch to light theme' : 'Switch to dark theme';
+  }
 }

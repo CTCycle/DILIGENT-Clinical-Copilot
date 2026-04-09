@@ -2,9 +2,16 @@ import { CommonModule } from '@angular/common';
 import { Component, OnDestroy, inject, signal } from '@angular/core';
 import { FormsModule } from '@angular/forms';
 
+import { ModalShellComponent } from '../../components/modal-shell/modal-shell.component';
 import { DEFAULT_FORM_STATE, REPORT_EXPORT_FILENAME } from '../../core/constants';
 import { AppStateService } from '../../core/state/app-state.service';
-import { buildClinicalPayload, createDownloadUrl, normalizeVisitDateInput } from '../../core/utils';
+import {
+  buildClinicalPayload,
+  createDownloadUrl,
+  formatErrorMessage,
+  formatUnknownError,
+  normalizeVisitDateInput,
+} from '../../core/utils';
 import {
   JobStatus,
   JobStatusResponse,
@@ -24,7 +31,7 @@ function isTerminalJobStatus(status: JobStatus | null): boolean {
 
 @Component({
   selector: 'app-dili-agent-page',
-  imports: [CommonModule, FormsModule],
+  imports: [CommonModule, FormsModule, ModalShellComponent],
   templateUrl: './dili-agent-page.component.html',
   styleUrl: './dili-agent-page.component.scss',
 })
@@ -32,6 +39,7 @@ export class DiliAgentPageComponent implements OnDestroy {
   readonly stateService = inject(AppStateService);
 
   readonly isCancelling = signal(false);
+  readonly isMissingLabsModalOpen = signal(false);
   readonly todayIso = todayIso;
 
   private poller: { stop: () => void } | null = null;
@@ -88,7 +96,7 @@ export class DiliAgentPageComponent implements OnDestroy {
     this.stopPoller();
     this.isCancelling.set(false);
     this.stateService.updateDiliAgent({
-      message: `[ERROR] ${pollError}`,
+      message: formatErrorMessage(pollError),
       exportUrl: null,
       jobStage: null,
       jobStageMessage: null,
@@ -134,7 +142,7 @@ export class DiliAgentPageComponent implements OnDestroy {
       });
     } else if (status.status === 'failed') {
       const errorMessage = status.error
-        ? `[ERROR] ${status.error}`
+        ? formatErrorMessage(status.error)
         : '[ERROR] Clinical analysis failed.';
       this.stateService.updateDiliAgent({
         message: errorMessage,
@@ -162,16 +170,41 @@ export class DiliAgentPageComponent implements OnDestroy {
     );
   }
 
+  private async executeRunSession(allowMissingLabs: boolean | null): Promise<void> {
+    this.isCancelling.set(false);
+    this.stateService.updateDiliAgent({ isRunning: true });
+    this.resetOutputs();
+    this.stopPoller();
+
+    try {
+      const payload = buildClinicalPayload(this.vm.form, this.vm.settings, allowMissingLabs);
+      const startResult = await startClinicalJob(payload);
+      this.stateService.updateDiliAgent({
+        jobId: startResult.job_id,
+        jobProgress: 0,
+        jobStatus: startResult.status,
+        jobStage: 'session_initialization',
+        jobStageMessage: 'Initializing clinical session',
+      });
+      const intervalMs = startResult.poll_interval * 1000;
+      this.startPolling(startResult.job_id, intervalMs);
+    } catch (error) {
+      this.stateService.updateDiliAgent({
+        message: formatUnknownError(error, 'Unexpected error'),
+        exportUrl: null,
+        jobStage: null,
+        jobStageMessage: null,
+        isRunning: false,
+      });
+    }
+  }
+
   async runSession(): Promise<void> {
     const form = this.vm.form;
     const missingMessageByField: Array<[keyof typeof form, string]> = [
       ['anamnesis', '[ERROR] Provide the anamnesis.'],
       ['visitDate', '[ERROR] Provide the visit date.'],
       ['drugs', '[ERROR] Provide current drugs.'],
-      [
-        'laboratoryAnalysis',
-        '[ERROR] Provide laboratory data sufficient to determine hepatotoxicity pattern, ideally dated ALT or AST, ALP, and bilirubin.',
-      ],
     ];
 
     const firstMissing = missingMessageByField.find(([field]) => !String(form[field]).trim());
@@ -184,33 +217,22 @@ export class DiliAgentPageComponent implements OnDestroy {
       return;
     }
 
-    this.isCancelling.set(false);
-    this.stateService.updateDiliAgent({ isRunning: true });
-    this.resetOutputs();
-    this.stopPoller();
-
-    try {
-      const payload = buildClinicalPayload(this.vm.form, this.vm.settings);
-      const startResult = await startClinicalJob(payload);
-      this.stateService.updateDiliAgent({
-        jobId: startResult.job_id,
-        jobProgress: 0,
-        jobStatus: startResult.status,
-        jobStage: 'session_initialization',
-        jobStageMessage: 'Initializing clinical session',
-      });
-      const intervalMs = startResult.poll_interval * 1000;
-      this.startPolling(startResult.job_id, intervalMs);
-    } catch (error) {
-      const description = error instanceof Error ? error.message : 'Unexpected error';
-      this.stateService.updateDiliAgent({
-        message: `[ERROR] ${description}`,
-        exportUrl: null,
-        jobStage: null,
-        jobStageMessage: null,
-        isRunning: false,
-      });
+    if (!form.laboratoryAnalysis.trim()) {
+      this.resetOutputs();
+      this.isMissingLabsModalOpen.set(true);
+      return;
     }
+
+    await this.executeRunSession(null);
+  }
+
+  cancelMissingLabs(): void {
+    this.isMissingLabsModalOpen.set(false);
+  }
+
+  async confirmMissingLabs(): Promise<void> {
+    this.isMissingLabsModalOpen.set(false);
+    await this.executeRunSession(true);
   }
 
   async stopSession(): Promise<void> {
@@ -224,9 +246,9 @@ export class DiliAgentPageComponent implements OnDestroy {
         message: '[INFO] Cancellation requested. Waiting for worker shutdown...',
       });
     } catch (error) {
-      const description =
-        error instanceof Error ? error.message : 'Failed to request cancellation.';
-      this.stateService.updateDiliAgent({ message: `[ERROR] ${description}` });
+      this.stateService.updateDiliAgent({
+        message: formatUnknownError(error, 'Failed to request cancellation.'),
+      });
     } finally {
       this.isCancelling.set(false);
     }

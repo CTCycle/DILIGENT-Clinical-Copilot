@@ -9,6 +9,21 @@ export function sanitizeField(value: string): string | null {
   return normalized.length ? normalized : null;
 }
 
+export function formatErrorMessage(message: string): string {
+  const normalized = message.trim();
+  if (!normalized) {
+    return "[ERROR] Unexpected error";
+  }
+  return normalized.startsWith("[ERROR]") ? normalized : `[ERROR] ${normalized}`;
+}
+
+export function formatUnknownError(error: unknown, fallback: string): string {
+  if (error instanceof Error) {
+    return formatErrorMessage(error.message);
+  }
+  return formatErrorMessage(fallback);
+}
+
 export function normalizeVisitDateInput(value: string): string {
   const normalized = value.trim();
   if (!normalized) {
@@ -86,6 +101,7 @@ function buildVisitDatePayload(
 export function buildClinicalPayload(
   form: ClinicalFormState,
   settings: RuntimeSettings,
+  allowMissingLabs: boolean | null = null,
 ): ClinicalRequestPayload {
   const payload: ClinicalRequestPayload = {
     name: sanitizeField(form.patientName),
@@ -104,6 +120,9 @@ export function buildClinicalPayload(
     cloud_temperature: settings.cloudTemperature,
     ollama_reasoning: settings.reasoning,
   };
+  if (allowMissingLabs !== null) {
+    payload.allow_missing_labs = allowMissingLabs;
+  }
   return payload;
 }
 
