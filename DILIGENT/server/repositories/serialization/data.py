@@ -14,8 +14,9 @@ from xml.etree import ElementTree
 
 import pandas as pd
 from pypdf import PdfReader
+from sqlalchemy.engine import Engine
 from sqlalchemy import and_, case, delete, exists, func, inspect, or_, select, update
-from sqlalchemy.orm import Session, sessionmaker
+from sqlalchemy.orm import Session, selectinload, sessionmaker
 
 from DILIGENT.server.configurations.bootstrap import server_settings
 from DILIGENT.server.domain.documents import Document
@@ -28,14 +29,13 @@ from DILIGENT.server.common.constants import (
     LIVERTOX_OPTIONAL_COLUMNS,
     LIVERTOX_REQUIRED_COLUMNS,
     RXNORM_CATALOG_COLUMNS,
-    TABLE_DRUGS,
-    TABLE_DRUG_RXNORM_CODES,
-    TABLE_DRUG_ALIASES,
-    TABLE_LIVERTOX_MONOGRAPHS,
     TEXT_FILE_FALLBACK_ENCODINGS,
 )
 from DILIGENT.server.common.utils.logger import logger
-from DILIGENT.server.repositories.queries.data import DataRepositoryQueries
+from DILIGENT.server.repositories.database.session import (
+    resolve_engine,
+    resolve_session_factory,
+)
 from DILIGENT.server.repositories.queries.drugs import DrugRepositoryQueries
 from DILIGENT.server.repositories.schemas.models import (
     ClinicalSession,
@@ -59,12 +59,16 @@ from DILIGENT.server.services.text.synonyms import parse_synonym_list, split_syn
 
 
 class _RepositorySerializationService:
-    def __init__(self, queries: DataRepositoryQueries | None = None) -> None:
-        self.queries = queries or DataRepositoryQueries()
-        self.engine = self.queries.database.backend.engine  # type: ignore[attr-defined]
-        self.session_factory = sessionmaker(
-            bind=self.engine,
-            future=True,
+    def __init__(
+        self,
+        *,
+        engine: Engine | None = None,
+        session_factory: sessionmaker | None = None,
+    ) -> None:
+        self.engine = resolve_engine(engine)
+        self.session_factory = resolve_session_factory(
+            engine=self.engine,
+            session_factory=session_factory,
         )
 
     # -------------------------------------------------------------------------
@@ -555,50 +559,57 @@ class _RepositorySerializationService:
     # -----------------------------------------------------------------------------
     def get_livertox_records(self) -> pd.DataFrame:
         self.ensure_session_result_table()
-        drugs_frame = self.queries.load_table(TABLE_DRUGS)
-        monographs_frame = self.queries.load_table(TABLE_LIVERTOX_MONOGRAPHS)
-        aliases_frame = self.queries.load_table(TABLE_DRUG_ALIASES)
-        if drugs_frame.empty or monographs_frame.empty:
-            return pd.DataFrame(columns=LIVERTOX_COLUMNS)
-        merged = monographs_frame.merge(
-            drugs_frame,
-            left_on="drug_id",
-            right_on="id",
-            how="left",
-            suffixes=("_monograph", "_drug"),
-        )
-        aliases_by_drug = self.build_alias_lookup_by_kind(aliases_frame)
-        records: list[dict[str, Any]] = []
-        for row in merged.to_dict(orient="records"):
-            drug_id = row.get("drug_id")
-            grouped_aliases = (
-                aliases_by_drug.get(int(drug_id), {}) if drug_id is not None else {}
+        db_session = self.session_factory()
+        try:
+            drugs = (
+                db_session.execute(
+                    select(Drug)
+                    .join(Drug.monograph)
+                    .options(
+                        selectinload(Drug.monograph),
+                        selectinload(Drug.aliases),
+                    )
+                    .order_by(Drug.id.asc())
+                )
+                .scalars()
+                .unique()
+                .all()
             )
+        finally:
+            db_session.close()
+        if not drugs:
+            return pd.DataFrame(columns=LIVERTOX_COLUMNS)
+        records: list[dict[str, Any]] = []
+        for drug in drugs:
+            monograph = drug.monograph
+            if monograph is None:
+                continue
+            grouped_aliases = self.group_aliases_by_kind(list(drug.aliases))
             records.append(
                 {
-                    "drug_name": self.normalize_string(row.get("canonical_name")),
-                    "nbk_id": self.normalize_string(row.get("livertox_nbk_id")),
+                    "drug_name": self.normalize_string(drug.canonical_name),
+                    "nbk_id": self.normalize_string(drug.livertox_nbk_id),
                     "ingredient": self.join_values(grouped_aliases.get("ingredient", set())),
                     "brand_name": self.join_values(grouped_aliases.get("brand", set())),
                     "synonyms": self.join_values(grouped_aliases.get("synonym", set())),
-                    "excerpt": self.normalize_string(row.get("excerpt")),
-                    "likelihood_score": self.normalize_string(row.get("likelihood_score")),
-                    "last_update": self.normalize_string(row.get("last_update")),
-                    "reference_count": row.get("reference_count"),
-                    "year_approved": row.get("year_approved"),
+                    "excerpt": self.normalize_string(monograph.excerpt),
+                    "likelihood_score": self.normalize_string(monograph.likelihood_score),
+                    "last_update": self.normalize_string(monograph.last_update),
+                    "reference_count": monograph.reference_count,
+                    "year_approved": monograph.year_approved,
                     "agent_classification": self.normalize_string(
-                        row.get("agent_classification")
+                        monograph.agent_classification
                     ),
                     "primary_classification": self.normalize_string(
-                        row.get("primary_classification")
+                        monograph.primary_classification
                     ),
                     "secondary_classification": self.normalize_string(
-                        row.get("secondary_classification")
+                        monograph.secondary_classification
                     ),
-                    "include_in_livertox": row.get("include_in_livertox"),
-                    "source_url": self.normalize_string(row.get("source_url")),
+                    "include_in_livertox": monograph.include_in_livertox,
+                    "source_url": self.normalize_string(monograph.source_url),
                     "source_last_modified": self.normalize_string(
-                        row.get("source_last_modified")
+                        monograph.source_last_modified
                     ),
                 }
             )
@@ -623,52 +634,60 @@ class _RepositorySerializationService:
     # -----------------------------------------------------------------------------
     def get_drugs_catalog(self) -> pd.DataFrame:
         self.ensure_session_result_table()
-        drugs_frame = self.queries.load_table(TABLE_DRUGS)
-        rxcui_frame = self.queries.load_table(TABLE_DRUG_RXNORM_CODES)
-        aliases_frame = self.queries.load_table(TABLE_DRUG_ALIASES)
-        if drugs_frame.empty:
+        db_session = self.session_factory()
+        try:
+            drugs = (
+                db_session.execute(
+                    select(Drug)
+                    .options(
+                        selectinload(Drug.rxnorm_codes),
+                        selectinload(Drug.aliases),
+                    )
+                    .order_by(Drug.id.asc())
+                )
+                .scalars()
+                .unique()
+                .all()
+            )
+        finally:
+            db_session.close()
+        if not drugs:
             return pd.DataFrame(columns=RXNORM_CATALOG_COLUMNS)
-        if aliases_frame.empty:
-            return pd.DataFrame(columns=RXNORM_CATALOG_COLUMNS)
-        source_series = aliases_frame.get("source", pd.Series(dtype=str))
-        aliases_frame = aliases_frame[
-            source_series.astype(str).str.casefold() == "rxnorm"
-        ].copy()
-        if aliases_frame.empty:
-            return pd.DataFrame(columns=RXNORM_CATALOG_COLUMNS)
-        rxcui_by_drug: dict[int, set[str]] = {}
-        if not rxcui_frame.empty:
-            for mapping in rxcui_frame.to_dict(orient="records"):
-                drug_id = mapping.get("drug_id")
-                normalized_rxcui = self.normalize_string(mapping.get("rxcui"))
-                if drug_id is None or normalized_rxcui is None:
-                    continue
-                values = rxcui_by_drug.setdefault(int(drug_id), set())
-                values.add(normalized_rxcui)
         records: list[dict[str, Any]] = []
-        for row in drugs_frame.to_dict(orient="records"):
-            drug_id = int(row["id"])
-            rxcui_values = set(rxcui_by_drug.get(drug_id, set()))
-            primary_rxcui = self.normalize_string(row.get("rxnorm_rxcui"))
+        for drug in drugs:
+            rxnorm_aliases = [
+                alias
+                for alias in drug.aliases
+                if (self.normalize_string(alias.source) or "").casefold() == "rxnorm"
+            ]
+            if not rxnorm_aliases:
+                continue
+            rxcui_values = {
+                normalized_rxcui
+                for normalized_rxcui in (
+                    self.normalize_string(mapping.rxcui) for mapping in drug.rxnorm_codes
+                )
+                if normalized_rxcui is not None
+            }
+            primary_rxcui = self.normalize_string(drug.rxnorm_rxcui)
             if primary_rxcui is not None:
                 rxcui_values.add(primary_rxcui)
             if not rxcui_values:
                 continue
-            aliases = aliases_frame[aliases_frame["drug_id"] == drug_id]
-            raw_name = self.first_alias_value(aliases, "raw_name")
-            standard_name = self.first_alias_value(aliases, "standard_name")
-            term_type = self.first_alias_term_type(aliases)
-            brand_names = self.join_values(self.alias_values_for_kind(aliases, "brand"))
-            synonyms = sorted(self.alias_values_for_kind(aliases, "synonym"))
+            raw_name = self.first_alias_model_value(rxnorm_aliases, "raw_name")
+            standard_name = self.first_alias_model_value(rxnorm_aliases, "standard_name")
+            term_type = self.first_alias_model_term_type(rxnorm_aliases)
+            brand_names = self.join_values(
+                self.alias_model_values_for_kind(rxnorm_aliases, "brand")
+            )
+            synonyms = sorted(self.alias_model_values_for_kind(rxnorm_aliases, "synonym"))
             for rxcui in sorted(rxcui_values):
                 records.append(
                     {
                         "rxcui": rxcui,
-                        "raw_name": raw_name
-                        or self.normalize_string(row.get("canonical_name")),
+                        "raw_name": raw_name or self.normalize_string(drug.canonical_name),
                         "term_type": term_type,
-                        "name": standard_name
-                        or self.normalize_string(row.get("canonical_name")),
+                        "name": standard_name or self.normalize_string(drug.canonical_name),
                         "brand_names": brand_names,
                         "synonyms": json.dumps(synonyms, ensure_ascii=False),
                     }
@@ -2245,6 +2264,17 @@ class _RepositorySerializationService:
         return lookup
 
     # -----------------------------------------------------------------------------
+    def group_aliases_by_kind(self, aliases: list[DrugAlias]) -> dict[str, set[str]]:
+        grouped: dict[str, set[str]] = {}
+        for alias in aliases:
+            alias_value = self.normalize_string(alias.alias)
+            alias_kind = self.normalize_string(alias.alias_kind)
+            if alias_value is None or alias_kind is None:
+                continue
+            grouped.setdefault(alias_kind.casefold(), set()).add(alias_value)
+        return grouped
+
+    # -----------------------------------------------------------------------------
     def alias_values_for_kind(self, aliases: pd.DataFrame, alias_kind: str) -> set[str]:
         if aliases.empty:
             return set()
@@ -2254,6 +2284,21 @@ class _RepositorySerializationService:
         values: set[str] = set()
         for item in selected["alias"].tolist():
             normalized = self.normalize_string(item)
+            if normalized is not None:
+                values.add(normalized)
+        return values
+
+    # -----------------------------------------------------------------------------
+    def alias_model_values_for_kind(
+        self,
+        aliases: list[DrugAlias],
+        alias_kind: str,
+    ) -> set[str]:
+        values: set[str] = set()
+        for alias in aliases:
+            if (self.normalize_string(alias.alias_kind) or "").casefold() != alias_kind.casefold():
+                continue
+            normalized = self.normalize_string(alias.alias)
             if normalized is not None:
                 values.add(normalized)
         return values
@@ -2273,11 +2318,36 @@ class _RepositorySerializationService:
                 return normalized
         return None
 
+    # -----------------------------------------------------------------------------
+    def first_alias_model_value(
+        self,
+        aliases: list[DrugAlias],
+        alias_kind: str,
+    ) -> str | None:
+        values = sorted(self.alias_model_values_for_kind(aliases, alias_kind), key=str.casefold)
+        return values[0] if values else None
+
+    # -----------------------------------------------------------------------------
+    def first_alias_model_term_type(self, aliases: list[DrugAlias]) -> str | None:
+        for alias in aliases:
+            normalized = self.normalize_string(alias.term_type)
+            if normalized is not None:
+                return normalized
+        return None
+
 
 ###############################################################################
 class DataSerializer:
-    def __init__(self, queries: DataRepositoryQueries | None = None) -> None:
-        self.service = _RepositorySerializationService(queries=queries)
+    def __init__(
+        self,
+        *,
+        engine: Engine | None = None,
+        session_factory: sessionmaker | None = None,
+    ) -> None:
+        self.service = _RepositorySerializationService(
+            engine=engine,
+            session_factory=session_factory,
+        )
 
     # -------------------------------------------------------------------------
     def __getattr__(self, name: str) -> Any:

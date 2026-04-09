@@ -1,7 +1,6 @@
 from __future__ import annotations
 
 import json
-from types import SimpleNamespace
 from typing import Any
 
 import pandas as pd
@@ -15,14 +14,9 @@ from DILIGENT.server.repositories.schemas.models import (
     ClinicalSession,
     ClinicalSessionLab,
     ClinicalSessionResult,
+    Patient,
 )
 from DILIGENT.server.services.updater.livertox import LiverToxUpdater
-
-
-###############################################################################
-class QueryStub:
-    def __init__(self, engine: Any) -> None:
-        self.database = SimpleNamespace(backend=SimpleNamespace(engine=engine))
 
 
 ###############################################################################
@@ -48,7 +42,7 @@ class LookupStub:
 def build_serializer() -> tuple[Any, Any]:
     engine = create_engine("sqlite+pysqlite:///:memory:", future=True)
     Base.metadata.create_all(engine)
-    serializer = DataSerializer(queries=QueryStub(engine))
+    serializer = DataSerializer(engine=engine)
     return serializer, engine
 
 
@@ -83,10 +77,18 @@ def test_save_clinical_session_preserves_row_append_order() -> None:
             .scalars()
             .all()
         )
+        patients = (
+            db_session.execute(select(Patient).order_by(Patient.id))
+            .scalars()
+            .all()
+        )
 
     assert len(rows) == 2
-    assert rows[0].patient_name == "existing"
-    assert rows[1].patient_name == "incoming"
+    assert [row.session_timestamp.isoformat() for row in rows] == [
+        "2025-01-01T00:00:00",
+        "2025-01-02T00:00:00",
+    ]
+    assert [row.name for row in patients] == ["existing", "incoming"]
 
 
 # -----------------------------------------------------------------------------
