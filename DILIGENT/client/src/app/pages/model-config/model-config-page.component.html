@@ -44,7 +44,7 @@
             <div class="model-config-row-header-top">
               <div class="model-config-row-heading">
                 <h2 class="modal-section-title">Local Model Catalog</h2>
-                <p class="model-config-caption">{{ availableLocalModelCount() }} installed in Ollama.</p>
+                <span class="model-config-caption">{{ availableLocalModelCount() }} installed in Ollama.</span>
               </div>
               <div class="model-config-search-and-filters">
                 <div class="model-config-search">
@@ -218,32 +218,30 @@
             ></app-provider-access-card>
           </div>
           <div class="model-config-extra-right">
-            <div class="model-config-extra-panel">
-              <p class="model-config-extra-panel-title">Model Configuration</p>
-              <label class="field checkbox">
-                <input
-                  type="checkbox"
-                  [ngModel]="appState.state().diliAgent.settings.reasoning"
-                  (ngModelChange)="handleReasoningChange($event)"
-                  [disabled]="isSaving() || isLoading()"
-                />
-                <span class="field-label">Enable SDL/Reasoning</span>
-              </label>
-              <div class="field">
-                <label class="field-label" for="global-temperature-input">Temperature</label>
-                <input
-                  id="global-temperature-input"
-                  type="number"
-                  min="0"
-                  max="2"
-                  step="0.01"
-                  [ngModel]="draftConfig().temperature"
-                  (ngModelChange)="setTemperature($event)"
-                  [disabled]="isSaving() || isLoading()"
-                  class="model-config-temperature-input"
-                />
-              </div>
+            <p class="model-config-extra-panel-title">Model Configuration</p>
+            <div class="field">
+              <label class="field-label" for="global-temperature-input">Temperature</label>
+              <input
+                id="global-temperature-input"
+                type="number"
+                min="0"
+                max="2"
+                step="0.01"
+                [ngModel]="draftConfig().temperature"
+                (ngModelChange)="setTemperature($event)"
+                [disabled]="isSaving() || isLoading()"
+                class="model-config-temperature-input"
+              />
             </div>
+            <label class="field checkbox model-config-reasoning-field">
+              <input
+                type="checkbox"
+                [ngModel]="appState.state().diliAgent.settings.reasoning"
+                (ngModelChange)="handleReasoningChange($event)"
+                [disabled]="isSaving() || isLoading()"
+              />
+              <span class="field-label">Enable SDL/Reasoning</span>
+            </label>
           </div>
         </div>
       </section>

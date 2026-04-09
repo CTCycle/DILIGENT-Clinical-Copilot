@@ -1,5 +1,5 @@
 import { CommonModule } from '@angular/common';
-import { Component, ElementRef, OnInit, ViewChild, signal } from '@angular/core';
+import { Component, OnInit, signal } from '@angular/core';
 import { FormsModule } from '@angular/forms';
 
 import {
@@ -94,6 +94,25 @@ function formatDuration(seconds: number | null): string {
   return `${Math.floor(rounded / 60)}m ${rounded % 60}s`;
 }
 
+function resolveRagDocumentsPath(
+  vectorStore: InspectionRagVectorStoreSummary | null,
+): string {
+  if (!vectorStore) {
+    return '';
+  }
+  const explicitPath = vectorStore.source_documents_path?.trim();
+  if (explicitPath) {
+    return explicitPath;
+  }
+  const vectorDbPath = vectorStore.vector_db_path?.trim();
+  if (!vectorDbPath) {
+    return '';
+  }
+  return vectorDbPath.replace(/[\\/]vectors$/i, (match) =>
+    match.startsWith('\\') ? '\\documents' : '/documents',
+  );
+}
+
 @Component({
   selector: 'app-data-inspection-page',
   standalone: true,
@@ -102,8 +121,6 @@ function formatDuration(seconds: number | null): string {
   styleUrl: './data-inspection-page.component.scss',
 })
 export class DataInspectionPageComponent implements OnInit {
-  @ViewChild('ragFolderInput') private ragFolderInput?: ElementRef<HTMLInputElement>;
-
   readonly inspectionViews = INSPECTION_VIEWS;
   readonly activeView = signal<InspectionViewId>('sessions');
 
@@ -147,7 +164,7 @@ export class DataInspectionPageComponent implements OnInit {
 
   readonly ragDocuments = signal<InspectionRagDocumentRow[]>([]);
   readonly ragVectorStore = signal<InspectionRagVectorStoreSummary | null>(null);
-  readonly selectedRagFolderPath = signal<string | null>(null);
+  readonly ragDocumentsPathInput = signal('');
   readonly ragTotal = signal(0);
   readonly ragOffset = signal(0);
   readonly ragLoading = signal(false);
@@ -217,7 +234,8 @@ export class DataInspectionPageComponent implements OnInit {
   }
 
   get displayedRagFolderPath(): string {
-    return this.selectedRagFolderPath() || this.ragVectorStore()?.source_documents_path || 'N/A';
+    const manualPath = this.ragDocumentsPathInput().trim();
+    return manualPath || resolveRagDocumentsPath(this.ragVectorStore()) || 'N/A';
   }
 
   async loadSessions(): Promise<void> {
@@ -352,6 +370,9 @@ export class DataInspectionPageComponent implements OnInit {
       this.ragDocuments.set(filtered.slice(offset, offset + PAGE_LIMIT));
       this.ragTotal.set(filtered.length);
       this.ragVectorStore.set(vectorStore);
+      if (!this.ragDocumentsPathInput().trim()) {
+        this.ragDocumentsPathInput.set(resolveRagDocumentsPath(vectorStore));
+      }
     } catch (error) {
       this.ragDocuments.set([]);
       this.ragTotal.set(0);
@@ -604,19 +625,8 @@ export class DataInspectionPageComponent implements OnInit {
     await this.loadRag();
   }
 
-  openRagFolderPicker(): void {
-    this.ragFolderInput?.nativeElement.click();
-  }
-
-  onRagFolderSelection(event: Event): void {
-    const input = event.target as HTMLInputElement | null;
-    const files = Array.from(input?.files ?? []);
-    const firstRelativePath = files[0]?.webkitRelativePath || '';
-    const selectedFolderName = firstRelativePath.split('/')[0]?.trim() || null;
-    this.selectedRagFolderPath.set(selectedFolderName);
-    if (input) {
-      input.value = '';
-    }
+  setRagDocumentsPathInput(value: string): void {
+    this.ragDocumentsPathInput.set(value);
   }
 
   async openUpdateModal(target: InspectionUpdateTarget): Promise<void> {
@@ -629,8 +639,12 @@ export class DataInspectionPageComponent implements OnInit {
     this.updateMessage.set('');
     try {
       const payload = await this.fetchUpdateConfig(target);
-      this.updateConfig.set(payload.defaults || {});
-      this.updateConfigText.set(JSON.stringify(payload.defaults || {}, null, 2));
+      const defaults = { ...(payload.defaults || {}) };
+      if (target === 'rag' && this.ragDocumentsPathInput().trim()) {
+        defaults['documents_path'] = this.ragDocumentsPathInput().trim();
+      }
+      this.updateConfig.set(defaults);
+      this.updateConfigText.set(JSON.stringify(defaults, null, 2));
     } catch (error) {
       this.updateConfig.set({});
       this.updateConfigText.set('{}');
@@ -721,7 +735,10 @@ export class DataInspectionPageComponent implements OnInit {
     if (target === 'livertox') return startInspectionLiverToxUpdateJob(overrides);
     if (target === 'dili_priors') return startInspectionDiliPriorsUpdateJob(overrides);
     if (target === 'drug_labels') return startInspectionDrugLabelsUpdateJob(overrides);
-    return startInspectionRagUpdateJob(overrides);
+    return startInspectionRagUpdateJob({
+      ...overrides,
+      documents_path: this.ragDocumentsPathInput().trim() || undefined,
+    });
   }
 
   private async fetchUpdateStatus(

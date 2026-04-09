@@ -352,18 +352,21 @@
                 />
               </div>
               <div class="inspection-widget-header-actions inspection-header-actions-fixed">
-                <button
-                  type="button"
-                  class="btn btn-secondary inspection-mini-btn inspection-mini-btn-folder"
-                  (click)="openRagFolderPicker()"
-                  aria-label="Pick a RAG source folder"
-                  title="Pick a RAG source folder"
-                >
-                  <svg class="inspection-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M4 6a2 2 0 0 1 2-2h5l2 2h7a2 2 0 0 1 2 2v8a3 3 0 0 1-3 3H7a3 3 0 0 1-3-3V6Zm2 0v8a1 1 0 0 0 1 1h12a1 1 0 0 0 1-1V8H12.17l-2-2H6Z" /></svg>
-                </button>
-                <input #ragFolderInput type="file" class="inspection-folder-input" webkitdirectory directory multiple (change)="onRagFolderSelection($event)" />
                 <button class="btn btn-secondary inspection-mini-btn" type="button" (click)="openUpdateModal('rag')">Update Embeddings</button>
               </div>
+            </div>
+
+            <div class="inspection-rag-path-editor">
+              <label class="field-label" for="rag-documents-path-input">RAG source path</label>
+              <input
+                id="rag-documents-path-input"
+                type="text"
+                class="inspection-search inspection-rag-path-input"
+                [ngModel]="ragDocumentsPathInput()"
+                (ngModelChange)="setRagDocumentsPathInput($event)"
+                aria-label="RAG source path"
+                placeholder="Enter the full documents folder path"
+              />
             </div>
 
             <div class="inspection-scroll-frame inspection-scroll-frame-compact inspection-rag-second-view">

@@ -518,7 +518,7 @@ app-root {
 
 .model-config-row-header-top {
   display: flex;
-  align-items: flex-end;
+  align-items: center;
   justify-content: space-between;
   gap: var(--space-md);
 }
@@ -3951,29 +3951,19 @@ input[type="date"]::-webkit-calendar-picker-indicator:hover {
 .model-config-extra-right {
   display: flex;
   flex-direction: column;
-  gap: var(--space-md);
-}
-
-.model-config-extra-panel {
-  border: 1px solid rgba(15, 125, 90, 0.2);
-  border-radius: var(--radius-md);
-  background: rgba(255, 255, 255, 0.7);
-  padding: var(--space-md);
-}
-
-.model-config-extra-panel .field {
-  margin-bottom: var(--space-sm);
-}
-
-.model-config-extra-panel .field:last-child {
-  margin-bottom: 0;
+  gap: var(--space-lg);
+  padding: var(--space-sm) 0;
 }
 
 .model-config-extra-panel-title {
-  margin: 0 0 var(--space-sm);
+  margin: 0;
   font-size: var(--font-sm);
   font-weight: 700;
   color: var(--color-text-primary);
+}
+
+.model-config-reasoning-field {
+  margin-top: var(--space-xs);
 }
 
 @media (max-width: 1080px) {
@@ -4348,22 +4338,24 @@ input[type="date"]::-webkit-calendar-picker-indicator:hover {
 
 .model-config-row-heading {
   display: flex;
-  flex-direction: column;
-  gap: 2px;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 10px;
 }
 
 .model-config-search-and-filters {
   display: flex;
-  flex-wrap: wrap;
+  flex-wrap: nowrap;
   justify-content: flex-end;
   align-items: center;
   gap: 12px 18px;
   min-width: 0;
+  flex: 1;
 }
 
 .model-config-filter-pills {
   display: flex;
-  flex-wrap: wrap;
+  flex-wrap: nowrap;
   justify-content: flex-end;
   gap: 12px;
 }
@@ -4377,6 +4369,17 @@ input[type="date"]::-webkit-calendar-picker-indicator:hover {
 .model-config-temperature-input {
   width: 112px;
   max-width: 100%;
+}
+
+.inspection-rag-path-editor {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  margin-bottom: var(--space-md);
+}
+
+.inspection-rag-path-input {
+  width: 100%;
 }
 
 @media (max-width: 1080px) {
@@ -4394,6 +4397,7 @@ input[type="date"]::-webkit-calendar-picker-indicator:hover {
   .model-config-row-header-top,
   .model-config-search-and-filters,
   .model-config-filter-pills {
+    flex-wrap: wrap;
     justify-content: flex-start;
   }
 }

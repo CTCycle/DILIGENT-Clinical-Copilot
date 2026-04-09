@@ -334,7 +334,6 @@ class RagDocumentListResponse(BaseModel):
     total: int
 
 
-###############################################################################
 class LanceVectorStoreSummaryResponse(BaseModel):
     model_config = ConfigDict(extra="forbid")
     source_documents_path: str
