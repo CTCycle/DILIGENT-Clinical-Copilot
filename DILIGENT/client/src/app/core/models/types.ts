@@ -72,6 +72,7 @@ export type ClinicalRequestPayload = {
   anamnesis: string | null;
   drugs: string | null;
   laboratory_analysis: string | null;
+  allow_missing_labs?: boolean | null;
   use_rag: boolean;
   use_web_search: boolean;
   use_cloud_services?: boolean;

@@ -151,9 +151,11 @@ def ensure_postgres_database(settings: DatabaseSettings) -> str:
 def run_database_initialization() -> None:
     settings = server_settings.database
     if settings.embedded_database:
+        logger.info("Running SQLite initialization path.")
         initialize_sqlite_database(settings)
         return
 
+    logger.info("Running PostgreSQL initialization path (manual trigger expected).")
     engine_name = normalize_postgres_engine(settings.engine).lower()
     if engine_name not in {
         "postgres",

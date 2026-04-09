@@ -2080,7 +2080,15 @@ input[type="date"]::-webkit-calendar-picker-indicator:hover {
 
 @media (max-width: 768px) {
   :root {
-    --app-top-nav-height: 96px;
+    --app-top-nav-height: 0px;
+  }
+
+  .app-top-nav {
+    position: static;
+  }
+
+  .app-main {
+    padding-top: 0;
   }
 
   .app-header {
@@ -2091,6 +2099,15 @@ input[type="date"]::-webkit-calendar-picker-indicator:hover {
   .app-header-content {
     grid-template-columns: 1fr;
     gap: 12px;
+  }
+
+  .app-header-actions {
+    justify-self: start;
+  }
+
+  .tab-bar {
+    width: 100%;
+    justify-content: flex-start;
   }
 
   .app-header-wordmark {
@@ -3680,6 +3697,10 @@ input[type="date"]::-webkit-calendar-picker-indicator:hover {
     width: 100%;
   }
 
+  .inspection-header-actions-fixed {
+    gap: var(--space-xs);
+  }
+
   .inspection-controls {
     flex-wrap: wrap;
     justify-content: flex-start;
@@ -3704,6 +3725,18 @@ input[type="date"]::-webkit-calendar-picker-indicator:hover {
 
   .inspection-date {
     width: 100%;
+    min-width: 0;
+  }
+
+  .inspection-toggle-group {
+    width: 100%;
+    flex-wrap: wrap;
+    border-radius: 18px;
+  }
+
+  .inspection-toggle-pill {
+    flex: 1 1 96px;
+    text-align: center;
   }
 
   .inspection-search {
@@ -3713,6 +3746,28 @@ input[type="date"]::-webkit-calendar-picker-indicator:hover {
 
   .inspection-actions-cell {
     width: 118px;
+  }
+
+  .inspection-scroll-frame {
+    overflow-x: auto;
+    -webkit-overflow-scrolling: touch;
+  }
+
+  .inspection-table {
+    min-width: 640px;
+    table-layout: auto;
+  }
+
+  .inspection-pager-actions {
+    display: grid;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    width: 100%;
+    align-items: center;
+  }
+
+  .inspection-pager-range {
+    min-width: 0;
+    text-align: center;
   }
 
   .inspection-update-config-grid {
@@ -4149,3 +4204,143 @@ input[type="date"]::-webkit-calendar-picker-indicator:hover {
   background: rgba(148, 163, 184, 0.22);
 }
 
+
+/* ============================================
+   Angular Parity Fixes
+   ============================================ */
+.app-header-icon-btn {
+  width: 36px;
+  height: 36px;
+  border: 1px solid rgba(148, 163, 184, 0.4);
+  background: rgba(255, 255, 255, 0.72);
+  transition: background 0.2s ease, border-color 0.2s ease, color 0.2s ease;
+}
+
+.app-header-icon-btn .theme-icon {
+  width: 18px;
+  height: 18px;
+  display: block;
+}
+
+.app-header-icon-btn:hover {
+  border-color: rgba(34, 197, 94, 0.58);
+  background: rgba(220, 252, 231, 0.45);
+}
+
+:root[data-theme="dark"] .app-header-icon-btn {
+  background: rgba(15, 23, 42, 0.9);
+  border-color: rgba(71, 85, 105, 0.72);
+  color: var(--color-text-secondary);
+}
+
+:root[data-theme="dark"] .app-header-icon-btn:hover {
+  border-color: rgba(100, 116, 139, 0.8);
+  background: rgba(30, 41, 59, 0.92);
+}
+
+.stitch-dili-sidebar .stitch-dili-patient {
+  min-height: 100%;
+}
+
+.stitch-dili-inline-fields {
+  margin-bottom: var(--space-xl);
+}
+
+.stitch-dili-controls .toggle-label {
+  font-size: 14px;
+  font-weight: 600;
+}
+
+.inspection-widget-header {
+  align-items: center;
+}
+
+.inspection-controls-half {
+  width: min(620px, 52%);
+  max-width: min(620px, 52%);
+  min-width: 340px;
+}
+
+.inspection-controls {
+  flex-wrap: nowrap;
+}
+
+.inspection-controls-knowledge {
+  width: 100%;
+}
+
+.inspection-controls-knowledge .inspection-search {
+  width: 100%;
+}
+
+.inspection-header-actions-fixed {
+  width: auto;
+  max-width: none;
+  min-width: 0;
+}
+
+.inspection-table {
+  table-layout: fixed;
+}
+
+.inspection-table th:last-child,
+.inspection-table td:last-child {
+  width: 136px;
+}
+
+.inspection-actions-cell {
+  min-width: 136px;
+}
+
+.inspection-pager {
+  justify-content: flex-end;
+  border-top: 0;
+  margin-top: var(--space-xs);
+}
+
+.inspection-pager-actions {
+  align-items: center;
+  gap: var(--space-sm);
+}
+
+.inspection-pager-range {
+  min-width: 112px;
+  text-align: center;
+}
+
+@media (max-width: 1080px) {
+  .inspection-controls-half {
+    width: 100%;
+    max-width: 100%;
+    min-width: 0;
+  }
+
+  .inspection-header-actions-fixed {
+    width: 100%;
+    justify-content: flex-start;
+  }
+}
+
+@media (max-width: 720px) {
+  .inspection-header-actions-fixed {
+    display: grid;
+    grid-template-columns: 1fr;
+  }
+
+  .inspection-toggle-group,
+  .inspection-select,
+  .inspection-date {
+    width: 100%;
+    min-width: 0;
+  }
+
+  .inspection-scroll-frame {
+    overflow-x: auto;
+    -webkit-overflow-scrolling: touch;
+  }
+
+  .inspection-table {
+    min-width: 640px;
+    table-layout: auto;
+  }
+}
