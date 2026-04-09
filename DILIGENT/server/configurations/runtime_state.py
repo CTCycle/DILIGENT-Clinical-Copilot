@@ -8,6 +8,7 @@ from DILIGENT.server.domain.settings.configuration import LLMRuntimeDefaults
 from DILIGENT.server.domain.settings.runtime import LLMRuntimeState
 
 
+###############################################################################
 class LLMRuntimeConfig:
     defaults: LLMRuntimeDefaults | None = None
     _state: LLMRuntimeState = LLMRuntimeState()
