@@ -279,6 +279,7 @@ class InspectionDrugLabelsOverrideRequest(BaseModel):
 ###############################################################################
 class InspectionRagOverrideRequest(BaseModel):
     model_config = ConfigDict(extra="forbid")
+    documents_path: str | None = Field(default=None, max_length=1024)
     chunk_size: int | None = Field(default=None, ge=64, le=8192)
     chunk_overlap: int | None = Field(default=None, ge=0, le=2048)
     embedding_batch_size: int | None = Field(default=None, ge=1, le=4096)
@@ -336,6 +337,7 @@ class RagDocumentListResponse(BaseModel):
 ###############################################################################
 class LanceVectorStoreSummaryResponse(BaseModel):
     model_config = ConfigDict(extra="forbid")
+    source_documents_path: str
     vector_db_path: str
     collection_name: str
     collection_exists: bool

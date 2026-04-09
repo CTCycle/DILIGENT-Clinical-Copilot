@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+import base64
+import binascii
 import hashlib
 import json
 import os
@@ -48,6 +50,7 @@ from DILIGENT.server.repositories.schemas.models import (
     DrugLabelSection,
     DrugRxnormCode,
     LiverToxMonograph,
+    Patient,
 )
 from DILIGENT.server.repositories.vectors import LanceVectorDatabase
 from DILIGENT.server.services.retrieval.embeddings import EmbeddingGenerator
@@ -63,7 +66,6 @@ class _RepositorySerializationService:
             bind=self.engine,
             future=True,
         )
-        self.ensure_session_result_table()
 
     # -------------------------------------------------------------------------
     def save_clinical_session(self, session_data: dict[str, Any]) -> None:
@@ -73,8 +75,9 @@ class _RepositorySerializationService:
         self.ensure_session_result_table()
         db_session = self.session_factory()
         try:
+            persisted_patient = self.persist_patient(db_session, session_data)
             persisted_session = ClinicalSession(
-                patient_name=self.normalize_string(session_data.get("patient_name")),
+                patient_id=int(persisted_patient.id),
                 session_timestamp=self.parse_datetime(
                     session_data.get("session_timestamp")
                 ),
@@ -104,6 +107,7 @@ class _RepositorySerializationService:
     def ensure_session_result_table(self) -> None:
         inspector = inspect(self.engine)
         required_tables = (
+            Patient.__tablename__,
             ClinicalSession.__tablename__,
             ClinicalSessionResult.__tablename__,
             Drug.__tablename__,
@@ -121,7 +125,8 @@ class _RepositorySerializationService:
             )
 
         required_columns = {
-            ClinicalSession.__tablename__: {"session_status"},
+            Patient.__tablename__: {"image_blob"},
+            ClinicalSession.__tablename__: {"patient_id", "session_status"},
             Drug.__tablename__: {"rxnav_last_update"},
         }
         for table_name, columns in required_columns.items():
@@ -143,6 +148,34 @@ class _RepositorySerializationService:
         if lowered == "failed":
             return "failed"
         return "successful"
+
+    # -----------------------------------------------------------------------------
+    def persist_patient(self, db_session: Session, session_data: dict[str, Any]) -> Patient:
+        patient = Patient(
+            name=self.normalize_string(session_data.get("patient_name")),
+            visit_date=self.normalize_date_value(session_data.get("patient_visit_date")),
+            anamnesis=self.normalize_string(session_data.get("anamnesis")),
+            drugs=self.normalize_string(session_data.get("drugs")),
+            laboratory_analysis=self.normalize_string(session_data.get("laboratory_analysis")),
+            image_blob=self.decode_patient_image(session_data.get("patient_image_base64")),
+        )
+        db_session.add(patient)
+        db_session.flush()
+        return patient
+
+    # -----------------------------------------------------------------------------
+    def decode_patient_image(self, value: Any) -> bytes | None:
+        normalized = self.normalize_string(value)
+        if normalized is None:
+            return None
+        payload = normalized
+        if payload.startswith("data:") and "," in payload:
+            payload = payload.split(",", maxsplit=1)[1].strip()
+        try:
+            return base64.b64decode(payload, validate=True)
+        except (binascii.Error, ValueError):
+            logger.warning("Skipping invalid patient image payload during session save")
+            return None
 
     # -----------------------------------------------------------------------------
     def save_livertox_records(self, records: pd.DataFrame) -> None:
@@ -711,7 +744,7 @@ class _RepositorySerializationService:
             )
             conditions.append(
                 or_(
-                    func.lower(func.coalesce(ClinicalSession.patient_name, "")).like(
+                    func.lower(func.coalesce(Patient.name, "")).like(
                         search_pattern,
                         escape="\\",
                     ),
@@ -742,8 +775,15 @@ class _RepositorySerializationService:
 
         db_session = self.session_factory()
         try:
-            sessions_stmt = select(ClinicalSession)
-            count_stmt = select(func.count()).select_from(ClinicalSession)
+            sessions_stmt = select(ClinicalSession, Patient).join(
+                Patient,
+                ClinicalSession.patient_id == Patient.id,
+            )
+            count_stmt = (
+                select(func.count())
+                .select_from(ClinicalSession)
+                .join(Patient, ClinicalSession.patient_id == Patient.id)
+            )
             if conditions:
                 combined = and_(*conditions)
                 sessions_stmt = sessions_stmt.where(combined)
@@ -758,18 +798,17 @@ class _RepositorySerializationService:
                     .offset(safe_offset)
                     .limit(safe_limit)
                 )
-                .scalars()
                 .all()
             )
             items = [
                 {
-                    "session_id": int(row.id),
-                    "patient_name": self.normalize_string(row.patient_name),
-                    "session_timestamp": row.session_timestamp,
-                    "status": self.normalize_session_status(row.session_status),
-                    "total_duration": self.to_float(row.total_duration),
+                    "session_id": int(session_row.id),
+                    "patient_name": self.normalize_string(patient_row.name),
+                    "session_timestamp": session_row.session_timestamp,
+                    "status": self.normalize_session_status(session_row.session_status),
+                    "total_duration": self.to_float(session_row.total_duration),
                 }
-                for row in rows
+                for session_row, patient_row in rows
             ]
             return items, total_rows
         finally:
@@ -820,6 +859,7 @@ class _RepositorySerializationService:
             existing = db_session.get(ClinicalSession, safe_session_id)
             if existing is None:
                 return False
+            patient_id = int(existing.patient_id)
             db_session.execute(
                 delete(ClinicalSessionResult).where(
                     ClinicalSessionResult.session_id == safe_session_id
@@ -843,6 +883,13 @@ class _RepositorySerializationService:
             db_session.execute(
                 delete(ClinicalSession).where(ClinicalSession.id == safe_session_id)
             )
+            remaining_patient_sessions = db_session.execute(
+                select(func.count())
+                .select_from(ClinicalSession)
+                .where(ClinicalSession.patient_id == patient_id)
+            ).scalar_one()
+            if int(remaining_patient_sessions) == 0:
+                db_session.execute(delete(Patient).where(Patient.id == patient_id))
             db_session.commit()
             return True
         except Exception:
@@ -1596,6 +1643,14 @@ class _RepositorySerializationService:
 
     # -----------------------------------------------------------------------------
     def normalize_date(self, value: Any) -> str | None:
+        normalized_date = self.normalize_date_value(value)
+        if normalized_date is None:
+            normalized = self.normalize_string(value)
+            return normalized or None
+        return normalized_date.isoformat()
+
+    # -----------------------------------------------------------------------------
+    def normalize_date_value(self, value: Any) -> date | None:
         normalized = self.normalize_string(value)
         if not normalized:
             return None
@@ -1624,8 +1679,8 @@ class _RepositorySerializationService:
         else:
             parsed = pd.to_datetime(normalized, errors="coerce", utc=True)
         if pd.isna(parsed):
-            return normalized
-        return parsed.date().isoformat()
+            return None
+        return parsed.date()
 
     # -----------------------------------------------------------------------------
     def join_values(self, values: set[str]) -> str | None:

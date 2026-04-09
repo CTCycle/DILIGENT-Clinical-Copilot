@@ -52,6 +52,11 @@ class PatientData(BaseModel):
         max_length=MAX_LAB_TEXT_LENGTH,
         description="Free-text laboratory section, potentially with dated values and ULN notes.",
     )
+    patient_image_base64: str | None = Field(
+        None,
+        max_length=8_000_000,
+        description="Base64-encoded patient profile image.",
+    )
     has_hepatic_diseases: bool = Field(
         default=False,
         description="Indicates whether the patient has a history of hepatic diseases.",
@@ -67,7 +72,7 @@ class PatientData(BaseModel):
 
     # -------------------------------------------------------------------------
     @field_validator(
-        "name", "anamnesis", "drugs", "laboratory_analysis", mode="before"
+        "name", "anamnesis", "drugs", "laboratory_analysis", "patient_image_base64", mode="before"
     )
     @classmethod
     def strip_text(cls, value: str | None) -> str | None:
@@ -180,6 +185,7 @@ class ClinicalSessionRequest(BaseModel):
     use_web_search: bool = False
     drugs: str | None = Field(default=None, max_length=20000)
     laboratory_analysis: str | None = Field(default=None, max_length=MAX_LAB_TEXT_LENGTH)
+    patient_image_base64: str | None = Field(default=None, max_length=8_000_000)
     use_cloud_services: bool | None = None
     llm_provider: str | None = Field(default=None, max_length=32)
     cloud_model: str | None = Field(default=None, max_length=200)
@@ -199,6 +205,7 @@ class ClinicalSessionRequest(BaseModel):
         "anamnesis",
         "drugs",
         "laboratory_analysis",
+        "patient_image_base64",
         "llm_provider",
         "cloud_model",
         "text_extraction_model",

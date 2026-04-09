@@ -1,5 +1,5 @@
 import { CommonModule } from '@angular/common';
-import { Component, OnDestroy, inject, signal } from '@angular/core';
+import { Component, ElementRef, OnDestroy, ViewChild, inject, signal } from '@angular/core';
 import { FormsModule } from '@angular/forms';
 
 import { ModalShellComponent } from '../../components/modal-shell/modal-shell.component';
@@ -36,6 +36,8 @@ function isTerminalJobStatus(status: JobStatus | null): boolean {
   styleUrl: './dili-agent-page.component.scss',
 })
 export class DiliAgentPageComponent implements OnDestroy {
+  @ViewChild('patientImageInput') private patientImageInput?: ElementRef<HTMLInputElement>;
+
   readonly stateService = inject(AppStateService);
 
   readonly isCancelling = signal(false);
@@ -64,6 +66,24 @@ export class DiliAgentPageComponent implements OnDestroy {
 
   handleVisitDateChange(value: string): void {
     this.handleFormChange('visitDate', normalizeVisitDateInput(value));
+  }
+
+  openPatientImagePicker(): void {
+    this.patientImageInput?.nativeElement.click();
+  }
+
+  handlePatientImageSelection(event: Event): void {
+    const input = event.target as HTMLInputElement | null;
+    const file = input?.files?.[0];
+    if (!file) {
+      return;
+    }
+    const reader = new FileReader();
+    reader.onload = () => {
+      const dataUrl = typeof reader.result === 'string' ? reader.result : null;
+      this.handleFormChange('patientImageDataUrl', dataUrl);
+    };
+    reader.readAsDataURL(file);
   }
 
   private revokeObjectUrl(): void {
@@ -304,6 +324,10 @@ export class DiliAgentPageComponent implements OnDestroy {
 
   get patientNameLabel(): string {
     return this.vm.form.patientName.trim() || 'Unnamed patient';
+  }
+
+  get patientImageDataUrl(): string | null {
+    return this.vm.form.patientImageDataUrl;
   }
 
   get recordedDateLabel(): string {
