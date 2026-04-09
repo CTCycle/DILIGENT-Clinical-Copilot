@@ -181,6 +181,7 @@ class DataInspectionService:
         else:
             source = config.get("rag", {})
             defaults = {
+                "documents_path": str(source.get("documents_path", DOCS_PATH)),
                 "chunk_size": int(source.get("chunk_size", server_settings.rag.chunk_size)),
                 "chunk_overlap": int(
                     source.get("chunk_overlap", server_settings.rag.chunk_overlap)
@@ -402,6 +403,7 @@ class DataInspectionService:
     def get_rag_vector_store_summary(self) -> dict[str, Any]:
         config = self.load_runtime_config()
         rag_cfg = config.get("rag", {}) if isinstance(config, dict) else {}
+        documents_path = str(rag_cfg.get("documents_path", DOCS_PATH))
         collection_name = str(
             rag_cfg.get("vector_collection_name", server_settings.rag.vector_collection_name)
         )
@@ -420,6 +422,7 @@ class DataInspectionService:
             except Exception as exc:  # noqa: BLE001
                 logger.warning("Unable to load LanceDB inspection summary: %s", exc)
         return {
+            "source_documents_path": documents_path,
             "vector_db_path": VECTOR_DB_PATH,
             "collection_name": collection_name,
             "collection_exists": exists,
@@ -761,6 +764,7 @@ class DataInspectionService:
             fallback_message="RAG update started",
         )
         updater = RagEmbeddingUpdater(
+            documents_path=override_values.get("documents_path"),
             use_cloud_embeddings=override_values.get("use_cloud_embeddings"),
             cloud_provider=override_values.get("cloud_provider"),
             cloud_embedding_model=override_values.get("cloud_embedding_model"),

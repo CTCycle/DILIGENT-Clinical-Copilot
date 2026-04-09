@@ -106,14 +106,14 @@ export const DEFAULT_SETTINGS: RuntimeSettings = {
   ),
   parsingModel: LLM_RUNTIME_DEFAULTS.parsing_model,
   clinicalModel: LLM_RUNTIME_DEFAULTS.clinical_model,
-  ollamaTemperature: LLM_RUNTIME_DEFAULTS.ollama_temperature,
-  cloudTemperature: LLM_RUNTIME_DEFAULTS.cloud_temperature,
+  temperature: LLM_RUNTIME_DEFAULTS.cloud_temperature,
   reasoning: LLM_RUNTIME_DEFAULTS.ollama_reasoning,
 };
 
 export const DEFAULT_FORM_STATE: ClinicalFormState = {
   patientName: "",
   visitDate: "",
+  patientImageDataUrl: null,
   anamnesis: "",
   drugs: "",
   laboratoryAnalysis: "",

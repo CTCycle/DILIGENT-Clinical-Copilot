@@ -42,28 +42,32 @@
         <section class="model-config-local-row" [class.is-disabled]="isSaving() || isLoading()" [attr.aria-disabled]="isSaving() || isLoading()">
           <div class="model-config-row-header">
             <div class="model-config-row-header-top">
-              <h2 class="modal-section-title">Local Model Catalog</h2>
-              <p class="model-config-caption">{{ availableLocalModelCount() }} installed in Ollama.</p>
-            </div>
-            <div class="model-config-search">
-              <input
-                type="search"
-                placeholder="Search models"
-                [ngModel]="modelSearchQuery()"
-                (ngModelChange)="setModelSearchQuery($event)"
-              />
-            </div>
-            <div class="model-config-filter-pills">
-              @for (filter of modelFilters; track filter.key) {
-                <button
-                  type="button"
-                  class="model-config-filter-pill"
-                  [class.is-active]="isFilterActive(filter.key)"
-                  (click)="toggleFilter(filter.key)"
-                >
-                  {{ filter.label }}
-                </button>
-              }
+              <div class="model-config-row-heading">
+                <h2 class="modal-section-title">Local Model Catalog</h2>
+                <p class="model-config-caption">{{ availableLocalModelCount() }} installed in Ollama.</p>
+              </div>
+              <div class="model-config-search-and-filters">
+                <div class="model-config-search">
+                  <input
+                    type="search"
+                    placeholder="Search models"
+                    [ngModel]="modelSearchQuery()"
+                    (ngModelChange)="setModelSearchQuery($event)"
+                  />
+                </div>
+                <div class="model-config-filter-pills">
+                  @for (filter of modelFilters; track filter.key) {
+                    <button
+                      type="button"
+                      class="model-config-filter-pill"
+                      [class.is-active]="isFilterActive(filter.key)"
+                      (click)="toggleFilter(filter.key)"
+                    >
+                      {{ filter.label }}
+                    </button>
+                  }
+                </div>
+              </div>
             </div>
           </div>
 
@@ -122,8 +126,15 @@
                         (click)="handleRoleSelection('clinical', model.name)"
                         [disabled]="isSaving() || isLoading() || draftConfig().clinicalModel === model.name"
                         [attr.aria-pressed]="draftConfig().clinicalModel === model.name"
+                        [attr.aria-label]="draftConfig().clinicalModel === model.name ? 'Clinical model selected' : 'Set ' + model.name + ' as clinical model'"
+                        [attr.title]="draftConfig().clinicalModel === model.name ? 'Clinical model selected' : 'Set as clinical model'"
                       >
-                        Clinical
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                          <path d="M12 21s-6.8-4.9-9-8a4.8 4.8 0 0 1 7-6l2 2 2-2a4.8 4.8 0 0 1 7 6c-2.2 3.1-9 8-9 8Z" />
+                        </svg>
+                        <span class="visually-hidden">
+                          {{ draftConfig().clinicalModel === model.name ? 'Clinical model selected' : 'Set as clinical model' }}
+                        </span>
                       </button>
                       <button
                         class="access-key-action model-config-role-action"
@@ -132,8 +143,18 @@
                         (click)="handleRoleSelection('text_extraction', model.name)"
                         [disabled]="isSaving() || isLoading() || draftConfig().parsingModel === model.name"
                         [attr.aria-pressed]="draftConfig().parsingModel === model.name"
+                        [attr.aria-label]="draftConfig().parsingModel === model.name ? 'Text extraction model selected' : 'Set ' + model.name + ' as text extraction model'"
+                        [attr.title]="draftConfig().parsingModel === model.name ? 'Text extraction model selected' : 'Set as text extraction model'"
                       >
-                        Extraction
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                          <path d="M14 3H6a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V9z" />
+                          <path d="M14 3v6h6" />
+                          <path d="M8 13h8" />
+                          <path d="M8 17h5" />
+                        </svg>
+                        <span class="visually-hidden">
+                          {{ draftConfig().parsingModel === model.name ? 'Text extraction model selected' : 'Set as text extraction model' }}
+                        </span>
                       </button>
                     </div>
                   </div>
@@ -184,7 +205,7 @@
       }
 
       <section class="model-config-extra-row" [class.is-disabled]="isSaving() || isLoading()" [attr.aria-disabled]="isSaving() || isLoading()">
-        <h2 class="modal-section-title">Extra Parameters (Search and RAG)</h2>
+        <h2 class="modal-section-title">Extra Parameters</h2>
         <div class="model-config-extra-columns">
           <div class="model-config-extra-left">
             <app-provider-access-card
@@ -208,33 +229,18 @@
                 />
                 <span class="field-label">Enable SDL/Reasoning</span>
               </label>
-            </div>
-            <div class="model-config-extra-panel">
-              <p class="model-config-extra-panel-title">RAG Configuration</p>
               <div class="field">
-                <label class="field-label" for="ollama-temperature-input">Ollama temperature</label>
+                <label class="field-label" for="global-temperature-input">Temperature</label>
                 <input
-                  id="ollama-temperature-input"
+                  id="global-temperature-input"
                   type="number"
                   min="0"
                   max="2"
                   step="0.01"
-                  [ngModel]="draftConfig().ollamaTemperature"
-                  (ngModelChange)="setTemperature('ollama', $event)"
+                  [ngModel]="draftConfig().temperature"
+                  (ngModelChange)="setTemperature($event)"
                   [disabled]="isSaving() || isLoading()"
-                />
-              </div>
-              <div class="field">
-                <label class="field-label" for="cloud-temperature-input">Cloud temperature</label>
-                <input
-                  id="cloud-temperature-input"
-                  type="number"
-                  min="0"
-                  max="2"
-                  step="0.01"
-                  [ngModel]="draftConfig().cloudTemperature"
-                  (ngModelChange)="setTemperature('cloud', $event)"
-                  [disabled]="isSaving() || isLoading()"
+                  class="model-config-temperature-input"
                 />
               </div>
             </div>
@@ -252,8 +258,7 @@
         @if (draftConfig().useCloudServices) {
           <div><dt>Cloud Model</dt><dd>{{ draftCloudModel() || 'Not set' }}</dd></div>
         }
-        <div><dt>Ollama temperature</dt><dd>{{ draftConfig().ollamaTemperature.toFixed(2) }}</dd></div>
-        <div><dt>Cloud temperature</dt><dd>{{ draftConfig().cloudTemperature.toFixed(2) }}</dd></div>
+        <div><dt>Temperature</dt><dd>{{ draftConfig().temperature.toFixed(2) }}</dd></div>
       </dl>
 
       @if (!draftConfig().useCloudServices) {

@@ -71,8 +71,7 @@ export function buildRuntimeSettingsFromConfig(
     cloudModel,
     parsingModel: resolvedParsingModel,
     clinicalModel: resolvedClinicalModel,
-    ollamaTemperature: payload.ollama_temperature,
-    cloudTemperature: payload.cloud_temperature,
+    temperature: payload.cloud_temperature ?? payload.ollama_temperature,
     reasoning: payload.ollama_reasoning,
   };
 }

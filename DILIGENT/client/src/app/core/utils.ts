@@ -98,6 +98,20 @@ function buildVisitDatePayload(
   return { day, month, year };
 }
 
+function extractBase64Payload(dataUrl: string | null): string | null {
+  if (!dataUrl) {
+    return null;
+  }
+  const normalized = dataUrl.trim();
+  if (!normalized) {
+    return null;
+  }
+  if (normalized.startsWith("data:") && normalized.includes(",")) {
+    return normalized.split(",", 2)[1]?.trim() || null;
+  }
+  return normalized;
+}
+
 export function buildClinicalPayload(
   form: ClinicalFormState,
   settings: RuntimeSettings,
@@ -109,6 +123,7 @@ export function buildClinicalPayload(
     anamnesis: sanitizeField(form.anamnesis),
     drugs: sanitizeField(form.drugs),
     laboratory_analysis: sanitizeField(form.laboratoryAnalysis),
+    patient_image_base64: extractBase64Payload(form.patientImageDataUrl),
     use_rag: form.useRag,
     use_web_search: form.useWebSearch,
     use_cloud_services: settings.useCloudServices,
@@ -116,8 +131,8 @@ export function buildClinicalPayload(
     cloud_model: settings.cloudModel,
     text_extraction_model: settings.parsingModel,
     clinical_model: settings.clinicalModel,
-    ollama_temperature: settings.ollamaTemperature,
-    cloud_temperature: settings.cloudTemperature,
+    ollama_temperature: settings.temperature,
+    cloud_temperature: settings.temperature,
     ollama_reasoning: settings.reasoning,
   };
   if (allowMissingLabs !== null) {

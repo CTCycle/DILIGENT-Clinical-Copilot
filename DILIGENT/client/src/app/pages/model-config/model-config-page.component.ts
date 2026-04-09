@@ -41,8 +41,7 @@ type DraftRuntimeConfig = {
   cloudModel: string | null;
   clinicalModel: string;
   parsingModel: string;
-  ollamaTemperature: number;
-  cloudTemperature: number;
+  temperature: number;
 };
 
 type ModelPullProgressState = {
@@ -137,8 +136,7 @@ function resolveDraftFromSettings(runtimeSettings: RuntimeSettings): DraftRuntim
     cloudModel,
     clinicalModel: runtimeSettings.clinicalModel,
     parsingModel: runtimeSettings.parsingModel,
-    ollamaTemperature: runtimeSettings.ollamaTemperature,
-    cloudTemperature: runtimeSettings.cloudTemperature,
+    temperature: runtimeSettings.temperature,
   };
 }
 
@@ -250,8 +248,7 @@ export class ModelConfigPageComponent implements OnInit {
       (this.draftCloudModel() || '') !== (savedCloudModel || '') ||
       draft.clinicalModel !== settings.clinicalModel ||
       draft.parsingModel !== settings.parsingModel ||
-      draft.ollamaTemperature !== settings.ollamaTemperature ||
-      draft.cloudTemperature !== settings.cloudTemperature;
+      draft.temperature !== settings.temperature;
 
     return (
       this.isLoading() ||
@@ -343,14 +340,13 @@ export class ModelConfigPageComponent implements OnInit {
     await this.persistConfigPatch({ ollama_reasoning: enabled }, 'Extra parameters saved.', false);
   }
 
-  setTemperature(kind: 'ollama' | 'cloud', value: string): void {
+  setTemperature(value: string): void {
     const parsed = Number.parseFloat(value);
     if (!Number.isFinite(parsed)) return;
     const bounded = Math.max(0, Math.min(2, parsed));
     this.draftConfig.update((previous) => ({
       ...previous,
-      ollamaTemperature: kind === 'ollama' ? bounded : previous.ollamaTemperature,
-      cloudTemperature: kind === 'cloud' ? bounded : previous.cloudTemperature,
+      temperature: bounded,
     }));
   }
 
@@ -363,8 +359,8 @@ export class ModelConfigPageComponent implements OnInit {
         cloud_model: this.draftCloudModel(),
         clinical_model: draft.clinicalModel || null,
         text_extraction_model: draft.parsingModel || null,
-        ollama_temperature: draft.ollamaTemperature,
-        cloud_temperature: draft.cloudTemperature,
+        ollama_temperature: draft.temperature,
+        cloud_temperature: draft.temperature,
       },
       'Configuration saved.',
       true,

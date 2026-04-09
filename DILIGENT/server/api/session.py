@@ -174,6 +174,8 @@ def build_failed_session_payload(
     language_result = detect_clinical_language(payload)
     return {
         "patient_name": payload.name,
+        "patient_visit_date": payload.visit_date,
+        "patient_image_base64": payload.patient_image_base64,
         "session_timestamp": datetime.now(),
         "hepatic_pattern": "indeterminate",
         "anamnesis": payload.anamnesis,
@@ -887,6 +889,7 @@ class ClinicalSessionEndpoint:
             payload_data.update(
                 {
                     "has_hepatic_diseases": request_payload.has_hepatic_diseases,
+                    "patient_image_base64": request_payload.patient_image_base64,
                 }
             )
             return PatientData.model_validate(payload_data)
@@ -1512,6 +1515,8 @@ class ClinicalSessionEndpoint:
             self.serializer.save_clinical_session,
             {
                 "patient_name": payload.name,
+                "patient_visit_date": payload.visit_date,
+                "patient_image_base64": payload.patient_image_base64,
                 "session_timestamp": datetime.now(),
                 "hepatic_pattern": pattern_score.classification,
                 "anamnesis": payload.anamnesis,

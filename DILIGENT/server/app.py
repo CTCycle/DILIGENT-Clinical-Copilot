@@ -16,6 +16,7 @@ from DILIGENT.server.api.ollama import router as ollama_router
 from DILIGENT.server.api.research import router as research_router
 from DILIGENT.server.api.root import RootEndpoint
 from DILIGENT.server.api.error_handling import register_error_handling
+from DILIGENT.server.repositories.database.initializer import initialize_database
 
 
 ###############################################################################
@@ -41,6 +42,11 @@ routers = [
 for router in routers:
     app.include_router(router)
     app.include_router(router, prefix="/api", include_in_schema=False)
+
+
+@app.on_event("startup")
+async def initialize_database_on_startup() -> None:
+    initialize_database()
 
 root_endpoint = RootEndpoint(
     app=app,

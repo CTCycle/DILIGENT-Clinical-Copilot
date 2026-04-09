@@ -367,10 +367,10 @@
             </div>
 
             <div class="inspection-scroll-frame inspection-scroll-frame-compact inspection-rag-second-view">
-              <table class="inspection-table inspection-table-dense">
+              <table class="inspection-table inspection-table-dense inspection-rag-summary-table">
                 <thead>
                   <tr>
-                    <th>Folder path</th>
+                    <th class="inspection-rag-path-column">Folder path</th>
                     <th>Collection</th>
                     <th>Embeddings</th>
                     <th>Documents</th>
@@ -380,7 +380,7 @@
                 </thead>
                 <tbody>
                   <tr>
-                    <td>{{ displayedRagFolderPath }}</td>
+                    <td class="inspection-rag-path-cell" [title]="displayedRagFolderPath">{{ displayedRagFolderPath }}</td>
                     <td>{{ ragVectorStore()?.collection_name || 'N/A' }}</td>
                     <td>{{ ragVectorStore()?.embedding_count ?? 0 }}</td>
                     <td>{{ ragVectorStore()?.distinct_document_count ?? 0 }}</td>

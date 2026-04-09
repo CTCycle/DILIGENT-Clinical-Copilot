@@ -94,48 +94,6 @@ function formatDuration(seconds: number | null): string {
   return `${Math.floor(rounded / 60)}m ${rounded % 60}s`;
 }
 
-function resolveSelectedFolderPath(files: FileList | null): string | null {
-  if (!files || files.length === 0) {
-    return null;
-  }
-
-  const normalizedPaths = Array.from(files)
-    .map((file) => {
-      const maybeWithRelativePath = file as File & { webkitRelativePath?: string };
-      return maybeWithRelativePath.webkitRelativePath || file.name;
-    })
-    .map((path) => path.replace(/\\/g, '/'))
-    .filter((path) => path.length > 0);
-
-  if (normalizedPaths.length === 0) {
-    return null;
-  }
-
-  const directorySegments = normalizedPaths.map((path) => path.split('/').slice(0, -1));
-  const firstDirectory = directorySegments[0] ?? [];
-  const sharedSegments = [...firstDirectory];
-
-  for (const segments of directorySegments.slice(1)) {
-    let index = 0;
-    while (
-      index < sharedSegments.length &&
-      index < segments.length &&
-      sharedSegments[index] === segments[index]
-    ) {
-      index += 1;
-    }
-    sharedSegments.splice(index);
-  }
-
-  const shared = sharedSegments.join('/');
-  if (shared) {
-    return shared;
-  }
-
-  const fallback = normalizedPaths[0]?.split('/').slice(0, -1).join('/');
-  return fallback || null;
-}
-
 @Component({
   selector: 'app-data-inspection-page',
   standalone: true,
@@ -189,12 +147,12 @@ export class DataInspectionPageComponent implements OnInit {
 
   readonly ragDocuments = signal<InspectionRagDocumentRow[]>([]);
   readonly ragVectorStore = signal<InspectionRagVectorStoreSummary | null>(null);
+  readonly selectedRagFolderPath = signal<string | null>(null);
   readonly ragTotal = signal(0);
   readonly ragOffset = signal(0);
   readonly ragLoading = signal(false);
   readonly ragError = signal<string | null>(null);
   readonly ragSearchInput = signal('');
-  readonly selectedRagFolderPath = signal<string | null>(null);
 
   readonly reportSession = signal<InspectionSessionItem | null>(null);
   readonly reportContent = signal('');
@@ -259,7 +217,7 @@ export class DataInspectionPageComponent implements OnInit {
   }
 
   get displayedRagFolderPath(): string {
-    return this.selectedRagFolderPath() || this.ragVectorStore()?.vector_db_path || 'N/A';
+    return this.selectedRagFolderPath() || this.ragVectorStore()?.source_documents_path || 'N/A';
   }
 
   async loadSessions(): Promise<void> {
@@ -652,8 +610,13 @@ export class DataInspectionPageComponent implements OnInit {
 
   onRagFolderSelection(event: Event): void {
     const input = event.target as HTMLInputElement | null;
-    const selected = resolveSelectedFolderPath(input?.files ?? null);
-    this.selectedRagFolderPath.set(selected);
+    const files = Array.from(input?.files ?? []);
+    const firstRelativePath = files[0]?.webkitRelativePath || '';
+    const selectedFolderName = firstRelativePath.split('/')[0]?.trim() || null;
+    this.selectedRagFolderPath.set(selectedFolderName);
+    if (input) {
+      input.value = '';
+    }
   }
 
   async openUpdateModal(target: InspectionUpdateTarget): Promise<void> {
