@@ -1,9 +1,8 @@
 # TypeScript Guidelines (DILIGENT Client)
 
-Last updated: 2026-04-08
+Last updated: 2026-04-09
 
-
-Scope: `DILIGENT/client` (React 18 + Vite + TypeScript 5).
+Scope: `DILIGENT/client` (Angular standalone + TypeScript 5).
 
 Also mandatory: apply `assets/docs/ERROR_HANDLING.md`.
 
@@ -12,31 +11,31 @@ Also mandatory: apply `assets/docs/ERROR_HANDLING.md`.
 - Keep strict TypeScript settings enabled.
 - Prefer `unknown` over `any` for untrusted/external values.
 - Narrow types via explicit guards before use.
-- Keep shared API contracts in `src/types.ts` and reuse them consistently.
+- Keep shared API contracts in `src/app/core/models/types.ts` and reuse them consistently.
 
 ## 2. Structure and ownership
 
-- Centralize network calls in `src/services/api.ts`.
-- Keep app-wide state in `src/context/AppStateContext.tsx`.
-- Keep page-level orchestration in `src/pages/*`.
-- Keep reusable UI controls in `src/components/*`.
-- Keep shared constants/defaults in `src/constants.ts`.
+- Centralize network calls in `src/app/core/services/api.ts`.
+- Keep app-wide state in `src/app/core/state/app-state.service.ts`.
+- Keep page-level orchestration in `src/app/pages/*`.
+- Keep reusable UI controls in `src/app/components/*`.
+- Keep shared constants/defaults in `src/app/core/constants.ts`.
 
-## 3. React implementation rules
+## 3. Angular implementation rules
 
-- Use function components with explicit prop interfaces.
-- Use controlled inputs for form-heavy clinical workflows.
-- Clean up all side effects (`useEffect` timers, listeners, object URLs, polling loops).
-- Memoize only non-trivial derived values.
+- Use standalone components by default.
+- Use signals for local/global UI state and explicit cleanup for timers/listeners/object URLs/pollers.
+- Keep form-heavy clinical workflows deterministic (template-driven or reactive forms are both acceptable).
+- Keep side effects in lifecycle hooks or explicit service methods, never in template expressions.
 
 ## 4. API/runtime coherence
 
 - Keep frontend API base path compatible with `/api`.
 - When adding/modifying endpoints, update together:
   - backend API/domain models
-  - `src/services/api.ts`
-  - `src/types.ts`
-  - impacted UI pages/components
+  - `src/app/core/services/api.ts`
+  - `src/app/core/models/types.ts`
+  - impacted Angular pages/components
 - Handle non-success responses explicitly; do not silently ignore failures.
 
 ## 5. Job and polling UX

@@ -120,6 +120,7 @@ echo - "%uv_lock%"
 echo - uv and python runtimes
 echo - portable Node.js runtime
 echo - runtime cache folders
+echo - Angular local caches and generated proxy config
 echo.
 set /p confirm="Type YES to continue: "
 if /i not "%confirm%"=="YES" (
@@ -174,6 +175,18 @@ if exist "%client_dir%\dist" (
   echo [INFO] Removed frontend build directory "%client_dir%\dist".
 ) else (
   echo [INFO] No frontend build directory found to remove.
+)
+if exist "%client_dir%\.angular" (
+  rd /s /q "%client_dir%\.angular"
+  echo [INFO] Removed Angular cache directory "%client_dir%\.angular".
+) else (
+  echo [INFO] No Angular cache directory found to remove.
+)
+if exist "%client_dir%\proxy.conf.json" (
+  del /q "%client_dir%\proxy.conf.json"
+  echo [INFO] Removed generated Angular proxy config "%client_dir%\proxy.conf.json".
+) else (
+  echo [INFO] No generated Angular proxy config found to remove.
 )
 if exist "%client_dir%\package-lock.json" (
   del /q "%client_dir%\package-lock.json"
