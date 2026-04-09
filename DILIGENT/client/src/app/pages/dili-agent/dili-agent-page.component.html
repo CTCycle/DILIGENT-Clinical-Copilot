@@ -1,0 +1,154 @@
+<main class="page-container stitch-dili-page">
+  <header class="stitch-dili-heading">
+    <h1>Drug-Induced Liver Injury analysis</h1>
+    <p>Clinical Copilot</p>
+  </header>
+
+  <div class="stitch-dili-grid">
+    <div class="stitch-dili-main">
+      <section class="stitch-dili-card">
+        <div class="stitch-dili-input-stack">
+          <div class="stitch-dili-input-group">
+            <h3>Anamnesis</h3>
+            <textarea
+              id="anamnesis"
+              aria-label="Anamnesis"
+              placeholder="Describe patient history, symptoms onset, and clinical observations..."
+              [ngModel]="vm.form.anamnesis"
+              (ngModelChange)="handleFormChange('anamnesis', $event)"
+            ></textarea>
+          </div>
+
+          <div class="stitch-dili-input-group">
+            <h3>Current Drugs</h3>
+            <textarea
+              id="drugs"
+              aria-label="Current Drugs"
+              placeholder="List medications, dosages, frequency, and duration of use..."
+              [ngModel]="vm.form.drugs"
+              (ngModelChange)="handleFormChange('drugs', $event)"
+            ></textarea>
+          </div>
+
+          <div class="stitch-dili-input-group">
+            <h3>Laboratory Analysis</h3>
+            <textarea
+              id="laboratory-analysis"
+              aria-label="Laboratory Analysis"
+              placeholder="Input raw lab results (ALT, AST, ALP, Bilirubin, etc.)..."
+              [ngModel]="vm.form.laboratoryAnalysis"
+              (ngModelChange)="handleFormChange('laboratoryAnalysis', $event)"
+            ></textarea>
+          </div>
+        </div>
+      </section>
+    </div>
+
+    <aside class="stitch-dili-sidebar">
+      <section class="stitch-dili-card stitch-dili-patient">
+        <div class="stitch-dili-patient-top">
+          <div class="stitch-dili-avatar" aria-hidden="true">
+            {{ patientNameLabel.charAt(0).toUpperCase() }}
+          </div>
+          <div>
+            <h3>{{ patientNameLabel }}</h3>
+            <p>Recorded: {{ recordedDateLabel }}</p>
+          </div>
+        </div>
+
+        <div class="stitch-dili-inline-fields">
+          <div class="field">
+            <label class="field-label" for="patient-name">Patient Name</label>
+            <input
+              id="patient-name"
+              type="text"
+              placeholder="e.g., Marco Rossi"
+              [ngModel]="vm.form.patientName"
+              (ngModelChange)="handleFormChange('patientName', $event)"
+            />
+          </div>
+          <div class="field">
+            <label class="field-label" for="visit-date">Visit Date</label>
+            <input
+              id="visit-date"
+              type="date"
+              [max]="todayIso"
+              [ngModel]="vm.form.visitDate"
+              (ngModelChange)="handleVisitDateChange($event)"
+            />
+          </div>
+        </div>
+
+        <div class="stitch-dili-controls">
+          <p>Retrieval Controls</p>
+          <label class="toggle-row">
+            <input
+              type="checkbox"
+              [ngModel]="vm.form.useRag"
+              (ngModelChange)="handleFormChange('useRag', $event)"
+            />
+            <span class="toggle-label">Internal RAG</span>
+          </label>
+          <label class="toggle-row">
+            <input
+              type="checkbox"
+              [ngModel]="vm.form.useWebSearch"
+              (ngModelChange)="handleFormChange('useWebSearch', $event)"
+            />
+            <span class="toggle-label">Web Search</span>
+          </label>
+        </div>
+
+        <div class="stitch-dili-actions">
+          <button class="btn btn-primary" type="button" [disabled]="isCancelling()" (click)="runOrStop()">
+            @if (vm.isRunning) {
+              {{ isCancelling() ? 'Stopping...' : 'Stop analysis' }}
+            } @else {
+              Run DILI analysis
+            }
+          </button>
+          <button class="stitch-dili-clear" type="button" (click)="clearAll()" [disabled]="vm.isRunning">
+            Clear all
+          </button>
+        </div>
+      </section>
+
+      <div class="stitch-dili-tip">
+        Ensure laboratory results include units for accurate drug-induced liver injury risk profiling.
+      </div>
+    </aside>
+  </div>
+
+  <section class="report-section stitch-dili-report">
+    <div class="report-shell">
+      <div class="report-header">
+        <p class="report-eyebrow">Report Output</p>
+      </div>
+
+      <div class="report-toolbar">
+        <button class="toolbar-btn" type="button" (click)="copyReport()" [disabled]="!vm.message">
+          Copy
+        </button>
+        <button class="toolbar-btn" type="button" (click)="toggleExpand()" [disabled]="!vm.message">
+          {{ vm.isExpanded ? 'Collapse' : 'Expand' }}
+        </button>
+        <button class="toolbar-btn" type="button" (click)="downloadReport()" [disabled]="!vm.exportUrl">
+          Download markdown
+        </button>
+      </div>
+
+      <div class="report-content" [class.is-expanded]="vm.isExpanded">
+        @if (showSpinner) {
+          <div class="session-spinner" role="status" aria-live="polite">
+            <div class="spinner-wheel"></div>
+            <p class="spinner-label">
+              {{ (vm.jobStageMessage || 'Generating report') + (vm.jobProgress > 0 ? ('... ' + (vm.jobProgress | number:'1.0-0') + '%') : '...') }}
+            </p>
+          </div>
+        } @else {
+          <pre class="inspection-excerpt-text">{{ reportBody }}</pre>
+        }
+      </div>
+    </div>
+  </section>
+</main>

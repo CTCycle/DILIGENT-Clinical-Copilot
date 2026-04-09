@@ -65,7 +65,7 @@ if exist "%DOTENV%" (
         if not "!line!"=="" if "!line:~0,1!" NEQ "#" if "!line:~0,1!" NEQ ";" (
             for /f "tokens=1,* delims==" %%K in ("!line!") do (
                 set "k=%%K"
-                set "v=%%M"
+                set "v=%%L"
                 if defined v (
                     for /f "tokens=* delims= " %%Q in ("!v!") do set "v=%%Q"
                     set "v=!v:"=!"

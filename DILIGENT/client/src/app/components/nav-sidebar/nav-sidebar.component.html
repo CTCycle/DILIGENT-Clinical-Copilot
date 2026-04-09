@@ -1,0 +1,39 @@
+<div class="app-top-nav">
+  <header class="app-header">
+    <div class="app-header-content">
+      <div class="app-header-brand">
+        <span class="app-header-logo">
+          <img src="/diligent-logo.png" alt="Diligent logo" />
+        </span>
+        <span class="app-header-wordmark">Diligent</span>
+      </div>
+      <nav class="tab-bar" aria-label="Main navigation">
+        <div class="tab-items">
+          @for (item of navItems; track item.pageId) {
+            <button
+              type="button"
+              class="tab-item"
+              [class.active]="stateService.state().activePage === item.pageId"
+              (click)="onNavigate(item.pageId)"
+              [attr.aria-current]="stateService.state().activePage === item.pageId ? 'page' : null"
+              [title]="item.label"
+            >
+              <span class="tab-label">{{ item.label }}</span>
+            </button>
+          }
+        </div>
+      </nav>
+      <div class="app-header-actions">
+        <button
+          type="button"
+          class="app-header-icon-btn"
+          (click)="toggleTheme()"
+          aria-label="Toggle dark mode"
+          title="Toggle dark mode"
+        >
+          Theme
+        </button>
+      </div>
+    </div>
+  </header>
+</div>

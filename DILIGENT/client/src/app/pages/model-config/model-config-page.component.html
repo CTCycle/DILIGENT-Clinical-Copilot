@@ -1,0 +1,300 @@
+<main class="page-container model-config-page">
+  <header class="page-header model-config-header-compact">
+    <h1>Model Configurations</h1>
+    <p class="lede">Adjust runtime preferences for DILI analysis.</p>
+  </header>
+
+  <div class="model-config-layout">
+    <div class="model-config-main-column">
+      <section class="model-config-runtime-row" aria-label="Runtime source selector">
+        <h2 class="modal-section-title">Runtime Source</h2>
+        <div class="model-config-runtime-options">
+          <label class="model-config-runtime-option" [class.is-active]="!draftConfig().useCloudServices">
+            <input
+              type="radio"
+              name="runtime-source"
+              [checked]="!draftConfig().useCloudServices"
+              (change)="handleCloudSwitchChange(false)"
+              [disabled]="isSaving() || isLoading()"
+            />
+            <span>
+              <span class="field-label">Local Models (Ollama)</span>
+              <span class="field-helper">Run both model roles using local Ollama models.</span>
+            </span>
+          </label>
+          <label class="model-config-runtime-option" [class.is-active]="draftConfig().useCloudServices">
+            <input
+              type="radio"
+              name="runtime-source"
+              [checked]="draftConfig().useCloudServices"
+              (change)="handleCloudSwitchChange(true)"
+              [disabled]="isSaving() || isLoading()"
+            />
+            <span>
+              <span class="field-label">Cloud Models (OpenAI / Gemini)</span>
+              <span class="field-helper">Use a cloud provider and configured cloud model.</span>
+            </span>
+          </label>
+        </div>
+      </section>
+
+      @if (!draftConfig().useCloudServices) {
+        <section class="model-config-local-row" [class.is-disabled]="isSaving() || isLoading()" [attr.aria-disabled]="isSaving() || isLoading()">
+          <div class="model-config-row-header">
+            <div class="model-config-row-header-top">
+              <h2 class="modal-section-title">Local Model Catalog</h2>
+              <p class="model-config-caption">{{ availableLocalModelCount() }} installed in Ollama.</p>
+            </div>
+            <div class="model-config-search">
+              <input
+                type="search"
+                placeholder="Search models"
+                [ngModel]="modelSearchQuery()"
+                (ngModelChange)="setModelSearchQuery($event)"
+              />
+            </div>
+            <div class="model-config-filter-pills">
+              @for (filter of modelFilters; track filter.key) {
+                <button
+                  type="button"
+                  class="model-config-filter-pill"
+                  [class.is-active]="isFilterActive(filter.key)"
+                  (click)="toggleFilter(filter.key)"
+                >
+                  {{ filter.label }}
+                </button>
+              }
+            </div>
+          </div>
+
+          <div class="model-config-list-shell">
+            <ul class="model-config-model-list">
+              @if (noLocalModelMessage()) {
+                <li class="model-config-empty-note">{{ noLocalModelMessage() }}</li>
+              }
+              @for (model of filteredLocalModels(); track model.name) {
+                <li class="model-config-model-item" [class.is-selected]="draftConfig().clinicalModel === model.name || draftConfig().parsingModel === model.name">
+                  <div class="model-config-model-details">
+                    <div class="model-config-model-name-row">
+                      <span class="model-config-model-name">{{ model.name }}</span>
+                      <span class="model-config-availability-pill" [class.is-available]="model.available_in_ollama" [class.is-unavailable]="!model.available_in_ollama">
+                        {{ model.available_in_ollama ? 'Installed' : 'Not installed' }}
+                      </span>
+                    </div>
+                    <span class="model-config-model-description" [title]="model.description">{{ model.description }}</span>
+
+                    @if (progressForModel(model.name); as progress) {
+                      <div class="model-config-pull-progress" role="status" aria-live="polite">
+                        <div class="model-config-pull-progress-track" aria-hidden="true">
+                          <div class="model-config-pull-progress-fill" [style.width.%]="progress.progress"></div>
+                        </div>
+                        <p class="model-config-pull-progress-label">{{ progress.message }}</p>
+                      </div>
+                    }
+
+                    <div class="model-config-role-pill-row" aria-live="polite">
+                      @if (draftConfig().clinicalModel === model.name) {
+                        <span class="model-config-role-pill">Clinical</span>
+                      }
+                      @if (draftConfig().parsingModel === model.name) {
+                        <span class="model-config-role-pill">Text extraction</span>
+                      }
+                    </div>
+                  </div>
+
+                  <div class="model-config-model-item-side">
+                    <div class="model-config-model-action-row">
+                      @if (!model.available_in_ollama) {
+                        <button
+                          class="btn btn-secondary model-config-inline-btn"
+                          type="button"
+                          (click)="pullModelByName(model.name)"
+                          [disabled]="isSaving() || isLoading() || appState.state().diliAgent.isPulling"
+                        >
+                          {{ progressForModel(model.name) ? 'Installing...' : 'Install' }}
+                        </button>
+                      }
+
+                      <button
+                        class="access-key-action model-config-role-action"
+                        [class.is-active]="draftConfig().clinicalModel === model.name"
+                        type="button"
+                        (click)="handleRoleSelection('clinical', model.name)"
+                        [disabled]="isSaving() || isLoading() || draftConfig().clinicalModel === model.name"
+                        [attr.aria-pressed]="draftConfig().clinicalModel === model.name"
+                      >
+                        Clinical
+                      </button>
+                      <button
+                        class="access-key-action model-config-role-action"
+                        [class.is-active]="draftConfig().parsingModel === model.name"
+                        type="button"
+                        (click)="handleRoleSelection('text_extraction', model.name)"
+                        [disabled]="isSaving() || isLoading() || draftConfig().parsingModel === model.name"
+                        [attr.aria-pressed]="draftConfig().parsingModel === model.name"
+                      >
+                        Extraction
+                      </button>
+                    </div>
+                  </div>
+                </li>
+              }
+            </ul>
+          </div>
+        </section>
+      }
+
+      @if (draftConfig().useCloudServices) {
+        <section class="model-config-cloud-row">
+          <h2 class="modal-section-title">Cloud Model Configuration</h2>
+          <div class="model-config-cloud-layout">
+            <div class="model-config-cloud-controls">
+              <div class="model-config-provider-list model-config-provider-list-narrow">
+                @for (provider of cloudProviderOptions(); track provider) {
+                  <app-provider-access-card
+                    variant="selectable"
+                    [label]="getProviderLabel(provider)"
+                    [isActive]="draftProvider() === provider"
+                    [disabled]="isSaving() || isLoading()"
+                    [manageKeyAriaLabel]="'Manage ' + getProviderLabel(provider) + ' access keys'"
+                    (select)="handleProviderChange(provider)"
+                    (manageKeys)="openKeys(provider)"
+                  ></app-provider-access-card>
+                }
+              </div>
+
+              <div class="field model-config-cloud-model-field model-config-cloud-model-field-narrow">
+                <label class="field-label" for="cloud-model-select">Cloud Model</label>
+                <select
+                  id="cloud-model-select"
+                  [ngModel]="draftCloudModel() || ''"
+                  (ngModelChange)="handleCloudModelChange($event)"
+                  [disabled]="isSaving() || isLoading() || !activeCloudModels().length"
+                >
+                  @for (modelName of activeCloudModels(); track modelName) {
+                    <option [value]="modelName">{{ modelName }}</option>
+                  }
+                </select>
+              </div>
+            </div>
+
+            <p class="model-config-cloud-description">Provider configuration appears only when cloud runtime is selected.</p>
+          </div>
+        </section>
+      }
+
+      <section class="model-config-extra-row" [class.is-disabled]="isSaving() || isLoading()" [attr.aria-disabled]="isSaving() || isLoading()">
+        <h2 class="modal-section-title">Extra Parameters (Search and RAG)</h2>
+        <div class="model-config-extra-columns">
+          <div class="model-config-extra-left">
+            <app-provider-access-card
+              variant="compact"
+              [label]="getProviderLabel('tavily')"
+              hint="Research API key"
+              [disabled]="isSaving() || isLoading()"
+              manageKeyAriaLabel="Manage Tavily access keys"
+              (manageKeys)="openKeys('tavily')"
+            ></app-provider-access-card>
+          </div>
+          <div class="model-config-extra-right">
+            <div class="model-config-extra-panel">
+              <p class="model-config-extra-panel-title">Model Configuration</p>
+              <label class="field checkbox">
+                <input
+                  type="checkbox"
+                  [ngModel]="appState.state().diliAgent.settings.reasoning"
+                  (ngModelChange)="handleReasoningChange($event)"
+                  [disabled]="isSaving() || isLoading()"
+                />
+                <span class="field-label">Enable SDL/Reasoning</span>
+              </label>
+            </div>
+            <div class="model-config-extra-panel">
+              <p class="model-config-extra-panel-title">RAG Configuration</p>
+              <div class="field">
+                <label class="field-label" for="ollama-temperature-input">Ollama temperature</label>
+                <input
+                  id="ollama-temperature-input"
+                  type="number"
+                  min="0"
+                  max="2"
+                  step="0.01"
+                  [ngModel]="draftConfig().ollamaTemperature"
+                  (ngModelChange)="setTemperature('ollama', $event)"
+                  [disabled]="isSaving() || isLoading()"
+                />
+              </div>
+              <div class="field">
+                <label class="field-label" for="cloud-temperature-input">Cloud temperature</label>
+                <input
+                  id="cloud-temperature-input"
+                  type="number"
+                  min="0"
+                  max="2"
+                  step="0.01"
+                  [ngModel]="draftConfig().cloudTemperature"
+                  (ngModelChange)="setTemperature('cloud', $event)"
+                  [disabled]="isSaving() || isLoading()"
+                />
+              </div>
+            </div>
+          </div>
+        </div>
+      </section>
+    </div>
+
+    <aside class="model-config-summary-panel">
+      <h2 class="modal-section-title">Current Configuration</h2>
+      <dl class="model-config-summary-list">
+        <div><dt>Runtime</dt><dd>{{ runtimeLabel() }}</dd></div>
+        <div><dt>Clinical Model</dt><dd>{{ draftConfig().clinicalModel || 'Not set' }}</dd></div>
+        <div><dt>Text Extraction</dt><dd>{{ draftConfig().parsingModel || 'Not set' }}</dd></div>
+        @if (draftConfig().useCloudServices) {
+          <div><dt>Cloud Model</dt><dd>{{ draftCloudModel() || 'Not set' }}</dd></div>
+        }
+        <div><dt>Ollama temperature</dt><dd>{{ draftConfig().ollamaTemperature.toFixed(2) }}</dd></div>
+        <div><dt>Cloud temperature</dt><dd>{{ draftConfig().cloudTemperature.toFixed(2) }}</dd></div>
+      </dl>
+
+      @if (!draftConfig().useCloudServices) {
+        <div class="model-config-missing">
+          <h3 class="model-config-summary-subtitle">Missing dependencies</h3>
+          @if (missingRequiredModels().length) {
+            <ul class="model-config-missing-list">
+              @for (modelName of missingRequiredModels(); track modelName) {
+                <li>{{ modelName }} not installed</li>
+              }
+            </ul>
+          } @else {
+            <p class="model-config-caption">All selected local models are installed.</p>
+          }
+        </div>
+      }
+
+      <div class="model-config-summary-actions">
+        @if (!draftConfig().useCloudServices && missingRequiredModels().length > 0) {
+          <button
+            class="btn btn-secondary"
+            type="button"
+            (click)="installRequiredModels(missingRequiredModels())"
+            [disabled]="isLoading() || isSaving() || appState.state().diliAgent.isPulling"
+          >
+            {{ appState.state().diliAgent.isPulling ? 'Installing...' : 'Install Required Models' }}
+          </button>
+        }
+        <button class="btn btn-primary" type="button" (click)="handleSaveConfiguration()" [disabled]="saveDisabled()">
+          {{ isSaving() ? 'Saving...' : 'Save Configuration' }}
+        </button>
+      </div>
+    </aside>
+  </div>
+
+  <app-status-message [message]="statusMessage()" [tone]="statusTone()"></app-status-message>
+
+  <app-access-key-modal
+    [isOpen]="openProviderModal() !== null"
+    [provider]="openProviderModal() || 'openai'"
+    [providerLabel]="resolveProviderLabel(openProviderModal() || 'openai')"
+    (closed)="closeKeys()"
+  ></app-access-key-modal>
+</main>
