@@ -4341,6 +4341,8 @@ input[type="date"]::-webkit-calendar-picker-indicator:hover {
   align-items: center;
   flex-wrap: wrap;
   gap: 10px;
+  flex: 0 0 auto;
+  min-width: fit-content;
 }
 
 .model-config-search-and-filters {
@@ -4350,7 +4352,8 @@ input[type="date"]::-webkit-calendar-picker-indicator:hover {
   align-items: center;
   gap: 12px 18px;
   min-width: 0;
-  flex: 1;
+  flex: 1 1 auto;
+  margin-left: auto;
 }
 
 .model-config-filter-pills {
@@ -4358,6 +4361,7 @@ input[type="date"]::-webkit-calendar-picker-indicator:hover {
   flex-wrap: nowrap;
   justify-content: flex-end;
   gap: 12px;
+  min-width: 0;
 }
 
 .model-config-local-card,
@@ -4369,6 +4373,10 @@ input[type="date"]::-webkit-calendar-picker-indicator:hover {
 .model-config-temperature-input {
   width: 112px;
   max-width: 100%;
+}
+
+.model-config-caption {
+  white-space: nowrap;
 }
 
 .inspection-rag-path-editor {
