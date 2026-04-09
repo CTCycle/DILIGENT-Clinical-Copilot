@@ -8,6 +8,7 @@ import {
   resolveStatusTone,
 } from '../../components/status-message/status-message.component';
 import { AppStateService } from '../../core/state/app-state.service';
+import { formatUnknownError } from '../../core/utils';
 import { CLOUD_MODEL_CHOICES } from '../../core/constants';
 import {
   buildRuntimeSettingsFromConfig,
@@ -271,8 +272,7 @@ export class ModelConfigPageComponent implements OnInit {
       this.applyConfigToState(payload, syncDraft);
       this.statusMessage.set('');
     } catch (error) {
-      const description = error instanceof Error ? error.message : 'Unable to load model settings.';
-      this.statusMessage.set(`[ERROR] ${description}`);
+      this.statusMessage.set(formatUnknownError(error, 'Unable to load model settings.'));
     } finally {
       this.isLoading.set(false);
     }
@@ -299,8 +299,7 @@ export class ModelConfigPageComponent implements OnInit {
       this.applyConfigToState(payload, syncDraft);
       this.statusMessage.set(successMessage);
     } catch (error) {
-      const description = error instanceof Error ? error.message : 'Unable to save model settings.';
-      this.statusMessage.set(`[ERROR] ${description}`);
+      this.statusMessage.set(formatUnknownError(error, 'Unable to save model settings.'));
     } finally {
       this.isSaving.set(false);
     }
