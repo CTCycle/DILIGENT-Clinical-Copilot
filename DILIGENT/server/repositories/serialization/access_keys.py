@@ -6,8 +6,11 @@ from typing import Literal
 from sqlalchemy.engine import Engine
 from sqlalchemy.orm import sessionmaker
 
+from DILIGENT.server.repositories.database.session import (
+    resolve_engine,
+    resolve_session_factory,
+)
 from DILIGENT.server.repositories.queries.access_keys import AccessKeyRepositoryQueries
-from DILIGENT.server.repositories.queries.data import DataRepositoryQueries
 from DILIGENT.server.repositories.serialization.access_key_encryption import (
     AccessKeyEncryptionMaterialSerializer,
 )
@@ -27,21 +30,18 @@ RESEARCH_PROVIDER = "tavily"
 class AccessKeySerializer:
     def __init__(
         self,
-        queries: DataRepositoryQueries | None = None,
         *,
         engine: Engine | None = None,
         session_factory: sessionmaker | None = None,
     ) -> None:
-        self.queries = queries or DataRepositoryQueries()
-        resolved_engine = engine or self.queries.database.backend.engine  # type: ignore[attr-defined]
-        self.engine = resolved_engine
-        self.session_factory = session_factory or sessionmaker(
-            bind=resolved_engine,
-            future=True,
+        self.engine = resolve_engine(engine)
+        self.session_factory = resolve_session_factory(
+            engine=self.engine,
+            session_factory=session_factory,
             expire_on_commit=False,
         )
         self.encryption_material_serializer = AccessKeyEncryptionMaterialSerializer(
-            engine=resolved_engine,
+            engine=self.engine,
             session_factory=self.session_factory,
         )
 

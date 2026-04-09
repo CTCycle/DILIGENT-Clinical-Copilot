@@ -7,7 +7,10 @@ from sqlalchemy.orm import Session, sessionmaker
 
 from DILIGENT.server.configurations.runtime_state import LLMRuntimeConfig
 from DILIGENT.server.domain.model_configs import ModelConfigSnapshot
-from DILIGENT.server.repositories.queries.data import DataRepositoryQueries
+from DILIGENT.server.repositories.database.session import (
+    resolve_engine,
+    resolve_session_factory,
+)
 from DILIGENT.server.repositories.queries.model_config import ModelConfigRepositoryQueries
 from DILIGENT.server.repositories.schemas.models import ModelSelection, RuntimeSetting
 
@@ -20,12 +23,16 @@ class ModelConfigSerializer:
     OLLAMA_TEMPERATURE_KEY = "ollama_temperature"
     CLOUD_TEMPERATURE_KEY = "cloud_temperature"
 
-    def __init__(self, queries: DataRepositoryQueries | None = None) -> None:
-        self.queries = queries or DataRepositoryQueries()
-        self.engine = self.queries.database.backend.engine  # type: ignore[attr-defined]
-        self.session_factory = sessionmaker(
-            bind=self.engine,
-            future=True,
+    def __init__(
+        self,
+        *,
+        engine=None,
+        session_factory: sessionmaker | None = None,
+    ) -> None:
+        self.engine = resolve_engine(engine)
+        self.session_factory = resolve_session_factory(
+            engine=self.engine,
+            session_factory=session_factory,
         )
 
     # -------------------------------------------------------------------------

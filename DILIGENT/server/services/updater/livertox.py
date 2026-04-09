@@ -26,7 +26,6 @@ from DILIGENT.server.common.utils.logger import logger
 from DILIGENT.server.services.text.normalization import normalize_whitespace
 from DILIGENT.server.services.updater.sanitizer import LiverToxExcerptSanitizer
 from DILIGENT.server.repositories.serialization.data import DataSerializer
-from DILIGENT.server.repositories.database.backend import database
 
 SUPPORTED_MONOGRAPH_EXTENSIONS = (".html", ".htm", ".xhtml", ".xml", ".nxml", ".pdf")
 NBK_ID_PATTERN = re.compile(r"^NBK\d+$", re.IGNORECASE)
@@ -109,7 +108,6 @@ class LiverToxUpdater:
         archive_name: str | None = None,
         monograph_max_workers: int | None = None,
         serializer: DataSerializer | None = None,
-        database_client=database,
     ) -> None:
         self.supported_extensions = SUPPORTED_MONOGRAPH_EXTENSIONS
         self.http_headers = dict(DEFAULT_HTTP_HEADERS)
@@ -119,7 +117,6 @@ class LiverToxUpdater:
         self.sources_path = os.path.abspath(sources_path)
         self.redownload = redownload
         self.serializer = serializer or DataSerializer()
-        self.database = database_client
         self.excerpt_sanitizer = LiverToxExcerptSanitizer()
         self.header_row = 1
 

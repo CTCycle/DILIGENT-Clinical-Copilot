@@ -1,6 +1,5 @@
 from __future__ import annotations
 
-from types import SimpleNamespace
 from typing import Any
 
 import pandas as pd
@@ -19,17 +18,11 @@ from DILIGENT.server.repositories.schemas.models import (
 from DILIGENT.server.services.updater.livertox import LiverToxUpdater
 
 
-###############################################################################
-class QueryStub:
-    def __init__(self, engine: Any) -> None:
-        self.database = SimpleNamespace(backend=SimpleNamespace(engine=engine))
-
-
 # -----------------------------------------------------------------------------
 def build_serializer() -> tuple[Any, Any]:
     engine = create_engine("sqlite+pysqlite:///:memory:", future=True)
     Base.metadata.create_all(engine)
-    serializer = DataSerializer(queries=QueryStub(engine))
+    serializer = DataSerializer(engine=engine)
     return serializer, engine
 
 

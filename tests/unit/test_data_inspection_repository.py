@@ -2,9 +2,6 @@ from __future__ import annotations
 
 import time
 from datetime import date, datetime
-from types import SimpleNamespace
-from typing import Any
-
 from sqlalchemy import create_engine, select
 from sqlalchemy.orm import sessionmaker
 
@@ -19,23 +16,18 @@ from DILIGENT.server.repositories.schemas.models import (
     DrugLabelSection,
     DrugRxnormCode,
     LiverToxMonograph,
+    Patient,
 )
 from DILIGENT.server.repositories.serialization.data import DataSerializer
 from DILIGENT.server.services.inspection import DataInspectionService
 from DILIGENT.server.services.jobs import JobManager
 
 
-###############################################################################
-class QueryStub:
-    def __init__(self, engine: Any) -> None:
-        self.database = SimpleNamespace(backend=SimpleNamespace(engine=engine))
-
-
 # -----------------------------------------------------------------------------
 def build_serializer() -> tuple[DataSerializer, Any]:
     engine = create_engine("sqlite+pysqlite:///:memory:", future=True)
     Base.metadata.create_all(engine)
-    serializer = DataSerializer(queries=QueryStub(engine))
+    serializer = DataSerializer(engine=engine)
     return serializer, engine
 
 
@@ -220,8 +212,11 @@ def test_catalog_search_and_drug_delete_cleanup() -> None:
                 display_order=0,
             )
         )
+        patient = Patient(name="Drug Link")
+        db_session.add(patient)
+        db_session.flush()
         clinical_session = ClinicalSession(
-            patient_name="Drug Link",
+            patient_id=int(patient.id),
             session_timestamp=datetime(2025, 1, 4, 10, 0),
             session_status="successful",
         )
