@@ -13,7 +13,7 @@ from DILIGENT.server.models.prompts import (
     DRUG_EXTRACTION_PROMPT,
 )
 from DILIGENT.server.models.providers import initialize_llm_client
-from DILIGENT.server.domain.clinical import (
+from DILIGENT.server.domain.clinical.entities import (
     DrugEntry,
     PatientDrugs,
 )
@@ -853,4 +853,5 @@ class DrugsParser:
             except ValueError:
                 return stripped
         return f"{day.zfill(2)}.{month.zfill(2)}"
+
 

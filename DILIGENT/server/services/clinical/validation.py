@@ -1,13 +1,13 @@
 from __future__ import annotations
 
-from DILIGENT.server.domain.clinical import (
+from DILIGENT.server.domain.clinical.entities import (
     ClinicalPipelineValidationError,
     DrugEntry,
     PatientData,
     PatientDrugs,
     PipelineIssue,
 )
-from DILIGENT.server.domain.validation import ValidationMessageBundle
+from DILIGENT.server.domain.clinical.validation import ValidationMessageBundle
 
 
 def build_validation_bundle(report_language: str) -> ValidationMessageBundle:
@@ -99,3 +99,4 @@ def ensure_timed_therapy_drug(
         field="drugs",
     )
     raise ClinicalPipelineValidationError(issues=[issue], message=issue.message)
+

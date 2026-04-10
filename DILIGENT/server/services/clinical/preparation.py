@@ -5,12 +5,12 @@ import re
 from collections.abc import Callable
 from typing import Any
 
-from DILIGENT.server.domain.clinical import (
+from DILIGENT.server.domain.clinical.entities import (
     DrugEntry,
     HepatotoxicityPatternScore,
     PatientDrugs,
 )
-from DILIGENT.server.domain.clinical_extras import HepatoxPreparedInputs
+from DILIGENT.server.domain.clinical.extras import HepatoxPreparedInputs
 from DILIGENT.server.common.utils.logger import logger
 from DILIGENT.server.repositories.serialization.data import DataSerializer
 from DILIGENT.server.services.clinical.knowledge import ClinicalKnowledgeComposer
@@ -430,4 +430,5 @@ class ClinicalKnowledgePreparation:
             "Treat drugs whose known hepatotoxicity pattern matches this classification as stronger causal candidates, and downgrade mismatches."
         )
         return " ".join(segments)
+
 

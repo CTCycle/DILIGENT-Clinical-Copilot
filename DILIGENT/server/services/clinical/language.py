@@ -2,8 +2,8 @@ from __future__ import annotations
 
 import re
 
-from DILIGENT.server.domain.clinical import PatientData
-from DILIGENT.server.domain.language import LanguageDetectionResult
+from DILIGENT.server.domain.clinical.entities import PatientData
+from DILIGENT.server.domain.clinical.language import LanguageDetectionResult
 
 
 SUPPORTED_REPORT_LANGUAGES: tuple[str, ...] = ("en", "it", "de", "fr", "es")
@@ -92,3 +92,4 @@ def detect_clinical_language(payload: PatientData) -> LanguageDetectionResult:
         report_language=best_language if best_language in SUPPORTED_REPORT_LANGUAGES else "en",
         confidence=confidence,
     )
+

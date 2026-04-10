@@ -19,7 +19,7 @@ from sqlalchemy import and_, case, delete, exists, func, inspect, or_, select, u
 from sqlalchemy.orm import Session, selectinload, sessionmaker
 
 from DILIGENT.server.configurations.bootstrap import server_settings
-from DILIGENT.server.domain.documents import Document
+from DILIGENT.server.domain.documents.entities import Document
 from DILIGENT.server.common.constants import (
     DEFAULT_EMBEDDING_BATCH_SIZE,
     DRUG_NAME_ALLOWED_PATTERN,
@@ -2680,5 +2680,6 @@ class VectorSerializer:
 
 
     
+
 
 

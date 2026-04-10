@@ -16,7 +16,7 @@ from DILIGENT.server.models.prompts import (
     LIVERTOX_REPORT_EXAMPLE,
 )
 from DILIGENT.server.models.providers import initialize_llm_client
-from DILIGENT.server.domain.clinical import (
+from DILIGENT.server.domain.clinical.entities import (
     ClinicalLabEntry,
     ClinicalPipelineValidationError,
     DrugEntry,
@@ -1604,4 +1604,5 @@ class HepatoxConsultation:
         _ = entry
         message = "Automated analysis was unavailable due to a technical issue; a clinician should review the LiverTox documentation manually."
         return message
+
 

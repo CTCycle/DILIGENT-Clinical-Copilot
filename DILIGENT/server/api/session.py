@@ -14,7 +14,7 @@ from pydantic_core import ErrorDetails
 
 from DILIGENT.server.models.cloud import LLMError
 
-from DILIGENT.server.domain.clinical import (
+from DILIGENT.server.domain.clinical.entities import (
     ClinicalLabEntry,
     ClinicalPipelineValidationError,
     ClinicalSessionRequest,
@@ -29,7 +29,7 @@ from DILIGENT.server.domain.clinical import (
     PatientRucamAssessmentBundle,
     PipelineIssue,
 )
-from DILIGENT.server.domain.jobs import (
+from DILIGENT.server.domain.jobs.entities import (
     JobCancelResponse,
     JobStartResponse,
     JobStatusResponse,
@@ -1711,4 +1711,5 @@ endpoint = ClinicalSessionEndpoint(
     payload_sanitizer=payload_sanitization_service,
 )
 endpoint.add_routes()
+
 
