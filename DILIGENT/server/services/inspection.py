@@ -14,7 +14,7 @@ from DILIGENT.server.common.constants import (
 from DILIGENT.server.common.utils.logger import logger
 from DILIGENT.server.configurations.bootstrap import server_settings
 from DILIGENT.server.configurations.settings import get_app_settings
-from DILIGENT.server.domain.inspection import InspectionJobPhase
+from DILIGENT.server.domain.inspection.entities import InspectionJobPhase
 from DILIGENT.server.repositories.serialization.data import DataSerializer, DocumentSerializer
 from DILIGENT.server.repositories.vectors import LanceVectorDatabase
 from DILIGENT.server.services.jobs import JobManager, job_manager
@@ -864,3 +864,4 @@ class DataInspectionService:
         if payload is None:
             return False
         return self.jobs.cancel_job(job_id)
+

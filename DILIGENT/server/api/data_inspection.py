@@ -6,7 +6,7 @@ from fastapi import APIRouter, Body, HTTPException, Query, status
 
 from DILIGENT.server.common.utils.logger import logger
 from DILIGENT.server.configurations.bootstrap import server_settings
-from DILIGENT.server.domain.inspection import (
+from DILIGENT.server.domain.inspection.entities import (
     CatalogListFilters,
     DeleteEntityResponse,
     DiliPriorCatalogResponse,
@@ -31,7 +31,7 @@ from DILIGENT.server.domain.inspection import (
     SessionListFilters,
     SessionStatus,
 )
-from DILIGENT.server.domain.jobs import JobCancelResponse, JobStartResponse, JobStatusResponse
+from DILIGENT.server.domain.jobs.entities import JobCancelResponse, JobStartResponse, JobStatusResponse
 from DILIGENT.server.services.inspection import DataInspectionService
 
 
@@ -699,3 +699,4 @@ class DataInspectionEndpoint:
 
 endpoint = DataInspectionEndpoint(router=router, service=service)
 endpoint.add_routes()
+

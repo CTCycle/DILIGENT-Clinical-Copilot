@@ -8,7 +8,7 @@ from dotenv import load_dotenv
 
 from DILIGENT.server.common.constants import ENV_FILE_PATH
 from DILIGENT.server.common.utils.logger import logger
-from DILIGENT.server.domain.bootstrap import EnvironmentBootstrapState
+from DILIGENT.server.domain.environment.bootstrap import EnvironmentBootstrapState
 
 
 # -----------------------------------------------------------------------------
@@ -108,3 +108,4 @@ __all__ = [
     "reset_environment_bootstrap_for_tests",
     "server_settings",
 ]
+
