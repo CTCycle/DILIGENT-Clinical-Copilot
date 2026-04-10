@@ -12,12 +12,12 @@ import httpx
 
 from DILIGENT.server.common.utils.logger import logger
 from DILIGENT.server.configurations.bootstrap import server_settings
-from DILIGENT.server.domain.research import (
+from DILIGENT.server.domain.research.entities import (
     ResearchAnswerPayload,
     ResearchCitation,
     ResearchSource,
 )
-from DILIGENT.server.domain.research_extra import TavilySearchOutcome
+from DILIGENT.server.domain.research.extras import TavilySearchOutcome
 from DILIGENT.server.models.providers import initialize_llm_client
 from DILIGENT.server.repositories.serialization.access_keys import AccessKeySerializer
 
@@ -709,3 +709,4 @@ class TavilyResearchService:
 
 
 tavily_research_service = TavilyResearchService()
+

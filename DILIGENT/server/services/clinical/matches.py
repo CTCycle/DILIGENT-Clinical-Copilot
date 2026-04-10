@@ -10,7 +10,7 @@ from rapidfuzz import fuzz
 from DILIGENT.server.configurations.bootstrap import server_settings
 from DILIGENT.server.common.constants import MATCHING_STOPWORDS
 from DILIGENT.server.common.utils.logger import logger
-from DILIGENT.server.domain.matching import (
+from DILIGENT.server.domain.clinical.matching import (
     AliasCacheEntry,
     LiverToxMatch,
     MonographRecord,
@@ -1446,4 +1446,5 @@ class LiverToxMatcher:
         matches: list[LiverToxMatch],
     ) -> list[dict[str, Any]]:
         return self.data.build_drugs_to_excerpt_mapping(patient_drugs, matches)
+
 

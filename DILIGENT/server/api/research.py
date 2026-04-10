@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from fastapi import APIRouter, Body, HTTPException, status
 
-from DILIGENT.server.domain.research import (
+from DILIGENT.server.domain.research.entities import (
     ResearchRequest,
     ResearchResponse,
 )
@@ -59,3 +59,4 @@ class ResearchEndpoint:
 
 endpoint = ResearchEndpoint(router=router)
 endpoint.add_routes()
+

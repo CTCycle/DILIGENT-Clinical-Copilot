@@ -5,7 +5,7 @@ from typing import Any
 
 from pydantic import BaseModel, Field
 
-from DILIGENT.server.domain.clinical import (
+from DILIGENT.server.domain.clinical.entities import (
     ClinicalLabEntry,
     LiverInjuryOnsetContext,
     PatientDrugs,
@@ -30,3 +30,4 @@ class HepatoxPreparedInputs:
 class LabExtractionPayload(BaseModel):
     entries: list[ClinicalLabEntry] = Field(default_factory=list)
     onset_context: LiverInjuryOnsetContext | None = Field(default=None)
+

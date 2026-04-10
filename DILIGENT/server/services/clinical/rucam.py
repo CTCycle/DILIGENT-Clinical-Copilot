@@ -4,7 +4,7 @@ import re
 from datetime import date, datetime
 from typing import Any
 
-from DILIGENT.server.domain.clinical import (
+from DILIGENT.server.domain.clinical.entities import (
     ClinicalLabEntry,
     DrugEntry,
     DrugRucamAssessment,
@@ -17,7 +17,7 @@ from DILIGENT.server.domain.clinical import (
     PatientRucamAssessmentBundle,
     RucamComponentAssessment,
 )
-from DILIGENT.server.domain.rucam import RucamAnchor
+from DILIGENT.server.domain.clinical.rucam import RucamAnchor
 from DILIGENT.server.services.text.normalization import normalize_drug_query_name
 
 
@@ -683,3 +683,4 @@ class RucamScoreEstimator:
         if assessable >= 4 and (onset_date is not None or has_exposure_dates):
             return "moderate"
         return "low"
+

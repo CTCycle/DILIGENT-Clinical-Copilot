@@ -10,7 +10,7 @@ from typing import Any
 from DILIGENT.server.common.utils.logger import logger
 from DILIGENT.server.configurations.bootstrap import server_settings
 from DILIGENT.server.configurations.runtime_state import LLMRuntimeConfig
-from DILIGENT.server.domain.clinical import DiseaseContextEntry, PatientDiseaseContext
+from DILIGENT.server.domain.clinical.entities import DiseaseContextEntry, PatientDiseaseContext
 from DILIGENT.server.models.prompts import ANAMNESIS_DISEASE_EXTRACTION_PROMPT
 from DILIGENT.server.models.providers import initialize_llm_client
 from DILIGENT.server.services.text.normalization import normalize_token
@@ -283,3 +283,4 @@ class DiseaseExtractor:
         )
         self.emit_progress(progress_callback, 1.0)
         return PatientDiseaseContext(entries=deduplicated)
+
