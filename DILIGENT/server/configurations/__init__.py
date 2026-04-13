@@ -1,11 +1,11 @@
 from __future__ import annotations
 
-from DILIGENT.server.configurations.bootstrap import (
+from DILIGENT.server.configurations.startup import (
     ensure_environment_loaded,
     initialize_environment,
     reset_environment_bootstrap_for_tests,
 )
-from DILIGENT.server.configurations.settings import (
+from DILIGENT.server.configurations.management import (
     get_app_settings,
     reload_settings_for_tests,
     reset_app_settings_cache,

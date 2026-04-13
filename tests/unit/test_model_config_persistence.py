@@ -4,7 +4,7 @@ from datetime import datetime
 
 from DILIGENT.server.api.model_config import ModelConfigEndpoint
 from DILIGENT.server.api.session import endpoint as clinical_endpoint
-from DILIGENT.server.configurations.runtime_state import LLMRuntimeConfig
+from DILIGENT.server.configurations.llm_configs import LLMRuntimeConfig
 from DILIGENT.server.domain.model_configs import ModelConfigSnapshot
 
 
@@ -75,3 +75,4 @@ def test_clinical_runtime_overrides_are_request_scoped() -> None:
     assert LLMRuntimeConfig.is_cloud_enabled() == initial["use_cloud"]
     assert LLMRuntimeConfig.get_llm_provider() == initial["provider"]
     assert LLMRuntimeConfig.get_cloud_model() == initial["cloud_model"]
+

@@ -6,7 +6,7 @@ from typing import Any
 
 import pandas as pd
 
-from DILIGENT.server.configurations.bootstrap import server_settings
+from DILIGENT.server.configurations.startup import server_settings
 from DILIGENT.server.services.text.normalization import coerce_text
 
 ###############################################################################
@@ -428,3 +428,4 @@ class LiverToxData:
                 yield SimpleNamespace(**mapping)
             return
         return
+

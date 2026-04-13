@@ -1,9 +1,11 @@
 from __future__ import annotations
 
+import json
 import os
 from pathlib import Path
-from threading import Lock, RLock
+from threading import RLock
 from typing import Any
+from functools import lru_cache
 
 from pydantic import ValidationError
 
@@ -16,9 +18,8 @@ from DILIGENT.server.common.utils.types import (
     coerce_str,
     coerce_str_or_none,
 )
-from DILIGENT.server.configurations.base import ensure_mapping, load_configuration_data
-from DILIGENT.server.configurations.environment_bootstrap import ensure_environment_loaded
-from DILIGENT.server.configurations.runtime_state import LLMRuntimeConfig
+from DILIGENT.server.configurations.environment import ensure_environment_loaded
+from DILIGENT.server.configurations.llm_configs import LLMRuntimeConfig
 from DILIGENT.server.domain.settings.configuration import (
     DatabaseSettings,
     DrugsMatcherSettings,
@@ -38,8 +39,25 @@ OLLAMA_DEFAULT_HOST = "localhost"
 OLLAMA_DEFAULT_PORT = 11434
 OLLAMA_DEFAULT_SCHEME = "http"
 
-_SETTINGS_LOCK = Lock()
-_SETTINGS_MANAGER: JsonConfigurationManager | None = None
+
+def ensure_mapping(value: Any) -> dict[str, Any]:
+    if isinstance(value, dict):
+        return value
+    return {}
+
+
+def load_configuration_data(path: str) -> dict[str, Any]:
+    if not os.path.exists(path):
+        raise RuntimeError(f"Configuration file not found: {path}")
+    try:
+        with open(path, "r", encoding="utf-8") as handle:
+            data = json.load(handle)
+    except (OSError, json.JSONDecodeError) as exc:
+        raise RuntimeError(f"Unable to load configuration from {path}") from exc
+    if not isinstance(data, dict):
+        raise RuntimeError("Configuration must be a JSON object.")
+    return data
+
 
 ###############################################################################
 class EnvironmentSnapshot:
@@ -94,6 +112,17 @@ class JsonConfigurationManager:
     def get_value(self, block_name: str, key: str, default: Any = None) -> Any:
         block = self.get_block(block_name)
         return block.get(key, default)
+
+
+class _ConfigurationRuntimeState:
+    def __init__(self) -> None:
+        self.lock = RLock()
+        self.manager: JsonConfigurationManager | None = None
+
+
+@lru_cache(maxsize=1)
+def _runtime_state() -> _ConfigurationRuntimeState:
+    return _ConfigurationRuntimeState()
 
 
 def _resolve_ollama_url_with_scheme(
@@ -371,28 +400,30 @@ def _build_settings_manager(config_path: str | None = None) -> JsonConfiguration
 
 
 def get_server_settings(config_path: str | None = None) -> ServerSettings:
-    global _SETTINGS_MANAGER
     if config_path:
         manager = _build_settings_manager(config_path=config_path)
         settings = manager.settings
         LLMRuntimeConfig.configure(settings.llm_defaults)
         return settings
 
-    with _SETTINGS_LOCK:
-        if _SETTINGS_MANAGER is None:
-            _SETTINGS_MANAGER = _build_settings_manager()
-        settings = _SETTINGS_MANAGER.settings
+    state = _runtime_state()
+    default_path = Path(constants.CONFIGURATIONS_FILE)
+    with state.lock:
+        if state.manager is None or state.manager._config_path != default_path:
+            state.manager = _build_settings_manager()
+        settings = state.manager.settings
 
     LLMRuntimeConfig.configure(settings.llm_defaults)
     return settings
 
 
 def get_configuration_manager() -> JsonConfigurationManager:
-    global _SETTINGS_MANAGER
-    with _SETTINGS_LOCK:
-        if _SETTINGS_MANAGER is None:
-            _SETTINGS_MANAGER = _build_settings_manager()
-        return _SETTINGS_MANAGER
+    state = _runtime_state()
+    default_path = Path(constants.CONFIGURATIONS_FILE)
+    with state.lock:
+        if state.manager is None or state.manager._config_path != default_path:
+            state.manager = _build_settings_manager()
+        return state.manager
 
 
 def get_configuration_block(block_name: str) -> dict[str, Any]:
@@ -409,11 +440,41 @@ def reload_settings_for_tests() -> ServerSettings:
 
 
 def reset_app_settings_cache() -> None:
-    global _SETTINGS_MANAGER
-    with _SETTINGS_LOCK:
-        _SETTINGS_MANAGER = None
+    state = _runtime_state()
+    with state.lock:
+        state.manager = None
 
 
-# Backward-compatible alias used by existing call sites.
 def get_app_settings() -> ServerSettings:
     return get_server_settings()
+
+
+class ConfigurationManagement:
+    @classmethod
+    def get_app_settings(cls) -> ServerSettings:
+        return get_app_settings()
+
+    @classmethod
+    def get_server_settings(cls, config_path: str | None = None) -> ServerSettings:
+        return get_server_settings(config_path=config_path)
+
+    @classmethod
+    def get_configuration_block(cls, block_name: str) -> dict[str, Any]:
+        return get_configuration_block(block_name)
+
+    @classmethod
+    def get_configuration_value(
+        cls,
+        block_name: str,
+        key: str,
+        default: Any = None,
+    ) -> Any:
+        return get_configuration_value(block_name, key, default)
+
+    @classmethod
+    def reload_settings_for_tests(cls) -> ServerSettings:
+        return reload_settings_for_tests()
+
+    @classmethod
+    def reset_app_settings_cache(cls) -> None:
+        reset_app_settings_cache()

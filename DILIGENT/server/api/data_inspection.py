@@ -5,7 +5,7 @@ from datetime import date
 from fastapi import APIRouter, Body, HTTPException, Query, status
 
 from DILIGENT.server.common.utils.logger import logger
-from DILIGENT.server.configurations.bootstrap import server_settings
+from DILIGENT.server.configurations.startup import server_settings
 from DILIGENT.server.domain.inspection.entities import (
     CatalogListFilters,
     DeleteEntityResponse,
@@ -699,4 +699,5 @@ class DataInspectionEndpoint:
 
 endpoint = DataInspectionEndpoint(router=router, service=service)
 endpoint.add_routes()
+
 

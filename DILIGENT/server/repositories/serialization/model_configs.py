@@ -5,7 +5,7 @@ from typing import Literal
 
 from sqlalchemy.orm import Session, sessionmaker
 
-from DILIGENT.server.configurations.runtime_state import LLMRuntimeConfig
+from DILIGENT.server.configurations.llm_configs import LLMRuntimeConfig
 from DILIGENT.server.domain.model_config.entities import ModelConfigSnapshot
 from DILIGENT.server.repositories.database.session import (
     resolve_engine,
@@ -261,4 +261,5 @@ class ModelConfigSerializer:
             return None
         normalized = str(value).strip()
         return normalized or None
+
 

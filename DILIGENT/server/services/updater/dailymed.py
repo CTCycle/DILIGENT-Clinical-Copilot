@@ -15,7 +15,7 @@ from DILIGENT.server.common.constants import (
     DAILYMED_SECTION_WHITELIST,
     HEPATIC_KEYWORDS,
 )
-from DILIGENT.server.configurations.bootstrap import server_settings
+from DILIGENT.server.configurations.startup import server_settings
 from DILIGENT.server.repositories.serialization.data import DataSerializer
 
 
@@ -360,3 +360,4 @@ class DailyMedLabelUpdater:
             if candidate in mapping:
                 return mapping[candidate]
         return None
+

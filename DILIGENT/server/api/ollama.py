@@ -13,7 +13,7 @@ from DILIGENT.server.domain.jobs.entities import (
     JobStatusResponse,
 )
 from DILIGENT.server.domain.model_catalog.entities import ModelListResponse, ModelPullResponse
-from DILIGENT.server.configurations.bootstrap import server_settings
+from DILIGENT.server.configurations.startup import server_settings
 from DILIGENT.server.services.jobs import job_manager
 from DILIGENT.server.common.utils.logger import logger
 
@@ -387,5 +387,6 @@ class OllamaEndpoint:
 
 endpoint = OllamaEndpoint(router=router)
 endpoint.add_routes()
+
 
 
