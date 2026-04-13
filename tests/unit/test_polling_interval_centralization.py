@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from typing import Any
 
-from DILIGENT.server.configurations.bootstrap import server_settings
+from DILIGENT.server.configurations.startup import server_settings
 from DILIGENT.server.domain.clinical import ClinicalSessionRequest
 from DILIGENT.server.api import ollama as ollama_routes
 from DILIGENT.server.api import session as session_routes
@@ -84,3 +84,4 @@ def test_clinical_progress_callback_raises_when_stop_requested(monkeypatch) -> N
     except session_routes.ClinicalJobCancelled:
         return
     raise AssertionError("Expected ClinicalJobCancelled when stop is requested.")
+

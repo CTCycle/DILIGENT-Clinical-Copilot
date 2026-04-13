@@ -34,8 +34,8 @@ from DILIGENT.server.domain.jobs.entities import (
     JobStartResponse,
     JobStatusResponse,
 )
-from DILIGENT.server.configurations.bootstrap import server_settings
-from DILIGENT.server.configurations.runtime_state import LLMRuntimeConfig
+from DILIGENT.server.configurations.startup import server_settings
+from DILIGENT.server.configurations.llm_configs import LLMRuntimeConfig
 from DILIGENT.server.repositories.serialization.data import DataSerializer
 from DILIGENT.server.services.jobs import job_manager
 from DILIGENT.server.common.utils.logger import logger
@@ -1711,5 +1711,6 @@ endpoint = ClinicalSessionEndpoint(
     payload_sanitizer=payload_sanitization_service,
 )
 endpoint.add_routes()
+
 
 

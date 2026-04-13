@@ -3,7 +3,7 @@ from __future__ import annotations
 import json
 import time
 
-from DILIGENT.server.configurations.bootstrap import server_settings
+from DILIGENT.server.configurations.startup import server_settings
 from DILIGENT.server.repositories.database.initializer import initialize_database
 from DILIGENT.server.common.utils.logger import logger
 
@@ -19,3 +19,4 @@ if __name__ == "__main__":
     initialize_database()
     elapsed = time.perf_counter() - start
     logger.info("Database initialization completed in %.2f seconds", elapsed)
+
