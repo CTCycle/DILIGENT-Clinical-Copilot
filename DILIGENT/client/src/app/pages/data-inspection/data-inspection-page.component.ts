@@ -110,7 +110,7 @@ function resolveRagDocumentsPath(
   if (!vectorDbPath) {
     return '';
   }
-  return vectorDbPath.replace(/[\\/]vectors$/i, (match) =>
+  return vectorDbPath.replace(new RegExp(String.raw`[\\/]vectors$`, 'i'), (match) =>
     match.startsWith('\\') ? '\\documents' : '/documents',
   );
 }
@@ -253,7 +253,11 @@ export class DataInspectionPageComponent implements OnInit, OnDestroy {
   readonly updateError = signal<string | null>(null);
   private updatePollToken = 0;
 
-  async ngOnInit(): Promise<void> {
+  ngOnInit(): void {
+    void this.initializePageData();
+  }
+
+  private async initializePageData(): Promise<void> {
     await Promise.all([
       this.loadSessions(),
       this.loadRxNav(),
@@ -547,7 +551,7 @@ export class DataInspectionPageComponent implements OnInit, OnDestroy {
         case 'Home':
           return this.inspectionViews[0]?.id;
         case 'End':
-          return this.inspectionViews[this.inspectionViews.length - 1]?.id;
+          return this.inspectionViews.at(-1)?.id;
         default:
           return null;
       }
@@ -649,7 +653,7 @@ export class DataInspectionPageComponent implements OnInit, OnDestroy {
     this.updateMessage.set('');
     try {
       const payload = await this.fetchUpdateConfig(target);
-      const defaults = { ...(payload.defaults || {}) };
+      const defaults = { ...(payload.defaults ?? undefined) };
       if (target === 'rag' && this.ragDocumentsPathInput().trim()) {
         defaults['documents_path'] = this.ragDocumentsPathInput().trim();
       }
