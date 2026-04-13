@@ -20,7 +20,6 @@ import httpx
 from DILIGENT.server.models.cloud import CloudLLMClient, LLMError, LLMTimeout
 from DILIGENT.server.models.structured import StructuredOutputParser, parse_json_dict, T
 from DILIGENT.server.configurations.bootstrap import server_settings
-from DILIGENT.server.configurations.settings import get_app_settings
 from DILIGENT.server.configurations.runtime_state import LLMRuntimeConfig
 from DILIGENT.server.common.constants import (
     PARSING_MODEL_CHOICES,
@@ -58,6 +57,26 @@ class _OllamaChatFallback(Exception):
     """Internal control flow for switching to /api/generate streaming."""
 
 ProgressCb: TypeAlias = Callable[[dict[str, Any]], None | Awaitable[None]]
+
+
+###############################################################################
+def _env_float(name: str, default: float) -> float:
+    raw = os.getenv(name)
+    if raw is None:
+        return default
+    try:
+        return float(raw)
+    except (TypeError, ValueError):
+        return default
+
+
+###############################################################################
+def _env_str(name: str, default: str) -> str:
+    raw = os.getenv(name)
+    if raw is None:
+        return default
+    value = raw.strip()
+    return value or default
 
 
 ###############################################################################
@@ -115,33 +134,28 @@ class OllamaClient:
         self.residency_lock = asyncio.Lock()
         self.residency_plan_cache: dict[str, Any] | None = None
         self.residency_plan_cache_expiry = 0.0
-        app_settings = get_app_settings()
         self.residency_usage_window_s = max(
-            float(app_settings.ollama_prefetch_usage_window_s),
+            _env_float("OLLAMA_PREFETCH_USAGE_WINDOW_S", 120.0),
             30.0,
         )
         self.residency_transition_window_s = max(
-            float(app_settings.ollama_prefetch_transition_window_s),
+            _env_float("OLLAMA_PREFETCH_TRANSITION_WINDOW_S", 60.0),
             5.0,
         )
         self.residency_prefetch_cooldown_s = max(
-            float(app_settings.ollama_prefetch_cooldown_s),
+            _env_float("OLLAMA_PREFETCH_COOLDOWN_S", 20.0),
             1.0,
         )
         self.residency_ram_safety_ratio = max(
-            float(app_settings.ollama_ram_safety_ratio),
+            _env_float("OLLAMA_RAM_SAFETY_RATIO", 0.75),
             0.1,
         )
         self.residency_vram_safety_ratio = max(
-            float(app_settings.ollama_vram_safety_ratio),
+            _env_float("OLLAMA_VRAM_SAFETY_RATIO", 0.85),
             0.1,
         )
-        self.residency_dual_keep_alive = (
-            (app_settings.ollama_dual_resident_keep_alive or "").strip() or "4h"
-        )
-        self.residency_single_keep_alive = (
-            (app_settings.ollama_single_resident_keep_alive or "").strip() or "30m"
-        )
+        self.residency_dual_keep_alive = _env_str("OLLAMA_DUAL_RESIDENT_KEEP_ALIVE", "4h")
+        self.residency_single_keep_alive = _env_str("OLLAMA_SINGLE_RESIDENT_KEEP_ALIVE", "30m")
         self.residency_usage_history: deque[tuple[float, str]] = deque(maxlen=256)
         self.prefetch_last_run_by_model: dict[str, float] = {}
         self.prefetch_tasks: dict[str, asyncio.Task[None]] = {}
@@ -1920,4 +1934,3 @@ def initialize_llm_client(
         default_model=selected_model,
         **kwargs,
     )
-

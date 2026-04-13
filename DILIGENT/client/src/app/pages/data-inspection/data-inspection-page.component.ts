@@ -2,6 +2,7 @@ import { CommonModule } from '@angular/common';
 import { Component, OnDestroy, OnInit, signal } from '@angular/core';
 import { FormsModule } from '@angular/forms';
 
+import { ModalShellComponent } from '../../components/modal-shell/modal-shell.component';
 import {
   cancelInspectionDiliPriorsUpdateJob,
   cancelInspectionDrugLabelsUpdateJob,
@@ -56,6 +57,7 @@ import {
   InspectionUpdateConfigResponse,
   InspectionUpdateJobStatusResponse,
 } from '../../core/models/types';
+import { InspectionPagedResource } from './inspection-paged-resource';
 
 const PAGE_LIMIT = 10;
 
@@ -113,10 +115,42 @@ function resolveRagDocumentsPath(
   );
 }
 
+function parseOverridesPayload(raw: string): {
+  value: Record<string, unknown> | null;
+  error: string | null;
+} {
+  const normalized = raw.trim();
+  if (!normalized) {
+    return { value: {}, error: null };
+  }
+  let parsed: unknown;
+  try {
+    parsed = JSON.parse(normalized);
+  } catch {
+    return { value: null, error: 'Invalid JSON overrides.' };
+  }
+  if (!isRecord(parsed)) {
+    return { value: null, error: 'Overrides must be a JSON object.' };
+  }
+  return { value: parsed, error: null };
+}
+
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return !!value && typeof value === 'object' && !Array.isArray(value);
+}
+
+function resolveUpdateProgressMessage(status: InspectionUpdateJobStatusResponse): string {
+  const message =
+    typeof status.result?.progress_message === 'string'
+      ? status.result.progress_message
+      : null;
+  return message || status.error || `Job status: ${status.status}`;
+}
+
 @Component({
   selector: 'app-data-inspection-page',
   standalone: true,
-  imports: [CommonModule, FormsModule],
+  imports: [CommonModule, FormsModule, ModalShellComponent],
   templateUrl: './data-inspection-page.component.html',
   styleUrl: './data-inspection-page.component.scss',
 })
@@ -134,33 +168,49 @@ export class DataInspectionPageComponent implements OnInit, OnDestroy {
   readonly sessionDateMode = signal<InspectionDateFilterMode | 'none'>('none');
   readonly sessionDate = signal('');
 
-  readonly rxnavItems = signal<InspectionRxNavItem[]>([]);
-  readonly rxnavTotal = signal(0);
-  readonly rxnavOffset = signal(0);
-  readonly rxnavLoading = signal(false);
-  readonly rxnavError = signal<string | null>(null);
-  readonly rxnavSearchInput = signal('');
+  private readonly rxnavCatalog = new InspectionPagedResource<InspectionRxNavItem>(
+    (params) => fetchInspectionRxNavCatalog(params),
+    'Failed to load drug catalog.',
+  );
+  readonly rxnavItems = this.rxnavCatalog.items;
+  readonly rxnavTotal = this.rxnavCatalog.total;
+  readonly rxnavOffset = this.rxnavCatalog.offset;
+  readonly rxnavLoading = this.rxnavCatalog.loading;
+  readonly rxnavError = this.rxnavCatalog.error;
+  readonly rxnavSearchInput = this.rxnavCatalog.searchInput;
 
-  readonly livertoxItems = signal<InspectionLiverToxItem[]>([]);
-  readonly livertoxTotal = signal(0);
-  readonly livertoxOffset = signal(0);
-  readonly livertoxLoading = signal(false);
-  readonly livertoxError = signal<string | null>(null);
-  readonly livertoxSearchInput = signal('');
+  private readonly liverToxCatalog = new InspectionPagedResource<InspectionLiverToxItem>(
+    (params) => fetchInspectionLiverToxCatalog(params),
+    'Failed to load LiverTox.',
+  );
+  readonly livertoxItems = this.liverToxCatalog.items;
+  readonly livertoxTotal = this.liverToxCatalog.total;
+  readonly livertoxOffset = this.liverToxCatalog.offset;
+  readonly livertoxLoading = this.liverToxCatalog.loading;
+  readonly livertoxError = this.liverToxCatalog.error;
+  readonly livertoxSearchInput = this.liverToxCatalog.searchInput;
 
-  readonly diliPriorItems = signal<InspectionDiliPriorItem[]>([]);
-  readonly diliPriorTotal = signal(0);
-  readonly diliPriorOffset = signal(0);
-  readonly diliPriorLoading = signal(false);
-  readonly diliPriorError = signal<string | null>(null);
-  readonly diliPriorSearchInput = signal('');
+  private readonly diliPriorCatalog = new InspectionPagedResource<InspectionDiliPriorItem>(
+    (params) => fetchInspectionDiliPriorsCatalog(params),
+    'Failed to load DILI priors.',
+  );
+  readonly diliPriorItems = this.diliPriorCatalog.items;
+  readonly diliPriorTotal = this.diliPriorCatalog.total;
+  readonly diliPriorOffset = this.diliPriorCatalog.offset;
+  readonly diliPriorLoading = this.diliPriorCatalog.loading;
+  readonly diliPriorError = this.diliPriorCatalog.error;
+  readonly diliPriorSearchInput = this.diliPriorCatalog.searchInput;
 
-  readonly drugLabelItems = signal<InspectionDrugLabelItem[]>([]);
-  readonly drugLabelTotal = signal(0);
-  readonly drugLabelOffset = signal(0);
-  readonly drugLabelLoading = signal(false);
-  readonly drugLabelError = signal<string | null>(null);
-  readonly drugLabelSearchInput = signal('');
+  private readonly drugLabelCatalog = new InspectionPagedResource<InspectionDrugLabelItem>(
+    (params) => fetchInspectionDrugLabelsCatalog(params),
+    'Failed to load drug labels.',
+  );
+  readonly drugLabelItems = this.drugLabelCatalog.items;
+  readonly drugLabelTotal = this.drugLabelCatalog.total;
+  readonly drugLabelOffset = this.drugLabelCatalog.offset;
+  readonly drugLabelLoading = this.drugLabelCatalog.loading;
+  readonly drugLabelError = this.drugLabelCatalog.error;
+  readonly drugLabelSearchInput = this.drugLabelCatalog.searchInput;
 
   readonly ragDocuments = signal<InspectionRagDocumentRow[]>([]);
   readonly ragVectorStore = signal<InspectionRagVectorStoreSummary | null>(null);
@@ -269,83 +319,19 @@ export class DataInspectionPageComponent implements OnInit, OnDestroy {
   }
 
   async loadRxNav(): Promise<void> {
-    this.rxnavLoading.set(true);
-    this.rxnavError.set(null);
-    try {
-      const payload = await fetchInspectionRxNavCatalog({
-        search: this.rxnavSearchInput(),
-        offset: this.rxnavOffset(),
-        limit: PAGE_LIMIT,
-      });
-      this.rxnavItems.set(payload.items);
-      this.rxnavTotal.set(payload.total);
-    } catch (error) {
-      this.rxnavItems.set([]);
-      this.rxnavTotal.set(0);
-      this.rxnavError.set(error instanceof Error ? error.message : 'Failed to load drug catalog.');
-    } finally {
-      this.rxnavLoading.set(false);
-    }
+    await this.rxnavCatalog.load();
   }
 
   async loadLiverTox(): Promise<void> {
-    this.livertoxLoading.set(true);
-    this.livertoxError.set(null);
-    try {
-      const payload = await fetchInspectionLiverToxCatalog({
-        search: this.livertoxSearchInput(),
-        offset: this.livertoxOffset(),
-        limit: PAGE_LIMIT,
-      });
-      this.livertoxItems.set(payload.items);
-      this.livertoxTotal.set(payload.total);
-    } catch (error) {
-      this.livertoxItems.set([]);
-      this.livertoxTotal.set(0);
-      this.livertoxError.set(error instanceof Error ? error.message : 'Failed to load LiverTox.');
-    } finally {
-      this.livertoxLoading.set(false);
-    }
+    await this.liverToxCatalog.load();
   }
 
   async loadDiliPriors(): Promise<void> {
-    this.diliPriorLoading.set(true);
-    this.diliPriorError.set(null);
-    try {
-      const payload = await fetchInspectionDiliPriorsCatalog({
-        search: this.diliPriorSearchInput(),
-        offset: this.diliPriorOffset(),
-        limit: PAGE_LIMIT,
-      });
-      this.diliPriorItems.set(payload.items);
-      this.diliPriorTotal.set(payload.total);
-    } catch (error) {
-      this.diliPriorItems.set([]);
-      this.diliPriorTotal.set(0);
-      this.diliPriorError.set(error instanceof Error ? error.message : 'Failed to load DILI priors.');
-    } finally {
-      this.diliPriorLoading.set(false);
-    }
+    await this.diliPriorCatalog.load();
   }
 
   async loadDrugLabels(): Promise<void> {
-    this.drugLabelLoading.set(true);
-    this.drugLabelError.set(null);
-    try {
-      const payload = await fetchInspectionDrugLabelsCatalog({
-        search: this.drugLabelSearchInput(),
-        offset: this.drugLabelOffset(),
-        limit: PAGE_LIMIT,
-      });
-      this.drugLabelItems.set(payload.items);
-      this.drugLabelTotal.set(payload.total);
-    } catch (error) {
-      this.drugLabelItems.set([]);
-      this.drugLabelTotal.set(0);
-      this.drugLabelError.set(error instanceof Error ? error.message : 'Failed to load drug labels.');
-    } finally {
-      this.drugLabelLoading.set(false);
-    }
+    await this.drugLabelCatalog.load();
   }
 
   async loadRag(): Promise<void> {
@@ -604,55 +590,35 @@ export class DataInspectionPageComponent implements OnInit, OnDestroy {
   }
 
   async updateRxNavSearch(value: string): Promise<void> {
-    this.rxnavSearchInput.set(value);
-    this.rxnavOffset.set(0);
-    await this.loadRxNav();
+    await this.rxnavCatalog.updateSearch(value);
   }
 
   async pageRxNav(direction: -1 | 1): Promise<void> {
-    const next = this.rxnavOffset() + direction * PAGE_LIMIT;
-    if (next < 0 || next >= this.rxnavTotal()) return;
-    this.rxnavOffset.set(next);
-    await this.loadRxNav();
+    await this.rxnavCatalog.page(direction);
   }
 
   async updateLiverToxSearch(value: string): Promise<void> {
-    this.livertoxSearchInput.set(value);
-    this.livertoxOffset.set(0);
-    await this.loadLiverTox();
+    await this.liverToxCatalog.updateSearch(value);
   }
 
   async pageLiverTox(direction: -1 | 1): Promise<void> {
-    const next = this.livertoxOffset() + direction * PAGE_LIMIT;
-    if (next < 0 || next >= this.livertoxTotal()) return;
-    this.livertoxOffset.set(next);
-    await this.loadLiverTox();
+    await this.liverToxCatalog.page(direction);
   }
 
   async updateDiliPriorsSearch(value: string): Promise<void> {
-    this.diliPriorSearchInput.set(value);
-    this.diliPriorOffset.set(0);
-    await this.loadDiliPriors();
+    await this.diliPriorCatalog.updateSearch(value);
   }
 
   async pageDiliPriors(direction: -1 | 1): Promise<void> {
-    const next = this.diliPriorOffset() + direction * PAGE_LIMIT;
-    if (next < 0 || next >= this.diliPriorTotal()) return;
-    this.diliPriorOffset.set(next);
-    await this.loadDiliPriors();
+    await this.diliPriorCatalog.page(direction);
   }
 
   async updateDrugLabelsSearch(value: string): Promise<void> {
-    this.drugLabelSearchInput.set(value);
-    this.drugLabelOffset.set(0);
-    await this.loadDrugLabels();
+    await this.drugLabelCatalog.updateSearch(value);
   }
 
   async pageDrugLabels(direction: -1 | 1): Promise<void> {
-    const next = this.drugLabelOffset() + direction * PAGE_LIMIT;
-    if (next < 0 || next >= this.drugLabelTotal()) return;
-    this.drugLabelOffset.set(next);
-    await this.loadDrugLabels();
+    await this.drugLabelCatalog.page(direction);
   }
 
   async updateRagSearch(value: string): Promise<void> {
@@ -723,24 +689,13 @@ export class DataInspectionPageComponent implements OnInit, OnDestroy {
     this.updateProgress.set(0);
     this.updateMessage.set('Starting update job...');
 
-    let overrides: Record<string, unknown> = {};
-    const raw = this.updateConfigText().trim();
-    if (raw) {
-      try {
-        const parsed = JSON.parse(raw);
-        if (parsed && typeof parsed === 'object' && !Array.isArray(parsed)) {
-          overrides = parsed as Record<string, unknown>;
-        } else {
-          this.updateError.set('Overrides must be a JSON object.');
-          this.updateRunning.set(false);
-          return;
-        }
-      } catch {
-        this.updateError.set('Invalid JSON overrides.');
-        this.updateRunning.set(false);
-        return;
-      }
+    const parsedOverrides = parseOverridesPayload(this.updateConfigText());
+    if (parsedOverrides.error) {
+      this.updateError.set(parsedOverrides.error);
+      this.updateRunning.set(false);
+      return;
     }
+    const overrides = parsedOverrides.value ?? {};
 
     try {
       const started = await this.startUpdate(target, overrides);
@@ -829,10 +784,7 @@ export class DataInspectionPageComponent implements OnInit, OnDestroy {
         return;
       }
       this.updateProgress.set(typeof status.progress === 'number' ? status.progress : 0);
-      this.updateMessage.set(
-        (status.result?.progress_message as string) ||
-          (status.error || `Job status: ${status.status}`),
-      );
+      this.updateMessage.set(resolveUpdateProgressMessage(status));
 
       if (status.status === 'completed') {
         this.updateRunning.set(false);

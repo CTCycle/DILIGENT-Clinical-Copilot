@@ -1,82 +1,49 @@
 from __future__ import annotations
 
-from functools import lru_cache
 from pathlib import Path
 from typing import Any
 
-from dotenv import load_dotenv
-
 from DILIGENT.server.common.constants import ENV_FILE_PATH
-from DILIGENT.server.common.utils.logger import logger
-from DILIGENT.server.domain.environment.bootstrap import EnvironmentBootstrapState
-
-
-# -----------------------------------------------------------------------------
-@lru_cache(maxsize=1)
-def _bootstrap_state() -> EnvironmentBootstrapState:
-    return EnvironmentBootstrapState()
+from DILIGENT.server.configurations import settings as settings_module
+from DILIGENT.server.configurations.environment_bootstrap import (
+    ensure_environment_loaded,
+    reset_environment_bootstrap_for_tests,
+)
 
 
 ###############################################################################
-def ensure_environment_loaded(*, force: bool = False) -> Path | None:
-    state = _bootstrap_state()
-
-    with state.lock:
-        env_path = Path(ENV_FILE_PATH)
-        if state.bootstrapped and not force:
-            return env_path if env_path.exists() else None
-
-        if env_path.exists():
-            load_dotenv(dotenv_path=env_path, override=True)
-        else:
-            logger.warning(".env file not found at: %s", env_path)
-
-        state.bootstrapped = True
-        return env_path if env_path.exists() else None
-
-
-###############################################################################
-def reset_environment_bootstrap_for_tests() -> None:
-    state = _bootstrap_state()
-    with state.lock:
-        state.bootstrapped = False
-
-
-# -----------------------------------------------------------------------------
 def initialize_environment() -> Path | None:
     return ensure_environment_loaded()
 
 
 # -----------------------------------------------------------------------------
 def get_app_settings():
-    from DILIGENT.server.configurations.settings import get_app_settings as _get_app_settings
-
-    return _get_app_settings()
+    return settings_module.get_app_settings()
 
 
 # -----------------------------------------------------------------------------
 def get_server_settings(config_path: str | None = None):
-    from DILIGENT.server.configurations.settings import get_server_settings as _get_server_settings
+    return settings_module.get_server_settings(config_path=config_path)
 
-    return _get_server_settings(config_path=config_path)
+
+# -----------------------------------------------------------------------------
+def get_configuration_block(block_name: str) -> dict[str, Any]:
+    return settings_module.get_configuration_block(block_name)
+
+
+# -----------------------------------------------------------------------------
+def get_configuration_value(block_name: str, key: str, default: Any = None) -> Any:
+    return settings_module.get_configuration_value(block_name, key, default)
 
 
 # -----------------------------------------------------------------------------
 def reload_settings_for_tests():
-    from DILIGENT.server.configurations.settings import (
-        reload_settings_for_tests as _reload_settings_for_tests,
-    )
-
-    return _reload_settings_for_tests()
+    return settings_module.reload_settings_for_tests()
 
 
 # -----------------------------------------------------------------------------
 def reset_app_settings_cache() -> None:
-    from DILIGENT.server.configurations.settings import (
-        reset_app_settings_cache as _reset_app_settings_cache,
-    )
-
-    _reset_app_settings_cache()
+    settings_module.reset_app_settings_cache()
 
 
 class _ServerSettingsProxy:
@@ -100,6 +67,8 @@ __all__ = [
     "ensure_environment_loaded",
     "environment_settings",
     "get_app_settings",
+    "get_configuration_block",
+    "get_configuration_value",
     "get_server_settings",
     "initialize_environment",
     "initialize_settings",

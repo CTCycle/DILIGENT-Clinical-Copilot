@@ -435,25 +435,100 @@
     </section>
   </section>
 
-  @if (reportSession()) {
-    <div class="modal-overlay"><dialog class="modal-container inspection-modal inspection-modal-large" open><div class="modal-header"><div class="modal-header-content"><h2 class="modal-title">Session Report</h2><p class="modal-subtitle">Session {{ reportSession()!.session_id }}</p></div><button class="modal-close" type="button" (click)="closeSessionReport()">Close</button></div><div class="modal-body inspection-excerpt-body">@if (reportLoading()) { <p>Loading report...</p> } @if (reportError()) { <p class="inspection-error-text">{{ reportError() }}</p> } @if (!reportLoading() && !reportError()) { <pre class="inspection-excerpt-text">{{ reportContent() }}</pre> }</div></dialog></div>
-  }
+  <app-modal-shell
+    [isOpen]="!!reportSession()"
+    title="Session Report"
+    [subtitle]="'Session ' + (reportSession()?.session_id ?? '')"
+    dialogClassName="modal-container inspection-modal inspection-modal-large"
+    closeLabel="Close session report"
+    (close)="closeSessionReport()"
+  >
+    <div class="inspection-excerpt-body">
+      @if (reportLoading()) { <p>Loading report...</p> }
+      @if (reportError()) { <p class="inspection-error-text">{{ reportError() }}</p> }
+      @if (!reportLoading() && !reportError()) {
+        <pre class="inspection-excerpt-text">{{ reportContent() }}</pre>
+      }
+    </div>
+  </app-modal-shell>
 
-  @if (aliasData() || aliasError() || aliasLoading()) {
-    <div class="modal-overlay"><dialog class="modal-container inspection-modal" open><div class="modal-header"><div class="modal-header-content"><h2 class="modal-title">RxNav Aliases</h2><p class="modal-subtitle">{{ aliasData()?.drug_name || 'Loading...' }}</p></div><button class="modal-close" type="button" (click)="closeAliases()">Close</button></div><div class="modal-body">@if (aliasLoading()) { <p>Loading aliases...</p> } @if (aliasError()) { <p class="inspection-error-text">{{ aliasError() }}</p> } @if (aliasData()) {@for (group of aliasData()!.groups; track group.source) {<section class="inspection-alias-group"><h3>{{ group.source }}</h3><ul>@for (entry of group.aliases; track entry.alias + entry.alias_kind) {<li><span>{{ entry.alias }}</span><span class="inspection-alias-kind">{{ entry.alias_kind }}</span></li>}</ul></section>}}</div></dialog></div>
-  }
+  <app-modal-shell
+    [isOpen]="!!aliasData() || !!aliasError() || aliasLoading()"
+    title="RxNav Aliases"
+    [subtitle]="aliasData()?.drug_name || 'Loading...'"
+    dialogClassName="modal-container inspection-modal"
+    closeLabel="Close aliases"
+    (close)="closeAliases()"
+  >
+    @if (aliasLoading()) { <p>Loading aliases...</p> }
+    @if (aliasError()) { <p class="inspection-error-text">{{ aliasError() }}</p> }
+    @if (aliasData()) {
+      @for (group of aliasData()!.groups; track group.source) {
+        <section class="inspection-alias-group">
+          <h3>{{ group.source }}</h3>
+          <ul>
+            @for (entry of group.aliases; track entry.alias + entry.alias_kind) {
+              <li>
+                <span>{{ entry.alias }}</span>
+                <span class="inspection-alias-kind">{{ entry.alias_kind }}</span>
+              </li>
+            }
+          </ul>
+        </section>
+      }
+    }
+  </app-modal-shell>
 
-  @if (excerptData() || excerptError() || excerptLoading()) {
-    <div class="modal-overlay"><dialog class="modal-container inspection-modal inspection-modal-large" open><div class="modal-header"><div class="modal-header-content"><h2 class="modal-title">LiverTox Excerpt</h2></div><button class="modal-close" type="button" (click)="closeExcerpt()">Close</button></div><div class="modal-body inspection-excerpt-body">@if (excerptLoading()) { <p>Loading excerpt...</p> } @if (excerptError()) { <p class="inspection-error-text">{{ excerptError() }}</p> } @if (excerptData()) { <pre class="inspection-excerpt-text">{{ excerptData()!.excerpt }}</pre> }</div></dialog></div>
-  }
+  <app-modal-shell
+    [isOpen]="!!excerptData() || !!excerptError() || excerptLoading()"
+    title="LiverTox Excerpt"
+    dialogClassName="modal-container inspection-modal inspection-modal-large"
+    closeLabel="Close excerpt"
+    (close)="closeExcerpt()"
+  >
+    <div class="inspection-excerpt-body">
+      @if (excerptLoading()) { <p>Loading excerpt...</p> }
+      @if (excerptError()) { <p class="inspection-error-text">{{ excerptError() }}</p> }
+      @if (excerptData()) { <pre class="inspection-excerpt-text">{{ excerptData()!.excerpt }}</pre> }
+    </div>
+  </app-modal-shell>
 
-  @if (diliPriorDetailData() || diliPriorDetailError() || diliPriorDetailLoading()) {
-    <div class="modal-overlay"><dialog class="modal-container inspection-modal inspection-modal-large" open><div class="modal-header"><div class="modal-header-content"><h2 class="modal-title">DILI Prior Details</h2></div><button class="modal-close" type="button" (click)="closeDiliPriorDetails()">Close</button></div><div class="modal-body inspection-excerpt-body">@if (diliPriorDetailLoading()) { <p>Loading details...</p> } @if (diliPriorDetailError()) { <p class="inspection-error-text">{{ diliPriorDetailError() }}</p> } @if (diliPriorDetailData()) { <pre class="inspection-excerpt-text">{{ diliPriorDetailData()!.annotations | json }}</pre> }</div></dialog></div>
-  }
+  <app-modal-shell
+    [isOpen]="!!diliPriorDetailData() || !!diliPriorDetailError() || diliPriorDetailLoading()"
+    title="DILI Prior Details"
+    dialogClassName="modal-container inspection-modal inspection-modal-large"
+    closeLabel="Close DILI prior details"
+    (close)="closeDiliPriorDetails()"
+  >
+    <div class="inspection-excerpt-body">
+      @if (diliPriorDetailLoading()) { <p>Loading details...</p> }
+      @if (diliPriorDetailError()) { <p class="inspection-error-text">{{ diliPriorDetailError() }}</p> }
+      @if (diliPriorDetailData()) {
+        <pre class="inspection-excerpt-text">{{ diliPriorDetailData()!.annotations | json }}</pre>
+      }
+    </div>
+  </app-modal-shell>
 
-  @if (drugLabelSectionsData() || drugLabelSectionsError() || drugLabelSectionsLoading()) {
-    <div class="modal-overlay"><dialog class="modal-container inspection-modal inspection-modal-large" open><div class="modal-header"><div class="modal-header-content"><h2 class="modal-title">Drug Label Sections</h2></div><button class="modal-close" type="button" (click)="closeDrugLabelSections()">Close</button></div><div class="modal-body inspection-excerpt-body">@if (drugLabelSectionsLoading()) { <p>Loading sections...</p> } @if (drugLabelSectionsError()) { <p class="inspection-error-text">{{ drugLabelSectionsError() }}</p> } @if (drugLabelSectionsData()) {@for (section of drugLabelSectionsData()!.sections; track section.section_key + section.display_order) {<section class="inspection-alias-group"><h3>{{ section.section_title || section.section_key }}</h3><pre class="inspection-excerpt-text">{{ section.text }}</pre></section>}}</div></dialog></div>
-  }
+  <app-modal-shell
+    [isOpen]="!!drugLabelSectionsData() || !!drugLabelSectionsError() || drugLabelSectionsLoading()"
+    title="Drug Label Sections"
+    dialogClassName="modal-container inspection-modal inspection-modal-large"
+    closeLabel="Close label sections"
+    (close)="closeDrugLabelSections()"
+  >
+    <div class="inspection-excerpt-body">
+      @if (drugLabelSectionsLoading()) { <p>Loading sections...</p> }
+      @if (drugLabelSectionsError()) { <p class="inspection-error-text">{{ drugLabelSectionsError() }}</p> }
+      @if (drugLabelSectionsData()) {
+        @for (section of drugLabelSectionsData()!.sections; track section.section_key + section.display_order) {
+          <section class="inspection-alias-group">
+            <h3>{{ section.section_title || section.section_key }}</h3>
+            <pre class="inspection-excerpt-text">{{ section.text }}</pre>
+          </section>
+        }
+      }
+    </div>
+  </app-modal-shell>
 
   @if (activeUpdateTarget()) {
     <div class="modal-overlay">
