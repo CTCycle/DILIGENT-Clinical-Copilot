@@ -12,19 +12,22 @@ from DILIGENT.server.domain.environment.bootstrap import EnvironmentBootstrapSta
 
 
 @lru_cache(maxsize=1)
-def _bootstrap_state() -> EnvironmentBootstrapState:
-    return EnvironmentBootstrapState()
+def _runtime_state() -> "_EnvironmentRuntimeState":
+    return _EnvironmentRuntimeState()
 
 
-_DOTENV_INJECTED_KEYS: set[str] = set()
+class _EnvironmentRuntimeState:
+    def __init__(self) -> None:
+        self.bootstrap = EnvironmentBootstrapState()
+        self.dotenv_injected_keys: set[str] = set()
 
 
 def ensure_environment_loaded(*, force: bool = False) -> Path | None:
-    state = _bootstrap_state()
+    state = _runtime_state()
 
-    with state.lock:
+    with state.bootstrap.lock:
         env_path = Path(constants.ENV_FILE_PATH)
-        if state.bootstrapped and not force:
+        if state.bootstrap.bootstrapped and not force:
             return env_path if env_path.exists() else None
 
         previous_keys = set(os.environ.keys())
@@ -33,9 +36,9 @@ def ensure_environment_loaded(*, force: bool = False) -> Path | None:
         else:
             logger.warning(".env file not found at: %s", env_path)
 
-        _DOTENV_INJECTED_KEYS.clear()
-        _DOTENV_INJECTED_KEYS.update(set(os.environ.keys()) - previous_keys)
-        state.bootstrapped = True
+        state.dotenv_injected_keys.clear()
+        state.dotenv_injected_keys.update(set(os.environ.keys()) - previous_keys)
+        state.bootstrap.bootstrapped = True
         return env_path if env_path.exists() else None
 
 
@@ -44,11 +47,11 @@ def initialize_environment() -> Path | None:
 
 
 def get_dotenv_injected_keys() -> set[str]:
-    return set(_DOTENV_INJECTED_KEYS)
+    return set(_runtime_state().dotenv_injected_keys)
 
 
 def reset_environment_bootstrap_for_tests() -> None:
-    state = _bootstrap_state()
-    with state.lock:
-        state.bootstrapped = False
-    _DOTENV_INJECTED_KEYS.clear()
+    state = _runtime_state()
+    with state.bootstrap.lock:
+        state.bootstrap.bootstrapped = False
+    state.dotenv_injected_keys.clear()

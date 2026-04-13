@@ -7,8 +7,8 @@ import httpx
 
 from DILIGENT.server.common.constants import GEMINI_API_BASE, OPENAI_API_BASE
 from DILIGENT.server.common.utils.logger import logger
-from DILIGENT.server.configurations.bootstrap import server_settings
-from DILIGENT.server.configurations.runtime_state import LLMRuntimeConfig
+from DILIGENT.server.configurations.startup import server_settings
+from DILIGENT.server.configurations.llm_configs import LLMRuntimeConfig
 from DILIGENT.server.models.structured import StructuredOutputParser, parse_json_dict, T
 from DILIGENT.server.repositories.serialization.access_keys import AccessKeySerializer
 
@@ -521,3 +521,4 @@ class CloudLLMClient:
     @staticmethod
     def parse_json(obj_or_text: dict[str, Any] | str) -> dict[str, Any] | None:
         return parse_json_dict(obj_or_text)
+

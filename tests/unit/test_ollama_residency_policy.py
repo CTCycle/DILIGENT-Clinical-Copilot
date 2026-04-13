@@ -4,7 +4,7 @@ import asyncio
 import time
 from unittest.mock import AsyncMock
 
-from DILIGENT.server.configurations.runtime_state import LLMRuntimeConfig
+from DILIGENT.server.configurations.llm_configs import LLMRuntimeConfig
 from DILIGENT.server.models.providers import OllamaClient
 
 
@@ -96,3 +96,4 @@ def test_resolve_policy_keep_alive_uses_dual_setting(monkeypatch) -> None:
     asyncio.run(client.close())
 
     assert keep_alive == "8h"
+

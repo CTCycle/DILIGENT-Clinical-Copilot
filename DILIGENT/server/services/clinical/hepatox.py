@@ -32,8 +32,8 @@ from DILIGENT.server.domain.clinical.entities import (
     PatientRucamAssessmentBundle,
     PipelineIssue,
 )
-from DILIGENT.server.configurations.bootstrap import server_settings
-from DILIGENT.server.configurations.runtime_state import LLMRuntimeConfig
+from DILIGENT.server.configurations.startup import server_settings
+from DILIGENT.server.configurations.llm_configs import LLMRuntimeConfig
 from DILIGENT.server.common.constants import (
     DEFAULT_DILI_CLASSIFICATION,
     R_SCORE_CHOLESTATIC_THRESHOLD,
@@ -1604,5 +1604,6 @@ class HepatoxConsultation:
         _ = entry
         message = "Automated analysis was unavailable due to a technical issue; a clinician should review the LiverTox documentation manually."
         return message
+
 
 

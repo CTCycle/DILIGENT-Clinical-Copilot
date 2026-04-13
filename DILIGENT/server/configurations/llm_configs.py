@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from functools import lru_cache
 from threading import RLock
 from typing import Any, Literal
 
@@ -8,178 +9,207 @@ from DILIGENT.server.domain.settings.configuration import LLMRuntimeDefaults
 from DILIGENT.server.domain.settings.runtime import LLMRuntimeState
 
 
+class _LLMRuntimeStore:
+    def __init__(self) -> None:
+        self.defaults: LLMRuntimeDefaults | None = None
+        self.state = LLMRuntimeState()
+        self.lock = RLock()
+
+
+@lru_cache(maxsize=1)
+def _runtime_store() -> _LLMRuntimeStore:
+    return _LLMRuntimeStore()
+
+
 ###############################################################################
 class LLMRuntimeConfig:
-    defaults: LLMRuntimeDefaults | None = None
-    _state: LLMRuntimeState = LLMRuntimeState()
-    _lock: RLock = RLock()
-
     @classmethod
     def _update_state(cls, **updates: Any) -> LLMRuntimeState:
+        store = _runtime_store()
         changed = False
         for field_name, value in updates.items():
-            if getattr(cls._state, field_name) != value:
-                setattr(cls._state, field_name, value)
+            if getattr(store.state, field_name) != value:
+                setattr(store.state, field_name, value)
                 changed = True
         if changed:
-            cls._state.revision += 1
-        return cls._state
+            store.state.revision += 1
+        return store.state
 
     @classmethod
     def configure(cls, defaults: LLMRuntimeDefaults) -> None:
-        with cls._lock:
-            cls.defaults = defaults
+        store = _runtime_store()
+        with store.lock:
+            store.defaults = defaults
             cls.reset_defaults()
 
     @classmethod
     def _get_defaults(cls) -> LLMRuntimeDefaults:
-        if cls.defaults is None:
+        defaults = _runtime_store().defaults
+        if defaults is None:
             raise RuntimeError("Client runtime defaults are not configured.")
-        return cls.defaults
+        return defaults
 
     @classmethod
     def touch_revision(cls) -> None:
-        with cls._lock:
-            cls._state.revision += 1
+        store = _runtime_store()
+        with store.lock:
+            store.state.revision += 1
 
     @classmethod
     def set_parsing_model(cls, model: str) -> str:
         value = model.strip()
-        with cls._lock:
-            if value and value != cls._state.parsing_model:
+        store = _runtime_store()
+        with store.lock:
+            if value and value != store.state.parsing_model:
                 cls._update_state(parsing_model=value)
-            return cls._state.parsing_model
+            return store.state.parsing_model
 
     @classmethod
     def set_clinical_model(cls, model: str) -> str:
         value = model.strip()
-        with cls._lock:
-            if value and value != cls._state.clinical_model:
+        store = _runtime_store()
+        with store.lock:
+            if value and value != store.state.clinical_model:
                 cls._update_state(clinical_model=value)
-            return cls._state.clinical_model
+            return store.state.clinical_model
 
     @classmethod
     def set_llm_provider(cls, provider: str) -> str:
         defaults = cls._get_defaults()
         value = provider.strip().lower()
-        with cls._lock:
+        store = _runtime_store()
+        with store.lock:
             if not value:
-                return cls._state.llm_provider
+                return store.state.llm_provider
             if value not in CLOUD_MODEL_CHOICES:
                 value = defaults.llm_provider
-            if cls._state.llm_provider != value:
+            if store.state.llm_provider != value:
                 models = CLOUD_MODEL_CHOICES.get(value, [])
-                cloud_model = cls._state.cloud_model
+                cloud_model = store.state.cloud_model
                 if cloud_model not in models:
                     cloud_model = models[0] if models else ""
                 cls._update_state(llm_provider=value, cloud_model=cloud_model)
-            return cls._state.llm_provider
+            return store.state.llm_provider
 
     @classmethod
     def set_cloud_model(cls, model: str) -> str:
         value = model.strip()
-        with cls._lock:
+        store = _runtime_store()
+        with store.lock:
             if not value:
-                if cls._state.cloud_model:
+                if store.state.cloud_model:
                     cls._update_state(cloud_model="")
-                return cls._state.cloud_model
-            models = CLOUD_MODEL_CHOICES.get(cls._state.llm_provider, [])
+                return store.state.cloud_model
+            models = CLOUD_MODEL_CHOICES.get(store.state.llm_provider, [])
             if value not in models:
                 fallback = models[0] if models else ""
-                if fallback and fallback != cls._state.cloud_model:
+                if fallback and fallback != store.state.cloud_model:
                     cls._update_state(cloud_model=fallback)
-                return cls._state.cloud_model
-            if cls._state.cloud_model != value:
+                return store.state.cloud_model
+            if store.state.cloud_model != value:
                 cls._update_state(cloud_model=value)
-            return cls._state.cloud_model
+            return store.state.cloud_model
 
     @classmethod
     def set_use_cloud_services(cls, enabled: bool) -> bool:
         normalized = bool(enabled)
-        with cls._lock:
-            if cls._state.use_cloud_services != normalized:
+        store = _runtime_store()
+        with store.lock:
+            if store.state.use_cloud_services != normalized:
                 cls._update_state(use_cloud_services=normalized)
-            return cls._state.use_cloud_services
+            return store.state.use_cloud_services
 
     @classmethod
     def set_ollama_temperature(cls, value: float | None) -> float:
         defaults = cls._get_defaults()
-        with cls._lock:
+        store = _runtime_store()
+        with store.lock:
             try:
-                parsed = float(value) if value is not None else cls._state.ollama_temperature
+                parsed = float(value) if value is not None else store.state.ollama_temperature
             except (TypeError, ValueError):
                 parsed = defaults.ollama_temperature
             rounded = round(max(0.0, min(2.0, parsed)), 2)
-            if cls._state.ollama_temperature != rounded:
+            if store.state.ollama_temperature != rounded:
                 cls._update_state(ollama_temperature=rounded)
-            return cls._state.ollama_temperature
+            return store.state.ollama_temperature
 
     @classmethod
     def set_cloud_temperature(cls, value: float | None) -> float:
         defaults = cls._get_defaults()
-        with cls._lock:
+        store = _runtime_store()
+        with store.lock:
             try:
-                parsed = float(value) if value is not None else cls._state.cloud_temperature
+                parsed = float(value) if value is not None else store.state.cloud_temperature
             except (TypeError, ValueError):
                 parsed = defaults.cloud_temperature
             rounded = round(max(0.0, min(2.0, parsed)), 2)
-            if cls._state.cloud_temperature != rounded:
+            if store.state.cloud_temperature != rounded:
                 cls._update_state(cloud_temperature=rounded)
-            return cls._state.cloud_temperature
+            return store.state.cloud_temperature
 
     @classmethod
     def set_ollama_reasoning(cls, enabled: bool) -> bool:
         normalized = bool(enabled)
-        with cls._lock:
-            if cls._state.ollama_reasoning != normalized:
+        store = _runtime_store()
+        with store.lock:
+            if store.state.ollama_reasoning != normalized:
                 cls._update_state(ollama_reasoning=normalized)
-            return cls._state.ollama_reasoning
+            return store.state.ollama_reasoning
 
     @classmethod
     def get_parsing_model(cls) -> str:
-        with cls._lock:
-            return cls._state.parsing_model
+        store = _runtime_store()
+        with store.lock:
+            return store.state.parsing_model
 
     @classmethod
     def get_clinical_model(cls) -> str:
-        with cls._lock:
-            return cls._state.clinical_model
+        store = _runtime_store()
+        with store.lock:
+            return store.state.clinical_model
 
     @classmethod
     def get_llm_provider(cls) -> str:
-        with cls._lock:
-            return cls._state.llm_provider
+        store = _runtime_store()
+        with store.lock:
+            return store.state.llm_provider
 
     @classmethod
     def get_cloud_model(cls) -> str:
-        with cls._lock:
-            return cls._state.cloud_model
+        store = _runtime_store()
+        with store.lock:
+            return store.state.cloud_model
 
     @classmethod
     def is_cloud_enabled(cls) -> bool:
-        with cls._lock:
-            return cls._state.use_cloud_services
+        store = _runtime_store()
+        with store.lock:
+            return store.state.use_cloud_services
 
     @classmethod
     def get_ollama_temperature(cls) -> float:
-        with cls._lock:
-            return cls._state.ollama_temperature
+        store = _runtime_store()
+        with store.lock:
+            return store.state.ollama_temperature
 
     @classmethod
     def is_ollama_reasoning_enabled(cls) -> bool:
-        with cls._lock:
-            return cls._state.ollama_reasoning
+        store = _runtime_store()
+        with store.lock:
+            return store.state.ollama_reasoning
 
     @classmethod
     def get_cloud_temperature(cls) -> float:
-        with cls._lock:
-            return cls._state.cloud_temperature
+        store = _runtime_store()
+        with store.lock:
+            return store.state.cloud_temperature
 
     @classmethod
     def reset_defaults(cls) -> None:
         defaults = cls._get_defaults()
-        with cls._lock:
-            cls._state = LLMRuntimeState(
+        store = _runtime_store()
+        with store.lock:
+            store.state = LLMRuntimeState(
                 parsing_model=defaults.parsing_model,
                 clinical_model=defaults.clinical_model,
                 llm_provider=defaults.llm_provider,
@@ -193,25 +223,27 @@ class LLMRuntimeConfig:
 
     @classmethod
     def get_revision(cls) -> int:
-        with cls._lock:
-            return cls._state.revision
+        store = _runtime_store()
+        with store.lock:
+            return store.state.revision
 
     @classmethod
     def resolve_provider_and_model(
         cls,
         purpose: Literal["clinical", "parser"],
     ) -> tuple[str, str]:
-        with cls._lock:
-            if cls._state.use_cloud_services:
-                provider = cls._state.llm_provider
-                model = cls._state.cloud_model.strip()
+        store = _runtime_store()
+        with store.lock:
+            if store.state.use_cloud_services:
+                provider = store.state.llm_provider
+                model = store.state.cloud_model.strip()
                 if not model:
                     model = (
-                        cls._state.parsing_model
+                        store.state.parsing_model
                         if purpose == "parser"
-                        else cls._state.clinical_model
+                        else store.state.clinical_model
                     )
             else:
                 provider = "ollama"
-                model = cls._state.parsing_model if purpose == "parser" else cls._state.clinical_model
+                model = store.state.parsing_model if purpose == "parser" else store.state.clinical_model
             return provider, model.strip()

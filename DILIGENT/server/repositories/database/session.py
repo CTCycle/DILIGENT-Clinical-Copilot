@@ -6,7 +6,7 @@ from functools import lru_cache
 from sqlalchemy.engine import Engine
 from sqlalchemy.orm import sessionmaker
 
-from DILIGENT.server.configurations.bootstrap import server_settings
+from DILIGENT.server.configurations.startup import server_settings
 
 
 REPOSITORY_CLASS_PATHS = {
@@ -47,3 +47,4 @@ def resolve_session_factory(
         future=True,
         expire_on_commit=expire_on_commit,
     )
+

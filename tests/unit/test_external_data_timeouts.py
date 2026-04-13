@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from DILIGENT.server.configurations.settings import (
+from DILIGENT.server.configurations.management import (
     EnvironmentSnapshot,
     build_settings_payload_from_json,
 )
@@ -60,3 +60,4 @@ def test_external_data_timeouts_floor_to_positive_values() -> None:
     assert settings["clinical_llm_timeout"] == 1.0
     assert settings["livertox_llm_timeout"] == 1.0
     assert settings["ollama_server_start_timeout"] == 1.0
+

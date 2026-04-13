@@ -10,7 +10,7 @@ from DILIGENT.server.common.constants import (
     DILIRANK_SOURCE_URL,
     DILIST_SOURCE_URL,
 )
-from DILIGENT.server.configurations.bootstrap import server_settings
+from DILIGENT.server.configurations.startup import server_settings
 from DILIGENT.server.repositories.serialization.data import DataSerializer
 from DILIGENT.server.services.text.normalization import normalize_drug_name
 
@@ -260,3 +260,4 @@ class DiliPriorUpdater:
                 "source_last_modified",
             ]
         )
+

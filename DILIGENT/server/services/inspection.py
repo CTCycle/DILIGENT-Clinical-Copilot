@@ -12,7 +12,7 @@ from DILIGENT.server.common.constants import (
     VECTOR_DB_PATH,
 )
 from DILIGENT.server.common.utils.logger import logger
-from DILIGENT.server.configurations.bootstrap import server_settings
+from DILIGENT.server.configurations.startup import server_settings
 from DILIGENT.server.domain.inspection.entities import InspectionJobPhase
 from DILIGENT.server.repositories.serialization.data import DataSerializer, DocumentSerializer
 from DILIGENT.server.repositories.vectors import LanceVectorDatabase
@@ -863,4 +863,5 @@ class DataInspectionService:
         if payload is None:
             return False
         return self.jobs.cancel_job(job_id)
+
 

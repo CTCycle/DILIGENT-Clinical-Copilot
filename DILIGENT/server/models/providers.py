@@ -19,8 +19,8 @@ import httpx
 
 from DILIGENT.server.models.cloud import CloudLLMClient, LLMError, LLMTimeout
 from DILIGENT.server.models.structured import StructuredOutputParser, parse_json_dict, T
-from DILIGENT.server.configurations.bootstrap import server_settings
-from DILIGENT.server.configurations.runtime_state import LLMRuntimeConfig
+from DILIGENT.server.configurations.startup import server_settings
+from DILIGENT.server.configurations.llm_configs import LLMRuntimeConfig
 from DILIGENT.server.common.constants import (
     PARSING_MODEL_CHOICES,
 )
@@ -1934,3 +1934,4 @@ def initialize_llm_client(
         default_model=selected_model,
         **kwargs,
     )
+

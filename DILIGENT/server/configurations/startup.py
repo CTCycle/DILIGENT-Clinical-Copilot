@@ -1,14 +1,15 @@
 from __future__ import annotations
 
+import os
 from pathlib import Path
 from typing import Any
 
-from DILIGENT.server.common.constants import ENV_FILE_PATH
-from DILIGENT.server.configurations import settings as settings_module
-from DILIGENT.server.configurations.environment_bootstrap import (
+from DILIGENT.server.common.constants import ENV_FILE_PATH, TRUTHY_ENV_VALUES
+from DILIGENT.server.configurations.environment import (
     ensure_environment_loaded,
     reset_environment_bootstrap_for_tests,
 )
+from DILIGENT.server.configurations.management import ConfigurationManagement
 
 
 ###############################################################################
@@ -16,34 +17,33 @@ def initialize_environment() -> Path | None:
     return ensure_environment_loaded()
 
 
-# -----------------------------------------------------------------------------
 def get_app_settings():
-    return settings_module.get_app_settings()
+    return ConfigurationManagement.get_app_settings()
 
 
-# -----------------------------------------------------------------------------
 def get_server_settings(config_path: str | None = None):
-    return settings_module.get_server_settings(config_path=config_path)
+    return ConfigurationManagement.get_server_settings(config_path=config_path)
 
 
-# -----------------------------------------------------------------------------
 def get_configuration_block(block_name: str) -> dict[str, Any]:
-    return settings_module.get_configuration_block(block_name)
+    return ConfigurationManagement.get_configuration_block(block_name)
 
 
-# -----------------------------------------------------------------------------
 def get_configuration_value(block_name: str, key: str, default: Any = None) -> Any:
-    return settings_module.get_configuration_value(block_name, key, default)
+    return ConfigurationManagement.get_configuration_value(block_name, key, default)
 
 
-# -----------------------------------------------------------------------------
 def reload_settings_for_tests():
-    return settings_module.reload_settings_for_tests()
+    return ConfigurationManagement.reload_settings_for_tests()
 
 
-# -----------------------------------------------------------------------------
 def reset_app_settings_cache() -> None:
-    settings_module.reset_app_settings_cache()
+    ConfigurationManagement.reset_app_settings_cache()
+
+
+def tauri_mode_enabled() -> bool:
+    value = (os.getenv("DILIGENT_TAURI_MODE") or "").strip().lower()
+    return value in TRUTHY_ENV_VALUES
 
 
 class _ServerSettingsProxy:
@@ -58,12 +58,12 @@ server_settings = _ServerSettingsProxy()
 environment_settings = server_settings
 
 
-# -----------------------------------------------------------------------------
 def initialize_settings() -> None:
     get_app_settings()
 
 
 __all__ = [
+    "ENV_FILE_PATH",
     "ensure_environment_loaded",
     "environment_settings",
     "get_app_settings",
@@ -76,5 +76,5 @@ __all__ = [
     "reset_app_settings_cache",
     "reset_environment_bootstrap_for_tests",
     "server_settings",
+    "tauri_mode_enabled",
 ]
-
