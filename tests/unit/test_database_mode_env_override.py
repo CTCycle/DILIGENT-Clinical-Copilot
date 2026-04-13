@@ -31,7 +31,7 @@ def _base_payload() -> dict:
     }
 
 
-def test_database_env_override_precedence_dotenv_over_os_over_json(tmp_path, monkeypatch) -> None:
+def test_database_settings_are_loaded_from_json_without_env_overlap(tmp_path, monkeypatch) -> None:
     config_path = tmp_path / "configurations.json"
     _write_config(config_path, _base_payload())
     dotenv_path = tmp_path / ".env"
@@ -45,13 +45,13 @@ def test_database_env_override_precedence_dotenv_over_os_over_json(tmp_path, mon
     reset_app_settings_cache()
     settings = get_app_settings()
 
-    assert settings.database.host == "dotenv-host"
+    assert settings.database.host == "json-host"
 
     monkeypatch.delenv("DB_HOST", raising=False)
     bootstrap.reset_environment_bootstrap_for_tests()
     reset_app_settings_cache()
     settings = get_app_settings()
-    assert settings.database.host == "dotenv-host"
+    assert settings.database.host == "json-host"
 
     monkeypatch.setattr(constants, "ENV_FILE_PATH", str(tmp_path / ".missing.env"))
     monkeypatch.setattr(bootstrap, "ENV_FILE_PATH", str(tmp_path / ".missing.env"))

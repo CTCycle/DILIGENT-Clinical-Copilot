@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from DILIGENT.server.configurations.sources import (
+from DILIGENT.server.configurations.settings import (
     EnvironmentSnapshot,
     build_settings_payload_from_json,
 )
