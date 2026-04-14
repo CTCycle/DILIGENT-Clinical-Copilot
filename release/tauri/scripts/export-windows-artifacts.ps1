@@ -61,32 +61,26 @@ foreach ($file in $portableExeCandidates) {
   Copy-Item -Path $file.FullName -Destination $portableDir -Force
 }
 
-$portableResourceEntries = @(
-  "DILIGENT",
-  "runtimes",
-  "pyproject.toml",
-  "uv.lock",
-  "resources",
-  "_up_"
-)
-
-foreach ($entry in $portableResourceEntries) {
-  $sourcePath = Join-Path $releaseDir $entry
-  if (Test-Path $sourcePath) {
-    $destinationPath = Join-Path $portableDir $entry
-    Copy-Item -Path $sourcePath -Destination $destinationPath -Recurse -Force
-  }
+$portablePayloadSourceDir = Join-Path $releaseDir "r"
+$portablePayloadDestinationDir = Join-Path $portableDir "r"
+if (Test-Path $portablePayloadSourceDir) {
+  Copy-Item -Path $portablePayloadSourceDir -Destination $portablePayloadDestinationDir -Recurse -Force
 }
 
 $requiredPortablePaths = @(
-  (Join-Path $portableDir "DILIGENT"),
-  (Join-Path $portableDir "runtimes\uv\uv.exe"),
-  (Join-Path $portableDir "runtimes\python\python.exe"),
-  (Join-Path $portableDir "runtimes\nodejs\node.exe"),
-  (Join-Path $portableDir "runtimes\nodejs\npm.cmd"),
-  (Join-Path $portableDir "runtimes\uv.lock"),
-  (Join-Path $portableDir "pyproject.toml"),
-  (Join-Path $portableDir "uv.lock")
+  (Join-Path $portableDir "r"),
+  (Join-Path $portableDir "r\server"),
+  (Join-Path $portableDir "r\scripts"),
+  (Join-Path $portableDir "r\settings"),
+  (Join-Path $portableDir "r\client\dist"),
+  (Join-Path $portableDir "r\resources\models"),
+  (Join-Path $portableDir "r\resources\sources"),
+  (Join-Path $portableDir "r\runtimes\uv\uv.exe"),
+  (Join-Path $portableDir "r\runtimes\python\python.exe"),
+  (Join-Path $portableDir "r\runtimes\nodejs\node.exe"),
+  (Join-Path $portableDir "r\runtimes\nodejs\npm.cmd"),
+  (Join-Path $portableDir "r\runtimes\uv.lock"),
+  (Join-Path $portableDir "r\pyproject.toml")
 )
 
 foreach ($requiredPath in $requiredPortablePaths) {
