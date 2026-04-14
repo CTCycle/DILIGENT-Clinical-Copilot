@@ -25,6 +25,15 @@ CONFIGURATIONS_FILE = str(Path(SETTING_PATH) / "configurations.json")
 ###############################################################################
 CLINICAL_API_URL = "/clinical"
 
+# [APP DEFAULTS]
+###############################################################################
+FASTAPI_TITLE = "DILI Backend"
+FASTAPI_VERSION = "1.0.0"
+FASTAPI_DESCRIPTION = "FastAPI backend"
+OLLAMA_DEFAULT_HOST = "localhost"
+OLLAMA_DEFAULT_PORT = 11434
+OLLAMA_DEFAULT_SCHEME = "http"
+
 # [EXPORTS]
 ###############################################################################
 REPORT_EXPORT_DIRECTORY_PREFIX = "diligent_report_"

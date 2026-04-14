@@ -1,21 +1,24 @@
 from __future__ import annotations
 
-from DILIGENT.server.configurations.startup import (
+from DILIGENT.server.configurations.environment import (
     ensure_environment_loaded,
-    initialize_environment,
     reset_environment_bootstrap_for_tests,
 )
-from DILIGENT.server.configurations.management import (
-    get_app_settings,
+from DILIGENT.server.configurations.management import ConfigurationManager
+from DILIGENT.server.configurations.startup import (
+    get_configuration_manager,
+    get_server_settings,
+    initialize_environment,
     reload_settings_for_tests,
-    reset_app_settings_cache,
 )
 
+
 __all__ = [
+    "ConfigurationManager",
     "ensure_environment_loaded",
-    "get_app_settings",
+    "get_configuration_manager",
+    "get_server_settings",
     "initialize_environment",
     "reload_settings_for_tests",
-    "reset_app_settings_cache",
     "reset_environment_bootstrap_for_tests",
 ]
