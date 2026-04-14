@@ -5,7 +5,7 @@ import os
 
 from DILIGENT.server.common import constants
 from DILIGENT.server.configurations import environment
-from DILIGENT.server.configurations.startup import get_app_settings, reset_app_settings_cache
+from DILIGENT.server.configurations.startup import get_server_settings, reset_app_settings_cache
 
 
 def test_initialize_environment_loads_dotenv_with_override_precedence(tmp_path, monkeypatch) -> None:
@@ -29,7 +29,7 @@ def test_ui_owned_env_keys_do_not_override_json_runtime_defaults(monkeypatch, tm
     monkeypatch.setenv("LLM_PROVIDER", "gemini")
 
     reset_app_settings_cache()
-    settings = get_app_settings()
+    settings = get_server_settings()
     assert settings.llm_defaults.llm_provider == "openai"
 
     monkeypatch.delenv("LLM_PROVIDER", raising=False)
@@ -45,7 +45,7 @@ def test_ui_owned_json_keys_are_ignored(monkeypatch, tmp_path) -> None:
     monkeypatch.setattr(constants, "CONFIGURATIONS_FILE", str(config_path))
 
     reset_app_settings_cache()
-    settings = get_app_settings()
+    settings = get_server_settings()
     assert settings.llm_defaults.cloud_model == constants.OPENAI_CLOUD_MODELS[0]
 
     reset_app_settings_cache()

@@ -5,7 +5,6 @@ import os
 from pathlib import Path
 from threading import RLock
 from typing import Any
-from functools import lru_cache
 
 from pydantic import ValidationError
 
@@ -18,8 +17,6 @@ from DILIGENT.server.common.utils.types import (
     coerce_str,
     coerce_str_or_none,
 )
-from DILIGENT.server.configurations.environment import ensure_environment_loaded
-from DILIGENT.server.configurations.llm_configs import LLMRuntimeConfig
 from DILIGENT.server.domain.settings.configuration import (
     DatabaseSettings,
     DrugsMatcherSettings,
@@ -31,14 +28,6 @@ from DILIGENT.server.domain.settings.configuration import (
     RagSettings,
     ServerSettings,
 )
-
-FASTAPI_TITLE = "DILI Backend"
-FASTAPI_VERSION = "1.0.0"
-FASTAPI_DESCRIPTION = "FastAPI backend"
-OLLAMA_DEFAULT_HOST = "localhost"
-OLLAMA_DEFAULT_PORT = 11434
-OLLAMA_DEFAULT_SCHEME = "http"
-
 
 def ensure_mapping(value: Any) -> dict[str, Any]:
     if isinstance(value, dict):
@@ -73,7 +62,7 @@ class EnvironmentSnapshot:
         self.ollama_port = ollama_port
 
 
-class JsonConfigurationManager:
+class ConfigurationManager:
     def __init__(self, config_path: str | None = None) -> None:
         self._config_path = Path(config_path or constants.CONFIGURATIONS_FILE)
         self._lock = RLock()
@@ -82,7 +71,11 @@ class JsonConfigurationManager:
         self.reload()
 
     @property
-    def settings(self) -> ServerSettings:
+    def config_path(self) -> Path:
+        return self._config_path
+
+    @property
+    def server_settings(self) -> ServerSettings:
         with self._lock:
             if self._settings is None:
                 self.reload()
@@ -114,17 +107,6 @@ class JsonConfigurationManager:
         return block.get(key, default)
 
 
-class _ConfigurationRuntimeState:
-    def __init__(self) -> None:
-        self.lock = RLock()
-        self.manager: JsonConfigurationManager | None = None
-
-
-@lru_cache(maxsize=1)
-def _runtime_state() -> _ConfigurationRuntimeState:
-    return _ConfigurationRuntimeState()
-
-
 def _resolve_ollama_url_with_scheme(
     normalized_host: str,
     *,
@@ -136,10 +118,10 @@ def _resolve_ollama_url_with_scheme(
         resolved_port = (
             port_value
             if port_value is not None
-            else coerce_int(parsed_port, OLLAMA_DEFAULT_PORT, minimum=1, maximum=65535)
+            else coerce_int(parsed_port, constants.OLLAMA_DEFAULT_PORT, minimum=1, maximum=65535)
         )
         return f"{scheme}://{host_only}:{resolved_port}"
-    resolved_port = port_value if port_value is not None else OLLAMA_DEFAULT_PORT
+    resolved_port = port_value if port_value is not None else constants.OLLAMA_DEFAULT_PORT
     return f"{scheme}://{host_port}:{resolved_port}"
 
 
@@ -148,7 +130,10 @@ def resolve_ollama_base_url(
     ollama_url: str | None,
     ollama_host: str | None,
     ollama_port: int | None,
-    fallback: str = f"{OLLAMA_DEFAULT_SCHEME}://{OLLAMA_DEFAULT_HOST}:{OLLAMA_DEFAULT_PORT}",
+    fallback: str = (
+        f"{constants.OLLAMA_DEFAULT_SCHEME}://"
+        f"{constants.OLLAMA_DEFAULT_HOST}:{constants.OLLAMA_DEFAULT_PORT}"
+    ),
 ) -> str:
     if ollama_url:
         return ollama_url.rstrip("/")
@@ -158,10 +143,10 @@ def resolve_ollama_base_url(
         normalized_host = host_value.strip().rstrip("/")
         if "://" in normalized_host:
             return _resolve_ollama_url_with_scheme(normalized_host, port_value=port_value)
-        resolved_port = port_value if port_value is not None else OLLAMA_DEFAULT_PORT
-        return f"{OLLAMA_DEFAULT_SCHEME}://{normalized_host}:{resolved_port}"
+        resolved_port = port_value if port_value is not None else constants.OLLAMA_DEFAULT_PORT
+        return f"{constants.OLLAMA_DEFAULT_SCHEME}://{normalized_host}:{resolved_port}"
     if port_value is not None:
-        return f"{OLLAMA_DEFAULT_SCHEME}://{OLLAMA_DEFAULT_HOST}:{port_value}"
+        return f"{constants.OLLAMA_DEFAULT_SCHEME}://{constants.OLLAMA_DEFAULT_HOST}:{port_value}"
     return fallback.rstrip("/")
 
 
@@ -201,9 +186,9 @@ def _default_llm_runtime_defaults(environment: EnvironmentSnapshot) -> LLMRuntim
 def _build_fastapi_settings(data: dict[str, Any]) -> FastAPISettings:
     payload = ensure_mapping(data)
     return FastAPISettings(
-        title=coerce_str(payload.get("title"), FASTAPI_TITLE),
-        version=coerce_str(payload.get("version"), FASTAPI_VERSION),
-        description=coerce_str(payload.get("description"), FASTAPI_DESCRIPTION),
+        title=coerce_str(payload.get("title"), constants.FASTAPI_TITLE),
+        version=coerce_str(payload.get("version"), constants.FASTAPI_VERSION),
+        description=coerce_str(payload.get("description"), constants.FASTAPI_DESCRIPTION),
     )
 
 
@@ -392,89 +377,3 @@ def build_settings_payload_from_json(config: dict[str, Any], env: EnvironmentSna
         "ingestion": _build_ingestion_settings(ingestion_payload).model_dump(),
         "llm_defaults": llm_defaults.model_dump(),
     }
-
-
-def _build_settings_manager(config_path: str | None = None) -> JsonConfigurationManager:
-    ensure_environment_loaded()
-    return JsonConfigurationManager(config_path=config_path)
-
-
-def get_server_settings(config_path: str | None = None) -> ServerSettings:
-    if config_path:
-        manager = _build_settings_manager(config_path=config_path)
-        settings = manager.settings
-        LLMRuntimeConfig.configure(settings.llm_defaults)
-        return settings
-
-    state = _runtime_state()
-    default_path = Path(constants.CONFIGURATIONS_FILE)
-    with state.lock:
-        if state.manager is None or state.manager._config_path != default_path:
-            state.manager = _build_settings_manager()
-        settings = state.manager.settings
-
-    LLMRuntimeConfig.configure(settings.llm_defaults)
-    return settings
-
-
-def get_configuration_manager() -> JsonConfigurationManager:
-    state = _runtime_state()
-    default_path = Path(constants.CONFIGURATIONS_FILE)
-    with state.lock:
-        if state.manager is None or state.manager._config_path != default_path:
-            state.manager = _build_settings_manager()
-        return state.manager
-
-
-def get_configuration_block(block_name: str) -> dict[str, Any]:
-    return get_configuration_manager().get_block(block_name)
-
-
-def get_configuration_value(block_name: str, key: str, default: Any = None) -> Any:
-    return get_configuration_manager().get_value(block_name, key, default)
-
-
-def reload_settings_for_tests() -> ServerSettings:
-    reset_app_settings_cache()
-    return get_server_settings()
-
-
-def reset_app_settings_cache() -> None:
-    state = _runtime_state()
-    with state.lock:
-        state.manager = None
-
-
-def get_app_settings() -> ServerSettings:
-    return get_server_settings()
-
-
-class ConfigurationManagement:
-    @classmethod
-    def get_app_settings(cls) -> ServerSettings:
-        return get_app_settings()
-
-    @classmethod
-    def get_server_settings(cls, config_path: str | None = None) -> ServerSettings:
-        return get_server_settings(config_path=config_path)
-
-    @classmethod
-    def get_configuration_block(cls, block_name: str) -> dict[str, Any]:
-        return get_configuration_block(block_name)
-
-    @classmethod
-    def get_configuration_value(
-        cls,
-        block_name: str,
-        key: str,
-        default: Any = None,
-    ) -> Any:
-        return get_configuration_value(block_name, key, default)
-
-    @classmethod
-    def reload_settings_for_tests(cls) -> ServerSettings:
-        return reload_settings_for_tests()
-
-    @classmethod
-    def reset_app_settings_cache(cls) -> None:
-        reset_app_settings_cache()

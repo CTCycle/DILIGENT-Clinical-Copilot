@@ -1,15 +1,31 @@
 from __future__ import annotations
 
+from functools import lru_cache
 import os
 from pathlib import Path
+from threading import RLock
 from typing import Any
 
+from DILIGENT.server.common import constants
 from DILIGENT.server.common.constants import ENV_FILE_PATH, TRUTHY_ENV_VALUES
 from DILIGENT.server.configurations.environment import (
     ensure_environment_loaded,
     reset_environment_bootstrap_for_tests,
 )
-from DILIGENT.server.configurations.management import ConfigurationManagement
+from DILIGENT.server.configurations.llm_configs import LLMRuntimeConfig
+from DILIGENT.server.configurations.management import ConfigurationManager
+from DILIGENT.server.domain.settings.configuration import ServerSettings
+
+
+class _ConfigurationRuntimeState:
+    def __init__(self) -> None:
+        self.lock = RLock()
+        self.manager: ConfigurationManager | None = None
+
+
+@lru_cache(maxsize=1)
+def _runtime_state() -> _ConfigurationRuntimeState:
+    return _ConfigurationRuntimeState()
 
 
 ###############################################################################
@@ -17,28 +33,48 @@ def initialize_environment() -> Path | None:
     return ensure_environment_loaded()
 
 
-def get_app_settings():
-    return ConfigurationManagement.get_app_settings()
+def _build_settings_manager(config_path: str | None = None) -> ConfigurationManager:
+    ensure_environment_loaded()
+    return ConfigurationManager(config_path=config_path)
 
 
-def get_server_settings(config_path: str | None = None):
-    return ConfigurationManagement.get_server_settings(config_path=config_path)
+def get_configuration_manager(config_path: str | None = None) -> ConfigurationManager:
+    if config_path:
+        return _build_settings_manager(config_path=config_path)
+
+    state = _runtime_state()
+    default_path = Path(constants.CONFIGURATIONS_FILE)
+    with state.lock:
+        if state.manager is None or state.manager.config_path != default_path:
+            state.manager = _build_settings_manager(config_path=str(default_path))
+        return state.manager
+
+
+def get_server_settings(config_path: str | None = None) -> ServerSettings:
+    manager = get_configuration_manager(config_path=config_path)
+    settings = manager.server_settings
+    LLMRuntimeConfig.configure(settings.llm_defaults)
+    return settings
 
 
 def get_configuration_block(block_name: str) -> dict[str, Any]:
-    return ConfigurationManagement.get_configuration_block(block_name)
+    return get_configuration_manager().get_block(block_name)
 
 
 def get_configuration_value(block_name: str, key: str, default: Any = None) -> Any:
-    return ConfigurationManagement.get_configuration_value(block_name, key, default)
+    return get_configuration_manager().get_value(block_name, key, default)
 
 
-def reload_settings_for_tests():
-    return ConfigurationManagement.reload_settings_for_tests()
+def reload_settings_for_tests(config_path: str | None = None) -> ServerSettings:
+    if config_path is None:
+        reset_app_settings_cache()
+    return get_server_settings(config_path=config_path)
 
 
 def reset_app_settings_cache() -> None:
-    ConfigurationManagement.reset_app_settings_cache()
+    state = _runtime_state()
+    with state.lock:
+        state.manager = None
 
 
 def tauri_mode_enabled() -> bool:
@@ -55,18 +91,16 @@ class _ServerSettingsProxy:
 
 
 server_settings = _ServerSettingsProxy()
-environment_settings = server_settings
 
 
 def initialize_settings() -> None:
-    get_app_settings()
+    get_server_settings()
 
 
 __all__ = [
     "ENV_FILE_PATH",
     "ensure_environment_loaded",
-    "environment_settings",
-    "get_app_settings",
+    "get_configuration_manager",
     "get_configuration_block",
     "get_configuration_value",
     "get_server_settings",
