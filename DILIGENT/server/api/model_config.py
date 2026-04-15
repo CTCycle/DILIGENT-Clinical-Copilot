@@ -446,10 +446,10 @@ class ModelConfigEndpoint:
         try:
             async with OllamaClient() as client:
                 models = await client.list_models()
-        except Exception as exc:
-            if isinstance(exc, (OllamaTimeout, OllamaError)):
-                logger.warning("Unable to list local Ollama models: %s", exc)
-                return set()
+        except (OllamaTimeout, OllamaError) as exc:
+            logger.warning("Unable to list local Ollama models: %s", exc)
+            return set()
+        except Exception:
             logger.exception("Unexpected error while listing local Ollama models")
             return set()
         return {
