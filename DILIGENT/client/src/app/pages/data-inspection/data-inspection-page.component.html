@@ -522,17 +522,17 @@
                 [attr.fill]="event.color"
               />
               <rect
-                [attr.x]="event.x - 92"
+                [attr.x]="event.x - (timelineCardWidth / 2)"
                 [attr.y]="event.cardY"
-                width="184"
-                height="54"
+                [attr.width]="timelineCardWidth"
+                [attr.height]="timelineCardHeight"
                 rx="8"
                 fill="#f8fafc"
                 stroke="#cbd5e1"
                 stroke-width="1"
               />
               <text
-                [attr.x]="event.x - 82"
+                [attr.x]="event.x - (timelineCardWidth / 2) + 10"
                 [attr.y]="event.cardY + 18"
                 font-size="11"
                 font-weight="700"
@@ -541,12 +541,22 @@
                 {{ event.raw.title }}
               </text>
               <text
-                [attr.x]="event.x - 82"
+                [attr.x]="event.x - (timelineCardWidth / 2) + 10"
                 [attr.y]="event.cardY + 36"
                 font-size="10"
                 fill="#334155"
               >
                 {{ event.dateLabel }}
+              </text>
+              <text
+                [attr.x]="event.x - (timelineCardWidth / 2) + 10"
+                [attr.y]="event.cardY + 50"
+                font-size="10"
+                fill="#475569"
+              >
+                @for (line of event.detailLines; track line + '-' + $index) {
+                  <tspan [attr.x]="event.x - (timelineCardWidth / 2) + 10" [attr.dy]="$index === 0 ? 0 : 12">{{ line }}</tspan>
+                }
               </text>
             }
           </svg>

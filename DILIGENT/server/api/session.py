@@ -90,6 +90,36 @@ def build_failed_session_payload(
     elapsed_seconds: float,
 ) -> dict[str, Any]:
     language_result = detect_clinical_language(payload)
+    runtime_settings = {
+        "use_cloud_services": bool(
+            runtime_overrides.get("use_cloud_services")
+            if runtime_overrides.get("use_cloud_services") is not None
+            else LLMRuntimeConfig.is_cloud_enabled()
+        ),
+        "llm_provider": runtime_overrides.get("llm_provider")
+        or LLMRuntimeConfig.get_llm_provider(),
+        "cloud_model": runtime_overrides.get("cloud_model")
+        or LLMRuntimeConfig.get_cloud_model(),
+        "parsing_model": runtime_overrides.get("parsing_model")
+        or LLMRuntimeConfig.get_parsing_model(),
+        "clinical_model": runtime_overrides.get("clinical_model")
+        or LLMRuntimeConfig.get_clinical_model(),
+        "ollama_temperature": (
+            runtime_overrides.get("ollama_temperature")
+            if runtime_overrides.get("ollama_temperature") is not None
+            else LLMRuntimeConfig.get_ollama_temperature()
+        ),
+        "cloud_temperature": (
+            runtime_overrides.get("cloud_temperature")
+            if runtime_overrides.get("cloud_temperature") is not None
+            else LLMRuntimeConfig.get_cloud_temperature()
+        ),
+        "ollama_reasoning": bool(
+            runtime_overrides.get("ollama_reasoning")
+            if runtime_overrides.get("ollama_reasoning") is not None
+            else LLMRuntimeConfig.is_ollama_reasoning_enabled()
+        ),
+    }
     return {
         "patient_name": payload.name,
         "patient_visit_date": payload.visit_date,
@@ -127,6 +157,7 @@ def build_failed_session_payload(
             "excluded_drugs": [],
             "unresolved_drugs": [],
             "structured_case": {},
+            "runtime_settings": runtime_settings,
         },
     }
 
@@ -1444,6 +1475,16 @@ class ClinicalSessionEndpoint:
                 "therapy_drugs": [entry.model_dump() for entry in therapy_drugs.entries],
                 "anamnesis_drugs": [entry.model_dump() for entry in anamnesis_drugs.entries],
                 "anamnesis_diseases": [entry.model_dump() for entry in disease_context.entries],
+            },
+            "runtime_settings": {
+                "use_cloud_services": LLMRuntimeConfig.is_cloud_enabled(),
+                "llm_provider": LLMRuntimeConfig.get_llm_provider(),
+                "cloud_model": LLMRuntimeConfig.get_cloud_model(),
+                "parsing_model": LLMRuntimeConfig.get_parsing_model(),
+                "clinical_model": LLMRuntimeConfig.get_clinical_model(),
+                "ollama_temperature": LLMRuntimeConfig.get_ollama_temperature(),
+                "cloud_temperature": LLMRuntimeConfig.get_cloud_temperature(),
+                "ollama_reasoning": LLMRuntimeConfig.is_ollama_reasoning_enabled(),
             },
         }
         self.emit_progress(

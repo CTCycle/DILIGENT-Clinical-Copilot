@@ -971,6 +971,8 @@ class _RepositorySerializationService:
                 "anamnesis": self.normalize_string(patient_row.anamnesis),
                 "drugs": self.normalize_string(patient_row.drugs),
                 "laboratory_analysis": self.normalize_string(patient_row.laboratory_analysis),
+                "parsing_model": self.normalize_string(session_row.parsing_model),
+                "clinical_model": self.normalize_string(session_row.clinical_model),
                 "sections": sections,
                 "session_result_payload": session_payload,
             }

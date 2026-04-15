@@ -4483,9 +4483,12 @@ input[type="date"]::-webkit-calendar-picker-indicator:hover {
 
 .inspection-timeline-scroll {
   overflow-x: auto;
+  overflow-y: auto;
   border: 1px solid rgba(148, 163, 184, 0.32);
   border-radius: var(--radius-lg);
   background: rgba(241, 245, 249, 0.72);
+  max-height: 72vh;
+  padding: 8px;
 }
 
 .inspection-timeline-svg {
