@@ -23,6 +23,8 @@ import {
   InspectionUpdateConfigResponse,
   InspectionRxNavCatalogResponse,
   InspectionSessionCatalogResponse,
+  InspectionSessionTimeline,
+  InspectionSessionTimelineRequest,
   InspectionSessionQuery,
   InspectionUpdateJobStatusResponse,
   InspectionSessionReportResponse,
@@ -406,6 +408,31 @@ export async function fetchInspectionSessionReport(
   return requestJson<InspectionSessionReportResponse>(
     `${API_BASE_URL}/inspection/sessions/${encodeURIComponent(String(sessionId))}/report`,
     { method: "GET" },
+  );
+}
+
+export async function fetchInspectionSessionTimeline(
+  sessionId: number,
+): Promise<InspectionSessionTimeline> {
+  return requestJson<InspectionSessionTimeline>(
+    `${API_BASE_URL}/inspection/sessions/${encodeURIComponent(String(sessionId))}/timeline`,
+    { method: "GET" },
+  );
+}
+
+export async function generateInspectionSessionTimeline(
+  sessionId: number,
+  payload: InspectionSessionTimelineRequest = {},
+): Promise<InspectionSessionTimeline> {
+  return requestJson<InspectionSessionTimeline>(
+    `${API_BASE_URL}/inspection/sessions/${encodeURIComponent(String(sessionId))}/timeline`,
+    {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify(payload),
+    },
   );
 }
 

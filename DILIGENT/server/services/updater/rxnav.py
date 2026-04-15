@@ -19,7 +19,7 @@ from DILIGENT.server.common.constants import (
     RXNAV_CURATED_ALIASES_PATH,
     RXNAV_SYNONYM_STOPWORDS,
 )
-from DILIGENT.server.domain.rxnav.entities import RxNormCandidate
+from DILIGENT.server.domain.rxnav import RxNormCandidate
 from DILIGENT.server.repositories.serialization.data import DataSerializer
 from DILIGENT.server.services.text.normalization import normalize_drug_name
 

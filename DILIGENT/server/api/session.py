@@ -29,7 +29,7 @@ from DILIGENT.server.domain.clinical.entities import (
     PatientRucamAssessmentBundle,
     PipelineIssue,
 )
-from DILIGENT.server.domain.jobs.entities import (
+from DILIGENT.server.domain.jobs import (
     JobCancelResponse,
     JobStartResponse,
     JobStatusResponse,

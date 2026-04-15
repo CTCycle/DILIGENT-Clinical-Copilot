@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import asyncio
 from datetime import date, datetime, UTC
 from functools import partial
 from pathlib import Path
@@ -13,9 +14,11 @@ from DILIGENT.server.common.constants import (
 )
 from DILIGENT.server.common.utils.logger import logger
 from DILIGENT.server.configurations.startup import server_settings
-from DILIGENT.server.domain.inspection.entities import InspectionJobPhase
+from DILIGENT.server.domain.inspection import InspectionJobPhase
+from DILIGENT.server.domain.patient_timeline import PatientTimeline
 from DILIGENT.server.repositories.serialization.data import DataSerializer, DocumentSerializer
 from DILIGENT.server.repositories.vectors import LanceVectorDatabase
+from DILIGENT.server.services.clinical.timeline import PatientTimelineExtractor
 from DILIGENT.server.services.jobs import JobManager, job_manager
 from DILIGENT.server.services.updater.embeddings import RagEmbeddingUpdater
 from DILIGENT.server.services.updater.dailymed import DailyMedLabelUpdater
@@ -101,9 +104,11 @@ class DataInspectionService:
         self,
         *,
         serializer: DataSerializer | None = None,
+        timeline_extractor: PatientTimelineExtractor | None = None,
         jobs: JobManager = job_manager,
     ) -> None:
         self.serializer = serializer or DataSerializer()
+        self.timeline_extractor = timeline_extractor or PatientTimelineExtractor()
         self.jobs = jobs
 
     # -------------------------------------------------------------------------
@@ -267,6 +272,53 @@ class DataInspectionService:
     # -------------------------------------------------------------------------
     def delete_session(self, session_id: int) -> bool:
         return self.serializer.delete_session(session_id)
+
+    # -------------------------------------------------------------------------
+    def get_session_timeline(self, session_id: int) -> PatientTimeline | None:
+        payload = self.serializer.get_session_result_payload(session_id)
+        if not isinstance(payload, dict):
+            return None
+        timeline_payload = payload.get("patient_timeline")
+        if not isinstance(timeline_payload, dict):
+            return None
+        try:
+            return PatientTimeline.model_validate(timeline_payload)
+        except Exception as exc:  # noqa: BLE001
+            logger.warning(
+                "Invalid persisted timeline payload for session_id=%s: %s",
+                session_id,
+                exc,
+            )
+            return None
+
+    # -------------------------------------------------------------------------
+    def generate_session_timeline(
+        self,
+        session_id: int,
+        *,
+        force_regenerate: bool = False,
+    ) -> PatientTimeline | None:
+        if not force_regenerate:
+            cached = self.get_session_timeline(session_id)
+            if cached is not None:
+                return cached
+
+        source = self.serializer.get_session_timeline_source(session_id)
+        if source is None:
+            return None
+        session_payload = source.get("session_result_payload")
+        if not isinstance(session_payload, dict):
+            session_payload = {}
+
+        timeline = asyncio.run(
+            self.timeline_extractor.extract_timeline(
+                session_id=session_id,
+                source_payload=source,
+            )
+        )
+        session_payload["patient_timeline"] = timeline.model_dump(mode="json")
+        self.serializer.upsert_session_result_payload(session_id, session_payload)
+        return timeline
 
     # -------------------------------------------------------------------------
     def list_rxnav_catalog(
