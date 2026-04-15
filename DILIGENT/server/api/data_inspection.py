@@ -6,7 +6,7 @@ from fastapi import APIRouter, Body, HTTPException, Query, status
 
 from DILIGENT.server.common.utils.logger import logger
 from DILIGENT.server.configurations.startup import server_settings
-from DILIGENT.server.domain.inspection.entities import (
+from DILIGENT.server.domain.inspection import (
     CatalogListFilters,
     DeleteEntityResponse,
     DiliPriorCatalogResponse,
@@ -31,7 +31,11 @@ from DILIGENT.server.domain.inspection.entities import (
     SessionListFilters,
     SessionStatus,
 )
-from DILIGENT.server.domain.jobs.entities import JobCancelResponse, JobStartResponse, JobStatusResponse
+from DILIGENT.server.domain.jobs import JobCancelResponse, JobStartResponse, JobStatusResponse
+from DILIGENT.server.domain.patient_timeline import (
+    PatientTimeline,
+    SessionTimelineRegenerateRequest,
+)
 from DILIGENT.server.services.inspection import DataInspectionService
 
 
@@ -158,6 +162,48 @@ class DataInspectionEndpoint:
                 detail="Session report not found.",
             )
         return SessionReportResponse(session_id=session_id, report=report)
+
+    # -------------------------------------------------------------------------
+    def get_session_timeline(self, session_id: int) -> PatientTimeline:
+        timeline = self.service.get_session_timeline(session_id)
+        if timeline is None:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail="Session timeline not found.",
+            )
+        return timeline
+
+    # -------------------------------------------------------------------------
+    def generate_session_timeline(
+        self,
+        session_id: int,
+        request: SessionTimelineRegenerateRequest = Body(
+            default=SessionTimelineRegenerateRequest()
+        ),
+        force_regenerate_query: bool = Query(default=False, alias="force_regenerate"),
+    ) -> PatientTimeline:
+        force_regenerate = bool(force_regenerate_query or request.force_regenerate)
+        try:
+            timeline = self.service.generate_session_timeline(
+                session_id,
+                force_regenerate=force_regenerate,
+            )
+        except RuntimeError as exc:
+            logger.warning(
+                "Session timeline generation failed session_id=%s error=%s",
+                session_id,
+                exc,
+            )
+            raise HTTPException(
+                status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+                detail="Timeline generation is currently unavailable. Please retry.",
+            ) from exc
+        if timeline is None:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail="Session not found.",
+            )
+        return timeline
 
     # -------------------------------------------------------------------------
     def delete_session(self, session_id: int) -> DeleteEntityResponse:
@@ -459,6 +505,20 @@ class DataInspectionEndpoint:
             self.get_session_report,
             methods=["GET"],
             response_model=SessionReportResponse,
+            status_code=status.HTTP_200_OK,
+        )
+        self.router.add_api_route(
+            "/sessions/{session_id}/timeline",
+            self.get_session_timeline,
+            methods=["GET"],
+            response_model=PatientTimeline,
+            status_code=status.HTTP_200_OK,
+        )
+        self.router.add_api_route(
+            "/sessions/{session_id}/timeline",
+            self.generate_session_timeline,
+            methods=["POST"],
+            response_model=PatientTimeline,
             status_code=status.HTTP_200_OK,
         )
         self.router.add_api_route(

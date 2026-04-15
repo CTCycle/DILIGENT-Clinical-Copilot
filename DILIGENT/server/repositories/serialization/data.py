@@ -19,7 +19,7 @@ from sqlalchemy import and_, case, delete, exists, func, inspect, or_, select, u
 from sqlalchemy.orm import Session, selectinload, sessionmaker
 
 from DILIGENT.server.configurations.startup import server_settings
-from DILIGENT.server.domain.documents.entities import Document
+from DILIGENT.server.domain.documents import Document
 from DILIGENT.server.common.constants import (
     DEFAULT_EMBEDDING_BATCH_SIZE,
     DRUG_NAME_ALLOWED_PATTERN,
@@ -866,6 +866,114 @@ class _RepositorySerializationService:
                 )
             ).scalar_one_or_none()
             return self.normalize_string(section_report)
+        finally:
+            db_session.close()
+
+    # -----------------------------------------------------------------------------
+    def parse_session_result_payload(self, payload_json: str | None) -> dict[str, Any] | None:
+        normalized_payload = self.normalize_string(payload_json)
+        if normalized_payload is None:
+            return None
+        try:
+            parsed = json.loads(normalized_payload)
+        except json.JSONDecodeError:
+            return None
+        return parsed if isinstance(parsed, dict) else None
+
+    # -----------------------------------------------------------------------------
+    def get_session_result_payload(self, session_id: int) -> dict[str, Any] | None:
+        self.ensure_session_result_table()
+        safe_session_id = int(session_id)
+        db_session = self.session_factory()
+        try:
+            payload_json = db_session.execute(
+                select(ClinicalSessionResult.payload_json).where(
+                    ClinicalSessionResult.session_id == safe_session_id
+                )
+            ).scalar_one_or_none()
+            return self.parse_session_result_payload(payload_json)
+        finally:
+            db_session.close()
+
+    # -----------------------------------------------------------------------------
+    def upsert_session_result_payload(self, session_id: int, payload: dict[str, Any]) -> bool:
+        self.ensure_session_result_table()
+        safe_session_id = int(session_id)
+        serialized_payload = self.serialize_json_payload(payload)
+        if serialized_payload is None:
+            return False
+        db_session = self.session_factory()
+        try:
+            existing_session = db_session.get(ClinicalSession, safe_session_id)
+            if existing_session is None:
+                return False
+            existing_result = db_session.execute(
+                select(ClinicalSessionResult).where(
+                    ClinicalSessionResult.session_id == safe_session_id
+                )
+            ).scalar_one_or_none()
+            if existing_result is None:
+                db_session.add(
+                    ClinicalSessionResult(
+                        session_id=safe_session_id,
+                        payload_json=serialized_payload,
+                    )
+                )
+            else:
+                existing_result.payload_json = serialized_payload
+            db_session.commit()
+            return True
+        except Exception:
+            db_session.rollback()
+            raise
+        finally:
+            db_session.close()
+
+    # -----------------------------------------------------------------------------
+    def get_session_timeline_source(self, session_id: int) -> dict[str, Any] | None:
+        self.ensure_session_result_table()
+        safe_session_id = int(session_id)
+        db_session = self.session_factory()
+        try:
+            row = db_session.execute(
+                select(ClinicalSession, Patient)
+                .join(Patient, ClinicalSession.patient_id == Patient.id)
+                .where(ClinicalSession.id == safe_session_id)
+            ).first()
+            if row is None:
+                return None
+            session_row, patient_row = row
+            payload_json = db_session.execute(
+                select(ClinicalSessionResult.payload_json).where(
+                    ClinicalSessionResult.session_id == safe_session_id
+                )
+            ).scalar_one_or_none()
+            session_payload = self.parse_session_result_payload(payload_json) or {}
+            section_rows = db_session.execute(
+                select(ClinicalSessionSection.section_kind, ClinicalSessionSection.content).where(
+                    ClinicalSessionSection.session_id == safe_session_id
+                )
+            ).all()
+            sections = {
+                str(kind): self.normalize_string(content)
+                for kind, content in section_rows
+                if self.normalize_string(kind) is not None
+            }
+            return {
+                "session_id": safe_session_id,
+                "patient_name": self.normalize_string(patient_row.name),
+                "visit_date": patient_row.visit_date.isoformat() if patient_row.visit_date else None,
+                "session_timestamp": (
+                    session_row.session_timestamp.isoformat()
+                    if session_row.session_timestamp
+                    else None
+                ),
+                "anamnesis": self.normalize_string(patient_row.anamnesis),
+                "drugs": self.normalize_string(patient_row.drugs),
+                "laboratory_analysis": self.normalize_string(patient_row.laboratory_analysis),
+                "sections": sections,
+                "session_result_payload": session_payload,
+            }
         finally:
             db_session.close()
 

@@ -8,7 +8,7 @@ from dotenv import load_dotenv
 
 from DILIGENT.server.common import constants
 from DILIGENT.server.common.utils.logger import logger
-from DILIGENT.server.domain.environment.bootstrap import EnvironmentBootstrapState
+from DILIGENT.server.domain.bootstrap import EnvironmentBootstrapState
 
 
 @lru_cache(maxsize=1)

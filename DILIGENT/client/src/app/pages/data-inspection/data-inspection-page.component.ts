@@ -12,6 +12,7 @@ import {
   deleteInspectionLiverToxDrug,
   deleteInspectionRxNavDrug,
   deleteInspectionSession,
+  fetchInspectionSessionTimeline,
   fetchInspectionDiliPriorDetails,
   fetchInspectionDiliPriorsCatalog,
   fetchInspectionDiliPriorsUpdateConfig,
@@ -34,6 +35,7 @@ import {
   fetchInspectionRxNavUpdateJobStatus,
   fetchInspectionSessionReport,
   fetchInspectionSessions,
+  generateInspectionSessionTimeline,
   startInspectionDiliPriorsUpdateJob,
   startInspectionDrugLabelsUpdateJob,
   startInspectionLiverToxUpdateJob,
@@ -53,6 +55,9 @@ import {
   InspectionRagVectorStoreSummary,
   InspectionRxNavItem,
   InspectionSessionItem,
+  InspectionSessionTimeline,
+  InspectionTimelineEvent,
+  InspectionTimelineEventType,
   InspectionSessionStatus,
   InspectionUpdateConfigResponse,
   InspectionUpdateJobStatusResponse,
@@ -147,6 +152,24 @@ function resolveUpdateProgressMessage(status: InspectionUpdateJobStatusResponse)
   return message || status.error || `Job status: ${status.status}`;
 }
 
+function isNotFoundError(error: unknown): boolean {
+  if (!(error instanceof Error)) {
+    return false;
+  }
+  return error.message.toLowerCase().includes('not found');
+}
+
+type TimelineRenderEvent = {
+  raw: InspectionTimelineEvent;
+  lane: 'top' | 'bottom';
+  x: number;
+  cardY: number;
+  connectorEndY: number;
+  anchorY: number;
+  color: string;
+  dateLabel: string;
+};
+
 @Component({
   selector: 'app-data-inspection-page',
   standalone: true,
@@ -225,6 +248,15 @@ export class DataInspectionPageComponent implements OnInit, OnDestroy {
   readonly reportContent = signal('');
   readonly reportLoading = signal(false);
   readonly reportError = signal<string | null>(null);
+
+  readonly timelineSession = signal<InspectionSessionItem | null>(null);
+  readonly timelineData = signal<InspectionSessionTimeline | null>(null);
+  readonly timelineLoading = signal(false);
+  readonly timelineError = signal<string | null>(null);
+  private readonly timelineCache = new Map<number, InspectionSessionTimeline>();
+  readonly timelineAxisY = 220;
+  readonly timelineChartHeight = 460;
+  readonly timelineChartPaddingX = 90;
 
   readonly aliasData = signal<InspectionDrugAliasesResponse | null>(null);
   readonly aliasLoading = signal(false);
@@ -399,6 +431,172 @@ export class DataInspectionPageComponent implements OnInit, OnDestroy {
     this.reportError.set(null);
   }
 
+  async openPatientTimeline(row: InspectionSessionItem): Promise<void> {
+    this.timelineSession.set(row);
+    this.timelineError.set(null);
+    const cached = this.timelineCache.get(row.session_id) || null;
+    if (cached) {
+      this.timelineData.set(cached);
+      this.timelineLoading.set(false);
+      return;
+    }
+
+    this.timelineLoading.set(true);
+    this.timelineData.set(null);
+    try {
+      const timeline = await fetchInspectionSessionTimeline(row.session_id);
+      this.timelineCache.set(row.session_id, timeline);
+      this.timelineData.set(timeline);
+    } catch (error) {
+      if (isNotFoundError(error)) {
+        try {
+          const timeline = await generateInspectionSessionTimeline(row.session_id);
+          this.timelineCache.set(row.session_id, timeline);
+          this.timelineData.set(timeline);
+        } catch (generationError) {
+          this.timelineError.set(
+            generationError instanceof Error
+              ? generationError.message
+              : 'Failed to generate patient timeline.',
+          );
+        }
+      } else {
+        this.timelineError.set(
+          error instanceof Error ? error.message : 'Failed to load patient timeline.',
+        );
+      }
+    } finally {
+      this.timelineLoading.set(false);
+    }
+  }
+
+  closePatientTimeline(): void {
+    this.timelineSession.set(null);
+    this.timelineLoading.set(false);
+    this.timelineError.set(null);
+  }
+
+  async regeneratePatientTimeline(): Promise<void> {
+    const session = this.timelineSession();
+    if (!session) {
+      return;
+    }
+    this.timelineLoading.set(true);
+    this.timelineError.set(null);
+    try {
+      const timeline = await generateInspectionSessionTimeline(session.session_id, {
+        force_regenerate: true,
+      });
+      this.timelineCache.set(session.session_id, timeline);
+      this.timelineData.set(timeline);
+    } catch (error) {
+      this.timelineError.set(
+        error instanceof Error ? error.message : 'Failed to regenerate patient timeline.',
+      );
+    } finally {
+      this.timelineLoading.set(false);
+    }
+  }
+
+  timelineSvgWidth(): number {
+    const eventCount = this.timelineData()?.events.length ?? 0;
+    return Math.max(980, 260 + eventCount * 180);
+  }
+
+  timelineRenderEvents(): TimelineRenderEvent[] {
+    const timeline = this.timelineData();
+    if (!timeline || timeline.events.length === 0) {
+      return [];
+    }
+    const colors: Record<InspectionTimelineEventType, string> = {
+      therapy: '#0f766e',
+      disease: '#b91c1c',
+      lab: '#0369a1',
+      other: '#57534e',
+    };
+    const events = [...timeline.events].sort((a, b) => a.sort_order - b.sort_order);
+    const count = events.length;
+    const width = this.timelineSvgWidth();
+    const startX = this.timelineChartPaddingX;
+    const endX = width - this.timelineChartPaddingX;
+    const range = Math.max(endX - startX, 1);
+
+    return events.map((event, index) => {
+      const lane: 'top' | 'bottom' = index % 2 === 0 ? 'top' : 'bottom';
+      const x = count === 1 ? startX + range / 2 : startX + (range * index) / (count - 1);
+      const anchorY = this.timelineAxisY;
+      const connectorEndY = lane === 'top' ? anchorY - 70 : anchorY + 70;
+      const cardY = lane === 'top' ? 26 : this.timelineAxisY + 86;
+      const dateLabel = event.event_date || event.relative_time || 'Date not reported';
+      return {
+        raw: event,
+        lane,
+        x,
+        cardY,
+        connectorEndY,
+        anchorY,
+        color: colors[event.event_type] || colors.other,
+        dateLabel,
+      };
+    });
+  }
+
+  exportTimelinePng(): void {
+    const svg = document.getElementById('inspection-timeline-svg') as SVGSVGElement | null;
+    if (!svg) {
+      this.timelineError.set('Timeline canvas is unavailable for export.');
+      return;
+    }
+
+    const serializer = new XMLSerializer();
+    const source = serializer.serializeToString(svg);
+    const blob = new Blob([source], { type: 'image/svg+xml;charset=utf-8' });
+    const url = URL.createObjectURL(blob);
+    const image = new Image();
+
+    image.onload = () => {
+      const width = this.timelineSvgWidth();
+      const height = this.timelineChartHeight;
+      const canvas = document.createElement('canvas');
+      canvas.width = width * 2;
+      canvas.height = height * 2;
+      const context = canvas.getContext('2d');
+      if (!context) {
+        URL.revokeObjectURL(url);
+        this.timelineError.set('Failed to initialize export renderer.');
+        return;
+      }
+      context.scale(2, 2);
+      context.fillStyle = '#ffffff';
+      context.fillRect(0, 0, width, height);
+      context.drawImage(image, 0, 0, width, height);
+      canvas.toBlob((pngBlob) => {
+        if (!pngBlob) {
+          this.timelineError.set('Failed to encode PNG export.');
+          URL.revokeObjectURL(url);
+          return;
+        }
+        const downloadUrl = URL.createObjectURL(pngBlob);
+        const link = document.createElement('a');
+        const sessionId = this.timelineSession()?.session_id ?? 'session';
+        link.href = downloadUrl;
+        link.download = `patient-timeline-${sessionId}.png`;
+        document.body.appendChild(link);
+        link.click();
+        link.remove();
+        URL.revokeObjectURL(downloadUrl);
+        URL.revokeObjectURL(url);
+      }, 'image/png');
+    };
+
+    image.onerror = () => {
+      URL.revokeObjectURL(url);
+      this.timelineError.set('Failed to render timeline for export.');
+    };
+
+    image.src = url;
+  }
+
   async confirmAndRemoveSession(row: InspectionSessionItem): Promise<void> {
     const patientLabel = row.patient_name?.trim() || 'Unknown patient';
     const confirmed = globalThis.confirm(
@@ -410,6 +608,7 @@ export class DataInspectionPageComponent implements OnInit, OnDestroy {
 
     try {
       await deleteInspectionSession(row.session_id);
+      this.timelineCache.delete(row.session_id);
       await this.loadSessions();
     } catch (error) {
       this.sessionError.set(

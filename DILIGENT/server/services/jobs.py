@@ -10,7 +10,7 @@ from typing import Any
 from collections.abc import Callable
 
 from DILIGENT.server.common.utils.logger import logger
-from DILIGENT.server.domain.jobs.entities import JobState
+from DILIGENT.server.domain.jobs import JobState
 
 
 SENSITIVE_ERROR_TOKENS: tuple[str, ...] = (

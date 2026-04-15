@@ -2,9 +2,11 @@ from __future__ import annotations
 
 import time
 from datetime import date, datetime
+from typing import Any
 from sqlalchemy import create_engine, select
 from sqlalchemy.orm import sessionmaker
 
+from DILIGENT.server.domain.patient_timeline import PatientTimeline, PatientTimelineEvent
 from DILIGENT.server.repositories.schemas.models import (
     Base,
     ClinicalSession,
@@ -350,3 +352,68 @@ def test_update_job_lifecycle_with_cooperative_cancel() -> None:
     )
     assert final_livertox is not None
     assert final_livertox["status"] == "cancelled"
+
+
+class FakeTimelineExtractor:
+    def __init__(self) -> None:
+        self.call_count = 0
+
+    async def extract_timeline(
+        self,
+        *,
+        session_id: int,
+        source_payload: dict[str, Any],
+    ) -> PatientTimeline:
+        _ = source_payload
+        self.call_count += 1
+        return PatientTimeline(
+            session_id=session_id,
+            generated_at=datetime(2026, 1, 1, 12, 0),
+            events=[
+                PatientTimelineEvent(
+                    event_id=f"event-{session_id}-1",
+                    title="Therapy started",
+                    event_type="therapy",
+                    event_date="2025-01-10",
+                    source="drugs",
+                )
+            ],
+        )
+
+
+# -----------------------------------------------------------------------------
+def test_timeline_generation_persists_and_reuses_payload() -> None:
+    serializer, _ = build_serializer()
+    save_session(
+        serializer,
+        patient_name="Timeline Patient",
+        timestamp=datetime(2025, 1, 1, 8, 30),
+        status="successful",
+        report="Timeline report",
+        anamnesis="Symptoms started in January 2025.",
+    )
+    session_rows, _ = serializer.list_sessions(
+        search="Timeline Patient",
+        status_filter=None,
+        date_mode=None,
+        filter_date=None,
+        offset=0,
+        limit=10,
+    )
+    session_id = int(session_rows[0]["session_id"])
+    extractor = FakeTimelineExtractor()
+    service = DataInspectionService(serializer=serializer, timeline_extractor=extractor)
+
+    generated = service.generate_session_timeline(session_id)
+    assert generated is not None
+    assert generated.events[0].title == "Therapy started"
+    assert extractor.call_count == 1
+
+    cached = service.get_session_timeline(session_id)
+    assert cached is not None
+    assert cached.events[0].event_type == "therapy"
+
+    reused = service.generate_session_timeline(session_id)
+    assert reused is not None
+    assert reused.events[0].title == "Therapy started"
+    assert extractor.call_count == 1

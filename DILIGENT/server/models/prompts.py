@@ -110,6 +110,32 @@ Return:
 
 ANAMNESIS_LAB_EXTRACTION_PROMPT = CLINICAL_LAB_EXTRACTION_PROMPT
 
+PATIENT_TIMELINE_EXTRACTION_PROMPT = """
+You are a clinical timeline extraction assistant.
+Extract chronological, patient-specific events from the provided case context.
+Always return a JSON object that strictly matches the provided schema.
+
+Required event coverage when evidence exists:
+- Therapy starts, changes, and discontinuations/suspensions.
+- Disease manifestations and symptom onset milestones.
+- Laboratory analysis milestones (especially liver-related tests).
+- Any other clinically relevant event with an explicit date or relative time.
+
+Rules:
+- Extract only events supported by the provided context.
+- Keep `title` concise and clinically specific.
+- Keep `description` factual and brief.
+- Set `event_type` to one of: therapy, disease, lab, other.
+- Use ISO date (`YYYY-MM-DD`) in `event_date` when explicit or inferable with high confidence.
+- Use `relative_time` when only relative timing is available.
+- Preserve provenance in `source` (e.g., anamnesis, laboratory_analysis, structured_case, report).
+- Use confidence between 0 and 1; lower confidence for ambiguous inferences.
+- Do not invent dates, treatments, diseases, or lab values.
+
+Return:
+- A JSON object that conforms exactly to the supplied schema.
+"""
+
 DILI_RAG_QUERY_PROMPT = (
     "{name} drug induced liver injury (DILI) {classification} pattern "
     "Pattern of hepatotoxicity - {r_part} "
