@@ -1,6 +1,6 @@
 # DILIGENT Clinical Copilot
 
-[![Release](https://img.shields.io/github/v/release/CTCycle/Pharmagent-Clinical-Copilot?display_name=tag)](https://github.com/CTCycle/Pharmagent-Clinical-Copilot/releases) [![Python](https://img.shields.io/badge/python-%3E%3D3.14-blue?logo=python&logoColor=white)](./pyproject.toml) [![Angular](https://img.shields.io/badge/angular-%5E21.2.0-DD0031?logo=angular&logoColor=white)](./DILIGENT/client/package.json) [![License](https://img.shields.io/badge/license-Polyform%20Noncommercial%201.0.0-lightgrey)](./LICENSE) [![CI](https://github.com/CTCycle/Pharmagent-Clinical-Copilot/actions/workflows/ci.yml/badge.svg)](https://github.com/CTCycle/Pharmagent-Clinical-Copilot/actions/workflows/ci.yml)
+[![Release](https://img.shields.io/github/v/release/CTCycle/DILIGENT-Clinical-Copilot?display_name=tag)](https://github.com/CTCycle/DILIGENT-Clinical-Copilot/releases) [![Python](https://img.shields.io/badge/python-%3E%3D3.14-blue?logo=python&logoColor=white)](./pyproject.toml) [![Angular](https://img.shields.io/badge/angular-%5E21.2.0-DD0031?logo=angular&logoColor=white)](./DILIGENT/client/package.json) [![License](https://img.shields.io/badge/license-Polyform%20Noncommercial%201.0.0-lightgrey)](./LICENSE) [![CI](https://github.com/CTCycle/DILIGENT-Clinical-Copilot/actions/workflows/ci.yml/badge.svg)](https://github.com/CTCycle/DILIGENT-Clinical-Copilot/actions/workflows/ci.yml)
 
 ## 1. Project Overview
 DILIGENT Clinical Copilot supports clinicians during Drug-Induced Liver Injury (DILI) evaluations with a FastAPI backend and an Angular + TypeScript frontend. It collects anamnesis, medications, and lab values, then coordinates clinical analysis with optional RAG support and session persistence for review.
@@ -67,21 +67,27 @@ Detailed user journeys and feature guidance are documented in `assets/docs/USER_
 
 #### Landing Page
 ![Landing page](assets/figures/home.png)
+_Main DILI analysis workspace with clinical inputs and patient context panel._
 
 #### Dashboard / Report Output
 ![Dashboard view](assets/figures/dashboard.png)
+_Analysis dashboard focused on the report output area and execution controls._
 
 #### Model Configuration (Settings)
 ![Model settings](assets/figures/settings.png)
+_Runtime source selection and current model configuration summary._
 
 #### Local Model Catalog (List)
 ![Model list](assets/figures/models-list.png)
+_Scrollable local model catalog with install and role-assignment actions._
 
-#### Provider Access Key (Detail Modal)
+#### Provider Access Key Management
 ![Provider key detail](assets/figures/model-detail.png)
+_Tavily access-key management entry point within the configuration panel._
 
 #### Data Inspection
 ![Data inspection](assets/figures/data-inspection.png)
+_Session inspection table with status, timing, and record actions._
 
 ## 5. Desktop Packaging (Tauri)
 Build Windows desktop artifacts:
@@ -111,3 +117,4 @@ Use this script for offline maintenance operations (for example DB initializatio
 
 ## 8. License
 Non-commercial use is covered by the Polyform Noncommercial License 1.0.0; commercial licensing is available separately. See `LICENSE`.
+
