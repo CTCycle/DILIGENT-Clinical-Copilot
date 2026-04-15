@@ -181,6 +181,30 @@ export type InspectionSessionReportResponse = {
   report: string;
 };
 
+export type InspectionTimelineEventType = "therapy" | "disease" | "lab" | "other";
+
+export type InspectionTimelineEvent = {
+  event_id: string;
+  title: string;
+  description: string | null;
+  event_type: InspectionTimelineEventType;
+  event_date: string | null;
+  relative_time: string | null;
+  source: string | null;
+  confidence: number | null;
+  sort_order: number;
+};
+
+export type InspectionSessionTimeline = {
+  session_id: number;
+  generated_at: string;
+  events: InspectionTimelineEvent[];
+};
+
+export type InspectionSessionTimelineRequest = {
+  force_regenerate?: boolean;
+};
+
 export type InspectionCatalogQuery = {
   search?: string;
   offset?: number;

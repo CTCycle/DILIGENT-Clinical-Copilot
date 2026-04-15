@@ -95,6 +95,9 @@
                       </td>
                       <td>{{ formatDuration(row.total_duration) }}</td>
                       <td class="inspection-actions-cell">
+                        <button class="inspection-icon-button is-timeline" type="button" (click)="openPatientTimeline(row)" [attr.aria-label]="'Patient timeline for session ' + row.session_id" [attr.title]="'Patient timeline for session ' + row.session_id">
+                          <svg class="inspection-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M3 12h18v2H3v-2Zm2-5h2v12H5V7Zm12 3h2v9h-2v-9Zm-6-6h2v15h-2V4Z" /></svg>
+                        </button>
                         <button class="inspection-icon-button is-primary" type="button" (click)="openSessionReport(row)" [attr.aria-label]="'View report for session ' + row.session_id" [attr.title]="'View report for session ' + row.session_id">
                           <svg class="inspection-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 5C7 5 2.73 8.11 1 12c1.73 3.89 6 7 11 7s9.27-3.11 11-7c-1.73-3.89-6-7-11-7Zm0 11a4 4 0 1 1 0-8 4 4 0 0 1 0 8Z" /></svg>
                         </button>
@@ -448,6 +451,109 @@
       @if (reportError()) { <p class="inspection-error-text">{{ reportError() }}</p> }
       @if (!reportLoading() && !reportError()) {
         <pre class="inspection-excerpt-text">{{ reportContent() }}</pre>
+      }
+    </div>
+  </app-modal-shell>
+
+  <app-modal-shell
+    [isOpen]="!!timelineSession()"
+    title="Patient Timeline"
+    [subtitle]="'Session ' + (timelineSession()?.session_id ?? '')"
+    dialogClassName="modal-container inspection-modal inspection-modal-large"
+    closeLabel="Close patient timeline"
+    (close)="closePatientTimeline()"
+  >
+    <div class="inspection-excerpt-body">
+      <div class="inspection-pager-actions" style="margin-bottom: 12px;">
+        <button class="btn btn-secondary inspection-mini-btn" type="button" (click)="regeneratePatientTimeline()" [disabled]="timelineLoading()">Regenerate</button>
+        <button class="btn btn-primary inspection-mini-btn" type="button" (click)="exportTimelinePng()" [disabled]="timelineLoading() || !timelineData()">Export timeline</button>
+      </div>
+      @if (timelineLoading()) { <p>Loading timeline...</p> }
+      @if (timelineError()) { <p class="inspection-error-text">{{ timelineError() }}</p> }
+      @if (!timelineLoading() && timelineData() && timelineData()!.events.length > 0) {
+        <div class="inspection-timeline-scroll">
+          <svg
+            id="inspection-timeline-svg"
+            class="inspection-timeline-svg"
+            [attr.width]="timelineSvgWidth()"
+            [attr.height]="timelineChartHeight"
+            [attr.viewBox]="'0 0 ' + timelineSvgWidth() + ' ' + timelineChartHeight"
+            role="img"
+            aria-label="Patient clinical timeline"
+          >
+            <defs>
+              <marker id="timeline-arrow-head" markerWidth="10" markerHeight="10" refX="8" refY="5" orient="auto">
+                <path d="M0,0 L10,5 L0,10 z" fill="#86efac" />
+              </marker>
+            </defs>
+            <line
+              [attr.x1]="timelineChartPaddingX"
+              [attr.y1]="timelineAxisY"
+              [attr.x2]="timelineSvgWidth() - timelineChartPaddingX - 14"
+              [attr.y2]="timelineAxisY"
+              stroke="#86efac"
+              stroke-width="12"
+              stroke-linecap="round"
+            />
+            <line
+              [attr.x1]="timelineSvgWidth() - timelineChartPaddingX - 14"
+              [attr.y1]="timelineAxisY"
+              [attr.x2]="timelineSvgWidth() - timelineChartPaddingX + 2"
+              [attr.y2]="timelineAxisY"
+              stroke="#86efac"
+              stroke-width="4"
+              marker-end="url(#timeline-arrow-head)"
+            />
+            @for (event of timelineRenderEvents(); track event.raw.event_id + '-' + event.raw.sort_order) {
+              <line
+                [attr.x1]="event.x"
+                [attr.y1]="event.anchorY"
+                [attr.x2]="event.x"
+                [attr.y2]="event.connectorEndY"
+                [attr.stroke]="event.color"
+                stroke-width="2"
+              />
+              <rect
+                [attr.x]="event.x - 6"
+                [attr.y]="event.anchorY - 6"
+                width="12"
+                height="12"
+                rx="2"
+                [attr.fill]="event.color"
+              />
+              <rect
+                [attr.x]="event.x - 92"
+                [attr.y]="event.cardY"
+                width="184"
+                height="54"
+                rx="8"
+                fill="#f8fafc"
+                stroke="#cbd5e1"
+                stroke-width="1"
+              />
+              <text
+                [attr.x]="event.x - 82"
+                [attr.y]="event.cardY + 18"
+                font-size="11"
+                font-weight="700"
+                fill="#0f172a"
+              >
+                {{ event.raw.title }}
+              </text>
+              <text
+                [attr.x]="event.x - 82"
+                [attr.y]="event.cardY + 36"
+                font-size="10"
+                fill="#334155"
+              >
+                {{ event.dateLabel }}
+              </text>
+            }
+          </svg>
+        </div>
+      }
+      @if (!timelineLoading() && timelineData() && timelineData()!.events.length === 0) {
+        <p class="inspection-empty-note">No timeline events were extracted for this session.</p>
       }
     </div>
   </app-modal-shell>

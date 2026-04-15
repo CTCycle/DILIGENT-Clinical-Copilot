@@ -5,7 +5,7 @@ from typing import Literal
 from fastapi import APIRouter, Body, HTTPException, Path, Query, status
 
 from DILIGENT.server.common.utils.logger import logger
-from DILIGENT.server.domain.access_keys.entities import (
+from DILIGENT.server.domain.keys import (
     AccessKeyCreateRequest,
     AccessKeyDeleteResponse,
     AccessKeyResponse,
