@@ -170,6 +170,7 @@ type TimelineRenderEvent = {
   anchorY: number;
   color: string;
   dateLabel: string;
+  detailLines: string[];
 };
 
 type WritableSignalLike<T> = {
@@ -262,8 +263,10 @@ export class DataInspectionPageComponent implements OnInit, OnDestroy {
   readonly timelineError = signal<string | null>(null);
   private readonly timelineCache = new Map<number, InspectionSessionTimeline>();
   readonly timelineAxisY = 220;
-  readonly timelineChartHeight = 460;
+  readonly timelineChartHeight = 500;
   readonly timelineChartPaddingX = 90;
+  readonly timelineCardWidth = 232;
+  readonly timelineCardHeight = 96;
 
   readonly aliasData = signal<InspectionDrugAliasesResponse | null>(null);
   readonly aliasLoading = signal(false);
@@ -499,7 +502,7 @@ export class DataInspectionPageComponent implements OnInit, OnDestroy {
 
   timelineSvgWidth(): number {
     const eventCount = this.timelineData()?.events.length ?? 0;
-    return Math.max(980, 260 + eventCount * 180);
+    return Math.max(1120, 280 + eventCount * 220);
   }
 
   timelineRenderEvents(): TimelineRenderEvent[] {
@@ -525,8 +528,9 @@ export class DataInspectionPageComponent implements OnInit, OnDestroy {
       const x = count === 1 ? startX + range / 2 : startX + (range * index) / (count - 1);
       const anchorY = this.timelineAxisY;
       const connectorEndY = lane === 'top' ? anchorY - 70 : anchorY + 70;
-      const cardY = lane === 'top' ? 26 : this.timelineAxisY + 86;
+      const cardY = lane === 'top' ? 20 : this.timelineAxisY + 86;
       const dateLabel = event.event_date || event.relative_time || 'Date not reported';
+      const detailLines = this.buildTimelineDetailLines(event);
       return {
         raw: event,
         lane,
@@ -536,8 +540,61 @@ export class DataInspectionPageComponent implements OnInit, OnDestroy {
         anchorY,
         color: colors[event.event_type] || colors.other,
         dateLabel,
+        detailLines,
       };
     });
+  }
+
+  private buildTimelineDetailLines(event: InspectionTimelineEvent): string[] {
+    const fragments: string[] = [];
+    if (event.description && event.description.trim()) {
+      fragments.push(event.description.trim());
+    }
+    if (event.source && event.source.trim()) {
+      fragments.push(`Source: ${event.source.trim()}`);
+    }
+    if (typeof event.confidence === 'number' && Number.isFinite(event.confidence)) {
+      fragments.push(`Confidence: ${Math.round(event.confidence * 100)}%`);
+    }
+    if (fragments.length === 0) {
+      return ['No additional details.'];
+    }
+    return this.wrapTimelineText(fragments.join(' • '), 38, 3);
+  }
+
+  private wrapTimelineText(text: string, maxCharsPerLine: number, maxLines: number): string[] {
+    const normalized = text.replace(/\s+/g, ' ').trim();
+    if (!normalized) {
+      return [];
+    }
+    const words = normalized.split(' ');
+    const lines: string[] = [];
+    let current = '';
+    for (const word of words) {
+      const candidate = current ? `${current} ${word}` : word;
+      if (candidate.length <= maxCharsPerLine) {
+        current = candidate;
+        continue;
+      }
+      if (current) {
+        lines.push(current);
+      }
+      current = word;
+      if (lines.length >= maxLines) {
+        break;
+      }
+    }
+    if (current && lines.length < maxLines) {
+      lines.push(current);
+    }
+    if (words.length > 0 && lines.length > 0 && lines.length === maxLines) {
+      const consumed = lines.join(' ');
+      if (consumed.length < normalized.length) {
+        const last = lines[maxLines - 1] ?? '';
+        lines[maxLines - 1] = last.length > 3 ? `${last.slice(0, maxCharsPerLine - 1)}…` : `${last}…`;
+      }
+    }
+    return lines;
   }
 
   exportTimelinePng(): void {

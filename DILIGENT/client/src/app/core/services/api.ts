@@ -38,6 +38,7 @@ import {
 
 const HTTP_TIMEOUT =
   HTTP_TIMEOUT_SECONDS;
+const TIMELINE_REQUEST_TIMEOUT_SECONDS = 120;
 const GENERIC_REQUEST_ERROR = "[ERROR] Request could not be completed. Please try again.";
 const TIMEOUT_REQUEST_ERROR = "[ERROR] Request timed out. Please retry.";
 const NETWORK_REQUEST_ERROR =
@@ -416,6 +417,7 @@ export async function fetchInspectionSessionTimeline(
   return requestJson<InspectionSessionTimeline>(
     `${API_BASE_URL}/inspection/sessions/${encodeURIComponent(String(sessionId))}/timeline`,
     { method: "GET" },
+    TIMELINE_REQUEST_TIMEOUT_SECONDS,
   );
 }
 
@@ -432,6 +434,7 @@ export async function generateInspectionSessionTimeline(
       },
       body: JSON.stringify(payload),
     },
+    TIMELINE_REQUEST_TIMEOUT_SECONDS,
   );
 }
 
