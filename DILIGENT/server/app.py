@@ -11,6 +11,7 @@ from DILIGENT.server.configurations.startup import tauri_mode_enabled
 from DILIGENT.server.api.access_keys import router as access_keys_router
 from DILIGENT.server.api.data_inspection import router as data_inspection_router
 from DILIGENT.server.api.model_config import router as model_config_router
+from DILIGENT.server.api.model_config import sync_runtime_model_config
 from DILIGENT.server.api.session import router as session_router
 from DILIGENT.server.api.ollama import router as ollama_router
 from DILIGENT.server.api.research import router as research_router
@@ -49,6 +50,7 @@ for router in routers:
 @app.on_event("startup")
 async def initialize_database_on_startup() -> None:
     initialize_database()
+    sync_runtime_model_config()
 
 root_endpoint = RootEndpoint(
     app=app,

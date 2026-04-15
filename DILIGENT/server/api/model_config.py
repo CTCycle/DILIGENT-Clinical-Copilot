@@ -338,3 +338,9 @@ endpoint = ModelConfigEndpoint(router=router, serializer=serializer)
 endpoint.add_routes()
 
 
+def sync_runtime_model_config() -> None:
+    """Load persisted model-config snapshot and apply it to runtime state."""
+    snapshot = endpoint.ensure_defaults()
+    endpoint.apply_runtime_snapshot(snapshot)
+
+
