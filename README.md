@@ -1,5 +1,7 @@
 # DILIGENT Clinical Copilot
 
+[![Release](https://img.shields.io/github/v/release/CTCycle/Pharmagent-Clinical-Copilot?display_name=tag)](https://github.com/CTCycle/Pharmagent-Clinical-Copilot/releases) [![Python](https://img.shields.io/badge/python-%3E%3D3.14-blue?logo=python&logoColor=white)](./pyproject.toml) [![Angular](https://img.shields.io/badge/angular-%5E21.2.0-DD0031?logo=angular&logoColor=white)](./DILIGENT/client/package.json) [![License](https://img.shields.io/badge/license-Polyform%20Noncommercial%201.0.0-lightgrey)](./LICENSE) [![CI](https://github.com/CTCycle/Pharmagent-Clinical-Copilot/actions/workflows/ci.yml/badge.svg)](https://github.com/CTCycle/Pharmagent-Clinical-Copilot/actions/workflows/ci.yml)
+
 ## 1. Project Overview
 DILIGENT Clinical Copilot supports clinicians during Drug-Induced Liver Injury (DILI) evaluations with a FastAPI backend and an Angular + TypeScript frontend. It collects anamnesis, medications, and lab values, then coordinates clinical analysis with optional RAG support and session persistence for review.
 
