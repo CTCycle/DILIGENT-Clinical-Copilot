@@ -2,6 +2,8 @@ from __future__ import annotations
 
 from pathlib import Path
 
+from DILIGENT.server.common.utils.catalog_loader import CatalogLoader
+
 # [PATHS]
 ###############################################################################
 PROJECT_DIR = str(Path(__file__).resolve().parents[2])
@@ -45,46 +47,10 @@ REPORT_EXPORT_FILENAME = "clinical_report.md"
 OPENAI_API_BASE = "https://api.openai.com/v1"
 GEMINI_API_BASE = "https://generativelanguage.googleapis.com/v1"
 
-PARSING_MODEL_CHOICES = [
-    "qwen3:1.7b",
-    "qwen3:8b",
-    "qwen3:14b",
-    "llama3.1:8b",
-    "mistral-nemo:12b",
-    "gemma2:9b",
-    "phi3.5:mini",
-    "phi3:medium",
-]
-CLINICAL_MODEL_CHOICES = [
-    "gpt-oss:20b",
-    "llama3.1:8b",
-    "llama3.1:70b",
-    "phi3.5:mini",
-    "phi3.5:moe",
-    "deepseek-r1:14b",
-    "alibayram/medgemma:4b",
-    "alibayram/medgemma:27b",
-    "gemma3:9b",
-    "gemma3:27b",
-]
-OPENAI_CLOUD_MODELS = [
-    "gpt-5.4",
-    "gpt-5.4-pro",
-    "gpt-5.4-mini",
-    "gpt-5.4-nano",
-    "gpt-5.2",
-    "gpt-5.2-pro",
-    "gpt-5",
-    "gpt-5-mini",
-    "gpt-5-nano",
-    "gpt-4.1",
-    "gpt-4.1-mini",
-]
-GEMINI_CLOUD_MODELS = [
-    "gemini-2.5-pro",
-    "gemini-2.5-flash",
-    "gemini-2.5-flash-lite",
-]
+PARSING_MODEL_CHOICES = CatalogLoader.get_string_list("llm_models.json", "parsing_model_choices")
+CLINICAL_MODEL_CHOICES = CatalogLoader.get_string_list("llm_models.json", "clinical_model_choices")
+OPENAI_CLOUD_MODELS = CatalogLoader.get_string_list("llm_models.json", "openai_cloud_models")
+GEMINI_CLOUD_MODELS = CatalogLoader.get_string_list("llm_models.json", "gemini_cloud_models")
 CLOUD_MODEL_CHOICES: dict[str, list[str]] = {
     "openai": OPENAI_CLOUD_MODELS,
     "gemini": GEMINI_CLOUD_MODELS,
@@ -209,105 +175,9 @@ HEPATOTOXIC_MEDDRA_TERMS = {
     "blood bilirubin increased",
 }
 
-MATCHING_STOPWORDS = {
-    "and",
-    "apply",
-    "combo",
-    "combination",
-    "caps",
-    "capsule",
-    "capsules",
-    "chewable",
-    "cream",
-    "dose",
-    "doses",
-    "drink",
-    "drops",
-    "elixir",
-    "enteric",
-    "extended",
-    "foam",
-    "for",
-    "free",
-    "gel",
-    "granules",
-    "im",
-    "inj",
-    "injection",
-    "intramuscular",
-    "intravenous",
-    "iv",
-    "kit",
-    "liquid",
-    "lotion",
-    "mg",
-    "ml",
-    "nasal",
-    "ointment",
-    "of",
-    "ophthalmic",
-    "or",
-    "oral",
-    "pack",
-    "packet",
-    "packets",
-    "patch",
-    "plus",
-    "powder",
-    "po",
-    "prefilled",
-    "release",
-    "sc",
-    "sol",
-    "solution",
-    "soln",
-    "spray",
-    "sterile",
-    "subcutaneous",
-    "suppository",
-    "susp",
-    "suspension",
-    "sustained",
-    "syringe",
-    "syrup",
-    "tablet",
-    "tablets",
-    "the",
-    "topical",
-    "treat",
-    "treatment",
-    "therapy",
-    "vial",
-    "use",
-    "with",
-    "without",
-}
+MATCHING_STOPWORDS = CatalogLoader.get_string_set("text_normalization.json", "matching_stopwords")
 
-CLINICAL_GENERIC_TERMS = {
-    "administration",
-    "applicator",
-    "autoinjector",
-    "auto-injector",
-    "autoinjectors",
-    "injector",
-    "injectors",
-    "device",
-    "devices",
-    "dosing",
-    "inhaler",
-    "inhalers",
-    "infusion",
-    "injectable",
-    "injectables",
-    "needle",
-    "needles",
-    "pen",
-    "pens",
-    "prefill",
-    "pre-filled",
-    "pump",
-    "syringes",
-}
+CLINICAL_GENERIC_TERMS = CatalogLoader.get_string_set("text_normalization.json", "clinical_generic_terms")
 
 RXNAV_SYNONYM_STOPWORDS = MATCHING_STOPWORDS | CLINICAL_GENERIC_TERMS
 
