@@ -31,6 +31,7 @@ import {
   startModelPullJob,
   updateModelConfigState,
 } from '../../core/services/api';
+import { JobPollingService } from '../../core/services/job-polling.service';
 import { AccessKeyModalComponent } from './components/access-key-modal.component';
 
 type ModelFilterKey = 'installed' | 'reasoning' | 'small' | 'extraction';
@@ -149,6 +150,7 @@ function resolveDraftFromSettings(runtimeSettings: RuntimeSettings): DraftRuntim
 })
 export class ModelConfigPageComponent implements OnInit {
   readonly appState = inject(AppStateService);
+  private readonly jobPolling = inject(JobPollingService);
 
   readonly modelFilters = MODEL_FILTERS;
 
@@ -215,7 +217,7 @@ export class ModelConfigPageComponent implements OnInit {
 
   readonly missingRequiredModels = computed(() => {
     const draft = this.draftConfig();
-    if (draft.useCloudServices) return [] as string[];
+    if (draft.useCloudServices) return [];
     const modelMap = new Map(this.localModels().map((model) => [model.name, model]));
     const missing = new Set<string>();
     for (const modelName of [draft.clinicalModel, draft.parsingModel]) {
@@ -440,36 +442,38 @@ export class ModelConfigPageComponent implements OnInit {
     const safeIntervalMs = Math.max(250, intervalMs);
     const requestTimeoutSeconds = Math.min(30, Math.max(5, Math.ceil((safeIntervalMs / 1000) * 4)));
 
-    while (true) {
-      const payload = await fetchModelPullJobStatus(jobId, requestTimeoutSeconds);
-      const progress = Math.max(0, Math.min(100, payload.progress));
-      const message =
-        typeof payload.result?.progress_message === 'string' && payload.result.progress_message.trim()
-          ? payload.result.progress_message
-          : payload.status === 'completed'
-            ? `Model '${modelName}' is available locally.`
-            : payload.status === 'cancelled'
-              ? `Pull cancelled for '${modelName}'.`
-              : payload.status === 'failed'
-                ? `Pull failed for '${modelName}'.`
-                : `Pulling '${modelName}' from Ollama...`;
+    await this.jobPolling.run({
+      intervalMs: safeIntervalMs,
+      pollStep: async () => {
+        const payload = await fetchModelPullJobStatus(jobId, requestTimeoutSeconds);
+        const progress = Math.max(0, Math.min(100, payload.progress));
+        const message =
+          typeof payload.result?.progress_message === 'string' && payload.result.progress_message.trim()
+            ? payload.result.progress_message
+            : payload.status === 'completed'
+              ? `Model '${modelName}' is available locally.`
+              : payload.status === 'cancelled'
+                ? `Pull cancelled for '${modelName}'.`
+                : payload.status === 'failed'
+                  ? `Pull failed for '${modelName}'.`
+                  : `Pulling '${modelName}' from Ollama...`;
 
-      this.updateModelPullProgress(modelName, {
-        progress,
-        status: payload.status,
-        message,
-      });
+        this.updateModelPullProgress(modelName, {
+          progress,
+          status: payload.status,
+          message,
+        });
 
-      if (TERMINAL_JOB_STATUSES.includes(payload.status)) {
+        if (!TERMINAL_JOB_STATUSES.includes(payload.status)) {
+          return true;
+        }
         if (payload.status === 'completed') {
-          return;
+          return false;
         }
         const errorMessage = payload.error?.trim() || message;
         throw new Error(`[ERROR] ${errorMessage}`);
-      }
-
-      await new Promise((resolve) => globalThis.setTimeout(resolve, safeIntervalMs));
-    }
+      },
+    });
   }
 
   private updateModelPullProgress(modelName: string, progress: ModelPullProgressState | null): void {

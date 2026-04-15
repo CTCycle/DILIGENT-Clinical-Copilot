@@ -1,8 +1,9 @@
 import { CommonModule } from '@angular/common';
-import { Component, OnDestroy, OnInit, signal } from '@angular/core';
+import { Component, OnDestroy, OnInit, inject, signal } from '@angular/core';
 import { FormsModule } from '@angular/forms';
 
 import { ModalShellComponent } from '../../components/modal-shell/modal-shell.component';
+import { InspectionPagerComponent } from '../../components/inspection-pager/inspection-pager.component';
 import {
   cancelInspectionDiliPriorsUpdateJob,
   cancelInspectionDrugLabelsUpdateJob,
@@ -42,6 +43,7 @@ import {
   startInspectionRagUpdateJob,
   startInspectionRxNavUpdateJob,
 } from '../../core/services/api';
+import { JobPollingService } from '../../core/services/job-polling.service';
 import {
   InspectionDateFilterMode,
   InspectionDiliPriorDetailResponse,
@@ -170,14 +172,19 @@ type TimelineRenderEvent = {
   dateLabel: string;
 };
 
+type WritableSignalLike<T> = {
+  set(value: T): void;
+};
+
 @Component({
   selector: 'app-data-inspection-page',
   standalone: true,
-  imports: [CommonModule, FormsModule, ModalShellComponent],
+  imports: [CommonModule, FormsModule, ModalShellComponent, InspectionPagerComponent],
   templateUrl: './data-inspection-page.component.html',
   styleUrl: './data-inspection-page.component.scss',
 })
 export class DataInspectionPageComponent implements OnInit, OnDestroy {
+  private readonly jobPolling = inject(JobPollingService);
   readonly inspectionViews = INSPECTION_VIEWS;
   readonly activeView = signal<InspectionViewId>('sessions');
 
@@ -314,14 +321,6 @@ export class DataInspectionPageComponent implements OnInit, OnDestroy {
 
   statusLabel(value: InspectionSessionStatus): string {
     return value === 'failed' ? 'Failed' : 'Successful';
-  }
-
-  rangeEnd(offset: number, total: number): number {
-    return Math.min(offset + PAGE_LIMIT, total);
-  }
-
-  rangeStart(offset: number, total: number): number {
-    return total <= 0 ? 0 : offset + 1;
   }
 
   get displayedRagFolderPath(): string {
@@ -542,11 +541,12 @@ export class DataInspectionPageComponent implements OnInit, OnDestroy {
   }
 
   exportTimelinePng(): void {
-    const svg = document.getElementById('inspection-timeline-svg') as SVGSVGElement | null;
-    if (!svg) {
+    const element = document.getElementById('inspection-timeline-svg');
+    if (!(element instanceof SVGSVGElement)) {
       this.timelineError.set('Timeline canvas is unavailable for export.');
       return;
     }
+    const svg = element;
 
     const serializer = new XMLSerializer();
     const source = serializer.serializeToString(svg);
@@ -618,22 +618,17 @@ export class DataInspectionPageComponent implements OnInit, OnDestroy {
   }
 
   async openAliases(drugId: number): Promise<void> {
-    this.aliasLoading.set(true);
-    this.aliasError.set(null);
-    this.aliasData.set(null);
-    try {
-      this.aliasData.set(await fetchInspectionRxNavAliases(drugId));
-    } catch (error) {
-      this.aliasError.set(error instanceof Error ? error.message : 'Failed to load aliases.');
-    } finally {
-      this.aliasLoading.set(false);
-    }
+    await this.loadDetailModal({
+      loadingSignal: this.aliasLoading,
+      errorSignal: this.aliasError,
+      dataSignal: this.aliasData,
+      request: () => fetchInspectionRxNavAliases(drugId),
+      fallbackErrorMessage: 'Failed to load aliases.',
+    });
   }
 
   closeAliases(): void {
-    this.aliasData.set(null);
-    this.aliasError.set(null);
-    this.aliasLoading.set(false);
+    this.closeDetailModal(this.aliasLoading, this.aliasError, this.aliasData);
   }
 
   async removeRxNavDrug(drugId: number): Promise<void> {
@@ -654,22 +649,17 @@ export class DataInspectionPageComponent implements OnInit, OnDestroy {
   }
 
   async openExcerpt(drugId: number): Promise<void> {
-    this.excerptLoading.set(true);
-    this.excerptError.set(null);
-    this.excerptData.set(null);
-    try {
-      this.excerptData.set(await fetchInspectionLiverToxExcerpt(drugId));
-    } catch (error) {
-      this.excerptError.set(error instanceof Error ? error.message : 'Failed to load excerpt.');
-    } finally {
-      this.excerptLoading.set(false);
-    }
+    await this.loadDetailModal({
+      loadingSignal: this.excerptLoading,
+      errorSignal: this.excerptError,
+      dataSignal: this.excerptData,
+      request: () => fetchInspectionLiverToxExcerpt(drugId),
+      fallbackErrorMessage: 'Failed to load excerpt.',
+    });
   }
 
   closeExcerpt(): void {
-    this.excerptData.set(null);
-    this.excerptError.set(null);
-    this.excerptLoading.set(false);
+    this.closeDetailModal(this.excerptLoading, this.excerptError, this.excerptData);
   }
 
   async removeLiverToxDrug(drugId: number): Promise<void> {
@@ -690,41 +680,39 @@ export class DataInspectionPageComponent implements OnInit, OnDestroy {
   }
 
   async openDiliPriorDetails(drugId: number): Promise<void> {
-    this.diliPriorDetailLoading.set(true);
-    this.diliPriorDetailError.set(null);
-    this.diliPriorDetailData.set(null);
-    try {
-      this.diliPriorDetailData.set(await fetchInspectionDiliPriorDetails(drugId));
-    } catch (error) {
-      this.diliPriorDetailError.set(error instanceof Error ? error.message : 'Failed to load DILI prior details.');
-    } finally {
-      this.diliPriorDetailLoading.set(false);
-    }
+    await this.loadDetailModal({
+      loadingSignal: this.diliPriorDetailLoading,
+      errorSignal: this.diliPriorDetailError,
+      dataSignal: this.diliPriorDetailData,
+      request: () => fetchInspectionDiliPriorDetails(drugId),
+      fallbackErrorMessage: 'Failed to load DILI prior details.',
+    });
   }
 
   closeDiliPriorDetails(): void {
-    this.diliPriorDetailData.set(null);
-    this.diliPriorDetailError.set(null);
-    this.diliPriorDetailLoading.set(false);
+    this.closeDetailModal(
+      this.diliPriorDetailLoading,
+      this.diliPriorDetailError,
+      this.diliPriorDetailData,
+    );
   }
 
   async openDrugLabelSections(drugId: number): Promise<void> {
-    this.drugLabelSectionsLoading.set(true);
-    this.drugLabelSectionsError.set(null);
-    this.drugLabelSectionsData.set(null);
-    try {
-      this.drugLabelSectionsData.set(await fetchInspectionDrugLabelSections(drugId));
-    } catch (error) {
-      this.drugLabelSectionsError.set(error instanceof Error ? error.message : 'Failed to load label sections.');
-    } finally {
-      this.drugLabelSectionsLoading.set(false);
-    }
+    await this.loadDetailModal({
+      loadingSignal: this.drugLabelSectionsLoading,
+      errorSignal: this.drugLabelSectionsError,
+      dataSignal: this.drugLabelSectionsData,
+      request: () => fetchInspectionDrugLabelSections(drugId),
+      fallbackErrorMessage: 'Failed to load label sections.',
+    });
   }
 
   closeDrugLabelSections(): void {
-    this.drugLabelSectionsData.set(null);
-    this.drugLabelSectionsError.set(null);
-    this.drugLabelSectionsLoading.set(false);
+    this.closeDetailModal(
+      this.drugLabelSectionsLoading,
+      this.drugLabelSectionsError,
+      this.drugLabelSectionsData,
+    );
   }
 
   changeView(view: InspectionViewId): void {
@@ -981,27 +969,31 @@ export class DataInspectionPageComponent implements OnInit, OnDestroy {
     jobId: string,
     pollToken: number,
   ): Promise<void> {
-    while (this.isUpdatePollingActive(pollToken)) {
-      const status = await this.fetchUpdateStatus(target, jobId);
-      if (!this.isUpdatePollingActive(pollToken)) {
-        return;
-      }
-      this.updateProgress.set(typeof status.progress === 'number' ? status.progress : 0);
-      this.updateMessage.set(resolveUpdateProgressMessage(status));
+    await this.jobPolling.run({
+      intervalMs: 1200,
+      isCancelled: () => !this.isUpdatePollingActive(pollToken),
+      pollStep: async () => {
+        const status = await this.fetchUpdateStatus(target, jobId);
+        if (!this.isUpdatePollingActive(pollToken)) {
+          return false;
+        }
+        this.updateProgress.set(typeof status.progress === 'number' ? status.progress : 0);
+        this.updateMessage.set(resolveUpdateProgressMessage(status));
 
-      if (status.status === 'completed') {
-        this.updateRunning.set(false);
-        await this.refreshTargetAfterUpdate(target);
-        return;
-      }
-      if (status.status === 'failed' || status.status === 'cancelled') {
-        this.updateRunning.set(false);
-        this.updateError.set(status.error || `Update job ${status.status}.`);
-        return;
-      }
+        if (status.status === 'completed') {
+          this.updateRunning.set(false);
+          await this.refreshTargetAfterUpdate(target);
+          return false;
+        }
+        if (status.status === 'failed' || status.status === 'cancelled') {
+          this.updateRunning.set(false);
+          this.updateError.set(status.error || `Update job ${status.status}.`);
+          return false;
+        }
 
-      await new Promise((resolve) => globalThis.setTimeout(resolve, 1200));
-    }
+        return true;
+      },
+    });
   }
 
   private beginUpdatePolling(): number {
@@ -1016,6 +1008,41 @@ export class DataInspectionPageComponent implements OnInit, OnDestroy {
 
   private isUpdatePollingActive(pollToken: number): boolean {
     return this.updatePollToken === pollToken;
+  }
+
+  private async loadDetailModal<T>({
+    loadingSignal,
+    errorSignal,
+    dataSignal,
+    request,
+    fallbackErrorMessage,
+  }: {
+    loadingSignal: WritableSignalLike<boolean>;
+    errorSignal: WritableSignalLike<string | null>;
+    dataSignal: WritableSignalLike<T | null>;
+    request: () => Promise<T>;
+    fallbackErrorMessage: string;
+  }): Promise<void> {
+    loadingSignal.set(true);
+    errorSignal.set(null);
+    dataSignal.set(null);
+    try {
+      dataSignal.set(await request());
+    } catch (error) {
+      errorSignal.set(error instanceof Error ? error.message : fallbackErrorMessage);
+    } finally {
+      loadingSignal.set(false);
+    }
+  }
+
+  private closeDetailModal<T>(
+    loadingSignal: WritableSignalLike<boolean>,
+    errorSignal: WritableSignalLike<string | null>,
+    dataSignal: WritableSignalLike<T | null>,
+  ): void {
+    dataSignal.set(null);
+    errorSignal.set(null);
+    loadingSignal.set(false);
   }
 
   private async refreshTargetAfterUpdate(target: InspectionUpdateTarget): Promise<void> {

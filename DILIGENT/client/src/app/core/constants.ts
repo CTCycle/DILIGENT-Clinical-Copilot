@@ -43,9 +43,9 @@ export const CLOUD_MODEL_CHOICES: Record<CloudProvider, string[]> = {
   gemini: ["gemini-2.5-pro", "gemini-2.5-flash", "gemini-2.5-flash-lite"],
 };
 
-export const CLOUD_PROVIDERS: CloudProvider[] = Object.keys(
-  CLOUD_MODEL_CHOICES,
-) as CloudProvider[];
+export const CLOUD_PROVIDERS: CloudProvider[] = Object.keys(CLOUD_MODEL_CHOICES).filter(
+  isCloudProvider,
+);
 
 export type LLMRuntimeDefaults = {
   parsing_model: string;

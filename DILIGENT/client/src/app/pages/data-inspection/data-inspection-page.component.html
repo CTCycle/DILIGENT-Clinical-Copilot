@@ -117,13 +117,13 @@
               @if (sessionError()) { <p class="inspection-error-text">{{ sessionError() }}</p> }
             </div>
 
-            <div class="inspection-pager">
-              <div class="inspection-pager-actions">
-                <button class="btn btn-secondary inspection-mini-btn" type="button" (click)="pageSessions(-1)" [disabled]="sessionOffset() === 0">Previous</button>
-                <span class="inspection-pager-range">{{ rangeStart(sessionOffset(), sessionTotal()) }}-{{ rangeEnd(sessionOffset(), sessionTotal()) }} / {{ sessionTotal() }}</span>
-                <button class="btn btn-secondary inspection-mini-btn" type="button" (click)="pageSessions(1)" [disabled]="sessionOffset() + 10 >= sessionTotal()">Next</button>
-              </div>
-            </div>
+            <app-inspection-pager
+              [offset]="sessionOffset()"
+              [total]="sessionTotal()"
+              [pageSize]="10"
+              (previous)="pageSessions(-1)"
+              (next)="pageSessions(1)"
+            />
           </div>
         </section>
       }
@@ -170,13 +170,13 @@
               @if (rxnavError()) { <p class="inspection-error-text">{{ rxnavError() }}</p> }
             </div>
 
-            <div class="inspection-pager">
-              <div class="inspection-pager-actions">
-                <button class="btn btn-secondary inspection-mini-btn" type="button" (click)="pageRxNav(-1)" [disabled]="rxnavOffset() === 0">Previous</button>
-                <span class="inspection-pager-range">{{ rangeStart(rxnavOffset(), rxnavTotal()) }}-{{ rangeEnd(rxnavOffset(), rxnavTotal()) }} / {{ rxnavTotal() }}</span>
-                <button class="btn btn-secondary inspection-mini-btn" type="button" (click)="pageRxNav(1)" [disabled]="rxnavOffset() + 10 >= rxnavTotal()">Next</button>
-              </div>
-            </div>
+            <app-inspection-pager
+              [offset]="rxnavOffset()"
+              [total]="rxnavTotal()"
+              [pageSize]="10"
+              (previous)="pageRxNav(-1)"
+              (next)="pageRxNav(1)"
+            />
           </div>
         </section>
       }
@@ -223,13 +223,13 @@
               @if (livertoxError()) { <p class="inspection-error-text">{{ livertoxError() }}</p> }
             </div>
 
-            <div class="inspection-pager">
-              <div class="inspection-pager-actions">
-                <button class="btn btn-secondary inspection-mini-btn" type="button" (click)="pageLiverTox(-1)" [disabled]="livertoxOffset() === 0">Previous</button>
-                <span class="inspection-pager-range">{{ rangeStart(livertoxOffset(), livertoxTotal()) }}-{{ rangeEnd(livertoxOffset(), livertoxTotal()) }} / {{ livertoxTotal() }}</span>
-                <button class="btn btn-secondary inspection-mini-btn" type="button" (click)="pageLiverTox(1)" [disabled]="livertoxOffset() + 10 >= livertoxTotal()">Next</button>
-              </div>
-            </div>
+            <app-inspection-pager
+              [offset]="livertoxOffset()"
+              [total]="livertoxTotal()"
+              [pageSize]="10"
+              (previous)="pageLiverTox(-1)"
+              (next)="pageLiverTox(1)"
+            />
           </div>
         </section>
       }
@@ -275,13 +275,13 @@
               @if (diliPriorError()) { <p class="inspection-error-text">{{ diliPriorError() }}</p> }
             </div>
 
-            <div class="inspection-pager">
-              <div class="inspection-pager-actions">
-                <button class="btn btn-secondary inspection-mini-btn" type="button" (click)="pageDiliPriors(-1)" [disabled]="diliPriorOffset() === 0">Previous</button>
-                <span class="inspection-pager-range">{{ rangeStart(diliPriorOffset(), diliPriorTotal()) }}-{{ rangeEnd(diliPriorOffset(), diliPriorTotal()) }} / {{ diliPriorTotal() }}</span>
-                <button class="btn btn-secondary inspection-mini-btn" type="button" (click)="pageDiliPriors(1)" [disabled]="diliPriorOffset() + 10 >= diliPriorTotal()">Next</button>
-              </div>
-            </div>
+            <app-inspection-pager
+              [offset]="diliPriorOffset()"
+              [total]="diliPriorTotal()"
+              [pageSize]="10"
+              (previous)="pageDiliPriors(-1)"
+              (next)="pageDiliPriors(1)"
+            />
           </div>
         </section>
       }
@@ -327,13 +327,13 @@
               @if (drugLabelError()) { <p class="inspection-error-text">{{ drugLabelError() }}</p> }
             </div>
 
-            <div class="inspection-pager">
-              <div class="inspection-pager-actions">
-                <button class="btn btn-secondary inspection-mini-btn" type="button" (click)="pageDrugLabels(-1)" [disabled]="drugLabelOffset() === 0">Previous</button>
-                <span class="inspection-pager-range">{{ rangeStart(drugLabelOffset(), drugLabelTotal()) }}-{{ rangeEnd(drugLabelOffset(), drugLabelTotal()) }} / {{ drugLabelTotal() }}</span>
-                <button class="btn btn-secondary inspection-mini-btn" type="button" (click)="pageDrugLabels(1)" [disabled]="drugLabelOffset() + 10 >= drugLabelTotal()">Next</button>
-              </div>
-            </div>
+            <app-inspection-pager
+              [offset]="drugLabelOffset()"
+              [total]="drugLabelTotal()"
+              [pageSize]="10"
+              (previous)="pageDrugLabels(-1)"
+              (next)="pageDrugLabels(1)"
+            />
           </div>
         </section>
       }
@@ -425,13 +425,13 @@
               @if (ragError()) { <p class="inspection-error-text">{{ ragError() }}</p> }
             </div>
 
-            <div class="inspection-pager">
-              <div class="inspection-pager-actions">
-                <button class="btn btn-secondary inspection-mini-btn" type="button" (click)="pageRag(-1)" [disabled]="ragOffset() === 0">Previous</button>
-                <span class="inspection-pager-range">{{ rangeStart(ragOffset(), ragTotal()) }}-{{ rangeEnd(ragOffset(), ragTotal()) }} / {{ ragTotal() }}</span>
-                <button class="btn btn-secondary inspection-mini-btn" type="button" (click)="pageRag(1)" [disabled]="ragOffset() + 10 >= ragTotal()">Next</button>
-              </div>
-            </div>
+            <app-inspection-pager
+              [offset]="ragOffset()"
+              [total]="ragTotal()"
+              [pageSize]="10"
+              (previous)="pageRag(-1)"
+              (next)="pageRag(1)"
+            />
           </div>
         </section>
       }

@@ -37,7 +37,6 @@ import {
 } from "../models/types";
 
 const HTTP_TIMEOUT =
-  Number.parseFloat("") ||
   HTTP_TIMEOUT_SECONDS;
 const GENERIC_REQUEST_ERROR = "[ERROR] Request could not be completed. Please try again.";
 const TIMEOUT_REQUEST_ERROR = "[ERROR] Request timed out. Please retry.";
@@ -248,7 +247,7 @@ async function requestJson<T>(
   if (!result.json) {
     throw new Error("[ERROR] Service returned an invalid response. Please retry.");
   }
-  return result.json as T;
+  return JSON.parse(JSON.stringify(result.json));
 }
 
 function buildQueryString(
