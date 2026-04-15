@@ -1,0 +1,234 @@
+{
+  "local_model_catalog": [
+    {
+      "name": "llama3.1:8b",
+      "family": "llama3",
+      "description": "Meta Llama 3.1 8B instruction model for general-purpose generation (dense transformer)."
+    },
+    {
+      "name": "llama3.1:70b",
+      "family": "llama3",
+      "description": "Meta Llama 3.1 70B instruction model for high-quality long-form reasoning (dense transformer)."
+    },
+    {
+      "name": "dolphin3:8b",
+      "family": "dolphin3",
+      "description": "Dolphin 3 8B instruction model based on Llama 3.1, tuned for tool use and structured reasoning."
+    },
+    {
+      "name": "olmo2:7b",
+      "family": "olmo2",
+      "description": "AllenAI OLMo 2 7B fully open model for general language tasks."
+    },
+    {
+      "name": "olmo2:13b",
+      "family": "olmo2",
+      "description": "AllenAI OLMo 2 13B fully open model with expanded capability over 7B."
+    },
+    {
+      "name": "deepseek-v3:671b",
+      "family": "deepseek-v3",
+      "description": "DeepSeek-V3 671B Mixture-of-Experts language model for large-scale reasoning."
+    },
+    {
+      "name": "mistral-nemo:12b",
+      "family": "mistral-nemo",
+      "description": "Mistral NeMo 12B multilingual model from Mistral AI and NVIDIA."
+    },
+    {
+      "name": "smollm2:135m",
+      "family": "smollm2",
+      "description": "SmolLM2 135M compact open model optimized for lightweight local inference."
+    },
+    {
+      "name": "smollm2:360m",
+      "family": "smollm2",
+      "description": "SmolLM2 360M compact open model for low-latency general language tasks."
+    },
+    {
+      "name": "smollm2:1.7b",
+      "family": "smollm2",
+      "description": "SmolLM2 1.7B compact open model balancing quality and efficiency."
+    },
+    {
+      "name": "deepcoder:1.5b",
+      "family": "deepcoder",
+      "description": "DeepCoder 1.5B code-specialized model for programming and code reasoning tasks."
+    },
+    {
+      "name": "deepcoder:14b",
+      "family": "deepcoder",
+      "description": "DeepCoder 14B code-specialized model with stronger synthesis and debugging ability."
+    },
+    {
+      "name": "phi4-reasoning:14b",
+      "family": "phi4-reasoning",
+      "description": "Microsoft Phi-4 Reasoning 14B model focused on deliberate multi-step reasoning."
+    },
+    {
+      "name": "phi4-mini-reasoning:3.8b",
+      "family": "phi4-mini-reasoning",
+      "description": "Microsoft Phi-4 Mini Reasoning 3.8B model for efficient structured reasoning."
+    },
+    {
+      "name": "granite3.1-dense:2b",
+      "family": "granite3.1",
+      "description": "IBM Granite 3.1 Dense 2B model for compact enterprise-oriented language tasks."
+    },
+    {
+      "name": "granite3.1-dense:8b",
+      "family": "granite3.1",
+      "description": "IBM Granite 3.1 Dense 8B model with improved general utility."
+    },
+    {
+      "name": "granite3.1-moe:1b",
+      "family": "granite3.1",
+      "description": "IBM Granite 3.1 MoE 1B model using sparse expert routing for efficiency."
+    },
+    {
+      "name": "granite3.1-moe:3b",
+      "family": "granite3.1",
+      "description": "IBM Granite 3.1 MoE 3B model using sparse expert routing for stronger quality."
+    },
+    {
+      "name": "granite3.3:2b",
+      "family": "granite3.3",
+      "description": "IBM Granite 3.3 2B open model for compact enterprise and coding tasks."
+    },
+    {
+      "name": "granite3.3:8b",
+      "family": "granite3.3",
+      "description": "IBM Granite 3.3 8B open model tuned for higher-quality enterprise use."
+    },
+    {
+      "name": "granite4:350m",
+      "family": "granite4",
+      "description": "IBM Granite 4 350M model for extremely lightweight local inference."
+    },
+    {
+      "name": "granite4:1b",
+      "family": "granite4",
+      "description": "IBM Granite 4 1B model for compact, general language workloads."
+    },
+    {
+      "name": "granite4:3b",
+      "family": "granite4",
+      "description": "IBM Granite 4 3B model for higher-quality local language tasks."
+    },
+    {
+      "name": "deepseek-r1:1.5b",
+      "family": "deepseek-r1",
+      "description": "DeepSeek-R1 1.5B reasoning model from the R1 family."
+    },
+    {
+      "name": "deepseek-r1:7b",
+      "family": "deepseek-r1",
+      "description": "DeepSeek-R1 7B reasoning model for local multi-step problem solving."
+    },
+    {
+      "name": "deepseek-r1:8b",
+      "family": "deepseek-r1",
+      "description": "DeepSeek-R1 8B reasoning model variant in the R1 lineup."
+    },
+    {
+      "name": "deepseek-r1:14b",
+      "family": "deepseek-r1",
+      "description": "DeepSeek-R1 14B reasoning model balancing quality and efficiency."
+    },
+    {
+      "name": "deepseek-r1:32b",
+      "family": "deepseek-r1",
+      "description": "DeepSeek-R1 32B reasoning model for stronger long-form reasoning."
+    },
+    {
+      "name": "deepseek-r1:70b",
+      "family": "deepseek-r1",
+      "description": "DeepSeek-R1 70B reasoning model for high-quality complex tasks."
+    },
+    {
+      "name": "deepseek-r1:671b",
+      "family": "deepseek-r1",
+      "description": "DeepSeek-R1 671B flagship reasoning model in the R1 series."
+    },
+    {
+      "name": "exaone-deep:2.4b",
+      "family": "exaone-deep",
+      "description": "EXAONE Deep 2.4B reasoning model from LG AI Research."
+    },
+    {
+      "name": "exaone-deep:7.8b",
+      "family": "exaone-deep",
+      "description": "EXAONE Deep 7.8B reasoning model for stronger complex reasoning."
+    },
+    {
+      "name": "exaone-deep:32b",
+      "family": "exaone-deep",
+      "description": "EXAONE Deep 32B reasoning model for high-capability local inference."
+    },
+    {
+      "name": "qwen3:0.6b",
+      "family": "qwen3",
+      "description": "Qwen3 0.6B open model in the Qwen3 dense and MoE family."
+    },
+    {
+      "name": "qwen3:1.7b",
+      "family": "qwen3",
+      "description": "Qwen3 1.7B open model in the Qwen3 dense and MoE family."
+    },
+    {
+      "name": "qwen3:4b",
+      "family": "qwen3",
+      "description": "Qwen3 4B open model in the Qwen3 dense and MoE family."
+    },
+    {
+      "name": "qwen3:8b",
+      "family": "qwen3",
+      "description": "Qwen3 8B open model in the Qwen3 dense and MoE family."
+    },
+    {
+      "name": "qwen3:14b",
+      "family": "qwen3",
+      "description": "Qwen3 14B open model in the Qwen3 dense and MoE family."
+    },
+    {
+      "name": "qwen3:30b",
+      "family": "qwen3",
+      "description": "Qwen3 30B open model in the Qwen3 dense and MoE family."
+    },
+    {
+      "name": "qwen3:32b",
+      "family": "qwen3",
+      "description": "Qwen3 32B open model in the Qwen3 dense and MoE family."
+    },
+    {
+      "name": "qwen3:235b",
+      "family": "qwen3",
+      "description": "Qwen3 235B flagship open model in the Qwen3 dense and MoE family."
+    },
+    {
+      "name": "ministral3:3b",
+      "family": "ministral-3",
+      "description": "Mistral Ministral 3B open model for compact multilingual and agentic workloads."
+    },
+    {
+      "name": "ministral3:8b",
+      "family": "ministral-3",
+      "description": "Mistral Ministral 8B open model for stronger multilingual and agentic workloads."
+    },
+    {
+      "name": "ministral3:14b",
+      "family": "ministral-3",
+      "description": "Mistral Ministral 14B open model for high-capability multilingual and agentic workloads."
+    },
+    {
+      "name": "gpt-oss:20b",
+      "family": "gpt-oss",
+      "description": "OpenAI gpt-oss-20b open-weight model for local reasoning and tool usage."
+    },
+    {
+      "name": "gpt-oss:120b",
+      "family": "gpt-oss",
+      "description": "OpenAI gpt-oss-120b open-weight model for advanced local reasoning and agentic tasks."
+    }
+  ]
+}

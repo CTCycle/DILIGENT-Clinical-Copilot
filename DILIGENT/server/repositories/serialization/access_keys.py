@@ -6,12 +6,19 @@ from typing import Literal
 from sqlalchemy.engine import Engine
 from sqlalchemy.orm import sessionmaker
 
+from DILIGENT.server.repositories.database.session import (
+    resolve_engine,
+    resolve_session_factory,
+)
 from DILIGENT.server.repositories.queries.access_keys import AccessKeyRepositoryQueries
-from DILIGENT.server.repositories.queries.data import DataRepositoryQueries
+from DILIGENT.server.repositories.serialization.access_key_encryption import (
+    AccessKeyEncryptionMaterialSerializer,
+)
 from DILIGENT.server.repositories.schemas.models import AccessKey, ResearchAccessKey
-from DILIGENT.server.services.keys.cryptography import (
-    encrypt as encrypt_access_key,
-    fingerprint as build_fingerprint,
+from DILIGENT.server.services.cryptography import (
+    decrypt_with_key_material,
+    encrypt_with_key_material,
+    fingerprint_plaintext,
 )
 
 ProviderName = Literal["openai", "gemini", "tavily"]
@@ -23,18 +30,19 @@ RESEARCH_PROVIDER = "tavily"
 class AccessKeySerializer:
     def __init__(
         self,
-        queries: DataRepositoryQueries | None = None,
         *,
         engine: Engine | None = None,
         session_factory: sessionmaker | None = None,
     ) -> None:
-        self.queries = queries or DataRepositoryQueries()
-        resolved_engine = engine or self.queries.database.backend.engine  # type: ignore[attr-defined]
-        self.engine = resolved_engine
-        self.session_factory = session_factory or sessionmaker(
-            bind=resolved_engine,
-            future=True,
+        self.engine = resolve_engine(engine)
+        self.session_factory = resolve_session_factory(
+            engine=self.engine,
+            session_factory=session_factory,
             expire_on_commit=False,
+        )
+        self.encryption_material_serializer = AccessKeyEncryptionMaterialSerializer(
+            engine=self.engine,
+            session_factory=self.session_factory,
         )
 
     # -------------------------------------------------------------------------
@@ -93,11 +101,13 @@ class AccessKeySerializer:
     def create_key(self, provider: str, plaintext_key: str) -> AccessKey | ResearchAccessKey:
         normalized_provider = self.normalize_provider(provider)
         table = self.resolve_table(normalized_provider)
-        ciphertext = encrypt_access_key(plaintext_key)
+        active_material = self.encryption_material_serializer.get_active_material()
+        ciphertext = encrypt_with_key_material(plaintext_key, active_material.key_material)
         row = table(
             provider=normalized_provider,
             encrypted_value=ciphertext,
-            fingerprint=build_fingerprint(ciphertext),
+            encryption_key_version=int(active_material.key_version),
+            fingerprint=fingerprint_plaintext(plaintext_key),
             is_active=False,
         )
         db_session = self.session_factory()
@@ -113,19 +123,30 @@ class AccessKeySerializer:
             db_session.close()
 
     # -------------------------------------------------------------------------
+    def decrypt_key_row(self, row: AccessKey | ResearchAccessKey) -> str:
+        version = getattr(row, "encryption_key_version", None)
+        if version is None:
+            raise RuntimeError("Missing encryption key version metadata for stored provider key")
+        material = self.encryption_material_serializer.get_material_by_version(int(version))
+        if material is None:
+            raise RuntimeError(f"Encryption material version {version} is not available")
+        return decrypt_with_key_material(row.encrypted_value, material.key_material)
+
+    # -------------------------------------------------------------------------
     def activate_key(
         self,
         key_id: int,
         *,
-        provider: str | None = None,
+        provider: str,
     ) -> AccessKey | ResearchAccessKey:
         db_session = self.session_factory()
         now = datetime.now()
         try:
+            normalized_provider = self.normalize_provider(provider)
             target = self.get_key_by_id(
                 db_session,
                 key_id,
-                provider=provider,
+                provider=normalized_provider,
             )
             if target is None:
                 raise ValueError("Access key not found")
@@ -148,13 +169,14 @@ class AccessKeySerializer:
             db_session.close()
 
     # -------------------------------------------------------------------------
-    def delete_key(self, key_id: int, *, provider: str | None = None) -> bool:
+    def delete_key(self, key_id: int, *, provider: str) -> bool:
         db_session = self.session_factory()
         try:
+            normalized_provider = self.normalize_provider(provider)
             target = self.get_key_by_id(
                 db_session,
                 key_id,
-                provider=provider,
+                provider=normalized_provider,
             )
             if target is None:
                 return False

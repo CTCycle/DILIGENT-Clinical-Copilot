@@ -8,11 +8,19 @@ from collections.abc import Callable
 from typing import Any
 
 from DILIGENT.server.common.utils.logger import logger
-from DILIGENT.server.configurations import LLMRuntimeConfig, server_settings
-from DILIGENT.server.domain.clinical import DiseaseContextEntry, PatientDiseaseContext
+from DILIGENT.server.configurations.startup import server_settings
+from DILIGENT.server.configurations.llm_configs import LLMRuntimeConfig
+from DILIGENT.server.domain.clinical.entities import DiseaseContextEntry, PatientDiseaseContext
 from DILIGENT.server.models.prompts import ANAMNESIS_DISEASE_EXTRACTION_PROMPT
 from DILIGENT.server.models.providers import initialize_llm_client
 from DILIGENT.server.services.text.normalization import normalize_token
+
+
+###############################################################################
+RATE_LIMIT_WAIT_HINT_RE = re.compile(
+    r"please\s+try\s+again\s+in\s+([0-9]+(?:\.[0-9]+)?)s",
+    re.IGNORECASE,
+)
 
 
 ###############################################################################
@@ -30,6 +38,7 @@ class DiseaseExtractor:
         self.timeout_s = float(timeout_s)
         self.client: Any | None = client
         self.model: str = ""
+        self.extraction_retry_attempts = 2
         self.client_lock = asyncio.Lock()
         if client is None:
             self.client_provider: str | None = None
@@ -61,6 +70,9 @@ class DiseaseExtractor:
                     timeout_s=self.timeout_s,
                 )
                 self.client_provider = provider
+                self.extraction_retry_attempts = (
+                    4 if provider in {"openai", "gemini"} else 2
+                )
             self.runtime_revision = revision
             self.model = model
             if (
@@ -176,6 +188,30 @@ class DiseaseExtractor:
         return [selected[key] for key in order if key in selected]
 
     # -------------------------------------------------------------------------
+    @staticmethod
+    def extract_rate_limit_wait_hint_seconds(exc: Exception) -> float | None:
+        message = str(exc)
+        match = RATE_LIMIT_WAIT_HINT_RE.search(message)
+        if match is None:
+            return None
+        try:
+            parsed = float(match.group(1))
+        except (TypeError, ValueError):
+            return None
+        if parsed <= 0:
+            return None
+        return min(parsed + 0.25, 30.0)
+
+    # -------------------------------------------------------------------------
+    def retry_backoff_seconds(self, attempt: int, *, exc: Exception | None = None) -> float:
+        if exc is not None:
+            hinted_wait = self.extract_rate_limit_wait_hint_seconds(exc)
+            if hinted_wait is not None:
+                return hinted_wait
+        normalized_attempt = max(int(attempt), 1)
+        return min(8.0, 0.75 * (2 ** (normalized_attempt - 1)))
+
+    # -------------------------------------------------------------------------
     async def extract_diseases_from_anamnesis(
         self,
         anamnesis: str | None,
@@ -198,18 +234,35 @@ class DiseaseExtractor:
                 "Extract diseases from this anamnesis chunk, with temporal and hepatic metadata.\n"
                 f"[Chunk {index}/{len(chunks)}]\n{chunk}"
             )
-            try:
-                parsed = await self.client.llm_structured_call(
-                    model=self.model,
-                    system_prompt=ANAMNESIS_DISEASE_EXTRACTION_PROMPT.strip(),
-                    user_prompt=user_prompt,
-                    schema=PatientDiseaseContext,
-                    temperature=self.temperature,
-                    use_json_mode=True,
-                    max_repair_attempts=2,
-                )
-            except Exception as exc:
-                raise RuntimeError("Failed to extract diseases from anamnesis") from exc
+            for attempt in range(1, self.extraction_retry_attempts + 1):
+                try:
+                    parsed = await self.client.llm_structured_call(
+                        model=self.model,
+                        system_prompt=ANAMNESIS_DISEASE_EXTRACTION_PROMPT.strip(),
+                        user_prompt=user_prompt,
+                        schema=PatientDiseaseContext,
+                        temperature=self.temperature,
+                        use_json_mode=True,
+                        max_repair_attempts=2,
+                    )
+                    break
+                except Exception as exc:
+                    if attempt >= self.extraction_retry_attempts:
+                        raise RuntimeError("Failed to extract diseases from anamnesis") from exc
+                    delay = self.retry_backoff_seconds(attempt, exc=exc)
+                    logger.warning(
+                        (
+                            "Retrying anamnesis disease extraction for chunk %d/%d "
+                            "(attempt %d/%d, delay %.2fs): %s"
+                        ),
+                        index,
+                        len(chunks),
+                        attempt,
+                        self.extraction_retry_attempts,
+                        delay,
+                        exc,
+                    )
+                    await asyncio.sleep(delay)
             raw_entries.extend(parsed.entries)
             self.emit_progress(
                 progress_callback,
@@ -230,3 +283,5 @@ class DiseaseExtractor:
         )
         self.emit_progress(progress_callback, 1.0)
         return PatientDiseaseContext(entries=deduplicated)
+
+

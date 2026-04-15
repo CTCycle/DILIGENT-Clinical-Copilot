@@ -1,20 +1,28 @@
 from __future__ import annotations
 
+import os
 import urllib.parse
 
 import sqlalchemy
 from sqlalchemy import column, literal, select, table
 from sqlalchemy.exc import SQLAlchemyError
+from sqlalchemy import inspect
+from sqlalchemy.orm import sessionmaker
 from sqlalchemy.sql.elements import TextClause
 
-from DILIGENT.server.configurations import DatabaseSettings, server_settings
+from DILIGENT.server.configurations.startup import server_settings
+from DILIGENT.server.domain.settings.configuration import DatabaseSettings
 from DILIGENT.server.repositories.database.postgres import PostgresRepository
 from DILIGENT.server.repositories.database.sqlite import SQLiteRepository
 from DILIGENT.server.repositories.database.utils import (
     normalize_postgres_engine,
     validate_postgres_database_name,
 )
+from DILIGENT.server.repositories.serialization.access_key_encryption import (
+    AccessKeyEncryptionMaterialSerializer,
+)
 from DILIGENT.server.repositories.schemas.models import Base
+from DILIGENT.server.common.constants import DATABASE_FILENAME, RESOURCES_PATH
 from DILIGENT.server.common.utils.logger import logger
 
 # -----------------------------------------------------------------------------
@@ -74,9 +82,31 @@ def build_postgres_create_database_sql(
 
 # -----------------------------------------------------------------------------
 def initialize_sqlite_database(settings: DatabaseSettings) -> None:
+    db_path = os.path.join(RESOURCES_PATH, DATABASE_FILENAME)
+    file_exists = os.path.exists(db_path)
+    if file_exists and sqlite_schema_is_legacy(db_path):
+        os.remove(db_path)
+        logger.warning("Removed legacy SQLite database at %s", db_path)
     repository = SQLiteRepository(settings)
-    Base.metadata.create_all(repository.engine)
     logger.info("Initialized SQLite database schema at %s", repository.db_path)
+
+
+# -----------------------------------------------------------------------------
+def sqlite_schema_is_legacy(db_path: str) -> bool:
+    engine = sqlalchemy.create_engine(f"sqlite:///{db_path}", echo=False, future=True)
+    try:
+        inspector = inspect(engine)
+        if not inspector.has_table("patients"):
+            return True
+        session_columns = {
+            str(item.get("name")) for item in inspector.get_columns("clinical_sessions")
+        }
+        patient_columns = {
+            str(item.get("name")) for item in inspector.get_columns("patients")
+        }
+        return "patient_id" not in session_columns or "image_blob" not in patient_columns
+    finally:
+        engine.dispose()
 
 
 # -----------------------------------------------------------------------------
@@ -119,6 +149,15 @@ def ensure_postgres_database(settings: DatabaseSettings) -> str:
     normalized_settings = clone_settings_with_database(settings, target_database)
     repository = PostgresRepository(normalized_settings)
     Base.metadata.create_all(repository.engine)
+    material_serializer = AccessKeyEncryptionMaterialSerializer(
+        engine=repository.engine,
+        session_factory=sessionmaker(
+            bind=repository.engine,
+            future=True,
+            expire_on_commit=False,
+        ),
+    )
+    material_serializer.ensure_seeded("provider_access_keys")
     logger.info("Ensured PostgreSQL tables exist in %s", target_database)
 
     return target_database
@@ -128,9 +167,11 @@ def ensure_postgres_database(settings: DatabaseSettings) -> str:
 def run_database_initialization() -> None:
     settings = server_settings.database
     if settings.embedded_database:
+        logger.info("Running SQLite initialization path.")
         initialize_sqlite_database(settings)
         return
 
+    logger.info("Running PostgreSQL initialization path (manual trigger expected).")
     engine_name = normalize_postgres_engine(settings.engine).lower()
     if engine_name not in {
         "postgres",
@@ -153,3 +194,4 @@ def initialize_database() -> None:
     except Exception as exc:
         logger.exception("Unexpected error during database initialization.")
         raise SystemExit(1) from exc
+

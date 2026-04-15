@@ -17,7 +17,6 @@ set "uv_dir=%runtimes_dir%\uv"
 set "uv_exe=%uv_dir%\uv.exe"
 set "uv_zip_path=%uv_dir%\uv.zip"
 set "UV_CACHE_DIR=%runtimes_dir%\.uv-cache"
-set "LEGACY_UV_CACHE_DIR=%runtimes_dir%\uv_cache"
 set "uv_lock=%runtimes_dir%\uv.lock"
 set "uv_lock_file=%root_folder%uv.lock"
 
@@ -31,13 +30,7 @@ set "nodejs_dir=%runtimes_dir%\nodejs"
 set "server_dir=%project_folder%server"
 set "scripts_dir=%project_folder%\scripts"
 set "init_db_script=%scripts_dir%\initialize_database.py"
-set "drugs_script=%scripts_dir%\update_drugs_catalog.py"
-set "livertox_script=%scripts_dir%\update_livertox_data.py"
-set "rag_script=%scripts_dir%\update_rag.py"
 set "init_db_module=DILIGENT.scripts.initialize_database"
-set "drugs_module=DILIGENT.scripts.update_drugs_catalog"
-set "livertox_module=DILIGENT.scripts.update_livertox_data"
-set "rag_module=DILIGENT.scripts.update_RAG"
 
 
 :::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
@@ -48,25 +41,19 @@ cls
 echo ==========================================================================
 echo                         Setup and Maintenance
 echo ==========================================================================
-echo 1. Remove logs
-echo 2. Uninstall app
-echo 3. Initialize database
-echo 4. Update RxNav drugs catalog
-echo 5. Update LiverTox data
-echo 6. Update RAG documents
-echo 7. Clean desktop build artifacts
-echo 8. Exit
+echo 1. Initialize database
+echo 2. Remove logs
+echo 3. Clean desktop build artifacts
+echo 4. Uninstall app
+echo 5. Exit
 echo.
-set /p sub_choice="Select an option (1-8): "
+set /p sub_choice="Select an option (1-5): "
 
-if "%sub_choice%"=="1" goto :logs
-if "%sub_choice%"=="2" goto :uninstall
-if "%sub_choice%"=="3" goto :run_init_db
-if "%sub_choice%"=="4" goto :run_drugs
-if "%sub_choice%"=="5" goto :run_livertox
-if "%sub_choice%"=="6" goto :run_rag
-if "%sub_choice%"=="7" goto :clean_desktop_build
-if "%sub_choice%"=="8" goto :exit
+if "%sub_choice%"=="1" goto :run_init_db
+if "%sub_choice%"=="2" goto :logs
+if "%sub_choice%"=="3" goto :clean_desktop_build
+if "%sub_choice%"=="4" goto :uninstall
+if "%sub_choice%"=="5" goto :exit
 echo Invalid option, try again.
 pause
 goto :setup_menu
@@ -90,10 +77,50 @@ if exist "%log_path%\*.log" (
 pause
 goto :setup_menu
 
+:clean_desktop_build
+set "desktop_dist_dir=%client_dir%\dist"
+set "desktop_tauri_target_dir=%client_dir%\src-tauri\target"
+set "did_cleanup=0"
+
+if exist "%desktop_dist_dir%" (
+  rd /s /q "%desktop_dist_dir%"
+  if "%ERRORLEVEL%"=="0" (
+    echo [SUCCESS] Removed "%desktop_dist_dir%".
+    set "did_cleanup=1"
+  ) else (
+    echo [WARN] Could not remove "%desktop_dist_dir%".
+  )
+) else (
+  echo [INFO] Not found: "%desktop_dist_dir%".
+)
+
+if exist "%desktop_tauri_target_dir%" (
+  rd /s /q "%desktop_tauri_target_dir%"
+  if "%ERRORLEVEL%"=="0" (
+    echo [SUCCESS] Removed "%desktop_tauri_target_dir%".
+    set "did_cleanup=1"
+  ) else (
+    echo [WARN] Could not remove "%desktop_tauri_target_dir%".
+  )
+) else (
+  echo [INFO] Not found: "%desktop_tauri_target_dir%".
+)
+
+if "%did_cleanup%"=="0" (
+  echo [INFO] No desktop build artifacts were removed.
+)
+pause
+goto :setup_menu
+
 :uninstall
 echo --------------------------------------------------------------------------
-echo This operation will remove runtime-local uv artifacts, caches, lockfile,
-echo embedded Python, portable Node.js, and runtimes\.venv.
+echo This operation will remove runtime-local artifacts under "%runtimes_dir%":
+echo - "%venv_dir%"
+echo - "%uv_lock%"
+echo - uv and python runtimes
+echo - portable Node.js runtime
+echo - runtime cache folders
+echo - Angular local caches and generated proxy config
 echo.
 set /p confirm="Type YES to continue: "
 if /i not "%confirm%"=="YES" (
@@ -103,7 +130,7 @@ if /i not "%confirm%"=="YES" (
 )
 if exist "%uv_lock%" (
   del /q "%uv_lock%"
-  echo [INFO] Removed runtime lockfile "%uv_lock%".
+  echo [INFO] Removed "%uv_lock%".
 ) else (
   echo [INFO] No runtime lockfile found to remove at "%uv_lock%".
 )
@@ -118,12 +145,6 @@ if exist "%UV_CACHE_DIR%" (
   echo [INFO] Removed uv cache "%UV_CACHE_DIR%".
 ) else (
   echo [INFO] No uv cache directory found to remove.
-)
-if exist "%LEGACY_UV_CACHE_DIR%" (
-  rd /s /q "%LEGACY_UV_CACHE_DIR%"
-  echo [INFO] Removed legacy uv cache "%LEGACY_UV_CACHE_DIR%".
-) else (
-  echo [INFO] No legacy uv cache directory found to remove.
 )
 if exist "%python_dir%" (
   rd /s /q "%python_dir%"
@@ -155,6 +176,18 @@ if exist "%client_dir%\dist" (
 ) else (
   echo [INFO] No frontend build directory found to remove.
 )
+if exist "%client_dir%\.angular" (
+  rd /s /q "%client_dir%\.angular"
+  echo [INFO] Removed Angular cache directory "%client_dir%\.angular".
+) else (
+  echo [INFO] No Angular cache directory found to remove.
+)
+if exist "%client_dir%\proxy.conf.json" (
+  del /q "%client_dir%\proxy.conf.json"
+  echo [INFO] Removed generated Angular proxy config "%client_dir%\proxy.conf.json".
+) else (
+  echo [INFO] No generated Angular proxy config found to remove.
+)
 if exist "%client_dir%\package-lock.json" (
   del /q "%client_dir%\package-lock.json"
   echo [INFO] Removed frontend package-lock.json at "%client_dir%\package-lock.json".
@@ -185,28 +218,6 @@ goto :setup_menu
 call :run_server_script "" "Database initialization" "%init_db_script%"
 goto :setup_menu
 
-:run_drugs
-call :run_server_script "%drugs_module%" "RxNav drugs catalog refresh" "%drugs_script%"
-goto :setup_menu
-
-:run_livertox
-call :run_server_script "%livertox_module%" "LiverTox dataset refresh" "%livertox_script%"
-goto :setup_menu
-
-:run_rag
-call :run_server_script "%rag_module%" "RAG embeddings refresh" "%rag_script%"
-goto :setup_menu
-
-:clean_desktop_build
-if not exist "%root_folder%release\tauri\scripts\clean-tauri-build.ps1" (
-  echo [ERROR] Desktop cleanup script not found.
-  pause
-  goto :setup_menu
-)
-powershell -NoProfile -ExecutionPolicy Bypass -File "%root_folder%release\tauri\scripts\clean-tauri-build.ps1"
-pause
-goto :setup_menu
-
 :run_server_script
 set "script_module=%~1"
 set "script_label=%~2"
@@ -229,28 +240,6 @@ if not exist "%script_path%" (
   set "run_script_ec=1"
   goto :run_server_script_end
 )
-if not exist "%uv_lock%" (
-  if exist "%uv_lock_file%" (
-    copy /y "%uv_lock_file%" "%uv_lock%" >nul
-    if errorlevel 1 (
-      echo [ERROR] Runtime lockfile not found at "%uv_lock%" and seeding from "%uv_lock_file%" failed.
-      set "run_script_ec=1"
-      goto :run_server_script_end
-    )
-    echo [INFO] Seeded runtime lockfile from workspace lockfile: "%uv_lock%".
-  ) else (
-    echo [ERROR] Runtime lockfile not found at "%uv_lock%".
-    echo [INFO] Expected lockfile at runtimes\uv.lock or workspace uv.lock.
-    set "run_script_ec=1"
-    goto :run_server_script_end
-  )
-)
-copy /y "%uv_lock%" "%uv_lock_file%" >nul
-if errorlevel 1 (
-  echo [WARN] Failed to copy runtime lockfile to "%uv_lock_file%".
-  set "run_script_ec=1"
-  goto :run_server_script_end
-)
 echo [RUN] !script_label!
 pushd "%root_folder%" >nul
 if "%script_module%"=="" (
@@ -260,10 +249,6 @@ if "%script_module%"=="" (
 )
 set "run_script_ec=!ERRORLEVEL!"
 popd >nul
-if exist "%uv_lock_file%" (
-  copy /y "%uv_lock_file%" "%uv_lock%" >nul
-  if errorlevel 1 echo [WARN] Failed to update runtime lockfile "%uv_lock%".
-)
 if "!run_script_ec!"=="0" (
   echo [SUCCESS] !script_label! completed successfully.
 ) else (
@@ -275,3 +260,5 @@ exit /b !run_script_ec!
 
 :exit
 endlocal
+
+

@@ -2,37 +2,34 @@ from __future__ import annotations
 
 import time
 from datetime import date, datetime
-from types import SimpleNamespace
 from typing import Any
-
 from sqlalchemy import create_engine, select
 from sqlalchemy.orm import sessionmaker
 
+from DILIGENT.server.domain.patient_timeline import PatientTimeline, PatientTimelineEvent
 from DILIGENT.server.repositories.schemas.models import (
     Base,
     ClinicalSession,
     ClinicalSessionDrug,
     Drug,
     DrugAlias,
+    DrugDiliAnnotation,
+    DrugLabelDocument,
+    DrugLabelSection,
     DrugRxnormCode,
     LiverToxMonograph,
+    Patient,
 )
 from DILIGENT.server.repositories.serialization.data import DataSerializer
 from DILIGENT.server.services.inspection import DataInspectionService
 from DILIGENT.server.services.jobs import JobManager
 
 
-###############################################################################
-class QueryStub:
-    def __init__(self, engine: Any) -> None:
-        self.database = SimpleNamespace(backend=SimpleNamespace(engine=engine))
-
-
 # -----------------------------------------------------------------------------
 def build_serializer() -> tuple[DataSerializer, Any]:
     engine = create_engine("sqlite+pysqlite:///:memory:", future=True)
     Base.metadata.create_all(engine)
-    serializer = DataSerializer(queries=QueryStub(engine))
+    serializer = DataSerializer(engine=engine)
     return serializer, engine
 
 
@@ -187,8 +184,41 @@ def test_catalog_search_and_drug_delete_cleanup() -> None:
                 last_update="2025-01-06",
             )
         )
+        db_session.add(
+            DrugDiliAnnotation(
+                drug_id=int(drug.id),
+                source_dataset="dilirank",
+                source_record_id="dr-1",
+                source_name="Acetaminophen",
+                source_name_norm="acetaminophen",
+                classification="Most-DILI-Concern",
+            )
+        )
+        label_document = DrugLabelDocument(
+            drug_id=int(drug.id),
+            source="dailymed",
+            set_id="set-1",
+            spl_version=1,
+            title="Acetaminophen Label",
+            effective_date="2025-01-01",
+        )
+        db_session.add(label_document)
+        db_session.flush()
+        db_session.add(
+            DrugLabelSection(
+                document_id=int(label_document.id),
+                section_key="boxed_warning",
+                section_title="Boxed Warning",
+                text="Hepatic warning section",
+                contains_hepatic_keywords=True,
+                display_order=0,
+            )
+        )
+        patient = Patient(name="Drug Link")
+        db_session.add(patient)
+        db_session.flush()
         clinical_session = ClinicalSession(
-            patient_name="Drug Link",
+            patient_id=int(patient.id),
             session_timestamp=datetime(2025, 1, 4, 10, 0),
             session_status="successful",
         )
@@ -229,6 +259,30 @@ def test_catalog_search_and_drug_delete_cleanup() -> None:
     assert excerpt is not None
     assert "injury" in excerpt["excerpt"]
 
+    dili_catalog, dili_total = serializer.list_dili_annotations_catalog(
+        search="acetaminophen",
+        offset=0,
+        limit=10,
+    )
+    assert dili_total == 1
+    assert dili_catalog[0]["dilirank_class"] == "Most-DILI-Concern"
+
+    dili_detail = serializer.get_dili_annotation_details(rxnav_items[0]["drug_id"])
+    assert dili_detail is not None
+    assert len(dili_detail["annotations"]) == 1
+
+    label_catalog, label_total = serializer.list_drug_label_catalog(
+        search="acetaminophen",
+        offset=0,
+        limit=10,
+    )
+    assert label_total == 1
+    assert label_catalog[0]["retained_section_count"] == 1
+
+    label_sections = serializer.get_drug_label_sections(rxnav_items[0]["drug_id"])
+    assert label_sections is not None
+    assert len(label_sections["sections"]) == 1
+
     assert serializer.delete_drug_with_cleanup(rxnav_items[0]["drug_id"]) is True
 
     with session_factory() as db_session:
@@ -236,6 +290,9 @@ def test_catalog_search_and_drug_delete_cleanup() -> None:
         assert db_session.execute(select(DrugAlias)).scalars().all() == []
         assert db_session.execute(select(DrugRxnormCode)).scalars().all() == []
         assert db_session.execute(select(LiverToxMonograph)).scalars().all() == []
+        assert db_session.execute(select(DrugDiliAnnotation)).scalars().all() == []
+        assert db_session.execute(select(DrugLabelSection)).scalars().all() == []
+        assert db_session.execute(select(DrugLabelDocument)).scalars().all() == []
         session_drugs = db_session.execute(select(ClinicalSessionDrug)).scalars().all()
         assert len(session_drugs) == 1
         assert session_drugs[0].drug_id is None
@@ -247,12 +304,20 @@ def test_update_job_lifecycle_with_cooperative_cancel() -> None:
     jobs = JobManager()
     service = DataInspectionService(serializer=serializer, jobs=jobs)
 
-    def fast_rxnav_runner(job_id: str) -> dict[str, Any]:
+    def fast_rxnav_runner(
+        job_id: str,
+        overrides: dict[str, Any] | None = None,
+    ) -> dict[str, Any]:
+        _ = overrides
         jobs.update_progress(job_id, 50)
         jobs.update_result(job_id, {"progress_message": "halfway"})
         return {"summary": {"records": 2}}
 
-    def slow_livertox_runner(job_id: str) -> dict[str, Any]:
+    def slow_livertox_runner(
+        job_id: str,
+        overrides: dict[str, Any] | None = None,
+    ) -> dict[str, Any]:
+        _ = overrides
         for _ in range(120):
             if jobs.should_stop(job_id):
                 return {}
@@ -287,3 +352,68 @@ def test_update_job_lifecycle_with_cooperative_cancel() -> None:
     )
     assert final_livertox is not None
     assert final_livertox["status"] == "cancelled"
+
+
+class FakeTimelineExtractor:
+    def __init__(self) -> None:
+        self.call_count = 0
+
+    async def extract_timeline(
+        self,
+        *,
+        session_id: int,
+        source_payload: dict[str, Any],
+    ) -> PatientTimeline:
+        _ = source_payload
+        self.call_count += 1
+        return PatientTimeline(
+            session_id=session_id,
+            generated_at=datetime(2026, 1, 1, 12, 0),
+            events=[
+                PatientTimelineEvent(
+                    event_id=f"event-{session_id}-1",
+                    title="Therapy started",
+                    event_type="therapy",
+                    event_date="2025-01-10",
+                    source="drugs",
+                )
+            ],
+        )
+
+
+# -----------------------------------------------------------------------------
+def test_timeline_generation_persists_and_reuses_payload() -> None:
+    serializer, _ = build_serializer()
+    save_session(
+        serializer,
+        patient_name="Timeline Patient",
+        timestamp=datetime(2025, 1, 1, 8, 30),
+        status="successful",
+        report="Timeline report",
+        anamnesis="Symptoms started in January 2025.",
+    )
+    session_rows, _ = serializer.list_sessions(
+        search="Timeline Patient",
+        status_filter=None,
+        date_mode=None,
+        filter_date=None,
+        offset=0,
+        limit=10,
+    )
+    session_id = int(session_rows[0]["session_id"])
+    extractor = FakeTimelineExtractor()
+    service = DataInspectionService(serializer=serializer, timeline_extractor=extractor)
+
+    generated = service.generate_session_timeline(session_id)
+    assert generated is not None
+    assert generated.events[0].title == "Therapy started"
+    assert extractor.call_count == 1
+
+    cached = service.get_session_timeline(session_id)
+    assert cached is not None
+    assert cached.events[0].event_type == "therapy"
+
+    reused = service.generate_session_timeline(session_id)
+    assert reused is not None
+    assert reused.events[0].title == "Therapy started"
+    assert extractor.call_count == 1

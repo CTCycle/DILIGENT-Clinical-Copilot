@@ -5,9 +5,11 @@ from datetime import date
 from typing import Any
 
 from DILIGENT.server.domain.clinical import (
+    LiverInjuryOnsetContext,
     DiseaseContextEntry,
     DrugEntry,
     HepatotoxicityPatternScore,
+    PatientLabTimeline,
     PatientData,
     PatientDiseaseContext,
     PatientDrugs,
@@ -27,6 +29,28 @@ class FakeDiseaseClient:
         if self.responses:
             return self.responses.pop(0)
         return schema(entries=[])
+
+
+class FlakyDiseaseClient:
+    def __init__(self, *, failures_before_success: int) -> None:
+        self.failures_before_success = max(failures_before_success, 0)
+        self.call_count = 0
+
+    async def llm_structured_call(self, **kwargs: Any) -> PatientDiseaseContext:
+        self.call_count += 1
+        if self.call_count <= self.failures_before_success:
+            raise RuntimeError(
+                "HTTP 429: Please try again in 0.01s. rate_limit_exceeded"
+            )
+        return PatientDiseaseContext(
+            entries=[
+                DiseaseContextEntry(
+                    name="Steatosi epatica",
+                    chronic=True,
+                    hepatic_related=True,
+                )
+            ]
+        )
 
 
 def test_extract_diseases_from_anamnesis_deduplicates_and_keeps_rich_entry() -> None:
@@ -73,16 +97,26 @@ def test_extract_diseases_from_anamnesis_deduplicates_and_keeps_rich_entry() -> 
     assert steatosis.hepatic_related is True
 
 
+def test_extract_diseases_from_anamnesis_retries_transient_failures() -> None:
+    client = FlakyDiseaseClient(failures_before_success=1)
+    extractor = DiseaseExtractor(client=client)
+    extractor.extraction_retry_attempts = 2
+
+    parsed = asyncio.run(
+        extractor.extract_diseases_from_anamnesis("Steatosi epatica cronica.")
+    )
+
+    assert client.call_count == 2
+    assert [entry.name for entry in parsed.entries] == ["Steatosi epatica"]
+
+
 def test_build_structured_clinical_context_includes_disease_timeline() -> None:
     payload = PatientData(
         name="Patient A",
         visit_date=date(2025, 4, 14),
         anamnesis="History of steatosis and hypertension.",
         drugs="Ursodeoxycholic acid 300 mg",
-        alt="100",
-        alt_max="50",
-        alp="120",
-        alp_max="100",
+        laboratory_analysis="ALT 100 U/L (ULN 50) on 2025-04-14; ALP 120 U/L (ULN 100)",
     )
     therapy_drugs = PatientDrugs(entries=[DrugEntry(name="Ursodeoxycholic acid")])
     anamnesis_drugs = PatientDrugs(entries=[DrugEntry(name="Metformin")])
@@ -109,6 +143,8 @@ def test_build_structured_clinical_context_includes_disease_timeline() -> None:
         therapy_drugs=therapy_drugs,
         anamnesis_drugs=anamnesis_drugs,
         disease_context=disease_context,
+        lab_timeline=PatientLabTimeline(entries=[]),
+        onset_context=LiverInjuryOnsetContext(onset_basis="unknown"),
         pattern_score=pattern_score,
     )
 

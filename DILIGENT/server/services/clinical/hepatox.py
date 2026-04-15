@@ -16,19 +16,24 @@ from DILIGENT.server.models.prompts import (
     LIVERTOX_REPORT_EXAMPLE,
 )
 from DILIGENT.server.models.providers import initialize_llm_client
-from DILIGENT.server.domain.clinical import (
+from DILIGENT.server.domain.clinical.entities import (
+    ClinicalLabEntry,
     ClinicalPipelineValidationError,
     DrugEntry,
     DrugClinicalAssessment,
+    DrugRucamAssessment,
     DrugSuspensionContext,
     HepatotoxicityPatternAssessment,
     HepatotoxicityPatternScore,
     PatientData,
     PatientDrugClinicalReport,
     PatientDrugs,
+    PatientLabTimeline,
+    PatientRucamAssessmentBundle,
     PipelineIssue,
 )
-from DILIGENT.server.configurations import LLMRuntimeConfig, server_settings
+from DILIGENT.server.configurations.startup import server_settings
+from DILIGENT.server.configurations.llm_configs import LLMRuntimeConfig
 from DILIGENT.server.common.constants import (
     DEFAULT_DILI_CLASSIFICATION,
     R_SCORE_CHOLESTATIC_THRESHOLD,
@@ -45,6 +50,24 @@ from DILIGENT.server.services.research.tavily import tavily_research_service
 NOT_AVAILABLE_TEXT = "Not available"
 REDUNDANT_REPORT_LINE_RE = re.compile(
     r"generated\s+report.*?(drug[- ]induced\s+liver\s+injury|\bdili\b)",
+    re.IGNORECASE,
+)
+LIVERTOX_TITLE_LINE_RE = re.compile(
+    r"^\s*\*{0,2}[^*\n]+?\s*-\s*LiverTox score\b.*\*{0,2}\s*$",
+    re.IGNORECASE,
+)
+REPORT_LABEL_LINE_RE = re.compile(r"^\s*\*{0,2}\s*Report\s*\*{0,2}\s*$", re.IGNORECASE)
+BIBLIOGRAPHY_LINE_RE = re.compile(
+    r"^\s*\*{0,2}\s*Bibliography source\s*\*{0,2}\s*:\s*LiverTox\s*$",
+    re.IGNORECASE,
+)
+DRIFT_SECTION_LINE_RE = re.compile(r"^\s*(medication|assessment|plan)\s*$", re.IGNORECASE)
+STRUCTURED_DILI_SECTION_LINE_RE = re.compile(
+    r"^\s*#{0,6}\s*\*{0,2}\s*Structured\s+DILI\s+Assessment\s+Report\s*\*{0,2}\s*$",
+    re.IGNORECASE,
+)
+RATE_LIMIT_WAIT_HINT_RE = re.compile(
+    r"please\s+try\s+again\s+in\s+([0-9]+(?:\.[0-9]+)?)s",
     re.IGNORECASE,
 )
 
@@ -102,18 +125,23 @@ class HepatotoxicityPatternAnalyzer:
 
     # -------------------------------------------------------------------------
     def calculate_hepatotoxicity_pattern(
-        self, payload: PatientData
+        self, lab_timeline: PatientLabTimeline
     ) -> HepatotoxicityPatternScore:
-        alt_value = self.parse_marker_value(payload.alt)
-        alt_max_value = self.parse_marker_value(payload.alt_max)
-        alp_value = self.parse_marker_value(payload.alp)
-        alp_max_value = self.parse_marker_value(payload.alp_max)
-
+        anchor = self.select_anchor_pair(lab_timeline)
+        if anchor is None:
+            score = HepatotoxicityPatternScore(
+                alt_multiple=None,
+                alp_multiple=None,
+                r_score=None,
+                classification=DEFAULT_DILI_CLASSIFICATION,
+            )
+            self.r_score = None
+            return score
         score = self.calculator.calculate(
-            alt_value=alt_value,
-            alt_uln=alt_max_value,
-            alp_value=alp_value,
-            alp_uln=alp_max_value,
+            alt_value=anchor["alt_value"],
+            alt_uln=anchor["alt_uln"],
+            alp_value=anchor["alp_value"],
+            alp_uln=anchor["alp_uln"],
         )
         self.r_score = score.r_score
         return score
@@ -121,67 +149,109 @@ class HepatotoxicityPatternAnalyzer:
     # -------------------------------------------------------------------------
     def assess_payload(
         self,
-        payload: PatientData,
-        *,
-        allow_missing_labs: bool = False,
+        lab_timeline: PatientLabTimeline,
     ) -> HepatotoxicityPatternAssessment:
-        field_mapping = [
-            ("alt", "ALT"),
-            ("alt_max", "ALT upper limit"),
-            ("alp", "ALP"),
-            ("alp_max", "ALP upper limit"),
-        ]
-        parsed_values: dict[str, float] = {}
-        issues: list[PipelineIssue] = []
-        for field_name, label in field_mapping:
-            raw_value = getattr(payload, field_name, None)
-            parsed = self.parse_marker_value(raw_value)
-            if parsed is None:
-                issues.append(
-                    PipelineIssue(
-                        severity="warning",
-                        code="missing_labs",
-                        message=(
-                            f"{label} is missing or invalid. ALT, ALT max, ALP, and ALP max "
-                            "are required for a determined hepatotoxicity pattern."
-                        ),
-                        field=field_name,
-                    )
-                )
-                continue
-            parsed_values[field_name] = parsed
-
-        if issues:
-            if not allow_missing_labs:
-                raise ClinicalPipelineValidationError(
-                    issues=issues,
-                    message="Missing laboratory values required for hepatotoxicity pattern assessment.",
-                )
-            indeterminate = HepatotoxicityPatternScore(
-                alt_multiple=None,
-                alp_multiple=None,
-                r_score=None,
-                classification=DEFAULT_DILI_CLASSIFICATION,
+        score = self.calculate_hepatotoxicity_pattern(lab_timeline)
+        if score.r_score is None:
+            issue = PipelineIssue(
+                severity="error",
+                code="missing_hepatotoxicity_inputs",
+                message=(
+                    "Provide laboratory data sufficient to determine hepatotoxicity pattern, "
+                    "ideally dated ALT or AST, ALP, and bilirubin."
+                ),
+                field="laboratory_analysis",
             )
-            self.r_score = indeterminate.r_score
-            return HepatotoxicityPatternAssessment(
-                score=indeterminate,
-                status="undetermined_due_to_missing_labs",
-                issues=issues,
-            )
-
-        score = self.calculator.calculate(
-            alt_value=parsed_values["alt"],
-            alt_uln=parsed_values["alt_max"],
-            alp_value=parsed_values["alp"],
-            alp_uln=parsed_values["alp_max"],
-        )
+            raise ClinicalPipelineValidationError(issues=[issue], message=issue.message)
         self.r_score = score.r_score
         return HepatotoxicityPatternAssessment(
             score=score,
             status="ok",
             issues=[],
         )
+
+    # -------------------------------------------------------------------------
+    def select_anchor_pair(self, lab_timeline: PatientLabTimeline) -> dict[str, float] | None:
+        dated_candidates = self.group_entries_by_date(lab_timeline.entries)
+        for sample_date in sorted(dated_candidates):
+            bucket = dated_candidates[sample_date]
+            pair = self.build_anchor_from_bucket(bucket)
+            if pair is not None:
+                return pair
+        undated = self.build_anchor_from_bucket(lab_timeline.entries)
+        return undated
+
+    # -------------------------------------------------------------------------
+    def group_entries_by_date(
+        self,
+        entries: list[ClinicalLabEntry],
+    ) -> dict[str, list[ClinicalLabEntry]]:
+        grouped: dict[str, list[ClinicalLabEntry]] = {}
+        for entry in entries:
+            if not entry.sample_date:
+                continue
+            grouped.setdefault(entry.sample_date, []).append(entry)
+        return grouped
+
+    # -------------------------------------------------------------------------
+    def build_anchor_from_bucket(
+        self,
+        entries: list[ClinicalLabEntry],
+    ) -> dict[str, float] | None:
+        alt_like = self.pick_best_entry(entries, {"ALT", "AST"})
+        alp = self.pick_best_entry(entries, {"ALP"})
+        if alt_like is None or alp is None:
+            return None
+        alt_value = self.parse_entry_value(alt_like)
+        alp_value = self.parse_entry_value(alp)
+        if alt_value is None or alp_value is None:
+            return None
+        alt_uln = self.resolve_uln(alt_like, fallback=40.0)
+        alp_uln = self.resolve_uln(alp, fallback=120.0)
+        if alt_uln <= 0 or alp_uln <= 0:
+            return None
+        return {
+            "alt_value": alt_value,
+            "alt_uln": alt_uln,
+            "alp_value": alp_value,
+            "alp_uln": alp_uln,
+        }
+
+    # -------------------------------------------------------------------------
+    def pick_best_entry(
+        self,
+        entries: list[ClinicalLabEntry],
+        marker_names: set[str],
+    ) -> ClinicalLabEntry | None:
+        selected: ClinicalLabEntry | None = None
+        for entry in entries:
+            if entry.marker_name.upper() not in marker_names:
+                continue
+            if selected is None:
+                selected = entry
+                continue
+            selected_value = self.parse_entry_value(selected)
+            current_value = self.parse_entry_value(entry)
+            if selected_value is None and current_value is not None:
+                selected = entry
+            elif current_value is not None and selected_value is not None and current_value > selected_value:
+                selected = entry
+        return selected
+
+    # -------------------------------------------------------------------------
+    def parse_entry_value(self, entry: ClinicalLabEntry) -> float | None:
+        if entry.value is not None:
+            return float(entry.value)
+        return self.parse_marker_value(entry.value_text)
+
+    # -------------------------------------------------------------------------
+    def resolve_uln(self, entry: ClinicalLabEntry, *, fallback: float) -> float:
+        if entry.upper_limit_normal is not None and entry.upper_limit_normal > 0:
+            return float(entry.upper_limit_normal)
+        parsed = self.parse_marker_value(entry.upper_limit_text)
+        if parsed is not None and parsed > 0:
+            return parsed
+        return fallback
 
     # -------------------------------------------------------------------------
     def parse_marker_value(self, raw: str | None) -> float | None:
@@ -233,7 +303,7 @@ class HepatoxConsultation:
         self.llm_client = initialize_llm_client(purpose="clinical", timeout_s=timeout_s)
         self.MAX_EXCERPT_LENGTH = server_settings.external_data.max_excerpt_length
         self.patient_name = (patient_name or "").strip() or None
-        _, model_candidate = LLMRuntimeConfig.resolve_provider_and_model("clinical")
+        provider, model_candidate = LLMRuntimeConfig.resolve_provider_and_model("clinical")
         self.llm_model = model_candidate or LLMRuntimeConfig.get_clinical_model()
         try:
             chat_signature = inspect.signature(self.llm_client.chat)
@@ -247,23 +317,25 @@ class HepatoxConsultation:
         self.rag_use_reranking = bool(server_settings.rag.use_reranking)
         self.rag_top_n = max(int(server_settings.rag.rerank_top_n), 1)
         self.rag_candidate_k = max(int(server_settings.rag.rerank_candidate_k), self.rag_top_n)
+        default_parallel_analyses = 3 if provider == "ollama" else 1
         self.max_parallel_analyses = max(
             1,
             int(
                 getattr(
                     server_settings.external_data,
                     "clinical_llm_max_concurrency",
-                    3,
+                    default_parallel_analyses,
                 )
             ),
         )
+        default_retry_attempts = 2 if provider == "ollama" else 4
         self.analysis_retry_attempts = max(
             1,
             int(
                 getattr(
                     server_settings.external_data,
                     "clinical_llm_retry_attempts",
-                    2,
+                    default_retry_attempts,
                 )
             ),
         )
@@ -274,8 +346,10 @@ class HepatoxConsultation:
         *,
         prepared_inputs: HepatoxPreparedInputs | None,
         visit_date: date | None = None,
+        report_language: str = "en",
         rag_query: dict[str, str] | None = None,
         use_web_search: bool = False,
+        rucam_bundle: PatientRucamAssessmentBundle | None = None,
         progress_callback: Callable[[str, float], None] | None = None,
     ) -> dict[str, Any] | None:
         if prepared_inputs is None:
@@ -292,9 +366,11 @@ class HepatoxConsultation:
             resolved_mapping,
             clinical_context=prepared_inputs.clinical_context,
             visit_date=visit_date,
+            report_language=report_language,
             pattern_prompt=prepared_inputs.pattern_prompt,
             rag_query=rag_query,
             use_web_search=use_web_search,
+            rucam_bundle=rucam_bundle,
             progress_callback=progress_callback,
         )
         return report.model_dump()
@@ -306,9 +382,11 @@ class HepatoxConsultation:
         *,
         clinical_context: str | None,
         visit_date: date | None,
+        report_language: str,
         pattern_prompt: str,
         rag_query: dict[str, str] | None = None,
         use_web_search: bool = False,
+        rucam_bundle: PatientRucamAssessmentBundle | None = None,
         progress_callback: Callable[[str, float], None] | None = None,
     ) -> PatientDrugClinicalReport:
         normalized_context = clinical_context.strip() if clinical_context else ""
@@ -318,6 +396,12 @@ class HepatoxConsultation:
         )
         entries: list[DrugClinicalAssessment] = []
         llm_jobs: list[tuple[int, Any]] = []
+        rucam_by_key: dict[str, DrugRucamAssessment] = {}
+        if rucam_bundle is not None:
+            for item in rucam_bundle.entries:
+                normalized_key = normalize_drug_query_name(item.drug_name)
+                if normalized_key:
+                    rucam_by_key[normalized_key] = item
 
         # iterate over all drugs to identify those with LiverTox excerpts and those without
         for idx, drug_entry in enumerate(self.drugs.entries):
@@ -326,10 +410,12 @@ class HepatoxConsultation:
                 drug_entry=drug_entry,
                 resolved_drugs=resolved_drugs,
                 visit_date=visit_date,
+                report_language=report_language,
                 normalized_context=normalized_context,
                 pattern_summary=pattern_summary,
                 rag_query=rag_query,
                 use_web_search=use_web_search,
+                rucam_by_key=rucam_by_key,
             )
             entries.append(entry)
             if job:
@@ -380,6 +466,7 @@ class HepatoxConsultation:
         final_report = await self.finalize_patient_report(
             entries,
             clinical_context=normalized_context,
+            report_language=report_language,
         )
         self.emit_progress(progress_callback, stage="report_composition", fraction=1.0)
 
@@ -424,10 +511,12 @@ class HepatoxConsultation:
         drug_entry: DrugEntry,
         resolved_drugs: dict[str, dict[str, Any]],
         visit_date: date | None,
+        report_language: str,
         normalized_context: str,
         pattern_summary: str,
         rag_query: dict[str, str] | None,
         use_web_search: bool,
+        rucam_by_key: dict[str, DrugRucamAssessment],
     ) -> tuple[DrugClinicalAssessment, tuple[int, Any] | None]:
         raw_name = drug_entry.name or ""
         normalized_drug_key = normalize_drug_query_name(raw_name)
@@ -444,8 +533,23 @@ class HepatoxConsultation:
         if not origins and drug_entry.source in {"therapy", "anamnesis"}:
             origins = [drug_entry.source]
         extraction_metadata = livertox_data.get("extraction_metadata", [])
+        dili_annotations = (
+            livertox_data.get("dili_annotations", [])
+            if isinstance(livertox_data.get("dili_annotations"), list)
+            else []
+        )
+        label_sections = (
+            livertox_data.get("label_sections", [])
+            if isinstance(livertox_data.get("label_sections"), list)
+            else []
+        )
+        knowledge_prompt = str(livertox_data.get("knowledge_prompt") or "").strip()
         missing_livertox = bool(livertox_data.get("missing_livertox"))
         ambiguous_match = bool(livertox_data.get("ambiguous_match"))
+        raw_match_status = livertox_data.get("match_status")
+        match_status = (
+            str(raw_match_status).strip().lower() if raw_match_status is not None else None
+        )
         match_candidates = [
             str(candidate).strip()
             for candidate in livertox_data.get("match_candidates", [])
@@ -454,6 +558,7 @@ class HepatoxConsultation:
 
         suspension = self.evaluate_suspension(drug_entry, visit_date)
         matched_lvt_row = matched_row if isinstance(matched_row, dict) else None
+        rucam = rucam_by_key.get(normalized_drug_key)
         entry = DrugClinicalAssessment(
             drug_name=drug_entry.name,
             canonical_name=canonical_name,
@@ -463,8 +568,10 @@ class HepatoxConsultation:
             extracted_excerpts=excerpts_list,
             missing_livertox=missing_livertox,
             ambiguous_match=ambiguous_match,
+            match_status=match_status,
             match_candidates=match_candidates,
             suspension=suspension,
+            rucam=rucam,
         )
 
         if suspension.excluded:
@@ -507,6 +614,11 @@ class HepatoxConsultation:
             pattern_summary=pattern_summary,
             metadata=entry.matched_livertox_row,
             web_evidence=web_evidence,
+            rucam=entry.rucam,
+            dili_prior_block=self.format_dili_prior_block(dili_annotations),
+            official_label_block=self.format_official_label_block(label_sections),
+            knowledge_prompt=knowledge_prompt,
+            report_language=report_language,
         )
         return entry, (idx, job)
 
@@ -917,6 +1029,132 @@ class HepatoxConsultation:
         return f"{normalized_name} - LiverTox score {normalized_score}"
 
     # -------------------------------------------------------------------------
+    def summarize_rucam_components(
+        self,
+        rucam: DrugRucamAssessment | None,
+    ) -> str:
+        if rucam is None or not rucam.components:
+            return "Not available."
+        pieces: list[str] = []
+        for component in rucam.components:
+            pieces.append(
+                f"{component.label}: {component.score} ({component.status})"
+            )
+        return "; ".join(pieces)
+
+    # -------------------------------------------------------------------------
+    def format_rucam_limitations(self, rucam: DrugRucamAssessment | None) -> str:
+        if rucam is None or not rucam.limitations:
+            return "None documented."
+        return "; ".join(item for item in rucam.limitations if item)
+
+    # -------------------------------------------------------------------------
+    def format_rucam_prompt_block(self, rucam: DrugRucamAssessment | None) -> str:
+        if rucam is None:
+            return "Estimated RUCAM not available."
+        limitations = ", ".join((rucam.limitations or [])[:3]) or "not specified"
+        return (
+            f"- Score: {rucam.total_score}\n"
+            f"- Category: {rucam.causality_category}\n"
+            f"- Confidence: {rucam.confidence}\n"
+            f"- Estimated due to incomplete clinical data: yes\n"
+            f"- Key limitations: {limitations}"
+        )
+
+    # -------------------------------------------------------------------------
+    def format_dili_prior_block(self, annotations: list[dict[str, Any]]) -> str:
+        if not annotations:
+            return "No DILIrank or DILIst prior-risk annotations available."
+        lines = []
+        for item in annotations:
+            source = str(item.get("source_dataset") or "unknown").strip().upper()
+            classification = str(item.get("classification") or "not reported").strip()
+            severity = str(item.get("severity_class") or "not reported").strip()
+            concern = str(item.get("concern_class") or "not reported").strip()
+            lines.append(
+                f"- {source}: classification={classification}; severity={severity}; concern={concern}"
+            )
+        return "\n".join(lines)
+
+    # -------------------------------------------------------------------------
+    def format_official_label_block(self, sections: list[dict[str, Any]]) -> str:
+        if not sections:
+            return "No retained DailyMed official label sections available."
+        lines: list[str] = []
+        for section in sections:
+            title = str(section.get("section_title") or section.get("section_key") or "Section")
+            text = str(section.get("text") or "").strip()
+            if not text:
+                continue
+            lines.append(f"- {title}:\n{text}")
+        return "\n".join(lines) if lines else "No retained DailyMed official label sections available."
+
+    # -------------------------------------------------------------------------
+    @staticmethod
+    def is_materially_in_report_language(text: str, report_language: str) -> bool:
+        normalized = (text or "").strip()
+        if not normalized:
+            return True
+        language_key = (report_language or "").strip().lower()[:2]
+        if language_key == "en":
+            return True
+        token_pattern = re.compile(r"[A-Za-zÀ-ÖØ-öø-ÿ]+")
+        language_markers: dict[str, set[str]] = {
+            "it": {"il", "la", "del", "della", "con", "per", "farmaco", "paziente"},
+            "de": {"der", "die", "das", "und", "mit", "für", "patient", "arznei"},
+            "fr": {"le", "la", "les", "des", "avec", "pour", "patient", "médicament"},
+            "es": {"el", "la", "los", "las", "con", "para", "paciente", "fármaco"},
+        }
+        target_markers = language_markers.get(language_key)
+        if not target_markers:
+            return True
+        english_markers = {"the", "and", "with", "for", "patient", "drug", "liver"}
+        target_hits = 0
+        english_hits = 0
+        for match in token_pattern.finditer(normalized):
+            token = match.group(0).casefold()
+            if token in target_markers:
+                target_hits += 1
+            if token in english_markers:
+                english_hits += 1
+        if target_hits == 0:
+            return False
+        return target_hits >= english_hits
+
+    # -------------------------------------------------------------------------
+    async def repair_language_once(
+        self,
+        *,
+        source_text: str,
+        report_language: str,
+    ) -> str:
+        language_map = "en=English, it=Italian, de=German, fr=French, es=Spanish"
+        repair_system = (
+            "You rewrite clinical text into the requested language only. "
+            "Do not add new clinical facts."
+        )
+        repair_user = (
+            f"Target language code: {report_language}\n"
+            f"Language map: {language_map}\n"
+            "Rewrite the text entirely in the target language. "
+            "Do not produce bilingual output. Keep drug names and direct quotes unchanged.\n\n"
+            f"Text:\n{source_text}"
+        )
+        chat_kwargs: dict[str, Any] = {
+            "model": self.llm_model,
+            "messages": [
+                {"role": "system", "content": repair_system},
+                {"role": "user", "content": repair_user},
+            ],
+        }
+        if self.chat_supports_temperature:
+            chat_kwargs["temperature"] = 0.0
+        else:
+            chat_kwargs["options"] = {"temperature": 0.0}
+        repaired = await self.llm_client.chat(**chat_kwargs)
+        return self.coerce_chat_text(repaired).strip()
+
+    # -------------------------------------------------------------------------
     async def request_drug_analysis(
         self,
         *,
@@ -933,6 +1171,11 @@ class HepatoxConsultation:
         pattern_summary: str,
         metadata: dict[str, Any] | None,
         web_evidence: str,
+        rucam: DrugRucamAssessment | None,
+        dili_prior_block: str = "No DILI prior annotations available.",
+        official_label_block: str = "No official label excerpts available.",
+        knowledge_prompt: str = "No supplemental knowledge prompt available.",
+        report_language: str = "en",
     ) -> str:
         start_details = self.format_start_prompt(suspension)
         suspension_details = self.format_suspension_prompt(suspension)
@@ -950,8 +1193,10 @@ class HepatoxConsultation:
             if isinstance(item, dict) and item
         ]
         extraction_block = "\n".join(metadata_items) if metadata_items else "- Not available"
+        rucam_block = self.format_rucam_prompt_block(rucam)
         user_prompt = LIVERTOX_CLINICAL_USER_PROMPT.format(
             drug_name=self.escape_braces(drug_name.strip() or drug_name),
+            report_language=self.escape_braces(report_language),
             canonical_name=self.escape_braces(canonical_name.strip() or canonical_name),
             origins=self.escape_braces(origin_block),
             extraction_metadata=self.escape_braces(extraction_block),
@@ -965,6 +1210,10 @@ class HepatoxConsultation:
             suspension_details=self.escape_braces(suspension_details),
             timeline_note=self.escape_braces(timeline_note),
             pattern_summary=self.escape_braces(pattern_summary),
+            rucam_block=self.escape_braces(rucam_block),
+            dili_prior_block=self.escape_braces(dili_prior_block),
+            official_label_block=self.escape_braces(official_label_block),
+            knowledge_prompt=self.escape_braces(knowledge_prompt),
             metadata_block=self.escape_braces(metadata_block),
             livertox_score=self.escape_braces(score),
             example_block=self.escape_braces(LIVERTOX_REPORT_EXAMPLE),
@@ -991,16 +1240,30 @@ class HepatoxConsultation:
                     raise RuntimeError(
                         f"LLM analysis failed for {drug_name}: {exc}"
                     ) from exc
-                delay = self.retry_backoff_seconds(attempt)
+                delay = self.retry_backoff_seconds(attempt, exc=exc)
                 logger.warning(
-                    "Retrying LLM analysis for '%s' after error (attempt %d/%d): %s",
+                    "Retrying LLM analysis for '%s' after error (attempt %d/%d, delay %.2fs): %s",
                     drug_name,
                     attempt,
                     self.analysis_retry_attempts,
+                    delay,
                     exc,
                 )
                 await asyncio.sleep(delay)
-        return self.coerce_chat_text(raw_response)
+        response_text = self.coerce_chat_text(raw_response).strip()
+        if not self.is_materially_in_report_language(response_text, report_language):
+            logger.warning(
+                "Language mismatch detected for drug analysis '%s' (target=%s); applying one repair pass",
+                drug_name,
+                report_language,
+            )
+            repaired_text = await self.repair_language_once(
+                source_text=response_text,
+                report_language=report_language,
+            )
+            if repaired_text:
+                response_text = repaired_text
+        return response_text
 
     # -------------------------------------------------------------------------
     @staticmethod
@@ -1021,9 +1284,29 @@ class HepatoxConsultation:
         return str(raw_response).strip()
 
     # -------------------------------------------------------------------------
-    def retry_backoff_seconds(self, attempt: int) -> float:
+    @staticmethod
+    def extract_rate_limit_wait_hint_seconds(exc: Exception) -> float | None:
+        message = str(exc)
+        match = RATE_LIMIT_WAIT_HINT_RE.search(message)
+        if match is None:
+            return None
+        try:
+            parsed = float(match.group(1))
+        except (TypeError, ValueError):
+            return None
+        if parsed <= 0:
+            return None
+        # Add a small safety margin to avoid retrying too early.
+        return min(parsed + 0.25, 30.0)
+
+    # -------------------------------------------------------------------------
+    def retry_backoff_seconds(self, attempt: int, *, exc: Exception | None = None) -> float:
+        if exc is not None:
+            hinted_wait = self.extract_rate_limit_wait_hint_seconds(exc)
+            if hinted_wait is not None:
+                return hinted_wait
         normalized_attempt = max(int(attempt), 1)
-        return min(2.0, 0.35 * normalized_attempt)
+        return min(8.0, 0.75 * (2 ** (normalized_attempt - 1)))
 
     # -------------------------------------------------------------------------
     @staticmethod
@@ -1032,6 +1315,8 @@ class HepatoxConsultation:
             return ""
         cleaned_lines: list[str] = []
         for raw_line in text.splitlines():
+            if STRUCTURED_DILI_SECTION_LINE_RE.match(raw_line.strip()):
+                break
             compact = re.sub(r"[\s*_`#:\-]+", " ", raw_line).strip()
             if compact and REDUNDANT_REPORT_LINE_RE.search(compact):
                 continue
@@ -1045,25 +1330,171 @@ class HepatoxConsultation:
         entries: list[DrugClinicalAssessment],
         *,
         clinical_context: str | None,
+        report_language: str,
     ) -> str | None:
-        paragraphs = [
-            entry.paragraph.strip()
-            for entry in entries
-            if entry.paragraph and entry.paragraph.strip()
-        ]
-        if not paragraphs:
+        matched_entries: list[DrugClinicalAssessment] = []
+        unresolved_entries: list[DrugClinicalAssessment] = []
+        for entry in entries:
+            if self.should_render_as_matched_drug(entry):
+                matched_entries.append(entry)
+                continue
+            unresolved_entries.append(entry)
+
+        matched_sections = [self.render_matched_drug_section(entry) for entry in matched_entries]
+        matched_sections = [section for section in matched_sections if section]
+        unresolved_section = self.render_unresolved_mentions_section(unresolved_entries)
+        sections: list[str] = []
+        if matched_sections:
+            sections.append("\n\n---\n\n".join(matched_sections))
+        if unresolved_section:
+            sections.append(unresolved_section)
+        if not sections:
             return None
-        separator = "\n\n---\n\n" if len(paragraphs) > 1 else "\n\n"
-        combined_report = separator.join(paragraphs)
-        conclusion = await self.generate_conclusion(
-            clinical_context=clinical_context or "",
-            multi_drug_report=combined_report,
-        )
-        if conclusion:
-            combined_report = (
-                f"{combined_report}\n\n## Global Synthesis and Clinical Recommendations\n\n{conclusion}"
+
+        combined_report = "\n\n---\n\n".join(sections)
+        if matched_sections:
+            conclusion = await self.generate_conclusion(
+                clinical_context=clinical_context or "",
+                multi_drug_report="\n\n---\n\n".join(matched_sections),
+                report_language=report_language,
             )
+            if conclusion:
+                combined_report = (
+                    f"{combined_report}\n\n## Global Synthesis and Clinical Recommendations\n\n{conclusion}"
+                )
         return combined_report
+
+    # -------------------------------------------------------------------------
+    @staticmethod
+    def should_render_as_matched_drug(entry: DrugClinicalAssessment) -> bool:
+        status = (entry.match_status or "").strip().lower()
+        return status in {"matched", "matched_with_excerpt", "matched_no_excerpt"}
+
+    # -------------------------------------------------------------------------
+    def render_matched_drug_section(self, entry: DrugClinicalAssessment) -> str:
+        score = self.resolve_livertox_score(entry.matched_livertox_row)
+        title = self.format_drug_heading(entry.drug_name, score)
+        body = self.sanitize_renderable_body(entry)
+        if not body:
+            body = self.build_fallback_technical_note(entry)
+        rucam = entry.rucam
+        rucam_score = rucam.total_score if rucam is not None else "n/a"
+        rucam_category = rucam.causality_category if rucam is not None else "not available"
+        rucam_confidence = rucam.confidence if rucam is not None else "not available"
+        component_summary = (
+            ", ".join(
+                f"{component.label}: {component.score}"
+                for component in (rucam.components or [])
+                if component is not None
+            )
+            if rucam is not None
+            else ""
+        )
+        if not component_summary:
+            component_summary = "Not available"
+        limitations = (
+            ", ".join((rucam.limitations or [])[:3])
+            if rucam is not None and rucam.limitations
+            else "incomplete serial labs and/or missing rechallenge data"
+        )
+        return (
+            f"**{title}**\n\n"
+            f"**Estimated RUCAM**: {rucam_score}, {rucam_category}, confidence {rucam_confidence}. "
+            f"Estimated due to incomplete clinical data; key limitations: {limitations}.\n\n"
+            f"**RUCAM component summary**: {component_summary}\n\n"
+            f"**RUCAM limitations**: {limitations}\n\n"
+            f"**Report**\n\n"
+            f"{body}\n\n"
+            f"**Bibliography source**: LiverTox"
+        ).strip()
+
+    # -------------------------------------------------------------------------
+    def sanitize_renderable_body(self, entry: DrugClinicalAssessment) -> str:
+        text = entry.paragraph.strip() if entry.paragraph else ""
+        if not text:
+            return ""
+        expected_name = (entry.drug_name or "").strip().lower()
+        lines: list[str] = []
+        for raw_line in text.splitlines():
+            stripped = raw_line.strip()
+            if not stripped:
+                if lines and lines[-1]:
+                    lines.append("")
+                continue
+            if REDUNDANT_REPORT_LINE_RE.search(
+                re.sub(r"[\s*_`#:\-]+", " ", stripped).strip()
+            ):
+                continue
+            if REPORT_LABEL_LINE_RE.match(stripped):
+                continue
+            if BIBLIOGRAPHY_LINE_RE.match(stripped):
+                continue
+            if stripped == "---":
+                continue
+            if stripped.lower().startswith("## global synthesis"):
+                break
+            if DRIFT_SECTION_LINE_RE.match(stripped):
+                break
+            if STRUCTURED_DILI_SECTION_LINE_RE.match(stripped):
+                break
+            title_match = LIVERTOX_TITLE_LINE_RE.match(stripped)
+            if title_match:
+                if expected_name and expected_name not in stripped.lower():
+                    continue
+                continue
+            lines.append(raw_line.rstrip())
+        sanitized = "\n".join(lines).strip()
+        sanitized = re.sub(r"\n{3,}", "\n\n", sanitized).strip()
+        normalized = re.sub(r"\s+", " ", sanitized).strip().lower()
+        if "local livertox excerpt not available" in normalized:
+            return ""
+        return sanitized
+
+    # -------------------------------------------------------------------------
+    def build_fallback_technical_note(self, entry: DrugClinicalAssessment) -> str:
+        if entry.suspension.excluded:
+            return self.build_excluded_paragraph(entry)
+        if entry.ambiguous_match:
+            return self.build_ambiguous_match_paragraph(entry)
+        if entry.missing_livertox:
+            return self.build_missing_excerpt_paragraph(entry)
+        return self.build_error_paragraph(entry)
+
+    # -------------------------------------------------------------------------
+    def render_unresolved_mentions_section(
+        self, entries: list[DrugClinicalAssessment]
+    ) -> str | None:
+        if not entries:
+            return None
+        lines: list[str] = ["## Unresolved Drug Mentions", ""]
+        for entry in entries:
+            label = (entry.drug_name or "").strip() or "Unnamed drug"
+            reason = self.describe_unresolved_entry(entry)
+            rucam_summary = (
+                f"Estimated RUCAM {entry.rucam.total_score} ({entry.rucam.causality_category}, confidence {entry.rucam.confidence})"
+                if entry.rucam is not None
+                else "Estimated RUCAM not available"
+            )
+            lines.append(f"- **{label}**: {reason} {rucam_summary}.")
+        return "\n".join(lines).strip()
+
+    # -------------------------------------------------------------------------
+    def describe_unresolved_entry(self, entry: DrugClinicalAssessment) -> str:
+        status = (entry.match_status or "").strip().lower()
+        if status in {"ambiguous", "ambiguous_match"} or entry.ambiguous_match:
+            candidates = (
+                ", ".join(entry.match_candidates)
+                if entry.match_candidates
+                else "not available"
+            )
+            return f"Ambiguous match in local knowledge base (candidates: {candidates})."
+        if status in {"missing", "missing_match"}:
+            return "No matching drug record found in the local knowledge base."
+        if status == "matched_no_excerpt":
+            return "Matched drug record found, but no local LiverTox excerpt is available."
+        if entry.missing_livertox:
+            return "Matched record found, but no local LiverTox excerpt is available."
+        return "Could not produce a deterministic matched-drug section."
 
     # -------------------------------------------------------------------------
     async def generate_conclusion(
@@ -1071,6 +1502,7 @@ class HepatoxConsultation:
         *,
         clinical_context: str,
         multi_drug_report: str,
+        report_language: str,
     ) -> str | None:
         report_body = multi_drug_report.strip()
         if not report_body:
@@ -1079,6 +1511,7 @@ class HepatoxConsultation:
         if not context_body:
             context_body = "No clinical context was provided."
         user_prompt = LIVERTOX_CONCLUSION_USER_PROMPT.format(
+            report_language=self.escape_braces(report_language),
             clinical_context=self.escape_braces(context_body),
             multi_drug_report=self.escape_braces(report_body),
         )
@@ -1094,49 +1527,83 @@ class HepatoxConsultation:
             chat_kwargs["temperature"] = self.temperature
         else:
             chat_kwargs["options"] = {"temperature": self.temperature}
-        try:
-            raw_response = await self.llm_client.chat(**chat_kwargs)
-        except Exception as exc:  # noqa: BLE001
-            logger.error("Failed to generate clinical conclusion: %s", exc)
-            return None
+        for attempt in range(1, self.analysis_retry_attempts + 1):
+            try:
+                raw_response = await self.llm_client.chat(**chat_kwargs)
+                break
+            except Exception as exc:  # noqa: BLE001
+                if attempt >= self.analysis_retry_attempts:
+                    logger.error("Failed to generate clinical conclusion: %s", exc)
+                    return None
+                delay = self.retry_backoff_seconds(attempt, exc=exc)
+                logger.warning(
+                    "Retrying clinical conclusion generation after error (attempt %d/%d, delay %.2fs): %s",
+                    attempt,
+                    self.analysis_retry_attempts,
+                    delay,
+                    exc,
+                )
+                await asyncio.sleep(delay)
         conclusion = self.coerce_chat_text(raw_response).strip()
+        if conclusion and not self.is_materially_in_report_language(conclusion, report_language):
+            logger.warning(
+                "Language mismatch detected for global conclusion (target=%s); applying one repair pass",
+                report_language,
+            )
+            repaired = await self.repair_language_once(
+                source_text=conclusion,
+                report_language=report_language,
+            )
+            if repaired:
+                conclusion = repaired
         return conclusion or None
 
     # -------------------------------------------------------------------------
     def build_excluded_paragraph(self, entry: DrugClinicalAssessment) -> str:
-        score = self.resolve_livertox_score(entry.matched_livertox_row)
-        heading = self.format_drug_heading(entry.drug_name, score)
         suspension = entry.suspension
         if suspension.suspension_date is not None:
-            detail = f"The therapy was suspended on {suspension.suspension_date.isoformat()} well before the visit, so the drug was excluded from this DILI assessment."
+            detail = (
+                f"The therapy was suspended on {suspension.suspension_date.isoformat()} "
+                "well before the visit, so this exposure was excluded from active DILI "
+                "causality assessment."
+            )
         else:
-            detail = "The therapy was reported as suspended well before the visit and was excluded from the current DILI assessment."
-        recommendation = "Manual verification of latency is suggested if the exposure history becomes relevant again."
-        return (
-            f"{heading}\n{detail} {recommendation}\nBibliography source: LiverTox"
+            detail = (
+                "The therapy was reported as suspended well before the visit and was "
+                "excluded from active DILI causality assessment."
+            )
+        recommendation = (
+            "Manual latency verification is suggested if the exposure history becomes "
+            "clinically relevant again."
         )
+        return f"{detail} {recommendation}"
 
     # -------------------------------------------------------------------------
     def build_missing_excerpt_paragraph(self, entry: DrugClinicalAssessment) -> str:
-        normalized_name = entry.drug_name.strip() if entry.drug_name else "Unnamed drug"
-        return f"{normalized_name}: local LiverTox excerpt not available."
+        _ = entry
+        return (
+            "No local LiverTox excerpt is currently available for this matched drug, "
+            "so automated causality narration could not be generated."
+        )
 
     # -------------------------------------------------------------------------
     def build_ambiguous_match_paragraph(self, entry: DrugClinicalAssessment) -> str:
-        heading = self.format_drug_heading(entry.drug_name, NOT_AVAILABLE_TEXT)
-        candidates = ", ".join(entry.match_candidates) if entry.match_candidates else "Not available"
+        candidates = (
+            ", ".join(entry.match_candidates) if entry.match_candidates else "not available"
+        )
         note = (
             "Drug matching was ambiguous; no LiverTox excerpt was injected to avoid an "
             "incorrect attribution."
         )
         details = f"Candidate matches: {candidates}."
         guidance = "Manual curation is required before causality assessment."
-        return f"{heading}\n{note} {details} {guidance}\nBibliography source: LiverTox"
+        return f"{note} {details} {guidance}"
 
     # -------------------------------------------------------------------------
     def build_error_paragraph(self, entry: DrugClinicalAssessment) -> str:
-        score = self.resolve_livertox_score(entry.matched_livertox_row)
-        heading = self.format_drug_heading(entry.drug_name, score)
+        _ = entry
         message = "Automated analysis was unavailable due to a technical issue; a clinician should review the LiverTox documentation manually."
-        return f"{heading}\n{message}\nBibliography source: LiverTox"
+        return message
+
+
 

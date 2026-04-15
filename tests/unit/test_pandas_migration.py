@@ -1,7 +1,6 @@
 from __future__ import annotations
 
 import json
-from types import SimpleNamespace
 from typing import Any
 
 import pandas as pd
@@ -13,15 +12,11 @@ from DILIGENT.server.repositories.serialization.data import DataSerializer
 from DILIGENT.server.repositories.schemas.models import (
     Base,
     ClinicalSession,
+    ClinicalSessionLab,
     ClinicalSessionResult,
+    Patient,
 )
 from DILIGENT.server.services.updater.livertox import LiverToxUpdater
-
-
-###############################################################################
-class QueryStub:
-    def __init__(self, engine: Any) -> None:
-        self.database = SimpleNamespace(backend=SimpleNamespace(engine=engine))
 
 
 ###############################################################################
@@ -47,7 +42,7 @@ class LookupStub:
 def build_serializer() -> tuple[Any, Any]:
     engine = create_engine("sqlite+pysqlite:///:memory:", future=True)
     Base.metadata.create_all(engine)
-    serializer = DataSerializer(queries=QueryStub(engine))
+    serializer = DataSerializer(engine=engine)
     return serializer, engine
 
 
@@ -82,10 +77,18 @@ def test_save_clinical_session_preserves_row_append_order() -> None:
             .scalars()
             .all()
         )
+        patients = (
+            db_session.execute(select(Patient).order_by(Patient.id))
+            .scalars()
+            .all()
+        )
 
     assert len(rows) == 2
-    assert rows[0].patient_name == "existing"
-    assert rows[1].patient_name == "incoming"
+    assert [row.session_timestamp.isoformat() for row in rows] == [
+        "2025-01-01T00:00:00",
+        "2025-01-02T00:00:00",
+    ]
+    assert [row.name for row in patients] == ["existing", "incoming"]
 
 
 # -----------------------------------------------------------------------------
@@ -124,6 +127,52 @@ def test_save_clinical_session_persists_raw_result_payload() -> None:
     assert result_row is not None
     assert result_row.session_id == session_row.id
     assert json.loads(result_row.payload_json) == raw_payload
+
+
+# -----------------------------------------------------------------------------
+def test_save_clinical_session_deduplicates_labs_per_marker() -> None:
+    serializer, engine = build_serializer()
+    serializer.save_clinical_session(
+        {
+            "patient_name": "lab-patient",
+            "session_timestamp": "2025-01-04T00:00:00",
+            "session_result_payload": {
+                "lab_timeline": [
+                    {
+                        "marker_name": "ALT",
+                        "sample_date": "2025-01-01",
+                        "value": "120",
+                        "upper_limit_normal": "40",
+                    },
+                    {
+                        "marker_name": "ALT",
+                        "sample_date": "2025-01-03",
+                        "value": "150",
+                        "upper_limit_normal": "40",
+                    },
+                    {
+                        "marker_name": "AST",
+                        "sample_date": "2025-01-02",
+                        "value": "90",
+                        "upper_limit_normal": "35",
+                    },
+                ],
+            },
+        }
+    )
+
+    factory = sessionmaker(bind=engine, future=True)
+    with factory() as db_session:
+        labs = (
+            db_session.execute(
+                select(ClinicalSessionLab).order_by(ClinicalSessionLab.lab_code)
+            )
+            .scalars()
+            .all()
+        )
+
+    assert len(labs) == 2
+    assert [row.lab_code for row in labs] == ["alt", "ast"]
 
 
 # -----------------------------------------------------------------------------

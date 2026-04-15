@@ -73,6 +73,23 @@ def sanitize_anamnesis_text(value: str | None) -> str | None:
         return None
     return "\n".join(cleaned_lines)
 
+
+# -----------------------------------------------------------------------------
+def sanitize_laboratory_text(value: str | None) -> str | None:
+    if value is None:
+        return None
+    normalized = unicodedata.normalize("NFKC", value)
+    normalized = normalized.replace("\r\n", "\n").replace("\r", "\n")
+    stripped_html = strip_html(normalized)
+    cleaned_lines: list[str] = []
+    for raw_line in stripped_html.split("\n"):
+        compact = MULTISPACE_RE.sub(" ", raw_line).strip()
+        if compact:
+            cleaned_lines.append(compact)
+    if not cleaned_lines:
+        return None
+    return "\n".join(cleaned_lines)
+
 # -----------------------------------------------------------------------------
 def normalize_visit_date(
     value: datetime | date | dict[str, Any] | str | None,
@@ -134,10 +151,7 @@ def sanitize_dili_payload(
     visit_date: datetime | date | dict[str, Any] | str | None,
     anamnesis: str | None,   
     drugs: str | None,
-    alt: str | None,
-    alt_max: str | None,
-    alp: str | None,
-    alp_max: str | None,
+    laboratory_analysis: str | None,
     use_rag: bool,
     use_web_search: bool = False,
 ) -> dict[str, Any]:
@@ -156,10 +170,7 @@ def sanitize_dili_payload(
         ),
         "anamnesis": sanitize_anamnesis_text(anamnesis),
         "drugs": sanitize_drugs_text(drugs),
-        "alt": sanitize_field(alt),
-        "alt_max": sanitize_field(alt_max),
-        "alp": sanitize_field(alp),
-        "alp_max": sanitize_field(alp_max),
+        "laboratory_analysis": sanitize_laboratory_text(laboratory_analysis),
         "use_rag": bool(use_rag),
         "use_web_search": bool(use_web_search),
     }
@@ -175,10 +186,7 @@ class PayloadSanitizationService:
         visit_date: datetime | date | dict[str, Any] | str | None,
         anamnesis: str | None,
         drugs: str | None,
-        alt: str | None,
-        alt_max: str | None,
-        alp: str | None,
-        alp_max: str | None,
+        laboratory_analysis: str | None,
         use_rag: bool,
         use_web_search: bool = False,
     ) -> dict[str, Any]:
@@ -187,10 +195,7 @@ class PayloadSanitizationService:
             visit_date=visit_date,
             anamnesis=anamnesis,
             drugs=drugs,
-            alt=alt,
-            alt_max=alt_max,
-            alp=alp,
-            alp_max=alp_max,
+            laboratory_analysis=laboratory_analysis,
             use_rag=use_rag,
             use_web_search=use_web_search,
         )

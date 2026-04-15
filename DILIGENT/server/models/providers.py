@@ -19,7 +19,8 @@ import httpx
 
 from DILIGENT.server.models.cloud import CloudLLMClient, LLMError, LLMTimeout
 from DILIGENT.server.models.structured import StructuredOutputParser, parse_json_dict, T
-from DILIGENT.server.configurations import LLMRuntimeConfig, server_settings
+from DILIGENT.server.configurations.startup import server_settings
+from DILIGENT.server.configurations.llm_configs import LLMRuntimeConfig
 from DILIGENT.server.common.constants import (
     PARSING_MODEL_CHOICES,
 )
@@ -29,6 +30,7 @@ from DILIGENT.server.common.utils.types import extract_positive_int
 
 ProviderName = Literal["openai", "azure-openai", "anthropic", "gemini"]
 RuntimePurpose = Literal["clinical", "parser"]
+OLLAMA_GENERATE_PATH = "/api/generate"
 
 __all__ = [
     "OllamaClient",
@@ -46,13 +48,35 @@ __all__ = [
 class OllamaError(RuntimeError):
     pass
 
+###############################################################################
 class OllamaTimeout(OllamaError):
     """Raised when requests to Ollama exceed the configured timeout."""
 
+###############################################################################
 class _OllamaChatFallback(Exception):
     """Internal control flow for switching to /api/generate streaming."""
 
 ProgressCb: TypeAlias = Callable[[dict[str, Any]], None | Awaitable[None]]
+
+
+###############################################################################
+def _env_float(name: str, default: float) -> float:
+    raw = os.getenv(name)
+    if raw is None:
+        return default
+    try:
+        return float(raw)
+    except (TypeError, ValueError):
+        return default
+
+
+###############################################################################
+def _env_str(name: str, default: str) -> str:
+    raw = os.getenv(name)
+    if raw is None:
+        return default
+    value = raw.strip()
+    return value or default
 
 
 ###############################################################################
@@ -110,39 +134,28 @@ class OllamaClient:
         self.residency_lock = asyncio.Lock()
         self.residency_plan_cache: dict[str, Any] | None = None
         self.residency_plan_cache_expiry = 0.0
-        self.residency_usage_window_s = self.resolve_env_float(
-            "OLLAMA_PREFETCH_USAGE_WINDOW_S",
-            default=300.0,
-            minimum=30.0,
+        self.residency_usage_window_s = max(
+            _env_float("OLLAMA_PREFETCH_USAGE_WINDOW_S", 120.0),
+            30.0,
         )
-        self.residency_transition_window_s = self.resolve_env_float(
-            "OLLAMA_PREFETCH_TRANSITION_WINDOW_S",
-            default=120.0,
-            minimum=5.0,
+        self.residency_transition_window_s = max(
+            _env_float("OLLAMA_PREFETCH_TRANSITION_WINDOW_S", 60.0),
+            5.0,
         )
-        self.residency_prefetch_cooldown_s = self.resolve_env_float(
-            "OLLAMA_PREFETCH_COOLDOWN_S",
-            default=15.0,
-            minimum=1.0,
+        self.residency_prefetch_cooldown_s = max(
+            _env_float("OLLAMA_PREFETCH_COOLDOWN_S", 20.0),
+            1.0,
         )
-        self.residency_ram_safety_ratio = self.resolve_env_float(
-            "OLLAMA_RAM_SAFETY_RATIO",
-            default=0.85,
-            minimum=0.1,
+        self.residency_ram_safety_ratio = max(
+            _env_float("OLLAMA_RAM_SAFETY_RATIO", 0.75),
+            0.1,
         )
-        self.residency_vram_safety_ratio = self.resolve_env_float(
-            "OLLAMA_VRAM_SAFETY_RATIO",
-            default=0.85,
-            minimum=0.1,
+        self.residency_vram_safety_ratio = max(
+            _env_float("OLLAMA_VRAM_SAFETY_RATIO", 0.85),
+            0.1,
         )
-        self.residency_dual_keep_alive = os.getenv(
-            "OLLAMA_DUAL_RESIDENT_KEEP_ALIVE",
-            "4h",
-        ).strip() or "4h"
-        self.residency_single_keep_alive = os.getenv(
-            "OLLAMA_SINGLE_RESIDENT_KEEP_ALIVE",
-            "30m",
-        ).strip() or "30m"
+        self.residency_dual_keep_alive = _env_str("OLLAMA_DUAL_RESIDENT_KEEP_ALIVE", "4h")
+        self.residency_single_keep_alive = _env_str("OLLAMA_SINGLE_RESIDENT_KEEP_ALIVE", "30m")
         self.residency_usage_history: deque[tuple[float, str]] = deque(maxlen=256)
         self.prefetch_last_run_by_model: dict[str, float] = {}
         self.prefetch_tasks: dict[str, asyncio.Task[None]] = {}
@@ -237,20 +250,6 @@ class OllamaClient:
             if cache_valid:
                 return set(self.model_cache)
         return await self.refresh_model_cache()
-
-    # -------------------------------------------------------------------------
-    @staticmethod
-    def resolve_env_float(name: str, *, default: float, minimum: float = 0.0) -> float:
-        raw = (os.getenv(name) or "").strip()
-        if not raw:
-            return default
-        try:
-            parsed = float(raw)
-        except ValueError:
-            return default
-        if parsed < minimum:
-            return default
-        return parsed
 
     # -------------------------------------------------------------------------
     @staticmethod
@@ -476,48 +475,79 @@ class OllamaClient:
         target_models: list[str],
     ) -> str | None:
         candidates = self.dedupe_models(target_models)
-        if current_model not in candidates:
-            return None
-        if len(candidates) < 2:
+        if current_model not in candidates or len(candidates) < 2:
             return None
 
+        history = self._recent_residency_history(candidates)
+        frequency: dict[str, int] = dict.fromkeys(candidates, 0)
+        self._count_residency_frequency(history, frequency)
+        transitions = self._count_residency_transitions(history)
+
+        selected = self._select_target_model(
+            current_model=current_model,
+            candidates=candidates,
+            history=history,
+            frequency=frequency,
+            transitions=transitions,
+        )
+        if selected is not None:
+            return selected
+
+        return next((candidate for candidate in candidates if candidate != current_model), None)
+
+    def _recent_residency_history(self, candidates: list[str]) -> list[tuple[float, str]]:
         now = time.monotonic()
         cutoff = now - self.residency_usage_window_s
-        history = [
+        return [
             (ts, model)
             for ts, model in self.residency_usage_history
             if ts >= cutoff and model in candidates
         ]
 
-        frequency: dict[str, int] = {model: 0 for model in candidates}
-        transitions: dict[tuple[str, str], int] = {}
+    @staticmethod
+    def _count_residency_frequency(
+        history: list[tuple[float, str]],
+        frequency: dict[str, int],
+    ) -> None:
         for _, model in history:
-            frequency[model] = frequency.get(model, 0) + 1
+            frequency[model] += 1
+
+    def _count_residency_transitions(
+        self,
+        history: list[tuple[float, str]],
+    ) -> dict[tuple[str, str], int]:
+        transitions: dict[tuple[str, str], int] = {}
         for (prev_ts, prev_model), (next_ts, next_model) in zip(history, history[1:]):
             if (next_ts - prev_ts) > self.residency_transition_window_s:
                 continue
             key = (prev_model, next_model)
             transitions[key] = transitions.get(key, 0) + 1
+        return transitions
 
+    @staticmethod
+    def _select_target_model(
+        *,
+        current_model: str,
+        candidates: list[str],
+        history: list[tuple[float, str]],
+        frequency: dict[str, int],
+        transitions: dict[tuple[str, str], int],
+    ) -> str | None:
         selected: str | None = None
         selected_score = -1.0
+        last_model = history[-1][1] if history else None
         for candidate in candidates:
             if candidate == current_model:
                 continue
-            transition_score = transitions.get((current_model, candidate), 0) * 3.0
-            frequency_score = float(frequency.get(candidate, 0))
-            recency_score = 0.5 if history and history[-1][1] == candidate else 0.0
-            score = transition_score + frequency_score + recency_score
+            score = (
+                transitions.get((current_model, candidate), 0) * 3.0
+                + float(frequency.get(candidate, 0))
+                + (0.5 if last_model == candidate else 0.0)
+            )
             if score > selected_score:
                 selected = candidate
                 selected_score = score
-        if selected:
-            return selected
-
-        for candidate in candidates:
-            if candidate != current_model:
-                return candidate
-        return None
+        return selected
 
     # -------------------------------------------------------------------------
     def handle_prefetch_task_done(self, task: asyncio.Task[None]) -> None:
@@ -548,7 +578,7 @@ class OllamaClient:
                 options={"num_predict": 0},
                 keep_alive=keep_alive,
             )
-            resp = await self.client.post("/api/generate", json=payload)
+            resp = await self.client.post(OLLAMA_GENERATE_PATH, json=payload)
             self.raise_for_status(resp)
             logger.debug(
                 "Prefetched Ollama model '%s' with keep_alive='%s'",
