@@ -2,11 +2,14 @@
   "name": "diligent-client",
   "version": "1.0.0",
   "private": true,
-  "type": "module",
   "scripts": {
-    "dev": "vite --host",
-    "build": "vite build",
-    "preview": "vite preview --host",
+    "ng": "ng",
+    "dev": "node ./scripts/ng-serve.mjs",
+    "start": "node ./scripts/ng-serve.mjs",
+    "build": "ng build",
+    "watch": "ng build --watch --configuration development",
+    "preview": "node ./scripts/preview-server.mjs",
+    "test": "ng test",
     "tauri:icon": "tauri icon public/favicon.png && powershell -NoProfile -Command \"Remove-Item -Recurse -Force src-tauri/icons/android,src-tauri/icons/ios -ErrorAction SilentlyContinue\"",
     "tauri:dev": "tauri dev --config src-tauri/tauri.conf.json",
     "tauri:build": "tauri build --config src-tauri/tauri.conf.json",
@@ -15,18 +18,20 @@
     "tauri:clean": "powershell -NoProfile -ExecutionPolicy Bypass -File ../../release/tauri/scripts/clean-tauri-build.ps1"
   },
   "dependencies": {
-    "react": "^18.3.1",
-    "react-dom": "^18.3.1",
-    "react-markdown": "^9.0.1",
-    "remark-gfm": "^4.0.0"
+    "@angular/common": "^21.2.0",
+    "@angular/compiler": "^21.2.0",
+    "@angular/core": "^21.2.0",
+    "@angular/forms": "^21.2.0",
+    "@angular/platform-browser": "^21.2.0",
+    "@angular/router": "^21.2.0",
+    "rxjs": "~7.8.0",
+    "tslib": "^2.3.0"
   },
   "devDependencies": {
+    "@angular/build": "^21.2.7",
+    "@angular/cli": "^21.2.7",
+    "@angular/compiler-cli": "^21.2.0",
     "@tauri-apps/cli": "^2.8.2",
-    "@types/react": "^18.3.18",
-    "@types/react-dom": "^18.3.0",
-    "@vitejs/plugin-react": "^5.1.2",
-    "@vitejs/plugin-react-swc": "^4.2.2",
-    "typescript": "^5.7.3",
-    "vite": "^7.2.7"
+    "typescript": "~5.9.2"
   }
 }

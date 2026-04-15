@@ -11,6 +11,7 @@ AccessKeyTable = type[AccessKey] | type[ResearchAccessKey]
 
 ###############################################################################
 class AccessKeyRepositoryQueries:
+    
     # -------------------------------------------------------------------------
     @staticmethod
     def list_for_provider(table: AccessKeyTable, provider: str):

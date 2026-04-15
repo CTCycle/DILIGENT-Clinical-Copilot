@@ -23,7 +23,7 @@ class AccessKeyCreateRequest(BaseModel):
     def strip_access_key(cls, value: str | None) -> str:
         if value is None:
             raise ValueError("access_key must not be null")
-        normalized = CONTROL_CHARACTERS_RE.sub("", str(value)).strip()        
+        normalized = CONTROL_CHARACTERS_RE.sub("", str(value)).strip()
         if not normalized:
             raise ValueError("access_key must not be empty")
         return normalized

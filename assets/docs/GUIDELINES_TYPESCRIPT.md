@@ -1,51 +1,62 @@
-## TypeScript Guidelines (DILIGENT Client)
+# TypeScript Guidelines (DILIGENT Client)
 
-These rules apply to `DILIGENT/client` (React 18 + Vite + TypeScript 5).
+Last updated: 2026-04-09
 
-## 1. Type Safety
+Scope: `DILIGENT/client` (Angular standalone + TypeScript 5).
 
-- Keep `tsconfig` strictness enabled (`"strict": true`).
-- Prefer `unknown` over `any` for external or loosely typed values.
-- Narrow types explicitly with guards before use.
-- Model API payloads/responses in `src/types.ts` and reuse them across pages/components/services.
+Also mandatory: apply `assets/docs/ERROR_HANDLING.md`.
 
-## 2. Project Structure
+## 1. Type safety
 
-- Keep data fetching in `src/services/api.ts`; avoid ad-hoc `fetch` in UI components.
-- Keep shared runtime/form/app state in `src/context/AppStateContext.tsx`.
-- Keep route/page-level orchestration in `src/pages/*`.
-- Keep dumb UI pieces in `src/components/*`.
-- Keep constants and defaults in `src/constants.ts`.
+- Keep strict TypeScript settings enabled.
+- Prefer `unknown` over `any` for untrusted/external values.
+- Narrow types via explicit guards before use.
+- Keep shared API contracts in `src/app/core/models/types.ts` and reuse them consistently.
 
-## 3. React Patterns
+## 2. Structure and ownership
 
-- Use function components and explicit prop interfaces.
-- Use controlled inputs for clinical forms.
-- Clean up side effects (`useEffect` cleanup for timers, listeners, object URLs, pollers).
-- Avoid duplicating derived values; use `useMemo` where serialization/filtering is non-trivial.
+- Centralize network calls in `src/app/core/services/api.ts`.
+- Keep app-wide state in `src/app/core/state/app-state.service.ts`.
+- Keep page-level orchestration in `src/app/pages/*`.
+- Keep reusable UI controls in `src/app/components/*`.
+- Keep shared constants/defaults in `src/app/core/constants.ts`.
 
-## 4. API and Runtime Contracts
+## 3. Angular implementation rules
 
-- Respect `API_BASE_URL` contract and keep frontend API pathing `/api` compatible.
-- When adding endpoints, update:
-  - backend route + entity models
-  - `src/services/api.ts`
-  - frontend `src/types.ts` contracts
-- Handle non-200 responses with clear `[ERROR]` messages; never silently swallow API failures.
+- Use standalone components by default.
+- Use signals for local/global UI state and explicit cleanup for timers/listeners/object URLs/pollers.
+- Keep form-heavy clinical workflows deterministic (template-driven or reactive forms are both acceptable).
+- Keep side effects in lifecycle hooks or explicit service methods, never in template expressions.
 
-## 5. UX and Resilience
+## 4. API/runtime coherence
 
-- Disable conflicting actions during long-running operations (`isRunning`, `isSaving`, `isPulling`).
-- Treat polling terminal states consistently: `completed`, `failed`, `cancelled`.
-- Preserve accessibility basics: labels, button roles, and meaningful `aria-*` attributes.
+- Keep frontend API base path compatible with `/api`.
+- When adding/modifying endpoints, update together:
+  - backend API/domain models
+  - `src/app/core/services/api.ts`
+  - `src/app/core/models/types.ts`
+  - impacted Angular pages/components
+- Handle non-success responses explicitly; do not silently ignore failures.
 
-## 6. Testing Expectations
+## 5. Job and polling UX
 
-- Frontend behavior is validated through Playwright E2E tests in `tests/e2e`.
-- When adding UI flows or API interactions, add or update corresponding E2E coverage.
-- Prefer behavior assertions over internal implementation details.
+- Disable conflicting actions during active operations (`isRunning`, `isPulling`, update jobs).
+- Use shared terminal states: `completed`, `failed`, `cancelled`.
+- Keep progress/result messaging stable and user-safe.
+
+## 6. Accessibility and UI consistency
+
+- Follow `assets/docs/UI_STANDARDS.md`.
+- Preserve meaningful labels, keyboard reachability, and `aria-*` semantics.
+- Do not rely on color alone for state communication.
 
 ## 7. Security
 
-- Never expose plaintext access keys in UI state, logs, or responses.
-- Treat all backend payloads as untrusted and validate/normalize before rendering.
+- Never expose plaintext provider keys in UI logs or persistent client state.
+- Treat backend payloads as untrusted; normalize before rendering.
+
+## 8. Testing expectations
+
+- Validate frontend behavior through `tests/e2e`.
+- Add/update E2E coverage when changing user-visible flows or API interactions.
+- Prefer behavior assertions over implementation details.

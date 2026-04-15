@@ -2,10 +2,11 @@ from __future__ import annotations
 
 from pathlib import Path
 
-import pandas as pd
+from sqlalchemy import select
 
-from DILIGENT.server.configurations.server import DatabaseSettings
+from DILIGENT.server.domain.settings.configuration import DatabaseSettings
 from DILIGENT.server.repositories.database.sqlite import SQLiteRepository
+from DILIGENT.server.repositories.schemas.models import ModelSelection
 
 
 def _build_settings() -> DatabaseSettings:
@@ -26,7 +27,7 @@ def _build_settings() -> DatabaseSettings:
     )
 
 
-def test_sqlite_repository_table_reads_use_orm_queries(
+def test_sqlite_repository_exposes_orm_session_factory(
     monkeypatch, tmp_path: Path
 ) -> None:  # type: ignore[no-untyped-def]
     monkeypatch.setattr(
@@ -39,40 +40,39 @@ def test_sqlite_repository_table_reads_use_orm_queries(
     )
     repository = SQLiteRepository(_build_settings())
 
-    payload = pd.DataFrame(
-        [
-            {
-                "role_type": "clinical",
-                "provider": None,
-                "model_name": "llama3.1:8b",
-                "is_active": True,
-            },
-            {
-                "role_type": "text_extraction",
-                "provider": None,
-                "model_name": "llama3.1:8b",
-                "is_active": True,
-            },
-            {
-                "role_type": "cloud",
-                "provider": "openai",
-                "model_name": "gpt-4.1-mini",
-                "is_active": True,
-            },
-        ]
-    )
-    repository.upsert_into_database(payload, "model_selections")
+    with repository.session_factory() as db_session:
+        db_session.add_all(
+            [
+                ModelSelection(
+                    role_type="clinical",
+                    provider=None,
+                    model_name="llama3.1:8b",
+                    is_active=True,
+                ),
+                ModelSelection(
+                    role_type="text_extraction",
+                    provider=None,
+                    model_name="llama3.1:8b",
+                    is_active=True,
+                ),
+                ModelSelection(
+                    role_type="cloud",
+                    provider="openai",
+                    model_name="gpt-4.1-mini",
+                    is_active=True,
+                ),
+            ]
+        )
+        db_session.commit()
 
-    assert repository.count_rows("model_selections") == 3
+    with repository.session_factory() as db_session:
+        loaded = (
+            db_session.execute(
+                select(ModelSelection).order_by(ModelSelection.role_type.asc())
+            )
+            .scalars()
+            .all()
+        )
 
-    loaded = repository.load_from_database("model_selections")
-    assert len(loaded.index) == 3
-    assert set(loaded["role_type"].tolist()) == {"clinical", "text_extraction", "cloud"}
-
-    paged = repository.load_paginated("model_selections", offset=1, limit=1)
-    assert len(paged.index) == 1
-
-    chunks = list(repository.stream_rows("model_selections", page_size=2))
-    assert [len(chunk.index) for chunk in chunks] == [2, 1]
-    streamed = pd.concat(chunks, ignore_index=True)
-    assert streamed["role_type"].tolist() == loaded["role_type"].tolist()
+    assert len(loaded) == 3
+    assert [row.role_type for row in loaded] == ["clinical", "cloud", "text_extraction"]

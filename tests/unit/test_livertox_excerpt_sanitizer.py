@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from DILIGENT.server.services.updater.livertox_sanitizer import (
+from DILIGENT.server.services.updater.sanitizer import (
     LiverToxExcerptSanitizer,
 )
 

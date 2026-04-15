@@ -1,0 +1,670 @@
+<main class="page-container inspection-page inspection-page-workbench">
+  <header class="page-header inspection-page-intro">
+    <h1>Data Inspection</h1>
+    <p class="lede">Browse recorded sessions, curated drug knowledge, and RAG indexing details.</p>
+  </header>
+
+  <section class="inspection-layout">
+    <aside class="inspection-toolbar" aria-label="Data inspection views">
+      <p class="inspection-toolbar-eyebrow">Views</p>
+      <div class="inspection-toolbar-list" role="tablist" aria-label="Inspection datasets" aria-orientation="vertical">
+        @for (view of inspectionViews; track view.id) {
+          <button
+            type="button"
+            class="inspection-toolbar-item"
+            role="tab"
+            [attr.id]="inspectionTabId(view.id)"
+            [class.is-active]="activeView() === view.id"
+            [attr.aria-selected]="activeView() === view.id"
+            [attr.aria-controls]="view.id + '-panel'"
+            [attr.tabindex]="activeView() === view.id ? '0' : '-1'"
+            (click)="changeView(view.id)"
+            (keydown)="onInspectionTabKeydown($event, view.id)"
+          >
+            <span>{{ view.label }}</span>
+          </button>
+        }
+      </div>
+    </aside>
+
+    <section
+      class="inspection-active-view"
+      [attr.id]="activeView() + '-panel'"
+      role="tabpanel"
+      [attr.aria-labelledby]="inspectionTabId(activeView())"
+    >
+      @if (activeView() === 'sessions') {
+        <section class="inspection-view-content">
+          <div class="inspection-widget">
+            <div class="inspection-widget-header inspection-widget-header-split">
+              <div class="inspection-controls inspection-controls-half">
+                <input
+                  type="search"
+                  class="inspection-search"
+                  placeholder="Search sessions..."
+                  [ngModel]="sessionSearchInput()"
+                  (ngModelChange)="updateSessionsSearch($event)"
+                  aria-label="Search sessions"
+                />
+              </div>
+              <div class="inspection-widget-header-actions inspection-header-actions-fixed">
+                <div class="inspection-toggle-group">
+                  <button type="button" class="inspection-toggle-pill" [class.is-active]="sessionStatusFilter() === 'all'" (click)="updateSessionsStatus('all')">All</button>
+                  <button type="button" class="inspection-toggle-pill" [class.is-active]="sessionStatusFilter() === 'successful'" (click)="updateSessionsStatus('successful')">Successful</button>
+                  <button type="button" class="inspection-toggle-pill" [class.is-active]="sessionStatusFilter() === 'failed'" (click)="updateSessionsStatus('failed')">Failed</button>
+                </div>
+                <select class="inspection-select" [ngModel]="sessionDateMode()" (ngModelChange)="updateSessionsDateMode($event)" aria-label="Date filter mode">
+                  <option value="none">Date filter</option>
+                  <option value="before">Before</option>
+                  <option value="after">After</option>
+                  <option value="exact">Exact</option>
+                </select>
+                <input
+                  type="date"
+                  class="inspection-date"
+                  [ngModel]="sessionDate()"
+                  (ngModelChange)="updateSessionsDate($event)"
+                  [disabled]="sessionDateMode() === 'none'"
+                  aria-label="Session date filter"
+                />
+              </div>
+            </div>
+
+            <div class="inspection-scroll-frame">
+              <table class="inspection-table inspection-table-dense">
+                <thead>
+                  <tr>
+                    <th>#</th>
+                    <th>Patient</th>
+                    <th>Date</th>
+                    <th>Status</th>
+                    <th>Total time</th>
+                    <th aria-label="Actions"></th>
+                  </tr>
+                </thead>
+                <tbody>
+                  @for (row of sessionItems(); track row.session_id; let i = $index) {
+                    <tr>
+                      <td>{{ sessionOffset() + i + 1 }}</td>
+                      <td>{{ row.patient_name || 'Unknown' }}</td>
+                      <td>{{ formatDateTime(row.session_timestamp) }}</td>
+                      <td>
+                        <span class="inspection-status-chip" [class.is-successful]="row.status === 'successful'" [class.is-failed]="row.status === 'failed'">
+                          {{ statusLabel(row.status) }}
+                        </span>
+                      </td>
+                      <td>{{ formatDuration(row.total_duration) }}</td>
+                      <td class="inspection-actions-cell">
+                        <button class="inspection-icon-button is-timeline" type="button" (click)="openPatientTimeline(row)" [attr.aria-label]="'Patient timeline for session ' + row.session_id" [attr.title]="'Patient timeline for session ' + row.session_id">
+                          <svg class="inspection-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M3 12h18v2H3v-2Zm2-5h2v12H5V7Zm12 3h2v9h-2v-9Zm-6-6h2v15h-2V4Z" /></svg>
+                        </button>
+                        <button class="inspection-icon-button is-primary" type="button" (click)="openSessionReport(row)" [attr.aria-label]="'View report for session ' + row.session_id" [attr.title]="'View report for session ' + row.session_id">
+                          <svg class="inspection-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 5C7 5 2.73 8.11 1 12c1.73 3.89 6 7 11 7s9.27-3.11 11-7c-1.73-3.89-6-7-11-7Zm0 11a4 4 0 1 1 0-8 4 4 0 0 1 0 8Z" /></svg>
+                        </button>
+                        <button class="inspection-icon-button is-danger" type="button" (click)="confirmAndRemoveSession(row)" [attr.aria-label]="'Delete session ' + row.session_id" [attr.title]="'Delete session ' + row.session_id">
+                          <svg class="inspection-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M16 9v10H8V9h8Zm-1.5-6h-5l-1 1H5v2h14V4h-3.5l-1-1ZM18 7H6v12c0 1.1.9 2 2 2h8c1.1 0 2-.9 2-2V7Z" /></svg>
+                        </button>
+                        <button class="inspection-icon-button" type="button" disabled aria-label="Modify session (not implemented)" title="Modify session (not implemented)">
+                          <svg class="inspection-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="m3 17.25 9.81-9.82 2.76 2.76L5.76 20H3v-2.75Zm14.71-8.04-2.92-2.92 1.41-1.41a2 2 0 0 1 2.83 0l.09.09a2 2 0 0 1 0 2.83l-1.41 1.41Z" /></svg>
+                        </button>
+                      </td>
+                    </tr>
+                  }
+                </tbody>
+              </table>
+              @if (sessionLoading()) { <p class="inspection-loading-note">Loading sessions...</p> }
+              @if (!sessionLoading() && sessionItems().length === 0) { <p class="inspection-empty-note">No sessions found.</p> }
+              @if (sessionError()) { <p class="inspection-error-text">{{ sessionError() }}</p> }
+            </div>
+
+            <app-inspection-pager
+              [offset]="sessionOffset()"
+              [total]="sessionTotal()"
+              [pageSize]="10"
+              (previous)="pageSessions(-1)"
+              (next)="pageSessions(1)"
+            />
+          </div>
+        </section>
+      }
+
+      @if (activeView() === 'rxnav') {
+        <section class="inspection-view-content">
+          <div class="inspection-widget">
+            <div class="inspection-widget-header">
+              <div class="inspection-controls inspection-controls-half inspection-controls-knowledge">
+                <input type="search" class="inspection-search" placeholder="Search RxNav..." [ngModel]="rxnavSearchInput()" (ngModelChange)="updateRxNavSearch($event)" aria-label="Search RxNav data" />
+              </div>
+              <div class="inspection-widget-header-actions inspection-header-actions-fixed">
+                <button class="btn btn-secondary inspection-mini-btn" type="button" (click)="openUpdateModal('rxnav')">Update Catalog</button>
+              </div>
+            </div>
+
+            <div class="inspection-scroll-frame inspection-scroll-frame-compact">
+              <table class="inspection-table inspection-table-dense">
+                <thead><tr><th>Drug</th><th>Last update</th><th aria-label="Actions"></th></tr></thead>
+                <tbody>
+                  @for (row of rxnavItems(); track row.drug_id) {
+                    <tr>
+                      <td>{{ row.drug_name }}</td>
+                      <td>{{ row.last_update || 'N/A' }}</td>
+                      <td class="inspection-actions-cell">
+                        <button class="inspection-icon-button is-primary" type="button" (click)="openAliases(row.drug_id)" [attr.aria-label]="'View aliases for ' + row.drug_name" [attr.title]="'View aliases for ' + row.drug_name">
+                          <svg class="inspection-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 5C7 5 2.73 8.11 1 12c1.73 3.89 6 7 11 7s9.27-3.11 11-7c-1.73-3.89-6-7-11-7Zm0 11a4 4 0 1 1 0-8 4 4 0 0 1 0 8Z" /></svg>
+                        </button>
+                        <button class="inspection-icon-button is-danger" type="button" (click)="removeRxNavDrug(row.drug_id)" [attr.aria-label]="'Delete ' + row.drug_name" [attr.title]="'Delete ' + row.drug_name">
+                          <svg class="inspection-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M16 9v10H8V9h8Zm-1.5-6h-5l-1 1H5v2h14V4h-3.5l-1-1ZM18 7H6v12c0 1.1.9 2 2 2h8c1.1 0 2-.9 2-2V7Z" /></svg>
+                        </button>
+                        <button class="inspection-icon-button" type="button" disabled aria-label="Modify RxNav entry (not implemented)" title="Modify RxNav entry (not implemented)">
+                          <svg class="inspection-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="m3 17.25 9.81-9.82 2.76 2.76L5.76 20H3v-2.75Zm14.71-8.04-2.92-2.92 1.41-1.41a2 2 0 0 1 2.83 0l.09.09a2 2 0 0 1 0 2.83l-1.41 1.41Z" /></svg>
+                        </button>
+                      </td>
+                    </tr>
+                  }
+                  @if (!rxnavLoading() && rxnavItems().length === 0) {
+                    <tr><td colspan="3" class="inspection-empty-row">No RxNav rows found.</td></tr>
+                  }
+                </tbody>
+              </table>
+              @if (rxnavLoading()) { <p class="inspection-loading-note">Loading RxNav data...</p> }
+              @if (rxnavError()) { <p class="inspection-error-text">{{ rxnavError() }}</p> }
+            </div>
+
+            <app-inspection-pager
+              [offset]="rxnavOffset()"
+              [total]="rxnavTotal()"
+              [pageSize]="10"
+              (previous)="pageRxNav(-1)"
+              (next)="pageRxNav(1)"
+            />
+          </div>
+        </section>
+      }
+
+      @if (activeView() === 'livertox') {
+        <section class="inspection-view-content">
+          <div class="inspection-widget">
+            <div class="inspection-widget-header">
+              <div class="inspection-controls inspection-controls-half inspection-controls-knowledge">
+                <input type="search" class="inspection-search" placeholder="Search LiverTox..." [ngModel]="livertoxSearchInput()" (ngModelChange)="updateLiverToxSearch($event)" aria-label="Search LiverTox data" />
+              </div>
+              <div class="inspection-widget-header-actions inspection-header-actions-fixed">
+                <button class="btn btn-secondary inspection-mini-btn" type="button" (click)="openUpdateModal('livertox')">Update Base</button>
+              </div>
+            </div>
+
+            <div class="inspection-scroll-frame inspection-scroll-frame-compact">
+              <table class="inspection-table inspection-table-dense">
+                <thead><tr><th>Drug</th><th>Last update</th><th aria-label="Actions"></th></tr></thead>
+                <tbody>
+                  @for (row of livertoxItems(); track row.drug_id) {
+                    <tr>
+                      <td>{{ row.drug_name }}</td>
+                      <td>{{ row.last_update || 'N/A' }}</td>
+                      <td class="inspection-actions-cell">
+                        <button class="inspection-icon-button is-primary" type="button" (click)="openExcerpt(row.drug_id)" [attr.aria-label]="'View excerpt for ' + row.drug_name" [attr.title]="'View excerpt for ' + row.drug_name">
+                          <svg class="inspection-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 5C7 5 2.73 8.11 1 12c1.73 3.89 6 7 11 7s9.27-3.11 11-7c-1.73-3.89-6-7-11-7Zm0 11a4 4 0 1 1 0-8 4 4 0 0 1 0 8Z" /></svg>
+                        </button>
+                        <button class="inspection-icon-button is-danger" type="button" (click)="removeLiverToxDrug(row.drug_id)" [attr.aria-label]="'Delete ' + row.drug_name" [attr.title]="'Delete ' + row.drug_name">
+                          <svg class="inspection-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M16 9v10H8V9h8Zm-1.5-6h-5l-1 1H5v2h14V4h-3.5l-1-1ZM18 7H6v12c0 1.1.9 2 2 2h8c1.1 0 2-.9 2-2V7Z" /></svg>
+                        </button>
+                        <button class="inspection-icon-button" type="button" disabled aria-label="Modify LiverTox entry (not implemented)" title="Modify LiverTox entry (not implemented)">
+                          <svg class="inspection-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="m3 17.25 9.81-9.82 2.76 2.76L5.76 20H3v-2.75Zm14.71-8.04-2.92-2.92 1.41-1.41a2 2 0 0 1 2.83 0l.09.09a2 2 0 0 1 0 2.83l-1.41 1.41Z" /></svg>
+                        </button>
+                      </td>
+                    </tr>
+                  }
+                  @if (!livertoxLoading() && livertoxItems().length === 0) {
+                    <tr><td colspan="3" class="inspection-empty-row">No LiverTox rows found.</td></tr>
+                  }
+                </tbody>
+              </table>
+              @if (livertoxLoading()) { <p class="inspection-loading-note">Loading LiverTox data...</p> }
+              @if (livertoxError()) { <p class="inspection-error-text">{{ livertoxError() }}</p> }
+            </div>
+
+            <app-inspection-pager
+              [offset]="livertoxOffset()"
+              [total]="livertoxTotal()"
+              [pageSize]="10"
+              (previous)="pageLiverTox(-1)"
+              (next)="pageLiverTox(1)"
+            />
+          </div>
+        </section>
+      }
+
+      @if (activeView() === 'dili_priors') {
+        <section class="inspection-view-content">
+          <div class="inspection-widget">
+            <div class="inspection-widget-header">
+              <div class="inspection-controls inspection-controls-half inspection-controls-knowledge">
+                <input type="search" class="inspection-search" placeholder="Search DILI priors..." [ngModel]="diliPriorSearchInput()" (ngModelChange)="updateDiliPriorsSearch($event)" aria-label="Search DILI priors data" />
+              </div>
+              <div class="inspection-widget-header-actions inspection-header-actions-fixed">
+                <button class="btn btn-secondary inspection-mini-btn" type="button" (click)="openUpdateModal('dili_priors')">Update Priors</button>
+              </div>
+            </div>
+
+            <div class="inspection-scroll-frame inspection-scroll-frame-compact">
+              <table class="inspection-table inspection-table-dense">
+                <thead><tr><th>Drug</th><th>DILIrank class</th><th>DILIst class</th><th>Linked sources</th><th aria-label="Actions"></th></tr></thead>
+                <tbody>
+                  @for (row of diliPriorItems(); track row.drug_id) {
+                    <tr>
+                      <td>{{ row.drug_name }}</td>
+                      <td>{{ row.dilirank_class || 'N/A' }}</td>
+                      <td>{{ row.dilist_class || 'N/A' }}</td>
+                      <td>{{ row.linked_source_count }}</td>
+                      <td class="inspection-actions-cell">
+                        <button class="inspection-icon-button is-primary" type="button" (click)="openDiliPriorDetails(row.drug_id)" [attr.aria-label]="'View DILI priors for ' + row.drug_name" [attr.title]="'View DILI priors for ' + row.drug_name">
+                          <svg class="inspection-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 5C7 5 2.73 8.11 1 12c1.73 3.89 6 7 11 7s9.27-3.11 11-7c-1.73-3.89-6-7-11-7Zm0 11a4 4 0 1 1 0-8 4 4 0 0 1 0 8Z" /></svg>
+                        </button>
+                        <button class="inspection-icon-button" type="button" disabled aria-label="Modify DILI prior entry (not implemented)" title="Modify DILI prior entry (not implemented)">
+                          <svg class="inspection-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="m3 17.25 9.81-9.82 2.76 2.76L5.76 20H3v-2.75Zm14.71-8.04-2.92-2.92 1.41-1.41a2 2 0 0 1 2.83 0l.09.09a2 2 0 0 1 0 2.83l-1.41 1.41Z" /></svg>
+                        </button>
+                      </td>
+                    </tr>
+                  }
+                  @if (!diliPriorLoading() && diliPriorItems().length === 0) {
+                    <tr><td colspan="5" class="inspection-empty-row">No DILI prior rows found.</td></tr>
+                  }
+                </tbody>
+              </table>
+              @if (diliPriorLoading()) { <p class="inspection-loading-note">Loading DILI priors...</p> }
+              @if (diliPriorError()) { <p class="inspection-error-text">{{ diliPriorError() }}</p> }
+            </div>
+
+            <app-inspection-pager
+              [offset]="diliPriorOffset()"
+              [total]="diliPriorTotal()"
+              [pageSize]="10"
+              (previous)="pageDiliPriors(-1)"
+              (next)="pageDiliPriors(1)"
+            />
+          </div>
+        </section>
+      }
+
+      @if (activeView() === 'drug_labels') {
+        <section class="inspection-view-content">
+          <div class="inspection-widget">
+            <div class="inspection-widget-header">
+              <div class="inspection-controls inspection-controls-half inspection-controls-knowledge">
+                <input type="search" class="inspection-search" placeholder="Search drug labels..." [ngModel]="drugLabelSearchInput()" (ngModelChange)="updateDrugLabelsSearch($event)" aria-label="Search drug labels data" />
+              </div>
+              <div class="inspection-widget-header-actions inspection-header-actions-fixed">
+                <button class="btn btn-secondary inspection-mini-btn" type="button" (click)="openUpdateModal('drug_labels')">Update Labels</button>
+              </div>
+            </div>
+
+            <div class="inspection-scroll-frame inspection-scroll-frame-compact">
+              <table class="inspection-table inspection-table-dense">
+                <thead><tr><th>Drug</th><th>Source</th><th>Effective date</th><th>Retained sections</th><th aria-label="Actions"></th></tr></thead>
+                <tbody>
+                  @for (row of drugLabelItems(); track row.drug_id) {
+                    <tr>
+                      <td>{{ row.drug_name }}</td>
+                      <td>{{ row.source }}</td>
+                      <td>{{ row.effective_date || 'N/A' }}</td>
+                      <td>{{ row.retained_section_count }}</td>
+                      <td class="inspection-actions-cell">
+                        <button class="inspection-icon-button is-primary" type="button" (click)="openDrugLabelSections(row.drug_id)" [attr.aria-label]="'View labels for ' + row.drug_name" [attr.title]="'View labels for ' + row.drug_name">
+                          <svg class="inspection-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 5C7 5 2.73 8.11 1 12c1.73 3.89 6 7 11 7s9.27-3.11 11-7c-1.73-3.89-6-7-11-7Zm0 11a4 4 0 1 1 0-8 4 4 0 0 1 0 8Z" /></svg>
+                        </button>
+                        <button class="inspection-icon-button" type="button" disabled aria-label="Modify drug label entry (not implemented)" title="Modify drug label entry (not implemented)">
+                          <svg class="inspection-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="m3 17.25 9.81-9.82 2.76 2.76L5.76 20H3v-2.75Zm14.71-8.04-2.92-2.92 1.41-1.41a2 2 0 0 1 2.83 0l.09.09a2 2 0 0 1 0 2.83l-1.41 1.41Z" /></svg>
+                        </button>
+                      </td>
+                    </tr>
+                  }
+                  @if (!drugLabelLoading() && drugLabelItems().length === 0) {
+                    <tr><td colspan="5" class="inspection-empty-row">No drug label rows found.</td></tr>
+                  }
+                </tbody>
+              </table>
+              @if (drugLabelLoading()) { <p class="inspection-loading-note">Loading drug labels...</p> }
+              @if (drugLabelError()) { <p class="inspection-error-text">{{ drugLabelError() }}</p> }
+            </div>
+
+            <app-inspection-pager
+              [offset]="drugLabelOffset()"
+              [total]="drugLabelTotal()"
+              [pageSize]="10"
+              (previous)="pageDrugLabels(-1)"
+              (next)="pageDrugLabels(1)"
+            />
+          </div>
+        </section>
+      }
+
+      @if (activeView() === 'rag') {
+        <section class="inspection-view-content">
+          <div class="inspection-widget">
+            <div class="inspection-widget-header">
+              <div class="inspection-controls inspection-controls-half inspection-controls-knowledge">
+                <input
+                  type="search"
+                  class="inspection-search"
+                  placeholder="Search RAG documents..."
+                  [ngModel]="ragSearchInput()"
+                  (ngModelChange)="updateRagSearch($event)"
+                  aria-label="Search RAG documents"
+                />
+              </div>
+              <div class="inspection-widget-header-actions inspection-header-actions-fixed">
+                <button class="btn btn-secondary inspection-mini-btn" type="button" (click)="openUpdateModal('rag')">Update Embeddings</button>
+              </div>
+            </div>
+
+            <div class="inspection-rag-path-editor">
+              <label class="field-label" for="rag-documents-path-input">RAG source path</label>
+              <input
+                id="rag-documents-path-input"
+                type="text"
+                class="inspection-search inspection-rag-path-input"
+                [ngModel]="ragDocumentsPathInput()"
+                (ngModelChange)="setRagDocumentsPathInput($event)"
+                aria-label="RAG source path"
+                placeholder="Enter the full documents folder path"
+              />
+            </div>
+
+            <div class="inspection-scroll-frame inspection-scroll-frame-compact inspection-rag-second-view">
+              <table class="inspection-table inspection-table-dense inspection-rag-summary-table">
+                <thead>
+                  <tr>
+                    <th class="inspection-rag-path-column">Folder path</th>
+                    <th>Collection</th>
+                    <th>Embeddings</th>
+                    <th>Documents</th>
+                    <th>Dimension</th>
+                    <th>Index ready</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  <tr>
+                    <td class="inspection-rag-path-cell" [title]="displayedRagFolderPath">{{ displayedRagFolderPath }}</td>
+                    <td>{{ ragVectorStore()?.collection_name || 'N/A' }}</td>
+                    <td>{{ ragVectorStore()?.embedding_count ?? 0 }}</td>
+                    <td>{{ ragVectorStore()?.distinct_document_count ?? 0 }}</td>
+                    <td>{{ ragVectorStore()?.embedding_dimension ?? 'N/A' }}</td>
+                    <td>{{ ragVectorStore()?.index_ready ? 'Yes' : 'No' }}</td>
+                  </tr>
+                </tbody>
+              </table>
+            </div>
+
+            <div class="inspection-scroll-frame inspection-scroll-frame-compact">
+              <table class="inspection-table inspection-table-dense">
+                <thead>
+                  <tr>
+                    <th>File</th>
+                    <th>Extension</th>
+                    <th>Size</th>
+                    <th>Last modified</th>
+                    <th>Supported</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  @for (row of ragDocuments(); track row.path) {
+                    <tr>
+                      <td>{{ row.file_name }}</td>
+                      <td>{{ row.extension }}</td>
+                      <td>{{ row.file_size }}</td>
+                      <td>{{ formatDateTime(row.last_modified) }}</td>
+                      <td>{{ row.supported_for_ingestion ? 'Yes' : 'No' }}</td>
+                    </tr>
+                  }
+                  @if (!ragLoading() && ragDocuments().length === 0) {
+                    <tr><td colspan="5" class="inspection-empty-row">No RAG documents found.</td></tr>
+                  }
+                </tbody>
+              </table>
+              @if (ragLoading()) { <p class="inspection-loading-note">Loading RAG data...</p> }
+              @if (ragError()) { <p class="inspection-error-text">{{ ragError() }}</p> }
+            </div>
+
+            <app-inspection-pager
+              [offset]="ragOffset()"
+              [total]="ragTotal()"
+              [pageSize]="10"
+              (previous)="pageRag(-1)"
+              (next)="pageRag(1)"
+            />
+          </div>
+        </section>
+      }
+    </section>
+  </section>
+
+  <app-modal-shell
+    [isOpen]="!!reportSession()"
+    title="Session Report"
+    [subtitle]="'Session ' + (reportSession()?.session_id ?? '')"
+    dialogClassName="modal-container inspection-modal inspection-modal-large"
+    closeLabel="Close session report"
+    (close)="closeSessionReport()"
+  >
+    <div class="inspection-excerpt-body">
+      @if (reportLoading()) { <p>Loading report...</p> }
+      @if (reportError()) { <p class="inspection-error-text">{{ reportError() }}</p> }
+      @if (!reportLoading() && !reportError()) {
+        <pre class="inspection-excerpt-text">{{ reportContent() }}</pre>
+      }
+    </div>
+  </app-modal-shell>
+
+  <app-modal-shell
+    [isOpen]="!!timelineSession()"
+    title="Patient Timeline"
+    [subtitle]="'Session ' + (timelineSession()?.session_id ?? '')"
+    dialogClassName="modal-container inspection-modal inspection-modal-large"
+    closeLabel="Close patient timeline"
+    (close)="closePatientTimeline()"
+  >
+    <div class="inspection-excerpt-body">
+      <div class="inspection-pager-actions" style="margin-bottom: 12px;">
+        <button class="btn btn-secondary inspection-mini-btn" type="button" (click)="regeneratePatientTimeline()" [disabled]="timelineLoading()">Regenerate</button>
+        <button class="btn btn-primary inspection-mini-btn" type="button" (click)="exportTimelinePng()" [disabled]="timelineLoading() || !timelineData()">Export timeline</button>
+      </div>
+      @if (timelineLoading()) { <p>Loading timeline...</p> }
+      @if (timelineError()) { <p class="inspection-error-text">{{ timelineError() }}</p> }
+      @if (!timelineLoading() && timelineData() && timelineData()!.events.length > 0) {
+        <div class="inspection-timeline-scroll">
+          <svg
+            id="inspection-timeline-svg"
+            class="inspection-timeline-svg"
+            [attr.width]="timelineSvgWidth()"
+            [attr.height]="timelineChartHeight"
+            [attr.viewBox]="'0 0 ' + timelineSvgWidth() + ' ' + timelineChartHeight"
+            role="img"
+            aria-label="Patient clinical timeline"
+          >
+            <defs>
+              <marker id="timeline-arrow-head" markerWidth="10" markerHeight="10" refX="8" refY="5" orient="auto">
+                <path d="M0,0 L10,5 L0,10 z" fill="#86efac" />
+              </marker>
+            </defs>
+            <line
+              [attr.x1]="timelineChartPaddingX"
+              [attr.y1]="timelineAxisY"
+              [attr.x2]="timelineSvgWidth() - timelineChartPaddingX - 14"
+              [attr.y2]="timelineAxisY"
+              stroke="#86efac"
+              stroke-width="12"
+              stroke-linecap="round"
+            />
+            <line
+              [attr.x1]="timelineSvgWidth() - timelineChartPaddingX - 14"
+              [attr.y1]="timelineAxisY"
+              [attr.x2]="timelineSvgWidth() - timelineChartPaddingX + 2"
+              [attr.y2]="timelineAxisY"
+              stroke="#86efac"
+              stroke-width="4"
+              marker-end="url(#timeline-arrow-head)"
+            />
+            @for (event of timelineRenderEvents(); track event.raw.event_id + '-' + event.raw.sort_order) {
+              <line
+                [attr.x1]="event.x"
+                [attr.y1]="event.anchorY"
+                [attr.x2]="event.x"
+                [attr.y2]="event.connectorEndY"
+                [attr.stroke]="event.color"
+                stroke-width="2"
+              />
+              <rect
+                [attr.x]="event.x - 6"
+                [attr.y]="event.anchorY - 6"
+                width="12"
+                height="12"
+                rx="2"
+                [attr.fill]="event.color"
+              />
+              <rect
+                [attr.x]="event.x - 92"
+                [attr.y]="event.cardY"
+                width="184"
+                height="54"
+                rx="8"
+                fill="#f8fafc"
+                stroke="#cbd5e1"
+                stroke-width="1"
+              />
+              <text
+                [attr.x]="event.x - 82"
+                [attr.y]="event.cardY + 18"
+                font-size="11"
+                font-weight="700"
+                fill="#0f172a"
+              >
+                {{ event.raw.title }}
+              </text>
+              <text
+                [attr.x]="event.x - 82"
+                [attr.y]="event.cardY + 36"
+                font-size="10"
+                fill="#334155"
+              >
+                {{ event.dateLabel }}
+              </text>
+            }
+          </svg>
+        </div>
+      }
+      @if (!timelineLoading() && timelineData() && timelineData()!.events.length === 0) {
+        <p class="inspection-empty-note">No timeline events were extracted for this session.</p>
+      }
+    </div>
+  </app-modal-shell>
+
+  <app-modal-shell
+    [isOpen]="!!aliasData() || !!aliasError() || aliasLoading()"
+    title="RxNav Aliases"
+    [subtitle]="aliasData()?.drug_name || 'Loading...'"
+    dialogClassName="modal-container inspection-modal"
+    closeLabel="Close aliases"
+    (close)="closeAliases()"
+  >
+    @if (aliasLoading()) { <p>Loading aliases...</p> }
+    @if (aliasError()) { <p class="inspection-error-text">{{ aliasError() }}</p> }
+    @if (aliasData()) {
+      @for (group of aliasData()!.groups; track group.source) {
+        <section class="inspection-alias-group">
+          <h3>{{ group.source }}</h3>
+          <ul>
+            @for (entry of group.aliases; track entry.alias + entry.alias_kind) {
+              <li>
+                <span>{{ entry.alias }}</span>
+                <span class="inspection-alias-kind">{{ entry.alias_kind }}</span>
+              </li>
+            }
+          </ul>
+        </section>
+      }
+    }
+  </app-modal-shell>
+
+  <app-modal-shell
+    [isOpen]="!!excerptData() || !!excerptError() || excerptLoading()"
+    title="LiverTox Excerpt"
+    dialogClassName="modal-container inspection-modal inspection-modal-large"
+    closeLabel="Close excerpt"
+    (close)="closeExcerpt()"
+  >
+    <div class="inspection-excerpt-body">
+      @if (excerptLoading()) { <p>Loading excerpt...</p> }
+      @if (excerptError()) { <p class="inspection-error-text">{{ excerptError() }}</p> }
+      @if (excerptData()) { <pre class="inspection-excerpt-text">{{ excerptData()!.excerpt }}</pre> }
+    </div>
+  </app-modal-shell>
+
+  <app-modal-shell
+    [isOpen]="!!diliPriorDetailData() || !!diliPriorDetailError() || diliPriorDetailLoading()"
+    title="DILI Prior Details"
+    dialogClassName="modal-container inspection-modal inspection-modal-large"
+    closeLabel="Close DILI prior details"
+    (close)="closeDiliPriorDetails()"
+  >
+    <div class="inspection-excerpt-body">
+      @if (diliPriorDetailLoading()) { <p>Loading details...</p> }
+      @if (diliPriorDetailError()) { <p class="inspection-error-text">{{ diliPriorDetailError() }}</p> }
+      @if (diliPriorDetailData()) {
+        <pre class="inspection-excerpt-text">{{ diliPriorDetailData()!.annotations | json }}</pre>
+      }
+    </div>
+  </app-modal-shell>
+
+  <app-modal-shell
+    [isOpen]="!!drugLabelSectionsData() || !!drugLabelSectionsError() || drugLabelSectionsLoading()"
+    title="Drug Label Sections"
+    dialogClassName="modal-container inspection-modal inspection-modal-large"
+    closeLabel="Close label sections"
+    (close)="closeDrugLabelSections()"
+  >
+    <div class="inspection-excerpt-body">
+      @if (drugLabelSectionsLoading()) { <p>Loading sections...</p> }
+      @if (drugLabelSectionsError()) { <p class="inspection-error-text">{{ drugLabelSectionsError() }}</p> }
+      @if (drugLabelSectionsData()) {
+        @for (section of drugLabelSectionsData()!.sections; track section.section_key + section.display_order) {
+          <section class="inspection-alias-group">
+            <h3>{{ section.section_title || section.section_key }}</h3>
+            <pre class="inspection-excerpt-text">{{ section.text }}</pre>
+          </section>
+        }
+      }
+    </div>
+  </app-modal-shell>
+
+  @if (activeUpdateTarget()) {
+    <div class="modal-overlay">
+      <dialog class="modal-container inspection-modal inspection-modal-large" open>
+        <div class="modal-header">
+          <div class="modal-header-content">
+            <h2 class="modal-title">Update {{ activeUpdateTarget() }}</h2>
+            <p class="modal-subtitle">Configure overrides, run, monitor progress, and cancel if needed.</p>
+          </div>
+          <button class="modal-close" type="button" (click)="closeUpdateModal()">Close</button>
+        </div>
+        <div class="modal-body inspection-excerpt-body">
+          @if (updateLoading()) {
+            <p>Loading update configuration...</p>
+          } @else {
+            <label class="field-label" for="update-overrides">JSON overrides</label>
+            <textarea id="update-overrides" class="field-textarea" style="width:100%;min-height:220px;" [ngModel]="updateConfigText()" (ngModelChange)="setUpdateConfigText($event)"></textarea>
+            <div class="inspection-job-panel">
+              <p class="inspection-job-message">Job ID: {{ updateJobId() || 'Not started' }}</p>
+              <div class="inspection-job-bar-track"><div class="inspection-job-bar-fill" [style.width.%]="updateProgress()"></div></div>
+              <p class="inspection-job-message">{{ updateMessage() || 'Ready to start.' }}</p>
+              @if (updateError()) { <p class="inspection-error-text">{{ updateError() }}</p> }
+            </div>
+            <div class="inspection-pager-actions" style="margin-top: 8px;">
+              <button class="btn btn-primary inspection-mini-btn" type="button" (click)="startUpdateJob()" [disabled]="updateRunning()">Start Update</button>
+              <button class="btn btn-secondary inspection-mini-btn" type="button" (click)="cancelUpdateJob()" [disabled]="!updateRunning()">Cancel</button>
+            </div>
+          }
+        </div>
+      </dialog>
+    </div>
+  }
+</main>

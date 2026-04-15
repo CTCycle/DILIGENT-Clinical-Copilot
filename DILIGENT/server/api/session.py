@@ -2,8 +2,9 @@ from __future__ import annotations
 
 import asyncio
 import time
+from contextlib import contextmanager
 from datetime import datetime
-from collections.abc import Callable, Sequence
+from collections.abc import Sequence
 from typing import Any
 
 from fastapi import APIRouter, Body, HTTPException, status
@@ -13,14 +14,19 @@ from pydantic_core import ErrorDetails
 
 from DILIGENT.server.models.cloud import LLMError
 
-from DILIGENT.server.domain.clinical import (
+from DILIGENT.server.domain.clinical.entities import (
+    ClinicalLabEntry,
     ClinicalPipelineValidationError,
     ClinicalSessionRequest,
     DiseaseContextEntry,
     DrugEntry,
+    DrugRucamAssessment,
+    LiverInjuryOnsetContext,
+    PatientLabTimeline,
     PatientData,
     PatientDiseaseContext,
     PatientDrugs,
+    PatientRucamAssessmentBundle,
     PipelineIssue,
 )
 from DILIGENT.server.domain.jobs import (
@@ -28,7 +34,8 @@ from DILIGENT.server.domain.jobs import (
     JobStartResponse,
     JobStatusResponse,
 )
-from DILIGENT.server.configurations import LLMRuntimeConfig, server_settings
+from DILIGENT.server.configurations.startup import server_settings
+from DILIGENT.server.configurations.llm_configs import LLMRuntimeConfig
 from DILIGENT.server.repositories.serialization.data import DataSerializer
 from DILIGENT.server.services.jobs import job_manager
 from DILIGENT.server.common.utils.logger import logger
@@ -37,101 +44,43 @@ from DILIGENT.server.services.clinical.hepatox import (
     HepatotoxicityPatternAnalyzer,
     HepatoxConsultation,
 )
+from DILIGENT.server.services.clinical.job_progress import (
+    ClinicalConsultationProgressCallback,
+    ClinicalJobCancelled,
+    ClinicalJobProgressCallback,
+    ensure_clinical_job_not_cancelled,
+    report_clinical_job_progress,
+    StageProgressFractionCallback,
+)
+from DILIGENT.server.services.clinical.language import detect_clinical_language
 from DILIGENT.server.services.clinical.preparation import ClinicalKnowledgePreparation
+from DILIGENT.server.services.clinical.candidate_selection import select_relevant_candidates
 from DILIGENT.server.services.clinical.disease import DiseaseExtractor
+from DILIGENT.server.services.clinical.labs import ClinicalLabExtractor
 from DILIGENT.server.services.clinical.parser import DrugsParser
+from DILIGENT.server.services.clinical.rucam import RucamScoreEstimator
+from DILIGENT.server.services.clinical.validation import (
+    build_validation_bundle,
+    ensure_required_sections,
+    ensure_timed_therapy_drug,
+)
 from DILIGENT.server.services.payload import PayloadSanitizationService
 from DILIGENT.server.services.retrieval.query import DILIQueryBuilder
 from DILIGENT.server.services.text.normalization import normalize_drug_query_name
 
 drugs_parser = DrugsParser(timeout_s=server_settings.external_data.parser_llm_timeout)
 disease_extractor = DiseaseExtractor(timeout_s=server_settings.external_data.disease_llm_timeout)
+lab_extractor = ClinicalLabExtractor(timeout_s=server_settings.external_data.disease_llm_timeout)
 pattern_analyzer = HepatotoxicityPatternAnalyzer()
+rucam_estimator = RucamScoreEstimator()
 input_preparator = ClinicalKnowledgePreparation()
 router = APIRouter(tags=["session"])
 serializer = DataSerializer()
 payload_sanitization_service = PayloadSanitizationService()
 NOT_AVAILABLE = "Not available"
-CLINICAL_PROGRESS_MESSAGES: dict[str, str] = {
-    "session_initialization": "Initializing clinical session",
-    "hepatotoxicity_pattern": "Calculating hepatotoxicity pattern",
-    "therapy_extraction": "Extracting drugs from therapy",
-    "anamnesis_extraction": "Extracting drugs from anamnesis",
-    "anamnesis_disease_extraction": "Extracting diseases from anamnesis",
-    "rag_query_building": "Building RAG queries",
-    "livertox_lookup": "Consulting LiverTox knowledge base",
-    "llm_analysis": "Running LLM drug-by-drug assessment",
-    "report_composition": "Composing final clinical report",
-    "finalization": "Finalizing and persisting session",
-}
 
 
-# -----------------------------------------------------------------------------
-class ClinicalJobProgressCallback:
-    def __init__(self, *, job_id: str) -> None:
-        self.job_id = job_id
-
-    # -------------------------------------------------------------------------
-    def __call__(self, stage: str, progress: float) -> None:
-        report_clinical_job_progress(self.job_id, stage=stage, progress=progress)
-
-
-# -----------------------------------------------------------------------------
-class ClinicalConsultationProgressCallback:
-    def __init__(
-        self,
-        *,
-        progress_callback: Callable[[str, float], None] | None,
-    ) -> None:
-        self.progress_callback = progress_callback
-
-    # -------------------------------------------------------------------------
-    def __call__(self, stage: str, fraction: float) -> None:
-        if self.progress_callback is None:
-            return
-        bounded_fraction = min(1.0, max(0.0, float(fraction)))
-        if stage == "llm_analysis":
-            self.progress_callback("llm_analysis", 62.0 + (bounded_fraction * 24.0))
-        elif stage == "report_composition":
-            self.progress_callback("report_composition", 86.0 + (bounded_fraction * 8.0))
-
-
-# -----------------------------------------------------------------------------
-class StageProgressFractionCallback:
-    def __init__(
-        self,
-        *,
-        progress_callback: Callable[[str, float], None],
-        stage: str,
-        start_value: float,
-        end_value: float,
-    ) -> None:
-        self.progress_callback = progress_callback
-        self.stage = stage
-        self.lower = min(start_value, end_value)
-        self.span = max(0.0, end_value - self.lower)
-
-    # -------------------------------------------------------------------------
-    def __call__(self, fraction: float) -> None:
-        bounded_fraction = min(1.0, max(0.0, float(fraction)))
-        self.progress_callback(self.stage, self.lower + (self.span * bounded_fraction))
-
-
-# -----------------------------------------------------------------------------
-def report_clinical_job_progress(job_id: str, *, stage: str, progress: float) -> None:
-    bounded = min(100.0, max(0.0, float(progress)))
-    message = CLINICAL_PROGRESS_MESSAGES.get(stage, stage.replace("_", " ").strip())
-    job_manager.update_progress(job_id, bounded)
-    job_manager.update_result(
-        job_id,
-        {
-            "progress_stage": stage,
-            "progress_message": message,
-        },
-    )
-
-
-# -----------------------------------------------------------------------------
+###############################################################################
 def build_failed_session_payload(
     *,
     payload: PatientData,
@@ -140,16 +89,16 @@ def build_failed_session_payload(
     error_message: str,
     elapsed_seconds: float,
 ) -> dict[str, Any]:
+    language_result = detect_clinical_language(payload)
     return {
         "patient_name": payload.name,
+        "patient_visit_date": payload.visit_date,
+        "patient_image_base64": payload.patient_image_base64,
         "session_timestamp": datetime.now(),
-        "alt_value": payload.alt,
-        "alt_upper_limit": payload.alt_max,
-        "alp_value": payload.alp,
-        "alp_upper_limit": payload.alp_max,
         "hepatic_pattern": "indeterminate",
         "anamnesis": payload.anamnesis,
         "drugs": payload.drugs,
+        "laboratory_analysis": payload.laboratory_analysis,
         "parsing_model": runtime_overrides.get("parsing_model")
         or LLMRuntimeConfig.get_parsing_model(),
         "clinical_model": runtime_overrides.get("clinical_model")
@@ -169,16 +118,145 @@ def build_failed_session_payload(
             "anamnesis_drugs": [],
             "anamnesis_diseases": [],
             "matched_drugs": [],
+            "rucam_assessments": [],
+            "lab_timeline": [],
+            "onset_context": None,
+            "detected_input_language": language_result.detected_input_language,
+            "report_language": language_result.report_language,
+            "relevant_drugs": [],
+            "excluded_drugs": [],
+            "unresolved_drugs": [],
+            "structured_case": {},
         },
     }
 
 
 ###############################################################################
 class NarrativeBuilder:
-    
+    BUNDLES: dict[str, dict[str, str]] = {
+        "en": {
+            "no_data": "- No data provided.",
+            "summary_title": "# Clinical Visit Summary",
+            "patient": "- **Patient:** {value}",
+            "visit_date": "- **Visit date:** {value}",
+            "anamnesis_title": "## Anamnesis",
+            "no_anamnesis": "_No anamnesis provided._",
+            "pattern_title": "## Hepatotoxicity Pattern",
+            "classification": "- **Classification:** {value}",
+            "r_score": "- **R-score:** {value}",
+            "therapy_title": "## Current Drugs",
+            "detected_drugs": "**Detected drugs ({count}):** {value}",
+            "historical_title": "## Historical Drug Mentions",
+            "historical_mentions": "- **Historical mentions ({count}):** {value}",
+            "rucam_title": "## Estimated RUCAM",
+            "rucam_item": "- **{drug}**: score {score} ({category}, confidence {confidence})",
+            "warnings_title": "## Warnings",
+            "report_title": "## Clinical Report",
+            "no_report": "No clinical report generated.",
+            "none_detected": "None detected",
+        },
+        "it": {
+            "no_data": "- Nessun dato fornito.",
+            "summary_title": "# Sintesi Visita Clinica",
+            "patient": "- **Paziente:** {value}",
+            "visit_date": "- **Data visita:** {value}",
+            "anamnesis_title": "## Anamnesi",
+            "no_anamnesis": "_Anamnesi non fornita._",
+            "pattern_title": "## Pattern di Epatotossicità",
+            "classification": "- **Classificazione:** {value}",
+            "r_score": "- **R-score:** {value}",
+            "therapy_title": "## Terapia Corrente",
+            "detected_drugs": "**Farmaci rilevati ({count}):** {value}",
+            "historical_title": "## Menzioni Farmaci Anamnestiche",
+            "historical_mentions": "- **Menzioni storiche ({count}):** {value}",
+            "rucam_title": "## RUCAM Stimato",
+            "rucam_item": "- **{drug}**: punteggio {score} ({category}, confidenza {confidence})",
+            "warnings_title": "## Avvisi",
+            "report_title": "## Report Clinico",
+            "no_report": "Nessun report clinico generato.",
+            "none_detected": "Nessuno rilevato",
+        },
+        "de": {
+            "no_data": "- Keine Daten angegeben.",
+            "summary_title": "# Zusammenfassung des Klinischen Besuchs",
+            "patient": "- **Patient:** {value}",
+            "visit_date": "- **Besuchsdatum:** {value}",
+            "anamnesis_title": "## Anamnese",
+            "no_anamnesis": "_Keine Anamnese angegeben._",
+            "pattern_title": "## Hepatotoxizitätsmuster",
+            "classification": "- **Klassifikation:** {value}",
+            "r_score": "- **R-Score:** {value}",
+            "therapy_title": "## Aktuelle Medikamente",
+            "detected_drugs": "**Erkannte Medikamente ({count}):** {value}",
+            "historical_title": "## Historische Medikamentenerwähnungen",
+            "historical_mentions": "- **Historische Erwähnungen ({count}):** {value}",
+            "rucam_title": "## Geschätzter RUCAM",
+            "rucam_item": "- **{drug}**: Score {score} ({category}, Vertrauen {confidence})",
+            "warnings_title": "## Warnhinweise",
+            "report_title": "## Klinischer Bericht",
+            "no_report": "Kein klinischer Bericht erstellt.",
+            "none_detected": "Keine erkannt",
+        },
+        "fr": {
+            "no_data": "- Aucune donnée fournie.",
+            "summary_title": "# Résumé de la Visite Clinique",
+            "patient": "- **Patient:** {value}",
+            "visit_date": "- **Date de visite:** {value}",
+            "anamnesis_title": "## Anamnèse",
+            "no_anamnesis": "_Aucune anamnèse fournie._",
+            "pattern_title": "## Profil d’Hépatotoxicité",
+            "classification": "- **Classification:** {value}",
+            "r_score": "- **Score R:** {value}",
+            "therapy_title": "## Médicaments Actuels",
+            "detected_drugs": "**Médicaments détectés ({count}) :** {value}",
+            "historical_title": "## Mentions Médicamenteuses Antérieures",
+            "historical_mentions": "- **Mentions historiques ({count}) :** {value}",
+            "rucam_title": "## RUCAM Estimé",
+            "rucam_item": "- **{drug}** : score {score} ({category}, confiance {confidence})",
+            "warnings_title": "## Avertissements",
+            "report_title": "## Rapport Clinique",
+            "no_report": "Aucun rapport clinique généré.",
+            "none_detected": "Aucun détecté",
+        },
+        "es": {
+            "no_data": "- No se proporcionaron datos.",
+            "summary_title": "# Resumen de la Visita Clínica",
+            "patient": "- **Paciente:** {value}",
+            "visit_date": "- **Fecha de visita:** {value}",
+            "anamnesis_title": "## Anamnesis",
+            "no_anamnesis": "_No se proporcionó anamnesis._",
+            "pattern_title": "## Patrón de Hepatotoxicidad",
+            "classification": "- **Clasificación:** {value}",
+            "r_score": "- **Puntuación R:** {value}",
+            "therapy_title": "## Fármacos Actuales",
+            "detected_drugs": "**Fármacos detectados ({count}):** {value}",
+            "historical_title": "## Menciones Históricas de Fármacos",
+            "historical_mentions": "- **Menciones históricas ({count}):** {value}",
+            "rucam_title": "## RUCAM Estimado",
+            "rucam_item": "- **{drug}**: puntuación {score} ({category}, confianza {confidence})",
+            "warnings_title": "## Advertencias",
+            "report_title": "## Informe Clínico",
+            "no_report": "No se generó un informe clínico.",
+            "none_detected": "Ninguno detectado",
+        },
+    }
+
     # -------------------------------------------------------------------------
     @staticmethod
-    def build_bullet_list(content: str | None) -> list[str]:
+    def bundle(report_language: str) -> dict[str, str]:
+        if report_language.startswith("de"):
+            return NarrativeBuilder.BUNDLES["de"]
+        if report_language.startswith("fr"):
+            return NarrativeBuilder.BUNDLES["fr"]
+        if report_language.startswith("es"):
+            return NarrativeBuilder.BUNDLES["es"]
+        if report_language.startswith("it"):
+            return NarrativeBuilder.BUNDLES["it"]
+        return NarrativeBuilder.BUNDLES["en"]
+
+    # -------------------------------------------------------------------------
+    @staticmethod
+    def build_bullet_list(content: str | None, *, no_data_label: str) -> list[str]:
         lines: list[str] = []
         if content:
             for entry in content.splitlines():
@@ -186,7 +264,7 @@ class NarrativeBuilder:
                 if stripped:
                     lines.append(f"- {stripped}")
         if not lines:
-            lines.append("- No data provided.")
+            lines.append(no_data_label)
         return lines
 
     # -------------------------------------------------------------------------
@@ -218,70 +296,89 @@ class NarrativeBuilder:
         pattern_strings: dict[str, str],
         detected_drugs: list[str],
         anamnesis_detected_drugs: list[str],
+        rucam_assessments: list[DrugRucamAssessment] | None = None,
+        report_language: str,
         issues: list[PipelineIssue],
         final_report: str | None,
     ) -> str:
+        bundle = NarrativeBuilder.bundle(report_language)
         classification = getattr(pattern_score, "classification", NOT_AVAILABLE)
-        alt_multiple = pattern_strings.get("alt_multiple", NOT_AVAILABLE)
-        alp_multiple = pattern_strings.get("alp_multiple", NOT_AVAILABLE)
         r_score = pattern_strings.get("r_score", NOT_AVAILABLE)
-        drug_summary = ", ".join(detected_drugs) if detected_drugs else "None detected"
+        drug_summary = ", ".join(detected_drugs) if detected_drugs else bundle["none_detected"]
 
         sections: list[str] = []
 
         header_section = [
-            "# Clinical Visit Summary",
+            bundle["summary_title"],
             "",
-            f"- **Patient:** {patient_label}",
-            f"- **Visit date:** {visit_label}",
+            bundle["patient"].format(value=patient_label),
+            bundle["visit_date"].format(value=visit_label),
         ]
         sections.append("\n".join(header_section))
 
-        anamnesis_content = anamnesis if anamnesis else "_No anamnesis provided._"
-        sections.append("\n".join(["## Anamnesis and Exams", "", anamnesis_content]))
+        anamnesis_content = anamnesis if anamnesis else bundle["no_anamnesis"]
+        sections.append("\n".join([bundle["anamnesis_title"], "", anamnesis_content]))
 
         pattern_section = [
-            "## Hepato-toxicity Pattern",
+            bundle["pattern_title"],
             "",
-            f"- **Classification:** {classification}",
-            f"- **ALT multiple:** {alt_multiple}",
-            f"- **ALP multiple:** {alp_multiple}",
-            f"- **R-score:** {r_score}",
+            bundle["classification"].format(value=classification),
+            bundle["r_score"].format(value=r_score),
         ]
         sections.append("\n".join(pattern_section))
 
-        therapy_section = ["## Pharmacological Therapy", ""]
-        therapy_section.extend(NarrativeBuilder.build_bullet_list(drugs_text))
+        therapy_section = [bundle["therapy_title"], ""]
+        therapy_section.extend(
+            NarrativeBuilder.build_bullet_list(
+                drugs_text,
+                no_data_label=bundle["no_data"],
+            )
+        )
         therapy_section.extend(
             [
                 "",
-                f"**Detected drugs ({len(detected_drugs)}):** {drug_summary}",
+                bundle["detected_drugs"].format(count=len(detected_drugs), value=drug_summary),
             ]
         )
         sections.append("\n".join(therapy_section))
 
         anamnesis_drug_summary = (
-            ", ".join(anamnesis_detected_drugs) if anamnesis_detected_drugs else "None detected"
+            ", ".join(anamnesis_detected_drugs) if anamnesis_detected_drugs else bundle["none_detected"]
         )
         sections.append(
             "\n".join(
                 [
-                    "## Drugs Mentioned in Anamnesis (Historical)",
+                    bundle["historical_title"],
                     "",
-                    f"- **Historical mentions ({len(anamnesis_detected_drugs)}):** {anamnesis_drug_summary}",
+                    bundle["historical_mentions"].format(
+                        count=len(anamnesis_detected_drugs),
+                        value=anamnesis_drug_summary,
+                    ),
                 ]
             )
         )
+        if rucam_assessments:
+            rucam_section = [bundle["rucam_title"], ""]
+            for assessment in rucam_assessments:
+                rucam_section.append(
+                    bundle["rucam_item"].format(
+                        drug=assessment.drug_name,
+                        score=assessment.total_score,
+                        category=assessment.causality_category,
+                        confidence=assessment.confidence,
+                    )
+                )
+            sections.append("\n".join(rucam_section))
 
         if issues:
-            warnings_section = ["## Warnings", ""]
+            warnings_section = [bundle["warnings_title"], ""]
             for issue in issues:
                 warnings_section.append(f"- {issue.message}")
             sections.append("\n".join(warnings_section))
 
-        clinical_report_section = ["## Clinical Report", ""]
+        clinical_report_section = [bundle["report_title"], ""]
         clinical_report_section.append(
-            final_report.strip() if final_report else "No clinical report generated."
+            final_report.strip() if final_report else bundle["no_report"]
         )
         sections.append("\n".join(clinical_report_section))
 
@@ -294,70 +391,80 @@ async def execute_clinical_job(
     runtime_overrides: dict[str, Any],
     job_id: str,
 ) -> dict[str, Any]:
-    endpoint.apply_runtime_overrides(
+    with endpoint.runtime_override_context(
         use_cloud_services=runtime_overrides.get("use_cloud_services"),
         llm_provider=runtime_overrides.get("llm_provider"),
         cloud_model=runtime_overrides.get("cloud_model"),
         parsing_model=runtime_overrides.get("parsing_model"),
         clinical_model=runtime_overrides.get("clinical_model"),
         ollama_temperature=runtime_overrides.get("ollama_temperature"),
+        cloud_temperature=runtime_overrides.get("cloud_temperature"),
         ollama_reasoning=runtime_overrides.get("ollama_reasoning"),
-    )
+    ):
+        ensure_clinical_job_not_cancelled(job_id)
 
-    if job_manager.should_stop(job_id):
-        return ""
-
-    report_clinical_job_progress(
-        job_id,
-        stage="session_initialization",
-        progress=5.0,
-    )
-    progress_callback = ClinicalJobProgressCallback(job_id=job_id)
-    job_started_at = time.perf_counter()
-
-    try:
-        result = await endpoint.process_single_patient(
-            payload,
-            allow_missing_labs=bool(runtime_overrides.get("allow_missing_labs")),
-            progress_callback=progress_callback,
-        )
-    except ClinicalPipelineValidationError as exc:
-        serialized_issues = [issue.model_dump() for issue in exc.issues]
-        await asyncio.to_thread(
-            serializer.save_clinical_session,
-            build_failed_session_payload(
-                payload=payload,
-                runtime_overrides=runtime_overrides,
-                issues=serialized_issues,
-                error_message=str(exc),
-                elapsed_seconds=(time.perf_counter() - job_started_at),
-            ),
-        )
-        job_manager.update_result(
+        report_clinical_job_progress(
             job_id,
-            {
-                "validation_error": str(exc),
-                "issues": serialized_issues,
-            },
+            stage="session_initialization",
+            progress=5.0,
         )
-        raise
-    except Exception as exc:
-        failure_issue = PipelineIssue(
-            severity="error",
-            code="clinical_job_failed",
-            message=str(exc).strip() or "Clinical analysis failed unexpectedly.",
-        ).model_dump()
-        await asyncio.to_thread(
-            serializer.save_clinical_session,
-            build_failed_session_payload(
-                payload=payload,
-                runtime_overrides=runtime_overrides,
-                issues=[failure_issue],
-                error_message=str(exc),
-                elapsed_seconds=(time.perf_counter() - job_started_at),
-            ),
-        )
-        raise
+        progress_callback = ClinicalJobProgressCallback(job_id=job_id)
+        job_started_at = time.perf_counter()
+
+        try:
+            result = await endpoint.process_single_patient(
+                payload,
+                progress_callback=progress_callback,
+                stop_check=lambda: ensure_clinical_job_not_cancelled(job_id),
+            )
+        except ClinicalJobCancelled:
+            job_manager.update_result(
+                job_id,
+                {
+                    "progress_status": "cancelled",
+                    "progress_message": "Clinical analysis cancelled.",
+                },
+            )
+            return {}
+        except ClinicalPipelineValidationError as exc:
+            serialized_issues = [issue.model_dump() for issue in exc.issues]
+            await asyncio.to_thread(
+                serializer.save_clinical_session,
+                build_failed_session_payload(
+                    payload=payload,
+                    runtime_overrides=runtime_overrides,
+                    issues=serialized_issues,
+                    error_message=str(exc),
+                    elapsed_seconds=(time.perf_counter() - job_started_at),
+                ),
+            )
+            job_manager.update_result(
+                job_id,
+                {
+                    "validation_error": str(exc),
+                    "issues": serialized_issues,
+                },
+            )
+            raise
+        except Exception as exc:
+            if job_manager.should_stop(job_id):
+                return {}
+            failure_issue = PipelineIssue(
+                severity="error",
+                code="clinical_job_failed",
+                message=str(exc).strip() or "Clinical analysis failed unexpectedly.",
+            ).model_dump()
+            await asyncio.to_thread(
+                serializer.save_clinical_session,
+                build_failed_session_payload(
+                    payload=payload,
+                    runtime_overrides=runtime_overrides,
+                    issues=[failure_issue],
+                    error_message=str(exc),
+                    elapsed_seconds=(time.perf_counter() - job_started_at),
+                ),
+            )
+            raise
     return result
 
 
@@ -385,14 +492,18 @@ class ClinicalSessionEndpoint:
         router: APIRouter,
         drugs_parser: DrugsParser,
         disease_extractor: DiseaseExtractor,
+        lab_extractor: ClinicalLabExtractor,
         pattern_analyzer: HepatotoxicityPatternAnalyzer,
+        rucam_estimator: RucamScoreEstimator,
         serializer: DataSerializer,
         payload_sanitizer: PayloadSanitizationService,
     ) -> None:
         self.router = router
         self.drugs_parser = drugs_parser
         self.disease_extractor = disease_extractor
+        self.lab_extractor = lab_extractor
         self.pattern_analyzer = pattern_analyzer
+        self.rucam_estimator = rucam_estimator
         self.serializer = serializer
         self.payload_sanitizer = payload_sanitizer
 
@@ -468,6 +579,32 @@ class ClinicalSessionEndpoint:
 
     # -------------------------------------------------------------------------
     @staticmethod
+    def build_fallback_therapy_drugs(raw_text: str | None) -> PatientDrugs:
+        if not raw_text:
+            return PatientDrugs(entries=[])
+
+        candidates = raw_text.replace(";", "\n").splitlines()
+        entries: list[DrugEntry] = []
+        seen_keys: set[str] = set()
+        for candidate in candidates:
+            normalized = candidate.strip().lstrip("-*• ").strip()
+            if not normalized:
+                continue
+            lookup_key = normalize_drug_query_name(normalized)
+            if not lookup_key or lookup_key in seen_keys:
+                continue
+            seen_keys.add(lookup_key)
+            entries.append(
+                DrugEntry(
+                    name=normalized,
+                    source="therapy",
+                    historical_flag=False,
+                )
+            )
+        return PatientDrugs(entries=entries)
+
+    # -------------------------------------------------------------------------
+    @staticmethod
     def format_structured_diseases(disease_context: PatientDiseaseContext) -> list[str]:
         if not disease_context.entries:
             return ["- None detected."]
@@ -488,12 +625,46 @@ class ClinicalSessionEndpoint:
 
     # -------------------------------------------------------------------------
     @staticmethod
+    def format_lab_timeline(lab_timeline: PatientLabTimeline) -> list[str]:
+        if not lab_timeline.entries:
+            return ["- None extracted."]
+        lines: list[str] = []
+        for entry in lab_timeline.entries:
+            if not isinstance(entry, ClinicalLabEntry):
+                continue
+            date_token = entry.sample_date or entry.relative_time or "unknown_time"
+            value_token = entry.value if entry.value is not None else (entry.value_text or "n/a")
+            uln_token = (
+                entry.upper_limit_normal
+                if entry.upper_limit_normal is not None
+                else (entry.upper_limit_text or "n/a")
+            )
+            lines.append(
+                f"- {date_token} | {entry.marker_name}: {value_token} (ULN: {uln_token}) | source: {entry.source}"
+            )
+        return lines or ["- None extracted."]
+
+    # -------------------------------------------------------------------------
+    @staticmethod
+    def format_onset_context(onset_context: LiverInjuryOnsetContext | None) -> list[str]:
+        if onset_context is None:
+            return ["- Onset anchor unavailable."]
+        return [
+            f"- Onset date: {onset_context.onset_date or 'Not available'}",
+            f"- Onset basis: {onset_context.onset_basis}",
+            f"- Evidence: {onset_context.evidence or 'Not reported.'}",
+        ]
+
+    # -------------------------------------------------------------------------
+    @staticmethod
     def build_structured_clinical_context(
         payload: PatientData,
         *,
         therapy_drugs: PatientDrugs,
         anamnesis_drugs: PatientDrugs,
         disease_context: PatientDiseaseContext,
+        lab_timeline: PatientLabTimeline,
+        onset_context: LiverInjuryOnsetContext | None,
         pattern_score: Any,
     ) -> str:
         therapy_mentions = [
@@ -510,6 +681,9 @@ class ClinicalSessionEndpoint:
             "# Clinical Context",
             f"Anamnesis: {(payload.anamnesis or '').strip() or 'Not provided.'}",
             "",
+            "# Laboratory Analysis (Raw)",
+            (payload.laboratory_analysis or "").strip() or "Not provided.",
+            "",
             "# Therapy List (Raw)",
             (payload.drugs or "").strip() or "Not provided.",
             "",
@@ -520,6 +694,12 @@ class ClinicalSessionEndpoint:
             "# Structured Disease Timeline (from Anamnesis)",
             *ClinicalSessionEndpoint.format_structured_diseases(disease_context),
             "",
+            "# Longitudinal Laboratory Timeline",
+            *ClinicalSessionEndpoint.format_lab_timeline(lab_timeline),
+            "",
+            "# Estimated Liver Injury Onset Anchor",
+            *ClinicalSessionEndpoint.format_onset_context(onset_context),
+            "",
             "# Visit Date Anchor",
             (
                 f"- Visit date: {payload.visit_date.isoformat()}"
@@ -529,8 +709,6 @@ class ClinicalSessionEndpoint:
             "",
             "# Hepatotoxicity Pattern",
             f"- Classification: {getattr(pattern_score, 'classification', 'indeterminate')}",
-            f"- ALT multiple: {getattr(pattern_score, 'alt_multiple', None)}",
-            f"- ALP multiple: {getattr(pattern_score, 'alp_multiple', None)}",
             f"- R score: {getattr(pattern_score, 'r_score', None)}",
         ]
         return "\n".join(lines).strip()
@@ -545,6 +723,7 @@ class ClinicalSessionEndpoint:
         parsing_model: str | None,
         clinical_model: str | None,
         ollama_temperature: float | None,
+        cloud_temperature: float | None,
         ollama_reasoning: bool | None,
     ) -> None:
         if use_cloud_services is not None:
@@ -559,13 +738,15 @@ class ClinicalSessionEndpoint:
             LLMRuntimeConfig.set_clinical_model(clinical_model)
         if ollama_temperature is not None:
             LLMRuntimeConfig.set_ollama_temperature(ollama_temperature)
+        if cloud_temperature is not None:
+            LLMRuntimeConfig.set_cloud_temperature(cloud_temperature)
         if ollama_reasoning is not None:
             LLMRuntimeConfig.set_ollama_reasoning(ollama_reasoning)
 
         parser_provider, parser_model = LLMRuntimeConfig.resolve_provider_and_model("parser")
         clinical_provider, clinical_model_resolved = LLMRuntimeConfig.resolve_provider_and_model("clinical")
         logger.info(
-            "Resolved LLM runtime for request: cloud=%s provider=%s cloud_model=%s parsing_provider=%s parsing_model=%s clinical_provider=%s clinical_model=%s temperature=%.2f reasoning=%s",
+            "Resolved LLM runtime for request: cloud=%s provider=%s cloud_model=%s parsing_provider=%s parsing_model=%s clinical_provider=%s clinical_model=%s ollama_temperature=%.2f cloud_temperature=%.2f reasoning=%s",
             LLMRuntimeConfig.is_cloud_enabled(),
             LLMRuntimeConfig.get_llm_provider(),
             LLMRuntimeConfig.get_cloud_model(),
@@ -574,8 +755,62 @@ class ClinicalSessionEndpoint:
             clinical_provider,
             clinical_model_resolved,
             LLMRuntimeConfig.get_ollama_temperature(),
+            LLMRuntimeConfig.get_cloud_temperature(),
             LLMRuntimeConfig.is_ollama_reasoning_enabled(),
         )
+
+    # -------------------------------------------------------------------------
+    @staticmethod
+    def capture_runtime_snapshot() -> dict[str, Any]:
+        return {
+            "use_cloud_services": LLMRuntimeConfig.is_cloud_enabled(),
+            "llm_provider": LLMRuntimeConfig.get_llm_provider(),
+            "cloud_model": LLMRuntimeConfig.get_cloud_model(),
+            "parsing_model": LLMRuntimeConfig.get_parsing_model(),
+            "clinical_model": LLMRuntimeConfig.get_clinical_model(),
+            "ollama_temperature": LLMRuntimeConfig.get_ollama_temperature(),
+            "cloud_temperature": LLMRuntimeConfig.get_cloud_temperature(),
+            "ollama_reasoning": LLMRuntimeConfig.is_ollama_reasoning_enabled(),
+        }
+
+    # -------------------------------------------------------------------------
+    @contextmanager
+    def runtime_override_context(
+        self,
+        *,
+        use_cloud_services: bool | None,
+        llm_provider: str | None,
+        cloud_model: str | None,
+        parsing_model: str | None,
+        clinical_model: str | None,
+        ollama_temperature: float | None,
+        cloud_temperature: float | None,
+        ollama_reasoning: bool | None,
+    ):
+        snapshot = self.capture_runtime_snapshot()
+        self.apply_runtime_overrides(
+            use_cloud_services=use_cloud_services,
+            llm_provider=llm_provider,
+            cloud_model=cloud_model,
+            parsing_model=parsing_model,
+            clinical_model=clinical_model,
+            ollama_temperature=ollama_temperature,
+            cloud_temperature=cloud_temperature,
+            ollama_reasoning=ollama_reasoning,
+        )
+        try:
+            yield
+        finally:
+            self.apply_runtime_overrides(
+                use_cloud_services=bool(snapshot["use_cloud_services"]),
+                llm_provider=str(snapshot["llm_provider"]),
+                cloud_model=str(snapshot["cloud_model"]),
+                parsing_model=str(snapshot["parsing_model"]),
+                clinical_model=str(snapshot["clinical_model"]),
+                ollama_temperature=float(snapshot["ollama_temperature"]),
+                cloud_temperature=float(snapshot["cloud_temperature"]),
+                ollama_reasoning=bool(snapshot["ollama_reasoning"]),
+            )
 
     # -------------------------------------------------------------------------
     def build_patient_payload(
@@ -588,16 +823,14 @@ class ClinicalSessionEndpoint:
                 visit_date=request_payload.visit_date,
                 anamnesis=request_payload.anamnesis,
                 drugs=request_payload.drugs,
-                alt=request_payload.alt,
-                alt_max=request_payload.alt_max,
-                alp=request_payload.alp,
-                alp_max=request_payload.alp_max,
+                laboratory_analysis=request_payload.laboratory_analysis,
                 use_rag=request_payload.use_rag,
                 use_web_search=request_payload.use_web_search,
             )
             payload_data.update(
                 {
                     "has_hepatic_diseases": request_payload.has_hepatic_diseases,
+                    "patient_image_base64": request_payload.patient_image_base64,
                 }
             )
             return PatientData.model_validate(payload_data)
@@ -612,9 +845,11 @@ class ClinicalSessionEndpoint:
         self,
         payload: PatientData,
         *,
-        allow_missing_labs: bool = False,
         progress_callback: Callable[[str, float], None] | None = None,
+        stop_check: Callable[[], None] | None = None,
     ) -> dict[str, Any]:
+        if stop_check is not None:
+            stop_check()
         logger.info(
             "Starting Drug-Induced Liver Injury (DILI) analysis for patient: %s",
             payload.name,
@@ -626,34 +861,14 @@ class ClinicalSessionEndpoint:
             stage="session_initialization",
             value=5.0,
         )
+        language_result = detect_clinical_language(payload)
+        report_language = language_result.report_language
+        validation_bundle = build_validation_bundle(report_language)
+        ensure_required_sections(payload, bundle=validation_bundle)
+        if stop_check is not None:
+            stop_check()
         issues: list[PipelineIssue] = []
-        pattern_assessment = self.pattern_analyzer.assess_payload(
-            payload,
-            allow_missing_labs=allow_missing_labs,
-        )
-        pattern_score = pattern_assessment.score
-        issues.extend(pattern_assessment.issues)
-        logger.info(
-            "Patient hepatotoxicity pattern classified as %s (R=%.3f, status=%s)",
-            pattern_score.classification,
-            pattern_score.r_score if pattern_score.r_score is not None else float("nan"),
-            pattern_assessment.status,
-        )
-        self.emit_progress(
-            progress_callback,
-            stage="hepatotoxicity_pattern",
-            value=15.0,
-        )
-
         cleaned_therapy_text = self.drugs_parser.clean_text(payload.drugs or "")
-        if not cleaned_therapy_text:
-            issue = PipelineIssue(
-                severity="error",
-                code="missing_therapy_drugs",
-                message="At least one therapy drug is required for DILI analysis.",
-                field="drugs",
-            )
-            raise ClinicalPipelineValidationError(issues=[issue], message=issue.message)
 
         self.emit_progress(
             progress_callback,
@@ -667,26 +882,46 @@ class ClinicalSessionEndpoint:
             end_value=30.0,
         )
         start_time = time.perf_counter()
-        therapy_drugs = await self.drugs_parser.extract_drugs_from_therapy(
-            cleaned_therapy_text,
-            progress_callback=therapy_progress_callback,
-        )
-        elapsed = time.perf_counter() - start_time
-        logger.info("Therapy drugs extraction required %.4f seconds", elapsed)
-        logger.info("Detected %s drugs from therapy list", len(therapy_drugs.entries))
+        try:
+            therapy_drugs = await self.drugs_parser.extract_drugs_from_therapy(
+                cleaned_therapy_text,
+                progress_callback=therapy_progress_callback,
+            )
+            if stop_check is not None:
+                stop_check()
+            elapsed = time.perf_counter() - start_time
+            logger.info("Therapy drugs extraction required %.4f seconds", elapsed)
+            logger.info("Detected %s drugs from therapy list", len(therapy_drugs.entries))
+        except Exception as exc:
+            elapsed = time.perf_counter() - start_time
+            logger.warning(
+                (
+                    "Therapy drugs extraction failed after %.4f seconds; "
+                    "falling back to line-based parsing: %s"
+                ),
+                elapsed,
+                exc,
+            )
+            issues.append(
+                PipelineIssue(
+                    severity="warning",
+                    code="therapy_extraction_fallback",
+                    message=(
+                        "Therapy extraction via LLM was unavailable; "
+                        "the analysis continued using the raw therapy list."
+                    ),
+                    field="drugs",
+                )
+            )
+            therapy_drugs = self.build_fallback_therapy_drugs(cleaned_therapy_text)
         self.emit_progress(
             progress_callback,
             stage="therapy_extraction",
             value=30.0,
         )
-        if not therapy_drugs.entries:
-            issue = PipelineIssue(
-                severity="error",
-                code="missing_therapy_drugs",
-                message="At least one therapy drug is required for DILI analysis.",
-                field="drugs",
-            )
-            raise ClinicalPipelineValidationError(issues=[issue], message=issue.message)
+        if stop_check is not None:
+            stop_check()
+        ensure_timed_therapy_drug(therapy_drugs, bundle=validation_bundle)
 
         self.emit_progress(
             progress_callback,
@@ -700,18 +935,45 @@ class ClinicalSessionEndpoint:
             end_value=42.0,
         )
         start_time = time.perf_counter()
-        anamnesis_drugs = await self.drugs_parser.extract_drugs_from_anamnesis(
-            payload.anamnesis,
-            progress_callback=anamnesis_progress_callback,
-        )
-        elapsed = time.perf_counter() - start_time
-        logger.info("Anamnesis drugs extraction required %.4f seconds", elapsed)
-        logger.info("Detected %s drugs from anamnesis", len(anamnesis_drugs.entries))
+        try:
+            anamnesis_drugs = await self.drugs_parser.extract_drugs_from_anamnesis(
+                payload.anamnesis,
+                progress_callback=anamnesis_progress_callback,
+            )
+            if stop_check is not None:
+                stop_check()
+            elapsed = time.perf_counter() - start_time
+            logger.info("Anamnesis drugs extraction required %.4f seconds", elapsed)
+            logger.info("Detected %s drugs from anamnesis", len(anamnesis_drugs.entries))
+        except Exception as exc:
+            elapsed = time.perf_counter() - start_time
+            logger.warning(
+                (
+                    "Anamnesis drugs extraction failed after %.4f seconds; "
+                    "continuing without historical drug mentions: %s"
+                ),
+                elapsed,
+                exc,
+            )
+            issues.append(
+                PipelineIssue(
+                    severity="warning",
+                    code="anamnesis_extraction_failed",
+                    message=(
+                        "Drug extraction from anamnesis was unavailable; "
+                        "the analysis continued without historical drug mentions."
+                    ),
+                    field="anamnesis",
+                )
+            )
+            anamnesis_drugs = PatientDrugs(entries=[])
         self.emit_progress(
             progress_callback,
             stage="anamnesis_extraction",
             value=42.0,
         )
+        if stop_check is not None:
+            stop_check()
 
         self.emit_progress(
             progress_callback,
@@ -725,39 +987,210 @@ class ClinicalSessionEndpoint:
             end_value=48.0,
         )
         start_time = time.perf_counter()
-        disease_context = await self.disease_extractor.extract_diseases_from_anamnesis(
-            payload.anamnesis,
-            progress_callback=disease_progress_callback,
-        )
-        elapsed = time.perf_counter() - start_time
-        logger.info("Anamnesis disease extraction required %.4f seconds", elapsed)
-        logger.info("Detected %s diseases from anamnesis", len(disease_context.entries))
+        try:
+            disease_context = await self.disease_extractor.extract_diseases_from_anamnesis(
+                payload.anamnesis,
+                progress_callback=disease_progress_callback,
+            )
+            if stop_check is not None:
+                stop_check()
+            elapsed = time.perf_counter() - start_time
+            logger.info("Anamnesis disease extraction required %.4f seconds", elapsed)
+            logger.info("Detected %s diseases from anamnesis", len(disease_context.entries))
+        except Exception as exc:
+            elapsed = time.perf_counter() - start_time
+            logger.warning(
+                (
+                    "Anamnesis disease extraction failed after %.4f seconds; "
+                    "continuing without structured disease timeline: %s"
+                ),
+                elapsed,
+                exc,
+            )
+            issues.append(
+                PipelineIssue(
+                    severity="warning",
+                    code="anamnesis_disease_extraction_failed",
+                    message=(
+                        "Disease extraction from anamnesis was unavailable; "
+                        "the analysis continued without structured disease timeline."
+                    ),
+                    field="anamnesis",
+                )
+            )
+            disease_context = PatientDiseaseContext(entries=[])
         self.emit_progress(
             progress_callback,
             stage="anamnesis_disease_extraction",
             value=48.0,
         )
+        if stop_check is not None:
+            stop_check()
+
+        self.emit_progress(
+            progress_callback,
+            stage="anamnesis_lab_extraction",
+            value=48.0,
+        )
+        lab_progress_callback = self.build_stage_progress_callback(
+            progress_callback,
+            stage="anamnesis_lab_extraction",
+            start_value=48.0,
+            end_value=52.0,
+        )
+        start_time = time.perf_counter()
+        try:
+            lab_timeline, onset_context = await self.lab_extractor.extract_from_payload(
+                payload,
+                progress_callback=lab_progress_callback,
+            )
+            if stop_check is not None:
+                stop_check()
+            elapsed = time.perf_counter() - start_time
+            logger.info("Anamnesis lab extraction required %.4f seconds", elapsed)
+            logger.info("Detected %s timeline lab entries", len(lab_timeline.entries))
+        except Exception as exc:
+            elapsed = time.perf_counter() - start_time
+            logger.warning(
+                (
+                    "Anamnesis lab extraction failed after %.4f seconds; "
+                    "continuing without structured lab timeline: %s"
+                ),
+                elapsed,
+                exc,
+            )
+            issues.append(
+                PipelineIssue(
+                    severity="warning",
+                    code="anamnesis_lab_extraction_failed",
+                    message=(
+                        "Longitudinal lab extraction from anamnesis was unavailable; "
+                        "the analysis continued without timeline enrichment."
+                    ),
+                    field="anamnesis",
+                )
+            )
+            lab_timeline = PatientLabTimeline(entries=[])
+            onset_context = None
+        self.emit_progress(
+            progress_callback,
+            stage="anamnesis_lab_extraction",
+            value=52.0,
+        )
+        if stop_check is not None:
+            stop_check()
+
+        try:
+            pattern_assessment = self.pattern_analyzer.assess_payload(lab_timeline)
+        except ClinicalPipelineValidationError as exc:
+            localized = [
+                PipelineIssue(
+                    severity=item.severity,
+                    code=item.code,
+                    message=(
+                        validation_bundle.insufficient_labs
+                        if item.code == "missing_hepatotoxicity_inputs"
+                        else item.message
+                    ),
+                    field=item.field,
+                    line_index=item.line_index,
+                    raw_line=item.raw_line,
+                )
+                for item in exc.issues
+            ]
+            raise ClinicalPipelineValidationError(
+                issues=localized,
+                message=localized[0].message if localized else exc.args[0],
+            ) from exc
+        pattern_score = pattern_assessment.score
+        issues.extend(pattern_assessment.issues)
+        logger.info(
+            "Patient hepatotoxicity pattern classified as %s (R=%.3f, status=%s)",
+            pattern_score.classification,
+            pattern_score.r_score if pattern_score.r_score is not None else float("nan"),
+            pattern_assessment.status,
+        )
+        self.emit_progress(
+            progress_callback,
+            stage="hepatotoxicity_pattern",
+            value=54.0,
+        )
+        if stop_check is not None:
+            stop_check()
 
         all_detected_drugs = PatientDrugs(
             entries=[*therapy_drugs.entries, *anamnesis_drugs.entries]
         )
-        analysis_drugs = self.merge_drugs_for_analysis(therapy_drugs, anamnesis_drugs)
+        candidate_selection = select_relevant_candidates(
+            therapy_drugs=therapy_drugs,
+            anamnesis_drugs=anamnesis_drugs,
+            visit_date=payload.visit_date,
+        )
+        analysis_drugs = candidate_selection.ordered_analysis_drugs
         logger.info(
             "Using %s deduplicated drugs for matching/consultation",
             len(analysis_drugs.entries),
         )
+
+        self.emit_progress(
+            progress_callback,
+            stage="rucam_estimation",
+            value=52.0,
+        )
+        start_time = time.perf_counter()
+        try:
+            rucam_bundle = self.rucam_estimator.estimate(
+                payload=payload,
+                analysis_drugs=analysis_drugs,
+                anamnesis_drugs=anamnesis_drugs,
+                disease_context=disease_context,
+                lab_timeline=lab_timeline,
+                onset_context=onset_context,
+                pattern_score=pattern_score,
+                resolved_drugs=None,
+            )
+            elapsed = time.perf_counter() - start_time
+            logger.info("RUCAM estimation required %.4f seconds", elapsed)
+        except Exception as exc:
+            elapsed = time.perf_counter() - start_time
+            logger.warning(
+                "RUCAM estimation failed after %.4f seconds; continuing without RUCAM: %s",
+                elapsed,
+                exc,
+            )
+            issues.append(
+                PipelineIssue(
+                    severity="warning",
+                    code="rucam_estimation_failed",
+                    message=(
+                        "RUCAM estimation was unavailable; the analysis continued without "
+                        "per-drug estimated RUCAM."
+                    ),
+                )
+            )
+            rucam_bundle = PatientRucamAssessmentBundle(entries=[])
+        self.emit_progress(
+            progress_callback,
+            stage="rucam_estimation",
+            value=54.0,
+        )
+        if stop_check is not None:
+            stop_check()
+
         structured_context = self.build_structured_clinical_context(
             payload,
             therapy_drugs=therapy_drugs,
             anamnesis_drugs=anamnesis_drugs,
             disease_context=disease_context,
+            lab_timeline=lab_timeline,
+            onset_context=onset_context,
             pattern_score=pattern_score,
         )
 
         self.emit_progress(
             progress_callback,
             stage="rag_query_building",
-            value=48.0,
+            value=54.0,
         )
         rag_query: dict[str, str] | None = None
         if payload.use_rag:
@@ -771,18 +1204,20 @@ class ClinicalSessionEndpoint:
         self.emit_progress(
             progress_callback,
             stage="rag_query_building",
-            value=50.0,
+            value=56.0,
         )
+        if stop_check is not None:
+            stop_check()
 
         self.emit_progress(
             progress_callback,
             stage="livertox_lookup",
-            value=50.0,
+            value=56.0,
         )
         livertox_progress_callback = self.build_stage_progress_callback(
             progress_callback,
             stage="livertox_lookup",
-            start_value=50.0,
+            start_value=56.0,
             end_value=62.0,
         )
         prepared_inputs = await input_preparator.prepare_inputs(
@@ -791,11 +1226,37 @@ class ClinicalSessionEndpoint:
             pattern_score=pattern_score,
             progress_callback=livertox_progress_callback,
         )
+        if stop_check is not None:
+            stop_check()
         self.emit_progress(
             progress_callback,
             stage="livertox_lookup",
             value=62.0,
         )
+
+        try:
+            rucam_bundle = self.rucam_estimator.estimate(
+                payload=payload,
+                analysis_drugs=analysis_drugs,
+                anamnesis_drugs=anamnesis_drugs,
+                disease_context=disease_context,
+                lab_timeline=lab_timeline,
+                onset_context=onset_context,
+                pattern_score=pattern_score,
+                resolved_drugs=prepared_inputs.resolved_drugs if prepared_inputs else None,
+            )
+        except Exception as exc:
+            logger.warning("RUCAM re-estimation with LiverTox metadata failed: %s", exc)
+            issues.append(
+                PipelineIssue(
+                    severity="warning",
+                    code="rucam_reestimate_failed",
+                    message=(
+                        "RUCAM refinement with matched LiverTox metadata failed; "
+                        "using preliminary estimates."
+                    ),
+                )
+            )
 
         start_time = time.perf_counter()
         clinical_session: HepatoxConsultation | None = None
@@ -809,15 +1270,25 @@ class ClinicalSessionEndpoint:
             drug_assessment = await clinical_session.run_analysis(
                 prepared_inputs=prepared_inputs,
                 visit_date=payload.visit_date,
+                report_language=report_language,
                 rag_query=rag_query,
                 use_web_search=payload.use_web_search,
+                rucam_bundle=rucam_bundle,
                 progress_callback=consultation_progress_callback,
             )
+            if stop_check is not None:
+                stop_check()
             elapsed = time.perf_counter() - start_time
             logger.info("Hepato-toxicity consultation required %.4f seconds", elapsed)
 
             if isinstance(drug_assessment, dict):
-                final_report = drug_assessment.get("final_report", "").strip()
+                raw_final_report = drug_assessment.get("final_report")
+                if isinstance(raw_final_report, str):
+                    final_report = raw_final_report.strip()
+                elif raw_final_report is None:
+                    final_report = None
+                else:
+                    final_report = str(raw_final_report).strip()
         except LLMError as exc:
             issues.append(
                 PipelineIssue(
@@ -836,10 +1307,18 @@ class ClinicalSessionEndpoint:
             )
 
         patient_label = payload.name or "Unknown patient"
+        missing_visit_label_by_language = {
+            "en": "Not provided",
+            "it": "Non disponibile",
+            "de": "Nicht angegeben",
+            "fr": "Non renseignée",
+            "es": "No proporcionada",
+        }
+        report_language_key = report_language.strip().lower()[:2]
         visit_label = (
             payload.visit_date.strftime("%d %B %Y")
             if payload.visit_date
-            else "Not provided"
+            else missing_visit_label_by_language.get(report_language_key, "Not provided")
         )
 
         global_elapsed = time.perf_counter() - global_start_time
@@ -861,6 +1340,11 @@ class ClinicalSessionEndpoint:
                 normalized_key = normalize_drug_query_name(key)
                 if normalized_key:
                     resolved_drug_map[normalized_key] = value
+        rucam_by_name: dict[str, DrugRucamAssessment] = {}
+        for item in rucam_bundle.entries:
+            normalized_key = normalize_drug_query_name(item.drug_name)
+            if normalized_key:
+                rucam_by_name[normalized_key] = item
         matched_drugs_payload: list[dict[str, Any]] = []
         for detected_name in detected_drugs:
             normalized_name = normalize_drug_query_name(detected_name)
@@ -897,16 +1381,31 @@ class ClinicalSessionEndpoint:
                     "match_candidates": resolved.get("match_candidates")
                     if isinstance(resolved, dict)
                     else [],
+                    "chosen_candidate": resolved.get("chosen_candidate")
+                    if isinstance(resolved, dict)
+                    else None,
+                    "rejected_candidates": resolved.get("rejected_candidates")
+                    if isinstance(resolved, dict)
+                    else [],
                     "missing_livertox": resolved.get("missing_livertox")
                     if isinstance(resolved, dict)
                     else True,
                     "ambiguous_match": resolved.get("ambiguous_match")
                     if isinstance(resolved, dict)
                     else False,
+                    "regimen_group_ids": resolved.get("regimen_group_ids")
+                    if isinstance(resolved, dict)
+                    else [],
+                    "regimen_components": resolved.get("regimen_components")
+                    if isinstance(resolved, dict)
+                    else [],
                     "origins": resolved.get("origins") if isinstance(resolved, dict) else [],
                     "raw_mentions": resolved.get("raw_mentions")
                     if isinstance(resolved, dict)
                     else [],
+                    "rucam": rucam_by_name.get(normalized_name).model_dump()
+                    if normalized_name in rucam_by_name
+                    else None,
                 }
             )
         serialized_issues = self.serialize_pipeline_issues(issues)
@@ -920,6 +1419,8 @@ class ClinicalSessionEndpoint:
             pattern_strings=pattern_strings,
             detected_drugs=detected_drugs,
             anamnesis_detected_drugs=anamnesis_detected_drugs,
+            rucam_assessments=rucam_bundle.entries,
+            report_language=report_language,
             issues=issues,
             final_report=final_report,
         )
@@ -931,24 +1432,38 @@ class ClinicalSessionEndpoint:
             "anamnesis_drugs": anamnesis_detected_drugs,
             "anamnesis_diseases": anamnesis_detected_diseases,
             "matched_drugs": matched_drugs_payload,
+            "rucam_assessments": [item.model_dump() for item in rucam_bundle.entries],
+            "lab_timeline": [entry.model_dump() for entry in lab_timeline.entries],
+            "onset_context": onset_context.model_dump() if onset_context else None,
+            "detected_input_language": language_result.detected_input_language,
+            "report_language": language_result.report_language,
+            "relevant_drugs": candidate_selection.relevant,
+            "excluded_drugs": candidate_selection.excluded,
+            "unresolved_drugs": candidate_selection.unresolved,
+            "structured_case": {
+                "therapy_drugs": [entry.model_dump() for entry in therapy_drugs.entries],
+                "anamnesis_drugs": [entry.model_dump() for entry in anamnesis_drugs.entries],
+                "anamnesis_diseases": [entry.model_dump() for entry in disease_context.entries],
+            },
         }
         self.emit_progress(
             progress_callback,
             stage="finalization",
             value=96.0,
         )
+        if stop_check is not None:
+            stop_check()
         await asyncio.to_thread(
             self.serializer.save_clinical_session,
             {
                 "patient_name": payload.name,
+                "patient_visit_date": payload.visit_date,
+                "patient_image_base64": payload.patient_image_base64,
                 "session_timestamp": datetime.now(),
-                "alt_value": payload.alt,
-                "alt_upper_limit": payload.alt_max,
-                "alp_value": payload.alp,
-                "alp_upper_limit": payload.alp_max,
                 "hepatic_pattern": pattern_score.classification,
                 "anamnesis": payload.anamnesis,
                 "drugs": payload.drugs,
+                "laboratory_analysis": payload.laboratory_analysis,
                 "parsing_model": getattr(self.drugs_parser, "model", None),
                 "clinical_model": getattr(clinical_session, "llm_model", None),
                 "total_duration": global_elapsed,
@@ -965,6 +1480,8 @@ class ClinicalSessionEndpoint:
             stage="finalization",
             value=99.0,
         )
+        if stop_check is not None:
+            stop_check()
 
         return result_payload
 
@@ -973,22 +1490,19 @@ class ClinicalSessionEndpoint:
         self,
         request_payload: ClinicalSessionRequest = Body(...),
     ) -> PlainTextResponse:
-        self.apply_runtime_overrides(
-            use_cloud_services=request_payload.use_cloud_services,
-            llm_provider=request_payload.llm_provider,
-            cloud_model=request_payload.cloud_model,
-            parsing_model=request_payload.parsing_model,
-            clinical_model=request_payload.clinical_model,
-            ollama_temperature=request_payload.ollama_temperature,
-            ollama_reasoning=request_payload.ollama_reasoning,
-        )
-
         patient_payload = self.build_patient_payload(request_payload)
         try:
-            single_result = await self.process_single_patient(
-                patient_payload,
-                allow_missing_labs=bool(request_payload.allow_missing_labs),
-            )
+            with self.runtime_override_context(
+                use_cloud_services=request_payload.use_cloud_services,
+                llm_provider=request_payload.llm_provider,
+                cloud_model=request_payload.cloud_model,
+                parsing_model=request_payload.parsing_model,
+                clinical_model=request_payload.clinical_model,
+                ollama_temperature=request_payload.ollama_temperature,
+                cloud_temperature=request_payload.cloud_temperature,
+                ollama_reasoning=request_payload.ollama_reasoning,
+            ):
+                single_result = await self.process_single_patient(patient_payload)
         except ClinicalPipelineValidationError as exc:
             raise HTTPException(
                 status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
@@ -1016,8 +1530,8 @@ class ClinicalSessionEndpoint:
             "parsing_model": request_payload.parsing_model,
             "clinical_model": request_payload.clinical_model,
             "ollama_temperature": request_payload.ollama_temperature,
+            "cloud_temperature": request_payload.cloud_temperature,
             "ollama_reasoning": request_payload.ollama_reasoning,
-            "allow_missing_labs": request_payload.allow_missing_labs,
         }
 
         job_id = job_manager.start_job(
@@ -1050,7 +1564,7 @@ class ClinicalSessionEndpoint:
         if job_status is None:
             raise HTTPException(
                 status_code=status.HTTP_404_NOT_FOUND,
-                detail=f"Job not found: {job_id}",
+                detail="Job not found.",
             )
         return JobStatusResponse(**job_status)
 
@@ -1060,7 +1574,7 @@ class ClinicalSessionEndpoint:
         if job_status is None:
             raise HTTPException(
                 status_code=status.HTTP_404_NOT_FOUND,
-                detail=f"Job not found: {job_id}",
+                detail="Job not found.",
             )
         success = job_manager.cancel_job(job_id)
         if success:
@@ -1108,9 +1622,13 @@ endpoint = ClinicalSessionEndpoint(
     router=router,
     drugs_parser=drugs_parser,
     disease_extractor=disease_extractor,
+    lab_extractor=lab_extractor,
     pattern_analyzer=pattern_analyzer,
+    rucam_estimator=rucam_estimator,
     serializer=serializer,
     payload_sanitizer=payload_sanitization_service,
 )
 endpoint.add_routes()
+
+
 

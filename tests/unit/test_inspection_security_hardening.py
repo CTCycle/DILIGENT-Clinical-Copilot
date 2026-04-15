@@ -6,6 +6,12 @@ from sqlalchemy import create_engine
 
 from DILIGENT.server.domain.inspection import (
     CatalogListFilters,
+    DiliPriorCatalogResponse,
+    DiliPriorDetailResponse,
+    DrugLabelCatalogResponse,
+    DrugLabelSectionsResponse,
+    InspectionDiliPriorsOverrideRequest,
+    InspectionDrugLabelsOverrideRequest,
     MAX_SEARCH_LENGTH,
     SessionListFilters,
 )
@@ -58,3 +64,74 @@ def test_schema_guard_rejects_missing_required_columns() -> None:
 
     with pytest.raises(RuntimeError, match="missing required column"):
         service.ensure_session_result_table()
+
+
+# -----------------------------------------------------------------------------
+def test_new_inspection_models_validate_shapes() -> None:
+    priors_request = InspectionDiliPriorsOverrideRequest(redownload=True)
+    assert priors_request.redownload is True
+
+    labels_request = InspectionDrugLabelsOverrideRequest(
+        dailymed_request_timeout=10.0,
+        dailymed_max_concurrency=4,
+        redownload=False,
+    )
+    assert labels_request.dailymed_max_concurrency == 4
+
+    priors_catalog = DiliPriorCatalogResponse(
+        items=[
+            {
+                "drug_id": 1,
+                "drug_name": "Acetaminophen",
+                "dilirank_class": "Most-DILI-Concern",
+                "dilist_class": "Known",
+                "linked_source_count": 2,
+            }
+        ],
+        total=1,
+        offset=0,
+        limit=10,
+    )
+    assert priors_catalog.total == 1
+
+    prior_detail = DiliPriorDetailResponse(
+        drug_id=1,
+        drug_name="Acetaminophen",
+        annotations=[{"source_dataset": "dilirank"}],
+    )
+    assert len(prior_detail.annotations) == 1
+
+    label_catalog = DrugLabelCatalogResponse(
+        items=[
+            {
+                "drug_id": 1,
+                "drug_name": "Acetaminophen",
+                "source": "dailymed",
+                "effective_date": "2025-01-01",
+                "retained_section_count": 1,
+            }
+        ],
+        total=1,
+        offset=0,
+        limit=10,
+    )
+    assert label_catalog.total == 1
+
+    label_detail = DrugLabelSectionsResponse(
+        drug_id=1,
+        drug_name="Acetaminophen",
+        source="dailymed",
+        set_id="set-1",
+        spl_version=1,
+        effective_date="2025-01-01",
+        sections=[
+            {
+                "section_key": "boxed_warning",
+                "section_title": "Boxed Warning",
+                "text": "Hepatic warning.",
+                "contains_hepatic_keywords": True,
+                "display_order": 0,
+            }
+        ],
+    )
+    assert label_detail.sections[0]["section_key"] == "boxed_warning"

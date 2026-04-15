@@ -2,26 +2,39 @@ from __future__ import annotations
 
 from datetime import date
 
-from fastapi import APIRouter, HTTPException, Query, status
+from fastapi import APIRouter, Body, HTTPException, Query, status
 
-from DILIGENT.server.configurations import server_settings
+from DILIGENT.server.common.utils.logger import logger
+from DILIGENT.server.configurations.startup import server_settings
 from DILIGENT.server.domain.inspection import (
     CatalogListFilters,
     DeleteEntityResponse,
+    DiliPriorCatalogResponse,
+    DiliPriorDetailResponse,
     DateFilterMode,
     DrugAliasesResponse,
+    DrugLabelCatalogResponse,
+    DrugLabelSectionsResponse,
+    InspectionDiliPriorsOverrideRequest,
+    InspectionDrugLabelsOverrideRequest,
+    InspectionLiverToxOverrideRequest,
+    InspectionRagOverrideRequest,
+    InspectionRxNavOverrideRequest,
+    InspectionUpdateConfigResponse,
+    LanceVectorStoreSummaryResponse,
     LiverToxCatalogResponse,
     LiverToxExcerptResponse,
+    RagDocumentListResponse,
     RxNavCatalogResponse,
     SessionCatalogResponse,
     SessionReportResponse,
     SessionListFilters,
     SessionStatus,
 )
-from DILIGENT.server.domain.jobs import (
-    JobCancelResponse,
-    JobStartResponse,
-    JobStatusResponse,
+from DILIGENT.server.domain.jobs import JobCancelResponse, JobStartResponse, JobStatusResponse
+from DILIGENT.server.domain.patient_timeline import (
+    PatientTimeline,
+    SessionTimelineRegenerateRequest,
 )
 from DILIGENT.server.services.inspection import DataInspectionService
 
@@ -57,9 +70,15 @@ class DataInspectionEndpoint:
         )
 
     # -------------------------------------------------------------------------
-    def start_update_job(self, *, job_type: str, message: str) -> JobStartResponse:
+    def start_update_job(
+        self,
+        *,
+        job_type: str,
+        message: str,
+        overrides: dict[str, object] | None = None,
+    ) -> JobStartResponse:
         try:
-            payload = self.service.start_update_job(job_type)
+            payload = self.service.start_update_job(job_type, overrides=overrides)
         except ValueError as exc:
             detail = str(exc)
             error_status = (
@@ -67,11 +86,18 @@ class DataInspectionEndpoint:
                 if "already running" in detail
                 else status.HTTP_422_UNPROCESSABLE_ENTITY
             )
-            raise HTTPException(status_code=error_status, detail=detail) from exc
+            logger.warning("Inspection update job rejected type=%s detail=%s", job_type, detail)
+            safe_detail = (
+                "An update job is already running."
+                if error_status == status.HTTP_409_CONFLICT
+                else "Invalid update request."
+            )
+            raise HTTPException(status_code=error_status, detail=safe_detail) from exc
         except RuntimeError as exc:
+            logger.warning("Inspection update job failed to start type=%s error=%s", job_type, exc)
             raise HTTPException(
                 status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-                detail=str(exc),
+                detail="Update job could not start. Please retry.",
             ) from exc
         return self.build_job_start_response(payload=payload, message=message)
 
@@ -81,7 +107,7 @@ class DataInspectionEndpoint:
         if payload is None:
             raise HTTPException(
                 status_code=status.HTTP_404_NOT_FOUND,
-                detail=f"Job not found: {job_id}",
+                detail="Job not found.",
             )
         return JobStatusResponse(**payload)
 
@@ -91,7 +117,7 @@ class DataInspectionEndpoint:
         if not success:
             raise HTTPException(
                 status_code=status.HTTP_404_NOT_FOUND,
-                detail=f"Job not found: {job_id}",
+                detail="Job not found.",
             )
         return JobCancelResponse(
             job_id=job_id,
@@ -133,9 +159,51 @@ class DataInspectionEndpoint:
         if report is None:
             raise HTTPException(
                 status_code=status.HTTP_404_NOT_FOUND,
-                detail=f"Session report not found: {session_id}",
+                detail="Session report not found.",
             )
         return SessionReportResponse(session_id=session_id, report=report)
+
+    # -------------------------------------------------------------------------
+    def get_session_timeline(self, session_id: int) -> PatientTimeline:
+        timeline = self.service.get_session_timeline(session_id)
+        if timeline is None:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail="Session timeline not found.",
+            )
+        return timeline
+
+    # -------------------------------------------------------------------------
+    def generate_session_timeline(
+        self,
+        session_id: int,
+        request: SessionTimelineRegenerateRequest = Body(
+            default=SessionTimelineRegenerateRequest()
+        ),
+        force_regenerate_query: bool = Query(default=False, alias="force_regenerate"),
+    ) -> PatientTimeline:
+        force_regenerate = bool(force_regenerate_query or request.force_regenerate)
+        try:
+            timeline = self.service.generate_session_timeline(
+                session_id,
+                force_regenerate=force_regenerate,
+            )
+        except RuntimeError as exc:
+            logger.warning(
+                "Session timeline generation failed session_id=%s error=%s",
+                session_id,
+                exc,
+            )
+            raise HTTPException(
+                status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+                detail="Timeline generation is currently unavailable. Please retry.",
+            ) from exc
+        if timeline is None:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail="Session not found.",
+            )
+        return timeline
 
     # -------------------------------------------------------------------------
     def delete_session(self, session_id: int) -> DeleteEntityResponse:
@@ -143,7 +211,7 @@ class DataInspectionEndpoint:
         if not deleted:
             raise HTTPException(
                 status_code=status.HTTP_404_NOT_FOUND,
-                detail=f"Session not found: {session_id}",
+                detail="Session not found.",
             )
         return DeleteEntityResponse(deleted=True)
 
@@ -168,7 +236,7 @@ class DataInspectionEndpoint:
         if payload is None:
             raise HTTPException(
                 status_code=status.HTTP_404_NOT_FOUND,
-                detail=f"Drug not found: {drug_id}",
+                detail="Drug not found.",
             )
         return DrugAliasesResponse(**payload)
 
@@ -178,15 +246,24 @@ class DataInspectionEndpoint:
         if not deleted:
             raise HTTPException(
                 status_code=status.HTTP_404_NOT_FOUND,
-                detail=f"Drug not found: {drug_id}",
+                detail="Drug not found.",
             )
         return DeleteEntityResponse(deleted=True)
 
     # -------------------------------------------------------------------------
-    def start_rxnav_update_job(self) -> JobStartResponse:
+    def get_rxnav_update_config(self) -> InspectionUpdateConfigResponse:
+        payload = self.service.build_update_config_response("rxnav")
+        return InspectionUpdateConfigResponse(**payload)
+
+    # -------------------------------------------------------------------------
+    def start_rxnav_update_job(
+        self,
+        overrides: InspectionRxNavOverrideRequest = Body(default=InspectionRxNavOverrideRequest()),
+    ) -> JobStartResponse:
         return self.start_update_job(
             job_type=self.service.RXNAV_JOB_TYPE,
             message="RxNav update job started",
+            overrides=overrides.model_dump(exclude_none=True),
         )
 
     # -------------------------------------------------------------------------
@@ -224,7 +301,7 @@ class DataInspectionEndpoint:
         if payload is None:
             raise HTTPException(
                 status_code=status.HTTP_404_NOT_FOUND,
-                detail=f"LiverTox excerpt not found for drug: {drug_id}",
+                detail="LiverTox excerpt not found.",
             )
         return LiverToxExcerptResponse(**payload)
 
@@ -234,15 +311,138 @@ class DataInspectionEndpoint:
         if not deleted:
             raise HTTPException(
                 status_code=status.HTTP_404_NOT_FOUND,
-                detail=f"Drug not found: {drug_id}",
+                detail="Drug not found.",
             )
         return DeleteEntityResponse(deleted=True)
 
     # -------------------------------------------------------------------------
-    def start_livertox_update_job(self) -> JobStartResponse:
+    def list_dili_priors_catalog(
+        self,
+        search: str | None = Query(default=None),
+        offset: int = Query(default=0, ge=0),
+        limit: int = Query(default=10, ge=1, le=100),
+    ) -> DiliPriorCatalogResponse:
+        filters = CatalogListFilters(search=search, offset=offset, limit=limit)
+        payload = self.service.list_dili_priors_catalog(
+            search=filters.search,
+            offset=filters.offset,
+            limit=filters.limit,
+        )
+        return DiliPriorCatalogResponse(**payload)
+
+    # -------------------------------------------------------------------------
+    def get_dili_prior_details(self, drug_id: int) -> DiliPriorDetailResponse:
+        payload = self.service.get_dili_prior_details(drug_id)
+        if payload is None:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail="DILI prior details not found.",
+            )
+        return DiliPriorDetailResponse(**payload)
+
+    # -------------------------------------------------------------------------
+    def get_dili_priors_update_config(self) -> InspectionUpdateConfigResponse:
+        payload = self.service.build_update_config_response("dili_priors")
+        return InspectionUpdateConfigResponse(**payload)
+
+    # -------------------------------------------------------------------------
+    def start_dili_priors_update_job(
+        self,
+        overrides: InspectionDiliPriorsOverrideRequest = Body(
+            default=InspectionDiliPriorsOverrideRequest()
+        ),
+    ) -> JobStartResponse:
+        return self.start_update_job(
+            job_type=self.service.DILI_PRIORS_JOB_TYPE,
+            message="DILI priors update job started",
+            overrides=overrides.model_dump(exclude_none=True),
+        )
+
+    # -------------------------------------------------------------------------
+    def get_dili_priors_update_job_status(self, job_id: str) -> JobStatusResponse:
+        return self.get_update_job_status(
+            job_id=job_id,
+            job_type=self.service.DILI_PRIORS_JOB_TYPE,
+        )
+
+    # -------------------------------------------------------------------------
+    def cancel_dili_priors_update_job(self, job_id: str) -> JobCancelResponse:
+        return self.cancel_update_job(
+            job_id=job_id,
+            job_type=self.service.DILI_PRIORS_JOB_TYPE,
+        )
+
+    # -------------------------------------------------------------------------
+    def list_drug_labels_catalog(
+        self,
+        search: str | None = Query(default=None),
+        offset: int = Query(default=0, ge=0),
+        limit: int = Query(default=10, ge=1, le=100),
+    ) -> DrugLabelCatalogResponse:
+        filters = CatalogListFilters(search=search, offset=offset, limit=limit)
+        payload = self.service.list_drug_labels_catalog(
+            search=filters.search,
+            offset=filters.offset,
+            limit=filters.limit,
+        )
+        return DrugLabelCatalogResponse(**payload)
+
+    # -------------------------------------------------------------------------
+    def get_drug_label_sections(self, drug_id: int) -> DrugLabelSectionsResponse:
+        payload = self.service.get_drug_label_sections(drug_id)
+        if payload is None:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail="Drug label sections not found.",
+            )
+        return DrugLabelSectionsResponse(**payload)
+
+    # -------------------------------------------------------------------------
+    def get_drug_labels_update_config(self) -> InspectionUpdateConfigResponse:
+        payload = self.service.build_update_config_response("drug_labels")
+        return InspectionUpdateConfigResponse(**payload)
+
+    # -------------------------------------------------------------------------
+    def start_drug_labels_update_job(
+        self,
+        overrides: InspectionDrugLabelsOverrideRequest = Body(
+            default=InspectionDrugLabelsOverrideRequest()
+        ),
+    ) -> JobStartResponse:
+        return self.start_update_job(
+            job_type=self.service.DRUG_LABELS_JOB_TYPE,
+            message="Drug labels update job started",
+            overrides=overrides.model_dump(exclude_none=True),
+        )
+
+    # -------------------------------------------------------------------------
+    def get_drug_labels_update_job_status(self, job_id: str) -> JobStatusResponse:
+        return self.get_update_job_status(
+            job_id=job_id,
+            job_type=self.service.DRUG_LABELS_JOB_TYPE,
+        )
+
+    # -------------------------------------------------------------------------
+    def cancel_drug_labels_update_job(self, job_id: str) -> JobCancelResponse:
+        return self.cancel_update_job(
+            job_id=job_id,
+            job_type=self.service.DRUG_LABELS_JOB_TYPE,
+        )
+
+    # -------------------------------------------------------------------------
+    def get_livertox_update_config(self) -> InspectionUpdateConfigResponse:
+        payload = self.service.build_update_config_response("livertox")
+        return InspectionUpdateConfigResponse(**payload)
+
+    # -------------------------------------------------------------------------
+    def start_livertox_update_job(
+        self,
+        overrides: InspectionLiverToxOverrideRequest = Body(default=InspectionLiverToxOverrideRequest()),
+    ) -> JobStartResponse:
         return self.start_update_job(
             job_type=self.service.LIVERTOX_JOB_TYPE,
             message="LiverTox update job started",
+            overrides=overrides.model_dump(exclude_none=True),
         )
 
     # -------------------------------------------------------------------------
@@ -260,6 +460,38 @@ class DataInspectionEndpoint:
         )
 
     # -------------------------------------------------------------------------
+    def get_rag_update_config(self) -> InspectionUpdateConfigResponse:
+        payload = self.service.build_update_config_response("rag")
+        return InspectionUpdateConfigResponse(**payload)
+
+    # -------------------------------------------------------------------------
+    def list_rag_documents(self) -> RagDocumentListResponse:
+        return RagDocumentListResponse(**self.service.list_rag_documents())
+
+    # -------------------------------------------------------------------------
+    def get_rag_vector_store(self) -> LanceVectorStoreSummaryResponse:
+        return LanceVectorStoreSummaryResponse(**self.service.get_rag_vector_store_summary())
+
+    # -------------------------------------------------------------------------
+    def start_rag_update_job(
+        self,
+        overrides: InspectionRagOverrideRequest = Body(default=InspectionRagOverrideRequest()),
+    ) -> JobStartResponse:
+        return self.start_update_job(
+            job_type=self.service.RAG_JOB_TYPE,
+            message="RAG embeddings update job started",
+            overrides=overrides.model_dump(exclude_none=True),
+        )
+
+    # -------------------------------------------------------------------------
+    def get_rag_update_job_status(self, job_id: str) -> JobStatusResponse:
+        return self.get_update_job_status(job_id=job_id, job_type=self.service.RAG_JOB_TYPE)
+
+    # -------------------------------------------------------------------------
+    def cancel_rag_update_job(self, job_id: str) -> JobCancelResponse:
+        return self.cancel_update_job(job_id=job_id, job_type=self.service.RAG_JOB_TYPE)
+
+    # -------------------------------------------------------------------------
     def add_routes(self) -> None:
         self.router.add_api_route(
             "/sessions",
@@ -273,6 +505,20 @@ class DataInspectionEndpoint:
             self.get_session_report,
             methods=["GET"],
             response_model=SessionReportResponse,
+            status_code=status.HTTP_200_OK,
+        )
+        self.router.add_api_route(
+            "/sessions/{session_id}/timeline",
+            self.get_session_timeline,
+            methods=["GET"],
+            response_model=PatientTimeline,
+            status_code=status.HTTP_200_OK,
+        )
+        self.router.add_api_route(
+            "/sessions/{session_id}/timeline",
+            self.generate_session_timeline,
+            methods=["POST"],
+            response_model=PatientTimeline,
             status_code=status.HTTP_200_OK,
         )
         self.router.add_api_route(
@@ -302,6 +548,13 @@ class DataInspectionEndpoint:
             self.delete_rxnav_drug,
             methods=["DELETE"],
             response_model=DeleteEntityResponse,
+            status_code=status.HTTP_200_OK,
+        )
+        self.router.add_api_route(
+            "/rxnav/update-config",
+            self.get_rxnav_update_config,
+            methods=["GET"],
+            response_model=InspectionUpdateConfigResponse,
             status_code=status.HTTP_200_OK,
         )
         self.router.add_api_route(
@@ -348,6 +601,13 @@ class DataInspectionEndpoint:
             status_code=status.HTTP_200_OK,
         )
         self.router.add_api_route(
+            "/livertox/update-config",
+            self.get_livertox_update_config,
+            methods=["GET"],
+            response_model=InspectionUpdateConfigResponse,
+            status_code=status.HTTP_200_OK,
+        )
+        self.router.add_api_route(
             "/livertox/jobs",
             self.start_livertox_update_job,
             methods=["POST"],
@@ -368,7 +628,136 @@ class DataInspectionEndpoint:
             response_model=JobCancelResponse,
             status_code=status.HTTP_200_OK,
         )
+        self.router.add_api_route(
+            "/dili-priors",
+            self.list_dili_priors_catalog,
+            methods=["GET"],
+            response_model=DiliPriorCatalogResponse,
+            status_code=status.HTTP_200_OK,
+        )
+        self.router.add_api_route(
+            "/dili-priors/{drug_id}",
+            self.get_dili_prior_details,
+            methods=["GET"],
+            response_model=DiliPriorDetailResponse,
+            status_code=status.HTTP_200_OK,
+        )
+        self.router.add_api_route(
+            "/dili-priors/update-config",
+            self.get_dili_priors_update_config,
+            methods=["GET"],
+            response_model=InspectionUpdateConfigResponse,
+            status_code=status.HTTP_200_OK,
+        )
+        self.router.add_api_route(
+            "/dili-priors/jobs",
+            self.start_dili_priors_update_job,
+            methods=["POST"],
+            response_model=JobStartResponse,
+            status_code=status.HTTP_202_ACCEPTED,
+        )
+        self.router.add_api_route(
+            "/dili-priors/jobs/{job_id}",
+            self.get_dili_priors_update_job_status,
+            methods=["GET"],
+            response_model=JobStatusResponse,
+            status_code=status.HTTP_200_OK,
+        )
+        self.router.add_api_route(
+            "/dili-priors/jobs/{job_id}",
+            self.cancel_dili_priors_update_job,
+            methods=["DELETE"],
+            response_model=JobCancelResponse,
+            status_code=status.HTTP_200_OK,
+        )
+        self.router.add_api_route(
+            "/drug-labels",
+            self.list_drug_labels_catalog,
+            methods=["GET"],
+            response_model=DrugLabelCatalogResponse,
+            status_code=status.HTTP_200_OK,
+        )
+        self.router.add_api_route(
+            "/drug-labels/{drug_id}/sections",
+            self.get_drug_label_sections,
+            methods=["GET"],
+            response_model=DrugLabelSectionsResponse,
+            status_code=status.HTTP_200_OK,
+        )
+        self.router.add_api_route(
+            "/drug-labels/update-config",
+            self.get_drug_labels_update_config,
+            methods=["GET"],
+            response_model=InspectionUpdateConfigResponse,
+            status_code=status.HTTP_200_OK,
+        )
+        self.router.add_api_route(
+            "/drug-labels/jobs",
+            self.start_drug_labels_update_job,
+            methods=["POST"],
+            response_model=JobStartResponse,
+            status_code=status.HTTP_202_ACCEPTED,
+        )
+        self.router.add_api_route(
+            "/drug-labels/jobs/{job_id}",
+            self.get_drug_labels_update_job_status,
+            methods=["GET"],
+            response_model=JobStatusResponse,
+            status_code=status.HTTP_200_OK,
+        )
+        self.router.add_api_route(
+            "/drug-labels/jobs/{job_id}",
+            self.cancel_drug_labels_update_job,
+            methods=["DELETE"],
+            response_model=JobCancelResponse,
+            status_code=status.HTTP_200_OK,
+        )
+
+        self.router.add_api_route(
+            "/rag/update-config",
+            self.get_rag_update_config,
+            methods=["GET"],
+            response_model=InspectionUpdateConfigResponse,
+            status_code=status.HTTP_200_OK,
+        )
+        self.router.add_api_route(
+            "/rag/documents",
+            self.list_rag_documents,
+            methods=["GET"],
+            response_model=RagDocumentListResponse,
+            status_code=status.HTTP_200_OK,
+        )
+        self.router.add_api_route(
+            "/rag/vector-store",
+            self.get_rag_vector_store,
+            methods=["GET"],
+            response_model=LanceVectorStoreSummaryResponse,
+            status_code=status.HTTP_200_OK,
+        )
+        self.router.add_api_route(
+            "/rag/jobs",
+            self.start_rag_update_job,
+            methods=["POST"],
+            response_model=JobStartResponse,
+            status_code=status.HTTP_202_ACCEPTED,
+        )
+        self.router.add_api_route(
+            "/rag/jobs/{job_id}",
+            self.get_rag_update_job_status,
+            methods=["GET"],
+            response_model=JobStatusResponse,
+            status_code=status.HTTP_200_OK,
+        )
+        self.router.add_api_route(
+            "/rag/jobs/{job_id}/cancel",
+            self.cancel_rag_update_job,
+            methods=["POST"],
+            response_model=JobCancelResponse,
+            status_code=status.HTTP_200_OK,
+        )
 
 
 endpoint = DataInspectionEndpoint(router=router, service=service)
 endpoint.add_routes()
+
+

@@ -2,6 +2,8 @@ from __future__ import annotations
 
 from pathlib import Path
 
+from DILIGENT.server.common.utils.catalog_loader import CatalogLoader
+
 # [PATHS]
 ###############################################################################
 PROJECT_DIR = str(Path(__file__).resolve().parents[2])
@@ -14,6 +16,7 @@ ARCHIVES_PATH = str(Path(SOURCES_PATH) / "archives")
 DOCS_PATH = str(Path(SOURCES_PATH) / "documents")
 LOGS_PATH = str(Path(RESOURCES_PATH) / "logs")
 VECTOR_DB_PATH = str(Path(SOURCES_PATH) / "vectors")
+RXNAV_CURATED_ALIASES_PATH = str(Path(SOURCES_PATH) / "rxnav_curated_aliases.json")
 ENV_FILE_PATH = str(Path(SETTING_PATH) / ".env")
 DATABASE_FILENAME = "database.db"
 
@@ -23,6 +26,15 @@ CONFIGURATIONS_FILE = str(Path(SETTING_PATH) / "configurations.json")
 # [ENDPOINTS]
 ###############################################################################
 CLINICAL_API_URL = "/clinical"
+
+# [APP DEFAULTS]
+###############################################################################
+FASTAPI_TITLE = "DILI Backend"
+FASTAPI_VERSION = "1.0.0"
+FASTAPI_DESCRIPTION = "FastAPI backend"
+OLLAMA_DEFAULT_HOST = "localhost"
+OLLAMA_DEFAULT_PORT = 11434
+OLLAMA_DEFAULT_SCHEME = "http"
 
 # [EXPORTS]
 ###############################################################################
@@ -35,42 +47,10 @@ REPORT_EXPORT_FILENAME = "clinical_report.md"
 OPENAI_API_BASE = "https://api.openai.com/v1"
 GEMINI_API_BASE = "https://generativelanguage.googleapis.com/v1"
 
-PARSING_MODEL_CHOICES = [
-    "qwen3:1.7b",
-    "qwen3:8b",
-    "qwen3:14b",
-    "llama3.1:8b",
-    "mistral-nemo:12b",
-    "gemma2:9b",
-    "phi3.5:mini",
-    "phi3:medium",
-]
-CLINICAL_MODEL_CHOICES = [
-    "gpt-oss:20b",
-    "llama3.1:8b",
-    "llama3.1:70b",
-    "phi3.5:mini",
-    "phi3.5:moe",
-    "deepseek-r1:14b",
-    "alibayram/medgemma:4b",
-    "alibayram/medgemma:27b",
-    "gemma3:9b",
-    "gemma3:27b",
-]
-OPENAI_CLOUD_MODELS = [
-    "gpt-5.2",
-    "gpt-5.2-pro",
-    "gpt-5",
-    "gpt-5-mini",
-    "gpt-5-nano",
-    "gpt-4.1",
-    "gpt-4.1-mini",
-]
-GEMINI_CLOUD_MODELS = [
-    "gemini-2.5-pro",
-    "gemini-2.5-flash",
-    "gemini-2.5-flash-lite",
-]
+PARSING_MODEL_CHOICES = CatalogLoader.get_string_list("llm_models.json", "parsing_model_choices")
+CLINICAL_MODEL_CHOICES = CatalogLoader.get_string_list("llm_models.json", "clinical_model_choices")
+OPENAI_CLOUD_MODELS = CatalogLoader.get_string_list("llm_models.json", "openai_cloud_models")
+GEMINI_CLOUD_MODELS = CatalogLoader.get_string_list("llm_models.json", "gemini_cloud_models")
 CLOUD_MODEL_CHOICES: dict[str, list[str]] = {
     "openai": OPENAI_CLOUD_MODELS,
     "gemini": GEMINI_CLOUD_MODELS,
@@ -87,7 +67,11 @@ TABLE_DRUGS = "drugs"
 TABLE_DRUG_RXNORM_CODES = "drug_rxnorm_codes"
 TABLE_DRUG_ALIASES = "drug_aliases"
 TABLE_LIVERTOX_MONOGRAPHS = "livertox_monographs"
+TABLE_DRUG_DILI_ANNOTATIONS = "drug_dili_annotations"
+TABLE_DRUG_LABEL_DOCUMENTS = "drug_label_documents"
+TABLE_DRUG_LABEL_SECTIONS = "drug_label_sections"
 TABLE_MODEL_SELECTIONS = "model_selections"
+TABLE_RUNTIME_SETTINGS = "runtime_settings"
 TABLE_ACCESS_KEYS = "access_keys"
 
 RXNORM_CATALOG_COLUMNS = [
@@ -144,10 +128,35 @@ LIVERTOX_MASTER_COLUMNS = [
 ###############################################################################
 ATC_BASE_URL = "https://atcddd.fhi.no/atc_ddd_index/"
 LIVERTOX_BASE_URL = "https://ftp.ncbi.nlm.nih.gov/pub/litarch/29/31/"
+DILIRANK_SOURCE_URL = "https://www.fda.gov/science-research/liver-toxicity-knowledge-base-ltkb/drug-induced-liver-injury-rank-dilirank-dataset"
+DILIST_SOURCE_URL = "https://pubmed.ncbi.nlm.nih.gov/30247677/"
+DAILYMED_RXNORM_SETID_MAPPING_URL = "https://dailymed.nlm.nih.gov/dailymed/spl-resources-all-drug-labels.cfm"
+DAILYMED_LABEL_XML_BASE_URL = "https://dailymed.nlm.nih.gov/dailymed/services/v2/spls"
 DOCUMENT_SUPPORTED_EXTENSIONS = {".pdf", ".txt", ".xml", ".docx", ".doc"}
 TEXT_FILE_FALLBACK_ENCODINGS = ("utf-8", "utf-16", "latin-1", "iso-8859-1")
 DRUG_NAME_ALLOWED_PATTERN = r"[A-Za-z0-9\s\-/(),'+\.]+"
 DEFAULT_EMBEDDING_BATCH_SIZE = 64
+DAILYMED_SECTION_WHITELIST = (
+    "boxed_warning",
+    "warnings_and_precautions",
+    "adverse_reactions",
+    "contraindications",
+    "use_in_specific_populations",
+)
+HEPATIC_KEYWORDS = {
+    "liver",
+    "hepatic",
+    "hepatotoxic",
+    "hepatitis",
+    "cholestatic",
+    "bilirubin",
+    "transaminase",
+    "alt",
+    "ast",
+    "alp",
+    "drug induced liver injury",
+    "dili",
+}
 
 HEPATOTOXIC_MEDDRA_TERMS = {
     "hepatotoxicity",
@@ -166,105 +175,9 @@ HEPATOTOXIC_MEDDRA_TERMS = {
     "blood bilirubin increased",
 }
 
-MATCHING_STOPWORDS = {
-    "and",
-    "apply",
-    "combo",
-    "combination",
-    "caps",
-    "capsule",
-    "capsules",
-    "chewable",
-    "cream",
-    "dose",
-    "doses",
-    "drink",
-    "drops",
-    "elixir",
-    "enteric",
-    "extended",
-    "foam",
-    "for",
-    "free",
-    "gel",
-    "granules",
-    "im",
-    "inj",
-    "injection",
-    "intramuscular",
-    "intravenous",
-    "iv",
-    "kit",
-    "liquid",
-    "lotion",
-    "mg",
-    "ml",
-    "nasal",
-    "ointment",
-    "of",
-    "ophthalmic",
-    "or",
-    "oral",
-    "pack",
-    "packet",
-    "packets",
-    "patch",
-    "plus",
-    "powder",
-    "po",
-    "prefilled",
-    "release",
-    "sc",
-    "sol",
-    "solution",
-    "soln",
-    "spray",
-    "sterile",
-    "subcutaneous",
-    "suppository",
-    "susp",
-    "suspension",
-    "sustained",
-    "syringe",
-    "syrup",
-    "tablet",
-    "tablets",
-    "the",
-    "topical",
-    "treat",
-    "treatment",
-    "therapy",
-    "vial",
-    "use",
-    "with",
-    "without",
-}
+MATCHING_STOPWORDS = CatalogLoader.get_string_set("text_normalization.json", "matching_stopwords")
 
-CLINICAL_GENERIC_TERMS = {
-    "administration",
-    "applicator",
-    "autoinjector",
-    "auto-injector",
-    "autoinjectors",
-    "injector",
-    "injectors",
-    "device",
-    "devices",
-    "dosing",
-    "inhaler",
-    "inhalers",
-    "infusion",
-    "injectable",
-    "injectables",
-    "needle",
-    "needles",
-    "pen",
-    "pens",
-    "prefill",
-    "pre-filled",
-    "pump",
-    "syringes",
-}
+CLINICAL_GENERIC_TERMS = CatalogLoader.get_string_set("text_normalization.json", "clinical_generic_terms")
 
 RXNAV_SYNONYM_STOPWORDS = MATCHING_STOPWORDS | CLINICAL_GENERIC_TERMS
 
@@ -275,6 +188,8 @@ NO_CLINICAL_CONTEXT_FALLBACK = "No additional clinical context provided."
 UNKNOWN_R_SCORE_TOKEN = "R=NA"
 R_SCORE_HEPATOCELLULAR_THRESHOLD = 5.0
 R_SCORE_CHOLESTATIC_THRESHOLD = 2.0
+TRUTHY_ENV_VALUES = {"1", "true", "yes", "on"}
+FALSY_ENV_VALUES = {"0", "false", "no", "off"}
 
 __all__ = [
     "MATCHING_STOPWORDS",

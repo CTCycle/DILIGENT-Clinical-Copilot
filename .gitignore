@@ -2,11 +2,6 @@
 DILIGENT/resources/sources/archives/**
 DILIGENT/resources/sources/documents/**
 DILIGENT/resources/sources/vectors/**
-runtimes/**
-!runtimes/.gitkeep
-!runtimes/uv.lock
-runtimes/.uv-cache/**
-runtimes/uv_cache/**
 DILIGENT/resources/logs/**
 DILIGENT/client/node_modules/
 DILIGENT/client/dist/
@@ -16,6 +11,7 @@ DILIGENT/client/src-tauri/r/
 DILIGENT/client/src-tauri/target/
 DILIGENT/client/src-tauri/gen/
 release/windows/
+runtimes/**
 
 # Python
 *.py[cod]
@@ -41,6 +37,7 @@ pnpm-debug.log*
 lerna-debug.log*
 package-lock.json
 yarn.lock
+.angular/cache/**
 
 # IDE / OS
 .vscode/
@@ -49,10 +46,10 @@ yarn.lock
 .DS_Store
 Thumbs.db
 
-# Agents
-.agent/skills/**
+
 
 # Misc
+Cargo.toml
 *.lock
 *.log
 *.db

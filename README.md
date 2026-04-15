@@ -1,54 +1,23 @@
 # DILIGENT Clinical Copilot
 
+[![Release](https://img.shields.io/github/v/release/CTCycle/Pharmagent-Clinical-Copilot?display_name=tag)](https://github.com/CTCycle/Pharmagent-Clinical-Copilot/releases) [![Python](https://img.shields.io/badge/python-%3E%3D3.14-blue?logo=python&logoColor=white)](./pyproject.toml) [![Angular](https://img.shields.io/badge/angular-%5E21.2.0-DD0031?logo=angular&logoColor=white)](./DILIGENT/client/package.json) [![License](https://img.shields.io/badge/license-Polyform%20Noncommercial%201.0.0-lightgrey)](./LICENSE) [![CI](https://github.com/CTCycle/Pharmagent-Clinical-Copilot/actions/workflows/ci.yml/badge.svg)](https://github.com/CTCycle/Pharmagent-Clinical-Copilot/actions/workflows/ci.yml)
+
 ## 1. Project Overview
-DILIGENT Clinical Copilot supports clinicians during Drug-Induced Liver Injury (DILI) evaluations with a FastAPI backend and a React + TypeScript (Vite) frontend. The frontend collects anamnesis, medications, and lab values, while the backend coordinates drug parsing and LLM-assisted clinical analysis. Optional Retrieval-Augmented Generation (RAG) grounds outputs on a local LiverTox archive, and sessions can be stored for review and auditing.
+DILIGENT Clinical Copilot supports clinicians during Drug-Induced Liver Injury (DILI) evaluations with a FastAPI backend and an Angular + TypeScript frontend. It collects anamnesis, medications, and lab values, then coordinates clinical analysis with optional RAG support and session persistence for review.
 
-> **Work in Progress**: This project is still under active development. It will be updated regularly, but you may encounter bugs, issues, or incomplete features.
+> **Work in Progress**: This project is under active development and may contain incomplete features or defects.
 
-## 2. Runtime Model
-DILIGENT is configuration-first and uses one active runtime file: `DILIGENT/settings/.env`.
+## 2. Quick Start
 
-- Local mode is the default workflow for developers (no Docker required).
-- Cloud mode is provided through Docker (`backend` + `frontend`) using the same `.env` contract.
-- Packaged desktop mode uses Tauri with a local Python backend started by the desktop shell.
-- Mode switching is done by replacing `.env` values only.
-
-Runtime profiles:
-- `DILIGENT/settings/.env.local.example`
-- `DILIGENT/settings/.env.cloud.example`
-- `DILIGENT/settings/.env.local.tauri.example`
-- Active runtime file: `DILIGENT/settings/.env`
-
-Exact mode switch procedure:
-```cmd
-copy /Y DILIGENT\settings\.env.local.example DILIGENT\settings\.env
-```
-or
-```cmd
-copy /Y DILIGENT\settings\.env.cloud.example DILIGENT\settings\.env
-```
-or
-```cmd
-copy /Y DILIGENT\settings\.env.local.tauri.example DILIGENT\settings\.env
-```
-
-Detailed packaging notes: `assets/docs/PACKAGING_AND_RUNTIME_MODES.md`.
-
-## 3. Local Mode (Default)
-
-### 3.1 Windows (One-Click Setup)
+### 2.1 Windows (Recommended)
 Run:
 ```cmd
 DILIGENT\start_on_windows.bat
 ```
 
-The launcher will:
-1. Verify or download portable runtimes into the repository (first run only).
-2. Install backend dependencies with `uv`.
-3. Install frontend dependencies (`npm ci` when lockfile exists, fallback `npm install`).
-4. Build frontend when needed and start backend/frontend.
+The launcher prepares local runtimes/dependencies and starts backend plus frontend.
 
-### 3.2 macOS / Linux (Manual)
+### 2.2 macOS / Linux (Manual)
 Prerequisites:
 - Python 3.14+
 - Node.js 18+ and npm
@@ -70,82 +39,29 @@ npm run build
 npm run preview -- --host 127.0.0.1 --port 7861
 ```
 
-## 4. Cloud Mode (Docker)
-1. Activate cloud profile:
+## 3. Runtime Profiles
+DILIGENT is configuration-first and uses one active runtime file: `DILIGENT/settings/.env`.
+
+Switch to local profile:
 ```cmd
-copy /Y DILIGENT\settings\.env.cloud.example DILIGENT\settings\.env
-```
-2. Build images:
-```cmd
-docker compose --env-file DILIGENT/settings/.env build --no-cache
-```
-3. Start:
-```cmd
-docker compose --env-file DILIGENT/settings/.env up -d
-```
-4. Stop:
-```cmd
-docker compose --env-file DILIGENT/settings/.env down
+copy /Y DILIGENT\settings\.env.local.example DILIGENT\settings\.env
 ```
 
-Cloud topology:
-- `backend`: FastAPI/Uvicorn container on internal port `8000`.
-- `frontend`: Nginx static hosting.
-- Frontend proxies `/api` to `backend:8000` for same-origin API calls.
-
-## 5. Packaged Desktop Mode (Tauri)
-Prepare the desktop profile:
+Switch to local Tauri profile:
 ```cmd
 copy /Y DILIGENT\settings\.env.local.tauri.example DILIGENT\settings\.env
 ```
 
-Ensure the portable build runtimes are present:
-```cmd
-DILIGENT\start_on_windows.bat
-```
+See `assets/docs/PACKAGING_AND_RUNTIME_MODES.md` for full runtime and packaging details.
 
-Required root runtime layout:
-- `runtimes/python/python.exe`
-- `runtimes/uv/uv.exe`
-- `runtimes/nodejs/node.exe`
-- `runtimes/nodejs/npm.cmd`
-- `runtimes/.venv`
-- `runtimes/uv.lock`
+## 4. Using the Application
+Typical workflow:
+1. Enter anamnesis, exam notes, medications, and lab values.
+2. Choose model/provider settings and optionally enable RAG/web search.
+3. Run analysis and review the generated report.
+4. Use Data Inspection for session history and data-update operations.
 
-Rust prerequisite for Tauri packaging (build machines):
-- Install Rust via `rustup` (`https://rustup.rs/`).
-- Ensure a default toolchain is configured (for example `stable-x86_64-pc-windows-msvc`).
-
-Build the Windows desktop artifacts:
-```cmd
-release\tauri\build_with_tauri.bat
-```
-
-Public outputs are exported to:
-- `release/windows/installers`
-- `release/windows/portable`
-
-Regenerate desktop icon assets from the shared web favicon source:
-```cmd
-cd DILIGENT\client
-npm run tauri:icon
-```
-
-Clean previous desktop build outputs:
-```cmd
-cd DILIGENT\client
-npm run tauri:clean
-```
-
-## 6. Deterministic Dependencies
-- Backend is lockfile-backed by `runtimes/uv.lock` and installed with `uv sync --frozen` in Docker.
-- Frontend is lockfile-backed by `DILIGENT/client/package-lock.json` and installed with `npm ci` in Docker.
-- Docker base images are pinned in `docker/backend.Dockerfile` and `docker/frontend.Dockerfile`.
-
-## 7. Using the Application
-- Enter anamnesis, exam notes, current medications, and ALT/ALP values.
-- Choose inference path (Ollama or cloud), select parsing/clinical models, and toggle RAG.
-- Run the analysis and review/export the report.
+Detailed user journeys and feature guidance are documented in `assets/docs/USER_MANUAL.md`.
 
 ### Screenshots
 
@@ -167,34 +83,31 @@ npm run tauri:clean
 #### Data Inspection
 ![Data inspection](assets/figures/data-inspection.png)
 
-## 8. Configuration Reference
-Runtime values are read from `DILIGENT/settings/.env`.
+## 5. Desktop Packaging (Tauri)
+Build Windows desktop artifacts:
+```cmd
+release\tauri\build_with_tauri.bat
+```
 
-| Variable | Description |
-|---|---|
-| `FASTAPI_HOST`, `FASTAPI_PORT` | Backend host/port. |
-| `UI_HOST`, `UI_PORT` | Frontend host/port (local preview, cloud publish port). |
-| `VITE_API_BASE_URL` | Frontend API base path (`/api` recommended). |
-| `RELOAD` | Enables uvicorn reload when `true`. |
-| `DB_EMBEDDED` | `true` uses embedded SQLite; `false` enables external DB settings. |
-| `DB_ENGINE`, `DB_HOST`, `DB_PORT`, `DB_NAME`, `DB_USER`, `DB_PASSWORD` | External DB connection settings. |
-| `DB_SSL`, `DB_SSL_CA` | External DB TLS settings. |
-| `DB_CONNECT_TIMEOUT`, `DB_INSERT_BATCH_SIZE` | DB runtime tuning settings. |
-| `OPTIONAL_DEPENDENCIES` | Enables optional launcher dependency installation path. |
-| `MPLBACKEND`, `KERAS_BACKEND` | Runtime plotting/ML backend settings. |
-| `OPENAI_API_KEY`, `GEMINI_API_KEY` | Cloud provider API keys. |
+Generated outputs:
+- `release/windows/installers`
+- `release/windows/portable`
 
-## 9. Setup and Maintenance
-Run `DILIGENT/setup_and_maintenance.bat` for maintenance operations:
-- Remove logs
-- Uninstall app (local runtimes/artifacts)
-- Initialize database
-- Update RxNav catalog
-- Update LiverTox data
-- Vectorize RAG documents
-- Clean desktop build artifacts
+## 6. Setup and Maintenance
+Run:
+```cmd
+DILIGENT\setup_and_maintenance.bat
+```
 
-## 10. License
+Use this script for offline maintenance operations (for example DB initialization and cleanup tasks).
+
+## 7. Documentation Map
+- `assets/docs/USER_MANUAL.md`: end-user operation, journeys, key commands.
+- `assets/docs/ARCHITECTURE.md`: system boundaries and data flow.
+- `assets/docs/BACKGROUND_JOBS.md`: job lifecycle and semantics.
+- `assets/docs/PACKAGING_AND_RUNTIME_MODES.md`: runtime profiles and packaging.
+- `assets/docs/ERROR_HANDLING.md`: backend/frontend error strategy.
+- `assets/docs/UI_STANDARDS.md`: frontend design standards.
+
+## 8. License
 Non-commercial use is covered by the Polyform Noncommercial License 1.0.0; commercial licensing is available separately. See `LICENSE`.
-
-

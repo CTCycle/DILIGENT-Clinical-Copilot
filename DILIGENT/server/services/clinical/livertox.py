@@ -6,7 +6,7 @@ from typing import Any
 
 import pandas as pd
 
-from DILIGENT.server.configurations import server_settings
+from DILIGENT.server.configurations.startup import server_settings
 from DILIGENT.server.services.text.normalization import coerce_text
 
 ###############################################################################
@@ -210,8 +210,18 @@ class LiverToxData:
                     )
                 else:
                     notes = list(dict.fromkeys([*notes, "matched_record_missing_excerpt"]))
-            missing_livertox = match_status != "matched" or not unique_excerpts
-            ambiguous_match = match_status == "ambiguous"
+            resolved_status = self.resolve_entry_match_status(
+                match_status=match_status,
+                excerpts=unique_excerpts,
+            )
+            missing_livertox = resolved_status != "matched_with_excerpt"
+            ambiguous_match = resolved_status == "ambiguous_match"
+            chosen_candidate = coerce_text(getattr(match, "matched_name", None))
+            rejected_candidates = [
+                str(candidate).strip()
+                for candidate in list(getattr(match, "rejected_candidate_names", []) or [])
+                if str(candidate).strip()
+            ]
             entries.append(
                 {
                     "drug_name": original,
@@ -222,13 +232,26 @@ class LiverToxData:
                     "match_confidence": getattr(match, "confidence", None),
                     "match_reason": getattr(match, "reason", None),
                     "match_notes": notes,
-                    "match_status": match_status,
+                    "match_status": resolved_status,
                     "match_candidates": list(getattr(match, "candidate_names", []) or []),
+                    "chosen_candidate": chosen_candidate,
+                    "rejected_candidates": rejected_candidates,
                     "missing_livertox": missing_livertox,
                     "ambiguous_match": ambiguous_match,
                 }
             )
         return entries
+
+    # -------------------------------------------------------------------------
+    @staticmethod
+    def resolve_entry_match_status(*, match_status: str, excerpts: list[str]) -> str:
+        if match_status == "ambiguous":
+            return "ambiguous_match"
+        if match_status != "matched":
+            return "missing_match"
+        if excerpts:
+            return "matched_with_excerpt"
+        return "matched_no_excerpt"
 
     # -------------------------------------------------------------------------
     def find_related_excerpt(self, normalized_query: str) -> str | None:
@@ -284,25 +307,68 @@ class LiverToxData:
         if self.livertox_df is None or self.livertox_df.empty:
             return {}
         index: dict[str, dict[str, Any]] = {}
-        rows = sorted(
-            self.livertox_df.to_dict(orient="records"),
-            key=lambda row: (
-                self.lookup.normalize_name(str(row.get("drug_name", ""))),
-                str(row.get("nbk_id", "")).casefold(),
-            ),
-        )
-        for row in rows:
+        for row in self.livertox_df.to_dict(orient="records"):
             drug_name = coerce_text(row.get("drug_name"))
             if drug_name is None:
                 continue
             normalized = self.lookup.normalize_name(drug_name)
             if not normalized:
                 continue
-            if normalized in index:
-                continue
-            index[normalized] = row # type: ignore
+            existing = index.get(normalized)
+            if existing is None or self.is_preferred_row(row, existing):
+                index[normalized] = row
         self.rows_by_name = index
         return self.rows_by_name
+
+    # -------------------------------------------------------------------------
+    def is_preferred_row(self, candidate: dict[str, Any], current: dict[str, Any]) -> bool:
+        candidate_score = self.row_quality_score(candidate)
+        current_score = self.row_quality_score(current)
+        if candidate_score != current_score:
+            return candidate_score > current_score
+        return self.row_tie_break_key(candidate) < self.row_tie_break_key(current)
+
+    # -------------------------------------------------------------------------
+    def row_quality_score(self, row: dict[str, Any]) -> tuple[int, int, int, int]:
+        has_excerpt = 1 if coerce_text(row.get("excerpt")) else 0
+        include_in_livertox = 1 if self.coerce_boolish(row.get("include_in_livertox")) else 0
+        reference_count = self.coerce_int(row.get("reference_count"))
+        year_approved = self.coerce_int(row.get("year_approved"))
+        return (
+            has_excerpt,
+            include_in_livertox,
+            reference_count,
+            year_approved,
+        )
+
+    # -------------------------------------------------------------------------
+    @staticmethod
+    def row_tie_break_key(row: dict[str, Any]) -> tuple[str, str]:
+        nbk_id = (coerce_text(row.get("nbk_id")) or "~").casefold()
+        drug_name = (coerce_text(row.get("drug_name")) or "~").casefold()
+        return nbk_id, drug_name
+
+    # -------------------------------------------------------------------------
+    @staticmethod
+    def coerce_int(value: Any) -> int:
+        if value is None:
+            return -1
+        try:
+            return int(value)
+        except (TypeError, ValueError):
+            return -1
+
+    # -------------------------------------------------------------------------
+    @staticmethod
+    def coerce_boolish(value: Any) -> bool:
+        if isinstance(value, bool):
+            return value
+        if isinstance(value, (int, float)):
+            return bool(value)
+        if value is None:
+            return False
+        lowered = str(value).strip().lower()
+        return lowered in {"1", "true", "yes", "y", "t"}
 
     # -------------------------------------------------------------------------
     def derive_master_alias_source(
@@ -362,3 +428,4 @@ class LiverToxData:
                 yield SimpleNamespace(**mapping)
             return
         return
+

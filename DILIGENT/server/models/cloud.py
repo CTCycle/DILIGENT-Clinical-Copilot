@@ -7,12 +7,10 @@ import httpx
 
 from DILIGENT.server.common.constants import GEMINI_API_BASE, OPENAI_API_BASE
 from DILIGENT.server.common.utils.logger import logger
-from DILIGENT.server.configurations import server_settings
+from DILIGENT.server.configurations.startup import server_settings
+from DILIGENT.server.configurations.llm_configs import LLMRuntimeConfig
 from DILIGENT.server.models.structured import StructuredOutputParser, parse_json_dict, T
 from DILIGENT.server.repositories.serialization.access_keys import AccessKeySerializer
-from DILIGENT.server.services.keys.cryptography import (
-    decrypt as decrypt_access_key,
-)
 
 ProviderName = Literal["openai", "azure-openai", "anthropic", "gemini"]
 
@@ -21,7 +19,7 @@ ProviderName = Literal["openai", "azure-openai", "anthropic", "gemini"]
 class LLMError(RuntimeError):
     pass
 
-
+###############################################################################
 class LLMTimeout(LLMError):
     """Raised when requests exceed the configured timeout."""
 
@@ -95,7 +93,7 @@ class CloudLLMClient:
         if row is None:
             return None
         try:
-            return decrypt_access_key(row.encrypted_value)
+            return access_key_serializer.decrypt_key_row(row)
         except Exception as exc:  # noqa: BLE001
             provider_label = "OpenAI" if provider == "openai" else "Gemini"
             raise LLMError(f"Failed to decrypt active {provider_label} access key") from exc
@@ -132,6 +130,12 @@ class CloudLLMClient:
 
     # ---------------------------------------------------------------------
     @staticmethod
+    def is_gpt5_family_model(model: str | None) -> bool:
+        normalized = (model or "").strip().lower()
+        return normalized.startswith("gpt-5")
+
+    # ---------------------------------------------------------------------
+    @staticmethod
     def raise_for_status(resp: httpx.Response) -> None:
         try:
             resp.raise_for_status()
@@ -148,15 +152,22 @@ class CloudLLMClient:
         format: str | None = None,
         options: dict[str, Any] | None = None,
     ) -> dict[str, Any] | str:
+        options_payload = dict(options) if options else {}
+        if "temperature" not in options_payload:
+            options_payload["temperature"] = LLMRuntimeConfig.get_cloud_temperature()
         if self.provider == "openai":
             return await self.chat_openai(
                 model=model,
                 messages=messages,
                 format=format,
-                options=options,
+                options=options_payload,
             )
         if self.provider == "gemini":
-            return await self.chat_gemini(model=model, messages=messages)
+            return await self.chat_gemini(
+                model=model,
+                messages=messages,
+                options=options_payload,
+            )
         raise LLMError(f"Provider '{self.provider}' does not support chat yet")
 
     # ---------------------------------------------------------------------
@@ -184,18 +195,13 @@ class CloudLLMClient:
         format: str | None,
         options: dict[str, Any] | None,
     ) -> dict[str, Any] | str:
-        body: dict[str, Any] = {
-            "model": model or self.default_model,
-            "messages": messages,
-            "stream": False,
-        }
-        if options:
-            if "temperature" in options:
-                body["temperature"] = options["temperature"]
-            if "top_p" in options:
-                body["top_p"] = options["top_p"]
-        if format == "json":
-            body["response_format"] = {"type": "json_object"}
+        resolved_model = model or self.default_model
+        body = self._build_openai_chat_body(
+            resolved_model=resolved_model,
+            messages=messages,
+            format=format,
+            options=options,
+        )
 
         try:
             resp = await self.client.post("/chat/completions", json=body)
@@ -216,6 +222,29 @@ class CloudLLMClient:
             except json.JSONDecodeError:
                 return content
         return str(content)
+
+    def _build_openai_chat_body(
+        self,
+        *,
+        resolved_model: str,
+        messages: list[dict[str, str]],
+        format: str | None,
+        options: dict[str, Any] | None,
+    ) -> dict[str, Any]:
+        body: dict[str, Any] = {
+            "model": resolved_model,
+            "messages": messages,
+            "stream": False,
+        }
+        if options:
+            supports_sampling = not self.is_gpt5_family_model(resolved_model)
+            if supports_sampling and "temperature" in options:
+                body["temperature"] = options["temperature"]
+            if supports_sampling and "top_p" in options:
+                body["top_p"] = options["top_p"]
+        if format == "json":
+            body["response_format"] = {"type": "json_object"}
+        return body
 
     # ---------------------------------------------------------------------
     @staticmethod
@@ -254,6 +283,7 @@ class CloudLLMClient:
         *,
         model: str,
         messages: list[dict[str, str]],
+        options: dict[str, Any] | None = None,
     ) -> dict[str, Any] | str:
         resolved_model = model or self.default_model
         model_resource = self.resolve_gemini_model_resource(resolved_model)
@@ -263,6 +293,14 @@ class CloudLLMClient:
         body: dict[str, Any] = {"contents": contents}
         if system_text:
             body["systemInstruction"] = {"parts": [{"text": system_text}]}
+        if options and "temperature" in options:
+            try:
+                temperature = float(options["temperature"])
+            except (TypeError, ValueError):
+                temperature = 0.0
+            body["generationConfig"] = {
+                "temperature": max(0.0, min(2.0, temperature))
+            }
 
         try:
             resp = await self.client.post(path, json=body)
@@ -383,7 +421,11 @@ class CloudLLMClient:
             model=resolved_model,
             messages=messages,
             format="json" if use_json_mode else None,
-            options={"temperature": temperature},
+            options=(
+                None
+                if self.is_gpt5_family_model(resolved_model)
+                else {"temperature": temperature}
+            ),
         )
         text = json.dumps(raw) if isinstance(raw, dict) else str(raw)
         return await self.parse_with_repairs(
@@ -465,7 +507,11 @@ class CloudLLMClient:
                     model=model,
                     messages=repair_messages,
                     format="json" if use_json_mode else None,
-                    options={"temperature": 0.0},
+                    options=(
+                        None
+                        if self.is_gpt5_family_model(model)
+                        else {"temperature": 0.0}
+                    ),
                 )
                 text = json.dumps(raw) if isinstance(raw, dict) else str(raw)
 
@@ -475,3 +521,4 @@ class CloudLLMClient:
     @staticmethod
     def parse_json(obj_or_text: dict[str, Any] | str) -> dict[str, Any] | None:
         return parse_json_dict(obj_or_text)
+
