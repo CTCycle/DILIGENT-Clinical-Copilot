@@ -13,7 +13,7 @@ from DILIGENT.server.domain.jobs import (
     JobStatusResponse,
 )
 from DILIGENT.server.domain.models import ModelListResponse, ModelPullResponse
-from DILIGENT.server.configurations import server_settings
+from DILIGENT.server.configurations.startup import server_settings
 from DILIGENT.server.services.jobs import job_manager
 from DILIGENT.server.common.utils.logger import logger
 
@@ -104,6 +104,34 @@ def resolve_pull_progress_message(name: str, event: dict[str, Any]) -> str:
 
 
 ###############################################################################
+class PullProgressUpdater:
+    def __init__(self, *, name: str, job_id: str, initial_progress: float) -> None:
+        self.name = name
+        self.job_id = job_id
+        self.current_progress = initial_progress
+
+    # -------------------------------------------------------------------------
+    async def __call__(self, event: dict[str, Any]) -> None:
+        if job_manager.should_stop(self.job_id):
+            raise RuntimeError("Model pull stop requested.")
+
+        self.current_progress = resolve_pull_progress(self.current_progress, event)
+        job_manager.update_progress(self.job_id, self.current_progress)
+
+        total = coerce_positive_float(event.get("total"))
+        completed = coerce_positive_float(event.get("completed"))
+        progress_patch: dict[str, Any] = {
+            "progress_status": str(event.get("status", "")).strip().lower() or "running",
+            "progress_message": resolve_pull_progress_message(self.name, event),
+        }
+        if total is not None:
+            progress_patch["total_bytes"] = int(total)
+        if completed is not None:
+            progress_patch["completed_bytes"] = int(completed)
+        job_manager.update_result(self.job_id, progress_patch)
+
+
+###############################################################################
 async def pull_model_async(name: str, stream: bool, job_id: str | None = None) -> dict[str, Any]:
     async with OllamaClient() as client:
         local = set(await client.list_models())
@@ -123,34 +151,19 @@ async def pull_model_async(name: str, stream: bool, job_id: str | None = None) -
             )
         if not already:
             logger.info("Downloading model %s from Ollama library", name)
-            current_progress = 6.0
             if job_id is not None:
-                job_manager.update_progress(job_id, current_progress)
-
-                async def update_pull_progress(event: dict[str, Any]) -> None:
-                    nonlocal current_progress
-                    if job_manager.should_stop(job_id):
-                        raise RuntimeError("Model pull stop requested.")
-
-                    current_progress = resolve_pull_progress(current_progress, event)
-                    job_manager.update_progress(job_id, current_progress)
-
-                    total = coerce_positive_float(event.get("total"))
-                    completed = coerce_positive_float(event.get("completed"))
-                    progress_patch: dict[str, Any] = {
-                        "progress_status": str(event.get("status", "")).strip().lower() or "running",
-                        "progress_message": resolve_pull_progress_message(name, event),
-                    }
-                    if total is not None:
-                        progress_patch["total_bytes"] = int(total)
-                    if completed is not None:
-                        progress_patch["completed_bytes"] = int(completed)
-                    job_manager.update_result(job_id, progress_patch)
+                initial_progress = 6.0
+                job_manager.update_progress(job_id, initial_progress)
+                progress_updater = PullProgressUpdater(
+                    name=name,
+                    job_id=job_id,
+                    initial_progress=initial_progress,
+                )
 
                 await client.pull(
                     name,
                     stream=stream,
-                    progress_callback=update_pull_progress,
+                    progress_callback=progress_updater,
                 )
             else:
                 await client.pull(name, stream=stream)
@@ -199,6 +212,24 @@ class OllamaEndpoint:
         self.router = router        
 
     # -------------------------------------------------------------------------
+    @staticmethod
+    def raise_ollama_http_exception(exc: Exception, *, action: str) -> None:
+        if isinstance(exc, OllamaTimeout):
+            raise HTTPException(
+                status_code=status.HTTP_504_GATEWAY_TIMEOUT,
+                detail="Ollama request timed out. Please retry.",
+            ) from exc
+        if isinstance(exc, OllamaError):
+            raise HTTPException(
+                status_code=status.HTTP_502_BAD_GATEWAY,
+                detail="Ollama service is unavailable. Verify Ollama is running and retry.",
+            ) from exc
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Unexpected error while {action}.",
+        ) from exc
+
+    # -------------------------------------------------------------------------
     async def pull_model(
         self,
         name: str = Query(
@@ -223,14 +254,12 @@ class OllamaEndpoint:
                 return ModelPullResponse(
                     status="success", pulled=(not already), model=model_name
                 )
+        except OllamaTimeout as exc:
+            self.raise_ollama_http_exception(exc, action="pulling model")
+        except OllamaError as exc:
+            self.raise_ollama_http_exception(exc, action="pulling model")
         except Exception as exc:
-            if isinstance(exc, OllamaTimeout):
-                raise HTTPException(status_code=504, detail=str(exc))
-            if isinstance(exc, OllamaError):
-                raise HTTPException(status_code=502, detail=str(exc))
-            raise HTTPException(
-                status_code=500, detail="Unexpected error while pulling model"
-            )
+            self.raise_ollama_http_exception(exc, action="pulling model")
 
     # -------------------------------------------------------------------------
     def start_pull_job(
@@ -283,7 +312,7 @@ class OllamaEndpoint:
         if job_status is None:
             raise HTTPException(
                 status_code=status.HTTP_404_NOT_FOUND,
-                detail=f"Job not found: {job_id}",
+                detail="Job not found.",
             )
         return JobStatusResponse(**job_status)
 
@@ -293,7 +322,7 @@ class OllamaEndpoint:
         if job_status is None:
             raise HTTPException(
                 status_code=status.HTTP_404_NOT_FOUND,
-                detail=f"Job not found: {job_id}",
+                detail="Job not found.",
             )
         success = job_manager.cancel_job(job_id)
         if success:
@@ -310,14 +339,12 @@ class OllamaEndpoint:
             async with OllamaClient() as client:
                 models = await client.list_models()
             return ModelListResponse(models=models, count=len(models))
+        except OllamaTimeout as exc:
+            self.raise_ollama_http_exception(exc, action="listing models")
+        except OllamaError as exc:
+            self.raise_ollama_http_exception(exc, action="listing models")
         except Exception as exc:
-            if isinstance(exc, OllamaTimeout):
-                raise HTTPException(status_code=504, detail=str(exc))
-            if isinstance(exc, OllamaError):
-                raise HTTPException(status_code=502, detail=str(exc))
-            raise HTTPException(
-                status_code=500, detail="Unexpected error while listing models"
-            )
+            self.raise_ollama_http_exception(exc, action="listing models")
         
     # -------------------------------------------------------------------------
     def add_routes(self) -> None:
@@ -360,4 +387,6 @@ class OllamaEndpoint:
 
 endpoint = OllamaEndpoint(router=router)
 endpoint.add_routes()
+
+
 

@@ -1,26 +1,30 @@
 from __future__ import annotations
 
+import asyncio
 import re
 import time
 from collections import deque
-from dataclasses import dataclass
 from datetime import UTC, datetime
 from typing import Any, Iterable
 from urllib.parse import urlparse
 
 import httpx
-from pydantic import BaseModel, Field
 
 from DILIGENT.server.common.utils.logger import logger
-from DILIGENT.server.configurations import server_settings
-from DILIGENT.server.domain.research import ResearchCitation, ResearchSource
+from DILIGENT.server.configurations.startup import server_settings
+from DILIGENT.server.domain.research.entities import (
+    ResearchAnswerPayload,
+    ResearchCitation,
+    ResearchSource,
+)
+from DILIGENT.server.domain.research.extras import TavilySearchOutcome
 from DILIGENT.server.models.providers import initialize_llm_client
 from DILIGENT.server.repositories.serialization.access_keys import AccessKeySerializer
-from DILIGENT.server.services.keys.cryptography import decrypt as decrypt_access_key
 
 
 TAVILY_SEARCH_URL = "https://api.tavily.com/search"
 TAVILY_EXTRACT_URL = "https://api.tavily.com/extract"
+TRANSIENT_HTTP_STATUS_CODES: set[int] = {408, 429, 500, 502, 503, 504}
 DEFAULT_SOURCE_TEXT_MAX_CHARS = 1800
 DEFAULT_WEB_SNIPPET_MAX_CHARS = 420
 DEFAULT_QUERY_MAX_LEN = 180
@@ -35,22 +39,6 @@ INJECTION_RE = re.compile(
     re.IGNORECASE,
 )
 
-
-###############################################################################
-class ResearchAnswerPayload(BaseModel):
-    answer: str = Field(..., min_length=1)
-    citations: list[ResearchCitation] = Field(default_factory=list)
-
-
-###############################################################################
-@dataclass(slots=True)
-class TavilySearchOutcome:
-    normalized_query: str
-    sources: list[ResearchSource]
-    message: str | None = None
-    usage: dict[str, Any] | None = None
-
-
 ###############################################################################
 class TavilyResearchService:
     def __init__(self) -> None:
@@ -63,6 +51,9 @@ class TavilyResearchService:
         self.fast_max_results = int(external_data.tavily_fast_max_results)
         self.thorough_max_results = int(external_data.tavily_thorough_max_results)
         self.extract_top_urls = int(external_data.tavily_extract_top_urls)
+        self.retry_limit = 2
+        self.retry_backoff_base_s = 0.4
+        self.retry_backoff_cap_s = 2.5
         self.search_cache: dict[str, tuple[float, dict[str, Any]]] = {}
         self.extract_cache: dict[str, tuple[float, str]] = {}
         self.request_timestamps: deque[float] = deque()
@@ -88,15 +79,13 @@ class TavilyResearchService:
                 mark_used=mark_used,
             )
         except Exception as exc:  # noqa: BLE001
-            logger.warning("Unable to load active Tavily access key: %s", exc)
-            return None
+            raise RuntimeError("Failed to load active Tavily access key") from exc
         if active_key is None:
             return None
         try:
-            return decrypt_access_key(active_key.encrypted_value)
+            return self.access_key_serializer.decrypt_key_row(active_key)
         except Exception as exc:  # noqa: BLE001
-            logger.warning("Unable to decrypt active Tavily access key: %s", exc)
-            return None
+            raise RuntimeError("Failed to decrypt active Tavily access key") from exc
 
     # -------------------------------------------------------------------------
     def normalize_question(self, question: str) -> str:
@@ -165,6 +154,64 @@ class TavilyResearchService:
             return query
         simplified = " ".join(tokens[:8])
         return self.normalize_question(simplified)
+
+    # -------------------------------------------------------------------------
+    @staticmethod
+    def is_transient_status(status_code: int) -> bool:
+        return status_code in TRANSIENT_HTTP_STATUS_CODES
+
+    # -------------------------------------------------------------------------
+    def backoff_seconds(self, attempt: int) -> float:
+        if attempt <= 0:
+            return 0.0
+        delay = self.retry_backoff_base_s * (2 ** (attempt - 1))
+        return min(delay, self.retry_backoff_cap_s)
+
+    # -------------------------------------------------------------------------
+    async def post_json_with_retry(
+        self,
+        *,
+        url: str,
+        payload: dict[str, Any],
+        operation: str,
+    ) -> dict[str, Any]:
+        attempt = 0
+        while True:
+            self.consume_rate_slot()
+            try:
+                async with httpx.AsyncClient(timeout=self.request_timeout_s) as client:
+                    response = await client.post(url, json=payload)
+            except httpx.TimeoutException as exc:
+                if attempt >= self.retry_limit:
+                    raise RuntimeError(
+                        f"{operation} timed out after {attempt + 1} attempt(s)."
+                    ) from exc
+                await asyncio.sleep(self.backoff_seconds(attempt + 1))
+                attempt += 1
+                continue
+            except httpx.RequestError as exc:
+                if attempt >= self.retry_limit:
+                    raise RuntimeError(
+                        f"{operation} failed due to a network error after {attempt + 1} attempt(s)."
+                    ) from exc
+                await asyncio.sleep(self.backoff_seconds(attempt + 1))
+                attempt += 1
+                continue
+
+            if self.is_transient_status(response.status_code):
+                if attempt >= self.retry_limit:
+                    raise RuntimeError(
+                        f"{operation} failed with HTTP {response.status_code} after {attempt + 1} attempt(s)."
+                    )
+                await asyncio.sleep(self.backoff_seconds(attempt + 1))
+                attempt += 1
+                continue
+
+            response.raise_for_status()
+            data = response.json()
+            if not isinstance(data, dict):
+                raise RuntimeError(f"{operation} returned an invalid payload.")
+            return data
 
     # -------------------------------------------------------------------------
     def make_search_cache_key(self, query: str, mode: str) -> str:
@@ -290,7 +337,7 @@ class TavilyResearchService:
                     allowed_domains=allowed_domains,
                     blocked_domains=blocked_domains,
                 )
-            except Exception as exc:  # noqa: BLE001
+            except RuntimeError as exc:
                 message = f"Search attempt failed for query '{query}': {exc}"
                 continue
             usage_payload = (
@@ -320,7 +367,7 @@ class TavilyResearchService:
                             allowed_domains=allowed_domains,
                             blocked_domains=blocked_domains,
                         )
-                    except Exception as exc:  # noqa: BLE001
+                    except RuntimeError as exc:
                         message = f"Simplified retry failed: {exc}"
                     else:
                         retry_results = retry_payload.get("results")
@@ -348,7 +395,7 @@ class TavilyResearchService:
                     url=source.url,
                     question=question,
                 )
-            except Exception as exc:  # noqa: BLE001
+            except RuntimeError as exc:
                 extraction_failures += 1
                 logger.warning("Tavily extract failed for %s: %s", source.url, exc)
                 extracted = None
@@ -417,16 +464,11 @@ class TavilyResearchService:
         if exclude_domains:
             payload["exclude_domains"] = exclude_domains
 
-        async with httpx.AsyncClient(timeout=self.request_timeout_s) as client:
-            response = await client.post(TAVILY_SEARCH_URL, json=payload)
-        if response.status_code == 429:
-            raise RuntimeError("Tavily rate limited the request (HTTP 429).")
-        if response.status_code >= 500:
-            raise RuntimeError(f"Tavily search server error (HTTP {response.status_code}).")
-        response.raise_for_status()
-        data = response.json()
-        if not isinstance(data, dict):
-            raise RuntimeError("Tavily search returned an invalid payload.")
+        data = await self.post_json_with_retry(
+            url=TAVILY_SEARCH_URL,
+            payload=payload,
+            operation="Tavily search",
+        )
         self.cache_set(self.search_cache, cache_key, data, self.search_cache_ttl_s)
         return data
 
@@ -451,14 +493,11 @@ class TavilyResearchService:
             "chunk_size": 500,
             "chunks_per_source": DEFAULT_CHUNKS_PER_SOURCE,
         }
-        async with httpx.AsyncClient(timeout=self.request_timeout_s) as client:
-            response = await client.post(TAVILY_EXTRACT_URL, json=payload)
-        if response.status_code == 429:
-            raise RuntimeError("Tavily extract rate-limited this URL (HTTP 429).")
-        if response.status_code >= 500:
-            raise RuntimeError(f"Tavily extract server error (HTTP {response.status_code}).")
-        response.raise_for_status()
-        data = response.json()
+        data = await self.post_json_with_retry(
+            url=TAVILY_EXTRACT_URL,
+            payload=payload,
+            operation="Tavily extract",
+        )
         extracted = self.parse_extract_payload(data)
         if not extracted:
             return None
@@ -670,3 +709,5 @@ class TavilyResearchService:
 
 
 tavily_research_service = TavilyResearchService()
+
+

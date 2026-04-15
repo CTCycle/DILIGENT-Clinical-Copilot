@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import asyncio
 
+from DILIGENT.server.domain.clinical import DrugEntry
 from DILIGENT.server.services.clinical.parser import DrugsParser
 
 
@@ -97,3 +98,39 @@ def test_extract_drugs_from_therapy_empty_input_is_safe() -> None:
     parsed = asyncio.run(parser.extract_drugs_from_therapy(""))
 
     assert parsed.entries == []
+
+
+def test_normalize_entry_filters_non_drug_fragments() -> None:
+    parser = DrugsParser(client=object())
+
+    assert (
+        parser.normalize_entry(
+            DrugEntry(name="In riserva"),
+            source="therapy",
+            historical_flag=False,
+        )
+        is None
+    )
+    assert (
+        parser.normalize_entry(
+            DrugEntry(name="il lunedi"),
+            source="therapy",
+            historical_flag=False,
+        )
+        is None
+    )
+    assert (
+        parser.normalize_entry(
+            DrugEntry(name="ulteriore ciclo (originariamente previsto il"),
+            source="therapy",
+            historical_flag=False,
+        )
+        is None
+    )
+    kept = parser.normalize_entry(
+        DrugEntry(name="Pemetrexed"),
+        source="therapy",
+        historical_flag=False,
+    )
+    assert kept is not None
+    assert kept.name == "Pemetrexed"

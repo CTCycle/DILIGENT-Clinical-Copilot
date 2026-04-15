@@ -1,0 +1,45 @@
+{
+  "aliases": [
+    {
+      "canonical_name": "amoxicillin clavulanate",
+      "alias_kind": "brand",
+      "aliases": [
+        "Co-amoxi",
+        "Co amoxi",
+        "Coamoxi",
+        "Amoxicillin/Clavulanate",
+        "Amoxicillin-Clavulanate"
+      ]
+    },
+    {
+      "canonical_name": "metformin",
+      "alias_kind": "synonym",
+      "aliases": [
+        "Metformina"
+      ]
+    },
+    {
+      "canonical_name": "quetiapine",
+      "alias_kind": "synonym",
+      "aliases": [
+        "Quetiapina"
+      ]
+    },
+    {
+      "canonical_name": "fluvastatin",
+      "alias_kind": "synonym",
+      "aliases": [
+        "Fluvastatina"
+      ]
+    },
+    {
+      "canonical_name": "trimethoprim sulfamethoxazole",
+      "alias_kind": "brand",
+      "aliases": [
+        "Bactrim",
+        "Trimethoprim-Sulfamethoxazole",
+        "Trimethoprim/Sulfamethoxazole"
+      ]
+    }
+  ]
+}

@@ -1,6 +1,7 @@
 from __future__ import annotations
+from typing import Tuple
 
-from sqlalchemy import select
+from sqlalchemy import Select, select
 
 from DILIGENT.server.repositories.schemas.models import (
     Drug,
@@ -12,39 +13,40 @@ from DILIGENT.server.repositories.schemas.models import (
 
 ###############################################################################
 class DrugRepositoryQueries:
+
     # -------------------------------------------------------------------------
     @staticmethod
-    def by_livertox_nbk_id(livertox_nbk_id: str):
+    def by_livertox_nbk_id(livertox_nbk_id: str) -> Select[tuple[Drug]]:
         return select(Drug).where(Drug.livertox_nbk_id == livertox_nbk_id)
 
     # -------------------------------------------------------------------------
     @staticmethod
-    def drug_rxcui_mapping(rxcui: str):
+    def drug_rxcui_mapping(rxcui: str) -> Select[tuple[DrugRxnormCode]]:
         return select(DrugRxnormCode).where(DrugRxnormCode.rxcui == rxcui)
 
     # -------------------------------------------------------------------------
     @staticmethod
-    def drug_by_joined_rxcui(rxcui: str):
+    def drug_by_joined_rxcui(rxcui: str) -> Select[tuple[Drug]]:
         return select(Drug).join(DrugRxnormCode).where(DrugRxnormCode.rxcui == rxcui)
 
     # -------------------------------------------------------------------------
     @staticmethod
-    def drug_by_rxnorm_rxcui(rxcui: str):
+    def drug_by_rxnorm_rxcui(rxcui: str) -> Select[tuple[Drug]]:
         return select(Drug).where(Drug.rxnorm_rxcui == rxcui)
 
     # -------------------------------------------------------------------------
     @staticmethod
-    def drug_by_canonical_name_norm(canonical_name_norm: str):
+    def drug_by_canonical_name_norm(canonical_name_norm: str) -> Select[tuple[Drug]]:
         return select(Drug).where(Drug.canonical_name_norm == canonical_name_norm)
 
     # -------------------------------------------------------------------------
     @staticmethod
-    def alias_by_norm(alias_norm: str):
+    def alias_by_norm(alias_norm: str) -> Select[tuple[DrugAlias]]:
         return select(DrugAlias).where(DrugAlias.alias_norm == alias_norm)
 
     # -------------------------------------------------------------------------
     @staticmethod
-    def monograph_by_drug_id(drug_id: int):
+    def monograph_by_drug_id(drug_id: int) -> Select[tuple[LiverToxMonograph]]:
         return select(LiverToxMonograph).where(LiverToxMonograph.drug_id == drug_id)
 
     # -------------------------------------------------------------------------

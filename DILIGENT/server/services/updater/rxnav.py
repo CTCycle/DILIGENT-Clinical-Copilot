@@ -3,28 +3,34 @@ from __future__ import annotations
 import asyncio
 import codecs
 import json
+import os
 import re
 import time
 import unicodedata
-from dataclasses import dataclass
 from typing import Any
-from collections.abc import Callable, Iterator
+from collections.abc import Awaitable, Callable, Iterator
 
 import httpx
 import pandas as pd
 
-from DILIGENT.server.configurations import server_settings
+from DILIGENT.server.configurations.startup import server_settings
 from DILIGENT.server.common.utils.logger import logger
-from DILIGENT.server.common.constants import RXNAV_SYNONYM_STOPWORDS
+from DILIGENT.server.common.constants import (
+    RXNAV_CURATED_ALIASES_PATH,
+    RXNAV_SYNONYM_STOPWORDS,
+)
+from DILIGENT.server.domain.rxnav import RxNormCandidate
 from DILIGENT.server.repositories.serialization.data import DataSerializer
-
+from DILIGENT.server.services.text.normalization import normalize_drug_name
 
 
 ###############################################################################
-@dataclass(slots=True)
-class RxNormCandidate:
-    value: str
-    kind: str
+async def run_with_semaphore(
+    semaphore: asyncio.Semaphore,
+    task_factory: Callable[[], Awaitable[Any]],
+):
+    async with semaphore:
+        return await task_factory()
 
 
 ###############################################################################
@@ -151,11 +157,27 @@ class RxNavClient:
     TERM_PATTERN = re.compile(r"[A-Za-z0-9]+(?:[-'][A-Za-z0-9]+)*")
     BRACKET_PATTERN = re.compile(r"\[([^\]]+)\]")
 
-    def __init__(self, *, enabled: bool | None = None) -> None:
+    def __init__(
+        self,
+        *,
+        enabled: bool | None = None,
+        request_timeout: float | None = None,
+        max_concurrency: int | None = None,
+    ) -> None:
         self.enabled = True
         external_settings = server_settings.external_data
-        self.timeout = max(float(external_settings.rxnav_request_timeout), 1.0)
-        self.max_concurrency = max(int(external_settings.rxnav_max_concurrency), 1)
+        configured_timeout = (
+            float(request_timeout)
+            if request_timeout is not None
+            else float(external_settings.rxnav_request_timeout)
+        )
+        configured_concurrency = (
+            int(max_concurrency)
+            if max_concurrency is not None
+            else int(external_settings.rxnav_max_concurrency)
+        )
+        self.timeout = max(configured_timeout, 1.0)
+        self.max_concurrency = max(configured_concurrency, 1)
         self.cache: dict[str, dict[str, RxNormCandidate]] = {}
         self.synonym_cache: dict[str, list[str]] = {}
 
@@ -641,6 +663,7 @@ class RxNavDrugCatalogBuilder:
         rx_client: RxNavClient | None = None,
         *,
         serializer: DataSerializer | None = None,
+        curated_aliases_path: str | None = None,
     ) -> None:
         combined: set[str] = set()
         for attr in ("SALT_STOPWORDS", "FORM_STOPWORDS", "UNIT_STOPWORDS"):
@@ -671,6 +694,77 @@ class RxNavDrugCatalogBuilder:
         self.total_records: int | None = None
         self.last_logged_count = 0
         self.serializer = serializer or DataSerializer()
+        resolved_path = curated_aliases_path or RXNAV_CURATED_ALIASES_PATH
+        self.curated_aliases_path = os.path.abspath(resolved_path)
+        self.curated_aliases_by_canonical = self.load_curated_aliases()
+
+    # -------------------------------------------------------------------------
+    def load_curated_aliases(self) -> dict[str, list[tuple[str, str]]]:
+        path = self.curated_aliases_path
+        if not os.path.exists(path):
+            logger.info("RxNav curated alias file not found at '%s'; skipping", path)
+            return {}
+        try:
+            with open(path, "r", encoding="utf-8") as handle:
+                payload = json.load(handle)
+        except (OSError, json.JSONDecodeError) as exc:
+            logger.warning(
+                "Failed to read RxNav curated alias file '%s': %s",
+                path,
+                exc,
+            )
+            return {}
+
+        records: list[Any]
+        if isinstance(payload, dict):
+            candidate_records = payload.get("aliases")
+            records = candidate_records if isinstance(candidate_records, list) else []
+        elif isinstance(payload, list):
+            records = payload
+        else:
+            records = []
+
+        curated: dict[str, dict[tuple[str, str], tuple[str, str]]] = {}
+        for record in records:
+            if not isinstance(record, dict):
+                continue
+            canonical_name = record.get("canonical_name")
+            if not isinstance(canonical_name, str):
+                continue
+            canonical_norm = normalize_drug_name(canonical_name)
+            if not canonical_norm:
+                continue
+            raw_kind = record.get("alias_kind")
+            alias_kind = (
+                str(raw_kind).strip().lower()
+                if isinstance(raw_kind, str) and str(raw_kind).strip()
+                else "synonym"
+            )
+            aliases: list[str] = []
+            alias_single = record.get("alias")
+            if isinstance(alias_single, str):
+                aliases.append(alias_single)
+            alias_list = record.get("aliases")
+            if isinstance(alias_list, list):
+                for value in alias_list:
+                    if isinstance(value, str):
+                        aliases.append(value)
+            for raw_alias in aliases:
+                alias = raw_alias.strip()
+                if not alias:
+                    continue
+                alias_norm = normalize_drug_name(alias)
+                if not alias_norm:
+                    continue
+                by_alias = curated.setdefault(canonical_norm, {})
+                key = (alias_norm, alias_kind)
+                if key not in by_alias:
+                    by_alias[key] = (alias, alias_kind)
+
+        return {
+            canonical: sorted(values.values(), key=lambda item: item[0].casefold())
+            for canonical, values in curated.items()
+        }
 
     # -------------------------------------------------------------------------
     def emit_progress(
@@ -921,42 +1015,63 @@ class RxNavDrugCatalogBuilder:
     ) -> tuple[dict[str, list[str]], dict[str, list[str]]]:
         alias_results: dict[str, list[str]] = {}
         synonym_results: dict[str, list[str]] = {}
+        concurrency_limit = max(1, int(self.rx_client.max_concurrency))
+        semaphore = asyncio.Semaphore(concurrency_limit)
+        chunk_size = max(concurrency_limit * 4, concurrency_limit)
+
         async with httpx.AsyncClient(
             timeout=self.rx_client.timeout,
             limits=self.rx_client._build_limits(),
         ) as client:
-            alias_tasks = {
-                cache_key: asyncio.create_task(
-                    self.rx_client.fetch_drug_terms_async(query, client=client)
-                )
-                for cache_key, query in pending_alias_queries.items()
-            }
-            synonym_tasks = {
-                identifier: asyncio.create_task(
-                    self.rx_client.fetch_rxcui_synonyms_async(identifier, client=client)
-                )
-                for identifier in pending_synonym_identifiers
-            }
-            for cache_key, task in alias_tasks.items():
-                try:
-                    alias_results[cache_key] = await task
-                except Exception as exc:  # noqa: BLE001
-                    logger.warning(
-                        "Failed to prefetch RxNav aliases for '%s': %s",
-                        pending_alias_queries.get(cache_key),
-                        exc,
+            alias_entries = list(pending_alias_queries.items())
+            for start in range(0, len(alias_entries), chunk_size):
+                chunk = alias_entries[start : start + chunk_size]
+                tasks = {
+                    cache_key: asyncio.create_task(
+                        run_with_semaphore(
+                            semaphore,
+                            lambda query=query: self.rx_client.fetch_drug_terms_async(
+                                query, client=client
+                            )
+                        )
                     )
-                    alias_results[cache_key] = []
-            for identifier, task in synonym_tasks.items():
-                try:
-                    synonym_results[identifier] = await task
-                except Exception as exc:  # noqa: BLE001
-                    logger.warning(
-                        "Failed to prefetch RxNav synonyms for '%s': %s",
-                        identifier,
-                        exc,
+                    for cache_key, query in chunk
+                }
+                for cache_key, task in tasks.items():
+                    try:
+                        alias_results[cache_key] = await task
+                    except Exception as exc:  # noqa: BLE001
+                        logger.warning(
+                            "Failed to prefetch RxNav aliases for '%s': %s",
+                            pending_alias_queries.get(cache_key),
+                            exc,
+                        )
+                        alias_results[cache_key] = []
+
+            synonym_entries = list(pending_synonym_identifiers)
+            for start in range(0, len(synonym_entries), chunk_size):
+                chunk = synonym_entries[start : start + chunk_size]
+                tasks = {
+                    identifier: asyncio.create_task(
+                        run_with_semaphore(
+                            semaphore,
+                            lambda identifier=identifier: self.rx_client.fetch_rxcui_synonyms_async(
+                                identifier, client=client
+                            )
+                        )
                     )
-                    synonym_results[identifier] = []
+                    for identifier in chunk
+                }
+                for identifier, task in tasks.items():
+                    try:
+                        synonym_results[identifier] = await task
+                    except Exception as exc:  # noqa: BLE001
+                        logger.warning(
+                            "Failed to prefetch RxNav synonyms for '%s': %s",
+                            identifier,
+                            exc,
+                        )
+                        synonym_results[identifier] = []
         return alias_results, synonym_results
 
     # -------------------------------------------------------------------------
@@ -964,7 +1079,10 @@ class RxNavDrugCatalogBuilder:
         frame = pd.DataFrame(batch)
         if frame.empty:
             return
-        self.serializer.upsert_drugs_catalog_records(frame)
+        self.serializer.upsert_drugs_catalog_records(
+            frame,
+            curated_aliases_by_canonical=self.curated_aliases_by_canonical,
+        )
 
     # -------------------------------------------------------------------------
     def stream_min_concepts(self, chunks: Iterator[bytes]) -> Iterator[dict[str, Any]]:
@@ -1381,4 +1499,6 @@ class RxNavDrugCatalogBuilder:
         if len(formatted) == 1:
             return formatted[0]
         return ", ".join(formatted)
+
+
 

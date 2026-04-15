@@ -1,0 +1,80 @@
+<app-modal-shell (close)="closed.emit()"
+  [isOpen]="isOpen"
+  [title]="providerLabel + ' Access Keys'"
+  subtitle="Stored encrypted at rest. Activate one key at a time for this provider."
+  dialogClassName="modal-container access-key-modal"
+  closeLabel="Close access key modal"
+>
+  <section class="modal-section">
+    <h3 class="modal-section-title">Add New Key</h3>
+    <div class="access-key-input-row">
+      <label class="visually-hidden" for="new-access-key-input">Access key</label>
+      <input
+        id="new-access-key-input"
+        class="access-key-input"
+        type="password"
+        placeholder="Paste access key"
+        [(ngModel)]="newKeyValue"
+        [disabled]="isSaving"
+      />
+      <button class="btn btn-primary access-key-add-btn" type="button" (click)="addKey()" [disabled]="isSaving">
+        Add
+      </button>
+    </div>
+  </section>
+
+  <section class="modal-section">
+    <h3 class="modal-section-title">Stored Keys</h3>
+    @if (isLoading) {
+      <p class="access-key-empty">Loading keys...</p>
+    }
+    @if (!isLoading && !hasKeys) {
+      <p class="access-key-empty">No keys stored for this provider.</p>
+    }
+    @if (!isLoading && hasKeys) {
+      <ul class="access-key-list">
+        @for (item of sortedKeys; track item.id) {
+          <li class="access-key-row" [class.is-active]="item.is_active">
+            <div class="access-key-meta">
+              <p class="access-key-fingerprint">{{ fingerprintLabel(item) }}</p>
+              <p class="access-key-timestamp">Last used: {{ lastUsedLabel(item) }}</p>
+            </div>
+            <div class="access-key-actions">
+              <button
+                class="access-key-action"
+                [class.is-active]="item.is_active"
+                type="button"
+                (click)="activateKey(item.id)"
+                [disabled]="isSaving"
+                [title]="item.is_active ? 'Active key' : 'Activate key'"
+              >
+                Active
+              </button>
+              <button
+                class="access-key-action"
+                type="button"
+                (click)="toggleVisibility(item.id)"
+                [disabled]="isSaving"
+                title="Toggle fingerprint view"
+              >
+                View
+              </button>
+              <button
+                class="access-key-action is-danger"
+                type="button"
+                (click)="deleteKey(item.id)"
+                [disabled]="isSaving"
+                title="Delete key"
+              >
+                Delete
+              </button>
+            </div>
+          </li>
+        }
+      </ul>
+    }
+  </section>
+
+  <app-status-message [message]="errorMessage ? '[ERROR] ' + errorMessage : ''" tone="is-error"></app-status-message>
+</app-modal-shell>
+

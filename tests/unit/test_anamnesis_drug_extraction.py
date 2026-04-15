@@ -91,3 +91,26 @@ def test_extract_drugs_from_anamnesis_chunks_long_input() -> None:
 
     assert client.call_count >= 2
     assert [entry.name for entry in parsed.entries] == ["Aspirin", "Metformin"]
+
+
+def test_extract_drugs_from_anamnesis_filters_non_drug_fragments() -> None:
+    fake_client = FakeStructuredClient(
+        [
+            PatientDrugs(
+                entries=[
+                    DrugEntry(name="Pemetrexed"),
+                    DrugEntry(name="Benziodiazepine"),
+                    DrugEntry(name="In riserva"),
+                    DrugEntry(name="il lunedi"),
+                    DrugEntry(name="ulteriore ciclo (originariamente previsto il"),
+                ]
+            )
+        ]
+    )
+    parser = DrugsParser(client=fake_client)
+
+    parsed = asyncio.run(
+        parser.extract_drugs_from_anamnesis("History includes oncology treatment.")
+    )
+
+    assert [entry.name for entry in parsed.entries] == ["Pemetrexed", "Benziodiazepine"]

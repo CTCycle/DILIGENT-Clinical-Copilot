@@ -3,50 +3,60 @@ from __future__ import annotations
 import inspect
 import threading
 import uuid
-from dataclasses import dataclass, field
+import asyncio
 from time import monotonic
 from typing import Any
 
 from collections.abc import Callable
 
 from DILIGENT.server.common.utils.logger import logger
+from DILIGENT.server.domain.jobs import JobState
+
+
+SENSITIVE_ERROR_TOKENS: tuple[str, ...] = (
+    "traceback",
+    "stack",
+    "token",
+    "secret",
+    "password",
+    "authorization",
+    "api key",
+    "access key",
+)
 
 
 ###############################################################################
-@dataclass
-class JobState:
-    job_id: str
-    job_type: str
-    status: str
-    progress: float = 0.0
-    result: dict[str, Any] | None = None
-    error: str | None = None
-    created_at: float = field(default_factory=monotonic)
-    completed_at: float | None = None
-    stop_requested: bool = False
-    lock: threading.Lock = field(default_factory=threading.Lock, init=False, repr=False)
+class JobErrorSanitizer:
+    # -------------------------------------------------------------------------
+    @staticmethod
+    def can_show_exception_message(message: str) -> bool:
+        candidate = message.strip()
+        if not candidate:
+            return False
+        if len(candidate) > 180:
+            return False
+        lowered = candidate.casefold()
+        return not any(token in lowered for token in SENSITIVE_ERROR_TOKENS)
 
     # -------------------------------------------------------------------------
-    def update(self, **kwargs: Any) -> None:
-        with self.lock:
-            for key, value in kwargs.items():
-                if hasattr(self, key):
-                    setattr(self, key, value)
+    @classmethod
+    def build_safe_job_error_message(cls, exc: Exception) -> str:
+        if isinstance(exc, (TimeoutError, asyncio.TimeoutError)):
+            return "Operation timed out. Please retry."
+        if isinstance(exc, FileNotFoundError):
+            return "A required file was not found. Check configuration and retry."
+        if isinstance(exc, ConnectionError):
+            return "A dependency could not be reached. Please retry shortly."
+        if isinstance(exc, ValueError):
+            candidate = str(exc).split("\n")[0]
+            if cls.can_show_exception_message(candidate):
+                return candidate
+            return "Input validation failed. Review the request and retry."
 
-    # -------------------------------------------------------------------------
-    def snapshot(self) -> dict[str, Any]:
-        with self.lock:
-            return {
-                "job_id": self.job_id,
-                "job_type": self.job_type,
-                "status": self.status,
-                "progress": self.progress,
-                "result": self.result,
-                "error": self.error,
-                "created_at": self.created_at,
-                "completed_at": self.completed_at,
-            }
-
+        candidate = str(exc).split("\n")[0]
+        if cls.can_show_exception_message(candidate):
+            return candidate
+        return "Operation failed unexpectedly. Please retry."
 
 ###############################################################################
 class JobManager:
@@ -194,9 +204,14 @@ class JobManager:
                 state.update(status="cancelled", completed_at=monotonic())
                 logger.info("Job %s cancelled during execution", job_id)
                 return
-            error_msg = str(exc).split("\n")[0][:200]
+            error_msg = JobErrorSanitizer.build_safe_job_error_message(exc)
             state.update(status="failed", error=error_msg, completed_at=monotonic())
-            logger.error("Job %s failed: %s", job_id, error_msg)
+            logger.error(
+                "Job %s failed type=%s message=%s",
+                job_id,
+                type(exc).__name__,
+                error_msg,
+            )
             logger.debug("Job %s error details", job_id, exc_info=True)
 
     # -------------------------------------------------------------------------
@@ -205,12 +220,14 @@ class JobManager:
             signature = inspect.signature(runner)
         except (TypeError, ValueError):
             return False
-        for param in signature.parameters.values():
-            if param.kind == param.VAR_KEYWORD:
+        parameters = list(signature.parameters.values())
+        for param in parameters:
+            if param.kind == inspect.Parameter.VAR_KEYWORD:
                 return True
-        return "job_id" in signature.parameters
+        return any(param.name == "job_id" for param in parameters)
 
 
 ###############################################################################
 job_manager = JobManager()
+
 

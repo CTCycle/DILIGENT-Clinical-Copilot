@@ -2,8 +2,8 @@ from __future__ import annotations
 
 import re
 
-SQL_IDENTIFIER_RE = re.compile(r"^[A-Za-z_][A-Za-z0-9_]*$")
-POSTGRES_DATABASE_NAME_RE = re.compile(r"^[A-Za-z0-9_][A-Za-z0-9_-]{0,62}$")
+SQL_IDENTIFIER_RE = re.compile(r"^[A-Za-z_]\w*$", re.ASCII)
+POSTGRES_DATABASE_NAME_RE = re.compile(r"^\w[\w-]{0,62}$", re.ASCII)
 
 
 # ----------------------------------------------------------------------------- 
