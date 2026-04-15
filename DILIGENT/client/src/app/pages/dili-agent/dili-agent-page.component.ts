@@ -73,8 +73,11 @@ export class DiliAgentPageComponent implements OnDestroy {
   }
 
   handlePatientImageSelection(event: Event): void {
-    const input = event.target as HTMLInputElement | null;
-    const file = input?.files?.[0];
+    const target = event.target;
+    if (!(target instanceof HTMLInputElement)) {
+      return;
+    }
+    const file = target.files?.[0];
     if (!file) {
       return;
     }
