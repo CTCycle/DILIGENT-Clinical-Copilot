@@ -3,6 +3,8 @@ from __future__ import annotations
 import asyncio
 import io
 import re
+import zipfile
+from collections.abc import Callable
 from typing import Any
 from xml.etree import ElementTree
 
@@ -17,6 +19,8 @@ from DILIGENT.server.common.constants import (
 )
 from DILIGENT.server.configurations.startup import server_settings
 from DILIGENT.server.repositories.serialization.data import DataSerializer
+
+ProgressCallback = Callable[[float, str], None]
 
 
 ###############################################################################
@@ -72,11 +76,44 @@ class DailyMedLabelUpdater:
         self.keyword_tokens = {token.casefold() for token in HEPATIC_KEYWORDS}
 
     # -------------------------------------------------------------------------
-    def update_labels(self, *, redownload: bool = False) -> dict[str, int]:
+    def update_labels(
+        self,
+        *,
+        redownload: bool = False,
+        progress_callback: ProgressCallback | None = None,
+        should_stop: Callable[[], bool] | None = None,
+    ) -> dict[str, int]:
         _ = redownload
-        targets = self.load_target_drugs()
+        self.emit_progress(progress_callback, progress=13.0, message="Loading drug catalog")
+        targets = self.load_target_drugs(
+            progress_callback=progress_callback,
+            should_stop=should_stop,
+        )
+        self.emit_progress(
+            progress_callback,
+            progress=20.0,
+            message=f"Resolved {len(targets)} DailyMed target drugs",
+        )
+        if self.should_cancel(should_stop):
+            raise RuntimeError("Drug labels update cancelled by user request")
+        self.emit_progress(
+            progress_callback,
+            progress=24.0,
+            message="Loading DailyMed RxNorm mapping",
+        )
         mapping = self.load_rxnorm_to_setid_mapping()
-        records = self.persist_documents(targets, mapping)
+        mapping_rows = sum(len(items) for items in mapping.values())
+        self.emit_progress(
+            progress_callback,
+            progress=30.0,
+            message=f"Loaded {mapping_rows} DailyMed mapping rows",
+        )
+        records = self.persist_documents(
+            targets,
+            mapping,
+            progress_callback=progress_callback,
+            should_stop=should_stop,
+        )
         return {
             "target_drugs": len(targets),
             "mapped_drugs": sum(1 for target in targets if target["rxcui"] in mapping),
@@ -84,18 +121,55 @@ class DailyMedLabelUpdater:
         }
 
     # -------------------------------------------------------------------------
-    def load_target_drugs(self) -> list[dict[str, Any]]:
-        catalog = self.serializer.stream_drugs_catalog()
+    def load_target_drugs(
+        self,
+        *,
+        progress_callback: ProgressCallback | None = None,
+        should_stop: Callable[[], bool] | None = None,
+    ) -> list[dict[str, Any]]:
+        catalog = self.serializer.get_drugs_catalog()
         if catalog.empty:
             return []
+        db_session = self.serializer.session_factory()
+        rxcui_to_drug_id: dict[str, int | None] = {}
         rows: list[dict[str, Any]] = []
-        for row in catalog.to_dict(orient="records"):
-            drug_id = self.serializer.to_int(row.get("drug_id"))
-            rxcui = self.clean_text(row.get("rxcui"))
-            drug_name = self.clean_text(row.get("canonical_name"))
-            if drug_id is None or rxcui is None or drug_name is None:
-                continue
-            rows.append({"drug_id": drug_id, "drug_name": drug_name, "rxcui": rxcui})
+        try:
+            total_rows = max(len(catalog), 1)
+            report_interval = max(1, total_rows // 25)
+            for index, row in enumerate(catalog.itertuples(index=False), start=1):
+                if self.should_cancel(should_stop):
+                    raise RuntimeError("Drug labels update cancelled by user request")
+                rxcui = self.clean_text(getattr(row, "rxcui", None))
+                drug_name = self.clean_text(getattr(row, "name", None)) or self.clean_text(
+                    getattr(row, "raw_name", None)
+                )
+                if rxcui is None or drug_name is None:
+                    continue
+                if rxcui not in rxcui_to_drug_id:
+                    rxcui_to_drug_id[rxcui] = self.serializer.resolve_drug_id(
+                        db_session,
+                        matched_drug_name=drug_name,
+                        rxcui=rxcui,
+                        nbk_id=None,
+                    )
+                drug_id = rxcui_to_drug_id[rxcui]
+                if drug_id is None:
+                    continue
+                rows.append({"drug_id": drug_id, "drug_name": drug_name, "rxcui": rxcui})
+                if progress_callback is not None and (
+                    index % report_interval == 0 or index == total_rows
+                ):
+                    progress = 13.0 + (index / total_rows) * 7.0
+                    self.emit_progress(
+                        progress_callback,
+                        progress=progress,
+                        message=(
+                            f"Resolved {len(rows)} DailyMed target drugs "
+                            f"({index}/{total_rows})"
+                        ),
+                    )
+        finally:
+            db_session.close()
         return rows
 
     # -------------------------------------------------------------------------
@@ -136,6 +210,18 @@ class DailyMedLabelUpdater:
 
     # -------------------------------------------------------------------------
     def parse_mapping_frame(self, content: bytes, content_type: str) -> pd.DataFrame:
+        if content.startswith(b"PK"):
+            try:
+                with zipfile.ZipFile(io.BytesIO(content)) as archive:
+                    for name in archive.namelist():
+                        lowered = name.lower()
+                        if lowered.endswith(".csv"):
+                            return pd.read_csv(io.BytesIO(archive.read(name)))
+                        if lowered.endswith((".txt", ".tsv")):
+                            text = archive.read(name).decode("utf-8", errors="ignore")
+                            return pd.read_csv(io.StringIO(text), sep="|")
+            except Exception:
+                return pd.DataFrame()
         if "csv" in content_type:
             return pd.read_csv(io.BytesIO(content))
         if "excel" in content_type or "spreadsheet" in content_type:
@@ -176,12 +262,11 @@ class DailyMedLabelUpdater:
         return sorted_pool[0] if sorted_pool else None
 
     # -------------------------------------------------------------------------
-    async def download_label_xml(self, set_id: str) -> str:
+    async def download_label_xml(self, set_id: str, *, client: httpx.AsyncClient) -> str:
         url = f"{DAILYMED_LABEL_XML_BASE_URL}/{set_id}.xml"
-        async with httpx.AsyncClient(timeout=self.request_timeout, follow_redirects=True) as client:
-            response = await client.get(url)
-            response.raise_for_status()
-            return response.text
+        response = await client.get(url)
+        response.raise_for_status()
+        return response.text
 
     # -------------------------------------------------------------------------
     def extract_relevant_sections(self, xml_text: str) -> list[dict[str, Any]]:
@@ -247,17 +332,19 @@ class DailyMedLabelUpdater:
         self,
         targets: list[dict[str, Any]],
         mapping: dict[str, list[dict[str, Any]]],
+        *,
+        progress_callback: ProgressCallback | None = None,
+        should_stop: Callable[[], bool] | None = None,
     ) -> list[dict[str, Any]]:
         loop = asyncio.new_event_loop()
         asyncio.set_event_loop(loop)
-        semaphore = asyncio.Semaphore(self.max_concurrency)
-
         try:
             rows = loop.run_until_complete(
-                self.gather_persistable_rows(
+                self._persist_documents_async(
                     targets=targets,
                     mapping=mapping,
-                    semaphore=semaphore,
+                    progress_callback=progress_callback,
+                    should_stop=should_stop,
                 )
             )
         finally:
@@ -267,29 +354,83 @@ class DailyMedLabelUpdater:
         return rows
 
     # -------------------------------------------------------------------------
+    async def _persist_documents_async(
+        self,
+        *,
+        targets: list[dict[str, Any]],
+        mapping: dict[str, list[dict[str, Any]]],
+        progress_callback: ProgressCallback | None = None,
+        should_stop: Callable[[], bool] | None = None,
+    ) -> list[dict[str, Any]]:
+        limits = httpx.Limits(
+            max_connections=self.max_concurrency,
+            max_keepalive_connections=self.max_concurrency,
+        )
+        async with httpx.AsyncClient(
+            timeout=self.request_timeout,
+            follow_redirects=True,
+            limits=limits,
+        ) as client:
+            return await self.gather_persistable_rows(
+                targets=targets,
+                mapping=mapping,
+                client=client,
+                progress_callback=progress_callback,
+                should_stop=should_stop,
+            )
+
+    # -------------------------------------------------------------------------
     async def gather_persistable_rows(
         self,
         *,
         targets: list[dict[str, Any]],
         mapping: dict[str, list[dict[str, Any]]],
-        semaphore: asyncio.Semaphore,
+        client: httpx.AsyncClient,
+        progress_callback: ProgressCallback | None = None,
+        should_stop: Callable[[], bool] | None = None,
     ) -> list[dict[str, Any]]:
-        tasks = [
-            asyncio.create_task(
-                self.load_document_row(
+        total = len(targets)
+        if total == 0:
+            return []
+        results: list[dict[str, Any] | None] = [None] * total
+        queue: asyncio.Queue[tuple[int, dict[str, Any]] | None] = asyncio.Queue()
+        for index, target in enumerate(targets):
+            queue.put_nowait((index, target))
+        worker_count = min(self.max_concurrency, total)
+        for _ in range(worker_count):
+            queue.put_nowait(None)
+        completed = 0
+        report_interval = max(1, total // 50)
+        error_message = "Drug labels update cancelled by user request"
+
+        async def worker() -> None:
+            nonlocal completed
+            while True:
+                item = await queue.get()
+                if item is None:
+                    return
+                index, target = item
+                if self.should_cancel(should_stop):
+                    raise RuntimeError(error_message)
+                result = await self.load_document_row(
                     target=target,
                     mapping=mapping,
-                    semaphore=semaphore,
+                    client=client,
                 )
-            )
-            for target in targets
-        ]
-        rows: list[dict[str, Any]] = []
-        for task in tasks:
-            result = await task
-            if result is not None:
-                rows.append(result)
-        return rows
+                results[index] = result
+                completed += 1
+                if progress_callback is not None and (
+                    completed % report_interval == 0 or completed == total
+                ):
+                    progress = 30.0 + (completed / total) * 58.0
+                    self.emit_progress(
+                        progress_callback,
+                        progress=progress,
+                        message=f"Downloaded {completed}/{total} DailyMed labels",
+                    )
+
+        await asyncio.gather(*(worker() for _ in range(worker_count)))
+        return [item for item in results if item is not None]
 
     # -------------------------------------------------------------------------
     async def load_document_row(
@@ -297,7 +438,7 @@ class DailyMedLabelUpdater:
         *,
         target: dict[str, Any],
         mapping: dict[str, list[dict[str, Any]]],
-        semaphore: asyncio.Semaphore,
+        client: httpx.AsyncClient,
     ) -> dict[str, Any] | None:
         best = self.select_best_label_for_drug(target["rxcui"], mapping)
         if best is None:
@@ -305,8 +446,7 @@ class DailyMedLabelUpdater:
         set_id = self.clean_text(best.get("set_id"))
         if set_id is None:
             return None
-        async with semaphore:
-            xml_text = await self.download_label_xml(set_id)
+        xml_text = await self.download_label_xml(set_id, client=client)
         sections = self.extract_relevant_sections(xml_text)
         if not sections:
             return None
@@ -339,6 +479,23 @@ class DailyMedLabelUpdater:
             if key in normalized:
                 return value
         return None
+
+    # -------------------------------------------------------------------------
+    def emit_progress(
+        self,
+        progress_callback: ProgressCallback | None,
+        *,
+        progress: float,
+        message: str,
+    ) -> None:
+        if progress_callback is None:
+            return
+        progress_callback(progress, message)
+
+    # -------------------------------------------------------------------------
+    @staticmethod
+    def should_cancel(should_stop: Callable[[], bool] | None) -> bool:
+        return bool(should_stop and should_stop())
 
     # -------------------------------------------------------------------------
     @staticmethod

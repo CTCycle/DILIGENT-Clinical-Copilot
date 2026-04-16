@@ -155,12 +155,6 @@ class DataInspectionService:
         elif target == "dili_priors":
             source = config.get("external_data", {})
             defaults = {
-                "dili_priors_request_timeout": float(
-                    source.get(
-                        "dili_priors_request_timeout",
-                        server_settings.external_data.dili_priors_request_timeout,
-                    )
-                ),
                 "redownload": False,
             }
             allowed_fields = list(defaults.keys())
@@ -931,7 +925,9 @@ class DataInspectionService:
             max_concurrency=override_values.get("dailymed_max_concurrency"),
         )
         result = updater.update_labels(
-            redownload=bool(override_values.get("redownload", False))
+            redownload=bool(override_values.get("redownload", False)),
+            progress_callback=progress_callback,
+            should_stop=stop_check,
         )
         self.report_phase_by_target(
             job_id=job_id,
