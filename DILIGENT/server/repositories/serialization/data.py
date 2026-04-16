@@ -1300,6 +1300,7 @@ class _RepositorySerializationService:
             db_session.execute(delete(DrugLabelSection))
             db_session.execute(delete(DrugLabelDocument))
             db_session.flush()
+            deduped: dict[tuple[str, str, int], dict[str, Any]] = {}
             for record in records:
                 drug_id = self.to_int(record.get("drug_id"))
                 source = self.normalize_string(record.get("source"))
@@ -1307,18 +1308,34 @@ class _RepositorySerializationService:
                 spl_version = self.to_int(record.get("spl_version"))
                 if drug_id is None or source is None or set_id is None or spl_version is None:
                     continue
-                document = DrugLabelDocument(
-                    drug_id=drug_id,
-                    source=source,
-                    set_id=set_id,
-                    spl_version=spl_version,
-                    title=self.normalize_string(record.get("title")),
-                    labeler=self.normalize_string(record.get("labeler")),
-                    effective_date=self.normalize_date(record.get("effective_date")),
-                    source_url=self.normalize_string(record.get("source_url")),
-                    source_last_modified=self.normalize_string(
+                key = (source, set_id, spl_version)
+                if key in deduped:
+                    continue
+                deduped[key] = {
+                    "drug_id": drug_id,
+                    "source": source,
+                    "set_id": set_id,
+                    "spl_version": spl_version,
+                    "title": self.normalize_string(record.get("title")),
+                    "labeler": self.normalize_string(record.get("labeler")),
+                    "effective_date": self.normalize_date(record.get("effective_date")),
+                    "source_url": self.normalize_string(record.get("source_url")),
+                    "source_last_modified": self.normalize_string(
                         record.get("source_last_modified")
                     ),
+                    "sections": record.get("sections"),
+                }
+            for record in deduped.values():
+                document = DrugLabelDocument(
+                    drug_id=int(record["drug_id"]),
+                    source=str(record["source"]),
+                    set_id=str(record["set_id"]),
+                    spl_version=int(record["spl_version"]),
+                    title=record["title"],
+                    labeler=record["labeler"],
+                    effective_date=record["effective_date"],
+                    source_url=record["source_url"],
+                    source_last_modified=record["source_last_modified"],
                 )
                 db_session.add(document)
                 db_session.flush()

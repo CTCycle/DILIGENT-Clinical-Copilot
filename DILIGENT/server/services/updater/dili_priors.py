@@ -1,6 +1,10 @@
 from __future__ import annotations
 
 import io
+from html import unescape
+from html.parser import HTMLParser
+import json
+import re
 from typing import Any
 
 import httpx
@@ -16,7 +20,75 @@ from DILIGENT.server.services.text.normalization import normalize_drug_name
 
 
 ###############################################################################
+class _HTMLTableParser(HTMLParser):
+    def __init__(self) -> None:
+        super().__init__()
+        self.tables: list[list[list[tuple[str, str]]]] = []
+        self._in_table = False
+        self._current_table: list[list[tuple[str, str]]] = []
+        self._current_row: list[tuple[str, str]] | None = None
+        self._current_cell_tag: str | None = None
+        self._current_cell_parts: list[str] = []
+
+    # ---------------------------------------------------------------------
+    def handle_starttag(self, tag: str, attrs: list[tuple[str, str | None]]) -> None:
+        _ = attrs
+        tag = tag.casefold()
+        if tag == "table":
+            self._in_table = True
+            self._current_table = []
+        elif self._in_table and tag == "tr":
+            self._current_row = []
+        elif self._in_table and tag in {"th", "td"}:
+            self._current_cell_tag = tag
+            self._current_cell_parts = []
+
+    # ---------------------------------------------------------------------
+    def handle_endtag(self, tag: str) -> None:
+        tag = tag.casefold()
+        if not self._in_table:
+            return
+        if tag in {"th", "td"} and self._current_cell_tag == tag:
+            if self._current_row is not None:
+                self._current_row.append((tag, unescape("".join(self._current_cell_parts).strip())))
+            self._current_cell_tag = None
+            self._current_cell_parts = []
+        elif tag == "tr":
+            if self._current_row:
+                self._current_table.append(self._current_row)
+            self._current_row = None
+        elif tag == "table":
+            if self._current_table:
+                self.tables.append(self._current_table)
+            self._in_table = False
+            self._current_table = []
+            self._current_row = None
+            self._current_cell_tag = None
+            self._current_cell_parts = []
+
+    # ---------------------------------------------------------------------
+    def handle_data(self, data: str) -> None:
+        if self._current_cell_tag is not None:
+            self._current_cell_parts.append(data)
+
+
+###############################################################################
 class DiliPriorUpdater:
+    HEADER_TOKENS = {
+        "ltkbid",
+        "compoundname",
+        "severityclass",
+        "labelsection",
+        "vdiliconcern",
+        "comment",
+        "dilistid",
+        "dilistclassification",
+        "routesofadministration",
+        "compoundname",
+        "compound",
+        "routeofadministration",
+    }
+
     def __init__(
         self,
         *,
@@ -66,6 +138,11 @@ class DiliPriorUpdater:
             response.raise_for_status()
             content_type = (response.headers.get("content-type") or "").lower()
             content = response.content
+            text = response.text
+        if "html" in content_type or "<table" in text.casefold():
+            tables = self.parse_html_tables(text)
+            if tables:
+                return max(tables, key=lambda frame: (int(frame.shape[0]), int(frame.shape[1])))
         if "csv" in content_type:
             return pd.read_csv(io.BytesIO(content))
         if "excel" in content_type or "spreadsheet" in content_type:
@@ -80,19 +157,81 @@ class DiliPriorUpdater:
             return pd.DataFrame()
 
     # -------------------------------------------------------------------------
+    def parse_html_tables(self, text: str) -> list[pd.DataFrame]:
+        parser = _HTMLTableParser()
+        parser.feed(text)
+        frames: list[pd.DataFrame] = []
+        for table in parser.tables:
+            if not table:
+                continue
+            header_row = table[0]
+            has_header = bool(header_row) and all(cell_tag == "th" for cell_tag, _ in header_row)
+            if not has_header:
+                has_header = self.looks_like_header_row(header_row)
+            if has_header:
+                columns = [cell_text or f"column_{index + 1}" for index, (_, cell_text) in enumerate(header_row)]
+                rows = [
+                    [cell_text for _, cell_text in row]
+                    for row in table[1:]
+                    if any(cell_text for _, cell_text in row)
+                ]
+                frame = pd.DataFrame(rows, columns=columns)
+            else:
+                max_columns = max(len(row) for row in table)
+                rows = [
+                    [cell_text for _, cell_text in row] + [None] * (max_columns - len(row))
+                    for row in table
+                    if any(cell_text for _, cell_text in row)
+                ]
+                frame = pd.DataFrame(rows, columns=[f"column_{index + 1}" for index in range(max_columns)])
+            if not frame.empty:
+                frames.append(frame)
+        return frames
+
+    # -------------------------------------------------------------------------
+    def looks_like_header_row(self, row: list[tuple[str, str]]) -> bool:
+        normalized = [self.normalize_header_token(text) for _, text in row if text]
+        if len(normalized) < 2:
+            return False
+        header_hits = sum(1 for token in normalized if token in self.HEADER_TOKENS)
+        return header_hits >= max(2, len(normalized) - 1)
+
+    # -------------------------------------------------------------------------
+    @staticmethod
+    def normalize_header_token(value: str) -> str:
+        return re.sub(r"[^a-z0-9]+", "", value.casefold())
+
+    # -------------------------------------------------------------------------
     def parse_dilirank(self, frame: pd.DataFrame) -> pd.DataFrame:
         if frame.empty:
             return self.empty_annotation_frame()
         working = frame.copy().where(pd.notnull(frame), None)
         lowered = {str(column).strip().lower(): column for column in working.columns}
-        name_column = self.pick_column(lowered, ["drug", "drug_name", "name"])
-        record_column = self.pick_column(lowered, ["id", "dilirank_id", "record_id"])
+        name_column = self.pick_column(
+            lowered,
+            ["drug", "drug_name", "name", "compoundname", "compound name", "compound"],
+        )
+        record_column = self.pick_column(
+            lowered,
+            ["id", "dilirank_id", "record_id", "ltkbid", "ltkb_id"],
+        )
         classification_column = self.pick_column(
             lowered,
-            ["dilirank", "classification", "class"],
+            [
+                "dilirank",
+                "classification",
+                "class",
+                "vdili-concern",
+                "vdili concern",
+                "vdili_concern",
+            ],
         )
-        severity_column = self.pick_column(lowered, ["severity", "severity_class"])
-        concern_column = self.pick_column(lowered, ["concern", "concern_class"])
+        severity_column = self.pick_column(lowered, ["severity", "severity_class", "severityclass"])
+        concern_column = self.pick_column(
+            lowered,
+            ["concern", "concern_class", "dililst", "dilist", "dilist classification"],
+        )
+        label_section_column = self.pick_column(lowered, ["label_section", "labelsection", "label section"])
         comment_column = self.pick_column(lowered, ["comment", "notes"])
         rows: list[dict[str, Any]] = []
         for index, row in enumerate(working.to_dict(orient="records"), start=1):
@@ -110,7 +249,7 @@ class DiliPriorUpdater:
                     "classification": self.clean_text(row.get(classification_column)),
                     "severity_class": self.clean_text(row.get(severity_column)),
                     "concern_class": self.clean_text(row.get(concern_column)),
-                    "label_section": None,
+                    "label_section": self.clean_text(row.get(label_section_column)),
                     "routes": None,
                     "comment": self.clean_text(row.get(comment_column)),
                     "source_url": DILIRANK_SOURCE_URL,
@@ -125,12 +264,31 @@ class DiliPriorUpdater:
             return self.empty_annotation_frame()
         working = frame.copy().where(pd.notnull(frame), None)
         lowered = {str(column).strip().lower(): column for column in working.columns}
-        name_column = self.pick_column(lowered, ["drug", "drug_name", "name"])
-        record_column = self.pick_column(lowered, ["id", "dilist_id", "record_id"])
-        classification_column = self.pick_column(lowered, ["classification", "class", "category"])
+        name_column = self.pick_column(
+            lowered,
+            ["drug", "drug_name", "name", "compoundname", "compound name", "compound"],
+        )
+        record_column = self.pick_column(
+            lowered,
+            ["id", "dilist_id", "record_id", "ltkbid", "ltkb_id"],
+        )
+        classification_column = self.pick_column(
+            lowered,
+            [
+                "classification",
+                "class",
+                "category",
+                "dilist",
+                "dilist classification",
+                "dilist_classification",
+            ],
+        )
         concern_column = self.pick_column(lowered, ["concern", "concern_class"])
-        route_column = self.pick_column(lowered, ["route", "routes"])
-        label_section_column = self.pick_column(lowered, ["label_section", "section"])
+        route_column = self.pick_column(
+            lowered,
+            ["route", "routes", "route of administration", "routes of administration"],
+        )
+        label_section_column = self.pick_column(lowered, ["label_section", "section", "label section"])
         comment_column = self.pick_column(lowered, ["comment", "notes"])
         rows: list[dict[str, Any]] = []
         for index, row in enumerate(working.to_dict(orient="records"), start=1):
@@ -171,46 +329,33 @@ class DiliPriorUpdater:
                 "unmatched_rows": 0,
                 "ambiguous_rows": 0,
             }
-        by_canonical: dict[str, set[int]] = {}
-        by_alias: dict[str, set[int]] = {}
-        stream = self.serializer.stream_drugs_catalog()
-        for row in stream.to_dict(orient="records"):
-            drug_id = self.serializer.to_int(row.get("drug_id"))
-            if drug_id is None:
-                continue
-            canonical = self.clean_text(row.get("canonical_name_norm"))
-            if canonical:
-                by_canonical.setdefault(canonical, set()).add(drug_id)
-            for alias in row.get("aliases", []) or []:
-                if not isinstance(alias, dict):
-                    continue
-                alias_norm = self.clean_text(alias.get("alias_norm"))
-                if alias_norm:
-                    by_alias.setdefault(alias_norm, set()).add(drug_id)
+        db_session = self.serializer.session_factory()
         linked_rows = 0
         ambiguous_rows = 0
         unmatched_rows = 0
         rows: list[dict[str, Any]] = []
-        for row in frame.to_dict(orient="records"):
-            source_name_norm = self.clean_text(row.get("source_name_norm"))
-            matched_ids = set(by_canonical.get(source_name_norm or "", set()))
-            if not matched_ids:
-                matched_ids = set(by_alias.get(source_name_norm or "", set()))
-            matched_id: int | None = None
-            if len(matched_ids) == 1:
-                matched_id = next(iter(matched_ids))
-                linked_rows += 1
-            elif len(matched_ids) > 1:
-                ambiguous_rows += 1
-            else:
-                unmatched_rows += 1
-            rows.append(
-                {
-                    **row,
-                    "source_dataset": source_dataset,
-                    "drug_id": matched_id,
-                }
-            )
+        try:
+            for row in frame.to_dict(orient="records"):
+                source_name = self.clean_text(row.get("source_name"))
+                matched_id = self.serializer.resolve_drug_id(
+                    db_session,
+                    matched_drug_name=source_name,
+                    rxcui=None,
+                    nbk_id=None,
+                )
+                if matched_id is not None:
+                    linked_rows += 1
+                else:
+                    unmatched_rows += 1
+                rows.append(
+                    {
+                        **row,
+                        "source_dataset": source_dataset,
+                        "drug_id": matched_id,
+                    }
+                )
+        finally:
+            db_session.close()
         return pd.DataFrame(rows), {
             "downloaded_rows": len(rows),
             "linked_rows": linked_rows,
@@ -239,6 +384,7 @@ class DiliPriorUpdater:
             if candidate in mapping:
                 return mapping[candidate]
         return None
+
 
     # -------------------------------------------------------------------------
     @staticmethod
