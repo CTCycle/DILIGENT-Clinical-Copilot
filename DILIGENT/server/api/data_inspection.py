@@ -636,17 +636,17 @@ class DataInspectionEndpoint:
             status_code=status.HTTP_200_OK,
         )
         self.router.add_api_route(
-            "/dili-priors/{drug_id}",
-            self.get_dili_prior_details,
-            methods=["GET"],
-            response_model=DiliPriorDetailResponse,
-            status_code=status.HTTP_200_OK,
-        )
-        self.router.add_api_route(
             "/dili-priors/update-config",
             self.get_dili_priors_update_config,
             methods=["GET"],
             response_model=InspectionUpdateConfigResponse,
+            status_code=status.HTTP_200_OK,
+        )
+        self.router.add_api_route(
+            "/dili-priors/{drug_id}",
+            self.get_dili_prior_details,
+            methods=["GET"],
+            response_model=DiliPriorDetailResponse,
             status_code=status.HTTP_200_OK,
         )
         self.router.add_api_route(
