@@ -15,7 +15,6 @@ from DILIGENT.server.services.session_service import (
     build_failed_session_payload,
     execute_clinical_job,
     run_clinical_job,
-    set_clinical_session_service,
 )
 
 job_manager = session_service_module.job_manager
@@ -77,7 +76,6 @@ endpoint = ClinicalSessionEndpoint(
     payload_sanitizer=session_service_module.payload_sanitization_service,
     router=router,
 )
-set_clinical_session_service(endpoint)
 
 
 ###############################################################################
