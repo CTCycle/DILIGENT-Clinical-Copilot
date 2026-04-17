@@ -305,17 +305,18 @@ start "" /b "%uv_exe%" run --no-sync --python "%python_exe%" python -m uvicorn %
 REM ============================================================================
 REM Wait for backend
 REM ============================================================================
-echo [WAIT] Waiting for backend to be ready on port !FASTAPI_PORT!...
-for /L %%i in (1,1,20) do (
-  netstat -ano | findstr ":!FASTAPI_PORT!" | findstr "LISTENING" >nul
+set "BACKEND_BASE_URL=http://!FASTAPI_HOST!:!FASTAPI_PORT!"
+echo [WAIT] Waiting for backend readiness at !BACKEND_BASE_URL!...
+for /L %%i in (1,1,60) do (
+  powershell -NoLogo -NoProfile -ExecutionPolicy Bypass -Command "$base='!BACKEND_BASE_URL!'; $paths=@('/api/health','/health','/docs','/'); foreach ($p in $paths) { try { $r = Invoke-WebRequest -UseBasicParsing -Uri ($base + $p) -TimeoutSec 2; if ($r.StatusCode -ge 200 -and $r.StatusCode -lt 300) { exit 0 } } catch {} }; exit 1" >nul 2>&1
   if !errorlevel! equ 0 goto :backend_ready_check
-  timeout /t 1 /nobreak >nul
+  timeout /t 1 /nobreak >nul 2>&1
 )
-echo [WARN] Timed out waiting for backend. Proceeding to launch frontend...
+echo [FATAL] Backend did not become ready at !BACKEND_BASE_URL! (checked /api/health, /health, /docs, /).
+goto error
 :backend_ready_check
 
-echo [RUN] Launching frontend
-pushd "%FRONTEND_DIR%" >nul
+echo [RUN] Launching frontendpushd "%FRONTEND_DIR%" >nul
 call :kill_port !UI_PORT!
 start "" /b "%NPM_CMD%" run preview -- --host !UI_HOST! --port !UI_PORT! --strictPort
 popd >nul
