@@ -46,6 +46,7 @@ Current documentation inventory (exhaustive):
 - Use explicit contracts at boundaries (API schema, typed payloads, structured errors).
 - Prioritize deterministic behavior and testability.
 - Keep security defaults strict: input validation, least privilege, and no secret leakage.
+- Do not use global variables or the `global` keyword. Pass dependencies/state explicitly via parameters, constructors, or scoped containers.
 
 ## 4. Execution rules
 
