@@ -20,7 +20,7 @@ import {
   cancelClinicalJob,
   pollClinicalJobStatus,
   startClinicalJob,
-} from '../../core/services/api';
+} from '../../core/services/clinical-api';
 
 const todayIso = new Date().toISOString().slice(0, 10);
 const DEFAULT_POLL_INTERVAL_MS = 1000;
@@ -348,3 +348,4 @@ export class DiliAgentPageComponent implements OnDestroy {
     return DEFAULT_POLL_INTERVAL_MS;
   }
 }
+

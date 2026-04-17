@@ -13,9 +13,28 @@ service = ModelConfigService(serializer=serializer)
 
 ###############################################################################
 class ModelConfigEndpoint:
-    def __init__(self, *, router: APIRouter, service: ModelConfigService) -> None:
+    def __init__(
+        self,
+        *,
+        router: APIRouter,
+        service: ModelConfigService | None = None,
+        serializer: ModelConfigSerializer | None = None,
+    ) -> None:
         self.router = router
-        self.service = service
+        if service is not None:
+            self.service = service
+        else:
+            resolved_serializer = serializer or ModelConfigSerializer()
+            self.service = ModelConfigService(serializer=resolved_serializer)
+        self.serializer = self.service.serializer
+
+    # -------------------------------------------------------------------------
+    def ensure_defaults(self):
+        return self.service.ensure_defaults()
+
+    # -------------------------------------------------------------------------
+    def apply_runtime_snapshot(self, snapshot) -> None:
+        self.service.apply_runtime_snapshot(snapshot)
 
     # -------------------------------------------------------------------------
     async def get_state(self) -> ModelConfigStateResponse:

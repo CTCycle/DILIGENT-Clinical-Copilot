@@ -30,7 +30,7 @@ import {
   fetchModelPullJobStatus,
   startModelPullJob,
   updateModelConfigState,
-} from '../../core/services/api';
+} from '../../core/services/model-config-api';
 import { JobPollingService } from '../../core/services/job-polling.service';
 import { AccessKeyModalComponent } from './components/access-key-modal.component';
 
@@ -512,3 +512,4 @@ export class ModelConfigPageComponent implements OnInit {
     return this.activeFilters()[key];
   }
 }
+

@@ -42,7 +42,7 @@ import {
   startInspectionLiverToxUpdateJob,
   startInspectionRagUpdateJob,
   startInspectionRxNavUpdateJob,
-} from '../../core/services/api';
+} from '../../core/services/inspection-api';
 import { JobPollingService } from '../../core/services/job-polling.service';
 import {
   InspectionDateFilterMode,
@@ -1122,3 +1122,4 @@ export class DataInspectionPageComponent implements OnInit, OnDestroy {
     await this.loadRag();
   }
 }
+

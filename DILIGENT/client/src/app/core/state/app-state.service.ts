@@ -2,7 +2,7 @@ import { Injectable, effect, signal } from '@angular/core';
 
 import { DEFAULT_FORM_STATE, DEFAULT_SETTINGS } from '../constants';
 import { buildRuntimeSettingsFromConfig } from '../model-config';
-import { fetchModelConfigState } from '../services/api';
+import { fetchModelConfigState } from '../services/model-config-api';
 import { ClinicalFormState, JobStatus, RuntimeSettings } from '../models/types';
 
 export type PageId = 'dili-agent' | 'data-inspection' | 'model-config';
@@ -122,3 +122,4 @@ export class AppStateService {
     }
   }
 }
+
