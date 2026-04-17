@@ -17,8 +17,8 @@ from typing import Any, Literal, NoReturn, TypeAlias
 
 import httpx
 
-from DILIGENT.server.models.cloud import CloudLLMClient, LLMError, LLMTimeout
-from DILIGENT.server.models.structured import StructuredOutputParser, parse_json_dict, T
+from DILIGENT.server.services.llm.cloud import CloudLLMClient, LLMError, LLMTimeout
+from DILIGENT.server.services.llm.structured import StructuredOutputParser, parse_json_dict, T
 from DILIGENT.server.configurations.startup import server_settings
 from DILIGENT.server.configurations.llm_configs import LLMRuntimeConfig
 from DILIGENT.server.common.constants import (

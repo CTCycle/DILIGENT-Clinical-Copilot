@@ -12,7 +12,7 @@ from fastapi.responses import PlainTextResponse
 from pydantic import ValidationError
 from pydantic_core import ErrorDetails
 
-from DILIGENT.server.models.cloud import LLMError
+from DILIGENT.server.services.llm.cloud import LLMError
 
 from DILIGENT.server.domain.clinical.entities import (
     ClinicalLabEntry,

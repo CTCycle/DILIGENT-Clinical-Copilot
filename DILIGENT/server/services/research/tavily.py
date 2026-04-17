@@ -18,7 +18,7 @@ from DILIGENT.server.domain.research.entities import (
     ResearchSource,
 )
 from DILIGENT.server.domain.research.extras import TavilySearchOutcome
-from DILIGENT.server.models.providers import initialize_llm_client
+from DILIGENT.server.services.llm.providers import initialize_llm_client
 from DILIGENT.server.repositories.serialization.access_keys import AccessKeySerializer
 
 

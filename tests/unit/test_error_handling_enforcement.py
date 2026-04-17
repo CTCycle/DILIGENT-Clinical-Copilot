@@ -15,7 +15,7 @@ from DILIGENT.server.api import access_keys as access_keys_api
 from DILIGENT.server.api import data_inspection as data_inspection_api
 from DILIGENT.server.api import ollama as ollama_api
 from DILIGENT.server.api.error_handling import REQUEST_ID_HEADER, register_error_handling
-from DILIGENT.server.models.providers import OllamaError
+from DILIGENT.server.services.llm.providers import OllamaError
 from DILIGENT.server.services.jobs import JobManager
 from DILIGENT.server.services.research import tavily as tavily_module
 from DILIGENT.server.services.research.tavily import TavilyResearchService

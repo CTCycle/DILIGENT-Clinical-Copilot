@@ -9,7 +9,7 @@ from DILIGENT.server.common.constants import GEMINI_API_BASE, OPENAI_API_BASE
 from DILIGENT.server.common.utils.logger import logger
 from DILIGENT.server.configurations.startup import server_settings
 from DILIGENT.server.configurations.llm_configs import LLMRuntimeConfig
-from DILIGENT.server.models.structured import StructuredOutputParser, parse_json_dict, T
+from DILIGENT.server.services.llm.structured import StructuredOutputParser, parse_json_dict, T
 from DILIGENT.server.repositories.serialization.access_keys import AccessKeySerializer
 
 ProviderName = Literal["openai", "azure-openai", "anthropic", "gemini"]

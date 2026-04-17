@@ -9,8 +9,8 @@ from typing import Any, Literal, cast
 from DILIGENT.server.configurations.startup import server_settings
 from DILIGENT.server.common.constants import CLOUD_MODEL_CHOICES, VECTOR_DB_PATH
 from DILIGENT.server.common.utils.logger import logger
-from DILIGENT.server.models.cloud import CloudLLMClient
-from DILIGENT.server.models.providers import OllamaClient
+from DILIGENT.server.services.llm.cloud import CloudLLMClient
+from DILIGENT.server.services.llm.providers import OllamaClient
 from DILIGENT.server.repositories.vectors import LanceVectorDatabase
 
 ProviderName = Literal["openai", "azure-openai", "anthropic", "gemini"]
