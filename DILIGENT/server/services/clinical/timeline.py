@@ -14,8 +14,8 @@ from DILIGENT.server.domain.patient_timeline import (
     PatientTimelineEvent,
     PatientTimelineExtraction,
 )
-from DILIGENT.server.models.prompts import PATIENT_TIMELINE_EXTRACTION_PROMPT
-from DILIGENT.server.models.providers import initialize_llm_client
+from DILIGENT.server.services.prompts import PATIENT_TIMELINE_EXTRACTION_PROMPT
+from DILIGENT.server.services.llm.providers import initialize_llm_client
 
 
 DATE_PREFIX_RE = re.compile(r"^\d{4}-\d{2}-\d{2}$")

@@ -5,7 +5,7 @@ import time
 from unittest.mock import AsyncMock
 
 from DILIGENT.server.configurations.llm_configs import LLMRuntimeConfig
-from DILIGENT.server.models.providers import OllamaClient
+from DILIGENT.server.services.llm.providers import OllamaClient
 
 
 # -----------------------------------------------------------------------------

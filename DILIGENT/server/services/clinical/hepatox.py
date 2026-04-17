@@ -8,14 +8,14 @@ from collections.abc import Callable
 from datetime import date, datetime
 from typing import Any
 
-from DILIGENT.server.models.prompts import (
+from DILIGENT.server.services.prompts import (
     LIVERTOX_CONCLUSION_SYSTEM_PROMPT,
     LIVERTOX_CONCLUSION_USER_PROMPT,
     LIVERTOX_CLINICAL_SYSTEM_PROMPT,
     LIVERTOX_CLINICAL_USER_PROMPT,
     LIVERTOX_REPORT_EXAMPLE,
 )
-from DILIGENT.server.models.providers import initialize_llm_client
+from DILIGENT.server.services.llm.providers import initialize_llm_client
 from DILIGENT.server.domain.clinical.entities import (
     ClinicalLabEntry,
     ClinicalPipelineValidationError,

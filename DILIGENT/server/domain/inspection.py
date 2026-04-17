@@ -149,7 +149,28 @@ class DiliPriorDetailResponse(BaseModel):
     model_config = ConfigDict(extra="forbid")
     drug_id: int
     drug_name: str
-    annotations: list[dict[str, Any]] = Field(default_factory=list)
+    annotations: list["DiliPriorAnnotation"] = Field(default_factory=list)
+
+
+###############################################################################
+class DiliPriorAnnotation(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+    source_dataset: str | None = None
+    source_record_id: str | None = None
+    source_name: str | None = None
+    source_name_norm: str | None = None
+    classification: str | None = None
+    severity_class: str | None = None
+    concern_class: str | None = None
+    label_section: str | None = None
+    routes: str | None = None
+    comment: str | None = None
+    source_url: str | None = None
+    source_last_modified: str | None = None
+
+    # -------------------------------------------------------------------------
+    def __getitem__(self, key: str) -> Any:
+        return getattr(self, key)
 
 
 ###############################################################################
@@ -180,7 +201,21 @@ class DrugLabelSectionsResponse(BaseModel):
     set_id: str
     spl_version: int
     effective_date: str | None = None
-    sections: list[dict[str, Any]] = Field(default_factory=list)
+    sections: list["DrugLabelSection"] = Field(default_factory=list)
+
+
+###############################################################################
+class DrugLabelSection(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+    section_key: str | None = None
+    section_title: str | None = None
+    text: str | None = None
+    contains_hepatic_keywords: bool
+    display_order: int
+
+    # -------------------------------------------------------------------------
+    def __getitem__(self, key: str) -> Any:
+        return getattr(self, key)
 
 
 ###############################################################################

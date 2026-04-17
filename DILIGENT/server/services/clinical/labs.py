@@ -18,8 +18,8 @@ from DILIGENT.server.domain.clinical.entities import (
     PatientData,
     PatientLabTimeline,
 )
-from DILIGENT.server.models.prompts import CLINICAL_LAB_EXTRACTION_PROMPT
-from DILIGENT.server.models.providers import initialize_llm_client
+from DILIGENT.server.services.prompts import CLINICAL_LAB_EXTRACTION_PROMPT
+from DILIGENT.server.services.llm.providers import initialize_llm_client
 
 
 ###############################################################################

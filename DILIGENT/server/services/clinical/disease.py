@@ -11,8 +11,8 @@ from DILIGENT.server.common.utils.logger import logger
 from DILIGENT.server.configurations.startup import server_settings
 from DILIGENT.server.configurations.llm_configs import LLMRuntimeConfig
 from DILIGENT.server.domain.clinical.entities import DiseaseContextEntry, PatientDiseaseContext
-from DILIGENT.server.models.prompts import ANAMNESIS_DISEASE_EXTRACTION_PROMPT
-from DILIGENT.server.models.providers import initialize_llm_client
+from DILIGENT.server.services.prompts import ANAMNESIS_DISEASE_EXTRACTION_PROMPT
+from DILIGENT.server.services.llm.providers import initialize_llm_client
 from DILIGENT.server.services.text.normalization import normalize_token
 
 

@@ -8,11 +8,11 @@ from collections.abc import Callable
 from datetime import date
 from typing import Any, Literal
 
-from DILIGENT.server.models.prompts import (
+from DILIGENT.server.services.prompts import (
     ANAMNESIS_DRUG_EXTRACTION_PROMPT,
     DRUG_EXTRACTION_PROMPT,
 )
-from DILIGENT.server.models.providers import initialize_llm_client
+from DILIGENT.server.services.llm.providers import initialize_llm_client
 from DILIGENT.server.domain.clinical.entities import (
     DrugEntry,
     PatientDrugs,

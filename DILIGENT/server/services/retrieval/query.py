@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from collections import defaultdict
 
-from DILIGENT.server.models.prompts import DILI_RAG_QUERY_PROMPT
+from DILIGENT.server.services.prompts import DILI_RAG_QUERY_PROMPT
 from DILIGENT.server.domain.clinical.entities import PatientDrugs
 from DILIGENT.server.common.constants import (
     DEFAULT_DILI_CLASSIFICATION,

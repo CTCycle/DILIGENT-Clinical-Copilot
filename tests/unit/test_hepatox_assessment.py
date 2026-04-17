@@ -5,7 +5,7 @@ from datetime import date
 
 import pytest
 
-from DILIGENT.server.models.prompts import LIVERTOX_CLINICAL_USER_PROMPT
+from DILIGENT.server.services.prompts import LIVERTOX_CLINICAL_USER_PROMPT
 from DILIGENT.server.domain.clinical import (
     ClinicalLabEntry,
     ClinicalPipelineValidationError,
