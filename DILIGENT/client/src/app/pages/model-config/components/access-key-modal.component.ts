@@ -8,7 +8,7 @@ import {
   createAccessKey,
   deleteAccessKey,
   fetchAccessKeys,
-} from '../../../core/services/api';
+} from '../../../core/services/model-config-api';
 import { ModalShellComponent } from '../../../components/modal-shell/modal-shell.component';
 import { StatusMessageComponent } from '../../../components/status-message/status-message.component';
 
@@ -149,4 +149,5 @@ export class AccessKeyModalComponent implements OnChanges {
     return formatTimestamp(item.last_used_at);
   }
 }
+
 
