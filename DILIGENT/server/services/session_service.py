@@ -417,11 +417,11 @@ class NarrativeBuilder:
 
 ###############################################################################
 async def execute_clinical_job(
+    service: "ClinicalSessionEndpoint",
     payload: PatientData,
     runtime_overrides: dict[str, Any],
     job_id: str,
 ) -> dict[str, Any]:
-    service = require_clinical_session_service()
     with service.runtime_override_context(
         use_cloud_services=runtime_overrides.get("use_cloud_services"),
         llm_provider=runtime_overrides.get("llm_provider"),
@@ -501,12 +501,18 @@ async def execute_clinical_job(
 
 ###############################################################################
 def run_clinical_job(
+    service: "ClinicalSessionEndpoint",
     payload: PatientData,
     runtime_overrides: dict[str, Any],
     job_id: str,
 ) -> dict[str, Any]:
     result = asyncio.run(
-        execute_clinical_job(payload=payload, runtime_overrides=runtime_overrides, job_id=job_id)
+        execute_clinical_job(
+            service=service,
+            payload=payload,
+            runtime_overrides=runtime_overrides,
+            job_id=job_id,
+        )
     )
     if not result:
         return {}
@@ -1579,6 +1585,7 @@ class ClinicalSessionEndpoint:
             job_type=self.JOB_TYPE,
             runner=run_clinical_job,
             kwargs={
+                "service": self,
                 "payload": patient_payload,
                 "runtime_overrides": runtime_overrides,
             },
@@ -1626,19 +1633,5 @@ class ClinicalSessionEndpoint:
             message="Cancellation requested" if success else "Job cannot be cancelled",
         )
     
-endpoint: ClinicalSessionEndpoint | None = None
-
-
-###############################################################################
-def set_clinical_session_service(service: ClinicalSessionEndpoint) -> None:
-    global endpoint
-    endpoint = service
-
-
-###############################################################################
-def require_clinical_session_service() -> ClinicalSessionEndpoint:
-    if endpoint is None:
-        raise RuntimeError("Clinical session service is not configured.")
-    return endpoint
 
 
