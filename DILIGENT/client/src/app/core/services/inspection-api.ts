@@ -353,8 +353,15 @@ export async function fetchInspectionRagUpdateConfig(): Promise<InspectionUpdate
   });
 }
 
-export async function fetchInspectionRagDocuments(): Promise<InspectionRagDocumentsResponse> {
-  return requestJson<InspectionRagDocumentsResponse>(`${API_BASE_URL}/inspection/rag/documents`, {
+export async function fetchInspectionRagDocuments(
+  query: InspectionCatalogQuery,
+): Promise<InspectionRagDocumentsResponse> {
+  const queryString = buildQueryString({
+    search: query.search,
+    offset: query.offset ?? 0,
+    limit: query.limit ?? 10,
+  });
+  return requestJson<InspectionRagDocumentsResponse>(`${API_BASE_URL}/inspection/rag/documents${queryString}`, {
     method: "GET" },
   );
 }

@@ -367,6 +367,8 @@ class RagDocumentListResponse(BaseModel):
     model_config = ConfigDict(extra="forbid")
     items: list[RagDocumentListItem] = Field(default_factory=list)
     total: int
+    offset: int = 0
+    limit: int = 0
 
 
 class LanceVectorStoreSummaryResponse(BaseModel):

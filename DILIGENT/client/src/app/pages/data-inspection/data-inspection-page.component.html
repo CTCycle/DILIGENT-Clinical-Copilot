@@ -70,7 +70,7 @@
               </div>
             </div>
 
-            <div class="inspection-scroll-frame">
+            <div class="inspection-scroll-frame" (scroll)="onSessionsScroll($event)">
               <table class="inspection-table inspection-table-dense">
                 <thead>
                   <tr>
@@ -83,9 +83,14 @@
                   </tr>
                 </thead>
                 <tbody>
-                  @for (row of sessionItems(); track row.session_id; let i = $index) {
+                  @if (sessionItems().length > 0) {
+                    <tr class="inspection-virtual-spacer-row">
+                      <td colspan="6" [style.height.px]="sessionTopPaddingPx()"></td>
+                    </tr>
+                  }
+                  @for (row of sessionVisibleItems(); track row.session_id; let i = $index) {
                     <tr>
-                      <td>{{ sessionOffset() + i + 1 }}</td>
+                      <td>{{ sessionVisibleStartIndex() + i + 1 }}</td>
                       <td>{{ row.patient_name || 'Unknown' }}</td>
                       <td>{{ formatDateTime(row.session_timestamp) }}</td>
                       <td>
@@ -125,20 +130,19 @@
                       </td>
                     </tr>
                   }
+                  @if (sessionItems().length > 0) {
+                    <tr class="inspection-virtual-spacer-row">
+                      <td colspan="6" [style.height.px]="sessionBottomPaddingPx()"></td>
+                    </tr>
+                  }
                 </tbody>
               </table>
               @if (sessionLoading()) { <p class="inspection-loading-note">Loading sessions...</p> }
+              @if (sessionLoadingMore()) { <p class="inspection-loading-note">Loading more sessions...</p> }
+              @if (!sessionLoading() && sessionHasMore()) { <p class="inspection-loading-note">Scroll to load more...</p> }
               @if (!sessionLoading() && sessionItems().length === 0) { <p class="inspection-empty-note">No sessions found.</p> }
               @if (sessionError()) { <p class="inspection-error-text">{{ sessionError() }}</p> }
             </div>
-
-            <app-inspection-pager
-              [offset]="sessionOffset()"
-              [total]="sessionTotal()"
-              [pageSize]="10"
-              (previous)="pageSessions(-1)"
-              (next)="pageSessions(1)"
-            />
           </div>
         </section>
       }
@@ -155,11 +159,14 @@
               (updateClick)="openUpdateModal('rxnav')"
             />
 
-            <div class="inspection-scroll-frame inspection-scroll-frame-compact">
+            <div class="inspection-scroll-frame inspection-scroll-frame-compact" (scroll)="onRxNavScroll($event)">
               <table class="inspection-table inspection-table-dense">
                 <thead><tr><th>Drug</th><th>Last update</th><th aria-label="Actions"></th></tr></thead>
                 <tbody>
-                  @for (row of rxnavItems(); track row.drug_id) {
+                  @if (rxnavItems().length > 0) {
+                    <tr class="inspection-virtual-spacer-row"><td colspan="3" [style.height.px]="rxnavTopPaddingPx()"></td></tr>
+                  }
+                  @for (row of rxnavVisibleItems(); track row.drug_id) {
                     <tr>
                       <td>{{ row.drug_name }}</td>
                       <td>{{ row.last_update || 'N/A' }}</td>
@@ -187,22 +194,19 @@
                       </td>
                     </tr>
                   }
+                  @if (rxnavItems().length > 0) {
+                    <tr class="inspection-virtual-spacer-row"><td colspan="3" [style.height.px]="rxnavBottomPaddingPx()"></td></tr>
+                  }
                   @if (!rxnavLoading() && rxnavItems().length === 0) {
                     <tr><td colspan="3" class="inspection-empty-row">No RxNav rows found.</td></tr>
                   }
                 </tbody>
               </table>
               @if (rxnavLoading()) { <p class="inspection-loading-note">Loading RxNav data...</p> }
+              @if (rxnavLoadingMore()) { <p class="inspection-loading-note">Loading more RxNav rows...</p> }
+              @if (!rxnavLoading() && rxnavHasMore()) { <p class="inspection-loading-note">Scroll to load more...</p> }
               @if (rxnavError()) { <p class="inspection-error-text">{{ rxnavError() }}</p> }
             </div>
-
-            <app-inspection-pager
-              [offset]="rxnavOffset()"
-              [total]="rxnavTotal()"
-              [pageSize]="10"
-              (previous)="pageRxNav(-1)"
-              (next)="pageRxNav(1)"
-            />
           </div>
         </section>
       }
@@ -219,11 +223,14 @@
               (updateClick)="openUpdateModal('livertox')"
             />
 
-            <div class="inspection-scroll-frame inspection-scroll-frame-compact">
+            <div class="inspection-scroll-frame inspection-scroll-frame-compact" (scroll)="onLiverToxScroll($event)">
               <table class="inspection-table inspection-table-dense">
                 <thead><tr><th>Drug</th><th>Last update</th><th aria-label="Actions"></th></tr></thead>
                 <tbody>
-                  @for (row of livertoxItems(); track row.drug_id) {
+                  @if (livertoxItems().length > 0) {
+                    <tr class="inspection-virtual-spacer-row"><td colspan="3" [style.height.px]="livertoxTopPaddingPx()"></td></tr>
+                  }
+                  @for (row of livertoxVisibleItems(); track row.drug_id) {
                     <tr>
                       <td>{{ row.drug_name }}</td>
                       <td>{{ row.last_update || 'N/A' }}</td>
@@ -251,22 +258,19 @@
                       </td>
                     </tr>
                   }
+                  @if (livertoxItems().length > 0) {
+                    <tr class="inspection-virtual-spacer-row"><td colspan="3" [style.height.px]="livertoxBottomPaddingPx()"></td></tr>
+                  }
                   @if (!livertoxLoading() && livertoxItems().length === 0) {
                     <tr><td colspan="3" class="inspection-empty-row">No LiverTox rows found.</td></tr>
                   }
                 </tbody>
               </table>
               @if (livertoxLoading()) { <p class="inspection-loading-note">Loading LiverTox data...</p> }
+              @if (livertoxLoadingMore()) { <p class="inspection-loading-note">Loading more LiverTox rows...</p> }
+              @if (!livertoxLoading() && livertoxHasMore()) { <p class="inspection-loading-note">Scroll to load more...</p> }
               @if (livertoxError()) { <p class="inspection-error-text">{{ livertoxError() }}</p> }
             </div>
-
-            <app-inspection-pager
-              [offset]="livertoxOffset()"
-              [total]="livertoxTotal()"
-              [pageSize]="10"
-              (previous)="pageLiverTox(-1)"
-              (next)="pageLiverTox(1)"
-            />
           </div>
         </section>
       }
@@ -283,11 +287,14 @@
               (updateClick)="openUpdateModal('dili_priors')"
             />
 
-            <div class="inspection-scroll-frame inspection-scroll-frame-compact">
+            <div class="inspection-scroll-frame inspection-scroll-frame-compact" (scroll)="onDiliPriorsScroll($event)">
               <table class="inspection-table inspection-table-dense">
                 <thead><tr><th>Drug</th><th>DILIrank class</th><th>DILIst class</th><th>Linked sources</th><th aria-label="Actions"></th></tr></thead>
                 <tbody>
-                  @for (row of diliPriorItems(); track row.drug_id) {
+                  @if (diliPriorItems().length > 0) {
+                    <tr class="inspection-virtual-spacer-row"><td colspan="5" [style.height.px]="diliPriorTopPaddingPx()"></td></tr>
+                  }
+                  @for (row of diliPriorVisibleItems(); track row.drug_id) {
                     <tr>
                       <td>{{ row.drug_name }}</td>
                       <td>{{ row.dilirank_class || 'N/A' }}</td>
@@ -310,22 +317,19 @@
                       </td>
                     </tr>
                   }
+                  @if (diliPriorItems().length > 0) {
+                    <tr class="inspection-virtual-spacer-row"><td colspan="5" [style.height.px]="diliPriorBottomPaddingPx()"></td></tr>
+                  }
                   @if (!diliPriorLoading() && diliPriorItems().length === 0) {
                     <tr><td colspan="5" class="inspection-empty-row">No DILI prior rows found.</td></tr>
                   }
                 </tbody>
               </table>
               @if (diliPriorLoading()) { <p class="inspection-loading-note">Loading DILI priors...</p> }
+              @if (diliPriorLoadingMore()) { <p class="inspection-loading-note">Loading more DILI priors...</p> }
+              @if (!diliPriorLoading() && diliPriorHasMore()) { <p class="inspection-loading-note">Scroll to load more...</p> }
               @if (diliPriorError()) { <p class="inspection-error-text">{{ diliPriorError() }}</p> }
             </div>
-
-            <app-inspection-pager
-              [offset]="diliPriorOffset()"
-              [total]="diliPriorTotal()"
-              [pageSize]="10"
-              (previous)="pageDiliPriors(-1)"
-              (next)="pageDiliPriors(1)"
-            />
           </div>
         </section>
       }
@@ -342,11 +346,14 @@
               (updateClick)="openUpdateModal('drug_labels')"
             />
 
-            <div class="inspection-scroll-frame inspection-scroll-frame-compact">
+            <div class="inspection-scroll-frame inspection-scroll-frame-compact" (scroll)="onDrugLabelsScroll($event)">
               <table class="inspection-table inspection-table-dense">
                 <thead><tr><th>Drug</th><th>Source</th><th>Effective date</th><th>Retained sections</th><th aria-label="Actions"></th></tr></thead>
                 <tbody>
-                  @for (row of drugLabelItems(); track row.drug_id) {
+                  @if (drugLabelItems().length > 0) {
+                    <tr class="inspection-virtual-spacer-row"><td colspan="5" [style.height.px]="drugLabelTopPaddingPx()"></td></tr>
+                  }
+                  @for (row of drugLabelVisibleItems(); track row.drug_id) {
                     <tr>
                       <td>{{ row.drug_name }}</td>
                       <td>{{ row.source }}</td>
@@ -369,22 +376,19 @@
                       </td>
                     </tr>
                   }
+                  @if (drugLabelItems().length > 0) {
+                    <tr class="inspection-virtual-spacer-row"><td colspan="5" [style.height.px]="drugLabelBottomPaddingPx()"></td></tr>
+                  }
                   @if (!drugLabelLoading() && drugLabelItems().length === 0) {
                     <tr><td colspan="5" class="inspection-empty-row">No drug label rows found.</td></tr>
                   }
                 </tbody>
               </table>
               @if (drugLabelLoading()) { <p class="inspection-loading-note">Loading drug labels...</p> }
+              @if (drugLabelLoadingMore()) { <p class="inspection-loading-note">Loading more drug labels...</p> }
+              @if (!drugLabelLoading() && drugLabelHasMore()) { <p class="inspection-loading-note">Scroll to load more...</p> }
               @if (drugLabelError()) { <p class="inspection-error-text">{{ drugLabelError() }}</p> }
             </div>
-
-            <app-inspection-pager
-              [offset]="drugLabelOffset()"
-              [total]="drugLabelTotal()"
-              [pageSize]="10"
-              (previous)="pageDrugLabels(-1)"
-              (next)="pageDrugLabels(1)"
-            />
           </div>
         </section>
       }
@@ -399,20 +403,24 @@
               [updateButtonLabel]="'Update Embeddings'"
               (searchChange)="updateRagSearch($event)"
               (updateClick)="openUpdateModal('rag')"
-            />
-
-            <div class="inspection-rag-path-editor">
-              <label class="field-label" for="rag-documents-path-input">RAG source path</label>
+            >
+              <button
+                inspectionToolbarBeforeActions
+                class="btn btn-secondary inspection-mini-btn"
+                type="button"
+                (click)="openRagFolderPicker()"
+              >
+                Select Folder
+              </button>
               <input
-                id="rag-documents-path-input"
-                type="text"
-                class="inspection-search inspection-rag-path-input"
-                [ngModel]="ragDocumentsPathInput()"
-                (ngModelChange)="setRagDocumentsPathInput($event)"
-                aria-label="RAG source path"
-                placeholder="Enter the full documents folder path"
+                #ragFolderInput
+                type="file"
+                class="inspection-folder-input"
+                webkitdirectory
+                directory
+                (change)="handleRagFolderSelection($event)"
               />
-            </div>
+            </app-inspection-catalog-toolbar>
 
             <div class="inspection-scroll-frame inspection-scroll-frame-compact inspection-rag-second-view">
               <table class="inspection-table inspection-table-dense inspection-rag-summary-table">
@@ -439,7 +447,7 @@
               </table>
             </div>
 
-            <div class="inspection-scroll-frame inspection-scroll-frame-compact">
+            <div class="inspection-scroll-frame inspection-scroll-frame-compact" (scroll)="onRagScroll($event)">
               <table class="inspection-table inspection-table-dense">
                 <thead>
                   <tr>
@@ -451,7 +459,10 @@
                   </tr>
                 </thead>
                 <tbody>
-                  @for (row of ragDocuments(); track row.path) {
+                  @if (ragDocuments().length > 0) {
+                    <tr class="inspection-virtual-spacer-row"><td colspan="5" [style.height.px]="ragTopPaddingPx()"></td></tr>
+                  }
+                  @for (row of ragVisibleItems(); track row.path) {
                     <tr>
                       <td>{{ row.file_name }}</td>
                       <td>{{ row.extension }}</td>
@@ -460,22 +471,19 @@
                       <td>{{ row.supported_for_ingestion ? 'Yes' : 'No' }}</td>
                     </tr>
                   }
+                  @if (ragDocuments().length > 0) {
+                    <tr class="inspection-virtual-spacer-row"><td colspan="5" [style.height.px]="ragBottomPaddingPx()"></td></tr>
+                  }
                   @if (!ragLoading() && ragDocuments().length === 0) {
                     <tr><td colspan="5" class="inspection-empty-row">No RAG documents found.</td></tr>
                   }
                 </tbody>
               </table>
               @if (ragLoading()) { <p class="inspection-loading-note">Loading RAG data...</p> }
+              @if (ragLoadingMore()) { <p class="inspection-loading-note">Loading more RAG documents...</p> }
+              @if (!ragLoading() && ragHasMore()) { <p class="inspection-loading-note">Scroll to load more...</p> }
               @if (ragError()) { <p class="inspection-error-text">{{ ragError() }}</p> }
             </div>
-
-            <app-inspection-pager
-              [offset]="ragOffset()"
-              [total]="ragTotal()"
-              [pageSize]="10"
-              (previous)="pageRag(-1)"
-              (next)="pageRag(1)"
-            />
           </div>
         </section>
       }

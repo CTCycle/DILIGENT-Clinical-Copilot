@@ -26,6 +26,7 @@ import { FormsModule } from '@angular/forms';
         />
       </div>
       <div class="inspection-widget-header-actions inspection-header-actions-fixed">
+        <ng-content select="[inspectionToolbarBeforeActions]"></ng-content>
         <button class="btn btn-secondary inspection-mini-btn" type="button" (click)="updateClick.emit()">
           {{ updateButtonLabel() }}
         </button>
