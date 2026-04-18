@@ -6,7 +6,6 @@ from pydantic import RootModel
 
 from DILIGENT.server.domain.clinical.entities import ClinicalSessionRequest
 from DILIGENT.server.domain.jobs import JobCancelResponse, JobStartResponse, JobStatusResponse
-from DILIGENT.server.services import session_service as session_service_module
 from DILIGENT.server.services.clinical.hepatox import HepatoxConsultation
 from DILIGENT.server.services.clinical.job_progress import CLINICAL_PROGRESS_MESSAGES
 from DILIGENT.server.services.clinical.preparation import ClinicalKnowledgePreparation
@@ -17,8 +16,15 @@ from DILIGENT.server.services.session_service import (
     NarrativeBuilder,
     StageProgressFractionCallback,
     build_failed_session_payload,
+    disease_extractor,
+    drugs_parser,
     execute_clinical_job,
+    lab_extractor,
+    pattern_analyzer,
+    payload_sanitization_service,
+    rucam_estimator,
     run_clinical_job,
+    serializer,
 )
 
 
@@ -86,13 +92,13 @@ class ClinicalSessionEndpoint:
 
 router = APIRouter(tags=["session"])
 service = ClinicalSessionService(
-    drugs_parser=session_service_module.drugs_parser,
-    disease_extractor=session_service_module.disease_extractor,
-    lab_extractor=session_service_module.lab_extractor,
-    pattern_analyzer=session_service_module.pattern_analyzer,
-    rucam_estimator=session_service_module.rucam_estimator,
-    serializer=session_service_module.serializer,
-    payload_sanitizer=session_service_module.payload_sanitization_service,
+    drugs_parser=drugs_parser,
+    disease_extractor=disease_extractor,
+    lab_extractor=lab_extractor,
+    pattern_analyzer=pattern_analyzer,
+    rucam_estimator=rucam_estimator,
+    serializer=serializer,
+    payload_sanitizer=payload_sanitization_service,
     input_preparator=ClinicalKnowledgePreparation(),
     hepatox_consultation_cls=HepatoxConsultation,
     job_manager=job_manager,

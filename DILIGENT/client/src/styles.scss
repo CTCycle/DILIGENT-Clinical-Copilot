@@ -3238,16 +3238,17 @@ input[type="date"]::-webkit-calendar-picker-indicator:hover {
 
 .inspection-scroll-frame {
   min-height: 0;
-  max-height: none;
-  flex: 0 0 auto;
-  overflow: visible;
-  border: 0;
-  border-radius: 0;
-  background: transparent;
+  max-height: min(54vh, 520px);
+  flex: 1 1 auto;
+  overflow-x: hidden;
+  overflow-y: auto;
+  border: 1px solid rgba(148, 163, 184, 0.25);
+  border-radius: var(--radius-sm);
+  background: color-mix(in srgb, var(--color-surface) 94%, transparent);
 }
 
 .inspection-scroll-frame-compact {
-  max-height: none;
+  max-height: min(50vh, 460px);
 }
 
 .inspection-table {
@@ -3259,9 +3260,14 @@ input[type="date"]::-webkit-calendar-picker-indicator:hover {
 .inspection-table td {
   text-align: left;
   border-bottom: 1px solid rgba(148, 163, 184, 0.25);
-  padding: 6px 8px;
+  padding: 7px 8px;
   font-size: var(--font-sm);
   vertical-align: middle;
+}
+
+.inspection-virtual-spacer-row td {
+  padding: 0;
+  border: 0;
 }
 
 .inspection-table th {
@@ -3917,7 +3923,7 @@ input[type="date"]::-webkit-calendar-picker-indicator:hover {
 }
 
 .inspection-rag-second-view {
-  margin-top: 22px;
+  margin-top: 10px;
 }
 
 .inspection-actions-cell {
@@ -4401,17 +4407,6 @@ input[type="date"]::-webkit-calendar-picker-indicator:hover {
 .model-config-row-heading .modal-section-title {
   margin: 0;
   line-height: 1.1;
-}
-
-.inspection-rag-path-editor {
-  display: flex;
-  flex-direction: column;
-  gap: 8px;
-  margin-bottom: var(--space-md);
-}
-
-.inspection-rag-path-input {
-  width: 100%;
 }
 
 @media (max-width: 1080px) {

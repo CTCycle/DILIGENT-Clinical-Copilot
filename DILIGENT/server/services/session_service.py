@@ -81,6 +81,7 @@ NOT_AVAILABLE = "Not available"
 def build_failed_session_payload(
     *,
     payload: PatientData,
+    patient_image_base64: str | None,
     runtime_overrides: dict[str, Any],
     issues: list[dict[str, Any]],
     error_message: str,
@@ -120,7 +121,7 @@ def build_failed_session_payload(
     return {
         "patient_name": payload.name,
         "patient_visit_date": payload.visit_date,
-        "patient_image_base64": payload.patient_image_base64,
+        "patient_image_base64": patient_image_base64,
         "session_timestamp": datetime.now(),
         "hepatic_pattern": "indeterminate",
         "anamnesis": payload.anamnesis,
@@ -417,6 +418,7 @@ class NarrativeBuilder:
 async def execute_clinical_job(
     service: "ClinicalSessionService",
     payload: PatientData,
+    patient_image_base64: str | None,
     runtime_overrides: dict[str, Any],
     job_id: str,
 ) -> dict[str, Any]:
@@ -450,6 +452,7 @@ async def execute_clinical_job(
         try:
             result = await service.process_single_patient(
                 payload,
+                patient_image_base64=patient_image_base64,
                 progress_callback=progress_callback,
                 stop_check=ensure_not_cancelled,
             )
@@ -468,6 +471,7 @@ async def execute_clinical_job(
                 service.serializer.save_clinical_session,
                 build_failed_session_payload(
                     payload=payload,
+                    patient_image_base64=patient_image_base64,
                     runtime_overrides=runtime_overrides,
                     issues=serialized_issues,
                     error_message=str(exc),
@@ -494,6 +498,7 @@ async def execute_clinical_job(
                 service.serializer.save_clinical_session,
                 build_failed_session_payload(
                     payload=payload,
+                    patient_image_base64=patient_image_base64,
                     runtime_overrides=runtime_overrides,
                     issues=[failure_issue],
                     error_message=str(exc),
@@ -535,6 +540,7 @@ def report_clinical_job_progress(
 def run_clinical_job(
     service: "ClinicalSessionService",
     payload: PatientData,
+    patient_image_base64: str | None,
     runtime_overrides: dict[str, Any],
     job_id: str,
 ) -> dict[str, Any]:
@@ -542,6 +548,7 @@ def run_clinical_job(
         execute_clinical_job(
             service=service,
             payload=payload,
+            patient_image_base64=patient_image_base64,
             runtime_overrides=runtime_overrides,
             job_id=job_id,
         )
@@ -902,12 +909,6 @@ class ClinicalSessionService:
                 use_rag=request_payload.use_rag,
                 use_web_search=request_payload.use_web_search,
             )
-            payload_data.update(
-                {
-                    "has_hepatic_diseases": request_payload.has_hepatic_diseases,
-                    "patient_image_base64": request_payload.patient_image_base64,
-                }
-            )
             return PatientData.model_validate(payload_data)
         except ValidationError as exc:
             raise HTTPException(
@@ -916,10 +917,34 @@ class ClinicalSessionService:
             ) from exc
 
     # -------------------------------------------------------------------------
+    @staticmethod
+    def build_runtime_overrides(
+        request_payload: ClinicalSessionRequest,
+    ) -> dict[str, Any]:
+        use_cloud_services = request_payload.use_cloud_services
+        llm_provider = request_payload.llm_provider
+        cloud_mode_requested = bool(use_cloud_services) or (
+            isinstance(llm_provider, str) and llm_provider.strip().lower() in {"openai", "gemini"}
+        )
+
+        return {
+            "use_cloud_services": use_cloud_services,
+            "llm_provider": llm_provider,
+            "cloud_model": request_payload.cloud_model,
+            # Ignore local model overrides when a cloud provider is requested.
+            "parsing_model": None if cloud_mode_requested else request_payload.parsing_model,
+            "clinical_model": None if cloud_mode_requested else request_payload.clinical_model,
+            "ollama_temperature": None if cloud_mode_requested else request_payload.ollama_temperature,
+            "cloud_temperature": request_payload.cloud_temperature,
+            "ollama_reasoning": None if cloud_mode_requested else request_payload.ollama_reasoning,
+        }
+
+    # -------------------------------------------------------------------------
     async def process_single_patient(
         self,
         payload: PatientData,
         *,
+        patient_image_base64: str | None = None,
         progress_callback: Callable[[str, float], None] | None = None,
         stop_check: Callable[[], None] | None = None,
     ) -> dict[str, Any]:
@@ -1546,7 +1571,7 @@ class ClinicalSessionService:
             {
                 "patient_name": payload.name,
                 "patient_visit_date": payload.visit_date,
-                "patient_image_base64": payload.patient_image_base64,
+                "patient_image_base64": patient_image_base64,
                 "session_timestamp": datetime.now(),
                 "hepatic_pattern": pattern_score.classification,
                 "anamnesis": payload.anamnesis,
@@ -1579,18 +1604,22 @@ class ClinicalSessionService:
         request_payload: ClinicalSessionRequest = Body(...),
     ) -> PlainTextResponse:
         patient_payload = self.build_patient_payload(request_payload)
+        runtime_overrides = self.build_runtime_overrides(request_payload)
         try:
             with self.runtime_override_context(
-                use_cloud_services=request_payload.use_cloud_services,
-                llm_provider=request_payload.llm_provider,
-                cloud_model=request_payload.cloud_model,
-                parsing_model=request_payload.parsing_model,
-                clinical_model=request_payload.clinical_model,
-                ollama_temperature=request_payload.ollama_temperature,
-                cloud_temperature=request_payload.cloud_temperature,
-                ollama_reasoning=request_payload.ollama_reasoning,
+                use_cloud_services=runtime_overrides.get("use_cloud_services"),
+                llm_provider=runtime_overrides.get("llm_provider"),
+                cloud_model=runtime_overrides.get("cloud_model"),
+                parsing_model=runtime_overrides.get("parsing_model"),
+                clinical_model=runtime_overrides.get("clinical_model"),
+                ollama_temperature=runtime_overrides.get("ollama_temperature"),
+                cloud_temperature=runtime_overrides.get("cloud_temperature"),
+                ollama_reasoning=runtime_overrides.get("ollama_reasoning"),
             ):
-                single_result = await self.process_single_patient(patient_payload)
+                single_result = await self.process_single_patient(
+                    patient_payload,
+                    patient_image_base64=request_payload.patient_image_base64,
+                )
         except ClinicalPipelineValidationError as exc:
             raise HTTPException(
                 status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
@@ -1611,16 +1640,7 @@ class ClinicalSessionService:
             )
 
         patient_payload = self.build_patient_payload(request_payload)
-        runtime_overrides = {
-            "use_cloud_services": request_payload.use_cloud_services,
-            "llm_provider": request_payload.llm_provider,
-            "cloud_model": request_payload.cloud_model,
-            "parsing_model": request_payload.parsing_model,
-            "clinical_model": request_payload.clinical_model,
-            "ollama_temperature": request_payload.ollama_temperature,
-            "cloud_temperature": request_payload.cloud_temperature,
-            "ollama_reasoning": request_payload.ollama_reasoning,
-        }
+        runtime_overrides = self.build_runtime_overrides(request_payload)
 
         job_id = self.job_manager.start_job(
             job_type=self.JOB_TYPE,
@@ -1628,6 +1648,7 @@ class ClinicalSessionService:
             kwargs={
                 "service": self,
                 "payload": patient_payload,
+                "patient_image_base64": request_payload.patient_image_base64,
                 "runtime_overrides": runtime_overrides,
             },
         )
