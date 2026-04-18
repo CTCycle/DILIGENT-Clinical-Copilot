@@ -93,11 +93,11 @@ class ModelConfigService:
         if "cloud_temperature" in fields_set and payload.cloud_temperature is not None:
             updates["cloud_temperature"] = payload.cloud_temperature
 
+        if "ollama_reasoning" in fields_set and payload.ollama_reasoning is not None:
+            updates["ollama_reasoning"] = payload.ollama_reasoning
+
         if updates:
             snapshot = self.serializer.save_snapshot(**updates)
-
-        if "ollama_reasoning" in fields_set and payload.ollama_reasoning is not None:
-            LLMRuntimeConfig.set_ollama_reasoning(payload.ollama_reasoning)
 
         self.apply_runtime_snapshot(snapshot)
         return self.build_response(snapshot=snapshot, local_models=local_models)
@@ -171,6 +171,8 @@ class ModelConfigService:
             )
         if snapshot.cloud_provider is None and snapshot.cloud_model is None and snapshot.updated_at is None:
             updates["use_cloud_models"] = LLMRuntimeConfig.is_cloud_enabled()
+        if snapshot.updated_at is None:
+            updates["ollama_reasoning"] = LLMRuntimeConfig.is_ollama_reasoning_enabled()
 
         if updates:
             return self.serializer.save_snapshot(**updates)
@@ -248,6 +250,7 @@ class ModelConfigService:
             LLMRuntimeConfig.set_clinical_model(snapshot.clinical_model)
         LLMRuntimeConfig.set_ollama_temperature(snapshot.ollama_temperature)
         LLMRuntimeConfig.set_cloud_temperature(snapshot.cloud_temperature)
+        LLMRuntimeConfig.set_ollama_reasoning(snapshot.ollama_reasoning)
 
         provider = self.resolve_provider(snapshot.cloud_provider)
         LLMRuntimeConfig.set_llm_provider(provider)
@@ -275,7 +278,7 @@ class ModelConfigService:
             cloud_model=cloud_model,
             clinical_model=snapshot.clinical_model,
             text_extraction_model=snapshot.text_extraction_model,
-            ollama_temperature=LLMRuntimeConfig.get_ollama_temperature(),
-            cloud_temperature=LLMRuntimeConfig.get_cloud_temperature(),
-            ollama_reasoning=LLMRuntimeConfig.is_ollama_reasoning_enabled(),
+            ollama_temperature=snapshot.ollama_temperature,
+            cloud_temperature=snapshot.cloud_temperature,
+            ollama_reasoning=snapshot.ollama_reasoning,
         )

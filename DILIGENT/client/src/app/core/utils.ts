@@ -114,10 +114,9 @@ function extractBase64Payload(dataUrl: string | null): string | null {
 
 export function buildClinicalPayload(
   form: ClinicalFormState,
-  settings: RuntimeSettings,
+  _settings: RuntimeSettings,
   allowMissingLabs: boolean | null = null,
 ): ClinicalRequestPayload {
-  const cloudMode = Boolean(settings.useCloudServices);
   const payload: ClinicalRequestPayload = {
     name: sanitizeField(form.patientName),
     visit_date: buildVisitDatePayload(form.visitDate),
@@ -127,14 +126,6 @@ export function buildClinicalPayload(
     patient_image_base64: extractBase64Payload(form.patientImageDataUrl),
     use_rag: form.useRag,
     use_web_search: form.useWebSearch,
-    use_cloud_services: settings.useCloudServices,
-    llm_provider: settings.provider,
-    cloud_model: settings.cloudModel,
-    text_extraction_model: cloudMode ? undefined : settings.parsingModel,
-    clinical_model: cloudMode ? undefined : settings.clinicalModel,
-    ollama_temperature: cloudMode ? undefined : settings.temperature,
-    cloud_temperature: settings.temperature,
-    ollama_reasoning: cloudMode ? undefined : settings.reasoning,
   };
   if (allowMissingLabs !== null) {
     payload.allow_missing_labs = allowMissingLabs;
