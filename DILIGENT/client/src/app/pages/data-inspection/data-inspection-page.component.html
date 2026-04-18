@@ -95,18 +95,33 @@
                       </td>
                       <td>{{ formatDuration(row.total_duration) }}</td>
                       <td class="inspection-actions-cell">
-                        <button class="inspection-icon-button is-timeline" type="button" (click)="openPatientTimeline(row)" [attr.aria-label]="'Patient timeline for session ' + row.session_id" [attr.title]="'Patient timeline for session ' + row.session_id">
-                          <svg class="inspection-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M3 12h18v2H3v-2Zm2-5h2v12H5V7Zm12 3h2v9h-2v-9Zm-6-6h2v15h-2V4Z" /></svg>
-                        </button>
-                        <button class="inspection-icon-button is-primary" type="button" (click)="openSessionReport(row)" [attr.aria-label]="'View report for session ' + row.session_id" [attr.title]="'View report for session ' + row.session_id">
-                          <svg class="inspection-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 5C7 5 2.73 8.11 1 12c1.73 3.89 6 7 11 7s9.27-3.11 11-7c-1.73-3.89-6-7-11-7Zm0 11a4 4 0 1 1 0-8 4 4 0 0 1 0 8Z" /></svg>
-                        </button>
-                        <button class="inspection-icon-button is-danger" type="button" (click)="confirmAndRemoveSession(row)" [attr.aria-label]="'Delete session ' + row.session_id" [attr.title]="'Delete session ' + row.session_id">
-                          <svg class="inspection-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M16 9v10H8V9h8Zm-1.5-6h-5l-1 1H5v2h14V4h-3.5l-1-1ZM18 7H6v12c0 1.1.9 2 2 2h8c1.1 0 2-.9 2-2V7Z" /></svg>
-                        </button>
-                        <button class="inspection-icon-button" type="button" disabled aria-label="Modify session (not implemented)" title="Modify session (not implemented)">
-                          <svg class="inspection-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="m3 17.25 9.81-9.82 2.76 2.76L5.76 20H3v-2.75Zm14.71-8.04-2.92-2.92 1.41-1.41a2 2 0 0 1 2.83 0l.09.09a2 2 0 0 1 0 2.83l-1.41 1.41Z" /></svg>
-                        </button>
+                        <app-inspection-action-icon-button
+                          [buttonClass]="'inspection-icon-button is-timeline'"
+                          [ariaLabel]="'Patient timeline for session ' + row.session_id"
+                          [title]="'Patient timeline for session ' + row.session_id"
+                          [iconPath]="'M3 12h18v2H3v-2Zm2-5h2v12H5V7Zm12 3h2v9h-2v-9Zm-6-6h2v15h-2V4Z'"
+                          (activated)="openPatientTimeline(row)"
+                        />
+                        <app-inspection-action-icon-button
+                          [buttonClass]="'inspection-icon-button is-primary'"
+                          [ariaLabel]="'View report for session ' + row.session_id"
+                          [title]="'View report for session ' + row.session_id"
+                          [iconPath]="'M12 5C7 5 2.73 8.11 1 12c1.73 3.89 6 7 11 7s9.27-3.11 11-7c-1.73-3.89-6-7-11-7Zm0 11a4 4 0 1 1 0-8 4 4 0 0 1 0 8Z'"
+                          (activated)="openSessionReport(row)"
+                        />
+                        <app-inspection-action-icon-button
+                          [buttonClass]="'inspection-icon-button is-danger'"
+                          [ariaLabel]="'Delete session ' + row.session_id"
+                          [title]="'Delete session ' + row.session_id"
+                          [iconPath]="'M16 9v10H8V9h8Zm-1.5-6h-5l-1 1H5v2h14V4h-3.5l-1-1ZM18 7H6v12c0 1.1.9 2 2 2h8c1.1 0 2-.9 2-2V7Z'"
+                          (activated)="confirmAndRemoveSession(row)"
+                        />
+                        <app-inspection-action-icon-button
+                          [ariaLabel]="'Modify session (not implemented)'"
+                          [title]="'Modify session (not implemented)'"
+                          [iconPath]="'m3 17.25 9.81-9.82 2.76 2.76L5.76 20H3v-2.75Zm14.71-8.04-2.92-2.92 1.41-1.41a2 2 0 0 1 2.83 0l.09.09a2 2 0 0 1 0 2.83l-1.41 1.41Z'"
+                          [disabled]="true"
+                        />
                       </td>
                     </tr>
                   }
@@ -149,15 +164,26 @@
                       <td>{{ row.drug_name }}</td>
                       <td>{{ row.last_update || 'N/A' }}</td>
                       <td class="inspection-actions-cell">
-                        <button class="inspection-icon-button is-primary" type="button" (click)="openAliases(row.drug_id)" [attr.aria-label]="'View aliases for ' + row.drug_name" [attr.title]="'View aliases for ' + row.drug_name">
-                          <svg class="inspection-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 5C7 5 2.73 8.11 1 12c1.73 3.89 6 7 11 7s9.27-3.11 11-7c-1.73-3.89-6-7-11-7Zm0 11a4 4 0 1 1 0-8 4 4 0 0 1 0 8Z" /></svg>
-                        </button>
-                        <button class="inspection-icon-button is-danger" type="button" (click)="removeRxNavDrug(row.drug_id)" [attr.aria-label]="'Delete ' + row.drug_name" [attr.title]="'Delete ' + row.drug_name">
-                          <svg class="inspection-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M16 9v10H8V9h8Zm-1.5-6h-5l-1 1H5v2h14V4h-3.5l-1-1ZM18 7H6v12c0 1.1.9 2 2 2h8c1.1 0 2-.9 2-2V7Z" /></svg>
-                        </button>
-                        <button class="inspection-icon-button" type="button" disabled aria-label="Modify RxNav entry (not implemented)" title="Modify RxNav entry (not implemented)">
-                          <svg class="inspection-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="m3 17.25 9.81-9.82 2.76 2.76L5.76 20H3v-2.75Zm14.71-8.04-2.92-2.92 1.41-1.41a2 2 0 0 1 2.83 0l.09.09a2 2 0 0 1 0 2.83l-1.41 1.41Z" /></svg>
-                        </button>
+                        <app-inspection-action-icon-button
+                          [buttonClass]="'inspection-icon-button is-primary'"
+                          [ariaLabel]="'View aliases for ' + row.drug_name"
+                          [title]="'View aliases for ' + row.drug_name"
+                          [iconPath]="'M12 5C7 5 2.73 8.11 1 12c1.73 3.89 6 7 11 7s9.27-3.11 11-7c-1.73-3.89-6-7-11-7Zm0 11a4 4 0 1 1 0-8 4 4 0 0 1 0 8Z'"
+                          (activated)="openAliases(row.drug_id)"
+                        />
+                        <app-inspection-action-icon-button
+                          [buttonClass]="'inspection-icon-button is-danger'"
+                          [ariaLabel]="'Delete ' + row.drug_name"
+                          [title]="'Delete ' + row.drug_name"
+                          [iconPath]="'M16 9v10H8V9h8Zm-1.5-6h-5l-1 1H5v2h14V4h-3.5l-1-1ZM18 7H6v12c0 1.1.9 2 2 2h8c1.1 0 2-.9 2-2V7Z'"
+                          (activated)="removeRxNavDrug(row.drug_id)"
+                        />
+                        <app-inspection-action-icon-button
+                          [ariaLabel]="'Modify RxNav entry (not implemented)'"
+                          [title]="'Modify RxNav entry (not implemented)'"
+                          [iconPath]="'m3 17.25 9.81-9.82 2.76 2.76L5.76 20H3v-2.75Zm14.71-8.04-2.92-2.92 1.41-1.41a2 2 0 0 1 2.83 0l.09.09a2 2 0 0 1 0 2.83l-1.41 1.41Z'"
+                          [disabled]="true"
+                        />
                       </td>
                     </tr>
                   }
@@ -202,15 +228,26 @@
                       <td>{{ row.drug_name }}</td>
                       <td>{{ row.last_update || 'N/A' }}</td>
                       <td class="inspection-actions-cell">
-                        <button class="inspection-icon-button is-primary" type="button" (click)="openExcerpt(row.drug_id)" [attr.aria-label]="'View excerpt for ' + row.drug_name" [attr.title]="'View excerpt for ' + row.drug_name">
-                          <svg class="inspection-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 5C7 5 2.73 8.11 1 12c1.73 3.89 6 7 11 7s9.27-3.11 11-7c-1.73-3.89-6-7-11-7Zm0 11a4 4 0 1 1 0-8 4 4 0 0 1 0 8Z" /></svg>
-                        </button>
-                        <button class="inspection-icon-button is-danger" type="button" (click)="removeLiverToxDrug(row.drug_id)" [attr.aria-label]="'Delete ' + row.drug_name" [attr.title]="'Delete ' + row.drug_name">
-                          <svg class="inspection-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M16 9v10H8V9h8Zm-1.5-6h-5l-1 1H5v2h14V4h-3.5l-1-1ZM18 7H6v12c0 1.1.9 2 2 2h8c1.1 0 2-.9 2-2V7Z" /></svg>
-                        </button>
-                        <button class="inspection-icon-button" type="button" disabled aria-label="Modify LiverTox entry (not implemented)" title="Modify LiverTox entry (not implemented)">
-                          <svg class="inspection-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="m3 17.25 9.81-9.82 2.76 2.76L5.76 20H3v-2.75Zm14.71-8.04-2.92-2.92 1.41-1.41a2 2 0 0 1 2.83 0l.09.09a2 2 0 0 1 0 2.83l-1.41 1.41Z" /></svg>
-                        </button>
+                        <app-inspection-action-icon-button
+                          [buttonClass]="'inspection-icon-button is-primary'"
+                          [ariaLabel]="'View excerpt for ' + row.drug_name"
+                          [title]="'View excerpt for ' + row.drug_name"
+                          [iconPath]="'M12 5C7 5 2.73 8.11 1 12c1.73 3.89 6 7 11 7s9.27-3.11 11-7c-1.73-3.89-6-7-11-7Zm0 11a4 4 0 1 1 0-8 4 4 0 0 1 0 8Z'"
+                          (activated)="openExcerpt(row.drug_id)"
+                        />
+                        <app-inspection-action-icon-button
+                          [buttonClass]="'inspection-icon-button is-danger'"
+                          [ariaLabel]="'Delete ' + row.drug_name"
+                          [title]="'Delete ' + row.drug_name"
+                          [iconPath]="'M16 9v10H8V9h8Zm-1.5-6h-5l-1 1H5v2h14V4h-3.5l-1-1ZM18 7H6v12c0 1.1.9 2 2 2h8c1.1 0 2-.9 2-2V7Z'"
+                          (activated)="removeLiverToxDrug(row.drug_id)"
+                        />
+                        <app-inspection-action-icon-button
+                          [ariaLabel]="'Modify LiverTox entry (not implemented)'"
+                          [title]="'Modify LiverTox entry (not implemented)'"
+                          [iconPath]="'m3 17.25 9.81-9.82 2.76 2.76L5.76 20H3v-2.75Zm14.71-8.04-2.92-2.92 1.41-1.41a2 2 0 0 1 2.83 0l.09.09a2 2 0 0 1 0 2.83l-1.41 1.41Z'"
+                          [disabled]="true"
+                        />
                       </td>
                     </tr>
                   }
@@ -257,12 +294,19 @@
                       <td>{{ row.dilist_class || 'N/A' }}</td>
                       <td>{{ row.linked_source_count }}</td>
                       <td class="inspection-actions-cell">
-                        <button class="inspection-icon-button is-primary" type="button" (click)="openDiliPriorDetails(row.drug_id)" [attr.aria-label]="'View DILI priors for ' + row.drug_name" [attr.title]="'View DILI priors for ' + row.drug_name">
-                          <svg class="inspection-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 5C7 5 2.73 8.11 1 12c1.73 3.89 6 7 11 7s9.27-3.11 11-7c-1.73-3.89-6-7-11-7Zm0 11a4 4 0 1 1 0-8 4 4 0 0 1 0 8Z" /></svg>
-                        </button>
-                        <button class="inspection-icon-button" type="button" disabled aria-label="Modify DILI prior entry (not implemented)" title="Modify DILI prior entry (not implemented)">
-                          <svg class="inspection-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="m3 17.25 9.81-9.82 2.76 2.76L5.76 20H3v-2.75Zm14.71-8.04-2.92-2.92 1.41-1.41a2 2 0 0 1 2.83 0l.09.09a2 2 0 0 1 0 2.83l-1.41 1.41Z" /></svg>
-                        </button>
+                        <app-inspection-action-icon-button
+                          [buttonClass]="'inspection-icon-button is-primary'"
+                          [ariaLabel]="'View DILI priors for ' + row.drug_name"
+                          [title]="'View DILI priors for ' + row.drug_name"
+                          [iconPath]="'M12 5C7 5 2.73 8.11 1 12c1.73 3.89 6 7 11 7s9.27-3.11 11-7c-1.73-3.89-6-7-11-7Zm0 11a4 4 0 1 1 0-8 4 4 0 0 1 0 8Z'"
+                          (activated)="openDiliPriorDetails(row.drug_id)"
+                        />
+                        <app-inspection-action-icon-button
+                          [ariaLabel]="'Modify DILI prior entry (not implemented)'"
+                          [title]="'Modify DILI prior entry (not implemented)'"
+                          [iconPath]="'m3 17.25 9.81-9.82 2.76 2.76L5.76 20H3v-2.75Zm14.71-8.04-2.92-2.92 1.41-1.41a2 2 0 0 1 2.83 0l.09.09a2 2 0 0 1 0 2.83l-1.41 1.41Z'"
+                          [disabled]="true"
+                        />
                       </td>
                     </tr>
                   }
@@ -309,12 +353,19 @@
                       <td>{{ row.effective_date || 'N/A' }}</td>
                       <td>{{ row.retained_section_count }}</td>
                       <td class="inspection-actions-cell">
-                        <button class="inspection-icon-button is-primary" type="button" (click)="openDrugLabelSections(row.drug_id)" [attr.aria-label]="'View labels for ' + row.drug_name" [attr.title]="'View labels for ' + row.drug_name">
-                          <svg class="inspection-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 5C7 5 2.73 8.11 1 12c1.73 3.89 6 7 11 7s9.27-3.11 11-7c-1.73-3.89-6-7-11-7Zm0 11a4 4 0 1 1 0-8 4 4 0 0 1 0 8Z" /></svg>
-                        </button>
-                        <button class="inspection-icon-button" type="button" disabled aria-label="Modify drug label entry (not implemented)" title="Modify drug label entry (not implemented)">
-                          <svg class="inspection-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="m3 17.25 9.81-9.82 2.76 2.76L5.76 20H3v-2.75Zm14.71-8.04-2.92-2.92 1.41-1.41a2 2 0 0 1 2.83 0l.09.09a2 2 0 0 1 0 2.83l-1.41 1.41Z" /></svg>
-                        </button>
+                        <app-inspection-action-icon-button
+                          [buttonClass]="'inspection-icon-button is-primary'"
+                          [ariaLabel]="'View labels for ' + row.drug_name"
+                          [title]="'View labels for ' + row.drug_name"
+                          [iconPath]="'M12 5C7 5 2.73 8.11 1 12c1.73 3.89 6 7 11 7s9.27-3.11 11-7c-1.73-3.89-6-7-11-7Zm0 11a4 4 0 1 1 0-8 4 4 0 0 1 0 8Z'"
+                          (activated)="openDrugLabelSections(row.drug_id)"
+                        />
+                        <app-inspection-action-icon-button
+                          [ariaLabel]="'Modify drug label entry (not implemented)'"
+                          [title]="'Modify drug label entry (not implemented)'"
+                          [iconPath]="'m3 17.25 9.81-9.82 2.76 2.76L5.76 20H3v-2.75Zm14.71-8.04-2.92-2.92 1.41-1.41a2 2 0 0 1 2.83 0l.09.09a2 2 0 0 1 0 2.83l-1.41 1.41Z'"
+                          [disabled]="true"
+                        />
                       </td>
                     </tr>
                   }
