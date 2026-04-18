@@ -15,7 +15,7 @@ Also mandatory: apply `assets/docs/ERROR_HANDLING.md`.
 
 ## 2. Structure and ownership
 
-- Centralize network calls in `src/app/core/services/api.ts`.
+- Centralize network calls in `src/app/core/services/*-api.ts`, and keep shared HTTP transport/error handling in `src/app/core/services/http-api.ts`.
 - Keep app-wide state in `src/app/core/state/app-state.service.ts`.
 - Keep page-level orchestration in `src/app/pages/*`.
 - Keep reusable UI controls in `src/app/components/*`.
@@ -33,7 +33,7 @@ Also mandatory: apply `assets/docs/ERROR_HANDLING.md`.
 - Keep frontend API base path compatible with `/api`.
 - When adding/modifying endpoints, update together:
   - backend API/domain models
-  - `src/app/core/services/api.ts`
+  - impacted module service under `src/app/core/services/*-api.ts`
   - `src/app/core/models/types.ts`
   - impacted Angular pages/components
 - Handle non-success responses explicitly; do not silently ignore failures.

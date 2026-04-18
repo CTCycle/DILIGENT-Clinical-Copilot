@@ -131,14 +131,14 @@
       @if (activeView() === 'rxnav') {
         <section class="inspection-view-content">
           <div class="inspection-widget">
-            <div class="inspection-widget-header">
-              <div class="inspection-controls inspection-controls-half inspection-controls-knowledge">
-                <input type="search" class="inspection-search" placeholder="Search RxNav..." [ngModel]="rxnavSearchInput()" (ngModelChange)="updateRxNavSearch($event)" aria-label="Search RxNav data" />
-              </div>
-              <div class="inspection-widget-header-actions inspection-header-actions-fixed">
-                <button class="btn btn-secondary inspection-mini-btn" type="button" (click)="openUpdateModal('rxnav')">Update Catalog</button>
-              </div>
-            </div>
+            <app-inspection-catalog-toolbar
+              [searchPlaceholder]="'Search RxNav...'"
+              [searchAriaLabel]="'Search RxNav data'"
+              [searchValue]="rxnavSearchInput()"
+              [updateButtonLabel]="'Update Catalog'"
+              (searchChange)="updateRxNavSearch($event)"
+              (updateClick)="openUpdateModal('rxnav')"
+            />
 
             <div class="inspection-scroll-frame inspection-scroll-frame-compact">
               <table class="inspection-table inspection-table-dense">
@@ -184,14 +184,14 @@
       @if (activeView() === 'livertox') {
         <section class="inspection-view-content">
           <div class="inspection-widget">
-            <div class="inspection-widget-header">
-              <div class="inspection-controls inspection-controls-half inspection-controls-knowledge">
-                <input type="search" class="inspection-search" placeholder="Search LiverTox..." [ngModel]="livertoxSearchInput()" (ngModelChange)="updateLiverToxSearch($event)" aria-label="Search LiverTox data" />
-              </div>
-              <div class="inspection-widget-header-actions inspection-header-actions-fixed">
-                <button class="btn btn-secondary inspection-mini-btn" type="button" (click)="openUpdateModal('livertox')">Update Base</button>
-              </div>
-            </div>
+            <app-inspection-catalog-toolbar
+              [searchPlaceholder]="'Search LiverTox...'"
+              [searchAriaLabel]="'Search LiverTox data'"
+              [searchValue]="livertoxSearchInput()"
+              [updateButtonLabel]="'Update Base'"
+              (searchChange)="updateLiverToxSearch($event)"
+              (updateClick)="openUpdateModal('livertox')"
+            />
 
             <div class="inspection-scroll-frame inspection-scroll-frame-compact">
               <table class="inspection-table inspection-table-dense">
@@ -237,14 +237,14 @@
       @if (activeView() === 'dili_priors') {
         <section class="inspection-view-content">
           <div class="inspection-widget">
-            <div class="inspection-widget-header">
-              <div class="inspection-controls inspection-controls-half inspection-controls-knowledge">
-                <input type="search" class="inspection-search" placeholder="Search DILI priors..." [ngModel]="diliPriorSearchInput()" (ngModelChange)="updateDiliPriorsSearch($event)" aria-label="Search DILI priors data" />
-              </div>
-              <div class="inspection-widget-header-actions inspection-header-actions-fixed">
-                <button class="btn btn-secondary inspection-mini-btn" type="button" (click)="openUpdateModal('dili_priors')">Update Priors</button>
-              </div>
-            </div>
+            <app-inspection-catalog-toolbar
+              [searchPlaceholder]="'Search DILI priors...'"
+              [searchAriaLabel]="'Search DILI priors data'"
+              [searchValue]="diliPriorSearchInput()"
+              [updateButtonLabel]="'Update Priors'"
+              (searchChange)="updateDiliPriorsSearch($event)"
+              (updateClick)="openUpdateModal('dili_priors')"
+            />
 
             <div class="inspection-scroll-frame inspection-scroll-frame-compact">
               <table class="inspection-table inspection-table-dense">
@@ -289,14 +289,14 @@
       @if (activeView() === 'drug_labels') {
         <section class="inspection-view-content">
           <div class="inspection-widget">
-            <div class="inspection-widget-header">
-              <div class="inspection-controls inspection-controls-half inspection-controls-knowledge">
-                <input type="search" class="inspection-search" placeholder="Search drug labels..." [ngModel]="drugLabelSearchInput()" (ngModelChange)="updateDrugLabelsSearch($event)" aria-label="Search drug labels data" />
-              </div>
-              <div class="inspection-widget-header-actions inspection-header-actions-fixed">
-                <button class="btn btn-secondary inspection-mini-btn" type="button" (click)="openUpdateModal('drug_labels')">Update Labels</button>
-              </div>
-            </div>
+            <app-inspection-catalog-toolbar
+              [searchPlaceholder]="'Search drug labels...'"
+              [searchAriaLabel]="'Search drug labels data'"
+              [searchValue]="drugLabelSearchInput()"
+              [updateButtonLabel]="'Update Labels'"
+              (searchChange)="updateDrugLabelsSearch($event)"
+              (updateClick)="openUpdateModal('drug_labels')"
+            />
 
             <div class="inspection-scroll-frame inspection-scroll-frame-compact">
               <table class="inspection-table inspection-table-dense">
@@ -341,21 +341,14 @@
       @if (activeView() === 'rag') {
         <section class="inspection-view-content">
           <div class="inspection-widget">
-            <div class="inspection-widget-header">
-              <div class="inspection-controls inspection-controls-half inspection-controls-knowledge">
-                <input
-                  type="search"
-                  class="inspection-search"
-                  placeholder="Search RAG documents..."
-                  [ngModel]="ragSearchInput()"
-                  (ngModelChange)="updateRagSearch($event)"
-                  aria-label="Search RAG documents"
-                />
-              </div>
-              <div class="inspection-widget-header-actions inspection-header-actions-fixed">
-                <button class="btn btn-secondary inspection-mini-btn" type="button" (click)="openUpdateModal('rag')">Update Embeddings</button>
-              </div>
-            </div>
+            <app-inspection-catalog-toolbar
+              [searchPlaceholder]="'Search RAG documents...'"
+              [searchAriaLabel]="'Search RAG documents'"
+              [searchValue]="ragSearchInput()"
+              [updateButtonLabel]="'Update Embeddings'"
+              (searchChange)="updateRagSearch($event)"
+              (updateClick)="openUpdateModal('rag')"
+            />
 
             <div class="inspection-rag-path-editor">
               <label class="field-label" for="rag-documents-path-input">RAG source path</label>

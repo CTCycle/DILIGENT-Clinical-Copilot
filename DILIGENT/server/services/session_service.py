@@ -5,6 +5,7 @@ import time
 from contextlib import contextmanager
 from datetime import datetime
 from collections.abc import Sequence
+from functools import partial
 from typing import Any
 from collections.abc import Callable
 
@@ -419,22 +420,16 @@ async def execute_clinical_job(
     runtime_overrides: dict[str, Any],
     job_id: str,
 ) -> dict[str, Any]:
-    def ensure_not_cancelled() -> None:
-        if service.job_manager.should_stop(job_id):
-            raise ClinicalJobCancelled("Clinical job stop requested.")
-
-    def report_progress(stage: str, progress: float) -> None:
-        ensure_not_cancelled()
-        bounded = min(100.0, max(0.0, float(progress)))
-        message = CLINICAL_PROGRESS_MESSAGES.get(stage, stage.replace("_", " ").strip())
-        service.job_manager.update_progress(job_id, bounded)
-        service.job_manager.update_result(
-            job_id,
-            {
-                "progress_stage": stage,
-                "progress_message": message,
-            },
-        )
+    ensure_not_cancelled = partial(
+        ensure_clinical_job_not_cancelled,
+        job_manager=service.job_manager,
+        job_id=job_id,
+    )
+    report_progress = partial(
+        report_clinical_job_progress,
+        job_manager=service.job_manager,
+        job_id=job_id,
+    )
 
     with service.runtime_override_context(
         use_cloud_services=runtime_overrides.get("use_cloud_services"),
@@ -507,6 +502,33 @@ async def execute_clinical_job(
             )
             raise
     return result
+
+
+###############################################################################
+def ensure_clinical_job_not_cancelled(*, job_manager: JobManager, job_id: str) -> None:
+    if job_manager.should_stop(job_id):
+        raise ClinicalJobCancelled("Clinical job stop requested.")
+
+
+###############################################################################
+def report_clinical_job_progress(
+    stage: str,
+    progress: float,
+    *,
+    job_manager: JobManager,
+    job_id: str,
+) -> None:
+    ensure_clinical_job_not_cancelled(job_manager=job_manager, job_id=job_id)
+    bounded = min(100.0, max(0.0, float(progress)))
+    message = CLINICAL_PROGRESS_MESSAGES.get(stage, stage.replace("_", " ").strip())
+    job_manager.update_progress(job_id, bounded)
+    job_manager.update_result(
+        job_id,
+        {
+            "progress_stage": stage,
+            "progress_message": message,
+        },
+    )
 
 
 ###############################################################################
