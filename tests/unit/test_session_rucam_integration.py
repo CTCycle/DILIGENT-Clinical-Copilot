@@ -194,8 +194,8 @@ def test_session_persists_rucam_bundle_and_per_drug_rucam(monkeypatch) -> None:
     endpoint.disease_extractor = FakeDiseaseExtractor()
     endpoint.lab_extractor = FakeLabExtractor(fail=False)
     endpoint.rucam_estimator = FakeRucamEstimator(fail=False)
-    monkeypatch.setattr(session_module, "input_preparator", FakeInputPreparator())
-    monkeypatch.setattr(session_module, "HepatoxConsultation", FakeHepatoxConsultation)
+    monkeypatch.setattr(endpoint, "input_preparator", FakeInputPreparator())
+    monkeypatch.setattr(endpoint, "hepatox_consultation_cls", FakeHepatoxConsultation)
 
     result = asyncio.run(endpoint.process_single_patient(_build_payload()))
 
@@ -214,8 +214,8 @@ def test_session_lab_or_rucam_failure_degrades_to_warnings(monkeypatch) -> None:
     endpoint.disease_extractor = FakeDiseaseExtractor()
     endpoint.lab_extractor = FakeLabExtractor(fail=True)
     endpoint.rucam_estimator = FakeRucamEstimator(fail=True)
-    monkeypatch.setattr(session_module, "input_preparator", FakeInputPreparator())
-    monkeypatch.setattr(session_module, "HepatoxConsultation", FakeHepatoxConsultation)
+    monkeypatch.setattr(endpoint, "input_preparator", FakeInputPreparator())
+    monkeypatch.setattr(endpoint, "hepatox_consultation_cls", FakeHepatoxConsultation)
 
     try:
         asyncio.run(endpoint.process_single_patient(_build_payload()))

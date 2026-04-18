@@ -72,4 +72,4 @@ class RootEndpoint:
             )
             return
 
-        self.app.add_api_route("/", self.redirect_root, methods=["GET"])
+        self.app.add_api_route("/", self.redirect_root, methods=["GET"], include_in_schema=False)
