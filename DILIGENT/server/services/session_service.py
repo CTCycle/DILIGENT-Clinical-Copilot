@@ -52,7 +52,7 @@ from DILIGENT.server.services.clinical.job_progress import (
     ClinicalJobCancelled,
     StageProgressFractionCallback,
 )
-from DILIGENT.server.services.clinical.language import detect_clinical_language
+from DILIGENT.server.services.clinical.language import ClinicalLanguageDetector
 from DILIGENT.server.services.clinical.preparation import ClinicalKnowledgePreparation
 from DILIGENT.server.services.clinical.candidate_selection import select_relevant_candidates
 from DILIGENT.server.services.clinical.disease import DiseaseExtractor
@@ -87,7 +87,7 @@ def build_failed_session_payload(
     error_message: str,
     elapsed_seconds: float,
 ) -> dict[str, Any]:
-    language_result = detect_clinical_language(payload)
+    language_result = ClinicalLanguageDetector.detect(payload)
     runtime_settings = {
         "use_cloud_services": bool(
             LLMRuntimeConfig.is_cloud_enabled()
@@ -832,7 +832,7 @@ class ClinicalSessionService:
             stage="session_initialization",
             value=5.0,
         )
-        language_result = detect_clinical_language(payload)
+        language_result = ClinicalLanguageDetector.detect(payload)
         report_language = language_result.report_language
         validation_bundle = build_validation_bundle(report_language)
         ensure_required_sections(payload, bundle=validation_bundle)
@@ -856,6 +856,7 @@ class ClinicalSessionService:
         try:
             therapy_drugs = await self.drugs_parser.extract_drugs_from_therapy(
                 cleaned_therapy_text,
+                text_is_clean=True,
                 progress_callback=therapy_progress_callback,
             )
             if stop_check is not None:

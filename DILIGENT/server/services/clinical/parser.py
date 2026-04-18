@@ -198,9 +198,10 @@ class DrugsParser:
         self,
         text: str | None,
         *,
+        text_is_clean: bool = False,
         progress_callback: Callable[[float], None] | None = None,
     ) -> PatientDrugs:
-        cleaned = self.clean_text(text)
+        cleaned = text if text_is_clean else self.clean_text(text)
         if not cleaned:
             return PatientDrugs(entries=[])
         lines = [

@@ -68,6 +68,13 @@
     "drug_name_max_length": 200,
     "drug_name_max_tokens": 8
   },
+  "clinical_language_detection": {
+    "min_best_score": 2.0,
+    "high_confidence_min_score": 8.0,
+    "high_confidence_min_margin": 3.0,
+    "moderate_confidence_min_score": 4.0,
+    "moderate_confidence_min_margin": 1.0
+  },
   "drugs_matcher": {
     "direct_confidence": 1.0,
     "master_confidence": 0.92,
