@@ -39,11 +39,11 @@ LANGUAGE_HINTS: dict[str, set[str]] = {
     },
 }
 
-
+###############################################################################
 def _tokenize(value: str) -> list[str]:
     return [match.group(0).casefold() for match in TOKEN_PATTERN.finditer(value)]
 
-
+###############################################################################
 def _score_text_by_language(payload: PatientData) -> dict[str, float]:
     scores: dict[str, float] = {code: 0.0 for code in SUPPORTED_REPORT_LANGUAGES}
     sections = {
@@ -59,7 +59,7 @@ def _score_text_by_language(payload: PatientData) -> dict[str, float]:
                     scores[lang_code] += weight
     return scores
 
-
+###############################################################################
 def detect_clinical_language(payload: PatientData) -> LanguageDetectionResult:
     scored_sections = [payload.anamnesis, payload.laboratory_analysis, payload.drugs]
     weighted_text = " ".join(section.strip() for section in scored_sections if section and section.strip())
