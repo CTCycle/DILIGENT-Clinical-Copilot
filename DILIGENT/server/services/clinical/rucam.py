@@ -572,7 +572,7 @@ class RucamScoreEstimator:
             for entry in disease_context.entries
             if bool(entry.hepatic_related) or "hepat" in (entry.name or "").lower()
         ]
-        if payload.has_hepatic_diseases and hepatic_entries:
+        if hepatic_entries:
             return RucamComponentAssessment(
                 component_key="non_drug_causes",
                 label="Non-drug causes",

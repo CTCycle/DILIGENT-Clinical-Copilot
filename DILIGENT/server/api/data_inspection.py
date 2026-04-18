@@ -465,8 +465,20 @@ class DataInspectionEndpoint:
         return InspectionUpdateConfigResponse(**payload)
 
     # -------------------------------------------------------------------------
-    def list_rag_documents(self) -> RagDocumentListResponse:
-        return RagDocumentListResponse(**self.service.list_rag_documents())
+    def list_rag_documents(
+        self,
+        search: str | None = Query(default=None),
+        offset: int = Query(default=0, ge=0),
+        limit: int = Query(default=10, ge=1, le=100),
+    ) -> RagDocumentListResponse:
+        filters = CatalogListFilters(search=search, offset=offset, limit=limit)
+        return RagDocumentListResponse(
+            **self.service.list_rag_documents(
+                search=filters.search,
+                offset=filters.offset,
+                limit=filters.limit,
+            )
+        )
 
     # -------------------------------------------------------------------------
     def get_rag_vector_store(self) -> LanceVectorStoreSummaryResponse:

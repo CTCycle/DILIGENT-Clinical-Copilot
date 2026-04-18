@@ -581,7 +581,13 @@ class DataInspectionService:
         return self.serializer.delete_drug_with_cleanup(drug_id)
 
     # -------------------------------------------------------------------------
-    def list_rag_documents(self) -> dict[str, Any]:
+    def list_rag_documents(
+        self,
+        *,
+        search: str | None,
+        offset: int,
+        limit: int,
+    ) -> dict[str, Any]:
         serializer = DocumentSerializer(DOCS_PATH)
         items: list[dict[str, Any]] = []
         supported_ext = {entry.lower() for entry in DOCUMENT_SUPPORTED_EXTENSIONS}
@@ -606,7 +612,26 @@ class DataInspectionService:
                 }
             )
         items.sort(key=lambda item: str(item["path"]).casefold())
-        return {"items": items, "total": len(items)}
+        normalized_search = (search or "").strip().casefold()
+        if normalized_search:
+            items = [
+                item
+                for item in items
+                if normalized_search in str(item["file_name"]).casefold()
+                or normalized_search in str(item["path"]).casefold()
+                or normalized_search in str(item["extension"]).casefold()
+            ]
+
+        total = len(items)
+        bounded_offset = max(int(offset), 0)
+        bounded_limit = max(int(limit), 1)
+        paged = items[bounded_offset : bounded_offset + bounded_limit]
+        return {
+            "items": paged,
+            "total": total,
+            "offset": bounded_offset,
+            "limit": bounded_limit,
+        }
 
     # -------------------------------------------------------------------------
     def get_rag_vector_store_summary(self) -> dict[str, Any]:

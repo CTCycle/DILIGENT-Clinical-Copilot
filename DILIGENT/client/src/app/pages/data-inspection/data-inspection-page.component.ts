@@ -1,11 +1,10 @@
 import { CommonModule } from '@angular/common';
-import { Component, OnDestroy, OnInit, inject, signal } from '@angular/core';
+import { Component, ElementRef, OnDestroy, OnInit, ViewChild, inject, signal } from '@angular/core';
 import { FormsModule } from '@angular/forms';
 
 import { InspectionActionIconButtonComponent } from '../../components/inspection-action-icon-button/inspection-action-icon-button.component';
 import { ModalShellComponent } from '../../components/modal-shell/modal-shell.component';
 import { InspectionCatalogToolbarComponent } from '../../components/inspection-catalog-toolbar/inspection-catalog-toolbar.component';
-import { InspectionPagerComponent } from '../../components/inspection-pager/inspection-pager.component';
 import {
   cancelInspectionDiliPriorsUpdateJob,
   cancelInspectionDrugLabelsUpdateJob,
@@ -67,12 +66,7 @@ import {
 } from '../../core/models/types';
 import { InspectionDetailResource } from './inspection-detail-resource';
 import { InspectionPagedResource } from './inspection-paged-resource';
-import {
-  InspectionUpdateJobResource,
-  InspectionUpdateTargetActionsMap,
-} from './inspection-update-job-resource';
-
-const PAGE_LIMIT = 10;
+import { InspectionUpdateJobResource, InspectionUpdateTargetActionsMap } from './inspection-update-job-resource';
 
 type InspectionViewId =
   | 'sessions'
@@ -155,34 +149,58 @@ type TimelineRenderEvent = {
     ModalShellComponent,
     InspectionActionIconButtonComponent,
     InspectionCatalogToolbarComponent,
-    InspectionPagerComponent,
   ],
   templateUrl: './data-inspection-page.component.html',
   styleUrl: './data-inspection-page.component.scss',
 })
 export class DataInspectionPageComponent implements OnInit, OnDestroy {
+  @ViewChild('ragFolderInput') private ragFolderInput?: ElementRef<HTMLInputElement>;
+
   private readonly jobPolling = inject(JobPollingService);
   readonly inspectionViews = INSPECTION_VIEWS;
   readonly activeView = signal<InspectionViewId>('sessions');
 
-  readonly sessionItems = signal<InspectionSessionItem[]>([]);
-  readonly sessionTotal = signal(0);
-  readonly sessionOffset = signal(0);
-  readonly sessionLoading = signal(false);
-  readonly sessionError = signal<string | null>(null);
-  readonly sessionSearchInput = signal('');
   readonly sessionStatusFilter = signal<InspectionSessionStatus | 'all'>('all');
   readonly sessionDateMode = signal<InspectionDateFilterMode | 'none'>('none');
   readonly sessionDate = signal('');
+  private readonly sessionCatalog = new InspectionPagedResource<InspectionSessionItem>(
+    (params) => {
+      const statusFilter = this.sessionStatusFilter();
+      const dateModeFilter = this.sessionDateMode();
+      return fetchInspectionSessions({
+        ...params,
+        status: statusFilter === 'all' ? undefined : statusFilter,
+        date_mode: dateModeFilter === 'none' ? undefined : dateModeFilter,
+        date: dateModeFilter === 'none' ? undefined : this.sessionDate() || undefined,
+      });
+    },
+    'Failed to load sessions.',
+  );
+  readonly sessionItems = this.sessionCatalog.items;
+  readonly sessionVisibleItems = this.sessionCatalog.visibleItems;
+  readonly sessionVisibleStartIndex = this.sessionCatalog.visibleStartIndex;
+  readonly sessionTopPaddingPx = this.sessionCatalog.topPaddingPx;
+  readonly sessionBottomPaddingPx = this.sessionCatalog.bottomPaddingPx;
+  readonly sessionTotal = this.sessionCatalog.total;
+  readonly sessionLoading = this.sessionCatalog.loading;
+  readonly sessionLoadingMore = this.sessionCatalog.loadingMore;
+  readonly sessionHasMore = this.sessionCatalog.hasMore;
+  readonly sessionError = this.sessionCatalog.error;
+  readonly sessionSearchInput = this.sessionCatalog.searchInput;
 
   private readonly rxnavCatalog = new InspectionPagedResource<InspectionRxNavItem>(
     (params) => fetchInspectionRxNavCatalog(params),
     'Failed to load drug catalog.',
   );
   readonly rxnavItems = this.rxnavCatalog.items;
+  readonly rxnavVisibleItems = this.rxnavCatalog.visibleItems;
+  readonly rxnavVisibleStartIndex = this.rxnavCatalog.visibleStartIndex;
+  readonly rxnavTopPaddingPx = this.rxnavCatalog.topPaddingPx;
+  readonly rxnavBottomPaddingPx = this.rxnavCatalog.bottomPaddingPx;
   readonly rxnavTotal = this.rxnavCatalog.total;
-  readonly rxnavOffset = this.rxnavCatalog.offset;
   readonly rxnavLoading = this.rxnavCatalog.loading;
+  readonly rxnavLoadingMore = this.rxnavCatalog.loadingMore;
+  readonly rxnavHasMore = this.rxnavCatalog.hasMore;
   readonly rxnavError = this.rxnavCatalog.error;
   readonly rxnavSearchInput = this.rxnavCatalog.searchInput;
 
@@ -191,9 +209,14 @@ export class DataInspectionPageComponent implements OnInit, OnDestroy {
     'Failed to load LiverTox.',
   );
   readonly livertoxItems = this.liverToxCatalog.items;
+  readonly livertoxVisibleItems = this.liverToxCatalog.visibleItems;
+  readonly livertoxVisibleStartIndex = this.liverToxCatalog.visibleStartIndex;
+  readonly livertoxTopPaddingPx = this.liverToxCatalog.topPaddingPx;
+  readonly livertoxBottomPaddingPx = this.liverToxCatalog.bottomPaddingPx;
   readonly livertoxTotal = this.liverToxCatalog.total;
-  readonly livertoxOffset = this.liverToxCatalog.offset;
   readonly livertoxLoading = this.liverToxCatalog.loading;
+  readonly livertoxLoadingMore = this.liverToxCatalog.loadingMore;
+  readonly livertoxHasMore = this.liverToxCatalog.hasMore;
   readonly livertoxError = this.liverToxCatalog.error;
   readonly livertoxSearchInput = this.liverToxCatalog.searchInput;
 
@@ -202,9 +225,14 @@ export class DataInspectionPageComponent implements OnInit, OnDestroy {
     'Failed to load DILI priors.',
   );
   readonly diliPriorItems = this.diliPriorCatalog.items;
+  readonly diliPriorVisibleItems = this.diliPriorCatalog.visibleItems;
+  readonly diliPriorVisibleStartIndex = this.diliPriorCatalog.visibleStartIndex;
+  readonly diliPriorTopPaddingPx = this.diliPriorCatalog.topPaddingPx;
+  readonly diliPriorBottomPaddingPx = this.diliPriorCatalog.bottomPaddingPx;
   readonly diliPriorTotal = this.diliPriorCatalog.total;
-  readonly diliPriorOffset = this.diliPriorCatalog.offset;
   readonly diliPriorLoading = this.diliPriorCatalog.loading;
+  readonly diliPriorLoadingMore = this.diliPriorCatalog.loadingMore;
+  readonly diliPriorHasMore = this.diliPriorCatalog.hasMore;
   readonly diliPriorError = this.diliPriorCatalog.error;
   readonly diliPriorSearchInput = this.diliPriorCatalog.searchInput;
 
@@ -213,20 +241,34 @@ export class DataInspectionPageComponent implements OnInit, OnDestroy {
     'Failed to load drug labels.',
   );
   readonly drugLabelItems = this.drugLabelCatalog.items;
+  readonly drugLabelVisibleItems = this.drugLabelCatalog.visibleItems;
+  readonly drugLabelVisibleStartIndex = this.drugLabelCatalog.visibleStartIndex;
+  readonly drugLabelTopPaddingPx = this.drugLabelCatalog.topPaddingPx;
+  readonly drugLabelBottomPaddingPx = this.drugLabelCatalog.bottomPaddingPx;
   readonly drugLabelTotal = this.drugLabelCatalog.total;
-  readonly drugLabelOffset = this.drugLabelCatalog.offset;
   readonly drugLabelLoading = this.drugLabelCatalog.loading;
+  readonly drugLabelLoadingMore = this.drugLabelCatalog.loadingMore;
+  readonly drugLabelHasMore = this.drugLabelCatalog.hasMore;
   readonly drugLabelError = this.drugLabelCatalog.error;
   readonly drugLabelSearchInput = this.drugLabelCatalog.searchInput;
 
-  readonly ragDocuments = signal<InspectionRagDocumentRow[]>([]);
+  private readonly ragCatalog = new InspectionPagedResource<InspectionRagDocumentRow>(
+    (params) => fetchInspectionRagDocuments(params),
+    'Failed to load RAG state.',
+  );
+  readonly ragDocuments = this.ragCatalog.items;
+  readonly ragVisibleItems = this.ragCatalog.visibleItems;
+  readonly ragVisibleStartIndex = this.ragCatalog.visibleStartIndex;
+  readonly ragTopPaddingPx = this.ragCatalog.topPaddingPx;
+  readonly ragBottomPaddingPx = this.ragCatalog.bottomPaddingPx;
+  readonly ragTotal = this.ragCatalog.total;
+  readonly ragLoading = this.ragCatalog.loading;
+  readonly ragLoadingMore = this.ragCatalog.loadingMore;
+  readonly ragHasMore = this.ragCatalog.hasMore;
+  readonly ragError = this.ragCatalog.error;
+  readonly ragSearchInput = this.ragCatalog.searchInput;
   readonly ragVectorStore = signal<InspectionRagVectorStoreSummary | null>(null);
-  readonly ragDocumentsPathInput = signal('');
-  readonly ragTotal = signal(0);
-  readonly ragOffset = signal(0);
-  readonly ragLoading = signal(false);
-  readonly ragError = signal<string | null>(null);
-  readonly ragSearchInput = signal('');
+  readonly ragSelectedFolderPath = signal('');
 
   readonly reportSession = signal<InspectionSessionItem | null>(null);
   readonly reportContent = signal('');
@@ -324,7 +366,7 @@ export class DataInspectionPageComponent implements OnInit, OnDestroy {
   private readonly updateJob = new InspectionUpdateJobResource(
     this.jobPolling,
     this.updateTargetActions,
-    () => this.ragDocumentsPathInput(),
+    () => this.ragSelectedFolderPath(),
   );
   readonly activeUpdateTarget = this.updateJob.activeTarget;
   readonly updateConfig = this.updateJob.updateConfig;
@@ -368,88 +410,41 @@ export class DataInspectionPageComponent implements OnInit, OnDestroy {
   }
 
   get displayedRagFolderPath(): string {
-    const manualPath = this.ragDocumentsPathInput().trim();
+    const manualPath = this.ragSelectedFolderPath().trim();
     return manualPath || resolveRagDocumentsPath(this.ragVectorStore()) || 'N/A';
   }
 
   async loadSessions(): Promise<void> {
-    this.sessionLoading.set(true);
-    this.sessionError.set(null);
-    try {
-      const statusFilter = this.sessionStatusFilter();
-      const dateMode = this.sessionDateMode();
-      const payload = await fetchInspectionSessions({
-        search: this.sessionSearchInput(),
-        status: statusFilter === 'all' ? undefined : statusFilter,
-        date_mode: dateMode === 'none' ? undefined : dateMode,
-        date: dateMode === 'none' ? undefined : this.sessionDate() || undefined,
-        offset: this.sessionOffset(),
-        limit: PAGE_LIMIT,
-      });
-      this.sessionItems.set(payload.items);
-      this.sessionTotal.set(payload.total);
-    } catch (error) {
-      this.sessionItems.set([]);
-      this.sessionTotal.set(0);
-      this.sessionError.set(error instanceof Error ? error.message : 'Failed to load sessions.');
-    } finally {
-      this.sessionLoading.set(false);
-    }
+    await this.sessionCatalog.loadInitial();
   }
 
   async loadRxNav(): Promise<void> {
-    await this.rxnavCatalog.load();
+    await this.rxnavCatalog.loadInitial();
   }
 
   async loadLiverTox(): Promise<void> {
-    await this.liverToxCatalog.load();
+    await this.liverToxCatalog.loadInitial();
   }
 
   async loadDiliPriors(): Promise<void> {
-    await this.diliPriorCatalog.load();
+    await this.diliPriorCatalog.loadInitial();
   }
 
   async loadDrugLabels(): Promise<void> {
-    await this.drugLabelCatalog.load();
+    await this.drugLabelCatalog.loadInitial();
   }
 
   async loadRag(): Promise<void> {
-    this.ragLoading.set(true);
-    this.ragError.set(null);
+    await this.ragCatalog.loadInitial();
     try {
-      const [documents, vectorStore] = await Promise.all([
-        fetchInspectionRagDocuments(),
-        fetchInspectionRagVectorStore(),
-      ]);
-
-      const normalizedSearch = this.ragSearchInput().trim().toLowerCase();
-      const filtered = documents.items.filter((item) => {
-        if (!normalizedSearch) {
-          return true;
-        }
-        const haystack = `${item.file_name} ${item.path} ${item.extension}`.toLowerCase();
-        return haystack.includes(normalizedSearch);
-      });
-
-      let offset = this.ragOffset();
-      if (offset >= filtered.length && filtered.length > 0) {
-        offset = Math.max(0, filtered.length - PAGE_LIMIT);
-        this.ragOffset.set(offset);
-      }
-
-      this.ragDocuments.set(filtered.slice(offset, offset + PAGE_LIMIT));
-      this.ragTotal.set(filtered.length);
+      const vectorStore = await fetchInspectionRagVectorStore();
       this.ragVectorStore.set(vectorStore);
-      if (!this.ragDocumentsPathInput().trim()) {
-        this.ragDocumentsPathInput.set(resolveRagDocumentsPath(vectorStore));
+      if (!this.ragSelectedFolderPath().trim()) {
+        this.ragSelectedFolderPath.set(resolveRagDocumentsPath(vectorStore));
       }
     } catch (error) {
-      this.ragDocuments.set([]);
-      this.ragTotal.set(0);
       this.ragVectorStore.set(null);
       this.ragError.set(error instanceof Error ? error.message : 'Failed to load RAG state.');
-    } finally {
-      this.ragLoading.set(false);
     }
   }
 
@@ -822,33 +817,21 @@ export class DataInspectionPageComponent implements OnInit, OnDestroy {
   }
 
   async updateSessionsSearch(value: string): Promise<void> {
-    this.sessionSearchInput.set(value);
-    this.sessionOffset.set(0);
-    await this.loadSessions();
+    await this.sessionCatalog.updateSearch(value);
   }
 
   async updateSessionsStatus(value: InspectionSessionStatus | 'all'): Promise<void> {
     this.sessionStatusFilter.set(value);
-    this.sessionOffset.set(0);
     await this.loadSessions();
   }
 
   async updateSessionsDateMode(value: InspectionDateFilterMode | 'none'): Promise<void> {
     this.sessionDateMode.set(value);
-    this.sessionOffset.set(0);
     await this.loadSessions();
   }
 
   async updateSessionsDate(value: string): Promise<void> {
     this.sessionDate.set(value);
-    this.sessionOffset.set(0);
-    await this.loadSessions();
-  }
-
-  async pageSessions(direction: -1 | 1): Promise<void> {
-    const next = this.sessionOffset() + direction * PAGE_LIMIT;
-    if (next < 0 || next >= this.sessionTotal()) return;
-    this.sessionOffset.set(next);
     await this.loadSessions();
   }
 
@@ -856,49 +839,82 @@ export class DataInspectionPageComponent implements OnInit, OnDestroy {
     await this.rxnavCatalog.updateSearch(value);
   }
 
-  async pageRxNav(direction: -1 | 1): Promise<void> {
-    await this.rxnavCatalog.page(direction);
-  }
-
   async updateLiverToxSearch(value: string): Promise<void> {
     await this.liverToxCatalog.updateSearch(value);
-  }
-
-  async pageLiverTox(direction: -1 | 1): Promise<void> {
-    await this.liverToxCatalog.page(direction);
   }
 
   async updateDiliPriorsSearch(value: string): Promise<void> {
     await this.diliPriorCatalog.updateSearch(value);
   }
 
-  async pageDiliPriors(direction: -1 | 1): Promise<void> {
-    await this.diliPriorCatalog.page(direction);
-  }
-
   async updateDrugLabelsSearch(value: string): Promise<void> {
     await this.drugLabelCatalog.updateSearch(value);
   }
 
-  async pageDrugLabels(direction: -1 | 1): Promise<void> {
-    await this.drugLabelCatalog.page(direction);
-  }
-
   async updateRagSearch(value: string): Promise<void> {
-    this.ragSearchInput.set(value);
-    this.ragOffset.set(0);
-    await this.loadRag();
+    await this.ragCatalog.updateSearch(value);
   }
 
-  async pageRag(direction: -1 | 1): Promise<void> {
-    const next = this.ragOffset() + direction * PAGE_LIMIT;
-    if (next < 0 || next >= this.ragTotal()) return;
-    this.ragOffset.set(next);
-    await this.loadRag();
+  onSessionsScroll(event: Event): void {
+    this.sessionCatalog.handleScrollEvent(event);
   }
 
-  setRagDocumentsPathInput(value: string): void {
-    this.ragDocumentsPathInput.set(value);
+  onRxNavScroll(event: Event): void {
+    this.rxnavCatalog.handleScrollEvent(event);
+  }
+
+  onLiverToxScroll(event: Event): void {
+    this.liverToxCatalog.handleScrollEvent(event);
+  }
+
+  onDiliPriorsScroll(event: Event): void {
+    this.diliPriorCatalog.handleScrollEvent(event);
+  }
+
+  onDrugLabelsScroll(event: Event): void {
+    this.drugLabelCatalog.handleScrollEvent(event);
+  }
+
+  onRagScroll(event: Event): void {
+    this.ragCatalog.handleScrollEvent(event);
+  }
+
+  openRagFolderPicker(): void {
+    this.ragFolderInput?.nativeElement.click();
+  }
+
+  handleRagFolderSelection(event: Event): void {
+    const target = event.target;
+    if (!(target instanceof HTMLInputElement) || !target.files || target.files.length === 0) {
+      return;
+    }
+    const firstFile = target.files[0] as File & { path?: string; webkitRelativePath?: string };
+    const webkitPath = firstFile.webkitRelativePath || '';
+    const rootFolder = webkitPath.split('/')[0]?.trim() || '';
+    const absoluteCandidate = this.resolveAbsoluteFolderPath(firstFile, webkitPath, rootFolder);
+    const resolvedPath = absoluteCandidate || rootFolder;
+    if (resolvedPath) {
+      this.ragSelectedFolderPath.set(resolvedPath);
+    }
+  }
+
+  private resolveAbsoluteFolderPath(
+    file: File & { path?: string },
+    webkitRelativePath: string,
+    rootFolder: string,
+  ): string {
+    const filePath = typeof file.path === 'string' ? file.path.trim() : '';
+    if (!filePath || !webkitRelativePath || !rootFolder) {
+      return '';
+    }
+    const normalizedFilePath = filePath.replace(/\\/g, '/');
+    const normalizedRelative = webkitRelativePath.replace(/\\/g, '/');
+    if (!normalizedFilePath.toLowerCase().endsWith(normalizedRelative.toLowerCase())) {
+      return '';
+    }
+    const base = normalizedFilePath.slice(0, normalizedFilePath.length - normalizedRelative.length);
+    const slash = base.endsWith('/') ? '' : '/';
+    return `${base}${slash}${rootFolder}`;
   }
 
   async openUpdateModal(target: InspectionUpdateTarget): Promise<void> {

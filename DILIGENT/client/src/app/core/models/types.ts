@@ -327,6 +327,8 @@ export type InspectionRagDocumentRow = {
 export type InspectionRagDocumentsResponse = {
   items: InspectionRagDocumentRow[];
   total: number;
+  offset: number;
+  limit: number;
 };
 
 export type InspectionRagVectorStoreSummary = {

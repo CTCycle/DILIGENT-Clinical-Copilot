@@ -117,6 +117,7 @@ export function buildClinicalPayload(
   settings: RuntimeSettings,
   allowMissingLabs: boolean | null = null,
 ): ClinicalRequestPayload {
+  const cloudMode = Boolean(settings.useCloudServices);
   const payload: ClinicalRequestPayload = {
     name: sanitizeField(form.patientName),
     visit_date: buildVisitDatePayload(form.visitDate),
@@ -129,11 +130,11 @@ export function buildClinicalPayload(
     use_cloud_services: settings.useCloudServices,
     llm_provider: settings.provider,
     cloud_model: settings.cloudModel,
-    text_extraction_model: settings.parsingModel,
-    clinical_model: settings.clinicalModel,
-    ollama_temperature: settings.temperature,
+    text_extraction_model: cloudMode ? undefined : settings.parsingModel,
+    clinical_model: cloudMode ? undefined : settings.clinicalModel,
+    ollama_temperature: cloudMode ? undefined : settings.temperature,
     cloud_temperature: settings.temperature,
-    ollama_reasoning: settings.reasoning,
+    ollama_reasoning: cloudMode ? undefined : settings.reasoning,
   };
   if (allowMissingLabs !== null) {
     payload.allow_missing_labs = allowMissingLabs;

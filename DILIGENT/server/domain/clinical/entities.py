@@ -52,15 +52,6 @@ class PatientData(BaseModel):
         max_length=MAX_LAB_TEXT_LENGTH,
         description="Free-text laboratory section, potentially with dated values and ULN notes.",
     )
-    patient_image_base64: str | None = Field(
-        None,
-        max_length=8_000_000,
-        description="Base64-encoded patient profile image.",
-    )
-    has_hepatic_diseases: bool = Field(
-        default=False,
-        description="Indicates whether the patient has a history of hepatic diseases.",
-    )
     use_rag: bool = Field(
         default=False,
         description="Enables retrieval augmented generation during analysis.",
@@ -72,7 +63,7 @@ class PatientData(BaseModel):
 
     # -------------------------------------------------------------------------
     @field_validator(
-        "name", "anamnesis", "drugs", "laboratory_analysis", "patient_image_base64", mode="before"
+        "name", "anamnesis", "drugs", "laboratory_analysis", mode="before"
     )
     @classmethod
     def strip_text(cls, value: str | None) -> str | None:
@@ -180,7 +171,6 @@ class ClinicalSessionRequest(BaseModel):
     name: str | None = Field(default=None, max_length=200)
     visit_date: date | dict[str, int] | str | None = None
     anamnesis: str | None = Field(default=None, max_length=20000)
-    has_hepatic_diseases: bool = False
     use_rag: bool = False
     use_web_search: bool = False
     drugs: str | None = Field(default=None, max_length=20000)
