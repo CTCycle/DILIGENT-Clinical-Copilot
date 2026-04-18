@@ -38,7 +38,7 @@ from DILIGENT.server.domain.jobs import (
 from DILIGENT.server.configurations.startup import server_settings
 from DILIGENT.server.configurations.llm_configs import LLMRuntimeConfig
 from DILIGENT.server.repositories.serialization.data import DataSerializer
-from DILIGENT.server.services.jobs import job_manager
+from DILIGENT.server.services.jobs import JobManager, job_manager as default_job_manager
 from DILIGENT.server.common.utils.logger import logger
 from DILIGENT.server.common.utils.types import coerce_bool_or_unknown
 from DILIGENT.server.services.clinical.hepatox import (
@@ -46,11 +46,9 @@ from DILIGENT.server.services.clinical.hepatox import (
     HepatoxConsultation,
 )
 from DILIGENT.server.services.clinical.job_progress import (
+    CLINICAL_PROGRESS_MESSAGES,
     ClinicalConsultationProgressCallback,
     ClinicalJobCancelled,
-    ClinicalJobProgressCallback,
-    ensure_clinical_job_not_cancelled,
-    report_clinical_job_progress,
     StageProgressFractionCallback,
 )
 from DILIGENT.server.services.clinical.language import detect_clinical_language
@@ -73,8 +71,7 @@ drugs_parser = DrugsParser(timeout_s=server_settings.external_data.parser_llm_ti
 disease_extractor = DiseaseExtractor(timeout_s=server_settings.external_data.disease_llm_timeout)
 lab_extractor = ClinicalLabExtractor(timeout_s=server_settings.external_data.disease_llm_timeout)
 pattern_analyzer = HepatotoxicityPatternAnalyzer()
-rucam_estimator = RucamScoreEstimator()
-input_preparator = ClinicalKnowledgePreparation()serializer = DataSerializer()
+rucam_estimator = RucamScoreEstimator()serializer = DataSerializer()
 payload_sanitization_service = PayloadSanitizationService()
 NOT_AVAILABLE = "Not available"
 
@@ -417,11 +414,28 @@ class NarrativeBuilder:
 
 ###############################################################################
 async def execute_clinical_job(
-    service: "ClinicalSessionEndpoint",
+    service: "ClinicalSessionService",
     payload: PatientData,
     runtime_overrides: dict[str, Any],
     job_id: str,
 ) -> dict[str, Any]:
+    def ensure_not_cancelled() -> None:
+        if service.job_manager.should_stop(job_id):
+            raise ClinicalJobCancelled("Clinical job stop requested.")
+
+    def report_progress(stage: str, progress: float) -> None:
+        ensure_not_cancelled()
+        bounded = min(100.0, max(0.0, float(progress)))
+        message = CLINICAL_PROGRESS_MESSAGES.get(stage, stage.replace("_", " ").strip())
+        service.job_manager.update_progress(job_id, bounded)
+        service.job_manager.update_result(
+            job_id,
+            {
+                "progress_stage": stage,
+                "progress_message": message,
+            },
+        )
+
     with service.runtime_override_context(
         use_cloud_services=runtime_overrides.get("use_cloud_services"),
         llm_provider=runtime_overrides.get("llm_provider"),
@@ -432,24 +446,20 @@ async def execute_clinical_job(
         cloud_temperature=runtime_overrides.get("cloud_temperature"),
         ollama_reasoning=runtime_overrides.get("ollama_reasoning"),
     ):
-        ensure_clinical_job_not_cancelled(job_id)
+        ensure_not_cancelled()
 
-        report_clinical_job_progress(
-            job_id,
-            stage="session_initialization",
-            progress=5.0,
-        )
-        progress_callback = ClinicalJobProgressCallback(job_id=job_id)
+        report_progress(stage="session_initialization", progress=5.0)
+        progress_callback = report_progress
         job_started_at = time.perf_counter()
 
         try:
             result = await service.process_single_patient(
                 payload,
                 progress_callback=progress_callback,
-                stop_check=lambda: ensure_clinical_job_not_cancelled(job_id),
+                stop_check=ensure_not_cancelled,
             )
         except ClinicalJobCancelled:
-            job_manager.update_result(
+            service.job_manager.update_result(
                 job_id,
                 {
                     "progress_status": "cancelled",
@@ -460,7 +470,7 @@ async def execute_clinical_job(
         except ClinicalPipelineValidationError as exc:
             serialized_issues = [issue.model_dump() for issue in exc.issues]
             await asyncio.to_thread(
-                serializer.save_clinical_session,
+                service.serializer.save_clinical_session,
                 build_failed_session_payload(
                     payload=payload,
                     runtime_overrides=runtime_overrides,
@@ -469,7 +479,7 @@ async def execute_clinical_job(
                     elapsed_seconds=(time.perf_counter() - job_started_at),
                 ),
             )
-            job_manager.update_result(
+            service.job_manager.update_result(
                 job_id,
                 {
                     "validation_error": str(exc),
@@ -478,7 +488,7 @@ async def execute_clinical_job(
             )
             raise
         except Exception as exc:
-            if job_manager.should_stop(job_id):
+            if service.job_manager.should_stop(job_id):
                 return {}
             failure_issue = PipelineIssue(
                 severity="error",
@@ -486,7 +496,7 @@ async def execute_clinical_job(
                 message=str(exc).strip() or "Clinical analysis failed unexpectedly.",
             ).model_dump()
             await asyncio.to_thread(
-                serializer.save_clinical_session,
+                service.serializer.save_clinical_session,
                 build_failed_session_payload(
                     payload=payload,
                     runtime_overrides=runtime_overrides,
@@ -501,7 +511,7 @@ async def execute_clinical_job(
 
 ###############################################################################
 def run_clinical_job(
-    service: "ClinicalSessionEndpoint",
+    service: "ClinicalSessionService",
     payload: PatientData,
     runtime_overrides: dict[str, Any],
     job_id: str,
@@ -520,7 +530,7 @@ def run_clinical_job(
 
 
 ###############################################################################
-class ClinicalSessionEndpoint:
+class ClinicalSessionService:
     JOB_TYPE = "clinical"
 
     def __init__(
@@ -533,6 +543,9 @@ class ClinicalSessionEndpoint:
         rucam_estimator: RucamScoreEstimator,
         serializer: DataSerializer,
         payload_sanitizer: PayloadSanitizationService,
+        input_preparator: ClinicalKnowledgePreparation | None = None,
+        hepatox_consultation_cls: type[HepatoxConsultation] | None = None,
+        job_manager: JobManager | None = None,
         router: Any | None = None,
     ) -> None:
         self.router = router
@@ -543,6 +556,9 @@ class ClinicalSessionEndpoint:
         self.rucam_estimator = rucam_estimator
         self.serializer = serializer
         self.payload_sanitizer = payload_sanitizer
+        self.input_preparator = input_preparator or ClinicalKnowledgePreparation()
+        self.hepatox_consultation_cls = hepatox_consultation_cls or HepatoxConsultation
+        self.job_manager = job_manager or default_job_manager
 
     # -------------------------------------------------------------------------
     @staticmethod
@@ -729,13 +745,13 @@ class ClinicalSessionEndpoint:
             f"- Anamnesis: {', '.join(anamnesis_mentions) if anamnesis_mentions else 'None'}",
             "",
             "# Structured Disease Timeline (from Anamnesis)",
-            *ClinicalSessionEndpoint.format_structured_diseases(disease_context),
+            *ClinicalSessionService.format_structured_diseases(disease_context),
             "",
             "# Longitudinal Laboratory Timeline",
-            *ClinicalSessionEndpoint.format_lab_timeline(lab_timeline),
+            *ClinicalSessionService.format_lab_timeline(lab_timeline),
             "",
             "# Estimated Liver Injury Onset Anchor",
-            *ClinicalSessionEndpoint.format_onset_context(onset_context),
+            *ClinicalSessionService.format_onset_context(onset_context),
             "",
             "# Visit Date Anchor",
             (
@@ -1257,7 +1273,7 @@ class ClinicalSessionEndpoint:
             start_value=56.0,
             end_value=62.0,
         )
-        prepared_inputs = await input_preparator.prepare_inputs(
+        prepared_inputs = await self.input_preparator.prepare_inputs(
             all_detected_drugs,
             clinical_context=structured_context,
             pattern_score=pattern_score,
@@ -1299,7 +1315,10 @@ class ClinicalSessionEndpoint:
         clinical_session: HepatoxConsultation | None = None
         final_report: str | None = None
         try:
-            clinical_session = HepatoxConsultation(analysis_drugs, patient_name=payload.name)
+            clinical_session = self.hepatox_consultation_cls(
+                analysis_drugs,
+                patient_name=payload.name,
+            )
             consultation_progress_callback = ClinicalConsultationProgressCallback(
                 progress_callback=progress_callback,
             )
@@ -1563,7 +1582,7 @@ class ClinicalSessionEndpoint:
         self,
         request_payload: ClinicalSessionRequest = Body(...),
     ) -> JobStartResponse:
-        if job_manager.is_job_running(self.JOB_TYPE):
+        if self.job_manager.is_job_running(self.JOB_TYPE):
             raise HTTPException(
                 status_code=status.HTTP_409_CONFLICT,
                 detail="Clinical analysis is already in progress",
@@ -1581,7 +1600,7 @@ class ClinicalSessionEndpoint:
             "ollama_reasoning": request_payload.ollama_reasoning,
         }
 
-        job_id = job_manager.start_job(
+        job_id = self.job_manager.start_job(
             job_type=self.JOB_TYPE,
             runner=run_clinical_job,
             kwargs={
@@ -1591,7 +1610,7 @@ class ClinicalSessionEndpoint:
             },
         )
 
-        job_status = job_manager.get_job_status(job_id)
+        job_status = self.job_manager.get_job_status(job_id)
         if job_status is None:
             raise HTTPException(
                 status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
@@ -1608,7 +1627,7 @@ class ClinicalSessionEndpoint:
 
     # -------------------------------------------------------------------------
     def get_clinical_job_status(self, job_id: str) -> JobStatusResponse:
-        job_status = job_manager.get_job_status(job_id)
+        job_status = self.job_manager.get_job_status(job_id)
         if job_status is None:
             raise HTTPException(
                 status_code=status.HTTP_404_NOT_FOUND,
@@ -1618,13 +1637,13 @@ class ClinicalSessionEndpoint:
 
     # -------------------------------------------------------------------------
     def cancel_clinical_job(self, job_id: str) -> JobCancelResponse:
-        job_status = job_manager.get_job_status(job_id)
+        job_status = self.job_manager.get_job_status(job_id)
         if job_status is None:
             raise HTTPException(
                 status_code=status.HTTP_404_NOT_FOUND,
                 detail="Job not found.",
             )
-        success = job_manager.cancel_job(job_id)
+        success = self.job_manager.cancel_job(job_id)
         if success:
             logger.info("Clinical analysis stop requested for job %s", job_id)
         return JobCancelResponse(
@@ -1633,5 +1652,6 @@ class ClinicalSessionEndpoint:
             message="Cancellation requested" if success else "Job cannot be cancelled",
         )
     
+
 
 
