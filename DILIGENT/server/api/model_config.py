@@ -71,5 +71,5 @@ endpoint.add_routes()
 
 def sync_runtime_model_config() -> None:
     """Load persisted model-config snapshot and apply it to runtime state."""
-    snapshot = service.ensure_defaults()
-    service.apply_runtime_snapshot(snapshot)
+    snapshot = endpoint.ensure_defaults()
+    endpoint.apply_runtime_snapshot(snapshot)

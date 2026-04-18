@@ -399,38 +399,72 @@ class DailyMedLabelUpdater:
         worker_count = min(self.max_concurrency, total)
         for _ in range(worker_count):
             queue.put_nowait(None)
-        completed = 0
+        progress_state = {"completed": 0}
+        progress_lock = asyncio.Lock()
         report_interval = max(1, total // 50)
         error_message = "Drug labels update cancelled by user request"
 
-        async def worker() -> None:
-            nonlocal completed
-            while True:
-                item = await queue.get()
-                if item is None:
-                    return
-                index, target = item
-                if self.should_cancel(should_stop):
-                    raise RuntimeError(error_message)
-                result = await self.load_document_row(
-                    target=target,
+        await asyncio.gather(
+            *(
+                self.gather_persistable_rows_worker(
+                    queue=queue,
+                    results=results,
                     mapping=mapping,
                     client=client,
+                    total=total,
+                    report_interval=report_interval,
+                    progress_callback=progress_callback,
+                    should_stop=should_stop,
+                    progress_state=progress_state,
+                    progress_lock=progress_lock,
+                    error_message=error_message,
                 )
-                results[index] = result
-                completed += 1
-                if progress_callback is not None and (
-                    completed % report_interval == 0 or completed == total
-                ):
-                    progress = 30.0 + (completed / total) * 58.0
-                    self.emit_progress(
-                        progress_callback,
-                        progress=progress,
-                        message=f"Downloaded {completed}/{total} DailyMed labels",
-                    )
-
-        await asyncio.gather(*(worker() for _ in range(worker_count)))
+                for _ in range(worker_count)
+            )
+        )
         return [item for item in results if item is not None]
+
+    # -------------------------------------------------------------------------
+    async def gather_persistable_rows_worker(
+        self,
+        *,
+        queue: asyncio.Queue[tuple[int, dict[str, Any]] | None],
+        results: list[dict[str, Any] | None],
+        mapping: dict[str, list[dict[str, Any]]],
+        client: httpx.AsyncClient,
+        total: int,
+        report_interval: int,
+        progress_callback: ProgressCallback | None,
+        should_stop: Callable[[], bool] | None,
+        progress_state: dict[str, int],
+        progress_lock: asyncio.Lock,
+        error_message: str,
+    ) -> None:
+        while True:
+            item = await queue.get()
+            if item is None:
+                return
+            index, target = item
+            if self.should_cancel(should_stop):
+                raise RuntimeError(error_message)
+            result = await self.load_document_row(
+                target=target,
+                mapping=mapping,
+                client=client,
+            )
+            results[index] = result
+            async with progress_lock:
+                progress_state["completed"] += 1
+                completed = progress_state["completed"]
+            if progress_callback is not None and (
+                completed % report_interval == 0 or completed == total
+            ):
+                progress = 30.0 + (completed / total) * 58.0
+                self.emit_progress(
+                    progress_callback,
+                    progress=progress,
+                    message=f"Downloaded {completed}/{total} DailyMed labels",
+                )
 
     # -------------------------------------------------------------------------
     async def load_document_row(

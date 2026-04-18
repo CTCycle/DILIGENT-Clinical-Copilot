@@ -61,8 +61,16 @@ Active clinical pipeline (request-driven from session endpoints):
   - Reusable UI components and modals.
 - `DILIGENT/client/src/app/core/state/app-state.service.ts`
   - Shared app-level signal state and theme/page coordination.
-- `DILIGENT/client/src/app/core/services/api.ts`
-  - HTTP client, API payload shaping, and job polling integration.
+- `DILIGENT/client/src/app/core/services/http-api.ts`
+  - HTTP transport, timeout handling, and user-safe API error normalization.
+- `DILIGENT/client/src/app/core/services/clinical-api.ts`
+  - Clinical/session endpoint integration.
+- `DILIGENT/client/src/app/core/services/inspection-api.ts`
+  - Data inspection/catalog and update-job endpoint integration.
+- `DILIGENT/client/src/app/core/services/model-config-api.ts`
+  - Model configuration and model-pull endpoint integration.
+- `DILIGENT/client/src/app/core/services/job-polling.service.ts`
+  - Shared polling loop orchestration for long-running jobs.
 - `DILIGENT/client/src/app/core/models/types.ts`
   - Shared frontend contract types.
 

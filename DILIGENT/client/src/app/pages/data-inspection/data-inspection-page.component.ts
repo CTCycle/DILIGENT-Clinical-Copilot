@@ -3,6 +3,7 @@ import { Component, OnDestroy, OnInit, inject, signal } from '@angular/core';
 import { FormsModule } from '@angular/forms';
 
 import { ModalShellComponent } from '../../components/modal-shell/modal-shell.component';
+import { InspectionCatalogToolbarComponent } from '../../components/inspection-catalog-toolbar/inspection-catalog-toolbar.component';
 import { InspectionPagerComponent } from '../../components/inspection-pager/inspection-pager.component';
 import {
   cancelInspectionDiliPriorsUpdateJob,
@@ -61,9 +62,12 @@ import {
   InspectionTimelineEvent,
   InspectionTimelineEventType,
   InspectionSessionStatus,
+  InspectionUpdateTarget,
   InspectionUpdateConfigResponse,
   InspectionUpdateJobStatusResponse,
+  JobStartResponse,
 } from '../../core/models/types';
+import { InspectionDetailResource } from './inspection-detail-resource';
 import { InspectionPagedResource } from './inspection-paged-resource';
 
 const PAGE_LIMIT = 10;
@@ -75,7 +79,6 @@ type InspectionViewId =
   | 'dili_priors'
   | 'drug_labels'
   | 'rag';
-type InspectionUpdateTarget = 'rxnav' | 'livertox' | 'dili_priors' | 'drug_labels' | 'rag';
 
 const INSPECTION_VIEWS: Array<{ id: InspectionViewId; label: string }> = [
   { id: 'sessions', label: 'Sessions' },
@@ -173,14 +176,24 @@ type TimelineRenderEvent = {
   detailLines: string[];
 };
 
-type WritableSignalLike<T> = {
-  set(value: T): void;
+type InspectionUpdateTargetActions = {
+  fetchConfig: () => Promise<InspectionUpdateConfigResponse>;
+  start: (overrides: Record<string, unknown>) => Promise<JobStartResponse>;
+  status: (jobId: string) => Promise<InspectionUpdateJobStatusResponse>;
+  cancel: (jobId: string) => Promise<void>;
+  refresh: () => Promise<void>;
 };
 
 @Component({
   selector: 'app-data-inspection-page',
   standalone: true,
-  imports: [CommonModule, FormsModule, ModalShellComponent, InspectionPagerComponent],
+  imports: [
+    CommonModule,
+    FormsModule,
+    ModalShellComponent,
+    InspectionCatalogToolbarComponent,
+    InspectionPagerComponent,
+  ],
   templateUrl: './data-inspection-page.component.html',
   styleUrl: './data-inspection-page.component.scss',
 })
@@ -268,21 +281,26 @@ export class DataInspectionPageComponent implements OnInit, OnDestroy {
   readonly timelineCardWidth = 232;
   readonly timelineCardHeight = 96;
 
-  readonly aliasData = signal<InspectionDrugAliasesResponse | null>(null);
-  readonly aliasLoading = signal(false);
-  readonly aliasError = signal<string | null>(null);
+  private readonly aliasDetail = new InspectionDetailResource<InspectionDrugAliasesResponse>();
+  readonly aliasData = this.aliasDetail.data;
+  readonly aliasLoading = this.aliasDetail.loading;
+  readonly aliasError = this.aliasDetail.error;
 
-  readonly excerptData = signal<InspectionLiverToxExcerptResponse | null>(null);
-  readonly excerptLoading = signal(false);
-  readonly excerptError = signal<string | null>(null);
+  private readonly excerptDetail = new InspectionDetailResource<InspectionLiverToxExcerptResponse>();
+  readonly excerptData = this.excerptDetail.data;
+  readonly excerptLoading = this.excerptDetail.loading;
+  readonly excerptError = this.excerptDetail.error;
 
-  readonly diliPriorDetailData = signal<InspectionDiliPriorDetailResponse | null>(null);
-  readonly diliPriorDetailLoading = signal(false);
-  readonly diliPriorDetailError = signal<string | null>(null);
+  private readonly diliPriorDetail = new InspectionDetailResource<InspectionDiliPriorDetailResponse>();
+  readonly diliPriorDetailData = this.diliPriorDetail.data;
+  readonly diliPriorDetailLoading = this.diliPriorDetail.loading;
+  readonly diliPriorDetailError = this.diliPriorDetail.error;
 
-  readonly drugLabelSectionsData = signal<InspectionDrugLabelSectionsResponse | null>(null);
-  readonly drugLabelSectionsLoading = signal(false);
-  readonly drugLabelSectionsError = signal<string | null>(null);
+  private readonly drugLabelSectionsDetail =
+    new InspectionDetailResource<InspectionDrugLabelSectionsResponse>();
+  readonly drugLabelSectionsData = this.drugLabelSectionsDetail.data;
+  readonly drugLabelSectionsLoading = this.drugLabelSectionsDetail.loading;
+  readonly drugLabelSectionsError = this.drugLabelSectionsDetail.error;
 
   readonly activeUpdateTarget = signal<InspectionUpdateTarget | null>(null);
   readonly updateConfig = signal<Record<string, unknown> | null>(null);
@@ -294,6 +312,70 @@ export class DataInspectionPageComponent implements OnInit, OnDestroy {
   readonly updateMessage = signal('');
   readonly updateError = signal<string | null>(null);
   private updatePollToken = 0;
+  private readonly updateTargetActions: Record<
+    InspectionUpdateTarget,
+    InspectionUpdateTargetActions
+  > = {
+    rxnav: {
+      fetchConfig: () => fetchInspectionRxNavUpdateConfig(),
+      start: (overrides) => startInspectionRxNavUpdateJob(overrides),
+      status: (jobId) => fetchInspectionRxNavUpdateJobStatus(jobId),
+      cancel: async (jobId) => {
+        await cancelInspectionRxNavUpdateJob(jobId);
+      },
+      refresh: async () => {
+        await this.loadRxNav();
+      },
+    },
+    livertox: {
+      fetchConfig: () => fetchInspectionLiverToxUpdateConfig(),
+      start: (overrides) => startInspectionLiverToxUpdateJob(overrides),
+      status: (jobId) => fetchInspectionLiverToxUpdateJobStatus(jobId),
+      cancel: async (jobId) => {
+        await cancelInspectionLiverToxUpdateJob(jobId);
+      },
+      refresh: async () => {
+        await this.loadLiverTox();
+      },
+    },
+    dili_priors: {
+      fetchConfig: () => fetchInspectionDiliPriorsUpdateConfig(),
+      start: (overrides) => startInspectionDiliPriorsUpdateJob(overrides),
+      status: (jobId) => fetchInspectionDiliPriorsUpdateJobStatus(jobId),
+      cancel: async (jobId) => {
+        await cancelInspectionDiliPriorsUpdateJob(jobId);
+      },
+      refresh: async () => {
+        await this.loadDiliPriors();
+      },
+    },
+    drug_labels: {
+      fetchConfig: () => fetchInspectionDrugLabelsUpdateConfig(),
+      start: (overrides) => startInspectionDrugLabelsUpdateJob(overrides),
+      status: (jobId) => fetchInspectionDrugLabelsUpdateJobStatus(jobId),
+      cancel: async (jobId) => {
+        await cancelInspectionDrugLabelsUpdateJob(jobId);
+      },
+      refresh: async () => {
+        await this.loadDrugLabels();
+      },
+    },
+    rag: {
+      fetchConfig: () => fetchInspectionRagUpdateConfig(),
+      start: (overrides) =>
+        startInspectionRagUpdateJob({
+          ...overrides,
+          documents_path: this.ragDocumentsPathInput().trim() || undefined,
+        }),
+      status: (jobId) => fetchInspectionRagUpdateJobStatus(jobId),
+      cancel: async (jobId) => {
+        await cancelInspectionRagUpdateJob(jobId);
+      },
+      refresh: async () => {
+        await this.loadRag();
+      },
+    },
+  };
 
   ngOnInit(): void {
     void this.initializePageData();
@@ -675,17 +757,11 @@ export class DataInspectionPageComponent implements OnInit, OnDestroy {
   }
 
   async openAliases(drugId: number): Promise<void> {
-    await this.loadDetailModal({
-      loadingSignal: this.aliasLoading,
-      errorSignal: this.aliasError,
-      dataSignal: this.aliasData,
-      request: () => fetchInspectionRxNavAliases(drugId),
-      fallbackErrorMessage: 'Failed to load aliases.',
-    });
+    await this.aliasDetail.load(() => fetchInspectionRxNavAliases(drugId), 'Failed to load aliases.');
   }
 
   closeAliases(): void {
-    this.closeDetailModal(this.aliasLoading, this.aliasError, this.aliasData);
+    this.aliasDetail.close();
   }
 
   async removeRxNavDrug(drugId: number): Promise<void> {
@@ -706,17 +782,11 @@ export class DataInspectionPageComponent implements OnInit, OnDestroy {
   }
 
   async openExcerpt(drugId: number): Promise<void> {
-    await this.loadDetailModal({
-      loadingSignal: this.excerptLoading,
-      errorSignal: this.excerptError,
-      dataSignal: this.excerptData,
-      request: () => fetchInspectionLiverToxExcerpt(drugId),
-      fallbackErrorMessage: 'Failed to load excerpt.',
-    });
+    await this.excerptDetail.load(() => fetchInspectionLiverToxExcerpt(drugId), 'Failed to load excerpt.');
   }
 
   closeExcerpt(): void {
-    this.closeDetailModal(this.excerptLoading, this.excerptError, this.excerptData);
+    this.excerptDetail.close();
   }
 
   async removeLiverToxDrug(drugId: number): Promise<void> {
@@ -737,39 +807,25 @@ export class DataInspectionPageComponent implements OnInit, OnDestroy {
   }
 
   async openDiliPriorDetails(drugId: number): Promise<void> {
-    await this.loadDetailModal({
-      loadingSignal: this.diliPriorDetailLoading,
-      errorSignal: this.diliPriorDetailError,
-      dataSignal: this.diliPriorDetailData,
-      request: () => fetchInspectionDiliPriorDetails(drugId),
-      fallbackErrorMessage: 'Failed to load DILI prior details.',
-    });
+    await this.diliPriorDetail.load(
+      () => fetchInspectionDiliPriorDetails(drugId),
+      'Failed to load DILI prior details.',
+    );
   }
 
   closeDiliPriorDetails(): void {
-    this.closeDetailModal(
-      this.diliPriorDetailLoading,
-      this.diliPriorDetailError,
-      this.diliPriorDetailData,
-    );
+    this.diliPriorDetail.close();
   }
 
   async openDrugLabelSections(drugId: number): Promise<void> {
-    await this.loadDetailModal({
-      loadingSignal: this.drugLabelSectionsLoading,
-      errorSignal: this.drugLabelSectionsError,
-      dataSignal: this.drugLabelSectionsData,
-      request: () => fetchInspectionDrugLabelSections(drugId),
-      fallbackErrorMessage: 'Failed to load label sections.',
-    });
+    await this.drugLabelSectionsDetail.load(
+      () => fetchInspectionDrugLabelSections(drugId),
+      'Failed to load label sections.',
+    );
   }
 
   closeDrugLabelSections(): void {
-    this.closeDetailModal(
-      this.drugLabelSectionsLoading,
-      this.drugLabelSectionsError,
-      this.drugLabelSectionsData,
-    );
+    this.drugLabelSectionsDetail.close();
   }
 
   changeView(view: InspectionViewId): void {
@@ -896,7 +952,7 @@ export class DataInspectionPageComponent implements OnInit, OnDestroy {
     this.updateProgress.set(0);
     this.updateMessage.set('');
     try {
-      const payload = await this.fetchUpdateConfig(target);
+      const payload = await this.updateTargetActions[target].fetchConfig();
       const defaults = { ...(payload.defaults ?? undefined) };
       if (target === 'rag' && this.ragDocumentsPathInput().trim()) {
         defaults['documents_path'] = this.ragDocumentsPathInput().trim();
@@ -946,7 +1002,7 @@ export class DataInspectionPageComponent implements OnInit, OnDestroy {
     const overrides = parsedOverrides.value ?? {};
 
     try {
-      const started = await this.startUpdate(target, overrides);
+      const started = await this.updateTargetActions[target].start(overrides);
       this.updateJobId.set(started.job_id);
       this.updateMessage.set(started.message || 'Update running...');
       const pollToken = this.beginUpdatePolling();
@@ -964,61 +1020,11 @@ export class DataInspectionPageComponent implements OnInit, OnDestroy {
       return;
     }
     try {
-      await this.cancelUpdate(target, jobId);
+      await this.updateTargetActions[target].cancel(jobId);
       this.updateMessage.set('Cancellation requested.');
     } catch (error) {
       this.updateError.set(error instanceof Error ? error.message : 'Failed to cancel update job.');
     }
-  }
-
-  private async fetchUpdateConfig(target: InspectionUpdateTarget): Promise<InspectionUpdateConfigResponse> {
-    if (target === 'rxnav') return fetchInspectionRxNavUpdateConfig();
-    if (target === 'livertox') return fetchInspectionLiverToxUpdateConfig();
-    if (target === 'dili_priors') return fetchInspectionDiliPriorsUpdateConfig();
-    if (target === 'drug_labels') return fetchInspectionDrugLabelsUpdateConfig();
-    return fetchInspectionRagUpdateConfig();
-  }
-
-  private async startUpdate(target: InspectionUpdateTarget, overrides: Record<string, unknown>) {
-    if (target === 'rxnav') return startInspectionRxNavUpdateJob(overrides);
-    if (target === 'livertox') return startInspectionLiverToxUpdateJob(overrides);
-    if (target === 'dili_priors') return startInspectionDiliPriorsUpdateJob(overrides);
-    if (target === 'drug_labels') return startInspectionDrugLabelsUpdateJob(overrides);
-    return startInspectionRagUpdateJob({
-      ...overrides,
-      documents_path: this.ragDocumentsPathInput().trim() || undefined,
-    });
-  }
-
-  private async fetchUpdateStatus(
-    target: InspectionUpdateTarget,
-    jobId: string,
-  ): Promise<InspectionUpdateJobStatusResponse> {
-    if (target === 'rxnav') return fetchInspectionRxNavUpdateJobStatus(jobId);
-    if (target === 'livertox') return fetchInspectionLiverToxUpdateJobStatus(jobId);
-    if (target === 'dili_priors') return fetchInspectionDiliPriorsUpdateJobStatus(jobId);
-    if (target === 'drug_labels') return fetchInspectionDrugLabelsUpdateJobStatus(jobId);
-    return fetchInspectionRagUpdateJobStatus(jobId);
-  }
-
-  private async cancelUpdate(target: InspectionUpdateTarget, jobId: string): Promise<void> {
-    if (target === 'rxnav') {
-      await cancelInspectionRxNavUpdateJob(jobId);
-      return;
-    }
-    if (target === 'livertox') {
-      await cancelInspectionLiverToxUpdateJob(jobId);
-      return;
-    }
-    if (target === 'dili_priors') {
-      await cancelInspectionDiliPriorsUpdateJob(jobId);
-      return;
-    }
-    if (target === 'drug_labels') {
-      await cancelInspectionDrugLabelsUpdateJob(jobId);
-      return;
-    }
-    await cancelInspectionRagUpdateJob(jobId);
   }
 
   private async pollUpdateJob(
@@ -1030,7 +1036,7 @@ export class DataInspectionPageComponent implements OnInit, OnDestroy {
       intervalMs: 1200,
       isCancelled: () => !this.isUpdatePollingActive(pollToken),
       pollStep: async () => {
-        const status = await this.fetchUpdateStatus(target, jobId);
+        const status = await this.updateTargetActions[target].status(jobId);
         if (!this.isUpdatePollingActive(pollToken)) {
           return false;
         }
@@ -1039,7 +1045,7 @@ export class DataInspectionPageComponent implements OnInit, OnDestroy {
 
         if (status.status === 'completed') {
           this.updateRunning.set(false);
-          await this.refreshTargetAfterUpdate(target);
+          await this.updateTargetActions[target].refresh();
           return false;
         }
         if (status.status === 'failed' || status.status === 'cancelled') {
@@ -1065,61 +1071,6 @@ export class DataInspectionPageComponent implements OnInit, OnDestroy {
 
   private isUpdatePollingActive(pollToken: number): boolean {
     return this.updatePollToken === pollToken;
-  }
-
-  private async loadDetailModal<T>({
-    loadingSignal,
-    errorSignal,
-    dataSignal,
-    request,
-    fallbackErrorMessage,
-  }: {
-    loadingSignal: WritableSignalLike<boolean>;
-    errorSignal: WritableSignalLike<string | null>;
-    dataSignal: WritableSignalLike<T | null>;
-    request: () => Promise<T>;
-    fallbackErrorMessage: string;
-  }): Promise<void> {
-    loadingSignal.set(true);
-    errorSignal.set(null);
-    dataSignal.set(null);
-    try {
-      dataSignal.set(await request());
-    } catch (error) {
-      errorSignal.set(error instanceof Error ? error.message : fallbackErrorMessage);
-    } finally {
-      loadingSignal.set(false);
-    }
-  }
-
-  private closeDetailModal<T>(
-    loadingSignal: WritableSignalLike<boolean>,
-    errorSignal: WritableSignalLike<string | null>,
-    dataSignal: WritableSignalLike<T | null>,
-  ): void {
-    dataSignal.set(null);
-    errorSignal.set(null);
-    loadingSignal.set(false);
-  }
-
-  private async refreshTargetAfterUpdate(target: InspectionUpdateTarget): Promise<void> {
-    if (target === 'rxnav') {
-      await this.loadRxNav();
-      return;
-    }
-    if (target === 'livertox') {
-      await this.loadLiverTox();
-      return;
-    }
-    if (target === 'dili_priors') {
-      await this.loadDiliPriors();
-      return;
-    }
-    if (target === 'drug_labels') {
-      await this.loadDrugLabels();
-      return;
-    }
-    await this.loadRag();
   }
 }
 
