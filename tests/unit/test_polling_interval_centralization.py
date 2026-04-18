@@ -45,7 +45,7 @@ class JobManagerStub:
 # -----------------------------------------------------------------------------
 def test_start_clinical_job_uses_centralized_poll_interval(monkeypatch) -> None:
     job_manager_stub = JobManagerStub()
-    monkeypatch.setattr(session_routes, "job_manager", job_manager_stub)
+    monkeypatch.setattr(session_routes.endpoint, "job_manager", job_manager_stub)
 
     response = session_routes.endpoint.start_clinical_job(
         ClinicalSessionRequest(anamnesis="Clinical context")
@@ -73,7 +73,11 @@ def test_clinical_progress_callback_raises_when_stop_requested(monkeypatch) -> N
         def should_stop(self, job_id: str) -> bool:
             return True
 
-    monkeypatch.setattr(session_routes, "job_manager", StopRequestedJobManagerStub())
+    monkeypatch.setattr(
+        session_routes.endpoint,
+        "job_manager",
+        StopRequestedJobManagerStub(),
+    )
 
     try:
         session_routes.report_clinical_job_progress(

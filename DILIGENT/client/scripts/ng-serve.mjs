@@ -57,10 +57,14 @@ writeFileSync(
   'utf8',
 );
 
+const isWindows = process.platform === 'win32';
 const child = spawn(
-  process.platform === 'win32' ? 'npx.cmd' : 'npx',
+  'npx',
   ['ng', 'serve', '--host', uiHost, '--port', uiPort, '--proxy-config', 'proxy.conf.json'],
-  { stdio: 'inherit' },
+  {
+    stdio: 'inherit',
+    shell: isWindows,
+  },
 );
 
 child.on('exit', (code) => {
