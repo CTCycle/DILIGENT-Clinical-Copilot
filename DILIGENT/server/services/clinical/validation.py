@@ -9,7 +9,7 @@ from DILIGENT.server.domain.clinical.entities import (
 )
 from DILIGENT.server.domain.clinical.validation import ValidationMessageBundle
 
-
+###############################################################################
 def build_validation_bundle(report_language: str) -> ValidationMessageBundle:
     if report_language.startswith("it"):
         return ValidationMessageBundle(
