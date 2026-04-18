@@ -76,14 +76,6 @@ export type ClinicalRequestPayload = {
   allow_missing_labs?: boolean | null;
   use_rag: boolean;
   use_web_search: boolean;
-  use_cloud_services?: boolean;
-  llm_provider?: CloudProvider | null;
-  cloud_model?: string | null;
-  text_extraction_model?: string;
-  clinical_model?: string;
-  ollama_temperature?: number;
-  cloud_temperature?: number;
-  ollama_reasoning?: boolean;
 };
 
 export type ApiResult = {

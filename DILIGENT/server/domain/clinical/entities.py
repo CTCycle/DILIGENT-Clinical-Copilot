@@ -2,16 +2,13 @@ from __future__ import annotations
 
 from collections.abc import Mapping
 from datetime import date, datetime
-import math
 import re
 from typing import Any, Literal
 
-from pydantic import AliasChoices, BaseModel, ConfigDict, Field, field_validator, model_validator
+from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
 
 Comparator = Literal["<=", "<", ">=", ">"]
 CONTROL_CHARACTERS_RE = re.compile(r"[\x00-\x08\x0B\x0C\x0E-\x1F\x7F]")
-SAFE_PROVIDER_RE = re.compile(r"^[a-z][a-z0-9-]{1,31}$")
-SAFE_MODEL_NAME_RE = re.compile(r"^[A-Za-z0-9][A-Za-z0-9._:/+\-]{0,199}$")
 MAX_LAB_TEXT_LENGTH = 20000
 
 
@@ -176,18 +173,6 @@ class ClinicalSessionRequest(BaseModel):
     drugs: str | None = Field(default=None, max_length=20000)
     laboratory_analysis: str | None = Field(default=None, max_length=MAX_LAB_TEXT_LENGTH)
     patient_image_base64: str | None = Field(default=None, max_length=8_000_000)
-    use_cloud_services: bool | None = None
-    llm_provider: str | None = Field(default=None, max_length=32)
-    cloud_model: str | None = Field(default=None, max_length=200)
-    text_extraction_model: str | None = Field(
-        default=None,
-        max_length=200,
-        validation_alias=AliasChoices("text_extraction_model", "parsing_model"),
-    )
-    clinical_model: str | None = Field(default=None, max_length=200)
-    ollama_temperature: float | None = None
-    cloud_temperature: float | None = None
-    ollama_reasoning: bool | None = None
 
     # -------------------------------------------------------------------------
     @field_validator(
@@ -196,10 +181,6 @@ class ClinicalSessionRequest(BaseModel):
         "drugs",
         "laboratory_analysis",
         "patient_image_base64",
-        "llm_provider",
-        "cloud_model",
-        "text_extraction_model",
-        "clinical_model",
         mode="before",
     )
     @classmethod
@@ -209,54 +190,6 @@ class ClinicalSessionRequest(BaseModel):
         without_controls = CONTROL_CHARACTERS_RE.sub(" ", str(value))
         stripped = without_controls.strip()
         return stripped or None
-
-    # -------------------------------------------------------------------------
-    @field_validator("llm_provider")
-    @classmethod
-    def validate_provider_name(cls, value: str | None) -> str | None:
-        if value is None:
-            return None
-        normalized = value.strip().lower()
-        if not SAFE_PROVIDER_RE.fullmatch(normalized):
-            raise ValueError("Invalid provider value")
-        return normalized
-
-    # -------------------------------------------------------------------------
-    @field_validator("cloud_model", "text_extraction_model", "clinical_model")
-    @classmethod
-    def validate_model_name(cls, value: str | None) -> str | None:
-        if value is None:
-            return None
-        normalized = value.strip()
-        if not normalized:
-            return None
-        if not SAFE_MODEL_NAME_RE.fullmatch(normalized):
-            raise ValueError("Invalid model name")
-        return normalized
-
-    @property
-    def parsing_model(self) -> str | None:
-        return self.text_extraction_model
-
-    # -------------------------------------------------------------------------
-    @field_validator("ollama_temperature")
-    @classmethod
-    def validate_ollama_temperature(cls, value: float | None) -> float | None:
-        if value is None:
-            return None
-        if not math.isfinite(value):
-            raise ValueError("ollama_temperature must be finite")
-        return round(max(0.0, min(2.0, float(value))), 2)
-
-    # -------------------------------------------------------------------------
-    @field_validator("cloud_temperature")
-    @classmethod
-    def validate_cloud_temperature(cls, value: float | None) -> float | None:
-        if value is None:
-            return None
-        if not math.isfinite(value):
-            raise ValueError("cloud_temperature must be finite")
-        return round(max(0.0, min(2.0, float(value))), 2)
 
 
 ###############################################################################

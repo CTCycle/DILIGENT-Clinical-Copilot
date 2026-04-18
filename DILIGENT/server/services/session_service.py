@@ -2,7 +2,6 @@ from __future__ import annotations
 
 import asyncio
 import time
-from contextlib import contextmanager
 from datetime import datetime
 from collections.abc import Sequence
 from functools import partial
@@ -39,6 +38,7 @@ from DILIGENT.server.domain.jobs import (
 from DILIGENT.server.configurations.startup import server_settings
 from DILIGENT.server.configurations.llm_configs import LLMRuntimeConfig
 from DILIGENT.server.repositories.serialization.data import DataSerializer
+from DILIGENT.server.repositories.serialization.model_configs import ModelConfigSerializer
 from DILIGENT.server.services.jobs import JobManager, job_manager as default_job_manager
 from DILIGENT.server.common.utils.logger import logger
 from DILIGENT.server.common.utils.types import coerce_bool_or_unknown
@@ -65,6 +65,7 @@ from DILIGENT.server.services.clinical.validation import (
     ensure_timed_therapy_drug,
 )
 from DILIGENT.server.services.payload import PayloadSanitizationService
+from DILIGENT.server.services.model_config_service import ModelConfigService
 from DILIGENT.server.services.retrieval.query import DILIQueryBuilder
 from DILIGENT.server.services.text.normalization import normalize_drug_query_name
 
@@ -82,7 +83,6 @@ def build_failed_session_payload(
     *,
     payload: PatientData,
     patient_image_base64: str | None,
-    runtime_overrides: dict[str, Any],
     issues: list[dict[str, Any]],
     error_message: str,
     elapsed_seconds: float,
@@ -90,32 +90,20 @@ def build_failed_session_payload(
     language_result = detect_clinical_language(payload)
     runtime_settings = {
         "use_cloud_services": bool(
-            runtime_overrides.get("use_cloud_services")
-            if runtime_overrides.get("use_cloud_services") is not None
-            else LLMRuntimeConfig.is_cloud_enabled()
+            LLMRuntimeConfig.is_cloud_enabled()
         ),
-        "llm_provider": runtime_overrides.get("llm_provider")
-        or LLMRuntimeConfig.get_llm_provider(),
-        "cloud_model": runtime_overrides.get("cloud_model")
-        or LLMRuntimeConfig.get_cloud_model(),
-        "parsing_model": runtime_overrides.get("parsing_model")
-        or LLMRuntimeConfig.get_parsing_model(),
-        "clinical_model": runtime_overrides.get("clinical_model")
-        or LLMRuntimeConfig.get_clinical_model(),
+        "llm_provider": LLMRuntimeConfig.get_llm_provider(),
+        "cloud_model": LLMRuntimeConfig.get_cloud_model(),
+        "parsing_model": LLMRuntimeConfig.get_parsing_model(),
+        "clinical_model": LLMRuntimeConfig.get_clinical_model(),
         "ollama_temperature": (
-            runtime_overrides.get("ollama_temperature")
-            if runtime_overrides.get("ollama_temperature") is not None
-            else LLMRuntimeConfig.get_ollama_temperature()
+            LLMRuntimeConfig.get_ollama_temperature()
         ),
         "cloud_temperature": (
-            runtime_overrides.get("cloud_temperature")
-            if runtime_overrides.get("cloud_temperature") is not None
-            else LLMRuntimeConfig.get_cloud_temperature()
+            LLMRuntimeConfig.get_cloud_temperature()
         ),
         "ollama_reasoning": bool(
-            runtime_overrides.get("ollama_reasoning")
-            if runtime_overrides.get("ollama_reasoning") is not None
-            else LLMRuntimeConfig.is_ollama_reasoning_enabled()
+            LLMRuntimeConfig.is_ollama_reasoning_enabled()
         ),
     }
     return {
@@ -127,10 +115,8 @@ def build_failed_session_payload(
         "anamnesis": payload.anamnesis,
         "drugs": payload.drugs,
         "laboratory_analysis": payload.laboratory_analysis,
-        "parsing_model": runtime_overrides.get("parsing_model")
-        or LLMRuntimeConfig.get_parsing_model(),
-        "clinical_model": runtime_overrides.get("clinical_model")
-        or LLMRuntimeConfig.get_clinical_model(),
+        "parsing_model": LLMRuntimeConfig.get_parsing_model(),
+        "clinical_model": LLMRuntimeConfig.get_clinical_model(),
         "total_duration": elapsed_seconds,
         "final_report": None,
         "detected_drugs": [],
@@ -419,9 +405,9 @@ async def execute_clinical_job(
     service: "ClinicalSessionService",
     payload: PatientData,
     patient_image_base64: str | None,
-    runtime_overrides: dict[str, Any],
     job_id: str,
 ) -> dict[str, Any]:
+    service.apply_persisted_runtime_configuration()
     ensure_not_cancelled = partial(
         ensure_clinical_job_not_cancelled,
         job_manager=service.job_manager,
@@ -433,79 +419,67 @@ async def execute_clinical_job(
         job_id=job_id,
     )
 
-    with service.runtime_override_context(
-        use_cloud_services=runtime_overrides.get("use_cloud_services"),
-        llm_provider=runtime_overrides.get("llm_provider"),
-        cloud_model=runtime_overrides.get("cloud_model"),
-        parsing_model=runtime_overrides.get("parsing_model"),
-        clinical_model=runtime_overrides.get("clinical_model"),
-        ollama_temperature=runtime_overrides.get("ollama_temperature"),
-        cloud_temperature=runtime_overrides.get("cloud_temperature"),
-        ollama_reasoning=runtime_overrides.get("ollama_reasoning"),
-    ):
-        ensure_not_cancelled()
+    ensure_not_cancelled()
 
-        report_progress(stage="session_initialization", progress=5.0)
-        progress_callback = report_progress
-        job_started_at = time.perf_counter()
+    report_progress(stage="session_initialization", progress=5.0)
+    progress_callback = report_progress
+    job_started_at = time.perf_counter()
 
-        try:
-            result = await service.process_single_patient(
-                payload,
+    try:
+        result = await service.process_single_patient(
+            payload,
+            patient_image_base64=patient_image_base64,
+            progress_callback=progress_callback,
+            stop_check=ensure_not_cancelled,
+        )
+    except ClinicalJobCancelled:
+        service.job_manager.update_result(
+            job_id,
+            {
+                "progress_status": "cancelled",
+                "progress_message": "Clinical analysis cancelled.",
+            },
+        )
+        return {}
+    except ClinicalPipelineValidationError as exc:
+        serialized_issues = [issue.model_dump() for issue in exc.issues]
+        await asyncio.to_thread(
+            service.serializer.save_clinical_session,
+            build_failed_session_payload(
+                payload=payload,
                 patient_image_base64=patient_image_base64,
-                progress_callback=progress_callback,
-                stop_check=ensure_not_cancelled,
-            )
-        except ClinicalJobCancelled:
-            service.job_manager.update_result(
-                job_id,
-                {
-                    "progress_status": "cancelled",
-                    "progress_message": "Clinical analysis cancelled.",
-                },
-            )
+                issues=serialized_issues,
+                error_message=str(exc),
+                elapsed_seconds=(time.perf_counter() - job_started_at),
+            ),
+        )
+        service.job_manager.update_result(
+            job_id,
+            {
+                "validation_error": str(exc),
+                "issues": serialized_issues,
+            },
+        )
+        raise
+    except Exception as exc:
+        if service.job_manager.should_stop(job_id):
             return {}
-        except ClinicalPipelineValidationError as exc:
-            serialized_issues = [issue.model_dump() for issue in exc.issues]
-            await asyncio.to_thread(
-                service.serializer.save_clinical_session,
-                build_failed_session_payload(
-                    payload=payload,
-                    patient_image_base64=patient_image_base64,
-                    runtime_overrides=runtime_overrides,
-                    issues=serialized_issues,
-                    error_message=str(exc),
-                    elapsed_seconds=(time.perf_counter() - job_started_at),
-                ),
-            )
-            service.job_manager.update_result(
-                job_id,
-                {
-                    "validation_error": str(exc),
-                    "issues": serialized_issues,
-                },
-            )
-            raise
-        except Exception as exc:
-            if service.job_manager.should_stop(job_id):
-                return {}
-            failure_issue = PipelineIssue(
-                severity="error",
-                code="clinical_job_failed",
-                message=str(exc).strip() or "Clinical analysis failed unexpectedly.",
-            ).model_dump()
-            await asyncio.to_thread(
-                service.serializer.save_clinical_session,
-                build_failed_session_payload(
-                    payload=payload,
-                    patient_image_base64=patient_image_base64,
-                    runtime_overrides=runtime_overrides,
-                    issues=[failure_issue],
-                    error_message=str(exc),
-                    elapsed_seconds=(time.perf_counter() - job_started_at),
-                ),
-            )
-            raise
+        failure_issue = PipelineIssue(
+            severity="error",
+            code="clinical_job_failed",
+            message=str(exc).strip() or "Clinical analysis failed unexpectedly.",
+        ).model_dump()
+        await asyncio.to_thread(
+            service.serializer.save_clinical_session,
+            build_failed_session_payload(
+                payload=payload,
+                patient_image_base64=patient_image_base64,
+                issues=[failure_issue],
+                error_message=str(exc),
+                elapsed_seconds=(time.perf_counter() - job_started_at),
+            ),
+        )
+        raise
     return result
 
 
@@ -541,7 +515,6 @@ def run_clinical_job(
     service: "ClinicalSessionService",
     payload: PatientData,
     patient_image_base64: str | None,
-    runtime_overrides: dict[str, Any],
     job_id: str,
 ) -> dict[str, Any]:
     result = asyncio.run(
@@ -549,7 +522,6 @@ def run_clinical_job(
             service=service,
             payload=payload,
             patient_image_base64=patient_image_base64,
-            runtime_overrides=runtime_overrides,
             job_id=job_id,
         )
     )
@@ -588,6 +560,7 @@ class ClinicalSessionService:
         self.input_preparator = input_preparator or ClinicalKnowledgePreparation()
         self.hepatox_consultation_cls = hepatox_consultation_cls or HepatoxConsultation
         self.job_manager = job_manager or default_job_manager
+        self.model_config_service = ModelConfigService(serializer=ModelConfigSerializer())
 
     # -------------------------------------------------------------------------
     @staticmethod
@@ -796,39 +769,13 @@ class ClinicalSessionService:
         return "\n".join(lines).strip()
 
     # -------------------------------------------------------------------------
-    def apply_runtime_overrides(
-        self,
-        *,
-        use_cloud_services: bool | None,
-        llm_provider: str | None,
-        cloud_model: str | None,
-        parsing_model: str | None,
-        clinical_model: str | None,
-        ollama_temperature: float | None,
-        cloud_temperature: float | None,
-        ollama_reasoning: bool | None,
-    ) -> None:
-        if use_cloud_services is not None:
-            LLMRuntimeConfig.set_use_cloud_services(use_cloud_services)
-        if llm_provider is not None:
-            LLMRuntimeConfig.set_llm_provider(llm_provider)
-        if cloud_model is not None:
-            LLMRuntimeConfig.set_cloud_model(cloud_model)
-        if parsing_model is not None:
-            LLMRuntimeConfig.set_parsing_model(parsing_model)
-        if clinical_model is not None:
-            LLMRuntimeConfig.set_clinical_model(clinical_model)
-        if ollama_temperature is not None:
-            LLMRuntimeConfig.set_ollama_temperature(ollama_temperature)
-        if cloud_temperature is not None:
-            LLMRuntimeConfig.set_cloud_temperature(cloud_temperature)
-        if ollama_reasoning is not None:
-            LLMRuntimeConfig.set_ollama_reasoning(ollama_reasoning)
-
+    def apply_persisted_runtime_configuration(self) -> None:
+        snapshot = self.model_config_service.ensure_defaults()
+        self.model_config_service.apply_runtime_snapshot(snapshot)
         parser_provider, parser_model = LLMRuntimeConfig.resolve_provider_and_model("parser")
         clinical_provider, clinical_model_resolved = LLMRuntimeConfig.resolve_provider_and_model("clinical")
         logger.info(
-            "Resolved LLM runtime for request: cloud=%s provider=%s cloud_model=%s parsing_provider=%s parsing_model=%s clinical_provider=%s clinical_model=%s ollama_temperature=%.2f cloud_temperature=%.2f reasoning=%s",
+            "Resolved LLM runtime from persisted model config: cloud=%s provider=%s cloud_model=%s parsing_provider=%s parsing_model=%s clinical_provider=%s clinical_model=%s ollama_temperature=%.2f cloud_temperature=%.2f reasoning=%s",
             LLMRuntimeConfig.is_cloud_enabled(),
             LLMRuntimeConfig.get_llm_provider(),
             LLMRuntimeConfig.get_cloud_model(),
@@ -840,59 +787,6 @@ class ClinicalSessionService:
             LLMRuntimeConfig.get_cloud_temperature(),
             LLMRuntimeConfig.is_ollama_reasoning_enabled(),
         )
-
-    # -------------------------------------------------------------------------
-    @staticmethod
-    def capture_runtime_snapshot() -> dict[str, Any]:
-        return {
-            "use_cloud_services": LLMRuntimeConfig.is_cloud_enabled(),
-            "llm_provider": LLMRuntimeConfig.get_llm_provider(),
-            "cloud_model": LLMRuntimeConfig.get_cloud_model(),
-            "parsing_model": LLMRuntimeConfig.get_parsing_model(),
-            "clinical_model": LLMRuntimeConfig.get_clinical_model(),
-            "ollama_temperature": LLMRuntimeConfig.get_ollama_temperature(),
-            "cloud_temperature": LLMRuntimeConfig.get_cloud_temperature(),
-            "ollama_reasoning": LLMRuntimeConfig.is_ollama_reasoning_enabled(),
-        }
-
-    # -------------------------------------------------------------------------
-    @contextmanager
-    def runtime_override_context(
-        self,
-        *,
-        use_cloud_services: bool | None,
-        llm_provider: str | None,
-        cloud_model: str | None,
-        parsing_model: str | None,
-        clinical_model: str | None,
-        ollama_temperature: float | None,
-        cloud_temperature: float | None,
-        ollama_reasoning: bool | None,
-    ):
-        snapshot = self.capture_runtime_snapshot()
-        self.apply_runtime_overrides(
-            use_cloud_services=use_cloud_services,
-            llm_provider=llm_provider,
-            cloud_model=cloud_model,
-            parsing_model=parsing_model,
-            clinical_model=clinical_model,
-            ollama_temperature=ollama_temperature,
-            cloud_temperature=cloud_temperature,
-            ollama_reasoning=ollama_reasoning,
-        )
-        try:
-            yield
-        finally:
-            self.apply_runtime_overrides(
-                use_cloud_services=bool(snapshot["use_cloud_services"]),
-                llm_provider=str(snapshot["llm_provider"]),
-                cloud_model=str(snapshot["cloud_model"]),
-                parsing_model=str(snapshot["parsing_model"]),
-                clinical_model=str(snapshot["clinical_model"]),
-                ollama_temperature=float(snapshot["ollama_temperature"]),
-                cloud_temperature=float(snapshot["cloud_temperature"]),
-                ollama_reasoning=bool(snapshot["ollama_reasoning"]),
-            )
 
     # -------------------------------------------------------------------------
     def build_patient_payload(
@@ -915,29 +809,6 @@ class ClinicalSessionService:
                 status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
                 detail=self.serialize_validation_errors(exc.errors()),
             ) from exc
-
-    # -------------------------------------------------------------------------
-    @staticmethod
-    def build_runtime_overrides(
-        request_payload: ClinicalSessionRequest,
-    ) -> dict[str, Any]:
-        use_cloud_services = request_payload.use_cloud_services
-        llm_provider = request_payload.llm_provider
-        cloud_mode_requested = bool(use_cloud_services) or (
-            isinstance(llm_provider, str) and llm_provider.strip().lower() in {"openai", "gemini"}
-        )
-
-        return {
-            "use_cloud_services": use_cloud_services,
-            "llm_provider": llm_provider,
-            "cloud_model": request_payload.cloud_model,
-            # Ignore local model overrides when a cloud provider is requested.
-            "parsing_model": None if cloud_mode_requested else request_payload.parsing_model,
-            "clinical_model": None if cloud_mode_requested else request_payload.clinical_model,
-            "ollama_temperature": None if cloud_mode_requested else request_payload.ollama_temperature,
-            "cloud_temperature": request_payload.cloud_temperature,
-            "ollama_reasoning": None if cloud_mode_requested else request_payload.ollama_reasoning,
-        }
 
     # -------------------------------------------------------------------------
     async def process_single_patient(
@@ -1604,22 +1475,12 @@ class ClinicalSessionService:
         request_payload: ClinicalSessionRequest = Body(...),
     ) -> PlainTextResponse:
         patient_payload = self.build_patient_payload(request_payload)
-        runtime_overrides = self.build_runtime_overrides(request_payload)
+        self.apply_persisted_runtime_configuration()
         try:
-            with self.runtime_override_context(
-                use_cloud_services=runtime_overrides.get("use_cloud_services"),
-                llm_provider=runtime_overrides.get("llm_provider"),
-                cloud_model=runtime_overrides.get("cloud_model"),
-                parsing_model=runtime_overrides.get("parsing_model"),
-                clinical_model=runtime_overrides.get("clinical_model"),
-                ollama_temperature=runtime_overrides.get("ollama_temperature"),
-                cloud_temperature=runtime_overrides.get("cloud_temperature"),
-                ollama_reasoning=runtime_overrides.get("ollama_reasoning"),
-            ):
-                single_result = await self.process_single_patient(
-                    patient_payload,
-                    patient_image_base64=request_payload.patient_image_base64,
-                )
+            single_result = await self.process_single_patient(
+                patient_payload,
+                patient_image_base64=request_payload.patient_image_base64,
+            )
         except ClinicalPipelineValidationError as exc:
             raise HTTPException(
                 status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
@@ -1640,7 +1501,7 @@ class ClinicalSessionService:
             )
 
         patient_payload = self.build_patient_payload(request_payload)
-        runtime_overrides = self.build_runtime_overrides(request_payload)
+        self.apply_persisted_runtime_configuration()
 
         job_id = self.job_manager.start_job(
             job_type=self.JOB_TYPE,
@@ -1649,7 +1510,6 @@ class ClinicalSessionService:
                 "service": self,
                 "payload": patient_payload,
                 "patient_image_base64": request_payload.patient_image_base64,
-                "runtime_overrides": runtime_overrides,
             },
         )
 

@@ -22,6 +22,7 @@ UNSET = object()
 class ModelConfigSerializer:
     OLLAMA_TEMPERATURE_KEY = "ollama_temperature"
     CLOUD_TEMPERATURE_KEY = "cloud_temperature"
+    OLLAMA_REASONING_KEY = "ollama_reasoning"
 
     def __init__(
         self,
@@ -60,6 +61,7 @@ class ModelConfigSerializer:
         cloud_model: str | None | object = UNSET,
         ollama_temperature: float | object = UNSET,
         cloud_temperature: float | object = UNSET,
+        ollama_reasoning: bool | object = UNSET,
     ) -> ModelConfigSnapshot:
         db_session = self.session_factory()
         now = datetime.now()
@@ -105,14 +107,21 @@ class ModelConfigSerializer:
                 self.upsert_runtime_setting(
                     db_session=db_session,
                     key=self.OLLAMA_TEMPERATURE_KEY,
-                    value=self.normalize_temperature(ollama_temperature),
+                    value=f"{self.normalize_temperature(ollama_temperature):.2f}",
                     updated_at=now,
                 )
             if cloud_temperature is not UNSET:
                 self.upsert_runtime_setting(
                     db_session=db_session,
                     key=self.CLOUD_TEMPERATURE_KEY,
-                    value=self.normalize_temperature(cloud_temperature),
+                    value=f"{self.normalize_temperature(cloud_temperature):.2f}",
+                    updated_at=now,
+                )
+            if ollama_reasoning is not UNSET:
+                self.upsert_runtime_setting(
+                    db_session=db_session,
+                    key=self.OLLAMA_REASONING_KEY,
+                    value=self.normalize_bool_text(ollama_reasoning),
                     updated_at=now,
                 )
 
@@ -158,7 +167,7 @@ class ModelConfigSerializer:
         *,
         db_session: Session,
         key: str,
-        value: float,
+        value: str,
         updated_at: datetime,
     ) -> None:
         existing = (
@@ -166,17 +175,16 @@ class ModelConfigSerializer:
             .filter(RuntimeSetting.setting_key == key)
             .one_or_none()
         )
-        serialized = f"{value:.2f}"
         if existing is None:
             db_session.add(
                 RuntimeSetting(
                     setting_key=key,
-                    setting_value=serialized,
+                    setting_value=value,
                     updated_at=updated_at,
                 )
             )
             return
-        existing.setting_value = serialized
+        existing.setting_value = value
         existing.updated_at = updated_at
 
     # -------------------------------------------------------------------------
@@ -208,6 +216,21 @@ class ModelConfigSerializer:
         )
 
     # -------------------------------------------------------------------------
+    @classmethod
+    def read_runtime_reasoning(cls, rows: list[RuntimeSetting]) -> bool:
+        values = {str(row.setting_key): row.setting_value for row in rows}
+        raw_value = values.get(cls.OLLAMA_REASONING_KEY)
+        if raw_value is None:
+            return bool(LLMRuntimeConfig.is_ollama_reasoning_enabled())
+        normalized = str(raw_value).strip().lower()
+        return normalized in {"1", "true", "yes", "on"}
+
+    # -------------------------------------------------------------------------
+    @staticmethod
+    def normalize_bool_text(value: object) -> str:
+        return "true" if bool(value) else "false"
+
+    # -------------------------------------------------------------------------
     @staticmethod
     def build_snapshot(rows: list[ModelSelection]) -> ModelConfigSnapshot:
         return ModelConfigSerializer.build_snapshot_with_runtime(rows, [])
@@ -224,6 +247,7 @@ class ModelConfigSerializer:
         text_extraction = role_map.get("text_extraction")
         cloud = role_map.get("cloud")
         ollama_temperature, cloud_temperature = cls.read_runtime_temperatures(runtime_rows)
+        ollama_reasoning = cls.read_runtime_reasoning(runtime_rows)
         updated_values = [
             row.updated_at
             for row in role_map.values()
@@ -251,6 +275,7 @@ class ModelConfigSerializer:
             ),
             ollama_temperature=ollama_temperature,
             cloud_temperature=cloud_temperature,
+            ollama_reasoning=ollama_reasoning,
             updated_at=updated_at,
         )
 
