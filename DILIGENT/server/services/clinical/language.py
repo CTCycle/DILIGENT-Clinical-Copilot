@@ -34,7 +34,7 @@ class ClinicalLanguageDetector:
 
     @classmethod
     def score_text_by_language(cls, text: str) -> dict[str, float]:
-        scores: dict[str, float] = {code: 0.0 for code in SUPPORTED_REPORT_LANGUAGES}
+        scores: dict[str, float] = dict.fromkeys(SUPPORTED_REPORT_LANGUAGES, 0.0)
         tokens = cls.tokenize(text)
         if not tokens:
             return scores
@@ -46,7 +46,7 @@ class ClinicalLanguageDetector:
         for lang_code in SUPPORTED_REPORT_LANGUAGES:
             hints = LANGUAGE_HINTS.get(lang_code, set())
             function_hints = LANGUAGE_FUNCTION_HINTS.get(lang_code, set())
-            phrase_hints = LANGUAGE_PHRASE_HINTS.get(lang_code, tuple())
+            phrase_hints = LANGUAGE_PHRASE_HINTS.get(lang_code, ())
             diacritic_hints = LANGUAGE_DIACRITIC_HINTS.get(lang_code, set())
 
             exact_hint_hits = sum(1 for token in tokens if token in hints)
@@ -156,3 +156,6 @@ class ClinicalLanguageDetector:
             report_language=best_language,
             confidence=confidence,
         )
+
+
+detect_clinical_language = ClinicalLanguageDetector.detect

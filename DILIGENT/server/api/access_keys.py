@@ -10,26 +10,11 @@ from DILIGENT.server.domain.keys import (
     AccessKeyDeleteResponse,
     AccessKeyResponse,
 )
-from DILIGENT.server.repositories.serialization.access_keys import AccessKeySerializer
-from DILIGENT.server.repositories.schemas.models import AccessKey, ResearchAccessKey
-
-ProviderName = Literal["openai", "gemini", "tavily"]
+from DILIGENT.server.services.access_keys_service import AccessKeyService, ProviderName
 
 router = APIRouter(prefix="/access-keys", tags=["access-keys"])
-serializer = AccessKeySerializer()
-
-
-###############################################################################
-def to_response(row: AccessKey | ResearchAccessKey) -> AccessKeyResponse:
-    return AccessKeyResponse(
-        id=int(row.id),
-        provider=str(row.provider),  # type: ignore[arg-type]
-        is_active=bool(row.is_active),
-        fingerprint=str(row.fingerprint),
-        created_at=row.created_at,
-        updated_at=row.updated_at,
-        last_used_at=row.last_used_at,
-    )
+service = AccessKeyService()
+serializer = service.serializer
 
 
 ###############################################################################
@@ -38,14 +23,13 @@ def list_access_keys(
     provider: ProviderName = Query(..., description="openai, gemini, or tavily"),
 ) -> list[AccessKeyResponse]:
     try:
-        rows = serializer.list_keys(provider)
+        return service.list_access_keys(provider)
     except ValueError as exc:
         logger.warning("Access key listing rejected: %s", exc)
         raise HTTPException(
             status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
             detail="Invalid access key provider.",
         ) from exc
-    return [to_response(row) for row in rows]
 
 
 ###############################################################################
@@ -54,7 +38,7 @@ def create_access_key(
     payload: AccessKeyCreateRequest = Body(...),
 ) -> AccessKeyResponse:
     try:
-        created = serializer.create_key(payload.provider, payload.access_key)
+        return service.create_access_key(payload.provider, payload.access_key)
     except RuntimeError as exc:
         logger.warning("Access key creation failed due to dependency/config issue: %s", exc)
         raise HTTPException(
@@ -67,7 +51,6 @@ def create_access_key(
             status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
             detail="Invalid access key input.",
         ) from exc
-    return to_response(created)
 
 
 ###############################################################################
@@ -81,14 +64,13 @@ def activate_access_key(
     provider: ProviderName = Query(..., description="openai, gemini, or tavily"),
 ) -> AccessKeyResponse:
     try:
-        row = serializer.activate_key(key_id, provider=provider)
+        return service.activate_access_key(key_id, provider=provider)
     except ValueError as exc:
         logger.warning("Access key activation rejected for id=%s provider=%s: %s", key_id, provider, exc)
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
             detail="Access key not found.",
         ) from exc
-    return to_response(row)
 
 
 ###############################################################################
@@ -101,7 +83,7 @@ def delete_access_key(
     key_id: int = Path(..., ge=1),
     provider: ProviderName = Query(..., description="openai, gemini, or tavily"),
 ) -> AccessKeyDeleteResponse:
-    deleted = serializer.delete_key(key_id, provider=provider)
+    deleted = service.delete_access_key(key_id, provider=provider)
     if not deleted:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,

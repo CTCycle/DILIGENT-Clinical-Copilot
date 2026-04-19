@@ -1,0 +1,1366 @@
+from __future__ import annotations
+
+import asyncio
+import html
+import io
+import json
+import multiprocessing
+import os
+import re
+import tarfile
+import unicodedata
+from concurrent.futures import ALL_COMPLETED, FIRST_COMPLETED, Future, ProcessPoolExecutor, wait
+from datetime import UTC, datetime
+from typing import Any
+from collections.abc import Callable
+
+import httpx
+import pandas as pd
+from pdfminer.high_level import extract_text as pdfminer_extract_text
+from pypdf import PdfReader
+from tqdm import tqdm
+
+from DILIGENT.server.configurations.startup import server_settings
+from DILIGENT.server.common.constants import LIVERTOX_BASE_URL, ARCHIVES_PATH
+from DILIGENT.server.common.utils.logger import logger
+from DILIGENT.server.services.text.normalization import normalize_whitespace
+from DILIGENT.server.services.updater.sanitizer import LiverToxExcerptSanitizer
+from DILIGENT.server.repositories.serialization.data import DataSerializer
+
+SUPPORTED_MONOGRAPH_EXTENSIONS = (".html", ".htm", ".xhtml", ".xml", ".nxml", ".pdf")
+NBK_ID_PATTERN = re.compile(r"^NBK\d+$", re.IGNORECASE)
+
+DEFAULT_HTTP_HEADERS = {
+    "User-Agent": (
+        "DILIGENTClinicalCopilot/1.0 (contact=clinical-copilot@pharmagent.local)"
+    )
+}
+
+DOWNLOAD_CHUNK_SIZE = 262_144
+
+
+# -----------------------------------------------------------------------------
+def load_json(path: str) -> dict[str, Any] | None:
+    if not os.path.isfile(path):
+        return None
+    try:
+        with open(path, "r", encoding="utf-8") as handle:
+            return json.load(handle)
+    except (json.JSONDecodeError, OSError):
+        return None
+
+
+# -----------------------------------------------------------------------------
+def save_masterlist_metadata(path: str, payload: dict[str, Any]) -> None:
+    with open(path, "w", encoding="utf-8") as handle:
+        json.dump(payload, handle)
+
+
+# -----------------------------------------------------------------------------
+def metadata_matches(stored: dict[str, Any], remote: dict[str, Any]) -> bool:
+    return stored.get("last_modified") == remote.get("last_modified") and int(
+        stored.get("size", 0)
+    ) == int(remote.get("size", 0))
+
+# -----------------------------------------------------------------------------
+def process_monograph_payload(
+    member_name: str,
+    data: bytes,
+) -> dict[str, str] | None:
+    return LiverToxUpdater.process_monograph_member(member_name, data)
+
+
+###############################################################################
+async def download_file(
+    client: httpx.AsyncClient,
+    url: str,
+    destination: str,
+    total_size: int,
+    label: str,
+    *,
+    chunk_size: int,
+) -> None:
+    async with client.stream("GET", url) as response:
+        response.raise_for_status()
+        with (
+            open(destination, "wb") as output,
+            tqdm(
+                total=total_size,
+                unit="B",
+                unit_scale=True,
+                desc=label,
+                ncols=80,
+            ) as progress,
+        ):
+            async for chunk in response.aiter_bytes(chunk_size=chunk_size):
+                if chunk:
+                    output.write(chunk)
+                    progress.update(len(chunk))
+
+
+###############################################################################
+class LiverToxUpdater:
+    def __init__(
+        self,
+        sources_path: str,
+        *,
+        redownload: bool,
+        archive_name: str | None = None,
+        monograph_max_workers: int | None = None,
+        serializer: DataSerializer | None = None,
+    ) -> None:
+        self.supported_extensions = SUPPORTED_MONOGRAPH_EXTENSIONS
+        self.http_headers = dict(DEFAULT_HTTP_HEADERS)
+        self.delay = 0.5
+        self.chunk_size = DOWNLOAD_CHUNK_SIZE
+
+        self.sources_path = os.path.abspath(sources_path)
+        self.redownload = redownload
+        self.serializer = serializer or DataSerializer()
+        self.excerpt_sanitizer = LiverToxExcerptSanitizer()
+        self.header_row = 1
+
+        self.base_url = LIVERTOX_BASE_URL
+        self.file_name = (archive_name or server_settings.external_data.livertox_archive).strip()
+        self.monograph_max_workers = max(
+            1,
+            int(
+                monograph_max_workers
+                if monograph_max_workers is not None
+                else server_settings.external_data.livertox_monograph_max_workers
+            ),
+        )
+        self.tar_file_path = os.path.join(ARCHIVES_PATH, self.file_name)
+        self.master_list_path = os.path.join(ARCHIVES_PATH, "LiverTox_Master_List.xlsx")
+        self.master_list_metadata_path = os.path.join(
+            ARCHIVES_PATH, "livertox_master_list.metadata.json"
+        )
+        self.archive_metadata_path = os.path.join(
+            ARCHIVES_PATH, "livertox_archive.metadata.json"
+        )
+
+    # -------------------------------------------------------------------------
+    def emit_progress(
+        self,
+        progress_callback: Callable[[float, str], None] | None,
+        *,
+        progress: float,
+        message: str,
+    ) -> None:
+        if progress_callback is None:
+            return
+        bounded_progress = min(100.0, max(0.0, float(progress)))
+        progress_callback(bounded_progress, message)
+
+    # -------------------------------------------------------------------------
+    def should_cancel(self, should_stop: Callable[[], bool] | None) -> bool:
+        if should_stop is None:
+            return False
+        return bool(should_stop())
+
+    # -------------------------------------------------------------------------
+    def sanitize_livertox_master_list(self, data: pd.DataFrame) -> pd.DataFrame | None:
+        if data.empty:
+            return
+
+        column_mapping = {
+            "Count": "reference_count",
+            "Ingredient": "ingredient",
+            "Brand Name": "brand_name",
+            "Likelihood Score": "likelihood_score",
+            "Chapter Title": "chapter_title",
+            "Last Update": "last_update",
+            "Year Approved": "year_approved",
+            "Type of Agent": "agent_classification",
+            "In LiverTox": "include_in_livertox",
+            "Primary Classification": "primary_classification",
+            "Secondary Classification": "secondary_classification",
+        }
+
+        data = data.rename(columns=lambda s: re.sub(r"\s+", " ", s).strip())
+        data = data.rename(columns=column_mapping)
+
+        required_columns = list(column_mapping.values())
+        for column in required_columns:
+            if column not in data.columns:
+                data[column] = pd.NA
+
+        data = data[required_columns]
+
+        text_columns = [
+            "ingredient",
+            "brand_name",
+            "likelihood_score",
+            "chapter_title",
+            "agent_classification",
+            "primary_classification",
+            "secondary_classification",
+        ]
+        for column in text_columns:
+            data[column] = self.clean_master_list_column(data[column])
+
+        data = data.dropna(subset=["chapter_title"])
+
+        invalid_headers = {
+            "ingredient": {"ingredient", "count"},
+            "brand_name": {"brand name"},
+        }
+        for column, values in invalid_headers.items():
+            data = data[~data[column].fillna("").str.lower().isin(values)]
+
+        data["last_update"] = pd.to_datetime(data["last_update"], errors="coerce")
+        data["reference_count"] = pd.to_numeric(
+            data["reference_count"], errors="coerce"
+        )
+        data["year_approved"] = pd.to_numeric(data["year_approved"], errors="coerce")
+
+        data = data.drop_duplicates(subset=["ingredient", "brand_name"], keep="last")
+
+        return data.reset_index(drop=True)
+
+    # -------------------------------------------------------------------------
+    def clean_master_list_column(self, series: pd.Series) -> pd.Series:
+        cleaned = series.fillna("").astype(str).str.strip()
+        cleaned = cleaned.replace("", pd.NA)
+        return cleaned
+
+    # -------------------------------------------------------------------------
+    async def download_bulk_data(self, dest_path: str) -> dict[str, Any]:
+        url = self.base_url + self.file_name
+        async with httpx.AsyncClient(
+            timeout=30.0, headers=self.http_headers, follow_redirects=True
+        ) as client:
+            head = await client.head(url)
+            head.raise_for_status()
+            metadata = {
+                "size": int(head.headers.get("Content-Length", 0)),
+                "last_modified": head.headers.get("Last-Modified"),
+                "source_url": str(head.url),
+            }
+            dest_dir = os.path.abspath(dest_path)
+            os.makedirs(dest_dir, exist_ok=True)
+            file_path = os.path.join(dest_dir, self.file_name)
+
+            stored_metadata = load_json(self.archive_metadata_path)
+            if self.redownload:
+                stored_metadata = None
+
+            if (
+                stored_metadata
+                and os.path.isfile(file_path)
+                and metadata_matches(stored_metadata, metadata)
+            ):
+                logger.info("LiverTox archive unchanged; skipping download")
+                return {
+                    "file_path": file_path,
+                    "size": metadata.get("size", 0),
+                    "last_modified": metadata.get("last_modified"),
+                    "downloaded": False,
+                    "source_url": metadata["source_url"],
+                }
+
+            await asyncio.sleep(self.delay)
+            await download_file(
+                client,
+                url,
+                file_path,
+                metadata.get("size", 0),
+                self.file_name,
+                chunk_size=self.chunk_size,
+            )
+            save_masterlist_metadata(self.archive_metadata_path, metadata)
+
+        return {
+            "file_path": file_path,
+            "size": metadata.get("size", 0),
+            "last_modified": metadata.get("last_modified"),
+            "downloaded": True,
+            "source_url": metadata["source_url"],
+        }
+
+    # -------------------------------------------------------------------------
+    def refresh_master_list(self) -> tuple[dict[str, Any], pd.DataFrame]:
+        logger.info("Refreshing LiverTox master list")
+        metadata = asyncio.run(self.download_master_list())
+
+        frame = pd.read_excel(
+            metadata["file_path"],
+            engine="openpyxl",
+            header=self.header_row,
+            skiprows=0,
+        )
+        sanitized = self.sanitize_livertox_master_list(frame)
+        if sanitized is None:
+            sanitized = pd.DataFrame()
+        else:
+            sanitized = sanitized.copy()
+            sanitized["source_url"] = metadata.get("source_url")
+            sanitized["source_last_modified"] = metadata.get("last_modified")
+            if (
+                "last_update" in sanitized.columns
+                and pd.api.types.is_datetime64_any_dtype(sanitized["last_update"])
+            ):
+                sanitized["last_update"] = sanitized["last_update"].dt.strftime( # type: ignore
+                    "%Y-%m-%d"
+                )
+        metadata["records"] = len(sanitized.index)
+
+        return metadata, sanitized
+
+    # -------------------------------------------------------------------------
+    async def download_master_list(self) -> dict[str, Any]:
+        async with httpx.AsyncClient(
+            timeout=30.0, headers=self.http_headers, follow_redirects=True
+        ) as client:
+            master_url = await self.resolve_master_list_url(client)
+            head = await client.head(master_url)
+            head.raise_for_status()
+            metadata = {
+                "size": int(head.headers.get("Content-Length", 0)),
+                "last_modified": head.headers.get("Last-Modified"),
+                "source_url": str(head.url),
+            }
+            stored_metadata = load_json(self.master_list_metadata_path)
+            if self.redownload:
+                stored_metadata = None
+            if (
+                stored_metadata
+                and os.path.isfile(self.master_list_path)
+                and metadata_matches(stored_metadata, metadata)
+            ):
+                logger.info("Master list unchanged; skipping download")
+                return {
+                    "file_path": self.master_list_path,
+                    "size": metadata.get("size", 0),
+                    "last_modified": metadata.get("last_modified"),
+                    "downloaded": False,
+                    "source_url": metadata["source_url"],
+                }
+
+            await asyncio.sleep(self.delay)
+            await download_file(
+                client,
+                master_url,
+                self.master_list_path,
+                metadata.get("size", 0),
+                os.path.basename(self.master_list_path),
+                chunk_size=self.chunk_size,
+            )
+            save_masterlist_metadata(self.master_list_metadata_path, metadata)
+
+        return {
+            "file_path": self.master_list_path,
+            "size": metadata.get("size", 0),
+            "last_modified": metadata.get("last_modified"),
+            "downloaded": True,
+            "source_url": metadata["source_url"],
+        }
+
+    # -------------------------------------------------------------------------
+    async def resolve_master_list_url(self, client: httpx.AsyncClient) -> str:
+        try:
+            return await self.resolve_master_list_from_bookshelf(client)
+        except Exception as exc:
+            logger.warning("Bookshelf Excel lookup failed: %s", exc)
+        try:
+            return await self.resolve_master_list_from_bin(client, self.base_url)
+        except Exception as exc:
+            logger.warning("Primary FTP lookup failed: %s", exc)
+            fallback_url = await self.resolve_master_list_via_datagov(client)
+            return fallback_url
+
+    # -------------------------------------------------------------------------
+    async def resolve_master_list_from_bookshelf(
+        self, client: httpx.AsyncClient
+    ) -> str:
+        report_url = "https://www.ncbi.nlm.nih.gov/books/NBK571102/?report=excel"
+        head_response: httpx.Response | None = None
+        try:
+            head_response = await client.head(report_url, follow_redirects=False)
+            head_response.raise_for_status()
+        except httpx.HTTPStatusError as exc:
+            if exc.response.status_code not in (301, 302, 303, 307, 308):
+                head_response = None
+            else:
+                head_response = exc.response
+        except httpx.HTTPError:
+            head_response = None
+
+        redirect_statuses = {301, 302, 303, 307, 308}
+        if head_response is not None:
+            if (
+                head_response.status_code in redirect_statuses
+                and head_response.headers.get("Location")
+            ):
+                candidate = httpx.URL(report_url).join(
+                    head_response.headers["Location"]
+                )
+                return await self.probe_master_list_candidate(client, str(candidate))
+            content_type = (head_response.headers.get("Content-Type") or "").lower()
+            disposition = (
+                head_response.headers.get("Content-Disposition") or ""
+            ).lower()
+            if "excel" in content_type or ".xlsx" in disposition:
+                return await self.probe_master_list_candidate(
+                    client, str(head_response.url)
+                )
+
+        get_response = await client.get(report_url, follow_redirects=False)
+        if get_response.status_code in redirect_statuses and get_response.headers.get(
+            "Location"
+        ):
+            candidate = httpx.URL(report_url).join(get_response.headers["Location"])
+            return await self.probe_master_list_candidate(client, str(candidate))
+
+        content_type = (get_response.headers.get("Content-Type") or "").lower()
+        disposition = (get_response.headers.get("Content-Disposition") or "").lower()
+        if "excel" in content_type or ".xlsx" in disposition:
+            return await self.probe_master_list_candidate(client, str(get_response.url))
+
+        html_content = get_response.text
+        for pattern in (
+            r"url=([^\"'>]+\.xlsx)",
+            r"['\"]([^'\"]+\.xlsx)['\"]",
+        ):
+            for match in re.finditer(pattern, html_content, flags=re.IGNORECASE):
+                candidate_url = match.group(1)
+                candidate = httpx.URL(report_url).join(candidate_url)
+                try:
+                    return await self.probe_master_list_candidate(
+                        client, str(candidate)
+                    )
+                except Exception as exc:  # pragma: no cover - network dependent
+                    logger.debug(
+                        "Bookshelf candidate %s failed: %s", str(candidate), exc
+                    )
+                    continue
+
+        raise RuntimeError("Unable to resolve master list via Bookshelf report page")
+
+    # -------------------------------------------------------------------------
+    async def resolve_master_list_from_bin(
+        self, client: httpx.AsyncClient, base_url: str
+    ) -> str:
+        bin_url = str(httpx.URL(base_url).join("bin/"))
+        response = await client.get(bin_url)
+        response.raise_for_status()
+        content = response.text
+        matches = re.finditer(
+            r"<a[^>]+href=\"([^\"]+\.xlsx)\"[^>]*>([^<]*(?:<[^>]+>[^<]*)*)</a>",
+            content,
+            flags=re.IGNORECASE,
+        )
+        candidates: list[tuple[str, str]] = []
+        for match in matches:
+            href, label = match.groups()
+            if "ipmcbook" in href.lower():
+                continue
+            normalized_label = re.sub(r"\s+", " ", label.lower())
+            if "master" not in normalized_label and "excel" not in normalized_label:
+                continue
+            url = httpx.URL(bin_url).join(href)
+            human_url = str(url)
+            if not human_url.lower().startswith(
+                "https://www.ncbi.nlm.nih.gov/"
+            ) and not human_url.startswith(base_url):
+                continue
+            candidates.append((human_url, label.strip()))
+        if not candidates:
+            href_matches = re.finditer(
+                r"href=\"([^\"]+\.xlsx)\"",
+                content,
+                flags=re.IGNORECASE,
+            )
+            for match in href_matches:
+                href = match.group(1)
+                if "ipmcbook" in href.lower():
+                    continue
+                url = httpx.URL(bin_url).join(href)
+                human_url = str(url)
+                if not human_url.lower().startswith(
+                    "https://www.ncbi.nlm.nih.gov/"
+                ) and not human_url.startswith(base_url):
+                    continue
+                if "master" in os.path.basename(human_url).lower():
+                    candidates.append((human_url, os.path.basename(human_url)))
+        if not candidates:
+            raise RuntimeError(
+                "Unable to locate LiverTox master list link on FTP bin page"
+            )
+        candidates.sort(key=lambda item: item[0])
+        chosen_url = candidates[0][0]
+        return chosen_url
+
+    # -------------------------------------------------------------------------
+    async def resolve_master_list_via_datagov(self, client: httpx.AsyncClient) -> str:
+        api_url = "https://catalog.data.gov/api/3/action/package_show"
+        response = await client.get(api_url, params={"id": "livertox"})
+        response.raise_for_status()
+        try:
+            payload = response.json()
+        except ValueError as exc:
+            raise RuntimeError(
+                "Unable to resolve FTP folder from Data.gov entry"
+            ) from exc
+        result = payload.get("result", {}) if isinstance(payload, dict) else {}
+        resources = result.get("resources") if isinstance(result, dict) else None
+        if not isinstance(resources, list):
+            raise RuntimeError("Unable to resolve FTP folder from Data.gov entry")
+
+        direct_candidates: list[str] = []
+        direct_seen: set[str] = set()
+        folder_candidates: list[str] = []
+        folder_seen: set[str] = set()
+        for resource in resources:
+            if not isinstance(resource, dict):
+                continue
+            raw_url = str(resource.get("url") or "").strip()
+            if not raw_url:
+                continue
+            normalized_url = self.normalize_datagov_resource_url(raw_url)
+            if not normalized_url:
+                continue
+            lowered = normalized_url.lower()
+            if ".xlsx" in lowered:
+                if normalized_url not in direct_seen:
+                    direct_seen.add(normalized_url)
+                    direct_candidates.append(normalized_url)
+                continue
+            nbk_match = re.search(r"/(nbk\d+)(?:/|$)", lowered)
+            if nbk_match:
+                nbk_id = nbk_match.group(1).upper()
+                for template in (
+                    f"https://www.ncbi.nlm.nih.gov/books/{nbk_id}/?report=excel",
+                    f"https://www.ncbi.nlm.nih.gov/books/{nbk_id}/bin/{nbk_id}.xlsx",
+                ):
+                    if template not in direct_seen:
+                        direct_seen.add(template)
+                        direct_candidates.append(template)
+            if "ftp.ncbi.nlm.nih.gov" in lowered:
+                if normalized_url.endswith("/"):
+                    base_candidate = normalized_url
+                else:
+                    base_candidate = f"{normalized_url.rsplit('/', 1)[0]}/"
+                if base_candidate not in folder_seen:
+                    folder_seen.add(base_candidate)
+                    folder_candidates.append(base_candidate)
+
+        last_error: Exception | None = None
+        for candidate in direct_candidates:
+            try:
+                resolved_direct = await self.probe_master_list_candidate(
+                    client, candidate
+                )
+            except Exception as exc:  # pragma: no cover - network dependent
+                last_error = exc
+                logger.debug("Candidate Data.gov direct %s failed: %s", candidate, exc)
+                continue
+            return resolved_direct
+
+        if not folder_candidates:
+            raise RuntimeError("Unable to resolve FTP folder from Data.gov entry")
+
+        original_base = self.base_url
+        for base_candidate in folder_candidates:
+            try:
+                resolved = await self.resolve_master_list_from_bin(
+                    client, base_candidate
+                )
+            except Exception as exc:  # pragma: no cover - network dependent
+                last_error = exc
+                logger.debug(
+                    "Candidate Data.gov base %s failed: %s", base_candidate, exc
+                )
+                continue
+            self.base_url = base_candidate
+            return resolved
+
+        self.base_url = original_base
+        if last_error is not None:
+            raise RuntimeError(
+                "Unable to resolve FTP folder from Data.gov entry"
+            ) from last_error
+        raise RuntimeError("Unable to resolve FTP folder from Data.gov entry")
+
+    # -------------------------------------------------------------------------
+    def normalize_datagov_resource_url(self, url: str) -> str | None:
+        normalized = url.strip()
+        if not normalized:
+            return None
+        if normalized.startswith("ftp://"):
+            normalized = "https://" + normalized[len("ftp://") :]
+        if normalized.startswith("http"):
+            return normalized
+        if normalized.startswith("//"):
+            return f"https:{normalized}"
+        return None
+
+    # -------------------------------------------------------------------------
+    async def probe_master_list_candidate(
+        self, client: httpx.AsyncClient, candidate: str
+    ) -> str:
+        try:
+            response = await client.head(candidate)
+            response.raise_for_status()
+        except httpx.HTTPStatusError:  # pragma: no cover - network dependent
+            response = await self.fetch_candidate_with_get(client, candidate)
+        except httpx.HTTPError:  # pragma: no cover - network dependent
+            response = await self.fetch_candidate_with_get(client, candidate)
+        content_type = (response.headers.get("Content-Type") or "").lower()
+        if ".xlsx" not in candidate.lower() and "excel" not in content_type:
+            disposition = (response.headers.get("Content-Disposition") or "").lower()
+            if ".xlsx" in disposition:
+                return str(response.url)
+            raise RuntimeError("Candidate does not appear to be an Excel file")
+        return str(response.url)
+
+    # -------------------------------------------------------------------------
+    async def fetch_candidate_with_get(
+        self, client: httpx.AsyncClient, candidate: str
+    ) -> httpx.Response:
+        probe_headers = dict(self.http_headers)
+        probe_headers.setdefault("Range", "bytes=0-0")
+        response = await client.get(
+            candidate,
+            headers=probe_headers,
+            follow_redirects=True,
+        )
+        try:
+            response.raise_for_status()
+        except httpx.HTTPStatusError as exc:  # pragma: no cover - network dependent
+            if exc.response.status_code == 416:
+                response = await client.get(
+                    candidate,
+                    headers=self.http_headers,
+                    follow_redirects=True,
+                )
+                response.raise_for_status()
+            else:
+                raise RuntimeError("Master list candidate returned HTTP error") from exc
+        return response
+
+    # -----------------------------------------------------------------------------
+    def update_from_livertox(
+        self,
+        *,
+        progress_callback: Callable[[float, str], None] | None = None,
+        should_stop: Callable[[], bool] | None = None,
+    ) -> dict[str, Any]:
+        logger.info("Starting LiverTox update")
+        if self.should_cancel(should_stop):
+            raise RuntimeError("LiverTox update cancelled by user request")
+        self.emit_progress(
+            progress_callback,
+            progress=5.0,
+            message="Refreshing LiverTox master list",
+        )
+        master_metadata, master_frame = self.refresh_master_list()
+
+        logger.info("Checking LiverTox archive metadata")
+        if self.should_cancel(should_stop):
+            raise RuntimeError("LiverTox update cancelled by user request")
+        self.emit_progress(
+            progress_callback,
+            progress=20.0,
+            message="Downloading LiverTox archive metadata",
+        )
+        archive_metadata = asyncio.run(self.download_bulk_data(self.sources_path))
+        archive_path = archive_metadata.get("file_path") or os.path.join(
+            self.sources_path, server_settings.external_data.livertox_archive
+        )
+
+        local_info = self.collect_local_archive_info(archive_path)
+        logger.info("Extracting LiverTox monographs from %s", archive_path)
+        self.emit_progress(
+            progress_callback,
+            progress=35.0,
+            message="Extracting LiverTox monographs",
+        )
+        extracted = self.collect_monographs(
+            archive_path,
+            should_stop=should_stop,
+            progress_callback=progress_callback,
+        )
+        if self.should_cancel(should_stop):
+            raise RuntimeError("LiverTox update cancelled by user request")
+        logger.info("Sanitizing %d extracted entries", len(extracted))
+        self.emit_progress(
+            progress_callback,
+            progress=70.0,
+            message="Sanitizing extracted LiverTox entries",
+        )
+        monograph_df = self.sanitize_records(extracted)
+        logger.info("Combining LiverTox datasets")
+        self.emit_progress(
+            progress_callback,
+            progress=80.0,
+            message="Combining master list and monograph excerpts",
+        )
+        unified = self.build_unified_dataset(
+            monograph_df,
+            master_frame,
+            master_metadata,
+        )
+        logger.info("Finalizing sanitized dataset")
+        self.emit_progress(
+            progress_callback,
+            progress=88.0,
+            message="Finalizing LiverTox dataset",
+        )
+        final_dataset = self.finalize_dataset(unified)
+        logger.info("Persisting finalized records to database")
+        if self.should_cancel(should_stop):
+            raise RuntimeError("LiverTox update cancelled by user request")
+        self.emit_progress(
+            progress_callback,
+            progress=95.0,
+            message="Persisting LiverTox records",
+        )
+        self.serializer.save_livertox_records(final_dataset)
+
+        payload = {**master_metadata, **archive_metadata, **local_info}
+        payload["processed_entries"] = len(final_dataset.index)
+        payload["records"] = len(final_dataset.index)
+        logger.info("LiverTox update completed successfully")
+        self.emit_progress(
+            progress_callback,
+            progress=99.0,
+            message="LiverTox update completed",
+        )
+
+        return payload
+
+    # -------------------------------------------------------------------------
+    def collect_local_archive_info(self, archive_path: str) -> dict[str, Any]:
+        if not os.path.isfile(archive_path):
+            raise RuntimeError(
+                "LiverTox archive not found; enable REDOWNLOAD to fetch a fresh copy."
+            )
+        size = os.path.getsize(archive_path)
+        modified = datetime.fromtimestamp(
+            os.path.getmtime(archive_path), UTC
+        ).isoformat()
+        return {"file_path": archive_path, "size": size, "last_modified": modified}
+
+    # -----------------------------------------------------------------------------
+    def build_unified_dataset(
+        self,
+        monographs: pd.DataFrame,
+        master_frame: pd.DataFrame,
+        master_metadata: dict[str, Any],
+    ) -> pd.DataFrame:
+        base_columns = [
+            "drug_name",
+            "ingredient",
+            "brand_name",
+            "likelihood_score",
+            "last_update",
+            "reference_count",
+            "year_approved",
+            "agent_classification",
+            "primary_classification",
+            "secondary_classification",
+            "include_in_livertox",
+            "source_url",
+            "source_last_modified",
+        ]
+        monograph_columns = ["drug_name", "nbk_id", "excerpt", "synonyms"]
+        final_columns = base_columns + ["nbk_id", "excerpt", "synonyms"]
+
+        if master_frame is None or master_frame.empty:
+            master = pd.DataFrame(columns=base_columns)
+        else:
+            master = master_frame.copy()
+            if "chapter_title" in master.columns:
+                master = master.rename(columns={"chapter_title": "drug_name"})
+            if "drug_name" not in master.columns:
+                master["drug_name"] = pd.NA
+            master["drug_name"] = master["drug_name"].astype(str).str.strip()
+            master = master[master["drug_name"] != ""]
+            for column in base_columns:
+                if column not in master.columns:
+                    master[column] = pd.NA
+            if master.empty and master_metadata.get("source_url"):
+                master = pd.DataFrame(columns=base_columns)
+            else:
+                metadata_source_url = master_metadata.get("source_url")
+                metadata_last_modified = master_metadata.get("last_modified")
+                if metadata_source_url is not None:
+                    master["source_url"] = master["source_url"].fillna(
+                        metadata_source_url
+                    )
+                if metadata_last_modified is not None:
+                    master["source_last_modified"] = master[
+                        "source_last_modified"
+                    ].fillna(metadata_last_modified)
+            master = master[base_columns]
+
+        if monographs.empty:
+            monograph_df = pd.DataFrame(columns=monograph_columns)
+        else:
+            monograph_df = monographs.copy()
+        for column in monograph_columns:
+            if column not in monograph_df.columns:
+                monograph_df[column] = pd.NA
+        monograph_df = monograph_df[monograph_columns]
+
+        if master.empty:
+            dataset = monograph_df.copy()
+            for column in base_columns:
+                if column not in dataset.columns:
+                    dataset[column] = pd.NA
+            dataset = dataset[final_columns]
+            return self.sanitize_unified_dataset(dataset)
+
+        dataset = master.merge(monograph_df, on="drug_name", how="left")
+        if not monograph_df.empty:
+            matched = dataset["drug_name"].unique().tolist()
+            unmatched = monograph_df[~monograph_df["drug_name"].isin(matched)]
+            if not unmatched.empty:
+                filler = unmatched.copy()
+                for column in base_columns:
+                    if column not in filler.columns:
+                        filler[column] = pd.NA
+                filler = filler[dataset.columns]
+                dataset = pd.concat([dataset, filler], ignore_index=True)
+        dataset = dataset[final_columns]
+        return self.sanitize_unified_dataset(dataset)
+
+    # -------------------------------------------------------------------------
+    def contains_symbol(self, value: str) -> bool:
+        if not isinstance(value, str):
+            return False
+        return bool(re.search(r"[^A-Za-z0-9\s\-/(),'.+]", value))
+
+    # -------------------------------------------------------------------------
+    def sanitize_unified_dataset(self, frame: pd.DataFrame) -> pd.DataFrame:
+        if frame.empty:
+            return frame.copy()
+        sanitized = frame.copy()
+        sanitized["drug_name"] = sanitized["drug_name"].astype(str).str.strip()
+        sanitized = sanitized[sanitized["drug_name"] != ""]
+        numeric_mask = sanitized["drug_name"].str.fullmatch(r"\d+")
+        sanitized = sanitized[~numeric_mask]
+        symbol_mask = sanitized["drug_name"].apply(self.contains_symbol)
+        sanitized = sanitized[~symbol_mask]
+
+        for column in ("ingredient", "brand_name"):
+            if column not in sanitized.columns:
+                sanitized[column] = pd.NA
+            sanitized[column] = sanitized[column].where(
+                pd.notnull(sanitized[column]), pd.NA
+            )
+            sanitized[column] = sanitized[column].astype(str).str.strip()
+            sanitized.loc[
+                sanitized[column].isin(["", "nan", "None", "<NA>"]), column
+            ] = pd.NA
+            invalid_mask = sanitized[column].notna() & sanitized[column].apply(
+                self.contains_symbol
+            )
+            invalid_mask = invalid_mask.fillna(False)
+            sanitized = sanitized[~invalid_mask]
+
+        sanitized["excerpt"] = sanitized["excerpt"].astype(str).str.strip()
+        sanitized.loc[
+            sanitized["excerpt"].isin(["", "nan", "None", "NaT"]), "excerpt"
+        ] = pd.NA
+        sanitized.loc[sanitized["excerpt"].isna(), "excerpt"] = pd.NA
+        return sanitized.reset_index(drop=True)
+
+    # -----------------------------------------------------------------------------
+    def collect_monographs(
+        self,
+        archive_path: str | None = None,
+        *,
+        should_stop: Callable[[], bool] | None = None,
+        progress_callback: Callable[[float, str], None] | None = None,
+    ) -> list[dict[str, str]]:
+        tar_path = archive_path or self.tar_file_path
+        normalized_path = os.path.abspath(tar_path)
+        if not os.path.isfile(normalized_path):
+            raise FileNotFoundError(f"LiverTox archive missing at {normalized_path}")
+        if not tarfile.is_tarfile(normalized_path):
+            raise RuntimeError(f"Invalid LiverTox archive at {normalized_path}")
+
+        collected: list[dict[str, str]] = []
+        max_workers = self.monograph_max_workers
+
+        # Stage 1: scan only archive metadata and keep one member per basename.
+        selected_members: list[tarfile.TarInfo] = []
+        selected_basenames: set[str] = set()
+        with tarfile.open(normalized_path, "r:gz") as archive:
+            for member in archive.getmembers():
+                if not member.isfile():
+                    continue
+                normalized_name = os.path.normpath(member.name)
+                if os.path.isabs(normalized_name) or normalized_name.startswith(".."):
+                    logger.warning("Skipping unsafe archive member: %s", member.name)
+                    continue
+                extension = os.path.splitext(normalized_name.lower())[1]
+                if extension not in self.supported_extensions:
+                    continue
+                base_name = os.path.basename(member.name).lower()
+                if base_name in selected_basenames:
+                    continue
+                selected_basenames.add(base_name)
+                selected_members.append(member)
+
+        if not selected_members:
+            return collected
+
+        total_payloads = len(selected_members)
+        processed_count = 0
+        worker_budget = min(max_workers, total_payloads) or 1
+
+        if worker_budget == 1:
+            with tarfile.open(normalized_path, "r:gz") as archive:
+                for member in tqdm(
+                    selected_members,
+                    desc="Processing LiverTox files",
+                    total=total_payloads,
+                ):
+                    if self.should_cancel(should_stop):
+                        raise RuntimeError("LiverTox update cancelled by user request")
+                    extracted = archive.extractfile(member)
+                    if extracted is None:
+                        processed_count += 1
+                        self.emit_monograph_progress(
+                            progress_callback=progress_callback,
+                            processed_count=processed_count,
+                            total_payloads=total_payloads,
+                        )
+                        continue
+                    try:
+                        data = extracted.read()
+                    finally:
+                        extracted.close()
+                    if data:
+                        record = LiverToxUpdater.process_monograph_member(member.name, data)
+                        if record:
+                            collected.append(record)
+                    processed_count += 1
+                    self.emit_monograph_progress(
+                        progress_callback=progress_callback,
+                        processed_count=processed_count,
+                        total_payloads=total_payloads,
+                    )
+            return self.sort_monograph_records(collected)
+
+        ctx = multiprocessing.get_context("spawn")
+        max_in_flight = max(1, worker_budget * 2)
+        with ProcessPoolExecutor(max_workers=worker_budget, mp_context=ctx) as executor:
+            in_flight: dict[Future[dict[str, str] | None], str] = {}
+            with tarfile.open(normalized_path, "r:gz") as archive:
+                for member in tqdm(
+                    selected_members,
+                    desc="Reading LiverTox files",
+                    total=total_payloads,
+                ):
+                    if self.should_cancel(should_stop):
+                        raise RuntimeError("LiverTox update cancelled by user request")
+                    extracted = archive.extractfile(member)
+                    if extracted is None:
+                        processed_count += 1
+                        self.emit_monograph_progress(
+                            progress_callback=progress_callback,
+                            processed_count=processed_count,
+                            total_payloads=total_payloads,
+                        )
+                        continue
+                    try:
+                        data = extracted.read()
+                    finally:
+                        extracted.close()
+                    if not data:
+                        processed_count += 1
+                        self.emit_monograph_progress(
+                            progress_callback=progress_callback,
+                            processed_count=processed_count,
+                            total_payloads=total_payloads,
+                        )
+                        continue
+                    future = executor.submit(process_monograph_payload, member.name, data)
+                    in_flight[future] = member.name
+                    if len(in_flight) >= max_in_flight:
+                        processed_count = self.drain_monograph_futures(
+                            in_flight=in_flight,
+                            collected=collected,
+                            processed_count=processed_count,
+                            total_payloads=total_payloads,
+                            progress_callback=progress_callback,
+                            wait_for_one=True,
+                        )
+
+            while in_flight:
+                if self.should_cancel(should_stop):
+                    raise RuntimeError("LiverTox update cancelled by user request")
+                processed_count = self.drain_monograph_futures(
+                    in_flight=in_flight,
+                    collected=collected,
+                    processed_count=processed_count,
+                    total_payloads=total_payloads,
+                    progress_callback=progress_callback,
+                    wait_for_one=False,
+                )
+        return self.sort_monograph_records(collected)
+
+    # -------------------------------------------------------------------------
+    def emit_monograph_progress(
+        self,
+        *,
+        progress_callback: Callable[[float, str], None] | None,
+        processed_count: int,
+        total_payloads: int,
+    ) -> None:
+        ratio = min(1.0, max(0.0, processed_count / max(total_payloads, 1)))
+        self.emit_progress(
+            progress_callback,
+            progress=35.0 + (ratio * 33.0),
+            message=f"Processed {processed_count}/{total_payloads} LiverTox files",
+        )
+
+    # -------------------------------------------------------------------------
+    def drain_monograph_futures(
+        self,
+        *,
+        in_flight: dict[Future[dict[str, str] | None], str],
+        collected: list[dict[str, str]],
+        processed_count: int,
+        total_payloads: int,
+        progress_callback: Callable[[float, str], None] | None,
+        wait_for_one: bool,
+    ) -> int:
+        if not in_flight:
+            return processed_count
+        return_when = FIRST_COMPLETED if wait_for_one else ALL_COMPLETED
+        done, _ = wait(set(in_flight), return_when=return_when)
+        for future in done:
+            member_name = in_flight.pop(future, "")
+            base_name = os.path.basename(member_name).lower()
+            try:
+                record = future.result()
+            except Exception as exc:  # noqa: BLE001
+                logger.warning(
+                    "Failed to process LiverTox monograph '%s': %s",
+                    base_name or "<unknown>",
+                    exc,
+                )
+                processed_count += 1
+                self.emit_monograph_progress(
+                    progress_callback=progress_callback,
+                    processed_count=processed_count,
+                    total_payloads=total_payloads,
+                )
+                continue
+            if record:
+                collected.append(record)
+            processed_count += 1
+            self.emit_monograph_progress(
+                progress_callback=progress_callback,
+                processed_count=processed_count,
+                total_payloads=total_payloads,
+            )
+        return processed_count
+
+    # -------------------------------------------------------------------------
+    def sort_monograph_records(
+        self, records: list[dict[str, str]]
+    ) -> list[dict[str, str]]:
+        return sorted(
+            records,
+            key=lambda item: (
+                str(item.get("drug_name", "")).casefold(),
+                str(item.get("nbk_id", "")).casefold(),
+                str(item.get("excerpt", "")).casefold(),
+            ),
+        )
+
+    # -------------------------------------------------------------------------
+    @staticmethod
+    def process_monograph_member(
+        member_name: str,
+        data: bytes,
+    ) -> dict[str, str] | None:
+        payload = LiverToxUpdater.convert_member_bytes(member_name, data)
+        if payload is None:
+            return None
+        plain_text, markup_text = payload
+        if not plain_text:
+            return None
+        nbk_id = LiverToxUpdater.extract_nbk(member_name, markup_text or plain_text)
+        record_nbk = nbk_id or LiverToxUpdater.derive_identifier(member_name)
+        if not record_nbk:
+            return None
+        drug_name = LiverToxUpdater.extract_title(
+            markup_text or "",
+            plain_text,
+            record_nbk,
+        )
+        cleaned_text = plain_text.strip()
+        if not drug_name or not cleaned_text:
+            return None
+        return {
+            "nbk_id": record_nbk,
+            "drug_name": drug_name,
+            "excerpt": cleaned_text,
+        }
+
+    # -------------------------------------------------------------------------
+    @staticmethod
+    def convert_member_bytes(
+        member_name: str, data: bytes
+    ) -> tuple[str, str | None] | None:
+        lower_name = member_name.lower()
+        if lower_name.endswith(".pdf"):
+            text = LiverToxUpdater.pdf_to_text(data)
+            if text.strip():
+                return text, None
+            decoded = LiverToxUpdater.decode_markup(data)
+            return decoded, decoded
+        markup = LiverToxUpdater.decode_markup(data)
+        text = LiverToxUpdater.html_to_text(markup)
+        return text, markup
+
+    # -------------------------------------------------------------------------
+    @staticmethod
+    def decode_markup(data: bytes) -> str:
+        try:
+            return data.decode("utf-8")
+        except UnicodeDecodeError:
+            return data.decode("latin-1", errors="ignore")
+
+    # -------------------------------------------------------------------------
+    @staticmethod
+    def pdf_to_text(data: bytes) -> str:
+        buffer = io.BytesIO(data)
+        if pdfminer_extract_text is not None:
+            try:
+                buffer.seek(0)
+                text = pdfminer_extract_text(buffer)
+                if text:
+                    return text
+            except Exception:
+                buffer.seek(0)
+        if PdfReader is not None:
+            try:
+                buffer.seek(0)
+                reader = PdfReader(buffer)
+                collected: list[str] = []
+                for page in reader.pages:
+                    page_text = page.extract_text()
+                    if page_text:
+                        collected.append(page_text)
+                if collected:
+                    return "\n".join(collected)
+            except Exception:
+                buffer.seek(0)
+        try:
+            return data.decode("utf-8")
+        except UnicodeDecodeError:
+            return data.decode("latin-1", errors="ignore")
+
+    # -------------------------------------------------------------------------
+    @staticmethod
+    def extract_nbk(member_name: str, content: str) -> str | None:
+        match = re.search(r"NBK\d+", member_name, re.IGNORECASE)
+        if match:
+            return match.group(0).upper()
+        match = re.search(r"NBK\d+", content, re.IGNORECASE)
+        if match:
+            return match.group(0).upper()
+        return None
+
+    # -------------------------------------------------------------------------
+    @staticmethod
+    def derive_identifier(member_name: str) -> str:
+        base = os.path.basename(member_name)
+        stem = os.path.splitext(base)[0]
+        cleaned = normalize_whitespace(LiverToxUpdater.strip_punctuation(stem))
+        return cleaned or base
+
+    # -------------------------------------------------------------------------
+    @staticmethod
+    def extract_title(html_text: str, plain_text: str, default: str) -> str:
+        patterns = (
+            r"<title-group[^>]*>\s*<title[^>]*>(.*?)</title>",
+            r"<article-title[^>]*>(.*?)</article-title>",
+            r"<h1[^>]*>(.*?)</h1>",
+            r"<title[^>]*>(.*?)</title>",
+        )
+        for pattern in patterns:
+            for match in re.finditer(pattern, html_text, flags=re.IGNORECASE | re.DOTALL):
+                fragment = LiverToxUpdater.clean_fragment(match.group(1))
+                normalized = LiverToxUpdater.normalize_extracted_title(fragment)
+                if normalized:
+                    return normalized
+        for line in plain_text.splitlines():
+            stripped = line.strip()
+            if stripped:
+                normalized = LiverToxUpdater.normalize_extracted_title(stripped)
+                if normalized:
+                    return normalized
+        return LiverToxUpdater.normalize_extracted_title(default) or default
+
+    # -------------------------------------------------------------------------
+    @staticmethod
+    def clean_fragment(fragment: str) -> str:
+        return LiverToxUpdater.html_to_text(fragment)
+
+    # -------------------------------------------------------------------------
+    @staticmethod
+    def normalize_extracted_title(value: str) -> str:
+        cleaned = normalize_whitespace(value)
+        if not cleaned:
+            return ""
+        cleaned = re.sub(
+            r"\s*[-|:]\s*(?:LiverTox|NCBI Bookshelf)\b.*$",
+            "",
+            cleaned,
+            flags=re.IGNORECASE,
+        )
+        return normalize_whitespace(cleaned)
+
+    # -------------------------------------------------------------------------
+    @staticmethod
+    def html_to_text(html_text: str) -> str:
+        # Tempered dot avoids runaway backtracking on malformed HTML.
+        stripped = re.sub(
+            r"(?is)<(script|style)[^>]*>(?:(?!</\1>).)*</\1>", " ", html_text
+        )
+        stripped = re.sub(r"<[^>]+>", " ", stripped)
+        unescaped = html.unescape(stripped)
+        return normalize_whitespace(unescaped)
+
+    # -------------------------------------------------------------------------
+    @staticmethod
+    def strip_punctuation(value: str) -> str:
+        normalized = unicodedata.normalize("NFKD", value)
+        folded = "".join(char for char in normalized if not unicodedata.combining(char))
+        return re.sub(r"[-_,.;:()\[\]{}\/\\]", " ", folded)
+
+    # -------------------------------------------------------------------------
+    def sanitize_records(self, entries: list[dict[str, Any]]) -> pd.DataFrame:
+        sanitized = self.serializer.sanitize_livertox_records(entries)
+        if sanitized.empty:
+            sanitized = pd.DataFrame(
+                columns=["nbk_id", "drug_name", "excerpt", "synonyms"]
+            )
+        sanitized = sanitized.copy()
+        sanitized["drug_name"] = sanitized["drug_name"].astype(str).str.strip()
+        sanitized = sanitized[sanitized["drug_name"] != ""]
+        numeric_mask = sanitized["drug_name"].str.fullmatch(r"\d+")
+        sanitized = sanitized[~numeric_mask]
+        sanitized["excerpt"] = sanitized["excerpt"].apply(self.sanitize_excerpt)
+        sanitized.loc[sanitized["excerpt"] == "", "excerpt"] = pd.NA
+        if "synonyms" not in sanitized.columns:
+            sanitized["synonyms"] = pd.NA
+        sanitized["synonyms"] = sanitized["synonyms"].where(
+            pd.notnull(sanitized["synonyms"]), pd.NA
+        )
+        return sanitized.reset_index(drop=True)
+
+    # -------------------------------------------------------------------------
+    def sanitize_excerpt(self, value: Any) -> str | Any:
+        if value is None or pd.isna(value):
+            return pd.NA
+        text = str(value).strip()
+        if not text or text.lower() in {"nan", "none", "<na>"}:
+            return pd.NA
+        cleaned = self.excerpt_sanitizer.sanitize(text)
+        if not cleaned:
+            return pd.NA
+        return cleaned
+
+    # -------------------------------------------------------------------------
+    def finalize_dataset(self, frame: pd.DataFrame) -> pd.DataFrame:
+        if frame.empty:
+            return frame.copy()
+        finalized = self.sanitize_unified_dataset(frame)
+        for column in finalized.columns:
+            if column == "drug_name":
+                continue
+            finalized[column] = finalized[column].where(pd.notnull(finalized[column]), pd.NA)
+            finalized[column] = finalized[column].astype(str).str.strip()
+            finalized.loc[
+                finalized[column].isin(["", "nan", "NaT", "None", "<NA>"]), column
+            ] = pd.NA
+        finalized["synonyms"] = finalized["synonyms"].apply(
+            lambda value: (
+                value.strip()
+                if isinstance(value, str)
+                and value.strip()
+                and value.strip().lower() not in {"<na>", "nan", "nat", "none"}
+                else pd.NA
+            )
+        )
+        finalized["excerpt"] = finalized["excerpt"].astype(str).str.strip()
+        finalized.loc[
+            finalized["excerpt"].isin(["", "nan", "NaT", "None", "<NA>"]), "excerpt"
+        ] = pd.NA
+        if "nbk_id" not in finalized.columns:
+            finalized["nbk_id"] = pd.NA
+        nbk_series = finalized["nbk_id"].apply(self.normalize_nbk_id)
+        counts = nbk_series.dropna().value_counts()
+        safe_nbk_values = set(counts[counts == 1].index.tolist())
+        safe_mask = nbk_series.isin(safe_nbk_values)
+        nulled_nbk_count = int((nbk_series.notna() & ~safe_mask).sum())
+        safe_nbk_count = int(safe_mask.sum())
+        finalized["nbk_id"] = nbk_series.where(safe_mask, pd.NA)
+        logger.info(
+            "LiverTox NBK audit: total_rows=%d safe_nbk_count=%d nulled_nbk_count=%d",
+            len(finalized.index),
+            safe_nbk_count,
+            nulled_nbk_count,
+        )
+
+        for column in ("source_last_modified", "source_url", "last_update"):
+            if column not in finalized.columns:
+                finalized[column] = pd.NA
+        sort_frame = finalized.assign(
+            _drug_name_sort=finalized["drug_name"].astype(str).str.casefold(),
+            _source_last_modified_sort=finalized["source_last_modified"]
+            .fillna("")
+            .astype(str)
+            .str.casefold(),
+            _source_url_sort=finalized["source_url"].fillna("").astype(str).str.casefold(),
+            _last_update_sort=finalized["last_update"].fillna("").astype(str).str.casefold(),
+        )
+        sort_frame = sort_frame.sort_values(
+            by=[
+                "_drug_name_sort",
+                "_source_last_modified_sort",
+                "_source_url_sort",
+                "_last_update_sort",
+            ],
+            kind="mergesort",
+        )
+        deduped = sort_frame.drop_duplicates(
+            subset=["drug_name", "ingredient", "brand_name"],
+            keep="first",
+        )
+        deduped = deduped.drop(
+            columns=[
+                "_drug_name_sort",
+                "_source_last_modified_sort",
+                "_source_url_sort",
+                "_last_update_sort",
+            ]
+        )
+        return deduped.reset_index(drop=True)
+
+    # -------------------------------------------------------------------------
+    def normalize_nbk_id(self, value: Any) -> str | None:
+        if value is None:
+            return None
+        if pd.isna(value):
+            return None
+        normalized = str(value).strip().upper()
+        if not normalized:
+            return None
+        if not NBK_ID_PATTERN.fullmatch(normalized):
+            return None
+        return normalized
+
+
+
+

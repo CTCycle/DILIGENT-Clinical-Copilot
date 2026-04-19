@@ -16,8 +16,8 @@ class ModelConfigSnapshot:
     cloud_model: str | None
     ollama_temperature: float
     cloud_temperature: float
-    ollama_reasoning: bool
-    updated_at: datetime | None
+    ollama_reasoning: bool = False
+    updated_at: datetime | None = None
 
 
 ###############################################################################
