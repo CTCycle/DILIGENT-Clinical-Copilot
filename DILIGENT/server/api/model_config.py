@@ -3,12 +3,10 @@ from __future__ import annotations
 from fastapi import APIRouter, Body, status
 
 from DILIGENT.server.domain.model_configs import ModelConfigStateResponse, ModelConfigUpdateRequest
-from DILIGENT.server.repositories.serialization.model_configs import ModelConfigSerializer
 from DILIGENT.server.services.model_config_service import ModelConfigService
 
 router = APIRouter(prefix="/model-config", tags=["model-config"])
-serializer = ModelConfigSerializer()
-service = ModelConfigService(serializer=serializer)
+service = ModelConfigService()
 
 
 ###############################################################################
@@ -18,14 +16,10 @@ class ModelConfigEndpoint:
         *,
         router: APIRouter,
         service: ModelConfigService | None = None,
-        serializer: ModelConfigSerializer | None = None,
+        serializer=None,
     ) -> None:
         self.router = router
-        if service is not None:
-            self.service = service
-        else:
-            resolved_serializer = serializer or ModelConfigSerializer()
-            self.service = ModelConfigService(serializer=resolved_serializer)
+        self.service = service or ModelConfigService(serializer=serializer)
         self.serializer = self.service.serializer
 
     # -------------------------------------------------------------------------

@@ -2,6 +2,7 @@ from __future__ import annotations
 
 from collections.abc import Iterable
 from typing import Any, cast
+from typing import Protocol
 
 from fastapi import HTTPException, status
 
@@ -29,10 +30,15 @@ LOCAL_MODEL_CATALOG = cast(
 LOCAL_MODEL_CATALOG_NAMES = {name for name, _, _ in LOCAL_MODEL_CATALOG}
 
 
+class ModelConfigSnapshotStore(Protocol):
+    def load_snapshot(self) -> ModelConfigSnapshot: ...
+    def save_snapshot(self, **updates: Any) -> ModelConfigSnapshot: ...
+
+
 ###############################################################################
 class ModelConfigService:
-    def __init__(self, serializer: ModelConfigSerializer) -> None:
-        self.serializer = serializer
+    def __init__(self, serializer: ModelConfigSnapshotStore | None = None) -> None:
+        self.serializer = serializer or ModelConfigSerializer()
 
     # -------------------------------------------------------------------------
     async def get_state(self) -> ModelConfigStateResponse:

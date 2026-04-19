@@ -109,7 +109,7 @@ def test_missing_longitudinal_data_yields_course_zero_and_low_confidence() -> No
 
 def test_alternative_cause_negative_scoring() -> None:
     estimator = RucamScoreEstimator()
-    payload = PatientData(anamnesis="Known chronic viral hepatitis.", drugs="Drug A", has_hepatic_diseases=True)
+    payload = PatientData(anamnesis="Known chronic viral hepatitis.", drugs="Drug A")
     analysis = PatientDrugs(entries=[DrugEntry(name="Drug A")])
     disease_context = PatientDiseaseContext(
         entries=[DiseaseContextEntry(name="Chronic viral hepatitis", hepatic_related=True, evidence="HBV chronic infection.")]

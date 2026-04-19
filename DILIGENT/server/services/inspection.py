@@ -1,7 +1,6 @@
 from __future__ import annotations
 
 import asyncio
-from contextlib import contextmanager
 from datetime import date, datetime, UTC
 from functools import partial
 from pathlib import Path
@@ -22,6 +21,12 @@ from DILIGENT.server.repositories.serialization.data import DataSerializer, Docu
 from DILIGENT.server.repositories.vectors import LanceVectorDatabase
 from DILIGENT.server.services.clinical.timeline import PatientTimelineExtractor
 from DILIGENT.server.services.jobs import JobManager, job_manager
+from DILIGENT.server.services.inspection_runtime import (
+    coerce_optional_bool,
+    coerce_optional_float,
+    coerce_optional_str,
+    runtime_override_context,
+)
 from DILIGENT.server.services.updater.embeddings import RagEmbeddingUpdater
 from DILIGENT.server.services.updater.dailymed import DailyMedLabelUpdater
 from DILIGENT.server.services.updater.dili_priors import DiliPriorUpdater
@@ -288,125 +293,6 @@ class DataInspectionService:
             return None
 
     # -------------------------------------------------------------------------
-    @staticmethod
-    def _coerce_optional_str(value: Any) -> str | None:
-        if value is None:
-            return None
-        text = str(value).strip()
-        return text or None
-
-    # -------------------------------------------------------------------------
-    @staticmethod
-    def _coerce_optional_bool(value: Any) -> bool | None:
-        if value is None:
-            return None
-        if isinstance(value, bool):
-            return value
-        if isinstance(value, str):
-            normalized = value.strip().lower()
-            if normalized in {"true", "1", "yes", "on"}:
-                return True
-            if normalized in {"false", "0", "no", "off"}:
-                return False
-            return None
-        if isinstance(value, (int, float)):
-            return bool(value)
-        return None
-
-    # -------------------------------------------------------------------------
-    @staticmethod
-    def _coerce_optional_float(value: Any) -> float | None:
-        if value is None:
-            return None
-        try:
-            return float(value)
-        except (TypeError, ValueError):
-            return None
-
-    # -------------------------------------------------------------------------
-    @staticmethod
-    def capture_runtime_snapshot() -> dict[str, Any]:
-        return {
-            "use_cloud_services": LLMRuntimeConfig.is_cloud_enabled(),
-            "llm_provider": LLMRuntimeConfig.get_llm_provider(),
-            "cloud_model": LLMRuntimeConfig.get_cloud_model(),
-            "parsing_model": LLMRuntimeConfig.get_parsing_model(),
-            "clinical_model": LLMRuntimeConfig.get_clinical_model(),
-            "ollama_temperature": LLMRuntimeConfig.get_ollama_temperature(),
-            "cloud_temperature": LLMRuntimeConfig.get_cloud_temperature(),
-            "ollama_reasoning": LLMRuntimeConfig.is_ollama_reasoning_enabled(),
-        }
-
-    # -------------------------------------------------------------------------
-    @staticmethod
-    def apply_runtime_overrides(
-        *,
-        use_cloud_services: bool | None,
-        llm_provider: str | None,
-        cloud_model: str | None,
-        parsing_model: str | None,
-        clinical_model: str | None,
-        ollama_temperature: float | None,
-        cloud_temperature: float | None,
-        ollama_reasoning: bool | None,
-    ) -> None:
-        if use_cloud_services is not None:
-            LLMRuntimeConfig.set_use_cloud_services(use_cloud_services)
-        if llm_provider is not None:
-            LLMRuntimeConfig.set_llm_provider(llm_provider)
-        if cloud_model is not None:
-            LLMRuntimeConfig.set_cloud_model(cloud_model)
-        if parsing_model is not None:
-            LLMRuntimeConfig.set_parsing_model(parsing_model)
-        if clinical_model is not None:
-            LLMRuntimeConfig.set_clinical_model(clinical_model)
-        if ollama_temperature is not None:
-            LLMRuntimeConfig.set_ollama_temperature(ollama_temperature)
-        if cloud_temperature is not None:
-            LLMRuntimeConfig.set_cloud_temperature(cloud_temperature)
-        if ollama_reasoning is not None:
-            LLMRuntimeConfig.set_ollama_reasoning(ollama_reasoning)
-
-    # -------------------------------------------------------------------------
-    @contextmanager
-    def runtime_override_context(
-        self,
-        *,
-        use_cloud_services: bool | None,
-        llm_provider: str | None,
-        cloud_model: str | None,
-        parsing_model: str | None,
-        clinical_model: str | None,
-        ollama_temperature: float | None,
-        cloud_temperature: float | None,
-        ollama_reasoning: bool | None,
-    ):
-        snapshot = self.capture_runtime_snapshot()
-        self.apply_runtime_overrides(
-            use_cloud_services=use_cloud_services,
-            llm_provider=llm_provider,
-            cloud_model=cloud_model,
-            parsing_model=parsing_model,
-            clinical_model=clinical_model,
-            ollama_temperature=ollama_temperature,
-            cloud_temperature=cloud_temperature,
-            ollama_reasoning=ollama_reasoning,
-        )
-        try:
-            yield
-        finally:
-            self.apply_runtime_overrides(
-                use_cloud_services=bool(snapshot["use_cloud_services"]),
-                llm_provider=str(snapshot["llm_provider"]),
-                cloud_model=str(snapshot["cloud_model"]),
-                parsing_model=str(snapshot["parsing_model"]),
-                clinical_model=str(snapshot["clinical_model"]),
-                ollama_temperature=float(snapshot["ollama_temperature"]),
-                cloud_temperature=float(snapshot["cloud_temperature"]),
-                ollama_reasoning=bool(snapshot["ollama_reasoning"]),
-            )
-
-    # -------------------------------------------------------------------------
     def generate_session_timeline(
         self,
         session_id: int,
@@ -432,23 +318,23 @@ class DataInspectionService:
             20.0,
             min(300.0, float(getattr(self.timeline_extractor, "timeout_s", 90.0)) + 20.0),
         )
-        parsing_model = self._coerce_optional_str(runtime_settings.get("parsing_model")) or self._coerce_optional_str(
+        parsing_model = coerce_optional_str(runtime_settings.get("parsing_model")) or coerce_optional_str(
             source.get("parsing_model")
         )
-        clinical_model = self._coerce_optional_str(runtime_settings.get("clinical_model")) or self._coerce_optional_str(
+        clinical_model = coerce_optional_str(runtime_settings.get("clinical_model")) or coerce_optional_str(
             source.get("clinical_model")
         )
 
         try:
-            with self.runtime_override_context(
-                use_cloud_services=self._coerce_optional_bool(runtime_settings.get("use_cloud_services")),
-                llm_provider=self._coerce_optional_str(runtime_settings.get("llm_provider")),
-                cloud_model=self._coerce_optional_str(runtime_settings.get("cloud_model")),
+            with runtime_override_context(
+                use_cloud_services=coerce_optional_bool(runtime_settings.get("use_cloud_services")),
+                llm_provider=coerce_optional_str(runtime_settings.get("llm_provider")),
+                cloud_model=coerce_optional_str(runtime_settings.get("cloud_model")),
                 parsing_model=parsing_model,
                 clinical_model=clinical_model,
-                ollama_temperature=self._coerce_optional_float(runtime_settings.get("ollama_temperature")),
-                cloud_temperature=self._coerce_optional_float(runtime_settings.get("cloud_temperature")),
-                ollama_reasoning=self._coerce_optional_bool(runtime_settings.get("ollama_reasoning")),
+                ollama_temperature=coerce_optional_float(runtime_settings.get("ollama_temperature")),
+                cloud_temperature=coerce_optional_float(runtime_settings.get("cloud_temperature")),
+                ollama_reasoning=coerce_optional_bool(runtime_settings.get("ollama_reasoning")),
             ):
                 timeline = asyncio.run(
                     asyncio.wait_for(

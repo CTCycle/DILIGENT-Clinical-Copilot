@@ -36,6 +36,7 @@ from DILIGENT.server.common.utils.patterns import (
 
 ###############################################################################
 class DrugsParser:
+    LLM_CLIENT_NOT_INITIALIZED_ERROR = "LLM client is not initialized for drug extraction"
     SCHEDULE_RE = DRUG_SCHEDULE_RE
     BULLET_RE = DRUG_BULLET_RE
     BRACKET_TRAIL_RE = DRUG_BRACKET_TRAIL_RE
@@ -43,25 +44,25 @@ class DrugsParser:
     SUSPENSION_DATE_RE = DRUG_SUSPENSION_DATE_RE
     START_DATE_RE = DRUG_START_DATE_RE
     ROUTE_PATTERNS: tuple[tuple[str, re.Pattern[str]], ...] = (
-        ("oral", re.compile(r"\b(?:po|p\.?o\.?|per\s+os|orale|oral)\b", re.IGNORECASE)),
+        ("oral", re.compile(r"\b(?:p\.?o\.?|per\s+os|oral(?:e)?)\b", re.IGNORECASE)),
         (
             "iv",
             re.compile(
-                r"\b(?:iv|i\.?v\.?|ev|e\.?v\.?|endovenos[ao]?|intraven(?:ous|osa)?)\b",
+                r"\b(?:i\.?v\.?|e\.?v\.?|endovenos[ao]?|intraven(?:ous|osa)?)\b",
                 re.IGNORECASE,
             ),
         ),
         (
             "im",
             re.compile(
-                r"\b(?:im|i\.?m\.?|intramuscolar[ei]|intramuscular)\b",
+                r"\b(?:i\.?m\.?|intramuscolar[ei]|intramuscular)\b",
                 re.IGNORECASE,
             ),
         ),
         (
             "sc",
             re.compile(
-                r"\b(?:sc|s\.?c\.?|sottocutane[ao]?|subcut(?:aneous|anea)?)\b",
+                r"\b(?:s\.?c\.?|sottocutane[ao]?|subcut(?:aneous|anea)?)\b",
                 re.IGNORECASE,
             ),
         ),
@@ -228,7 +229,7 @@ class DrugsParser:
         if fallback_chunks:
             await self.ensure_client()
             if self.client is None:
-                raise RuntimeError("LLM client is not initialized for drug extraction")
+                raise RuntimeError(self.LLM_CLIENT_NOT_INITIALIZED_ERROR)
             try:
                 fallback_start = processed_chunks / total_chunks
                 fallback_span = len(fallback_chunks) / total_chunks
@@ -276,7 +277,7 @@ class DrugsParser:
         progress_span: float = 1.0,
     ) -> PatientDrugs:
         if self.client is None:
-            raise RuntimeError("LLM client is not initialized for drug extraction")
+            raise RuntimeError(self.LLM_CLIENT_NOT_INITIALIZED_ERROR)
 
         if not lines:
             return PatientDrugs(entries=[])
@@ -424,7 +425,7 @@ class DrugsParser:
 
         await self.ensure_client()
         if self.client is None:
-            raise RuntimeError("LLM client is not initialized for drug extraction")
+            raise RuntimeError(self.LLM_CLIENT_NOT_INITIALIZED_ERROR)
 
         cleaned_anamnesis = self.clean_text(anamnesis)
         chunks = self.chunk_anamnesis_text(cleaned_anamnesis)
