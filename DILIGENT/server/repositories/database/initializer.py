@@ -6,7 +6,6 @@ import urllib.parse
 import sqlalchemy
 from sqlalchemy import column, literal, select, table
 from sqlalchemy.exc import SQLAlchemyError
-from sqlalchemy import inspect
 from sqlalchemy.orm import sessionmaker
 from sqlalchemy.sql.elements import TextClause
 
@@ -82,31 +81,8 @@ def build_postgres_create_database_sql(
 
 # -----------------------------------------------------------------------------
 def initialize_sqlite_database(settings: DatabaseSettings) -> None:
-    db_path = os.path.join(RESOURCES_PATH, DATABASE_FILENAME)
-    file_exists = os.path.exists(db_path)
-    if file_exists and sqlite_schema_is_legacy(db_path):
-        os.remove(db_path)
-        logger.warning("Removed legacy SQLite database at %s", db_path)
     repository = SQLiteRepository(settings)
     logger.info("Initialized SQLite database schema at %s", repository.db_path)
-
-
-# -----------------------------------------------------------------------------
-def sqlite_schema_is_legacy(db_path: str) -> bool:
-    engine = sqlalchemy.create_engine(f"sqlite:///{db_path}", echo=False, future=True)
-    try:
-        inspector = inspect(engine)
-        if not inspector.has_table("patients"):
-            return True
-        session_columns = {
-            str(item.get("name")) for item in inspector.get_columns("clinical_sessions")
-        }
-        patient_columns = {
-            str(item.get("name")) for item in inspector.get_columns("patients")
-        }
-        return "patient_id" not in session_columns or "image_blob" not in patient_columns
-    finally:
-        engine.dispose()
 
 
 # -----------------------------------------------------------------------------

@@ -48,6 +48,15 @@ Provider key storage contract:
   - PostgreSQL: only during explicit DB initialization.
 - Provider keys are not provided through environment variables in the active model.
 
+Database compatibility rule:
+- Existing databases are not upgraded in place across schema-cleanup releases.
+- Recreate the schema (or remove/recreate local SQLite DB files) when upgrading across this cleanup.
+- Startup no longer probes legacy SQLite layouts for automatic salvage/deletion.
+
+Ollama compatibility rule:
+- Supported Ollama installations must expose the chat-capable `/api/chat` contract.
+- The backend no longer retries legacy `/api/generate` compatibility paths.
+
 ## 4. Local mode
 
 1. Activate profile:

@@ -72,7 +72,7 @@ class ClinicalSession(Base):
     )
     session_timestamp: Mapped[datetime | None] = mapped_column(DateTime)
     hepatic_pattern: Mapped[str | None] = mapped_column(String)
-    parsing_model: Mapped[str | None] = mapped_column(String)
+    text_extraction_model: Mapped[str | None] = mapped_column(String)
     clinical_model: Mapped[str | None] = mapped_column(String)
     total_duration: Mapped[float | None] = mapped_column(Float)
     session_status: Mapped[str | None] = mapped_column(String, nullable=True)

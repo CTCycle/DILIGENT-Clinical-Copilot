@@ -37,7 +37,7 @@ from DILIGENT.server.domain.jobs import (
 )
 from DILIGENT.server.configurations.startup import server_settings
 from DILIGENT.server.configurations.llm_configs import LLMRuntimeConfig
-from DILIGENT.server.repositories.serialization.data_core import DataSerializer
+from DILIGENT.server.repositories.serialization.data import DataSerializer
 from DILIGENT.server.repositories.serialization.model_configs import ModelConfigSerializer
 from DILIGENT.server.services.jobs import JobManager, job_manager as default_job_manager
 from DILIGENT.server.common.utils.logger import logger
@@ -155,7 +155,7 @@ class ClinicalSessionService(ClinicalSessionFormattingMixin):
         parser_provider, parser_model = LLMRuntimeConfig.resolve_provider_and_model("parser")
         clinical_provider, clinical_model_resolved = LLMRuntimeConfig.resolve_provider_and_model("clinical")
         logger.info(
-            "Resolved LLM runtime from persisted model config: cloud=%s provider=%s cloud_model=%s parsing_provider=%s parsing_model=%s clinical_provider=%s clinical_model=%s ollama_temperature=%.2f cloud_temperature=%.2f reasoning=%s",
+            "Resolved LLM runtime from persisted model config: cloud=%s provider=%s cloud_model=%s text_extraction_provider=%s text_extraction_model=%s clinical_provider=%s clinical_model=%s ollama_temperature=%.2f cloud_temperature=%.2f reasoning=%s",
             LLMRuntimeConfig.is_cloud_enabled(),
             LLMRuntimeConfig.get_llm_provider(),
             LLMRuntimeConfig.get_cloud_model(),
@@ -180,7 +180,7 @@ class ClinicalSessionService(ClinicalSessionFormattingMixin):
         use_cloud_services: bool | None,
         llm_provider: str | None,
         cloud_model: str | None,
-        parsing_model: str | None,
+        text_extraction_model: str | None,
         clinical_model: str | None,
         ollama_temperature: float | None,
         cloud_temperature: float | None,
@@ -190,7 +190,7 @@ class ClinicalSessionService(ClinicalSessionFormattingMixin):
             use_cloud_services=use_cloud_services,
             llm_provider=llm_provider,
             cloud_model=cloud_model,
-            parsing_model=parsing_model,
+            text_extraction_model=text_extraction_model,
             clinical_model=clinical_model,
             ollama_temperature=ollama_temperature,
             cloud_temperature=cloud_temperature,
@@ -204,7 +204,7 @@ class ClinicalSessionService(ClinicalSessionFormattingMixin):
         use_cloud_services: bool | None,
         llm_provider: str | None,
         cloud_model: str | None,
-        parsing_model: str | None,
+        text_extraction_model: str | None,
         clinical_model: str | None,
         ollama_temperature: float | None,
         cloud_temperature: float | None,
@@ -214,7 +214,7 @@ class ClinicalSessionService(ClinicalSessionFormattingMixin):
             use_cloud_services=use_cloud_services,
             llm_provider=llm_provider,
             cloud_model=cloud_model,
-            parsing_model=parsing_model,
+            text_extraction_model=text_extraction_model,
             clinical_model=clinical_model,
             ollama_temperature=ollama_temperature,
             cloud_temperature=cloud_temperature,
@@ -947,7 +947,7 @@ class ClinicalSessionService(ClinicalSessionFormattingMixin):
                 "use_cloud_services": LLMRuntimeConfig.is_cloud_enabled(),
                 "llm_provider": LLMRuntimeConfig.get_llm_provider(),
                 "cloud_model": LLMRuntimeConfig.get_cloud_model(),
-                "parsing_model": LLMRuntimeConfig.get_parsing_model(),
+                "text_extraction_model": LLMRuntimeConfig.get_text_extraction_model(),
                 "clinical_model": LLMRuntimeConfig.get_clinical_model(),
                 "ollama_temperature": LLMRuntimeConfig.get_ollama_temperature(),
                 "cloud_temperature": LLMRuntimeConfig.get_cloud_temperature(),
@@ -967,7 +967,7 @@ class ClinicalSessionService(ClinicalSessionFormattingMixin):
                 "anamnesis": payload.anamnesis,
                 "drugs": payload.drugs,
                 "laboratory_analysis": payload.laboratory_analysis,
-                "parsing_model": getattr(self.drugs_parser, "model", None),
+                "text_extraction_model": getattr(self.drugs_parser, "model", None),
                 "clinical_model": getattr(clinical_session, "llm_model", None),
                 "total_duration": global_elapsed,
                 "final_report": final_report,

@@ -36,7 +36,7 @@ class ModelConfigUpdateRequest(BaseModel):
     cloud_model: str | None = None
     text_extraction_model: str | None = Field(
         default=None,
-        validation_alias=AliasChoices("text_extraction_model", "parsing_model"),
+        validation_alias=AliasChoices("text_extraction_model", "text_extraction_model"),
     )
     clinical_model: str | None = None
     ollama_temperature: float | None = None

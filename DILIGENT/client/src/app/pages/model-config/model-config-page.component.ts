@@ -41,7 +41,7 @@ type DraftRuntimeConfig = {
   provider: CloudProvider;
   cloudModel: string | null;
   clinicalModel: string;
-  parsingModel: string;
+  textExtractionModel: string;
   temperature: number;
 };
 
@@ -136,7 +136,7 @@ function resolveDraftFromSettings(runtimeSettings: RuntimeSettings): DraftRuntim
     provider,
     cloudModel,
     clinicalModel: runtimeSettings.clinicalModel,
-    parsingModel: runtimeSettings.parsingModel,
+    textExtractionModel: runtimeSettings.textExtractionModel,
     temperature: runtimeSettings.temperature,
   };
 }
@@ -221,7 +221,7 @@ export class ModelConfigPageComponent implements OnInit {
     if (draft.useCloudServices) return [];
     const modelMap = new Map(this.localModels().map((model) => [model.name, model]));
     const missing = new Set<string>();
-    for (const modelName of [draft.clinicalModel, draft.parsingModel]) {
+    for (const modelName of [draft.clinicalModel, draft.textExtractionModel]) {
       const candidate = modelName.trim();
       if (!candidate) continue;
       const localModel = modelMap.get(candidate);
@@ -250,7 +250,7 @@ export class ModelConfigPageComponent implements OnInit {
       this.draftProvider() !== savedProvider ||
       (this.draftCloudModel() || '') !== (savedCloudModel || '') ||
       draft.clinicalModel !== settings.clinicalModel ||
-      draft.parsingModel !== settings.parsingModel ||
+      draft.textExtractionModel !== settings.textExtractionModel ||
       draft.temperature !== settings.temperature;
 
     return (
@@ -318,7 +318,7 @@ export class ModelConfigPageComponent implements OnInit {
     this.draftConfig.update((previous) => ({
       ...previous,
       clinicalModel: role === 'clinical' ? modelName : previous.clinicalModel,
-      parsingModel: role === 'text_extraction' ? modelName : previous.parsingModel,
+      textExtractionModel: role === 'text_extraction' ? modelName : previous.textExtractionModel,
     }));
   }
 
@@ -368,7 +368,7 @@ export class ModelConfigPageComponent implements OnInit {
     };
     if (!draft.useCloudServices) {
       patch.clinical_model = draft.clinicalModel || null;
-      patch.text_extraction_model = draft.parsingModel || null;
+      patch.text_extraction_model = draft.textExtractionModel || null;
     }
     await this.persistConfigPatch(
       patch,

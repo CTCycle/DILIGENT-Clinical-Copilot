@@ -32,7 +32,7 @@ def extract_issue_codes(payload: dict) -> set[str]:
 
 
 def test_clinical_requires_sections(api_context: APIRequestContext):
-    response = api_context.post("/clinical", data={"name": "Test"})
+    response = api_context.post("/api/clinical", data={"name": "Test"})
     assert response.status == 422
 
     codes = extract_issue_codes(response.json())
@@ -42,14 +42,14 @@ def test_clinical_requires_sections(api_context: APIRequestContext):
 
 def test_clinical_rejects_blank_sections(api_context: APIRequestContext):
     response = api_context.post(
-        "/clinical",
+        "/api/clinical",
         data={"anamnesis": "  \n", "drugs": "   ", "visit_date": None},
     )
     assert response.status == 422
 
 
 def test_clinical_accepts_minimal_payload(api_context: APIRequestContext):
-    response = api_context.post("/clinical", data=build_minimal_payload())
+    response = api_context.post("/api/clinical", data=build_minimal_payload())
     assert response.status == 202
 
     text = response.text()
@@ -63,7 +63,7 @@ def test_clinical_accepts_minimal_payload(api_context: APIRequestContext):
 def test_clinical_accepts_visit_date_dict(api_context: APIRequestContext):
     payload = build_minimal_payload()
     payload["visit_date"] = {"day": 15, "month": 1, "year": 2024}
-    response = api_context.post("/clinical", data=payload)
+    response = api_context.post("/api/clinical", data=payload)
     assert response.status == 202
 
     text = response.text()
@@ -78,7 +78,7 @@ def test_clinical_requires_therapy_drugs_even_with_anamnesis(
     payload["anamnesis"] = "History mentions aspirin."
     payload["drugs"] = "   "
 
-    response = api_context.post("/clinical", data=payload)
+    response = api_context.post("/api/clinical", data=payload)
     assert response.status == 422
 
     codes = extract_issue_codes(response.json())
@@ -89,7 +89,7 @@ def test_clinical_missing_labs_blocks_by_default(api_context: APIRequestContext)
     payload = build_minimal_payload()
     payload["laboratory_analysis"] = "Labs unavailable."
 
-    response = api_context.post("/clinical", data=payload)
+    response = api_context.post("/api/clinical", data=payload)
     assert response.status == 422
 
     codes = extract_issue_codes(response.json())
@@ -100,7 +100,7 @@ def test_clinical_missing_visit_date_blocks(api_context: APIRequestContext):
     payload = build_minimal_payload()
     payload["visit_date"] = None
 
-    response = api_context.post("/clinical", data=payload)
+    response = api_context.post("/api/clinical", data=payload)
     assert response.status == 422
     codes = extract_issue_codes(response.json())
     assert "missing_visit_date" in codes
@@ -110,7 +110,7 @@ def test_clinical_missing_anamnesis_blocks(api_context: APIRequestContext):
     payload = build_minimal_payload()
     payload["anamnesis"] = None
 
-    response = api_context.post("/clinical", data=payload)
+    response = api_context.post("/api/clinical", data=payload)
     assert response.status == 422
     codes = extract_issue_codes(response.json())
     assert "missing_anamnesis" in codes
@@ -120,7 +120,7 @@ def test_clinical_missing_timing_blocks(api_context: APIRequestContext):
     payload = build_minimal_payload()
     payload["drugs"] = "Zetamycin"
 
-    response = api_context.post("/clinical", data=payload)
+    response = api_context.post("/api/clinical", data=payload)
     assert response.status == 422
     codes = extract_issue_codes(response.json())
     assert "missing_timed_drug" in codes
@@ -137,7 +137,7 @@ def test_clinical_report_includes_estimated_rucam(api_context: APIRequestContext
         "Lab 2025-01-20: ALT 150 U/L (ULN 40), ALP 120 U/L (ULN 120)"
     )
 
-    response = api_context.post("/clinical", data=payload)
+    response = api_context.post("/api/clinical", data=payload)
     assert response.status == 202
     text = response.text()
     assert "RUCAM" in text
@@ -150,7 +150,7 @@ def test_clinical_endpoint_stable_without_usable_longitudinal_labs(
     payload["anamnesis"] = "Patient reports fatigue but no explicit longitudinal labs."
     payload["laboratory_analysis"] = "No measurable values."
 
-    response = api_context.post("/clinical", data=payload)
+    response = api_context.post("/api/clinical", data=payload)
     assert response.status == 422
     codes = extract_issue_codes(response.json())
     assert "missing_hepatotoxicity_inputs" in codes
@@ -168,7 +168,7 @@ def test_clinical_preserves_italian_output_language(api_context: APIRequestConte
         "use_rag": False,
         "has_hepatic_diseases": False,
     }
-    response = api_context.post("/clinical", data=payload)
+    response = api_context.post("/api/clinical", data=payload)
     assert response.status == 202
     text = response.text()
     assert "# Sintesi Visita Clinica" in text

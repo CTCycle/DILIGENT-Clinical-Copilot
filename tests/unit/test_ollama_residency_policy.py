@@ -19,7 +19,7 @@ def test_evaluate_dual_residency_plan_checks_ram_and_vram(monkeypatch) -> None:
     )
     monkeypatch.setattr(
         LLMRuntimeConfig,
-        "get_parsing_model",
+        "get_text_extraction_model",
         classmethod(lambda cls: "text-model"),
     )
     monkeypatch.setattr(

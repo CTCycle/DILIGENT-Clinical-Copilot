@@ -2,7 +2,7 @@ import { ClinicalFormState, CloudProvider, RuntimeSettings } from "./models/type
 
 export const API_BASE_URL = "/api";
 
-export const PARSING_MODEL_CHOICES = [
+export const TEXT_EXTRACTION_MODEL_CHOICES = [
   "qwen3:1.7b",
   "qwen3:8b",
   "qwen3:14b",
@@ -48,7 +48,7 @@ export const CLOUD_PROVIDERS: CloudProvider[] = Object.keys(CLOUD_MODEL_CHOICES)
 );
 
 export type LLMRuntimeDefaults = {
-  parsing_model: string;
+  text_extraction_model: string;
   clinical_model: string;
   llm_provider: CloudProvider;
   cloud_model: string;
@@ -59,7 +59,7 @@ export type LLMRuntimeDefaults = {
 };
 
 export const LLM_RUNTIME_DEFAULTS: Readonly<LLMRuntimeDefaults> = {
-  parsing_model: "qwen3:1.7b",
+  text_extraction_model: "qwen3:1.7b",
   clinical_model: "gpt-oss:20b",
   llm_provider: "openai",
   cloud_model: "gpt-4o-mini",
@@ -104,7 +104,7 @@ export const DEFAULT_SETTINGS: RuntimeSettings = {
     DEFAULT_PROVIDER,
     LLM_RUNTIME_DEFAULTS.cloud_model,
   ),
-  parsingModel: LLM_RUNTIME_DEFAULTS.parsing_model,
+  textExtractionModel: LLM_RUNTIME_DEFAULTS.text_extraction_model,
   clinicalModel: LLM_RUNTIME_DEFAULTS.clinical_model,
   temperature: LLM_RUNTIME_DEFAULTS.cloud_temperature,
   reasoning: LLM_RUNTIME_DEFAULTS.ollama_reasoning,

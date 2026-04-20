@@ -29,7 +29,7 @@ LOCAL_MODEL_CATALOG = cast(
 )
 LOCAL_MODEL_CATALOG_NAMES = {name for name, _, _ in LOCAL_MODEL_CATALOG}
 
-
+###############################################################################
 class ModelConfigSnapshotStore(Protocol):
     def load_snapshot(self) -> ModelConfigSnapshot: ...
     def save_snapshot(
@@ -207,7 +207,7 @@ class ModelConfigService:
             updates["clinical_model"] = self.normalize_optional_text(LLMRuntimeConfig.get_clinical_model())
         if snapshot.text_extraction_model is None:
             updates["text_extraction_model"] = self.normalize_optional_text(
-                LLMRuntimeConfig.get_parsing_model()
+                LLMRuntimeConfig.get_text_extraction_model()
             )
         if snapshot.cloud_provider is None:
             updates["cloud_provider"] = runtime_provider
@@ -297,7 +297,7 @@ class ModelConfigService:
     # -------------------------------------------------------------------------
     def apply_runtime_snapshot(self, snapshot: ModelConfigSnapshot) -> None:
         if snapshot.text_extraction_model:
-            LLMRuntimeConfig.set_parsing_model(snapshot.text_extraction_model)
+            LLMRuntimeConfig.set_text_extraction_model(snapshot.text_extraction_model)
         if snapshot.clinical_model:
             LLMRuntimeConfig.set_clinical_model(snapshot.clinical_model)
         LLMRuntimeConfig.set_ollama_temperature(snapshot.ollama_temperature)

@@ -33,23 +33,21 @@ Each job tracks:
 ## 4. Active job types and endpoints
 
 - `clinical`
-  - Start: `POST /clinical/jobs`
-  - Poll/cancel: `GET|DELETE /clinical/jobs/{job_id}`
+  - Start: `POST /api/clinical/jobs`
+  - Poll/cancel: `GET|DELETE /api/clinical/jobs/{job_id}`
 - `ollama_pull`
-  - Start: `POST /models/pull/jobs`
-  - Poll/cancel: `GET|DELETE /models/jobs/{job_id}`
+  - Start: `POST /api/models/pull/jobs`
+  - Poll/cancel: `GET|DELETE /api/models/jobs/{job_id}`
 - `rxnav_update`
-  - Start: `POST /inspection/rxnav/jobs`
-  - Poll/cancel: `GET|DELETE /inspection/rxnav/jobs/{job_id}`
+  - Start: `POST /api/inspection/rxnav/jobs`
+  - Poll/cancel: `GET|DELETE /api/inspection/rxnav/jobs/{job_id}`
 - `livertox_update`
-  - Start: `POST /inspection/livertox/jobs`
-  - Poll/cancel: `GET|DELETE /inspection/livertox/jobs/{job_id}`
+  - Start: `POST /api/inspection/livertox/jobs`
+  - Poll/cancel: `GET|DELETE /api/inspection/livertox/jobs/{job_id}`
 - `rag_update`
-  - Start: `POST /inspection/rag/jobs`
-  - Poll: `GET /inspection/rag/jobs/{job_id}`
-  - Cancel: `POST /inspection/rag/jobs/{job_id}/cancel`
-
-Equivalent `/api/*` prefixed routes are always available.
+  - Start: `POST /api/inspection/rag/jobs`
+  - Poll: `GET /api/inspection/rag/jobs/{job_id}`
+  - Cancel: `POST /api/inspection/rag/jobs/{job_id}/cancel`
 
 ## 5. Polling pattern
 

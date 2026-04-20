@@ -6,8 +6,16 @@ warnings.filterwarnings("ignore", category=FutureWarning)
 
 from fastapi import FastAPI
 
-from DILIGENT.server.configurations.startup import initialize_settings, server_settings
+from DILIGENT.server.configurations.startup import initialize_settings
 from DILIGENT.server.configurations.startup import tauri_mode_enabled
+from DILIGENT.server.common.constants import (
+    FASTAPI_DESCRIPTION,
+    FASTAPI_DOCS_URL,
+    FASTAPI_OPENAPI_URL,
+    FASTAPI_REDOC_URL,
+    FASTAPI_TITLE,
+    FASTAPI_VERSION,
+)
 from DILIGENT.server.api.access_keys import router as access_keys_router
 from DILIGENT.server.api.data_inspection import router as data_inspection_router
 from DILIGENT.server.api.model_config import router as model_config_router
@@ -24,12 +32,12 @@ from DILIGENT.server.repositories.database.initializer import initialize_databas
 initialize_settings()
 
 app = FastAPI(
-    title=server_settings.fastapi.title,
-    version=server_settings.fastapi.version,
-    description=server_settings.fastapi.description,
-    docs_url="/docs",
-    redoc_url="/redoc",
-    openapi_url="/openapi.json",
+    title=FASTAPI_TITLE,
+    version=FASTAPI_VERSION,
+    description=FASTAPI_DESCRIPTION,
+    docs_url=FASTAPI_DOCS_URL,
+    redoc_url=FASTAPI_REDOC_URL,
+    openapi_url=FASTAPI_OPENAPI_URL,
 )
 register_error_handling(app)
 
@@ -43,8 +51,7 @@ routers = [
 ]
 
 for router in routers:
-    app.include_router(router)
-    app.include_router(router, prefix="/api", include_in_schema=False)
+    app.include_router(router, prefix="/api")
 
 
 @app.on_event("startup")

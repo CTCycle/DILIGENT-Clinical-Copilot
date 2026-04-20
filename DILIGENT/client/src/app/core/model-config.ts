@@ -63,13 +63,13 @@ export function buildRuntimeSettingsFromConfig(
     cloudChoices,
   );
   const resolvedClinicalModel = payload.clinical_model || DEFAULT_SETTINGS.clinicalModel;
-  const resolvedParsingModel = payload.text_extraction_model || DEFAULT_SETTINGS.parsingModel;
+  const resolvedtextExtractionModel = payload.text_extraction_model || DEFAULT_SETTINGS.textExtractionModel;
   return {
     ...previous,
     useCloudServices: payload.use_cloud_services,
     provider,
     cloudModel,
-    parsingModel: resolvedParsingModel,
+    textExtractionModel: resolvedtextExtractionModel,
     clinicalModel: resolvedClinicalModel,
     temperature: payload.cloud_temperature ?? payload.ollama_temperature,
     reasoning: payload.ollama_reasoning,

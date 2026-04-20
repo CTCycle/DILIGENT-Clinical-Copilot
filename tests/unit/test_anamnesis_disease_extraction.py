@@ -14,7 +14,7 @@ from DILIGENT.server.domain.clinical import (
     PatientDiseaseContext,
     PatientDrugs,
 )
-from DILIGENT.server.api.session import ClinicalSessionEndpoint
+from DILIGENT.server.services.session_service import ClinicalSessionService
 from DILIGENT.server.services.clinical.disease import DiseaseExtractor
 
 
@@ -138,7 +138,7 @@ def test_build_structured_clinical_context_includes_disease_timeline() -> None:
         classification="mixed",
     )
 
-    context = ClinicalSessionEndpoint.build_structured_clinical_context(
+    context = ClinicalSessionService.build_structured_clinical_context(
         payload,
         therapy_drugs=therapy_drugs,
         anamnesis_drugs=anamnesis_drugs,

@@ -89,7 +89,7 @@ def build_failed_session_payload(
         ),
         "llm_provider": LLMRuntimeConfig.get_llm_provider(),
         "cloud_model": LLMRuntimeConfig.get_cloud_model(),
-        "parsing_model": LLMRuntimeConfig.get_parsing_model(),
+        "text_extraction_model": LLMRuntimeConfig.get_text_extraction_model(),
         "clinical_model": LLMRuntimeConfig.get_clinical_model(),
         "ollama_temperature": (
             LLMRuntimeConfig.get_ollama_temperature()
@@ -110,7 +110,7 @@ def build_failed_session_payload(
         "anamnesis": payload.anamnesis,
         "drugs": payload.drugs,
         "laboratory_analysis": payload.laboratory_analysis,
-        "parsing_model": LLMRuntimeConfig.get_parsing_model(),
+        "text_extraction_model": LLMRuntimeConfig.get_text_extraction_model(),
         "clinical_model": LLMRuntimeConfig.get_clinical_model(),
         "total_duration": elapsed_seconds,
         "final_report": None,

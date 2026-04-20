@@ -5,7 +5,7 @@ from pydantic import BaseModel, ConfigDict
 
 class LLMRuntimeState(BaseModel):
     model_config = ConfigDict(frozen=False)
-    parsing_model: str = ""
+    text_extraction_model: str = ""
     clinical_model: str = ""
     llm_provider: str = ""
     cloud_model: str = ""

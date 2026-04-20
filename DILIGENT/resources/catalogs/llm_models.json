@@ -1,5 +1,5 @@
 {
-  "parsing_model_choices": [
+  "text_extraction_model_choices": [
     "qwen3:1.7b",
     "qwen3:8b",
     "qwen3:14b",
