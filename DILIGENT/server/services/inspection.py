@@ -25,7 +25,6 @@ from DILIGENT.server.services.inspection_runtime import (
     coerce_optional_bool,
     coerce_optional_float,
     coerce_optional_str,
-    runtime_override_context,
 )
 from DILIGENT.server.services.updater.embeddings import RagEmbeddingUpdater
 from DILIGENT.server.services.updater.dailymed import DailyMedLabelUpdater
@@ -324,27 +323,28 @@ class DataInspectionService:
         clinical_model = coerce_optional_str(runtime_settings.get("clinical_model")) or coerce_optional_str(
             source.get("clinical_model")
         )
+        requested_runtime_settings = {
+            "use_cloud_services": coerce_optional_bool(runtime_settings.get("use_cloud_services")),
+            "llm_provider": coerce_optional_str(runtime_settings.get("llm_provider")),
+            "cloud_model": coerce_optional_str(runtime_settings.get("cloud_model")),
+            "text_extraction_model": text_extraction_model,
+            "clinical_model": clinical_model,
+            "ollama_temperature": coerce_optional_float(runtime_settings.get("ollama_temperature")),
+            "cloud_temperature": coerce_optional_float(runtime_settings.get("cloud_temperature")),
+            "ollama_reasoning": coerce_optional_bool(runtime_settings.get("ollama_reasoning")),
+        }
 
         try:
-            with runtime_override_context(
-                use_cloud_services=coerce_optional_bool(runtime_settings.get("use_cloud_services")),
-                llm_provider=coerce_optional_str(runtime_settings.get("llm_provider")),
-                cloud_model=coerce_optional_str(runtime_settings.get("cloud_model")),
-                text_extraction_model=text_extraction_model,
-                clinical_model=clinical_model,
-                ollama_temperature=coerce_optional_float(runtime_settings.get("ollama_temperature")),
-                cloud_temperature=coerce_optional_float(runtime_settings.get("cloud_temperature")),
-                ollama_reasoning=coerce_optional_bool(runtime_settings.get("ollama_reasoning")),
-            ):
-                timeline = asyncio.run(
-                    asyncio.wait_for(
-                        self.timeline_extractor.extract_timeline(
-                            session_id=session_id,
-                            source_payload=source,
-                        ),
-                        timeout=timeline_timeout_s,
-                    )
+            timeline = asyncio.run(
+                asyncio.wait_for(
+                    self.timeline_extractor.extract_timeline(
+                        session_id=session_id,
+                        source_payload=source,
+                        runtime_settings=requested_runtime_settings,
+                    ),
+                    timeout=timeline_timeout_s,
                 )
+            )
         except TimeoutError as exc:
             raise RuntimeError(
                 f"Timeline generation timed out after {int(timeline_timeout_s)}s"
@@ -353,14 +353,46 @@ class DataInspectionService:
             raise RuntimeError("Timeline generation failed") from exc
 
         session_payload["runtime_settings"] = {
-            "use_cloud_services": LLMRuntimeConfig.is_cloud_enabled(),
-            "llm_provider": LLMRuntimeConfig.get_llm_provider(),
-            "cloud_model": LLMRuntimeConfig.get_cloud_model(),
-            "text_extraction_model": LLMRuntimeConfig.get_text_extraction_model(),
-            "clinical_model": LLMRuntimeConfig.get_clinical_model(),
-            "ollama_temperature": LLMRuntimeConfig.get_ollama_temperature(),
-            "cloud_temperature": LLMRuntimeConfig.get_cloud_temperature(),
-            "ollama_reasoning": LLMRuntimeConfig.is_ollama_reasoning_enabled(),
+            "use_cloud_services": (
+                requested_runtime_settings["use_cloud_services"]
+                if requested_runtime_settings["use_cloud_services"] is not None
+                else LLMRuntimeConfig.is_cloud_enabled()
+            ),
+            "llm_provider": (
+                requested_runtime_settings["llm_provider"]
+                if requested_runtime_settings["llm_provider"]
+                else LLMRuntimeConfig.get_llm_provider()
+            ),
+            "cloud_model": (
+                requested_runtime_settings["cloud_model"]
+                if requested_runtime_settings["cloud_model"]
+                else LLMRuntimeConfig.get_cloud_model()
+            ),
+            "text_extraction_model": (
+                requested_runtime_settings["text_extraction_model"]
+                if requested_runtime_settings["text_extraction_model"]
+                else LLMRuntimeConfig.get_text_extraction_model()
+            ),
+            "clinical_model": (
+                requested_runtime_settings["clinical_model"]
+                if requested_runtime_settings["clinical_model"]
+                else LLMRuntimeConfig.get_clinical_model()
+            ),
+            "ollama_temperature": (
+                requested_runtime_settings["ollama_temperature"]
+                if requested_runtime_settings["ollama_temperature"] is not None
+                else LLMRuntimeConfig.get_ollama_temperature()
+            ),
+            "cloud_temperature": (
+                requested_runtime_settings["cloud_temperature"]
+                if requested_runtime_settings["cloud_temperature"] is not None
+                else LLMRuntimeConfig.get_cloud_temperature()
+            ),
+            "ollama_reasoning": (
+                requested_runtime_settings["ollama_reasoning"]
+                if requested_runtime_settings["ollama_reasoning"] is not None
+                else LLMRuntimeConfig.is_ollama_reasoning_enabled()
+            ),
         }
         session_payload["patient_timeline"] = timeline.model_dump(mode="json")
         self.serializer.upsert_session_result_payload(session_id, session_payload)
