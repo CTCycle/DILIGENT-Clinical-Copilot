@@ -12,10 +12,8 @@ set "root_folder=%tests_folder%..\"
 set "runtimes_dir=%root_folder%runtimes"
 set "settings_dir=%project_folder%settings"
 
-set "python_dir=%runtimes_dir%\python"
-set "python_exe=%python_dir%\python.exe"
-set "uv_dir=%runtimes_dir%\uv"
-set "uv_exe=%uv_dir%\uv.exe"
+set "venv_dir=%runtimes_dir%\.venv"
+set "python_exe=%venv_dir%\Scripts\python.exe"
 set "nodejs_dir=%runtimes_dir%\nodejs"
 set "node_exe=%nodejs_dir%\node.exe"
 set "npm_cmd=%nodejs_dir%\npm.cmd"
@@ -37,11 +35,7 @@ REM ============================================================================
 REM == Check prerequisites
 REM ============================================================================
 if not exist "%python_exe%" (
-    echo [ERROR] Python not found. Please run DILIGENT\start_on_windows.bat first.
-    goto error
-)
-if not exist "%uv_exe%" (
-    echo [ERROR] uv not found. Please run DILIGENT\start_on_windows.bat first.
+    echo [ERROR] Runtime venv Python not found. Please run DILIGENT\start_on_windows.bat first.
     goto error
 )
 if not exist "%node_exe%" (
@@ -92,11 +86,11 @@ echo [INFO] APP_TEST_FRONTEND_URL=%APP_TEST_FRONTEND_URL%
 REM ============================================================================
 REM == Force portable runtimes (avoid global Python/npm)
 REM ============================================================================
-set "PATH=%python_dir%;%nodejs_dir%;%PATH%"
-set "PYTHONHOME=%python_dir%"
+set "PATH=%venv_dir%\Scripts;%nodejs_dir%;%PATH%"
+set "PYTHONHOME="
 set "PYTHONPATH="
 set "PYTHONNOUSERSITE=1"
-set "VIRTUAL_ENV="
+set "VIRTUAL_ENV=%venv_dir%"
 set "__PYVENV_LAUNCHER__="
 set "PYTHON=%python_exe%"
 set "npm_config_python=%python_exe%"
@@ -123,10 +117,10 @@ REM ============================================================================
 REM == Install Playwright browsers if needed
 REM ============================================================================
 echo [STEP 1/5] Checking Playwright browsers...
-"%uv_exe%" run --python "%python_exe%" python -m playwright install chromium >nul 2>&1
+"%python_exe%" -m playwright install chromium >nul 2>&1
 if %ERRORLEVEL% NEQ 0 (
     echo [INFO] Installing Playwright browsers...
-    "%uv_exe%" run --python "%python_exe%" python -m playwright install
+    "%python_exe%" -m playwright install
 )
 echo [OK] Playwright browsers ready.
 
@@ -135,7 +129,7 @@ REM == Start backend
 REM ============================================================================
 echo [STEP 2/5] Starting backend server...
 call :kill_port %FASTAPI_PORT%
-start "" /b "%uv_exe%" run --python "%python_exe%" python -m uvicorn %UVICORN_MODULE% --host %FASTAPI_HOST% --port %FASTAPI_PORT% --log-level warning
+start "" /b "%python_exe%" -m uvicorn %UVICORN_MODULE% --host %FASTAPI_HOST% --port %FASTAPI_PORT% --log-level warning
 
 REM Wait for backend to be ready
 echo [INFO] Waiting for backend to start...
@@ -186,7 +180,7 @@ echo.
 echo ============================================================================
 
 pushd "%root_folder%" >nul
-"%uv_exe%" run --python "%python_exe%" python -m pytest %UNIT_PYTEST_ARGS%
+"%python_exe%" -m pytest %UNIT_PYTEST_ARGS%
 set "unit_result=%ERRORLEVEL%"
 
 echo.
@@ -195,7 +189,7 @@ echo [STEP 5/5] Running E2E tests...
 echo.
 echo ============================================================================
 
-"%uv_exe%" run --python "%python_exe%" python -m pytest %E2E_PYTEST_ARGS%
+"%python_exe%" -m pytest %E2E_PYTEST_ARGS%
 set "e2e_result=%ERRORLEVEL%"
 
 set "test_result=0"

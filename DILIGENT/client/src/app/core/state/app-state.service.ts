@@ -9,6 +9,7 @@ export type PageId = 'dili-agent' | 'data-inspection' | 'model-config';
 export type ThemeMode = 'light' | 'dark';
 
 const DEFAULT_PAGE: PageId = 'dili-agent';
+const DILI_AGENT_PERSISTED_STATE_KEY = 'dili-agent-state-v1';
 const PAGE_PATHS: Record<PageId, string> = {
   'dili-agent': '/',
   'data-inspection': '/data',
@@ -45,6 +46,7 @@ export interface DiliAgentState {
   jobStatus: JobStatus | null;
   jobStage: string | null;
   jobStageMessage: string | null;
+  isStarting: boolean;
   isRunning: boolean;
   isPulling: boolean;
   isExpanded: boolean;
@@ -56,6 +58,14 @@ export interface AppState {
   diliAgent: DiliAgentState;
 }
 
+type PersistedDiliAgentState = {
+  settings: RuntimeSettings;
+  form: ClinicalFormState;
+  message: string;
+  jobStatus: JobStatus | null;
+  isExpanded: boolean;
+};
+
 const DEFAULT_DILI_AGENT_STATE: DiliAgentState = {
   settings: DEFAULT_SETTINGS,
   form: DEFAULT_FORM_STATE,
@@ -66,15 +76,109 @@ const DEFAULT_DILI_AGENT_STATE: DiliAgentState = {
   jobStatus: null,
   jobStage: null,
   jobStageMessage: null,
+  isStarting: false,
   isRunning: false,
   isPulling: false,
   isExpanded: false,
 };
 
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return typeof value === 'object' && value !== null;
+}
+
+function readPersistedDiliAgentState(): Partial<DiliAgentState> | null {
+  if (!('sessionStorage' in globalThis)) {
+    return null;
+  }
+
+  try {
+    const serializedState = globalThis.sessionStorage.getItem(DILI_AGENT_PERSISTED_STATE_KEY);
+    if (!serializedState) {
+      return null;
+    }
+
+    const parsedState: unknown = JSON.parse(serializedState);
+    if (!isRecord(parsedState)) {
+      return null;
+    }
+
+    const persistedState = parsedState as Partial<PersistedDiliAgentState>;
+    const settings = persistedState.settings;
+    const form = persistedState.form;
+    const message = persistedState.message;
+    const jobStatus = persistedState.jobStatus;
+    const isExpanded = persistedState.isExpanded;
+
+    if (
+      !settings ||
+      !form ||
+      typeof message !== 'string' ||
+      (jobStatus !== null &&
+        jobStatus !== 'pending' &&
+        jobStatus !== 'running' &&
+        jobStatus !== 'completed' &&
+        jobStatus !== 'failed' &&
+        jobStatus !== 'cancelled') ||
+      typeof isExpanded !== 'boolean'
+    ) {
+      return null;
+    }
+
+    return {
+      settings: {
+        ...DEFAULT_SETTINGS,
+        ...settings,
+      },
+      form: {
+        ...DEFAULT_FORM_STATE,
+        ...form,
+      },
+      message,
+      jobStatus,
+      isExpanded,
+      isRunning: false,
+      isStarting: false,
+      jobId: null,
+      jobProgress: jobStatus === 'completed' ? 100 : 0,
+      jobStage: null,
+      jobStageMessage: null,
+      exportUrl: null,
+    };
+  } catch {
+    return null;
+  }
+}
+
+function writePersistedDiliAgentState(state: DiliAgentState): void {
+  if (!('sessionStorage' in globalThis)) {
+    return;
+  }
+
+  const persistedState: PersistedDiliAgentState = {
+    settings: state.settings,
+    form: state.form,
+    message: state.message,
+    jobStatus: state.jobStatus,
+    isExpanded: state.isExpanded,
+  };
+
+  try {
+    globalThis.sessionStorage.setItem(
+      DILI_AGENT_PERSISTED_STATE_KEY,
+      JSON.stringify(persistedState),
+    );
+  } catch {
+    // keep runtime state only when browser storage is unavailable
+  }
+}
+
 const DEFAULT_APP_STATE: AppState = {
   activePage: resolvePageIdFromPath(globalThis.location?.pathname ?? '/'),
   theme: globalThis.matchMedia?.('(prefers-color-scheme: dark)')?.matches ? 'dark' : 'light',
-  diliAgent: DEFAULT_DILI_AGENT_STATE,
+  diliAgent: {
+    ...DEFAULT_DILI_AGENT_STATE,
+    ...readPersistedDiliAgentState(),
+  },
 };
 
 @Injectable({ providedIn: 'root' })
@@ -86,6 +190,10 @@ export class AppStateService {
       const theme = this.state().theme;
       document.documentElement.dataset['theme'] = theme;
       document.documentElement.style.colorScheme = theme;
+    });
+
+    effect(() => {
+      writePersistedDiliAgentState(this.state().diliAgent);
     });
 
     if (this.state().activePage !== 'model-config') {

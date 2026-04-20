@@ -103,15 +103,17 @@
                         <app-inspection-action-icon-button
                           [buttonClass]="'inspection-icon-button is-timeline'"
                           [ariaLabel]="'Patient timeline for session ' + row.session_id"
-                          [title]="'Patient timeline for session ' + row.session_id"
+                          [title]="canOpenTimeline(row) ? ('Patient timeline for session ' + row.session_id) : 'Timeline unavailable for this session'"
                           [iconPath]="'M3 12h18v2H3v-2Zm2-5h2v12H5V7Zm12 3h2v9h-2v-9Zm-6-6h2v15h-2V4Z'"
+                          [disabled]="!canOpenTimeline(row)"
                           (activated)="openPatientTimeline(row)"
                         />
                         <app-inspection-action-icon-button
                           [buttonClass]="'inspection-icon-button is-primary'"
                           [ariaLabel]="'View report for session ' + row.session_id"
-                          [title]="'View report for session ' + row.session_id"
+                          [title]="canOpenSessionReport(row) ? ('View report for session ' + row.session_id) : 'Report unavailable for this session'"
                           [iconPath]="'M12 5C7 5 2.73 8.11 1 12c1.73 3.89 6 7 11 7s9.27-3.11 11-7c-1.73-3.89-6-7-11-7Zm0 11a4 4 0 1 1 0-8 4 4 0 0 1 0 8Z'"
+                          [disabled]="!canOpenSessionReport(row)"
                           (activated)="openSessionReport(row)"
                         />
                         <app-inspection-action-icon-button
@@ -418,6 +420,7 @@
                 class="inspection-folder-input"
                 webkitdirectory
                 directory
+                aria-label="RAG documents folder picker"
                 (change)="handleRagFolderSelection($event)"
               />
             </app-inspection-catalog-toolbar>
@@ -517,7 +520,7 @@
   >
     <div class="inspection-excerpt-body">
       <div class="inspection-pager-actions" style="margin-bottom: 12px;">
-        <button class="btn btn-secondary inspection-mini-btn" type="button" (click)="regeneratePatientTimeline()" [disabled]="timelineLoading()">Regenerate</button>
+        <button class="btn btn-secondary inspection-mini-btn" type="button" (click)="regeneratePatientTimeline()" [disabled]="timelineLoading() || isTimelineRegenerationBlocked()">Regenerate</button>
         <button class="btn btn-primary inspection-mini-btn" type="button" (click)="exportTimelinePng()" [disabled]="timelineLoading() || !timelineData()">Export timeline</button>
       </div>
       @if (timelineLoading()) { <p>Loading timeline...</p> }
