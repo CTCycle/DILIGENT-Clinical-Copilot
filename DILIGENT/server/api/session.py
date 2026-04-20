@@ -6,7 +6,7 @@ from pydantic import RootModel
 
 from DILIGENT.server.domain.clinical.entities import ClinicalSessionRequest
 from DILIGENT.server.domain.jobs import JobCancelResponse, JobStartResponse, JobStatusResponse
-from DILIGENT.server.services.clinical.hepatox import HepatoxConsultation
+from DILIGENT.server.services.clinical.hepatox_core import HepatoxConsultation
 from DILIGENT.server.services.clinical.job_progress import CLINICAL_PROGRESS_MESSAGES
 from DILIGENT.server.services.clinical.preparation import ClinicalKnowledgePreparation
 from DILIGENT.server.services.jobs import job_manager
@@ -33,63 +33,6 @@ class ClinicalSessionReportResponse(RootModel[str]):
     pass
 
 
-###############################################################################
-class ClinicalSessionEndpoint:
-    def __init__(self, *, router: APIRouter, service: ClinicalSessionService) -> None:
-        self.router = router
-        self.service = service
-
-    # -------------------------------------------------------------------------
-    def __getattr__(self, name: str):
-        return getattr(self.service, name)
-
-    # -------------------------------------------------------------------------
-    def __setattr__(self, name: str, value) -> None:
-        if name in {"router", "service"}:
-            object.__setattr__(self, name, value)
-            return
-        service = self.__dict__.get("service")
-        if service is not None and hasattr(service, name):
-            setattr(service, name, value)
-            return
-        object.__setattr__(self, name, value)
-
-    # -------------------------------------------------------------------------
-    @staticmethod
-    def build_structured_clinical_context(*args, **kwargs) -> str:
-        return ClinicalSessionService.build_structured_clinical_context(*args, **kwargs)
-
-    # -------------------------------------------------------------------------
-    async def process_single_patient(self, payload, *, progress_callback=None, stop_check=None):
-        return await self.service.process_single_patient(
-            payload,
-            progress_callback=progress_callback,
-            stop_check=stop_check,
-        )
-
-    # -------------------------------------------------------------------------
-    async def start_clinical_session(
-        self,
-        request_payload: ClinicalSessionRequest = Body(...),
-    ) -> PlainTextResponse:
-        return await self.service.start_clinical_session(request_payload)
-
-    # -------------------------------------------------------------------------
-    def start_clinical_job(
-        self,
-        request_payload: ClinicalSessionRequest = Body(...),
-    ) -> JobStartResponse:
-        return self.service.start_clinical_job(request_payload)
-
-    # -------------------------------------------------------------------------
-    def get_clinical_job_status(self, job_id: str) -> JobStatusResponse:
-        return self.service.get_clinical_job_status(job_id)
-
-    # -------------------------------------------------------------------------
-    def cancel_clinical_job(self, job_id: str) -> JobCancelResponse:
-        return self.service.cancel_clinical_job(job_id)
-
-
 router = APIRouter(tags=["session"])
 service = ClinicalSessionService(
     drugs_parser=drugs_parser,
@@ -104,31 +47,30 @@ service = ClinicalSessionService(
     job_manager=job_manager,
     router=router,
 )
-endpoint = ClinicalSessionEndpoint(router=router, service=service)
 
 
 ###############################################################################
 async def start_clinical_session(
     request_payload: ClinicalSessionRequest = Body(...),
 ) -> PlainTextResponse:
-    return await endpoint.start_clinical_session(request_payload)
+    return await service.start_clinical_session(request_payload)
 
 
 ###############################################################################
 def start_clinical_job(
     request_payload: ClinicalSessionRequest = Body(...),
 ) -> JobStartResponse:
-    return endpoint.start_clinical_job(request_payload)
+    return service.start_clinical_job(request_payload)
 
 
 ###############################################################################
 def get_clinical_job_status(job_id: str) -> JobStatusResponse:
-    return endpoint.get_clinical_job_status(job_id)
+    return service.get_clinical_job_status(job_id)
 
 
 ###############################################################################
 def cancel_clinical_job(job_id: str) -> JobCancelResponse:
-    return endpoint.cancel_clinical_job(job_id)
+    return service.cancel_clinical_job(job_id)
 
 
 ###############################################################################
@@ -140,12 +82,12 @@ def report_clinical_job_progress(
     message: str | None = None,
 ) -> None:
     _ = message
-    if endpoint.job_manager.should_stop(job_id):
+    if service.job_manager.should_stop(job_id):
         raise ClinicalJobCancelled("Clinical job stop requested.")
     bounded = min(100.0, max(0.0, float(progress)))
     status_message = CLINICAL_PROGRESS_MESSAGES.get(stage, stage.replace("_", " ").strip())
-    endpoint.job_manager.update_progress(job_id, bounded)
-    endpoint.job_manager.update_result(
+    service.job_manager.update_progress(job_id, bounded)
+    service.job_manager.update_result(
         job_id,
         {
             "progress_stage": stage,
@@ -185,12 +127,10 @@ router.add_api_route(
 )
 
 __all__ = [
-    "ClinicalSessionEndpoint",
     "NarrativeBuilder",
     "ClinicalJobCancelled",
     "build_failed_session_payload",
     "cancel_clinical_job",
-    "endpoint",
     "execute_clinical_job",
     "get_clinical_job_status",
     "report_clinical_job_progress",
