@@ -61,13 +61,13 @@ class LLMRuntimeConfig:
 
     # -------------------------------------------------------------------------
     @classmethod
-    def set_parsing_model(cls, model: str) -> str:
+    def set_text_extraction_model(cls, model: str) -> str:
         value = model.strip()
         store = _runtime_store()
         with store.lock:
-            if value and value != store.state.parsing_model:
-                cls._update_state(parsing_model=value)
-            return store.state.parsing_model
+            if value and value != store.state.text_extraction_model:
+                cls._update_state(text_extraction_model=value)
+            return store.state.text_extraction_model
 
     # -------------------------------------------------------------------------
     @classmethod
@@ -170,10 +170,10 @@ class LLMRuntimeConfig:
 
     # -------------------------------------------------------------------------
     @classmethod
-    def get_parsing_model(cls) -> str:
+    def get_text_extraction_model(cls) -> str:
         store = _runtime_store()
         with store.lock:
-            return store.state.parsing_model
+            return store.state.text_extraction_model
 
     # -------------------------------------------------------------------------
     @classmethod
@@ -231,7 +231,7 @@ class LLMRuntimeConfig:
         store = _runtime_store()
         with store.lock:
             store.state = LLMRuntimeState(
-                parsing_model=defaults.parsing_model,
+                text_extraction_model=defaults.text_extraction_model,
                 clinical_model=defaults.clinical_model,
                 llm_provider=defaults.llm_provider,
                 cloud_model=defaults.cloud_model,
@@ -262,11 +262,11 @@ class LLMRuntimeConfig:
                 model = store.state.cloud_model.strip()
                 if not model:
                     model = (
-                        store.state.parsing_model
+                        store.state.text_extraction_model
                         if purpose == "parser"
                         else store.state.clinical_model
                     )
             else:
                 provider = "ollama"
-                model = store.state.parsing_model if purpose == "parser" else store.state.clinical_model
+                model = store.state.text_extraction_model if purpose == "parser" else store.state.clinical_model
             return provider, model.strip()

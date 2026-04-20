@@ -3,7 +3,8 @@ from __future__ import annotations
 from datetime import datetime
 
 from DILIGENT.server.api.model_config import ModelConfigEndpoint
-from DILIGENT.server.api.session import endpoint as clinical_endpoint
+from DILIGENT.server.api.session import router as session_router
+from DILIGENT.server.api.session import service as clinical_service
 from DILIGENT.server.configurations.llm_configs import LLMRuntimeConfig
 from DILIGENT.server.domain.model_configs import ModelConfigSnapshot
 
@@ -35,7 +36,7 @@ def test_model_config_roundtrip_preserves_cloud_selection() -> None:
             updated_at=datetime.now(),
         )
     )
-    endpoint = ModelConfigEndpoint(router=clinical_endpoint.router, serializer=serializer)
+    endpoint = ModelConfigEndpoint(router=session_router, serializer=serializer)
 
     updated = endpoint.serializer.save_snapshot(
         use_cloud_models=True,
@@ -60,11 +61,11 @@ def test_clinical_runtime_overrides_are_request_scoped() -> None:
         "provider": LLMRuntimeConfig.get_llm_provider(),
         "cloud_model": LLMRuntimeConfig.get_cloud_model(),
     }
-    with clinical_endpoint.runtime_override_context(
+    with clinical_service.runtime_override_context(
         use_cloud_services=True,
         llm_provider="openai",
         cloud_model="gpt-5.4-mini",
-        parsing_model=None,
+        text_extraction_model=None,
         clinical_model=None,
         ollama_temperature=None,
         cloud_temperature=None,

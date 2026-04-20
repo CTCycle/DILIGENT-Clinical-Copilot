@@ -161,13 +161,17 @@ def environment_snapshot_from_os_env() -> EnvironmentSnapshot:
 
 
 def _default_llm_runtime_defaults(environment: EnvironmentSnapshot) -> LLMRuntimeDefaults:
-    parsing_default = constants.PARSING_MODEL_CHOICES[0] if constants.PARSING_MODEL_CHOICES else ""
+    text_extraction_default = (
+        constants.TEXT_EXTRACTION_MODEL_CHOICES[0]
+        if constants.TEXT_EXTRACTION_MODEL_CHOICES
+        else ""
+    )
     clinical_default = constants.CLINICAL_MODEL_CHOICES[0] if constants.CLINICAL_MODEL_CHOICES else ""
     provider_default = "openai"
     provider_models = constants.CLOUD_MODEL_CHOICES.get(provider_default, [])
     cloud_default = provider_models[0] if provider_models else ""
     return LLMRuntimeDefaults(
-        parsing_model=parsing_default,
+        text_extraction_model=text_extraction_default,
         clinical_model=clinical_default,
         llm_provider=provider_default,
         cloud_model=cloud_default,
