@@ -357,15 +357,18 @@ def test_update_job_lifecycle_with_cooperative_cancel() -> None:
 class FakeTimelineExtractor:
     def __init__(self) -> None:
         self.call_count = 0
+        self.last_runtime_settings: dict[str, Any] | None = None
 
     async def extract_timeline(
         self,
         *,
         session_id: int,
         source_payload: dict[str, Any],
+        runtime_settings: dict[str, Any] | None = None,
     ) -> PatientTimeline:
         _ = source_payload
         self.call_count += 1
+        self.last_runtime_settings = runtime_settings
         return PatientTimeline(
             session_id=session_id,
             generated_at=datetime(2026, 1, 1, 12, 0),
@@ -408,6 +411,9 @@ def test_timeline_generation_persists_and_reuses_payload() -> None:
     assert generated is not None
     assert generated.events[0].title == "Therapy started"
     assert extractor.call_count == 1
+    assert extractor.last_runtime_settings is not None
+    assert "text_extraction_model" in extractor.last_runtime_settings
+    assert "clinical_model" in extractor.last_runtime_settings
 
     cached = service.get_session_timeline(session_id)
     assert cached is not None

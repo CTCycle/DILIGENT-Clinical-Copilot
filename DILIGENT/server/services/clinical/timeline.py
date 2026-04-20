@@ -7,6 +7,7 @@ from datetime import datetime, UTC
 from typing import Any
 
 from DILIGENT.server.common.utils.logger import logger
+from DILIGENT.server.common.constants import CLOUD_MODEL_CHOICES
 from DILIGENT.server.configurations.llm_configs import LLMRuntimeConfig
 from DILIGENT.server.configurations.startup import server_settings
 from DILIGENT.server.domain.patient_timeline import (
@@ -15,7 +16,7 @@ from DILIGENT.server.domain.patient_timeline import (
     PatientTimelineExtraction,
 )
 from DILIGENT.server.services.prompts import PATIENT_TIMELINE_EXTRACTION_PROMPT
-from DILIGENT.server.services.llm.providers import initialize_llm_client
+from DILIGENT.server.services.llm.providers import initialize_llm_client, select_llm_provider
 
 
 DATE_PREFIX_RE = re.compile(r"^\d{4}-\d{2}-\d{2}$")
@@ -39,35 +40,92 @@ class PatientTimelineExtractor:
         if client is None:
             self.client_provider: str | None = None
             self.runtime_revision = -1
+            self.runtime_signature: tuple[str, str] | None = None
         else:
             self.client_provider = "injected"
             self.runtime_revision = LLMRuntimeConfig.get_revision()
+            self.runtime_signature = None
 
     # -------------------------------------------------------------------------
-    async def ensure_client(self) -> None:
+    @staticmethod
+    def _coerce_optional_text(value: Any) -> str:
+        if value is None:
+            return ""
+        return str(value).strip()
+
+    # -------------------------------------------------------------------------
+    @classmethod
+    def _resolve_provider_model_from_runtime_settings(
+        cls,
+        runtime_settings: dict[str, Any] | None,
+    ) -> tuple[str, str]:
+        if runtime_settings is None:
+            return LLMRuntimeConfig.resolve_provider_and_model("parser")
+
+        use_cloud_services = bool(runtime_settings.get("use_cloud_services"))
+        text_extraction_model = cls._coerce_optional_text(
+            runtime_settings.get("text_extraction_model")
+        )
+        clinical_model = cls._coerce_optional_text(runtime_settings.get("clinical_model"))
+        cloud_model = cls._coerce_optional_text(runtime_settings.get("cloud_model"))
+        llm_provider = cls._coerce_optional_text(runtime_settings.get("llm_provider")).lower()
+        if llm_provider not in CLOUD_MODEL_CHOICES:
+            llm_provider = LLMRuntimeConfig.get_llm_provider().strip().lower()
+        if llm_provider not in CLOUD_MODEL_CHOICES:
+            llm_provider = "openai"
+
+        if use_cloud_services:
+            model = cloud_model or text_extraction_model or clinical_model
+            return llm_provider, model
+
+        return "ollama", text_extraction_model or clinical_model
+
+    # -------------------------------------------------------------------------
+    async def ensure_client(
+        self,
+        *,
+        runtime_settings: dict[str, Any] | None = None,
+    ) -> None:
         async with self.client_lock:
-            revision = LLMRuntimeConfig.get_revision()
-            provider, model = LLMRuntimeConfig.resolve_provider_and_model("parser")
+            provider, model = self._resolve_provider_model_from_runtime_settings(runtime_settings)
+            revision = LLMRuntimeConfig.get_revision() if runtime_settings is None else -1
+            signature = (provider, model)
             if self.client_provider == "injected" and self.client is not None:
                 self.model = model
                 self.runtime_revision = revision
+                self.runtime_signature = signature
                 return
             needs_refresh = (
                 self.client is None
                 or self.client_provider != provider
-                or self.runtime_revision != revision
+                or (
+                    runtime_settings is None
+                    and self.runtime_revision != revision
+                )
+                or (
+                    runtime_settings is not None
+                    and self.runtime_signature != signature
+                )
             )
             if needs_refresh:
                 if self.client is not None:
                     with contextlib.suppress(Exception):
                         await self.client.close()
-                self.client = initialize_llm_client(
-                    purpose="parser",
-                    timeout_s=self.timeout_s,
-                )
+                if runtime_settings is None:
+                    self.client = initialize_llm_client(
+                        purpose="parser",
+                        timeout_s=self.timeout_s,
+                    )
+                else:
+                    self.client = select_llm_provider(
+                        provider=provider,
+                        timeout_s=self.timeout_s,
+                        default_model=model,
+                    )
                 self.client_provider = provider
                 self.extraction_retry_attempts = 4 if provider in {"openai", "gemini"} else 2
             self.runtime_revision = revision
+            self.runtime_signature = signature
             self.model = model
             if self.client is not None and model and hasattr(self.client, "default_model"):
                 self.client.default_model = model  # type: ignore[attr-defined]
@@ -136,8 +194,9 @@ class PatientTimelineExtractor:
         *,
         session_id: int,
         source_payload: dict[str, Any],
+        runtime_settings: dict[str, Any] | None = None,
     ) -> PatientTimeline:
-        await self.ensure_client()
+        await self.ensure_client(runtime_settings=runtime_settings)
         if self.client is None:
             raise RuntimeError("LLM client is not initialized for timeline extraction")
 
