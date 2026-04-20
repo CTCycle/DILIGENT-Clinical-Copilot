@@ -21,6 +21,11 @@ class FakeStructuredClient:
         return schema(entries=[])
 
 
+class AlwaysFailingStructuredClient:
+    async def llm_structured_call(self, **kwargs: Any) -> PatientDrugs:
+        raise RuntimeError("simulated llm failure")
+
+
 def test_extract_drugs_from_anamnesis_sets_historical_tags() -> None:
     fake_client = FakeStructuredClient(
         [
@@ -114,3 +119,14 @@ def test_extract_drugs_from_anamnesis_filters_non_drug_fragments() -> None:
     )
 
     assert [entry.name for entry in parsed.entries] == ["Pemetrexed", "Benziodiazepine"]
+
+
+def test_extract_drugs_from_anamnesis_llm_failure_uses_rule_fallback() -> None:
+    parser = DrugsParser(client=AlwaysFailingStructuredClient())
+    anamnesis = "Xanax 0,5 mg cpr sospesa dal 10/02/2024"
+
+    parsed = asyncio.run(parser.extract_drugs_from_anamnesis(anamnesis))
+
+    assert [entry.name for entry in parsed.entries] == ["Xanax"]
+    assert parsed.entries[0].historical_flag is True
+    assert parsed.entries[0].source == "anamnesis"

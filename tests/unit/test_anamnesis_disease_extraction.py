@@ -14,7 +14,7 @@ from DILIGENT.server.domain.clinical import (
     PatientDiseaseContext,
     PatientDrugs,
 )
-from DILIGENT.server.services.session_service import ClinicalSessionService
+from DILIGENT.server.services.session.session_service import ClinicalSessionService
 from DILIGENT.server.services.clinical.disease import DiseaseExtractor
 
 
