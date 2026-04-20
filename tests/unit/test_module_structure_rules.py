@@ -24,9 +24,9 @@ def _is_dataclass_decorator(decorator: ast.expr) -> bool:
 
 def _is_pydantic_model(class_node: ast.ClassDef) -> bool:
     for base in class_node.bases:
-        if isinstance(base, ast.Name) and base.id in {"BaseModel", "BaseSettings"}:
+        if isinstance(base, ast.Name) and base.id in {"BaseModel", "BaseSettings", "RootModel"}:
             return True
-        if isinstance(base, ast.Attribute) and base.attr in {"BaseModel", "BaseSettings"}:
+        if isinstance(base, ast.Attribute) and base.attr in {"BaseModel", "BaseSettings", "RootModel"}:
             return True
     return False
 
@@ -109,3 +109,21 @@ def test_models_live_under_domain() -> None:
         "Dataclasses and Pydantic models must be defined under DILIGENT/server/domain:\n"
         + "\n".join(violations)
     )
+
+
+def test_services_do_not_import_fastapi() -> None:
+    services_root = SERVER_ROOT / "services"
+    violations: list[str] = []
+    for path in _iter_python_files(services_root):
+        tree = ast.parse(path.read_text(encoding="utf-8"), filename=str(path))
+        for node in ast.walk(tree):
+            if isinstance(node, ast.Import):
+                for alias in node.names:
+                    name = alias.name
+                    if name == "fastapi" or name.startswith("fastapi."):
+                        violations.append(_format_violation(path, node, "fastapi import in services"))
+            elif isinstance(node, ast.ImportFrom):
+                module = node.module or ""
+                if module == "fastapi" or module.startswith("fastapi."):
+                    violations.append(_format_violation(path, node, "fastapi import in services"))
+    assert not violations, "FastAPI imports are forbidden under DILIGENT/server/services:\n" + "\n".join(violations)

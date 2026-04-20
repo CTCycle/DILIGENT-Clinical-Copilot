@@ -6,6 +6,7 @@ from DILIGENT.server.configurations.startup import server_settings
 from DILIGENT.server.domain.clinical import ClinicalSessionRequest
 from DILIGENT.server.api import ollama as ollama_routes
 from DILIGENT.server.api import session as session_routes
+from DILIGENT.server.services.clinical import job_progress as clinical_job_progress
 
 
 ###############################################################################
@@ -45,9 +46,9 @@ class JobManagerStub:
 # -----------------------------------------------------------------------------
 def test_start_clinical_job_uses_centralized_poll_interval(monkeypatch) -> None:
     job_manager_stub = JobManagerStub()
-    monkeypatch.setattr(session_routes.endpoint, "job_manager", job_manager_stub)
+    monkeypatch.setattr(session_routes.service, "job_manager", job_manager_stub)
 
-    response = session_routes.endpoint.start_clinical_job(
+    response = session_routes.service.start_clinical_job(
         ClinicalSessionRequest(anamnesis="Clinical context")
     )
 
@@ -57,7 +58,7 @@ def test_start_clinical_job_uses_centralized_poll_interval(monkeypatch) -> None:
 # -----------------------------------------------------------------------------
 def test_start_pull_job_uses_centralized_poll_interval(monkeypatch) -> None:
     job_manager_stub = JobManagerStub()
-    monkeypatch.setattr(ollama_routes, "job_manager", job_manager_stub)
+    monkeypatch.setattr(ollama_routes.service, "job_manager", job_manager_stub)
 
     response = ollama_routes.endpoint.start_pull_job(
         name="llama3.1:8b",
@@ -74,18 +75,18 @@ def test_clinical_progress_callback_raises_when_stop_requested(monkeypatch) -> N
             return True
 
     monkeypatch.setattr(
-        session_routes.endpoint,
+        clinical_job_progress,
         "job_manager",
         StopRequestedJobManagerStub(),
     )
 
     try:
-        session_routes.report_clinical_job_progress(
+        clinical_job_progress.report_clinical_job_progress(
             "job-cancelled",
             stage="llm_analysis",
             progress=75.0,
         )
-    except session_routes.ClinicalJobCancelled:
+    except clinical_job_progress.ClinicalJobCancelled:
         return
     raise AssertionError("Expected ClinicalJobCancelled when stop is requested.")
 

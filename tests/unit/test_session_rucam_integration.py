@@ -188,7 +188,7 @@ def _build_payload() -> PatientData:
 
 def test_session_persists_rucam_bundle_and_per_drug_rucam(monkeypatch) -> None:
     fake_serializer = FakeSerializer()
-    endpoint = session_module.endpoint
+    endpoint = session_module.service
     endpoint.serializer = fake_serializer
     endpoint.drugs_parser = FakeDrugsParser()
     endpoint.disease_extractor = FakeDiseaseExtractor()
@@ -208,7 +208,7 @@ def test_session_persists_rucam_bundle_and_per_drug_rucam(monkeypatch) -> None:
 
 def test_session_lab_or_rucam_failure_degrades_to_warnings(monkeypatch) -> None:
     fake_serializer = FakeSerializer()
-    endpoint = session_module.endpoint
+    endpoint = session_module.service
     endpoint.serializer = fake_serializer
     endpoint.drugs_parser = FakeDrugsParser()
     endpoint.disease_extractor = FakeDiseaseExtractor()

@@ -4,9 +4,8 @@ from collections.abc import Iterable
 from typing import Any, cast
 from typing import Protocol
 
-from fastapi import HTTPException, status
-
 from DILIGENT.server.common.constants import CLOUD_MODEL_CHOICES
+from DILIGENT.server.common.exceptions import ServiceValidationError
 from DILIGENT.server.common.utils.catalog_loader import CatalogLoader
 from DILIGENT.server.common.utils.logger import logger
 from DILIGENT.server.configurations.llm_configs import LLMRuntimeConfig
@@ -17,7 +16,7 @@ from DILIGENT.server.domain.model_configs import (
     ModelConfigUpdateRequest,
 )
 from DILIGENT.server.repositories.serialization.model_configs import ModelConfigSerializer
-from DILIGENT.server.services.llm.providers import OllamaClient, OllamaError, OllamaTimeout
+from DILIGENT.server.services.llm.providers import OllamaClient, OllamaError
 
 LOCAL_MODEL_CATALOG = cast(
     tuple[tuple[str, str, str], ...],
@@ -160,14 +159,12 @@ class ModelConfigService:
         if model_name is None:
             return
         if not local_model_names:
-            raise HTTPException(
-                status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
-                detail="No model catalog entries are available.",
+            raise ServiceValidationError(
+                "No model catalog entries are available.",
             )
         if model_name not in local_model_names:
-            raise HTTPException(
-                status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
-                detail=f"Model '{model_name}' is not supported for role '{role_name}'.",
+            raise ServiceValidationError(
+                f"Model '{model_name}' is not supported for role '{role_name}'.",
             )
 
     # -------------------------------------------------------------------------

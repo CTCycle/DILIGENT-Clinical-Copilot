@@ -3,14 +3,20 @@ from __future__ import annotations
 import asyncio
 import re
 from typing import Any
+from collections.abc import Callable
 
-from fastapi import HTTPException, status
-
+from DILIGENT.server.common.exceptions import (
+    ServiceConflictError,
+    ServiceDependencyError,
+    ServiceError,
+    ServiceNotFoundError,
+    ServiceValidationError,
+)
 from DILIGENT.server.common.utils.logger import logger
 from DILIGENT.server.configurations.startup import server_settings
 from DILIGENT.server.domain.jobs import JobCancelResponse, JobStartResponse, JobStatusResponse
 from DILIGENT.server.domain.models import ModelListResponse, ModelPullResponse
-from DILIGENT.server.services.jobs import job_manager
+from DILIGENT.server.services.jobs import JobManager, job_manager as default_job_manager
 from DILIGENT.server.services.llm.providers import OllamaClient, OllamaError, OllamaTimeout
 
 SAFE_OLLAMA_MODEL_RE = re.compile(r"^[A-Za-z0-9][A-Za-z0-9._:/+\-]{0,199}$")
@@ -20,15 +26,9 @@ SAFE_OLLAMA_MODEL_RE = re.compile(r"^[A-Za-z0-9][A-Za-z0-9._:/+\-]{0,199}$")
 def sanitize_model_name(name: str) -> str:
     normalized = str(name or "").strip()
     if not normalized:
-        raise HTTPException(
-            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
-            detail="Model name must not be empty.",
-        )
+        raise ServiceValidationError("Model name must not be empty.")
     if not SAFE_OLLAMA_MODEL_RE.fullmatch(normalized):
-        raise HTTPException(
-            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
-            detail="Invalid model name.",
-        )
+        raise ServiceValidationError("Invalid model name.")
     return normalized
 
 
@@ -96,18 +96,26 @@ def resolve_pull_progress_message(name: str, event: dict[str, Any]) -> str:
 
 ###############################################################################
 class PullProgressUpdater:
-    def __init__(self, *, name: str, job_id: str, initial_progress: float) -> None:
+    def __init__(
+        self,
+        *,
+        name: str,
+        job_id: str,
+        initial_progress: float,
+        jobs: JobManager,
+    ) -> None:
         self.name = name
         self.job_id = job_id
         self.current_progress = initial_progress
+        self.jobs = jobs
 
     # -------------------------------------------------------------------------
     async def __call__(self, event: dict[str, Any]) -> None:
-        if job_manager.should_stop(self.job_id):
+        if self.jobs.should_stop(self.job_id):
             raise RuntimeError("Model pull stop requested.")
 
         self.current_progress = resolve_pull_progress(self.current_progress, event)
-        job_manager.update_progress(self.job_id, self.current_progress)
+        self.jobs.update_progress(self.job_id, self.current_progress)
 
         total = coerce_positive_float(event.get("total"))
         completed = coerce_positive_float(event.get("completed"))
@@ -119,16 +127,23 @@ class PullProgressUpdater:
             progress_patch["total_bytes"] = int(total)
         if completed is not None:
             progress_patch["completed_bytes"] = int(completed)
-        job_manager.update_result(self.job_id, progress_patch)
+        self.jobs.update_result(self.job_id, progress_patch)
 
 
 ###############################################################################
-async def pull_model_async(name: str, stream: bool, job_id: str | None = None) -> dict[str, Any]:
-    async with OllamaClient() as client:
+async def pull_model_async(
+    *,
+    name: str,
+    stream: bool,
+    jobs: JobManager,
+    client_factory: Callable[[], Any],
+    job_id: str | None = None,
+) -> dict[str, Any]:
+    async with client_factory() as client:
         local = set(await client.list_models())
         already = name in local
         if job_id is not None:
-            job_manager.update_result(
+            jobs.update_result(
                 job_id,
                 {
                     "model": name,
@@ -144,19 +159,20 @@ async def pull_model_async(name: str, stream: bool, job_id: str | None = None) -
             logger.info("Downloading model %s from Ollama library", name)
             if job_id is not None:
                 initial_progress = 6.0
-                job_manager.update_progress(job_id, initial_progress)
+                jobs.update_progress(job_id, initial_progress)
                 progress_updater = PullProgressUpdater(
                     name=name,
                     job_id=job_id,
                     initial_progress=initial_progress,
+                    jobs=jobs,
                 )
                 await client.pull(name, stream=stream, progress_callback=progress_updater)
             else:
                 await client.pull(name, stream=stream)
 
         if job_id is not None:
-            job_manager.update_progress(job_id, 100.0)
-            job_manager.update_result(
+            jobs.update_progress(job_id, 100.0)
+            jobs.update_result(
                 job_id,
                 {
                     "model": name,
@@ -174,9 +190,16 @@ async def pull_model_async(name: str, stream: bool, job_id: str | None = None) -
 
 
 ###############################################################################
-def run_model_pull_job(name: str, stream: bool, job_id: str) -> dict[str, Any]:
-    if job_manager.should_stop(job_id):
-        job_manager.update_result(
+def run_model_pull_job(
+    *,
+    name: str,
+    stream: bool,
+    job_id: str,
+    jobs: JobManager,
+    client_factory: Callable[[], Any],
+) -> dict[str, Any]:
+    if jobs.should_stop(job_id):
+        jobs.update_result(
             job_id,
             {
                 "model": name,
@@ -185,66 +208,85 @@ def run_model_pull_job(name: str, stream: bool, job_id: str) -> dict[str, Any]:
             },
         )
         return {}
-    job_manager.update_progress(job_id, 2.0)
-    return asyncio.run(pull_model_async(name=name, stream=stream, job_id=job_id))
+    jobs.update_progress(job_id, 2.0)
+    return asyncio.run(
+        pull_model_async(
+            name=name,
+            stream=stream,
+            jobs=jobs,
+            client_factory=client_factory,
+            job_id=job_id,
+        )
+    )
 
 
 ###############################################################################
 class OllamaService:
     JOB_TYPE = "ollama_pull"
 
+    def __init__(
+        self,
+        *,
+        job_manager: JobManager | None = None,
+        client_factory: Callable[[], Any] | None = None,
+    ) -> None:
+        self.job_manager = job_manager or default_job_manager
+        self.client_factory = client_factory or OllamaClient
+
     # -------------------------------------------------------------------------
     @staticmethod
-    def raise_ollama_http_exception(exc: Exception, *, action: str) -> None:
+    def raise_ollama_service_error(exc: Exception, *, action: str) -> None:
         if isinstance(exc, OllamaTimeout):
-            raise HTTPException(
-                status_code=status.HTTP_504_GATEWAY_TIMEOUT,
-                detail="Ollama request timed out. Please retry.",
+            raise ServiceDependencyError(
+                "Ollama request timed out. Please retry.",
+                status_code=504,
             ) from exc
         if isinstance(exc, OllamaError):
-            raise HTTPException(
-                status_code=status.HTTP_502_BAD_GATEWAY,
-                detail="Ollama service is unavailable. Verify Ollama is running and retry.",
+            raise ServiceDependencyError(
+                "Ollama service is unavailable. Verify Ollama is running and retry.",
+                status_code=502,
             ) from exc
-        raise HTTPException(
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=f"Unexpected error while {action}.",
+        raise ServiceError(
+            f"Unexpected error while {action}.",
         ) from exc
 
     # -------------------------------------------------------------------------
     async def pull_model(self, *, name: str, stream: bool) -> ModelPullResponse:
         model_name = sanitize_model_name(name)
         try:
-            async with OllamaClient() as client:
-                local = set(await client.list_models())
-                already = model_name in local
-                if not already:
-                    logger.info("Downloading model %s from Ollama library", model_name)
-                    await client.pull(model_name, stream=stream)
-                return ModelPullResponse(status="success", pulled=(not already), model=model_name)
+            result = await pull_model_async(
+                name=model_name,
+                stream=stream,
+                jobs=self.job_manager,
+                client_factory=self.client_factory,
+            )
+            return ModelPullResponse(
+                status="success",
+                pulled=bool(result.get("pulled", False)),
+                model=model_name,
+            )
         except (OllamaTimeout, OllamaError, Exception) as exc:
-            self.raise_ollama_http_exception(exc, action="pulling model")
+            self.raise_ollama_service_error(exc, action="pulling model")
 
     # -------------------------------------------------------------------------
     def start_pull_job(self, *, name: str, stream: bool) -> JobStartResponse:
         model_name = sanitize_model_name(name)
-        if job_manager.is_job_running(self.JOB_TYPE):
-            raise HTTPException(
-                status_code=status.HTTP_409_CONFLICT,
-                detail="A model pull job is already in progress",
-            )
+        if self.job_manager.is_job_running(self.JOB_TYPE):
+            raise ServiceConflictError("A model pull job is already in progress")
 
-        job_id = job_manager.start_job(
+        job_id = self.job_manager.start_job(
             job_type=self.JOB_TYPE,
             runner=run_model_pull_job,
-            kwargs={"name": model_name, "stream": stream},
+            kwargs={
+                "name": model_name,
+                "stream": stream,
+                "jobs": self.job_manager,
+                "client_factory": self.client_factory,
+            },
         )
-        job_status = job_manager.get_job_status(job_id)
+        job_status = self.job_manager.get_job_status(job_id)
         if job_status is None:
-            raise HTTPException(
-                status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-                detail="Failed to initialize model pull job",
-            )
+            raise ServiceError("Failed to initialize model pull job")
         return JobStartResponse(
             job_id=job_id,
             job_type=job_status["job_type"],
@@ -254,20 +296,18 @@ class OllamaService:
         )
 
     # -------------------------------------------------------------------------
-    @staticmethod
-    def get_pull_job_status(*, job_id: str) -> JobStatusResponse:
-        job_status = job_manager.get_job_status(job_id)
+    def get_pull_job_status(self, *, job_id: str) -> JobStatusResponse:
+        job_status = self.job_manager.get_job_status(job_id)
         if job_status is None:
-            raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Job not found.")
+            raise ServiceNotFoundError("Job not found.")
         return JobStatusResponse(**job_status)
 
     # -------------------------------------------------------------------------
-    @staticmethod
-    def cancel_pull_job(*, job_id: str) -> JobCancelResponse:
-        job_status = job_manager.get_job_status(job_id)
+    def cancel_pull_job(self, *, job_id: str) -> JobCancelResponse:
+        job_status = self.job_manager.get_job_status(job_id)
         if job_status is None:
-            raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Job not found.")
-        success = job_manager.cancel_job(job_id)
+            raise ServiceNotFoundError("Job not found.")
+        success = self.job_manager.cancel_job(job_id)
         if success:
             logger.info("Model pull stop requested for job %s", job_id)
         return JobCancelResponse(
@@ -279,8 +319,8 @@ class OllamaService:
     # -------------------------------------------------------------------------
     async def list_available_models(self) -> ModelListResponse:
         try:
-            async with OllamaClient() as client:
+            async with self.client_factory() as client:
                 models = await client.list_models()
             return ModelListResponse(models=models, count=len(models))
         except (OllamaTimeout, OllamaError, Exception) as exc:
-            self.raise_ollama_http_exception(exc, action="listing models")
+            self.raise_ollama_service_error(exc, action="listing models")
