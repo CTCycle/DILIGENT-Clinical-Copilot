@@ -13,6 +13,7 @@ from fastapi.responses import PlainTextResponse
 from pydantic import ValidationError
 from pydantic_core import ErrorDetails
 
+from DILIGENT.server.domain.clinical.extras import HepatoxPreparedInputs
 from DILIGENT.server.services.llm.cloud import LLMError
 
 from DILIGENT.server.domain.clinical.entities import (
@@ -22,6 +23,7 @@ from DILIGENT.server.domain.clinical.entities import (
     DiseaseContextEntry,
     DrugEntry,
     DrugRucamAssessment,
+    HepatotoxicityPatternAssessment,
     LiverInjuryOnsetContext,
     PatientLabTimeline,
     PatientData,
@@ -249,6 +251,7 @@ class ClinicalSessionService(ClinicalSessionFormattingMixin):
         if stop_check is not None:
             stop_check()
 
+    # -------------------------------------------------------------------------
     @staticmethod
     def append_warning_issue(
         issues: list[PipelineIssue],
@@ -266,6 +269,7 @@ class ClinicalSessionService(ClinicalSessionFormattingMixin):
             )
         )
 
+    # -------------------------------------------------------------------------
     async def extract_therapy_drugs(
         self,
         *,
@@ -316,6 +320,7 @@ class ClinicalSessionService(ClinicalSessionFormattingMixin):
         self.run_stop_check(stop_check)
         return therapy_drugs
 
+    # -------------------------------------------------------------------------
     async def extract_anamnesis_drugs(
         self,
         *,
@@ -365,6 +370,7 @@ class ClinicalSessionService(ClinicalSessionFormattingMixin):
         self.run_stop_check(stop_check)
         return anamnesis_drugs
 
+    # -------------------------------------------------------------------------
     async def extract_disease_context(
         self,
         *,
@@ -414,6 +420,7 @@ class ClinicalSessionService(ClinicalSessionFormattingMixin):
         self.run_stop_check(stop_check)
         return disease_context
 
+    # -------------------------------------------------------------------------
     async def extract_lab_timeline(
         self,
         *,
@@ -464,6 +471,7 @@ class ClinicalSessionService(ClinicalSessionFormattingMixin):
         self.run_stop_check(stop_check)
         return lab_timeline, onset_context
 
+    # -------------------------------------------------------------------------
     def assess_pattern(
         self,
         *,
@@ -472,7 +480,7 @@ class ClinicalSessionService(ClinicalSessionFormattingMixin):
         issues: list[PipelineIssue],
         progress_callback: Callable[[str, float], None] | None,
         stop_check: Callable[[], None] | None,
-    ):
+    ) -> HepatotoxicityPatternAssessment:
         try:
             pattern_assessment = self.pattern_analyzer.assess_payload(lab_timeline)
         except ClinicalPipelineValidationError as exc:
@@ -507,6 +515,7 @@ class ClinicalSessionService(ClinicalSessionFormattingMixin):
         self.run_stop_check(stop_check)
         return pattern_assessment
 
+    # -------------------------------------------------------------------------
     def estimate_rucam(
         self,
         *,
@@ -556,6 +565,7 @@ class ClinicalSessionService(ClinicalSessionFormattingMixin):
         self.run_stop_check(stop_check)
         return rucam_bundle
 
+    # -------------------------------------------------------------------------
     @staticmethod
     def build_rag_query(
         *,
@@ -580,6 +590,7 @@ class ClinicalSessionService(ClinicalSessionFormattingMixin):
         ClinicalSessionService.run_stop_check(stop_check)
         return rag_query
 
+    # -------------------------------------------------------------------------
     async def run_livertox_lookup(
         self,
         *,
@@ -588,7 +599,7 @@ class ClinicalSessionService(ClinicalSessionFormattingMixin):
         pattern_score,
         progress_callback: Callable[[str, float], None] | None,
         stop_check: Callable[[], None] | None,
-    ):
+    ) -> HepatoxPreparedInputs | None:
         self.emit_progress(progress_callback, stage="livertox_lookup", value=56.0)
         livertox_progress_callback = self.build_stage_progress_callback(
             progress_callback,
@@ -606,6 +617,7 @@ class ClinicalSessionService(ClinicalSessionFormattingMixin):
         self.emit_progress(progress_callback, stage="livertox_lookup", value=62.0)
         return prepared_inputs
 
+    # -------------------------------------------------------------------------
     def reestimate_rucam_with_livertox(
         self,
         *,
@@ -643,6 +655,7 @@ class ClinicalSessionService(ClinicalSessionFormattingMixin):
             )
             return rucam_bundle
 
+    # -------------------------------------------------------------------------
     async def run_consultation(
         self,
         *,
@@ -702,6 +715,7 @@ class ClinicalSessionService(ClinicalSessionFormattingMixin):
             )
         return clinical_session, final_report
 
+    # -------------------------------------------------------------------------
     @staticmethod
     def build_matched_drugs_payload(
         *,
@@ -751,6 +765,7 @@ class ClinicalSessionService(ClinicalSessionFormattingMixin):
             )
         return matched_drugs_payload
 
+    # -------------------------------------------------------------------------
     async def process_single_patient(
         self,
         payload: PatientData,
