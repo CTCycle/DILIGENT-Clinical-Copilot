@@ -42,6 +42,9 @@ class SessionCatalogItem(BaseModel):
     session_timestamp: datetime | None = None
     status: SessionStatus
     total_duration: float | None = None
+    has_report: bool = False
+    has_timeline: bool = False
+    can_generate_timeline: bool = False
 
 
 ###############################################################################

@@ -3,13 +3,10 @@ from __future__ import annotations
 import asyncio
 import time
 from datetime import datetime
-from collections.abc import Sequence
-from functools import partial
 from typing import Any
 from collections.abc import Callable
 
 from pydantic import ValidationError
-from pydantic_core import ErrorDetails
 
 from DILIGENT.server.common.exceptions import (
     ServiceConflictError,
@@ -21,11 +18,8 @@ from DILIGENT.server.domain.clinical.extras import HepatoxPreparedInputs
 from DILIGENT.server.services.llm.cloud import LLMError
 
 from DILIGENT.server.domain.clinical.entities import (
-    ClinicalLabEntry,
     ClinicalPipelineValidationError,
     ClinicalSessionRequest,
-    DiseaseContextEntry,
-    DrugEntry,
     DrugRucamAssessment,
     HepatotoxicityPatternAssessment,
     LiverInjuryOnsetContext,
@@ -47,15 +41,12 @@ from DILIGENT.server.repositories.serialization.data import DataSerializer
 from DILIGENT.server.repositories.serialization.model_configs import ModelConfigSerializer
 from DILIGENT.server.services.jobs import JobManager, job_manager as default_job_manager
 from DILIGENT.server.common.utils.logger import logger
-from DILIGENT.server.common.utils.types import coerce_bool_or_unknown
 from DILIGENT.server.services.clinical.hepatox_core import (
     HepatotoxicityPatternAnalyzer,
     HepatoxConsultation,
 )
 from DILIGENT.server.services.clinical.job_progress import (
-    CLINICAL_PROGRESS_MESSAGES,
     ClinicalConsultationProgressCallback,
-    ClinicalJobCancelled,
     StageProgressFractionCallback,
 )
 from DILIGENT.server.services.clinical.language import ClinicalLanguageDetector
@@ -74,6 +65,7 @@ from DILIGENT.server.services.payload import PayloadSanitizationService
 from DILIGENT.server.services.model_config_service import ModelConfigService
 from DILIGENT.server.services.retrieval.query import DILIQueryBuilder
 from DILIGENT.server.services.runtime_overrides import RuntimeOverrides, RuntimeSnapshot
+from DILIGENT.server.services.session.session_shared import NarrativeBuilder, run_clinical_job
 from DILIGENT.server.services.session_formatting_mixin import ClinicalSessionFormattingMixin
 from DILIGENT.server.services.text.normalization import normalize_drug_query_name
 
@@ -84,10 +76,6 @@ pattern_analyzer = HepatotoxicityPatternAnalyzer()
 rucam_estimator = RucamScoreEstimator()
 serializer = DataSerializer()
 payload_sanitization_service = PayloadSanitizationService()
-from DILIGENT.server.services.session.session_shared import (
-    NarrativeBuilder,    
-    run_clinical_job,
-)
 
 ###############################################################################
 class ClinicalSessionService(ClinicalSessionFormattingMixin):
@@ -785,6 +773,11 @@ class ClinicalSessionService(ClinicalSessionFormattingMixin):
         ensure_required_sections(payload, bundle=validation_bundle)
         self.run_stop_check(stop_check)
 
+        parser_provider, parser_model = LLMRuntimeConfig.resolve_provider_and_model("parser")
+        for extractor in (self.drugs_parser, self.disease_extractor, self.lab_extractor):
+            setattr(extractor, "forced_provider", parser_provider)
+            setattr(extractor, "forced_model", parser_model)
+
         issues: list[PipelineIssue] = []
         cleaned_therapy_text = self.drugs_parser.clean_text(payload.drugs or "")
         therapy_drugs = await self.extract_therapy_drugs(
@@ -1025,6 +1018,7 @@ class ClinicalSessionService(ClinicalSessionFormattingMixin):
 
         patient_payload = self.build_patient_payload(request_payload)
         self.apply_persisted_runtime_configuration()
+        runtime_snapshot = self.capture_runtime_snapshot()
 
         job_id = self.job_manager.start_job(
             job_type=self.JOB_TYPE,
@@ -1033,6 +1027,7 @@ class ClinicalSessionService(ClinicalSessionFormattingMixin):
                 "service": self,
                 "payload": patient_payload,
                 "patient_image_base64": request_payload.patient_image_base64,
+                "runtime_snapshot": runtime_snapshot,
             },
         )
 
@@ -1075,4 +1070,3 @@ class ClinicalSessionService(ClinicalSessionFormattingMixin):
             message="Cancellation requested" if success else "Job cannot be cancelled",
         )
     
-

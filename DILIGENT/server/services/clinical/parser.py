@@ -12,7 +12,7 @@ from DILIGENT.server.services.prompts import (
     ANAMNESIS_DRUG_EXTRACTION_PROMPT,
     DRUG_EXTRACTION_PROMPT,
 )
-from DILIGENT.server.services.llm.providers import initialize_llm_client
+from DILIGENT.server.services.llm.providers import select_llm_provider
 from DILIGENT.server.domain.clinical.entities import (
     DrugEntry,
     PatientDrugs,
@@ -156,6 +156,8 @@ class DrugsParser:
         self.client: Any | None = client
         self.model: str = ""
         self.client_lock = asyncio.Lock()
+        self.forced_provider: str | None = None
+        self.forced_model: str | None = None
         if client is None:
             self.client_provider: str | None = None
             self.runtime_revision = -1
@@ -167,7 +169,9 @@ class DrugsParser:
     async def ensure_client(self) -> None:
         async with self.client_lock:
             revision = LLMRuntimeConfig.get_revision()
-            provider, model = LLMRuntimeConfig.resolve_provider_and_model("parser")
+            resolved_provider, resolved_model = LLMRuntimeConfig.resolve_provider_and_model("parser")
+            provider = (self.forced_provider or resolved_provider).strip()
+            model = (self.forced_model or resolved_model).strip()
             if self.client_provider == "injected" and self.client is not None:
                 self.model = model
                 self.runtime_revision = revision
@@ -182,8 +186,10 @@ class DrugsParser:
                 if self.client is not None:
                     with contextlib.suppress(Exception):
                         await self.client.close()
-                self.client = initialize_llm_client(
-                    purpose="parser", timeout_s=self.timeout_s
+                self.client = select_llm_provider(
+                    provider=provider,
+                    default_model=model,
+                    timeout_s=self.timeout_s,
                 )
                 self.client_provider = provider
             self.runtime_revision = revision
@@ -281,7 +287,14 @@ class DrugsParser:
                     progress_span=fallback_span,
                 )
             except Exception as exc:  # pragma: no cover - passthrough for visibility
-                raise RuntimeError("Failed to extract drugs via LLM") from exc
+                # Preserve already parsed deterministic entries when fallback LLM
+                # extraction is unavailable for a subset of lines.
+                logger.warning(
+                    "LLM fallback extraction unavailable; keeping deterministic therapy entries only: %s",
+                    exc,
+                )
+                self.emit_progress(progress_callback, 1.0)
+                return PatientDrugs(entries=[entry for entry in ordered_entries if entry is not None])
 
             llm_entries = list(structured.entries)
             for offset, (target_index, raw_line) in enumerate(fallback_chunks):

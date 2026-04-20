@@ -63,6 +63,7 @@
             type="file"
             accept="image/*"
             class="inspection-folder-input"
+            aria-label="Patient profile image file picker"
             (change)="handlePatientImageSelection($event)"
           />
           <div>
@@ -116,9 +117,9 @@
         </div>
 
         <div class="stitch-dili-actions">
-          <button class="btn btn-primary" type="button" [disabled]="isCancelling()" (click)="runOrStop()">
+          <button class="btn btn-primary" type="button" [disabled]="isCancelling() || vm.isStarting || isRunActionLocked()" (click)="runOrStop()">
             @if (vm.isRunning) {
-              {{ isCancelling() ? 'Stopping...' : 'Stop analysis' }}
+              {{ vm.isStarting || isRunActionLocked() ? 'Starting...' : (isCancelling() ? 'Stopping...' : 'Stop analysis') }}
             } @else {
               Run DILI analysis
             }
@@ -139,10 +140,10 @@
       </div>
 
       <div class="report-toolbar">
-        <button class="toolbar-btn" type="button" (click)="copyReport()" [disabled]="!vm.message">
+        <button class="toolbar-btn" type="button" (click)="copyReport()" [disabled]="!vm.exportUrl">
           Copy
         </button>
-        <button class="toolbar-btn" type="button" (click)="toggleExpand()" [disabled]="!vm.message">
+        <button class="toolbar-btn" type="button" (click)="toggleExpand()" [disabled]="!vm.exportUrl">
           {{ vm.isExpanded ? 'Collapse' : 'Expand' }}
         </button>
         <button class="toolbar-btn" type="button" (click)="downloadReport()" [disabled]="!vm.exportUrl">

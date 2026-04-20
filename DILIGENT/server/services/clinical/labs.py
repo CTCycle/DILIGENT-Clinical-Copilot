@@ -19,7 +19,7 @@ from DILIGENT.server.domain.clinical.entities import (
     PatientLabTimeline,
 )
 from DILIGENT.server.services.prompts import CLINICAL_LAB_EXTRACTION_PROMPT
-from DILIGENT.server.services.llm.providers import initialize_llm_client
+from DILIGENT.server.services.llm.providers import select_llm_provider
 
 
 ###############################################################################
@@ -57,6 +57,8 @@ class ClinicalLabExtractor:
         self.model: str = ""
         self.extraction_retry_attempts = 2
         self.client_lock = asyncio.Lock()
+        self.forced_provider: str | None = None
+        self.forced_model: str | None = None
         if client is None:
             self.client_provider: str | None = None
             self.runtime_revision = -1
@@ -68,7 +70,9 @@ class ClinicalLabExtractor:
     async def ensure_client(self) -> None:
         async with self.client_lock:
             revision = LLMRuntimeConfig.get_revision()
-            provider, model = LLMRuntimeConfig.resolve_provider_and_model("parser")
+            resolved_provider, resolved_model = LLMRuntimeConfig.resolve_provider_and_model("parser")
+            provider = (self.forced_provider or resolved_provider).strip()
+            model = (self.forced_model or resolved_model).strip()
             if self.client_provider == "injected" and self.client is not None:
                 self.model = model
                 self.runtime_revision = revision
@@ -82,8 +86,9 @@ class ClinicalLabExtractor:
                 if self.client is not None:
                     with contextlib.suppress(Exception):
                         await self.client.close()
-                self.client = initialize_llm_client(
-                    purpose="parser",
+                self.client = select_llm_provider(
+                    provider=provider,
+                    default_model=model,
                     timeout_s=self.timeout_s,
                 )
                 self.client_provider = provider
@@ -425,71 +430,78 @@ class ClinicalLabExtractor:
             block for block in (primary_labs_text, supplemental_anamnesis_text) if block
         )
         if merged_source_text:
-            await self.ensure_client()
-            if self.client is None:
-                raise RuntimeError("LLM client is not initialized for lab extraction")
-            chunks = self.chunk_text(merged_source_text)
-            llm_entries: list[ClinicalLabEntry] = []
-            llm_onset: LiverInjuryOnsetContext | None = None
-            llm_unavailable = False
-            for index, chunk in enumerate(chunks, start=1):
-                user_prompt = (
-                    "Extract longitudinal liver-related labs and onset clues from this clinical chunk.\n"
-                    f"[Chunk {index}/{len(chunks)}]\n{chunk}"
-                )
-                parsed: LabExtractionPayload | None = None
-                for attempt in range(1, self.extraction_retry_attempts + 1):
-                    try:
-                        parsed = await self.client.llm_structured_call(
-                            model=self.model,
-                            system_prompt=CLINICAL_LAB_EXTRACTION_PROMPT.strip(),
-                            user_prompt=user_prompt,
-                            schema=LabExtractionPayload,
-                            temperature=self.temperature,
-                            use_json_mode=True,
-                            max_repair_attempts=2,
-                        )
-                        break
-                    except Exception as exc:
-                        if attempt >= self.extraction_retry_attempts:
+            try:
+                await self.ensure_client()
+                if self.client is None:
+                    raise RuntimeError("LLM client is not initialized for lab extraction")
+                chunks = self.chunk_text(merged_source_text)
+                llm_entries: list[ClinicalLabEntry] = []
+                llm_onset: LiverInjuryOnsetContext | None = None
+                llm_unavailable = False
+                for index, chunk in enumerate(chunks, start=1):
+                    user_prompt = (
+                        "Extract longitudinal liver-related labs and onset clues from this clinical chunk.\n"
+                        f"[Chunk {index}/{len(chunks)}]\n{chunk}"
+                    )
+                    parsed: LabExtractionPayload | None = None
+                    for attempt in range(1, self.extraction_retry_attempts + 1):
+                        try:
+                            parsed = await self.client.llm_structured_call(
+                                model=self.model,
+                                system_prompt=CLINICAL_LAB_EXTRACTION_PROMPT.strip(),
+                                user_prompt=user_prompt,
+                                schema=LabExtractionPayload,
+                                temperature=self.temperature,
+                                use_json_mode=True,
+                                max_repair_attempts=2,
+                            )
+                            break
+                        except Exception as exc:
+                            if attempt >= self.extraction_retry_attempts:
+                                logger.warning(
+                                    (
+                                        "Clinical lab extraction unavailable for chunk %d/%d "
+                                        "after %d attempts; using deterministic parser output only: %s"
+                                    ),
+                                    index,
+                                    len(chunks),
+                                    self.extraction_retry_attempts,
+                                    exc,
+                                )
+                                parsed = LabExtractionPayload(entries=[], onset_context=None)
+                                llm_unavailable = True
+                                break
+                            delay = self.retry_backoff_seconds(attempt, exc=exc)
                             logger.warning(
                                 (
-                                    "Clinical lab extraction unavailable for chunk %d/%d "
-                                    "after %d attempts; using deterministic parser output only: %s"
-                                ),
+                                "Retrying clinical lab extraction for chunk %d/%d "
+                                "(attempt %d/%d, delay %.2fs): %s"
+                            ),
                                 index,
                                 len(chunks),
+                                attempt,
                                 self.extraction_retry_attempts,
+                                delay,
                                 exc,
                             )
-                            parsed = LabExtractionPayload(entries=[], onset_context=None)
-                            llm_unavailable = True
-                            break
-                        delay = self.retry_backoff_seconds(attempt, exc=exc)
-                        logger.warning(
-                            (
-                            "Retrying clinical lab extraction for chunk %d/%d "
-                            "(attempt %d/%d, delay %.2fs): %s"
-                        ),
-                            index,
-                            len(chunks),
-                            attempt,
-                            self.extraction_retry_attempts,
-                            delay,
-                            exc,
-                        )
-                        await asyncio.sleep(delay)
-                if parsed is None:
-                    parsed = LabExtractionPayload(entries=[], onset_context=None)
-                    llm_unavailable = True
-                llm_entries.extend(parsed.entries)
-                if llm_onset is None and parsed.onset_context is not None:
-                    llm_onset = parsed.onset_context
-                self.emit_progress(progress_callback, 0.2 + ((index / max(len(chunks), 1)) * 0.5))
-            timeline_entries.extend(llm_entries)
-            if llm_unavailable:
+                            await asyncio.sleep(delay)
+                    if parsed is None:
+                        parsed = LabExtractionPayload(entries=[], onset_context=None)
+                        llm_unavailable = True
+                    llm_entries.extend(parsed.entries)
+                    if llm_onset is None and parsed.onset_context is not None:
+                        llm_onset = parsed.onset_context
+                    self.emit_progress(progress_callback, 0.2 + ((index / max(len(chunks), 1)) * 0.5))
+                timeline_entries.extend(llm_entries)
+                if llm_unavailable:
+                    timeline_entries.extend(deterministic_entries)
+                onset_context = llm_onset
+            except Exception as exc:
+                logger.warning(
+                    "Clinical lab extraction unavailable; using deterministic parser output only: %s",
+                    exc,
+                )
                 timeline_entries.extend(deterministic_entries)
-            onset_context = llm_onset
         else:
             timeline_entries.extend(deterministic_entries)
 
