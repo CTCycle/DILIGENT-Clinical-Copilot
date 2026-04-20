@@ -37,12 +37,12 @@ from DILIGENT.server.domain.jobs import (
 )
 from DILIGENT.server.configurations.startup import server_settings
 from DILIGENT.server.configurations.llm_configs import LLMRuntimeConfig
-from DILIGENT.server.repositories.serialization.data import DataSerializer
+from DILIGENT.server.repositories.serialization.data_core import DataSerializer
 from DILIGENT.server.repositories.serialization.model_configs import ModelConfigSerializer
 from DILIGENT.server.services.jobs import JobManager, job_manager as default_job_manager
 from DILIGENT.server.common.utils.logger import logger
 from DILIGENT.server.common.utils.types import coerce_bool_or_unknown
-from DILIGENT.server.services.clinical.hepatox import (
+from DILIGENT.server.services.clinical.hepatox_core import (
     HepatotoxicityPatternAnalyzer,
     HepatoxConsultation,
 )
@@ -67,7 +67,7 @@ from DILIGENT.server.services.clinical.validation import (
 from DILIGENT.server.services.payload import PayloadSanitizationService
 from DILIGENT.server.services.model_config_service import ModelConfigService
 from DILIGENT.server.services.retrieval.query import DILIQueryBuilder
-from DILIGENT.server.services.runtime_overrides import RuntimeOverrides
+from DILIGENT.server.services.runtime_overrides import RuntimeOverrides, RuntimeSnapshot
 from DILIGENT.server.services.session_formatting_mixin import ClinicalSessionFormattingMixin
 from DILIGENT.server.services.text.normalization import normalize_drug_query_name
 
@@ -170,7 +170,7 @@ class ClinicalSessionService(ClinicalSessionFormattingMixin):
 
     # -------------------------------------------------------------------------
     @staticmethod
-    def capture_runtime_snapshot() -> dict[str, Any]:
+    def capture_runtime_snapshot() -> RuntimeSnapshot:
         return RuntimeOverrides.capture_snapshot()
 
     # -------------------------------------------------------------------------
@@ -244,41 +244,37 @@ class ClinicalSessionService(ClinicalSessionFormattingMixin):
             ) from exc
 
     # -------------------------------------------------------------------------
-    async def process_single_patient(
-        self,
-        payload: PatientData,
+    @staticmethod
+    def run_stop_check(stop_check: Callable[[], None] | None) -> None:
+        if stop_check is not None:
+            stop_check()
+
+    @staticmethod
+    def append_warning_issue(
+        issues: list[PipelineIssue],
         *,
-        patient_image_base64: str | None = None,
-        progress_callback: Callable[[str, float], None] | None = None,
-        stop_check: Callable[[], None] | None = None,
-    ) -> dict[str, Any]:
-        if stop_check is not None:
-            stop_check()
-        logger.info(
-            "Starting Drug-Induced Liver Injury (DILI) analysis for patient: %s",
-            payload.name,
+        code: str,
+        message: str,
+        field: str | None = None,
+    ) -> None:
+        issues.append(
+            PipelineIssue(
+                severity="warning",
+                code=code,
+                message=message,
+                field=field,
+            )
         )
 
-        global_start_time = time.perf_counter()
-        self.emit_progress(
-            progress_callback,
-            stage="session_initialization",
-            value=5.0,
-        )
-        language_result = ClinicalLanguageDetector.detect(payload)
-        report_language = language_result.report_language
-        validation_bundle = build_validation_bundle(report_language)
-        ensure_required_sections(payload, bundle=validation_bundle)
-        if stop_check is not None:
-            stop_check()
-        issues: list[PipelineIssue] = []
-        cleaned_therapy_text = self.drugs_parser.clean_text(payload.drugs or "")
-
-        self.emit_progress(
-            progress_callback,
-            stage="therapy_extraction",
-            value=22.0,
-        )
+    async def extract_therapy_drugs(
+        self,
+        *,
+        cleaned_therapy_text: str,
+        issues: list[PipelineIssue],
+        progress_callback: Callable[[str, float], None] | None,
+        stop_check: Callable[[], None] | None,
+    ) -> PatientDrugs:
+        self.emit_progress(progress_callback, stage="therapy_extraction", value=22.0)
         therapy_progress_callback = self.build_stage_progress_callback(
             progress_callback,
             stage="therapy_extraction",
@@ -292,8 +288,7 @@ class ClinicalSessionService(ClinicalSessionFormattingMixin):
                 text_is_clean=True,
                 progress_callback=therapy_progress_callback,
             )
-            if stop_check is not None:
-                stop_check()
+            self.run_stop_check(stop_check)
             elapsed = time.perf_counter() - start_time
             logger.info("Therapy drugs extraction required %.4f seconds", elapsed)
             logger.info("Detected %s drugs from therapy list", len(therapy_drugs.entries))
@@ -307,32 +302,29 @@ class ClinicalSessionService(ClinicalSessionFormattingMixin):
                 elapsed,
                 exc,
             )
-            issues.append(
-                PipelineIssue(
-                    severity="warning",
-                    code="therapy_extraction_fallback",
-                    message=(
-                        "Therapy extraction via LLM was unavailable; "
-                        "the analysis continued using the raw therapy list."
-                    ),
-                    field="drugs",
-                )
+            self.append_warning_issue(
+                issues,
+                code="therapy_extraction_fallback",
+                message=(
+                    "Therapy extraction via LLM was unavailable; "
+                    "the analysis continued using the raw therapy list."
+                ),
+                field="drugs",
             )
             therapy_drugs = self.build_fallback_therapy_drugs(cleaned_therapy_text)
-        self.emit_progress(
-            progress_callback,
-            stage="therapy_extraction",
-            value=30.0,
-        )
-        if stop_check is not None:
-            stop_check()
-        ensure_timed_therapy_drug(therapy_drugs, bundle=validation_bundle)
+        self.emit_progress(progress_callback, stage="therapy_extraction", value=30.0)
+        self.run_stop_check(stop_check)
+        return therapy_drugs
 
-        self.emit_progress(
-            progress_callback,
-            stage="anamnesis_extraction",
-            value=30.0,
-        )
+    async def extract_anamnesis_drugs(
+        self,
+        *,
+        anamnesis_text: str,
+        issues: list[PipelineIssue],
+        progress_callback: Callable[[str, float], None] | None,
+        stop_check: Callable[[], None] | None,
+    ) -> PatientDrugs:
+        self.emit_progress(progress_callback, stage="anamnesis_extraction", value=30.0)
         anamnesis_progress_callback = self.build_stage_progress_callback(
             progress_callback,
             stage="anamnesis_extraction",
@@ -342,11 +334,10 @@ class ClinicalSessionService(ClinicalSessionFormattingMixin):
         start_time = time.perf_counter()
         try:
             anamnesis_drugs = await self.drugs_parser.extract_drugs_from_anamnesis(
-                payload.anamnesis,
+                anamnesis_text,
                 progress_callback=anamnesis_progress_callback,
             )
-            if stop_check is not None:
-                stop_check()
+            self.run_stop_check(stop_check)
             elapsed = time.perf_counter() - start_time
             logger.info("Anamnesis drugs extraction required %.4f seconds", elapsed)
             logger.info("Detected %s drugs from anamnesis", len(anamnesis_drugs.entries))
@@ -360,31 +351,29 @@ class ClinicalSessionService(ClinicalSessionFormattingMixin):
                 elapsed,
                 exc,
             )
-            issues.append(
-                PipelineIssue(
-                    severity="warning",
-                    code="anamnesis_extraction_failed",
-                    message=(
-                        "Drug extraction from anamnesis was unavailable; "
-                        "the analysis continued without historical drug mentions."
-                    ),
-                    field="anamnesis",
-                )
+            self.append_warning_issue(
+                issues,
+                code="anamnesis_extraction_failed",
+                message=(
+                    "Drug extraction from anamnesis was unavailable; "
+                    "the analysis continued without historical drug mentions."
+                ),
+                field="anamnesis",
             )
             anamnesis_drugs = PatientDrugs(entries=[])
-        self.emit_progress(
-            progress_callback,
-            stage="anamnesis_extraction",
-            value=42.0,
-        )
-        if stop_check is not None:
-            stop_check()
+        self.emit_progress(progress_callback, stage="anamnesis_extraction", value=42.0)
+        self.run_stop_check(stop_check)
+        return anamnesis_drugs
 
-        self.emit_progress(
-            progress_callback,
-            stage="anamnesis_disease_extraction",
-            value=42.0,
-        )
+    async def extract_disease_context(
+        self,
+        *,
+        anamnesis_text: str,
+        issues: list[PipelineIssue],
+        progress_callback: Callable[[str, float], None] | None,
+        stop_check: Callable[[], None] | None,
+    ) -> PatientDiseaseContext:
+        self.emit_progress(progress_callback, stage="anamnesis_disease_extraction", value=42.0)
         disease_progress_callback = self.build_stage_progress_callback(
             progress_callback,
             stage="anamnesis_disease_extraction",
@@ -394,11 +383,10 @@ class ClinicalSessionService(ClinicalSessionFormattingMixin):
         start_time = time.perf_counter()
         try:
             disease_context = await self.disease_extractor.extract_diseases_from_anamnesis(
-                payload.anamnesis,
+                anamnesis_text,
                 progress_callback=disease_progress_callback,
             )
-            if stop_check is not None:
-                stop_check()
+            self.run_stop_check(stop_check)
             elapsed = time.perf_counter() - start_time
             logger.info("Anamnesis disease extraction required %.4f seconds", elapsed)
             logger.info("Detected %s diseases from anamnesis", len(disease_context.entries))
@@ -412,31 +400,29 @@ class ClinicalSessionService(ClinicalSessionFormattingMixin):
                 elapsed,
                 exc,
             )
-            issues.append(
-                PipelineIssue(
-                    severity="warning",
-                    code="anamnesis_disease_extraction_failed",
-                    message=(
-                        "Disease extraction from anamnesis was unavailable; "
-                        "the analysis continued without structured disease timeline."
-                    ),
-                    field="anamnesis",
-                )
+            self.append_warning_issue(
+                issues,
+                code="anamnesis_disease_extraction_failed",
+                message=(
+                    "Disease extraction from anamnesis was unavailable; "
+                    "the analysis continued without structured disease timeline."
+                ),
+                field="anamnesis",
             )
             disease_context = PatientDiseaseContext(entries=[])
-        self.emit_progress(
-            progress_callback,
-            stage="anamnesis_disease_extraction",
-            value=48.0,
-        )
-        if stop_check is not None:
-            stop_check()
+        self.emit_progress(progress_callback, stage="anamnesis_disease_extraction", value=48.0)
+        self.run_stop_check(stop_check)
+        return disease_context
 
-        self.emit_progress(
-            progress_callback,
-            stage="anamnesis_lab_extraction",
-            value=48.0,
-        )
+    async def extract_lab_timeline(
+        self,
+        *,
+        payload: PatientData,
+        issues: list[PipelineIssue],
+        progress_callback: Callable[[str, float], None] | None,
+        stop_check: Callable[[], None] | None,
+    ) -> tuple[PatientLabTimeline, LiverInjuryOnsetContext | None]:
+        self.emit_progress(progress_callback, stage="anamnesis_lab_extraction", value=48.0)
         lab_progress_callback = self.build_stage_progress_callback(
             progress_callback,
             stage="anamnesis_lab_extraction",
@@ -449,8 +435,7 @@ class ClinicalSessionService(ClinicalSessionFormattingMixin):
                 payload,
                 progress_callback=lab_progress_callback,
             )
-            if stop_check is not None:
-                stop_check()
+            self.run_stop_check(stop_check)
             elapsed = time.perf_counter() - start_time
             logger.info("Anamnesis lab extraction required %.4f seconds", elapsed)
             logger.info("Detected %s timeline lab entries", len(lab_timeline.entries))
@@ -464,27 +449,30 @@ class ClinicalSessionService(ClinicalSessionFormattingMixin):
                 elapsed,
                 exc,
             )
-            issues.append(
-                PipelineIssue(
-                    severity="warning",
-                    code="anamnesis_lab_extraction_failed",
-                    message=(
-                        "Longitudinal lab extraction from anamnesis was unavailable; "
-                        "the analysis continued without timeline enrichment."
-                    ),
-                    field="anamnesis",
-                )
+            self.append_warning_issue(
+                issues,
+                code="anamnesis_lab_extraction_failed",
+                message=(
+                    "Longitudinal lab extraction from anamnesis was unavailable; "
+                    "the analysis continued without timeline enrichment."
+                ),
+                field="anamnesis",
             )
             lab_timeline = PatientLabTimeline(entries=[])
             onset_context = None
-        self.emit_progress(
-            progress_callback,
-            stage="anamnesis_lab_extraction",
-            value=52.0,
-        )
-        if stop_check is not None:
-            stop_check()
+        self.emit_progress(progress_callback, stage="anamnesis_lab_extraction", value=52.0)
+        self.run_stop_check(stop_check)
+        return lab_timeline, onset_context
 
+    def assess_pattern(
+        self,
+        *,
+        lab_timeline: PatientLabTimeline,
+        validation_bundle: Any,
+        issues: list[PipelineIssue],
+        progress_callback: Callable[[str, float], None] | None,
+        stop_check: Callable[[], None] | None,
+    ):
         try:
             pattern_assessment = self.pattern_analyzer.assess_payload(lab_timeline)
         except ClinicalPipelineValidationError as exc:
@@ -507,41 +495,33 @@ class ClinicalSessionService(ClinicalSessionFormattingMixin):
                 issues=localized,
                 message=localized[0].message if localized else exc.args[0],
             ) from exc
-        pattern_score = pattern_assessment.score
         issues.extend(pattern_assessment.issues)
+        pattern_score = pattern_assessment.score
         logger.info(
             "Patient hepatotoxicity pattern classified as %s (R=%.3f, status=%s)",
             pattern_score.classification,
             pattern_score.r_score if pattern_score.r_score is not None else float("nan"),
             pattern_assessment.status,
         )
-        self.emit_progress(
-            progress_callback,
-            stage="hepatotoxicity_pattern",
-            value=54.0,
-        )
-        if stop_check is not None:
-            stop_check()
+        self.emit_progress(progress_callback, stage="hepatotoxicity_pattern", value=54.0)
+        self.run_stop_check(stop_check)
+        return pattern_assessment
 
-        all_detected_drugs = PatientDrugs(
-            entries=[*therapy_drugs.entries, *anamnesis_drugs.entries]
-        )
-        candidate_selection = select_relevant_candidates(
-            therapy_drugs=therapy_drugs,
-            anamnesis_drugs=anamnesis_drugs,
-            visit_date=payload.visit_date,
-        )
-        analysis_drugs = candidate_selection.ordered_analysis_drugs
-        logger.info(
-            "Using %s deduplicated drugs for matching/consultation",
-            len(analysis_drugs.entries),
-        )
-
-        self.emit_progress(
-            progress_callback,
-            stage="rucam_estimation",
-            value=52.0,
-        )
+    def estimate_rucam(
+        self,
+        *,
+        payload: PatientData,
+        analysis_drugs: PatientDrugs,
+        anamnesis_drugs: PatientDrugs,
+        disease_context: PatientDiseaseContext,
+        lab_timeline: PatientLabTimeline,
+        onset_context: LiverInjuryOnsetContext | None,
+        pattern_score,
+        issues: list[PipelineIssue],
+        progress_callback: Callable[[str, float], None] | None,
+        stop_check: Callable[[], None] | None,
+    ) -> PatientRucamAssessmentBundle:
+        self.emit_progress(progress_callback, stage="rucam_estimation", value=52.0)
         start_time = time.perf_counter()
         try:
             rucam_bundle = self.rucam_estimator.estimate(
@@ -563,40 +543,30 @@ class ClinicalSessionService(ClinicalSessionFormattingMixin):
                 elapsed,
                 exc,
             )
-            issues.append(
-                PipelineIssue(
-                    severity="warning",
-                    code="rucam_estimation_failed",
-                    message=(
-                        "RUCAM estimation was unavailable; the analysis continued without "
-                        "per-drug estimated RUCAM."
-                    ),
-                )
+            self.append_warning_issue(
+                issues,
+                code="rucam_estimation_failed",
+                message=(
+                    "RUCAM estimation was unavailable; the analysis continued without "
+                    "per-drug estimated RUCAM."
+                ),
             )
             rucam_bundle = PatientRucamAssessmentBundle(entries=[])
-        self.emit_progress(
-            progress_callback,
-            stage="rucam_estimation",
-            value=54.0,
-        )
-        if stop_check is not None:
-            stop_check()
+        self.emit_progress(progress_callback, stage="rucam_estimation", value=54.0)
+        self.run_stop_check(stop_check)
+        return rucam_bundle
 
-        structured_context = self.build_structured_clinical_context(
-            payload,
-            therapy_drugs=therapy_drugs,
-            anamnesis_drugs=anamnesis_drugs,
-            disease_context=disease_context,
-            lab_timeline=lab_timeline,
-            onset_context=onset_context,
-            pattern_score=pattern_score,
-        )
-
-        self.emit_progress(
-            progress_callback,
-            stage="rag_query_building",
-            value=54.0,
-        )
+    @staticmethod
+    def build_rag_query(
+        *,
+        payload: PatientData,
+        analysis_drugs: PatientDrugs,
+        structured_context: str,
+        pattern_score,
+        progress_callback: Callable[[str, float], None] | None,
+        stop_check: Callable[[], None] | None,
+    ) -> dict[str, str] | None:
+        ClinicalSessionService.emit_progress(progress_callback, stage="rag_query_building", value=54.0)
         rag_query: dict[str, str] | None = None
         if payload.use_rag:
             query_builder = DILIQueryBuilder(analysis_drugs)
@@ -606,19 +576,20 @@ class ClinicalSessionService(ClinicalSessionFormattingMixin):
                 pattern_classification=pattern_score.classification,
                 r_score=pattern_score.r_score,
             )
-        self.emit_progress(
-            progress_callback,
-            stage="rag_query_building",
-            value=56.0,
-        )
-        if stop_check is not None:
-            stop_check()
+        ClinicalSessionService.emit_progress(progress_callback, stage="rag_query_building", value=56.0)
+        ClinicalSessionService.run_stop_check(stop_check)
+        return rag_query
 
-        self.emit_progress(
-            progress_callback,
-            stage="livertox_lookup",
-            value=56.0,
-        )
+    async def run_livertox_lookup(
+        self,
+        *,
+        all_detected_drugs: PatientDrugs,
+        structured_context: str,
+        pattern_score,
+        progress_callback: Callable[[str, float], None] | None,
+        stop_check: Callable[[], None] | None,
+    ):
+        self.emit_progress(progress_callback, stage="livertox_lookup", value=56.0)
         livertox_progress_callback = self.build_stage_progress_callback(
             progress_callback,
             stage="livertox_lookup",
@@ -631,16 +602,26 @@ class ClinicalSessionService(ClinicalSessionFormattingMixin):
             pattern_score=pattern_score,
             progress_callback=livertox_progress_callback,
         )
-        if stop_check is not None:
-            stop_check()
-        self.emit_progress(
-            progress_callback,
-            stage="livertox_lookup",
-            value=62.0,
-        )
+        self.run_stop_check(stop_check)
+        self.emit_progress(progress_callback, stage="livertox_lookup", value=62.0)
+        return prepared_inputs
 
+    def reestimate_rucam_with_livertox(
+        self,
+        *,
+        payload: PatientData,
+        analysis_drugs: PatientDrugs,
+        anamnesis_drugs: PatientDrugs,
+        disease_context: PatientDiseaseContext,
+        lab_timeline: PatientLabTimeline,
+        onset_context: LiverInjuryOnsetContext | None,
+        pattern_score,
+        prepared_inputs,
+        rucam_bundle: PatientRucamAssessmentBundle,
+        issues: list[PipelineIssue],
+    ) -> PatientRucamAssessmentBundle:
         try:
-            rucam_bundle = self.rucam_estimator.estimate(
+            return self.rucam_estimator.estimate(
                 payload=payload,
                 analysis_drugs=analysis_drugs,
                 anamnesis_drugs=anamnesis_drugs,
@@ -652,29 +633,39 @@ class ClinicalSessionService(ClinicalSessionFormattingMixin):
             )
         except Exception as exc:
             logger.warning("RUCAM re-estimation with LiverTox metadata failed: %s", exc)
-            issues.append(
-                PipelineIssue(
-                    severity="warning",
-                    code="rucam_reestimate_failed",
-                    message=(
-                        "RUCAM refinement with matched LiverTox metadata failed; "
-                        "using preliminary estimates."
-                    ),
-                )
+            self.append_warning_issue(
+                issues,
+                code="rucam_reestimate_failed",
+                message=(
+                    "RUCAM refinement with matched LiverTox metadata failed; "
+                    "using preliminary estimates."
+                ),
             )
+            return rucam_bundle
 
-        start_time = time.perf_counter()
-        clinical_session: HepatoxConsultation | None = None
+    async def run_consultation(
+        self,
+        *,
+        payload: PatientData,
+        analysis_drugs: PatientDrugs,
+        prepared_inputs,
+        report_language: str,
+        rag_query: dict[str, str] | None,
+        rucam_bundle: PatientRucamAssessmentBundle,
+        issues: list[PipelineIssue],
+        progress_callback: Callable[[str, float], None] | None,
+        stop_check: Callable[[], None] | None,
+    ) -> tuple[HepatoxConsultation, str | None]:
+        clinical_session = self.hepatox_consultation_cls(
+            analysis_drugs,
+            patient_name=payload.name,
+        )
         final_report: str | None = None
+        start_time = time.perf_counter()
         try:
-            clinical_session = self.hepatox_consultation_cls(
-                analysis_drugs,
-                patient_name=payload.name,
-            )
             consultation_progress_callback = ClinicalConsultationProgressCallback(
                 progress_callback=progress_callback,
             )
-
             drug_assessment = await clinical_session.run_analysis(
                 prepared_inputs=prepared_inputs,
                 visit_date=payload.visit_date,
@@ -684,11 +675,9 @@ class ClinicalSessionService(ClinicalSessionFormattingMixin):
                 rucam_bundle=rucam_bundle,
                 progress_callback=consultation_progress_callback,
             )
-            if stop_check is not None:
-                stop_check()
+            self.run_stop_check(stop_check)
             elapsed = time.perf_counter() - start_time
             logger.info("Hepato-toxicity consultation required %.4f seconds", elapsed)
-
             if isinstance(drug_assessment, dict):
                 raw_final_report = drug_assessment.get("final_report")
                 if isinstance(raw_final_report, str):
@@ -698,21 +687,197 @@ class ClinicalSessionService(ClinicalSessionFormattingMixin):
                 else:
                     final_report = str(raw_final_report).strip()
         except LLMError as exc:
-            issues.append(
-                PipelineIssue(
-                    severity="warning",
-                    code="clinical_llm_unavailable",
-                    message=(
-                        "Clinical LLM analysis is unavailable; report generated without "
-                        "per-drug synthesis."
-                    ),
-                )
+            self.append_warning_issue(
+                issues,
+                code="clinical_llm_unavailable",
+                message=(
+                    "Clinical LLM analysis is unavailable; report generated without "
+                    "per-drug synthesis."
+                ),
             )
             logger.warning(
                 "Clinical LLM unavailable for patient '%s': %s",
                 payload.name or "unknown",
                 exc,
             )
+        return clinical_session, final_report
+
+    @staticmethod
+    def build_matched_drugs_payload(
+        *,
+        detected_drugs: list[str],
+        prepared_inputs,
+        rucam_bundle: PatientRucamAssessmentBundle,
+    ) -> list[dict[str, Any]]:
+        resolved_drug_map: dict[str, dict[str, Any]] = {}
+        if prepared_inputs is not None:
+            for key, value in prepared_inputs.resolved_drugs.items():
+                normalized_key = normalize_drug_query_name(key)
+                if normalized_key:
+                    resolved_drug_map[normalized_key] = value
+        rucam_by_name: dict[str, DrugRucamAssessment] = {}
+        for item in rucam_bundle.entries:
+            normalized_key = normalize_drug_query_name(item.drug_name)
+            if normalized_key:
+                rucam_by_name[normalized_key] = item
+
+        matched_drugs_payload: list[dict[str, Any]] = []
+        for detected_name in detected_drugs:
+            normalized_name = normalize_drug_query_name(detected_name)
+            resolved = resolved_drug_map.get(normalized_name, {})
+            matched_row = resolved.get("matched_livertox_row") if isinstance(resolved, dict) else None
+            matched_name = matched_row.get("drug_name") if isinstance(matched_row, dict) else None
+            rucam_entry = rucam_by_name.get(normalized_name)
+            matched_drugs_payload.append(
+                {
+                    "raw_drug_name": detected_name,
+                    "matched_drug_name": matched_name,
+                    "nbk_id": matched_row.get("nbk_id") if isinstance(matched_row, dict) else None,
+                    "match_confidence": resolved.get("match_confidence") if isinstance(resolved, dict) else None,
+                    "match_reason": resolved.get("match_reason") if isinstance(resolved, dict) else None,
+                    "match_notes": resolved.get("match_notes") if isinstance(resolved, dict) else [],
+                    "match_status": resolved.get("match_status") if isinstance(resolved, dict) else None,
+                    "match_candidates": resolved.get("match_candidates") if isinstance(resolved, dict) else [],
+                    "chosen_candidate": resolved.get("chosen_candidate") if isinstance(resolved, dict) else None,
+                    "rejected_candidates": resolved.get("rejected_candidates") if isinstance(resolved, dict) else [],
+                    "missing_livertox": resolved.get("missing_livertox") if isinstance(resolved, dict) else True,
+                    "ambiguous_match": resolved.get("ambiguous_match") if isinstance(resolved, dict) else False,
+                    "regimen_group_ids": resolved.get("regimen_group_ids") if isinstance(resolved, dict) else [],
+                    "regimen_components": resolved.get("regimen_components") if isinstance(resolved, dict) else [],
+                    "origins": resolved.get("origins") if isinstance(resolved, dict) else [],
+                    "raw_mentions": resolved.get("raw_mentions") if isinstance(resolved, dict) else [],
+                    "rucam": rucam_entry.model_dump() if rucam_entry is not None else None,
+                }
+            )
+        return matched_drugs_payload
+
+    async def process_single_patient(
+        self,
+        payload: PatientData,
+        *,
+        patient_image_base64: str | None = None,
+        progress_callback: Callable[[str, float], None] | None = None,
+        stop_check: Callable[[], None] | None = None,
+    ) -> dict[str, Any]:
+        self.run_stop_check(stop_check)
+        logger.info(
+            "Starting Drug-Induced Liver Injury (DILI) analysis for patient: %s",
+            payload.name,
+        )
+
+        global_start_time = time.perf_counter()
+        self.emit_progress(progress_callback, stage="session_initialization", value=5.0)
+        language_result = ClinicalLanguageDetector.detect(payload)
+        report_language = language_result.report_language
+        validation_bundle = build_validation_bundle(report_language)
+        ensure_required_sections(payload, bundle=validation_bundle)
+        self.run_stop_check(stop_check)
+
+        issues: list[PipelineIssue] = []
+        cleaned_therapy_text = self.drugs_parser.clean_text(payload.drugs or "")
+        therapy_drugs = await self.extract_therapy_drugs(
+            cleaned_therapy_text=cleaned_therapy_text,
+            issues=issues,
+            progress_callback=progress_callback,
+            stop_check=stop_check,
+        )
+        ensure_timed_therapy_drug(therapy_drugs, bundle=validation_bundle)
+        anamnesis_drugs = await self.extract_anamnesis_drugs(
+            anamnesis_text=payload.anamnesis,
+            issues=issues,
+            progress_callback=progress_callback,
+            stop_check=stop_check,
+        )
+        disease_context = await self.extract_disease_context(
+            anamnesis_text=payload.anamnesis,
+            issues=issues,
+            progress_callback=progress_callback,
+            stop_check=stop_check,
+        )
+        lab_timeline, onset_context = await self.extract_lab_timeline(
+            payload=payload,
+            issues=issues,
+            progress_callback=progress_callback,
+            stop_check=stop_check,
+        )
+        pattern_assessment = self.assess_pattern(
+            lab_timeline=lab_timeline,
+            validation_bundle=validation_bundle,
+            issues=issues,
+            progress_callback=progress_callback,
+            stop_check=stop_check,
+        )
+        pattern_score = pattern_assessment.score
+        all_detected_drugs = PatientDrugs(entries=[*therapy_drugs.entries, *anamnesis_drugs.entries])
+        candidate_selection = select_relevant_candidates(
+            therapy_drugs=therapy_drugs,
+            anamnesis_drugs=anamnesis_drugs,
+            visit_date=payload.visit_date,
+        )
+        analysis_drugs = candidate_selection.ordered_analysis_drugs
+        logger.info(
+            "Using %s deduplicated drugs for matching/consultation",
+            len(analysis_drugs.entries),
+        )
+        rucam_bundle = self.estimate_rucam(
+            payload=payload,
+            analysis_drugs=analysis_drugs,
+            anamnesis_drugs=anamnesis_drugs,
+            disease_context=disease_context,
+            lab_timeline=lab_timeline,
+            onset_context=onset_context,
+            pattern_score=pattern_score,
+            issues=issues,
+            progress_callback=progress_callback,
+            stop_check=stop_check,
+        )
+        structured_context = self.build_structured_clinical_context(
+            payload,
+            therapy_drugs=therapy_drugs,
+            anamnesis_drugs=anamnesis_drugs,
+            disease_context=disease_context,
+            lab_timeline=lab_timeline,
+            onset_context=onset_context,
+            pattern_score=pattern_score,
+        )
+        rag_query = self.build_rag_query(
+            payload=payload,
+            analysis_drugs=analysis_drugs,
+            structured_context=structured_context,
+            pattern_score=pattern_score,
+            progress_callback=progress_callback,
+            stop_check=stop_check,
+        )
+        prepared_inputs = await self.run_livertox_lookup(
+            all_detected_drugs=all_detected_drugs,
+            structured_context=structured_context,
+            pattern_score=pattern_score,
+            progress_callback=progress_callback,
+            stop_check=stop_check,
+        )
+        rucam_bundle = self.reestimate_rucam_with_livertox(
+            payload=payload,
+            analysis_drugs=analysis_drugs,
+            anamnesis_drugs=anamnesis_drugs,
+            disease_context=disease_context,
+            lab_timeline=lab_timeline,
+            onset_context=onset_context,
+            pattern_score=pattern_score,
+            prepared_inputs=prepared_inputs,
+            rucam_bundle=rucam_bundle,
+            issues=issues,
+        )
+        clinical_session, final_report = await self.run_consultation(
+            payload=payload,
+            analysis_drugs=analysis_drugs,
+            prepared_inputs=prepared_inputs,
+            report_language=report_language,
+            rag_query=rag_query,
+            rucam_bundle=rucam_bundle,
+            issues=issues,
+            progress_callback=progress_callback,
+            stop_check=stop_check,
+        )
 
         patient_label = payload.name or "Unknown patient"
         missing_visit_label_by_language = {
@@ -728,93 +893,19 @@ class ClinicalSessionService(ClinicalSessionFormattingMixin):
             if payload.visit_date
             else missing_visit_label_by_language.get(report_language_key, "Not provided")
         )
-
         global_elapsed = time.perf_counter() - global_start_time
         logger.info(
             "Total time for Drug Induced Liver Injury (DILI) assessment is %.4f seconds",
             global_elapsed,
         )
-
         detected_drugs = [entry.name for entry in analysis_drugs.entries if entry.name]
-        anamnesis_detected_drugs = [
-            entry.name for entry in anamnesis_drugs.entries if entry.name
-        ]
-        anamnesis_detected_diseases = [
-            entry.name for entry in disease_context.entries if entry.name
-        ]
-        resolved_drug_map: dict[str, dict[str, Any]] = {}
-        if prepared_inputs is not None:
-            for key, value in prepared_inputs.resolved_drugs.items():
-                normalized_key = normalize_drug_query_name(key)
-                if normalized_key:
-                    resolved_drug_map[normalized_key] = value
-        rucam_by_name: dict[str, DrugRucamAssessment] = {}
-        for item in rucam_bundle.entries:
-            normalized_key = normalize_drug_query_name(item.drug_name)
-            if normalized_key:
-                rucam_by_name[normalized_key] = item
-        matched_drugs_payload: list[dict[str, Any]] = []
-        for detected_name in detected_drugs:
-            normalized_name = normalize_drug_query_name(detected_name)
-            resolved = resolved_drug_map.get(normalized_name, {})
-            matched_row = (
-                resolved.get("matched_livertox_row")
-                if isinstance(resolved, dict)
-                else None
-            )
-            matched_name = (
-                matched_row.get("drug_name")
-                if isinstance(matched_row, dict)
-                else None
-            )
-            rucam_entry = rucam_by_name.get(normalized_name)
-            matched_drugs_payload.append(
-                {
-                    "raw_drug_name": detected_name,
-                    "matched_drug_name": matched_name,
-                    "nbk_id": matched_row.get("nbk_id")
-                    if isinstance(matched_row, dict)
-                    else None,
-                    "match_confidence": resolved.get("match_confidence")
-                    if isinstance(resolved, dict)
-                    else None,
-                    "match_reason": resolved.get("match_reason")
-                    if isinstance(resolved, dict)
-                    else None,
-                    "match_notes": resolved.get("match_notes")
-                    if isinstance(resolved, dict)
-                    else [],
-                    "match_status": resolved.get("match_status")
-                    if isinstance(resolved, dict)
-                    else None,
-                    "match_candidates": resolved.get("match_candidates")
-                    if isinstance(resolved, dict)
-                    else [],
-                    "chosen_candidate": resolved.get("chosen_candidate")
-                    if isinstance(resolved, dict)
-                    else None,
-                    "rejected_candidates": resolved.get("rejected_candidates")
-                    if isinstance(resolved, dict)
-                    else [],
-                    "missing_livertox": resolved.get("missing_livertox")
-                    if isinstance(resolved, dict)
-                    else True,
-                    "ambiguous_match": resolved.get("ambiguous_match")
-                    if isinstance(resolved, dict)
-                    else False,
-                    "regimen_group_ids": resolved.get("regimen_group_ids")
-                    if isinstance(resolved, dict)
-                    else [],
-                    "regimen_components": resolved.get("regimen_components")
-                    if isinstance(resolved, dict)
-                    else [],
-                    "origins": resolved.get("origins") if isinstance(resolved, dict) else [],
-                    "raw_mentions": resolved.get("raw_mentions")
-                    if isinstance(resolved, dict)
-                    else [],
-                    "rucam": rucam_entry.model_dump() if rucam_entry is not None else None,
-                }
-            )
+        anamnesis_detected_drugs = [entry.name for entry in anamnesis_drugs.entries if entry.name]
+        anamnesis_detected_diseases = [entry.name for entry in disease_context.entries if entry.name]
+        matched_drugs_payload = self.build_matched_drugs_payload(
+            detected_drugs=detected_drugs,
+            prepared_inputs=prepared_inputs,
+            rucam_bundle=rucam_bundle,
+        )
         serialized_issues = self.serialize_pipeline_issues(issues)
         pattern_strings = self.pattern_analyzer.stringify_scores(pattern_score)
         narrative = NarrativeBuilder.build_patient_narrative(
@@ -863,13 +954,8 @@ class ClinicalSessionService(ClinicalSessionFormattingMixin):
                 "ollama_reasoning": LLMRuntimeConfig.is_ollama_reasoning_enabled(),
             },
         }
-        self.emit_progress(
-            progress_callback,
-            stage="finalization",
-            value=96.0,
-        )
-        if stop_check is not None:
-            stop_check()
+        self.emit_progress(progress_callback, stage="finalization", value=96.0)
+        self.run_stop_check(stop_check)
         await asyncio.to_thread(
             self.serializer.save_clinical_session,
             {
@@ -892,14 +978,8 @@ class ClinicalSessionService(ClinicalSessionFormattingMixin):
                 "session_result_payload": result_payload,
             },
         )
-        self.emit_progress(
-            progress_callback,
-            stage="finalization",
-            value=99.0,
-        )
-        if stop_check is not None:
-            stop_check()
-
+        self.emit_progress(progress_callback, stage="finalization", value=99.0)
+        self.run_stop_check(stop_check)
         return result_payload
 
     # -------------------------------------------------------------------------

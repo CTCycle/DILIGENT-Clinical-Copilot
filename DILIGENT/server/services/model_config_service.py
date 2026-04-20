@@ -32,7 +32,18 @@ LOCAL_MODEL_CATALOG_NAMES = {name for name, _, _ in LOCAL_MODEL_CATALOG}
 
 class ModelConfigSnapshotStore(Protocol):
     def load_snapshot(self) -> ModelConfigSnapshot: ...
-    def save_snapshot(self, **updates: Any) -> ModelConfigSnapshot: ...
+    def save_snapshot(
+        self,
+        *,
+        clinical_model: str | None | object = ...,
+        text_extraction_model: str | None | object = ...,
+        use_cloud_models: bool | object = ...,
+        cloud_provider: str | None | object = ...,
+        cloud_model: str | None | object = ...,
+        ollama_temperature: float | object = ...,
+        cloud_temperature: float | object = ...,
+        ollama_reasoning: bool | object = ...,
+    ) -> ModelConfigSnapshot: ...
 
 
 ###############################################################################
