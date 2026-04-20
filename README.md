@@ -107,7 +107,12 @@ DILIGENT\setup_and_maintenance.bat
 
 Use this script for offline maintenance operations (for example DB initialization and cleanup tasks).
 
-## 7. Documentation Map
+## 7. Database and Ollama Compatibility
+- Database schemas are not upgraded in place across this cleanup; recreate the schema (or local SQLite DB file) when upgrading.
+- Runtime startup no longer performs legacy SQLite schema salvage/deletion.
+- Ollama must support the chat-capable `/api/chat` API; legacy `/api/generate` fallback behavior has been removed.
+
+## 8. Documentation Map
 - `assets/docs/USER_MANUAL.md`: end-user operation, journeys, key commands.
 - `assets/docs/ARCHITECTURE.md`: system boundaries and data flow.
 - `assets/docs/BACKGROUND_JOBS.md`: job lifecycle and semantics.
@@ -115,6 +120,6 @@ Use this script for offline maintenance operations (for example DB initializatio
 - `assets/docs/ERROR_HANDLING.md`: backend/frontend error strategy.
 - `assets/docs/UI_STANDARDS.md`: frontend design standards.
 
-## 8. License
+## 9. License
 Non-commercial use is covered by the Polyform Noncommercial License 1.0.0; commercial licensing is available separately. See `LICENSE`.
 

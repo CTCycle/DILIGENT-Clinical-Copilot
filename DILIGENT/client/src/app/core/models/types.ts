@@ -4,7 +4,7 @@ export type RuntimeSettings = {
   useCloudServices: boolean;
   provider: CloudProvider;
   cloudModel: string | null;
-  parsingModel: string;
+  textExtractionModel: string;
   clinicalModel: string;
   temperature: number;
   reasoning: boolean;

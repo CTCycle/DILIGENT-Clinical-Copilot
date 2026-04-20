@@ -82,7 +82,7 @@
                 <li class="model-config-empty-note">{{ noLocalModelMessage() }}</li>
               }
               @for (model of filteredLocalModels(); track model.name) {
-                <li class="model-config-model-item" [class.is-selected]="draftConfig().clinicalModel === model.name || draftConfig().parsingModel === model.name">
+                <li class="model-config-model-item" [class.is-selected]="draftConfig().clinicalModel === model.name || draftConfig().textExtractionModel === model.name">
                   <div class="model-config-model-details">
                     <div class="model-config-model-name-row">
                       <span class="model-config-model-name">{{ model.name }}</span>
@@ -105,7 +105,7 @@
                       @if (draftConfig().clinicalModel === model.name) {
                         <span class="model-config-role-pill">Clinical</span>
                       }
-                      @if (draftConfig().parsingModel === model.name) {
+                      @if (draftConfig().textExtractionModel === model.name) {
                         <span class="model-config-role-pill">Text extraction</span>
                       }
                     </div>
@@ -143,13 +143,13 @@
                       </button>
                       <button
                         class="access-key-action model-config-role-action"
-                        [class.is-active]="draftConfig().parsingModel === model.name"
+                        [class.is-active]="draftConfig().textExtractionModel === model.name"
                         type="button"
                         (click)="handleRoleSelection('text_extraction', model.name)"
-                        [disabled]="isSaving() || isLoading() || draftConfig().parsingModel === model.name"
-                        [attr.aria-pressed]="draftConfig().parsingModel === model.name"
-                        [attr.aria-label]="draftConfig().parsingModel === model.name ? 'Text extraction model selected' : 'Set ' + model.name + ' as text extraction model'"
-                        [attr.title]="draftConfig().parsingModel === model.name ? 'Text extraction model selected' : 'Set as text extraction model'"
+                        [disabled]="isSaving() || isLoading() || draftConfig().textExtractionModel === model.name"
+                        [attr.aria-pressed]="draftConfig().textExtractionModel === model.name"
+                        [attr.aria-label]="draftConfig().textExtractionModel === model.name ? 'Text extraction model selected' : 'Set ' + model.name + ' as text extraction model'"
+                        [attr.title]="draftConfig().textExtractionModel === model.name ? 'Text extraction model selected' : 'Set as text extraction model'"
                       >
                         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
                           <path d="M14 3H6a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V9z" />
@@ -158,7 +158,7 @@
                           <path d="M8 17h5" />
                         </svg>
                         <span class="visually-hidden">
-                          {{ draftConfig().parsingModel === model.name ? 'Text extraction model selected' : 'Set as text extraction model' }}
+                          {{ draftConfig().textExtractionModel === model.name ? 'Text extraction model selected' : 'Set as text extraction model' }}
                         </span>
                       </button>
                     </div>
@@ -257,7 +257,7 @@
       <dl class="model-config-summary-list">
         <div><dt>Runtime</dt><dd>{{ runtimeLabel() }}</dd></div>
         <div><dt>Clinical Model</dt><dd>{{ draftConfig().clinicalModel || 'Not set' }}</dd></div>
-        <div><dt>Text Extraction</dt><dd>{{ draftConfig().parsingModel || 'Not set' }}</dd></div>
+        <div><dt>Text Extraction</dt><dd>{{ draftConfig().textExtractionModel || 'Not set' }}</dd></div>
         @if (draftConfig().useCloudServices) {
           <div><dt>Cloud Model</dt><dd>{{ draftCloudModel() || 'Not set' }}</dd></div>
         }

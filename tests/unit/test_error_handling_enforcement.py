@@ -146,7 +146,7 @@ def test_access_key_endpoint_sanitizes_dependency_failure(monkeypatch) -> None:
 
     with TestClient(server_app_module.app, raise_server_exceptions=False) as client:
         response = client.post(
-            "/access-keys",
+            "/api/access-keys",
             json={"provider": "openai", "access_key": "sk-test-value"},
         )
 
@@ -167,7 +167,7 @@ def test_data_inspection_endpoint_sanitizes_runtime_failure(monkeypatch) -> None
     )
 
     with TestClient(server_app_module.app, raise_server_exceptions=False) as client:
-        response = client.post("/inspection/rxnav/jobs")
+        response = client.post("/api/inspection/rxnav/jobs")
 
     assert response.status_code == 500
     payload = response.json()
@@ -189,7 +189,7 @@ def test_ollama_endpoint_sanitizes_provider_error(monkeypatch) -> None:
     monkeypatch.setattr(ollama_api, "OllamaClient", FakeOllamaClient)
 
     with TestClient(server_app_module.app, raise_server_exceptions=False) as client:
-        response = client.get("/models/list")
+        response = client.get("/api/models/list")
 
     assert response.status_code == 502
     payload = response.json()

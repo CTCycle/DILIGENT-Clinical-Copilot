@@ -11,7 +11,7 @@ class RuntimeSnapshot(TypedDict):
     use_cloud_services: bool
     llm_provider: str
     cloud_model: str
-    parsing_model: str
+    text_extraction_model: str
     clinical_model: str
     ollama_temperature: float
     cloud_temperature: float
@@ -26,7 +26,7 @@ class RuntimeOverrides:
             "use_cloud_services": bool(LLMRuntimeConfig.is_cloud_enabled()),
             "llm_provider": str(LLMRuntimeConfig.get_llm_provider()),
             "cloud_model": str(LLMRuntimeConfig.get_cloud_model()),
-            "parsing_model": str(LLMRuntimeConfig.get_parsing_model()),
+            "text_extraction_model": str(LLMRuntimeConfig.get_text_extraction_model()),
             "clinical_model": str(LLMRuntimeConfig.get_clinical_model()),
             "ollama_temperature": float(LLMRuntimeConfig.get_ollama_temperature()),
             "cloud_temperature": float(LLMRuntimeConfig.get_cloud_temperature()),
@@ -39,7 +39,7 @@ class RuntimeOverrides:
         use_cloud_services: bool | None,
         llm_provider: str | None,
         cloud_model: str | None,
-        parsing_model: str | None,
+        text_extraction_model: str | None,
         clinical_model: str | None,
         ollama_temperature: float | None,
         cloud_temperature: float | None,
@@ -51,8 +51,8 @@ class RuntimeOverrides:
             LLMRuntimeConfig.set_llm_provider(llm_provider)
         if cloud_model is not None:
             LLMRuntimeConfig.set_cloud_model(cloud_model)
-        if parsing_model is not None:
-            LLMRuntimeConfig.set_parsing_model(parsing_model)
+        if text_extraction_model is not None:
+            LLMRuntimeConfig.set_text_extraction_model(text_extraction_model)
         if clinical_model is not None:
             LLMRuntimeConfig.set_clinical_model(clinical_model)
         if ollama_temperature is not None:
@@ -70,7 +70,7 @@ class RuntimeOverrides:
         use_cloud_services: bool | None,
         llm_provider: str | None,
         cloud_model: str | None,
-        parsing_model: str | None,
+        text_extraction_model: str | None,
         clinical_model: str | None,
         ollama_temperature: float | None,
         cloud_temperature: float | None,
@@ -81,7 +81,7 @@ class RuntimeOverrides:
             use_cloud_services=use_cloud_services,
             llm_provider=llm_provider,
             cloud_model=cloud_model,
-            parsing_model=parsing_model,
+            text_extraction_model=text_extraction_model,
             clinical_model=clinical_model,
             ollama_temperature=ollama_temperature,
             cloud_temperature=cloud_temperature,
@@ -94,7 +94,7 @@ class RuntimeOverrides:
                 use_cloud_services=snapshot["use_cloud_services"],
                 llm_provider=snapshot["llm_provider"],
                 cloud_model=snapshot["cloud_model"],
-                parsing_model=snapshot["parsing_model"],
+                text_extraction_model=snapshot["text_extraction_model"],
                 clinical_model=snapshot["clinical_model"],
                 ollama_temperature=snapshot["ollama_temperature"],
                 cloud_temperature=snapshot["cloud_temperature"],

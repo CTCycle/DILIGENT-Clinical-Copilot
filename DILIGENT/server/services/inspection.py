@@ -318,8 +318,8 @@ class DataInspectionService:
             20.0,
             min(300.0, float(getattr(self.timeline_extractor, "timeout_s", 90.0)) + 20.0),
         )
-        parsing_model = coerce_optional_str(runtime_settings.get("parsing_model")) or coerce_optional_str(
-            source.get("parsing_model")
+        text_extraction_model = coerce_optional_str(runtime_settings.get("text_extraction_model")) or coerce_optional_str(
+            source.get("text_extraction_model")
         )
         clinical_model = coerce_optional_str(runtime_settings.get("clinical_model")) or coerce_optional_str(
             source.get("clinical_model")
@@ -330,7 +330,7 @@ class DataInspectionService:
                 use_cloud_services=coerce_optional_bool(runtime_settings.get("use_cloud_services")),
                 llm_provider=coerce_optional_str(runtime_settings.get("llm_provider")),
                 cloud_model=coerce_optional_str(runtime_settings.get("cloud_model")),
-                parsing_model=parsing_model,
+                text_extraction_model=text_extraction_model,
                 clinical_model=clinical_model,
                 ollama_temperature=coerce_optional_float(runtime_settings.get("ollama_temperature")),
                 cloud_temperature=coerce_optional_float(runtime_settings.get("cloud_temperature")),
@@ -356,7 +356,7 @@ class DataInspectionService:
             "use_cloud_services": LLMRuntimeConfig.is_cloud_enabled(),
             "llm_provider": LLMRuntimeConfig.get_llm_provider(),
             "cloud_model": LLMRuntimeConfig.get_cloud_model(),
-            "parsing_model": LLMRuntimeConfig.get_parsing_model(),
+            "text_extraction_model": LLMRuntimeConfig.get_text_extraction_model(),
             "clinical_model": LLMRuntimeConfig.get_clinical_model(),
             "ollama_temperature": LLMRuntimeConfig.get_ollama_temperature(),
             "cloud_temperature": LLMRuntimeConfig.get_cloud_temperature(),

@@ -117,7 +117,7 @@ class IngestionSettings(BaseModel):
 
 class LLMRuntimeDefaults(BaseModel):
     model_config = ConfigDict(frozen=True)
-    parsing_model: str
+    text_extraction_model: str
     clinical_model: str
     llm_provider: str
     cloud_model: str
