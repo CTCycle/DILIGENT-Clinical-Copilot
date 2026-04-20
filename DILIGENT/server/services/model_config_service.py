@@ -41,23 +41,48 @@ class ModelConfigService:
         self.serializer = serializer or ModelConfigSerializer()
 
     # -------------------------------------------------------------------------
-    async def get_state(self) -> ModelConfigStateResponse:
+    async def get_state(
+        self,
+        *,
+        include_local_availability: bool | None = None,
+    ) -> ModelConfigStateResponse:
         snapshot = self.ensure_defaults()
         self.apply_runtime_snapshot(snapshot)
+        should_check_local_availability = (
+            include_local_availability
+            if include_local_availability is not None
+            else (not snapshot.use_cloud_models)
+        )
         local_models = await self.list_local_model_cards(
-            selected_models=(snapshot.clinical_model, snapshot.text_extraction_model)
+            selected_models=(snapshot.clinical_model, snapshot.text_extraction_model),
+            include_ollama_availability=should_check_local_availability,
         )
         return self.build_response(snapshot=snapshot, local_models=local_models)
 
     # -------------------------------------------------------------------------
     async def update_state(self, payload: ModelConfigUpdateRequest) -> ModelConfigStateResponse:
         snapshot = self.ensure_defaults()
-        local_models = await self.list_local_model_cards(
-            selected_models=(snapshot.clinical_model, snapshot.text_extraction_model)
-        )
-        local_model_names = {item.name for item in local_models}
         updates: dict[str, Any] = {}
         fields_set = payload.model_fields_set
+        local_roles_updated = (
+            "clinical_model" in fields_set
+            or "text_extraction_model" in fields_set
+        )
+        local_model_names = {
+            name
+            for name, _, _ in LOCAL_MODEL_CATALOG
+        }
+        if snapshot.clinical_model:
+            local_model_names.add(snapshot.clinical_model)
+        if snapshot.text_extraction_model:
+            local_model_names.add(snapshot.text_extraction_model)
+
+        if local_roles_updated:
+            local_models_for_validation = await self.list_local_model_cards(
+                selected_models=(snapshot.clinical_model, snapshot.text_extraction_model),
+                include_ollama_availability=True,
+            )
+            local_model_names = {item.name for item in local_models_for_validation}
 
         if "clinical_model" in fields_set:
             clinical_model = self.normalize_optional_text(payload.clinical_model)
@@ -106,6 +131,11 @@ class ModelConfigService:
             snapshot = self.serializer.save_snapshot(**updates)
 
         self.apply_runtime_snapshot(snapshot)
+        should_check_local_availability = (not snapshot.use_cloud_models) or local_roles_updated
+        local_models = await self.list_local_model_cards(
+            selected_models=(snapshot.clinical_model, snapshot.text_extraction_model),
+            include_ollama_availability=should_check_local_availability,
+        )
         return self.build_response(snapshot=snapshot, local_models=local_models)
 
     # -------------------------------------------------------------------------
@@ -216,8 +246,13 @@ class ModelConfigService:
         self,
         *,
         selected_models: Iterable[str | None] = (),
+        include_ollama_availability: bool = True,
     ) -> list[LocalModelCard]:
-        available_models = await self.list_available_ollama_models()
+        available_models = (
+            await self.list_available_ollama_models()
+            if include_ollama_availability
+            else set()
+        )
         cards = [
             LocalModelCard(
                 name=name,

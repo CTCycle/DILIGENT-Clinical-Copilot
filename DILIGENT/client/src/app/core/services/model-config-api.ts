@@ -19,8 +19,16 @@ import {
   GENERIC_REQUEST_ERROR,
 } from "./http-api";
 
-export async function fetchModelConfigState(): Promise<ModelConfigStateResponse> {
-  return requestJson<ModelConfigStateResponse>(`${API_BASE_URL}/model-config`, {
+export async function fetchModelConfigState(
+  includeLocalAvailability?: boolean,
+): Promise<ModelConfigStateResponse> {
+  const queryString =
+    typeof includeLocalAvailability === "boolean"
+      ? buildQueryString({
+          include_local_availability: includeLocalAvailability ? "true" : "false",
+        })
+      : "";
+  return requestJson<ModelConfigStateResponse>(`${API_BASE_URL}/model-config${queryString}`, {
     method: "GET",
   });
 }
