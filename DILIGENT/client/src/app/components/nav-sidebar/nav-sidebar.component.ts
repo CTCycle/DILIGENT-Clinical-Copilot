@@ -24,6 +24,39 @@ export class NavSidebarComponent {
     this.navigate.emit(pageId);
   }
 
+  onNavTabKeydown(event: KeyboardEvent, pageId: PageId): void {
+    const index = this.navItems.findIndex((item) => item.pageId === pageId);
+    if (index < 0) {
+      return;
+    }
+
+    let nextIndex: number | null = null;
+    switch (event.key) {
+      case 'ArrowRight':
+      case 'ArrowDown':
+        nextIndex = (index + 1) % this.navItems.length;
+        break;
+      case 'ArrowLeft':
+      case 'ArrowUp':
+        nextIndex = (index - 1 + this.navItems.length) % this.navItems.length;
+        break;
+      case 'Home':
+        nextIndex = 0;
+        break;
+      case 'End':
+        nextIndex = this.navItems.length - 1;
+        break;
+      default:
+        break;
+    }
+
+    if (nextIndex === null) {
+      return;
+    }
+    event.preventDefault();
+    this.onNavigate(this.navItems[nextIndex].pageId);
+  }
+
   toggleTheme(): void {
     this.stateService.toggleTheme();
   }

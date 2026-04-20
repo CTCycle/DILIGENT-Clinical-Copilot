@@ -3,69 +3,23 @@ from __future__ import annotations
 import asyncio
 import time
 from datetime import datetime
-from collections.abc import Sequence
 from functools import partial
 from typing import Any
-from collections.abc import Callable
-
-from pydantic import ValidationError
-from pydantic_core import ErrorDetails
-
-from DILIGENT.server.services.llm.cloud import LLMError
 
 from DILIGENT.server.domain.clinical.entities import (
-    ClinicalLabEntry,
     ClinicalPipelineValidationError,
-    ClinicalSessionRequest,
-    DiseaseContextEntry,
-    DrugEntry,
     DrugRucamAssessment,
-    LiverInjuryOnsetContext,
-    PatientLabTimeline,
     PatientData,
-    PatientDiseaseContext,
-    PatientDrugs,
-    PatientRucamAssessmentBundle,
     PipelineIssue,
 )
-from DILIGENT.server.domain.jobs import (
-    JobCancelResponse,
-    JobStartResponse,
-    JobStatusResponse,
-)
-from DILIGENT.server.configurations.startup import server_settings
 from DILIGENT.server.configurations.llm_configs import LLMRuntimeConfig
-from DILIGENT.server.repositories.serialization.data import DataSerializer
-from DILIGENT.server.repositories.serialization.model_configs import ModelConfigSerializer
-from DILIGENT.server.services.jobs import JobManager, job_manager as default_job_manager
-from DILIGENT.server.common.utils.logger import logger
-from DILIGENT.server.common.utils.types import coerce_bool_or_unknown
-from DILIGENT.server.services.clinical.hepatox import (
-    HepatotoxicityPatternAnalyzer,
-    HepatoxConsultation,
-)
+from DILIGENT.server.services.jobs import JobManager
 from DILIGENT.server.services.clinical.job_progress import (
     CLINICAL_PROGRESS_MESSAGES,
-    ClinicalConsultationProgressCallback,
     ClinicalJobCancelled,
-    StageProgressFractionCallback,
 )
 from DILIGENT.server.services.clinical.language import ClinicalLanguageDetector
-from DILIGENT.server.services.clinical.preparation import ClinicalKnowledgePreparation
-from DILIGENT.server.services.clinical.candidate_selection import select_relevant_candidates
-from DILIGENT.server.services.clinical.disease import DiseaseExtractor
-from DILIGENT.server.services.clinical.labs import ClinicalLabExtractor
-from DILIGENT.server.services.clinical.parser import DrugsParser
-from DILIGENT.server.services.clinical.rucam import RucamScoreEstimator
-from DILIGENT.server.services.clinical.validation import (
-    build_validation_bundle,
-    ensure_required_sections,
-    ensure_timed_therapy_drug,
-)
-from DILIGENT.server.services.payload import PayloadSanitizationService
-from DILIGENT.server.services.model_config_service import ModelConfigService
-from DILIGENT.server.services.retrieval.query import DILIQueryBuilder
-from DILIGENT.server.services.runtime_overrides import RuntimeOverrides
+from DILIGENT.server.services.runtime_overrides import RuntimeSnapshot
 
 NOT_AVAILABLE = "Not available"
 PATIENT_LINE_TEMPLATE = "- **Patient:** {value}"
@@ -395,7 +349,7 @@ class NarrativeBuilder:
 
 ###############################################################################
 async def execute_clinical_job(
-    service: "ClinicalSessionService",
+    service: Any,
     payload: PatientData,
     patient_image_base64: str | None,
     job_id: str,
@@ -505,19 +459,31 @@ def report_clinical_job_progress(
 
 ###############################################################################
 def run_clinical_job(
-    service: "ClinicalSessionService",
+    service: Any,
     payload: PatientData,
     patient_image_base64: str | None,
     job_id: str,
+    runtime_snapshot: RuntimeSnapshot | None = None,
 ) -> dict[str, Any]:
-    result = asyncio.run(
-        execute_clinical_job(
-            service=service,
-            payload=payload,
-            patient_image_base64=patient_image_base64,
-            job_id=job_id,
+    snapshot = runtime_snapshot or service.capture_runtime_snapshot()
+    with service.runtime_override_context(
+        use_cloud_services=snapshot["use_cloud_services"],
+        llm_provider=snapshot["llm_provider"],
+        cloud_model=snapshot["cloud_model"],
+        text_extraction_model=snapshot["text_extraction_model"],
+        clinical_model=snapshot["clinical_model"],
+        ollama_temperature=snapshot["ollama_temperature"],
+        cloud_temperature=snapshot["cloud_temperature"],
+        ollama_reasoning=snapshot["ollama_reasoning"],
+    ):
+        result = asyncio.run(
+            execute_clinical_job(
+                service=service,
+                payload=payload,
+                patient_image_base64=patient_image_base64,
+                job_id=job_id,
+            )
         )
-    )
     if not result:
         return {}
     return result

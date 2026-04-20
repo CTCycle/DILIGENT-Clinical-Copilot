@@ -1,5 +1,5 @@
 import { CommonModule } from '@angular/common';
-import { Component, ElementRef, OnDestroy, ViewChild, inject, signal } from '@angular/core';
+import { Component, ElementRef, OnDestroy, ViewChild, effect, inject, signal } from '@angular/core';
 import { FormsModule } from '@angular/forms';
 
 import { ModalShellComponent } from '../../components/modal-shell/modal-shell.component';
@@ -41,10 +41,30 @@ export class DiliAgentPageComponent implements OnDestroy {
   readonly stateService = inject(AppStateService);
 
   readonly isCancelling = signal(false);
+  readonly isRunActionLocked = signal(false);
   readonly isMissingLabsModalOpen = signal(false);
   readonly todayIso = todayIso;
 
   private poller: { stop: () => void } | null = null;
+  private runActionLockTimer: ReturnType<typeof globalThis.setTimeout> | null = null;
+  private runControlDebounceTimer: ReturnType<typeof globalThis.setTimeout> | null = null;
+  private runControlDebounced = false;
+
+  constructor() {
+    effect(() => {
+      const state = this.vm;
+      if (
+        state.jobStatus === 'completed' &&
+        state.message &&
+        !state.exportUrl &&
+        !state.isRunning &&
+        !state.isStarting
+      ) {
+        const restoredExportUrl = createDownloadUrl(state.message, REPORT_EXPORT_FILENAME);
+        this.stateService.updateDiliAgent({ exportUrl: restoredExportUrl });
+      }
+    });
+  }
 
   get vm() {
     return this.stateService.state().diliAgent;
@@ -52,6 +72,11 @@ export class DiliAgentPageComponent implements OnDestroy {
 
   ngOnDestroy(): void {
     this.stopPoller();
+    this.clearRunActionLock();
+    if (this.runControlDebounceTimer !== null) {
+      globalThis.clearTimeout(this.runControlDebounceTimer);
+      this.runControlDebounceTimer = null;
+    }
     this.revokeObjectUrl();
   }
 
@@ -123,8 +148,26 @@ export class DiliAgentPageComponent implements OnDestroy {
       exportUrl: null,
       jobStage: null,
       jobStageMessage: null,
+      isStarting: false,
       isRunning: false,
     });
+  }
+
+  private clearRunActionLock(): void {
+    if (this.runActionLockTimer !== null) {
+      globalThis.clearTimeout(this.runActionLockTimer);
+      this.runActionLockTimer = null;
+    }
+    this.isRunActionLocked.set(false);
+  }
+
+  private lockRunAction(windowMs: number = 1750): void {
+    this.clearRunActionLock();
+    this.isRunActionLocked.set(true);
+    this.runActionLockTimer = globalThis.setTimeout(() => {
+      this.runActionLockTimer = null;
+      this.isRunActionLocked.set(false);
+    }, Math.max(500, windowMs));
   }
 
   private onJobStatusUpdate(status: JobStatusResponse): void {
@@ -144,6 +187,7 @@ export class DiliAgentPageComponent implements OnDestroy {
       jobStatus: status.status,
       jobStage: stage,
       jobStageMessage: stageMessage,
+      isStarting: false,
       isRunning: !terminalStatus,
     });
 
@@ -194,8 +238,12 @@ export class DiliAgentPageComponent implements OnDestroy {
   }
 
   private async executeRunSession(allowMissingLabs: boolean | null): Promise<void> {
+    if (this.vm.isStarting || this.vm.isRunning || this.isRunActionLocked()) {
+      return;
+    }
+    this.lockRunAction();
     this.isCancelling.set(false);
-    this.stateService.updateDiliAgent({ isRunning: true });
+    this.stateService.updateDiliAgent({ isStarting: true, isRunning: true });
     this.resetOutputs();
     this.stopPoller();
 
@@ -208,6 +256,7 @@ export class DiliAgentPageComponent implements OnDestroy {
         jobStatus: startResult.status,
         jobStage: 'session_initialization',
         jobStageMessage: 'Initializing clinical session',
+        isStarting: false,
       });
       const intervalMs = startResult.poll_interval * 1000;
       this.startPolling(startResult.job_id, intervalMs);
@@ -217,6 +266,7 @@ export class DiliAgentPageComponent implements OnDestroy {
         exportUrl: null,
         jobStage: null,
         jobStageMessage: null,
+        isStarting: false,
         isRunning: false,
       });
     }
@@ -259,9 +309,13 @@ export class DiliAgentPageComponent implements OnDestroy {
   }
 
   async stopSession(): Promise<void> {
+    if (this.vm.isStarting && !this.vm.jobId) {
+      return;
+    }
     if (!this.vm.jobId) {
       return;
     }
+    this.lockRunAction(5000);
     this.isCancelling.set(true);
     try {
       await cancelClinicalJob(this.vm.jobId);
@@ -288,6 +342,7 @@ export class DiliAgentPageComponent implements OnDestroy {
       jobStatus: null,
       jobStage: null,
       jobStageMessage: null,
+      isStarting: false,
     });
   }
 
@@ -310,6 +365,17 @@ export class DiliAgentPageComponent implements OnDestroy {
   }
 
   runOrStop(): void {
+    if (this.runControlDebounced || this.vm.isStarting || this.isCancelling() || this.isRunActionLocked()) {
+      return;
+    }
+    this.runControlDebounced = true;
+    if (this.runControlDebounceTimer !== null) {
+      globalThis.clearTimeout(this.runControlDebounceTimer);
+    }
+    this.runControlDebounceTimer = globalThis.setTimeout(() => {
+      this.runControlDebounced = false;
+      this.runControlDebounceTimer = null;
+    }, 1000);
     if (this.vm.isRunning) {
       void this.stopSession();
       return;

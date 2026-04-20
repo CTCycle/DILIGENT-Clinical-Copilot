@@ -1903,6 +1903,8 @@ input[type="date"]::-webkit-calendar-picker-indicator:hover {
   right: 0;
   width: 100%;
   z-index: 120;
+  isolation: isolate;
+  contain: paint;
 }
 
 .app-header {
@@ -1942,21 +1944,17 @@ input[type="date"]::-webkit-calendar-picker-indicator:hover {
 .app-header-brand {
   display: inline-flex;
   align-items: center;
-  gap: 12px;
-  padding: 6px 8px;
-  border-radius: 12px;
-  border: 1px solid var(--color-border-subtle);
-  background: color-mix(in srgb, var(--color-surface) 84%, var(--color-surface-alt));
+  gap: 10px;
   justify-self: start;
   white-space: nowrap;
 }
 
 .app-header-wordmark {
   font-family: "Manrope", "Inter", sans-serif;
-  font-size: clamp(24px, 1.8vw, 32px);
+  font-size: clamp(14px, 1.15vw, 18px);
   font-weight: 720;
   line-height: 1;
-  letter-spacing: 0.01em;
+  letter-spacing: 0.005em;
   color: var(--color-brand);
   white-space: nowrap;
 }
@@ -1969,16 +1967,17 @@ input[type="date"]::-webkit-calendar-picker-indicator:hover {
 }
 
 .app-header-icon-btn {
-  width: 32px;
-  height: 32px;
+  width: 36px;
+  height: 36px;
   border-radius: 999px;
-  border: none;
-  background: transparent;
+  border: 1px solid rgba(148, 163, 184, 0.4);
+  background: rgba(255, 255, 255, 0.72);
   color: var(--color-text-secondary);
   display: inline-flex;
   align-items: center;
   justify-content: center;
   cursor: pointer;
+  transition: background 0.2s ease, border-color 0.2s ease, color 0.2s ease;
 }
 
 .app-header-icon-btn svg {
@@ -1987,7 +1986,8 @@ input[type="date"]::-webkit-calendar-picker-indicator:hover {
 }
 
 .app-header-icon-btn:hover {
-  background: #f0f4f3;
+  border-color: rgba(34, 197, 94, 0.58);
+  background: rgba(220, 252, 231, 0.45);
   color: var(--color-text-primary);
 }
 
@@ -2920,7 +2920,7 @@ input[type="date"]::-webkit-calendar-picker-indicator:hover {
   flex-direction: column;
   gap: var(--space-sm);
   --inspection-control-height: 32px;
-  --inspection-icon-action-size: 30px;
+  --inspection-icon-action-size: 38px;
 }
 
 .inspection-page-workbench {
@@ -3808,23 +3808,6 @@ input[type="date"]::-webkit-calendar-picker-indicator:hover {
   --app-background: radial-gradient(circle at top left, #e0e9e4 0%, #f3f8f5 100%);
 }
 
-.app-header-logo {
-  width: 56px;
-  height: 56px;
-}
-
-.app-header-brand {
-  padding: 0;
-  border-radius: 0;
-  border: none;
-  background: transparent;
-}
-
-.app-header-wordmark {
-  font-size: clamp(24px, 1.8vw, 32px);
-  letter-spacing: 0.01em;
-}
-
 .stitch-dili-heading h1 {
   font-size: clamp(30px, 2.75vw, 35px);
   letter-spacing: -0.012em;
@@ -4211,14 +4194,6 @@ input[type="date"]::-webkit-calendar-picker-indicator:hover {
 /* ============================================
    Angular Parity Fixes
    ============================================ */
-.app-header-icon-btn {
-  width: 36px;
-  height: 36px;
-  border: 1px solid rgba(148, 163, 184, 0.4);
-  background: rgba(255, 255, 255, 0.72);
-  transition: background 0.2s ease, border-color 0.2s ease, color 0.2s ease;
-}
-
 .app-header-icon-btn .theme-icon {
   width: 18px;
   height: 18px;
@@ -4279,15 +4254,6 @@ input[type="date"]::-webkit-calendar-picker-indicator:hover {
 .stitch-dili-controls .toggle-label {
   font-size: 14px;
   font-weight: 600;
-}
-
-.app-header-brand {
-  gap: 10px;
-}
-
-.app-header-wordmark {
-  font-size: clamp(14px, 1.15vw, 18px);
-  letter-spacing: 0.005em;
 }
 
 .inspection-widget-header {
@@ -4460,11 +4426,6 @@ input[type="date"]::-webkit-calendar-picker-indicator:hover {
   gap: 8px;
   min-width: 192px;
   width: 192px;
-}
-
-.inspection-icon-button {
-  width: 38px;
-  height: 38px;
 }
 
 .inspection-table th:last-child {

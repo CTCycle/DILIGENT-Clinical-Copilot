@@ -35,7 +35,7 @@ def test_models_list_returns_payload(api_context: APIRequestContext):
 
 
 def test_models_pull_requires_name(api_context: APIRequestContext):
-    response = api_context.get("/models/pull")
+    response = api_context.get("/api/models/pull")
     assert response.status == 422
 
 
@@ -51,7 +51,7 @@ def test_models_pull_noop_when_model_available(api_context: APIRequestContext):
 
     model = models[0]
     pull_response = api_context.get(
-        f"/models/pull?name={quote(model, safe='')}&stream=false"
+        f"/api/models/pull?name={quote(model, safe='')}&stream=false"
     )
     skip_if_ollama_unavailable(pull_response)
 

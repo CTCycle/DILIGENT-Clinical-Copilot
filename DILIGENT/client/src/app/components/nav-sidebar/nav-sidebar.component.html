@@ -8,13 +8,17 @@
         <span class="app-header-wordmark">DILIGENT Clinical Copilot</span>
       </div>
       <nav class="tab-bar" aria-label="Main navigation">
-        <div class="tab-items">
+        <div class="tab-items" role="tablist" aria-label="Main navigation tabs">
           @for (item of navItems; track item.pageId) {
             <button
               type="button"
               class="tab-item"
               [class.active]="stateService.state().activePage === item.pageId"
+              role="tab"
+              [attr.aria-selected]="stateService.state().activePage === item.pageId"
+              [attr.tabindex]="stateService.state().activePage === item.pageId ? '0' : '-1'"
               (click)="onNavigate(item.pageId)"
+              (keydown)="onNavTabKeydown($event, item.pageId)"
               [attr.aria-current]="stateService.state().activePage === item.pageId ? 'page' : null"
               [title]="item.label"
             >

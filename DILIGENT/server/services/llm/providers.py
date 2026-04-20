@@ -572,7 +572,7 @@ class OllamaClient:
                 options={"num_predict": 0},
                 keep_alive=keep_alive,
             )
-            resp = await self.client.post(OLLAMA_GENERATE_PATH, json=payload)
+            resp = await self.client.post("/api/generate", json=payload)
             self.raise_for_status(resp)
             logger.debug(
                 "Prefetched Ollama model '%s' with keep_alive='%s'",
@@ -1765,6 +1765,12 @@ def initialize_llm_client(
 ) -> OllamaClient | CloudLLMClient:
     kwargs.setdefault("timeout_s", server_settings.external_data.default_llm_timeout)
     provider, default_model = LLMRuntimeConfig.resolve_provider_and_model(purpose)
+    if LLMRuntimeConfig.is_cloud_enabled():
+        forced_provider = (LLMRuntimeConfig.get_llm_provider() or "").strip().lower()
+        provider = forced_provider or provider
+        forced_model = (LLMRuntimeConfig.get_cloud_model() or "").strip()
+        if forced_model:
+            default_model = forced_model
     selected_model = kwargs.pop("default_model", default_model)
     return select_llm_provider(
         provider=provider,

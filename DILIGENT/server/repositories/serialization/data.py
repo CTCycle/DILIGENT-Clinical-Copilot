@@ -819,6 +819,34 @@ class _RepositorySerializationService:
                 )
                 .all()
             )
+            session_ids = [int(session_row.id) for session_row, _ in rows]
+            report_session_ids: set[int] = set()
+            timeline_session_ids: set[int] = set()
+            if session_ids:
+                result_rows = db_session.execute(
+                    select(
+                        ClinicalSessionResult.session_id,
+                        ClinicalSessionResult.payload_json,
+                    ).where(ClinicalSessionResult.session_id.in_(session_ids))
+                ).all()
+                for result_session_id, payload_json in result_rows:
+                    parsed_payload = self.parse_session_result_payload(payload_json)
+                    if not isinstance(parsed_payload, dict):
+                        continue
+                    parsed_report = self.normalize_string(parsed_payload.get("report"))
+                    if parsed_report is not None:
+                        report_session_ids.add(int(result_session_id))
+                    parsed_timeline = parsed_payload.get("patient_timeline")
+                    if isinstance(parsed_timeline, dict):
+                        timeline_session_ids.add(int(result_session_id))
+                section_report_rows = db_session.execute(
+                    select(ClinicalSessionSection.session_id).where(
+                        ClinicalSessionSection.session_id.in_(session_ids),
+                        ClinicalSessionSection.section_kind == "final_report",
+                    )
+                ).all()
+                for (section_session_id,) in section_report_rows:
+                    report_session_ids.add(int(section_session_id))
             items = [
                 {
                     "session_id": int(session_row.id),
@@ -826,6 +854,13 @@ class _RepositorySerializationService:
                     "session_timestamp": session_row.session_timestamp,
                     "status": self.normalize_session_status(session_row.session_status),
                     "total_duration": self.to_float(session_row.total_duration),
+                    "has_report": int(session_row.id) in report_session_ids,
+                    "has_timeline": int(session_row.id) in timeline_session_ids,
+                    "can_generate_timeline": bool(
+                        self.normalize_string(patient_row.anamnesis)
+                        or self.normalize_string(patient_row.drugs)
+                        or self.normalize_string(patient_row.laboratory_analysis)
+                    ),
                 }
                 for session_row, patient_row in rows
             ]

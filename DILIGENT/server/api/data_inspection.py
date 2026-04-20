@@ -189,6 +189,21 @@ class DataInspectionEndpoint:
                 force_regenerate=force_regenerate,
             )
         except RuntimeError as exc:
+            detail_message = str(exc)
+            lowered_detail = detail_message.casefold()
+            if "cooling down" in lowered_detail or "already in progress" in lowered_detail:
+                raise HTTPException(
+                    status_code=status.HTTP_429_TOO_MANY_REQUESTS,
+                    detail=detail_message,
+                ) from exc
+            if "failed to list ollama models" in lowered_detail:
+                raise HTTPException(
+                    status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+                    detail=(
+                        "Timeline generation requires a reachable local model runtime. "
+                        "Start Ollama and retry."
+                    ),
+                ) from exc
             logger.warning(
                 "Session timeline generation failed session_id=%s error=%s",
                 session_id,

@@ -279,6 +279,7 @@ export class DataInspectionPageComponent implements OnInit, OnDestroy {
   readonly timelineData = signal<InspectionSessionTimeline | null>(null);
   readonly timelineLoading = signal(false);
   readonly timelineError = signal<string | null>(null);
+  readonly timelineRegenerationBlockedUntil = signal(0);
   private readonly timelineCache = new Map<number, InspectionSessionTimeline>();
   readonly timelineAxisY = 220;
   readonly timelineChartHeight = 500;
@@ -449,6 +450,13 @@ export class DataInspectionPageComponent implements OnInit, OnDestroy {
   }
 
   async openSessionReport(row: InspectionSessionItem): Promise<void> {
+    if (!row.has_report) {
+      this.reportSession.set(row);
+      this.reportContent.set('');
+      this.reportLoading.set(false);
+      this.reportError.set('[ERROR] Report is not available for this session.');
+      return;
+    }
     this.reportSession.set(row);
     this.reportLoading.set(true);
     this.reportError.set(null);
@@ -470,6 +478,16 @@ export class DataInspectionPageComponent implements OnInit, OnDestroy {
   }
 
   async openPatientTimeline(row: InspectionSessionItem): Promise<void> {
+    if (!this.canOpenTimeline(row)) {
+      this.timelineSession.set(row);
+      this.timelineData.set(null);
+      this.timelineLoading.set(false);
+      this.timelineError.set('[ERROR] Timeline data is unavailable for this session.');
+      return;
+    }
+    if (this.timelineLoading()) {
+      return;
+    }
     this.timelineSession.set(row);
     this.timelineError.set(null);
     const cached = this.timelineCache.get(row.session_id) || null;
@@ -492,6 +510,7 @@ export class DataInspectionPageComponent implements OnInit, OnDestroy {
           this.timelineCache.set(row.session_id, timeline);
           this.timelineData.set(timeline);
         } catch (generationError) {
+          this.timelineRegenerationBlockedUntil.set(Date.now() + 2000);
           this.timelineError.set(
             generationError instanceof Error
               ? generationError.message
@@ -519,6 +538,9 @@ export class DataInspectionPageComponent implements OnInit, OnDestroy {
     if (!session) {
       return;
     }
+    if (this.timelineLoading() || this.isTimelineRegenerationBlocked()) {
+      return;
+    }
     this.timelineLoading.set(true);
     this.timelineError.set(null);
     try {
@@ -528,6 +550,7 @@ export class DataInspectionPageComponent implements OnInit, OnDestroy {
       this.timelineCache.set(session.session_id, timeline);
       this.timelineData.set(timeline);
     } catch (error) {
+      this.timelineRegenerationBlockedUntil.set(Date.now() + 2000);
       this.timelineError.set(
         error instanceof Error ? error.message : 'Failed to regenerate patient timeline.',
       );
@@ -712,6 +735,18 @@ export class DataInspectionPageComponent implements OnInit, OnDestroy {
 
   async openAliases(drugId: number): Promise<void> {
     await this.aliasDetail.load(() => fetchInspectionRxNavAliases(drugId), 'Failed to load aliases.');
+  }
+
+  canOpenSessionReport(row: InspectionSessionItem): boolean {
+    return row.has_report;
+  }
+
+  canOpenTimeline(row: InspectionSessionItem): boolean {
+    return row.has_timeline || row.can_generate_timeline;
+  }
+
+  isTimelineRegenerationBlocked(): boolean {
+    return Date.now() < this.timelineRegenerationBlockedUntil();
   }
 
   closeAliases(): void {

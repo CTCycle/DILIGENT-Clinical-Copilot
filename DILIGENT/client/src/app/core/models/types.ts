@@ -159,6 +159,9 @@ export type InspectionSessionItem = {
   session_timestamp: string | null;
   status: InspectionSessionStatus;
   total_duration: number | null;
+  has_report: boolean;
+  has_timeline: boolean;
+  can_generate_timeline: boolean;
 };
 
 export type InspectionSessionCatalogResponse = {

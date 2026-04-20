@@ -14,7 +14,6 @@ def build_minimal_payload() -> dict:
         "drugs": "Zetamycin 10 mg 1-0-0-0",
         "laboratory_analysis": "Lab 2024-01-15: ALT 100 U/L (ULN 50), ALP 200 U/L (ULN 100), bilirubin 2.0 mg/dL",
         "use_rag": False,
-        "has_hepatic_diseases": False,
     }
 
 
@@ -166,7 +165,6 @@ def test_clinical_preserves_italian_output_language(api_context: APIRequestConte
             "Laboratorio 2025-01-10: ALT 320 U/L (ULN 40), ALP 140 U/L (ULN 120), bilirubina 2.1 mg/dL"
         ),
         "use_rag": False,
-        "has_hepatic_diseases": False,
     }
     response = api_context.post("/api/clinical", data=payload)
     assert response.status == 202
