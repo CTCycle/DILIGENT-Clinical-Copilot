@@ -134,3 +134,33 @@ def test_normalize_entry_filters_non_drug_fragments() -> None:
     )
     assert kept is not None
     assert kept.name == "Pemetrexed"
+
+
+def test_post_process_llm_entry_splits_dosage_from_temporal_details() -> None:
+    parser = DrugsParser(client=object())
+    raw_line = (
+        "Boswellia serrata estratto secco 1 cps BID, iniziata circa 6 settimane "
+        "prima dell'ittero, sospesa alla comparsa sintomi"
+    )
+    entry = DrugEntry(
+        name="Boswellia serrata estratto secco",
+        dosage=(
+            "1 cps BID, iniziata circa 6 settimane prima dell'ittero, "
+            "sospesa alla comparsa sintomi"
+        ),
+    )
+
+    parsed = parser.post_process_llm_entry(
+        entry,
+        raw_line=raw_line,
+        source="therapy",
+        historical_flag=False,
+    )
+
+    assert parsed is not None
+    assert parsed.dosage == "1 cps BID"
+    assert parsed.therapy_start_status is True
+    assert parsed.therapy_start_date == "circa 6 settimane prima dell'ittero"
+    assert parsed.suspension_status is True
+    assert parsed.suspension_date == "alla comparsa sintomi"
+    assert parsed.temporal_classification == "temporal_known"
