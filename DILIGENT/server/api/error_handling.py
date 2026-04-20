@@ -10,6 +10,7 @@ from fastapi.responses import JSONResponse
 from starlette.middleware.base import BaseHTTPMiddleware
 
 from DILIGENT.server.common.utils.logger import logger
+from DILIGENT.server.common.exceptions import ServiceError
 
 
 REQUEST_ID_HEADER = "X-Request-ID"
@@ -30,7 +31,7 @@ def resolve_request_id(request: Request) -> str:
 ###############################################################################
 def build_error_payload(
     *,
-    detail: str,
+    detail: object,
     request_id: str,
     retryable: bool,
 ) -> dict[str, object]:
@@ -152,6 +153,32 @@ def missing_resource_error_handler(
 
 
 ###############################################################################
+def service_error_handler(
+    request: Request,
+    exc: ServiceError,
+) -> JSONResponse:
+    request_id = resolve_request_id(request)
+    logger.warning(
+        "Service error request_id=%s method=%s path=%s type=%s",
+        request_id,
+        request.method,
+        request.url.path,
+        type(exc).__name__,
+    )
+    detail = exc.detail if isinstance(exc.detail, (str, list, dict)) else str(exc.detail)
+    response = JSONResponse(
+        status_code=int(exc.status_code),
+        content=build_error_payload(
+            detail=detail,
+            request_id=request_id,
+            retryable=bool(exc.retryable),
+        ),
+    )
+    response.headers.setdefault(REQUEST_ID_HEADER, request_id)
+    return response
+
+
+###############################################################################
 def unhandled_error_handler(
     request: Request,
     exc: Exception,
@@ -185,4 +212,5 @@ def register_error_handling(app: FastAPI) -> None:
     app.add_exception_handler(httpx.TimeoutException, timeout_error_handler)
     app.add_exception_handler(httpx.RequestError, dependency_error_handler)
     app.add_exception_handler(FileNotFoundError, missing_resource_error_handler)
+    app.add_exception_handler(ServiceError, service_error_handler)
     app.add_exception_handler(Exception, unhandled_error_handler)

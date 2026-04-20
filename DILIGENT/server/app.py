@@ -19,7 +19,7 @@ from DILIGENT.server.common.constants import (
 from DILIGENT.server.api.access_keys import router as access_keys_router
 from DILIGENT.server.api.data_inspection import router as data_inspection_router
 from DILIGENT.server.api.model_config import router as model_config_router
-from DILIGENT.server.api.model_config import sync_runtime_model_config
+from DILIGENT.server.configurations.model_runtime import sync_runtime_model_config
 from DILIGENT.server.api.session import router as session_router
 from DILIGENT.server.api.ollama import router as ollama_router
 from DILIGENT.server.api.research import router as research_router

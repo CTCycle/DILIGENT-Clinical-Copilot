@@ -8,11 +8,15 @@ from functools import partial
 from typing import Any
 from collections.abc import Callable
 
-from fastapi import Body, HTTPException, status
-from fastapi.responses import PlainTextResponse
 from pydantic import ValidationError
 from pydantic_core import ErrorDetails
 
+from DILIGENT.server.common.exceptions import (
+    ServiceConflictError,
+    ServiceError,
+    ServiceNotFoundError,
+    ServiceValidationError,
+)
 from DILIGENT.server.domain.clinical.extras import HepatoxPreparedInputs
 from DILIGENT.server.services.llm.cloud import LLMError
 
@@ -106,9 +110,7 @@ class ClinicalSessionService(ClinicalSessionFormattingMixin):
         input_preparator: ClinicalKnowledgePreparation | None = None,
         hepatox_consultation_cls: type[HepatoxConsultation] | None = None,
         job_manager: JobManager | None = None,
-        router: Any | None = None,
     ) -> None:
-        self.router = router
         self.drugs_parser = drugs_parser
         self.disease_extractor = disease_extractor
         self.lab_extractor = lab_extractor
@@ -240,9 +242,8 @@ class ClinicalSessionService(ClinicalSessionFormattingMixin):
             )
             return PatientData.model_validate(payload_data)
         except ValidationError as exc:
-            raise HTTPException(
-                status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
-                detail=self.serialize_validation_errors(exc.errors()),
+            raise ServiceValidationError(
+                self.serialize_validation_errors(exc.errors()),
             ) from exc
 
     # -------------------------------------------------------------------------
@@ -1000,8 +1001,8 @@ class ClinicalSessionService(ClinicalSessionFormattingMixin):
     # -------------------------------------------------------------------------
     async def start_clinical_session(
         self,
-        request_payload: ClinicalSessionRequest = Body(...),
-    ) -> PlainTextResponse:
+        request_payload: ClinicalSessionRequest,
+    ) -> str:
         patient_payload = self.build_patient_payload(request_payload)
         self.apply_persisted_runtime_configuration()
         try:
@@ -1010,22 +1011,20 @@ class ClinicalSessionService(ClinicalSessionFormattingMixin):
                 patient_image_base64=request_payload.patient_image_base64,
             )
         except ClinicalPipelineValidationError as exc:
-            raise HTTPException(
-                status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
-                detail=self.serialize_pipeline_issues(exc.issues),
+            raise ServiceValidationError(
+                self.serialize_pipeline_issues(exc.issues),
             ) from exc
         report = str(single_result.get("report", "")).strip()
-        return PlainTextResponse(content=report, status_code=status.HTTP_202_ACCEPTED)
+        return report
 
     # -------------------------------------------------------------------------
     def start_clinical_job(
         self,
-        request_payload: ClinicalSessionRequest = Body(...),
+        request_payload: ClinicalSessionRequest,
     ) -> JobStartResponse:
         if self.job_manager.is_job_running(self.JOB_TYPE):
-            raise HTTPException(
-                status_code=status.HTTP_409_CONFLICT,
-                detail="Clinical analysis is already in progress",
+            raise ServiceConflictError(
+                "Clinical analysis is already in progress",
             )
 
         patient_payload = self.build_patient_payload(request_payload)
@@ -1043,9 +1042,8 @@ class ClinicalSessionService(ClinicalSessionFormattingMixin):
 
         job_status = self.job_manager.get_job_status(job_id)
         if job_status is None:
-            raise HTTPException(
-                status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-                detail="Failed to initialize clinical analysis job",
+            raise ServiceError(
+                "Failed to initialize clinical analysis job",
             )
 
         return JobStartResponse(
@@ -1060,9 +1058,8 @@ class ClinicalSessionService(ClinicalSessionFormattingMixin):
     def get_clinical_job_status(self, job_id: str) -> JobStatusResponse:
         job_status = self.job_manager.get_job_status(job_id)
         if job_status is None:
-            raise HTTPException(
-                status_code=status.HTTP_404_NOT_FOUND,
-                detail="Job not found.",
+            raise ServiceNotFoundError(
+                "Job not found.",
             )
         return JobStatusResponse(**job_status)
 
@@ -1070,9 +1067,8 @@ class ClinicalSessionService(ClinicalSessionFormattingMixin):
     def cancel_clinical_job(self, job_id: str) -> JobCancelResponse:
         job_status = self.job_manager.get_job_status(job_id)
         if job_status is None:
-            raise HTTPException(
-                status_code=status.HTTP_404_NOT_FOUND,
-                detail="Job not found.",
+            raise ServiceNotFoundError(
+                "Job not found.",
             )
         success = self.job_manager.cancel_job(job_id)
         if success:
@@ -1083,6 +1079,5 @@ class ClinicalSessionService(ClinicalSessionFormattingMixin):
             message="Cancellation requested" if success else "Job cannot be cancelled",
         )
     
-
 
 

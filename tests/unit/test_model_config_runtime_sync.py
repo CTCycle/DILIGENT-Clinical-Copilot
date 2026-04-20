@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from DILIGENT.server.api import model_config
+from DILIGENT.server.configurations import model_runtime
 
 
 def test_sync_runtime_model_config_applies_snapshot(monkeypatch) -> None:
@@ -8,20 +8,20 @@ def test_sync_runtime_model_config_applies_snapshot(monkeypatch) -> None:
     applied: dict[str, object] = {}
 
     monkeypatch.setattr(
-        model_config.endpoint,
+        model_runtime.ModelConfigService,
         "ensure_defaults",
-        lambda: sentinel_snapshot,
+        lambda self: sentinel_snapshot,
     )
 
-    def fake_apply(snapshot: object) -> None:
+    def fake_apply(self, snapshot: object) -> None:
         applied["snapshot"] = snapshot
 
     monkeypatch.setattr(
-        model_config.endpoint,
+        model_runtime.ModelConfigService,
         "apply_runtime_snapshot",
         fake_apply,
     )
 
-    model_config.sync_runtime_model_config()
+    model_runtime.sync_runtime_model_config()
 
     assert applied["snapshot"] is sentinel_snapshot

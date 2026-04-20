@@ -32,18 +32,20 @@ Core workflow:
 ## 3. Backend boundaries
 
 - `DILIGENT/server/api/*`
-  - HTTP routes and request/response mapping.
+  - HTTP routes, request parsing, response mapping, and HTTP error translation.
   - Job start/poll/cancel endpoints.
 - `DILIGENT/server/domain/*`
-  - Typed domain payloads and contracts.
+  - Typed domain payloads and contracts (including API response models such as `ClinicalSessionReportResponse`).
 - `DILIGENT/server/services/*`
   - Clinical analysis pipeline, inspection/update orchestration, job orchestration.
+  - No FastAPI imports; services raise service-layer exceptions mapped in `server/api/error_handling.py`.
 - `DILIGENT/server/repositories/*`
   - Persistence boundaries, DB queries, serialization.
 - `DILIGENT/server/models/*`
   - Provider clients, prompt templates, structured-output helpers.
 - `DILIGENT/server/configurations/*`
   - Environment and runtime configuration loading.
+  - Startup/runtime wiring helpers (including `configurations/model_runtime.py::sync_runtime_model_config`).
 - `DILIGENT/server/common/*`
   - Shared utilities and constants.
 
@@ -93,9 +95,11 @@ Current managed job types:
 - `ollama_pull`
 - `rxnav_update`
 - `livertox_update`
+- `dili_priors_update`
+- `drug_labels_update`
 - `rag_update`
 
-All follow a shared start/poll/cancel lifecycle and shared job-state contract. See `assets/docs/BACKGROUND_JOBS.md`.
+All follow a shared start/poll/cancel lifecycle and shared job-state contract backed by the shared `job_manager` singleton (`DILIGENT/server/services/jobs.py`). See `assets/docs/BACKGROUND_JOBS.md`.
 
 ## 7. Data, resources, and persistence
 

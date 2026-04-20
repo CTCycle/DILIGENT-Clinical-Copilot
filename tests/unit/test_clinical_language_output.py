@@ -1,9 +1,9 @@
 from __future__ import annotations
 
-from DILIGENT.server.api.session import NarrativeBuilder
 from DILIGENT.server.domain.clinical import HepatotoxicityPatternScore
 from DILIGENT.server.services.clinical.language import detect_clinical_language
 from DILIGENT.server.services.clinical.validation import build_validation_bundle
+from DILIGENT.server.services.session_shared import NarrativeBuilder
 from DILIGENT.server.domain.clinical import PatientData
 
 

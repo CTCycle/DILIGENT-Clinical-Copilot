@@ -5,7 +5,7 @@ from datetime import date, datetime
 import re
 from typing import Any, Literal
 
-from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
+from pydantic import BaseModel, ConfigDict, Field, RootModel, field_validator, model_validator
 
 Comparator = Literal["<=", "<", ">=", ">"]
 CONTROL_CHARACTERS_RE = re.compile(r"[\x00-\x08\x0B\x0C\x0E-\x1F\x7F]")
@@ -190,6 +190,11 @@ class ClinicalSessionRequest(BaseModel):
         without_controls = CONTROL_CHARACTERS_RE.sub(" ", str(value))
         stripped = without_controls.strip()
         return stripped or None
+
+
+###############################################################################
+class ClinicalSessionReportResponse(RootModel[str]):
+    pass
 
 
 ###############################################################################

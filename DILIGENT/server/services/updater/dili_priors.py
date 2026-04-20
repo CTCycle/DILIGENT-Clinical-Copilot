@@ -3,9 +3,9 @@ from __future__ import annotations
 import io
 from html import unescape
 from html.parser import HTMLParser
-import json
 import re
 from typing import Any
+from collections.abc import Callable
 
 import httpx
 import pandas as pd
@@ -104,10 +104,28 @@ class DiliPriorUpdater:
         self.request_timeout = max(configured, 1.0)
 
     # -------------------------------------------------------------------------
-    def update_from_sources(self, *, redownload: bool = False) -> dict[str, dict[str, int]]:
+    def update_from_sources(
+        self,
+        *,
+        redownload: bool = False,
+        progress_callback: Callable[[float, str], None] | None = None,
+        should_stop: Callable[[], bool] | None = None,
+    ) -> dict[str, dict[str, int]]:
         _ = redownload
+        self.emit_progress(
+            progress_callback,
+            progress=15.0,
+            message="Downloading DILI prior sources",
+        )
+        self.raise_if_cancelled(should_stop)
         dilirank_frame = self.parse_dilirank(self.download_dilirank())
         dilist_frame = self.parse_dilist(self.download_dilist())
+        self.emit_progress(
+            progress_callback,
+            progress=45.0,
+            message="Parsing and matching prior annotations",
+        )
+        self.raise_if_cancelled(should_stop)
         dilirank_matched, dilirank_summary = self.match_rows_to_drugs(
             dilirank_frame,
             source_dataset="dilirank",
@@ -117,7 +135,18 @@ class DiliPriorUpdater:
             source_dataset="dilist",
         )
         unified = pd.concat([dilirank_matched, dilist_matched], ignore_index=True)
+        self.emit_progress(
+            progress_callback,
+            progress=82.0,
+            message="Persisting DILI prior annotations",
+        )
+        self.raise_if_cancelled(should_stop)
         self.persist_annotations(unified)
+        self.emit_progress(
+            progress_callback,
+            progress=96.0,
+            message="Finalizing DILI priors update",
+        )
         return {
             "dilirank": dilirank_summary,
             "dilist": dilist_summary,
@@ -384,6 +413,24 @@ class DiliPriorUpdater:
             if candidate in mapping:
                 return mapping[candidate]
         return None
+
+    # -------------------------------------------------------------------------
+    @staticmethod
+    def emit_progress(
+        progress_callback: Callable[[float, str], None] | None,
+        *,
+        progress: float,
+        message: str,
+    ) -> None:
+        if progress_callback is None:
+            return
+        progress_callback(progress, message)
+
+    # -------------------------------------------------------------------------
+    @staticmethod
+    def raise_if_cancelled(should_stop: Callable[[], bool] | None) -> None:
+        if should_stop is not None and should_stop():
+            raise RuntimeError("DILI priors update cancelled by user request")
 
 
     # -------------------------------------------------------------------------
