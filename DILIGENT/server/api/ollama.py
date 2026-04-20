@@ -5,12 +5,11 @@ from fastapi import APIRouter, Query, status
 from DILIGENT.server.domain.jobs import JobCancelResponse, JobStartResponse, JobStatusResponse
 from DILIGENT.server.domain.models import ModelListResponse, ModelPullResponse
 from DILIGENT.server.services.llm.providers import OllamaClient
-from DILIGENT.server.services import ollama_service as ollama_service_module
+from DILIGENT.server.services.jobs import job_manager
 from DILIGENT.server.services.ollama_service import OllamaService
 
 router = APIRouter(prefix="/models", tags=["models"])
-service = OllamaService()
-job_manager = ollama_service_module.job_manager
+service = OllamaService(job_manager=job_manager, client_factory=lambda: OllamaClient())
 
 
 ###############################################################################
@@ -18,11 +17,6 @@ class OllamaEndpoint:
     def __init__(self, *, router: APIRouter, service: OllamaService) -> None:
         self.router = router
         self.service = service
-
-    # -------------------------------------------------------------------------
-    @staticmethod
-    def sync_service_seams() -> None:
-        ollama_service_module.job_manager = job_manager
 
     # -------------------------------------------------------------------------
     async def pull_model(
@@ -38,8 +32,7 @@ class OllamaEndpoint:
             description="If True, stream pull from Ollama. Endpoint returns only final status (no SSE).",
         ),
     ) -> ModelPullResponse:
-        self.sync_service_seams()
-        ollama_service_module.OllamaClient = OllamaClient
+        self.service.client_factory = lambda: OllamaClient()
         return await self.service.pull_model(name=name, stream=stream)
 
     # -------------------------------------------------------------------------
@@ -56,23 +49,22 @@ class OllamaEndpoint:
             description="If True, stream pull from Ollama to expose incremental progress.",
         ),
     ) -> JobStartResponse:
-        self.sync_service_seams()
+        self.service.client_factory = lambda: OllamaClient()
         return self.service.start_pull_job(name=name, stream=stream)
 
     # -------------------------------------------------------------------------
     def get_pull_job_status(self, job_id: str) -> JobStatusResponse:
-        self.sync_service_seams()
+        self.service.client_factory = lambda: OllamaClient()
         return self.service.get_pull_job_status(job_id=job_id)
 
     # -------------------------------------------------------------------------
     def cancel_pull_job(self, job_id: str) -> JobCancelResponse:
-        self.sync_service_seams()
+        self.service.client_factory = lambda: OllamaClient()
         return self.service.cancel_pull_job(job_id=job_id)
 
     # -------------------------------------------------------------------------
     async def list_available_models(self) -> ModelListResponse:
-        self.sync_service_seams()
-        ollama_service_module.OllamaClient = OllamaClient
+        self.service.client_factory = lambda: OllamaClient()
         return await self.service.list_available_models()
 
     # -------------------------------------------------------------------------

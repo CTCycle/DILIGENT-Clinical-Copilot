@@ -752,6 +752,8 @@ class DataInspectionService:
     def run_dili_priors_update_job(
         self, job_id: str, overrides: dict[str, Any] | None = None
     ) -> dict[str, Any]:
+        stop_check = partial(self.jobs.should_stop, job_id)
+        progress_callback = DataInspectionProgressReporter(service=self, job_id=job_id)
         override_values = overrides or {}
         self.report_phase_by_target(
             job_id=job_id,
@@ -760,6 +762,8 @@ class DataInspectionService:
             progress=1.0,
             fallback_message="Configuration accepted",
         )
+        if stop_check():
+            return {}
         self.report_phase_by_target(
             job_id=job_id,
             target="dili_priors",
@@ -779,7 +783,9 @@ class DataInspectionService:
             request_timeout=override_values.get("dili_priors_request_timeout"),
         )
         result = updater.update_from_sources(
-            redownload=bool(override_values.get("redownload", False))
+            redownload=bool(override_values.get("redownload", False)),
+            progress_callback=progress_callback,
+            should_stop=stop_check,
         )
         self.report_phase_by_target(
             job_id=job_id,
@@ -808,6 +814,8 @@ class DataInspectionService:
     def run_drug_labels_update_job(
         self, job_id: str, overrides: dict[str, Any] | None = None
     ) -> dict[str, Any]:
+        stop_check = partial(self.jobs.should_stop, job_id)
+        progress_callback = DataInspectionProgressReporter(service=self, job_id=job_id)
         override_values = overrides or {}
         self.report_phase_by_target(
             job_id=job_id,
@@ -816,6 +824,8 @@ class DataInspectionService:
             progress=1.0,
             fallback_message="Configuration accepted",
         )
+        if stop_check():
+            return {}
         self.report_phase_by_target(
             job_id=job_id,
             target="drug_labels",
