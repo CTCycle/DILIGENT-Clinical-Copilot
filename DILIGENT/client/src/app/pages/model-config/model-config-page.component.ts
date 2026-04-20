@@ -155,6 +155,7 @@ export class ModelConfigPageComponent implements OnInit {
   readonly modelFilters = MODEL_FILTERS;
 
   readonly isLoading = signal(true);
+  readonly hasLoadedConfig = signal(false);
   readonly isSaving = signal(false);
   readonly localModels = signal<ModelConfigStateResponse['local_models']>([]);
   readonly cloudChoices = signal(CLOUD_MODEL_CHOICES);
@@ -264,16 +265,17 @@ export class ModelConfigPageComponent implements OnInit {
     await this.loadModelConfig();
   }
 
-  async loadModelConfig(syncDraft = true): Promise<void> {
+  async loadModelConfig(syncDraft = true, includeLocalAvailability?: boolean): Promise<void> {
     this.isLoading.set(true);
     try {
-      const payload = await fetchModelConfigState();
+      const payload = await fetchModelConfigState(includeLocalAvailability);
       this.applyConfigToState(payload, syncDraft);
       this.statusMessage.set('');
     } catch (error) {
       this.statusMessage.set(formatUnknownError(error, 'Unable to load model settings.'));
     } finally {
       this.isLoading.set(false);
+      this.hasLoadedConfig.set(true);
     }
   }
 
@@ -322,6 +324,9 @@ export class ModelConfigPageComponent implements OnInit {
 
   handleCloudSwitchChange(value: boolean): void {
     this.draftConfig.update((previous) => ({ ...previous, useCloudServices: value }));
+    if (!value) {
+      void this.loadModelConfig(false, true);
+    }
   }
 
   handleProviderChange(provider: CloudProvider): void {
@@ -354,16 +359,19 @@ export class ModelConfigPageComponent implements OnInit {
 
   async handleSaveConfiguration(): Promise<void> {
     const draft = this.draftConfig();
+    const patch: ModelConfigUpdateRequest = {
+      use_cloud_services: draft.useCloudServices,
+      llm_provider: this.draftProvider(),
+      cloud_model: this.draftCloudModel(),
+      ollama_temperature: draft.temperature,
+      cloud_temperature: draft.temperature,
+    };
+    if (!draft.useCloudServices) {
+      patch.clinical_model = draft.clinicalModel || null;
+      patch.text_extraction_model = draft.parsingModel || null;
+    }
     await this.persistConfigPatch(
-      {
-        use_cloud_services: draft.useCloudServices,
-        llm_provider: this.draftProvider(),
-        cloud_model: this.draftCloudModel(),
-        clinical_model: draft.clinicalModel || null,
-        text_extraction_model: draft.parsingModel || null,
-        ollama_temperature: draft.temperature,
-        cloud_temperature: draft.temperature,
-      },
+      patch,
       'Configuration saved.',
       true,
     );

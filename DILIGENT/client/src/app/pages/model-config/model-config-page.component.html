@@ -4,6 +4,11 @@
     <p class="lede">Adjust runtime preferences for DILI analysis.</p>
   </header>
 
+  @if (!hasLoadedConfig()) {
+    <section class="model-config-loading-state" role="status" aria-live="polite">
+      Loading model configuration...
+    </section>
+  } @else {
   <div class="model-config-layout">
     <div class="model-config-main-column">
       <section class="model-config-runtime-row" aria-label="Runtime source selector">
@@ -291,6 +296,7 @@
       </div>
     </aside>
   </div>
+  }
 
   <app-status-message [message]="statusMessage()" [tone]="statusTone()"></app-status-message>
 
