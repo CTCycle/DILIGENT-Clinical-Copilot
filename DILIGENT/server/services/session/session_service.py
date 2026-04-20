@@ -84,7 +84,7 @@ pattern_analyzer = HepatotoxicityPatternAnalyzer()
 rucam_estimator = RucamScoreEstimator()
 serializer = DataSerializer()
 payload_sanitization_service = PayloadSanitizationService()
-from DILIGENT.server.services.session_shared import (
+from DILIGENT.server.services.session.session_shared import (
     NarrativeBuilder,    
     run_clinical_job,
 )
@@ -1075,5 +1075,4 @@ class ClinicalSessionService(ClinicalSessionFormattingMixin):
             message="Cancellation requested" if success else "Job cannot be cancelled",
         )
     
-
 

@@ -11,7 +11,7 @@ from DILIGENT.server.domain.jobs import JobCancelResponse, JobStartResponse, Job
 from DILIGENT.server.services.clinical.hepatox_core import HepatoxConsultation
 from DILIGENT.server.services.clinical.preparation import ClinicalKnowledgePreparation
 from DILIGENT.server.services.jobs import job_manager
-from DILIGENT.server.services.session_service import (
+from DILIGENT.server.services.session.session_service import (
     ClinicalSessionService,
     disease_extractor,
     drugs_parser,

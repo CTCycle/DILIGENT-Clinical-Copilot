@@ -72,6 +72,46 @@ class DrugsParser:
         r"\b\d+(?:[.,]\d+)?\s*(?:mg|g|mcg|ug|ml|u|ui|units?)\b",
         re.IGNORECASE,
     )
+    DOSAGE_TEMPORAL_SPLIT_RE = re.compile(
+        r"""
+        (?:[,;]\s*|\s+)
+        (?:
+            iniziat[oaie]|
+            avviat[oaie]|
+            start(?:ed|ing)?|
+            began|
+            begin|
+            sospes[oaie]|
+            interrott[aoie]|
+            suspend(?:ed|ere|ing)?|
+            stopp?ed|
+            discontinued?|
+            alla\s+comparsa|
+            dal(?:la)?|
+            da(?:ll['’])?|
+            since|
+            from|
+            on
+        )\b.*$
+        """,
+        re.IGNORECASE | re.VERBOSE,
+    )
+    START_EVENT_RE = re.compile(
+        r"""
+        \b(?:iniz(?:io|iat[oaie])|avviat[oaie]|ripres[oaie]|riprend[ei]re|
+        assunzion[ei]|in\s+terapia|in\s+trattamento|terapia|trattamento|
+        start(?:ed|ing)?|initiat(?:ed|ion)|began|begin|resume[sd]?|taking)
+        \b(?P<tail>[^,;\n]*)
+        """,
+        re.IGNORECASE | re.VERBOSE,
+    )
+    SUSPENSION_EVENT_RE = re.compile(
+        r"""
+        \b(?:sospes[oaie]|interrott[aoie]|suspend(?:ed|ere|ing)?|stopp?ed|discontinued?)
+        \b(?P<tail>[^,;\n]*)
+        """,
+        re.IGNORECASE | re.VERBOSE,
+    )
     ANAMNESIS_CHUNK_MAX_CHARS = 2400
     NON_DRUG_EXACT_NAMES = {
         "in riserva",
@@ -210,12 +250,11 @@ class DrugsParser:
             for segment in (entry.strip() for entry in cleaned.split("\n"))
             if segment
         ]
-        grouped_lines = self.group_lines_for_llm(lines)
-        total_chunks = max(len(grouped_lines), 1)
+        total_chunks = max(len(lines), 1)
         processed_chunks = 0
         self.emit_progress(progress_callback, 0.0)
-        parsed_chunks, fallback_chunks = self.rule_based_parse(grouped_lines)
-        ordered_entries: list[DrugEntry | None] = [None] * len(grouped_lines)
+        parsed_chunks, fallback_chunks = self.rule_based_parse(lines)
+        ordered_entries: list[DrugEntry | None] = [None] * len(lines)
         for index, entry in parsed_chunks:
             normalized = self.normalize_entry(
                 entry,
@@ -288,13 +327,11 @@ class DrugsParser:
             "exactly one DrugEntry describing the drug provided in the user prompt."
         )
 
-        grouped_lines = self.group_lines_for_llm(lines)
-
         entries: list[DrugEntry] = []
-        total_lines = max(len(grouped_lines), 1)
+        total_lines = max(len(lines), 1)
         bounded_start = min(1.0, max(0.0, float(progress_start)))
         bounded_span = max(0.0, float(progress_span))
-        for index, line in enumerate(grouped_lines, start=1):
+        for index, line in enumerate(lines, start=1):
             # Request a deterministic parse for each drug-sized chunk
             parsed = await self.client.llm_structured_call(
                 model=self.model,
@@ -430,9 +467,10 @@ class DrugsParser:
         cleaned_anamnesis = self.clean_text(anamnesis)
         chunks = self.chunk_anamnesis_text(cleaned_anamnesis)
         self.emit_progress(progress_callback, 0.0)
-        try:
-            parsed_entries: list[DrugEntry] = []
-            for index, chunk in enumerate(chunks, start=1):
+        parsed_entries: list[DrugEntry] = []
+        llm_failures = 0
+        for index, chunk in enumerate(chunks, start=1):
+            try:
                 parsed = await self.client.llm_structured_call(
                     model=self.model,
                     system_prompt=ANAMNESIS_DRUG_EXTRACTION_PROMPT.strip(),
@@ -446,12 +484,17 @@ class DrugsParser:
                     max_repair_attempts=2,
                 )
                 parsed_entries.extend(parsed.entries)
-                self.emit_progress(
-                    progress_callback,
-                    (index / max(len(chunks), 1)) * 0.85,
+            except Exception:
+                llm_failures += 1
+                logger.warning(
+                    "Anamnesis LLM extraction failed for chunk %s/%s; continuing with rule-based fallback.",
+                    index,
+                    len(chunks),
                 )
-        except Exception as exc:
-            raise RuntimeError("Failed to extract drugs from anamnesis via LLM") from exc
+            self.emit_progress(
+                progress_callback,
+                (index / max(len(chunks), 1)) * 0.85,
+            )
 
         entries: list[DrugEntry] = []
         for entry in parsed_entries:
@@ -466,18 +509,14 @@ class DrugsParser:
         self.emit_progress(progress_callback, 0.95)
         merged_entries = self.deduplicate_drug_entries([*entries, *fallback_entries])
         logger.info(
-            "Anamnesis extraction produced %s normalized drugs (%s raw LLM entries, %s fallback candidates)",
+            "Anamnesis extraction produced %s normalized drugs (%s raw LLM entries, %s fallback candidates, %s LLM chunk failures)",
             len(merged_entries),
             len(parsed_entries),
             len(fallback_entries),
+            llm_failures,
         )
         self.emit_progress(progress_callback, 1.0)
         return PatientDrugs(entries=merged_entries)
-
-    # -------------------------------------------------------------------------
-    def group_lines_for_llm(self, lines: list[str]) -> list[str]:
-        grouped = [line.strip() for line in lines if line and line.strip()]
-        return grouped if grouped else lines
 
     # -------------------------------------------------------------------------
     def rule_based_parse(
@@ -667,9 +706,15 @@ class DrugsParser:
         date_match = self.SUSPENSION_DATE_RE.search(
             tail
         ) or self.SUSPENSION_DATE_RE.search(full_line)
-        date_value = (
-            self.normalize_date_token(date_match.group("date")) if date_match else None
-        )
+        if date_match:
+            date_value = self.normalize_date_token(date_match.group("date"))
+        elif status:
+            date_value = self.extract_event_detail(
+                full_line,
+                event_re=self.SUSPENSION_EVENT_RE,
+            )
+        else:
+            date_value = None
         return status, date_value
 
     # -------------------------------------------------------------------------
@@ -686,7 +731,29 @@ class DrugsParser:
                 date_token = match.group("date")
                 normalized = self.normalize_date_token(date_token)
                 return True, normalized
+        detail = self.extract_event_detail(
+            tail or full_line,
+            event_re=self.START_EVENT_RE,
+        )
+        if detail:
+            return True, detail
         return None, None
+
+    # -------------------------------------------------------------------------
+    def extract_event_detail(
+        self,
+        text: str,
+        *,
+        event_re: re.Pattern[str],
+    ) -> str | None:
+        match = event_re.search(text)
+        if not match:
+            return None
+        tail = match.groupdict().get("tail") or ""
+        raw = tail.strip(" ,;:.")
+        if not raw:
+            return None
+        return self.sanitize_text_field(raw)
 
     # -------------------------------------------------------------------------
     def has_alpha_token(self, text: str | None) -> bool:
@@ -718,6 +785,14 @@ class DrugsParser:
             return None
         normalized = re.sub(r"\s+", " ", str(value)).strip()
         return normalized or None
+
+    # -------------------------------------------------------------------------
+    def sanitize_dosage_field(self, value: str | None) -> str | None:
+        cleaned = self.sanitize_text_field(value)
+        if cleaned is None:
+            return None
+        stripped = self.DOSAGE_TEMPORAL_SPLIT_RE.sub("", cleaned).strip(" ,;")
+        return stripped or None
 
     # -------------------------------------------------------------------------
     @staticmethod
@@ -776,7 +851,7 @@ class DrugsParser:
             return None
         normalized = entry.model_copy(deep=True)
         normalized.name = name
-        normalized.dosage = self.sanitize_text_field(normalized.dosage)
+        normalized.dosage = self.sanitize_dosage_field(normalized.dosage)
         normalized.administration_mode = self.sanitize_text_field(
             normalized.administration_mode
         )
