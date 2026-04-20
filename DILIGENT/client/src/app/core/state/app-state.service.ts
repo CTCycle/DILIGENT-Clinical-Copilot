@@ -88,7 +88,9 @@ export class AppStateService {
       document.documentElement.style.colorScheme = theme;
     });
 
-    void this.hydrateSettings();
+    if (this.state().activePage !== 'model-config') {
+      void this.hydrateSettings();
+    }
   }
 
   setActivePage(page: PageId): void {

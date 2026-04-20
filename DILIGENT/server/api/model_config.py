@@ -1,6 +1,9 @@
 from __future__ import annotations
 
+from typing import Annotated
+
 from fastapi import APIRouter, Body, status
+from fastapi import Query
 
 from DILIGENT.server.domain.model_configs import ModelConfigStateResponse, ModelConfigUpdateRequest
 from DILIGENT.server.services.model_config_service import ModelConfigService
@@ -31,8 +34,13 @@ class ModelConfigEndpoint:
         self.service.apply_runtime_snapshot(snapshot)
 
     # -------------------------------------------------------------------------
-    async def get_state(self) -> ModelConfigStateResponse:
-        return await self.service.get_state()
+    async def get_state(
+        self,
+        include_local_availability: Annotated[bool | None, Query()] = None,
+    ) -> ModelConfigStateResponse:
+        return await self.service.get_state(
+            include_local_availability=include_local_availability,
+        )
 
     # -------------------------------------------------------------------------
     async def update_state(
