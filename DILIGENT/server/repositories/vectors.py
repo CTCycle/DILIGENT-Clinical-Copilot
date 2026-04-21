@@ -140,6 +140,7 @@ class LanceVectorDatabase:
                 )
             if not records:
                 return
+            self.ensure_fixed_embedding_schema(self.embedding_size)
         table = self.get_table()
         table.add(records)
         self.ensure_vector_index(table)
@@ -171,6 +172,51 @@ class LanceVectorDatabase:
         connection = self.connect()
         if self.table is None and self.collection_name not in connection.table_names():
             self.schema = self._schema_with_embedding_size(self.embedding_size)
+
+    # -------------------------------------------------------------------------
+    def ensure_fixed_embedding_schema(self, embedding_size: int) -> None:
+        if embedding_size <= 0:
+            return
+        connection = self.connect()
+        if self.collection_name not in connection.table_names():
+            self.schema = self._schema_with_embedding_size(embedding_size)
+            return
+        table = self.get_table()
+        try:
+            embedding_field = table.schema.field("embedding")
+        except KeyError:
+            logger.warning(
+                "LanceDB table '%s' has no 'embedding' field; rebuilding schema.",
+                self.collection_name,
+            )
+            embedding_field = None
+        if isinstance(getattr(embedding_field, "type", None), pa.FixedSizeListType):
+            return
+        logger.info(
+            "Migrating LanceDB table '%s' embedding column to fixed-size vectors (%d).",
+            self.collection_name,
+            embedding_size,
+        )
+        existing_records = table.to_arrow().to_pylist()
+        filtered_records, discarded = self._filter_records_by_embedding_size(
+            existing_records,
+            embedding_size,
+        )
+        if discarded:
+            logger.warning(
+                "Dropped %d legacy embedding rows with invalid dimensions during LanceDB schema migration.",
+                discarded,
+            )
+        target_schema = self._schema_with_embedding_size(embedding_size)
+        self.schema = target_schema
+        self.table = connection.create_table(
+            self.collection_name,
+            data=filtered_records or target_schema.empty_table(),
+            schema=target_schema,
+            mode="overwrite",
+        )
+        self.index_ready = False
+        self.index_creation_attempted = False
 
     # -------------------------------------------------------------------------
     def ensure_vector_index(self, table: Table | None = None) -> None:

@@ -10,6 +10,7 @@ import {
   createDownloadUrl,
   formatErrorMessage,
   formatUnknownError,
+  hasDrugTimingCue,
   normalizeVisitDateInput,
 } from '../../core/utils';
 import {
@@ -286,6 +287,15 @@ export class DiliAgentPageComponent implements OnDestroy {
       this.stateService.updateDiliAgent({
         isRunning: false,
         message: firstMissing[1],
+      });
+      return;
+    }
+
+    if (!hasDrugTimingCue(form.drugs)) {
+      this.resetOutputs();
+      this.stateService.updateDiliAgent({
+        isRunning: false,
+        message: '[ERROR] Provide at least one drug with start, stop, or other timing information.',
       });
       return;
     }

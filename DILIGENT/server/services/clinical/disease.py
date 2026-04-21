@@ -1,7 +1,6 @@
 from __future__ import annotations
 
 import asyncio
-import contextlib
 import re
 import unicodedata
 from collections.abc import Callable
@@ -12,13 +11,14 @@ from DILIGENT.server.configurations.startup import server_settings
 from DILIGENT.server.configurations.llm_configs import LLMRuntimeConfig
 from DILIGENT.server.domain.clinical.entities import DiseaseContextEntry, PatientDiseaseContext
 from DILIGENT.server.services.prompts import ANAMNESIS_DISEASE_EXTRACTION_PROMPT
+from DILIGENT.server.services.llm.client_runtime import ensure_runtime_client
 from DILIGENT.server.services.llm.providers import select_llm_provider
 from DILIGENT.server.services.text.normalization import normalize_token
 
 
 ###############################################################################
 RATE_LIMIT_WAIT_HINT_RE = re.compile(
-    r"please\s+try\s+again\s+in\s+([0-9]+(?:\.[0-9]+)?)s",
+    r"please\s+try\s+again\s+in\s+(\d+(?:\.\d+)?)s",
     re.IGNORECASE,
 )
 
@@ -40,6 +40,7 @@ class DiseaseExtractor:
         self.model: str = ""
         self.extraction_retry_attempts = 2
         self.client_lock = asyncio.Lock()
+        self.client_loop_id: int | None = None
         self.forced_provider: str | None = None
         self.forced_model: str | None = None
         if client is None:
@@ -51,41 +52,21 @@ class DiseaseExtractor:
 
     # -------------------------------------------------------------------------
     async def ensure_client(self) -> None:
-        async with self.client_lock:
-            revision = LLMRuntimeConfig.get_revision()
-            resolved_provider, resolved_model = LLMRuntimeConfig.resolve_provider_and_model("parser")
-            provider = (self.forced_provider or resolved_provider).strip()
-            model = (self.forced_model or resolved_model).strip()
-            if self.client_provider == "injected" and self.client is not None:
-                self.model = model
-                self.runtime_revision = revision
-                return
-            needs_refresh = (
-                self.client is None
-                or self.client_provider != provider
-                or self.runtime_revision != revision
-            )
-            if needs_refresh:
-                if self.client is not None:
-                    with contextlib.suppress(Exception):
-                        await self.client.close()
-                self.client = select_llm_provider(
-                    provider=provider,
-                    default_model=model,
-                    timeout_s=self.timeout_s,
-                )
-                self.client_provider = provider
-                self.extraction_retry_attempts = (
-                    4 if provider in {"openai", "gemini"} else 2
-                )
-            self.runtime_revision = revision
-            self.model = model
-            if (
-                self.client is not None
-                and model
-                and hasattr(self.client, "default_model")
-            ):
-                self.client.default_model = model  # type: ignore[attr-defined]
+        revision = LLMRuntimeConfig.get_revision()
+        resolved_provider, resolved_model = LLMRuntimeConfig.resolve_provider_and_model("parser")
+        provider = self.forced_provider or resolved_provider
+        model = self.forced_model or resolved_model
+        await ensure_runtime_client(
+            self,
+            provider=provider,
+            model=model,
+            revision=revision,
+            client_factory=lambda selected_provider, selected_model: select_llm_provider(
+                provider=selected_provider,
+                default_model=selected_model,
+                timeout_s=self.timeout_s,
+            ),
+        )
 
     # -------------------------------------------------------------------------
     @staticmethod
@@ -239,6 +220,7 @@ class DiseaseExtractor:
                 "Extract diseases from this anamnesis chunk, with temporal and hepatic metadata.\n"
                 f"[Chunk {index}/{len(chunks)}]\n{chunk}"
             )
+            parsed: PatientDiseaseContext | None = None
             for attempt in range(1, self.extraction_retry_attempts + 1):
                 try:
                     parsed = await self.client.llm_structured_call(
@@ -268,6 +250,8 @@ class DiseaseExtractor:
                         exc,
                     )
                     await asyncio.sleep(delay)
+            if parsed is None:
+                raise RuntimeError("Failed to extract diseases from anamnesis")
             raw_entries.extend(parsed.entries)
             self.emit_progress(
                 progress_callback,

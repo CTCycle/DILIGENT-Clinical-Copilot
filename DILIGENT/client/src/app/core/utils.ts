@@ -4,6 +4,10 @@ import {
   RuntimeSettings,
 } from "./models/types";
 
+const DRUG_TIMING_CUE_RE =
+  /\b(?:\d{1,2}[./-]\d{1,2}(?:[./-]\d{2,4})?|\d{4}[./-]\d{1,2}[./-]\d{1,2}|start(?:ed|ing)?|begin|began|since|from|on|until|stop(?:ped|ping)?|suspend(?:ed|ing)?|discontinu(?:e|ed)|interrott|sospes|inizi|avviat|ripres|terapia|treatment)\b/i;
+const DRUG_SCHEDULE_CUE_RE = /\b\d+(?:[.,]\d+)?\s*-\s*\d+(?:[.,]\d+)?(?:\s*-\s*\d+(?:[.,]\d+)?){1,2}\b/;
+
 export function sanitizeField(value: string): string | null {
   const normalized = value.trim();
   return normalized.length ? normalized : null;
@@ -131,6 +135,17 @@ export function buildClinicalPayload(
     payload.allow_missing_labs = allowMissingLabs;
   }
   return payload;
+}
+
+export function hasDrugTimingCue(value: string): boolean {
+  const normalized = value.trim();
+  if (!normalized) {
+    return false;
+  }
+  if (DRUG_SCHEDULE_CUE_RE.test(normalized)) {
+    return true;
+  }
+  return DRUG_TIMING_CUE_RE.test(normalized);
 }
 
 export function createDownloadUrl(content: string, filename: string): string {

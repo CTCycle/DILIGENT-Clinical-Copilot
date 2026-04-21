@@ -1,7 +1,6 @@
 from __future__ import annotations
 
 import asyncio
-import contextlib
 import re
 import unicodedata
 from collections.abc import Callable
@@ -12,6 +11,7 @@ from DILIGENT.server.services.prompts import (
     ANAMNESIS_DRUG_EXTRACTION_PROMPT,
     DRUG_EXTRACTION_PROMPT,
 )
+from DILIGENT.server.services.llm.client_runtime import ensure_runtime_client
 from DILIGENT.server.services.llm.providers import select_llm_provider
 from DILIGENT.server.domain.clinical.entities import (
     DrugEntry,
@@ -156,6 +156,7 @@ class DrugsParser:
         self.client: Any | None = client
         self.model: str = ""
         self.client_lock = asyncio.Lock()
+        self.client_loop_id: int | None = None
         self.forced_provider: str | None = None
         self.forced_model: str | None = None
         if client is None:
@@ -167,39 +168,21 @@ class DrugsParser:
 
     # -------------------------------------------------------------------------
     async def ensure_client(self) -> None:
-        async with self.client_lock:
-            revision = LLMRuntimeConfig.get_revision()
-            resolved_provider, resolved_model = LLMRuntimeConfig.resolve_provider_and_model("parser")
-            provider = (self.forced_provider or resolved_provider).strip()
-            model = (self.forced_model or resolved_model).strip()
-            if self.client_provider == "injected" and self.client is not None:
-                self.model = model
-                self.runtime_revision = revision
-                return
-            needs_refresh = (
-                self.client is None
-                or self.client_provider != provider
-                or self.runtime_revision != revision
-            )
-            if needs_refresh:
-                # Tear down stale clients so provider/model switches are honoured
-                if self.client is not None:
-                    with contextlib.suppress(Exception):
-                        await self.client.close()
-                self.client = select_llm_provider(
-                    provider=provider,
-                    default_model=model,
-                    timeout_s=self.timeout_s,
-                )
-                self.client_provider = provider
-            self.runtime_revision = revision
-            self.model = model
-            if (
-                self.client is not None
-                and model
-                and hasattr(self.client, "default_model")
-            ):
-                self.client.default_model = model  # type: ignore[attr-defined]
+        revision = LLMRuntimeConfig.get_revision()
+        resolved_provider, resolved_model = LLMRuntimeConfig.resolve_provider_and_model("parser")
+        provider = self.forced_provider or resolved_provider
+        model = self.forced_model or resolved_model
+        await ensure_runtime_client(
+            self,
+            provider=provider,
+            model=model,
+            revision=revision,
+            client_factory=lambda selected_provider, selected_model: select_llm_provider(
+                provider=selected_provider,
+                default_model=selected_model,
+                timeout_s=self.timeout_s,
+            ),
+        )
 
     # -------------------------------------------------------------------------
     @staticmethod

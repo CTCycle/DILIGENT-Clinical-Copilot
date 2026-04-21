@@ -43,8 +43,11 @@ function extractServerDetail(data: unknown): string {
   }
   if (Array.isArray(detail)) {
     const firstIssue = detail.find((item) => isRecord(item));
-    if (firstIssue && typeof firstIssue["msg"] === "string") {
-      return firstIssue["msg"].trim();
+    if (firstIssue) {
+      const messageCandidate = firstIssue["msg"] ?? firstIssue["message"] ?? firstIssue["detail"];
+      if (typeof messageCandidate === "string") {
+        return messageCandidate.trim();
+      }
     }
   }
   return "";
