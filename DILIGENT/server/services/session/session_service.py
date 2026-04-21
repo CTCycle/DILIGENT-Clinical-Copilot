@@ -37,6 +37,10 @@ from DILIGENT.server.domain.jobs import (
 )
 from DILIGENT.server.configurations.startup import server_settings
 from DILIGENT.server.configurations.llm_configs import LLMRuntimeConfig
+from DILIGENT.server.common.utils.languages import (
+    MISSING_VISIT_LABEL_BY_LANGUAGE,
+    resolve_supported_language_code,
+)
 from DILIGENT.server.repositories.serialization.data import DataSerializer
 from DILIGENT.server.repositories.serialization.model_configs import ModelConfigSerializer
 from DILIGENT.server.services.jobs import JobManager, job_manager as default_job_manager
@@ -219,7 +223,6 @@ class ClinicalSessionService(ClinicalSessionFormattingMixin):
         try:
             therapy_drugs = await self.drugs_parser.extract_drugs_from_therapy(
                 cleaned_therapy_text,
-                text_is_clean=True,
                 progress_callback=therapy_progress_callback,
             )
             self.run_stop_check(stop_check)
@@ -748,11 +751,6 @@ class ClinicalSessionService(ClinicalSessionFormattingMixin):
         ensure_required_sections(payload, bundle=validation_bundle)
         self.run_stop_check(stop_check)
 
-        parser_provider, parser_model = LLMRuntimeConfig.resolve_provider_and_model("parser")
-        for extractor in (self.drugs_parser, self.disease_extractor, self.lab_extractor):
-            setattr(extractor, "forced_provider", parser_provider)
-            setattr(extractor, "forced_model", parser_model)
-
         issues: list[PipelineIssue] = []
         cleaned_therapy_text = self.drugs_parser.clean_text(payload.drugs or "")
         therapy_drugs = await self.extract_therapy_drugs(
@@ -860,18 +858,11 @@ class ClinicalSessionService(ClinicalSessionFormattingMixin):
         )
 
         patient_label = payload.name or "Unknown patient"
-        missing_visit_label_by_language = {
-            "en": "Not provided",
-            "it": "Non disponibile",
-            "de": "Nicht angegeben",
-            "fr": "Non renseignée",
-            "es": "No proporcionada",
-        }
-        report_language_key = report_language.strip().lower()[:2]
+        report_language_key = resolve_supported_language_code(report_language)
         visit_label = (
             payload.visit_date.strftime("%d %B %Y")
             if payload.visit_date
-            else missing_visit_label_by_language.get(report_language_key, "Not provided")
+            else MISSING_VISIT_LABEL_BY_LANGUAGE.get(report_language_key, "Not provided")
         )
         global_elapsed = time.perf_counter() - global_start_time
         logger.info(

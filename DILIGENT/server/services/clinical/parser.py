@@ -231,10 +231,11 @@ class DrugsParser:
 
     # -------------------------------------------------------------------------
     def parse_drug_list(self, text: str | None) -> PatientDrugs:
+        cleaned_text = self.clean_text(text)
         try:
             asyncio.get_running_loop()
         except RuntimeError:
-            return asyncio.run(self.extract_drugs_from_therapy(text))
+            return asyncio.run(self.extract_drugs_from_therapy(cleaned_text))
         raise RuntimeError(
             "parse_drug_list cannot be used inside a running event loop; use"
             " 'await extract_drugs_from_therapy(...)' instead."
@@ -245,10 +246,9 @@ class DrugsParser:
         self,
         text: str | None,
         *,
-        text_is_clean: bool = False,
         progress_callback: Callable[[float], None] | None = None,
     ) -> PatientDrugs:
-        cleaned = text if text_is_clean else self.clean_text(text)
+        cleaned = text or ""
         if not cleaned:
             return PatientDrugs(entries=[])
         lines = [
