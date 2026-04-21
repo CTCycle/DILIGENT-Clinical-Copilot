@@ -6,15 +6,266 @@ import math
 from collections.abc import Coroutine
 from typing import Any, Literal, cast
 
+import httpx
+from langchain_google_genai import GoogleGenerativeAIEmbeddings
+from langchain_ollama import OllamaEmbeddings
+from langchain_openai import OpenAIEmbeddings
+
 from DILIGENT.server.configurations.startup import server_settings
 from DILIGENT.server.common.constants import CLOUD_MODEL_CHOICES, VECTOR_DB_PATH
 from DILIGENT.server.common.utils.logger import logger
-from DILIGENT.server.services.llm.cloud import CloudLLMClient
-from DILIGENT.server.services.llm.providers import OllamaClient
+from DILIGENT.server.repositories.serialization.access_keys import AccessKeySerializer
+from DILIGENT.server.services.llm.cloud import LLMError, LLMTimeout
+from DILIGENT.server.services.llm.providers import OllamaError, OllamaTimeout
 from DILIGENT.server.repositories.vectors import LanceVectorDatabase
 
 ProviderName = Literal["openai", "azure-openai", "anthropic", "gemini"]
 EmbeddingBackend = Literal["ollama", "cloud"]
+
+
+###############################################################################
+def _build_openai_embeddings_model(
+    *,
+    api_key: str,
+    model: str,
+    timeout_s: float,
+) -> OpenAIEmbeddings:
+    return OpenAIEmbeddings(
+        api_key=api_key,
+        model=model,
+        request_timeout=timeout_s,
+    )
+
+
+###############################################################################
+def _build_gemini_embeddings_model(
+    *,
+    api_key: str,
+    model: str,
+    timeout_s: float,
+) -> GoogleGenerativeAIEmbeddings:
+    return GoogleGenerativeAIEmbeddings(
+        google_api_key=api_key,
+        model=model,
+        request_timeout=timeout_s,
+    )
+
+
+###############################################################################
+def _build_ollama_embeddings_model(
+    *,
+    base_url: str,
+    model: str,
+    timeout_s: float,
+) -> OllamaEmbeddings:
+    return OllamaEmbeddings(
+        base_url=base_url,
+        model=model,
+        client_kwargs={"timeout": timeout_s},
+    )
+
+
+###############################################################################
+def _map_langchain_embedding_exception(
+    exc: Exception,
+    *,
+    provider: str,
+) -> LLMError | OllamaError:
+    if isinstance(exc, (LLMError, OllamaError)):
+        return exc
+    if isinstance(exc, TimeoutError):
+        if provider == "ollama":
+            return OllamaTimeout("Timed out requesting Ollama embeddings")
+        return LLMTimeout("Timed out requesting cloud embeddings")
+    if isinstance(exc, httpx.TimeoutException):
+        if provider == "ollama":
+            return OllamaTimeout("Timed out requesting Ollama embeddings")
+        return LLMTimeout("Timed out requesting cloud embeddings")
+    error_name = exc.__class__.__name__.lower()
+    if "timeout" in error_name:
+        if provider == "ollama":
+            return OllamaTimeout("Timed out requesting Ollama embeddings")
+        return LLMTimeout("Timed out requesting cloud embeddings")
+    if provider == "ollama":
+        return OllamaError(f"Failed to request Ollama embeddings: {exc}")
+    return LLMError(f"Failed to request cloud embeddings: {exc}")
+
+
+###############################################################################
+class CloudEmbeddingGenerator:
+    def __init__(
+        self,
+        *,
+        provider: ProviderName,
+        model: str,
+        timeout_s: float = server_settings.external_data.default_llm_timeout,
+    ) -> None:
+        normalized_provider = (provider or "").strip().lower()
+        if normalized_provider not in {"openai", "gemini"}:
+            raise ValueError(f"Unsupported cloud provider: {provider}")
+        resolved_model = (model or "").strip()
+        if not resolved_model:
+            raise ValueError("Cloud embedding model is required")
+        self.provider = cast(Literal["openai", "gemini"], normalized_provider)
+        self.model = resolved_model
+        self.timeout_s = float(timeout_s)
+        self.api_key = self.resolve_provider_access_key(self.provider)
+
+    # -------------------------------------------------------------------------
+    @staticmethod
+    def resolve_provider_access_key(provider: Literal["openai", "gemini"]) -> str:
+        serializer = AccessKeySerializer()
+        label = "OpenAI" if provider == "openai" else "Gemini"
+        try:
+            row = serializer.get_active_key(provider, mark_used=True)
+        except Exception as exc:  # noqa: BLE001
+            raise LLMError(f"Failed to load active {label} access key") from exc
+        if row is None:
+            raise LLMError(f"No active {label} access key configured")
+        try:
+            return serializer.decrypt_key_row(row)
+        except Exception as exc:  # noqa: BLE001
+            raise LLMError(f"Failed to decrypt active {label} access key") from exc
+
+    # -------------------------------------------------------------------------
+    async def embed_texts(self, texts: list[str]) -> list[list[float]]:
+        if not texts:
+            return []
+        try:
+            if self.provider == "openai":
+                embeddings_model = _build_openai_embeddings_model(
+                    api_key=self.api_key,
+                    model=self.model,
+                    timeout_s=self.timeout_s,
+                )
+            else:
+                embeddings_model = _build_gemini_embeddings_model(
+                    api_key=self.api_key,
+                    model=self.model,
+                    timeout_s=self.timeout_s,
+                )
+            vectors = await asyncio.to_thread(embeddings_model.embed_documents, texts)
+        except Exception as exc:  # noqa: BLE001
+            raise _map_langchain_embedding_exception(exc, provider=self.provider) from exc
+        return self.normalize_embeddings(vectors, expected=len(texts))
+
+    # -------------------------------------------------------------------------
+    async def embed_query(self, query: str) -> list[float]:
+        vectors = await self.embed_texts([query])
+        if not vectors:
+            return []
+        return vectors[0]
+
+    # -------------------------------------------------------------------------
+    @staticmethod
+    def normalize_embeddings(vectors: list[Any], *, expected: int) -> list[list[float]]:
+        normalized: list[list[float]] = []
+        for vector in vectors:
+            if not isinstance(vector, list):
+                raise LLMError("Invalid embedding payload returned by cloud provider")
+            try:
+                normalized.append([float(value) for value in vector])
+            except (TypeError, ValueError) as exc:
+                raise LLMError("Non-numeric values found in cloud embeddings") from exc
+        if len(normalized) != expected:
+            raise LLMError("Mismatch between cloud embeddings and inputs")
+        return normalized
+
+
+###############################################################################
+class OllamaEmbeddingGenerator:
+    def __init__(
+        self,
+        *,
+        model: str,
+        base_url: str | None = None,
+        timeout_s: float = server_settings.external_data.default_llm_timeout,
+    ) -> None:
+        resolved_model = (model or "").strip()
+        if not resolved_model:
+            raise ValueError("Ollama embedding model is required")
+        self.model = resolved_model
+        self.base_url = (base_url or server_settings.llm_defaults.ollama_host_default).rstrip("/")
+        self.timeout_s = float(timeout_s)
+
+    # -------------------------------------------------------------------------
+    async def embed_texts(self, texts: list[str]) -> list[list[float]]:
+        if not texts:
+            return []
+        embeddings_model = _build_ollama_embeddings_model(
+            base_url=self.base_url,
+            model=self.model,
+            timeout_s=self.timeout_s,
+        )
+        try:
+            vectors = await asyncio.to_thread(embeddings_model.embed_documents, texts)
+        except Exception as exc:  # noqa: BLE001
+            raise _map_langchain_embedding_exception(exc, provider="ollama") from exc
+        return self.normalize_embeddings(vectors, expected=len(texts))
+
+    # -------------------------------------------------------------------------
+    async def embed_query(self, query: str) -> list[float]:
+        vectors = await self.embed_texts([query])
+        if not vectors:
+            return []
+        return vectors[0]
+
+    # -------------------------------------------------------------------------
+    @staticmethod
+    def normalize_embeddings(vectors: list[Any], *, expected: int) -> list[list[float]]:
+        normalized: list[list[float]] = []
+        for vector in vectors:
+            if not isinstance(vector, list):
+                raise OllamaError("Invalid embedding payload returned by Ollama")
+            try:
+                normalized.append([float(value) for value in vector])
+            except (TypeError, ValueError) as exc:
+                raise OllamaError("Non-numeric values found in Ollama embeddings") from exc
+        if len(normalized) != expected:
+            raise OllamaError("Mismatch between Ollama embeddings and inputs")
+        return normalized
+
+
+###############################################################################
+def select_embedding_provider(
+    *,
+    backend: str,
+    ollama_base_url: str | None = None,
+    ollama_model: str | None = None,
+    use_cloud_embeddings: bool = False,
+    cloud_provider: str | None = None,
+    cloud_embedding_model: str | None = None,
+    timeout_s: float = server_settings.external_data.default_llm_timeout,
+) -> CloudEmbeddingGenerator | OllamaEmbeddingGenerator:
+    normalized_backend = backend.lower().strip() if backend else "ollama"
+    if use_cloud_embeddings:
+        normalized_backend = "cloud"
+
+    if normalized_backend == "cloud":
+        if not cloud_provider:
+            raise ValueError("Cloud provider is required for embeddings")
+        if not cloud_embedding_model:
+            raise ValueError("Cloud embedding model is required")
+        provider_normalized = cloud_provider.lower().strip()
+        if provider_normalized not in CLOUD_MODEL_CHOICES:
+            raise ValueError(
+                f"Unsupported cloud provider: {cloud_provider}. "
+                f"Allowed: {', '.join(CLOUD_MODEL_CHOICES.keys())}"
+            )
+        return CloudEmbeddingGenerator(
+            provider=cast(ProviderName, provider_normalized),
+            model=cloud_embedding_model,
+            timeout_s=timeout_s,
+        )
+
+    if normalized_backend == "ollama":
+        return OllamaEmbeddingGenerator(
+            model=(ollama_model or "").strip(),
+            base_url=ollama_base_url,
+            timeout_s=timeout_s,
+        )
+
+    raise ValueError(f"Unsupported embedding backend: {backend}")
 
 
 ###############################################################################
@@ -30,65 +281,24 @@ class EmbeddingGenerator:
         cloud_embedding_model: str | None = None,
     ) -> None:
         normalized_backend = backend.lower().strip() if backend else "ollama"
-        # Keep parameter flexible, but store as the constrained Literal type.
         self.backend: EmbeddingBackend = (
             "cloud" if use_cloud_embeddings else cast(EmbeddingBackend, normalized_backend)
         )
-
-        self.ollama_model: str | None = None
-        self.ollama_base_url: str | None = None
-        self.cloud_provider: ProviderName | None = None
-        self.cloud_embedding_model: str | None = None
-
-        if self.backend == "ollama":
-            if not ollama_model:
-                raise ValueError("Ollama embedding model is required")
-            self.ollama_model = ollama_model
-            self.ollama_base_url = ollama_base_url
-
-        elif self.backend == "cloud":
-            if not cloud_provider:
-                raise ValueError("Cloud provider is required for embeddings")
-            if not cloud_embedding_model:
-                raise ValueError("Cloud embedding model is required")
-
-            provider_normalized = cloud_provider.lower().strip()
-            if provider_normalized not in CLOUD_MODEL_CHOICES:
-                raise ValueError(
-                    f"Unsupported cloud provider: {cloud_provider}. "
-                    f"Allowed: {', '.join(CLOUD_MODEL_CHOICES.keys())}"
-                )
-            # Safe cast after validation against ALLOWED_PROVIDERS.
-            self.cloud_provider = cast(ProviderName, provider_normalized)
-            self.cloud_embedding_model = cloud_embedding_model
-        else:
-            raise ValueError(f"Unsupported embedding backend: {backend}")
+        self.provider = select_embedding_provider(
+            backend=backend,
+            ollama_base_url=ollama_base_url,
+            ollama_model=ollama_model,
+            use_cloud_embeddings=use_cloud_embeddings,
+            cloud_provider=cloud_provider,
+            cloud_embedding_model=cloud_embedding_model,
+        )
 
     # -------------------------------------------------------------------------
     def embed_texts(self, texts: list[str]) -> list[list[float]]:
         sanitized = [text if text.strip() else " " for text in texts]
         if not sanitized:
             return []
-
-        if self.backend == "ollama":
-            if self.ollama_model is None:
-                raise ValueError("Ollama embedding model is not configured")
-            embeddings = self.run_async(
-                self.embed_with_ollama(sanitized, self.ollama_model)
-            )
-        elif self.backend == "cloud":
-            if self.cloud_provider is None or self.cloud_embedding_model is None:
-                raise ValueError("Cloud embedding configuration is not set")
-            embeddings = self.run_async(
-                self.embed_with_cloud(
-                    sanitized,
-                    self.cloud_provider,
-                    self.cloud_embedding_model,
-                )
-            )
-        else:  # pragma: no cover - defensive branch
-            raise ValueError(f"Unsupported embedding backend: {self.backend}")
-
+        embeddings = self.run_async(self.provider.embed_texts(sanitized))
         return [[float(value) for value in vector] for vector in embeddings]
 
     # -------------------------------------------------------------------------
@@ -113,25 +323,6 @@ class EmbeddingGenerator:
                 new_loop.close()
                 asyncio.set_event_loop(previous_loop)
         return loop.run_until_complete(coroutine)
-
-    # -------------------------------------------------------------------------
-    async def embed_with_ollama(
-        self, texts: list[str], model: str
-    ) -> list[list[float]]:
-        async with OllamaClient(
-            base_url=self.ollama_base_url,
-            default_model=model,
-        ) as client:
-            return await client.embed(model=model, input_texts=texts)
-
-    # -------------------------------------------------------------------------
-    async def embed_with_cloud(
-        self, texts: list[str], provider: ProviderName, model: str
-    ) -> list[list[float]]:
-        async with CloudLLMClient(
-            provider=provider, default_model=model
-        ) as client:
-            return await client.embed(model=model, input_texts=texts)
 
 
 ###############################################################################
@@ -337,6 +528,10 @@ class SimilaritySearch:
         return dot_product / denominator
 
 
-__all__ = ["EmbeddingGenerator", "SimilaritySearch"]
-
-
+__all__ = [
+    "CloudEmbeddingGenerator",
+    "OllamaEmbeddingGenerator",
+    "select_embedding_provider",
+    "EmbeddingGenerator",
+    "SimilaritySearch",
+]
