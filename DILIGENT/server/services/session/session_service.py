@@ -647,51 +647,81 @@ class ClinicalSessionService(ClinicalSessionFormattingMixin):
 
     # -------------------------------------------------------------------------
     @staticmethod
+    def _normalized_resolved_drug_map(prepared_inputs) -> dict[str, dict[str, Any]]:
+        if prepared_inputs is None:
+            return {}
+        resolved_drug_map: dict[str, dict[str, Any]] = {}
+        for key, value in prepared_inputs.resolved_drugs.items():
+            normalized_key = normalize_drug_query_name(key)
+            if normalized_key and isinstance(value, dict):
+                resolved_drug_map[normalized_key] = value
+        return resolved_drug_map
+
+    # -------------------------------------------------------------------------
+    @staticmethod
+    def _normalized_rucam_map(
+        rucam_bundle: PatientRucamAssessmentBundle,
+    ) -> dict[str, DrugRucamAssessment]:
+        rucam_by_name: dict[str, DrugRucamAssessment] = {}
+        for item in rucam_bundle.entries:
+            normalized_key = normalize_drug_query_name(item.drug_name)
+            if normalized_key:
+                rucam_by_name[normalized_key] = item
+        return rucam_by_name
+
+    # -------------------------------------------------------------------------
+    @staticmethod
+    def _build_single_matched_drug_row(
+        *,
+        detected_name: str,
+        resolved: dict[str, Any],
+        rucam_entry: DrugRucamAssessment | None,
+    ) -> dict[str, Any]:
+        matched_row = resolved.get("matched_livertox_row")
+        if not isinstance(matched_row, dict):
+            matched_row = {}
+        return {
+            "raw_drug_name": detected_name,
+            "matched_drug_name": matched_row.get("drug_name"),
+            "nbk_id": matched_row.get("nbk_id"),
+            "match_confidence": resolved.get("match_confidence"),
+            "match_reason": resolved.get("match_reason"),
+            "match_notes": resolved.get("match_notes", []),
+            "match_status": resolved.get("match_status"),
+            "match_candidates": resolved.get("match_candidates", []),
+            "chosen_candidate": resolved.get("chosen_candidate"),
+            "rejected_candidates": resolved.get("rejected_candidates", []),
+            "missing_livertox": resolved.get("missing_livertox", True),
+            "ambiguous_match": resolved.get("ambiguous_match", False),
+            "regimen_group_ids": resolved.get("regimen_group_ids", []),
+            "regimen_components": resolved.get("regimen_components", []),
+            "origins": resolved.get("origins", []),
+            "raw_mentions": resolved.get("raw_mentions", []),
+            "rucam": rucam_entry.model_dump() if rucam_entry is not None else None,
+        }
+
+    # -------------------------------------------------------------------------
+    @staticmethod
     def build_matched_drugs_payload(
         *,
         detected_drugs: list[str],
         prepared_inputs,
         rucam_bundle: PatientRucamAssessmentBundle,
     ) -> list[dict[str, Any]]:
-        resolved_drug_map: dict[str, dict[str, Any]] = {}
-        if prepared_inputs is not None:
-            for key, value in prepared_inputs.resolved_drugs.items():
-                normalized_key = normalize_drug_query_name(key)
-                if normalized_key:
-                    resolved_drug_map[normalized_key] = value
-        rucam_by_name: dict[str, DrugRucamAssessment] = {}
-        for item in rucam_bundle.entries:
-            normalized_key = normalize_drug_query_name(item.drug_name)
-            if normalized_key:
-                rucam_by_name[normalized_key] = item
+        resolved_drug_map = ClinicalSessionService._normalized_resolved_drug_map(prepared_inputs)
+        rucam_by_name = ClinicalSessionService._normalized_rucam_map(rucam_bundle)
 
         matched_drugs_payload: list[dict[str, Any]] = []
         for detected_name in detected_drugs:
             normalized_name = normalize_drug_query_name(detected_name)
             resolved = resolved_drug_map.get(normalized_name, {})
-            matched_row = resolved.get("matched_livertox_row") if isinstance(resolved, dict) else None
-            matched_name = matched_row.get("drug_name") if isinstance(matched_row, dict) else None
             rucam_entry = rucam_by_name.get(normalized_name)
             matched_drugs_payload.append(
-                {
-                    "raw_drug_name": detected_name,
-                    "matched_drug_name": matched_name,
-                    "nbk_id": matched_row.get("nbk_id") if isinstance(matched_row, dict) else None,
-                    "match_confidence": resolved.get("match_confidence") if isinstance(resolved, dict) else None,
-                    "match_reason": resolved.get("match_reason") if isinstance(resolved, dict) else None,
-                    "match_notes": resolved.get("match_notes") if isinstance(resolved, dict) else [],
-                    "match_status": resolved.get("match_status") if isinstance(resolved, dict) else None,
-                    "match_candidates": resolved.get("match_candidates") if isinstance(resolved, dict) else [],
-                    "chosen_candidate": resolved.get("chosen_candidate") if isinstance(resolved, dict) else None,
-                    "rejected_candidates": resolved.get("rejected_candidates") if isinstance(resolved, dict) else [],
-                    "missing_livertox": resolved.get("missing_livertox") if isinstance(resolved, dict) else True,
-                    "ambiguous_match": resolved.get("ambiguous_match") if isinstance(resolved, dict) else False,
-                    "regimen_group_ids": resolved.get("regimen_group_ids") if isinstance(resolved, dict) else [],
-                    "regimen_components": resolved.get("regimen_components") if isinstance(resolved, dict) else [],
-                    "origins": resolved.get("origins") if isinstance(resolved, dict) else [],
-                    "raw_mentions": resolved.get("raw_mentions") if isinstance(resolved, dict) else [],
-                    "rucam": rucam_entry.model_dump() if rucam_entry is not None else None,
-                }
+                ClinicalSessionService._build_single_matched_drug_row(
+                    detected_name=detected_name,
+                    resolved=resolved,
+                    rucam_entry=rucam_entry,
+                )
             )
         return matched_drugs_payload
 

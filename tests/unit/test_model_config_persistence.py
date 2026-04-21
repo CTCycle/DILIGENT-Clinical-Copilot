@@ -38,7 +38,7 @@ def test_model_config_roundtrip_preserves_cloud_selection() -> None:
     )
     endpoint = ModelConfigEndpoint(router=session_router, serializer=serializer)
 
-    updated = endpoint.serializer.save_snapshot(
+    endpoint.serializer.save_snapshot(
         use_cloud_models=True,
         cloud_provider="openai",
         cloud_model="gpt-5.4-mini",

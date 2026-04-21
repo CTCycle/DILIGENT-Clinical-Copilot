@@ -71,28 +71,92 @@ class ModelConfigService:
     # -------------------------------------------------------------------------
     async def update_state(self, payload: ModelConfigUpdateRequest) -> ModelConfigStateResponse:
         snapshot = self.ensure_defaults()
-        updates: dict[str, Any] = {}
         fields_set = payload.model_fields_set
-        local_roles_updated = (
-            "clinical_model" in fields_set
-            or "text_extraction_model" in fields_set
+        local_roles_updated = self._local_roles_updated(fields_set)
+        local_model_names = await self._build_local_model_names(
+            snapshot=snapshot,
+            refresh_from_ollama=local_roles_updated,
         )
-        local_model_names = {
-            name
-            for name, _, _ in LOCAL_MODEL_CATALOG
-        }
+        updates = self._build_updates(
+            payload=payload,
+            snapshot=snapshot,
+            fields_set=fields_set,
+            local_model_names=local_model_names,
+        )
+
+        if updates:
+            snapshot = self.serializer.save_snapshot(**updates)
+
+        should_check_local_availability = (not snapshot.use_cloud_models) or local_roles_updated
+        local_models = await self.list_local_model_cards(
+            selected_models=(snapshot.clinical_model, snapshot.text_extraction_model),
+            include_ollama_availability=should_check_local_availability,
+        )
+        return self.build_response(snapshot=snapshot, local_models=local_models)
+
+    # -------------------------------------------------------------------------
+    @staticmethod
+    def _local_roles_updated(fields_set: set[str]) -> bool:
+        return "clinical_model" in fields_set or "text_extraction_model" in fields_set
+
+    # -------------------------------------------------------------------------
+    async def _build_local_model_names(
+        self,
+        *,
+        snapshot: ModelConfigSnapshot,
+        refresh_from_ollama: bool,
+    ) -> set[str]:
+        local_model_names = {name for name, _, _ in LOCAL_MODEL_CATALOG}
         if snapshot.clinical_model:
             local_model_names.add(snapshot.clinical_model)
         if snapshot.text_extraction_model:
             local_model_names.add(snapshot.text_extraction_model)
+        if not refresh_from_ollama:
+            return local_model_names
+        local_models_for_validation = await self.list_local_model_cards(
+            selected_models=(snapshot.clinical_model, snapshot.text_extraction_model),
+            include_ollama_availability=True,
+        )
+        return {item.name for item in local_models_for_validation}
 
-        if local_roles_updated:
-            local_models_for_validation = await self.list_local_model_cards(
-                selected_models=(snapshot.clinical_model, snapshot.text_extraction_model),
-                include_ollama_availability=True,
-            )
-            local_model_names = {item.name for item in local_models_for_validation}
+    # -------------------------------------------------------------------------
+    def _build_updates(
+        self,
+        *,
+        payload: ModelConfigUpdateRequest,
+        snapshot: ModelConfigSnapshot,
+        fields_set: set[str],
+        local_model_names: set[str],
+    ) -> dict[str, Any]:
+        updates: dict[str, Any] = {}
+        self._collect_local_model_updates(
+            payload=payload,
+            fields_set=fields_set,
+            local_model_names=local_model_names,
+            updates=updates,
+        )
+        self._collect_cloud_model_updates(
+            payload=payload,
+            snapshot=snapshot,
+            fields_set=fields_set,
+            updates=updates,
+        )
+        self._collect_runtime_option_updates(
+            payload=payload,
+            fields_set=fields_set,
+            updates=updates,
+        )
+        return updates
 
+    # -------------------------------------------------------------------------
+    def _collect_local_model_updates(
+        self,
+        *,
+        payload: ModelConfigUpdateRequest,
+        fields_set: set[str],
+        local_model_names: set[str],
+        updates: dict[str, Any],
+    ) -> None:
         if "clinical_model" in fields_set:
             clinical_model = self.normalize_optional_text(payload.clinical_model)
             self.validate_local_selection(
@@ -111,6 +175,15 @@ class ModelConfigService:
             )
             updates["text_extraction_model"] = text_extraction_model
 
+    # -------------------------------------------------------------------------
+    def _collect_cloud_model_updates(
+        self,
+        *,
+        payload: ModelConfigUpdateRequest,
+        snapshot: ModelConfigSnapshot,
+        fields_set: set[str],
+        updates: dict[str, Any],
+    ) -> None:
         provider = self.resolve_provider(
             payload.llm_provider if "llm_provider" in fields_set else snapshot.cloud_provider
         )
@@ -124,6 +197,14 @@ class ModelConfigService:
                 model_name=requested_cloud_model,
             )
 
+    # -------------------------------------------------------------------------
+    @staticmethod
+    def _collect_runtime_option_updates(
+        *,
+        payload: ModelConfigUpdateRequest,
+        fields_set: set[str],
+        updates: dict[str, Any],
+    ) -> None:
         if "use_cloud_services" in fields_set:
             updates["use_cloud_models"] = bool(payload.use_cloud_services)
 
@@ -135,16 +216,6 @@ class ModelConfigService:
 
         if "ollama_reasoning" in fields_set and payload.ollama_reasoning is not None:
             updates["ollama_reasoning"] = payload.ollama_reasoning
-
-        if updates:
-            snapshot = self.serializer.save_snapshot(**updates)
-
-        should_check_local_availability = (not snapshot.use_cloud_models) or local_roles_updated
-        local_models = await self.list_local_model_cards(
-            selected_models=(snapshot.clinical_model, snapshot.text_extraction_model),
-            include_ollama_availability=should_check_local_availability,
-        )
-        return self.build_response(snapshot=snapshot, local_models=local_models)
 
     # -------------------------------------------------------------------------
     @staticmethod
