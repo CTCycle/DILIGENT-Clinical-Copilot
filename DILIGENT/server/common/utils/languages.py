@@ -5,6 +5,13 @@ import re
 
 SUPPORTED_REPORT_LANGUAGES: tuple[str, ...] = ("en", "it", "de", "fr", "es")
 TOKEN_PATTERN = re.compile(r"[A-Za-zÀ-ÖØ-öø-ÿ]+")
+MISSING_VISIT_LABEL_BY_LANGUAGE: dict[str, str] = {
+    "en": "Not provided",
+    "it": "Non disponibile",
+    "de": "Nicht angegeben",
+    "fr": "Non renseignée",
+    "es": "No proporcionada",
+}
 
 LANGUAGE_HINTS: dict[str, set[str]] = {
     "en": {
