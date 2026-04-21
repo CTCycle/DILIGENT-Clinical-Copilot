@@ -16,6 +16,8 @@ from collections.abc import AsyncGenerator, Awaitable, Callable
 from typing import Any, Literal, NoReturn, TypeAlias
 
 import httpx
+from langchain_core.messages import AIMessage, AIMessageChunk, BaseMessage, HumanMessage, SystemMessage
+from langchain_ollama import ChatOllama, OllamaEmbeddings
 
 from DILIGENT.server.services.llm.cloud import CloudLLMClient, LLMError, LLMTimeout
 from DILIGENT.server.services.llm.structured import StructuredOutputParser, parse_json_dict, T
@@ -75,6 +77,61 @@ def _env_str(name: str, default: str) -> str:
 
 
 ###############################################################################
+def _build_langchain_messages(messages: list[dict[str, str]]) -> list[BaseMessage]:
+    output: list[BaseMessage] = []
+    for message in messages:
+        role = str(message.get("role", "user")).strip().lower()
+        content = str(message.get("content", ""))
+        if role == "system":
+            output.append(SystemMessage(content=content))
+        elif role in {"assistant", "model"}:
+            output.append(AIMessage(content=content))
+        else:
+            output.append(HumanMessage(content=content))
+    return output
+
+
+###############################################################################
+def _normalize_langchain_content(content: Any) -> dict[str, Any] | str:
+    if isinstance(content, dict):
+        return content
+    if isinstance(content, list):
+        chunks: list[str] = []
+        for item in content:
+            if isinstance(item, dict):
+                text = item.get("text")
+                if isinstance(text, str):
+                    chunks.append(text)
+                continue
+            if isinstance(item, str):
+                chunks.append(item)
+                continue
+            chunks.append(str(item))
+        content = "".join(chunks)
+    if isinstance(content, str):
+        try:
+            loaded = json.loads(content)
+        except json.JSONDecodeError:
+            return content
+        return loaded if isinstance(loaded, dict) else content
+    return str(content)
+
+
+###############################################################################
+def _map_ollama_langchain_exception(exc: Exception) -> OllamaError:
+    if isinstance(exc, OllamaError):
+        return exc
+    if isinstance(exc, TimeoutError):
+        return OllamaTimeout("Timed out waiting for Ollama response")
+    if isinstance(exc, httpx.TimeoutException):
+        return OllamaTimeout("Timed out waiting for Ollama response")
+    error_name = exc.__class__.__name__.lower()
+    if "timeout" in error_name:
+        return OllamaTimeout("Timed out waiting for Ollama response")
+    return OllamaError(f"Ollama request failed: {exc}")
+
+
+###############################################################################
 class OllamaClient:
     """
     Async wrapper around the Ollama REST API.
@@ -110,6 +167,7 @@ class OllamaClient:
     ) -> None:
         self.base_url = (base_url or server_settings.llm_defaults.ollama_host_default).rstrip("/")
         self.default_model = (default_model or "").strip() or None
+        self.timeout_s = float(timeout_s)
         limits = httpx.Limits(
             max_keepalive_connections=keepalive_connections,
             max_connections=keepalive_max,
@@ -801,6 +859,76 @@ class OllamaClient:
                 raise OllamaError(f"Model '{model}' was not found after pull completed")
 
     # -------------------------------------------------------------------------
+    def _build_ollama_chat_model(
+        self,
+        *,
+        model: str,
+        format: str | None,
+        temperature: float,
+        think: bool,
+        options: dict[str, Any] | None,
+        keep_alive: str | None,
+    ) -> ChatOllama:
+        kwargs: dict[str, Any] = {
+            "model": model,
+            "base_url": self.base_url,
+            "temperature": temperature,
+            "client_kwargs": {"timeout": self.timeout_s},
+        }
+        if format:
+            kwargs["format"] = format
+        if keep_alive:
+            kwargs["keep_alive"] = keep_alive
+        if think:
+            kwargs["think"] = True
+
+        supported_options = {
+            "mirostat",
+            "mirostat_eta",
+            "mirostat_tau",
+            "num_ctx",
+            "num_gpu",
+            "num_thread",
+            "num_predict",
+            "repeat_last_n",
+            "repeat_penalty",
+            "seed",
+            "stop",
+            "tfs_z",
+            "top_k",
+            "top_p",
+            "min_p",
+        }
+        for key, value in (options or {}).items():
+            if key in supported_options and key not in kwargs:
+                kwargs[key] = value
+
+        while True:
+            try:
+                return ChatOllama(**kwargs)
+            except TypeError as exc:
+                match = re.search(r"unexpected keyword argument '([^']+)'", str(exc))
+                if not match:
+                    raise
+                rejected = match.group(1)
+                if rejected not in kwargs:
+                    raise
+                kwargs.pop(rejected, None)
+
+    # -------------------------------------------------------------------------
+    def _build_ollama_embeddings_model(
+        self,
+        *,
+        model: str,
+    ) -> OllamaEmbeddings:
+        kwargs: dict[str, Any] = {
+            "model": model,
+            "base_url": self.base_url,
+            "client_kwargs": {"timeout": self.timeout_s},
+        }
+        return OllamaEmbeddings(**kwargs)
+
+    # -------------------------------------------------------------------------
     async def embed(
         self,
         *,
@@ -812,29 +940,28 @@ class OllamaClient:
 
         resolved_model = self.resolve_model_name(model)
         await self.ensure_model_ready(resolved_model)
-        embeddings: list[list[float]] = []
-        for text in input_texts:
-            payload = {"model": resolved_model, "prompt": text}
-            try:
-                resp = await self.client.post("/api/embeddings", json=payload)
-            except httpx.TimeoutException as exc:
+        embeddings_model = self._build_ollama_embeddings_model(model=resolved_model)
+        try:
+            vectors = await asyncio.to_thread(
+                embeddings_model.embed_documents,
+                input_texts,
+            )
+        except Exception as exc:  # noqa: BLE001
+            mapped = _map_ollama_langchain_exception(exc)
+            if isinstance(mapped, OllamaTimeout):
                 raise OllamaTimeout("Timed out requesting Ollama embeddings") from exc
-            except httpx.RequestError as exc:  # noqa: PERF203 - convert to domain error
-                raise OllamaError(f"Failed to request Ollama embeddings: {exc}") from exc
+            raise mapped from exc
 
-            self.raise_for_status(resp)
-            data = resp.json()
-            vector = data.get("embedding")
+        embeddings: list[list[float]] = []
+        for vector in vectors:
             if not isinstance(vector, list):
                 raise OllamaError("Invalid embedding payload returned by Ollama")
             try:
                 embeddings.append([float(value) for value in vector])
             except (TypeError, ValueError) as exc:
                 raise OllamaError("Non-numeric values found in Ollama embeddings") from exc
-
         if len(embeddings) != len(input_texts):
             raise OllamaError("Mismatch between Ollama embeddings and inputs")
-
         return embeddings
 
     # -------------------------------------------------------------------------
@@ -1265,29 +1392,26 @@ class OllamaClient:
             active_model=resolved_model,
             requested_keep_alive=keep_alive,
         )
-
-        body = self.build_chat_payload(
+        chat_model = self._build_ollama_chat_model(
             model=resolved_model,
-            messages=messages,
-            stream=False,
             format=format,
             temperature=temp_value,
             think=think_value,
             options=options_payload,
             keep_alive=resolved_keep_alive,
         )
-
+        lc_messages = _build_langchain_messages(messages)
         try:
-            resp = await self.client.post("/api/chat", json=body)
-        except httpx.TimeoutException as e:
-            raise OllamaTimeout("Timed out waiting for Ollama chat response") from e
+            response = await chat_model.ainvoke(lc_messages)
+        except Exception as exc:  # noqa: BLE001
+            mapped = _map_ollama_langchain_exception(exc)
+            if isinstance(mapped, OllamaTimeout):
+                raise OllamaTimeout("Timed out waiting for Ollama chat response") from exc
+            raise mapped from exc
 
-        self.raise_for_status(resp)
-
-        data = resp.json()
-        content = (data.get("message") or {}).get("content", "")
+        content = _normalize_langchain_content(response.content)
         await self.maybe_prefetch_target_model(active_model=resolved_model)
-        return self.decode_response_content(content)
+        return content
 
     # -------------------------------------------------------------------------
     async def chat_stream(
@@ -1322,32 +1446,35 @@ class OllamaClient:
             active_model=resolved_model,
             requested_keep_alive=keep_alive,
         )
-
-        body = self.build_chat_payload(
+        chat_model = self._build_ollama_chat_model(
             model=resolved_model,
-            messages=messages,
-            stream=True,
             format=format,
             temperature=temp_value,
             think=think_value,
             options=options_payload,
             keep_alive=resolved_keep_alive,
         )
-        async for evt in self._stream_chat_http(body):
-            yield evt
-        await self.maybe_prefetch_target_model(active_model=resolved_model)
-
-    # -------------------------------------------------------------------------
-    async def _stream_chat_http(
-        self, body: dict[str, Any]
-    ) -> AsyncGenerator[dict[str, Any], None]:
+        lc_messages = _build_langchain_messages(messages)
+        content_parts: list[str] = []
         try:
-            async with self.client.stream("POST", "/api/chat", json=body) as r:
-                self.raise_for_status(r)
-                async for evt in self.iter_json_stream_events(r):
-                    yield evt
-        except httpx.TimeoutException as e:
-            raise OllamaTimeout("Timed out during streamed chat response") from e
+            async for chunk in chat_model.astream(lc_messages):
+                if not isinstance(chunk, AIMessageChunk):
+                    normalized = _normalize_langchain_content(getattr(chunk, "content", ""))
+                else:
+                    normalized = _normalize_langchain_content(chunk.content)
+                text = json.dumps(normalized) if isinstance(normalized, dict) else str(normalized)
+                if not text:
+                    continue
+                content_parts.append(text)
+                yield {"message": {"role": "assistant", "content": text}, "done": False}
+        except Exception as exc:  # noqa: BLE001
+            mapped = _map_ollama_langchain_exception(exc)
+            if isinstance(mapped, OllamaTimeout):
+                raise OllamaTimeout("Timed out during streamed chat response") from exc
+            raise mapped from exc
+        final_content = "".join(content_parts)
+        yield {"message": {"role": "assistant", "content": final_content}, "done": True}
+        await self.maybe_prefetch_target_model(active_model=resolved_model)
 
     # -------------------------------------------------------------------------
     @classmethod
