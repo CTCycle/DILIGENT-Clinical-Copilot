@@ -64,6 +64,7 @@ from DILIGENT.server.services.clinical.validation import (
     build_validation_bundle,
     ensure_required_sections,
     ensure_timed_therapy_drug,
+    has_timing_information,
 )
 from DILIGENT.server.services.payload import PayloadSanitizationService
 from DILIGENT.server.services.model_config_service import ModelConfigService
@@ -178,6 +179,41 @@ class ClinicalSessionService(ClinicalSessionFormattingMixin):
             raise ServiceValidationError(
                 self.serialize_validation_errors(exc.errors()),
             ) from exc
+
+    # -------------------------------------------------------------------------
+    def build_validation_bundle_for_payload(self, payload: PatientData):
+        language_result = ClinicalLanguageDetector.detect(payload)
+        return build_validation_bundle(language_result.report_language)
+
+    # -------------------------------------------------------------------------
+    def ensure_submission_requirements(self, payload: PatientData) -> None:
+        validation_bundle = self.build_validation_bundle_for_payload(payload)
+        ensure_required_sections(payload, bundle=validation_bundle)
+
+        cleaned_therapy_text = self.drugs_parser.clean_text(payload.drugs or "")
+        if not cleaned_therapy_text:
+            ensure_timed_therapy_drug(
+                self.build_fallback_therapy_drugs(payload.drugs),
+                bundle=validation_bundle,
+            )
+            return
+
+        lines = [
+            segment.strip()
+            for segment in cleaned_therapy_text.split("\n")
+            if segment.strip()
+        ]
+        parsed_entries = [
+            parsed
+            for parsed in (self.drugs_parser.parse_line(line) for line in lines)
+            if parsed is not None
+        ]
+        if any(has_timing_information(entry) for entry in parsed_entries):
+            return
+        ensure_timed_therapy_drug(
+            self.build_fallback_therapy_drugs(payload.drugs),
+            bundle=validation_bundle,
+        )
 
     # -------------------------------------------------------------------------
     @staticmethod
@@ -959,6 +995,12 @@ class ClinicalSessionService(ClinicalSessionFormattingMixin):
         request_payload: ClinicalSessionRequest,
     ) -> str:
         patient_payload = self.build_patient_payload(request_payload)
+        try:
+            self.ensure_submission_requirements(patient_payload)
+        except ClinicalPipelineValidationError as exc:
+            raise ServiceValidationError(
+                self.serialize_pipeline_issues(exc.issues),
+            ) from exc
         self.apply_persisted_runtime_configuration()
         try:
             single_result = await self.process_single_patient(
@@ -983,6 +1025,12 @@ class ClinicalSessionService(ClinicalSessionFormattingMixin):
             )
 
         patient_payload = self.build_patient_payload(request_payload)
+        try:
+            self.ensure_submission_requirements(patient_payload)
+        except ClinicalPipelineValidationError as exc:
+            raise ServiceValidationError(
+                self.serialize_pipeline_issues(exc.issues),
+            ) from exc
         self.apply_persisted_runtime_configuration()
 
         job_id = self.job_manager.start_job(

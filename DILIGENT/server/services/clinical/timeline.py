@@ -1,7 +1,6 @@
 from __future__ import annotations
 
 import asyncio
-import contextlib
 import re
 from datetime import datetime, UTC
 from typing import Any
@@ -16,6 +15,7 @@ from DILIGENT.server.domain.patient_timeline import (
     PatientTimelineExtraction,
 )
 from DILIGENT.server.services.prompts import PATIENT_TIMELINE_EXTRACTION_PROMPT
+from DILIGENT.server.services.llm.client_runtime import ensure_runtime_client
 from DILIGENT.server.services.llm.providers import initialize_llm_client, select_llm_provider
 
 
@@ -37,6 +37,7 @@ class PatientTimelineExtractor:
         self.model: str = ""
         self.extraction_retry_attempts = 2
         self.client_lock = asyncio.Lock()
+        self.client_loop_id: int | None = None
         if client is None:
             self.client_provider: str | None = None
             self.runtime_revision = -1
@@ -86,49 +87,30 @@ class PatientTimelineExtractor:
         *,
         runtime_settings: dict[str, Any] | None = None,
     ) -> None:
-        async with self.client_lock:
-            provider, model = self._resolve_provider_model_from_runtime_settings(runtime_settings)
-            revision = LLMRuntimeConfig.get_revision() if runtime_settings is None else -1
-            signature = (provider, model)
-            if self.client_provider == "injected" and self.client is not None:
-                self.model = model
-                self.runtime_revision = revision
-                self.runtime_signature = signature
-                return
-            needs_refresh = (
-                self.client is None
-                or self.client_provider != provider
-                or (
-                    runtime_settings is None
-                    and self.runtime_revision != revision
+        provider, model = self._resolve_provider_model_from_runtime_settings(runtime_settings)
+        revision = LLMRuntimeConfig.get_revision() if runtime_settings is None else -1
+        signature = (provider, model)
+        await ensure_runtime_client(
+            self,
+            provider=provider,
+            model=model,
+            revision=revision,
+            signature=signature,
+            track_revision=runtime_settings is None,
+            track_signature=runtime_settings is not None,
+            client_factory=(
+                lambda _selected_provider, _selected_model: initialize_llm_client(
+                    purpose="parser",
+                    timeout_s=self.timeout_s,
                 )
-                or (
-                    runtime_settings is not None
-                    and self.runtime_signature != signature
+                if runtime_settings is None
+                else select_llm_provider(
+                    provider=provider,
+                    timeout_s=self.timeout_s,
+                    default_model=model,
                 )
-            )
-            if needs_refresh:
-                if self.client is not None:
-                    with contextlib.suppress(Exception):
-                        await self.client.close()
-                if runtime_settings is None:
-                    self.client = initialize_llm_client(
-                        purpose="parser",
-                        timeout_s=self.timeout_s,
-                    )
-                else:
-                    self.client = select_llm_provider(
-                        provider=provider,
-                        timeout_s=self.timeout_s,
-                        default_model=model,
-                    )
-                self.client_provider = provider
-                self.extraction_retry_attempts = 4 if provider in {"openai", "gemini"} else 2
-            self.runtime_revision = revision
-            self.runtime_signature = signature
-            self.model = model
-            if self.client is not None and model and hasattr(self.client, "default_model"):
-                self.client.default_model = model  # type: ignore[attr-defined]
+            ),
+        )
 
     # -------------------------------------------------------------------------
     @staticmethod
