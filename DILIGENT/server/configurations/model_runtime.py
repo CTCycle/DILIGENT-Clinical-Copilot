@@ -5,7 +5,6 @@ from DILIGENT.server.services.model_config_service import ModelConfigService
 
 ###############################################################################
 def sync_runtime_model_config() -> None:
-    """Load persisted model-config snapshot and apply it to runtime state."""
+    """Ensure persisted model-config defaults exist in the database."""
     service = ModelConfigService()
-    snapshot = service.ensure_defaults()
-    service.apply_runtime_snapshot(snapshot)
+    service.ensure_defaults()

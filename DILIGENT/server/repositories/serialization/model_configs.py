@@ -5,7 +5,6 @@ from typing import Literal
 
 from sqlalchemy.orm import Session, sessionmaker
 
-from DILIGENT.server.configurations.llm_configs import LLMRuntimeConfig
 from DILIGENT.server.domain.model_configs import ModelConfigSnapshot
 from DILIGENT.server.repositories.database.session import (
     resolve_engine,
@@ -23,6 +22,9 @@ class ModelConfigSerializer:
     OLLAMA_TEMPERATURE_KEY = "ollama_temperature"
     CLOUD_TEMPERATURE_KEY = "cloud_temperature"
     OLLAMA_REASONING_KEY = "ollama_reasoning"
+    DEFAULT_OLLAMA_TEMPERATURE = 0.7
+    DEFAULT_CLOUD_TEMPERATURE = 0.7
+    DEFAULT_OLLAMA_REASONING = False
 
     def __init__(
         self,
@@ -206,12 +208,12 @@ class ModelConfigSerializer:
             cls.normalize_temperature(
                 values.get(cls.OLLAMA_TEMPERATURE_KEY)
                 if cls.OLLAMA_TEMPERATURE_KEY in values
-                else LLMRuntimeConfig.get_ollama_temperature()
+                else cls.DEFAULT_OLLAMA_TEMPERATURE
             ),
             cls.normalize_temperature(
                 values.get(cls.CLOUD_TEMPERATURE_KEY)
                 if cls.CLOUD_TEMPERATURE_KEY in values
-                else LLMRuntimeConfig.get_cloud_temperature()
+                else cls.DEFAULT_CLOUD_TEMPERATURE
             ),
         )
 
@@ -221,7 +223,7 @@ class ModelConfigSerializer:
         values = {str(row.setting_key): row.setting_value for row in rows}
         raw_value = values.get(cls.OLLAMA_REASONING_KEY)
         if raw_value is None:
-            return bool(LLMRuntimeConfig.is_ollama_reasoning_enabled())
+            return bool(cls.DEFAULT_OLLAMA_REASONING)
         normalized = str(raw_value).strip().lower()
         return normalized in {"1", "true", "yes", "on"}
 

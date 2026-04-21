@@ -45,7 +45,6 @@ def test_model_config_roundtrip_preserves_cloud_selection() -> None:
         clinical_model="gpt-oss:20b",
         text_extraction_model="qwen3:1.7b",
     )
-    endpoint.apply_runtime_snapshot(updated)
     snapshot = endpoint.serializer.load_snapshot()
 
     assert snapshot.use_cloud_models is True
@@ -55,25 +54,9 @@ def test_model_config_roundtrip_preserves_cloud_selection() -> None:
     assert snapshot.text_extraction_model == "qwen3:1.7b"
 
 
-def test_clinical_runtime_overrides_are_request_scoped() -> None:
-    initial = {
-        "use_cloud": LLMRuntimeConfig.is_cloud_enabled(),
-        "provider": LLMRuntimeConfig.get_llm_provider(),
-        "cloud_model": LLMRuntimeConfig.get_cloud_model(),
-    }
-    with clinical_service.runtime_override_context(
-        use_cloud_services=True,
-        llm_provider="openai",
-        cloud_model="gpt-5.4-mini",
-        text_extraction_model=None,
-        clinical_model=None,
-        ollama_temperature=None,
-        cloud_temperature=None,
-        ollama_reasoning=None,
-    ):
-        assert LLMRuntimeConfig.is_cloud_enabled() is True
-        assert LLMRuntimeConfig.get_llm_provider() == "openai"
-    assert LLMRuntimeConfig.is_cloud_enabled() == initial["use_cloud"]
-    assert LLMRuntimeConfig.get_llm_provider() == initial["provider"]
-    assert LLMRuntimeConfig.get_cloud_model() == initial["cloud_model"]
+def test_clinical_service_reads_runtime_from_persisted_config() -> None:
+    clinical_service.apply_persisted_runtime_configuration()
+    parser_provider, parser_model = LLMRuntimeConfig.resolve_provider_and_model("parser")
+    assert parser_provider
+    assert parser_model
 

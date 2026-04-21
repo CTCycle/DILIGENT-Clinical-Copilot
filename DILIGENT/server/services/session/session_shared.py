@@ -19,7 +19,6 @@ from DILIGENT.server.services.clinical.job_progress import (
     ClinicalJobCancelled,
 )
 from DILIGENT.server.services.clinical.language import ClinicalLanguageDetector
-from DILIGENT.server.services.runtime_overrides import RuntimeSnapshot
 
 NOT_AVAILABLE = "Not available"
 PATIENT_LINE_TEMPLATE = "- **Patient:** {value}"
@@ -463,27 +462,15 @@ def run_clinical_job(
     payload: PatientData,
     patient_image_base64: str | None,
     job_id: str,
-    runtime_snapshot: RuntimeSnapshot | None = None,
 ) -> dict[str, Any]:
-    snapshot = runtime_snapshot or service.capture_runtime_snapshot()
-    with service.runtime_override_context(
-        use_cloud_services=snapshot["use_cloud_services"],
-        llm_provider=snapshot["llm_provider"],
-        cloud_model=snapshot["cloud_model"],
-        text_extraction_model=snapshot["text_extraction_model"],
-        clinical_model=snapshot["clinical_model"],
-        ollama_temperature=snapshot["ollama_temperature"],
-        cloud_temperature=snapshot["cloud_temperature"],
-        ollama_reasoning=snapshot["ollama_reasoning"],
-    ):
-        result = asyncio.run(
-            execute_clinical_job(
-                service=service,
-                payload=payload,
-                patient_image_base64=patient_image_base64,
-                job_id=job_id,
-            )
+    result = asyncio.run(
+        execute_clinical_job(
+            service=service,
+            payload=payload,
+            patient_image_base64=patient_image_base64,
+            job_id=job_id,
         )
+    )
     if not result:
         return {}
     return result
