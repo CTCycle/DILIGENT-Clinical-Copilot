@@ -57,7 +57,6 @@ class ModelConfigService:
         include_local_availability: bool | None = None,
     ) -> ModelConfigStateResponse:
         snapshot = self.ensure_defaults()
-        self.apply_runtime_snapshot(snapshot)
         should_check_local_availability = (
             include_local_availability
             if include_local_availability is not None
@@ -140,7 +139,6 @@ class ModelConfigService:
         if updates:
             snapshot = self.serializer.save_snapshot(**updates)
 
-        self.apply_runtime_snapshot(snapshot)
         should_check_local_availability = (not snapshot.use_cloud_models) or local_roles_updated
         local_models = await self.list_local_model_cards(
             selected_models=(snapshot.clinical_model, snapshot.text_extraction_model),
@@ -290,25 +288,6 @@ class ModelConfigService:
             for model_name in extra_models
         )
         return cards
-
-    # -------------------------------------------------------------------------
-    def apply_runtime_snapshot(self, snapshot: ModelConfigSnapshot) -> None:
-        if snapshot.text_extraction_model:
-            LLMRuntimeConfig.set_text_extraction_model(snapshot.text_extraction_model)
-        if snapshot.clinical_model:
-            LLMRuntimeConfig.set_clinical_model(snapshot.clinical_model)
-        LLMRuntimeConfig.set_ollama_temperature(snapshot.ollama_temperature)
-        LLMRuntimeConfig.set_cloud_temperature(snapshot.cloud_temperature)
-        LLMRuntimeConfig.set_ollama_reasoning(snapshot.ollama_reasoning)
-
-        provider = self.resolve_provider(snapshot.cloud_provider)
-        LLMRuntimeConfig.set_llm_provider(provider)
-        cloud_model = self.resolve_cloud_model(provider=provider, model_name=snapshot.cloud_model)
-        if cloud_model is None:
-            LLMRuntimeConfig.set_cloud_model("")
-        else:
-            LLMRuntimeConfig.set_cloud_model(cloud_model)
-        LLMRuntimeConfig.set_use_cloud_services(snapshot.use_cloud_models)
 
     # -------------------------------------------------------------------------
     def build_response(
