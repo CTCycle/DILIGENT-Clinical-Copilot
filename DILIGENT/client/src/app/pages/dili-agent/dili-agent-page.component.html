@@ -167,21 +167,23 @@
   </section>
 </main>
 
-<app-modal-shell
-  [isOpen]="isMissingLabsModalOpen()"
-  title="Missing laboratory analysis"
-  subtitle="Laboratory results are empty; hepatotoxicity pattern may be undetermined."
-  titleId="missing-labs-title"
-  ariaDescribedBy="missing-labs-description"
-  [footer]="true"
-  (close)="cancelMissingLabs()"
->
-  <p id="missing-labs-description" class="helper">
-    Continue only when you need to start an exploratory analysis before ALT, AST, ALP, and bilirubin
-    values are available.
-  </p>
-  <div modal-footer>
-    <button class="btn btn-secondary" type="button" (click)="cancelMissingLabs()">Cancel</button>
-    <button class="btn btn-primary" type="button" (click)="confirmMissingLabs()">Continue anyway</button>
-  </div>
-</app-modal-shell>
+@if (isMissingLabsModalOpen()) {
+  <app-modal-shell
+    [isOpen]="isMissingLabsModalOpen()"
+    title="Missing laboratory analysis"
+    subtitle="Laboratory results are empty; hepatotoxicity pattern may be undetermined."
+    titleId="missing-labs-title"
+    ariaDescribedBy="missing-labs-description"
+    [footer]="true"
+    (close)="cancelMissingLabs()"
+  >
+    <p id="missing-labs-description" class="helper">
+      Continue only when you need to start an exploratory analysis before ALT, AST, ALP, and bilirubin
+      values are available.
+    </p>
+    <div modal-footer>
+      <button class="btn btn-secondary" type="button" (click)="cancelMissingLabs()">Cancel</button>
+      <button class="btn btn-primary" type="button" (click)="confirmMissingLabs()">Continue anyway</button>
+    </div>
+  </app-modal-shell>
+}

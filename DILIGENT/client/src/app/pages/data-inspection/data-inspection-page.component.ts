@@ -500,7 +500,9 @@ export class DataInspectionPageComponent implements OnInit, OnDestroy {
     this.timelineLoading.set(true);
     this.timelineData.set(null);
     try {
-      const timeline = await fetchInspectionSessionTimeline(row.session_id);
+      const timeline = row.has_timeline
+        ? await fetchInspectionSessionTimeline(row.session_id)
+        : await generateInspectionSessionTimeline(row.session_id);
       this.timelineCache.set(row.session_id, timeline);
       this.timelineData.set(timeline);
     } catch (error) {
