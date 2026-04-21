@@ -30,10 +30,6 @@ class ModelConfigEndpoint:
         return self.service.ensure_defaults()
 
     # -------------------------------------------------------------------------
-    def apply_runtime_snapshot(self, snapshot) -> None:
-        self.service.apply_runtime_snapshot(snapshot)
-
-    # -------------------------------------------------------------------------
     async def get_state(
         self,
         include_local_availability: Annotated[bool | None, Query()] = None,

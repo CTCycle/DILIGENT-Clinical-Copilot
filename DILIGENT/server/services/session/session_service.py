@@ -64,7 +64,6 @@ from DILIGENT.server.services.clinical.validation import (
 from DILIGENT.server.services.payload import PayloadSanitizationService
 from DILIGENT.server.services.model_config_service import ModelConfigService
 from DILIGENT.server.services.retrieval.query import DILIQueryBuilder
-from DILIGENT.server.services.runtime_overrides import RuntimeOverrides, RuntimeSnapshot
 from DILIGENT.server.services.session.session_shared import NarrativeBuilder, run_clinical_job
 from DILIGENT.server.services.session_formatting_mixin import ClinicalSessionFormattingMixin
 from DILIGENT.server.services.text.normalization import normalize_drug_query_name
@@ -138,8 +137,7 @@ class ClinicalSessionService(ClinicalSessionFormattingMixin):
         )
 
     def apply_persisted_runtime_configuration(self) -> None:
-        snapshot = self.model_config_service.ensure_defaults()
-        self.model_config_service.apply_runtime_snapshot(snapshot)
+        self.model_config_service.ensure_defaults()
         parser_provider, parser_model = LLMRuntimeConfig.resolve_provider_and_model("parser")
         clinical_provider, clinical_model_resolved = LLMRuntimeConfig.resolve_provider_and_model("clinical")
         logger.info(
@@ -154,59 +152,6 @@ class ClinicalSessionService(ClinicalSessionFormattingMixin):
             LLMRuntimeConfig.get_ollama_temperature(),
             LLMRuntimeConfig.get_cloud_temperature(),
             LLMRuntimeConfig.is_ollama_reasoning_enabled(),
-        )
-
-    # -------------------------------------------------------------------------
-    @staticmethod
-    def capture_runtime_snapshot() -> RuntimeSnapshot:
-        return RuntimeOverrides.capture_snapshot()
-
-    # -------------------------------------------------------------------------
-    @staticmethod
-    def apply_runtime_overrides(
-        *,
-        use_cloud_services: bool | None,
-        llm_provider: str | None,
-        cloud_model: str | None,
-        text_extraction_model: str | None,
-        clinical_model: str | None,
-        ollama_temperature: float | None,
-        cloud_temperature: float | None,
-        ollama_reasoning: bool | None,
-    ) -> None:
-        RuntimeOverrides.apply(
-            use_cloud_services=use_cloud_services,
-            llm_provider=llm_provider,
-            cloud_model=cloud_model,
-            text_extraction_model=text_extraction_model,
-            clinical_model=clinical_model,
-            ollama_temperature=ollama_temperature,
-            cloud_temperature=cloud_temperature,
-            ollama_reasoning=ollama_reasoning,
-        )
-
-    # -------------------------------------------------------------------------
-    def runtime_override_context(
-        self,
-        *,
-        use_cloud_services: bool | None,
-        llm_provider: str | None,
-        cloud_model: str | None,
-        text_extraction_model: str | None,
-        clinical_model: str | None,
-        ollama_temperature: float | None,
-        cloud_temperature: float | None,
-        ollama_reasoning: bool | None,
-    ):
-        return RuntimeOverrides.context(
-            use_cloud_services=use_cloud_services,
-            llm_provider=llm_provider,
-            cloud_model=cloud_model,
-            text_extraction_model=text_extraction_model,
-            clinical_model=clinical_model,
-            ollama_temperature=ollama_temperature,
-            cloud_temperature=cloud_temperature,
-            ollama_reasoning=ollama_reasoning,
         )
 
     # -------------------------------------------------------------------------
@@ -1018,7 +963,6 @@ class ClinicalSessionService(ClinicalSessionFormattingMixin):
 
         patient_payload = self.build_patient_payload(request_payload)
         self.apply_persisted_runtime_configuration()
-        runtime_snapshot = self.capture_runtime_snapshot()
 
         job_id = self.job_manager.start_job(
             job_type=self.JOB_TYPE,
@@ -1027,7 +971,6 @@ class ClinicalSessionService(ClinicalSessionFormattingMixin):
                 "service": self,
                 "payload": patient_payload,
                 "patient_image_base64": request_payload.patient_image_base64,
-                "runtime_snapshot": runtime_snapshot,
             },
         )
 
