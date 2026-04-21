@@ -41,7 +41,11 @@ class LLMRuntimeConfig:
         normalized = (value or "").strip()
         if normalized and normalized in allowed:
             return normalized
-        return fallback if fallback in allowed else (allowed[0] if allowed else "")
+        if fallback in allowed:
+            return fallback
+        if allowed:
+            return allowed[0]
+        return ""
 
     # -------------------------------------------------------------------------
     @staticmethod
