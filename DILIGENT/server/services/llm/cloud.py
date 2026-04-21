@@ -4,6 +4,9 @@ import json
 from typing import Any, Literal
 
 import httpx
+from langchain_core.messages import AIMessage, BaseMessage, HumanMessage, SystemMessage
+from langchain_google_genai import ChatGoogleGenerativeAI
+from langchain_openai import ChatOpenAI
 
 from DILIGENT.server.common.constants import GEMINI_API_BASE, OPENAI_API_BASE
 from DILIGENT.server.common.utils.logger import logger
@@ -44,7 +47,9 @@ class CloudLLMClient:
     ) -> None:
         self.provider: ProviderName = provider
         self.default_model = default_model
+        self.timeout_s = float(timeout_s)
         provider_access_key = self.resolve_provider_access_key(provider)
+        self.provider_access_key = provider_access_key
 
         if provider == "openai":
             if not provider_access_key:
@@ -155,20 +160,159 @@ class CloudLLMClient:
         options_payload = dict(options) if options else {}
         if "temperature" not in options_payload:
             options_payload["temperature"] = LLMRuntimeConfig.get_cloud_temperature()
-        if self.provider == "openai":
-            return await self.chat_openai(
-                model=model,
-                messages=messages,
-                format=format,
-                options=options_payload,
-            )
-        if self.provider == "gemini":
-            return await self.chat_gemini(
-                model=model,
-                messages=messages,
-                options=options_payload,
-            )
-        raise LLMError(f"Provider '{self.provider}' does not support chat yet")
+        resolved_model = model or self.default_model
+        if not resolved_model:
+            raise LLMError("Model is required")
+
+        lc_messages = self._build_langchain_messages(messages)
+        try:
+            if self.provider == "openai":
+                chat_model = self._build_openai_chat_model(
+                    resolved_model=resolved_model,
+                    format=format,
+                    options=options_payload,
+                )
+            elif self.provider == "gemini":
+                chat_model = self._build_gemini_chat_model(
+                    resolved_model=resolved_model,
+                    options=options_payload,
+                )
+            else:
+                raise LLMError(f"Provider '{self.provider}' does not support chat yet")
+            response = await chat_model.ainvoke(lc_messages)
+        except Exception as exc:  # noqa: BLE001
+            raise self._map_langchain_exception(exc) from exc
+        return self._normalize_langchain_content(response.content)
+
+    # ---------------------------------------------------------------------
+    def _build_openai_chat_model(
+        self,
+        *,
+        resolved_model: str,
+        format: str | None,
+        options: dict[str, Any] | None,
+    ) -> ChatOpenAI:
+        kwargs: dict[str, Any] = {
+            "model": resolved_model,
+            "api_key": self.provider_access_key,
+            "base_url": self.base_url,
+            "timeout": self.timeout_s,
+        }
+        supports_sampling = not self.is_gpt5_family_model(resolved_model)
+        if supports_sampling and options and "temperature" in options:
+            kwargs["temperature"] = float(options["temperature"])
+        if supports_sampling and options and "top_p" in options:
+            kwargs["top_p"] = float(options["top_p"])
+        if format == "json":
+            kwargs["model_kwargs"] = {"response_format": {"type": "json_object"}}
+        return ChatOpenAI(**kwargs)
+
+    # ---------------------------------------------------------------------
+    def _build_gemini_chat_model(
+        self,
+        *,
+        resolved_model: str,
+        options: dict[str, Any] | None,
+    ) -> ChatGoogleGenerativeAI:
+        kwargs: dict[str, Any] = {
+            "model": resolved_model,
+            "google_api_key": self.provider_access_key,
+            "timeout": self.timeout_s,
+        }
+        if options and "temperature" in options:
+            kwargs["temperature"] = max(0.0, min(2.0, float(options["temperature"])))
+        return ChatGoogleGenerativeAI(**kwargs)
+
+    # ---------------------------------------------------------------------
+    @staticmethod
+    def resolve_gemini_model_resource(model: str | None) -> str:
+        model_name = (model or "").strip()
+        if not model_name:
+            raise LLMError("Gemini model is required")
+        if model_name.startswith("models/"):
+            return model_name
+        return f"models/{model_name}"
+
+    # ---------------------------------------------------------------------
+    @staticmethod
+    def _build_langchain_messages(
+        messages: list[dict[str, str]],
+    ) -> list[BaseMessage]:
+        output: list[BaseMessage] = []
+        for item in messages:
+            role = str(item.get("role", "user")).strip().lower()
+            content = str(item.get("content", ""))
+            if role == "system":
+                output.append(SystemMessage(content=content))
+            elif role in {"assistant", "model"}:
+                output.append(AIMessage(content=content))
+            else:
+                output.append(HumanMessage(content=content))
+        return output
+
+    # ---------------------------------------------------------------------
+    @staticmethod
+    def _normalize_langchain_content(content: Any) -> dict[str, Any] | str:
+        if isinstance(content, dict):
+            return content
+        if isinstance(content, list):
+            chunks: list[str] = []
+            for part in content:
+                if isinstance(part, dict):
+                    text = part.get("text")
+                    if isinstance(text, str):
+                        chunks.append(text)
+                    continue
+                if isinstance(part, str):
+                    chunks.append(part)
+                    continue
+                chunks.append(str(part))
+            content = "".join(chunks)
+        if isinstance(content, str):
+            try:
+                loaded = json.loads(content)
+            except json.JSONDecodeError:
+                return content
+            return loaded if isinstance(loaded, dict) else content
+        return str(content)
+
+    # ---------------------------------------------------------------------
+    @staticmethod
+    def _map_langchain_exception(exc: Exception) -> LLMError:
+        if isinstance(exc, LLMError):
+            return exc
+        if isinstance(exc, TimeoutError):
+            return LLMTimeout("Timed out waiting for cloud chat response")
+        if isinstance(exc, httpx.TimeoutException):
+            return LLMTimeout("Timed out waiting for cloud chat response")
+        error_name = exc.__class__.__name__.lower()
+        if "timeout" in error_name:
+            return LLMTimeout("Timed out waiting for cloud chat response")
+        return LLMError(f"Cloud LLM call failed: {exc}")
+
+    # ---------------------------------------------------------------------
+    async def llm_text_call(
+        self,
+        *,
+        model: str,
+        system_prompt: str,
+        user_prompt: str,
+        temperature: float = 0.0,
+    ) -> str:
+        resolved_model = model or (self.default_model or "")
+        raw = await self.chat(
+            model=resolved_model,
+            messages=[
+                {"role": "system", "content": system_prompt.strip()},
+                {"role": "user", "content": user_prompt},
+            ],
+            options=(
+                None
+                if self.is_gpt5_family_model(resolved_model)
+                else {"temperature": float(temperature)}
+            ),
+        )
+        return json.dumps(raw) if isinstance(raw, dict) else str(raw)
 
     # ---------------------------------------------------------------------
     async def embed(
@@ -185,147 +329,6 @@ class CloudLLMClient:
         if self.provider == "gemini":
             return await self.embed_gemini(model=model, input_texts=input_texts)
         raise LLMError(f"Provider '{self.provider}' does not support embeddings yet")
-
-    # ---------------------------------------------------------------------
-    async def chat_openai(
-        self,
-        *,
-        model: str,
-        messages: list[dict[str, str]],
-        format: str | None,
-        options: dict[str, Any] | None,
-    ) -> dict[str, Any] | str:
-        resolved_model = model or self.default_model
-        body = self._build_openai_chat_body(
-            resolved_model=resolved_model,
-            messages=messages,
-            format=format,
-            options=options,
-        )
-
-        try:
-            resp = await self.client.post("/chat/completions", json=body)
-        except httpx.TimeoutException as e:
-            raise LLMTimeout("Timed out waiting for OpenAI chat response") from e
-        self.raise_for_status(resp)
-
-        data = resp.json()
-        content = ((data.get("choices") or [{}])[0].get("message") or {}).get(
-            "content",
-            "",
-        )
-        if isinstance(content, dict):
-            return content
-        if isinstance(content, str):
-            try:
-                return json.loads(content)
-            except json.JSONDecodeError:
-                return content
-        return str(content)
-
-    def _build_openai_chat_body(
-        self,
-        *,
-        resolved_model: str,
-        messages: list[dict[str, str]],
-        format: str | None,
-        options: dict[str, Any] | None,
-    ) -> dict[str, Any]:
-        body: dict[str, Any] = {
-            "model": resolved_model,
-            "messages": messages,
-            "stream": False,
-        }
-        if options:
-            supports_sampling = not self.is_gpt5_family_model(resolved_model)
-            if supports_sampling and "temperature" in options:
-                body["temperature"] = options["temperature"]
-            if supports_sampling and "top_p" in options:
-                body["top_p"] = options["top_p"]
-        if format == "json":
-            body["response_format"] = {"type": "json_object"}
-        return body
-
-    # ---------------------------------------------------------------------
-    @staticmethod
-    def to_gemini_contents(
-        messages: list[dict[str, str]],
-    ) -> tuple[list[dict[str, Any]], str | None]:
-        contents: list[dict[str, Any]] = []
-        system_text: str | None = None
-        for message in messages:
-            role = message.get("role", "user")
-            text = message.get("content", "")
-            if role == "system":
-                if text:
-                    if system_text:
-                        system_text = f"{system_text}\n{text}"
-                    else:
-                        system_text = text
-                continue
-            gem_role = "user" if role == "user" else "model"
-            contents.append({"role": gem_role, "parts": [{"text": text}]})
-        return contents, system_text
-
-    # ---------------------------------------------------------------------
-    @staticmethod
-    def resolve_gemini_model_resource(model: str | None) -> str:
-        model_name = (model or "").strip()
-        if not model_name:
-            raise LLMError("Gemini model is required")
-        if model_name.startswith("models/"):
-            return model_name
-        return f"models/{model_name}"
-
-    # ---------------------------------------------------------------------
-    async def chat_gemini(
-        self,
-        *,
-        model: str,
-        messages: list[dict[str, str]],
-        options: dict[str, Any] | None = None,
-    ) -> dict[str, Any] | str:
-        resolved_model = model or self.default_model
-        model_resource = self.resolve_gemini_model_resource(resolved_model)
-        contents, system_text = self.to_gemini_contents(messages)
-        path = f"/{model_resource}:generateContent"
-
-        body: dict[str, Any] = {"contents": contents}
-        if system_text:
-            body["systemInstruction"] = {"parts": [{"text": system_text}]}
-        if options and "temperature" in options:
-            try:
-                temperature = float(options["temperature"])
-            except (TypeError, ValueError):
-                temperature = 0.0
-            body["generationConfig"] = {
-                "temperature": max(0.0, min(2.0, temperature))
-            }
-
-        try:
-            resp = await self.client.post(path, json=body)
-        except httpx.TimeoutException as e:
-            raise LLMTimeout("Timed out waiting for Gemini chat response") from e
-        self.raise_for_status(resp)
-
-        data = resp.json()
-        try:
-            content = (
-                ((data.get("candidates") or [{}])[0].get("content") or {})
-                .get("parts", [{}])[0]
-                .get("text", "")
-            )
-        except Exception:
-            content = ""
-
-        if isinstance(content, dict):
-            return content
-        if isinstance(content, str):
-            try:
-                return json.loads(content)
-            except json.JSONDecodeError:
-                return content
-        return str(content)
 
     # ---------------------------------------------------------------------
     async def embed_openai(
