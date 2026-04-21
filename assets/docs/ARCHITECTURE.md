@@ -55,6 +55,30 @@ Active clinical pipeline (request-driven from session endpoints):
 - deterministic per-drug RUCAM estimation (`services/clinical/rucam.py`)
 - language-sensitive report scaffolding and validation
 
+## 3.1 LLM and embedding transport boundaries
+
+- Cloud chat transport is implemented in `DILIGENT/server/services/llm/cloud.py` with LangChain chat models:
+  - OpenAI via `langchain_openai.ChatOpenAI`
+  - Gemini via `langchain_google_genai.ChatGoogleGenerativeAI`
+- Ollama inference transport in `DILIGENT/server/services/llm/providers.py` uses LangChain:
+  - chat/streaming via `langchain_ollama.ChatOllama`
+  - embeddings via `langchain_ollama.OllamaEmbeddings`
+- Structured output compatibility remains in `DILIGENT/server/services/llm/structured.py` and is still the schema-repair/parsing layer; LangChain only replaces transport.
+- Embedding provider selection and execution in `DILIGENT/server/services/retrieval/embeddings.py` is LangChain-backed:
+  - OpenAI via `langchain_openai.OpenAIEmbeddings`
+  - Gemini via `langchain_google_genai.GoogleGenerativeAIEmbeddings`
+  - Ollama via `langchain_ollama.OllamaEmbeddings`
+- Ollama operational control remains custom in `DILIGENT/server/services/llm/providers.py` for:
+  - model availability checks
+  - model listing/show/pull/pull stream
+  - server start/health checks
+  - residency and prefetch planning
+  - context-window estimation
+- Ingestion/chunking/vector persistence infrastructure remains unchanged:
+  - `DILIGENT/server/services/updater/embeddings.py`
+  - `DILIGENT/server/repositories/serialization/data.py`
+  - `DILIGENT/server/repositories/vectors.py`
+
 ## 4. Frontend boundaries
 
 - `DILIGENT/client/src/app/pages/*`
