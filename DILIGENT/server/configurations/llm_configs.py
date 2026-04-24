@@ -1,32 +1,20 @@
 from __future__ import annotations
 
 from datetime import datetime
-from threading import RLock
 from typing import Literal
 
 from DILIGENT.server.common.constants import CLOUD_MODEL_CHOICES
+from DILIGENT.server.configurations.startup import server_settings
 from DILIGENT.server.domain.model_configs import ModelConfigSnapshot
 from DILIGENT.server.domain.settings.configuration import LLMRuntimeDefaults
+from DILIGENT.server.repositories.serialization.model_configs import ModelConfigSerializer
 
 
 ###############################################################################
 class LLMRuntimeConfig:
-    _lock = RLock()
-    _defaults: LLMRuntimeDefaults | None = None
-
-    @classmethod
-    def configure(cls, defaults: LLMRuntimeDefaults) -> None:
-        with cls._lock:
-            cls._defaults = defaults
-
-    # -------------------------------------------------------------------------
-    @classmethod
-    def _get_defaults(cls) -> LLMRuntimeDefaults:
-        with cls._lock:
-            defaults = cls._defaults
-        if defaults is None:
-            raise RuntimeError("Client runtime defaults are not configured.")
-        return defaults
+    @staticmethod
+    def _get_defaults() -> LLMRuntimeDefaults:
+        return server_settings.llm_defaults
 
     # -------------------------------------------------------------------------
     @staticmethod
@@ -65,8 +53,6 @@ class LLMRuntimeConfig:
     # -------------------------------------------------------------------------
     @classmethod
     def _load_snapshot(cls) -> ModelConfigSnapshot:
-        from DILIGENT.server.repositories.serialization.model_configs import ModelConfigSerializer
-
         defaults = cls._get_defaults()
         snapshot = ModelConfigSerializer().load_snapshot()
         provider = cls._normalize_provider(snapshot.cloud_provider, defaults.llm_provider)
