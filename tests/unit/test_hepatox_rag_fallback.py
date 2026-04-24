@@ -24,3 +24,9 @@ def test_fetch_rag_documents_degrades_when_embedding_backend_fails() -> None:
     assert result is not None
     assert "RAG retrieval unavailable" in result
     assert "embedding backend unavailable" in result
+    assert len(consultation.pipeline_issues) == 1
+    issue = consultation.pipeline_issues[0]
+    assert issue.severity == "warning"
+    assert issue.code == "rag_retrieval_unavailable"
+    assert issue.field == "rag"
+    assert "Nivolumab" in issue.raw_line

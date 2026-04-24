@@ -37,12 +37,103 @@ function isRecord(value: unknown): value is Record<string, unknown> {
   return !!value && typeof value === 'object' && !Array.isArray(value);
 }
 
+function readStringKey(payload: Record<string, unknown>, ...keys: string[]): string | null {
+  for (const key of keys) {
+    const value = payload[key];
+    if (typeof value === 'string' && value.trim()) {
+      return value;
+    }
+  }
+  return null;
+}
+
+function readNumberKey(payload: Record<string, unknown>, ...keys: string[]): number | null {
+  for (const key of keys) {
+    const value = payload[key];
+    if (typeof value === 'number' && Number.isFinite(value)) {
+      return value;
+    }
+  }
+  return null;
+}
+
+function readRecordKey(payload: Record<string, unknown>, ...keys: string[]): Record<string, unknown> | null {
+  for (const key of keys) {
+    const value = payload[key];
+    if (isRecord(value)) {
+      return value;
+    }
+  }
+  return null;
+}
+
+function resolveStartJobId(started: JobStartResponse): string | null {
+  const payload = started as unknown;
+  if (!isRecord(payload)) {
+    return null;
+  }
+  return readStringKey(payload, 'job_id', 'jobId', 'id');
+}
+
+function resolveStatusValue(status: InspectionUpdateJobStatusResponse): string {
+  const payload = status as unknown;
+  if (!isRecord(payload)) {
+    return 'failed';
+  }
+  return readStringKey(payload, 'status') || 'failed';
+}
+
 function resolveUpdateProgressMessage(status: InspectionUpdateJobStatusResponse): string {
+  const payload = status as unknown;
+  if (!isRecord(payload)) {
+    return 'Update progress unavailable.';
+  }
+  const resultPayload = readRecordKey(payload, 'result');
+  const resultMessage = resultPayload
+    ? readStringKey(resultPayload, 'progress_message', 'progressMessage')
+    : null;
+  if (resultMessage) {
+    return resultMessage;
+  }
+  const errorMessage = readStringKey(payload, 'error');
+  if (errorMessage) {
+    return errorMessage;
+  }
+  const statusValue = readStringKey(payload, 'status') || 'unknown';
+  return `Job status: ${statusValue}`;
+}
+
+function resolveProgressValue(status: InspectionUpdateJobStatusResponse): number {
+  const payload = status as unknown;
+  if (!isRecord(payload)) {
+    return 0;
+  }
+  const directProgress = readNumberKey(payload, 'progress');
+  if (typeof directProgress === 'number') {
+    return directProgress;
+  }
+  const resultPayload = readRecordKey(payload, 'result');
+  const resultProgress = resultPayload ? readNumberKey(resultPayload, 'progress') : null;
+  return typeof resultProgress === 'number' ? resultProgress : 0;
+}
+
+function resolveErrorValue(status: InspectionUpdateJobStatusResponse): string | null {
+  const payload = status as unknown;
+  if (!isRecord(payload)) {
+    return null;
+  }
+  return readStringKey(payload, 'error');
+}
+
+function resolveStartedMessage(started: JobStartResponse): string {
+  const payload = started as unknown;
+  if (!isRecord(payload)) {
+    return 'Update running...';
+  }
   const message =
-    typeof status.result?.progress_message === 'string'
-      ? status.result.progress_message
-      : null;
-  return message || status.error || `Job status: ${status.status}`;
+    readStringKey(payload, 'message') ||
+    readStringKey(payload, 'detail');
+  return message || 'Update running...';
 }
 
 export class InspectionUpdateJobResource {
@@ -128,10 +219,14 @@ export class InspectionUpdateJobResource {
 
     try {
       const started = await this.actions[target].start(parsedOverrides.value);
-      this.updateJobId.set(started.job_id);
-      this.updateMessage.set(started.message || 'Update running...');
+      const startedJobId = resolveStartJobId(started);
+      if (!startedJobId) {
+        throw new Error('Update job started but no job id was returned.');
+      }
+      this.updateJobId.set(startedJobId);
+      this.updateMessage.set(resolveStartedMessage(started));
       const pollToken = this.beginPolling();
-      await this.pollUpdateJob(target, started.job_id, pollToken);
+      void this.pollUpdateJob(target, startedJobId, pollToken);
     } catch (error) {
       this.updateRunning.set(false);
       this.updateError.set(error instanceof Error ? error.message : 'Failed to start update job.');
@@ -193,31 +288,40 @@ export class InspectionUpdateJobResource {
     jobId: string,
     pollToken: number,
   ): Promise<void> {
-    await this.jobPolling.run({
-      intervalMs: 1200,
-      isCancelled: () => !this.isPollingActive(pollToken),
-      pollStep: async () => {
-        const status = await this.actions[target].status(jobId);
-        if (!this.isPollingActive(pollToken)) {
-          return false;
-        }
-        this.updateProgress.set(typeof status.progress === 'number' ? status.progress : 0);
-        this.updateMessage.set(resolveUpdateProgressMessage(status));
+    try {
+      await this.jobPolling.run({
+        intervalMs: 1200,
+        isCancelled: () => !this.isPollingActive(pollToken),
+        pollStep: async () => {
+          const status = await this.actions[target].status(jobId);
+          if (!this.isPollingActive(pollToken)) {
+            return false;
+          }
+          const statusValue = resolveStatusValue(status);
+          this.updateProgress.set(resolveProgressValue(status));
+          this.updateMessage.set(resolveUpdateProgressMessage(status));
 
-        if (status.status === 'completed') {
-          this.updateRunning.set(false);
-          await this.actions[target].refresh();
-          return false;
-        }
-        if (status.status === 'failed' || status.status === 'cancelled') {
-          this.updateRunning.set(false);
-          this.updateError.set(status.error || `Update job ${status.status}.`);
-          return false;
-        }
+          if (statusValue === 'completed') {
+            this.updateRunning.set(false);
+            await this.actions[target].refresh();
+            return false;
+          }
+          if (statusValue === 'failed' || statusValue === 'cancelled') {
+            this.updateRunning.set(false);
+            this.updateError.set(resolveErrorValue(status) || `Update job ${statusValue}.`);
+            return false;
+          }
 
-        return true;
-      },
-    });
+          return true;
+        },
+      });
+    } catch (error) {
+      if (!this.isPollingActive(pollToken)) {
+        return;
+      }
+      this.updateRunning.set(false);
+      this.updateError.set(error instanceof Error ? error.message : 'Failed to poll update job.');
+    }
   }
 
   private beginPolling(): number {

@@ -39,6 +39,7 @@ from DILIGENT.server.common.constants import (
     R_SCORE_HEPATOCELLULAR_THRESHOLD,
 )
 from DILIGENT.server.common.utils.logger import logger
+from DILIGENT.server.services.clinical.match_quality import classify_match_evidence
 from DILIGENT.server.services.retrieval.embeddings import SimilaritySearch
 from DILIGENT.server.services.clinical.preparation import HepatoxPreparedInputs
 from DILIGENT.server.services.text.normalization import normalize_drug_query_name
@@ -316,6 +317,7 @@ class HepatoxConsultation:
         self.rag_use_reranking = bool(server_settings.rag.use_reranking)
         self.rag_top_n = max(int(server_settings.rag.rerank_top_n), 1)
         self.rag_candidate_k = max(int(server_settings.rag.rerank_candidate_k), self.rag_top_n)
+        self.pipeline_issues: list[PipelineIssue] = []
         default_parallel_analyses = 3 if provider == "ollama" else 1
         self.max_parallel_analyses = max(
             1,
@@ -558,6 +560,26 @@ class HepatoxConsultation:
             for candidate in livertox_data.get("match_candidates", [])
             if str(candidate).strip()
         ]
+        match_notes = [
+            str(note).strip()
+            for note in livertox_data.get("match_notes", [])
+            if str(note).strip()
+        ]
+        match_confidence = livertox_data.get("match_confidence")
+        if match_confidence is not None:
+            try:
+                match_confidence = float(match_confidence)
+            except (TypeError, ValueError):
+                match_confidence = None
+        match_reason = livertox_data.get("match_reason")
+        match_quality = classify_match_evidence(
+            match_status=match_status,
+            match_reason=str(match_reason) if match_reason is not None else None,
+            match_confidence=match_confidence,
+            match_notes=match_notes,
+            missing_livertox=missing_livertox,
+            ambiguous_match=ambiguous_match,
+        )
 
         suspension = self.evaluate_suspension(drug_entry, visit_date)
         matched_lvt_row = matched_row if isinstance(matched_row, dict) else None
@@ -572,6 +594,11 @@ class HepatoxConsultation:
             missing_livertox=missing_livertox,
             ambiguous_match=ambiguous_match,
             match_status=match_status,
+            match_confidence=match_confidence,
+            match_reason=str(match_reason).strip() if match_reason is not None else None,
+            match_notes=match_notes,
+            evidence_quality=match_quality["evidence_quality"],
+            evidence_warnings=match_quality["evidence_warnings"],
             match_candidates=match_candidates,
             suspension=suspension,
             rucam=rucam,
@@ -704,7 +731,24 @@ class HepatoxConsultation:
                 drug_name,
                 exc,
             )
+            self.record_rag_retrieval_issue(drug_name=drug_name, error=exc)
             return f"No additional documents provided (reason: RAG retrieval unavailable: {exc})."
+
+    # -------------------------------------------------------------------------
+    def record_rag_retrieval_issue(self, *, drug_name: str, error: Exception) -> None:
+        issue = PipelineIssue(
+            severity="warning",
+            code="rag_retrieval_unavailable",
+            message=(
+                "Internal RAG retrieval was unavailable for "
+                f"{drug_name}; analysis continued without supporting documents."
+            ),
+            field="rag",
+            raw_line=f"{drug_name}: {error}",
+        )
+        if not hasattr(self, "pipeline_issues"):
+            self.pipeline_issues = []
+        self.pipeline_issues.append(issue)
 
     # -------------------------------------------------------------------------
     @staticmethod
@@ -1461,8 +1505,10 @@ class HepatoxConsultation:
             if rucam is not None and rucam.limitations
             else "incomplete serial labs and/or missing rechallenge data"
         )
+        evidence_lines = self.render_evidence_quality_lines(entry)
         return (
             f"**{title}**\n\n"
+            f"{evidence_lines}\n\n"
             f"**Estimated RUCAM**: {rucam_score}, {rucam_category}, confidence {rucam_confidence}. "
             f"Estimated due to incomplete clinical data; key limitations: {limitations}.\n\n"
             f"**RUCAM component summary**: {component_summary}\n\n"
@@ -1471,6 +1517,21 @@ class HepatoxConsultation:
             f"{body}\n\n"
             f"**Bibliography source**: LiverTox"
         ).strip()
+
+    # -------------------------------------------------------------------------
+    @staticmethod
+    def render_evidence_quality_lines(entry: DrugClinicalAssessment) -> str:
+        quality = entry.evidence_quality or "unknown"
+        matched_name = ""
+        if isinstance(entry.matched_livertox_row, dict):
+            matched_name = str(entry.matched_livertox_row.get("drug_name") or "").strip()
+        target = matched_name or entry.canonical_name or "not available"
+        warnings = "; ".join(entry.evidence_warnings) if entry.evidence_warnings else "None"
+        return (
+            f"**Evidence match**: {quality}. "
+            f"Matched local record: {target}. "
+            f"Warnings: {warnings}."
+        )
 
     # -------------------------------------------------------------------------
     def sanitize_renderable_body(self, entry: DrugClinicalAssessment) -> str:
