@@ -15,13 +15,11 @@ import pandas as pd
 
 from DILIGENT.server.configurations.startup import server_settings
 from DILIGENT.server.common.utils.logger import logger
-from DILIGENT.server.common.constants import (
-    RXNAV_CURATED_ALIASES_PATH,
-    RXNAV_SYNONYM_STOPWORDS,
-)
+from DILIGENT.server.common.constants import RXNAV_CURATED_ALIASES_PATH
 from DILIGENT.server.domain.rxnav import RxNormCandidate
 from DILIGENT.server.repositories.serialization.data import DataSerializer
 from DILIGENT.server.services.text.normalization import normalize_drug_name
+from DILIGENT.server.services.text.vocabulary import get_text_normalization_snapshot
 
 
 ###############################################################################
@@ -41,119 +39,6 @@ class RxNavClient:
     BACKOFF_TIME = (0.6, 1.2, 2.4)
     RETRY_STATUS = {429, 500, 502, 503, 504}
     TIMEOUT = 10.0
-    SALT_STOPWORDS = {
-        "acetate",
-        "adipate",
-        "aluminum",
-        "bitartrate",
-        "bromide",
-        "besylate",
-        "calcium",
-        "carbonate",
-        "chloride",
-        "citrate",
-        "diacetate",
-        "dihydrate",
-        "disodium",
-        "fumarate",
-        "hydrobromide",
-        "hydrochloride",
-        "hydrogen",
-        "isosorbide",
-        "lactate",
-        "maleate",
-        "mesylate",
-        "nitrate",
-        "phosphate",
-        "potassium",
-        "sesquihydrate",
-        "sodium",
-        "succinate",
-        "sulfate",
-        "tartrate",
-        "trihydrate",
-    }
-    FORM_STOPWORDS = {
-        "capsule",
-        "capsules",
-        "tablet",
-        "tablets",
-        "oral",
-        "solution",
-        "suspension",
-        "injection",
-        "intravenous",
-        "intramuscular",
-        "subcutaneous",
-        "topical",
-        "cream",
-        "ointment",
-        "patch",
-        "spray",
-        "gel",
-        "drops",
-        "ophthalmic",
-        "nasal",
-        "powder",
-        "elixir",
-        "syrup",
-        "kit",
-        "pack",
-        "dose",
-        "doses",
-        "film",
-        "coated",
-        "delayed",
-        "extended",
-        "release",
-        "chewable",
-        "lozenge",
-        "suppository",
-        "for",
-        "use",
-        "intrathecal",
-        "intralesional",
-        "implant",
-        "inhalation",
-        "sustained",
-        "concentrate",
-        "reconstituted",
-        "resin",
-        "prefilled",
-        "prefill",
-        "pre-filled",
-        "auto",
-        "injector",
-        "autoinjector",
-        "pen",
-        "device",
-        "syringe",
-        "syringes",
-    }
-    UNIT_STOPWORDS = {
-        "mg",
-        "mcg",
-        "g",
-        "kg",
-        "ml",
-        "l",
-        "iu",
-        "unit",
-        "units",
-        "percent",
-        "%",
-        "meq",
-        "mmol",
-    }
-    NAME_STOPWORDS = (
-        SALT_STOPWORDS
-        | FORM_STOPWORDS
-        | UNIT_STOPWORDS
-        | {
-            "solution",
-            "suspensions",
-        }
-    )
     TERM_PATTERN = re.compile(r"[A-Za-z0-9]+(?:[-'][A-Za-z0-9]+)*")
     BRACKET_PATTERN = re.compile(r"\[([^\]]+)\]")
 
@@ -180,6 +65,11 @@ class RxNavClient:
         self.max_concurrency = max(configured_concurrency, 1)
         self.cache: dict[str, dict[str, RxNormCandidate]] = {}
         self.synonym_cache: dict[str, list[str]] = {}
+        vocabulary = get_text_normalization_snapshot()
+        self.salt_stopwords = set(vocabulary.rxnav_salt_stopwords)
+        self.form_stopwords = set(vocabulary.rxnav_form_stopwords)
+        self.unit_stopwords = set(vocabulary.rxnav_unit_stopwords)
+        self.name_stopwords = set(vocabulary.rxnav_name_stopwords)
 
     # -------------------------------------------------------------------------
     def _build_limits(self) -> httpx.Limits:
@@ -387,8 +277,8 @@ class RxNavClient:
                     self.flush_extracted_tokens(tokens, extracted)
                     continue
                 if (
-                    base in self.NAME_STOPWORDS
-                    or base.rstrip("s") in self.NAME_STOPWORDS
+                    base in self.name_stopwords
+                    or base.rstrip("s") in self.name_stopwords
                 ):
                     self.flush_extracted_tokens(tokens, extracted)
                     continue
@@ -604,11 +494,11 @@ class RxNavClient:
             token_lower = token.lower()
             if token_lower.isdigit():
                 continue
-            if token_lower in self.UNIT_STOPWORDS:
+            if token_lower in self.unit_stopwords:
                 continue
-            if token_lower in self.FORM_STOPWORDS:
+            if token_lower in self.form_stopwords:
                 break
-            if token_lower in self.SALT_STOPWORDS:
+            if token_lower in self.salt_stopwords:
                 break
             kept.append(token_lower)
         normalized = " ".join(kept)

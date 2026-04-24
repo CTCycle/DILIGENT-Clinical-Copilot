@@ -6,8 +6,7 @@ from typing import Any
 
 import pandas as pd
 
-from DILIGENT.server.common.constants import MATCHING_STOPWORDS
-from DILIGENT.server.common.utils.patterns import FORM_DESCRIPTORS, FORM_TOKENS, UNIT_TOKENS
+from DILIGENT.server.services.text.vocabulary import get_text_normalization_snapshot
 
 # ---------------------------------------------------------------------------
 _SCHEDULE_TOKEN_RE = re.compile(r"^\d+(?:[.,]\d+)?(?:-\d+(?:[.,]\d+)?){1,3}$")
@@ -19,111 +18,6 @@ _STRENGTH_FRAGMENT_RE = re.compile(
     r"\b\d+(?:[.,]\d+)?\s*(?:mg|mcg|ug|g|kg|ml|l|ui|iu|u|mmol|meq|%)\b",
     re.IGNORECASE,
 )
-_FORMULATION_STOPWORDS = (
-    set(MATCHING_STOPWORDS)
-    | set(FORM_TOKENS)
-    | set(FORM_DESCRIPTORS)
-    | set(UNIT_TOKENS)
-    | {
-        "cp",
-        "cps",
-        "cpr",
-        "die",
-        "dosi",
-        "dose",
-        "fiala",
-        "fiale",
-        "per",
-        "os",
-        "sottocute",
-        "sottocutanea",
-        "sottocutaneo",
-        "ev",
-        "iv",
-        "im",
-        "po",
-        "oft",
-        "oftalmico",
-        "oftalmica",
-        "orale",
-        "orali",
-        "iniet",
-        "iniett",
-        "iniettabile",
-        "sosp",
-        "hcl",
-        "hydrochloride",
-        "cloridrato",
-        "estratto",
-        "secco",
-        "secca",
-    }
-)
-_MANUFACTURER_TOKENS = {
-    "ag",
-    "amino",
-    "axapharm",
-    "desitin",
-    "gmbh",
-    "inc",
-    "lab",
-    "labs",
-    "ltd",
-    "llc",
-    "mepha",
-    "pharm",
-    "pharma",
-    "ratiopharm",
-    "sa",
-    "sandoz",
-    "spa",
-    "streuli",
-    "teva",
-}
-_MANUFACTURER_SUFFIXES = (
-    "pharm",
-    "pharma",
-    "laboratories",
-    "laboratory",
-    "biotech",
-    "therapeutics",
-)
-_TRAILING_TEMPORAL_TOKENS = {
-    "da",
-    "dal",
-    "dall",
-    "dalla",
-    "dalle",
-    "dallo",
-    "dei",
-    "degli",
-    "del",
-    "della",
-    "delle",
-    "dello",
-    "di",
-    "from",
-    "since",
-}
-_KNOWN_QUERY_ALIASES = {
-    "bactrim": "trimethoprim sulfamethoxazole",
-    "bromelina": "bromelain",
-    "clexane": "enoxaparin",
-    "co amoxi": "amoxicillin clavulanate",
-    "coamoxi": "amoxicillin clavulanate",
-    "cotrimossazolo": "sulfamethoxazole trimethoprim",
-    "de ursil": "ursodiol",
-    "esomeprazolo": "esomeprazole",
-    "fortecortin": "dexamethasone",
-    "laxoberon": "picosulfate",
-    "mycostatin": "nystatin",
-    "nozinan": "levomepromazine",
-    "pantozol": "pantoprazole",
-    "valium": "diazepam",
-    "xanax": "alprazolam",
-}
-
-
 # ---------------------------------------------------------------------------
 def canonicalize_drug_query(value: str | None) -> str:
     if not value:
@@ -140,6 +34,8 @@ def canonicalize_drug_query(value: str | None) -> str:
 
     raw_tokens = re.findall(r"[^\s]+", normalized)
     kept_tokens: list[str] = []
+    vocabulary = get_text_normalization_snapshot()
+    formulation_stopwords = vocabulary.formulation_stopwords
     for raw_token in raw_tokens:
         token = raw_token.strip(" ._-/+")
         if not token:
@@ -151,13 +47,13 @@ def canonicalize_drug_query(value: str | None) -> str:
             continue
         ascii_parts = [part for part in ascii_token.split() if part]
         if ascii_parts and all(
-            part in _FORMULATION_STOPWORDS
+            part in formulation_stopwords
             or _NUMERIC_TOKEN_RE.fullmatch(part)
             or _DOSAGE_UNIT_TOKEN_RE.fullmatch(part)
             for part in ascii_parts
         ):
             continue
-        if ascii_token in _FORMULATION_STOPWORDS:
+        if ascii_token in formulation_stopwords:
             continue
         if _NUMERIC_TOKEN_RE.fullmatch(token):
             continue
@@ -236,10 +132,13 @@ def strip_manufacturer_suffix_tokens(tokens: list[str]) -> list[str]:
     trimmed = list(tokens)
     while trimmed:
         normalized = normalize_drug_name(trimmed[-1])
+        vocabulary = get_text_normalization_snapshot()
         if not normalized:
             trimmed.pop()
             continue
-        if normalized in _MANUFACTURER_TOKENS or normalized.endswith(_MANUFACTURER_SUFFIXES):
+        if normalized in vocabulary.manufacturer_tokens or normalized.endswith(
+            vocabulary.manufacturer_suffixes
+        ):
             trimmed.pop()
             continue
         break
@@ -253,7 +152,7 @@ def strip_trailing_temporal_tokens(tokens: list[str]) -> list[str]:
     trimmed = list(tokens)
     while trimmed:
         normalized = normalize_drug_name(trimmed[-1])
-        if normalized in _TRAILING_TEMPORAL_TOKENS:
+        if normalized in get_text_normalization_snapshot().trailing_temporal_tokens:
             trimmed.pop()
             continue
         break
@@ -265,8 +164,9 @@ def resolve_known_query_alias(value: str) -> str:
     normalized = normalize_drug_name(value)
     if not normalized:
         return ""
-    if normalized in _KNOWN_QUERY_ALIASES:
-        return _KNOWN_QUERY_ALIASES[normalized]
+    alias = get_text_normalization_snapshot().query_aliases.get(normalized)
+    if alias is not None:
+        return alias
 
     return normalized
 

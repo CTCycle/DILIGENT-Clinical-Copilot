@@ -38,6 +38,7 @@ from DILIGENT.server.common.utils.patterns import (
 class DrugsParser:
     LLM_CLIENT_NOT_INITIALIZED_ERROR = "LLM client is not initialized for drug extraction"
     SCHEDULE_RE = DRUG_SCHEDULE_RE
+    DATE_LIKE_SCHEDULE_RE = re.compile(r"^\d{4}\s*-\s*\d{1,2}\s*-\s*\d{1,2}$")
     BULLET_RE = DRUG_BULLET_RE
     BRACKET_TRAIL_RE = DRUG_BRACKET_TRAIL_RE
     SUSPENSION_RE = DRUG_SUSPENSION_RE
@@ -147,6 +148,9 @@ class DrugsParser:
         "in riserva",
         "al bisogno",
         "se necessario",
+        "dopo",
+        "paziente femmina",
+        "paziente maschio",
     }
     NON_DRUG_PREFIXES = (
         "ulteriore ciclo",
@@ -571,6 +575,8 @@ class DrugsParser:
             return None
 
         schedule_match = self.SCHEDULE_RE.search(line)
+        if schedule_match and self.is_date_like_schedule(schedule_match.group("schedule")):
+            schedule_match = None
         schedule_text = schedule_match.group("schedule") if schedule_match else None
         schedule_values = self.parse_schedule(schedule_text) if schedule_text else []
         administration_pattern = (
@@ -610,6 +616,8 @@ class DrugsParser:
     def parse_schedule(self, text: str | None) -> list[float]:
         if not text:
             return []
+        if self.is_date_like_schedule(text):
+            return []
         slots: list[float] = []
         for token in re.split(r"[-\s]+", text):
             normalized = token.strip()
@@ -629,6 +637,8 @@ class DrugsParser:
     def normalize_schedule_pattern(self, text: str | None) -> str | None:
         if not text:
             return None
+        if self.is_date_like_schedule(text):
+            return None
         parts: list[str] = []
         for token in text.split("-"):
             normalized = token.strip().replace(",", ".")
@@ -643,6 +653,12 @@ class DrugsParser:
             except ValueError:
                 parts.append(normalized)
         return "-".join(parts) if parts else None
+
+    # -------------------------------------------------------------------------
+    def is_date_like_schedule(self, text: str | None) -> bool:
+        if not text:
+            return False
+        return bool(self.DATE_LIKE_SCHEDULE_RE.fullmatch(text.strip()))
 
     # -------------------------------------------------------------------------
     def split_heading(self, text: str) -> tuple[str | None, str | None, str | None]:
@@ -938,6 +954,8 @@ class DrugsParser:
     def enrich_entry_from_line(self, entry: DrugEntry, raw_line: str) -> DrugEntry:
         normalized = entry.model_copy(deep=True)
         schedule_match = self.SCHEDULE_RE.search(raw_line)
+        if schedule_match and self.is_date_like_schedule(schedule_match.group("schedule")):
+            schedule_match = None
         if schedule_match:
             schedule_text = schedule_match.group("schedule")
             schedule_values = self.parse_schedule(schedule_text)

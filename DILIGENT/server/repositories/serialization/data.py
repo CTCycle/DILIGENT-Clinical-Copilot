@@ -52,10 +52,16 @@ from DILIGENT.server.repositories.schemas.models import (
     LiverToxMonograph,
     Patient,
 )
+from DILIGENT.server.repositories.serialization.text_normalization import (
+    TextNormalizationVocabularySerializer,
+)
 from DILIGENT.server.repositories.vectors import LanceVectorDatabase
 from DILIGENT.server.services.retrieval.embeddings import EmbeddingGenerator
 from DILIGENT.server.services.text.normalization import coerce_text, normalize_drug_name
 from DILIGENT.server.services.text.synonyms import parse_synonym_list, split_synonym_variants
+from DILIGENT.server.services.text.vocabulary import (
+    invalidate_text_normalization_snapshot,
+)
 
 
 class _RepositorySerializationService:
@@ -2002,6 +2008,11 @@ class _RepositorySerializationService:
                     if isinstance(item, str):
                         records.append({"raw_drug_name": item})
         seen: set[str] = set()
+        vocabulary_changed = False
+        vocabulary_serializer = TextNormalizationVocabularySerializer(
+            engine=self.engine,
+            session_factory=self.session_factory,
+        )
         for item in records:
             raw_drug_name = self.normalize_string(
                 item.get("raw_drug_name") or item.get("name")
@@ -2021,6 +2032,37 @@ class _RepositorySerializationService:
                 rxcui=rxcui,
                 nbk_id=nbk_id,
             )
+            match_reason = self.normalize_string(item.get("match_reason"))
+            match_confidence = self.to_float(item.get("match_confidence"))
+            should_promote_observed_alias = (
+                resolved_drug_id is not None
+                and match_reason == "exact_canonical"
+                and match_confidence == 1.0
+            )
+            if should_promote_observed_alias:
+                self.upsert_drug_alias(
+                    db_session,
+                    drug_id=resolved_drug_id,
+                    alias=raw_drug_name,
+                    alias_kind="observed_query",
+                    source="session",
+                    term_type=None,
+                )
+            else:
+                observation_category = (
+                    "observed_unresolved_query"
+                    if resolved_drug_id is None
+                    else "observed_unpromoted_query"
+                )
+                vocabulary_serializer.upsert_term(
+                    db_session,
+                    category=observation_category,
+                    term=raw_drug_name,
+                    replacement=None,
+                    source="session",
+                    increment=True,
+                )
+                vocabulary_changed = True
             notes = item.get("match_notes")
             if isinstance(notes, (list, dict)):
                 notes_value = json.dumps(notes, ensure_ascii=False)
@@ -2032,11 +2074,13 @@ class _RepositorySerializationService:
                     raw_drug_name=raw_drug_name,
                     raw_drug_name_norm=raw_drug_name_norm,
                     drug_id=resolved_drug_id,
-                    match_confidence=self.to_float(item.get("match_confidence")),
-                    match_reason=self.normalize_string(item.get("match_reason")),
+                    match_confidence=match_confidence,
+                    match_reason=match_reason,
                     match_notes=notes_value,
                 )
             )
+        if vocabulary_changed:
+            invalidate_text_normalization_snapshot()
 
     # -----------------------------------------------------------------------------
     def persist_session_result_payload(

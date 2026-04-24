@@ -107,6 +107,8 @@ def test_extract_drugs_from_anamnesis_filters_non_drug_fragments() -> None:
                     DrugEntry(name="Benziodiazepine"),
                     DrugEntry(name="In riserva"),
                     DrugEntry(name="il lunedi"),
+                    DrugEntry(name="Paziente femmina"),
+                    DrugEntry(name="Dopo"),
                     DrugEntry(name="ulteriore ciclo (originariamente previsto il"),
                 ]
             )

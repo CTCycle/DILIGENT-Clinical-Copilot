@@ -132,15 +132,23 @@ def test_postgresql_initialization_path_seeds_after_schema_creation(monkeypatch)
             assert purpose == "provider_access_keys"
             order.append("seeded")
 
+    class FakeTextNormalizationSerializer:
+        def __init__(self, **_kwargs) -> None:
+            pass
+
+        def ensure_seeded(self):
+            order.append("text_seeded")
+
     monkeypatch.setattr(initializer.sqlalchemy, "create_engine", lambda *a, **k: FakeAdminEngine())
     monkeypatch.setattr(initializer, "PostgresRepository", FakePostgresRepository)
     monkeypatch.setattr(initializer.Base.metadata, "create_all", fake_create_all)
     monkeypatch.setattr(initializer, "AccessKeyEncryptionMaterialSerializer", FakeMaterialSerializer)
+    monkeypatch.setattr(initializer, "TextNormalizationVocabularySerializer", FakeTextNormalizationSerializer)
 
     db_name = initializer.ensure_postgres_database(settings)
 
     assert db_name == "diligent"
-    assert order == ["create_all", "seeded"]
+    assert order == ["create_all", "seeded", "text_seeded"]
 
 
 # -----------------------------------------------------------------------------

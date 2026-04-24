@@ -11,6 +11,9 @@ from DILIGENT.server.domain.settings.configuration import DatabaseSettings
 from DILIGENT.server.repositories.serialization.access_key_encryption import (
     AccessKeyEncryptionMaterialSerializer,
 )
+from DILIGENT.server.repositories.serialization.text_normalization import (
+    TextNormalizationVocabularySerializer,
+)
 from DILIGENT.server.repositories.schemas.models import Base
 from DILIGENT.server.common.constants import DATABASE_FILENAME, RESOURCES_PATH
 from DILIGENT.server.common.utils.logger import logger
@@ -27,13 +30,13 @@ class SQLiteRepository:
             future=True,
         )
         event.listen(self.engine, "connect", self._enable_foreign_keys)
+        seed_session_factory = sessionmaker(
+            bind=self.engine,
+            future=True,
+            expire_on_commit=False,
+        )
         if should_initialize_schema:
             Base.metadata.create_all(self.engine)
-            seed_session_factory = sessionmaker(
-                bind=self.engine,
-                future=True,
-                expire_on_commit=False,
-            )
             AccessKeyEncryptionMaterialSerializer(
                 engine=self.engine,
                 session_factory=seed_session_factory,
@@ -42,6 +45,10 @@ class SQLiteRepository:
                 "SQLite DB file was missing; created and initialized schema at %s",
                 self.db_path,
             )
+        TextNormalizationVocabularySerializer(
+            engine=self.engine,
+            session_factory=seed_session_factory,
+        ).ensure_seeded()
         self.session_factory = sessionmaker(bind=self.engine, future=True)
 
     @staticmethod

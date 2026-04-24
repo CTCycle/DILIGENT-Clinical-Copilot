@@ -527,6 +527,49 @@ class RuntimeSetting(Base):
 
 
 ###############################################################################
+class TextNormalizationTerm(Base):
+    __tablename__ = "text_normalization_terms"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
+    category: Mapped[str] = mapped_column(String, nullable=False)
+    term: Mapped[str] = mapped_column(Text, nullable=False)
+    term_norm: Mapped[str] = mapped_column(String, nullable=False)
+    replacement: Mapped[str | None] = mapped_column(Text, nullable=True)
+    source: Mapped[str] = mapped_column(String, nullable=False)
+    encounter_count: Mapped[int] = mapped_column(
+        Integer,
+        nullable=False,
+        server_default=text("0"),
+    )
+    is_active: Mapped[bool] = mapped_column(
+        Boolean,
+        nullable=False,
+        server_default=text("true"),
+    )
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime,
+        nullable=False,
+        server_default=text("CURRENT_TIMESTAMP"),
+    )
+    updated_at: Mapped[datetime] = mapped_column(
+        DateTime,
+        nullable=False,
+        server_default=text("CURRENT_TIMESTAMP"),
+        server_onupdate=text("CURRENT_TIMESTAMP"),
+    )
+
+    __table_args__ = (
+        UniqueConstraint(
+            "category",
+            "term_norm",
+            name="uq_text_normalization_terms_category_term_norm",
+        ),
+        Index("ix_text_normalization_terms_category_active", "category", "is_active"),
+        Index("ix_text_normalization_terms_term_norm", "term_norm"),
+    )
+
+
+###############################################################################
 class AccessKeyEncryptionMaterial(Base):
     __tablename__ = "access_key_encryption_materials"
 

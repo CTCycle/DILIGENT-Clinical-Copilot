@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from datetime import date
 from typing import Any
 
 from DILIGENT.server.configurations.startup import server_settings
@@ -49,7 +50,11 @@ def test_start_clinical_job_uses_centralized_poll_interval(monkeypatch) -> None:
     monkeypatch.setattr(session_routes.service, "job_manager", job_manager_stub)
 
     response = session_routes.service.start_clinical_job(
-        ClinicalSessionRequest(anamnesis="Clinical context")
+        ClinicalSessionRequest(
+            anamnesis="Clinical context",
+            visit_date=date(2026, 4, 24),
+            drugs="Acetaminophen 500 mg 1 - 0 - 0 - 0 po started from 01/01/2024",
+        )
     )
 
     assert response.poll_interval == server_settings.jobs.polling_interval

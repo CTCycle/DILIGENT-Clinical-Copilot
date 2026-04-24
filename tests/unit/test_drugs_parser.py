@@ -110,6 +110,28 @@ def test_extract_drugs_from_therapy_strips_temporal_tail_from_name() -> None:
     assert [entry.route for entry in parsed.entries] == ["iv", "iv", "iv"]
 
 
+def test_extract_drugs_from_therapy_does_not_parse_iso_dates_as_schedule() -> None:
+    parser = DrugsParser(client=object())
+    therapy_text = (
+        "Piperacillina/tazobactam 4.5 g EV q8h, iniziata 2026-02-10, "
+        "sospesa 2026-02-16"
+    )
+
+    parsed = asyncio.run(parser.extract_drugs_from_therapy(therapy_text))
+
+    assert len(parsed.entries) == 1
+    entry = parsed.entries[0]
+    assert entry.name == "Piperacillina/tazobactam"
+    assert entry.dosage == "4.5 g EV q8h"
+    assert entry.route == "iv"
+    assert entry.administration_pattern is None
+    assert entry.daytime_administration == []
+    assert entry.therapy_start_status is True
+    assert entry.therapy_start_date == "2026-02-10"
+    assert entry.suspension_status is True
+    assert entry.suspension_date == "2026-02-16"
+
+
 def test_extract_drugs_from_therapy_skips_non_assumed_drug_line() -> None:
     parser = DrugsParser(client=object())
     therapy_text = """
@@ -138,6 +160,22 @@ def test_normalize_entry_filters_non_drug_fragments() -> None:
             DrugEntry(name="In riserva"),
             source="therapy",
             historical_flag=False,
+        )
+        is None
+    )
+    assert (
+        parser.normalize_entry(
+            DrugEntry(name="Paziente femmina"),
+            source="anamnesis",
+            historical_flag=True,
+        )
+        is None
+    )
+    assert (
+        parser.normalize_entry(
+            DrugEntry(name="Dopo"),
+            source="anamnesis",
+            historical_flag=True,
         )
         is None
     )
