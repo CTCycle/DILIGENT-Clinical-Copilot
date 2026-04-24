@@ -92,6 +92,36 @@ def test_extract_drugs_from_therapy_detects_ongoing_vs_suspended() -> None:
     assert ongoing.temporal_classification == "temporal_known"
 
 
+def test_extract_drugs_from_therapy_strips_temporal_tail_from_name() -> None:
+    parser = DrugsParser(client=object())
+    therapy_text = """
+    Nivolumab EV, ultima somministrazione 12 giorni prima del picco enzimatico
+    Ipilimumab EV, ultima somministrazione 12 giorni prima del picco enzimatico
+    Trastuzumab deruxtecan EV (linea precedente, sospeso 6 settimane fa)
+    """
+
+    parsed = asyncio.run(parser.extract_drugs_from_therapy(therapy_text))
+
+    assert [entry.name for entry in parsed.entries] == [
+        "Nivolumab",
+        "Ipilimumab",
+        "Trastuzumab deruxtecan",
+    ]
+    assert [entry.route for entry in parsed.entries] == ["iv", "iv", "iv"]
+
+
+def test_extract_drugs_from_therapy_skips_non_assumed_drug_line() -> None:
+    parser = DrugsParser(client=object())
+    therapy_text = """
+    Esomeprazolo 40 mg PO 1 volta/die, terapia cronica (>12 mesi)
+    Farmaci non assunti: paracetamolo ad alto dosaggio, antibiotici recenti
+    """
+
+    parsed = asyncio.run(parser.extract_drugs_from_therapy(therapy_text))
+
+    assert [entry.name for entry in parsed.entries] == ["Esomeprazolo"]
+
+
 def test_extract_drugs_from_therapy_empty_input_is_safe() -> None:
     parser = DrugsParser(client=object())
 
