@@ -1,62 +1,108 @@
-# UI Standards (Frontend)
+# UI Standards
 
-Last updated: 2026-04-09
+Last updated: 2026-04-24
 
-Scope: `DILIGENT/client/src` and `DILIGENT/client/src/styles.scss`.
-Goal: keep UI coherent, accessible, and maintainable.
+Scope: `DILIGENT/client/src` (Angular + SCSS).
 
-## 1. Design token usage
+## 1. Typography
 
-- Use existing CSS variables in `styles.scss` before adding raw values.
-- Prefer tokenized spacing, typography, colors, control sizes, and focus ring values.
-- New tokens must be reusable across at least two UI areas.
+- Primary families:
+  - `"Inter", "Segoe UI", "Helvetica Neue", Arial, sans-serif`
+  - `"Manrope", "Inter", sans-serif` for emphasized headings.
+- Tokenized size scale from `styles.scss`:
+  - `--font-xs: 11px`
+  - `--font-sm: 12px`
+  - `--font-base: 14px`
+  - `--font-md: 16px`
+  - `--font-lg: 18px`
+  - `--font-xl: 20px`
+  - `--font-2xl: 28px`
+  - `--font-3xl: 32px`
+- Readability:
+  - Body text line-height >= `1.5`
+  - Headings around `1.1` to `1.2` line-height.
 
-## 2. Layout and spacing
+## 2. Layout and Spacing
 
-- Maintain the current spacing rhythm (`4px` base, `8px` preferred cadence).
-- Use consistent section spacing and avoid ad-hoc one-off margins/paddings.
-- Keep responsive behavior explicit in media-query blocks.
+- Spacing tokens:
+  - `--space-xs: 4px` through `--space-3xl: 32px`.
+- Control heights:
+  - `--control-height-sm: 36px`
+  - `--control-height-md: 40px`
+  - `--control-height-lg: 44px`
+- Main page layouts:
+  - DILI page uses responsive grid (`.stitch-dili-grid`) and sticky sidebar on desktop.
+  - Model config uses two-column/two-row layout (`.model-config-layout`).
+  - Inspection page uses tabbed sections with scroll-aware tables/lists.
 
-## 3. Typography and labels
+## 3. Color System
 
-- Use the existing font-size tokens and heading scale.
-- Keep UI labels and navigation naming consistent across pages.
-- Avoid mixed conventions for similar controls.
+- Theme model:
+  - Light theme in `:root`
+  - Dark theme in `:root[data-theme="dark"]`
+- Core palette tokens:
+  - Brand: `--color-brand`, `--color-brand-light`, `--color-brand-bg`
+  - Text: `--color-text-primary`, `--color-text-secondary`, `--color-text-muted`, `--color-text-subtle`
+  - Surfaces/borders: `--color-surface`, `--color-surface-alt`, `--color-border`, `--color-border-subtle`, `--color-divider`
+- Semantic status tokens:
+  - info, success, error each with text/background/border variables.
 
-## 4. Color and status semantics
-
-- Use semantic color tokens, not hardcoded hex values.
-- Do not communicate state with color only; include text/icons where relevant.
-- Ensure contrast remains acceptable in both light and dark themes.
-
-## 5. Component rules
+## 4. Components and Patterns
 
 - Buttons:
-  - use shared button classes/variants,
-  - keep accessible touch/click target size,
-  - preserve disabled/loading states.
-- Inputs/selects/textarea:
-  - keep consistent control heights and paddings,
-  - keep visible `:focus-visible` styling.
-- Tabs:
-  - implement complete ARIA semantics (`tablist`, `tab`, `tabpanel`, keyboard nav).
+  - Preserve visible hover, active, and disabled states.
+  - Keep icon buttons labeled for accessibility.
+- Inputs/forms:
+  - Use shared control sizing and focus states.
+  - Maintain clear invalid/feedback messaging patterns.
 - Modals:
-  - use consistent close affordance and labeling.
+  - Use `ModalShellComponent` and consistent close actions.
+- Navigation:
+  - Sidebar/tab patterns must support keyboard navigation.
+- Tables and scroll areas (inspection):
+  - Keep fixed action-column sizing and responsive overflow behavior.
 
-## 6. Accessibility baseline
+## 5. Page Structure
 
-- Keyboard navigation must work for all interactive controls.
-- Preserve visible focus states.
-- Use meaningful `aria-*` attributes for dynamic state and tab/modal patterns.
-- Keep icon-only controls labelled for assistive technology.
+- Routes:
+  - `/` -> DILI analysis page
+  - `/data` -> Data inspection page
+  - `/model-config` -> Model configuration page
+- App shell:
+  - Root shell plus shared navigation (`NavSidebarComponent`) with page-level composition.
 
-## 7. Maintainability rules
+## 6. User Experience Rules
 
-- Keep diffs scoped to task intent.
-- Avoid duplicating selector blocks for the same component.
-- When redesigning a section, consolidate legacy CSS instead of layering conflicting overrides.
+- Core journeys must remain consistent:
+  - Run clinical analysis job
+  - Configure models/providers and keys
+  - Inspect sessions/catalogs and run update jobs
+- Error feedback:
+  - Use clear user-safe messages from centralized API error normalization.
+- Loading and empty states:
+  - Always provide explicit loading status and empty-state messaging.
+- Job UX:
+  - Keep terminal states explicit (`completed`, `failed`, `cancelled`).
 
-## 8. Relationship to audit report
+## 7. Responsiveness
 
-`assets/docs/UI_AUDIT_REPORT.md` tracks current debt and concrete remediation items.
-This standards file defines the target quality bar for new work.
+- Existing breakpoints to preserve:
+  - around `1100px` (main grid collapse)
+  - around `1080px` (inspection/model layout fallback)
+  - around `720px` (mobile stacking and table overflow)
+- Mobile constraints:
+  - Avoid clipped controls; enable horizontal scrolling for dense tables.
+
+## 8. Accessibility
+
+- Keyboard navigation must be supported for nav, tabs, modal actions, and key controls.
+- Keep visible focus indicators (`--focus-ring` behavior).
+- Use ARIA attributes where interactive semantics are not native.
+- Do not use color alone to indicate status; pair with text/icons.
+
+## 9. Design Principles
+
+- Consistency over one-off styling.
+- Clarity and predictability over decorative complexity.
+- Reuse tokens first; add new tokens only when reusable across multiple views.
+- Consolidate overrides when touching legacy blocks; avoid layered duplicate rules.
