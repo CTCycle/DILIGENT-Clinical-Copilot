@@ -4202,6 +4202,10 @@ input[type="date"]::-webkit-calendar-picker-indicator:hover {
   opacity: 1;
 }
 
+.app-header-icon-btn .theme-icon-image {
+  object-fit: contain;
+}
+
 .app-header-icon-btn .theme-icon path {
   fill: currentColor;
   opacity: 1;
