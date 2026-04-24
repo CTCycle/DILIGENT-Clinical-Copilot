@@ -1,6 +1,5 @@
 from __future__ import annotations
 
-import os
 import urllib.parse
 
 import sqlalchemy
@@ -20,8 +19,10 @@ from DILIGENT.server.repositories.database.utils import (
 from DILIGENT.server.repositories.serialization.access_key_encryption import (
     AccessKeyEncryptionMaterialSerializer,
 )
+from DILIGENT.server.repositories.serialization.text_normalization import (
+    TextNormalizationVocabularySerializer,
+)
 from DILIGENT.server.repositories.schemas.models import Base
-from DILIGENT.server.common.constants import DATABASE_FILENAME, RESOURCES_PATH
 from DILIGENT.server.common.utils.logger import logger
 
 # -----------------------------------------------------------------------------
@@ -134,6 +135,14 @@ def ensure_postgres_database(settings: DatabaseSettings) -> str:
         ),
     )
     material_serializer.ensure_seeded("provider_access_keys")
+    TextNormalizationVocabularySerializer(
+        engine=repository.engine,
+        session_factory=sessionmaker(
+            bind=repository.engine,
+            future=True,
+            expire_on_commit=False,
+        ),
+    ).ensure_seeded()
     logger.info("Ensured PostgreSQL tables exist in %s", target_database)
 
     return target_database

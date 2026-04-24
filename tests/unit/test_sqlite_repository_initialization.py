@@ -2,10 +2,11 @@ from __future__ import annotations
 
 from pathlib import Path
 
-from sqlalchemy import inspect
+from sqlalchemy import create_engine, func, inspect, select
 
 from DILIGENT.server.domain.settings.configuration import DatabaseSettings
 from DILIGENT.server.repositories.database.sqlite import SQLiteRepository
+from DILIGENT.server.repositories.schemas.models import Base, TextNormalizationTerm
 
 
 def _build_settings() -> DatabaseSettings:
@@ -47,11 +48,13 @@ def test_sqlite_repository_initializes_schema_when_db_file_missing(
     assert inspector.has_table("model_selections")
 
 
-def test_sqlite_repository_skips_schema_init_when_db_file_exists(
+def test_sqlite_repository_seeds_when_existing_db_has_schema(
     monkeypatch, tmp_path: Path
 ) -> None:  # type: ignore[no-untyped-def]
     db_path = tmp_path / "existing.db"
-    db_path.touch()
+    engine = create_engine(f"sqlite+pysqlite:///{db_path}", future=True)
+    Base.metadata.create_all(engine)
+    engine.dispose()
 
     monkeypatch.setattr(
         "DILIGENT.server.repositories.database.sqlite.RESOURCES_PATH",
@@ -65,5 +68,11 @@ def test_sqlite_repository_skips_schema_init_when_db_file_exists(
     repository = SQLiteRepository(_build_settings())
     inspector = inspect(repository.engine)
 
-    assert inspector.has_table("access_keys") is False
-    assert inspector.has_table("model_selections") is False
+    assert inspector.has_table("access_keys")
+    assert inspector.has_table("model_selections")
+    assert inspector.has_table("text_normalization_terms")
+    with repository.session_factory() as db_session:
+        normalization_terms = db_session.execute(
+            select(func.count()).select_from(TextNormalizationTerm)
+        ).scalar_one()
+    assert int(normalization_terms) > 0
