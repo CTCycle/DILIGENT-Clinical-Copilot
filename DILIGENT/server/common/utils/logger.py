@@ -40,6 +40,7 @@ LOG_CONFIG: dict[str, Any] = {
             "formatter": "default",
             "filename": log_filename,
             "mode": "a",
+            "encoding": "utf-8",
         },
     },
     "loggers": {

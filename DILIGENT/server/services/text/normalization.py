@@ -103,9 +103,6 @@ _TRAILING_TEMPORAL_TOKENS = {
     "since",
 }
 _KNOWN_QUERY_ALIASES = {
-    "acido folico": "folic acid",
-    "acido folico streuli": "folic acid",
-    "amlodipin": "amlodipine",
     "bactrim": "trimethoprim sulfamethoxazole",
     "clexane": "enoxaparin",
     "co amoxi": "amoxicillin clavulanate",
@@ -113,22 +110,11 @@ _KNOWN_QUERY_ALIASES = {
     "de ursil": "ursodiol",
     "fortecortin": "dexamethasone",
     "laxoberon": "picosulfate",
-    "metformina": "metformin",
     "mycostatin": "nystatin",
     "nozinan": "levomepromazine",
     "pantozol": "pantoprazole",
-    "quetiapina": "quetiapine",
-    "fluvastatina": "fluvastatin",
     "valium": "diazepam",
     "xanax": "alprazolam",
-}
-_TOKEN_VARIANT_MAP = {
-    "amlodipin": "amlodipine",
-    "fluvastatina": "fluvastatin",
-    "metformina": "metformin",
-    "morfina": "morphine",
-    "morphin": "morphine",
-    "quetiapina": "quetiapine",
 }
 
 
@@ -276,12 +262,7 @@ def resolve_known_query_alias(value: str) -> str:
     if normalized in _KNOWN_QUERY_ALIASES:
         return _KNOWN_QUERY_ALIASES[normalized]
 
-    tokens = normalized.split()
-    replaced_tokens = [_TOKEN_VARIANT_MAP.get(token, token) for token in tokens]
-    replaced = " ".join(replaced_tokens).strip()
-    if replaced in _KNOWN_QUERY_ALIASES:
-        return _KNOWN_QUERY_ALIASES[replaced]
-    return replaced or normalized
+    return normalized
 
 
 __all__ = [
