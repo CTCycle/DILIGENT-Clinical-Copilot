@@ -8,7 +8,6 @@ import pandas as pd
 from rapidfuzz import fuzz
 
 from DILIGENT.server.configurations.startup import server_settings
-from DILIGENT.server.common.constants import MATCHING_STOPWORDS
 from DILIGENT.server.common.utils.logger import logger
 from DILIGENT.server.domain.clinical.matching import (
     AliasCacheEntry,
@@ -21,6 +20,7 @@ from DILIGENT.server.services.text.normalization import (
     normalize_drug_query_name,
     normalize_whitespace,
 )
+from DILIGENT.server.services.text.vocabulary import get_text_normalization_snapshot
 from DILIGENT.server.services.clinical.livertox import LiverToxData
 from DILIGENT.server.services.text.synonyms import (
     extract_synonym_strings,
@@ -32,6 +32,31 @@ from DILIGENT.server.services.text.synonyms import (
 KT = TypeVar("KT")
 VT = TypeVar("VT")
 CACHE_MISS = object()
+
+
+def append_token_combinations(
+    alternatives: list[list[str]],
+    original_tokens: list[str],
+    index: int,
+    current: list[str],
+    results: list[list[str]],
+) -> None:
+    if len(results) >= 64:
+        return
+    if index >= len(alternatives):
+        if current != original_tokens:
+            results.append(current[:])
+        return
+    for option in alternatives[index]:
+        current.append(option)
+        append_token_combinations(
+            alternatives,
+            original_tokens,
+            index + 1,
+            current,
+            results,
+        )
+        current.pop()
 
 
 ###############################################################################
@@ -392,20 +417,7 @@ class DrugsLookup:
             alternatives.append(token_options[:8])
 
         results: list[list[str]] = []
-
-        def append_combinations(index: int, current: list[str]) -> None:
-            if len(results) >= 64:
-                return
-            if index >= len(alternatives):
-                if current != tokens:
-                    results.append(current[:])
-                return
-            for option in alternatives[index]:
-                current.append(option)
-                append_combinations(index + 1, current)
-                current.pop()
-
-        append_combinations(0, [])
+        append_token_combinations(alternatives, tokens, 0, [], results)
         return results
 
     # -------------------------------------------------------------------------
@@ -1049,7 +1061,10 @@ class DrugsLookup:
         return [
             token
             for token in tokens
-            if len(token) >= self.TOKEN_MIN_LENGTH and token not in MATCHING_STOPWORDS
+            if (
+                len(token) >= self.TOKEN_MIN_LENGTH
+                and token not in get_text_normalization_snapshot().matching_stopwords
+            )
         ]
 
     # -------------------------------------------------------------------------
@@ -1472,7 +1487,7 @@ class DrugsLookup:
                     normalized = self.normalize_name(variant)
                     if not normalized:
                         continue
-                    if normalized in MATCHING_STOPWORDS:
+                    if normalized in get_text_normalization_snapshot().matching_stopwords:
                         continue
                     if len(normalized) < self.TOKEN_MIN_LENGTH and " " not in normalized:
                         continue
@@ -1515,7 +1530,7 @@ class DrugsLookup:
     def is_token_valid(self, token: str) -> bool:
         if len(token) < self.TOKEN_MIN_LENGTH:
             return False
-        if token in MATCHING_STOPWORDS:
+        if token in get_text_normalization_snapshot().matching_stopwords:
             return False
         return not token.isdigit()
 

@@ -15,13 +15,11 @@ import pandas as pd
 
 from DILIGENT.server.configurations.startup import server_settings
 from DILIGENT.server.common.utils.logger import logger
-from DILIGENT.server.common.constants import (
-    RXNAV_CURATED_ALIASES_PATH,
-    RXNAV_SYNONYM_STOPWORDS,
-)
+from DILIGENT.server.common.constants import RXNAV_CURATED_ALIASES_PATH
 from DILIGENT.server.domain.rxnav import RxNormCandidate
 from DILIGENT.server.repositories.serialization.data import DataSerializer
 from DILIGENT.server.services.text.normalization import normalize_drug_name
+from DILIGENT.server.services.text.vocabulary import get_text_normalization_snapshot
 
 from DILIGENT.server.services.updater.rxnav_client import RxNavClient, run_with_semaphore
 
@@ -46,25 +44,9 @@ class RxNavDrugCatalogBuilder:
         serializer: DataSerializer | None = None,
         curated_aliases_path: str | None = None,
     ) -> None:
-        combined: set[str] = set()
-        for attr in ("SALT_STOPWORDS", "FORM_STOPWORDS", "UNIT_STOPWORDS"):
-            values = getattr(RxNavClient, attr, set())
-            combined.update(word.lower() for word in values)
-        combined.update({
-            "sterile",
-            "single",
-            "multi",
-            "dose",
-            "kit",
-            "pack",
-            "per",
-            "each",
-            "day",
-            "days",
-            "hour",
-            "hours",
-        })
-        synonym_stopwords = {word.casefold() for word in RXNAV_SYNONYM_STOPWORDS}
+        vocabulary = get_text_normalization_snapshot()
+        combined: set[str] = set(vocabulary.rxnav_name_stopwords)
+        synonym_stopwords = {word.casefold() for word in vocabulary.rxnav_synonym_stopwords}
         combined.update(synonym_stopwords)
         self.stopwords = combined
         self.synonym_stopwords = synonym_stopwords

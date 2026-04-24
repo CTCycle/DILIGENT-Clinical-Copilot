@@ -178,12 +178,6 @@ HEPATOTOXIC_MEDDRA_TERMS = {
     "blood bilirubin increased",
 }
 
-MATCHING_STOPWORDS = CatalogLoader.get_string_set("text_normalization.json", "matching_stopwords")
-
-CLINICAL_GENERIC_TERMS = CatalogLoader.get_string_set("text_normalization.json", "clinical_generic_terms")
-
-RXNAV_SYNONYM_STOPWORDS = MATCHING_STOPWORDS | CLINICAL_GENERIC_TERMS
-
 # [DILI DEFAULTS]
 ###############################################################################
 DEFAULT_DILI_CLASSIFICATION = "indeterminate"
@@ -193,9 +187,3 @@ R_SCORE_HEPATOCELLULAR_THRESHOLD = 5.0
 R_SCORE_CHOLESTATIC_THRESHOLD = 2.0
 TRUTHY_ENV_VALUES = {"1", "true", "yes", "on"}
 FALSY_ENV_VALUES = {"0", "false", "no", "off"}
-
-__all__ = [
-    "MATCHING_STOPWORDS",
-    "CLINICAL_GENERIC_TERMS",
-    "RXNAV_SYNONYM_STOPWORDS",
-]
