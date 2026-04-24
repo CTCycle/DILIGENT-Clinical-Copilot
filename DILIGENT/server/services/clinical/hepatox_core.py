@@ -521,7 +521,11 @@ class HepatoxConsultation:
         raw_name = drug_entry.name or ""
         normalized_drug_key = normalize_drug_query_name(raw_name)
 
-        livertox_data = resolved_drugs.get(normalized_drug_key, {})
+        livertox_data = self.resolve_livertox_data_for_entry(
+            raw_name=raw_name,
+            normalized_key=normalized_drug_key,
+            resolved_drugs=resolved_drugs,
+        )
         matched_row = livertox_data.get("matched_livertox_row", None)
         excerpts_list = livertox_data.get("extracted_excerpts", [])
         canonical_name = str(livertox_data.get("canonical_name") or raw_name).strip() or raw_name
@@ -621,6 +625,59 @@ class HepatoxConsultation:
             report_language=report_language,
         )
         return entry, (idx, job)
+
+    # -------------------------------------------------------------------------
+    def resolve_livertox_data_for_entry(
+        self,
+        *,
+        raw_name: str,
+        normalized_key: str,
+        resolved_drugs: dict[str, dict[str, Any]],
+    ) -> dict[str, Any]:
+        exact = resolved_drugs.get(normalized_key)
+        if exact is not None and self.livertox_payload_rank(exact) >= 3:
+            return exact
+
+        raw_name_normalized = raw_name.strip().casefold()
+        grouped: list[dict[str, Any]] = []
+        for payload in resolved_drugs.values():
+            raw_mentions = payload.get("raw_mentions", [])
+            if not isinstance(raw_mentions, list):
+                continue
+            if any(
+                isinstance(mention, str)
+                and mention.strip().casefold() == raw_name_normalized
+                for mention in raw_mentions
+            ):
+                grouped.append(payload)
+        if not grouped:
+            return exact or {}
+        grouped.sort(
+            key=lambda payload: (
+                self.livertox_payload_rank(payload),
+                len(str(payload.get("normalized_name") or "").split()),
+            ),
+            reverse=True,
+        )
+        if exact is not None and self.livertox_payload_rank(exact) >= self.livertox_payload_rank(grouped[0]):
+            return exact
+        return grouped[0]
+
+    # -------------------------------------------------------------------------
+    @staticmethod
+    def livertox_payload_rank(payload: dict[str, Any]) -> int:
+        status = str(payload.get("match_status") or "").strip().lower()
+        if status == "matched_with_excerpt":
+            return 4
+        if status == "matched_no_excerpt":
+            return 3
+        if status in {"matched", "match"}:
+            return 3
+        if status in {"ambiguous", "ambiguous_match"} or payload.get("ambiguous_match"):
+            return 2
+        if status in {"missing", "missing_match"} or payload.get("missing_livertox"):
+            return 1
+        return 0
 
     # -------------------------------------------------------------------------
     async def fetch_rag_documents(

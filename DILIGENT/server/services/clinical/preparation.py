@@ -287,7 +287,13 @@ class ClinicalKnowledgePreparation:
         if len(canonical_components) <= 1:
             return [candidate]
         regimen_group_id = "|".join(sorted(canonical_components))
-        expanded: list[dict[str, Any]] = []
+        expanded: list[dict[str, Any]] = [
+            {
+                **candidate,
+                "regimen_group_ids": [regimen_group_id],
+                "regimen_components": canonical_components[:],
+            }
+        ]
         for component in canonical_components:
             normalized_component = normalize_drug_query_name(component)
             if not normalized_component:

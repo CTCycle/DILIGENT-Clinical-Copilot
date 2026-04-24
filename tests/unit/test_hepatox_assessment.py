@@ -305,6 +305,35 @@ def test_finalize_patient_report_keeps_matched_drug_without_excerpt() -> None:
     assert "No local LiverTox excerpt is currently available" in report
 
 
+def test_livertox_data_resolution_rejoins_component_match_to_original_regimen() -> None:
+    consultation = HepatoxConsultation.__new__(HepatoxConsultation)
+    resolved = {
+        "piperacillina tazobactam": {
+            "normalized_name": "piperacillina tazobactam",
+            "match_status": "missing_match",
+            "missing_livertox": True,
+            "raw_mentions": ["Piperacillina/tazobactam"],
+        },
+        "piperacillina": {
+            "normalized_name": "piperacillina",
+            "match_status": "matched_with_excerpt",
+            "missing_livertox": False,
+            "raw_mentions": ["Piperacillina/tazobactam"],
+            "matched_livertox_row": {"drug_name": "Piperacillin"},
+            "extracted_excerpts": ["Piperacillin excerpt."],
+        },
+    }
+
+    payload = consultation.resolve_livertox_data_for_entry(
+        raw_name="Piperacillina/tazobactam",
+        normalized_key="piperacillina tazobactam",
+        resolved_drugs=resolved,
+    )
+
+    assert payload["match_status"] == "matched_with_excerpt"
+    assert payload["matched_livertox_row"]["drug_name"] == "Piperacillin"
+
+
 def test_unresolved_mentions_include_rucam_summary_when_available() -> None:
     consultation = HepatoxConsultation.__new__(HepatoxConsultation)
     section = consultation.render_unresolved_mentions_section(
