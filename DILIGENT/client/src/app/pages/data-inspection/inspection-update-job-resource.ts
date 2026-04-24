@@ -29,6 +29,18 @@ type InspectionUpdateTargetActions<TTarget extends InspectionUpdateTarget> = {
   refresh: () => Promise<void>;
 };
 
+type InspectionUpdateTargetState = {
+  config: Record<string, unknown> | null;
+  configText: string;
+  loading: boolean;
+  running: boolean;
+  jobId: string | null;
+  progress: number;
+  message: string;
+  error: string | null;
+  pollToken: number | null;
+};
+
 export type InspectionUpdateTargetActionsMap = {
   [TTarget in InspectionUpdateTarget]: InspectionUpdateTargetActions<TTarget>;
 };
@@ -148,6 +160,7 @@ export class InspectionUpdateJobResource {
   readonly updateError = signal<string | null>(null);
 
   private updatePollToken = 0;
+  private readonly targetStates = new Map<InspectionUpdateTarget, InspectionUpdateTargetState>();
 
   constructor(
     private readonly jobPolling: JobPollingService,
@@ -160,44 +173,46 @@ export class InspectionUpdateJobResource {
   }
 
   async open(target: InspectionUpdateTarget): Promise<void> {
-    this.cancelActivePolling();
     this.activeTarget.set(target);
-    this.updateLoading.set(true);
-    this.updateError.set(null);
-    this.updateRunning.set(false);
-    this.updateJobId.set(null);
-    this.updateProgress.set(0);
-    this.updateMessage.set('');
+    const state = this.getTargetState(target);
+    this.applyStateToSignals(state);
+
+    if (state.config !== null) {
+      return;
+    }
+
+    this.patchTargetState(target, { loading: true, error: null });
     try {
       const payload = await this.actions[target].fetchConfig();
       const defaults = { ...(payload.defaults ?? undefined) };
       if (target === 'rag' && this.getRagDocumentsPath().trim()) {
         defaults['documents_path'] = this.getRagDocumentsPath().trim();
       }
-      this.updateConfig.set(defaults);
-      this.updateConfigText.set(JSON.stringify(defaults, null, 2));
+      this.patchTargetState(target, {
+        config: defaults,
+        configText: JSON.stringify(defaults, null, 2),
+      });
     } catch (error) {
-      this.updateConfig.set({});
-      this.updateConfigText.set('{}');
-      this.updateError.set(error instanceof Error ? error.message : 'Failed to load update configuration.');
+      this.patchTargetState(target, {
+        config: {},
+        configText: '{}',
+        error: error instanceof Error ? error.message : 'Failed to load update configuration.',
+      });
     } finally {
-      this.updateLoading.set(false);
+      this.patchTargetState(target, { loading: false });
     }
   }
 
   close(): void {
-    this.cancelActivePolling();
     this.activeTarget.set(null);
-    this.updateLoading.set(false);
-    this.updateRunning.set(false);
-    this.updateJobId.set(null);
-    this.updateProgress.set(0);
-    this.updateMessage.set('');
-    this.updateError.set(null);
   }
 
   setConfigText(value: string): void {
-    this.updateConfigText.set(value);
+    const target = this.activeTarget();
+    if (!target) {
+      return;
+    }
+    this.patchTargetState(target, { configText: value });
   }
 
   async start(): Promise<void> {
@@ -206,14 +221,19 @@ export class InspectionUpdateJobResource {
       return;
     }
     this.updateError.set(null);
-    this.updateRunning.set(true);
-    this.updateProgress.set(0);
-    this.updateMessage.set('Starting update job...');
+    this.patchTargetState(target, {
+      error: null,
+      running: true,
+      progress: 0,
+      message: 'Starting update job...',
+    });
 
     const parsedOverrides = this.parseOverrides(target, this.updateConfigText());
     if (parsedOverrides.error) {
-      this.updateError.set(parsedOverrides.error);
-      this.updateRunning.set(false);
+      this.patchTargetState(target, {
+        error: parsedOverrides.error,
+        running: false,
+      });
       return;
     }
 
@@ -223,13 +243,18 @@ export class InspectionUpdateJobResource {
       if (!startedJobId) {
         throw new Error('Update job started but no job id was returned.');
       }
-      this.updateJobId.set(startedJobId);
-      this.updateMessage.set(resolveStartedMessage(started));
       const pollToken = this.beginPolling();
+      this.patchTargetState(target, {
+        jobId: startedJobId,
+        message: resolveStartedMessage(started),
+        pollToken,
+      });
       void this.pollUpdateJob(target, startedJobId, pollToken);
     } catch (error) {
-      this.updateRunning.set(false);
-      this.updateError.set(error instanceof Error ? error.message : 'Failed to start update job.');
+      this.patchTargetState(target, {
+        running: false,
+        error: error instanceof Error ? error.message : 'Failed to start update job.',
+      });
     }
   }
 
@@ -241,9 +266,11 @@ export class InspectionUpdateJobResource {
     }
     try {
       await this.actions[target].cancel(jobId);
-      this.updateMessage.set('Cancellation requested.');
+      this.patchTargetState(target, { message: 'Cancellation requested.' });
     } catch (error) {
-      this.updateError.set(error instanceof Error ? error.message : 'Failed to cancel update job.');
+      this.patchTargetState(target, {
+        error: error instanceof Error ? error.message : 'Failed to cancel update job.',
+      });
     }
   }
 
@@ -291,24 +318,33 @@ export class InspectionUpdateJobResource {
     try {
       await this.jobPolling.run({
         intervalMs: 1200,
-        isCancelled: () => !this.isPollingActive(pollToken),
+        isCancelled: () => !this.isPollingActive(target, pollToken),
         pollStep: async () => {
           const status = await this.actions[target].status(jobId);
-          if (!this.isPollingActive(pollToken)) {
+          if (!this.isPollingActive(target, pollToken)) {
             return false;
           }
           const statusValue = resolveStatusValue(status);
-          this.updateProgress.set(resolveProgressValue(status));
-          this.updateMessage.set(resolveUpdateProgressMessage(status));
+          this.patchTargetState(target, {
+            progress: resolveProgressValue(status),
+            message: resolveUpdateProgressMessage(status),
+          });
 
           if (statusValue === 'completed') {
-            this.updateRunning.set(false);
+            this.patchTargetState(target, {
+              running: false,
+              progress: 100,
+              pollToken: null,
+            });
             await this.actions[target].refresh();
             return false;
           }
           if (statusValue === 'failed' || statusValue === 'cancelled') {
-            this.updateRunning.set(false);
-            this.updateError.set(resolveErrorValue(status) || `Update job ${statusValue}.`);
+            this.patchTargetState(target, {
+              running: false,
+              error: resolveErrorValue(status) || `Update job ${statusValue}.`,
+              pollToken: null,
+            });
             return false;
           }
 
@@ -316,11 +352,14 @@ export class InspectionUpdateJobResource {
         },
       });
     } catch (error) {
-      if (!this.isPollingActive(pollToken)) {
+      if (!this.isPollingActive(target, pollToken)) {
         return;
       }
-      this.updateRunning.set(false);
-      this.updateError.set(error instanceof Error ? error.message : 'Failed to poll update job.');
+      this.patchTargetState(target, {
+        running: false,
+        error: error instanceof Error ? error.message : 'Failed to poll update job.',
+        pollToken: null,
+      });
     }
   }
 
@@ -331,10 +370,60 @@ export class InspectionUpdateJobResource {
 
   private cancelActivePolling(): void {
     this.updatePollToken += 1;
-    this.updateRunning.set(false);
+    for (const [target, state] of this.targetStates) {
+      if (state.running) {
+        this.patchTargetState(target, { running: false, pollToken: null });
+      }
+    }
   }
 
-  private isPollingActive(pollToken: number): boolean {
-    return this.updatePollToken === pollToken;
+  private isPollingActive(target: InspectionUpdateTarget, pollToken: number): boolean {
+    return this.getTargetState(target).pollToken === pollToken;
+  }
+
+  private getTargetState(target: InspectionUpdateTarget): InspectionUpdateTargetState {
+    const existing = this.targetStates.get(target);
+    if (existing) {
+      return existing;
+    }
+    const initial: InspectionUpdateTargetState = {
+      config: null,
+      configText: '{}',
+      loading: false,
+      running: false,
+      jobId: null,
+      progress: 0,
+      message: '',
+      error: null,
+      pollToken: null,
+    };
+    this.targetStates.set(target, initial);
+    return initial;
+  }
+
+  private patchTargetState(
+    target: InspectionUpdateTarget,
+    patch: Partial<InspectionUpdateTargetState>,
+  ): InspectionUpdateTargetState {
+    const next = {
+      ...this.getTargetState(target),
+      ...patch,
+    };
+    this.targetStates.set(target, next);
+    if (this.activeTarget() === target) {
+      this.applyStateToSignals(next);
+    }
+    return next;
+  }
+
+  private applyStateToSignals(state: InspectionUpdateTargetState): void {
+    this.updateConfig.set(state.config);
+    this.updateConfigText.set(state.configText);
+    this.updateLoading.set(state.loading);
+    this.updateRunning.set(state.running);
+    this.updateJobId.set(state.jobId);
+    this.updateProgress.set(state.progress);
+    this.updateMessage.set(state.message);
+    this.updateError.set(state.error);
   }
 }
