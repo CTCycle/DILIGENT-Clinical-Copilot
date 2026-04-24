@@ -1,12 +1,20 @@
 from __future__ import annotations
 
+import asyncio
 import json
 from typing import Any, Literal
 
 import httpx
-from langchain_core.messages import AIMessage, BaseMessage, HumanMessage, SystemMessage
-from langchain_google_genai import ChatGoogleGenerativeAI
-from langchain_openai import ChatOpenAI
+from openai import APIConnectionError, APITimeoutError, AsyncOpenAI, OpenAIError
+
+try:
+    from google import genai
+    from google.genai import errors as genai_errors
+    from google.genai import types as genai_types
+except ImportError:  # pragma: no cover - exercised only when dependency is absent.
+    genai = None  # type: ignore[assignment]
+    genai_errors = None  # type: ignore[assignment]
+    genai_types = None  # type: ignore[assignment]
 
 from DILIGENT.server.common.constants import GEMINI_API_BASE, OPENAI_API_BASE
 from DILIGENT.server.common.utils.logger import logger
@@ -50,6 +58,8 @@ class CloudLLMClient:
         self.timeout_s = float(timeout_s)
         provider_access_key = self.resolve_provider_access_key(provider)
         self.provider_access_key = provider_access_key
+        self.openai_client: AsyncOpenAI | None = None
+        self.gemini_client: Any | None = None
 
         if provider == "openai":
             if not provider_access_key:
@@ -59,6 +69,11 @@ class CloudLLMClient:
                 "Authorization": f"Bearer {provider_access_key}",
                 "Content-Type": "application/json",
             }
+            self.openai_client = AsyncOpenAI(
+                api_key=provider_access_key,
+                base_url=self.base_url,
+                timeout=self.timeout_s,
+            )
         elif provider == "gemini":
             if not provider_access_key:
                 raise LLMError("No active Gemini access key configured")
@@ -67,6 +82,9 @@ class CloudLLMClient:
                 "Content-Type": "application/json",
                 "x-goog-api-key": provider_access_key,
             }
+            if genai is None:
+                raise LLMError("google-genai is required for Gemini generation")
+            self.gemini_client = genai.Client(api_key=provider_access_key)
         elif provider in ("azure-openai", "anthropic"):
             raise LLMError(f"Provider '{provider}' not yet configured")
         else:
@@ -105,6 +123,8 @@ class CloudLLMClient:
 
     # ---------------------------------------------------------------------
     async def close(self) -> None:
+        if self.openai_client is not None:
+            await self.openai_client.close()
         await self.client.aclose()
 
     # ---------------------------------------------------------------------
@@ -164,64 +184,81 @@ class CloudLLMClient:
         if not resolved_model:
             raise LLMError("Model is required")
 
-        lc_messages = self._build_langchain_messages(messages)
         try:
             if self.provider == "openai":
-                chat_model = self._build_openai_chat_model(
+                return await self._chat_openai(
                     resolved_model=resolved_model,
                     format=format,
                     options=options_payload,
+                    messages=messages,
                 )
-            elif self.provider == "gemini":
-                chat_model = self._build_gemini_chat_model(
+            if self.provider == "gemini":
+                return await self._chat_gemini(
                     resolved_model=resolved_model,
                     options=options_payload,
+                    messages=messages,
+                    schema=None,
+                    json_mode=format == "json",
                 )
-            else:
-                raise LLMError(f"Provider '{self.provider}' does not support chat yet")
-            response = await chat_model.ainvoke(lc_messages)
         except Exception as exc:  # noqa: BLE001
-            raise self._map_langchain_exception(exc) from exc
-        return self._normalize_langchain_content(response.content)
+            raise self._map_provider_exception(exc) from exc
+        raise LLMError(f"Provider '{self.provider}' does not support chat yet")
 
     # ---------------------------------------------------------------------
-    def _build_openai_chat_model(
+    async def _chat_openai(
         self,
         *,
         resolved_model: str,
         format: str | None,
         options: dict[str, Any] | None,
-    ) -> ChatOpenAI:
-        kwargs: dict[str, Any] = {
-            "model": resolved_model,
-            "api_key": self.provider_access_key,
-            "base_url": self.base_url,
-            "timeout": self.timeout_s,
-        }
+        messages: list[dict[str, str]],
+    ) -> dict[str, Any] | str:
+        if self.openai_client is None:
+            raise LLMError("OpenAI client is not configured")
+        instructions, input_messages = self._build_openai_responses_input(messages)
+        kwargs: dict[str, Any] = {"model": resolved_model, "input": input_messages}
+        if instructions:
+            kwargs["instructions"] = instructions
         supports_sampling = not self.is_gpt5_family_model(resolved_model)
         if supports_sampling and options and "temperature" in options:
             kwargs["temperature"] = float(options["temperature"])
         if supports_sampling and options and "top_p" in options:
             kwargs["top_p"] = float(options["top_p"])
         if format == "json":
-            kwargs["model_kwargs"] = {"response_format": {"type": "json_object"}}
-        return ChatOpenAI(**kwargs)
+            kwargs["text"] = {"format": {"type": "json_object"}}
+        response = await self.openai_client.responses.create(**kwargs)
+        return self._normalize_content(self._extract_openai_output_text(response))
 
     # ---------------------------------------------------------------------
-    def _build_gemini_chat_model(
+    async def _chat_gemini(
         self,
         *,
         resolved_model: str,
         options: dict[str, Any] | None,
-    ) -> ChatGoogleGenerativeAI:
-        kwargs: dict[str, Any] = {
-            "model": resolved_model,
-            "google_api_key": self.provider_access_key,
-            "timeout": self.timeout_s,
-        }
+        messages: list[dict[str, str]],
+        schema: type[T] | None,
+        json_mode: bool,
+    ) -> dict[str, Any] | str:
+        if self.gemini_client is None:
+            raise LLMError("Gemini client is not configured")
+        system_instruction, contents = self._build_gemini_contents(messages)
+        config_kwargs: dict[str, Any] = {}
+        if system_instruction:
+            config_kwargs["system_instruction"] = system_instruction
         if options and "temperature" in options:
-            kwargs["temperature"] = max(0.0, min(2.0, float(options["temperature"])))
-        return ChatGoogleGenerativeAI(**kwargs)
+            config_kwargs["temperature"] = max(0.0, min(2.0, float(options["temperature"])))
+        if json_mode or schema is not None:
+            config_kwargs["response_mime_type"] = "application/json"
+        if schema is not None:
+            config_kwargs["response_json_schema"] = schema.model_json_schema()
+        config = self._build_gemini_config(config_kwargs)
+        response = await asyncio.to_thread(
+            self.gemini_client.models.generate_content,
+            model=resolved_model,
+            contents=contents,
+            config=config,
+        )
+        return self._normalize_content(getattr(response, "text", response))
 
     # ---------------------------------------------------------------------
     @staticmethod
@@ -235,24 +272,78 @@ class CloudLLMClient:
 
     # ---------------------------------------------------------------------
     @staticmethod
-    def _build_langchain_messages(
+    def _build_openai_responses_input(
         messages: list[dict[str, str]],
-    ) -> list[BaseMessage]:
-        output: list[BaseMessage] = []
+    ) -> tuple[str | None, list[dict[str, str]]]:
+        instructions: list[str] = []
+        input_messages: list[dict[str, str]] = []
         for item in messages:
             role = str(item.get("role", "user")).strip().lower()
             content = str(item.get("content", ""))
             if role == "system":
-                output.append(SystemMessage(content=content))
+                if content.strip():
+                    instructions.append(content.strip())
             elif role in {"assistant", "model"}:
-                output.append(AIMessage(content=content))
+                input_messages.append({"role": "assistant", "content": content})
             else:
-                output.append(HumanMessage(content=content))
-        return output
+                input_messages.append({"role": "user", "content": content})
+        if not input_messages:
+            input_messages.append({"role": "user", "content": ""})
+        return "\n\n".join(instructions) or None, input_messages
 
     # ---------------------------------------------------------------------
     @staticmethod
-    def _normalize_langchain_content(content: Any) -> dict[str, Any] | str:
+    def _build_gemini_contents(
+        messages: list[dict[str, str]],
+    ) -> tuple[str | None, list[dict[str, Any]]]:
+        system_instruction: list[str] = []
+        contents: list[dict[str, Any]] = []
+        for item in messages:
+            role = str(item.get("role", "user")).strip().lower()
+            content = str(item.get("content", ""))
+            if role == "system":
+                if content.strip():
+                    system_instruction.append(content.strip())
+                continue
+            gemini_role = "model" if role in {"assistant", "model"} else "user"
+            contents.append({"role": gemini_role, "parts": [{"text": content}]})
+        if not contents:
+            contents.append({"role": "user", "parts": [{"text": ""}]})
+        return "\n\n".join(system_instruction) or None, contents
+
+    # ---------------------------------------------------------------------
+    @staticmethod
+    def _build_gemini_config(config_kwargs: dict[str, Any]) -> Any | None:
+        if not config_kwargs:
+            return None
+        if genai_types is None:
+            return config_kwargs
+        return genai_types.GenerateContentConfig(**config_kwargs)
+
+    # ---------------------------------------------------------------------
+    @staticmethod
+    def _extract_openai_output_text(response: Any) -> str:
+        output_text = getattr(response, "output_text", None)
+        if isinstance(output_text, str):
+            return output_text
+        output = getattr(response, "output", None)
+        if isinstance(output, list):
+            chunks: list[str] = []
+            for item in output:
+                content = getattr(item, "content", None)
+                if not isinstance(content, list):
+                    continue
+                for part in content:
+                    text = getattr(part, "text", None)
+                    if isinstance(text, str):
+                        chunks.append(text)
+            if chunks:
+                return "".join(chunks)
+        return str(response)
+
+    # ---------------------------------------------------------------------
+    @staticmethod
+    def _normalize_content(content: Any) -> dict[str, Any] | str:
         if isinstance(content, dict):
             return content
         if isinstance(content, list):
@@ -278,13 +369,19 @@ class CloudLLMClient:
 
     # ---------------------------------------------------------------------
     @staticmethod
-    def _map_langchain_exception(exc: Exception) -> LLMError:
+    def _map_provider_exception(exc: Exception) -> LLMError:
         if isinstance(exc, LLMError):
             return exc
-        if isinstance(exc, TimeoutError):
+        if isinstance(exc, (TimeoutError, APITimeoutError)):
             return LLMTimeout("Timed out waiting for cloud chat response")
-        if isinstance(exc, httpx.TimeoutException):
+        if isinstance(exc, (httpx.TimeoutException, APIConnectionError)):
             return LLMTimeout("Timed out waiting for cloud chat response")
+        if genai_errors is not None:
+            timeout_error = getattr(genai_errors, "TimeoutError", None)
+            if timeout_error is not None and isinstance(exc, timeout_error):
+                return LLMTimeout("Timed out waiting for cloud chat response")
+        if isinstance(exc, OpenAIError):
+            return LLMError(f"Cloud LLM call failed: {exc}")
         error_name = exc.__class__.__name__.lower()
         if "timeout" in error_name:
             return LLMTimeout("Timed out waiting for cloud chat response")
@@ -414,11 +511,48 @@ class CloudLLMClient:
         parser = StructuredOutputParser(schema=schema)
         format_instructions = parser.get_format_instructions()
         resolved_model = model or (self.default_model or "")
+        system_with_format = f"{system_prompt.strip()}\n\n{format_instructions}"
         messages = self.build_structured_messages(
             system_prompt=system_prompt,
             user_prompt=user_prompt,
             format_instructions=format_instructions,
         )
+
+        if self.provider == "openai" and use_json_mode:
+            try:
+                return await self._structured_openai(
+                    model=resolved_model,
+                    system_prompt=system_with_format,
+                    user_prompt=user_prompt,
+                    schema=schema,
+                    temperature=temperature,
+                )
+            except Exception as exc:  # noqa: BLE001
+                logger.warning(
+                    "OpenAI native structured output failed; falling back to local parser: %s",
+                    exc,
+                )
+
+        if self.provider == "gemini" and use_json_mode:
+            try:
+                raw = await self._chat_gemini(
+                    resolved_model=resolved_model,
+                    options=(
+                        None
+                        if self.is_gpt5_family_model(resolved_model)
+                        else {"temperature": temperature}
+                    ),
+                    messages=[
+                        {"role": "system", "content": system_with_format},
+                        {"role": "user", "content": user_prompt},
+                    ],
+                    schema=schema,
+                    json_mode=True,
+                )
+                text = json.dumps(raw) if isinstance(raw, dict) else str(raw)
+                return parser.parse(text)
+            except Exception as exc:  # noqa: BLE001
+                raise self._map_provider_exception(exc) from exc
 
         raw = await self.chat(
             model=resolved_model,
@@ -440,6 +574,41 @@ class CloudLLMClient:
             use_json_mode=use_json_mode,
             max_repair_attempts=max_repair_attempts,
         )
+
+    # ---------------------------------------------------------------------
+    async def _structured_openai(
+        self,
+        *,
+        model: str,
+        system_prompt: str,
+        user_prompt: str,
+        schema: type[T],
+        temperature: float,
+    ) -> T:
+        if self.openai_client is None:
+            raise LLMError("OpenAI client is not configured")
+        kwargs: dict[str, Any] = {
+            "model": model,
+            "instructions": system_prompt.strip(),
+            "input": [{"role": "user", "content": user_prompt}],
+            "text_format": schema,
+        }
+        if not self.is_gpt5_family_model(model):
+            kwargs["temperature"] = float(temperature)
+        try:
+            response = await self.openai_client.responses.parse(**kwargs)
+        except Exception as exc:  # noqa: BLE001
+            mapped = self._map_provider_exception(exc)
+            if isinstance(mapped, LLMTimeout) or isinstance(exc, OpenAIError):
+                raise mapped from exc
+            raise
+        parsed = getattr(response, "output_parsed", None)
+        if isinstance(parsed, schema):
+            return parsed
+        if parsed is not None:
+            return schema.model_validate(parsed)
+        text = self._extract_openai_output_text(response)
+        return StructuredOutputParser(schema=schema).parse(text)
 
     # ---------------------------------------------------------------------
     @staticmethod
