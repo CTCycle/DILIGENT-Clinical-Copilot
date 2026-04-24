@@ -5,16 +5,10 @@ import json
 from typing import Any, Literal
 
 import httpx
+from google import genai
+from google.genai import errors as genai_errors
+from google.genai import types as genai_types
 from openai import APIConnectionError, APITimeoutError, AsyncOpenAI, OpenAIError
-
-try:
-    from google import genai
-    from google.genai import errors as genai_errors
-    from google.genai import types as genai_types
-except ImportError:  # pragma: no cover - exercised only when dependency is absent.
-    genai = None  # type: ignore[assignment]
-    genai_errors = None  # type: ignore[assignment]
-    genai_types = None  # type: ignore[assignment]
 
 from DILIGENT.server.common.constants import GEMINI_API_BASE, OPENAI_API_BASE
 from DILIGENT.server.common.utils.logger import logger
@@ -82,8 +76,6 @@ class CloudLLMClient:
                 "Content-Type": "application/json",
                 "x-goog-api-key": provider_access_key,
             }
-            if genai is None:
-                raise LLMError("google-genai is required for Gemini generation")
             self.gemini_client = genai.Client(api_key=provider_access_key)
         elif provider in ("azure-openai", "anthropic"):
             raise LLMError(f"Provider '{provider}' not yet configured")
@@ -316,8 +308,6 @@ class CloudLLMClient:
     def _build_gemini_config(config_kwargs: dict[str, Any]) -> Any | None:
         if not config_kwargs:
             return None
-        if genai_types is None:
-            return config_kwargs
         return genai_types.GenerateContentConfig(**config_kwargs)
 
     # ---------------------------------------------------------------------
@@ -376,10 +366,9 @@ class CloudLLMClient:
             return LLMTimeout("Timed out waiting for cloud chat response")
         if isinstance(exc, (httpx.TimeoutException, APIConnectionError)):
             return LLMTimeout("Timed out waiting for cloud chat response")
-        if genai_errors is not None:
-            timeout_error = getattr(genai_errors, "TimeoutError", None)
-            if timeout_error is not None and isinstance(exc, timeout_error):
-                return LLMTimeout("Timed out waiting for cloud chat response")
+        timeout_error = getattr(genai_errors, "TimeoutError", None)
+        if timeout_error is not None and isinstance(exc, timeout_error):
+            return LLMTimeout("Timed out waiting for cloud chat response")
         if isinstance(exc, OpenAIError):
             return LLMError(f"Cloud LLM call failed: {exc}")
         error_name = exc.__class__.__name__.lower()

@@ -12,7 +12,6 @@ from DILIGENT.server.configurations.environment import (
     ensure_environment_loaded,
     reset_environment_bootstrap_for_tests,
 )
-from DILIGENT.server.configurations.llm_configs import LLMRuntimeConfig
 from DILIGENT.server.configurations.management import ConfigurationManager
 from DILIGENT.server.domain.settings.configuration import ServerSettings
 
@@ -52,9 +51,7 @@ def get_configuration_manager(config_path: str | None = None) -> ConfigurationMa
 
 def get_server_settings(config_path: str | None = None) -> ServerSettings:
     manager = get_configuration_manager(config_path=config_path)
-    settings = manager.server_settings
-    LLMRuntimeConfig.configure(settings.llm_defaults)
-    return settings
+    return manager.server_settings
 
 
 def get_configuration_block(block_name: str) -> dict[str, Any]:
