@@ -1,6 +1,6 @@
 # DILIGENT Clinical Copilot User Manual
 
-Last updated: 2026-04-08
+Last updated: 2026-04-24
 
 This manual describes practical use of DILIGENT Clinical Copilot for clinical DILI assessment workflows.
 
@@ -21,7 +21,7 @@ Typical local URLs:
 - Frontend UI: `http://127.0.0.1:7861`
 - Backend API: `http://127.0.0.1:8000`
 
-Desktop packaged mode is available through Tauri builds. See `assets/docs/PACKAGING_AND_RUNTIME_MODES.md`.
+Desktop packaged mode is available through Tauri builds. See `assets/docs/RUNTIME_MODES.md`.
 
 ## 3. Primary user journeys
 
@@ -119,4 +119,4 @@ release\tauri\build_with_tauri.bat
 - `README.md` for installation and setup overview.
 - `assets/docs/ARCHITECTURE.md` for module boundaries and data flow.
 - `assets/docs/BACKGROUND_JOBS.md` for job behavior.
-- `assets/docs/PACKAGING_AND_RUNTIME_MODES.md` for local/desktop runtime modes.
+- `assets/docs/RUNTIME_MODES.md` for local/desktop runtime modes.
