@@ -14,7 +14,6 @@ from DILIGENT.server.domain.clinical import (
     DrugRucamAssessment,
     RucamComponentAssessment,
     DrugSuspensionContext,
-    PatientData,
     PatientLabTimeline,
 )
 from DILIGENT.server.services.clinical.hepatox import (
@@ -167,6 +166,10 @@ def test_render_matched_drug_section_contains_deterministic_rucam_summary() -> N
     entry = DrugClinicalAssessment(
         drug_name="Pantozol",
         match_status="matched",
+        match_confidence=0.92,
+        match_reason="exact_alias_ranked",
+        evidence_quality="weak_alias_or_class_match",
+        evidence_warnings=["Drug match is not a direct canonical match."],
         matched_livertox_row={"likelihood_score": "C"},
         paragraph="Core clinical narrative.",
         rucam=DrugRucamAssessment(
@@ -193,6 +196,8 @@ def test_render_matched_drug_section_contains_deterministic_rucam_summary() -> N
     assert "**Estimated RUCAM**: 6, probable, confidence moderate" in rendered
     assert "**RUCAM component summary**:" in rendered
     assert "**RUCAM limitations**:" in rendered
+    assert "**Evidence match**: weak_alias_or_class_match" in rendered
+    assert "Drug match is not a direct canonical match." in rendered
 
 
 def test_finalize_patient_report_uses_global_synthesis_section_header() -> None:

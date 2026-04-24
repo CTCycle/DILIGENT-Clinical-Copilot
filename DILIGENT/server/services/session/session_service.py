@@ -54,6 +54,7 @@ from DILIGENT.server.services.clinical.job_progress import (
     StageProgressFractionCallback,
 )
 from DILIGENT.server.services.clinical.language import ClinicalLanguageDetector
+from DILIGENT.server.services.clinical.match_quality import classify_match_evidence
 from DILIGENT.server.services.clinical.preparation import ClinicalKnowledgePreparation
 from DILIGENT.server.services.clinical.candidate_selection import select_relevant_candidates
 from DILIGENT.server.services.clinical.disease import DiseaseExtractor
@@ -237,6 +238,23 @@ class ClinicalSessionService(ClinicalSessionFormattingMixin):
                 message=message,
                 field=field,
             )
+        )
+
+    # -------------------------------------------------------------------------
+    @staticmethod
+    def append_knowledge_base_unavailable_issue(
+        issues: list[PipelineIssue],
+    ) -> None:
+        ClinicalSessionService.append_warning_issue(
+            issues,
+            code="knowledge_base_unavailable",
+            message=(
+                "Local RxNav/LiverTox knowledge base is unavailable or empty; "
+                "drug matching and evidence-backed consultation were skipped. "
+                "Rebuild or fetch the RxNav and LiverTox datasets before relying "
+                "on this report."
+            ),
+            field="knowledge_base",
         )
 
     # -------------------------------------------------------------------------
@@ -566,6 +584,7 @@ class ClinicalSessionService(ClinicalSessionFormattingMixin):
         all_detected_drugs: PatientDrugs,
         structured_context: str,
         pattern_score,
+        issues: list[PipelineIssue],
         progress_callback: Callable[[str, float], None] | None,
         stop_check: Callable[[], None] | None,
     ) -> HepatoxPreparedInputs | None:
@@ -583,6 +602,8 @@ class ClinicalSessionService(ClinicalSessionFormattingMixin):
             progress_callback=livertox_progress_callback,
         )
         self.run_stop_check(stop_check)
+        if prepared_inputs is None and all_detected_drugs.entries:
+            self.append_knowledge_base_unavailable_issue(issues)
         self.emit_progress(progress_callback, stage="livertox_lookup", value=62.0)
         return prepared_inputs
 
@@ -668,6 +689,7 @@ class ClinicalSessionService(ClinicalSessionFormattingMixin):
                     final_report = None
                 else:
                     final_report = str(raw_final_report).strip()
+            issues.extend(getattr(clinical_session, "pipeline_issues", []))
         except LLMError as exc:
             self.append_warning_issue(
                 issues,
@@ -716,17 +738,44 @@ class ClinicalSessionService(ClinicalSessionFormattingMixin):
         resolved: dict[str, Any],
         rucam_entry: DrugRucamAssessment | None,
     ) -> dict[str, Any]:
+        if not resolved:
+            resolved = {
+                "match_status": "missing_match",
+                "match_reason": "knowledge_base_unavailable",
+                "match_notes": ["No local RxNav/LiverTox evidence record was available."],
+                "missing_livertox": True,
+                "ambiguous_match": False,
+            }
         matched_row = resolved.get("matched_livertox_row")
         if not isinstance(matched_row, dict):
             matched_row = {}
+        match_notes = resolved.get("match_notes", [])
+        if not isinstance(match_notes, list):
+            match_notes = []
+        match_confidence = resolved.get("match_confidence")
+        if match_confidence is not None:
+            try:
+                match_confidence = float(match_confidence)
+            except (TypeError, ValueError):
+                match_confidence = None
+        match_quality = classify_match_evidence(
+            match_status=resolved.get("match_status"),
+            match_reason=resolved.get("match_reason"),
+            match_confidence=match_confidence,
+            match_notes=match_notes,
+            missing_livertox=bool(resolved.get("missing_livertox", True)),
+            ambiguous_match=bool(resolved.get("ambiguous_match", False)),
+        )
         return {
             "raw_drug_name": detected_name,
             "matched_drug_name": matched_row.get("drug_name"),
             "nbk_id": matched_row.get("nbk_id"),
-            "match_confidence": resolved.get("match_confidence"),
+            "match_confidence": match_confidence,
             "match_reason": resolved.get("match_reason"),
-            "match_notes": resolved.get("match_notes", []),
+            "match_notes": match_notes,
             "match_status": resolved.get("match_status"),
+            "evidence_quality": match_quality["evidence_quality"],
+            "evidence_warnings": match_quality["evidence_warnings"],
             "match_candidates": resolved.get("match_candidates", []),
             "chosen_candidate": resolved.get("chosen_candidate"),
             "rejected_candidates": resolved.get("rejected_candidates", []),
@@ -866,6 +915,7 @@ class ClinicalSessionService(ClinicalSessionFormattingMixin):
             all_detected_drugs=all_detected_drugs,
             structured_context=structured_context,
             pattern_score=pattern_score,
+            issues=issues,
             progress_callback=progress_callback,
             stop_check=stop_check,
         )
