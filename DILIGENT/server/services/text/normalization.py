@@ -54,6 +54,9 @@ _FORMULATION_STOPWORDS = (
         "hcl",
         "hydrochloride",
         "cloridrato",
+        "estratto",
+        "secco",
+        "secca",
     }
 )
 _MANUFACTURER_TOKENS = {
@@ -104,10 +107,13 @@ _TRAILING_TEMPORAL_TOKENS = {
 }
 _KNOWN_QUERY_ALIASES = {
     "bactrim": "trimethoprim sulfamethoxazole",
+    "bromelina": "bromelain",
     "clexane": "enoxaparin",
     "co amoxi": "amoxicillin clavulanate",
     "coamoxi": "amoxicillin clavulanate",
+    "cotrimossazolo": "sulfamethoxazole trimethoprim",
     "de ursil": "ursodiol",
+    "esomeprazolo": "esomeprazole",
     "fortecortin": "dexamethasone",
     "laxoberon": "picosulfate",
     "mycostatin": "nystatin",

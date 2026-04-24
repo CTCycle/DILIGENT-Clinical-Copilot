@@ -469,6 +469,70 @@ def test_matcher_keeps_unsafe_multilingual_fallbacks_unresolved() -> None:
     assert insulin.matched_name != "Folic Acid"
 
 
+def test_known_italian_drug_aliases_normalize_before_matching() -> None:
+    frame = pd.DataFrame(
+        [
+            {
+                "nbk_id": "NBK0701",
+                "drug_name": "Esomeprazole",
+                "excerpt": "Esomeprazole excerpt.",
+                "synonyms": "",
+                "ingredient": "Esomeprazole",
+                "brand_name": "",
+            },
+            {
+                "nbk_id": "NBK0702",
+                "drug_name": "Bromelain",
+                "excerpt": "Bromelain excerpt.",
+                "synonyms": "",
+                "ingredient": "Bromelain",
+                "brand_name": "",
+            },
+            {
+                "nbk_id": "NBK0703",
+                "drug_name": "Sulfamethoxazole Trimethoprim",
+                "excerpt": "Cotrimoxazole excerpt.",
+                "synonyms": "",
+                "ingredient": "Sulfamethoxazole Trimethoprim",
+                "brand_name": "",
+            },
+        ]
+    )
+    matcher = LiverToxMatcher(frame)
+
+    results = matcher.match_drug_names(
+        ["Esomeprazolo", "Bromelina", "Cotrimossazolo"]
+    )
+
+    assert [item.status for item in results] == ["matched", "matched", "matched"]
+    assert [item.matched_name for item in results] == [
+        "Esomeprazole",
+        "Bromelain",
+        "Sulfamethoxazole Trimethoprim",
+    ]
+
+
+def test_formulation_words_are_removed_from_livertox_query() -> None:
+    frame = pd.DataFrame(
+        [
+            {
+                "nbk_id": "NBK0704",
+                "drug_name": "Boswellia Serrata",
+                "excerpt": "Boswellia excerpt.",
+                "synonyms": "",
+                "ingredient": "Boswellia Serrata",
+                "brand_name": "",
+            }
+        ]
+    )
+    matcher = LiverToxMatcher(frame)
+
+    result = matcher.match_drug_names(["Boswellia serrata estratto secco"])[0]
+
+    assert result.status == "matched"
+    assert result.matched_name == "Boswellia Serrata"
+
+
 def test_matcher_prefers_full_latin_script_combination_before_components() -> None:
     frame = pd.DataFrame(
         [

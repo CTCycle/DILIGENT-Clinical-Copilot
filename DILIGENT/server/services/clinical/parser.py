@@ -96,6 +96,36 @@ class DrugsParser:
         """,
         re.IGNORECASE | re.VERBOSE,
     )
+    NAME_TEMPORAL_SPLIT_RE = re.compile(
+        r"""
+        (?:[,;]\s*|\s+)
+        (?:
+            ultima\s+somministrazione|
+            linea\s+precedente|
+            iniziat[oaie]|
+            avviat[oaie]|
+            start(?:ed|ing)?|
+            began|
+            begin|
+            sospes[oaie]|
+            interrott[aoie]|
+            suspend(?:ed|ere|ing)?|
+            stopp?ed|
+            discontinued?|
+            alla\s+comparsa|
+            dal(?:la)?|
+            da(?:ll['’])?|
+            since|
+            from|
+            on
+        )\b.*$
+        """,
+        re.IGNORECASE | re.VERBOSE,
+    )
+    TRAILING_ROUTE_TOKEN_RE = re.compile(
+        r"\b(?:p\.?o\.?|e\.?v\.?|i\.?v\.?|i\.?m\.?|s\.?c\.?|po|ev|iv|im|sc)\s*$",
+        re.IGNORECASE,
+    )
     START_EVENT_RE = re.compile(
         r"""
         \b(?:iniz(?:io|iat[oaie])|avviat[oaie]|ripres[oaie]|riprend[ei]re|
@@ -143,6 +173,13 @@ class DrugsParser:
         "saturday",
         "sunday",
     }
+    NON_THERAPY_LINE_PREFIXES = (
+        "farmaci non assunti",
+        "farmaci non in uso",
+        "non assunti",
+        "not taking",
+        "not currently taking",
+    )
 
     def __init__(
         self,
@@ -237,7 +274,7 @@ class DrugsParser:
         lines = [
             segment
             for segment in (entry.strip() for entry in cleaned.split("\n"))
-            if segment
+            if segment and not self.is_non_therapy_line(segment)
         ]
         total_chunks = max(len(lines), 1)
         processed_chunks = 0
@@ -548,6 +585,7 @@ class DrugsParser:
         bracket_match = self.BRACKET_TRAIL_RE.search(before)
         if bracket_match:
             before = before[: bracket_match.start()].strip()
+        before = self.strip_temporal_name_tail(before)
         name, dosage, administration_mode = self.split_heading(before)
         if not name:
             name = before or line.strip()
@@ -619,7 +657,8 @@ class DrugsParser:
                 first_numeric = idx
                 break
         if first_numeric is None:
-            return " ".join(tokens).strip() or None, None, None
+            name = self.strip_trailing_route_token(" ".join(tokens).strip())
+            return name or None, None, None
         name_tokens = tokens[:first_numeric]
         remainder = tokens[first_numeric:]
         mode_tokens: list[str] = []
@@ -650,9 +689,38 @@ class DrugsParser:
         if not dosage_tokens and remainder:
             dosage_tokens = remainder
         name = " ".join(name_tokens).strip() or None
+        name = self.strip_trailing_route_token(name)
         dosage = " ".join(dosage_tokens).strip() or None
         administration_mode = " ".join(mode_tokens).strip() or None
         return name, dosage, administration_mode
+
+    # -------------------------------------------------------------------------
+    def strip_temporal_name_tail(self, value: str | None) -> str:
+        if not value:
+            return ""
+        stripped = re.sub(
+            r"\([^)]*(?:linea\s+precedente|sospes[oaie]|discontinued?|stopp?ed)[^)]*\)\s*$",
+            "",
+            value,
+            flags=re.IGNORECASE,
+        )
+        stripped = self.NAME_TEMPORAL_SPLIT_RE.sub("", stripped)
+        return stripped.strip(" ,;:\t")
+
+    # -------------------------------------------------------------------------
+    def strip_trailing_route_token(self, value: str | None) -> str | None:
+        if value is None:
+            return None
+        stripped = self.TRAILING_ROUTE_TOKEN_RE.sub("", value).strip(" ,;:\t")
+        return stripped or None
+
+    # -------------------------------------------------------------------------
+    def is_non_therapy_line(self, line: str) -> bool:
+        normalized = self.normalize_filter_key(line)
+        return any(
+            normalized.startswith(prefix)
+            for prefix in self.NON_THERAPY_LINE_PREFIXES
+        )
 
     # -------------------------------------------------------------------------
     def extract_mode_from_prefix(

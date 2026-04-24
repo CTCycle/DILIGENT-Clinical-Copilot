@@ -25,7 +25,6 @@ from DILIGENT.server.domain.clinical.entities import (
     DrugSuspensionContext,
     HepatotoxicityPatternAssessment,
     HepatotoxicityPatternScore,
-    PatientData,
     PatientDrugClinicalReport,
     PatientDrugs,
     PatientLabTimeline,
@@ -694,10 +693,18 @@ class HepatoxConsultation:
                     break
         if not drug_rag_query:
             return None
-        return await asyncio.to_thread(
-            self.search_supporting_documents,
-            drug_rag_query,
-        )
+        try:
+            return await asyncio.to_thread(
+                self.search_supporting_documents,
+                drug_rag_query,
+            )
+        except Exception as exc:  # noqa: BLE001
+            logger.warning(
+                "RAG retrieval unavailable for drug '%s'; continuing without supporting documents: %s",
+                drug_name,
+                exc,
+            )
+            return f"No additional documents provided (reason: RAG retrieval unavailable: {exc})."
 
     # -------------------------------------------------------------------------
     @staticmethod
