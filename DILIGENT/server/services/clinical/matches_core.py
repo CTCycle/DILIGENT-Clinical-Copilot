@@ -213,9 +213,12 @@ class DrugsLookup:
                 notes=["No alias candidates available."],
             )
 
+        source_backed_aliases = self.resolve_source_backed_query_variants(
+            normalized_query
+        )
         local_aliases = [alias for alias, from_catalog in alias_entries if not from_catalog]
         stage1_keys = self.build_unique_keys(
-            [canonical_query, *local_aliases],
+            [canonical_query, *source_backed_aliases, *local_aliases],
             self.canonicalize_query,
         )
         stage1 = self.resolve_stage_matches(stage1_keys, self.match_primary_all)
@@ -230,7 +233,7 @@ class DrugsLookup:
             return stage1_result
 
         stage2_keys = self.build_unique_keys(
-            [alias for alias, _ in alias_entries],
+            [*source_backed_aliases, *(alias for alias, _ in alias_entries)],
             self.canonicalize_query,
         )
         stage2 = self.resolve_stage_matches(stage2_keys, self.match_alias_exact_all)
@@ -245,7 +248,7 @@ class DrugsLookup:
             return stage2_result
 
         stage3_keys = self.build_unique_keys(
-            [normalized_query, *(alias for alias, _ in alias_entries)],
+            [normalized_query, *source_backed_aliases, *(alias for alias, _ in alias_entries)],
             self.normalize_name,
         )
         stage3 = self.resolve_stage_matches(stage3_keys, self.match_normalized_all)
@@ -328,6 +331,142 @@ class DrugsLookup:
             seen.add(key)
             unique.append(key)
         return unique
+
+    # -------------------------------------------------------------------------
+    def resolve_source_backed_query_variants(self, normalized_query: str) -> list[str]:
+        data = self.require_data()
+        variants: list[str] = []
+        seen: set[str] = set()
+        for variant in self.generate_latin_query_variants(normalized_query):
+            normalized_variant = self.normalize_name(variant)
+            if not normalized_variant or normalized_variant == normalized_query:
+                continue
+            if normalized_variant in seen:
+                continue
+            if not self.has_trusted_exact_key(normalized_variant, data):
+                continue
+            seen.add(normalized_variant)
+            variants.append(variant)
+        return variants
+
+    # -------------------------------------------------------------------------
+    def has_trusted_exact_key(self, normalized_key: str, data: LiverToxData) -> bool:
+        return (
+            normalized_key in data.primary_index
+            or normalized_key in data.synonym_index
+            or normalized_key in data.brand_index
+            or normalized_key in data.ingredient_index
+            or normalized_key in self.catalog_global_index
+        )
+
+    # -------------------------------------------------------------------------
+    def generate_latin_query_variants(self, normalized_query: str) -> list[str]:
+        if not normalized_query or not re.fullmatch(r"[a-z0-9 ]+", normalized_query):
+            return []
+        tokens = normalized_query.split()
+        if not tokens:
+            return []
+        variants: set[str] = set()
+        for alternatives in self.build_token_alternatives(tokens):
+            candidate = normalize_whitespace(" ".join(alternatives))
+            if candidate and candidate != normalized_query:
+                variants.add(candidate)
+        for candidate in self.generate_acid_phrase_variants(tokens):
+            normalized_candidate = normalize_whitespace(candidate)
+            if normalized_candidate and normalized_candidate != normalized_query:
+                variants.add(normalized_candidate)
+            for alternatives in self.build_token_alternatives(normalized_candidate.split()):
+                combined_candidate = normalize_whitespace(" ".join(alternatives))
+                if combined_candidate and combined_candidate != normalized_query:
+                    variants.add(combined_candidate)
+        return sorted(variants, key=lambda item: (len(item), item))
+
+    # -------------------------------------------------------------------------
+    def build_token_alternatives(self, tokens: list[str]) -> list[list[str]]:
+        alternatives: list[list[str]] = []
+        for token in tokens:
+            token_options = [token]
+            for variant in self.generate_token_variants(token):
+                if variant not in token_options:
+                    token_options.append(variant)
+            alternatives.append(token_options[:8])
+
+        results: list[list[str]] = []
+
+        def append_combinations(index: int, current: list[str]) -> None:
+            if len(results) >= 64:
+                return
+            if index >= len(alternatives):
+                if current != tokens:
+                    results.append(current[:])
+                return
+            for option in alternatives[index]:
+                current.append(option)
+                append_combinations(index + 1, current)
+                current.pop()
+
+        append_combinations(0, [])
+        return results
+
+    # -------------------------------------------------------------------------
+    def generate_token_variants(self, token: str) -> list[str]:
+        variants: list[str] = []
+        if len(token) < self.TOKEN_MIN_LENGTH:
+            return variants
+        suffix_replacements: tuple[tuple[str, tuple[str, ...]], ...] = (
+            ("ina", ("in", "ine")),
+            ("ino", ("in", "ine")),
+            ("in", ("ine",)),
+            ("olo", ("ole", "ol")),
+            ("ola", ("ole", "ol")),
+            ("ato", ("ate",)),
+            ("ata", ("ate",)),
+            ("ico", ("ic",)),
+            ("ica", ("ic",)),
+        )
+        for suffix, replacements in suffix_replacements:
+            if not token.endswith(suffix):
+                continue
+            stem = token[: -len(suffix)]
+            if len(stem) < 3:
+                continue
+            for replacement in replacements:
+                variant = f"{stem}{replacement}"
+                if variant != token and variant not in variants:
+                    variants.append(variant)
+        for variant in [token, *variants[:]]:
+            if "f" not in variant:
+                continue
+            ph_variant = variant.replace("f", "ph")
+            if ph_variant != variant and ph_variant not in variants:
+                variants.append(ph_variant)
+        return variants
+
+    # -------------------------------------------------------------------------
+    def generate_acid_phrase_variants(self, tokens: list[str]) -> list[str]:
+        variants: list[str] = []
+        for index in range(len(tokens) - 1):
+            if tokens[index] not in {"acid", "acido", "acide"}:
+                continue
+            acid_forms = self.generate_acid_name_forms(tokens[index + 1])
+            if not acid_forms:
+                continue
+            for acid_form in acid_forms:
+                variant_tokens = [*tokens[:index], *acid_form.split(), *tokens[index + 2 :]]
+                variants.append(" ".join(variant_tokens))
+        return variants
+
+    # -------------------------------------------------------------------------
+    def generate_acid_name_forms(self, token: str) -> list[str]:
+        forms: list[str] = []
+        for suffix in ("ico", "ica"):
+            if not token.endswith(suffix):
+                continue
+            stem = token[: -len(suffix)]
+            if len(stem) < 3:
+                continue
+            forms.extend([f"{stem}ic acid", f"{stem}ate"])
+        return list(dict.fromkeys(forms))
 
     # -------------------------------------------------------------------------
     def resolve_stage_matches(
@@ -605,6 +744,8 @@ class DrugsLookup:
             ratio = fuzz.ratio(normalized_query, candidate) / 100.0
             if ratio < self.FUZZY_THRESHOLD:
                 continue
+            if not self.is_safe_fuzzy_candidate(normalized_query, candidate, ratio):
+                continue
             confidence = max(self.FUZZY_CONFIDENCE, ratio)
             notes = [f"score={ratio:.2f}"]
             if not is_primary:
@@ -621,6 +762,33 @@ class DrugsLookup:
             )
         )
         return ordered
+
+    # -------------------------------------------------------------------------
+    def is_safe_fuzzy_candidate(
+        self,
+        normalized_query: str,
+        candidate: str,
+        ratio: float,
+    ) -> bool:
+        query_tokens = self.catalog_significant_tokens(normalized_query)
+        candidate_tokens = self.catalog_significant_tokens(candidate)
+        if len(query_tokens) <= 1 and len(candidate_tokens) <= 1:
+            if normalized_query[:1] != candidate[:1]:
+                return False
+            return ratio >= max(self.FUZZY_THRESHOLD, 0.88)
+        if not query_tokens or not candidate_tokens:
+            return False
+        shared = set(query_tokens) & set(candidate_tokens)
+        if not shared:
+            return False
+        query_coverage = len(shared) / len(query_tokens)
+        candidate_coverage = len(shared) / len(candidate_tokens)
+        token_ratio = fuzz.token_set_ratio(normalized_query, candidate) / 100.0
+        return bool(
+            query_coverage >= 0.8
+            and candidate_coverage >= 0.8
+            and token_ratio >= self.FUZZY_THRESHOLD
+        )
 
     # -------------------------------------------------------------------------
     def create_matched_result(
@@ -901,11 +1069,20 @@ class DrugsLookup:
             substring_length = len(candidate)
         elif normalized_query in candidate:
             substring_length = len(normalized_query)
-        accepted = bool(shared_tokens)
+        accepted = False
+        if significant_query_tokens and candidate_tokens and shared_tokens:
+            query_coverage = len(shared_tokens) / len(significant_query_tokens)
+            candidate_coverage = len(shared_tokens) / len(candidate_tokens)
+            accepted = bool(
+                query_coverage >= 0.8
+                and candidate_coverage >= 0.8
+                and token_ratio >= self.CATALOG_TOKEN_RATIO_THRESHOLD
+                and overall_ratio >= self.CATALOG_OVERALL_RATIO_THRESHOLD
+            )
         if not accepted:
             accepted = bool(
                 token_ratio >= self.CATALOG_TOKEN_RATIO_THRESHOLD
-                and partial_ratio >= self.CATALOG_OVERALL_RATIO_THRESHOLD
+                and overall_ratio >= self.CATALOG_OVERALL_RATIO_THRESHOLD
             )
         score = (
             len(shared_tokens),

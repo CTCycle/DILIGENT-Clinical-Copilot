@@ -37,6 +37,14 @@ def build_livertox_df() -> pd.DataFrame:
                 "ingredient": "Esomeprazole",
                 "brand_name": "Nexium",
             },
+            {
+                "nbk_id": "NBK0004",
+                "drug_name": "Naproxen",
+                "excerpt": "Naproxen has rare liver injury reports.",
+                "synonyms": "",
+                "ingredient": "Naproxen",
+                "brand_name": "",
+            },
         ]
     )
 
@@ -68,13 +76,12 @@ def test_typo_resolves_via_fuzzy_above_threshold() -> None:
     assert result.reason == "fuzzy"
 
 
-def test_multiple_fuzzy_candidates_are_marked_ambiguous() -> None:
+def test_one_sided_fuzzy_fragment_is_not_joined_to_evidence() -> None:
     matcher = LiverToxMatcher(build_livertox_df())
     result = matcher.match_drug_names(["meprazole"])[0]
 
-    assert result.status == "ambiguous"
-    assert "Omeprazole" in result.candidate_names
-    assert "Esomeprazole" in result.candidate_names
+    assert result.status in {"missing", "ambiguous"}
+    assert result.matched_name is None
 
 
 def test_no_match_is_safe_and_explicit() -> None:
@@ -93,17 +100,16 @@ def test_excerpt_attached_only_for_valid_match_confidence() -> None:
     mapping = matcher.build_drugs_to_excerpt_mapping(queries, matches)
 
     matched = mapping[0]
-    ambiguous = mapping[1]
+    unresolved = mapping[1]
     missing = mapping[2]
 
     assert matched["missing_livertox"] is False
     assert matched["ambiguous_match"] is False
     assert matched["extracted_excerpts"]
 
-    assert ambiguous["match_status"] == "ambiguous_match"
-    assert ambiguous["ambiguous_match"] is True
-    assert ambiguous["missing_livertox"] is True
-    assert ambiguous["extracted_excerpts"] == []
+    assert unresolved["match_status"] in {"ambiguous_match", "missing_match"}
+    assert unresolved["missing_livertox"] is True
+    assert unresolved["extracted_excerpts"] == []
 
     assert missing["match_status"] == "missing_match"
     assert missing["missing_livertox"] is True
@@ -198,12 +204,12 @@ def test_related_excerpt_is_used_when_matched_monograph_excerpt_is_missing() -> 
 
 def test_query_normalization_handles_brands_and_manufacturers() -> None:
     assert normalize_drug_query_name("Levetiracetam Desitin 500 mg cpr") == "levetiracetam"
-    assert normalize_drug_query_name("Amlodipin axapharm cpr 5 mg") == "amlodipine"
-    assert normalize_drug_query_name("Acido folico Streuli 5 mg cpr") == "folic acid"
+    assert normalize_drug_query_name("Amlodipin axapharm cpr 5 mg") == "amlodipin"
+    assert normalize_drug_query_name("Acido folico Streuli 5 mg cpr") == "acido folico"
     assert normalize_drug_query_name("Pantozol 20 mg cpr") == "pantoprazole"
     assert normalize_drug_query_name("Levetiracetam dal 27.08.2024") == "levetiracetam"
     assert normalize_drug_query_name("Nozinan dal 11.09.2024") == "levomepromazine"
-    assert normalize_drug_query_name("Morfina gtt 5 3/die") == "morphine"
+    assert normalize_drug_query_name("Morfina gtt 5 3/die") == "morfina"
 
 
 def test_mapping_prefers_excerpt_row_for_duplicate_normalized_drug() -> None:
@@ -252,10 +258,7 @@ def test_mapping_prefers_excerpt_row_for_duplicate_normalized_drug() -> None:
 
 def test_query_normalization_high_value_aliases_are_deterministic() -> None:
     assert normalize_drug_query_name("Co-amoxi 1g") == "amoxicillin clavulanate"
-    assert normalize_drug_query_name("Metformina 1000 mg") == "metformin"
     assert normalize_drug_query_name("Bactrim") == "trimethoprim sulfamethoxazole"
-    assert normalize_drug_query_name("Quetiapina") == "quetiapine"
-    assert normalize_drug_query_name("Fluvastatina") == "fluvastatin"
     assert normalize_drug_query_name("amoxicillin/clavulanate") == "amoxicillin clavulanate"
 
 
@@ -356,6 +359,156 @@ def test_matcher_handles_known_italian_aliases_without_fuzzy() -> None:
     assert co_amoxi.reason != "fuzzy"
 
 
+def test_matcher_handles_latin_script_inn_variants_without_translated_aliases() -> None:
+    frame = pd.DataFrame(
+        [
+            {
+                "nbk_id": "NBK0401",
+                "drug_name": "Amlodipine",
+                "excerpt": "Amlodipine excerpt.",
+                "synonyms": "",
+                "ingredient": "Amlodipine",
+                "brand_name": "",
+            },
+            {
+                "nbk_id": "NBK0402",
+                "drug_name": "Atorvastatin",
+                "excerpt": "Atorvastatin excerpt.",
+                "synonyms": "",
+                "ingredient": "Atorvastatin",
+                "brand_name": "",
+            },
+            {
+                "nbk_id": "NBK0403",
+                "drug_name": "Esomeprazole",
+                "excerpt": "Esomeprazole excerpt.",
+                "synonyms": "",
+                "ingredient": "Esomeprazole",
+                "brand_name": "",
+            },
+            {
+                "nbk_id": "NBK0404",
+                "drug_name": "Naproxen",
+                "excerpt": "Naproxen excerpt.",
+                "synonyms": "",
+                "ingredient": "Naproxen",
+                "brand_name": "",
+            },
+            {
+                "nbk_id": "NBK0405",
+                "drug_name": "Morphine",
+                "excerpt": "Morphine excerpt.",
+                "synonyms": "",
+                "ingredient": "Morphine",
+                "brand_name": "",
+            },
+        ]
+    )
+    matcher = LiverToxMatcher(frame)
+
+    amlodipina = matcher.match_drug_names(["Amlodipina"])[0]
+    atorvastatina = matcher.match_drug_names(["Atorvastatina"])[0]
+    esomeprazolo = matcher.match_drug_names(["Esomeprazolo"])[0]
+    morfina = matcher.match_drug_names(["Morfina"])[0]
+
+    assert amlodipina.status == "matched"
+    assert amlodipina.matched_name == "Amlodipine"
+    assert amlodipina.reason != "fuzzy"
+    assert atorvastatina.status == "matched"
+    assert atorvastatina.matched_name == "Atorvastatin"
+    assert atorvastatina.reason != "fuzzy"
+    assert esomeprazolo.status == "matched"
+    assert esomeprazolo.matched_name == "Esomeprazole"
+    assert esomeprazolo.reason != "fuzzy"
+    assert morfina.status == "matched"
+    assert morfina.matched_name == "Morphine"
+    assert morfina.reason != "fuzzy"
+
+
+def test_matcher_keeps_unsafe_multilingual_fallbacks_unresolved() -> None:
+    frame = pd.DataFrame(
+        [
+            {
+                "nbk_id": "NBK0501",
+                "drug_name": "Naproxen",
+                "excerpt": "Naproxen excerpt.",
+                "synonyms": "",
+                "ingredient": "Naproxen",
+                "brand_name": "",
+            },
+            {
+                "nbk_id": "NBK0502",
+                "drug_name": "Folic Acid",
+                "excerpt": "Folic acid excerpt.",
+                "synonyms": "vitamin; basal; schema interno",
+                "ingredient": "Folic Acid",
+                "brand_name": "",
+            },
+        ]
+    )
+    catalog = pd.DataFrame(
+        [
+            {
+                "rxcui": "1",
+                "term_type": "IN",
+                "raw_name": "Folic Acid",
+                "name": "Folic Acid",
+                "synonyms": "vitamin; basal; schema interno",
+                "brand_names": "",
+            }
+        ]
+    )
+    matcher = LiverToxMatcher(frame, drugs_catalog_df=catalog)
+
+    esomeprazolo = matcher.match_drug_names(["Esomeprazolo"])[0]
+    insulin = matcher.match_drug_names(["Insulina basal-bolus secondo schema interno"])[0]
+
+    assert esomeprazolo.status in {"missing", "ambiguous"}
+    assert esomeprazolo.matched_name != "Naproxen"
+    assert insulin.status in {"missing", "ambiguous"}
+    assert insulin.matched_name != "Folic Acid"
+
+
+def test_matcher_prefers_full_latin_script_combination_before_components() -> None:
+    frame = pd.DataFrame(
+        [
+            {
+                "nbk_id": "NBK0601",
+                "drug_name": "Amoxicillin clavulanate",
+                "excerpt": "Combination amoxicillin clavulanate excerpt.",
+                "synonyms": "",
+                "ingredient": "Amoxicillin clavulanate",
+                "brand_name": "",
+            },
+            {
+                "nbk_id": "NBK0602",
+                "drug_name": "Piperacillin Tazobactam",
+                "excerpt": "Piperacillin tazobactam excerpt.",
+                "synonyms": "",
+                "ingredient": "Piperacillin Tazobactam",
+                "brand_name": "",
+            },
+            {
+                "nbk_id": "NBK0603",
+                "drug_name": "Piperacillin",
+                "excerpt": "Piperacillin component excerpt.",
+                "synonyms": "",
+                "ingredient": "Piperacillin",
+                "brand_name": "",
+            },
+        ]
+    )
+    matcher = LiverToxMatcher(frame)
+
+    amoxicillin = matcher.match_drug_names(["Amoxicillina/acido clavulanico"])[0]
+    piperacillin = matcher.match_drug_names(["Piperacillina/tazobactam"])[0]
+
+    assert amoxicillin.status == "matched"
+    assert amoxicillin.matched_name == "Amoxicillin clavulanate"
+    assert piperacillin.status == "matched"
+    assert piperacillin.matched_name == "Piperacillin Tazobactam"
+
+
 def test_mapping_classifies_matched_no_excerpt_separately_from_missing_match() -> None:
     frame = pd.DataFrame(
         [
@@ -395,6 +548,8 @@ def test_preparation_expands_regimen_into_multiple_components() -> None:
     candidates = preparation.build_drug_candidates(drugs)
     canonical_names = {candidate["canonical_name"] for candidate in candidates}
 
+    assert "encorafenib binimetinib" in canonical_names
+    assert "dabrafenib trametinib" in canonical_names
     assert "encorafenib" in canonical_names
     assert "binimetinib" in canonical_names
     assert "dabrafenib" in canonical_names
