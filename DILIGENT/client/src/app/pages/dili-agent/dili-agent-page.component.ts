@@ -238,7 +238,7 @@ export class DiliAgentPageComponent implements OnDestroy {
     );
   }
 
-  private async executeRunSession(allowMissingLabs: boolean | null): Promise<void> {
+  private async executeRunSession(): Promise<void> {
     if (this.vm.isStarting || this.vm.isRunning || this.isRunActionLocked()) {
       return;
     }
@@ -249,7 +249,7 @@ export class DiliAgentPageComponent implements OnDestroy {
     this.stopPoller();
 
     try {
-      const payload = buildClinicalPayload(this.vm.form, this.vm.settings, allowMissingLabs);
+      const payload = buildClinicalPayload(this.vm.form);
       const startResult = await startClinicalJob(payload);
       this.stateService.updateDiliAgent({
         jobId: startResult.job_id,
@@ -306,7 +306,7 @@ export class DiliAgentPageComponent implements OnDestroy {
       return;
     }
 
-    await this.executeRunSession(null);
+    await this.executeRunSession();
   }
 
   cancelMissingLabs(): void {
@@ -315,7 +315,7 @@ export class DiliAgentPageComponent implements OnDestroy {
 
   async confirmMissingLabs(): Promise<void> {
     this.isMissingLabsModalOpen.set(false);
-    await this.executeRunSession(true);
+    await this.executeRunSession();
   }
 
   async stopSession(): Promise<void> {
