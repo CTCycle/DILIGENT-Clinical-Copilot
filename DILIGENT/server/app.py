@@ -1,8 +1,7 @@
 from __future__ import annotations
 
-import warnings
-
-warnings.filterwarnings("ignore", category=FutureWarning)
+from collections.abc import AsyncIterator
+from contextlib import asynccontextmanager
 
 from fastapi import FastAPI
 
@@ -29,39 +28,45 @@ from DILIGENT.server.repositories.database.initializer import initialize_databas
 
 
 ###############################################################################
-initialize_settings()
-
-app = FastAPI(
-    title=FASTAPI_TITLE,
-    version=FASTAPI_VERSION,
-    description=FASTAPI_DESCRIPTION,
-    docs_url=FASTAPI_DOCS_URL,
-    redoc_url=FASTAPI_REDOC_URL,
-    openapi_url=FASTAPI_OPENAPI_URL,
-)
-register_error_handling(app)
-
-routers = [
-    session_router,
-    data_inspection_router,
-    ollama_router,
-    model_config_router,
-    access_keys_router,
-    research_router,
-]
-
-for router in routers:
-    app.include_router(router, prefix="/api")
-
-
-@app.on_event("startup")
-async def initialize_database_on_startup() -> None:
+@asynccontextmanager
+async def app_lifespan(_app: FastAPI) -> AsyncIterator[None]:
     initialize_database()
     sync_runtime_model_config()
+    yield
 
-root_endpoint = RootEndpoint(
-    app=app,
-    tauri_mode=tauri_mode_enabled(),
-)
-root_endpoint.add_routes()
+
+###############################################################################
+def create_app() -> FastAPI:
+    initialize_settings()
+
+    fastapi_app = FastAPI(
+        title=FASTAPI_TITLE,
+        version=FASTAPI_VERSION,
+        description=FASTAPI_DESCRIPTION,
+        docs_url=FASTAPI_DOCS_URL,
+        redoc_url=FASTAPI_REDOC_URL,
+        openapi_url=FASTAPI_OPENAPI_URL,
+        lifespan=app_lifespan,
+    )
+    register_error_handling(fastapi_app)
+
+    for router in (
+        session_router,
+        data_inspection_router,
+        ollama_router,
+        model_config_router,
+        access_keys_router,
+        research_router,
+    ):
+        fastapi_app.include_router(router, prefix="/api")
+
+    root_endpoint = RootEndpoint(
+        app=fastapi_app,
+        tauri_mode=tauri_mode_enabled(),
+    )
+    root_endpoint.add_routes()
+    return fastapi_app
+
+
+app = create_app()
 

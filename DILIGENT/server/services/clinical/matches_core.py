@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import re
 from collections import OrderedDict
-from typing import Any, Generic, Iterable, Iterator, Literal, TypeVar
+from typing import Any, Generic, Iterable, TypeVar
 
 import pandas as pd
 from rapidfuzz import fuzz

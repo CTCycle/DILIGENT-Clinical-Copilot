@@ -7,16 +7,14 @@ import os
 import re
 import time
 import unicodedata
+from collections.abc import Callable, Iterator
 from typing import Any
-from collections.abc import Awaitable, Callable, Iterator
 
 import httpx
 import pandas as pd
 
-from DILIGENT.server.configurations.startup import server_settings
 from DILIGENT.server.common.utils.logger import logger
 from DILIGENT.server.common.constants import RXNAV_CURATED_ALIASES_PATH
-from DILIGENT.server.domain.rxnav import RxNormCandidate
 from DILIGENT.server.repositories.serialization.data import DataSerializer
 from DILIGENT.server.services.text.normalization import normalize_drug_name
 from DILIGENT.server.services.text.vocabulary import get_text_normalization_snapshot
