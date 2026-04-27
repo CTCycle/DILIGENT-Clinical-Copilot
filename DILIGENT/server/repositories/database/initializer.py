@@ -162,7 +162,6 @@ def run_database_initialization() -> None:
         "postgres",
         "postgresql",
         "postgresql+psycopg",
-        "postgresql+psycopg2",
     }:
         raise ValueError(f"Unsupported database engine: {settings.engine}")
 
