@@ -1,7 +1,6 @@
 import {
   ClinicalFormState,
   ClinicalRequestPayload,
-  RuntimeSettings,
 } from "./models/types";
 
 const DRUG_TIMING_CUE_RE =
@@ -118,10 +117,8 @@ function extractBase64Payload(dataUrl: string | null): string | null {
 
 export function buildClinicalPayload(
   form: ClinicalFormState,
-  _settings: RuntimeSettings,
-  allowMissingLabs: boolean | null = null,
 ): ClinicalRequestPayload {
-  const payload: ClinicalRequestPayload = {
+  return {
     name: sanitizeField(form.patientName),
     visit_date: buildVisitDatePayload(form.visitDate),
     anamnesis: sanitizeField(form.anamnesis),
@@ -131,10 +128,6 @@ export function buildClinicalPayload(
     use_rag: form.useRag,
     use_web_search: form.useWebSearch,
   };
-  if (allowMissingLabs !== null) {
-    payload.allow_missing_labs = allowMissingLabs;
-  }
-  return payload;
 }
 
 export function hasDrugTimingCue(value: string): boolean {

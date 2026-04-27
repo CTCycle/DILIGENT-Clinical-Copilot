@@ -192,26 +192,16 @@ class LanceVectorDatabase:
             embedding_field = None
         if isinstance(getattr(embedding_field, "type", None), pa.FixedSizeListType):
             return
-        logger.info(
-            "Migrating LanceDB table '%s' embedding column to fixed-size vectors (%d).",
-            self.collection_name,
-            embedding_size,
-        )
-        existing_records = table.to_arrow().to_pylist()
-        filtered_records, discarded = self._filter_records_by_embedding_size(
-            existing_records,
-            embedding_size,
-        )
-        if discarded:
-            logger.warning(
-                "Dropped %d legacy embedding rows with invalid dimensions during LanceDB schema migration.",
-                discarded,
-            )
         target_schema = self._schema_with_embedding_size(embedding_size)
         self.schema = target_schema
+        logger.info(
+            "Rebuilding LanceDB table '%s' with fixed-size vectors (%d).",
+            self.collection_name,
+            embedding_size,
+        )
         self.table = connection.create_table(
             self.collection_name,
-            data=filtered_records or target_schema.empty_table(),
+            data=target_schema.empty_table(),
             schema=target_schema,
             mode="overwrite",
         )

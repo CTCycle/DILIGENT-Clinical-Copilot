@@ -17,7 +17,7 @@ class PatientData(BaseModel):
     """
     Input schema for submitting structured clinical data.
     - Accepts manual clinical sections captured in the GUI.
-    - Normalizes whitespace and keeps compat with legacy single-text payloads.
+    - Normalizes whitespace.
 
     """
     model_config = ConfigDict(extra="forbid")
@@ -136,31 +136,6 @@ class PatientData(BaseModel):
     def require_sections(self) -> "PatientData":
         return self
 
-    # -------------------------------------------------------------------------
-    def compose_structured_text(self) -> str | None:
-        sections: list[str] = []
-        anamnesis_body = self._compose_anamnesis_body()
-        if anamnesis_body:
-            sections.append(f"# ANAMNESIS\n{anamnesis_body}")
-        if self.drugs:
-            sections.append(f"# DRUGS\n{self.drugs}")
-        if self.laboratory_analysis:
-            sections.append(f"# LABORATORY ANALYSIS\n{self.laboratory_analysis}")
-        if not sections:
-            return None
-        return "\n\n".join(section.strip() for section in sections if section.strip())
-
-    # -------------------------------------------------------------------------
-    def _compose_anamnesis_body(self) -> str | None:
-        lines: list[str] = []
-        if self.anamnesis:
-            lines.append(self.anamnesis)
-        if not lines:
-            return None
-        body = "\n".join(line for line in lines if line.strip())
-        return body or None
-
-
 ###############################################################################
 class ClinicalSessionRequest(BaseModel):
     model_config = ConfigDict(extra="forbid")
@@ -195,24 +170,6 @@ class ClinicalSessionRequest(BaseModel):
 ###############################################################################
 class ClinicalSessionReportResponse(RootModel[str]):
     pass
-
-
-###############################################################################
-class PatientOutputReport(BaseModel):
-    report: str = Field(
-        ...,
-        min_length=1,
-        max_length=200,
-        description="Multiline text output with the final report.",
-        examples=["This is a sample note."],
-    )
-
-    @field_validator("report", mode="before")
-    @classmethod
-    def strip_report(cls, v: str) -> str:
-        if v is None:
-            return v
-        return str(v).strip()
 
 
 ###############################################################################

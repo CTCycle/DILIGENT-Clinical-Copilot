@@ -46,13 +46,8 @@ class AccessKeySerializer:
         )
 
     # -------------------------------------------------------------------------
-    def ensure_research_table(self) -> None:
-        ResearchAccessKey.__table__.create(bind=self.engine, checkfirst=True)
-
-    # -------------------------------------------------------------------------
     def resolve_table(self, provider: ProviderName):
         if provider == RESEARCH_PROVIDER:
-            self.ensure_research_table()
             return ResearchAccessKey
         return AccessKey
 
@@ -62,7 +57,6 @@ class AccessKeySerializer:
         row: AccessKey | ResearchAccessKey,
     ) -> type[AccessKey] | type[ResearchAccessKey]:
         if str(row.provider).strip().lower() == RESEARCH_PROVIDER:
-            self.ensure_research_table()
             return ResearchAccessKey
         return AccessKey
 
@@ -72,19 +66,11 @@ class AccessKeySerializer:
         db_session,
         key_id: int,
         *,
-        provider: str | None = None,
+        provider: str,
     ) -> AccessKey | ResearchAccessKey | None:
-        if provider is not None:
-            normalized_provider = self.normalize_provider(provider)
-            table = self.resolve_table(normalized_provider)
-            return db_session.get(table, key_id)
-
-        target = db_session.get(AccessKey, key_id)
-        if target is not None:
-            return target
-
-        self.ensure_research_table()
-        return db_session.get(ResearchAccessKey, key_id)
+        normalized_provider = self.normalize_provider(provider)
+        table = self.resolve_table(normalized_provider)
+        return db_session.get(table, key_id)
 
     # -------------------------------------------------------------------------
     def list_keys(self, provider: str) -> list[AccessKey | ResearchAccessKey]:
