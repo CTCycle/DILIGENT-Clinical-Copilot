@@ -20,7 +20,6 @@ import {
   AccessKeyProvider,
   CloudProvider,
   JobStatus,
-  LocalModelCard,
   ModelConfigStateResponse,
   ModelConfigUpdateRequest,
   RuntimeSettings,
@@ -33,23 +32,18 @@ import {
 } from '../../core/services/model-config-api';
 import { JobPollingService } from '../../core/services/job-polling.service';
 import { AccessKeyModalComponent } from './components/access-key-modal.component';
-
-type ModelFilterKey = 'installed' | 'reasoning' | 'small' | 'extraction';
-
-type DraftRuntimeConfig = {
-  useCloudServices: boolean;
-  provider: CloudProvider;
-  cloudModel: string | null;
-  clinicalModel: string;
-  textExtractionModel: string;
-  temperature: number;
-};
-
-type ModelPullProgressState = {
-  progress: number;
-  status: JobStatus;
-  message: string;
-};
+import { ModelRoleActionButtonComponent } from './components/model-role-action-button.component';
+import {
+  MODEL_FILTERS,
+  modelMatchesFilters,
+  resolveDraftFromSettings,
+} from './model-catalog';
+import {
+  DraftRuntimeConfig,
+  ModelFilterKey,
+  ModelPullProgressState,
+  ModelRole,
+} from './model-config.types';
 
 const DEFAULT_CLOUD_PROVIDERS: readonly CloudProvider[] = ['openai', 'gemini'];
 
@@ -58,13 +52,6 @@ const PROVIDER_LABELS: Record<AccessKeyProvider, string> = {
   gemini: 'Gemini',
   tavily: 'Tavily',
 };
-
-const MODEL_FILTERS: Array<{ key: ModelFilterKey; label: string }> = [
-  { key: 'installed', label: 'Installed' },
-  { key: 'reasoning', label: 'Reasoning' },
-  { key: 'small', label: 'Small models' },
-  { key: 'extraction', label: 'Extraction' },
-];
 
 const TERMINAL_JOB_STATUSES: readonly JobStatus[] = ['completed', 'failed', 'cancelled'];
 
@@ -79,72 +66,17 @@ function resolveProviderLabel(provider: string): string {
   return provider;
 }
 
-function resolveAvailabilityBadgeClass(modelAvailableInOllama: boolean | undefined): string {
-  return modelAvailableInOllama ? 'model-config-summary-ok' : 'model-config-summary-muted';
-}
-
-function resolveAvailabilityLabel(modelAvailableInOllama: boolean | undefined): string {
-  if (modelAvailableInOllama === undefined) {
-    return 'Unknown';
-  }
-  return modelAvailableInOllama ? 'Installed' : 'Not installed';
-}
-
-function parseModelSizeInBillions(name: string): number | null {
-  const match = name.match(/:(\d+(?:\.\d+)?)([mb])$/i);
-  if (!match) {
-    return null;
-  }
-  const value = Number.parseFloat(match[1]);
-  if (!Number.isFinite(value)) {
-    return null;
-  }
-  return match[2].toLowerCase() === 'm' ? value / 1000 : value;
-}
-
-function isReasoningModel(model: LocalModelCard): boolean {
-  const value = `${model.name} ${model.family} ${model.description}`.toLowerCase();
-  return value.includes('reasoning');
-}
-
-function isSmallModel(model: LocalModelCard): boolean {
-  const size = parseModelSizeInBillions(model.name);
-  return size !== null && size <= 4;
-}
-
-function isExtractionModel(model: LocalModelCard): boolean {
-  const value = `${model.name} ${model.family} ${model.description}`.toLowerCase();
-  const extractionKeywords = [
-    'extract',
-    'parsing',
-    'parser',
-    'structured',
-    'compact',
-    'lightweight',
-    'low-latency',
-    'smollm',
-  ];
-  return extractionKeywords.some((keyword) => value.includes(keyword)) || isSmallModel(model);
-}
-
-function resolveDraftFromSettings(runtimeSettings: RuntimeSettings): DraftRuntimeConfig {
-  const choices = resolveCloudChoices(undefined);
-  const provider = resolveProvider(runtimeSettings.provider, choices);
-  const cloudModel = resolveCloudModel(provider, runtimeSettings.cloudModel, choices);
-  return {
-    useCloudServices: runtimeSettings.useCloudServices,
-    provider,
-    cloudModel,
-    clinicalModel: runtimeSettings.clinicalModel,
-    textExtractionModel: runtimeSettings.textExtractionModel,
-    temperature: runtimeSettings.temperature,
-  };
-}
-
 @Component({
   selector: 'app-model-config-page',
   standalone: true,
-  imports: [CommonModule, FormsModule, ProviderAccessCardComponent, StatusMessageComponent, AccessKeyModalComponent],
+  imports: [
+    CommonModule,
+    FormsModule,
+    ProviderAccessCardComponent,
+    StatusMessageComponent,
+    AccessKeyModalComponent,
+    ModelRoleActionButtonComponent,
+  ],
   templateUrl: './model-config-page.component.html',
   styleUrl: './model-config-page.component.scss',
 })
@@ -173,16 +105,9 @@ export class ModelConfigPageComponent implements OnInit {
 
   readonly filteredLocalModels = computed(() => {
     const query = this.modelSearchQuery().trim().toLowerCase();
-    return this.localModels().filter((model) => {
-      const haystack = `${model.name} ${model.family} ${model.description}`.toLowerCase();
-      if (query && !haystack.includes(query)) return false;
-      const filters = this.activeFilters();
-      if (filters.installed && !model.available_in_ollama) return false;
-      if (filters.reasoning && !isReasoningModel(model)) return false;
-      if (filters.small && !isSmallModel(model)) return false;
-      if (filters.extraction && !isExtractionModel(model)) return false;
-      return true;
-    });
+    return this.localModels().filter((model) =>
+      modelMatchesFilters(model, query, this.activeFilters()),
+    );
   });
 
   readonly availableLocalModelCount = computed(
@@ -314,7 +239,7 @@ export class ModelConfigPageComponent implements OnInit {
     this.modelSearchQuery.set(value);
   }
 
-  handleRoleSelection(role: 'clinical' | 'text_extraction', modelName: string): void {
+  handleRoleSelection(role: ModelRole, modelName: string): void {
     this.draftConfig.update((previous) => ({
       ...previous,
       clinicalModel: role === 'clinical' ? modelName : previous.clinicalModel,
@@ -502,14 +427,6 @@ export class ModelConfigPageComponent implements OnInit {
 
   resolveProviderLabel(provider: string): string {
     return resolveProviderLabel(provider);
-  }
-
-  availabilityClass(modelAvailableInOllama: boolean | undefined): string {
-    return resolveAvailabilityBadgeClass(modelAvailableInOllama);
-  }
-
-  availabilityLabel(modelAvailableInOllama: boolean | undefined): string {
-    return resolveAvailabilityLabel(modelAvailableInOllama);
   }
 
   progressForModel(name: string): ModelPullProgressState | null {
