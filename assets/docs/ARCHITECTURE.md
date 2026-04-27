@@ -1,6 +1,6 @@
 # DILIGENT Clinical Copilot Architecture
 
-Last updated: 2026-04-24
+Last updated: 2026-04-27
 
 ## 1. System Summary
 
@@ -69,7 +69,7 @@ Notes:
 ## 3. Application Entry Points
 
 - Backend app: `DILIGENT/server/app.py`
-  - Initializes settings, builds FastAPI app, registers middleware/error handlers, mounts routers under `/api`, initializes DB on startup.
+  - Builds the FastAPI app through `create_app()`, initializes settings, registers middleware/error handlers, mounts routers under `/api`, and initializes DB/runtime model config through the FastAPI lifespan startup path.
 - Frontend app: `DILIGENT/client/src/main.ts`
   - Bootstraps Angular `App` with `appConfig`.
 - Frontend routing: `DILIGENT/client/src/app/app.routes.ts`
