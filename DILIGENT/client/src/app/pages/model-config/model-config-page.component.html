@@ -124,43 +124,20 @@
                         </button>
                       }
 
-                      <button
-                        class="access-key-action model-config-role-action"
-                        [class.is-active]="draftConfig().clinicalModel === model.name"
-                        type="button"
-                        (click)="handleRoleSelection('clinical', model.name)"
-                        [disabled]="isSaving() || isLoading() || draftConfig().clinicalModel === model.name"
-                        [attr.aria-pressed]="draftConfig().clinicalModel === model.name"
-                        [attr.aria-label]="draftConfig().clinicalModel === model.name ? 'Clinical model selected' : 'Set ' + model.name + ' as clinical model'"
-                        [attr.title]="draftConfig().clinicalModel === model.name ? 'Clinical model selected' : 'Set as clinical model'"
-                      >
-                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
-                          <path d="M12 21s-6.8-4.9-9-8a4.8 4.8 0 0 1 7-6l2 2 2-2a4.8 4.8 0 0 1 7 6c-2.2 3.1-9 8-9 8Z" />
-                        </svg>
-                        <span class="visually-hidden">
-                          {{ draftConfig().clinicalModel === model.name ? 'Clinical model selected' : 'Set as clinical model' }}
-                        </span>
-                      </button>
-                      <button
-                        class="access-key-action model-config-role-action"
-                        [class.is-active]="draftConfig().textExtractionModel === model.name"
-                        type="button"
-                        (click)="handleRoleSelection('text_extraction', model.name)"
-                        [disabled]="isSaving() || isLoading() || draftConfig().textExtractionModel === model.name"
-                        [attr.aria-pressed]="draftConfig().textExtractionModel === model.name"
-                        [attr.aria-label]="draftConfig().textExtractionModel === model.name ? 'Text extraction model selected' : 'Set ' + model.name + ' as text extraction model'"
-                        [attr.title]="draftConfig().textExtractionModel === model.name ? 'Text extraction model selected' : 'Set as text extraction model'"
-                      >
-                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
-                          <path d="M14 3H6a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V9z" />
-                          <path d="M14 3v6h6" />
-                          <path d="M8 13h8" />
-                          <path d="M8 17h5" />
-                        </svg>
-                        <span class="visually-hidden">
-                          {{ draftConfig().textExtractionModel === model.name ? 'Text extraction model selected' : 'Set as text extraction model' }}
-                        </span>
-                      </button>
+                      <app-model-role-action-button
+                        role="clinical"
+                        [modelName]="model.name"
+                        [selected]="draftConfig().clinicalModel === model.name"
+                        [disabled]="isSaving() || isLoading()"
+                        (roleSelected)="handleRoleSelection($event, model.name)"
+                      />
+                      <app-model-role-action-button
+                        role="text_extraction"
+                        [modelName]="model.name"
+                        [selected]="draftConfig().textExtractionModel === model.name"
+                        [disabled]="isSaving() || isLoading()"
+                        (roleSelected)="handleRoleSelection($event, model.name)"
+                      />
                     </div>
                   </div>
                 </li>
