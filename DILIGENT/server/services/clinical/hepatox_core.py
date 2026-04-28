@@ -43,7 +43,7 @@ from DILIGENT.server.services.clinical.match_quality import classify_match_evide
 from DILIGENT.server.services.retrieval.embeddings import SimilaritySearch
 from DILIGENT.server.services.clinical.preparation import HepatoxPreparedInputs
 from DILIGENT.server.services.text.normalization import normalize_drug_query_name
-from DILIGENT.server.services.research.tavily import tavily_research_service
+from DILIGENT.server.services.research.brave import brave_research_service
 
 
 ###############################################################################
@@ -538,16 +538,6 @@ class HepatoxConsultation:
         if not origins and drug_entry.source in {"therapy", "anamnesis"}:
             origins = [drug_entry.source]
         extraction_metadata = livertox_data.get("extraction_metadata", [])
-        dili_annotations = (
-            livertox_data.get("dili_annotations", [])
-            if isinstance(livertox_data.get("dili_annotations"), list)
-            else []
-        )
-        label_sections = (
-            livertox_data.get("label_sections", [])
-            if isinstance(livertox_data.get("label_sections"), list)
-            else []
-        )
         knowledge_prompt = str(livertox_data.get("knowledge_prompt") or "").strip()
         missing_livertox = bool(livertox_data.get("missing_livertox"))
         ambiguous_match = bool(livertox_data.get("ambiguous_match"))
@@ -645,8 +635,6 @@ class HepatoxConsultation:
             metadata=entry.matched_livertox_row,
             web_evidence=web_evidence,
             rucam=entry.rucam,
-            dili_prior_block=self.format_dili_prior_block(dili_annotations),
-            official_label_block=self.format_official_label_block(label_sections),
             knowledge_prompt=knowledge_prompt,
             report_language=report_language,
         )
@@ -761,7 +749,7 @@ class HepatoxConsultation:
         if not normalized_name:
             return "No web evidence available (reason: missing drug name)."
         try:
-            outcome = await tavily_research_service.search_sources(
+            outcome = await brave_research_service.search_sources(
                 question=f"{normalized_name} drug induced liver injury evidence",
                 mode="fast",
                 allowed_domains=None,
@@ -769,7 +757,7 @@ class HepatoxConsultation:
             )
         except Exception as exc:  # noqa: BLE001
             return f"No web evidence available (reason: {exc})."
-        return tavily_research_service.format_clinical_evidence_block(
+        return brave_research_service.format_clinical_evidence_block(
             sources=outcome.sources,
             message=outcome.message,
         )
@@ -1170,34 +1158,6 @@ class HepatoxConsultation:
         )
 
     # -------------------------------------------------------------------------
-    def format_dili_prior_block(self, annotations: list[dict[str, Any]]) -> str:
-        if not annotations:
-            return "No DILIrank or DILIst prior-risk annotations available."
-        lines = []
-        for item in annotations:
-            source = str(item.get("source_dataset") or "unknown").strip().upper()
-            classification = str(item.get("classification") or "not reported").strip()
-            severity = str(item.get("severity_class") or "not reported").strip()
-            concern = str(item.get("concern_class") or "not reported").strip()
-            lines.append(
-                f"- {source}: classification={classification}; severity={severity}; concern={concern}"
-            )
-        return "\n".join(lines)
-
-    # -------------------------------------------------------------------------
-    def format_official_label_block(self, sections: list[dict[str, Any]]) -> str:
-        if not sections:
-            return "No retained DailyMed official label sections available."
-        lines: list[str] = []
-        for section in sections:
-            title = str(section.get("section_title") or section.get("section_key") or "Section")
-            text = str(section.get("text") or "").strip()
-            if not text:
-                continue
-            lines.append(f"- {title}:\n{text}")
-        return "\n".join(lines) if lines else "No retained DailyMed official label sections available."
-
-    # -------------------------------------------------------------------------
     @staticmethod
     def is_materially_in_report_language(text: str, report_language: str) -> bool:
         normalized = (text or "").strip()
@@ -1280,8 +1240,6 @@ class HepatoxConsultation:
         metadata: dict[str, Any] | None,
         web_evidence: str,
         rucam: DrugRucamAssessment | None,
-        dili_prior_block: str = "No DILI prior annotations available.",
-        official_label_block: str = "No official label excerpts available.",
         knowledge_prompt: str = "No supplemental knowledge prompt available.",
         report_language: str = "en",
     ) -> str:
@@ -1319,8 +1277,6 @@ class HepatoxConsultation:
             timeline_note=self.escape_braces(timeline_note),
             pattern_summary=self.escape_braces(pattern_summary),
             rucam_block=self.escape_braces(rucam_block),
-            dili_prior_block=self.escape_braces(dili_prior_block),
-            official_label_block=self.escape_braces(official_label_block),
             knowledge_prompt=self.escape_braces(knowledge_prompt),
             metadata_block=self.escape_braces(metadata_block),
             livertox_score=self.escape_braces(score),

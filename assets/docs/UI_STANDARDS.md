@@ -105,4 +105,4 @@ Scope: `DILIGENT/client/src` (Angular + SCSS).
 - Consistency over one-off styling.
 - Clarity and predictability over decorative complexity.
 - Reuse tokens first; add new tokens only when reusable across multiple views.
-- Consolidate overrides when touching legacy blocks; avoid layered duplicate rules.
+- Consolidate overrides when touching older blocks; avoid layered duplicate rules.

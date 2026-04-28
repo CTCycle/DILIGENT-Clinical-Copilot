@@ -27,13 +27,11 @@ from DILIGENT.server.services.inspection_runtime import (
     coerce_optional_str,
 )
 from DILIGENT.server.services.updater.embeddings import RagEmbeddingUpdater
-from DILIGENT.server.services.updater.dailymed import DailyMedLabelUpdater
-from DILIGENT.server.services.updater.dili_priors import DiliPriorUpdater
 from DILIGENT.server.services.updater.livertox import LiverToxUpdater
 from DILIGENT.server.services.updater.rxnav import RxNavClient, RxNavDrugCatalogBuilder
 
 PhaseStep = tuple[InspectionJobPhase, int, int, str]
-UpdateTarget = Literal["rxnav", "livertox", "dili_priors", "drug_labels", "rag"]
+UpdateTarget = Literal["rxnav", "livertox", "rag"]
 
 
 ###############################################################################
@@ -55,8 +53,6 @@ class DataInspectionProgressReporter:
 class DataInspectionService:
     RXNAV_JOB_TYPE = "rxnav_update"
     LIVERTOX_JOB_TYPE = "livertox_update"
-    DILI_PRIORS_JOB_TYPE = "dili_priors_update"
-    DRUG_LABELS_JOB_TYPE = "drug_labels_update"
     RAG_JOB_TYPE = "rag_update"
     UPDATE_PHASES: dict[UpdateTarget, list[PhaseStep]] = {
         "rxnav": [
@@ -85,24 +81,6 @@ class DataInspectionService:
             ("persistence_indexing", 5, 7, "Persisting embeddings and index state"),
             ("finalization", 6, 7, "Finalizing vector store update"),
             ("completed", 7, 7, "RAG embeddings update completed"),
-        ],
-        "dili_priors": [
-            ("configuration_accepted", 1, 7, "Configuration accepted"),
-            ("update_started", 2, 7, "Update started"),
-            ("source_data_loading", 3, 7, "Downloading DILI prior sources"),
-            ("processing_extraction", 4, 7, "Parsing and matching prior annotations"),
-            ("persistence_indexing", 5, 7, "Persisting DILI prior annotations"),
-            ("finalization", 6, 7, "Finalizing DILI priors update"),
-            ("completed", 7, 7, "DILI priors update completed"),
-        ],
-        "drug_labels": [
-            ("configuration_accepted", 1, 7, "Configuration accepted"),
-            ("update_started", 2, 7, "Update started"),
-            ("source_data_loading", 3, 7, "Loading DailyMed RxNorm mapping"),
-            ("processing_extraction", 4, 7, "Selecting labels and extracting sections"),
-            ("persistence_indexing", 5, 7, "Persisting DailyMed labels"),
-            ("finalization", 6, 7, "Finalizing drug labels update"),
-            ("completed", 7, 7, "Drug labels update completed"),
         ],
     }
 
@@ -155,30 +133,6 @@ class DataInspectionService:
                 ),
                 "livertox_archive": str(
                     source.get("livertox_archive", server_settings.external_data.livertox_archive)
-                ),
-                "redownload": False,
-            }
-            allowed_fields = list(defaults.keys())
-        elif target == "dili_priors":
-            source = config.get("external_data", {})
-            defaults = {
-                "redownload": False,
-            }
-            allowed_fields = list(defaults.keys())
-        elif target == "drug_labels":
-            source = config.get("external_data", {})
-            defaults = {
-                "dailymed_request_timeout": float(
-                    source.get(
-                        "dailymed_request_timeout",
-                        server_settings.external_data.dailymed_request_timeout,
-                    )
-                ),
-                "dailymed_max_concurrency": int(
-                    source.get(
-                        "dailymed_max_concurrency",
-                        server_settings.external_data.dailymed_max_concurrency,
-                    )
                 ),
                 "redownload": False,
             }
@@ -476,54 +430,6 @@ class DataInspectionService:
         return self.serializer.get_livertox_excerpt(drug_id)
 
     # -------------------------------------------------------------------------
-    def list_dili_priors_catalog(
-        self,
-        *,
-        search: str | None,
-        offset: int,
-        limit: int,
-    ) -> dict[str, Any]:
-        items, total = self.serializer.list_dili_annotations_catalog(
-            search=search,
-            offset=offset,
-            limit=limit,
-        )
-        return {
-            "items": items,
-            "total": total,
-            "offset": max(int(offset), 0),
-            "limit": max(int(limit), 1),
-        }
-
-    # -------------------------------------------------------------------------
-    def get_dili_prior_details(self, drug_id: int) -> dict[str, Any] | None:
-        return self.serializer.get_dili_annotation_details(drug_id)
-
-    # -------------------------------------------------------------------------
-    def list_drug_labels_catalog(
-        self,
-        *,
-        search: str | None,
-        offset: int,
-        limit: int,
-    ) -> dict[str, Any]:
-        items, total = self.serializer.list_drug_label_catalog(
-            search=search,
-            offset=offset,
-            limit=limit,
-        )
-        return {
-            "items": items,
-            "total": total,
-            "offset": max(int(offset), 0),
-            "limit": max(int(limit), 1),
-        }
-
-    # -------------------------------------------------------------------------
-    def get_drug_label_sections(self, drug_id: int) -> dict[str, Any] | None:
-        return self.serializer.get_drug_label_sections(drug_id)
-
-    # -------------------------------------------------------------------------
     def delete_drug(self, drug_id: int) -> bool:
         return self.serializer.delete_drug_with_cleanup(drug_id)
 
@@ -810,131 +716,6 @@ class DataInspectionService:
         return {"summary": result}
 
     # -------------------------------------------------------------------------
-    def run_dili_priors_update_job(
-        self, job_id: str, overrides: dict[str, Any] | None = None
-    ) -> dict[str, Any]:
-        stop_check = partial(self.jobs.should_stop, job_id)
-        progress_callback = DataInspectionProgressReporter(service=self, job_id=job_id)
-        override_values = overrides or {}
-        self.report_phase_by_target(
-            job_id=job_id,
-            target="dili_priors",
-            phase="configuration_accepted",
-            progress=1.0,
-            fallback_message="Configuration accepted",
-        )
-        if stop_check():
-            return {}
-        self.report_phase_by_target(
-            job_id=job_id,
-            target="dili_priors",
-            phase="update_started",
-            progress=4.0,
-            fallback_message="DILI priors update started",
-        )
-        self.report_phase_by_target(
-            job_id=job_id,
-            target="dili_priors",
-            phase="source_data_loading",
-            progress=12.0,
-            fallback_message="Downloading DILI prior sources",
-        )
-        updater = DiliPriorUpdater(
-            serializer=self.serializer,
-            request_timeout=override_values.get("dili_priors_request_timeout"),
-        )
-        result = updater.update_from_sources(
-            redownload=bool(override_values.get("redownload", False)),
-            progress_callback=progress_callback,
-            should_stop=stop_check,
-        )
-        self.report_phase_by_target(
-            job_id=job_id,
-            target="dili_priors",
-            phase="persistence_indexing",
-            progress=90.0,
-            fallback_message="Persisting DILI priors",
-        )
-        self.report_phase_by_target(
-            job_id=job_id,
-            target="dili_priors",
-            phase="finalization",
-            progress=96.0,
-            fallback_message="Finalizing update",
-        )
-        self.report_phase_by_target(
-            job_id=job_id,
-            target="dili_priors",
-            phase="completed",
-            progress=100.0,
-            fallback_message="Completed",
-        )
-        return {"summary": result}
-
-    # -------------------------------------------------------------------------
-    def run_drug_labels_update_job(
-        self, job_id: str, overrides: dict[str, Any] | None = None
-    ) -> dict[str, Any]:
-        stop_check = partial(self.jobs.should_stop, job_id)
-        progress_callback = DataInspectionProgressReporter(service=self, job_id=job_id)
-        override_values = overrides or {}
-        self.report_phase_by_target(
-            job_id=job_id,
-            target="drug_labels",
-            phase="configuration_accepted",
-            progress=1.0,
-            fallback_message="Configuration accepted",
-        )
-        if stop_check():
-            return {}
-        self.report_phase_by_target(
-            job_id=job_id,
-            target="drug_labels",
-            phase="update_started",
-            progress=4.0,
-            fallback_message="Drug labels update started",
-        )
-        self.report_phase_by_target(
-            job_id=job_id,
-            target="drug_labels",
-            phase="source_data_loading",
-            progress=12.0,
-            fallback_message="Loading DailyMed mapping",
-        )
-        updater = DailyMedLabelUpdater(
-            serializer=self.serializer,
-            request_timeout=override_values.get("dailymed_request_timeout"),
-            max_concurrency=override_values.get("dailymed_max_concurrency"),
-        )
-        result = updater.update_labels(
-            redownload=bool(override_values.get("redownload", False)),
-            progress_callback=progress_callback,
-            should_stop=stop_check,
-        )
-        self.report_phase_by_target(
-            job_id=job_id,
-            target="drug_labels",
-            phase="persistence_indexing",
-            progress=90.0,
-            fallback_message="Persisting DailyMed labels",
-        )
-        self.report_phase_by_target(
-            job_id=job_id,
-            target="drug_labels",
-            phase="finalization",
-            progress=96.0,
-            fallback_message="Finalizing update",
-        )
-        self.report_phase_by_target(
-            job_id=job_id,
-            target="drug_labels",
-            phase="completed",
-            progress=100.0,
-            fallback_message="Completed",
-        )
-        return {"summary": result}
-
-    # -------------------------------------------------------------------------
     def run_rag_update_job(
         self, job_id: str, overrides: dict[str, Any] | None = None
     ) -> dict[str, Any]:
@@ -1023,10 +804,6 @@ class DataInspectionService:
             runner = partial(self.run_rxnav_update_job, overrides=override_values)
         elif job_type == self.LIVERTOX_JOB_TYPE:
             runner = partial(self.run_livertox_update_job, overrides=override_values)
-        elif job_type == self.DILI_PRIORS_JOB_TYPE:
-            runner = partial(self.run_dili_priors_update_job, overrides=override_values)
-        elif job_type == self.DRUG_LABELS_JOB_TYPE:
-            runner = partial(self.run_drug_labels_update_job, overrides=override_values)
         elif job_type == self.RAG_JOB_TYPE:
             runner = partial(self.run_rag_update_job, overrides=override_values)
         else:

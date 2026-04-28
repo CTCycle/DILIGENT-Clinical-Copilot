@@ -6,7 +6,7 @@ from DILIGENT.server.domain.keys import AccessKeyResponse
 from DILIGENT.server.repositories.serialization.access_keys import AccessKeySerializer
 from DILIGENT.server.repositories.schemas.models import AccessKey, ResearchAccessKey
 
-ProviderName = Literal["openai", "gemini", "tavily"]
+ProviderName = Literal["openai", "gemini", "brave"]
 
 
 ###############################################################################

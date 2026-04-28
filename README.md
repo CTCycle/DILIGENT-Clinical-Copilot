@@ -86,7 +86,7 @@ _Scrollable local model catalog with install and role-assignment actions._
 
 #### Provider Access Key Management
 ![Provider key detail](assets/figures/model-detail.png)
-_Tavily access-key management entry point within the configuration panel._
+_Brave Search access-key management entry point within the configuration panel._
 
 #### Data Inspection
 ![Data inspection](assets/figures/data-inspection.png)
@@ -110,10 +110,10 @@ DILIGENT\setup_and_maintenance.bat
 
 Use this script for offline maintenance operations (for example DB initialization and cleanup tasks).
 
-## 7. Database and Ollama Compatibility
+## 7. Database and Ollama Requirements
 - Database schemas are not upgraded in place across this cleanup; recreate the schema (or local SQLite DB file) when upgrading.
-- Runtime startup no longer performs legacy SQLite schema salvage/deletion.
-- Ollama must support the chat-capable `/api/chat` API; legacy `/api/generate` fallback behavior has been removed.
+- Runtime startup does not perform SQLite schema salvage/deletion.
+- Ollama must support the chat-capable `/api/chat` API; `/api/generate` fallback behavior has been removed.
 
 ## 8. Documentation Map
 - `assets/docs/USER_MANUAL.md`: end-user operation, journeys, key commands.

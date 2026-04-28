@@ -76,15 +76,15 @@ def test_code_never_reads_access_key_encryption_key_env_var() -> None:
 
 
 # -----------------------------------------------------------------------------
-def test_no_legacy_fallback_path_exists_in_runtime_behavior() -> None:
+def test_unavailable_key_material_version_fails_loudly() -> None:
     serializer, _ = build_serializer()
     serializer.create_key("openai", "openai-secret")
 
     stale_row = AccessKey(
         provider="openai",
-        encrypted_value="legacy-ciphertext",
+        encrypted_value="stale-ciphertext",
         encryption_key_version=1234,
-        fingerprint="legacy-fingerprint",
+        fingerprint="stale-fingerprint",
         is_active=True,
     )
     try:

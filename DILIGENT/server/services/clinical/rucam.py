@@ -539,16 +539,16 @@ class RucamScoreEstimator:
                 label="Concomitant drugs",
                 score=0,
                 status="scored",
-                rationale="No compatible concomitant drug detected.",
+                rationale="No aligned concomitant drug detected.",
             )
         strong = sum(1 for item in other if item.suspension_status and item.therapy_start_status)
         weak = sum(1 for item in other if item.therapy_start_date or item.suspension_date)
         if strong > 0:
             score = -2
-            rationale = "At least one concomitant drug had stronger compatible temporal metadata."
+            rationale = "At least one concomitant drug had stronger aligned temporal metadata."
         elif weak > 0:
             score = -1
-            rationale = "Concomitant drug exposure was temporally compatible but weakly documented."
+            rationale = "Concomitant drug exposure was temporally aligned but weakly documented."
         else:
             score = 0
             rationale = "Concomitant drugs lacked usable temporal metadata."

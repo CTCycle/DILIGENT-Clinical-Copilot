@@ -21,9 +21,9 @@ from DILIGENT.server.services.cryptography import (
     fingerprint_plaintext,
 )
 
-ProviderName = Literal["openai", "gemini", "tavily"]
-SUPPORTED_PROVIDERS = {"openai", "gemini", "tavily"}
-RESEARCH_PROVIDER = "tavily"
+ProviderName = Literal["openai", "gemini", "brave"]
+SUPPORTED_PROVIDERS = {"openai", "gemini", "brave"}
+RESEARCH_PROVIDER = "brave"
 
 
 ###############################################################################

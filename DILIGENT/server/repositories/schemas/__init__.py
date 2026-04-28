@@ -7,6 +7,7 @@ from DILIGENT.server.repositories.schemas.models import (
     Drug,
     DrugAlias,
     DrugRxnormCode,
+    KbMatchCache,
     LiverToxMonograph,
 )
 from DILIGENT.server.repositories.schemas.types import JSONSequence
@@ -21,5 +22,6 @@ __all__ = [
     "DrugAlias",
     "DrugRxnormCode",
     "JSONSequence",
+    "KbMatchCache",
     "LiverToxMonograph",
 ]

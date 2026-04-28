@@ -1,8 +1,6 @@
 import { signal } from '@angular/core';
 
 import {
-  InspectionDiliPriorsOverrideRequest,
-  InspectionDrugLabelsOverrideRequest,
   InspectionLiverToxOverrideRequest,
   InspectionRagOverrideRequest,
   InspectionRxNavOverrideRequest,
@@ -16,8 +14,6 @@ import { JobPollingService } from '../../core/services/job-polling.service';
 type InspectionUpdateOverridesByTarget = {
   rxnav: InspectionRxNavOverrideRequest;
   livertox: InspectionLiverToxOverrideRequest;
-  dili_priors: InspectionDiliPriorsOverrideRequest;
-  drug_labels: InspectionDrugLabelsOverrideRequest;
   rag: InspectionRagOverrideRequest;
 };
 
