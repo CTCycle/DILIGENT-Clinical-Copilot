@@ -43,7 +43,7 @@ export type ModelConfigUpdateRequest = {
   ollama_reasoning?: boolean;
 };
 
-export type AccessKeyProvider = "openai" | "gemini" | "tavily";
+export type AccessKeyProvider = "openai" | "gemini" | "brave";
 
 export type AccessKeyRecord = {
   id: number;
@@ -87,8 +87,6 @@ export type JobType =
   | "ollama_pull"
   | "rxnav_update"
   | "livertox_update"
-  | "dili_priors_update"
-  | "drug_labels_update"
   | "rag_update";
 
 export type JobStatus =
@@ -176,16 +174,28 @@ export type InspectionSessionReportResponse = {
 };
 
 export type InspectionTimelineEventType = "therapy" | "disease" | "lab" | "other";
+export type InspectionTimelineTimingType =
+  | "explicit_date"
+  | "relative"
+  | "duration"
+  | "recurring"
+  | "uncertain"
+  | "ordering";
 
 export type InspectionTimelineEvent = {
   event_id: string;
   title: string;
   description: string | null;
   event_type: InspectionTimelineEventType;
+  timing_type: InspectionTimelineTimingType;
   event_date: string | null;
   relative_time: string | null;
+  extracted_timing_text: string | null;
+  source_evidence: string | null;
+  linked_patient_event_ids: string[];
   source: string | null;
   confidence: number | null;
+  confidence_rationale: string | null;
   sort_order: number;
 };
 
@@ -264,7 +274,7 @@ export type InspectionDeleteResponse = {
   deleted: boolean;
 };
 
-export type InspectionUpdateTarget = "rxnav" | "livertox" | "dili_priors" | "drug_labels" | "rag";
+export type InspectionUpdateTarget = "rxnav" | "livertox" | "rag";
 
 export type InspectionUpdateConfigResponse = {
   target: InspectionUpdateTarget;
@@ -280,16 +290,6 @@ export type InspectionRxNavOverrideRequest = {
 export type InspectionLiverToxOverrideRequest = {
   livertox_monograph_max_workers?: number;
   livertox_archive?: string;
-  redownload?: boolean;
-};
-
-export type InspectionDiliPriorsOverrideRequest = {
-  redownload?: boolean;
-};
-
-export type InspectionDrugLabelsOverrideRequest = {
-  dailymed_request_timeout?: number;
-  dailymed_max_concurrency?: number;
   redownload?: boolean;
 };
 
@@ -338,55 +338,4 @@ export type InspectionRagVectorStoreSummary = {
   configured_index_type: string | null;
 };
 
-export type InspectionDiliPriorItem = {
-  drug_id: number;
-  drug_name: string;
-  dilirank_class: string | null;
-  dilist_class: string | null;
-  linked_source_count: number;
-};
-
-export type InspectionDiliPriorCatalogResponse = {
-  items: InspectionDiliPriorItem[];
-  total: number;
-  offset: number;
-  limit: number;
-};
-
-export type InspectionDiliPriorDetailResponse = {
-  drug_id: number;
-  drug_name: string;
-  annotations: Record<string, unknown>[];
-};
-
-export type InspectionDrugLabelItem = {
-  drug_id: number;
-  drug_name: string;
-  source: string;
-  effective_date: string | null;
-  retained_section_count: number;
-};
-
-export type InspectionDrugLabelCatalogResponse = {
-  items: InspectionDrugLabelItem[];
-  total: number;
-  offset: number;
-  limit: number;
-};
-
-export type InspectionDrugLabelSectionsResponse = {
-  drug_id: number;
-  drug_name: string;
-  source: string;
-  set_id: string;
-  spl_version: number;
-  effective_date: string | null;
-  sections: {
-    section_key: string;
-    section_title: string | null;
-    text: string;
-    contains_hepatic_keywords: boolean;
-    display_order: number;
-  }[];
-};
 

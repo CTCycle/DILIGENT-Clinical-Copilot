@@ -9,7 +9,7 @@ from DILIGENT.server.domain.research.entities import (
     ResearchResponse,
     ResearchSource,
 )
-from DILIGENT.server.domain.research.extras import TavilySearchOutcome
+from DILIGENT.server.domain.research.extras import BraveSearchOutcome
 
 __all__ = [
     "DOMAIN_NAME_RE",
@@ -19,5 +19,5 @@ __all__ = [
     "ResearchRequest",
     "ResearchResponse",
     "ResearchSource",
-    "TavilySearchOutcome",
+    "BraveSearchOutcome",
 ]

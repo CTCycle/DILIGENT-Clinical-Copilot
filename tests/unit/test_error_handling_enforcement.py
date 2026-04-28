@@ -17,8 +17,8 @@ from DILIGENT.server.api import ollama as ollama_api
 from DILIGENT.server.api.error_handling import REQUEST_ID_HEADER, register_error_handling
 from DILIGENT.server.services.llm.providers import OllamaError
 from DILIGENT.server.services.jobs import JobManager
-from DILIGENT.server.services.research import tavily as tavily_module
-from DILIGENT.server.services.research.tavily import TavilyResearchService
+from DILIGENT.server.services.research import brave as brave_module
+from DILIGENT.server.services.research.brave import BraveResearchService
 
 
 # -----------------------------------------------------------------------------
@@ -200,8 +200,8 @@ def test_ollama_endpoint_sanitizes_provider_error(monkeypatch) -> None:
 
 
 # -----------------------------------------------------------------------------
-def test_tavily_retry_retries_transient_status(monkeypatch) -> None:
-    service = TavilyResearchService()
+def test_brave_retry_retries_transient_status(monkeypatch) -> None:
+    service = BraveResearchService()
     service.retry_limit = 2
 
     class FakeResponse:
@@ -237,29 +237,28 @@ def test_tavily_retry_retries_transient_status(monkeypatch) -> None:
         async def __aexit__(self, exc_type, exc, tb) -> None:
             return None
 
-        async def post(self, url: str, json: dict[str, Any]):
+        async def get(self, url: str, params: dict[str, Any], headers: dict[str, str]):
             FakeAsyncClient.call_count += 1
             if FakeAsyncClient.call_count == 1:
                 return FakeResponse(503, {"detail": "unavailable"})
-            return FakeResponse(200, {"results": []})
+            return FakeResponse(200, {"web": {"results": []}})
 
     delays: list[float] = []
 
     async def fake_sleep(delay: float) -> None:
         delays.append(delay)
 
-    monkeypatch.setattr(tavily_module.httpx, "AsyncClient", FakeAsyncClient)
-    monkeypatch.setattr(tavily_module.asyncio, "sleep", fake_sleep)
+    monkeypatch.setattr(brave_module.httpx, "AsyncClient", FakeAsyncClient)
+    monkeypatch.setattr(brave_module.asyncio, "sleep", fake_sleep)
     monkeypatch.setattr(service, "consume_rate_slot", lambda: None)
 
     payload = asyncio.run(
-        service.post_json_with_retry(
-            url="https://unit.test/search",
-            payload={"query": "acetaminophen"},
-            operation="Tavily search",
+        service.get_json_with_retry(
+            api_key="brave-key",
+            params={"q": "acetaminophen"},
         )
     )
 
-    assert payload == {"results": []}
+    assert payload == {"web": {"results": []}}
     assert FakeAsyncClient.call_count == 2
     assert len(delays) == 1

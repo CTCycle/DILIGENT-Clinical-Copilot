@@ -90,9 +90,9 @@ class ResearchRequest(BaseModel):
 class ResearchSource(BaseModel):
     url: str = Field(..., min_length=1, max_length=2000)
     title: str | None = Field(default=None, max_length=500)
-    score: float | None = None
-    snippet: str | None = Field(default=None, max_length=2000)
-    extracted_text: str | None = Field(default=None, max_length=5000)
+    description: str | None = Field(default=None, max_length=2000)
+    source_domain: str | None = Field(default=None, max_length=253)
+    rank: int | None = Field(default=None, ge=1)
     retrieved_at: str = Field(..., min_length=1, max_length=64)
 
 

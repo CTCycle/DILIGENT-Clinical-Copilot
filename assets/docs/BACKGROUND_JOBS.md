@@ -48,12 +48,6 @@ Each job tracks:
   - Start: `POST /api/inspection/rag/jobs`
   - Poll: `GET /api/inspection/rag/jobs/{job_id}`
   - Cancel: `POST /api/inspection/rag/jobs/{job_id}/cancel`
-- `dili_priors_update`
-  - Start: `POST /api/inspection/dili-priors/jobs`
-  - Poll/cancel: `GET|DELETE /api/inspection/dili-priors/jobs/{job_id}`
-- `drug_labels_update`
-  - Start: `POST /api/inspection/drug-labels/jobs`
-  - Poll/cancel: `GET|DELETE /api/inspection/drug-labels/jobs/{job_id}`
 
 ## 5. Polling pattern
 
@@ -63,7 +57,7 @@ Standard contract:
 3. Cancel endpoint returns `JobCancelResponse`.
 4. Inspection update jobs may include phase-aware result fields:
    - `phase`, `step_index`, `step_count`, `progress_message`, `summary`.
-5. Inspection updater runners use cooperative cancellation (`should_stop`) and progress callbacks consistently across `rxnav`, `livertox`, `dili_priors`, `drug_labels`, and `rag`.
+5. Inspection updater runners use cooperative cancellation (`should_stop`) and progress callbacks consistently across `rxnav`, `livertox`, and `rag`.
 
 Frontend polling is implemented in `DILIGENT/client/src/app/core/services/api.ts` and stops on terminal states.
 
@@ -76,9 +70,7 @@ Cancellation is cooperative:
 
 If a runner does not check stop requests, cancellation is delayed.
 
-Current inspection cancellation/progress checkpoints:
-- `dili_priors_update`: checkpoints around source download, parsing/matching, and persistence.
-- `drug_labels_update`: checkpointed inside mapping/load/download loops and record persistence workers.
+Current inspection cancellation/progress checkpoints are implemented by the RxNav/RxNorm, LiverTox, and RAG update runners.
 
 ## 7. New job implementation checklist
 

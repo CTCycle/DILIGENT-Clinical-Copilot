@@ -15,11 +15,6 @@ class DrugRepositoryQueries:
 
     # -------------------------------------------------------------------------
     @staticmethod
-    def by_livertox_nbk_id(livertox_nbk_id: str) -> Select[tuple[Drug]]:
-        return select(Drug).where(Drug.livertox_nbk_id == livertox_nbk_id)
-
-    # -------------------------------------------------------------------------
-    @staticmethod
     def drug_rxcui_mapping(rxcui: str) -> Select[tuple[DrugRxnormCode]]:
         return select(DrugRxnormCode).where(DrugRxnormCode.rxcui == rxcui)
 
@@ -47,6 +42,13 @@ class DrugRepositoryQueries:
     @staticmethod
     def monograph_by_drug_id(drug_id: int) -> Select[tuple[LiverToxMonograph]]:
         return select(LiverToxMonograph).where(LiverToxMonograph.drug_id == drug_id)
+
+    # -------------------------------------------------------------------------
+    @staticmethod
+    def monograph_by_key(monograph_key: str) -> Select[tuple[LiverToxMonograph]]:
+        return select(LiverToxMonograph).where(
+            LiverToxMonograph.monograph_key == monograph_key
+        )
 
     # -------------------------------------------------------------------------
     @staticmethod

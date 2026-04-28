@@ -7,7 +7,7 @@ from DILIGENT.server.domain.research.entities import ResearchSource
 
 ###############################################################################
 @dataclass(slots=True)
-class TavilySearchOutcome:
+class BraveSearchOutcome:
     normalized_query: str
     sources: list[ResearchSource]
     message: str | None = None

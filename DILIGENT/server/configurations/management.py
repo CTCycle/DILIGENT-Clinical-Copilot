@@ -244,34 +244,59 @@ def _build_database_settings(payload: dict[str, Any]) -> DatabaseSettings:
 
 
 def _build_drugs_matcher_settings(data: dict[str, Any]) -> DrugsMatcherSettings:
-    suffixes_value = data.get("catalog_excluded_term_suffixes", ["PCK"])
-    candidates = list(suffixes_value) if isinstance(suffixes_value, (list, tuple, set)) else [suffixes_value]
-    suffixes: list[str] = []
-    for entry in candidates:
-        text = coerce_str(entry, "").upper()
-        if text:
-            suffixes.append(text)
-    suffix_tuple = tuple(suffixes) if suffixes else ("PCK",)
+    suffixes_value = data.get(
+        "catalog_excluded_term_suffixes",
+        constants.DEFAULT_DRUG_MATCH_CATALOG_EXCLUDED_TERM_SUFFIXES,
+    )
+    suffix_candidates = (
+        list(suffixes_value)
+        if isinstance(suffixes_value, (list, tuple, set))
+        else [suffixes_value]
+    )
+    suffixes = tuple(
+        text
+        for text in (coerce_str(entry, "").upper() for entry in suffix_candidates)
+        if text
+    )
     return DrugsMatcherSettings(
         direct_confidence=coerce_float(data.get("direct_confidence"), 1.0),
         master_confidence=coerce_float(data.get("master_confidence"), 0.92),
         synonym_confidence=coerce_float(data.get("synonym_confidence"), 0.90),
-        partial_confidence=coerce_float(data.get("partial_confidence"), 0.86),
-        fuzzy_confidence=coerce_float(data.get("fuzzy_confidence"), 0.84),
-        fuzzy_threshold=coerce_float(data.get("fuzzy_threshold"), 0.85),
-        token_max_frequency=coerce_positive_int(data.get("token_max_frequency"), 3),
-        token_min_length=coerce_positive_int(data.get("token_min_length"), 4),
         normalization_cache_limit=coerce_positive_int(data.get("normalization_cache_limit"), 10000),
-        variant_cache_limit=coerce_positive_int(data.get("variant_cache_limit"), 10000),
-        min_confidence=coerce_float(data.get("min_confidence"), 0.40),
-        catalog_excluded_term_suffixes=suffix_tuple,
-        catalog_token_ratio_threshold=coerce_float(data.get("catalog_token_ratio_threshold"), 0.93),
-        catalog_overall_ratio_threshold=coerce_float(data.get("catalog_overall_ratio_threshold"), 0.93),
-        fuzzy_early_exit_ratio=coerce_float(data.get("fuzzy_early_exit_ratio"), 0.95),
         match_cache_limit=coerce_positive_int(data.get("match_cache_limit"), 5000),
         alias_cache_limit=coerce_positive_int(data.get("alias_cache_limit"), 2000),
-        catalog_index_limit=coerce_positive_int(data.get("catalog_index_limit"), 75000),
-        catalog_candidate_limit=coerce_positive_int(data.get("catalog_candidate_limit"), 750),
+        min_confidence=coerce_float(data.get("min_confidence"), 0.90),
+        token_min_length=coerce_positive_int(
+            data.get("token_min_length"),
+            constants.DEFAULT_DRUG_MATCH_TOKEN_MIN_LENGTH,
+        ),
+        catalog_excluded_term_suffixes=(
+            suffixes or constants.DEFAULT_DRUG_MATCH_CATALOG_EXCLUDED_TERM_SUFFIXES
+        ),
+        catalog_index_limit=coerce_positive_int(
+            data.get("catalog_index_limit"),
+            constants.DEFAULT_DRUG_MATCH_CATALOG_INDEX_LIMIT,
+        ),
+        spelling_confidence=coerce_float(
+            data.get("spelling_confidence"),
+            constants.DEFAULT_DRUG_MATCH_SPELLING_CONFIDENCE,
+        ),
+        spelling_min_query_length=coerce_positive_int(
+            data.get("spelling_min_query_length"),
+            constants.DEFAULT_DRUG_MATCH_SPELLING_MIN_QUERY_LENGTH,
+        ),
+        spelling_short_name_length=coerce_positive_int(
+            data.get("spelling_short_name_length"),
+            constants.DEFAULT_DRUG_MATCH_SPELLING_SHORT_NAME_LENGTH,
+        ),
+        spelling_short_max_distance=coerce_positive_int(
+            data.get("spelling_short_max_distance"),
+            constants.DEFAULT_DRUG_MATCH_SPELLING_SHORT_MAX_DISTANCE,
+        ),
+        spelling_long_max_distance=coerce_positive_int(
+            data.get("spelling_long_max_distance"),
+            constants.DEFAULT_DRUG_MATCH_SPELLING_LONG_MAX_DISTANCE,
+        ),
     )
 
 
@@ -313,10 +338,10 @@ def _build_external_data_settings(data: dict[str, Any], *, fallback_timeout: flo
     disease_timeout = max(coerce_float(data.get("disease_llm_timeout"), parser_timeout), 1.0)
     clinical_timeout = max(coerce_float(data.get("clinical_llm_timeout"), default_llm_timeout), 1.0)
     livertox_timeout = max(coerce_float(data.get("livertox_llm_timeout"), default_llm_timeout), 1.0)
-    tavily_fast_max_results = coerce_positive_int(data.get("tavily_fast_max_results"), 5)
-    tavily_thorough_max_results = coerce_positive_int(data.get("tavily_thorough_max_results"), 10)
-    if tavily_thorough_max_results < tavily_fast_max_results:
-        tavily_thorough_max_results = tavily_fast_max_results
+    brave_fast_max_results = coerce_positive_int(data.get("brave_fast_max_results"), 5)
+    brave_thorough_max_results = coerce_positive_int(data.get("brave_thorough_max_results"), 10)
+    if brave_thorough_max_results < brave_fast_max_results:
+        brave_thorough_max_results = brave_fast_max_results
     return ExternalDataSettings(
         default_llm_timeout=default_llm_timeout,
         parser_llm_timeout=parser_timeout,
@@ -331,18 +356,11 @@ def _build_external_data_settings(data: dict[str, Any], *, fallback_timeout: flo
         max_excerpt_length=coerce_positive_int(data.get("max_excerpt_length"), 8000),
         rxnav_request_timeout=coerce_float(data.get("rxnav_request_timeout"), 12.0),
         rxnav_max_concurrency=coerce_positive_int(data.get("rxnav_max_concurrency"), 16),
-        dili_priors_request_timeout=max(coerce_float(data.get("dili_priors_request_timeout"), 20.0), 1.0),
-        dailymed_request_timeout=max(coerce_float(data.get("dailymed_request_timeout"), 20.0), 1.0),
-        dailymed_max_concurrency=coerce_positive_int(data.get("dailymed_max_concurrency"), 8),
-        dailymed_section_max_length=coerce_positive_int(data.get("dailymed_section_max_length"), 4000),
-        dailymed_max_sections_per_drug=coerce_positive_int(data.get("dailymed_max_sections_per_drug"), 5),
-        tavily_request_timeout_s=max(coerce_float(data.get("tavily_request_timeout_s"), 20.0), 1.0),
-        tavily_search_cache_ttl_s=coerce_positive_int(data.get("tavily_search_cache_ttl_s"), 21600),
-        tavily_extract_cache_ttl_s=coerce_positive_int(data.get("tavily_extract_cache_ttl_s"), 259200),
-        tavily_rate_limit_per_minute=coerce_positive_int(data.get("tavily_rate_limit_per_minute"), 30),
-        tavily_fast_max_results=tavily_fast_max_results,
-        tavily_thorough_max_results=tavily_thorough_max_results,
-        tavily_extract_top_urls=min(coerce_positive_int(data.get("tavily_extract_top_urls"), 3), 5),
+        brave_request_timeout_s=max(coerce_float(data.get("brave_request_timeout_s"), 20.0), 1.0),
+        brave_search_cache_ttl_s=coerce_positive_int(data.get("brave_search_cache_ttl_s"), 21600),
+        brave_rate_limit_per_minute=coerce_positive_int(data.get("brave_rate_limit_per_minute"), 30),
+        brave_fast_max_results=brave_fast_max_results,
+        brave_thorough_max_results=brave_thorough_max_results,
     )
 
 

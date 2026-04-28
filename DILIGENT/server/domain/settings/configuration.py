@@ -37,22 +37,18 @@ class DrugsMatcherSettings(BaseModel):
     direct_confidence: float
     master_confidence: float
     synonym_confidence: float
-    partial_confidence: float
-    fuzzy_confidence: float
-    fuzzy_threshold: float
-    token_max_frequency: int
-    token_min_length: int
     normalization_cache_limit: int
-    variant_cache_limit: int
     match_cache_limit: int
     alias_cache_limit: int
     min_confidence: float
+    token_min_length: int
     catalog_excluded_term_suffixes: tuple[str, ...]
-    catalog_token_ratio_threshold: float
-    catalog_overall_ratio_threshold: float
-    fuzzy_early_exit_ratio: float
     catalog_index_limit: int
-    catalog_candidate_limit: int
+    spelling_confidence: float
+    spelling_min_query_length: int
+    spelling_short_name_length: int
+    spelling_short_max_distance: int
+    spelling_long_max_distance: int
 
 
 class RagSettings(BaseModel):
@@ -94,18 +90,11 @@ class ExternalDataSettings(BaseModel):
     max_excerpt_length: int
     rxnav_request_timeout: float
     rxnav_max_concurrency: int
-    dili_priors_request_timeout: float
-    dailymed_request_timeout: float
-    dailymed_max_concurrency: int
-    dailymed_section_max_length: int
-    dailymed_max_sections_per_drug: int
-    tavily_request_timeout_s: float
-    tavily_search_cache_ttl_s: int
-    tavily_extract_cache_ttl_s: int
-    tavily_rate_limit_per_minute: int
-    tavily_fast_max_results: int
-    tavily_thorough_max_results: int
-    tavily_extract_top_urls: int
+    brave_request_timeout_s: float
+    brave_search_cache_ttl_s: int
+    brave_rate_limit_per_minute: int
+    brave_fast_max_results: int
+    brave_thorough_max_results: int
 
 
 class IngestionSettings(BaseModel):

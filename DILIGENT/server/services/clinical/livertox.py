@@ -5,8 +5,6 @@ from types import SimpleNamespace
 from typing import Any
 
 import pandas as pd
-
-from DILIGENT.server.configurations.startup import server_settings
 from DILIGENT.server.services.text.normalization import coerce_text
 
 ###############################################################################
@@ -154,7 +152,7 @@ class LiverToxData:
             return
         filtered: dict[str, list[Any]] = {}
         for token, records in self.token_occurrences.items():
-            if len(records) > server_settings.drugs_matcher.token_max_frequency:
+            if len(records) > 3:
                 continue
             filtered[token] = sorted(
                 records, key=lambda record: record.drug_name.lower()

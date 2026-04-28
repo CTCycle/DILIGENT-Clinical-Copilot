@@ -19,7 +19,7 @@ from DILIGENT.server.services.llm.cloud import LLMError, LLMTimeout
 from DILIGENT.server.services.llm.providers import OllamaError, OllamaTimeout
 from DILIGENT.server.repositories.vectors import LanceVectorDatabase
 
-ProviderName = Literal["openai", "azure-openai", "anthropic", "gemini"]
+ProviderName = Literal["openai", "gemini"]
 EmbeddingBackend = Literal["ollama", "cloud"]
 
 

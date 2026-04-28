@@ -112,7 +112,7 @@ Feature toggles/settings:
 - No official Docker/container workflow in current implementation.
 - Desktop build is Windows-focused in current release scripts/output layout.
 - Long-running operations rely on backend job polling lifecycle; frontend must poll for completion.
-- Some features require reachable external dependencies (for example Ollama, Tavily when enabled).
+- Some features require reachable external dependencies (for example Ollama, Brave Search when enabled).
 
 ## 7. Deployment and Packaging Notes
 

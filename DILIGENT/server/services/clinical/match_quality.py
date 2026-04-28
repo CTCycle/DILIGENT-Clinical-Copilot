@@ -37,7 +37,7 @@ def classify_match_evidence(
         warnings.append("Evidence excerpt was borrowed from a related LiverTox monograph.")
         quality = "fallback_related_monograph"
     elif (match_confidence is not None and float(match_confidence) < 1.0) or (
-        "alias" in normalized_reason or "fuzzy" in normalized_reason
+        "alias" in normalized_reason or "spelling_correction" in normalized_reason
     ):
         warnings.append("Drug match is not a direct canonical match.")
         quality = "weak_alias_or_class_match"
