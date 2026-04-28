@@ -43,12 +43,12 @@ def select_relevant_candidates(
         if not name:
             continue
         if score >= 3:
-            rationale = "Active or plausibly timed exposure with compatible relevance."
+            rationale = "Active or plausibly timed exposure with aligned relevance."
             relevant.append({"drug": name, "reason": rationale})
             selected_entries.append(entry)
             continue
         if score <= -1:
-            reason = "Historical or temporally incompatible exposure."
+            reason = "Historical or temporally conflicting exposure."
             excluded.append({"drug": name, "reason": reason})
             continue
         unresolved.append(

@@ -32,7 +32,7 @@ def test_extract_drugs_from_anamnesis_sets_historical_tags() -> None:
             PatientDrugs(
                 entries=[
                     DrugEntry(name="Aspirin", dosage="100 mg"),
-                    DrugEntry(name="Legacy Name\nmultiline", dosage="200 mg"),
+                    DrugEntry(name="Historical Name\nmultiline", dosage="200 mg"),
                 ]
             )
         ]

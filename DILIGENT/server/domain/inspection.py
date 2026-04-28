@@ -10,12 +10,10 @@ from pydantic import BaseModel, ConfigDict, Field, field_validator
 
 SessionStatus = Literal["successful", "failed"]
 DateFilterMode = Literal["before", "after", "exact"]
-InspectionUpdateTarget = Literal["rxnav", "livertox", "dili_priors", "drug_labels", "rag"]
+InspectionUpdateTarget = Literal["rxnav", "livertox", "rag"]
 InspectionUpdateJobType = Literal[
     "rxnav_update",
     "livertox_update",
-    "dili_priors_update",
-    "drug_labels_update",
     "rag_update",
 ]
 InspectionJobPhase = Literal[
@@ -129,99 +127,6 @@ class LiverToxExcerptResponse(BaseModel):
 
 
 ###############################################################################
-class DiliPriorCatalogItem(BaseModel):
-    model_config = ConfigDict(extra="forbid")
-    drug_id: int
-    drug_name: str
-    dilirank_class: str | None = None
-    dilist_class: str | None = None
-    linked_source_count: int = 0
-
-
-###############################################################################
-class DiliPriorCatalogResponse(BaseModel):
-    model_config = ConfigDict(extra="forbid")
-    items: list[DiliPriorCatalogItem] = Field(default_factory=list)
-    total: int
-    offset: int
-    limit: int
-
-
-###############################################################################
-class DiliPriorDetailResponse(BaseModel):
-    model_config = ConfigDict(extra="forbid")
-    drug_id: int
-    drug_name: str
-    annotations: list["DiliPriorAnnotation"] = Field(default_factory=list)
-
-
-###############################################################################
-class DiliPriorAnnotation(BaseModel):
-    model_config = ConfigDict(extra="forbid")
-    source_dataset: str | None = None
-    source_record_id: str | None = None
-    source_name: str | None = None
-    source_name_norm: str | None = None
-    classification: str | None = None
-    severity_class: str | None = None
-    concern_class: str | None = None
-    label_section: str | None = None
-    routes: str | None = None
-    comment: str | None = None
-    source_url: str | None = None
-    source_last_modified: str | None = None
-
-    # -------------------------------------------------------------------------
-    def __getitem__(self, key: str) -> Any:
-        return getattr(self, key)
-
-
-###############################################################################
-class DrugLabelCatalogItem(BaseModel):
-    model_config = ConfigDict(extra="forbid")
-    drug_id: int
-    drug_name: str
-    source: str
-    effective_date: str | None = None
-    retained_section_count: int = 0
-
-
-###############################################################################
-class DrugLabelCatalogResponse(BaseModel):
-    model_config = ConfigDict(extra="forbid")
-    items: list[DrugLabelCatalogItem] = Field(default_factory=list)
-    total: int
-    offset: int
-    limit: int
-
-
-###############################################################################
-class DrugLabelSectionsResponse(BaseModel):
-    model_config = ConfigDict(extra="forbid")
-    drug_id: int
-    drug_name: str
-    source: str
-    set_id: str
-    spl_version: int
-    effective_date: str | None = None
-    sections: list["DrugLabelSection"] = Field(default_factory=list)
-
-
-###############################################################################
-class DrugLabelSection(BaseModel):
-    model_config = ConfigDict(extra="forbid")
-    section_key: str | None = None
-    section_title: str | None = None
-    text: str | None = None
-    contains_hepatic_keywords: bool
-    display_order: int
-
-    # -------------------------------------------------------------------------
-    def __getitem__(self, key: str) -> Any:
-        return getattr(self, key)
-
-
-###############################################################################
 class DeleteEntityResponse(BaseModel):
     model_config = ConfigDict(extra="forbid")
     deleted: bool
@@ -298,20 +203,6 @@ class InspectionLiverToxOverrideRequest(BaseModel):
         if "/" in normalized or "\\" in normalized:
             raise ValueError("livertox_archive must be a file name only")
         return normalized
-
-
-###############################################################################
-class InspectionDiliPriorsOverrideRequest(BaseModel):
-    model_config = ConfigDict(extra="forbid")
-    redownload: bool | None = None
-
-
-###############################################################################
-class InspectionDrugLabelsOverrideRequest(BaseModel):
-    model_config = ConfigDict(extra="forbid")
-    dailymed_request_timeout: float | None = Field(default=None, ge=1.0, le=120.0)
-    dailymed_max_concurrency: int | None = Field(default=None, ge=1, le=64)
-    redownload: bool | None = None
 
 
 ###############################################################################

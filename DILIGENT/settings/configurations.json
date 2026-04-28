@@ -50,18 +50,11 @@
     "max_excerpt_length": 8000,
     "rxnav_request_timeout": 12.0,
     "rxnav_max_concurrency": 10,
-    "dili_priors_request_timeout": 20.0,
-    "dailymed_request_timeout": 20.0,
-    "dailymed_max_concurrency": 8,
-    "dailymed_section_max_length": 4000,
-    "dailymed_max_sections_per_drug": 5,
-    "tavily_request_timeout_s": 20.0,
-    "tavily_search_cache_ttl_s": 21600,
-    "tavily_extract_cache_ttl_s": 259200,
-    "tavily_rate_limit_per_minute": 30,
-    "tavily_fast_max_results": 5,
-    "tavily_thorough_max_results": 10,
-    "tavily_extract_top_urls": 3
+    "brave_request_timeout_s": 20.0,
+    "brave_search_cache_ttl_s": 21600,
+    "brave_rate_limit_per_minute": 30,
+    "brave_fast_max_results": 5,
+    "brave_thorough_max_results": 10
   },
   "ingestion": {
     "drug_name_min_length": 3,
@@ -79,24 +72,18 @@
     "direct_confidence": 1.0,
     "master_confidence": 0.92,
     "synonym_confidence": 0.9,
-    "partial_confidence": 0.86,
-    "fuzzy_confidence": 0.84,
-    "fuzzy_threshold": 0.85,
-    "fuzzy_early_exit_ratio": 0.95,
-    "token_max_frequency": 3,
-    "token_min_length": 4,
     "normalization_cache_limit": 10000,
-    "variant_cache_limit": 10000,
-    "min_confidence": 0.4,
-    "catalog_excluded_term_suffixes": [
-      "PCK"
-    ],
-    "catalog_token_ratio_threshold": 0.93,
-    "catalog_overall_ratio_threshold": 0.93,
+    "min_confidence": 0.9,
     "match_cache_limit": 5000,
     "alias_cache_limit": 2000,
+    "token_min_length": 4,
+    "catalog_excluded_term_suffixes": ["PCK"],
     "catalog_index_limit": 75000,
-    "catalog_candidate_limit": 750
+    "spelling_confidence": 0.94,
+    "spelling_min_query_length": 6,
+    "spelling_short_name_length": 10,
+    "spelling_short_max_distance": 1,
+    "spelling_long_max_distance": 2
   }
 }
 

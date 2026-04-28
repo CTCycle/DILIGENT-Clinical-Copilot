@@ -1,28 +1,18 @@
 import { CommonModule } from '@angular/common';
 import { Component, ElementRef, OnDestroy, OnInit, ViewChild, inject, signal } from '@angular/core';
 import { FormsModule } from '@angular/forms';
+import { Router } from '@angular/router';
 
 import { InspectionActionIconButtonComponent } from '../../components/inspection-action-icon-button/inspection-action-icon-button.component';
 import { ModalShellComponent } from '../../components/modal-shell/modal-shell.component';
 import { InspectionCatalogToolbarComponent } from '../../components/inspection-catalog-toolbar/inspection-catalog-toolbar.component';
 import {
-  cancelInspectionDiliPriorsUpdateJob,
-  cancelInspectionDrugLabelsUpdateJob,
   cancelInspectionLiverToxUpdateJob,
   cancelInspectionRagUpdateJob,
   cancelInspectionRxNavUpdateJob,
   deleteInspectionLiverToxDrug,
   deleteInspectionRxNavDrug,
   deleteInspectionSession,
-  fetchInspectionSessionTimeline,
-  fetchInspectionDiliPriorDetails,
-  fetchInspectionDiliPriorsCatalog,
-  fetchInspectionDiliPriorsUpdateConfig,
-  fetchInspectionDiliPriorsUpdateJobStatus,
-  fetchInspectionDrugLabelSections,
-  fetchInspectionDrugLabelsCatalog,
-  fetchInspectionDrugLabelsUpdateConfig,
-  fetchInspectionDrugLabelsUpdateJobStatus,
   fetchInspectionLiverToxCatalog,
   fetchInspectionLiverToxExcerpt,
   fetchInspectionLiverToxUpdateConfig,
@@ -37,9 +27,6 @@ import {
   fetchInspectionRxNavUpdateJobStatus,
   fetchInspectionSessionReport,
   fetchInspectionSessions,
-  generateInspectionSessionTimeline,
-  startInspectionDiliPriorsUpdateJob,
-  startInspectionDrugLabelsUpdateJob,
   startInspectionLiverToxUpdateJob,
   startInspectionRagUpdateJob,
   startInspectionRxNavUpdateJob,
@@ -47,20 +34,13 @@ import {
 import { JobPollingService } from '../../core/services/job-polling.service';
 import {
   InspectionDateFilterMode,
-  InspectionDiliPriorDetailResponse,
-  InspectionDiliPriorItem,
   InspectionDrugAliasesResponse,
-  InspectionDrugLabelItem,
-  InspectionDrugLabelSectionsResponse,
   InspectionLiverToxExcerptResponse,
   InspectionLiverToxItem,
   InspectionRagDocumentRow,
   InspectionRagVectorStoreSummary,
   InspectionRxNavItem,
   InspectionSessionItem,
-  InspectionSessionTimeline,
-  InspectionTimelineEvent,
-  InspectionTimelineEventType,
   InspectionSessionStatus,
   InspectionUpdateTarget,
 } from '../../core/models/types';
@@ -72,16 +52,12 @@ type InspectionViewId =
   | 'sessions'
   | 'rxnav'
   | 'livertox'
-  | 'dili_priors'
-  | 'drug_labels'
   | 'rag';
 
 const INSPECTION_VIEWS: Array<{ id: InspectionViewId; label: string }> = [
   { id: 'sessions', label: 'Sessions' },
   { id: 'rxnav', label: 'Drug Catalog' },
   { id: 'livertox', label: 'LiverTox' },
-  { id: 'dili_priors', label: 'DILI priors' },
-  { id: 'drug_labels', label: 'Drug labels' },
   { id: 'rag', label: 'RAG' },
 ];
 
@@ -121,25 +97,6 @@ function resolveRagDocumentsPath(
   );
 }
 
-function isNotFoundError(error: unknown): boolean {
-  if (!(error instanceof Error)) {
-    return false;
-  }
-  return error.message.toLowerCase().includes('not found');
-}
-
-type TimelineRenderEvent = {
-  raw: InspectionTimelineEvent;
-  lane: 'top' | 'bottom';
-  x: number;
-  cardY: number;
-  connectorEndY: number;
-  anchorY: number;
-  color: string;
-  dateLabel: string;
-  detailLines: string[];
-};
-
 @Component({
   selector: 'app-data-inspection-page',
   standalone: true,
@@ -157,6 +114,7 @@ export class DataInspectionPageComponent implements OnInit, OnDestroy {
   @ViewChild('ragFolderInput') private ragFolderInput?: ElementRef<HTMLInputElement>;
 
   private readonly jobPolling = inject(JobPollingService);
+  private readonly router = inject(Router);
   readonly inspectionViews = INSPECTION_VIEWS;
   readonly activeView = signal<InspectionViewId>('sessions');
 
@@ -220,38 +178,6 @@ export class DataInspectionPageComponent implements OnInit, OnDestroy {
   readonly livertoxError = this.liverToxCatalog.error;
   readonly livertoxSearchInput = this.liverToxCatalog.searchInput;
 
-  private readonly diliPriorCatalog = new InspectionPagedResource<InspectionDiliPriorItem>(
-    (params) => fetchInspectionDiliPriorsCatalog(params),
-    'Failed to load DILI priors.',
-  );
-  readonly diliPriorItems = this.diliPriorCatalog.items;
-  readonly diliPriorVisibleItems = this.diliPriorCatalog.visibleItems;
-  readonly diliPriorVisibleStartIndex = this.diliPriorCatalog.visibleStartIndex;
-  readonly diliPriorTopPaddingPx = this.diliPriorCatalog.topPaddingPx;
-  readonly diliPriorBottomPaddingPx = this.diliPriorCatalog.bottomPaddingPx;
-  readonly diliPriorTotal = this.diliPriorCatalog.total;
-  readonly diliPriorLoading = this.diliPriorCatalog.loading;
-  readonly diliPriorLoadingMore = this.diliPriorCatalog.loadingMore;
-  readonly diliPriorHasMore = this.diliPriorCatalog.hasMore;
-  readonly diliPriorError = this.diliPriorCatalog.error;
-  readonly diliPriorSearchInput = this.diliPriorCatalog.searchInput;
-
-  private readonly drugLabelCatalog = new InspectionPagedResource<InspectionDrugLabelItem>(
-    (params) => fetchInspectionDrugLabelsCatalog(params),
-    'Failed to load drug labels.',
-  );
-  readonly drugLabelItems = this.drugLabelCatalog.items;
-  readonly drugLabelVisibleItems = this.drugLabelCatalog.visibleItems;
-  readonly drugLabelVisibleStartIndex = this.drugLabelCatalog.visibleStartIndex;
-  readonly drugLabelTopPaddingPx = this.drugLabelCatalog.topPaddingPx;
-  readonly drugLabelBottomPaddingPx = this.drugLabelCatalog.bottomPaddingPx;
-  readonly drugLabelTotal = this.drugLabelCatalog.total;
-  readonly drugLabelLoading = this.drugLabelCatalog.loading;
-  readonly drugLabelLoadingMore = this.drugLabelCatalog.loadingMore;
-  readonly drugLabelHasMore = this.drugLabelCatalog.hasMore;
-  readonly drugLabelError = this.drugLabelCatalog.error;
-  readonly drugLabelSearchInput = this.drugLabelCatalog.searchInput;
-
   private readonly ragCatalog = new InspectionPagedResource<InspectionRagDocumentRow>(
     (params) => fetchInspectionRagDocuments(params),
     'Failed to load RAG state.',
@@ -275,18 +201,6 @@ export class DataInspectionPageComponent implements OnInit, OnDestroy {
   readonly reportLoading = signal(false);
   readonly reportError = signal<string | null>(null);
 
-  readonly timelineSession = signal<InspectionSessionItem | null>(null);
-  readonly timelineData = signal<InspectionSessionTimeline | null>(null);
-  readonly timelineLoading = signal(false);
-  readonly timelineError = signal<string | null>(null);
-  readonly timelineRegenerationBlockedUntil = signal(0);
-  private readonly timelineCache = new Map<number, InspectionSessionTimeline>();
-  readonly timelineAxisY = 220;
-  readonly timelineChartHeight = 500;
-  readonly timelineChartPaddingX = 90;
-  readonly timelineCardWidth = 232;
-  readonly timelineCardHeight = 96;
-
   private readonly aliasDetail = new InspectionDetailResource<InspectionDrugAliasesResponse>();
   readonly aliasData = this.aliasDetail.data;
   readonly aliasLoading = this.aliasDetail.loading;
@@ -297,16 +211,6 @@ export class DataInspectionPageComponent implements OnInit, OnDestroy {
   readonly excerptLoading = this.excerptDetail.loading;
   readonly excerptError = this.excerptDetail.error;
 
-  private readonly diliPriorDetail = new InspectionDetailResource<InspectionDiliPriorDetailResponse>();
-  readonly diliPriorDetailData = this.diliPriorDetail.data;
-  readonly diliPriorDetailLoading = this.diliPriorDetail.loading;
-  readonly diliPriorDetailError = this.diliPriorDetail.error;
-
-  private readonly drugLabelSectionsDetail =
-    new InspectionDetailResource<InspectionDrugLabelSectionsResponse>();
-  readonly drugLabelSectionsData = this.drugLabelSectionsDetail.data;
-  readonly drugLabelSectionsLoading = this.drugLabelSectionsDetail.loading;
-  readonly drugLabelSectionsError = this.drugLabelSectionsDetail.error;
   private readonly updateTargetActions: InspectionUpdateTargetActionsMap = {
     rxnav: {
       fetchConfig: () => fetchInspectionRxNavUpdateConfig(),
@@ -328,28 +232,6 @@ export class DataInspectionPageComponent implements OnInit, OnDestroy {
       },
       refresh: async () => {
         await this.loadLiverTox();
-      },
-    },
-    dili_priors: {
-      fetchConfig: () => fetchInspectionDiliPriorsUpdateConfig(),
-      start: (overrides) => startInspectionDiliPriorsUpdateJob(overrides),
-      status: (jobId) => fetchInspectionDiliPriorsUpdateJobStatus(jobId),
-      cancel: async (jobId) => {
-        await cancelInspectionDiliPriorsUpdateJob(jobId);
-      },
-      refresh: async () => {
-        await this.loadDiliPriors();
-      },
-    },
-    drug_labels: {
-      fetchConfig: () => fetchInspectionDrugLabelsUpdateConfig(),
-      start: (overrides) => startInspectionDrugLabelsUpdateJob(overrides),
-      status: (jobId) => fetchInspectionDrugLabelsUpdateJobStatus(jobId),
-      cancel: async (jobId) => {
-        await cancelInspectionDrugLabelsUpdateJob(jobId);
-      },
-      refresh: async () => {
-        await this.loadDrugLabels();
       },
     },
     rag: {
@@ -388,8 +270,6 @@ export class DataInspectionPageComponent implements OnInit, OnDestroy {
       this.loadSessions(),
       this.loadRxNav(),
       this.loadLiverTox(),
-      this.loadDiliPriors(),
-      this.loadDrugLabels(),
       this.loadRag(),
     ]);
   }
@@ -425,14 +305,6 @@ export class DataInspectionPageComponent implements OnInit, OnDestroy {
 
   async loadLiverTox(): Promise<void> {
     await this.liverToxCatalog.loadInitial();
-  }
-
-  async loadDiliPriors(): Promise<void> {
-    await this.diliPriorCatalog.loadInitial();
-  }
-
-  async loadDrugLabels(): Promise<void> {
-    await this.drugLabelCatalog.loadInitial();
   }
 
   async loadRag(): Promise<void> {
@@ -478,241 +350,9 @@ export class DataInspectionPageComponent implements OnInit, OnDestroy {
   }
 
   async openPatientTimeline(row: InspectionSessionItem): Promise<void> {
-    if (!this.canOpenTimeline(row)) {
-      this.timelineSession.set(row);
-      this.timelineData.set(null);
-      this.timelineLoading.set(false);
-      this.timelineError.set('[ERROR] Timeline data is unavailable for this session.');
-      return;
+    if (this.canOpenTimeline(row)) {
+      await this.router.navigate(['/sessions', row.session_id, 'timetable']);
     }
-    if (this.timelineLoading()) {
-      return;
-    }
-    this.timelineSession.set(row);
-    this.timelineError.set(null);
-    const cached = this.timelineCache.get(row.session_id) || null;
-    if (cached) {
-      this.timelineData.set(cached);
-      this.timelineLoading.set(false);
-      return;
-    }
-
-    this.timelineLoading.set(true);
-    this.timelineData.set(null);
-    try {
-      const timeline = row.has_timeline
-        ? await fetchInspectionSessionTimeline(row.session_id)
-        : await generateInspectionSessionTimeline(row.session_id);
-      this.timelineCache.set(row.session_id, timeline);
-      this.timelineData.set(timeline);
-    } catch (error) {
-      if (isNotFoundError(error)) {
-        try {
-          const timeline = await generateInspectionSessionTimeline(row.session_id);
-          this.timelineCache.set(row.session_id, timeline);
-          this.timelineData.set(timeline);
-        } catch (generationError) {
-          this.timelineRegenerationBlockedUntil.set(Date.now() + 2000);
-          this.timelineError.set(
-            generationError instanceof Error
-              ? generationError.message
-              : 'Failed to generate patient timeline.',
-          );
-        }
-      } else {
-        this.timelineError.set(
-          error instanceof Error ? error.message : 'Failed to load patient timeline.',
-        );
-      }
-    } finally {
-      this.timelineLoading.set(false);
-    }
-  }
-
-  closePatientTimeline(): void {
-    this.timelineSession.set(null);
-    this.timelineLoading.set(false);
-    this.timelineError.set(null);
-  }
-
-  async regeneratePatientTimeline(): Promise<void> {
-    const session = this.timelineSession();
-    if (!session) {
-      return;
-    }
-    if (this.timelineLoading() || this.isTimelineRegenerationBlocked()) {
-      return;
-    }
-    this.timelineLoading.set(true);
-    this.timelineError.set(null);
-    try {
-      const timeline = await generateInspectionSessionTimeline(session.session_id, {
-        force_regenerate: true,
-      });
-      this.timelineCache.set(session.session_id, timeline);
-      this.timelineData.set(timeline);
-    } catch (error) {
-      this.timelineRegenerationBlockedUntil.set(Date.now() + 2000);
-      this.timelineError.set(
-        error instanceof Error ? error.message : 'Failed to regenerate patient timeline.',
-      );
-    } finally {
-      this.timelineLoading.set(false);
-    }
-  }
-
-  timelineSvgWidth(): number {
-    const eventCount = this.timelineData()?.events.length ?? 0;
-    return Math.max(1120, 280 + eventCount * 220);
-  }
-
-  timelineRenderEvents(): TimelineRenderEvent[] {
-    const timeline = this.timelineData();
-    if (!timeline || timeline.events.length === 0) {
-      return [];
-    }
-    const colors: Record<InspectionTimelineEventType, string> = {
-      therapy: '#0f766e',
-      disease: '#b91c1c',
-      lab: '#0369a1',
-      other: '#57534e',
-    };
-    const events = [...timeline.events].sort((a, b) => a.sort_order - b.sort_order);
-    const count = events.length;
-    const width = this.timelineSvgWidth();
-    const startX = this.timelineChartPaddingX;
-    const endX = width - this.timelineChartPaddingX;
-    const range = Math.max(endX - startX, 1);
-
-    return events.map((event, index) => {
-      const lane: 'top' | 'bottom' = index % 2 === 0 ? 'top' : 'bottom';
-      const x = count === 1 ? startX + range / 2 : startX + (range * index) / (count - 1);
-      const anchorY = this.timelineAxisY;
-      const connectorEndY = lane === 'top' ? anchorY - 70 : anchorY + 70;
-      const cardY = lane === 'top' ? 20 : this.timelineAxisY + 86;
-      const dateLabel = event.event_date || event.relative_time || 'Date not reported';
-      const detailLines = this.buildTimelineDetailLines(event);
-      return {
-        raw: event,
-        lane,
-        x,
-        cardY,
-        connectorEndY,
-        anchorY,
-        color: colors[event.event_type] || colors.other,
-        dateLabel,
-        detailLines,
-      };
-    });
-  }
-
-  private buildTimelineDetailLines(event: InspectionTimelineEvent): string[] {
-    const fragments: string[] = [];
-    if (event.description && event.description.trim()) {
-      fragments.push(event.description.trim());
-    }
-    if (event.source && event.source.trim()) {
-      fragments.push(`Source: ${event.source.trim()}`);
-    }
-    if (typeof event.confidence === 'number' && Number.isFinite(event.confidence)) {
-      fragments.push(`Confidence: ${Math.round(event.confidence * 100)}%`);
-    }
-    if (fragments.length === 0) {
-      return ['No additional details.'];
-    }
-    return this.wrapTimelineText(fragments.join(' • '), 38, 3);
-  }
-
-  private wrapTimelineText(text: string, maxCharsPerLine: number, maxLines: number): string[] {
-    const normalized = text.replace(/\s+/g, ' ').trim();
-    if (!normalized) {
-      return [];
-    }
-    const words = normalized.split(' ');
-    const lines: string[] = [];
-    let current = '';
-    for (const word of words) {
-      const candidate = current ? `${current} ${word}` : word;
-      if (candidate.length <= maxCharsPerLine) {
-        current = candidate;
-        continue;
-      }
-      if (current) {
-        lines.push(current);
-      }
-      current = word;
-      if (lines.length >= maxLines) {
-        break;
-      }
-    }
-    if (current && lines.length < maxLines) {
-      lines.push(current);
-    }
-    if (words.length > 0 && lines.length > 0 && lines.length === maxLines) {
-      const consumed = lines.join(' ');
-      if (consumed.length < normalized.length) {
-        const last = lines[maxLines - 1] ?? '';
-        lines[maxLines - 1] = last.length > 3 ? `${last.slice(0, maxCharsPerLine - 1)}…` : `${last}…`;
-      }
-    }
-    return lines;
-  }
-
-  exportTimelinePng(): void {
-    const element = document.getElementById('inspection-timeline-svg');
-    if (!(element instanceof SVGSVGElement)) {
-      this.timelineError.set('Timeline canvas is unavailable for export.');
-      return;
-    }
-    const svg = element;
-
-    const serializer = new XMLSerializer();
-    const source = serializer.serializeToString(svg);
-    const blob = new Blob([source], { type: 'image/svg+xml;charset=utf-8' });
-    const url = URL.createObjectURL(blob);
-    const image = new Image();
-
-    image.onload = () => {
-      const width = this.timelineSvgWidth();
-      const height = this.timelineChartHeight;
-      const canvas = document.createElement('canvas');
-      canvas.width = width * 2;
-      canvas.height = height * 2;
-      const context = canvas.getContext('2d');
-      if (!context) {
-        URL.revokeObjectURL(url);
-        this.timelineError.set('Failed to initialize export renderer.');
-        return;
-      }
-      context.scale(2, 2);
-      context.fillStyle = '#ffffff';
-      context.fillRect(0, 0, width, height);
-      context.drawImage(image, 0, 0, width, height);
-      canvas.toBlob((pngBlob) => {
-        if (!pngBlob) {
-          this.timelineError.set('Failed to encode PNG export.');
-          URL.revokeObjectURL(url);
-          return;
-        }
-        const downloadUrl = URL.createObjectURL(pngBlob);
-        const link = document.createElement('a');
-        const sessionId = this.timelineSession()?.session_id ?? 'session';
-        link.href = downloadUrl;
-        link.download = `patient-timeline-${sessionId}.png`;
-        document.body.appendChild(link);
-        link.click();
-        link.remove();
-        URL.revokeObjectURL(downloadUrl);
-        URL.revokeObjectURL(url);
-      }, 'image/png');
-    };
-
-    image.onerror = () => {
-      URL.revokeObjectURL(url);
-      this.timelineError.set('Failed to render timeline for export.');
-    };
-
-    image.src = url;
   }
 
   async confirmAndRemoveSession(row: InspectionSessionItem): Promise<void> {
@@ -726,7 +366,6 @@ export class DataInspectionPageComponent implements OnInit, OnDestroy {
 
     try {
       await deleteInspectionSession(row.session_id);
-      this.timelineCache.delete(row.session_id);
       await this.loadSessions();
     } catch (error) {
       this.sessionError.set(
@@ -745,10 +384,6 @@ export class DataInspectionPageComponent implements OnInit, OnDestroy {
 
   canOpenTimeline(row: InspectionSessionItem): boolean {
     return row.has_timeline || row.can_generate_timeline;
-  }
-
-  isTimelineRegenerationBlocked(): boolean {
-    return Date.now() < this.timelineRegenerationBlockedUntil();
   }
 
   closeAliases(): void {
@@ -795,28 +430,6 @@ export class DataInspectionPageComponent implements OnInit, OnDestroy {
         error instanceof Error ? error.message : 'Failed to delete drug from LiverTox catalog.',
       );
     }
-  }
-
-  async openDiliPriorDetails(drugId: number): Promise<void> {
-    await this.diliPriorDetail.load(
-      () => fetchInspectionDiliPriorDetails(drugId),
-      'Failed to load DILI prior details.',
-    );
-  }
-
-  closeDiliPriorDetails(): void {
-    this.diliPriorDetail.close();
-  }
-
-  async openDrugLabelSections(drugId: number): Promise<void> {
-    await this.drugLabelSectionsDetail.load(
-      () => fetchInspectionDrugLabelSections(drugId),
-      'Failed to load label sections.',
-    );
-  }
-
-  closeDrugLabelSections(): void {
-    this.drugLabelSectionsDetail.close();
   }
 
   changeView(view: InspectionViewId): void {
@@ -880,14 +493,6 @@ export class DataInspectionPageComponent implements OnInit, OnDestroy {
     await this.liverToxCatalog.updateSearch(value);
   }
 
-  async updateDiliPriorsSearch(value: string): Promise<void> {
-    await this.diliPriorCatalog.updateSearch(value);
-  }
-
-  async updateDrugLabelsSearch(value: string): Promise<void> {
-    await this.drugLabelCatalog.updateSearch(value);
-  }
-
   async updateRagSearch(value: string): Promise<void> {
     await this.ragCatalog.updateSearch(value);
   }
@@ -902,14 +507,6 @@ export class DataInspectionPageComponent implements OnInit, OnDestroy {
 
   onLiverToxScroll(event: Event): void {
     this.liverToxCatalog.handleScrollEvent(event);
-  }
-
-  onDiliPriorsScroll(event: Event): void {
-    this.diliPriorCatalog.handleScrollEvent(event);
-  }
-
-  onDrugLabelsScroll(event: Event): void {
-    this.drugLabelCatalog.handleScrollEvent(event);
   }
 
   onRagScroll(event: Event): void {

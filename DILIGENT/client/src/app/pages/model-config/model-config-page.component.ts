@@ -50,7 +50,7 @@ const DEFAULT_CLOUD_PROVIDERS: readonly CloudProvider[] = ['openai', 'gemini'];
 const PROVIDER_LABELS: Record<AccessKeyProvider, string> = {
   openai: 'OpenAI',
   gemini: 'Gemini',
-  tavily: 'Tavily',
+  brave: 'Brave Search',
 };
 
 const TERMINAL_JOB_STATUSES: readonly JobStatus[] = ['completed', 'failed', 'cancelled'];
@@ -60,7 +60,7 @@ function isCloudProvider(provider: string): provider is CloudProvider {
 }
 
 function resolveProviderLabel(provider: string): string {
-  if (provider === 'openai' || provider === 'gemini' || provider === 'tavily') {
+  if (provider === 'openai' || provider === 'gemini' || provider === 'brave') {
     return PROVIDER_LABELS[provider];
   }
   return provider;

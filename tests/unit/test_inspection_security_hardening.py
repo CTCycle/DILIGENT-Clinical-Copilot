@@ -9,12 +9,9 @@ from sqlalchemy import create_engine
 from DILIGENT.server.api import data_inspection
 from DILIGENT.server.domain.inspection import (
     CatalogListFilters,
-    DiliPriorCatalogResponse,
-    DiliPriorDetailResponse,
-    DrugLabelCatalogResponse,
-    DrugLabelSectionsResponse,
-    InspectionDiliPriorsOverrideRequest,
-    InspectionDrugLabelsOverrideRequest,
+    InspectionLiverToxOverrideRequest,
+    InspectionRagOverrideRequest,
+    InspectionRxNavOverrideRequest,
     MAX_SEARCH_LENGTH,
     SessionListFilters,
 )
@@ -72,85 +69,36 @@ def test_schema_guard_rejects_missing_required_columns() -> None:
 
 # -----------------------------------------------------------------------------
 def test_new_inspection_models_validate_shapes() -> None:
-    priors_request = InspectionDiliPriorsOverrideRequest(redownload=True)
-    assert priors_request.redownload is True
-
-    labels_request = InspectionDrugLabelsOverrideRequest(
-        dailymed_request_timeout=10.0,
-        dailymed_max_concurrency=4,
-        redownload=False,
+    rxnav_request = InspectionRxNavOverrideRequest(
+        rxnav_request_timeout=10.0,
+        rxnav_max_concurrency=4,
     )
-    assert labels_request.dailymed_max_concurrency == 4
+    assert rxnav_request.rxnav_max_concurrency == 4
 
-    priors_catalog = DiliPriorCatalogResponse(
-        items=[
-            {
-                "drug_id": 1,
-                "drug_name": "Acetaminophen",
-                "dilirank_class": "Most-DILI-Concern",
-                "dilist_class": "Known",
-                "linked_source_count": 2,
-            }
-        ],
-        total=1,
-        offset=0,
-        limit=10,
+    livertox_request = InspectionLiverToxOverrideRequest(
+        livertox_archive="livertox-current.zip",
+        redownload=True,
     )
-    assert priors_catalog.total == 1
+    assert livertox_request.redownload is True
 
-    prior_detail = DiliPriorDetailResponse(
-        drug_id=1,
-        drug_name="Acetaminophen",
-        annotations=[{"source_dataset": "dilirank"}],
+    rag_request = InspectionRagOverrideRequest(
+        chunk_size=512,
+        chunk_overlap=64,
+        use_cloud_embeddings=False,
     )
-    assert len(prior_detail.annotations) == 1
-
-    label_catalog = DrugLabelCatalogResponse(
-        items=[
-            {
-                "drug_id": 1,
-                "drug_name": "Acetaminophen",
-                "source": "dailymed",
-                "effective_date": "2025-01-01",
-                "retained_section_count": 1,
-            }
-        ],
-        total=1,
-        offset=0,
-        limit=10,
-    )
-    assert label_catalog.total == 1
-
-    label_detail = DrugLabelSectionsResponse(
-        drug_id=1,
-        drug_name="Acetaminophen",
-        source="dailymed",
-        set_id="set-1",
-        spl_version=1,
-        effective_date="2025-01-01",
-        sections=[
-            {
-                "section_key": "boxed_warning",
-                "section_title": "Boxed Warning",
-                "text": "Hepatic warning.",
-                "contains_hepatic_keywords": True,
-                "display_order": 0,
-            }
-        ],
-    )
-    assert label_detail.sections[0]["section_key"] == "boxed_warning"
+    assert rag_request.chunk_size == 512
 
 
 # -----------------------------------------------------------------------------
-def test_dili_priors_update_config_route_is_not_shadowed() -> None:
+def test_livertox_update_config_route_is_not_shadowed() -> None:
     class ServiceStub:
         @staticmethod
         def build_update_config_response(target: str) -> dict[str, object]:
-            assert target == "dili_priors"
+            assert target == "livertox"
             return {
-                "target": "dili_priors",
-                "defaults": {"dili_priors_request_timeout": 10.0, "redownload": False},
-                "allowed_fields": ["dili_priors_request_timeout", "redownload"],
+                "target": "livertox",
+                "defaults": {"redownload": False},
+                "allowed_fields": ["redownload"],
             }
 
     app = FastAPI()
@@ -159,20 +107,20 @@ def test_dili_priors_update_config_route_is_not_shadowed() -> None:
     try:
         app.include_router(data_inspection.router)
         client = TestClient(app)
-        response = client.get("/inspection/dili-priors/update-config")
+        response = client.get("/inspection/livertox/update-config")
     finally:
         data_inspection.endpoint.service = original_service
 
     assert response.status_code == 200
-    assert response.json()["target"] == "dili_priors"
+    assert response.json()["target"] == "livertox"
 
 
 # -----------------------------------------------------------------------------
-def test_dili_priors_update_config_exposes_only_supported_overrides() -> None:
+def test_livertox_update_config_exposes_only_supported_overrides() -> None:
     service = object.__new__(DataInspectionService)
 
-    payload = service.build_update_config_response("dili_priors")
+    payload = service.build_update_config_response("livertox")
 
-    assert payload["target"] == "dili_priors"
-    assert payload["allowed_fields"] == ["redownload"]
-    assert set(payload["defaults"]) == {"redownload"}
+    assert payload["target"] == "livertox"
+    assert "redownload" in payload["allowed_fields"]
+    assert "redownload" in payload["defaults"]

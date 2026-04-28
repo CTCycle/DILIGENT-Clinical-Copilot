@@ -6,7 +6,7 @@ from DILIGENT.server.domain.research.entities import (
     ResearchRequest,
     ResearchResponse,
 )
-from DILIGENT.server.services.research.tavily import tavily_research_service
+from DILIGENT.server.services.research.brave import brave_research_service
 
 router = APIRouter(tags=["research"])
 
@@ -21,21 +21,21 @@ class ResearchEndpoint:
         self,
         payload: ResearchRequest = Body(...),
     ) -> ResearchResponse:
-        if not tavily_research_service.is_configured():
+        if not brave_research_service.is_configured():
             raise HTTPException(
                 status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
                 detail=(
-                    "No active Tavily access key configured. "
-                    "Add and activate a Tavily key in the access-key manager."
+                    "No active Brave Search access key configured. "
+                    "Add and activate a Brave Search key in the access-key manager."
                 ),
             )
-        outcome = await tavily_research_service.search_sources(
+        outcome = await brave_research_service.search_sources(
             question=payload.question,
             mode=payload.mode,
             allowed_domains=payload.allowed_domains,
             blocked_domains=payload.blocked_domains,
         )
-        answer, citations = await tavily_research_service.generate_answer_with_citations(
+        answer, citations = await brave_research_service.generate_answer_with_citations(
             question=payload.question,
             sources=outcome.sources,
         )

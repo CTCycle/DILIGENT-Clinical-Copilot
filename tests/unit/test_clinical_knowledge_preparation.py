@@ -16,25 +16,13 @@ class SerializerStub:
                 "drug_id": 101,
                 "drug_name": "Acetaminophen",
                 "livertox_excerpt": "LiverTox excerpt.",
-                "dili_annotations": [
-                    {"source_dataset": "dilirank", "classification": "Most-DILI-Concern"}
-                ],
-                "label_sections": [
-                    {
-                        "section_key": "boxed_warning",
-                        "section_title": "Boxed Warning",
-                        "text": "Hepatic warning text.",
-                        "contains_hepatic_keywords": True,
-                        "display_order": 0,
-                    }
-                ],
+                "livertox_monographs": [],
             }
         return {
             "drug_id": drug_id,
             "drug_name": "Unknown",
             "livertox_excerpt": None,
-            "dili_annotations": [],
-            "label_sections": [],
+            "livertox_monographs": [],
         }
 
     def get_livertox_records(self) -> Any:
@@ -94,13 +82,12 @@ def test_prepare_inputs_enriches_resolved_drugs_with_knowledge() -> None:
     assert prepared.resolved_drugs
     payload = next(iter(prepared.resolved_drugs.values()))
     assert payload["drug_id"] == 101
-    assert payload["dili_annotations"]
-    assert payload["label_sections"]
+    assert "LiverTox excerpt." in payload["knowledge_prompt"]
     assert payload["knowledge_prompt"]
 
 
 # -----------------------------------------------------------------------------
-def test_prepare_inputs_handles_missing_dailymed_data() -> None:
+def test_prepare_inputs_handles_missing_livertox_monographs() -> None:
     preparation = object.__new__(ClinicalKnowledgePreparation)
     preparation.serializer = SerializerStub()  # type: ignore[assignment]
     preparation.knowledge_composer = ClinicalKnowledgeComposer(
@@ -118,5 +105,4 @@ def test_prepare_inputs_handles_missing_dailymed_data() -> None:
 
     assert prepared is not None
     payload = next(iter(prepared.resolved_drugs.values()))
-    assert "dili_annotations" in payload
-    assert "label_sections" in payload
+    assert "livertox_monographs" in payload

@@ -4,8 +4,8 @@ import pytest
 from playwright.sync_api import APIRequestContext
 
 
-def get_active_tavily_keys(api_context: APIRequestContext) -> list[dict]:
-    response = api_context.get("/api/access-keys?provider=tavily")
+def get_active_brave_keys(api_context: APIRequestContext) -> list[dict]:
+    response = api_context.get("/api/access-keys?provider=brave")
     if response.status != 200:
         return []
     payload = response.json()
@@ -15,24 +15,24 @@ def get_active_tavily_keys(api_context: APIRequestContext) -> list[dict]:
 
 
 def test_research_returns_503_when_key_missing(api_context: APIRequestContext) -> None:
-    if get_active_tavily_keys(api_context):
-        pytest.skip("An active Tavily access key is configured; missing-key path not applicable.")
+    if get_active_brave_keys(api_context):
+        pytest.skip("An active Brave Search access key is configured; missing-key path not applicable.")
 
     response = api_context.post("/api/research", data={"question": "acetaminophen DILI evidence"})
     assert response.status == 503
-    assert "No active Tavily access key configured" in response.text()
+    assert "No active Brave Search access key" in response.text()
 
     alias_response = api_context.post("/api/research", data={"question": "acetaminophen DILI evidence"})
     assert alias_response.status == 503
 
 
 def test_research_smoke_when_key_available(api_context: APIRequestContext) -> None:
-    if not get_active_tavily_keys(api_context):
-        pytest.skip("No active Tavily access key is configured.")
+    if not get_active_brave_keys(api_context):
+        pytest.skip("No active Brave Search access key is configured.")
 
     response = api_context.post("/api/research", data={"question": "acetaminophen DILI evidence"})
     if response.status == 503:
-        pytest.skip("Active Tavily key exists but backend could not load it.")
+        pytest.skip("Active Brave Search key exists but backend could not load it.")
     assert response.status == 200
 
     payload = response.json()

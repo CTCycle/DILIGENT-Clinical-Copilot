@@ -17,7 +17,7 @@ from DILIGENT.server.configurations.llm_configs import LLMRuntimeConfig
 from DILIGENT.server.services.llm.structured import StructuredOutputParser, parse_json_dict, T
 from DILIGENT.server.repositories.serialization.access_keys import AccessKeySerializer
 
-ProviderName = Literal["openai", "azure-openai", "anthropic", "gemini"]
+ProviderName = Literal["openai", "gemini"]
 
 
 ###############################################################################
@@ -32,8 +32,8 @@ class LLMTimeout(LLMError):
 ###############################################################################
 class CloudLLMClient:
     """
-    Async client for hosted/proprietary LLMs (OpenAI, Gemini, etc.) with a
-    compatible interface to `OllamaClient` for easy swapping.
+    Async client for hosted/proprietary LLMs (OpenAI, Gemini, etc.) that follows
+    the app's shared LLM call shape.
 
     """
 
@@ -77,8 +77,6 @@ class CloudLLMClient:
                 "x-goog-api-key": provider_access_key,
             }
             self.gemini_client = genai.Client(api_key=provider_access_key)
-        elif provider in ("azure-openai", "anthropic"):
-            raise LLMError(f"Provider '{provider}' not yet configured")
         else:
             raise LLMError(f"Unknown provider: {provider}")
 

@@ -153,28 +153,22 @@ class Drug(Base):
         "DrugAlias",
         back_populates="drug",
     )
-    monograph: Mapped["LiverToxMonograph | None"] = relationship(
+    monographs: Mapped[list["LiverToxMonograph"]] = relationship(
         "LiverToxMonograph",
-        back_populates="drug",
-        uselist=False,
-    )
-    dili_annotations: Mapped[list["DrugDiliAnnotation"]] = relationship(
-        "DrugDiliAnnotation",
-        back_populates="drug",
-    )
-    label_documents: Mapped[list["DrugLabelDocument"]] = relationship(
-        "DrugLabelDocument",
         back_populates="drug",
     )
     session_drugs: Mapped[list["ClinicalSessionDrug"]] = relationship(
         "ClinicalSessionDrug",
         back_populates="drug",
     )
+    kb_match_cache_entries: Mapped[list["KbMatchCache"]] = relationship(
+        "KbMatchCache",
+        back_populates="drug",
+    )
 
     __table_args__ = (
         UniqueConstraint("canonical_name_norm", name="uq_drugs_canonical_name_norm"),
         UniqueConstraint("rxnorm_rxcui", name="uq_drugs_rxnorm_rxcui"),
-        UniqueConstraint("livertox_nbk_id", name="uq_drugs_livertox_nbk_id"),
         Index("ix_drugs_rxnorm_rxcui", "rxnorm_rxcui"),
         Index("ix_drugs_livertox_nbk_id", "livertox_nbk_id"),
     )
@@ -229,12 +223,10 @@ class LiverToxMonograph(Base):
     __tablename__ = "livertox_monographs"
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
-    drug_id: Mapped[int] = mapped_column(
-        Integer,
-        ForeignKey(DRUGS_ID_FK),
-        nullable=False,
-        unique=True,
-    )
+    drug_id: Mapped[int] = mapped_column(Integer, ForeignKey(DRUGS_ID_FK), nullable=False)
+    monograph_key: Mapped[str] = mapped_column(String, nullable=False)
+    drug_name_norm: Mapped[str] = mapped_column(String, nullable=False)
+    nbk_id: Mapped[str | None] = mapped_column(String, nullable=True)
     excerpt: Mapped[str | None] = mapped_column(Text)
     likelihood_score: Mapped[str | None] = mapped_column(String)
     last_update: Mapped[str | None] = mapped_column(String)
@@ -247,116 +239,13 @@ class LiverToxMonograph(Base):
     source_url: Mapped[str | None] = mapped_column(String)
     source_last_modified: Mapped[str | None] = mapped_column(String)
 
-    drug: Mapped["Drug"] = relationship("Drug", back_populates="monograph")
+    drug: Mapped["Drug"] = relationship("Drug", back_populates="monographs")
 
     __table_args__ = (
-        UniqueConstraint("drug_id", name="uq_livertox_monographs_drug_id"),
+        UniqueConstraint("monograph_key", name="uq_livertox_monographs_monograph_key"),
         Index("ix_livertox_monographs_drug_id", "drug_id"),
-    )
-
-
-###############################################################################
-class DrugDiliAnnotation(Base):
-    __tablename__ = "drug_dili_annotations"
-
-    id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
-    drug_id: Mapped[int | None] = mapped_column(Integer, ForeignKey(DRUGS_ID_FK), nullable=True)
-    source_dataset: Mapped[str] = mapped_column(String, nullable=False)
-    source_record_id: Mapped[str] = mapped_column(String, nullable=False)
-    source_name: Mapped[str | None] = mapped_column(Text, nullable=True)
-    source_name_norm: Mapped[str | None] = mapped_column(String, nullable=True)
-    classification: Mapped[str | None] = mapped_column(String, nullable=True)
-    severity_class: Mapped[str | None] = mapped_column(String, nullable=True)
-    concern_class: Mapped[str | None] = mapped_column(String, nullable=True)
-    label_section: Mapped[str | None] = mapped_column(String, nullable=True)
-    routes: Mapped[str | None] = mapped_column(Text, nullable=True)
-    comment: Mapped[str | None] = mapped_column(Text, nullable=True)
-    source_url: Mapped[str | None] = mapped_column(String, nullable=True)
-    source_last_modified: Mapped[str | None] = mapped_column(String, nullable=True)
-
-    drug: Mapped["Drug | None"] = relationship("Drug", back_populates="dili_annotations")
-
-    __table_args__ = (
-        UniqueConstraint(
-            "source_dataset",
-            "source_record_id",
-            name="uq_drug_dili_annotations_source_identity",
-        ),
-        Index("ix_drug_dili_annotations_drug_id", "drug_id"),
-        Index(
-            "ix_drug_dili_annotations_source_name_norm",
-            "source_dataset",
-            "source_name_norm",
-        ),
-    )
-
-
-###############################################################################
-class DrugLabelDocument(Base):
-    __tablename__ = "drug_label_documents"
-
-    id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
-    drug_id: Mapped[int] = mapped_column(Integer, ForeignKey(DRUGS_ID_FK), nullable=False)
-    source: Mapped[str] = mapped_column(String, nullable=False)
-    set_id: Mapped[str] = mapped_column(String, nullable=False)
-    spl_version: Mapped[int] = mapped_column(Integer, nullable=False)
-    title: Mapped[str | None] = mapped_column(Text, nullable=True)
-    labeler: Mapped[str | None] = mapped_column(Text, nullable=True)
-    effective_date: Mapped[str | None] = mapped_column(String, nullable=True)
-    source_url: Mapped[str | None] = mapped_column(String, nullable=True)
-    source_last_modified: Mapped[str | None] = mapped_column(String, nullable=True)
-
-    drug: Mapped["Drug"] = relationship("Drug", back_populates="label_documents")
-    sections: Mapped[list["DrugLabelSection"]] = relationship(
-        "DrugLabelSection",
-        back_populates="document",
-    )
-
-    __table_args__ = (
-        UniqueConstraint(
-            "source",
-            "set_id",
-            "spl_version",
-            name="uq_drug_label_documents_source_identity",
-        ),
-        Index("ix_drug_label_documents_drug_id", "drug_id"),
-        Index("ix_drug_label_documents_source_set_id", "source", "set_id"),
-    )
-
-
-###############################################################################
-class DrugLabelSection(Base):
-    __tablename__ = "drug_label_sections"
-
-    id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
-    document_id: Mapped[int] = mapped_column(
-        Integer,
-        ForeignKey("drug_label_documents.id"),
-        nullable=False,
-    )
-    section_key: Mapped[str] = mapped_column(String, nullable=False)
-    section_title: Mapped[str | None] = mapped_column(Text, nullable=True)
-    text: Mapped[str] = mapped_column(Text, nullable=False)
-    contains_hepatic_keywords: Mapped[bool] = mapped_column(Boolean, nullable=False)
-    display_order: Mapped[int] = mapped_column(Integer, nullable=False, server_default="0")
-
-    document: Mapped["DrugLabelDocument"] = relationship(
-        "DrugLabelDocument",
-        back_populates="sections",
-    )
-
-    __table_args__ = (
-        UniqueConstraint(
-            "document_id",
-            "section_key",
-            name="uq_drug_label_sections_document_key",
-        ),
-        Index("ix_drug_label_sections_document_id", "document_id"),
-        Index(
-            "ix_drug_label_sections_key_contains_hepatic",
-            "section_key",
-            "contains_hepatic_keywords",
-        ),
+        Index("ix_livertox_monographs_nbk_id", "nbk_id"),
+        Index("ix_livertox_monographs_drug_name_norm", "drug_name_norm"),
     )
 
 
@@ -449,6 +338,59 @@ class ClinicalSessionDrug(Base):
         Index("ix_clinical_session_drugs_session_id", "session_id"),
         Index("ix_clinical_session_drugs_drug_id", "drug_id"),
         Index("ix_clinical_session_drugs_raw_drug_name_norm", "raw_drug_name_norm"),
+    )
+
+
+###############################################################################
+class KbMatchCache(Base):
+    __tablename__ = "kb_match_cache"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
+    raw_drug_name: Mapped[str] = mapped_column(Text, nullable=False)
+    raw_drug_name_norm: Mapped[str] = mapped_column(String, nullable=False)
+    normalized_drug_key: Mapped[str] = mapped_column(String, nullable=False)
+    drug_id: Mapped[int | None] = mapped_column(Integer, ForeignKey(DRUGS_ID_FK), nullable=True)
+    rxnorm_rxcui: Mapped[str | None] = mapped_column(String, nullable=True)
+    livertox_monograph_key: Mapped[str | None] = mapped_column(String, nullable=True)
+    livertox_nbk_id: Mapped[str | None] = mapped_column(String, nullable=True)
+    source: Mapped[str] = mapped_column(String, nullable=False)
+    confidence: Mapped[float] = mapped_column(Float, nullable=False)
+    evidence_json: Mapped[str | None] = mapped_column(Text, nullable=True)
+    deterministic_evidence_version: Mapped[str | None] = mapped_column(String, nullable=True)
+    invalidated_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
+    invalidation_reason: Mapped[str | None] = mapped_column(Text, nullable=True)
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime,
+        nullable=False,
+        server_default=text("CURRENT_TIMESTAMP"),
+    )
+    updated_at: Mapped[datetime] = mapped_column(
+        DateTime,
+        nullable=False,
+        server_default=text("CURRENT_TIMESTAMP"),
+        server_onupdate=text("CURRENT_TIMESTAMP"),
+    )
+
+    drug: Mapped["Drug | None"] = relationship("Drug", back_populates="kb_match_cache_entries")
+
+    __table_args__ = (
+        CheckConstraint(
+            "source IN ('rxnav', 'livertox', 'rag')",
+            name="ck_kb_match_cache_source",
+        ),
+        CheckConstraint(
+            "confidence >= 0.0 AND confidence <= 1.0",
+            name="ck_kb_match_cache_confidence",
+        ),
+        UniqueConstraint(
+            "normalized_drug_key",
+            "source",
+            name="uq_kb_match_cache_key_source",
+        ),
+        Index("ix_kb_match_cache_raw_drug_name_norm", "raw_drug_name_norm"),
+        Index("ix_kb_match_cache_normalized_source", "normalized_drug_key", "source"),
+        Index("ix_kb_match_cache_drug_id", "drug_id"),
+        Index("ix_kb_match_cache_valid", "invalidated_at"),
     )
 
 
@@ -673,7 +615,7 @@ class ResearchAccessKey(Base):
     provider: Mapped[str] = mapped_column(
         String,
         nullable=False,
-        server_default=text("'tavily'"),
+        server_default=text("'brave'"),
     )
     encrypted_value: Mapped[str] = mapped_column(Text, nullable=False)
     encryption_key_version: Mapped[int] = mapped_column(Integer, nullable=False)
@@ -698,7 +640,7 @@ class ResearchAccessKey(Base):
 
     __table_args__ = (
         CheckConstraint(
-            "provider = 'tavily'",
+            "provider = 'brave'",
             name="ck_research_access_keys_provider",
         ),
         Index("ix_research_access_keys_provider", "provider"),

@@ -55,7 +55,7 @@ class PatientData(BaseModel):
     )
     use_web_search: bool = Field(
         default=False,
-        description="Enables Tavily-backed web evidence retrieval per analyzed drug.",
+        description="Enables Brave Search-backed web evidence retrieval per analyzed drug.",
     )
 
     # -------------------------------------------------------------------------

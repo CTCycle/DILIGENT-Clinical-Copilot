@@ -170,7 +170,7 @@ def test_gemini_chat_uses_generate_content_and_normalizes_json(monkeypatch) -> N
 
 
 # -----------------------------------------------------------------------------
-def test_llm_text_call_remains_compatibility_wrapper(monkeypatch) -> None:
+def test_llm_text_call_uses_openai_responses_api(monkeypatch) -> None:
     class FakeResponses:
         async def create(self, **kwargs: Any) -> FakeOpenAIResponse:
             _ = kwargs

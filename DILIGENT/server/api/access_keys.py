@@ -18,7 +18,7 @@ serializer = service.serializer
 ###############################################################################
 @router.get("", response_model=list[AccessKeyResponse], status_code=status.HTTP_200_OK)
 def list_access_keys(
-    provider: ProviderName = Query(..., description="openai, gemini, or tavily"),
+    provider: ProviderName = Query(..., description="openai, gemini, or brave"),
 ) -> list[AccessKeyResponse]:
     try:
         return service.list_access_keys(provider)
@@ -59,7 +59,7 @@ def create_access_key(
 )
 def activate_access_key(
     key_id: int = Path(..., ge=1),
-    provider: ProviderName = Query(..., description="openai, gemini, or tavily"),
+    provider: ProviderName = Query(..., description="openai, gemini, or brave"),
 ) -> AccessKeyResponse:
     try:
         return service.activate_access_key(key_id, provider=provider)
@@ -79,7 +79,7 @@ def activate_access_key(
 )
 def delete_access_key(
     key_id: int = Path(..., ge=1),
-    provider: ProviderName = Query(..., description="openai, gemini, or tavily"),
+    provider: ProviderName = Query(..., description="openai, gemini, or brave"),
 ) -> AccessKeyDeleteResponse:
     deleted = service.delete_access_key(key_id, provider=provider)
     if not deleted:

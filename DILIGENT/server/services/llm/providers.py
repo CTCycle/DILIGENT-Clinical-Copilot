@@ -30,7 +30,7 @@ from DILIGENT.server.common.utils.logger import logger
 from DILIGENT.server.common.utils.types import extract_positive_int
 
 
-ProviderName = Literal["openai", "azure-openai", "anthropic", "gemini"]
+ProviderName = Literal["openai", "gemini"]
 RuntimePurpose = Literal["clinical", "parser"]
 
 __all__ = [

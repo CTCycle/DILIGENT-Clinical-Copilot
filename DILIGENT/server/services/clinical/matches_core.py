@@ -5,7 +5,6 @@ from collections import OrderedDict
 from typing import Any, Generic, Iterable, TypeVar
 
 import pandas as pd
-from rapidfuzz import fuzz
 
 from DILIGENT.server.configurations.startup import server_settings
 from DILIGENT.server.common.utils.logger import logger
@@ -32,31 +31,6 @@ from DILIGENT.server.services.text.synonyms import (
 KT = TypeVar("KT")
 VT = TypeVar("VT")
 CACHE_MISS = object()
-
-
-def append_token_combinations(
-    alternatives: list[list[str]],
-    original_tokens: list[str],
-    index: int,
-    current: list[str],
-    results: list[list[str]],
-) -> None:
-    if len(results) >= 64:
-        return
-    if index >= len(alternatives):
-        if current != original_tokens:
-            results.append(current[:])
-        return
-    for option in alternatives[index]:
-        current.append(option)
-        append_token_combinations(
-            alternatives,
-            original_tokens,
-            index + 1,
-            current,
-            results,
-        )
-        current.pop()
 
 
 ###############################################################################
@@ -94,28 +68,20 @@ class DrugsLookup:
     DIRECT_CONFIDENCE = server_settings.drugs_matcher.direct_confidence
     MASTER_CONFIDENCE = server_settings.drugs_matcher.master_confidence
     SYNONYM_CONFIDENCE = server_settings.drugs_matcher.synonym_confidence
-    PARTIAL_CONFIDENCE = server_settings.drugs_matcher.partial_confidence
-    FUZZY_CONFIDENCE = server_settings.drugs_matcher.fuzzy_confidence
-    FUZZY_THRESHOLD = server_settings.drugs_matcher.fuzzy_threshold
-    TOKEN_MAX_FREQUENCY = server_settings.drugs_matcher.token_max_frequency
-    TOKEN_MIN_LENGTH = server_settings.drugs_matcher.token_min_length
     MIN_CONFIDENCE = server_settings.drugs_matcher.min_confidence
-    FUZZY_EARLY_EXIT_RATIO = server_settings.drugs_matcher.fuzzy_early_exit_ratio
     NORMALIZATION_CACHE_LIMIT = (
         server_settings.drugs_matcher.normalization_cache_limit
     )
-    VARIANT_CACHE_LIMIT = server_settings.drugs_matcher.variant_cache_limit
     MATCH_CACHE_LIMIT = server_settings.drugs_matcher.match_cache_limit
     ALIAS_CACHE_LIMIT = server_settings.drugs_matcher.alias_cache_limit
+    TOKEN_MIN_LENGTH = server_settings.drugs_matcher.token_min_length
     CATALOG_EXCLUDED_TERM_SUFFIXES = server_settings.drugs_matcher.catalog_excluded_term_suffixes
-    CATALOG_TOKEN_RATIO_THRESHOLD = (
-        server_settings.drugs_matcher.catalog_token_ratio_threshold
-    )
-    CATALOG_OVERALL_RATIO_THRESHOLD = (
-        server_settings.drugs_matcher.catalog_overall_ratio_threshold
-    )
     CATALOG_INDEX_LIMIT = server_settings.drugs_matcher.catalog_index_limit
-    CATALOG_CANDIDATE_LIMIT = server_settings.drugs_matcher.catalog_candidate_limit
+    SPELLING_CONFIDENCE = server_settings.drugs_matcher.spelling_confidence
+    SPELLING_MIN_QUERY_LENGTH = server_settings.drugs_matcher.spelling_min_query_length
+    SPELLING_SHORT_NAME_LENGTH = server_settings.drugs_matcher.spelling_short_name_length
+    SPELLING_SHORT_MAX_DISTANCE = server_settings.drugs_matcher.spelling_short_max_distance
+    SPELLING_LONG_MAX_DISTANCE = server_settings.drugs_matcher.spelling_long_max_distance
     REGIMEN_SPLIT_RE = re.compile(r"(?:\s*\+\s*|\s*/\s*|\s+\bplus\b\s+)", re.IGNORECASE)
     BRAND_COMBO_PREFERENCES: dict[str, str] = {
         "bactrim": "trimethoprim sulfamethoxazole",
@@ -133,12 +99,8 @@ class DrugsLookup:
             self.ALIAS_CACHE_LIMIT
         )
         self.catalog_global_index: dict[str, tuple[dict[str, Any], bool, str]] = {}
-        self.catalog_token_index: dict[str, set[str]] = {}
         self.normalization_cache: BoundedCache[str, str] = BoundedCache(
             self.NORMALIZATION_CACHE_LIMIT
-        )
-        self.variant_cache: BoundedCache[str, list[str]] = BoundedCache(
-            self.VARIANT_CACHE_LIMIT
         )
 
     # -------------------------------------------------------------------------
@@ -147,9 +109,7 @@ class DrugsLookup:
         self.match_cache.clear()
         self.alias_cache.clear()
         self.normalization_cache.clear()
-        self.variant_cache.clear()
         self.catalog_global_index = {}
-        self.catalog_token_index = {}
         self.prepare_catalog_synonyms()
 
     # -------------------------------------------------------------------------
@@ -287,32 +247,33 @@ class DrugsLookup:
         if stage3_result is not None:
             return stage3_result
 
-        fuzzy = self.match_fuzzy_candidates(normalized_query)
-        if len(fuzzy) == 1:
-            record, confidence, notes = fuzzy[0]
+        spelling = self.match_authoritative_spelling_candidates(normalized_query)
+        if len(spelling) == 1:
+            record, confidence, notes = spelling[0]
             return self.create_matched_result(
                 raw_name=raw_name,
                 canonical_query=canonical_query,
                 normalized_query=normalized_query,
                 record=record,
                 confidence=confidence,
-                reason="fuzzy",
+                reason="spelling_correction",
                 notes=notes,
             )
-        if len(fuzzy) > 1:
+        if len(spelling) > 1:
             return self.create_ambiguous_result(
                 raw_name=raw_name,
                 canonical_query=canonical_query,
                 normalized_query=normalized_query,
-                reason="ambiguous_fuzzy",
-                stage_matches=fuzzy,
+                reason="ambiguous_spelling_correction",
+                stage_matches=spelling,
             )
+
         return self.create_missing_result(
             raw_name=raw_name,
             canonical_query=canonical_query,
             normalized_query=normalized_query,
             reason="no_match",
-            notes=["No deterministic exact/alias/normalized/fuzzy match."],
+            notes=["No exact, alias, normalized, or unique spelling-correction match."],
         )
 
     # -------------------------------------------------------------------------
@@ -359,20 +320,7 @@ class DrugsLookup:
 
     # -------------------------------------------------------------------------
     def resolve_source_backed_query_variants(self, normalized_query: str) -> list[str]:
-        data = self.require_data()
-        variants: list[str] = []
-        seen: set[str] = set()
-        for variant in self.generate_latin_query_variants(normalized_query):
-            normalized_variant = self.normalize_name(variant)
-            if not normalized_variant or normalized_variant == normalized_query:
-                continue
-            if normalized_variant in seen:
-                continue
-            if not self.has_trusted_exact_key(normalized_variant, data):
-                continue
-            seen.add(normalized_variant)
-            variants.append(variant)
-        return variants
+        return []
 
     # -------------------------------------------------------------------------
     def has_trusted_exact_key(self, normalized_key: str, data: LiverToxData) -> bool:
@@ -385,100 +333,135 @@ class DrugsLookup:
         )
 
     # -------------------------------------------------------------------------
-    def generate_latin_query_variants(self, normalized_query: str) -> list[str]:
-        if not normalized_query or not re.fullmatch(r"[a-z0-9 ]+", normalized_query):
+    def match_authoritative_spelling_candidates(
+        self,
+        normalized_query: str,
+    ) -> list[tuple[MonographRecord, float, list[str]]]:
+        if len(normalized_query) < self.SPELLING_MIN_QUERY_LENGTH:
             return []
-        tokens = normalized_query.split()
-        if not tokens:
+        data = self.require_data()
+        candidate_keys: set[str] = set()
+        for candidate, _record, _original, _is_primary in data.variant_catalog:
+            candidate_keys.add(candidate)
+        candidate_keys.update(self.catalog_global_index.keys())
+
+        close_keys = [
+            candidate
+            for candidate in candidate_keys
+            if self.is_small_spelling_difference(normalized_query, candidate)
+        ]
+        if not close_keys:
             return []
-        variants: set[str] = set()
-        for alternatives in self.build_token_alternatives(tokens):
-            candidate = normalize_whitespace(" ".join(alternatives))
-            if candidate and candidate != normalized_query:
-                variants.add(candidate)
-        for candidate in self.generate_acid_phrase_variants(tokens):
-            normalized_candidate = normalize_whitespace(candidate)
-            if normalized_candidate and normalized_candidate != normalized_query:
-                variants.add(normalized_candidate)
-            for alternatives in self.build_token_alternatives(normalized_candidate.split()):
-                combined_candidate = normalize_whitespace(" ".join(alternatives))
-                if combined_candidate and combined_candidate != normalized_query:
-                    variants.add(combined_candidate)
-        return sorted(variants, key=lambda item: (len(item), item))
+
+        stage_matches: list[tuple[MonographRecord, float, list[str]]] = []
+        for key in sorted(close_keys):
+            matches = self.match_normalized_all(key)
+            if not matches and key in self.catalog_global_index:
+                entry, _is_synonym, original = self.catalog_global_index[key]
+                expansion_values = [
+                    original,
+                    entry.get("name"),
+                    entry.get("raw_name"),
+                    *entry.get("synonyms", []),
+                    *entry.get("fallback_aliases", []),
+                ]
+                expanded_keys = self.build_unique_keys(
+                    [str(value) for value in expansion_values if value],
+                    self.normalize_name,
+                )
+                matches = self.resolve_stage_matches(expanded_keys, self.match_normalized_all)
+            for record, _confidence, notes in matches:
+                stage_matches.append(
+                    (
+                        record,
+                        self.SPELLING_CONFIDENCE,
+                        [
+                            *notes,
+                            f"corrected_query='{normalized_query}'",
+                            f"matched_authoritative_key='{key}'",
+                        ],
+                    )
+                )
+        return self.dedupe_stage_matches(stage_matches)
 
     # -------------------------------------------------------------------------
-    def build_token_alternatives(self, tokens: list[str]) -> list[list[str]]:
-        alternatives: list[list[str]] = []
-        for token in tokens:
-            token_options = [token]
-            for variant in self.generate_token_variants(token):
-                if variant not in token_options:
-                    token_options.append(variant)
-            alternatives.append(token_options[:8])
-
-        results: list[list[str]] = []
-        append_token_combinations(alternatives, tokens, 0, [], results)
-        return results
-
-    # -------------------------------------------------------------------------
-    def generate_token_variants(self, token: str) -> list[str]:
-        variants: list[str] = []
-        if len(token) < self.TOKEN_MIN_LENGTH:
-            return variants
-        suffix_replacements: tuple[tuple[str, tuple[str, ...]], ...] = (
-            ("ina", ("in", "ine")),
-            ("ino", ("in", "ine")),
-            ("in", ("ine",)),
-            ("olo", ("ole", "ol")),
-            ("ola", ("ole", "ol")),
-            ("ato", ("ate",)),
-            ("ata", ("ate",)),
-            ("ico", ("ic",)),
-            ("ica", ("ic",)),
+    def is_small_spelling_difference(self, query: str, candidate: str) -> bool:
+        if query == candidate:
+            return False
+        if not query or not candidate or query[0] != candidate[0]:
+            return False
+        if abs(len(query) - len(candidate)) > 2:
+            return False
+        query_parts = query.split()
+        candidate_parts = candidate.split()
+        if len(query_parts) != len(candidate_parts):
+            return False
+        total_distance = 0
+        for query_part, candidate_part in zip(query_parts, candidate_parts, strict=True):
+            if abs(len(query_part) - len(candidate_part)) > 2:
+                return False
+            distance_limit = max(
+                self.SPELLING_SHORT_MAX_DISTANCE,
+                self.SPELLING_LONG_MAX_DISTANCE,
+            )
+            distance = self.bounded_edit_distance(
+                query_part,
+                candidate_part,
+                limit=distance_limit,
+            )
+            if distance > distance_limit:
+                return False
+            total_distance += distance
+        allowed_distance = (
+            self.SPELLING_SHORT_MAX_DISTANCE
+            if max(len(query), len(candidate)) < self.SPELLING_SHORT_NAME_LENGTH
+            else self.SPELLING_LONG_MAX_DISTANCE
         )
-        for suffix, replacements in suffix_replacements:
-            if not token.endswith(suffix):
-                continue
-            stem = token[: -len(suffix)]
-            if len(stem) < 3:
-                continue
-            for replacement in replacements:
-                variant = f"{stem}{replacement}"
-                if variant != token and variant not in variants:
-                    variants.append(variant)
-        for variant in [token, *variants[:]]:
-            if "f" not in variant:
-                continue
-            ph_variant = variant.replace("f", "ph")
-            if ph_variant != variant and ph_variant not in variants:
-                variants.append(ph_variant)
-        return variants
+        return 0 < total_distance <= allowed_distance
 
     # -------------------------------------------------------------------------
-    def generate_acid_phrase_variants(self, tokens: list[str]) -> list[str]:
-        variants: list[str] = []
-        for index in range(len(tokens) - 1):
-            if tokens[index] not in {"acid", "acido", "acide"}:
-                continue
-            acid_forms = self.generate_acid_name_forms(tokens[index + 1])
-            if not acid_forms:
-                continue
-            for acid_form in acid_forms:
-                variant_tokens = [*tokens[:index], *acid_form.split(), *tokens[index + 2 :]]
-                variants.append(" ".join(variant_tokens))
-        return variants
+    @staticmethod
+    def bounded_edit_distance(left: str, right: str, *, limit: int) -> int:
+        if abs(len(left) - len(right)) > limit:
+            return limit + 1
+        previous = list(range(len(right) + 1))
+        for left_index, left_char in enumerate(left, start=1):
+            current = [left_index]
+            row_min = current[0]
+            for right_index, right_char in enumerate(right, start=1):
+                cost = 0 if left_char == right_char else 1
+                value = min(
+                    previous[right_index] + 1,
+                    current[right_index - 1] + 1,
+                    previous[right_index - 1] + cost,
+                )
+                current.append(value)
+                row_min = min(row_min, value)
+            if row_min > limit:
+                return limit + 1
+            previous = current
+        return previous[-1]
 
     # -------------------------------------------------------------------------
-    def generate_acid_name_forms(self, token: str) -> list[str]:
-        forms: list[str] = []
-        for suffix in ("ico", "ica"):
-            if not token.endswith(suffix):
+    def dedupe_stage_matches(
+        self,
+        stage_matches: list[tuple[MonographRecord, float, list[str]]],
+    ) -> list[tuple[MonographRecord, float, list[str]]]:
+        merged: dict[str, tuple[MonographRecord, float, list[str]]] = {}
+        for record, confidence, notes in stage_matches:
+            record_key = self.record_identity_key(record)
+            existing = merged.get(record_key)
+            if existing is None or confidence > existing[1]:
+                merged[record_key] = (record, confidence, list(dict.fromkeys(notes)))
                 continue
-            stem = token[: -len(suffix)]
-            if len(stem) < 3:
-                continue
-            forms.extend([f"{stem}ic acid", f"{stem}ate"])
-        return list(dict.fromkeys(forms))
+            merged[record_key] = (
+                existing[0],
+                existing[1],
+                list(dict.fromkeys(existing[2] + notes)),
+            )
+        ordered = list(merged.values())
+        ordered.sort(key=lambda item: (item[0].drug_name.casefold(), item[0].nbk_id.casefold()))
+        return ordered
 
     # -------------------------------------------------------------------------
     def resolve_stage_matches(
@@ -489,9 +472,10 @@ class DrugsLookup:
         merged: dict[str, tuple[MonographRecord, float, list[str]]] = {}
         for key in keys:
             for record, confidence, notes in resolver(key):
-                existing = merged.get(record.nbk_id)
+                record_key = self.record_identity_key(record)
+                existing = merged.get(record_key)
                 if existing is None or confidence > existing[1]:
-                    merged[record.nbk_id] = (
+                    merged[record_key] = (
                         record,
                         confidence,
                         list(dict.fromkeys(notes)),
@@ -499,7 +483,7 @@ class DrugsLookup:
                     continue
                 if existing is not None:
                     combined = list(dict.fromkeys(existing[2] + notes))
-                    merged[record.nbk_id] = (existing[0], existing[1], combined)
+                    merged[record_key] = (existing[0], existing[1], combined)
         ordered = list(merged.values())
         ordered.sort(key=lambda item: (item[0].drug_name.casefold(), item[0].nbk_id.casefold()))
         return ordered
@@ -561,6 +545,11 @@ class DrugsLookup:
             reason=f"ambiguous_{stage_name}",
             stage_matches=ranked,
         )
+
+    # -------------------------------------------------------------------------
+    def record_identity_key(self, record: MonographRecord) -> str:
+        normalized_name = self.normalize_name(record.drug_name)
+        return f"{normalized_name}|{record.nbk_id}|{record.drug_name.casefold()}"
 
     # -------------------------------------------------------------------------
     def rank_stage_matches(
@@ -682,7 +671,7 @@ class DrugsLookup:
             for synonym_original in record.synonyms.values():
                 if self.canonicalize_query(synonym_original) != canonical_query:
                     continue
-                matches[record.nbk_id] = (
+                matches[self.record_identity_key(record)] = (
                     record,
                     self.SYNONYM_CONFIDENCE,
                     [f"synonym='{synonym_original}'"],
@@ -701,7 +690,7 @@ class DrugsLookup:
                         self.canonicalize_query(primary_name)
                     )
                     for record, _, _ in primary_matches:
-                        matches[record.nbk_id] = (
+                        matches[self.record_identity_key(record)] = (
                             record,
                             self.MASTER_CONFIDENCE,
                             [f"{alias_type}='{alias_value}'", f"drug='{primary_name}'"],
@@ -720,10 +709,10 @@ class DrugsLookup:
 
         direct = data.primary_index.get(normalized_query, [])
         for record in direct:
-            matches[record.nbk_id] = (record, self.DIRECT_CONFIDENCE, [])
+            matches[self.record_identity_key(record)] = (record, self.DIRECT_CONFIDENCE, [])
 
         for record, original in data.synonym_index.get(normalized_query, []):
-            matches[record.nbk_id] = (
+            matches[self.record_identity_key(record)] = (
                 record,
                 self.SYNONYM_CONFIDENCE,
                 [f"synonym='{original}'"],
@@ -733,7 +722,7 @@ class DrugsLookup:
             for alias_value, primary_name in alias_index.get(normalized_query, []):
                 primary_matches = self.match_primary_all(self.canonicalize_query(primary_name))
                 for record, _, _ in primary_matches:
-                    matches[record.nbk_id] = (
+                    matches[self.record_identity_key(record)] = (
                         record,
                         self.MASTER_CONFIDENCE,
                         [f"{alias_type}='{alias_value}'", f"drug='{primary_name}'"],
@@ -742,65 +731,6 @@ class DrugsLookup:
         ordered = list(matches.values())
         ordered.sort(key=lambda item: (item[0].drug_name.casefold(), item[0].nbk_id.casefold()))
         return ordered
-
-    # -------------------------------------------------------------------------
-    def match_fuzzy_candidates(
-        self,
-        normalized_query: str,
-    ) -> list[tuple[MonographRecord, float, list[str]]]:
-        if len(normalized_query) < self.TOKEN_MIN_LENGTH:
-            return []
-        data = self.require_data()
-        per_record: dict[str, tuple[MonographRecord, float, list[str]]] = {}
-        for candidate, record, original, is_primary in data.variant_catalog:
-            ratio = fuzz.ratio(normalized_query, candidate) / 100.0
-            if ratio < self.FUZZY_THRESHOLD:
-                continue
-            if not self.is_safe_fuzzy_candidate(normalized_query, candidate, ratio):
-                continue
-            confidence = max(self.FUZZY_CONFIDENCE, ratio)
-            notes = [f"score={ratio:.2f}"]
-            if not is_primary:
-                notes.insert(0, f"variant='{original}'")
-            current = per_record.get(record.nbk_id)
-            if current is None or confidence > current[1]:
-                per_record[record.nbk_id] = (record, confidence, notes)
-        ordered = list(per_record.values())
-        ordered.sort(
-            key=lambda item: (
-                -item[1],
-                item[0].drug_name.casefold(),
-                item[0].nbk_id.casefold(),
-            )
-        )
-        return ordered
-
-    # -------------------------------------------------------------------------
-    def is_safe_fuzzy_candidate(
-        self,
-        normalized_query: str,
-        candidate: str,
-        ratio: float,
-    ) -> bool:
-        query_tokens = self.catalog_significant_tokens(normalized_query)
-        candidate_tokens = self.catalog_significant_tokens(candidate)
-        if len(query_tokens) <= 1 and len(candidate_tokens) <= 1:
-            if normalized_query[:1] != candidate[:1]:
-                return False
-            return ratio >= max(self.FUZZY_THRESHOLD, 0.88)
-        if not query_tokens or not candidate_tokens:
-            return False
-        shared = set(query_tokens) & set(candidate_tokens)
-        if not shared:
-            return False
-        query_coverage = len(shared) / len(query_tokens)
-        candidate_coverage = len(shared) / len(candidate_tokens)
-        token_ratio = fuzz.token_set_ratio(normalized_query, candidate) / 100.0
-        return bool(
-            query_coverage >= 0.8
-            and candidate_coverage >= 0.8
-            and token_ratio >= self.FUZZY_THRESHOLD
-        )
 
     # -------------------------------------------------------------------------
     def create_matched_result(
@@ -949,47 +879,6 @@ class DrugsLookup:
         return alias_entries
 
     # -------------------------------------------------------------------------
-    def reason_priority(self, reason: str) -> int:
-        lowered = reason.lower()
-        if lowered == "monograph_name":
-            return 5
-        if lowered.startswith("synonym"):
-            return 4
-        if lowered.startswith("brand_") or lowered.startswith("ingredient_"):
-            return 3
-        if lowered.startswith("partial"):
-            return 2
-        if lowered.startswith("fuzzy"):
-            return 1
-        return 0
-
-    # -------------------------------------------------------------------------
-    def select_best_match_result(
-        self, matches: list[tuple[tuple[MonographRecord, float, str, list[str]], str]]
-    ) -> tuple[MonographRecord, float, str, list[str]]:
-        best_match: tuple[MonographRecord, float, str, list[str]] | None = None
-        best_score: tuple[float, int, int, int] | None = None
-        for match_result, normalized_query in matches:
-            record, confidence, reason, notes = match_result
-            token_overlap = sum(
-                1 for note in notes if isinstance(note, str) and note.startswith("token=")
-            )
-            target_name = record.normalized_name or self.normalize_name(record.drug_name)
-            length_distance = -abs(len(target_name) - len(normalized_query))
-            score = (
-                float(confidence),
-                self.reason_priority(reason),
-                token_overlap,
-                length_distance,
-            )
-            if best_score is None or score > best_score:
-                best_score = score
-                best_match = match_result
-        if best_match is None:
-            raise RuntimeError("select_best_match_result called with empty candidates")
-        return best_match
-
-    # -------------------------------------------------------------------------
     def add_alias_entry(
         self,
         alias_entries: list[tuple[str, bool]],
@@ -1009,105 +898,7 @@ class DrugsLookup:
     ) -> tuple[dict[str, Any], bool, str] | None:
         if not normalized_query:
             return None
-        direct_match = self.catalog_global_index.get(normalized_query)
-        if direct_match is not None:
-            return direct_match
-
-        if not self.catalog_global_index:
-            return None
-
-        significant_query_tokens = self.catalog_significant_tokens(normalized_query)
-        candidate_keys: set[str] = set()
-        if significant_query_tokens:
-            for token in significant_query_tokens:
-                matches = self.catalog_token_index.get(token)
-                if matches:
-                    candidate_keys.update(matches)
-                if len(candidate_keys) >= self.CATALOG_CANDIDATE_LIMIT:
-                    break
-        if not candidate_keys:
-            candidate_keys = set(self.catalog_global_index.keys())
-        candidate_list = sorted(candidate_keys)
-        if len(candidate_list) > self.CATALOG_CANDIDATE_LIMIT:
-            candidate_list = candidate_list[: self.CATALOG_CANDIDATE_LIMIT]
-
-        best_candidate: tuple[
-            tuple[int, int, float, float, float, int], dict[str, Any], bool, str
-        ] | None = None
-        for candidate_normalized in candidate_list:
-            payload = self.catalog_global_index.get(candidate_normalized)
-            if payload is None:
-                continue
-            entry, is_synonym, original = payload
-            accepted, score = self.evaluate_catalog_candidate(
-                normalized_query,
-                candidate_normalized,
-                significant_query_tokens,
-            )
-            if not accepted:
-                continue
-            candidate = (score, entry, is_synonym, original)
-            if best_candidate is None or candidate[0] > best_candidate[0]:
-                best_candidate = candidate
-
-        if best_candidate is not None:
-            return best_candidate[1], best_candidate[2], best_candidate[3]
-
-        return None
-
-    # -------------------------------------------------------------------------
-    def catalog_significant_tokens(self, value: str) -> list[str]:
-        tokens = value.split()
-        return [
-            token
-            for token in tokens
-            if (
-                len(token) >= self.TOKEN_MIN_LENGTH
-                and token not in get_text_normalization_snapshot().matching_stopwords
-            )
-        ]
-
-    # -------------------------------------------------------------------------
-    def evaluate_catalog_candidate(
-        self,
-        normalized_query: str,
-        candidate: str,
-        significant_query_tokens: list[str],
-    ) -> tuple[bool, tuple[int, int, float, float, float, int]]:
-        candidate_tokens = self.catalog_significant_tokens(candidate)
-        shared_tokens = set(significant_query_tokens) & set(candidate_tokens)
-        token_ratio = fuzz.token_set_ratio(normalized_query, candidate) / 100.0
-        partial_ratio = fuzz.partial_ratio(normalized_query, candidate) / 100.0
-        overall_ratio = fuzz.ratio(normalized_query, candidate) / 100.0
-        substring_length = 0
-        if candidate in normalized_query:
-            substring_length = len(candidate)
-        elif normalized_query in candidate:
-            substring_length = len(normalized_query)
-        accepted = False
-        if significant_query_tokens and candidate_tokens and shared_tokens:
-            query_coverage = len(shared_tokens) / len(significant_query_tokens)
-            candidate_coverage = len(shared_tokens) / len(candidate_tokens)
-            accepted = bool(
-                query_coverage >= 0.8
-                and candidate_coverage >= 0.8
-                and token_ratio >= self.CATALOG_TOKEN_RATIO_THRESHOLD
-                and overall_ratio >= self.CATALOG_OVERALL_RATIO_THRESHOLD
-            )
-        if not accepted:
-            accepted = bool(
-                token_ratio >= self.CATALOG_TOKEN_RATIO_THRESHOLD
-                and overall_ratio >= self.CATALOG_OVERALL_RATIO_THRESHOLD
-            )
-        score = (
-            len(shared_tokens),
-            substring_length,
-            token_ratio,
-            partial_ratio,
-            overall_ratio,
-            -abs(len(candidate) - len(normalized_query)),
-        )
-        return accepted, score
+        return self.catalog_global_index.get(normalized_query)
 
     # -------------------------------------------------------------------------
     def annotate_catalog_match(
@@ -1176,97 +967,6 @@ class DrugsLookup:
         return record, self.SYNONYM_CONFIDENCE, "synonym_match", notes
 
     # -------------------------------------------------------------------------
-    def match_partial(
-        self, normalized_query: str
-    ) -> tuple[MonographRecord, float, str, list[str]] | None:
-        data = self.require_data()
-        tokens = [
-            token for token in normalized_query.split() if self.is_token_valid(token)
-        ]
-        if not tokens:
-            return None
-        candidate_scores: dict[str, int] = {}
-        record_lookup: dict[str, MonographRecord] = {}
-        matched_tokens: dict[str, set[str]] = {}
-        for token in tokens:
-            for record in data.token_index.get(token, []):
-                key = record.normalized_name or record.drug_name.lower()
-                record_lookup[key] = record
-                bucket = matched_tokens.setdefault(key, set())
-                bucket.add(token)
-                candidate_scores[key] = len(bucket)
-        if not candidate_scores:
-            return None
-        best_score = max(candidate_scores.values())
-        tied = [key for key, score in candidate_scores.items() if score == best_score]
-        if len(tied) != 1:
-            best_record = self.select_best_partial_record(
-                normalized_query,
-                tied,
-                record_lookup,
-                matched_tokens,
-            )
-            if best_record is None:
-                return None
-            best_key = best_record.normalized_name or best_record.drug_name.lower()
-        else:
-            best_key = tied[0]
-            best_record = record_lookup[best_key]
-        note_tokens = sorted(matched_tokens.get(best_key, set()))
-        notes = [f"token='{token}'" for token in note_tokens]
-        return best_record, self.PARTIAL_CONFIDENCE, "partial_synonym", notes
-
-    # -------------------------------------------------------------------------
-    def select_best_partial_record(
-        self,
-        normalized_query: str,
-        candidates: list[str],
-        record_lookup: dict[str, MonographRecord],
-        matched_tokens: dict[str, set[str]],
-    ) -> MonographRecord | None:
-        best_record: MonographRecord | None = None
-        best_score: tuple[int, float, int] | None = None
-        for key in candidates:
-            record = record_lookup.get(key)
-            if record is None:
-                continue
-            normalized_target = record.normalized_name or self.normalize_name(
-                record.drug_name
-            )
-            token_overlap = len(matched_tokens.get(key, set()))
-            ratio = (
-                fuzz.ratio(normalized_query, normalized_target) / 100.0
-                if normalized_target
-                else 0.0
-            )
-            length_bias = (
-                -abs(len(normalized_target) - len(normalized_query))
-                if normalized_target
-                else -len(normalized_query)
-            )
-            score = (token_overlap, ratio, length_bias)
-            if best_score is None or score > best_score:
-                best_score = score
-                best_record = record
-        return best_record
-
-    # -------------------------------------------------------------------------
-    def match_fuzzy(
-        self, normalized_query: str
-    ) -> tuple[MonographRecord, float, str, list[str]] | None:
-        if len(normalized_query) < self.TOKEN_MIN_LENGTH:
-            return None
-        variant = self.find_best_variant(normalized_query)
-        if variant is None:
-            return None
-        record, original, is_primary, score = variant
-        reason = "fuzzy_primary" if is_primary else "fuzzy_synonym"
-        notes: list[str] = [f"score={score:.2f}"]
-        if not is_primary:
-            notes.insert(0, f"variant='{original}'")
-        return record, max(self.FUZZY_CONFIDENCE, score), reason, notes
-
-    # -------------------------------------------------------------------------
     def match_primary_name(
         self, drug_name: str
     ) -> tuple[MonographRecord, float, str, list[str]] | None:
@@ -1286,30 +986,9 @@ class DrugsLookup:
         return record, self.SYNONYM_CONFIDENCE, "drug_synonym", notes
 
     # -------------------------------------------------------------------------
-    def find_best_variant(
-        self, normalized_query: str
-    ) -> tuple[MonographRecord, str, bool, float] | None:
-        data = self.require_data()
-        best: tuple[MonographRecord, str, bool, float] | None = None
-        best_ratio = 0.0
-        for candidate, record, original, is_primary in data.variant_catalog:
-            if candidate == normalized_query:
-                return record, original, is_primary, 1.0
-            ratio = fuzz.ratio(normalized_query, candidate) / 100.0
-            if ratio > best_ratio:
-                best_ratio = ratio
-                best = (record, original, is_primary, ratio)
-                if best_ratio >= self.FUZZY_EARLY_EXIT_RATIO:
-                    break
-        if best is None or best_ratio < self.FUZZY_THRESHOLD:
-            return None
-        return best
-
-    # -------------------------------------------------------------------------
     def prepare_catalog_synonyms(self) -> None:
         data = self.data
         self.catalog_global_index = {}
-        self.catalog_token_index = {}
         if data is None:
             return
         catalog_source = data.drugs_catalog_df
@@ -1400,7 +1079,6 @@ class DrugsLookup:
                 is_synonym,
                 original,
             )
-            self._register_catalog_tokens(normalized_value)
             return
         if len(self.catalog_global_index) >= self.CATALOG_INDEX_LIMIT:
             return
@@ -1409,21 +1087,6 @@ class DrugsLookup:
             is_synonym,
             original,
         )
-        self._register_catalog_tokens(normalized_value)
-
-    # -------------------------------------------------------------------------
-    def _register_catalog_tokens(self, normalized_value: str) -> None:
-        tokens = self.catalog_significant_tokens(normalized_value)
-        if not tokens:
-            return
-        for token in tokens:
-            bucket = self.catalog_token_index.setdefault(token, set())
-            bucket.add(normalized_value)
-            if len(bucket) > self.CATALOG_CANDIDATE_LIMIT * 2:
-                ordered = sorted(bucket)
-                bucket.clear()
-                for candidate in ordered[: self.CATALOG_CANDIDATE_LIMIT]:
-                    bucket.add(candidate)
 
     # -------------------------------------------------------------------------
     def catalog_term_type_allowed(self, term_type: str | None) -> bool:
@@ -1497,9 +1160,6 @@ class DrugsLookup:
 
     # -------------------------------------------------------------------------
     def expand_variant(self, value: str) -> list[str]:
-        cached = self.variant_cache.get(value, CACHE_MISS)
-        if cached is not CACHE_MISS:
-            return list(cached)
         normalized = normalize_whitespace(value)
         if not normalized:
             return []
@@ -1509,7 +1169,6 @@ class DrugsLookup:
             if candidate:
                 variants.add(candidate)
         result = sorted(variants, key=str.casefold)
-        self.variant_cache.put(value, result)
         return result
 
     # -------------------------------------------------------------------------
