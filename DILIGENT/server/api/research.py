@@ -59,4 +59,3 @@ class ResearchEndpoint:
 
 endpoint = ResearchEndpoint(router=router)
 endpoint.add_routes()
-

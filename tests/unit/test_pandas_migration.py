@@ -79,9 +79,7 @@ def test_save_clinical_session_preserves_row_append_order() -> None:
             .all()
         )
         patients = (
-            db_session.execute(select(Patient).order_by(Patient.id))
-            .scalars()
-            .all()
+            db_session.execute(select(Patient).order_by(Patient.id)).scalars().all()
         )
 
     assert len(rows) == 2
@@ -112,7 +110,9 @@ def test_save_clinical_session_persists_raw_result_payload() -> None:
     factory = sessionmaker(bind=engine, future=True)
     with factory() as db_session:
         session_row = (
-            db_session.execute(select(ClinicalSession).order_by(ClinicalSession.id.desc()))
+            db_session.execute(
+                select(ClinicalSession).order_by(ClinicalSession.id.desc())
+            )
             .scalars()
             .first()
         )
@@ -222,7 +222,9 @@ def test_master_list_sanitization_handles_string_dtype_inputs() -> None:
             "Type of Agent": pd.Series(["Drug", "Drug"], dtype="string"),
             "In LiverTox": pd.Series(["Yes", "Yes"], dtype="string"),
             "Primary Classification": pd.Series(["ClassA", "ClassB"], dtype="string"),
-            "Secondary Classification": pd.Series(["ClassA2", "ClassB2"], dtype="string"),
+            "Secondary Classification": pd.Series(
+                ["ClassA2", "ClassB2"], dtype="string"
+            ),
         }
     )
 

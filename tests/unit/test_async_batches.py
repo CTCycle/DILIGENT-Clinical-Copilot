@@ -54,4 +54,3 @@ def test_run_batched_in_order_propagates_exceptions() -> None:
         assert False, "Expected RuntimeError"
     except RuntimeError as exc:
         assert str(exc) == "boom"
-

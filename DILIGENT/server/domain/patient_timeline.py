@@ -53,7 +53,9 @@ class PatientTimelineEvent(BaseModel):
         return normalized or None
 
     # -------------------------------------------------------------------------
-    @field_validator("description", "source_evidence", "confidence_rationale", mode="before")
+    @field_validator(
+        "description", "source_evidence", "confidence_rationale", mode="before"
+    )
     @classmethod
     def normalize_description(cls, value: str | None) -> str | None:
         if value is None:

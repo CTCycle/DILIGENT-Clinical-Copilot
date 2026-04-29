@@ -146,7 +146,9 @@ class CloudEmbeddingGenerator:
                 )
             vectors = await asyncio.to_thread(embeddings_model.embed_documents, texts)
         except Exception as exc:  # noqa: BLE001
-            raise _map_langchain_embedding_exception(exc, provider=self.provider) from exc
+            raise _map_langchain_embedding_exception(
+                exc, provider=self.provider
+            ) from exc
         return self.normalize_embeddings(vectors, expected=len(texts))
 
     # -------------------------------------------------------------------------
@@ -185,7 +187,9 @@ class OllamaEmbeddingGenerator:
         if not resolved_model:
             raise ValueError("Ollama embedding model is required")
         self.model = resolved_model
-        self.base_url = (base_url or server_settings.llm_defaults.ollama_host_default).rstrip("/")
+        self.base_url = (
+            base_url or server_settings.llm_defaults.ollama_host_default
+        ).rstrip("/")
         self.timeout_s = float(timeout_s)
 
     # -------------------------------------------------------------------------
@@ -220,7 +224,9 @@ class OllamaEmbeddingGenerator:
             try:
                 normalized.append([float(value) for value in vector])
             except (TypeError, ValueError) as exc:
-                raise OllamaError("Non-numeric values found in Ollama embeddings") from exc
+                raise OllamaError(
+                    "Non-numeric values found in Ollama embeddings"
+                ) from exc
         if len(normalized) != expected:
             raise OllamaError("Mismatch between Ollama embeddings and inputs")
         return normalized
@@ -282,7 +288,9 @@ class EmbeddingGenerator:
     ) -> None:
         normalized_backend = backend.lower().strip() if backend else "ollama"
         self.backend: EmbeddingBackend = (
-            "cloud" if use_cloud_embeddings else cast(EmbeddingBackend, normalized_backend)
+            "cloud"
+            if use_cloud_embeddings
+            else cast(EmbeddingBackend, normalized_backend)
         )
         self.provider = select_embedding_provider(
             backend=backend,
@@ -304,7 +312,7 @@ class EmbeddingGenerator:
     # -------------------------------------------------------------------------
     @staticmethod
     def run_async(
-        coroutine: Coroutine[Any, Any, list[list[float]]]
+        coroutine: Coroutine[Any, Any, list[list[float]]],
     ) -> list[list[float]]:
         try:
             loop = asyncio.get_running_loop()
@@ -474,7 +482,9 @@ class SimilaritySearch:
         try:
             vectors = self.embedding_generator.embed_texts([query, *texts])
         except Exception as exc:  # noqa: BLE001
-            logger.warning("Reranking fallback to retrieval order due to embedding error: %s", exc)
+            logger.warning(
+                "Reranking fallback to retrieval order due to embedding error: %s", exc
+            )
             return candidates[:top_n]
 
         expected_vectors = len(candidates) + 1

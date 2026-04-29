@@ -18,7 +18,9 @@ def build_serializer() -> tuple[AccessKeySerializer, sessionmaker]:
     engine = create_engine("sqlite+pysqlite:///:memory:", future=True)
     Base.metadata.create_all(engine)
     factory = sessionmaker(bind=engine, future=True, expire_on_commit=False)
-    AccessKeyEncryptionMaterialSerializer(engine=engine, session_factory=factory).ensure_seeded()
+    AccessKeyEncryptionMaterialSerializer(
+        engine=engine, session_factory=factory
+    ).ensure_seeded()
     serializer = AccessKeySerializer(engine=engine, session_factory=factory)
     return serializer, factory
 

@@ -10,7 +10,9 @@ from DILIGENT.server.repositories.database.session import (
     resolve_engine,
     resolve_session_factory,
 )
-from DILIGENT.server.repositories.queries.model_config import ModelConfigRepositoryQueries
+from DILIGENT.server.repositories.queries.model_config import (
+    ModelConfigRepositoryQueries,
+)
 from DILIGENT.server.repositories.schemas.models import ModelSelection, RuntimeSetting
 
 ModelRoleType = Literal["clinical", "text_extraction", "cloud"]
@@ -42,9 +44,15 @@ class ModelConfigSerializer:
     def load_snapshot(self) -> ModelConfigSnapshot:
         db_session = self.session_factory()
         try:
-            rows = db_session.execute(ModelConfigRepositoryQueries.select_all()).scalars().all()
+            rows = (
+                db_session.execute(ModelConfigRepositoryQueries.select_all())
+                .scalars()
+                .all()
+            )
             runtime_rows = (
-                db_session.execute(ModelConfigRepositoryQueries.select_runtime_settings())
+                db_session.execute(
+                    ModelConfigRepositoryQueries.select_runtime_settings()
+                )
                 .scalars()
                 .all()
             )
@@ -68,7 +76,11 @@ class ModelConfigSerializer:
         db_session = self.session_factory()
         now = datetime.now()
         try:
-            rows = db_session.execute(ModelConfigRepositoryQueries.select_all()).scalars().all()
+            rows = (
+                db_session.execute(ModelConfigRepositoryQueries.select_all())
+                .scalars()
+                .all()
+            )
             role_map = {str(row.role_type): row for row in rows}
 
             if clinical_model is not UNSET:
@@ -88,7 +100,9 @@ class ModelConfigSerializer:
                 )
                 text_extraction_row.model_name = normalized_text_extraction_model
                 text_extraction_row.provider = None
-                text_extraction_row.is_active = normalized_text_extraction_model is not None
+                text_extraction_row.is_active = (
+                    normalized_text_extraction_model is not None
+                )
                 text_extraction_row.updated_at = now
 
             cloud_fields_changed = any(
@@ -129,14 +143,20 @@ class ModelConfigSerializer:
 
             db_session.commit()
             refreshed_rows = (
-                db_session.execute(ModelConfigRepositoryQueries.select_all()).scalars().all()
-            )
-            refreshed_runtime_rows = (
-                db_session.execute(ModelConfigRepositoryQueries.select_runtime_settings())
+                db_session.execute(ModelConfigRepositoryQueries.select_all())
                 .scalars()
                 .all()
             )
-            return self.build_snapshot_with_runtime(refreshed_rows, refreshed_runtime_rows)
+            refreshed_runtime_rows = (
+                db_session.execute(
+                    ModelConfigRepositoryQueries.select_runtime_settings()
+                )
+                .scalars()
+                .all()
+            )
+            return self.build_snapshot_with_runtime(
+                refreshed_rows, refreshed_runtime_rows
+            )
         except Exception:
             db_session.rollback()
             raise
@@ -194,7 +214,7 @@ class ModelConfigSerializer:
     def normalize_temperature(value: object) -> float:
         try:
             parsed = float(value)
-        except (TypeError, ValueError):
+        except TypeError, ValueError:
             parsed = 0.7
         return round(max(0.0, min(2.0, parsed)), 2)
 
@@ -248,7 +268,9 @@ class ModelConfigSerializer:
         clinical = role_map.get("clinical")
         text_extraction = role_map.get("text_extraction")
         cloud = role_map.get("cloud")
-        ollama_temperature, cloud_temperature = cls.read_runtime_temperatures(runtime_rows)
+        ollama_temperature, cloud_temperature = cls.read_runtime_temperatures(
+            runtime_rows
+        )
         ollama_reasoning = cls.read_runtime_reasoning(runtime_rows)
         updated_values = [
             row.updated_at
@@ -288,5 +310,3 @@ class ModelConfigSerializer:
             return None
         normalized = str(value).strip()
         return normalized or None
-
-

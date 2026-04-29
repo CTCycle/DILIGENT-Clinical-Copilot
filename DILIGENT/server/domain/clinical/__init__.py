@@ -3,7 +3,7 @@ from __future__ import annotations
 from DILIGENT.server.domain.clinical.entities import (
     Comparator,
     CONTROL_CHARACTERS_RE,
-    MAX_LAB_TEXT_LENGTH,   
+    MAX_LAB_TEXT_LENGTH,
     ClinicalLabEntry,
     ClinicalPipelineValidationError,
     ClinicalSessionReportResponse,

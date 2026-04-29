@@ -9,8 +9,13 @@ from typing import Any
 from DILIGENT.server.common.utils.logger import logger
 from DILIGENT.server.configurations.startup import server_settings
 from DILIGENT.server.configurations.llm_configs import LLMRuntimeConfig
-from DILIGENT.server.domain.clinical.entities import DiseaseContextEntry, PatientDiseaseContext
-from DILIGENT.server.services.clinical.prompts import ANAMNESIS_DISEASE_EXTRACTION_PROMPT
+from DILIGENT.server.domain.clinical.entities import (
+    DiseaseContextEntry,
+    PatientDiseaseContext,
+)
+from DILIGENT.server.services.clinical.prompts import (
+    ANAMNESIS_DISEASE_EXTRACTION_PROMPT,
+)
 from DILIGENT.server.services.llm.client_runtime import ensure_runtime_client
 from DILIGENT.server.services.llm.providers import select_llm_provider
 from DILIGENT.server.services.text.normalization import normalize_token
@@ -53,7 +58,9 @@ class DiseaseExtractor:
     # -------------------------------------------------------------------------
     async def ensure_client(self) -> None:
         revision = LLMRuntimeConfig.get_revision()
-        resolved_provider, resolved_model = LLMRuntimeConfig.resolve_provider_and_model("parser")
+        resolved_provider, resolved_model = LLMRuntimeConfig.resolve_provider_and_model(
+            "parser"
+        )
         provider = self.forced_provider or resolved_provider
         model = self.forced_model or resolved_model
         await ensure_runtime_client(
@@ -61,10 +68,12 @@ class DiseaseExtractor:
             provider=provider,
             model=model,
             revision=revision,
-            client_factory=lambda selected_provider, selected_model: select_llm_provider(
-                provider=selected_provider,
-                default_model=selected_model,
-                timeout_s=self.timeout_s,
+            client_factory=lambda selected_provider, selected_model: (
+                select_llm_provider(
+                    provider=selected_provider,
+                    default_model=selected_model,
+                    timeout_s=self.timeout_s,
+                )
             ),
         )
 
@@ -182,14 +191,16 @@ class DiseaseExtractor:
             return None
         try:
             parsed = float(match.group(1))
-        except (TypeError, ValueError):
+        except TypeError, ValueError:
             return None
         if parsed <= 0:
             return None
         return min(parsed + 0.25, 30.0)
 
     # -------------------------------------------------------------------------
-    def retry_backoff_seconds(self, attempt: int, *, exc: Exception | None = None) -> float:
+    def retry_backoff_seconds(
+        self, attempt: int, *, exc: Exception | None = None
+    ) -> float:
         if exc is not None:
             hinted_wait = self.extract_rate_limit_wait_hint_seconds(exc)
             if hinted_wait is not None:
@@ -235,7 +246,9 @@ class DiseaseExtractor:
                     break
                 except Exception as exc:
                     if attempt >= self.extraction_retry_attempts:
-                        raise RuntimeError("Failed to extract diseases from anamnesis") from exc
+                        raise RuntimeError(
+                            "Failed to extract diseases from anamnesis"
+                        ) from exc
                     delay = self.retry_backoff_seconds(attempt, exc=exc)
                     logger.warning(
                         (
@@ -272,6 +285,3 @@ class DiseaseExtractor:
         )
         self.emit_progress(progress_callback, 1.0)
         return PatientDiseaseContext(entries=deduplicated)
-
-
-

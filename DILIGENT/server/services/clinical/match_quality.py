@@ -14,14 +14,18 @@ def classify_match_evidence(
 ) -> dict[str, Any]:
     normalized_status = (match_status or "").strip().lower()
     normalized_reason = (match_reason or "").strip().lower()
-    normalized_notes = [str(note).strip() for note in (match_notes or []) if str(note).strip()]
+    normalized_notes = [
+        str(note).strip() for note in (match_notes or []) if str(note).strip()
+    ]
     notes = {note.lower() for note in normalized_notes}
     warnings: list[str] = []
 
     if ambiguous_match or normalized_status in {"ambiguous", "ambiguous_match"}:
         return {
             "evidence_quality": "ambiguous_match",
-            "evidence_warnings": ["Multiple plausible local evidence matches require review."],
+            "evidence_warnings": [
+                "Multiple plausible local evidence matches require review."
+            ],
         }
 
     if normalized_status in {"missing", "missing_match"}:
@@ -34,7 +38,9 @@ def classify_match_evidence(
         warnings.append("Matched local drug record has no LiverTox excerpt.")
 
     if "fallback_excerpt_from_related_monograph" in notes:
-        warnings.append("Evidence excerpt was borrowed from a related LiverTox monograph.")
+        warnings.append(
+            "Evidence excerpt was borrowed from a related LiverTox monograph."
+        )
         quality = "fallback_related_monograph"
     elif (match_confidence is not None and float(match_confidence) < 1.0) or (
         "alias" in normalized_reason or "spelling_correction" in normalized_reason
@@ -47,7 +53,9 @@ def classify_match_evidence(
         quality = "direct_match_no_excerpt" if missing_livertox else "direct_match"
     else:
         quality = "unknown"
-        warnings.append("Match evidence quality could not be determined from stored metadata.")
+        warnings.append(
+            "Match evidence quality could not be determined from stored metadata."
+        )
 
     return {
         "evidence_quality": quality,

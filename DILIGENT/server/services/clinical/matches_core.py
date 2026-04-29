@@ -69,19 +69,25 @@ class DrugsLookup:
     MASTER_CONFIDENCE = server_settings.drugs_matcher.master_confidence
     SYNONYM_CONFIDENCE = server_settings.drugs_matcher.synonym_confidence
     MIN_CONFIDENCE = server_settings.drugs_matcher.min_confidence
-    NORMALIZATION_CACHE_LIMIT = (
-        server_settings.drugs_matcher.normalization_cache_limit
-    )
+    NORMALIZATION_CACHE_LIMIT = server_settings.drugs_matcher.normalization_cache_limit
     MATCH_CACHE_LIMIT = server_settings.drugs_matcher.match_cache_limit
     ALIAS_CACHE_LIMIT = server_settings.drugs_matcher.alias_cache_limit
     TOKEN_MIN_LENGTH = server_settings.drugs_matcher.token_min_length
-    CATALOG_EXCLUDED_TERM_SUFFIXES = server_settings.drugs_matcher.catalog_excluded_term_suffixes
+    CATALOG_EXCLUDED_TERM_SUFFIXES = (
+        server_settings.drugs_matcher.catalog_excluded_term_suffixes
+    )
     CATALOG_INDEX_LIMIT = server_settings.drugs_matcher.catalog_index_limit
     SPELLING_CONFIDENCE = server_settings.drugs_matcher.spelling_confidence
     SPELLING_MIN_QUERY_LENGTH = server_settings.drugs_matcher.spelling_min_query_length
-    SPELLING_SHORT_NAME_LENGTH = server_settings.drugs_matcher.spelling_short_name_length
-    SPELLING_SHORT_MAX_DISTANCE = server_settings.drugs_matcher.spelling_short_max_distance
-    SPELLING_LONG_MAX_DISTANCE = server_settings.drugs_matcher.spelling_long_max_distance
+    SPELLING_SHORT_NAME_LENGTH = (
+        server_settings.drugs_matcher.spelling_short_name_length
+    )
+    SPELLING_SHORT_MAX_DISTANCE = (
+        server_settings.drugs_matcher.spelling_short_max_distance
+    )
+    SPELLING_LONG_MAX_DISTANCE = (
+        server_settings.drugs_matcher.spelling_long_max_distance
+    )
     REGIMEN_SPLIT_RE = re.compile(r"(?:\s*\+\s*|\s*/\s*|\s+\bplus\b\s+)", re.IGNORECASE)
     BRAND_COMBO_PREFERENCES: dict[str, str] = {}
 
@@ -128,7 +134,9 @@ class DrugsLookup:
 
             cached = self.match_cache.get(normalized_query, CACHE_MISS)
             if cached is not CACHE_MISS:
-                results.append(self.clone_cached_match(cached, raw_name, canonical_query))
+                results.append(
+                    self.clone_cached_match(cached, raw_name, canonical_query)
+                )
                 continue
 
             alias_entries = self.resolve_alias_candidates(
@@ -197,7 +205,9 @@ class DrugsLookup:
         source_backed_aliases = self.resolve_source_backed_query_variants(
             normalized_query
         )
-        local_aliases = [alias for alias, from_catalog in alias_entries if not from_catalog]
+        local_aliases = [
+            alias for alias, from_catalog in alias_entries if not from_catalog
+        ]
         stage1_keys = self.build_unique_keys(
             [canonical_query, *source_backed_aliases, *local_aliases],
             self.canonicalize_query,
@@ -229,7 +239,11 @@ class DrugsLookup:
             return stage2_result
 
         stage3_keys = self.build_unique_keys(
-            [normalized_query, *source_backed_aliases, *(alias for alias, _ in alias_entries)],
+            [
+                normalized_query,
+                *source_backed_aliases,
+                *(alias for alias, _ in alias_entries),
+            ],
             self.normalize_name,
         )
         stage3 = self.resolve_stage_matches(stage3_keys, self.match_normalized_all)
@@ -365,7 +379,9 @@ class DrugsLookup:
                     [str(value) for value in expansion_values if value],
                     self.normalize_name,
                 )
-                matches = self.resolve_stage_matches(expanded_keys, self.match_normalized_all)
+                matches = self.resolve_stage_matches(
+                    expanded_keys, self.match_normalized_all
+                )
             for record, _confidence, notes in matches:
                 stage_matches.append(
                     (
@@ -393,7 +409,9 @@ class DrugsLookup:
         if len(query_parts) != len(candidate_parts):
             return False
         total_distance = 0
-        for query_part, candidate_part in zip(query_parts, candidate_parts, strict=True):
+        for query_part, candidate_part in zip(
+            query_parts, candidate_parts, strict=True
+        ):
             if abs(len(query_part) - len(candidate_part)) > 2:
                 return False
             distance_limit = max(
@@ -496,7 +514,9 @@ class DrugsLookup:
     ) -> LiverToxMatch | None:
         if not stage_matches:
             return None
-        preferred_combo = self.preferred_combo_name(raw_name, canonical_query, normalized_query)
+        preferred_combo = self.preferred_combo_name(
+            raw_name, canonical_query, normalized_query
+        )
         ranked = self.rank_stage_matches(
             stage_matches=stage_matches,
             raw_name=raw_name,
@@ -555,7 +575,9 @@ class DrugsLookup:
         canonical_query: str,
         normalized_query: str,
     ) -> list[tuple[MonographRecord, float, list[str]]]:
-        preferred_combo = self.preferred_combo_name(raw_name, canonical_query, normalized_query)
+        preferred_combo = self.preferred_combo_name(
+            raw_name, canonical_query, normalized_query
+        )
         ranked = sorted(
             stage_matches,
             key=lambda item: self.stage_match_score(
@@ -612,7 +634,9 @@ class DrugsLookup:
             alias_priority = 3
         if any(note.startswith("ingredient=") for note in normalized_notes):
             alias_priority = max(alias_priority, 1)
-        exact_name = int(bool(normalized_query) and normalized_record_name == normalized_query)
+        exact_name = int(
+            bool(normalized_query) and normalized_record_name == normalized_query
+        )
         return (
             is_preferred_combo,
             exact_name,
@@ -631,8 +655,14 @@ class DrugsLookup:
     ) -> str | None:
         normalized_raw = self.normalize_name(raw_name)
         preferences = get_text_normalization_snapshot().brand_combo_preferences
-        for candidate in (normalized_raw, normalized_query, self.normalize_name(canonical_query)):
-            preferred = preferences.get(candidate) or self.BRAND_COMBO_PREFERENCES.get(candidate)
+        for candidate in (
+            normalized_raw,
+            normalized_query,
+            self.normalize_name(canonical_query),
+        ):
+            preferred = preferences.get(candidate) or self.BRAND_COMBO_PREFERENCES.get(
+                candidate
+            )
             if preferred is None:
                 continue
             normalized_preferred = self.normalize_name(preferred)
@@ -706,7 +736,11 @@ class DrugsLookup:
         direct = data.primary_index.get(normalized_query, [])
         for stable_key in direct:
             record = data.records_by_stable_key[stable_key]
-            matches[self.record_identity_key(record)] = (record, self.DIRECT_CONFIDENCE, [])
+            matches[self.record_identity_key(record)] = (
+                record,
+                self.DIRECT_CONFIDENCE,
+                [],
+            )
 
         for stable_key, original in data.synonym_index.get(normalized_query, []):
             record = data.records_by_stable_key[stable_key]
@@ -716,9 +750,14 @@ class DrugsLookup:
                 [f"synonym='{original}'"],
             )
 
-        for alias_type, alias_index in (("brand", data.brand_index), ("ingredient", data.ingredient_index)):
+        for alias_type, alias_index in (
+            ("brand", data.brand_index),
+            ("ingredient", data.ingredient_index),
+        ):
             for alias_value, primary_name in alias_index.get(normalized_query, []):
-                primary_matches = self.match_primary_all(self.canonicalize_query(primary_name))
+                primary_matches = self.match_primary_all(
+                    self.canonicalize_query(primary_name)
+                )
                 for record, _, _ in primary_matches:
                     matches[self.record_identity_key(record)] = (
                         record,
@@ -1163,9 +1202,15 @@ class DrugsLookup:
                     normalized = self.normalize_name(variant)
                     if not normalized:
                         continue
-                    if normalized in get_text_normalization_snapshot().matching_stopwords:
+                    if (
+                        normalized
+                        in get_text_normalization_snapshot().matching_stopwords
+                    ):
                         continue
-                    if len(normalized) < self.TOKEN_MIN_LENGTH and " " not in normalized:
+                    if (
+                        len(normalized) < self.TOKEN_MIN_LENGTH
+                        and " " not in normalized
+                    ):
                         continue
                     if normalized not in synonyms:
                         synonyms[normalized] = variant
@@ -1310,6 +1355,3 @@ class LiverToxMatcher:
         matches: list[LiverToxMatch],
     ) -> list[dict[str, Any]]:
         return self.data.build_drugs_to_excerpt_mapping(patient_drugs, matches)
-
-
-

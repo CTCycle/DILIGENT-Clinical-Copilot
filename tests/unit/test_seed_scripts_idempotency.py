@@ -127,15 +127,15 @@ def test_rxnav_upsert_persists_curated_aliases_with_separate_provenance() -> Non
 
     factory = sessionmaker(bind=engine, future=True)
     with factory() as db_session:
-        aliases = db_session.execute(
-            select(DrugAlias).order_by(DrugAlias.alias_kind, DrugAlias.alias)
-        ).scalars().all()
+        aliases = (
+            db_session.execute(
+                select(DrugAlias).order_by(DrugAlias.alias_kind, DrugAlias.alias)
+            )
+            .scalars()
+            .all()
+        )
 
-    curated = [
-        alias
-        for alias in aliases
-        if alias.source == "curated"
-    ]
+    curated = [alias for alias in aliases if alias.source == "curated"]
     assert len(curated) == 2
     assert {(row.alias, row.alias_kind) for row in curated} == {
         ("Glucophage", "brand"),

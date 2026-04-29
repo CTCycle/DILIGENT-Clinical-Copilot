@@ -30,4 +30,3 @@ class HepatoxPreparedInputs:
 class LabExtractionPayload(BaseModel):
     entries: list[ClinicalLabEntry] = Field(default_factory=list)
     onset_context: LiverInjuryOnsetContext | None = Field(default=None)
-

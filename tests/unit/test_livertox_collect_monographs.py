@@ -67,7 +67,9 @@ class ThreadedProcessPoolExecutor:
         return self._executor.submit(*args, **kwargs)
 
 
-def test_collect_monographs_streams_parallel_batches(monkeypatch, tmp_path: Path) -> None:
+def test_collect_monographs_streams_parallel_batches(
+    monkeypatch, tmp_path: Path
+) -> None:
     archive_path = tmp_path / "livertox.tar.gz"
     build_archive(
         archive_path,

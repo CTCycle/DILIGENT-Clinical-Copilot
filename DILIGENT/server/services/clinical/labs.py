@@ -29,7 +29,9 @@ RATE_LIMIT_WAIT_HINT_RE = re.compile(
     re.IGNORECASE,
 )
 NUMERIC_RE = re.compile(r"[-+]?\d+(?:[.,]\d+)?")
-DATE_RE = re.compile(r"\b(?:\d{4}[-/.]\d{1,2}[-/.]\d{1,2}|\d{1,2}[-/.]\d{1,2}[-/.]\d{4})\b")
+DATE_RE = re.compile(
+    r"\b(?:\d{4}[-/.]\d{1,2}[-/.]\d{1,2}|\d{1,2}[-/.]\d{1,2}[-/.]\d{4})\b"
+)
 MARKER_ALIASES: dict[str, tuple[str, ...]] = {
     "ALT": ("alt", "alat", "gpt"),
     "AST": ("ast", "asat", "got"),
@@ -41,9 +43,11 @@ MARKER_ALIASES: dict[str, tuple[str, ...]] = {
     "ALB": ("albumin", "alb"),
 }
 
+
 def normalize_lab_marker(marker_name: str, aliases: dict[str, str]) -> str:
     normalized = (marker_name or "").strip().casefold()
     return aliases.get(normalized, marker_name)
+
 
 ###############################################################################
 class ClinicalLabExtractor:
@@ -75,7 +79,9 @@ class ClinicalLabExtractor:
     # -------------------------------------------------------------------------
     async def ensure_client(self) -> None:
         revision = LLMRuntimeConfig.get_revision()
-        resolved_provider, resolved_model = LLMRuntimeConfig.resolve_provider_and_model("parser")
+        resolved_provider, resolved_model = LLMRuntimeConfig.resolve_provider_and_model(
+            "parser"
+        )
         provider = self.forced_provider or resolved_provider
         model = self.forced_model or resolved_model
         await ensure_runtime_client(
@@ -83,10 +89,12 @@ class ClinicalLabExtractor:
             provider=provider,
             model=model,
             revision=revision,
-            client_factory=lambda selected_provider, selected_model: select_llm_provider(
-                provider=selected_provider,
-                default_model=selected_model,
-                timeout_s=self.timeout_s,
+            client_factory=lambda selected_provider, selected_model: (
+                select_llm_provider(
+                    provider=selected_provider,
+                    default_model=selected_model,
+                    timeout_s=self.timeout_s,
+                )
             ),
         )
 
@@ -203,7 +211,9 @@ class ClinicalLabExtractor:
                     value=value,
                     value_text=str(value),
                     upper_limit_normal=upper_limit,
-                    upper_limit_text=str(upper_limit) if upper_limit is not None else None,
+                    upper_limit_text=str(upper_limit)
+                    if upper_limit is not None
+                    else None,
                     sample_date=sample_date,
                     evidence=line[:500],
                     source=source,
@@ -221,7 +231,9 @@ class ClinicalLabExtractor:
         return None
 
     # -------------------------------------------------------------------------
-    def extract_date_from_text(self, text: str, *, visit_date: date | None) -> str | None:
+    def extract_date_from_text(
+        self, text: str, *, visit_date: date | None
+    ) -> str | None:
         match = DATE_RE.search(text)
         if match is None:
             return None
@@ -247,7 +259,9 @@ class ClinicalLabExtractor:
         text = (raw or "").strip().lower()
         if not text:
             return "UNKNOWN"
-        text = normalize_lab_marker(text, get_text_normalization_snapshot().lab_marker_aliases).lower()
+        text = normalize_lab_marker(
+            text, get_text_normalization_snapshot().lab_marker_aliases
+        ).lower()
         for canonical, aliases in MARKER_ALIASES.items():
             if text == canonical.lower():
                 return canonical
@@ -312,7 +326,9 @@ class ClinicalLabExtractor:
     @staticmethod
     def dedupe_key(entry: ClinicalLabEntry) -> tuple[str, str, str, str]:
         value_token = (
-            f"{entry.value:.6f}" if isinstance(entry.value, (int, float)) else (entry.value_text or "")
+            f"{entry.value:.6f}"
+            if isinstance(entry.value, (int, float))
+            else (entry.value_text or "")
         )
         date_token = (entry.sample_date or "").strip().lower()
         return (
@@ -341,10 +357,14 @@ class ClinicalLabExtractor:
         marker = self.normalize_marker_name(entry.marker_name)
         if marker == "UNKNOWN":
             return None
-        normalized_date = self.normalize_date_with_visit_year(entry.sample_date, visit_date)
+        normalized_date = self.normalize_date_with_visit_year(
+            entry.sample_date, visit_date
+        )
         return ClinicalLabEntry(
             marker_name=marker,
-            value=entry.value if entry.value is not None else self.parse_numeric(entry.value_text),
+            value=entry.value
+            if entry.value is not None
+            else self.parse_numeric(entry.value_text),
             value_text=entry.value_text,
             unit=entry.unit,
             upper_limit_normal=(
@@ -368,14 +388,16 @@ class ClinicalLabExtractor:
             return None
         try:
             parsed = float(match.group(1))
-        except (TypeError, ValueError):
+        except TypeError, ValueError:
             return None
         if parsed <= 0:
             return None
         return min(parsed + 0.25, 30.0)
 
     # -------------------------------------------------------------------------
-    def retry_backoff_seconds(self, attempt: int, *, exc: Exception | None = None) -> float:
+    def retry_backoff_seconds(
+        self, attempt: int, *, exc: Exception | None = None
+    ) -> float:
         if exc is not None:
             hinted_wait = self.extract_rate_limit_wait_hint_seconds(exc)
             if hinted_wait is not None:
@@ -470,8 +492,16 @@ class ClinicalLabExtractor:
         already_cleaned: bool = False,
         progress_callback: Callable[[float], None] | None = None,
     ) -> tuple[PatientLabTimeline, LiverInjuryOnsetContext | None]:
-        primary_labs_text = (payload.laboratory_analysis or "") if already_cleaned else self.clean_text(payload.laboratory_analysis)
-        supplemental_anamnesis_text = (payload.anamnesis or "") if already_cleaned else self.clean_text(payload.anamnesis)
+        primary_labs_text = (
+            (payload.laboratory_analysis or "")
+            if already_cleaned
+            else self.clean_text(payload.laboratory_analysis)
+        )
+        supplemental_anamnesis_text = (
+            (payload.anamnesis or "")
+            if already_cleaned
+            else self.clean_text(payload.anamnesis)
+        )
         deterministic_entries: list[ClinicalLabEntry] = []
         timeline_entries: list[ClinicalLabEntry] = []
         onset_context: LiverInjuryOnsetContext | None = None
@@ -500,7 +530,9 @@ class ClinicalLabExtractor:
             try:
                 await self.ensure_client()
                 if self.client is None:
-                    raise RuntimeError("LLM client is not initialized for lab extraction")
+                    raise RuntimeError(
+                        "LLM client is not initialized for lab extraction"
+                    )
                 chunks = self.chunk_text(merged_source_text)
                 llm_entries: list[ClinicalLabEntry] = []
                 llm_onset: LiverInjuryOnsetContext | None = None
@@ -529,10 +561,7 @@ class ClinicalLabExtractor:
 
                     # If the first LLM pass returns empty despite clear lab cues, retry once
                     # with a reinforced instruction before accepting an empty chunk.
-                    if (
-                        not parsed.entries
-                        and self.has_explicit_lab_signal(chunk)
-                    ):
+                    if not parsed.entries and self.has_explicit_lab_signal(chunk):
                         try:
                             reinforced = await self.llm_extract_chunk(
                                 chunk=chunk,
@@ -553,7 +582,9 @@ class ClinicalLabExtractor:
                     llm_entries.extend(parsed.entries)
                     if llm_onset is None and parsed.onset_context is not None:
                         llm_onset = parsed.onset_context
-                    self.emit_progress(progress_callback, 0.2 + ((index / max(len(chunks), 1)) * 0.5))
+                    self.emit_progress(
+                        progress_callback, 0.2 + ((index / max(len(chunks), 1)) * 0.5)
+                    )
                 timeline_entries.extend(llm_entries)
                 if llm_unavailable or (not llm_entries and deterministic_entries):
                     if not llm_entries and deterministic_entries:
@@ -588,7 +619,3 @@ class ClinicalLabExtractor:
         normalized.sort(key=self.lab_entry_sort_key)
         self.emit_progress(progress_callback, 1.0)
         return PatientLabTimeline(entries=normalized), onset_context
-
-
-
-

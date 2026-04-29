@@ -18,7 +18,11 @@ def _score_drug(entry: DrugEntry, visit_date: date | None) -> int:
         score += 1
     if entry.historical_flag:
         score -= 3
-    if visit_date is not None and entry.therapy_start_date and entry.therapy_start_date > visit_date.isoformat():
+    if (
+        visit_date is not None
+        and entry.therapy_start_date
+        and entry.therapy_start_date > visit_date.isoformat()
+    ):
         score -= 4
     return score
 
@@ -30,7 +34,11 @@ def select_relevant_candidates(
     visit_date: date | None,
 ) -> CandidateSelectionResult:
     candidates = [*therapy_drugs.entries, *anamnesis_drugs.entries]
-    scored: list[tuple[DrugEntry, int]] = [(entry, _score_drug(entry, visit_date)) for entry in candidates if (entry.name or "").strip()]
+    scored: list[tuple[DrugEntry, int]] = [
+        (entry, _score_drug(entry, visit_date))
+        for entry in candidates
+        if (entry.name or "").strip()
+    ]
     scored.sort(key=lambda item: item[1], reverse=True)
 
     relevant: list[dict[str, str]] = []
@@ -65,4 +73,3 @@ def select_relevant_candidates(
         unresolved=unresolved,
         ordered_analysis_drugs=PatientDrugs(entries=selected_entries),
     )
-

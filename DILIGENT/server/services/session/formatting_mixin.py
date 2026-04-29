@@ -31,13 +31,17 @@ class ClinicalSessionFormattingMixin:
             error_dict: dict[str, Any] = dict(error)
             ctx = error_dict.get("ctx")
             if isinstance(ctx, dict) and "error" in ctx:
-                serialized.append({**error_dict, "ctx": {**ctx, "error": str(ctx["error"])}})
+                serialized.append(
+                    {**error_dict, "ctx": {**ctx, "error": str(ctx["error"])}}
+                )
                 continue
             serialized.append(error_dict)
         return serialized
 
     @staticmethod
-    def serialize_pipeline_issues(issues: Sequence[PipelineIssue]) -> list[dict[str, Any]]:
+    def serialize_pipeline_issues(
+        issues: Sequence[PipelineIssue],
+    ) -> list[dict[str, Any]]:
         return [issue.model_dump() for issue in issues]
 
     @staticmethod
@@ -102,9 +106,7 @@ class ClinicalSessionFormattingMixin:
                 continue
             occurrence = entry.occurrence_time or "unknown"
             chronic = coerce_bool_or_unknown(entry.chronic)
-            hepatic_related = coerce_bool_or_unknown(
-                entry.hepatic_related
-            )
+            hepatic_related = coerce_bool_or_unknown(entry.hepatic_related)
             evidence = entry.evidence or "Not reported."
             lines.append(
                 f"- {entry.name} | occurrence: {occurrence} | chronic: {chronic} | hepatic-related: {hepatic_related} | evidence: {evidence}"
@@ -120,7 +122,9 @@ class ClinicalSessionFormattingMixin:
             if not isinstance(entry, ClinicalLabEntry):
                 continue
             date_token = entry.sample_date or entry.relative_time or "unknown_time"
-            value_token = entry.value if entry.value is not None else (entry.value_text or "n/a")
+            value_token = (
+                entry.value if entry.value is not None else (entry.value_text or "n/a")
+            )
             uln_token = (
                 entry.upper_limit_normal
                 if entry.upper_limit_normal is not None
@@ -132,7 +136,9 @@ class ClinicalSessionFormattingMixin:
         return lines or ["- None extracted."]
 
     @staticmethod
-    def format_onset_context(onset_context: LiverInjuryOnsetContext | None) -> list[str]:
+    def format_onset_context(
+        onset_context: LiverInjuryOnsetContext | None,
+    ) -> list[str]:
         if onset_context is None:
             return ["- Onset anchor unavailable."]
         return [

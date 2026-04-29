@@ -37,7 +37,9 @@ def create_access_key(
     try:
         return service.create_access_key(payload.provider, payload.access_key)
     except RuntimeError as exc:
-        logger.warning("Access key creation failed due to dependency/config issue: %s", exc)
+        logger.warning(
+            "Access key creation failed due to dependency/config issue: %s", exc
+        )
         raise HTTPException(
             status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
             detail="Access key service is unavailable. Please retry shortly.",
@@ -63,7 +65,12 @@ def activate_access_key(
     try:
         return service.activate_access_key(key_id, provider=provider)
     except ValueError as exc:
-        logger.warning("Access key activation rejected for id=%s provider=%s: %s", key_id, provider, exc)
+        logger.warning(
+            "Access key activation rejected for id=%s provider=%s: %s",
+            key_id,
+            provider,
+            exc,
+        )
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
             detail="Access key not found.",
@@ -87,5 +94,3 @@ def delete_access_key(
             detail="Access key not found",
         )
     return AccessKeyDeleteResponse()
-
-

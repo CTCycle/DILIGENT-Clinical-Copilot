@@ -16,7 +16,10 @@ from DILIGENT.server.domain.patient_timeline import (
 )
 from DILIGENT.server.services.clinical.prompts import PATIENT_TIMELINE_EXTRACTION_PROMPT
 from DILIGENT.server.services.llm.client_runtime import ensure_runtime_client
-from DILIGENT.server.services.llm.providers import initialize_llm_client, select_llm_provider
+from DILIGENT.server.services.llm.providers import (
+    initialize_llm_client,
+    select_llm_provider,
+)
 
 
 DATE_PREFIX_RE = re.compile(r"^\d{4}-\d{2}-\d{2}$")
@@ -67,9 +70,13 @@ class PatientTimelineExtractor:
         text_extraction_model = cls._coerce_optional_text(
             runtime_settings.get("text_extraction_model")
         )
-        clinical_model = cls._coerce_optional_text(runtime_settings.get("clinical_model"))
+        clinical_model = cls._coerce_optional_text(
+            runtime_settings.get("clinical_model")
+        )
         cloud_model = cls._coerce_optional_text(runtime_settings.get("cloud_model"))
-        llm_provider = cls._coerce_optional_text(runtime_settings.get("llm_provider")).lower()
+        llm_provider = cls._coerce_optional_text(
+            runtime_settings.get("llm_provider")
+        ).lower()
         if llm_provider not in CLOUD_MODEL_CHOICES:
             llm_provider = LLMRuntimeConfig.get_llm_provider().strip().lower()
         if llm_provider not in CLOUD_MODEL_CHOICES:
@@ -87,7 +94,9 @@ class PatientTimelineExtractor:
         *,
         runtime_settings: dict[str, Any] | None = None,
     ) -> None:
-        provider, model = self._resolve_provider_model_from_runtime_settings(runtime_settings)
+        provider, model = self._resolve_provider_model_from_runtime_settings(
+            runtime_settings
+        )
         revision = LLMRuntimeConfig.get_revision() if runtime_settings is None else -1
         signature = (provider, model)
         await ensure_runtime_client(
@@ -99,15 +108,17 @@ class PatientTimelineExtractor:
             track_revision=runtime_settings is None,
             track_signature=runtime_settings is not None,
             client_factory=(
-                lambda _selected_provider, _selected_model: initialize_llm_client(
-                    purpose="parser",
-                    timeout_s=self.timeout_s,
-                )
-                if runtime_settings is None
-                else select_llm_provider(
-                    provider=provider,
-                    timeout_s=self.timeout_s,
-                    default_model=model,
+                lambda _selected_provider, _selected_model: (
+                    initialize_llm_client(
+                        purpose="parser",
+                        timeout_s=self.timeout_s,
+                    )
+                    if runtime_settings is None
+                    else select_llm_provider(
+                        provider=provider,
+                        timeout_s=self.timeout_s,
+                        default_model=model,
+                    )
                 )
             ),
         )
@@ -145,7 +156,9 @@ class PatientTimelineExtractor:
         )
 
     # -------------------------------------------------------------------------
-    def normalize_events(self, events: list[PatientTimelineEvent]) -> list[PatientTimelineEvent]:
+    def normalize_events(
+        self, events: list[PatientTimelineEvent]
+    ) -> list[PatientTimelineEvent]:
         deduped: dict[tuple[str, str, str], PatientTimelineEvent] = {}
         for item in events:
             payload = item.model_dump()
@@ -158,7 +171,9 @@ class PatientTimelineExtractor:
             if previous is None:
                 deduped[key] = event
                 continue
-            previous_score = previous.confidence if previous.confidence is not None else -1.0
+            previous_score = (
+                previous.confidence if previous.confidence is not None else -1.0
+            )
             current_score = event.confidence if event.confidence is not None else -1.0
             if current_score > previous_score:
                 deduped[key] = event
@@ -222,4 +237,3 @@ class PatientTimelineExtractor:
             generated_at=datetime.now(UTC),
             events=normalized_events,
         )
-

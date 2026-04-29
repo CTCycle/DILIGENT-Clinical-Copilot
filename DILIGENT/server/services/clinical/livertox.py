@@ -7,9 +7,9 @@ from typing import Any
 import pandas as pd
 from DILIGENT.server.services.text.normalization import coerce_text
 
+
 ###############################################################################
 class LiverToxData:
-    
     def __init__(
         self,
         *,
@@ -48,7 +48,9 @@ class LiverToxData:
             return
         token_occurrences: dict[str, list[str]] = {}
         prepared_rows: list[dict[str, Any]] = []
-        for original_row_index, row in enumerate(self.livertox_df.to_dict(orient="records")):
+        for original_row_index, row in enumerate(
+            self.livertox_df.to_dict(orient="records")
+        ):
             raw_name = coerce_text(row.get("drug_name"))
             if raw_name is None:
                 continue
@@ -203,7 +205,9 @@ class LiverToxData:
                 continue
             filtered[token] = sorted(
                 records,
-                key=lambda stable_key: self.records_by_stable_key[stable_key].drug_name.casefold(),
+                key=lambda stable_key: self.records_by_stable_key[
+                    stable_key
+                ].drug_name.casefold(),
             )
         self.token_index = filtered
 
@@ -265,10 +269,14 @@ class LiverToxData:
                 if fallback_excerpt:
                     unique_excerpts.append(fallback_excerpt)
                     notes = list(
-                        dict.fromkeys([*notes, "fallback_excerpt_from_related_monograph"])
+                        dict.fromkeys(
+                            [*notes, "fallback_excerpt_from_related_monograph"]
+                        )
                     )
                 else:
-                    notes = list(dict.fromkeys([*notes, "matched_record_missing_excerpt"]))
+                    notes = list(
+                        dict.fromkeys([*notes, "matched_record_missing_excerpt"])
+                    )
             resolved_status = self.resolve_entry_match_status(
                 match_status=match_status,
                 excerpts=unique_excerpts,
@@ -278,7 +286,9 @@ class LiverToxData:
             chosen_candidate = coerce_text(getattr(match, "matched_name", None))
             rejected_candidates = [
                 str(candidate).strip()
-                for candidate in list(getattr(match, "rejected_candidate_names", []) or [])
+                for candidate in list(
+                    getattr(match, "rejected_candidate_names", []) or []
+                )
                 if str(candidate).strip()
             ]
             entries.append(
@@ -292,7 +302,9 @@ class LiverToxData:
                     "match_reason": getattr(match, "reason", None),
                     "match_notes": notes,
                     "match_status": resolved_status,
-                    "match_candidates": list(getattr(match, "candidate_names", []) or []),
+                    "match_candidates": list(
+                        getattr(match, "candidate_names", []) or []
+                    ),
                     "chosen_candidate": chosen_candidate,
                     "rejected_candidates": rejected_candidates,
                     "missing_livertox": missing_livertox,
@@ -380,7 +392,9 @@ class LiverToxData:
         return self.rows_by_name
 
     # -------------------------------------------------------------------------
-    def is_preferred_row(self, candidate: dict[str, Any], current: dict[str, Any]) -> bool:
+    def is_preferred_row(
+        self, candidate: dict[str, Any], current: dict[str, Any]
+    ) -> bool:
         candidate_score = self.row_quality_score(candidate)
         current_score = self.row_quality_score(current)
         if candidate_score != current_score:
@@ -390,7 +404,9 @@ class LiverToxData:
     # -------------------------------------------------------------------------
     def row_quality_score(self, row: dict[str, Any]) -> tuple[int, int, int, int]:
         has_excerpt = 1 if coerce_text(row.get("excerpt")) else 0
-        include_in_livertox = 1 if self.coerce_boolish(row.get("include_in_livertox")) else 0
+        include_in_livertox = (
+            1 if self.coerce_boolish(row.get("include_in_livertox")) else 0
+        )
         reference_count = self.coerce_int(row.get("reference_count"))
         year_approved = self.coerce_int(row.get("year_approved"))
         return (
@@ -415,7 +431,7 @@ class LiverToxData:
             return -1
         try:
             return int(value)
-        except (TypeError, ValueError):
+        except TypeError, ValueError:
             return -1
 
     # -------------------------------------------------------------------------
@@ -488,4 +504,3 @@ class LiverToxData:
                 yield SimpleNamespace(**mapping)
             return
         return
-

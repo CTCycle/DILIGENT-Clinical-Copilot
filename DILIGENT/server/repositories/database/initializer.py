@@ -25,6 +25,7 @@ from DILIGENT.server.repositories.serialization.text_normalization import (
 from DILIGENT.server.repositories.schemas.models import Base
 from DILIGENT.server.common.utils.logger import logger
 
+
 # -----------------------------------------------------------------------------
 def build_postgres_connect_args(settings: DatabaseSettings) -> dict[str, str | int]:
     connect_args: dict[str, str | int] = {
@@ -36,6 +37,7 @@ def build_postgres_connect_args(settings: DatabaseSettings) -> dict[str, str | i
         if settings.ssl_ca:
             connect_args["sslrootcert"] = settings.ssl_ca
     return connect_args
+
 
 # -----------------------------------------------------------------------------
 def build_postgres_url(settings: DatabaseSettings, database_name: str) -> str:
@@ -71,14 +73,16 @@ def clone_settings_with_database(
         select_page_size=settings.select_page_size,
     )
 
+
 # -----------------------------------------------------------------------------
 def build_postgres_create_database_sql(
     database_name: str,
 ) -> TextClause:
     safe_database_name = validate_postgres_database_name(database_name)
     return sqlalchemy.text(
-        f'CREATE DATABASE "{safe_database_name}" WITH ENCODING \'UTF8\' TEMPLATE template0'
+        f"CREATE DATABASE \"{safe_database_name}\" WITH ENCODING 'UTF8' TEMPLATE template0"
     )
+
 
 # -----------------------------------------------------------------------------
 def initialize_sqlite_database(settings: DatabaseSettings) -> None:
@@ -178,4 +182,3 @@ def initialize_database() -> None:
     except Exception as exc:
         logger.exception("Unexpected error during database initialization.")
         raise SystemExit(1) from exc
-

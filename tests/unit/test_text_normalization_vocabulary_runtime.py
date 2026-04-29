@@ -14,7 +14,9 @@ def test_runtime_upsert_list_and_deactivate_term() -> None:
     engine = create_engine("sqlite:///:memory:", future=True)
     Base.metadata.create_all(engine)
     factory = sessionmaker(bind=engine, future=True, expire_on_commit=False)
-    serializer = TextNormalizationVocabularySerializer(engine=engine, session_factory=factory)
+    serializer = TextNormalizationVocabularySerializer(
+        engine=engine, session_factory=factory
+    )
     session = factory()
     try:
         serializer.upsert_term(
@@ -48,4 +50,3 @@ def test_seed_mapping_categories_are_loaded() -> None:
     assert isinstance(snapshot.lab_marker_aliases, dict)
     assert isinstance(snapshot.brand_combo_preferences, dict)
     assert isinstance(snapshot.knowledge_source_references, dict)
-

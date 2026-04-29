@@ -2,7 +2,11 @@ from __future__ import annotations
 
 from fastapi import APIRouter, Query, status
 
-from DILIGENT.server.domain.jobs import JobCancelResponse, JobStartResponse, JobStatusResponse
+from DILIGENT.server.domain.jobs import (
+    JobCancelResponse,
+    JobStartResponse,
+    JobStatusResponse,
+)
 from DILIGENT.server.domain.models import ModelListResponse, ModelPullResponse
 from DILIGENT.server.services.llm.providers import OllamaClient
 from DILIGENT.server.services.runtime.jobs import job_manager
@@ -103,4 +107,3 @@ class OllamaEndpoint:
 
 endpoint = OllamaEndpoint(router=router, service=service)
 endpoint.add_routes()
-

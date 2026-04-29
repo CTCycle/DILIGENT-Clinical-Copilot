@@ -8,6 +8,7 @@ from DILIGENT.server.common.utils.logger import logger
 from DILIGENT.server.repositories.serialization.data import VectorSerializer
 from DILIGENT.server.repositories.vectors import LanceVectorDatabase
 
+
 ###############################################################################
 class RagEmbeddingUpdater:
     def __init__(
@@ -33,13 +34,19 @@ class RagEmbeddingUpdater:
             default_use_cloud if use_cloud_embeddings is None else use_cloud_embeddings
         )
         resolved_provider = cloud_provider or server_settings.rag.cloud_provider
-        resolved_model = cloud_embedding_model or server_settings.rag.cloud_embedding_model
+        resolved_model = (
+            cloud_embedding_model or server_settings.rag.cloud_embedding_model
+        )
         self.vector_collection_name = (
             vector_collection_name or server_settings.rag.vector_collection_name
         )
-        self.chunk_size = int(chunk_size if chunk_size is not None else server_settings.rag.chunk_size)
+        self.chunk_size = int(
+            chunk_size if chunk_size is not None else server_settings.rag.chunk_size
+        )
         self.chunk_overlap = int(
-            chunk_overlap if chunk_overlap is not None else server_settings.rag.chunk_overlap
+            chunk_overlap
+            if chunk_overlap is not None
+            else server_settings.rag.chunk_overlap
         )
         self.embedding_batch_size = int(
             embedding_batch_size
@@ -62,7 +69,9 @@ class RagEmbeddingUpdater:
         self.ollama_embedding_model = (
             ollama_embedding_model or server_settings.rag.ollama_embedding_model
         )
-        self.hf_embedding_model = hf_embedding_model or server_settings.rag.hf_embedding_model
+        self.hf_embedding_model = (
+            hf_embedding_model or server_settings.rag.hf_embedding_model
+        )
         self.reset_vector_collection = (
             server_settings.rag.reset_vector_collection
             if reset_vector_collection is None
@@ -113,4 +122,3 @@ class RagEmbeddingUpdater:
 
 
 __all__ = ["RagEmbeddingUpdater"]
-

@@ -9,7 +9,13 @@ import os
 import re
 import tarfile
 import unicodedata
-from concurrent.futures import ALL_COMPLETED, FIRST_COMPLETED, Future, ProcessPoolExecutor, wait
+from concurrent.futures import (
+    ALL_COMPLETED,
+    FIRST_COMPLETED,
+    Future,
+    ProcessPoolExecutor,
+    wait,
+)
 from datetime import UTC, datetime
 from typing import Any
 from collections.abc import Callable
@@ -46,7 +52,7 @@ def load_json(path: str) -> dict[str, Any] | None:
     try:
         with open(path, "r", encoding="utf-8") as handle:
             return json.load(handle)
-    except (json.JSONDecodeError, OSError):
+    except json.JSONDecodeError, OSError:
         return None
 
 
@@ -61,6 +67,7 @@ def metadata_matches(stored: dict[str, Any], remote: dict[str, Any]) -> bool:
     return stored.get("last_modified") == remote.get("last_modified") and int(
         stored.get("size", 0)
     ) == int(remote.get("size", 0))
+
 
 # -----------------------------------------------------------------------------
 def process_monograph_payload(
@@ -121,7 +128,9 @@ class LiverToxUpdater:
         self.header_row = 1
 
         self.base_url = LIVERTOX_BASE_URL
-        self.file_name = (archive_name or server_settings.external_data.livertox_archive).strip()
+        self.file_name = (
+            archive_name or server_settings.external_data.livertox_archive
+        ).strip()
         self.monograph_max_workers = max(
             1,
             int(
@@ -300,7 +309,7 @@ class LiverToxUpdater:
                 "last_update" in sanitized.columns
                 and pd.api.types.is_datetime64_any_dtype(sanitized["last_update"])
             ):
-                sanitized["last_update"] = sanitized["last_update"].dt.strftime( # type: ignore
+                sanitized["last_update"] = sanitized["last_update"].dt.strftime(  # type: ignore
                     "%Y-%m-%d"
                 )
         metadata["records"] = len(sanitized.index)
@@ -935,7 +944,9 @@ class LiverToxUpdater:
                     finally:
                         extracted.close()
                     if data:
-                        record = LiverToxUpdater.process_monograph_member(member.name, data)
+                        record = LiverToxUpdater.process_monograph_member(
+                            member.name, data
+                        )
                         if record:
                             collected.append(record)
                     processed_count += 1
@@ -979,7 +990,9 @@ class LiverToxUpdater:
                             total_payloads=total_payloads,
                         )
                         continue
-                    future = executor.submit(process_monograph_payload, member.name, data)
+                    future = executor.submit(
+                        process_monograph_payload, member.name, data
+                    )
                     in_flight[future] = member.name
                     if len(in_flight) >= max_in_flight:
                         processed_count = self.drain_monograph_futures(
@@ -1188,7 +1201,9 @@ class LiverToxUpdater:
             r"<title[^>]*>(.*?)</title>",
         )
         for pattern in patterns:
-            for match in re.finditer(pattern, html_text, flags=re.IGNORECASE | re.DOTALL):
+            for match in re.finditer(
+                pattern, html_text, flags=re.IGNORECASE | re.DOTALL
+            ):
                 fragment = LiverToxUpdater.clean_fragment(match.group(1))
                 normalized = LiverToxUpdater.normalize_extracted_title(fragment)
                 if normalized:
@@ -1279,7 +1294,9 @@ class LiverToxUpdater:
         for column in finalized.columns:
             if column == "drug_name":
                 continue
-            finalized[column] = finalized[column].where(pd.notnull(finalized[column]), pd.NA)
+            finalized[column] = finalized[column].where(
+                pd.notnull(finalized[column]), pd.NA
+            )
             finalized[column] = finalized[column].astype(str).str.strip()
             finalized.loc[
                 finalized[column].isin(["", "nan", "NaT", "None", "<NA>"]), column
@@ -1322,8 +1339,14 @@ class LiverToxUpdater:
             .fillna("")
             .astype(str)
             .str.casefold(),
-            _source_url_sort=finalized["source_url"].fillna("").astype(str).str.casefold(),
-            _last_update_sort=finalized["last_update"].fillna("").astype(str).str.casefold(),
+            _source_url_sort=finalized["source_url"]
+            .fillna("")
+            .astype(str)
+            .str.casefold(),
+            _last_update_sort=finalized["last_update"]
+            .fillna("")
+            .astype(str)
+            .str.casefold(),
         )
         sort_frame = sort_frame.sort_values(
             by=[
@@ -1360,7 +1383,3 @@ class LiverToxUpdater:
         if not NBK_ID_PATTERN.fullmatch(normalized):
             return None
         return normalized
-
-
-
-

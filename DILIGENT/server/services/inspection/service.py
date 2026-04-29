@@ -19,8 +19,14 @@ from DILIGENT.server.common.utils.logger import logger
 from DILIGENT.server.configurations.llm_configs import LLMRuntimeConfig
 from DILIGENT.server.configurations.startup import server_settings
 from DILIGENT.server.domain.inspection import InspectionJobPhase
-from DILIGENT.server.domain.patient_timeline import PatientTimeline, PatientTimelineEvent
-from DILIGENT.server.repositories.serialization.data import DataSerializer, DocumentSerializer
+from DILIGENT.server.domain.patient_timeline import (
+    PatientTimeline,
+    PatientTimelineEvent,
+)
+from DILIGENT.server.repositories.serialization.data import (
+    DataSerializer,
+    DocumentSerializer,
+)
 from DILIGENT.server.repositories.vectors import LanceVectorDatabase
 from DILIGENT.server.services.clinical.timeline import PatientTimelineExtractor
 from DILIGENT.server.services.runtime.jobs import JobManager, job_manager
@@ -30,8 +36,12 @@ from DILIGENT.server.services.inspection.runtime import (
 from DILIGENT.server.services.updater.embeddings import RagEmbeddingUpdater
 from DILIGENT.server.services.updater.livertox import LiverToxUpdater
 from DILIGENT.server.services.updater.rxnav import RxNavClient, RxNavDrugCatalogBuilder
-from DILIGENT.server.repositories.serialization.text_normalization import TextNormalizationVocabularySerializer
-from DILIGENT.server.services.text.vocabulary import invalidate_text_normalization_snapshot
+from DILIGENT.server.repositories.serialization.text_normalization import (
+    TextNormalizationVocabularySerializer,
+)
+from DILIGENT.server.services.text.vocabulary import (
+    invalidate_text_normalization_snapshot,
+)
 
 PhaseStep = tuple[InspectionJobPhase, int, int, str]
 UpdateTarget = Literal["rxnav", "livertox", "rag"]
@@ -105,7 +115,9 @@ class DataInspectionService:
     def load_runtime_config(self) -> dict[str, Any]:
         return server_settings.model_dump()
 
-    def list_text_normalization_terms(self, category: str | None = None) -> list[dict[str, Any]]:
+    def list_text_normalization_terms(
+        self, category: str | None = None
+    ) -> list[dict[str, Any]]:
         vocabulary = TextNormalizationVocabularySerializer(
             engine=self.serializer.engine,
             session_factory=self.serializer.session_factory,
@@ -230,7 +242,10 @@ class DataInspectionService:
                     )
                 ),
                 "livertox_archive": str(
-                    source.get("livertox_archive", server_settings.external_data.livertox_archive)
+                    source.get(
+                        "livertox_archive",
+                        server_settings.external_data.livertox_archive,
+                    )
                 ),
                 "redownload": False,
             }
@@ -239,12 +254,16 @@ class DataInspectionService:
             source = config.get("rag", {})
             defaults = {
                 "documents_path": str(source.get("documents_path", DOCS_PATH)),
-                "chunk_size": int(source.get("chunk_size", server_settings.rag.chunk_size)),
+                "chunk_size": int(
+                    source.get("chunk_size", server_settings.rag.chunk_size)
+                ),
                 "chunk_overlap": int(
                     source.get("chunk_overlap", server_settings.rag.chunk_overlap)
                 ),
                 "embedding_batch_size": int(
-                    source.get("embedding_batch_size", server_settings.rag.embedding_batch_size)
+                    source.get(
+                        "embedding_batch_size", server_settings.rag.embedding_batch_size
+                    )
                 ),
                 "vector_stream_batch_size": int(
                     source.get(
@@ -253,10 +272,15 @@ class DataInspectionService:
                     )
                 ),
                 "embedding_max_workers": int(
-                    source.get("embedding_max_workers", server_settings.rag.embedding_max_workers)
+                    source.get(
+                        "embedding_max_workers",
+                        server_settings.rag.embedding_max_workers,
+                    )
                 ),
                 "embedding_backend": str(
-                    source.get("embedding_backend", server_settings.rag.embedding_backend)
+                    source.get(
+                        "embedding_backend", server_settings.rag.embedding_backend
+                    )
                 ),
                 "ollama_embedding_model": str(
                     source.get(
@@ -265,7 +289,9 @@ class DataInspectionService:
                     )
                 ),
                 "hf_embedding_model": str(
-                    source.get("hf_embedding_model", server_settings.rag.hf_embedding_model)
+                    source.get(
+                        "hf_embedding_model", server_settings.rag.hf_embedding_model
+                    )
                 ),
                 "cloud_provider": str(
                     source.get("cloud_provider", server_settings.rag.cloud_provider)
@@ -277,7 +303,9 @@ class DataInspectionService:
                     )
                 ),
                 "use_cloud_embeddings": bool(
-                    source.get("use_cloud_embeddings", server_settings.rag.use_cloud_embeddings)
+                    source.get(
+                        "use_cloud_embeddings", server_settings.rag.use_cloud_embeddings
+                    )
                 ),
                 "reset_vector_collection": bool(
                     source.get(
@@ -356,7 +384,9 @@ class DataInspectionService:
         safe_session_id = int(session_id)
         now = time.monotonic()
         with self.timeline_generation_lock:
-            cooldown_until = self.timeline_generation_cooldown_until.get(safe_session_id, 0.0)
+            cooldown_until = self.timeline_generation_cooldown_until.get(
+                safe_session_id, 0.0
+            )
             if now < cooldown_until:
                 raise RuntimeError(
                     "Timeline regeneration is cooling down. Please wait a few seconds and retry."
@@ -385,14 +415,17 @@ class DataInspectionService:
 
             timeline_timeout_s = max(
                 20.0,
-                min(300.0, float(getattr(self.timeline_extractor, "timeout_s", 90.0)) + 20.0),
+                min(
+                    300.0,
+                    float(getattr(self.timeline_extractor, "timeout_s", 90.0)) + 20.0,
+                ),
             )
-            text_extraction_model = coerce_optional_str(runtime_settings.get("text_extraction_model")) or coerce_optional_str(
-                source.get("text_extraction_model")
-            )
-            clinical_model = coerce_optional_str(runtime_settings.get("clinical_model")) or coerce_optional_str(
-                source.get("clinical_model")
-            )
+            text_extraction_model = coerce_optional_str(
+                runtime_settings.get("text_extraction_model")
+            ) or coerce_optional_str(source.get("text_extraction_model"))
+            clinical_model = coerce_optional_str(
+                runtime_settings.get("clinical_model")
+            ) or coerce_optional_str(source.get("clinical_model"))
             requested_runtime_settings = {
                 # Use the single persisted runtime configuration applied at startup/runtime.
                 "use_cloud_services": LLMRuntimeConfig.is_cloud_enabled(),
@@ -400,7 +433,8 @@ class DataInspectionService:
                 "cloud_model": LLMRuntimeConfig.get_cloud_model(),
                 "text_extraction_model": LLMRuntimeConfig.get_text_extraction_model()
                 or text_extraction_model,
-                "clinical_model": LLMRuntimeConfig.get_clinical_model() or clinical_model,
+                "clinical_model": LLMRuntimeConfig.get_clinical_model()
+                or clinical_model,
                 "ollama_temperature": LLMRuntimeConfig.get_ollama_temperature(),
                 "cloud_temperature": LLMRuntimeConfig.get_cloud_temperature(),
                 "ollama_reasoning": LLMRuntimeConfig.is_ollama_reasoning_enabled(),
@@ -578,7 +612,9 @@ class DataInspectionService:
 
     # -------------------------------------------------------------------------
     def extract_lab_marker(self, text: str) -> str | None:
-        matched = re.search(r"\b(ALT|AST|ALP|TBIL|DBIL|GGT)\b[^.;,\n]*", text, re.IGNORECASE)
+        matched = re.search(
+            r"\b(ALT|AST|ALP|TBIL|DBIL|GGT)\b[^.;,\n]*", text, re.IGNORECASE
+        )
         if not matched:
             return None
         return matched.group(0).strip()[:120]
@@ -694,7 +730,9 @@ class DataInspectionService:
         rag_cfg = config.get("rag", {}) if isinstance(config, dict) else {}
         documents_path = str(rag_cfg.get("documents_path", DOCS_PATH))
         collection_name = str(
-            rag_cfg.get("vector_collection_name", server_settings.rag.vector_collection_name)
+            rag_cfg.get(
+                "vector_collection_name", server_settings.rag.vector_collection_name
+            )
         )
         vector_db = LanceVectorDatabase(
             database_path=VECTOR_DB_PATH,
@@ -735,7 +773,9 @@ class DataInspectionService:
         self.jobs.update_result(job_id, patch)
 
     # -------------------------------------------------------------------------
-    def report_job_progress(self, *, job_id: str, progress: float, message: str) -> None:
+    def report_job_progress(
+        self, *, job_id: str, progress: float, message: str
+    ) -> None:
         bounded_progress = min(100.0, max(0.0, float(progress)))
         self.jobs.update_progress(job_id, bounded_progress)
         self.patch_job_result(job_id=job_id, patch={"progress_message": message})
@@ -777,7 +817,9 @@ class DataInspectionService:
             None,
         )
         if step is None:
-            self.report_job_progress(job_id=job_id, progress=progress, message=fallback_message)
+            self.report_job_progress(
+                job_id=job_id, progress=progress, message=fallback_message
+            )
             return
         self.report_phase(
             job_id=job_id,
@@ -1000,12 +1042,16 @@ class DataInspectionService:
             progress=100.0,
             fallback_message="Completed",
         )
-        backend = "cloud" if bool(override_values.get("use_cloud_embeddings")) else "local"
+        backend = (
+            "cloud" if bool(override_values.get("use_cloud_embeddings")) else "local"
+        )
         result_with_backend = {**result, "backend": backend}
         return {"summary": result_with_backend}
 
     # -------------------------------------------------------------------------
-    def start_update_job(self, job_type: str, overrides: dict[str, Any] | None = None) -> dict[str, Any]:
+    def start_update_job(
+        self, job_type: str, overrides: dict[str, Any] | None = None
+    ) -> dict[str, Any]:
         if self.jobs.is_job_running(job_type):
             raise ValueError(f"Job type '{job_type}' is already running")
         override_values = dict(overrides or {})
@@ -1024,7 +1070,9 @@ class DataInspectionService:
         return status_payload
 
     # -------------------------------------------------------------------------
-    def get_job_status(self, job_id: str, *, expected_type: str) -> dict[str, Any] | None:
+    def get_job_status(
+        self, job_id: str, *, expected_type: str
+    ) -> dict[str, Any] | None:
         payload = self.jobs.get_job_status(job_id)
         if payload is None:
             return None
@@ -1045,6 +1093,3 @@ class DataInspectionService:
         if payload is None:
             return False
         return self.jobs.cancel_job(job_id)
-
-
-

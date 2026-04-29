@@ -37,7 +37,9 @@ def test_session_learning_promotes_only_direct_high_confidence_aliases() -> None
         patient = Patient(name="Test", visit_date=None)
         db_session.add_all([atorvastatin, loop_diuretics, patient])
         db_session.flush()
-        session = ClinicalSession(patient_id=int(patient.id), session_status="successful")
+        session = ClinicalSession(
+            patient_id=int(patient.id), session_status="successful"
+        )
         db_session.add(session)
         db_session.flush()
 
@@ -70,7 +72,9 @@ def test_session_learning_promotes_only_direct_high_confidence_aliases() -> None
         db_session.commit()
 
         aliases = db_session.execute(
-            select(DrugAlias.alias, DrugAlias.drug_id).where(DrugAlias.source == "session")
+            select(DrugAlias.alias, DrugAlias.drug_id).where(
+                DrugAlias.source == "session"
+            )
         ).all()
         terms = db_session.execute(
             select(TextNormalizationTerm.category, TextNormalizationTerm.term).where(

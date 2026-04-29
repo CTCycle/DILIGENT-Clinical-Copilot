@@ -2,6 +2,7 @@
 Pytest configuration for DILIGENT E2E tests.
 Provides fixtures for Playwright page objects and API client.
 """
+
 import os
 
 import pytest
@@ -13,7 +14,9 @@ def _normalize_host_for_url(host: str) -> str:
     return host
 
 
-def _build_base_url(host_env: str, port_env: str, default_host: str, default_port: str) -> str:
+def _build_base_url(
+    host_env: str, port_env: str, default_host: str, default_port: str
+) -> str:
     host = _normalize_host_for_url(os.getenv(host_env, default_host))
     port = os.getenv(port_env, default_port)
     return f"http://{host}:{port}"

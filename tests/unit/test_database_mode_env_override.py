@@ -4,7 +4,10 @@ import json
 
 from DILIGENT.server.common import constants
 from DILIGENT.server.configurations import startup as bootstrap
-from DILIGENT.server.configurations.startup import get_server_settings, reset_app_settings_cache
+from DILIGENT.server.configurations.startup import (
+    get_server_settings,
+    reset_app_settings_cache,
+)
 
 
 def _write_config(path, payload) -> None:
@@ -31,7 +34,9 @@ def _base_payload() -> dict:
     }
 
 
-def test_database_settings_are_loaded_from_json_without_env_overlap(tmp_path, monkeypatch) -> None:
+def test_database_settings_are_loaded_from_json_without_env_overlap(
+    tmp_path, monkeypatch
+) -> None:
     config_path = tmp_path / "configurations.json"
     _write_config(config_path, _base_payload())
     dotenv_path = tmp_path / ".env"
@@ -63,5 +68,3 @@ def test_database_settings_are_loaded_from_json_without_env_overlap(tmp_path, mo
     reset_app_settings_cache()
     settings = get_server_settings()
     assert settings.database.host == "json-host"
-
-

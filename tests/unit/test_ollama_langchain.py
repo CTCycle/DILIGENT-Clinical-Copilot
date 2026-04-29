@@ -23,7 +23,9 @@ class FakeSchema(BaseModel):
 
 # -----------------------------------------------------------------------------
 def _patch_generation_prep(monkeypatch, client: providers_module.OllamaClient) -> None:
-    async def fake_prepare_common_options(**kwargs: Any) -> tuple[str, float, bool, dict[str, Any] | None]:
+    async def fake_prepare_common_options(
+        **kwargs: Any,
+    ) -> tuple[str, float, bool, dict[str, Any] | None]:
         _ = kwargs
         return "llama3.1:8b", 0.4, True, {"num_ctx": 2048}
 
@@ -89,7 +91,9 @@ def test_chat_stream_preserves_stream_behavior(monkeypatch) -> None:
             yield FakeMessage(content="chunk-1")
             yield FakeMessage(content="chunk-2")
 
-    monkeypatch.setattr(client, "_build_ollama_chat_model", lambda **kwargs: FakeChatModel())
+    monkeypatch.setattr(
+        client, "_build_ollama_chat_model", lambda **kwargs: FakeChatModel()
+    )
 
     async def gather() -> list[dict[str, Any]]:
         events: list[dict[str, Any]] = []
@@ -121,7 +125,9 @@ def test_embed_uses_langchain_embeddings(monkeypatch) -> None:
         def embed_documents(self, texts: list[str]) -> list[list[float]]:
             return [[float(len(text))] for text in texts]
 
-    monkeypatch.setattr(client, "_build_ollama_embeddings_model", lambda **kwargs: FakeEmbeddings())
+    monkeypatch.setattr(
+        client, "_build_ollama_embeddings_model", lambda **kwargs: FakeEmbeddings()
+    )
     vectors = asyncio.run(client.embed(model="llama3.1:8b", input_texts=["a", "bb"]))
     assert vectors == [[1.0], [2.0]]
 
@@ -130,7 +136,7 @@ def test_embed_uses_langchain_embeddings(monkeypatch) -> None:
 def test_structured_output_repair_loop_still_works(monkeypatch) -> None:
     client = providers_module.OllamaClient(base_url="http://127.0.0.1:11434")
     parser = StructuredOutputParser(schema=FakeSchema)
-    replies = iter(['not-json', '{"status":"ok"}'])
+    replies = iter(["not-json", '{"status":"ok"}'])
 
     async def fake_chat(**kwargs: Any) -> dict[str, Any] | str:
         _ = kwargs
@@ -166,10 +172,15 @@ def test_ollama_inference_exception_maps_to_existing_error_types(monkeypatch) ->
             if False:
                 yield None
 
-    monkeypatch.setattr(client, "_build_ollama_chat_model", lambda **kwargs: FakeChatModel())
+    monkeypatch.setattr(
+        client, "_build_ollama_chat_model", lambda **kwargs: FakeChatModel()
+    )
     try:
-        asyncio.run(client.chat(model="llama3.1:8b", messages=[{"role": "user", "content": "x"}]))
+        asyncio.run(
+            client.chat(
+                model="llama3.1:8b", messages=[{"role": "user", "content": "x"}]
+            )
+        )
         assert False, "Expected timeout mapping"
     except providers_module.OllamaTimeout:
         pass
-

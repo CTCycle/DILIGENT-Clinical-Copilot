@@ -56,7 +56,8 @@ def test_model_config_roundtrip_preserves_cloud_selection() -> None:
 
 def test_clinical_service_reads_runtime_from_persisted_config() -> None:
     clinical_service.apply_persisted_runtime_configuration()
-    parser_provider, parser_model = LLMRuntimeConfig.resolve_provider_and_model("parser")
+    parser_provider, parser_model = LLMRuntimeConfig.resolve_provider_and_model(
+        "parser"
+    )
     assert parser_provider
     assert parser_model
-

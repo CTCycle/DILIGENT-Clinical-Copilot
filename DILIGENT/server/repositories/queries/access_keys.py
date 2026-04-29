@@ -11,7 +11,6 @@ AccessKeyTable = type[AccessKey] | type[ResearchAccessKey]
 
 ###############################################################################
 class AccessKeyRepositoryQueries:
-    
     # -------------------------------------------------------------------------
     @staticmethod
     def list_for_provider(table: AccessKeyTable, provider: str):
@@ -23,7 +22,9 @@ class AccessKeyRepositoryQueries:
 
     # -------------------------------------------------------------------------
     @staticmethod
-    def deactivate_provider_keys(table: AccessKeyTable, provider: str, *, now: datetime):
+    def deactivate_provider_keys(
+        table: AccessKeyTable, provider: str, *, now: datetime
+    ):
         return (
             update(table)
             .where(table.provider == provider)
@@ -41,4 +42,3 @@ class AccessKeyRepositoryQueries:
             )
             .order_by(table.updated_at.desc(), table.id.desc())
         )
-

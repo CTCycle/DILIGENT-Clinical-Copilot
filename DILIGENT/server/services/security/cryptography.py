@@ -31,7 +31,9 @@ def decrypt_with_key_material(ciphertext: str, key_material: str) -> str:
     if not normalized:
         raise ValueError("Encrypted access key must not be empty")
     try:
-        decoded = _load_fernet_from_material(key_material).decrypt(normalized.encode("utf-8"))
+        decoded = _load_fernet_from_material(key_material).decrypt(
+            normalized.encode("utf-8")
+        )
     except InvalidToken as exc:
         raise RuntimeError("Encrypted access key is invalid") from exc
     except Exception as exc:  # noqa: BLE001

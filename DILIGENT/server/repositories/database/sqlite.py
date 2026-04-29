@@ -22,7 +22,9 @@ from DILIGENT.server.common.utils.logger import logger
 class SQLiteRepository:
     def __init__(self, settings: DatabaseSettings) -> None:
         self.db_path: str | None = os.path.join(RESOURCES_PATH, DATABASE_FILENAME)
-        should_initialize_schema = bool(self.db_path and not os.path.exists(self.db_path))
+        should_initialize_schema = bool(
+            self.db_path and not os.path.exists(self.db_path)
+        )
         os.makedirs(os.path.dirname(self.db_path), exist_ok=True)
         self.engine: Engine = sqlalchemy.create_engine(
             f"sqlite:///{self.db_path}",

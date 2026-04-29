@@ -15,7 +15,9 @@ from DILIGENT.server.domain.model_configs import (
     ModelConfigStateResponse,
     ModelConfigUpdateRequest,
 )
-from DILIGENT.server.repositories.serialization.model_configs import ModelConfigSerializer
+from DILIGENT.server.repositories.serialization.model_configs import (
+    ModelConfigSerializer,
+)
 from DILIGENT.server.services.llm.providers import OllamaClient, OllamaError
 
 LOCAL_MODEL_CATALOG = cast(
@@ -27,6 +29,7 @@ LOCAL_MODEL_CATALOG = cast(
     ),
 )
 LOCAL_MODEL_CATALOG_NAMES = {name for name, _, _ in LOCAL_MODEL_CATALOG}
+
 
 ###############################################################################
 class ModelConfigSnapshotStore(Protocol):
@@ -69,7 +72,9 @@ class ModelConfigService:
         return self.build_response(snapshot=snapshot, local_models=local_models)
 
     # -------------------------------------------------------------------------
-    async def update_state(self, payload: ModelConfigUpdateRequest) -> ModelConfigStateResponse:
+    async def update_state(
+        self, payload: ModelConfigUpdateRequest
+    ) -> ModelConfigStateResponse:
         snapshot = self.ensure_defaults()
         fields_set = payload.model_fields_set
         local_roles_updated = self._local_roles_updated(fields_set)
@@ -87,7 +92,9 @@ class ModelConfigService:
         if updates:
             snapshot = self.serializer.save_snapshot(**updates)
 
-        should_check_local_availability = (not snapshot.use_cloud_models) or local_roles_updated
+        should_check_local_availability = (
+            not snapshot.use_cloud_models
+        ) or local_roles_updated
         local_models = await self.list_local_model_cards(
             selected_models=(snapshot.clinical_model, snapshot.text_extraction_model),
             include_ollama_availability=should_check_local_availability,
@@ -167,7 +174,9 @@ class ModelConfigService:
             updates["clinical_model"] = clinical_model
 
         if "text_extraction_model" in fields_set:
-            text_extraction_model = self.normalize_optional_text(payload.text_extraction_model)
+            text_extraction_model = self.normalize_optional_text(
+                payload.text_extraction_model
+            )
             self.validate_local_selection(
                 role_name="text_extraction",
                 model_name=text_extraction_model,
@@ -185,13 +194,17 @@ class ModelConfigService:
         updates: dict[str, Any],
     ) -> None:
         provider = self.resolve_provider(
-            payload.llm_provider if "llm_provider" in fields_set else snapshot.cloud_provider
+            payload.llm_provider
+            if "llm_provider" in fields_set
+            else snapshot.cloud_provider
         )
         if "llm_provider" in fields_set:
             updates["cloud_provider"] = provider
 
         if "cloud_model" in fields_set or "llm_provider" in fields_set:
-            requested_cloud_model = payload.cloud_model if "cloud_model" in fields_set else None
+            requested_cloud_model = (
+                payload.cloud_model if "cloud_model" in fields_set else None
+            )
             updates["cloud_model"] = self.resolve_cloud_model(
                 provider=provider,
                 model_name=requested_cloud_model,
@@ -208,7 +221,10 @@ class ModelConfigService:
         if "use_cloud_services" in fields_set:
             updates["use_cloud_models"] = bool(payload.use_cloud_services)
 
-        if "ollama_temperature" in fields_set and payload.ollama_temperature is not None:
+        if (
+            "ollama_temperature" in fields_set
+            and payload.ollama_temperature is not None
+        ):
             updates["ollama_temperature"] = payload.ollama_temperature
 
         if "cloud_temperature" in fields_set and payload.cloud_temperature is not None:
@@ -270,7 +286,9 @@ class ModelConfigService:
         )
 
         if snapshot.clinical_model is None:
-            updates["clinical_model"] = self.normalize_optional_text(LLMRuntimeConfig.get_clinical_model())
+            updates["clinical_model"] = self.normalize_optional_text(
+                LLMRuntimeConfig.get_clinical_model()
+            )
         if snapshot.text_extraction_model is None:
             updates["text_extraction_model"] = self.normalize_optional_text(
                 LLMRuntimeConfig.get_text_extraction_model()
@@ -282,7 +300,11 @@ class ModelConfigService:
                 provider=snapshot_provider,
                 model_name=runtime_cloud_model,
             )
-        if snapshot.cloud_provider is None and snapshot.cloud_model is None and snapshot.updated_at is None:
+        if (
+            snapshot.cloud_provider is None
+            and snapshot.cloud_model is None
+            and snapshot.updated_at is None
+        ):
             updates["use_cloud_models"] = LLMRuntimeConfig.is_cloud_enabled()
         if snapshot.updated_at is None:
             updates["ollama_reasoning"] = LLMRuntimeConfig.is_ollama_reasoning_enabled()
@@ -316,7 +338,11 @@ class ModelConfigService:
         except Exception:
             logger.exception("Unexpected error while listing local Ollama models")
             return set()
-        return {model.strip() for model in models if isinstance(model, str) and model.strip()}
+        return {
+            model.strip()
+            for model in models
+            if isinstance(model, str) and model.strip()
+        }
 
     # -------------------------------------------------------------------------
     async def list_local_model_cards(
@@ -368,7 +394,9 @@ class ModelConfigService:
         local_models: list[LocalModelCard],
     ) -> ModelConfigStateResponse:
         provider = self.resolve_provider(snapshot.cloud_provider)
-        cloud_model = self.resolve_cloud_model(provider=provider, model_name=snapshot.cloud_model)
+        cloud_model = self.resolve_cloud_model(
+            provider=provider, model_name=snapshot.cloud_model
+        )
         return ModelConfigStateResponse(
             local_models=local_models,
             cloud_model_choices=CLOUD_MODEL_CHOICES,

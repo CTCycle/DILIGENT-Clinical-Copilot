@@ -47,9 +47,9 @@ def test_sqlite_fresh_creation_seeds_registry_once(tmp_path, monkeypatch) -> Non
             select(func.count()).select_from(AccessKeyEncryptionMaterial)
         ).scalar_one()
         active_rows = db_session.execute(
-            select(func.count()).select_from(AccessKeyEncryptionMaterial).where(
-                AccessKeyEncryptionMaterial.is_active.is_(True)
-            )
+            select(func.count())
+            .select_from(AccessKeyEncryptionMaterial)
+            .where(AccessKeyEncryptionMaterial.is_active.is_(True))
         ).scalar_one()
 
     assert int(count_rows) == 1
@@ -77,7 +77,9 @@ def test_sqlite_reopen_with_existing_db_does_not_reseed(tmp_path, monkeypatch) -
 
 
 # -----------------------------------------------------------------------------
-def test_postgresql_initialization_path_seeds_after_schema_creation(monkeypatch) -> None:  # type: ignore[no-untyped-def]
+def test_postgresql_initialization_path_seeds_after_schema_creation(
+    monkeypatch,
+) -> None:  # type: ignore[no-untyped-def]
     settings = DatabaseSettings(
         embedded_database=False,
         engine="postgres",
@@ -139,11 +141,19 @@ def test_postgresql_initialization_path_seeds_after_schema_creation(monkeypatch)
         def ensure_seeded(self):
             order.append("text_seeded")
 
-    monkeypatch.setattr(initializer.sqlalchemy, "create_engine", lambda *a, **k: FakeAdminEngine())
+    monkeypatch.setattr(
+        initializer.sqlalchemy, "create_engine", lambda *a, **k: FakeAdminEngine()
+    )
     monkeypatch.setattr(initializer, "PostgresRepository", FakePostgresRepository)
     monkeypatch.setattr(initializer.Base.metadata, "create_all", fake_create_all)
-    monkeypatch.setattr(initializer, "AccessKeyEncryptionMaterialSerializer", FakeMaterialSerializer)
-    monkeypatch.setattr(initializer, "TextNormalizationVocabularySerializer", FakeTextNormalizationSerializer)
+    monkeypatch.setattr(
+        initializer, "AccessKeyEncryptionMaterialSerializer", FakeMaterialSerializer
+    )
+    monkeypatch.setattr(
+        initializer,
+        "TextNormalizationVocabularySerializer",
+        FakeTextNormalizationSerializer,
+    )
 
     db_name = initializer.ensure_postgres_database(settings)
 
@@ -162,10 +172,9 @@ def test_seeding_does_not_create_duplicate_active_rows(tmp_path, monkeypatch) ->
     factory = sessionmaker(bind=repository.engine, future=True)
     with factory() as db_session:
         count_rows = db_session.execute(
-            select(func.count()).select_from(AccessKeyEncryptionMaterial).where(
-                AccessKeyEncryptionMaterial.is_active.is_(True)
-            )
+            select(func.count())
+            .select_from(AccessKeyEncryptionMaterial)
+            .where(AccessKeyEncryptionMaterial.is_active.is_(True))
         ).scalar_one()
 
     assert int(count_rows) == 1
-

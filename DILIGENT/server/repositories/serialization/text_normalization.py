@@ -46,9 +46,7 @@ def normalize_term(value: str | None) -> str:
     if not value:
         return ""
     normalized = (
-        unicodedata.normalize("NFKD", value)
-        .encode("ascii", "ignore")
-        .decode("ascii")
+        unicodedata.normalize("NFKD", value).encode("ascii", "ignore").decode("ascii")
     )
     normalized = normalized.lower()
     normalized = re.sub(r"[^a-z0-9\s]", " ", normalized)
@@ -183,7 +181,11 @@ class TextNormalizationVocabularySerializer:
         if category:
             query = query.where(TextNormalizationTerm.category == category)
         return list(
-            db_session.execute(query.order_by(TextNormalizationTerm.category, TextNormalizationTerm.term_norm))
+            db_session.execute(
+                query.order_by(
+                    TextNormalizationTerm.category, TextNormalizationTerm.term_norm
+                )
+            )
             .scalars()
             .all()
         )

@@ -37,7 +37,9 @@ from DILIGENT.server.common.utils.patterns import (
 
 ###############################################################################
 class DrugsParser:
-    LLM_CLIENT_NOT_INITIALIZED_ERROR = "LLM client is not initialized for drug extraction"
+    LLM_CLIENT_NOT_INITIALIZED_ERROR = (
+        "LLM client is not initialized for drug extraction"
+    )
     SCHEDULE_RE = DRUG_SCHEDULE_RE
     DATE_LIKE_SCHEDULE_RE = re.compile(r"^\d{4}\s*-\s*\d{1,2}\s*-\s*\d{1,2}$")
     BULLET_RE = DRUG_BULLET_RE
@@ -157,9 +159,7 @@ class DrugsParser:
         "ulteriore ciclo",
         "eventuale inizio",
     )
-    NON_DRUG_CONTAINS = (
-        "originariamente previsto",
-    )
+    NON_DRUG_CONTAINS = ("originariamente previsto",)
     WEEKDAY_TOKENS = {
         "il",
         "la",
@@ -211,7 +211,9 @@ class DrugsParser:
     # -------------------------------------------------------------------------
     async def ensure_client(self) -> None:
         revision = LLMRuntimeConfig.get_revision()
-        resolved_provider, resolved_model = LLMRuntimeConfig.resolve_provider_and_model("parser")
+        resolved_provider, resolved_model = LLMRuntimeConfig.resolve_provider_and_model(
+            "parser"
+        )
         provider = self.forced_provider or resolved_provider
         model = self.forced_model or resolved_model
         await ensure_runtime_client(
@@ -219,10 +221,12 @@ class DrugsParser:
             provider=provider,
             model=model,
             revision=revision,
-            client_factory=lambda selected_provider, selected_model: select_llm_provider(
-                provider=selected_provider,
-                default_model=selected_model,
-                timeout_s=self.timeout_s,
+            client_factory=lambda selected_provider, selected_model: (
+                select_llm_provider(
+                    provider=selected_provider,
+                    default_model=selected_model,
+                    timeout_s=self.timeout_s,
+                )
             ),
         )
 
@@ -320,7 +324,9 @@ class DrugsParser:
                     exc,
                 )
                 self.emit_progress(progress_callback, 1.0)
-                return PatientDrugs(entries=[entry for entry in ordered_entries if entry is not None])
+                return PatientDrugs(
+                    entries=[entry for entry in ordered_entries if entry is not None]
+                )
 
             llm_entries = list(structured.entries)
             for offset, (target_index, raw_line) in enumerate(fallback_chunks):
@@ -402,7 +408,10 @@ class DrugsParser:
         current_size = 0
         for line in lines:
             line_size = len(line) + 1
-            if current_lines and current_size + line_size > self.ANAMNESIS_CHUNK_MAX_CHARS:
+            if (
+                current_lines
+                and current_size + line_size > self.ANAMNESIS_CHUNK_MAX_CHARS
+            ):
                 chunks.append("\n".join(current_lines))
                 current_lines = [line]
                 current_size = line_size
@@ -414,7 +423,9 @@ class DrugsParser:
         return chunks or [normalized]
 
     # -------------------------------------------------------------------------
-    def extract_drugs_from_anamnesis_rule_based(self, anamnesis: str) -> list[DrugEntry]:
+    def extract_drugs_from_anamnesis_rule_based(
+        self, anamnesis: str
+    ) -> list[DrugEntry]:
         lines = [line.strip() for line in anamnesis.split("\n") if line.strip()]
         entries: list[DrugEntry] = []
         for line in lines:
@@ -443,7 +454,10 @@ class DrugsParser:
             return True
         if self.detect_route(line):
             return True
-        if any(token in lowered for token in (" mg", " ml", " mcg", " cpr", " caps", " fiala", " sir ")):
+        if any(
+            token in lowered
+            for token in (" mg", " ml", " mcg", " cpr", " caps", " fiala", " sir ")
+        ):
             return True
         return False
 
@@ -460,7 +474,9 @@ class DrugsParser:
                 selected[normalized_name] = entry
                 order.append(normalized_name)
                 continue
-            if self.entry_information_score(entry) > self.entry_information_score(existing):
+            if self.entry_information_score(entry) > self.entry_information_score(
+                existing
+            ):
                 selected[normalized_name] = entry
         return [selected[key] for key in order if key in selected]
 
@@ -504,7 +520,9 @@ class DrugsParser:
         if self.client is None:
             raise RuntimeError(self.LLM_CLIENT_NOT_INITIALIZED_ERROR)
 
-        cleaned_anamnesis = (anamnesis or "") if already_cleaned else self.clean_text(anamnesis)
+        cleaned_anamnesis = (
+            (anamnesis or "") if already_cleaned else self.clean_text(anamnesis)
+        )
         chunks = self.chunk_anamnesis_text(cleaned_anamnesis)
         self.emit_progress(progress_callback, 0.0)
         parsed_entries: list[DrugEntry] = []
@@ -545,7 +563,9 @@ class DrugsParser:
             )
             if normalized is not None:
                 entries.append(normalized)
-        fallback_entries = self.extract_drugs_from_anamnesis_rule_based(cleaned_anamnesis)
+        fallback_entries = self.extract_drugs_from_anamnesis_rule_based(
+            cleaned_anamnesis
+        )
         self.emit_progress(progress_callback, 0.95)
         merged_entries = self.deduplicate_drug_entries([*entries, *fallback_entries])
         logger.info(
@@ -578,7 +598,9 @@ class DrugsParser:
             return None
 
         schedule_match = self.SCHEDULE_RE.search(line)
-        if schedule_match and self.is_date_like_schedule(schedule_match.group("schedule")):
+        if schedule_match and self.is_date_like_schedule(
+            schedule_match.group("schedule")
+        ):
             schedule_match = None
         schedule_text = schedule_match.group("schedule") if schedule_match else None
         schedule_values = self.parse_schedule(schedule_text) if schedule_text else []
@@ -737,8 +759,7 @@ class DrugsParser:
     def is_non_therapy_line(self, line: str) -> bool:
         normalized = self.normalize_filter_key(line)
         return any(
-            normalized.startswith(prefix)
-            for prefix in self.NON_THERAPY_LINE_PREFIXES
+            normalized.startswith(prefix) for prefix in self.NON_THERAPY_LINE_PREFIXES
         )
 
     # -------------------------------------------------------------------------
@@ -890,7 +911,9 @@ class DrugsParser:
     def is_non_drug_fragment_name(self, value: str) -> bool:
         normalized = self.normalize_filter_key(value)
         snapshot = get_text_normalization_snapshot()
-        non_drug_exact = set(self.NON_DRUG_EXACT_NAMES) | set(snapshot.drug_non_mentions)
+        non_drug_exact = set(self.NON_DRUG_EXACT_NAMES) | set(
+            snapshot.drug_non_mentions
+        )
         weekday_tokens = set(self.WEEKDAY_TOKENS) | set(snapshot.drug_weekday_words)
         duration_words = set(snapshot.drug_duration_words)
         if not normalized:
@@ -902,7 +925,9 @@ class DrugsParser:
         if any(fragment in normalized for fragment in self.NON_DRUG_CONTAINS):
             return True
         tokens = normalized.split()
-        if tokens and all(token.isdigit() or token in duration_words for token in tokens):
+        if tokens and all(
+            token.isdigit() or token in duration_words for token in tokens
+        ):
             return True
         if tokens and all(token in weekday_tokens for token in tokens):
             return True
@@ -913,11 +938,11 @@ class DrugsParser:
         schedule_present = bool(entry.administration_pattern) or bool(
             entry.daytime_administration
         )
-        start_present = (
-            entry.therapy_start_status is not None or bool(entry.therapy_start_date)
+        start_present = entry.therapy_start_status is not None or bool(
+            entry.therapy_start_date
         )
-        suspension_present = (
-            entry.suspension_status is not None or bool(entry.suspension_date)
+        suspension_present = entry.suspension_status is not None or bool(
+            entry.suspension_date
         )
         if schedule_present or start_present or suspension_present:
             return "temporal_known"
@@ -948,7 +973,9 @@ class DrugsParser:
         normalized.administration_pattern = self.sanitize_text_field(
             normalized.administration_pattern
         )
-        normalized.suspension_date = self.sanitize_text_field(normalized.suspension_date)
+        normalized.suspension_date = self.sanitize_text_field(
+            normalized.suspension_date
+        )
         normalized.therapy_start_date = self.sanitize_text_field(
             normalized.therapy_start_date
         )
@@ -963,7 +990,9 @@ class DrugsParser:
     def enrich_entry_from_line(self, entry: DrugEntry, raw_line: str) -> DrugEntry:
         normalized = entry.model_copy(deep=True)
         schedule_match = self.SCHEDULE_RE.search(raw_line)
-        if schedule_match and self.is_date_like_schedule(schedule_match.group("schedule")):
+        if schedule_match and self.is_date_like_schedule(
+            schedule_match.group("schedule")
+        ):
             schedule_match = None
         if schedule_match:
             schedule_text = schedule_match.group("schedule")
@@ -1021,7 +1050,3 @@ class DrugsParser:
             except ValueError:
                 return stripped
         return f"{day.zfill(2)}.{month.zfill(2)}"
-
-
-
-

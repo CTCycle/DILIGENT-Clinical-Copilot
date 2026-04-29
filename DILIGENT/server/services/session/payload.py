@@ -9,7 +9,9 @@ from datetime import datetime, date
 
 HTML_TAG_RE = re.compile(r"<[^>]+>")
 MULTISPACE_RE = re.compile(r"[ \t]+")
-DRUG_BULLET_PREFIX_RE = re.compile(r"^[\-\u2022\u2023\u2043\*\u25A0\u25AA\u25CF\u25E6\u2219\u00B7]+\s*")
+DRUG_BULLET_PREFIX_RE = re.compile(
+    r"^[\-\u2022\u2023\u2043\*\u25A0\u25AA\u25CF\u25E6\u2219\u00B7]+\s*"
+)
 DRUG_ALLOWED_SYMBOLS_RE = re.compile(r"[^\w\s.,;:/()\-+%[\]'\"<>=]")
 ANAMNESIS_ALLOWED_SYMBOLS_RE = re.compile(r"[^\w\s.,;:/()\-+%[\]'\"<>=]")
 
@@ -90,6 +92,7 @@ def sanitize_laboratory_text(value: str | None) -> str | None:
         return None
     return "\n".join(cleaned_lines)
 
+
 # -----------------------------------------------------------------------------
 def normalize_visit_date(
     value: datetime | date | dict[str, Any] | str | None,
@@ -114,7 +117,7 @@ def normalize_visit_date(
             month = int(month_raw)
             year = int(year_raw)
             normalized = date(year, month, day)
-        except (TypeError, ValueError):
+        except TypeError, ValueError:
             return None
 
     elif isinstance(value, datetime):
@@ -144,12 +147,13 @@ def normalize_visit_date(
         return today
     return normalized
 
+
 ##############################################################################
 def sanitize_dili_payload(
     *,
     patient_name: str | None,
     visit_date: datetime | date | dict[str, Any] | str | None,
-    anamnesis: str | None,   
+    anamnesis: str | None,
     drugs: str | None,
     laboratory_analysis: str | None,
     use_rag: bool,

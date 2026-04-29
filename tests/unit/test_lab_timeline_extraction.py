@@ -8,7 +8,10 @@ from DILIGENT.server.domain.clinical import (
     LiverInjuryOnsetContext,
     PatientData,
 )
-from DILIGENT.server.services.clinical.labs import ClinicalLabExtractor, LabExtractionPayload
+from DILIGENT.server.services.clinical.labs import (
+    ClinicalLabExtractor,
+    LabExtractionPayload,
+)
 
 
 class FakeLabClient:
@@ -95,7 +98,9 @@ def test_uses_ast_when_alt_absent() -> None:
 
 
 def test_merges_manual_labs_with_extracted_entries() -> None:
-    extractor = ClinicalLabExtractor(client=FakeLabClient([LabExtractionPayload(entries=[], onset_context=None)]))
+    extractor = ClinicalLabExtractor(
+        client=FakeLabClient([LabExtractionPayload(entries=[], onset_context=None)])
+    )
     payload = PatientData(
         anamnesis="No explicit labs in anamnesis.",
         drugs="Drug A",
@@ -126,7 +131,9 @@ def test_preserves_relative_timing_without_absolute_dates() -> None:
             ]
         )
     )
-    payload = PatientData(anamnesis="ALT peak two weeks after therapy start.", drugs="Drug A")
+    payload = PatientData(
+        anamnesis="ALT peak two weeks after therapy start.", drugs="Drug A"
+    )
 
     timeline, _ = asyncio.run(extractor.extract_from_payload(payload))
 

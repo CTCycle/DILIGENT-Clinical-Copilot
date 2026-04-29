@@ -19,7 +19,11 @@ from DILIGENT.server.repositories.serialization.data import DataSerializer
 from DILIGENT.server.services.text.normalization import normalize_drug_name
 from DILIGENT.server.services.text.vocabulary import get_text_normalization_snapshot
 
-from DILIGENT.server.services.updater.rxnav_client import RxNavClient, run_with_semaphore
+from DILIGENT.server.services.updater.rxnav_client import (
+    RxNavClient,
+    run_with_semaphore,
+)
+
 
 class RxNavDrugCatalogBuilder:
     TERMS_URL = "https://rxnav.nlm.nih.gov/REST/RxTerms/allconcepts.json"
@@ -44,7 +48,9 @@ class RxNavDrugCatalogBuilder:
     ) -> None:
         vocabulary = get_text_normalization_snapshot()
         combined: set[str] = set(vocabulary.rxnav_name_stopwords)
-        synonym_stopwords = {word.casefold() for word in vocabulary.rxnav_synonym_stopwords}
+        synonym_stopwords = {
+            word.casefold() for word in vocabulary.rxnav_synonym_stopwords
+        }
         combined.update(synonym_stopwords)
         self.stopwords = combined
         self.synonym_stopwords = synonym_stopwords
@@ -165,14 +171,18 @@ class RxNavDrugCatalogBuilder:
         )
         while attempt < self.MAX_RETRIES:
             try:
-                with httpx.stream("GET", self.TERMS_URL, timeout=self.TIMEOUT) as response:
+                with httpx.stream(
+                    "GET", self.TERMS_URL, timeout=self.TIMEOUT
+                ) as response:
                     if self.should_cancel(should_stop):
                         raise RuntimeError("RxNav update cancelled by user request")
                     if (
                         response.status_code in self.RETRY_STATUS
                         and attempt + 1 < self.MAX_RETRIES
                     ):
-                        time.sleep(self.BACKOFF_TIME[min(attempt, len(self.BACKOFF_TIME) - 1)])
+                        time.sleep(
+                            self.BACKOFF_TIME[min(attempt, len(self.BACKOFF_TIME) - 1)]
+                        )
                         attempt += 1
                         continue
                     response.raise_for_status()
@@ -237,7 +247,7 @@ class RxNavDrugCatalogBuilder:
         headers = response.headers
         try:
             content_length = int(headers.get("Content-Length", 0) or 0)
-        except (TypeError, ValueError):
+        except TypeError, ValueError:
             content_length = 0
         payload = {
             "source_url": str(response.request.url)
@@ -275,14 +285,14 @@ class RxNavDrugCatalogBuilder:
                 persisted = self.persist_concept_batch(concepts_batch)
                 count += persisted
                 concepts_batch.clear()
-                logger.info('Total records upserted into database: %d', count)
+                logger.info("Total records upserted into database: %d", count)
                 self.emit_catalog_progress(progress_callback, count=count)
         if concepts_batch:
             if self.should_cancel(should_stop):
                 raise RuntimeError("RxNav update cancelled by user request")
             persisted = self.persist_concept_batch(concepts_batch)
             count += persisted
-            logger.info('Total records upserted into database: %d', count)
+            logger.info("Total records upserted into database: %d", count)
             self.emit_catalog_progress(progress_callback, count=count)
 
         return {"table_name": self.TABLE_NAME, "count": count}
@@ -393,7 +403,7 @@ class RxNavDrugCatalogBuilder:
                             semaphore,
                             lambda query=query: self.rx_client.fetch_drug_terms_async(
                                 query, client=client
-                            )
+                            ),
                         )
                     )
                     for cache_key, query in chunk
@@ -416,9 +426,11 @@ class RxNavDrugCatalogBuilder:
                     identifier: asyncio.create_task(
                         run_with_semaphore(
                             semaphore,
-                            lambda identifier=identifier: self.rx_client.fetch_rxcui_synonyms_async(
-                                identifier, client=client
-                            )
+                            lambda identifier=identifier: (
+                                self.rx_client.fetch_rxcui_synonyms_async(
+                                    identifier, client=client
+                                )
+                            ),
                         )
                     )
                     for identifier in chunk
@@ -650,7 +662,7 @@ class RxNavDrugCatalogBuilder:
                         normalized_name,
                         normalized_brands,
                     )
-        
+
         if not aliases:
             return []
         return sorted(aliases.values(), key=str.casefold)
@@ -754,11 +766,7 @@ class RxNavDrugCatalogBuilder:
         if not cleaned:
             return
         cleaned = re.sub(r"\s+", " ", cleaned)
-        tokens = [
-            token
-            for token in self.TOKEN_SPLIT_PATTERN.split(cleaned)
-            if token
-        ]
+        tokens = [token for token in self.TOKEN_SPLIT_PATTERN.split(cleaned) if token]
         if not tokens:
             return
         sanitized_tokens: list[str] = []

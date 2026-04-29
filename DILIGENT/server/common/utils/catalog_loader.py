@@ -5,6 +5,7 @@ import json
 from pathlib import Path
 from typing import Any
 
+
 ###############################################################################
 class CatalogLoader:
     """Load static JSON catalogs from resources/catalogs at runtime."""
@@ -22,7 +23,9 @@ class CatalogLoader:
         with path.open("r", encoding="utf-8") as handle:
             payload = json.load(handle)
         if not isinstance(payload, dict):
-            raise ValueError(f"Catalog '{filename}' must contain a JSON object at root.")
+            raise ValueError(
+                f"Catalog '{filename}' must contain a JSON object at root."
+            )
         return payload
 
     # -------------------------------------------------------------------------

@@ -50,6 +50,7 @@ from DILIGENT.server.domain.settings.configuration import (
     ServerSettings,
 )
 
+
 def ensure_mapping(value: Any) -> dict[str, Any]:
     if isinstance(value, dict):
         return value
@@ -154,8 +155,7 @@ def resolve_ollama_base_url(
     ollama_host: str | None,
     ollama_port: int | None,
     fallback: str = (
-        f"{OLLAMA_DEFAULT_SCHEME}://"
-        f"{OLLAMA_DEFAULT_HOST}:{OLLAMA_DEFAULT_PORT}"
+        f"{OLLAMA_DEFAULT_SCHEME}://{OLLAMA_DEFAULT_HOST}:{OLLAMA_DEFAULT_PORT}"
     ),
 ) -> str:
     if ollama_url:
@@ -165,7 +165,9 @@ def resolve_ollama_base_url(
     if host_value:
         normalized_host = host_value.strip().rstrip("/")
         if "://" in normalized_host:
-            return _resolve_ollama_url_with_scheme(normalized_host, port_value=port_value)
+            return _resolve_ollama_url_with_scheme(
+                normalized_host, port_value=port_value
+            )
         resolved_port = port_value if port_value is not None else OLLAMA_DEFAULT_PORT
         return f"{OLLAMA_DEFAULT_SCHEME}://{normalized_host}:{resolved_port}"
     if port_value is not None:
@@ -183,11 +185,11 @@ def environment_snapshot_from_os_env() -> EnvironmentSnapshot:
     )
 
 
-def _default_llm_runtime_defaults(environment: EnvironmentSnapshot) -> LLMRuntimeDefaults:
+def _default_llm_runtime_defaults(
+    environment: EnvironmentSnapshot,
+) -> LLMRuntimeDefaults:
     text_extraction_default = (
-        TEXT_EXTRACTION_MODEL_CHOICES[0]
-        if TEXT_EXTRACTION_MODEL_CHOICES
-        else ""
+        TEXT_EXTRACTION_MODEL_CHOICES[0] if TEXT_EXTRACTION_MODEL_CHOICES else ""
     )
     clinical_default = CLINICAL_MODEL_CHOICES[0] if CLINICAL_MODEL_CHOICES else ""
     provider_default = "openai"
@@ -227,7 +229,9 @@ def _build_jobs_settings(data: dict[str, Any]) -> JobsSettings:
 
 
 def _build_database_settings(payload: dict[str, Any]) -> DatabaseSettings:
-    embedded = coerce_bool(payload.get("embedded_database", payload.get("embedded")), True)
+    embedded = coerce_bool(
+        payload.get("embedded_database", payload.get("embedded")), True
+    )
     insert_batch_size = coerce_int(payload.get("insert_batch_size"), 1000, minimum=1)
     commit_interval = coerce_int(payload.get("insert_commit_interval"), 5, minimum=1)
     select_page_size = coerce_int(payload.get("select_page_size"), 2000, minimum=100)
@@ -284,7 +288,9 @@ def _build_drugs_matcher_settings(data: dict[str, Any]) -> DrugsMatcherSettings:
         direct_confidence=coerce_float(data.get("direct_confidence"), 1.0),
         master_confidence=coerce_float(data.get("master_confidence"), 0.92),
         synonym_confidence=coerce_float(data.get("synonym_confidence"), 0.90),
-        normalization_cache_limit=coerce_positive_int(data.get("normalization_cache_limit"), 10000),
+        normalization_cache_limit=coerce_positive_int(
+            data.get("normalization_cache_limit"), 10000
+        ),
         match_cache_limit=coerce_positive_int(data.get("match_cache_limit"), 5000),
         alias_cache_limit=coerce_positive_int(data.get("alias_cache_limit"), 2000),
         min_confidence=coerce_float(data.get("min_confidence"), 0.90),
@@ -322,13 +328,17 @@ def _build_drugs_matcher_settings(data: dict[str, Any]) -> DrugsMatcherSettings:
     )
 
 
-def _build_rag_settings(data: dict[str, Any], defaults: LLMRuntimeDefaults) -> RagSettings:
+def _build_rag_settings(
+    data: dict[str, Any], defaults: LLMRuntimeDefaults
+) -> RagSettings:
     rerank_top_n = coerce_positive_int(data.get("rerank_top_n"), 10)
     rerank_candidate_k = coerce_positive_int(data.get("rerank_candidate_k"), 100)
     if rerank_candidate_k < rerank_top_n:
         rerank_candidate_k = rerank_top_n
     return RagSettings(
-        vector_collection_name=coerce_str(data.get("vector_collection_name"), "documents"),
+        vector_collection_name=coerce_str(
+            data.get("vector_collection_name"), "documents"
+        ),
         chunk_size=coerce_positive_int(data.get("chunk_size"), 1024),
         chunk_overlap=coerce_positive_int(data.get("chunk_overlap"), 128),
         embedding_batch_size=coerce_positive_int(
@@ -339,7 +349,9 @@ def _build_rag_settings(data: dict[str, Any], defaults: LLMRuntimeDefaults) -> R
         rerank_candidate_k=rerank_candidate_k,
         rerank_top_n=rerank_top_n,
         embedding_backend=coerce_str(data.get("embedding_backend"), "ollama"),
-        ollama_base_url=coerce_str(data.get("ollama_base_url"), defaults.ollama_host_default),
+        ollama_base_url=coerce_str(
+            data.get("ollama_base_url"), defaults.ollama_host_default
+        ),
         ollama_embedding_model=coerce_str(data.get("ollama_embedding_model"), ""),
         hf_embedding_model=coerce_str(data.get("hf_embedding_model"), ""),
         vector_index_metric=coerce_str(data.get("vector_index_metric"), "cosine"),
@@ -349,12 +361,16 @@ def _build_rag_settings(data: dict[str, Any], defaults: LLMRuntimeDefaults) -> R
         cloud_model=coerce_str(data.get("cloud_model"), defaults.cloud_model),
         cloud_embedding_model=coerce_str(data.get("cloud_embedding_model"), ""),
         use_cloud_embeddings=coerce_bool(data.get("use_cloud_embeddings"), False),
-        vector_stream_batch_size=coerce_positive_int(data.get("vector_stream_batch_size"), 1024),
+        vector_stream_batch_size=coerce_positive_int(
+            data.get("vector_stream_batch_size"), 1024
+        ),
         embedding_max_workers=coerce_positive_int(data.get("embedding_max_workers"), 4),
     )
 
 
-def _build_external_data_settings(data: dict[str, Any], *, fallback_timeout: float) -> ExternalDataSettings:
+def _build_external_data_settings(
+    data: dict[str, Any], *, fallback_timeout: float
+) -> ExternalDataSettings:
     unified_llm_timeout = max(
         coerce_float(
             data.get("llm_timeout"),
@@ -366,9 +382,13 @@ def _build_external_data_settings(data: dict[str, Any], *, fallback_timeout: flo
     parser_timeout = unified_llm_timeout
     disease_timeout = unified_llm_timeout
     clinical_timeout = unified_llm_timeout
-    livertox_timeout = max(coerce_float(data.get("livertox_llm_timeout"), unified_llm_timeout), 1.0)
+    livertox_timeout = max(
+        coerce_float(data.get("livertox_llm_timeout"), unified_llm_timeout), 1.0
+    )
     brave_fast_max_results = coerce_positive_int(data.get("brave_fast_max_results"), 5)
-    brave_thorough_max_results = coerce_positive_int(data.get("brave_thorough_max_results"), 10)
+    brave_thorough_max_results = coerce_positive_int(
+        data.get("brave_thorough_max_results"), 10
+    )
     if brave_thorough_max_results < brave_fast_max_results:
         brave_thorough_max_results = brave_fast_max_results
     return ExternalDataSettings(
@@ -377,17 +397,35 @@ def _build_external_data_settings(data: dict[str, Any], *, fallback_timeout: flo
         disease_llm_timeout=disease_timeout,
         clinical_llm_timeout=clinical_timeout,
         livertox_llm_timeout=livertox_timeout,
-        ollama_server_start_timeout=max(coerce_float(data.get("ollama_server_start_timeout"), 15.0), 1.0),
-        livertox_archive=coerce_str(data.get("livertox_archive"), "livertox_NBK547852.tar.gz"),
-        livertox_yield_interval=coerce_positive_int(data.get("livertox_yield_interval"), 25),
-        livertox_skip_deterministic_ratio=coerce_float(data.get("livertox_skip_deterministic_ratio"), 0.80),
-        livertox_monograph_max_workers=coerce_positive_int(data.get("livertox_monograph_max_workers"), 4),
+        ollama_server_start_timeout=max(
+            coerce_float(data.get("ollama_server_start_timeout"), 15.0), 1.0
+        ),
+        livertox_archive=coerce_str(
+            data.get("livertox_archive"), "livertox_NBK547852.tar.gz"
+        ),
+        livertox_yield_interval=coerce_positive_int(
+            data.get("livertox_yield_interval"), 25
+        ),
+        livertox_skip_deterministic_ratio=coerce_float(
+            data.get("livertox_skip_deterministic_ratio"), 0.80
+        ),
+        livertox_monograph_max_workers=coerce_positive_int(
+            data.get("livertox_monograph_max_workers"), 4
+        ),
         max_excerpt_length=coerce_positive_int(data.get("max_excerpt_length"), 8000),
         rxnav_request_timeout=coerce_float(data.get("rxnav_request_timeout"), 12.0),
-        rxnav_max_concurrency=coerce_positive_int(data.get("rxnav_max_concurrency"), 16),
-        brave_request_timeout_s=max(coerce_float(data.get("brave_request_timeout_s"), 20.0), 1.0),
-        brave_search_cache_ttl_s=coerce_positive_int(data.get("brave_search_cache_ttl_s"), 21600),
-        brave_rate_limit_per_minute=coerce_positive_int(data.get("brave_rate_limit_per_minute"), 30),
+        rxnav_max_concurrency=coerce_positive_int(
+            data.get("rxnav_max_concurrency"), 16
+        ),
+        brave_request_timeout_s=max(
+            coerce_float(data.get("brave_request_timeout_s"), 20.0), 1.0
+        ),
+        brave_search_cache_ttl_s=coerce_positive_int(
+            data.get("brave_search_cache_ttl_s"), 21600
+        ),
+        brave_rate_limit_per_minute=coerce_positive_int(
+            data.get("brave_rate_limit_per_minute"), 30
+        ),
         brave_fast_max_results=brave_fast_max_results,
         brave_thorough_max_results=brave_thorough_max_results,
     )
@@ -408,17 +446,23 @@ def _build_ingestion_settings(data: dict[str, Any]) -> IngestionSettings:
 def _build_session_pipeline_settings(data: dict[str, Any]) -> SessionPipelineSettings:
     payload = ensure_mapping(data)
     return SessionPipelineSettings(
-        text_extraction_batch_size=coerce_positive_int(payload.get("text_extraction_batch_size"), 4),
+        text_extraction_batch_size=coerce_positive_int(
+            payload.get("text_extraction_batch_size"), 4
+        ),
         text_extraction_max_concurrency=min(
             coerce_positive_int(payload.get("text_extraction_max_concurrency"), 2),
             4,
         ),
-        retrieval_batch_size=coerce_positive_int(payload.get("retrieval_batch_size"), 8),
+        retrieval_batch_size=coerce_positive_int(
+            payload.get("retrieval_batch_size"), 8
+        ),
         retrieval_max_concurrency=min(
             coerce_positive_int(payload.get("retrieval_max_concurrency"), 4),
             8,
         ),
-        clinical_assessment_batch_size=coerce_positive_int(payload.get("clinical_assessment_batch_size"), 2),
+        clinical_assessment_batch_size=coerce_positive_int(
+            payload.get("clinical_assessment_batch_size"), 2
+        ),
         clinical_assessment_max_concurrency=min(
             coerce_positive_int(payload.get("clinical_assessment_max_concurrency"), 2),
             4,
@@ -426,7 +470,9 @@ def _build_session_pipeline_settings(data: dict[str, Any]) -> SessionPipelineSet
     )
 
 
-def build_settings_payload_from_json(config: dict[str, Any], env: EnvironmentSnapshot) -> dict[str, Any]:
+def build_settings_payload_from_json(
+    config: dict[str, Any], env: EnvironmentSnapshot
+) -> dict[str, Any]:
     payload = ensure_mapping(config)
     llm_defaults = _default_llm_runtime_defaults(env)
     jobs_payload = ensure_mapping(payload.get("jobs"))
@@ -440,13 +486,17 @@ def build_settings_payload_from_json(config: dict[str, Any], env: EnvironmentSna
         "fastapi": _build_fastapi_settings().model_dump(),
         "jobs": _build_jobs_settings(jobs_payload).model_dump(),
         "database": _build_database_settings(database_payload).model_dump(),
-        "drugs_matcher": _build_drugs_matcher_settings(drugs_matcher_payload).model_dump(),
+        "drugs_matcher": _build_drugs_matcher_settings(
+            drugs_matcher_payload
+        ).model_dump(),
         "rag": _build_rag_settings(rag_payload, llm_defaults).model_dump(),
         "external_data": _build_external_data_settings(
             external_data_payload,
             fallback_timeout=30.0,
         ).model_dump(),
         "ingestion": _build_ingestion_settings(ingestion_payload).model_dump(),
-        "session_pipeline": _build_session_pipeline_settings(session_pipeline_payload).model_dump(),
+        "session_pipeline": _build_session_pipeline_settings(
+            session_pipeline_payload
+        ).model_dump(),
         "llm_defaults": llm_defaults.model_dump(),
     }

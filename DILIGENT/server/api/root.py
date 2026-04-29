@@ -22,7 +22,9 @@ class RootEndpoint:
     # -------------------------------------------------------------------------
     @staticmethod
     def get_client_dist_path() -> str:
-        project_path = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", ".."))
+        project_path = os.path.abspath(
+            os.path.join(os.path.dirname(__file__), "..", "..")
+        )
         return os.path.join(project_path, "client", "dist")
 
     # -------------------------------------------------------------------------
@@ -31,7 +33,9 @@ class RootEndpoint:
 
     # -------------------------------------------------------------------------
     @staticmethod
-    def resolve_safe_client_path(client_dist_path: str, relative_path: str) -> str | None:
+    def resolve_safe_client_path(
+        client_dist_path: str, relative_path: str
+    ) -> str | None:
         root_path = os.path.abspath(client_dist_path)
         candidate_path = os.path.abspath(os.path.join(root_path, relative_path))
         try:
@@ -62,9 +66,13 @@ class RootEndpoint:
         if self.packaged_client_available():
             assets_path = os.path.join(self.client_dist_path, "assets")
             if os.path.isdir(assets_path):
-                self.app.mount("/assets", StaticFiles(directory=assets_path), name="spa-assets")
+                self.app.mount(
+                    "/assets", StaticFiles(directory=assets_path), name="spa-assets"
+                )
             # Non-schema routes: static SPA delivery (no JSON response contract).
-            self.app.add_api_route("/", self.serve_spa_root, methods=["GET"], include_in_schema=False)
+            self.app.add_api_route(
+                "/", self.serve_spa_root, methods=["GET"], include_in_schema=False
+            )
             self.app.add_api_route(
                 "/{full_path:path}",
                 self.serve_spa_entrypoint,
@@ -74,4 +82,6 @@ class RootEndpoint:
             return
 
         # Non-schema route: docs redirect endpoint.
-        self.app.add_api_route("/", self.redirect_root, methods=["GET"], include_in_schema=False)
+        self.app.add_api_route(
+            "/", self.redirect_root, methods=["GET"], include_in_schema=False
+        )

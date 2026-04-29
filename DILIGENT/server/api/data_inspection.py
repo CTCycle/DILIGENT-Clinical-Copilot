@@ -27,7 +27,11 @@ from DILIGENT.server.domain.inspection import (
     TextNormalizationTermResponse,
     TextNormalizationTermUpsertRequest,
 )
-from DILIGENT.server.domain.jobs import JobCancelResponse, JobStartResponse, JobStatusResponse
+from DILIGENT.server.domain.jobs import (
+    JobCancelResponse,
+    JobStartResponse,
+    JobStatusResponse,
+)
 from DILIGENT.server.domain.patient_timeline import (
     PatientTimeline,
     SessionTimelineRegenerateRequest,
@@ -82,7 +86,9 @@ class DataInspectionEndpoint:
                 if "already running" in detail
                 else status.HTTP_422_UNPROCESSABLE_ENTITY
             )
-            logger.warning("Inspection update job rejected type=%s detail=%s", job_type, detail)
+            logger.warning(
+                "Inspection update job rejected type=%s detail=%s", job_type, detail
+            )
             safe_detail = (
                 "An update job is already running."
                 if error_status == status.HTTP_409_CONFLICT
@@ -90,7 +96,9 @@ class DataInspectionEndpoint:
             )
             raise HTTPException(status_code=error_status, detail=safe_detail) from exc
         except RuntimeError as exc:
-            logger.warning("Inspection update job failed to start type=%s error=%s", job_type, exc)
+            logger.warning(
+                "Inspection update job failed to start type=%s error=%s", job_type, exc
+            )
             raise HTTPException(
                 status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
                 detail="Update job could not start. Please retry.",
@@ -187,7 +195,10 @@ class DataInspectionEndpoint:
         except RuntimeError as exc:
             detail_message = str(exc)
             lowered_detail = detail_message.casefold()
-            if "cooling down" in lowered_detail or "already in progress" in lowered_detail:
+            if (
+                "cooling down" in lowered_detail
+                or "already in progress" in lowered_detail
+            ):
                 raise HTTPException(
                     status_code=status.HTTP_429_TOO_MANY_REQUESTS,
                     detail=detail_message,
@@ -269,7 +280,9 @@ class DataInspectionEndpoint:
     # -------------------------------------------------------------------------
     def start_rxnav_update_job(
         self,
-        overrides: InspectionRxNavOverrideRequest = Body(default=InspectionRxNavOverrideRequest()),
+        overrides: InspectionRxNavOverrideRequest = Body(
+            default=InspectionRxNavOverrideRequest()
+        ),
     ) -> JobStartResponse:
         return self.start_update_job(
             job_type=self.service.RXNAV_JOB_TYPE,
@@ -334,7 +347,9 @@ class DataInspectionEndpoint:
     # -------------------------------------------------------------------------
     def start_livertox_update_job(
         self,
-        overrides: InspectionLiverToxOverrideRequest = Body(default=InspectionLiverToxOverrideRequest()),
+        overrides: InspectionLiverToxOverrideRequest = Body(
+            default=InspectionLiverToxOverrideRequest()
+        ),
     ) -> JobStartResponse:
         return self.start_update_job(
             job_type=self.service.LIVERTOX_JOB_TYPE,
@@ -379,12 +394,16 @@ class DataInspectionEndpoint:
 
     # -------------------------------------------------------------------------
     def get_rag_vector_store(self) -> LanceVectorStoreSummaryResponse:
-        return LanceVectorStoreSummaryResponse(**self.service.get_rag_vector_store_summary())
+        return LanceVectorStoreSummaryResponse(
+            **self.service.get_rag_vector_store_summary()
+        )
 
     # -------------------------------------------------------------------------
     def start_rag_update_job(
         self,
-        overrides: InspectionRagOverrideRequest = Body(default=InspectionRagOverrideRequest()),
+        overrides: InspectionRagOverrideRequest = Body(
+            default=InspectionRagOverrideRequest()
+        ),
     ) -> JobStartResponse:
         return self.start_update_job(
             job_type=self.service.RAG_JOB_TYPE,
@@ -394,7 +413,9 @@ class DataInspectionEndpoint:
 
     # -------------------------------------------------------------------------
     def get_rag_update_job_status(self, job_id: str) -> JobStatusResponse:
-        return self.get_update_job_status(job_id=job_id, job_type=self.service.RAG_JOB_TYPE)
+        return self.get_update_job_status(
+            job_id=job_id, job_type=self.service.RAG_JOB_TYPE
+        )
 
     # -------------------------------------------------------------------------
     def cancel_rag_update_job(self, job_id: str) -> JobCancelResponse:
@@ -406,7 +427,9 @@ class DataInspectionEndpoint:
             for row in self.service.list_text_normalization_terms()
         ]
 
-    def list_text_normalization_category(self, category: str) -> list[TextNormalizationTermResponse]:
+    def list_text_normalization_category(
+        self, category: str
+    ) -> list[TextNormalizationTermResponse]:
         return [
             TextNormalizationTermResponse(**row)
             for row in self.service.list_text_normalization_terms(category=category)
@@ -415,7 +438,9 @@ class DataInspectionEndpoint:
     def upsert_text_normalization_category(
         self,
         category: str,
-        request: TextNormalizationTermUpsertRequest = Body(default=TextNormalizationTermUpsertRequest(term="")),
+        request: TextNormalizationTermUpsertRequest = Body(
+            default=TextNormalizationTermUpsertRequest(term="")
+        ),
     ) -> TextNormalizationTermResponse:
         return TextNormalizationTermResponse(
             **self.service.upsert_text_normalization_term(
@@ -427,8 +452,12 @@ class DataInspectionEndpoint:
             )
         )
 
-    def delete_text_normalization_category_term(self, category: str, term: str) -> DeleteEntityResponse:
-        deleted = self.service.deactivate_text_normalization_term(category=category, term=term)
+    def delete_text_normalization_category_term(
+        self, category: str, term: str
+    ) -> DeleteEntityResponse:
+        deleted = self.service.deactivate_text_normalization_term(
+            category=category, term=term
+        )
         return DeleteEntityResponse(deleted=deleted)
 
     # -------------------------------------------------------------------------
@@ -642,6 +671,3 @@ class DataInspectionEndpoint:
 
 endpoint = DataInspectionEndpoint(router=router, service=service)
 endpoint.add_routes()
-
-
-

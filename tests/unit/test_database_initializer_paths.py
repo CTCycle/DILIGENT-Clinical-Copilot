@@ -40,11 +40,15 @@ def _postgres_settings() -> DatabaseSettings:
     )
 
 
-def test_run_database_initialization_uses_sqlite_path_when_embedded(monkeypatch) -> None:  # type: ignore[no-untyped-def]
+def test_run_database_initialization_uses_sqlite_path_when_embedded(
+    monkeypatch,
+) -> None:  # type: ignore[no-untyped-def]
     calls: list[str] = []
     settings = _sqlite_settings()
 
-    monkeypatch.setattr(initializer, "server_settings", type("S", (), {"database": settings})())
+    monkeypatch.setattr(
+        initializer, "server_settings", type("S", (), {"database": settings})()
+    )
     monkeypatch.setattr(
         initializer,
         "initialize_sqlite_database",
@@ -61,11 +65,15 @@ def test_run_database_initialization_uses_sqlite_path_when_embedded(monkeypatch)
     assert calls == ["sqlite"]
 
 
-def test_run_database_initialization_uses_postgres_path_when_external(monkeypatch) -> None:  # type: ignore[no-untyped-def]
+def test_run_database_initialization_uses_postgres_path_when_external(
+    monkeypatch,
+) -> None:  # type: ignore[no-untyped-def]
     calls: list[str] = []
     settings = _postgres_settings()
 
-    monkeypatch.setattr(initializer, "server_settings", type("S", (), {"database": settings})())
+    monkeypatch.setattr(
+        initializer, "server_settings", type("S", (), {"database": settings})()
+    )
     monkeypatch.setattr(
         initializer,
         "initialize_sqlite_database",

@@ -62,7 +62,9 @@ BIBLIOGRAPHY_LINE_RE = re.compile(
     r"^\s*\*{0,2}\s*Bibliography source\s*\*{0,2}\s*:\s*LiverTox\s*$",
     re.IGNORECASE,
 )
-DRIFT_SECTION_LINE_RE = re.compile(r"^\s*(medication|assessment|plan)\s*$", re.IGNORECASE)
+DRIFT_SECTION_LINE_RE = re.compile(
+    r"^\s*(medication|assessment|plan)\s*$", re.IGNORECASE
+)
 STRUCTURED_DILI_SECTION_LINE_RE = re.compile(
     r"^\s*#{0,6}\s*\*{0,2}\s*Structured\s+DILI\s+Assessment\s+Report\s*\*{0,2}\s*$",
     re.IGNORECASE,
@@ -119,7 +121,6 @@ class HepatotoxicityPatternCalculator:
 
 ###############################################################################
 class HepatotoxicityPatternAnalyzer:
-
     def __init__(self) -> None:
         self.r_score: float | None = None
         self.calculator = HepatotoxicityPatternCalculator()
@@ -172,7 +173,9 @@ class HepatotoxicityPatternAnalyzer:
         )
 
     # -------------------------------------------------------------------------
-    def select_anchor_pair(self, lab_timeline: PatientLabTimeline) -> dict[str, float] | None:
+    def select_anchor_pair(
+        self, lab_timeline: PatientLabTimeline
+    ) -> dict[str, float] | None:
         dated_candidates = self.group_entries_by_date(lab_timeline.entries)
         for sample_date in sorted(dated_candidates):
             bucket = dated_candidates[sample_date]
@@ -235,7 +238,11 @@ class HepatotoxicityPatternAnalyzer:
             current_value = self.parse_entry_value(entry)
             if selected_value is None and current_value is not None:
                 selected = entry
-            elif current_value is not None and selected_value is not None and current_value > selected_value:
+            elif (
+                current_value is not None
+                and selected_value is not None
+                and current_value > selected_value
+            ):
                 selected = entry
         return selected
 
@@ -304,11 +311,13 @@ class HepatoxConsultation:
         self.llm_client = initialize_llm_client(purpose="clinical", timeout_s=timeout_s)
         self.MAX_EXCERPT_LENGTH = server_settings.external_data.max_excerpt_length
         self.patient_name = (patient_name or "").strip() or None
-        provider, model_candidate = LLMRuntimeConfig.resolve_provider_and_model("clinical")
+        provider, model_candidate = LLMRuntimeConfig.resolve_provider_and_model(
+            "clinical"
+        )
         self.llm_model = model_candidate or LLMRuntimeConfig.get_clinical_model()
         try:
             chat_signature = inspect.signature(self.llm_client.chat)
-        except (TypeError, ValueError):
+        except TypeError, ValueError:
             chat_signature = None
         self.chat_supports_temperature = (
             chat_signature is not None and "temperature" in chat_signature.parameters
@@ -317,7 +326,9 @@ class HepatoxConsultation:
         self.similarity_search: SimilaritySearch | None = None
         self.rag_use_reranking = bool(server_settings.rag.use_reranking)
         self.rag_top_n = max(int(server_settings.rag.rerank_top_n), 1)
-        self.rag_candidate_k = max(int(server_settings.rag.rerank_candidate_k), self.rag_top_n)
+        self.rag_candidate_k = max(
+            int(server_settings.rag.rerank_candidate_k), self.rag_top_n
+        )
         self.pipeline_issues: list[PipelineIssue] = []
         default_parallel_analyses = 3 if provider == "ollama" else 1
         self.max_parallel_analyses = max(
@@ -355,7 +366,9 @@ class HepatoxConsultation:
         progress_callback: Callable[[str, float], None] | None = None,
     ) -> dict[str, Any] | None:
         if prepared_inputs is None:
-            logger.info("No prepared inputs provided; skipping hepatotoxicity consultation")
+            logger.info(
+                "No prepared inputs provided; skipping hepatotoxicity consultation"
+            )
             return None
 
         resolved_mapping = prepared_inputs.resolved_drugs
@@ -444,7 +457,9 @@ class HepatoxConsultation:
                     entry.paragraph = self.build_error_paragraph(entry)
                 else:
                     normalized_outcome = (
-                        outcome.strip() if isinstance(outcome, str) else str(outcome).strip()
+                        outcome.strip()
+                        if isinstance(outcome, str)
+                        else str(outcome).strip()
                     )
                     normalized_outcome = self.remove_redundant_report_sentence(
                         normalized_outcome
@@ -530,7 +545,9 @@ class HepatoxConsultation:
         )
         matched_row = livertox_data.get("matched_livertox_row", None)
         excerpts_list = livertox_data.get("extracted_excerpts", [])
-        canonical_name = str(livertox_data.get("canonical_name") or raw_name).strip() or raw_name
+        canonical_name = (
+            str(livertox_data.get("canonical_name") or raw_name).strip() or raw_name
+        )
         origins = [
             origin
             for origin in livertox_data.get("origins", [])
@@ -544,7 +561,9 @@ class HepatoxConsultation:
         ambiguous_match = bool(livertox_data.get("ambiguous_match"))
         raw_match_status = livertox_data.get("match_status")
         match_status = (
-            str(raw_match_status).strip().lower() if raw_match_status is not None else None
+            str(raw_match_status).strip().lower()
+            if raw_match_status is not None
+            else None
         )
         match_candidates = [
             str(candidate).strip()
@@ -560,7 +579,7 @@ class HepatoxConsultation:
         if match_confidence is not None:
             try:
                 match_confidence = float(match_confidence)
-            except (TypeError, ValueError):
+            except TypeError, ValueError:
                 match_confidence = None
         match_reason = livertox_data.get("match_reason")
         match_quality = classify_match_evidence(
@@ -586,7 +605,9 @@ class HepatoxConsultation:
             ambiguous_match=ambiguous_match,
             match_status=match_status,
             match_confidence=match_confidence,
-            match_reason=str(match_reason).strip() if match_reason is not None else None,
+            match_reason=str(match_reason).strip()
+            if match_reason is not None
+            else None,
             match_notes=match_notes,
             evidence_quality=match_quality["evidence_quality"],
             evidence_warnings=match_quality["evidence_warnings"],
@@ -674,7 +695,9 @@ class HepatoxConsultation:
             ),
             reverse=True,
         )
-        if exact is not None and self.livertox_payload_rank(exact) >= self.livertox_payload_rank(grouped[0]):
+        if exact is not None and self.livertox_payload_rank(
+            exact
+        ) >= self.livertox_payload_rank(grouped[0]):
             return exact
         return grouped[0]
 
@@ -742,7 +765,9 @@ class HepatoxConsultation:
     # -------------------------------------------------------------------------
     @staticmethod
     def web_evidence_disabled_text() -> str:
-        return "No web evidence available (reason: web search disabled for this session)."
+        return (
+            "No web evidence available (reason: web search disabled for this session)."
+        )
 
     # -------------------------------------------------------------------------
     async def fetch_web_evidence_for_drug(self, *, drug_name: str) -> str:
@@ -820,7 +845,9 @@ class HepatoxConsultation:
         return "\n".join(fragments)
 
     # -------------------------------------------------------------------------
-    def format_similarity_fragment(self, index: int, record: dict[str, Any]) -> str | None:
+    def format_similarity_fragment(
+        self, index: int, record: dict[str, Any]
+    ) -> str | None:
         text = str(record.get("text", "")).strip()
         if not text:
             return None
@@ -1134,9 +1161,7 @@ class HepatoxConsultation:
             return "Not available."
         pieces: list[str] = []
         for component in rucam.components:
-            pieces.append(
-                f"{component.label}: {component.score} ({component.status})"
-            )
+            pieces.append(f"{component.label}: {component.score} ({component.status})")
         return "; ".join(pieces)
 
     # -------------------------------------------------------------------------
@@ -1259,7 +1284,9 @@ class HepatoxConsultation:
             for item in extraction_metadata
             if isinstance(item, dict) and item
         ]
-        extraction_block = "\n".join(metadata_items) if metadata_items else "- Not available"
+        extraction_block = (
+            "\n".join(metadata_items) if metadata_items else "- Not available"
+        )
         rucam_block = self.format_rucam_prompt_block(rucam)
         user_prompt = LIVERTOX_CLINICAL_USER_PROMPT.format(
             drug_name=self.escape_braces(drug_name.strip() or drug_name),
@@ -1362,7 +1389,7 @@ class HepatoxConsultation:
             return None
         try:
             parsed = float(match.group(1))
-        except (TypeError, ValueError):
+        except TypeError, ValueError:
             return None
         if parsed <= 0:
             return None
@@ -1370,7 +1397,9 @@ class HepatoxConsultation:
         return min(parsed + 0.25, 30.0)
 
     # -------------------------------------------------------------------------
-    def retry_backoff_seconds(self, attempt: int, *, exc: Exception | None = None) -> float:
+    def retry_backoff_seconds(
+        self, attempt: int, *, exc: Exception | None = None
+    ) -> float:
         if exc is not None:
             hinted_wait = self.extract_rate_limit_wait_hint_seconds(exc)
             if hinted_wait is not None:
@@ -1410,7 +1439,9 @@ class HepatoxConsultation:
                 continue
             unresolved_entries.append(entry)
 
-        matched_sections = [self.render_matched_drug_section(entry) for entry in matched_entries]
+        matched_sections = [
+            self.render_matched_drug_section(entry) for entry in matched_entries
+        ]
         matched_sections = [section for section in matched_sections if section]
         unresolved_section = self.render_unresolved_mentions_section(unresolved_entries)
         sections: list[str] = []
@@ -1429,9 +1460,7 @@ class HepatoxConsultation:
                 report_language=report_language,
             )
             if conclusion:
-                combined_report = (
-                    f"{combined_report}\n\n## Global Synthesis and Clinical Recommendations\n\n{conclusion}"
-                )
+                combined_report = f"{combined_report}\n\n## Global Synthesis and Clinical Recommendations\n\n{conclusion}"
         return combined_report
 
     # -------------------------------------------------------------------------
@@ -1449,7 +1478,9 @@ class HepatoxConsultation:
             body = self.build_fallback_technical_note(entry)
         rucam = entry.rucam
         rucam_score = rucam.total_score if rucam is not None else "n/a"
-        rucam_category = rucam.causality_category if rucam is not None else "not available"
+        rucam_category = (
+            rucam.causality_category if rucam is not None else "not available"
+        )
         rucam_confidence = rucam.confidence if rucam is not None else "not available"
         component_summary = (
             ", ".join(
@@ -1486,9 +1517,13 @@ class HepatoxConsultation:
         quality = entry.evidence_quality or "unknown"
         matched_name = ""
         if isinstance(entry.matched_livertox_row, dict):
-            matched_name = str(entry.matched_livertox_row.get("drug_name") or "").strip()
+            matched_name = str(
+                entry.matched_livertox_row.get("drug_name") or ""
+            ).strip()
         target = matched_name or entry.canonical_name or "not available"
-        warnings = "; ".join(entry.evidence_warnings) if entry.evidence_warnings else "None"
+        warnings = (
+            "; ".join(entry.evidence_warnings) if entry.evidence_warnings else "None"
+        )
         return (
             f"**Evidence match**: {quality}. "
             f"Matched local record: {target}. "
@@ -1574,11 +1609,15 @@ class HepatoxConsultation:
                 if entry.match_candidates
                 else "not available"
             )
-            return f"Ambiguous match in local knowledge base (candidates: {candidates})."
+            return (
+                f"Ambiguous match in local knowledge base (candidates: {candidates})."
+            )
         if status in {"missing", "missing_match"}:
             return "No matching drug record found in the local knowledge base."
         if status == "matched_no_excerpt":
-            return "Matched drug record found, but no local LiverTox excerpt is available."
+            return (
+                "Matched drug record found, but no local LiverTox excerpt is available."
+            )
         if entry.missing_livertox:
             return "Matched record found, but no local LiverTox excerpt is available."
         return "Could not produce a deterministic matched-drug section."
@@ -1632,7 +1671,9 @@ class HepatoxConsultation:
                 )
                 await asyncio.sleep(delay)
         conclusion = self.coerce_chat_text(raw_response).strip()
-        if conclusion and not self.is_materially_in_report_language(conclusion, report_language):
+        if conclusion and not self.is_materially_in_report_language(
+            conclusion, report_language
+        ):
             logger.warning(
                 "Language mismatch detected for global conclusion (target=%s); applying one repair pass",
                 report_language,
@@ -1676,7 +1717,9 @@ class HepatoxConsultation:
     # -------------------------------------------------------------------------
     def build_ambiguous_match_paragraph(self, entry: DrugClinicalAssessment) -> str:
         candidates = (
-            ", ".join(entry.match_candidates) if entry.match_candidates else "not available"
+            ", ".join(entry.match_candidates)
+            if entry.match_candidates
+            else "not available"
         )
         note = (
             "Drug matching was ambiguous; no LiverTox excerpt was injected to avoid an "
@@ -1692,8 +1735,7 @@ class HepatoxConsultation:
         message = "Automated analysis was unavailable due to a technical issue; a clinician should review the LiverTox documentation manually."
         return message
 
-
-
     def bibliography_source_label(self) -> str:
-        return get_text_normalization_snapshot().knowledge_source_references.get("livertox", "LiverTox")
-
+        return get_text_normalization_snapshot().knowledge_source_references.get(
+            "livertox", "LiverTox"
+        )

@@ -156,7 +156,9 @@ def record_text_normalization_observation(term: str, *, category: str) -> None:
         )
         db_session = repository.session_factory()
     except Exception as exc:
-        logger.debug("Skipping text normalization observation; database unavailable: %s", exc)
+        logger.debug(
+            "Skipping text normalization observation; database unavailable: %s", exc
+        )
         return
     try:
         serializer.upsert_term(
