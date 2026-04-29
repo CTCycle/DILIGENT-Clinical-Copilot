@@ -15,7 +15,7 @@ from DILIGENT.server.repositories.serialization.access_key_encryption import (
     AccessKeyEncryptionMaterialSerializer,
 )
 from DILIGENT.server.repositories.schemas.models import AccessKey, ResearchAccessKey
-from DILIGENT.server.services.cryptography import (
+from DILIGENT.server.services.security.cryptography import (
     decrypt_with_key_material,
     encrypt_with_key_material,
     fingerprint_plaintext,
@@ -209,3 +209,4 @@ class AccessKeySerializer:
         if normalized not in SUPPORTED_PROVIDERS:
             raise ValueError("Unsupported provider")
         return normalized  # type: ignore[return-value]
+

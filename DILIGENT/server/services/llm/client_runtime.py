@@ -5,7 +5,7 @@ import contextlib
 from collections.abc import Callable
 from typing import Any, Protocol
 
-
+###############################################################################
 class LLMClientRuntimeOwner(Protocol):
     client: Any | None
     model: str
@@ -14,12 +14,12 @@ class LLMClientRuntimeOwner(Protocol):
     client_provider: str | None
     runtime_revision: int
 
-
+###############################################################################
 def _get_runtime_signature(owner: LLMClientRuntimeOwner) -> tuple[str, str] | None:
     value = getattr(owner, "runtime_signature", None)
     return value if isinstance(value, tuple) else None
 
-
+###############################################################################
 def _set_runtime_signature(
     owner: LLMClientRuntimeOwner,
     signature: tuple[str, str] | None,
@@ -27,12 +27,12 @@ def _set_runtime_signature(
     if hasattr(owner, "runtime_signature"):
         setattr(owner, "runtime_signature", signature)
 
-
+###############################################################################
 def _set_retry_attempts(owner: LLMClientRuntimeOwner, provider: str) -> None:
     if hasattr(owner, "extraction_retry_attempts"):
         setattr(owner, "extraction_retry_attempts", 4 if provider in {"openai", "gemini"} else 2)
 
-
+###############################################################################
 def _needs_refresh(
     owner: LLMClientRuntimeOwner,
     *,
@@ -53,7 +53,7 @@ def _needs_refresh(
         or owner.client_loop_id != current_loop_id
     )
 
-
+###############################################################################
 async def ensure_runtime_client(
     owner: LLMClientRuntimeOwner,
     *,

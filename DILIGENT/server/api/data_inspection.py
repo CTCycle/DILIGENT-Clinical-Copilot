@@ -32,7 +32,7 @@ from DILIGENT.server.domain.patient_timeline import (
     PatientTimeline,
     SessionTimelineRegenerateRequest,
 )
-from DILIGENT.server.services.inspection import DataInspectionService
+from DILIGENT.server.services.inspection.service import DataInspectionService
 
 
 router = APIRouter(prefix="/inspection", tags=["inspection"])
@@ -642,5 +642,6 @@ class DataInspectionEndpoint:
 
 endpoint = DataInspectionEndpoint(router=router, service=service)
 endpoint.add_routes()
+
 
 

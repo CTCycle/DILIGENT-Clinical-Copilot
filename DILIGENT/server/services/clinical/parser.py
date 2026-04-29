@@ -7,7 +7,7 @@ from collections.abc import Callable
 from datetime import date
 from typing import Any, Literal
 
-from DILIGENT.server.services.prompts import (
+from DILIGENT.server.services.clinical.prompts import (
     ANAMNESIS_DRUG_EXTRACTION_PROMPT,
     DRUG_EXTRACTION_PROMPT,
 )
@@ -1021,6 +1021,7 @@ class DrugsParser:
             except ValueError:
                 return stripped
         return f"{day.zfill(2)}.{month.zfill(2)}"
+
 
 
 
