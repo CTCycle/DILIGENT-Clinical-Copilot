@@ -704,10 +704,17 @@ class DataInspectionService:
             stream_batch_size=server_settings.rag.vector_stream_batch_size,
         )
         exists = vector_db.has_collection()
+        embedding_count = 0
+        distinct_document_count = 0
+        embedding_dimension: int | None = None
         if exists:
             try:
                 vector_db.get_table()
-                vector_db.ensure_vector_index()
+                embedding_count = vector_db.count_embeddings()
+                distinct_document_count = vector_db.count_distinct_documents()
+                embedding_dimension = vector_db.read_embedding_dimension()
+                if embedding_count > 0:
+                    vector_db.ensure_vector_index()
             except Exception as exc:  # noqa: BLE001
                 logger.warning("Unable to load LanceDB inspection summary: %s", exc)
         return {
@@ -715,9 +722,9 @@ class DataInspectionService:
             "vector_db_path": VECTOR_DB_PATH,
             "collection_name": collection_name,
             "collection_exists": exists,
-            "embedding_count": vector_db.count_embeddings() if exists else 0,
-            "distinct_document_count": vector_db.count_distinct_documents() if exists else 0,
-            "embedding_dimension": vector_db.read_embedding_dimension() if exists else None,
+            "embedding_count": embedding_count,
+            "distinct_document_count": distinct_document_count,
+            "embedding_dimension": embedding_dimension,
             "index_ready": bool(vector_db.index_ready) if exists else False,
             "configured_metric": server_settings.rag.vector_index_metric,
             "configured_index_type": server_settings.rag.vector_index_type,

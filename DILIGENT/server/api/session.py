@@ -4,7 +4,6 @@ from fastapi import APIRouter, Body, status
 from fastapi.responses import PlainTextResponse
 
 from DILIGENT.server.domain.clinical.entities import (
-    ClinicalSessionReportResponse,
     ClinicalSessionRequest,
 )
 from DILIGENT.server.domain.jobs import JobCancelResponse, JobStartResponse, JobStatusResponse
@@ -67,7 +66,6 @@ router.add_api_route(
     "/clinical",
     start_clinical_session,
     methods=["POST"],
-    response_model=ClinicalSessionReportResponse,
     status_code=status.HTTP_202_ACCEPTED,
     response_class=PlainTextResponse,
 )
