@@ -7,7 +7,9 @@ from DILIGENT.server.common.constants import CLOUD_MODEL_CHOICES
 from DILIGENT.server.configurations.startup import server_settings
 from DILIGENT.server.domain.model_configs import ModelConfigSnapshot
 from DILIGENT.server.domain.settings.configuration import LLMRuntimeDefaults
-from DILIGENT.server.repositories.serialization.model_configs import ModelConfigSerializer
+from DILIGENT.server.repositories.serialization.model_configs import (
+    ModelConfigSerializer,
+)
 
 
 ###############################################################################
@@ -46,7 +48,7 @@ class LLMRuntimeConfig:
     def _normalize_temperature(value: float | None, fallback: float) -> float:
         try:
             parsed = float(value)
-        except (TypeError, ValueError):
+        except TypeError, ValueError:
             parsed = fallback
         return round(max(0.0, min(2.0, parsed)), 2)
 
@@ -55,10 +57,16 @@ class LLMRuntimeConfig:
     def _load_snapshot(cls) -> ModelConfigSnapshot:
         defaults = cls._get_defaults()
         snapshot = ModelConfigSerializer().load_snapshot()
-        provider = cls._normalize_provider(snapshot.cloud_provider, defaults.llm_provider)
-        cloud_model = cls._normalize_cloud_model(provider, snapshot.cloud_model, defaults.cloud_model)
+        provider = cls._normalize_provider(
+            snapshot.cloud_provider, defaults.llm_provider
+        )
+        cloud_model = cls._normalize_cloud_model(
+            provider, snapshot.cloud_model, defaults.cloud_model
+        )
         return ModelConfigSnapshot(
-            clinical_model=cls._normalize_local_model(snapshot.clinical_model, defaults.clinical_model),
+            clinical_model=cls._normalize_local_model(
+                snapshot.clinical_model, defaults.clinical_model
+            ),
             text_extraction_model=cls._normalize_local_model(
                 snapshot.text_extraction_model,
                 defaults.text_extraction_model,

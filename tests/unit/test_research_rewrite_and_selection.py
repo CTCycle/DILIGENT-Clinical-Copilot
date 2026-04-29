@@ -6,9 +6,11 @@ from DILIGENT.server.services.research.brave import BraveResearchService
 # -----------------------------------------------------------------------------
 def test_query_rewrite_generates_concise_queries() -> None:
     service = BraveResearchService()
-    queries = [service.normalize_question(
-        "Please help me find supporting evidence for acetaminophen and possible DILI risk in adults."
-    )]
+    queries = [
+        service.normalize_question(
+            "Please help me find supporting evidence for acetaminophen and possible DILI risk in adults."
+        )
+    ]
 
     assert 1 <= len(queries) <= 3
     assert all(query.strip() for query in queries)
@@ -56,4 +58,3 @@ def test_source_selection_dedupes_domains_and_respects_allow_block_lists() -> No
     assert "pubmed.ncbi.nlm.nih.gov" in selected_domains
     assert "nejm.org" in selected_domains
     assert len({item.url for item in selected}) == len(selected)
-

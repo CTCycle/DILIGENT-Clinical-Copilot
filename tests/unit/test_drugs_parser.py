@@ -113,8 +113,7 @@ def test_extract_drugs_from_therapy_strips_temporal_tail_from_name() -> None:
 def test_extract_drugs_from_therapy_does_not_parse_iso_dates_as_schedule() -> None:
     parser = DrugsParser(client=object())
     therapy_text = (
-        "Piperacillina/tazobactam 4.5 g EV q8h, iniziata 2026-02-10, "
-        "sospesa 2026-02-16"
+        "Piperacillina/tazobactam 4.5 g EV q8h, iniziata 2026-02-10, sospesa 2026-02-16"
     )
 
     parsed = asyncio.run(parser.extract_drugs_from_therapy(therapy_text))

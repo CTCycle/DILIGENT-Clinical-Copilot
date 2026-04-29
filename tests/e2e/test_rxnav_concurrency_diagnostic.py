@@ -95,6 +95,7 @@ async def run_probe(
     workload = make_workload(total_requests)
 
     async with httpx.AsyncClient(timeout=timeout_seconds, limits=limits) as client:
+
         async def run_single(endpoint: str, payload: str) -> None:
             async with semaphore:
                 metrics.append(
@@ -165,8 +166,7 @@ def test_rxnav_concurrency_diagnostic() -> None:
     baseline = summaries[0][1]
     baseline_successes = int(baseline["successes"])  # type: ignore[arg-type]
     assert baseline_successes > 0, (
-        "RxNav baseline probe had no successful responses. "
-        f"Summary: {baseline}"
+        f"RxNav baseline probe had no successful responses. Summary: {baseline}"
     )
 
     for level, summary in summaries:

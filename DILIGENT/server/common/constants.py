@@ -58,10 +58,18 @@ REPORT_EXPORT_FILENAME = "clinical_report.md"
 OPENAI_API_BASE = "https://api.openai.com/v1"
 GEMINI_API_BASE = "https://generativelanguage.googleapis.com/v1"
 
-TEXT_EXTRACTION_MODEL_CHOICES = CatalogLoader.get_string_list("llm_models.json", "text_extraction_model_choices")
-CLINICAL_MODEL_CHOICES = CatalogLoader.get_string_list("llm_models.json", "clinical_model_choices")
-OPENAI_CLOUD_MODELS = CatalogLoader.get_string_list("llm_models.json", "openai_cloud_models")
-GEMINI_CLOUD_MODELS = CatalogLoader.get_string_list("llm_models.json", "gemini_cloud_models")
+TEXT_EXTRACTION_MODEL_CHOICES = CatalogLoader.get_string_list(
+    "llm_models.json", "text_extraction_model_choices"
+)
+CLINICAL_MODEL_CHOICES = CatalogLoader.get_string_list(
+    "llm_models.json", "clinical_model_choices"
+)
+OPENAI_CLOUD_MODELS = CatalogLoader.get_string_list(
+    "llm_models.json", "openai_cloud_models"
+)
+GEMINI_CLOUD_MODELS = CatalogLoader.get_string_list(
+    "llm_models.json", "gemini_cloud_models"
+)
 CLOUD_MODEL_CHOICES: dict[str, list[str]] = {
     "openai": OPENAI_CLOUD_MODELS,
     "gemini": GEMINI_CLOUD_MODELS,

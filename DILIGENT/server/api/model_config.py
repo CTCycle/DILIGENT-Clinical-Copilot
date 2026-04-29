@@ -67,4 +67,3 @@ class ModelConfigEndpoint:
 
 endpoint = ModelConfigEndpoint(router=router, service=service)
 endpoint.add_routes()
-

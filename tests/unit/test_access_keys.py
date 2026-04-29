@@ -54,9 +54,11 @@ def test_activation_keeps_only_one_active_key_per_provider() -> None:
     serializer.activate_key(second.id, provider="openai")
 
     with factory() as db_session:
-        rows = db_session.execute(
-            select(AccessKey).where(AccessKey.provider == "openai")
-        ).scalars().all()
+        rows = (
+            db_session.execute(select(AccessKey).where(AccessKey.provider == "openai"))
+            .scalars()
+            .all()
+        )
 
     active_rows = [row for row in rows if row.is_active]
     assert len(active_rows) == 1

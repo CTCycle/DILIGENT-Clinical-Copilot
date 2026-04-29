@@ -179,7 +179,9 @@ class DrugRxnormCode(Base):
     __tablename__ = "drug_rxnorm_codes"
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
-    drug_id: Mapped[int] = mapped_column(Integer, ForeignKey(DRUGS_ID_FK), nullable=False)
+    drug_id: Mapped[int] = mapped_column(
+        Integer, ForeignKey(DRUGS_ID_FK), nullable=False
+    )
     rxcui: Mapped[str] = mapped_column(String, nullable=False)
 
     drug: Mapped["Drug"] = relationship("Drug", back_populates="rxnorm_codes")
@@ -196,7 +198,9 @@ class DrugAlias(Base):
     __tablename__ = "drug_aliases"
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
-    drug_id: Mapped[int] = mapped_column(Integer, ForeignKey(DRUGS_ID_FK), nullable=False)
+    drug_id: Mapped[int] = mapped_column(
+        Integer, ForeignKey(DRUGS_ID_FK), nullable=False
+    )
     alias: Mapped[str] = mapped_column(Text, nullable=False)
     alias_norm: Mapped[str] = mapped_column(String, nullable=False)
     alias_kind: Mapped[str] = mapped_column(String, nullable=False)
@@ -223,7 +227,9 @@ class LiverToxMonograph(Base):
     __tablename__ = "livertox_monographs"
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
-    drug_id: Mapped[int] = mapped_column(Integer, ForeignKey(DRUGS_ID_FK), nullable=False)
+    drug_id: Mapped[int] = mapped_column(
+        Integer, ForeignKey(DRUGS_ID_FK), nullable=False
+    )
     monograph_key: Mapped[str] = mapped_column(String, nullable=False)
     drug_name_norm: Mapped[str] = mapped_column(String, nullable=False)
     nbk_id: Mapped[str | None] = mapped_column(String, nullable=True)
@@ -318,7 +324,9 @@ class ClinicalSessionDrug(Base):
     )
     raw_drug_name: Mapped[str] = mapped_column(Text, nullable=False)
     raw_drug_name_norm: Mapped[str] = mapped_column(String, nullable=False)
-    drug_id: Mapped[int | None] = mapped_column(Integer, ForeignKey(DRUGS_ID_FK), nullable=True)
+    drug_id: Mapped[int | None] = mapped_column(
+        Integer, ForeignKey(DRUGS_ID_FK), nullable=True
+    )
     match_confidence: Mapped[float | None] = mapped_column(Float)
     match_reason: Mapped[str | None] = mapped_column(String)
     match_notes: Mapped[str | None] = mapped_column(Text)
@@ -349,14 +357,18 @@ class KbMatchCache(Base):
     raw_drug_name: Mapped[str] = mapped_column(Text, nullable=False)
     raw_drug_name_norm: Mapped[str] = mapped_column(String, nullable=False)
     normalized_drug_key: Mapped[str] = mapped_column(String, nullable=False)
-    drug_id: Mapped[int | None] = mapped_column(Integer, ForeignKey(DRUGS_ID_FK), nullable=True)
+    drug_id: Mapped[int | None] = mapped_column(
+        Integer, ForeignKey(DRUGS_ID_FK), nullable=True
+    )
     rxnorm_rxcui: Mapped[str | None] = mapped_column(String, nullable=True)
     livertox_monograph_key: Mapped[str | None] = mapped_column(String, nullable=True)
     livertox_nbk_id: Mapped[str | None] = mapped_column(String, nullable=True)
     source: Mapped[str] = mapped_column(String, nullable=False)
     confidence: Mapped[float] = mapped_column(Float, nullable=False)
     evidence_json: Mapped[str | None] = mapped_column(Text, nullable=True)
-    deterministic_evidence_version: Mapped[str | None] = mapped_column(String, nullable=True)
+    deterministic_evidence_version: Mapped[str | None] = mapped_column(
+        String, nullable=True
+    )
     invalidated_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
     invalidation_reason: Mapped[str | None] = mapped_column(Text, nullable=True)
     created_at: Mapped[datetime] = mapped_column(
@@ -371,7 +383,9 @@ class KbMatchCache(Base):
         server_onupdate=text("CURRENT_TIMESTAMP"),
     )
 
-    drug: Mapped["Drug | None"] = relationship("Drug", back_populates="kb_match_cache_entries")
+    drug: Mapped["Drug | None"] = relationship(
+        "Drug", back_populates="kb_match_cache_entries"
+    )
 
     __table_args__ = (
         CheckConstraint(

@@ -37,7 +37,10 @@ class FakeInputPreparator:
         return HepatoxPreparedInputs(
             resolved_drugs={
                 "drug-a": {
-                    "matched_livertox_row": {"drug_name": "Drug A", "likelihood_score": "B"},
+                    "matched_livertox_row": {
+                        "drug_name": "Drug A",
+                        "likelihood_score": "B",
+                    },
                     "match_confidence": 0.9,
                     "match_reason": "exact",
                     "match_status": "matched",
@@ -99,7 +102,7 @@ class FakeLabExtractor:
                         upper_limit_normal=120.0,
                         sample_date="2025-01-10",
                         source="laboratory_analysis",
-                    )
+                    ),
                 ]
             ),
             LiverInjuryOnsetContext(
@@ -147,7 +150,9 @@ class FakeDrugsParser:
     def clean_text(self, text: str) -> str:
         return text
 
-    async def extract_drugs_from_therapy(self, text: str, **kwargs: Any) -> PatientDrugs:
+    async def extract_drugs_from_therapy(
+        self, text: str, **kwargs: Any
+    ) -> PatientDrugs:
         _ = text
         _ = kwargs
         return PatientDrugs(
@@ -162,14 +167,18 @@ class FakeDrugsParser:
             ]
         )
 
-    async def extract_drugs_from_anamnesis(self, text: str | None, **kwargs: Any) -> PatientDrugs:
+    async def extract_drugs_from_anamnesis(
+        self, text: str | None, **kwargs: Any
+    ) -> PatientDrugs:
         _ = text
         _ = kwargs
         return PatientDrugs(entries=[])
 
 
 class FakeDiseaseExtractor:
-    async def extract_diseases_from_anamnesis(self, text: str | None, **kwargs: Any) -> PatientDiseaseContext:
+    async def extract_diseases_from_anamnesis(
+        self, text: str | None, **kwargs: Any
+    ) -> PatientDiseaseContext:
         _ = text
         _ = kwargs
         return PatientDiseaseContext(entries=[])
@@ -220,4 +229,6 @@ def test_session_lab_or_rucam_failure_degrades_to_warnings(monkeypatch) -> None:
         asyncio.run(endpoint.process_single_patient(_build_payload()))
         assert False, "Expected validation error for missing hepatotoxicity inputs."
     except ClinicalPipelineValidationError as exc:
-        assert any(issue.code == "missing_hepatotoxicity_inputs" for issue in exc.issues)
+        assert any(
+            issue.code == "missing_hepatotoxicity_inputs" for issue in exc.issues
+        )

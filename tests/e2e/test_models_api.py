@@ -1,6 +1,7 @@
 """
 E2E tests for the model management API endpoints.
 """
+
 from __future__ import annotations
 
 from urllib.parse import quote

@@ -58,6 +58,7 @@ class JobErrorSanitizer:
             return candidate
         return "Operation failed unexpectedly. Please retry."
 
+
 ###############################################################################
 class JobManager:
     def __init__(self) -> None:
@@ -115,7 +116,9 @@ class JobManager:
         if state.status not in ("pending", "running"):
             return False
         if state.status == "pending":
-            state.update(stop_requested=True, status="cancelled", completed_at=monotonic())
+            state.update(
+                stop_requested=True, status="cancelled", completed_at=monotonic()
+            )
             logger.info("Cancelled pending job %s", job_id)
             return True
         state.update(stop_requested=True, status="cancelled", completed_at=monotonic())
@@ -218,7 +221,7 @@ class JobManager:
     def runner_accepts_job_id(self, runner: Callable[..., dict[str, Any]]) -> bool:
         try:
             signature = inspect.signature(runner)
-        except (TypeError, ValueError):
+        except TypeError, ValueError:
             return False
         parameters = list(signature.parameters.values())
         for param in parameters:
@@ -229,5 +232,3 @@ class JobManager:
 
 ###############################################################################
 job_manager = JobManager()
-
-

@@ -1,6 +1,7 @@
 """
 E2E tests for the clinical session API endpoint.
 """
+
 from __future__ import annotations
 
 from playwright.sync_api import APIRequestContext

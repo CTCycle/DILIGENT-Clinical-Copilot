@@ -16,7 +16,9 @@ from DILIGENT.server.domain.inspection import (
     SessionListFilters,
 )
 from DILIGENT.server.services.inspection import DataInspectionService
-from DILIGENT.server.repositories.serialization.data import _RepositorySerializationService
+from DILIGENT.server.repositories.serialization.data import (
+    _RepositorySerializationService,
+)
 from DILIGENT.server.repositories.schemas.models import Base
 
 

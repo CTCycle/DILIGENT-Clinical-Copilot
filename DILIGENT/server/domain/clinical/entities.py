@@ -5,7 +5,14 @@ from datetime import date, datetime
 import re
 from typing import Any, Literal
 
-from pydantic import BaseModel, ConfigDict, Field, RootModel, field_validator, model_validator
+from pydantic import (
+    BaseModel,
+    ConfigDict,
+    Field,
+    RootModel,
+    field_validator,
+    model_validator,
+)
 
 Comparator = Literal["<=", "<", ">=", ">"]
 CONTROL_CHARACTERS_RE = re.compile(r"[\x00-\x08\x0B\x0C\x0E-\x1F\x7F]")
@@ -20,6 +27,7 @@ class PatientData(BaseModel):
     - Normalizes whitespace.
 
     """
+
     model_config = ConfigDict(extra="forbid")
 
     name: str | None = Field(
@@ -59,9 +67,7 @@ class PatientData(BaseModel):
     )
 
     # -------------------------------------------------------------------------
-    @field_validator(
-        "name", "anamnesis", "drugs", "laboratory_analysis", mode="before"
-    )
+    @field_validator("name", "anamnesis", "drugs", "laboratory_analysis", mode="before")
     @classmethod
     def strip_text(cls, value: str | None) -> str | None:
         return cls._strip_optional_text(value)
@@ -98,7 +104,7 @@ class PatientData(BaseModel):
             day = int(str(value.get("day", "")).strip())
             month = int(str(value.get("month", "")).strip())
             year = int(str(value.get("year", "")).strip())
-        except (TypeError, ValueError):
+        except TypeError, ValueError:
             return None
         try:
             return date(year, month, day)
@@ -136,6 +142,7 @@ class PatientData(BaseModel):
     def require_sections(self) -> "PatientData":
         return self
 
+
 ###############################################################################
 class ClinicalSessionRequest(BaseModel):
     model_config = ConfigDict(extra="forbid")
@@ -146,7 +153,9 @@ class ClinicalSessionRequest(BaseModel):
     use_rag: bool = False
     use_web_search: bool = False
     drugs: str | None = Field(default=None, max_length=20000)
-    laboratory_analysis: str | None = Field(default=None, max_length=MAX_LAB_TEXT_LENGTH)
+    laboratory_analysis: str | None = Field(
+        default=None, max_length=MAX_LAB_TEXT_LENGTH
+    )
     patient_image_base64: str | None = Field(default=None, max_length=8_000_000)
 
     # -------------------------------------------------------------------------
@@ -241,7 +250,7 @@ class DrugEntry(BaseModel):
                 continue
             try:
                 cleaned.append(float(slot))
-            except (TypeError, ValueError):
+            except TypeError, ValueError:
                 continue
         if not cleaned:
             return []
@@ -278,6 +287,7 @@ class ClinicalPipelineValidationError(Exception):
 # -----------------------------------------------------------------------------
 class PatientDrugs(BaseModel):
     """Container for parsed drug entries."""
+
     entries: list[DrugEntry] = Field(default_factory=list)
 
 
@@ -314,7 +324,9 @@ class ClinicalLabEntry(BaseModel):
     sample_date: str | None = Field(default=None, max_length=40)
     relative_time: str | None = Field(default=None, max_length=120)
     evidence: str | None = Field(default=None, max_length=500)
-    source: Literal["laboratory_analysis", "anamnesis", "merged"] = Field(default="anamnesis")
+    source: Literal["laboratory_analysis", "anamnesis", "merged"] = Field(
+        default="anamnesis"
+    )
 
     @field_validator(
         "marker_name",

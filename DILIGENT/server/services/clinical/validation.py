@@ -13,6 +13,7 @@ from DILIGENT.server.domain.clinical.entities import (
 )
 from DILIGENT.server.domain.clinical.validation import ValidationMessageBundle
 
+
 ###############################################################################
 def build_validation_bundle(report_language: str) -> ValidationMessageBundle:
     language_code = resolve_supported_language_code(report_language)
@@ -75,4 +76,3 @@ def ensure_timed_therapy_drug(
         field="drugs",
     )
     raise ClinicalPipelineValidationError(issues=[issue], message=issue.message)
-

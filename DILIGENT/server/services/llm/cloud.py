@@ -14,7 +14,11 @@ from DILIGENT.server.common.constants import GEMINI_API_BASE, OPENAI_API_BASE
 from DILIGENT.server.common.utils.logger import logger
 from DILIGENT.server.configurations.startup import server_settings
 from DILIGENT.server.configurations.llm_configs import LLMRuntimeConfig
-from DILIGENT.server.services.llm.structured import StructuredOutputParser, parse_json_dict, T
+from DILIGENT.server.services.llm.structured import (
+    StructuredOutputParser,
+    parse_json_dict,
+    T,
+)
 from DILIGENT.server.repositories.serialization.access_keys import AccessKeySerializer
 
 ProviderName = Literal["openai", "gemini"]
@@ -23,6 +27,7 @@ ProviderName = Literal["openai", "gemini"]
 ###############################################################################
 class LLMError(RuntimeError):
     pass
+
 
 ###############################################################################
 class LLMTimeout(LLMError):
@@ -102,14 +107,18 @@ class CloudLLMClient:
             row = access_key_serializer.get_active_key(provider, mark_used=True)
         except Exception as exc:  # noqa: BLE001
             provider_label = "OpenAI" if provider == "openai" else "Gemini"
-            raise LLMError(f"Failed to load active {provider_label} access key") from exc
+            raise LLMError(
+                f"Failed to load active {provider_label} access key"
+            ) from exc
         if row is None:
             return None
         try:
             return access_key_serializer.decrypt_key_row(row)
         except Exception as exc:  # noqa: BLE001
             provider_label = "OpenAI" if provider == "openai" else "Gemini"
-            raise LLMError(f"Failed to decrypt active {provider_label} access key") from exc
+            raise LLMError(
+                f"Failed to decrypt active {provider_label} access key"
+            ) from exc
 
     # ---------------------------------------------------------------------
     async def close(self) -> None:
@@ -236,7 +245,9 @@ class CloudLLMClient:
         if system_instruction:
             config_kwargs["system_instruction"] = system_instruction
         if options and "temperature" in options:
-            config_kwargs["temperature"] = max(0.0, min(2.0, float(options["temperature"])))
+            config_kwargs["temperature"] = max(
+                0.0, min(2.0, float(options["temperature"]))
+            )
         if json_mode or schema is not None:
             config_kwargs["response_mime_type"] = "application/json"
         if schema is not None:
@@ -680,4 +691,3 @@ class CloudLLMClient:
     @staticmethod
     def parse_json(obj_or_text: dict[str, Any] | str) -> dict[str, Any] | None:
         return parse_json_dict(obj_or_text)
-

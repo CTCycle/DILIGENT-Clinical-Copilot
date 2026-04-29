@@ -7,7 +7,6 @@ from DILIGENT.server.repositories.schemas.models import ModelSelection, RuntimeS
 
 ###############################################################################
 class ModelConfigRepositoryQueries:
-
     # -------------------------------------------------------------------------
     @staticmethod
     def select_all() -> Select[tuple[ModelSelection]]:
@@ -17,4 +16,3 @@ class ModelConfigRepositoryQueries:
     @staticmethod
     def select_runtime_settings() -> Select[tuple[RuntimeSetting]]:
         return select(RuntimeSetting)
-

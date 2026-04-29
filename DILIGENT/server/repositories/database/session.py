@@ -47,4 +47,3 @@ def resolve_session_factory(
         future=True,
         expire_on_commit=expire_on_commit,
     )
-

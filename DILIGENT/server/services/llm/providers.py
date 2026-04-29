@@ -16,11 +16,21 @@ from collections.abc import AsyncGenerator, Awaitable, Callable
 from typing import Any, Literal, NoReturn, TypeAlias
 
 import httpx
-from langchain_core.messages import AIMessage, AIMessageChunk, BaseMessage, HumanMessage, SystemMessage
+from langchain_core.messages import (
+    AIMessage,
+    AIMessageChunk,
+    BaseMessage,
+    HumanMessage,
+    SystemMessage,
+)
 from langchain_ollama import ChatOllama, OllamaEmbeddings
 
 from DILIGENT.server.services.llm.cloud import CloudLLMClient, LLMError, LLMTimeout
-from DILIGENT.server.services.llm.structured import StructuredOutputParser, parse_json_dict, T
+from DILIGENT.server.services.llm.structured import (
+    StructuredOutputParser,
+    parse_json_dict,
+    T,
+)
 from DILIGENT.server.configurations.startup import server_settings
 from DILIGENT.server.configurations.llm_configs import LLMRuntimeConfig
 from DILIGENT.server.common.constants import (
@@ -49,9 +59,11 @@ __all__ = [
 class OllamaError(RuntimeError):
     pass
 
+
 ###############################################################################
 class OllamaTimeout(OllamaError):
     """Raised when requests to Ollama exceed the configured timeout."""
+
 
 ProgressCb: TypeAlias = Callable[[dict[str, Any]], None | Awaitable[None]]
 
@@ -63,7 +75,7 @@ def _env_float(name: str, default: float) -> float:
         return default
     try:
         return float(raw)
-    except (TypeError, ValueError):
+    except TypeError, ValueError:
         return default
 
 
@@ -165,7 +177,9 @@ class OllamaClient:
         keepalive_max: int = 20,
         default_model: str | None = None,
     ) -> None:
-        self.base_url = (base_url or server_settings.llm_defaults.ollama_host_default).rstrip("/")
+        self.base_url = (
+            base_url or server_settings.llm_defaults.ollama_host_default
+        ).rstrip("/")
         self.default_model = (default_model or "").strip() or None
         self.timeout_s = float(timeout_s)
         limits = httpx.Limits(
@@ -206,8 +220,12 @@ class OllamaClient:
             _env_float("OLLAMA_VRAM_SAFETY_RATIO", 0.85),
             0.1,
         )
-        self.residency_dual_keep_alive = _env_str("OLLAMA_DUAL_RESIDENT_KEEP_ALIVE", "4h")
-        self.residency_single_keep_alive = _env_str("OLLAMA_SINGLE_RESIDENT_KEEP_ALIVE", "30m")
+        self.residency_dual_keep_alive = _env_str(
+            "OLLAMA_DUAL_RESIDENT_KEEP_ALIVE", "4h"
+        )
+        self.residency_single_keep_alive = _env_str(
+            "OLLAMA_SINGLE_RESIDENT_KEEP_ALIVE", "30m"
+        )
         self.residency_usage_history: deque[tuple[float, str]] = deque(maxlen=256)
         self.prefetch_last_run_by_model: dict[str, float] = {}
         self.prefetch_tasks: dict[str, asyncio.Task[None]] = {}
@@ -368,7 +386,7 @@ class OllamaClient:
     async def list_running_models(self) -> dict[str, dict[str, Any]]:
         try:
             resp = await self.client.get("/api/ps")
-        except (httpx.TimeoutException, httpx.RequestError):
+        except httpx.TimeoutException, httpx.RequestError:
             return {}
         if resp.status_code == 404:
             return {}
@@ -545,9 +563,13 @@ class OllamaClient:
         if selected is not None:
             return selected
 
-        return next((candidate for candidate in candidates if candidate != current_model), None)
+        return next(
+            (candidate for candidate in candidates if candidate != current_model), None
+        )
 
-    def _recent_residency_history(self, candidates: list[str]) -> list[tuple[float, str]]:
+    def _recent_residency_history(
+        self, candidates: list[str]
+    ) -> list[tuple[float, str]]:
         now = time.monotonic()
         cutoff = now - self.residency_usage_window_s
         return [
@@ -706,13 +728,13 @@ class OllamaClient:
         if temperature is not None:
             try:
                 temp_value = float(temperature)
-            except (TypeError, ValueError):
+            except TypeError, ValueError:
                 temp_value = default_temp
         if options_payload and "temperature" in options_payload:
             if temperature is None:
                 try:
                     temp_value = float(options_payload["temperature"])
-                except (TypeError, ValueError):
+                except TypeError, ValueError:
                     temp_value = default_temp
             options_payload.pop("temperature", None)
             if not options_payload:
@@ -959,7 +981,9 @@ class OllamaClient:
             try:
                 embeddings.append([float(value) for value in vector])
             except (TypeError, ValueError) as exc:
-                raise OllamaError("Non-numeric values found in Ollama embeddings") from exc
+                raise OllamaError(
+                    "Non-numeric values found in Ollama embeddings"
+                ) from exc
         if len(embeddings) != len(input_texts):
             raise OllamaError("Mismatch between Ollama embeddings and inputs")
         return embeddings
@@ -1124,7 +1148,7 @@ class OllamaClient:
         try:
             resp = await self.client.get("/api/tags")
             resp.raise_for_status()
-        except (httpx.RequestError, httpx.HTTPStatusError):
+        except httpx.RequestError, httpx.HTTPStatusError:
             return False
         return True
 
@@ -1249,7 +1273,7 @@ class OllamaClient:
                 text=True,
                 timeout=1.5,
             )
-        except (OSError, subprocess.SubprocessError):
+        except OSError, subprocess.SubprocessError:
             return 0
         if result.returncode != 0:
             return 0
@@ -1308,7 +1332,7 @@ class OllamaClient:
                 pages = sysconf("SC_PHYS_PAGES")
             if isinstance(page_size, int) and isinstance(pages, int):
                 return page_size * pages
-        except (ValueError, OSError, AttributeError):
+        except ValueError, OSError, AttributeError:
             pass
         return 0
 
@@ -1344,7 +1368,7 @@ class OllamaClient:
                     parsed = OllamaClient._parse_meminfo_line(line)
                     if parsed is not None:
                         return parsed
-        except (FileNotFoundError, PermissionError, ValueError):
+        except FileNotFoundError, PermissionError, ValueError:
             pass
         return 0
 
@@ -1406,7 +1430,9 @@ class OllamaClient:
         except Exception as exc:  # noqa: BLE001
             mapped = _map_ollama_langchain_exception(exc)
             if isinstance(mapped, OllamaTimeout):
-                raise OllamaTimeout("Timed out waiting for Ollama chat response") from exc
+                raise OllamaTimeout(
+                    "Timed out waiting for Ollama chat response"
+                ) from exc
             raise mapped from exc
 
         content = _normalize_langchain_content(response.content)
@@ -1459,10 +1485,16 @@ class OllamaClient:
         try:
             async for chunk in chat_model.astream(lc_messages):
                 if not isinstance(chunk, AIMessageChunk):
-                    normalized = _normalize_langchain_content(getattr(chunk, "content", ""))
+                    normalized = _normalize_langchain_content(
+                        getattr(chunk, "content", "")
+                    )
                 else:
                     normalized = _normalize_langchain_content(chunk.content)
-                text = json.dumps(normalized) if isinstance(normalized, dict) else str(normalized)
+                text = (
+                    json.dumps(normalized)
+                    if isinstance(normalized, dict)
+                    else str(normalized)
+                )
                 if not text:
                     continue
                 content_parts.append(text)
@@ -1712,7 +1744,9 @@ class OllamaClient:
                 "LLM call failed: no local text extraction models were found. "
                 f"Tried: {attempted}"
             ) from last_missing_error
-        raise RuntimeError("LLM call failed: no text extraction model candidates available")
+        raise RuntimeError(
+            "LLM call failed: no text extraction model candidates available"
+        )
 
     # -------------------------------------------------------------------------
     @staticmethod
@@ -1869,7 +1903,9 @@ def select_llm_provider(
     if p == "ollama":
         return OllamaClient(
             base_url=kwargs.get("base_url"),
-            timeout_s=kwargs.get("timeout_s", server_settings.external_data.default_llm_timeout),
+            timeout_s=kwargs.get(
+                "timeout_s", server_settings.external_data.default_llm_timeout
+            ),
             keepalive_connections=kwargs.get("keepalive_connections", 10),
             keepalive_max=kwargs.get("keepalive_max", 20),
             default_model=kwargs.get("default_model"),
@@ -1878,7 +1914,9 @@ def select_llm_provider(
         return CloudLLMClient(
             provider=p,  # type: ignore[arg-type]
             base_url=kwargs.get("base_url"),
-            timeout_s=kwargs.get("timeout_s", server_settings.external_data.default_llm_timeout),
+            timeout_s=kwargs.get(
+                "timeout_s", server_settings.external_data.default_llm_timeout
+            ),
             keepalive_connections=kwargs.get("keepalive_connections", 10),
             keepalive_max=kwargs.get("keepalive_max", 20),
             default_model=kwargs.get("default_model"),
@@ -1904,4 +1942,3 @@ def initialize_llm_client(
         default_model=selected_model,
         **kwargs,
     )
-

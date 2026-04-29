@@ -42,8 +42,13 @@ from DILIGENT.server.common.utils.languages import (
     resolve_supported_language_code,
 )
 from DILIGENT.server.repositories.serialization.data import DataSerializer
-from DILIGENT.server.repositories.serialization.model_configs import ModelConfigSerializer
-from DILIGENT.server.services.runtime.jobs import JobManager, job_manager as default_job_manager
+from DILIGENT.server.repositories.serialization.model_configs import (
+    ModelConfigSerializer,
+)
+from DILIGENT.server.services.runtime.jobs import (
+    JobManager,
+    job_manager as default_job_manager,
+)
 from DILIGENT.server.common.utils.logger import logger
 from DILIGENT.server.services.clinical.hepatox_core import (
     HepatotoxicityPatternAnalyzer,
@@ -56,7 +61,9 @@ from DILIGENT.server.services.clinical.job_progress import (
 from DILIGENT.server.services.clinical.language import ClinicalLanguageDetector
 from DILIGENT.server.services.clinical.match_quality import classify_match_evidence
 from DILIGENT.server.services.clinical.preparation import ClinicalKnowledgePreparation
-from DILIGENT.server.services.clinical.candidate_selection import select_relevant_candidates
+from DILIGENT.server.services.clinical.candidate_selection import (
+    select_relevant_candidates,
+)
 from DILIGENT.server.services.clinical.disease import DiseaseExtractor
 from DILIGENT.server.services.clinical.labs import ClinicalLabExtractor
 from DILIGENT.server.services.clinical.parser import DrugsParser
@@ -70,17 +77,27 @@ from DILIGENT.server.services.clinical.validation import (
 from DILIGENT.server.services.session.payload import PayloadSanitizationService
 from DILIGENT.server.services.llm.model_config import ModelConfigService
 from DILIGENT.server.services.retrieval.query import DILIQueryBuilder
-from DILIGENT.server.services.session.session_shared import NarrativeBuilder, run_clinical_job
-from DILIGENT.server.services.session.formatting_mixin import ClinicalSessionFormattingMixin
+from DILIGENT.server.services.session.session_shared import (
+    NarrativeBuilder,
+    run_clinical_job,
+)
+from DILIGENT.server.services.session.formatting_mixin import (
+    ClinicalSessionFormattingMixin,
+)
 from DILIGENT.server.services.text.normalization import normalize_drug_query_name
 
 drugs_parser = DrugsParser(timeout_s=server_settings.external_data.default_llm_timeout)
-disease_extractor = DiseaseExtractor(timeout_s=server_settings.external_data.default_llm_timeout)
-lab_extractor = ClinicalLabExtractor(timeout_s=server_settings.external_data.default_llm_timeout)
+disease_extractor = DiseaseExtractor(
+    timeout_s=server_settings.external_data.default_llm_timeout
+)
+lab_extractor = ClinicalLabExtractor(
+    timeout_s=server_settings.external_data.default_llm_timeout
+)
 pattern_analyzer = HepatotoxicityPatternAnalyzer()
 rucam_estimator = RucamScoreEstimator()
 serializer = DataSerializer()
 payload_sanitization_service = PayloadSanitizationService()
+
 
 ###############################################################################
 class ClinicalSessionService(ClinicalSessionFormattingMixin):
@@ -110,7 +127,9 @@ class ClinicalSessionService(ClinicalSessionFormattingMixin):
         self.input_preparator = input_preparator or ClinicalKnowledgePreparation()
         self.hepatox_consultation_cls = hepatox_consultation_cls or HepatoxConsultation
         self.job_manager = job_manager or default_job_manager
-        self.model_config_service = ModelConfigService(serializer=ModelConfigSerializer())
+        self.model_config_service = ModelConfigService(
+            serializer=ModelConfigSerializer()
+        )
 
     # -------------------------------------------------------------------------
     @staticmethod
@@ -144,8 +163,12 @@ class ClinicalSessionService(ClinicalSessionFormattingMixin):
 
     def apply_persisted_runtime_configuration(self) -> None:
         self.model_config_service.ensure_defaults()
-        parser_provider, parser_model = LLMRuntimeConfig.resolve_provider_and_model("parser")
-        clinical_provider, clinical_model_resolved = LLMRuntimeConfig.resolve_provider_and_model("clinical")
+        parser_provider, parser_model = LLMRuntimeConfig.resolve_provider_and_model(
+            "parser"
+        )
+        clinical_provider, clinical_model_resolved = (
+            LLMRuntimeConfig.resolve_provider_and_model("clinical")
+        )
         logger.info(
             "Resolved LLM runtime from persisted model config: cloud=%s provider=%s cloud_model=%s text_extraction_provider=%s text_extraction_model=%s clinical_provider=%s clinical_model=%s ollama_temperature=%.2f cloud_temperature=%.2f reasoning=%s",
             LLMRuntimeConfig.is_cloud_enabled(),
@@ -282,7 +305,9 @@ class ClinicalSessionService(ClinicalSessionFormattingMixin):
             self.run_stop_check(stop_check)
             elapsed = time.perf_counter() - start_time
             logger.info("Therapy drugs extraction required %.4f seconds", elapsed)
-            logger.info("Detected %s drugs from therapy list", len(therapy_drugs.entries))
+            logger.info(
+                "Detected %s drugs from therapy list", len(therapy_drugs.entries)
+            )
         except Exception as exc:
             elapsed = time.perf_counter() - start_time
             logger.warning(
@@ -332,7 +357,9 @@ class ClinicalSessionService(ClinicalSessionFormattingMixin):
             self.run_stop_check(stop_check)
             elapsed = time.perf_counter() - start_time
             logger.info("Anamnesis drugs extraction required %.4f seconds", elapsed)
-            logger.info("Detected %s drugs from anamnesis", len(anamnesis_drugs.entries))
+            logger.info(
+                "Detected %s drugs from anamnesis", len(anamnesis_drugs.entries)
+            )
         except Exception as exc:
             elapsed = time.perf_counter() - start_time
             logger.warning(
@@ -366,7 +393,9 @@ class ClinicalSessionService(ClinicalSessionFormattingMixin):
         progress_callback: Callable[[str, float], None] | None,
         stop_check: Callable[[], None] | None,
     ) -> PatientDiseaseContext:
-        self.emit_progress(progress_callback, stage="anamnesis_disease_extraction", value=42.0)
+        self.emit_progress(
+            progress_callback, stage="anamnesis_disease_extraction", value=42.0
+        )
         disease_progress_callback = self.build_stage_progress_callback(
             progress_callback,
             stage="anamnesis_disease_extraction",
@@ -388,9 +417,15 @@ class ClinicalSessionService(ClinicalSessionFormattingMixin):
                 )
                 self.run_stop_check(stop_check)
                 elapsed = time.perf_counter() - start_time
-                logger.info("Anamnesis disease extraction required %.4f seconds", elapsed)
-                logger.info("Detected %s diseases from anamnesis", len(disease_context.entries))
-                self.emit_progress(progress_callback, stage="anamnesis_disease_extraction", value=48.0)
+                logger.info(
+                    "Anamnesis disease extraction required %.4f seconds", elapsed
+                )
+                logger.info(
+                    "Detected %s diseases from anamnesis", len(disease_context.entries)
+                )
+                self.emit_progress(
+                    progress_callback, stage="anamnesis_disease_extraction", value=48.0
+                )
                 self.run_stop_check(stop_check)
                 return disease_context
             except TimeoutError as exc:
@@ -433,7 +468,9 @@ class ClinicalSessionService(ClinicalSessionFormattingMixin):
                     field="anamnesis",
                 )
                 disease_context = PatientDiseaseContext(entries=[])
-                self.emit_progress(progress_callback, stage="anamnesis_disease_extraction", value=48.0)
+                self.emit_progress(
+                    progress_callback, stage="anamnesis_disease_extraction", value=48.0
+                )
                 self.run_stop_check(stop_check)
                 return disease_context
         return PatientDiseaseContext(entries=[])
@@ -447,7 +484,9 @@ class ClinicalSessionService(ClinicalSessionFormattingMixin):
         progress_callback: Callable[[str, float], None] | None,
         stop_check: Callable[[], None] | None,
     ) -> tuple[PatientLabTimeline, LiverInjuryOnsetContext | None]:
-        self.emit_progress(progress_callback, stage="anamnesis_lab_extraction", value=48.0)
+        self.emit_progress(
+            progress_callback, stage="anamnesis_lab_extraction", value=48.0
+        )
         lab_progress_callback = self.build_stage_progress_callback(
             progress_callback,
             stage="anamnesis_lab_extraction",
@@ -485,7 +524,9 @@ class ClinicalSessionService(ClinicalSessionFormattingMixin):
             )
             lab_timeline = PatientLabTimeline(entries=[])
             onset_context = None
-        self.emit_progress(progress_callback, stage="anamnesis_lab_extraction", value=52.0)
+        self.emit_progress(
+            progress_callback, stage="anamnesis_lab_extraction", value=52.0
+        )
         self.run_stop_check(stop_check)
         return lab_timeline, onset_context
 
@@ -526,10 +567,14 @@ class ClinicalSessionService(ClinicalSessionFormattingMixin):
         logger.info(
             "Patient hepatotoxicity pattern classified as %s (R=%.3f, status=%s)",
             pattern_score.classification,
-            pattern_score.r_score if pattern_score.r_score is not None else float("nan"),
+            pattern_score.r_score
+            if pattern_score.r_score is not None
+            else float("nan"),
             pattern_assessment.status,
         )
-        self.emit_progress(progress_callback, stage="hepatotoxicity_pattern", value=54.0)
+        self.emit_progress(
+            progress_callback, stage="hepatotoxicity_pattern", value=54.0
+        )
         self.run_stop_check(stop_check)
         return pattern_assessment
 
@@ -594,7 +639,9 @@ class ClinicalSessionService(ClinicalSessionFormattingMixin):
         progress_callback: Callable[[str, float], None] | None,
         stop_check: Callable[[], None] | None,
     ) -> dict[str, str] | None:
-        ClinicalSessionService.emit_progress(progress_callback, stage="rag_query_building", value=54.0)
+        ClinicalSessionService.emit_progress(
+            progress_callback, stage="rag_query_building", value=54.0
+        )
         rag_query: dict[str, str] | None = None
         if payload.use_rag:
             query_builder = DILIQueryBuilder(analysis_drugs)
@@ -604,7 +651,9 @@ class ClinicalSessionService(ClinicalSessionFormattingMixin):
                 pattern_classification=pattern_score.classification,
                 r_score=pattern_score.r_score,
             )
-        ClinicalSessionService.emit_progress(progress_callback, stage="rag_query_building", value=56.0)
+        ClinicalSessionService.emit_progress(
+            progress_callback, stage="rag_query_building", value=56.0
+        )
         ClinicalSessionService.run_stop_check(stop_check)
         return rag_query
 
@@ -662,7 +711,9 @@ class ClinicalSessionService(ClinicalSessionFormattingMixin):
                 lab_timeline=lab_timeline,
                 onset_context=onset_context,
                 pattern_score=pattern_score,
-                resolved_drugs=prepared_inputs.resolved_drugs if prepared_inputs else None,
+                resolved_drugs=prepared_inputs.resolved_drugs
+                if prepared_inputs
+                else None,
             )
         except Exception as exc:
             logger.warning("RUCAM re-estimation with LiverTox metadata failed: %s", exc)
@@ -773,7 +824,9 @@ class ClinicalSessionService(ClinicalSessionFormattingMixin):
             resolved = {
                 "match_status": "missing_match",
                 "match_reason": "knowledge_base_unavailable",
-                "match_notes": ["No local RxNav/LiverTox evidence record was available."],
+                "match_notes": [
+                    "No local RxNav/LiverTox evidence record was available."
+                ],
                 "missing_livertox": True,
                 "ambiguous_match": False,
             }
@@ -787,7 +840,7 @@ class ClinicalSessionService(ClinicalSessionFormattingMixin):
         if match_confidence is not None:
             try:
                 match_confidence = float(match_confidence)
-            except (TypeError, ValueError):
+            except TypeError, ValueError:
                 match_confidence = None
         match_quality = classify_match_evidence(
             match_status=resolved.get("match_status"),
@@ -827,7 +880,9 @@ class ClinicalSessionService(ClinicalSessionFormattingMixin):
         prepared_inputs,
         rucam_bundle: PatientRucamAssessmentBundle,
     ) -> list[dict[str, Any]]:
-        resolved_drug_map = ClinicalSessionService._normalized_resolved_drug_map(prepared_inputs)
+        resolved_drug_map = ClinicalSessionService._normalized_resolved_drug_map(
+            prepared_inputs
+        )
         rucam_by_name = ClinicalSessionService._normalized_rucam_map(rucam_bundle)
 
         matched_drugs_payload: list[dict[str, Any]] = []
@@ -902,7 +957,9 @@ class ClinicalSessionService(ClinicalSessionFormattingMixin):
             stop_check=stop_check,
         )
         pattern_score = pattern_assessment.score
-        all_detected_drugs = PatientDrugs(entries=[*therapy_drugs.entries, *anamnesis_drugs.entries])
+        all_detected_drugs = PatientDrugs(
+            entries=[*therapy_drugs.entries, *anamnesis_drugs.entries]
+        )
         candidate_selection = select_relevant_candidates(
             therapy_drugs=therapy_drugs,
             anamnesis_drugs=anamnesis_drugs,
@@ -979,7 +1036,9 @@ class ClinicalSessionService(ClinicalSessionFormattingMixin):
         visit_label = (
             payload.visit_date.strftime("%d %B %Y")
             if payload.visit_date
-            else MISSING_VISIT_LABEL_BY_LANGUAGE.get(report_language_key, "Not provided")
+            else MISSING_VISIT_LABEL_BY_LANGUAGE.get(
+                report_language_key, "Not provided"
+            )
         )
         global_elapsed = time.perf_counter() - global_start_time
         logger.info(
@@ -987,8 +1046,12 @@ class ClinicalSessionService(ClinicalSessionFormattingMixin):
             global_elapsed,
         )
         detected_drugs = [entry.name for entry in analysis_drugs.entries if entry.name]
-        anamnesis_detected_drugs = [entry.name for entry in anamnesis_drugs.entries if entry.name]
-        anamnesis_detected_diseases = [entry.name for entry in disease_context.entries if entry.name]
+        anamnesis_detected_drugs = [
+            entry.name for entry in anamnesis_drugs.entries if entry.name
+        ]
+        anamnesis_detected_diseases = [
+            entry.name for entry in disease_context.entries if entry.name
+        ]
         matched_drugs_payload = self.build_matched_drugs_payload(
             detected_drugs=detected_drugs,
             prepared_inputs=prepared_inputs,
@@ -1027,9 +1090,15 @@ class ClinicalSessionService(ClinicalSessionFormattingMixin):
             "excluded_drugs": candidate_selection.excluded,
             "unresolved_drugs": candidate_selection.unresolved,
             "structured_case": {
-                "therapy_drugs": [entry.model_dump() for entry in therapy_drugs.entries],
-                "anamnesis_drugs": [entry.model_dump() for entry in anamnesis_drugs.entries],
-                "anamnesis_diseases": [entry.model_dump() for entry in disease_context.entries],
+                "therapy_drugs": [
+                    entry.model_dump() for entry in therapy_drugs.entries
+                ],
+                "anamnesis_drugs": [
+                    entry.model_dump() for entry in anamnesis_drugs.entries
+                ],
+                "anamnesis_diseases": [
+                    entry.model_dump() for entry in disease_context.entries
+                ],
             },
             "runtime_settings": {
                 "use_cloud_services": LLMRuntimeConfig.is_cloud_enabled(),
@@ -1162,5 +1231,3 @@ class ClinicalSessionService(ClinicalSessionFormattingMixin):
             success=success,
             message="Cancellation requested" if success else "Job cannot be cancelled",
         )
-    
-

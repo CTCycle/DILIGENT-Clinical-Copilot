@@ -94,4 +94,3 @@ def test_clinical_progress_callback_raises_when_stop_requested(monkeypatch) -> N
     except clinical_job_progress.ClinicalJobCancelled:
         return
     raise AssertionError("Expected ClinicalJobCancelled when stop is requested.")
-

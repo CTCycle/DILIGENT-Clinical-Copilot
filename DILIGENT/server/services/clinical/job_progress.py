@@ -48,7 +48,9 @@ class ClinicalConsultationProgressCallback:
         if stage == "llm_analysis":
             self.progress_callback("llm_analysis", 62.0 + (bounded_fraction * 24.0))
         elif stage == "report_composition":
-            self.progress_callback("report_composition", 86.0 + (bounded_fraction * 8.0))
+            self.progress_callback(
+                "report_composition", 86.0 + (bounded_fraction * 8.0)
+            )
 
 
 class StageProgressFractionCallback:
@@ -87,4 +89,3 @@ def report_clinical_job_progress(job_id: str, *, stage: str, progress: float) ->
             "progress_message": message,
         },
     )
-

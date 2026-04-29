@@ -3,7 +3,10 @@ from __future__ import annotations
 from sqlalchemy import create_engine, func, select
 from sqlalchemy.orm import sessionmaker
 
-from DILIGENT.server.repositories.schemas.models import AccessKeyEncryptionMaterial, Base
+from DILIGENT.server.repositories.schemas.models import (
+    AccessKeyEncryptionMaterial,
+    Base,
+)
 from DILIGENT.server.repositories.serialization.access_key_encryption import (
     AccessKeyEncryptionMaterialSerializer,
 )
@@ -57,7 +60,9 @@ def test_only_one_active_row_exists_per_purpose() -> None:
 
     with factory() as db_session:
         count_active = db_session.execute(
-            select(func.count()).select_from(AccessKeyEncryptionMaterial).where(
+            select(func.count())
+            .select_from(AccessKeyEncryptionMaterial)
+            .where(
                 AccessKeyEncryptionMaterial.key_purpose == "provider_access_keys",
                 AccessKeyEncryptionMaterial.is_active.is_(True),
             )
@@ -106,4 +111,3 @@ def test_encrypt_and_decrypt_use_db_seeded_material() -> None:
 
     assert ciphertext != plaintext
     assert restored == plaintext
-

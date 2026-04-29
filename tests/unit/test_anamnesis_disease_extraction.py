@@ -149,6 +149,8 @@ def test_build_structured_clinical_context_includes_disease_timeline() -> None:
     )
 
     assert "# Structured Disease Timeline (from Anamnesis)" in context
-    assert "Steatosis | occurrence: 2023 | chronic: yes | hepatic-related: yes" in context
+    assert (
+        "Steatosis | occurrence: 2023 | chronic: yes | hepatic-related: yes" in context
+    )
     assert "# Visit Date Anchor" in context
     assert "2025-04-14" in context

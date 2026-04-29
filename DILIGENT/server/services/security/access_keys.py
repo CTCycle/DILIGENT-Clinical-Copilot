@@ -33,12 +33,16 @@ class AccessKeyService:
         return [self.to_response(row) for row in rows]
 
     # -------------------------------------------------------------------------
-    def create_access_key(self, provider: ProviderName, access_key: str) -> AccessKeyResponse:
+    def create_access_key(
+        self, provider: ProviderName, access_key: str
+    ) -> AccessKeyResponse:
         created = self.serializer.create_key(provider, access_key)
         return self.to_response(created)
 
     # -------------------------------------------------------------------------
-    def activate_access_key(self, key_id: int, provider: ProviderName) -> AccessKeyResponse:
+    def activate_access_key(
+        self, key_id: int, provider: ProviderName
+    ) -> AccessKeyResponse:
         row = self.serializer.activate_key(key_id, provider=provider)
         return self.to_response(row)
 

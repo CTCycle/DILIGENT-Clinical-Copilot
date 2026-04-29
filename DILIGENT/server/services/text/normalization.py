@@ -18,6 +18,8 @@ _STRENGTH_FRAGMENT_RE = re.compile(
     r"\b\d+(?:[.,]\d+)?\s*(?:mg|mcg|ug|g|kg|ml|l|ui|iu|u|mmol|meq|%)\b",
     re.IGNORECASE,
 )
+
+
 # ---------------------------------------------------------------------------
 def canonicalize_drug_query(value: str | None) -> str:
     if not value:
@@ -109,9 +111,7 @@ def normalize_drug_name(value: str) -> str:
     if not value:
         return ""
     normalized = (
-        unicodedata.normalize("NFKD", value)
-        .encode("ascii", "ignore")
-        .decode("ascii")
+        unicodedata.normalize("NFKD", value).encode("ascii", "ignore").decode("ascii")
     )
     normalized = normalized.lower()
     normalized = re.sub(r"[^a-z0-9\s]", " ", normalized)

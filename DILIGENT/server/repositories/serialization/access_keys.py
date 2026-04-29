@@ -78,17 +78,23 @@ class AccessKeySerializer:
         table = self.resolve_table(normalized_provider)
         db_session = self.session_factory()
         try:
-            stmt = AccessKeyRepositoryQueries.list_for_provider(table, normalized_provider)
+            stmt = AccessKeyRepositoryQueries.list_for_provider(
+                table, normalized_provider
+            )
             return db_session.execute(stmt).scalars().all()
         finally:
             db_session.close()
 
     # -------------------------------------------------------------------------
-    def create_key(self, provider: str, plaintext_key: str) -> AccessKey | ResearchAccessKey:
+    def create_key(
+        self, provider: str, plaintext_key: str
+    ) -> AccessKey | ResearchAccessKey:
         normalized_provider = self.normalize_provider(provider)
         table = self.resolve_table(normalized_provider)
         active_material = self.encryption_material_serializer.get_active_material()
-        ciphertext = encrypt_with_key_material(plaintext_key, active_material.key_material)
+        ciphertext = encrypt_with_key_material(
+            plaintext_key, active_material.key_material
+        )
         row = table(
             provider=normalized_provider,
             encrypted_value=ciphertext,
@@ -112,10 +118,16 @@ class AccessKeySerializer:
     def decrypt_key_row(self, row: AccessKey | ResearchAccessKey) -> str:
         version = getattr(row, "encryption_key_version", None)
         if version is None:
-            raise RuntimeError("Missing encryption key version metadata for stored provider key")
-        material = self.encryption_material_serializer.get_material_by_version(int(version))
+            raise RuntimeError(
+                "Missing encryption key version metadata for stored provider key"
+            )
+        material = self.encryption_material_serializer.get_material_by_version(
+            int(version)
+        )
         if material is None:
-            raise RuntimeError(f"Encryption material version {version} is not available")
+            raise RuntimeError(
+                f"Encryption material version {version} is not available"
+            )
         return decrypt_with_key_material(row.encrypted_value, material.key_material)
 
     # -------------------------------------------------------------------------
@@ -186,7 +198,9 @@ class AccessKeySerializer:
         table = self.resolve_table(normalized_provider)
         db_session = self.session_factory()
         try:
-            stmt = AccessKeyRepositoryQueries.active_for_provider(table, normalized_provider)
+            stmt = AccessKeyRepositoryQueries.active_for_provider(
+                table, normalized_provider
+            )
             row = db_session.execute(stmt).scalars().first()
             if row is None:
                 return None
@@ -209,4 +223,3 @@ class AccessKeySerializer:
         if normalized not in SUPPORTED_PROVIDERS:
             raise ValueError("Unsupported provider")
         return normalized  # type: ignore[return-value]
-

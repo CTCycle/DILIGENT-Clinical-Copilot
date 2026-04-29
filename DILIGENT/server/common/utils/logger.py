@@ -50,9 +50,9 @@ LOG_CONFIG: dict[str, Any] = {
             "propagate": False,
         },
         "httpx": {
-            "level": "INFO",               
-            "handlers": ["console", "file"], 
-            "propagate": False,            
+            "level": "INFO",
+            "handlers": ["console", "file"],
+            "propagate": False,
         },
     },
     "root": {
@@ -66,4 +66,3 @@ LOG_CONFIG: dict[str, Any] = {
 ###############################################################################
 logging.config.dictConfig(LOG_CONFIG)
 logger = logging.getLogger()
-

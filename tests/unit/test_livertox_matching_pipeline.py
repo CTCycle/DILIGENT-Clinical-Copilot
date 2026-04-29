@@ -84,7 +84,9 @@ def test_one_sided_name_fragment_is_not_joined_to_evidence() -> None:
     assert result.matched_name is None
 
 
-def test_small_typo_stays_ambiguous_when_multiple_authoritative_candidates_exist() -> None:
+def test_small_typo_stays_ambiguous_when_multiple_authoritative_candidates_exist() -> (
+    None
+):
     frame = pd.DataFrame(
         [
             {
@@ -266,7 +268,9 @@ def test_related_excerpt_is_used_when_matched_monograph_excerpt_is_missing() -> 
 
 
 def test_query_normalization_handles_brands_and_manufacturers() -> None:
-    assert normalize_drug_query_name("Levetiracetam Desitin 500 mg cpr") == "levetiracetam"
+    assert (
+        normalize_drug_query_name("Levetiracetam Desitin 500 mg cpr") == "levetiracetam"
+    )
     assert normalize_drug_query_name("Amlodipin axapharm cpr 5 mg") == "amlodipin"
     assert normalize_drug_query_name("Acido folico Streuli 5 mg cpr") == "acido folico"
     assert normalize_drug_query_name("Pantozol 20 mg cpr") == "pantoprazole"
@@ -322,7 +326,10 @@ def test_mapping_prefers_excerpt_row_for_duplicate_normalized_drug() -> None:
 def test_query_normalization_high_value_aliases_are_deterministic() -> None:
     assert normalize_drug_query_name("Co-amoxi 1g") == "amoxicillin clavulanate"
     assert normalize_drug_query_name("Bactrim") == "trimethoprim sulfamethoxazole"
-    assert normalize_drug_query_name("amoxicillin/clavulanate") == "amoxicillin clavulanate"
+    assert (
+        normalize_drug_query_name("amoxicillin/clavulanate")
+        == "amoxicillin clavulanate"
+    )
 
 
 def test_matcher_prefers_combo_for_bactrim_brand_disambiguation() -> None:
@@ -361,7 +368,10 @@ def test_matcher_prefers_combo_for_bactrim_brand_disambiguation() -> None:
     assert result.status == "matched"
     assert result.matched_name == "Trimethoprim-Sulfamethoxazole"
     assert result.reason in {"exact_canonical", "exact_alias_ranked", "exact_alias"}
-    assert not result.rejected_candidate_names or "Trimethoprim-Sulfamethoxazole" not in result.rejected_candidate_names
+    assert (
+        not result.rejected_candidate_names
+        or "Trimethoprim-Sulfamethoxazole" not in result.rejected_candidate_names
+    )
 
 
 def test_matcher_handles_source_backed_spelling_aliases() -> None:
@@ -419,7 +429,12 @@ def test_matcher_handles_source_backed_spelling_aliases() -> None:
     assert fluvastatina.reason in {"exact_alias", "normalized_exact"}
     assert co_amoxi.status == "matched"
     assert co_amoxi.matched_name == "Amoxicillin clavulanate"
-    assert co_amoxi.reason in {"exact_canonical", "exact_alias_ranked", "exact_alias", "normalized_exact"}
+    assert co_amoxi.reason in {
+        "exact_canonical",
+        "exact_alias_ranked",
+        "exact_alias",
+        "normalized_exact",
+    }
 
 
 def test_matcher_accepts_small_authoritative_name_misspellings() -> None:
@@ -519,7 +534,9 @@ def test_matcher_keeps_unsafe_multilingual_fallbacks_unresolved() -> None:
     matcher = LiverToxMatcher(frame, drugs_catalog_df=catalog)
 
     esomeprazolo = matcher.match_drug_names(["Esomeprazolo"])[0]
-    insulin = matcher.match_drug_names(["Insulina basal-bolus secondo schema interno"])[0]
+    insulin = matcher.match_drug_names(["Insulina basal-bolus secondo schema interno"])[
+        0
+    ]
 
     assert esomeprazolo.status in {"missing", "ambiguous"}
     assert esomeprazolo.matched_name != "Naproxen"
@@ -558,9 +575,7 @@ def test_known_italian_drug_aliases_normalize_before_matching() -> None:
     )
     matcher = LiverToxMatcher(frame)
 
-    results = matcher.match_drug_names(
-        ["Esomeprazolo", "Bromelina", "Cotrimossazolo"]
-    )
+    results = matcher.match_drug_names(["Esomeprazolo", "Bromelina", "Cotrimossazolo"])
 
     assert [item.status for item in results] == ["matched", "matched", "matched"]
     assert [item.matched_name for item in results] == [
@@ -647,7 +662,9 @@ def test_mapping_classifies_matched_no_excerpt_separately_from_missing_match() -
     matcher = LiverToxMatcher(frame)
 
     queries = ["Piperacillin-Tazobactam", "UnknownDrugZZ"]
-    mapping = matcher.build_drugs_to_excerpt_mapping(queries, matcher.match_drug_names(queries))
+    mapping = matcher.build_drugs_to_excerpt_mapping(
+        queries, matcher.match_drug_names(queries)
+    )
 
     no_excerpt = mapping[0]
     missing = mapping[1]

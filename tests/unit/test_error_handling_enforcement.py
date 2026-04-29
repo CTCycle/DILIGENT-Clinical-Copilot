@@ -14,7 +14,10 @@ from DILIGENT.server import app as server_app_module
 from DILIGENT.server.api import access_keys as access_keys_api
 from DILIGENT.server.api import data_inspection as data_inspection_api
 from DILIGENT.server.api import ollama as ollama_api
-from DILIGENT.server.api.error_handling import REQUEST_ID_HEADER, register_error_handling
+from DILIGENT.server.api.error_handling import (
+    REQUEST_ID_HEADER,
+    register_error_handling,
+)
 from DILIGENT.server.services.llm.providers import OllamaError
 from DILIGENT.server.services.jobs import JobManager
 from DILIGENT.server.services.research import brave as brave_module
@@ -48,8 +51,7 @@ def test_backend_httpx_asyncclient_calls_require_explicit_timeout() -> None:
                 violations.append(f"{path}:{node.lineno}")
 
     assert not violations, (
-        "All httpx.AsyncClient calls must include timeout:\n"
-        + "\n".join(violations)
+        "All httpx.AsyncClient calls must include timeout:\n" + "\n".join(violations)
     )
 
 
@@ -142,7 +144,9 @@ def test_access_key_endpoint_sanitizes_dependency_failure(monkeypatch) -> None:
     def fake_create_key(provider: str, access_key: str):
         raise RuntimeError("encryption material registry unavailable token=abc123")
 
-    monkeypatch.setattr(access_keys_api.service.serializer, "create_key", fake_create_key)
+    monkeypatch.setattr(
+        access_keys_api.service.serializer, "create_key", fake_create_key
+    )
 
     with TestClient(server_app_module.app, raise_server_exceptions=False) as client:
         response = client.post(
@@ -152,7 +156,9 @@ def test_access_key_endpoint_sanitizes_dependency_failure(monkeypatch) -> None:
 
     assert response.status_code == 503
     payload = response.json()
-    assert payload["detail"] == "Access key service is unavailable. Please retry shortly."
+    assert (
+        payload["detail"] == "Access key service is unavailable. Please retry shortly."
+    )
 
 
 # -----------------------------------------------------------------------------
