@@ -5,7 +5,7 @@ from datetime import date
 
 import pytest
 
-from DILIGENT.server.services.prompts import LIVERTOX_CLINICAL_USER_PROMPT
+from DILIGENT.server.services.clinical.prompts import LIVERTOX_CLINICAL_USER_PROMPT
 from DILIGENT.server.domain.clinical import (
     ClinicalLabEntry,
     ClinicalPipelineValidationError,
@@ -206,9 +206,7 @@ def test_render_matched_drug_section_contains_deterministic_rucam_summary() -> N
 
     rendered = consultation.render_matched_drug_section(entry)
 
-    assert "**Estimated RUCAM**: 6, probable, confidence moderate" in rendered
-    assert "**RUCAM component summary**:" in rendered
-    assert "**RUCAM limitations**:" in rendered
+    assert "**RUCAM**: Structured RUCAM score: 6 (probable)." in rendered
     assert "**Evidence match**: weak_alias_or_class_match" in rendered
     assert "Drug match is not a direct canonical match." in rendered
 
@@ -322,7 +320,7 @@ def test_finalize_patient_report_keeps_matched_drug_without_excerpt() -> None:
 
     assert report is not None
     assert "**Valium - LiverTox score D**" in report
-    assert "No local LiverTox excerpt is currently available" in report
+    assert "No matching LiverTox record available." in report
 
 
 def test_livertox_data_resolution_rejoins_component_match_to_original_regimen() -> None:
@@ -379,7 +377,7 @@ def test_unresolved_mentions_include_rucam_summary_when_available() -> None:
     assert section is not None
     assert "UnknownX" in section
     assert "No matching drug record found in the local knowledge base." in section
-    assert "RUCAM 3 (possible, confidence low)" in section
+    assert "Structured RUCAM score: 3 (possible)." in section
 
 
 def test_sanitize_renderable_body_removes_structured_dili_section() -> None:

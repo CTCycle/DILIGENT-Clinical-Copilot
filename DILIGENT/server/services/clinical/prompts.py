@@ -196,7 +196,9 @@ Keep every section quantitative, evidence-based, and tied to the supplied clinic
 - Translate and synthesize English source content into `{report_language}`; do not preserve English sentence structure in final prose.
 - Mixed-language output is forbidden except for drug names, source titles, or direct quoted terminology when necessary.
 - Integrate RUCAM directly into causality reasoning; do not create a standalone RUCAM subsection.
-- State clearly that RUCAM is often estimated due to incomplete clinical data, is initial decision support, and is not definitive on its own.
+- Do not invent RUCAM scores.
+- If RUCAM is unavailable, state that it was not calculated because criteria-level evidence was insufficient.
+- If RUCAM is source-reported from trusted evidence, use that value directly and do not recalculate.
 - Prioritize robust semantic content over probabilistic layout formatting whenever deterministic rendering is available upstream.
 - Do not force specific opening sentence wrappers, bolding, or rigid markdown ornamentation unless strictly required for clinical meaning.
 - Output only the narrative clinical assessment body; do not emit title lines, section headings (for example "Report"), or bibliography labels.
