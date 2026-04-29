@@ -22,7 +22,7 @@ Mario R.
 2026-03-14
 
 ### Retrieval Controls
-- Internal RAG: ON
+- Internal RAG: OFF
 - Web Search: OFF
 
 ### Anamnesis

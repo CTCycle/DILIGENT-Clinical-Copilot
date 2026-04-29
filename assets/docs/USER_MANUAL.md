@@ -1,6 +1,6 @@
 # DILIGENT Clinical Copilot User Manual
 
-Last updated: 2026-04-24
+Last updated: 2026-04-29
 
 This manual describes practical use of DILIGENT Clinical Copilot for clinical DILI assessment workflows.
 
@@ -120,3 +120,8 @@ release\tauri\build_with_tauri.bat
 - `assets/docs/ARCHITECTURE.md` for module boundaries and data flow.
 - `assets/docs/BACKGROUND_JOBS.md` for job behavior.
 - `assets/docs/RUNTIME_MODES.md` for local/desktop runtime modes.
+
+- Report output is formatted in-app; downloads remain raw Markdown (.md).
+- Copy action includes formatted HTML with plain-text fallback.
+- Expanded report opens a full-page reading view.
+- RUCAM may be unavailable when criteria-level evidence is insufficient; explicit trusted-source RUCAM scores are used directly when present.
