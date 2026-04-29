@@ -8,7 +8,7 @@ from DILIGENT.server.domain.keys import (
     AccessKeyDeleteResponse,
     AccessKeyResponse,
 )
-from DILIGENT.server.services.access_keys_service import AccessKeyService, ProviderName
+from DILIGENT.server.services.security.access_keys import AccessKeyService, ProviderName
 
 router = APIRouter(prefix="/access-keys", tags=["access-keys"])
 service = AccessKeyService()
@@ -88,4 +88,5 @@ def delete_access_key(
             detail="Access key not found",
         )
     return AccessKeyDeleteResponse()
+
 

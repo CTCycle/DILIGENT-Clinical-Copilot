@@ -23,8 +23,8 @@ from DILIGENT.server.domain.patient_timeline import PatientTimeline, PatientTime
 from DILIGENT.server.repositories.serialization.data import DataSerializer, DocumentSerializer
 from DILIGENT.server.repositories.vectors import LanceVectorDatabase
 from DILIGENT.server.services.clinical.timeline import PatientTimelineExtractor
-from DILIGENT.server.services.jobs import JobManager, job_manager
-from DILIGENT.server.services.inspection_runtime import (
+from DILIGENT.server.services.runtime.jobs import JobManager, job_manager
+from DILIGENT.server.services.inspection.runtime import (
     coerce_optional_str,
 )
 from DILIGENT.server.services.updater.embeddings import RagEmbeddingUpdater
@@ -1038,5 +1038,6 @@ class DataInspectionService:
         if payload is None:
             return False
         return self.jobs.cancel_job(job_id)
+
 
 
