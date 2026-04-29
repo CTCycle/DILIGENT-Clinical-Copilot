@@ -215,22 +215,6 @@
         </div>
       }
 
-      <div class="model-config-summary-actions">
-        @if (!draftConfig().useCloudServices && missingRequiredModels().length > 0) {
-          <button
-            class="btn btn-secondary"
-            type="button"
-            (click)="installRequiredModels(missingRequiredModels())"
-            [disabled]="isLoading() || isSaving() || appState.state().diliAgent.isPulling"
-          >
-            {{ appState.state().diliAgent.isPulling ? 'Installing...' : 'Install Required Models' }}
-          </button>
-        }
-        <button class="btn btn-primary" type="button" (click)="handleSaveConfiguration()" [disabled]="saveDisabled()">
-          {{ isSaving() ? 'Saving...' : 'Save Configuration' }}
-        </button>
-      </div>
-
       <section class="model-config-extra-row model-config-extra-row--side" [class.is-disabled]="isSaving() || isLoading()" [attr.aria-disabled]="isSaving() || isLoading()">
         <h2 class="modal-section-title">Extra Parameters</h2>
         <div class="model-config-extra-columns">
@@ -245,7 +229,6 @@
             ></app-provider-access-card>
           </div>
           <div class="model-config-extra-right">
-            <p class="model-config-extra-panel-title">Model Configuration</p>
             <div class="field">
               <label class="field-label" for="global-temperature-input">Temperature</label>
               <input
@@ -272,6 +255,22 @@
           </div>
         </div>
       </section>
+
+      <div class="model-config-summary-actions">
+        @if (!draftConfig().useCloudServices && missingRequiredModels().length > 0) {
+          <button
+            class="btn btn-secondary"
+            type="button"
+            (click)="installRequiredModels(missingRequiredModels())"
+            [disabled]="isLoading() || isSaving() || appState.state().diliAgent.isPulling"
+          >
+            {{ appState.state().diliAgent.isPulling ? 'Installing...' : 'Install Required Models' }}
+          </button>
+        }
+        <button class="btn btn-primary" type="button" (click)="handleSaveConfiguration()" [disabled]="saveDisabled()">
+          {{ isSaving() ? 'Saving...' : 'Save Configuration' }}
+        </button>
+      </div>
     </aside>
   </div>
   }
