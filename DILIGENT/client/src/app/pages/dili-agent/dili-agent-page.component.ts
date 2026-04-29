@@ -1,5 +1,5 @@
 import { CommonModule } from '@angular/common';
-import { Component, ElementRef, OnDestroy, ViewChild, effect, inject, signal } from '@angular/core';
+import { Component, ElementRef, HostListener, OnDestroy, ViewChild, computed, effect, inject, signal } from '@angular/core';
 import { FormsModule } from '@angular/forms';
 
 import { ModalShellComponent } from '../../components/modal-shell/modal-shell.component';
@@ -22,6 +22,7 @@ import {
   pollClinicalJobStatus,
   startClinicalJob,
 } from '../../core/services/clinical-api';
+import { MarkdownRendererService } from '../../core/services/markdown-renderer.service';
 
 const todayIso = new Date().toISOString().slice(0, 10);
 const DEFAULT_POLL_INTERVAL_MS = 1000;
@@ -40,11 +41,14 @@ export class DiliAgentPageComponent implements OnDestroy {
   @ViewChild('patientImageInput') private patientImageInput?: ElementRef<HTMLInputElement>;
 
   readonly stateService = inject(AppStateService);
+  private readonly markdownRenderer = inject(MarkdownRendererService);
 
   readonly isCancelling = signal(false);
   readonly isRunActionLocked = signal(false);
   readonly isMissingLabsModalOpen = signal(false);
   readonly todayIso = todayIso;
+  readonly finalReportMarkdown = computed(() => this.stateService.state().diliAgent.message ?? '');
+  readonly renderedReport = computed(() => this.markdownRenderer.render(this.finalReportMarkdown()));
 
   private poller: { stop: () => void } | null = null;
   private runActionLockTimer: ReturnType<typeof globalThis.setTimeout> | null = null;
@@ -364,14 +368,31 @@ export class DiliAgentPageComponent implements OnDestroy {
     });
   }
 
-  copyReport(): void {
-    const message = this.vm.message;
-    if (!message) return;
-    void navigator.clipboard.writeText(message);
+  async copyReport(): Promise<void> {
+    const rendered = this.renderedReport();
+    if (!rendered.text) {
+      return;
+    }
+    const clipboardItemCtor = (globalThis as { ClipboardItem?: typeof ClipboardItem }).ClipboardItem;
+    if (navigator.clipboard && clipboardItemCtor) {
+      const item = new clipboardItemCtor({
+        'text/html': new Blob([rendered.html], { type: 'text/html' }),
+        'text/plain': new Blob([rendered.text], { type: 'text/plain' }),
+      });
+      await navigator.clipboard.write([item]);
+      return;
+    }
+    if (navigator.clipboard) {
+      await navigator.clipboard.writeText(rendered.text);
+    }
   }
 
-  toggleExpand(): void {
+  toggleReportExpanded(): void {
     this.stateService.updateDiliAgent({ isExpanded: !this.vm.isExpanded });
+  }
+
+  collapseReport(): void {
+    this.stateService.updateDiliAgent({ isExpanded: false });
   }
 
   downloadReport(): void {
@@ -380,6 +401,13 @@ export class DiliAgentPageComponent implements OnDestroy {
     anchor.href = this.vm.exportUrl;
     anchor.download = REPORT_EXPORT_FILENAME;
     anchor.click();
+  }
+
+  @HostListener('document:keydown.escape')
+  onEscape(): void {
+    if (this.vm.isExpanded) {
+      this.collapseReport();
+    }
   }
 
   runOrStop(): void {
