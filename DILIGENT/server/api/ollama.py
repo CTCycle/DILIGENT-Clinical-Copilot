@@ -32,7 +32,6 @@ class OllamaEndpoint:
             description="If True, stream pull from Ollama. Endpoint returns only final status (no SSE).",
         ),
     ) -> ModelPullResponse:
-        self.service.client_factory = lambda: OllamaClient()
         return await self.service.pull_model(name=name, stream=stream)
 
     # -------------------------------------------------------------------------
@@ -49,22 +48,18 @@ class OllamaEndpoint:
             description="If True, stream pull from Ollama to expose incremental progress.",
         ),
     ) -> JobStartResponse:
-        self.service.client_factory = lambda: OllamaClient()
         return self.service.start_pull_job(name=name, stream=stream)
 
     # -------------------------------------------------------------------------
     def get_pull_job_status(self, job_id: str) -> JobStatusResponse:
-        self.service.client_factory = lambda: OllamaClient()
         return self.service.get_pull_job_status(job_id=job_id)
 
     # -------------------------------------------------------------------------
     def cancel_pull_job(self, job_id: str) -> JobCancelResponse:
-        self.service.client_factory = lambda: OllamaClient()
         return self.service.cancel_pull_job(job_id=job_id)
 
     # -------------------------------------------------------------------------
     async def list_available_models(self) -> ModelListResponse:
-        self.service.client_factory = lambda: OllamaClient()
         return await self.service.list_available_models()
 
     # -------------------------------------------------------------------------

@@ -1,12 +1,12 @@
 from __future__ import annotations
 
 from datetime import datetime
+from typing import Any
 
-from DILIGENT.server.api.model_config import ModelConfigEndpoint
-from DILIGENT.server.api.session import router as session_router
 from DILIGENT.server.api.session import service as clinical_service
 from DILIGENT.server.configurations.llm_configs import LLMRuntimeConfig
 from DILIGENT.server.domain.model_configs import ModelConfigSnapshot
+from DILIGENT.server.services.llm.model_config import ModelConfigService
 
 
 class InMemorySerializer:
@@ -16,7 +16,7 @@ class InMemorySerializer:
     def load_snapshot(self) -> ModelConfigSnapshot:
         return self.snapshot
 
-    def save_snapshot(self, **updates):  # type: ignore[no-untyped-def]
+    def save_snapshot(self, **updates: Any) -> ModelConfigSnapshot:
         data = self.snapshot.__dict__.copy()
         data.update(updates)
         self.snapshot = ModelConfigSnapshot(**data)
@@ -36,16 +36,16 @@ def test_model_config_roundtrip_preserves_cloud_selection() -> None:
             updated_at=datetime.now(),
         )
     )
-    endpoint = ModelConfigEndpoint(router=session_router, serializer=serializer)
+    service = ModelConfigService(serializer=serializer)
 
-    endpoint.serializer.save_snapshot(
+    service.serializer.save_snapshot(
         use_cloud_models=True,
         cloud_provider="openai",
         cloud_model="gpt-5.4-mini",
         clinical_model="gpt-oss:20b",
         text_extraction_model="qwen3:1.7b",
     )
-    snapshot = endpoint.serializer.load_snapshot()
+    snapshot = service.serializer.load_snapshot()
 
     assert snapshot.use_cloud_models is True
     assert snapshot.cloud_provider == "openai"

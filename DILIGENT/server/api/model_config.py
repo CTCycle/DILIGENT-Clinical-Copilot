@@ -5,7 +5,11 @@ from typing import Annotated
 from fastapi import APIRouter, Body, status
 from fastapi import Query
 
-from DILIGENT.server.domain.model_configs import ModelConfigStateResponse, ModelConfigUpdateRequest
+from DILIGENT.server.domain.model_configs import (
+    ModelConfigSnapshot,
+    ModelConfigStateResponse,
+    ModelConfigUpdateRequest,
+)
 from DILIGENT.server.services.llm.model_config import ModelConfigService
 
 router = APIRouter(prefix="/model-config", tags=["model-config"])
@@ -19,14 +23,12 @@ class ModelConfigEndpoint:
         *,
         router: APIRouter,
         service: ModelConfigService | None = None,
-        serializer=None,
     ) -> None:
         self.router = router
-        self.service = service or ModelConfigService(serializer=serializer)
-        self.serializer = self.service.serializer
+        self.service = service or ModelConfigService()
 
     # -------------------------------------------------------------------------
-    def ensure_defaults(self):
+    def ensure_defaults(self) -> ModelConfigSnapshot:
         return self.service.ensure_defaults()
 
     # -------------------------------------------------------------------------

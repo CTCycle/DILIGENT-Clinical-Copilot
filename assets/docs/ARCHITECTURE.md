@@ -1,6 +1,6 @@
 # DILIGENT Clinical Copilot Architecture
 
-Last updated: 2026-04-27
+Last updated: 2026-04-29
 
 ## 1. System Summary
 
@@ -89,6 +89,7 @@ Root/OpenAPI routes:
 - In packaged Tauri mode, `/` and `/{full_path:path}` serve SPA assets.
 
 Session and clinical:
+- `GET /api/health`
 - `POST /api/clinical`
 - `POST /api/clinical/jobs`
 - `GET /api/clinical/jobs/{job_id}`
@@ -134,18 +135,10 @@ Inspection:
 - `POST /api/inspection/livertox/jobs`
 - `GET /api/inspection/livertox/jobs/{job_id}`
 - `DELETE /api/inspection/livertox/jobs/{job_id}`
-- `GET /api/inspection/dili-priors`
-- `GET /api/inspection/dili-priors/update-config`
-- `GET /api/inspection/dili-priors/{drug_id}`
-- `POST /api/inspection/dili-priors/jobs`
-- `GET /api/inspection/dili-priors/jobs/{job_id}`
-- `DELETE /api/inspection/dili-priors/jobs/{job_id}`
-- `GET /api/inspection/drug-labels`
-- `GET /api/inspection/drug-labels/{drug_id}/sections`
-- `GET /api/inspection/drug-labels/update-config`
-- `POST /api/inspection/drug-labels/jobs`
-- `GET /api/inspection/drug-labels/jobs/{job_id}`
-- `DELETE /api/inspection/drug-labels/jobs/{job_id}`
+- `GET /api/inspection/text-normalization`
+- `GET /api/inspection/text-normalization/{category}`
+- `PUT /api/inspection/text-normalization/{category}`
+- `DELETE /api/inspection/text-normalization/{category}/{term}`
 - `GET /api/inspection/rag/update-config`
 - `GET /api/inspection/rag/documents`
 - `GET /api/inspection/rag/vector-store`

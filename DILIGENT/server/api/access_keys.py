@@ -12,7 +12,6 @@ from DILIGENT.server.services.security.access_keys import AccessKeyService, Prov
 
 router = APIRouter(prefix="/access-keys", tags=["access-keys"])
 service = AccessKeyService()
-serializer = service.serializer
 
 
 ###############################################################################

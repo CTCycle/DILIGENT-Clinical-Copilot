@@ -36,6 +36,10 @@ def _format_violation(path: Path, node: ast.AST, label: str) -> str:
     return f"{path.as_posix()}:{line} ({label})"
 
 
+def _is_top_level_import(tree: ast.Module, import_node: ast.Import | ast.ImportFrom) -> bool:
+    return import_node in tree.body
+
+
 def test_no_nested_local_python_functions() -> None:
     violations: list[str] = []
     for path in _iter_python_files(SERVER_ROOT):
@@ -127,3 +131,22 @@ def test_services_do_not_import_fastapi() -> None:
                 if module == "fastapi" or module.startswith("fastapi."):
                     violations.append(_format_violation(path, node, "fastapi import in services"))
     assert not violations, "FastAPI imports are forbidden under DILIGENT/server/services:\n" + "\n".join(violations)
+
+
+def test_backend_imports_are_top_level_only() -> None:
+    root = Path("DILIGENT/server")
+    violations: list[str] = []
+
+    for path in root.rglob("*.py"):
+        if "__pycache__" in path.parts:
+            continue
+
+        tree = ast.parse(path.read_text(encoding="utf-8"), filename=str(path))
+
+        for node in ast.walk(tree):
+            if not isinstance(node, (ast.Import, ast.ImportFrom)):
+                continue
+            if not _is_top_level_import(tree, node):
+                violations.append(f"{path.as_posix()}:{node.lineno}")
+
+    assert not violations, "Imports inside functions/classes are forbidden:\n" + "\n".join(violations)
