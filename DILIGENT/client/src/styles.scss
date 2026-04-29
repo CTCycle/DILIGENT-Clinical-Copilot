@@ -3767,8 +3767,24 @@ input[type="date"]::-webkit-calendar-picker-indicator:hover {
   }
 
   .inspection-table {
-    min-width: 640px;
+    min-width: 560px;
     table-layout: auto;
+  }
+
+  .inspection-table th,
+  .inspection-table td {
+    padding: 6px 6px;
+    font-size: 12px;
+  }
+
+  .inspection-table-sessions th:nth-child(5),
+  .inspection-table-sessions td:nth-child(5) {
+    display: none;
+  }
+
+  .inspection-actions-cell {
+    width: 96px;
+    gap: 2px;
   }
 
   .inspection-pager-actions {
