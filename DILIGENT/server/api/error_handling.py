@@ -7,17 +7,19 @@ import httpx
 from fastapi import FastAPI, Request, status
 from fastapi.exceptions import RequestValidationError
 from fastapi.responses import JSONResponse
-from starlette.middleware.base import BaseHTTPMiddleware
+from starlette.middleware.base import BaseHTTPMiddleware, RequestResponseEndpoint
+from starlette.responses import Response
 
+from DILIGENT.server.common.constants import (
+    DEPENDENCY_FAILURE_MESSAGE,
+    GENERIC_FAILURE_MESSAGE,
+    MISSING_RESOURCE_MESSAGE,
+    REQUEST_ID_HEADER,
+    TIMEOUT_FAILURE_MESSAGE,
+)
 from DILIGENT.server.common.utils.logger import logger
+from DILIGENT.server.domain.errors import ApiErrorResponse
 from DILIGENT.server.common.exceptions import ServiceError
-
-
-REQUEST_ID_HEADER = "X-Request-ID"
-GENERIC_FAILURE_MESSAGE = "Request could not be completed. Please retry."
-TIMEOUT_FAILURE_MESSAGE = "Request timed out. Please retry."
-DEPENDENCY_FAILURE_MESSAGE = "Service dependency unavailable. Please retry shortly."
-MISSING_RESOURCE_MESSAGE = "Required resource was not found."
 
 
 ###############################################################################
@@ -35,17 +37,21 @@ def build_error_payload(
     request_id: str,
     retryable: bool,
 ) -> dict[str, object]:
-    return {
-        "detail": detail,
-        "request_id": request_id,
-        "retryable": retryable,
-    }
+    return ApiErrorResponse(
+        detail=detail,
+        request_id=request_id,
+        retryable=retryable,
+    ).model_dump()
 
 
 ###############################################################################
 class RequestIdMiddleware(BaseHTTPMiddleware):
     # -------------------------------------------------------------------------
-    async def dispatch(self, request: Request, call_next):
+    async def dispatch(
+        self,
+        request: Request,
+        call_next: RequestResponseEndpoint,
+    ) -> Response:
         request.state.request_id = uuid.uuid4().hex[:12]
         response = await call_next(request)
         response.headers.setdefault(REQUEST_ID_HEADER, resolve_request_id(request))
@@ -64,11 +70,11 @@ def request_validation_error_handler(
         request.method,
         request.url.path,
     )
-    payload: dict[str, object] = {
-        "detail": exc.errors(),
-        "request_id": request_id,
-        "retryable": False,
-    }
+    payload = build_error_payload(
+        detail=exc.errors(),
+        request_id=request_id,
+        retryable=False,
+    )
     response = JSONResponse(
         status_code=status.HTTP_422_UNPROCESSABLE_CONTENT,
         content=payload,

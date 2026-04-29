@@ -142,7 +142,7 @@ def test_access_key_endpoint_sanitizes_dependency_failure(monkeypatch) -> None:
     def fake_create_key(provider: str, access_key: str):
         raise RuntimeError("encryption material registry unavailable token=abc123")
 
-    monkeypatch.setattr(access_keys_api.serializer, "create_key", fake_create_key)
+    monkeypatch.setattr(access_keys_api.service.serializer, "create_key", fake_create_key)
 
     with TestClient(server_app_module.app, raise_server_exceptions=False) as client:
         response = client.post(

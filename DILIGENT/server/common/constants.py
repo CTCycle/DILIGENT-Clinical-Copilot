@@ -39,6 +39,14 @@ OLLAMA_DEFAULT_HOST = "localhost"
 OLLAMA_DEFAULT_PORT = 11434
 OLLAMA_DEFAULT_SCHEME = "http"
 
+# [ERROR HANDLING]
+###############################################################################
+REQUEST_ID_HEADER = "X-Request-ID"
+GENERIC_FAILURE_MESSAGE = "Request could not be completed. Please retry."
+TIMEOUT_FAILURE_MESSAGE = "Request timed out. Please retry."
+DEPENDENCY_FAILURE_MESSAGE = "Service dependency unavailable. Please retry shortly."
+MISSING_RESOURCE_MESSAGE = "Required resource was not found."
+
 # [EXPORTS]
 ###############################################################################
 REPORT_EXPORT_DIRECTORY_PREFIX = "diligent_report_"
