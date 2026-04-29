@@ -186,47 +186,6 @@
         </section>
       }
 
-      <section class="model-config-extra-row" [class.is-disabled]="isSaving() || isLoading()" [attr.aria-disabled]="isSaving() || isLoading()">
-        <h2 class="modal-section-title">Extra Parameters</h2>
-        <div class="model-config-extra-columns">
-          <div class="model-config-extra-left">
-            <app-provider-access-card
-              variant="compact"
-              [label]="getProviderLabel('brave')"
-              hint="Brave Search API key"
-              [disabled]="isSaving() || isLoading()"
-              manageKeyAriaLabel="Manage Brave Search access keys"
-              (manageKeys)="openKeys('brave')"
-            ></app-provider-access-card>
-          </div>
-          <div class="model-config-extra-right">
-            <p class="model-config-extra-panel-title">Model Configuration</p>
-            <div class="field">
-              <label class="field-label" for="global-temperature-input">Temperature</label>
-              <input
-                id="global-temperature-input"
-                type="number"
-                min="0"
-                max="2"
-                step="0.01"
-                [ngModel]="draftConfig().temperature"
-                (ngModelChange)="setTemperature($event)"
-                [disabled]="isSaving() || isLoading()"
-                class="model-config-temperature-input"
-              />
-            </div>
-            <label class="field checkbox model-config-reasoning-field">
-              <input
-                type="checkbox"
-                [ngModel]="appState.state().diliAgent.settings.reasoning"
-                (ngModelChange)="handleReasoningChange($event)"
-                [disabled]="isSaving() || isLoading()"
-              />
-              <span class="field-label">Enable SDL/Reasoning</span>
-            </label>
-          </div>
-        </div>
-      </section>
     </div>
 
     <aside class="model-config-summary-panel">
@@ -271,6 +230,48 @@
           {{ isSaving() ? 'Saving...' : 'Save Configuration' }}
         </button>
       </div>
+
+      <section class="model-config-extra-row model-config-extra-row--side" [class.is-disabled]="isSaving() || isLoading()" [attr.aria-disabled]="isSaving() || isLoading()">
+        <h2 class="modal-section-title">Extra Parameters</h2>
+        <div class="model-config-extra-columns">
+          <div class="model-config-extra-left">
+            <app-provider-access-card
+              variant="compact"
+              [label]="getProviderLabel('brave')"
+              hint="Brave Search API key"
+              [disabled]="isSaving() || isLoading()"
+              manageKeyAriaLabel="Manage Brave Search access keys"
+              (manageKeys)="openKeys('brave')"
+            ></app-provider-access-card>
+          </div>
+          <div class="model-config-extra-right">
+            <p class="model-config-extra-panel-title">Model Configuration</p>
+            <div class="field">
+              <label class="field-label" for="global-temperature-input">Temperature</label>
+              <input
+                id="global-temperature-input"
+                type="number"
+                min="0"
+                max="2"
+                step="0.01"
+                [ngModel]="draftConfig().temperature"
+                (ngModelChange)="setTemperature($event)"
+                [disabled]="isSaving() || isLoading()"
+                class="model-config-temperature-input"
+              />
+            </div>
+            <label class="field checkbox model-config-reasoning-field">
+              <input
+                type="checkbox"
+                [ngModel]="appState.state().diliAgent.settings.reasoning"
+                (ngModelChange)="handleReasoningChange($event)"
+                [disabled]="isSaving() || isLoading()"
+              />
+              <span class="field-label">Enable SDL/Reasoning</span>
+            </label>
+          </div>
+        </div>
+      </section>
     </aside>
   </div>
   }
