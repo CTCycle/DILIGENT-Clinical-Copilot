@@ -355,17 +355,24 @@ def _build_rag_settings(data: dict[str, Any], defaults: LLMRuntimeDefaults) -> R
 
 
 def _build_external_data_settings(data: dict[str, Any], *, fallback_timeout: float) -> ExternalDataSettings:
-    default_llm_timeout = max(coerce_float(data.get("default_llm_timeout"), fallback_timeout), 1.0)
-    parser_timeout = max(coerce_float(data.get("parser_llm_timeout"), default_llm_timeout), 1.0)
-    disease_timeout = max(coerce_float(data.get("disease_llm_timeout"), parser_timeout), 1.0)
-    clinical_timeout = max(coerce_float(data.get("clinical_llm_timeout"), default_llm_timeout), 1.0)
-    livertox_timeout = max(coerce_float(data.get("livertox_llm_timeout"), default_llm_timeout), 1.0)
+    unified_llm_timeout = max(
+        coerce_float(
+            data.get("llm_timeout"),
+            coerce_float(data.get("default_llm_timeout"), fallback_timeout),
+        ),
+        1.0,
+    )
+    # Parser and clinical flows share one timeout budget by policy.
+    parser_timeout = unified_llm_timeout
+    disease_timeout = unified_llm_timeout
+    clinical_timeout = unified_llm_timeout
+    livertox_timeout = max(coerce_float(data.get("livertox_llm_timeout"), unified_llm_timeout), 1.0)
     brave_fast_max_results = coerce_positive_int(data.get("brave_fast_max_results"), 5)
     brave_thorough_max_results = coerce_positive_int(data.get("brave_thorough_max_results"), 10)
     if brave_thorough_max_results < brave_fast_max_results:
         brave_thorough_max_results = brave_fast_max_results
     return ExternalDataSettings(
-        default_llm_timeout=default_llm_timeout,
+        default_llm_timeout=unified_llm_timeout,
         parser_llm_timeout=parser_timeout,
         disease_llm_timeout=disease_timeout,
         clinical_llm_timeout=clinical_timeout,
