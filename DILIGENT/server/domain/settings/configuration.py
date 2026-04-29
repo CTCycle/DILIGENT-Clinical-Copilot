@@ -117,6 +117,16 @@ class LLMRuntimeDefaults(BaseModel):
     ollama_host_default: str
 
 
+class SessionPipelineSettings(BaseModel):
+    model_config = ConfigDict(frozen=True)
+    text_extraction_batch_size: int
+    text_extraction_max_concurrency: int
+    retrieval_batch_size: int
+    retrieval_max_concurrency: int
+    clinical_assessment_batch_size: int
+    clinical_assessment_max_concurrency: int
+
+
 class ServerSettings(BaseModel):
     model_config = ConfigDict(frozen=True)
     fastapi: FastAPISettings
@@ -126,4 +136,5 @@ class ServerSettings(BaseModel):
     rag: RagSettings
     external_data: ExternalDataSettings
     ingestion: IngestionSettings
+    session_pipeline: SessionPipelineSettings
     llm_defaults: LLMRuntimeDefaults

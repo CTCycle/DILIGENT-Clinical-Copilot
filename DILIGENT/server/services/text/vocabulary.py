@@ -27,6 +27,12 @@ EMPTY_SNAPSHOT = TextNormalizationSnapshot(
     rxnav_name_stopwords=frozenset(),
     trailing_temporal_tokens=frozenset(),
     query_aliases={},
+    drug_non_mentions=frozenset(),
+    drug_duration_words=frozenset(),
+    drug_weekday_words=frozenset(),
+    lab_marker_aliases={},
+    brand_combo_preferences={},
+    knowledge_source_references={},
 )
 
 
@@ -66,8 +72,14 @@ def get_text_normalization_snapshot() -> TextNormalizationSnapshot:
         "rxnav_unit_stopword": set(),
         "rxnav_name_stopword": set(),
         "trailing_temporal_token": set(),
+        "drug_non_mention": set(),
+        "drug_duration_word": set(),
+        "drug_weekday_word": set(),
     }
     query_aliases: dict[str, str] = {}
+    lab_marker_aliases: dict[str, str] = {}
+    brand_combo_preferences: dict[str, str] = {}
+    knowledge_source_references: dict[str, str] = {}
     for row in rows:
         term_norm = normalize_term(row.term)
         if not term_norm:
@@ -76,6 +88,21 @@ def get_text_normalization_snapshot() -> TextNormalizationSnapshot:
             replacement = normalize_term(row.replacement)
             if replacement:
                 query_aliases[term_norm] = replacement
+            continue
+        if row.category == "lab_marker_alias":
+            replacement = normalize_term(row.replacement)
+            if replacement:
+                lab_marker_aliases[term_norm] = replacement
+            continue
+        if row.category == "brand_combo_preference":
+            replacement = normalize_term(row.replacement)
+            if replacement:
+                brand_combo_preferences[term_norm] = replacement
+            continue
+        if row.category == "knowledge_source_reference":
+            replacement = (row.replacement or "").strip()
+            if replacement:
+                knowledge_source_references[term_norm] = replacement
             continue
         bucket = grouped.get(row.category)
         if bucket is not None:
@@ -104,6 +131,12 @@ def get_text_normalization_snapshot() -> TextNormalizationSnapshot:
         rxnav_name_stopwords=frozenset(rxnav_name_stopwords),
         trailing_temporal_tokens=frozenset(grouped["trailing_temporal_token"]),
         query_aliases=query_aliases,
+        drug_non_mentions=frozenset(grouped["drug_non_mention"]),
+        drug_duration_words=frozenset(grouped["drug_duration_word"]),
+        drug_weekday_words=frozenset(grouped["drug_weekday_word"]),
+        lab_marker_aliases=lab_marker_aliases,
+        brand_combo_preferences=brand_combo_preferences,
+        knowledge_source_references=knowledge_source_references,
     )
 
 

@@ -58,3 +58,27 @@ class StructuredOutputParser(Generic[T]):
         if payload is None:
             raise ValueError("No JSON object found in model output")
         return self.schema.model_validate(payload)
+
+
+def parse_json_object_strict(raw: str) -> dict[str, Any]:
+    text = (raw or "").strip()
+    if not text:
+        raise ValueError("empty_input")
+    if text.startswith("```"):
+        stripped = re.sub(r"^```(?:json)?\s*", "", text, count=1, flags=re.IGNORECASE)
+        stripped = re.sub(r"\s*```$", "", stripped, count=1)
+        text = stripped.strip()
+    decoder = json.JSONDecoder()
+    try:
+        parsed, end_index = decoder.raw_decode(text)
+    except json.JSONDecodeError as exc:
+        raise ValueError("invalid_json_object") from exc
+    if not isinstance(parsed, dict):
+        raise ValueError("top_level_object_required")
+    prefix = text[: text.find("{")].strip()
+    if prefix:
+        raise ValueError("leading_prose_not_allowed")
+    trailing = text[end_index:].strip()
+    if trailing:
+        raise ValueError("trailing_prose_not_allowed")
+    return parsed

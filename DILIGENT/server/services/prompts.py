@@ -152,7 +152,7 @@ DILI_RAG_QUERY_PROMPT = (
     "Clinical context: {clinical}"
 )
 
-LIVERTOX_REPORT_EXAMPLE = """
+LIVERTOX_REPORT_EXAMPLE_TEMPLATE = """
 # Example Report Structure
 The drug report MUST follow the structure below. Keep every heading even if no data is available.
 
@@ -161,7 +161,7 @@ The drug report MUST follow the structure below. Keep every heading even if no d
 **Report**
 Provide a concise, evidence-based DILI assessment based only on the supplied context.
 
-**Bibliography source**: LiverTox
+**Bibliography source**: {bibliography_source}
 
 """
 
@@ -248,7 +248,7 @@ LIVERTOX_CLINICAL_USER_PROMPT = """
 - Timeline interpretation note: {timeline_note}
 
 # Output Requirements
-Write a clinician-facing assessment (≤500 words) for this drug by **reproducing the template below exactly**. Do not rearrange, rename, or omit headings; when a heading lacks data, state "Not reported" immediately after it. Always end with "Bibliography source: LiverTox".
+Write a clinician-facing assessment (≤500 words) for this drug by **reproducing the template below exactly**. Do not rearrange, rename, or omit headings; when a heading lacks data, state "Not reported" immediately after it. Always end with "Bibliography source: {bibliography_source}".
 
 {example_block}
 

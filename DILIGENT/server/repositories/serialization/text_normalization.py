@@ -30,6 +30,15 @@ STRING_LIST_CATEGORIES = {
     "rxnav_unit_stopwords": "rxnav_unit_stopword",
     "rxnav_name_stopwords": "rxnav_name_stopword",
     "trailing_temporal_tokens": "trailing_temporal_token",
+    "drug_non_mentions": "drug_non_mention",
+    "drug_duration_words": "drug_duration_word",
+    "drug_weekday_words": "drug_weekday_word",
+}
+MAPPING_CATEGORIES = {
+    "query_aliases": "query_alias",
+    "lab_marker_aliases": "lab_marker_alias",
+    "brand_combo_preferences": "brand_combo_preference",
+    "knowledge_source_references": "knowledge_source_reference",
 }
 
 
@@ -83,23 +92,16 @@ class TextNormalizationVocabularySerializer:
                 values=(str(value) for value in values),
                 source="seed",
             )
-        aliases = payload.get("query_aliases", [])
-        if isinstance(aliases, list):
-            for row in aliases:
-                if not isinstance(row, dict):
-                    continue
-                term = self.clean_text(row.get("term"))
-                replacement = self.clean_text(row.get("replacement"))
-                if term is None or replacement is None:
-                    continue
-                self.upsert_term(
-                    db_session,
-                    category="query_alias",
-                    term=term,
-                    replacement=replacement,
-                    source="seed",
-                )
-                seeded += 1
+        for key, category in MAPPING_CATEGORIES.items():
+            rows = payload.get(key, [])
+            if not isinstance(rows, list):
+                continue
+            seeded += self.upsert_mapping_terms(
+                db_session,
+                category=category,
+                rows=rows,
+                source="seed",
+            )
         logger.info("Seeded text normalization vocabulary (%s entries checked)", seeded)
 
     def upsert_terms(
@@ -170,6 +172,71 @@ class TextNormalizationVocabularySerializer:
             existing.is_active = True
         if increment:
             existing.encounter_count = int(existing.encounter_count or 0) + 1
+
+    def list_terms(
+        self,
+        db_session: Session,
+        *,
+        category: str | None = None,
+    ) -> list[TextNormalizationTerm]:
+        query = select(TextNormalizationTerm)
+        if category:
+            query = query.where(TextNormalizationTerm.category == category)
+        return list(
+            db_session.execute(query.order_by(TextNormalizationTerm.category, TextNormalizationTerm.term_norm))
+            .scalars()
+            .all()
+        )
+
+    def set_term_active(
+        self,
+        db_session: Session,
+        *,
+        category: str,
+        term: str,
+        is_active: bool,
+    ) -> bool:
+        term_norm = normalize_term(term)
+        if not term_norm:
+            return False
+        existing = (
+            db_session.execute(
+                select(TextNormalizationTerm).where(
+                    TextNormalizationTerm.category == category,
+                    TextNormalizationTerm.term_norm == term_norm,
+                )
+            )
+            .scalars()
+            .first()
+        )
+        if existing is None:
+            return False
+        existing.is_active = bool(is_active)
+        return True
+
+    def upsert_mapping_terms(
+        self,
+        db_session: Session,
+        *,
+        category: str,
+        rows: Iterable[dict[str, Any]],
+        source: str,
+    ) -> int:
+        count = 0
+        for row in rows:
+            term = self.clean_text(row.get("term"))
+            replacement = self.clean_text(row.get("replacement"))
+            if term is None or replacement is None:
+                continue
+            self.upsert_term(
+                db_session,
+                category=category,
+                term=term,
+                replacement=replacement,
+                source=source,
+            )
+            count += 1
+        return count
 
     @staticmethod
     def clean_text(value: Any) -> str | None:

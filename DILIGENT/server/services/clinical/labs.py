@@ -20,6 +20,7 @@ from DILIGENT.server.domain.clinical.entities import (
 from DILIGENT.server.services.prompts import CLINICAL_LAB_EXTRACTION_PROMPT
 from DILIGENT.server.services.llm.client_runtime import ensure_runtime_client
 from DILIGENT.server.services.llm.providers import select_llm_provider
+from DILIGENT.server.services.text.vocabulary import get_text_normalization_snapshot
 
 
 ###############################################################################
@@ -39,6 +40,10 @@ MARKER_ALIASES: dict[str, tuple[str, ...]] = {
     "INR": ("inr",),
     "ALB": ("albumin", "alb"),
 }
+
+def normalize_lab_marker(marker_name: str, aliases: dict[str, str]) -> str:
+    normalized = (marker_name or "").strip().casefold()
+    return aliases.get(normalized, marker_name)
 
 ###############################################################################
 class ClinicalLabExtractor:
@@ -242,6 +247,7 @@ class ClinicalLabExtractor:
         text = (raw or "").strip().lower()
         if not text:
             return "UNKNOWN"
+        text = normalize_lab_marker(text, get_text_normalization_snapshot().lab_marker_aliases).lower()
         for canonical, aliases in MARKER_ALIASES.items():
             if text == canonical.lower():
                 return canonical
@@ -382,10 +388,11 @@ class ClinicalLabExtractor:
         self,
         payload: PatientData,
         *,
+        already_cleaned: bool = False,
         progress_callback: Callable[[float], None] | None = None,
     ) -> tuple[PatientLabTimeline, LiverInjuryOnsetContext | None]:
-        primary_labs_text = self.clean_text(payload.laboratory_analysis)
-        supplemental_anamnesis_text = self.clean_text(payload.anamnesis)
+        primary_labs_text = (payload.laboratory_analysis or "") if already_cleaned else self.clean_text(payload.laboratory_analysis)
+        supplemental_anamnesis_text = (payload.anamnesis or "") if already_cleaned else self.clean_text(payload.anamnesis)
         deterministic_entries: list[ClinicalLabEntry] = []
         timeline_entries: list[ClinicalLabEntry] = []
         onset_context: LiverInjuryOnsetContext | None = None
