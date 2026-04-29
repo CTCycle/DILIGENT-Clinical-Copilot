@@ -82,11 +82,19 @@ export class DiliAgentPageComponent implements OnDestroy {
   }
 
   handleFormChange<K extends keyof typeof this.vm.form>(key: K, value: (typeof this.vm.form)[K]): void {
+    const currentMessage = this.vm.message ?? '';
+    const shouldClearValidationMessage =
+      !this.vm.isRunning &&
+      !this.vm.isStarting &&
+      currentMessage.startsWith('[ERROR]') &&
+      currentMessage !== '[ERROR] Clinical analysis failed.';
+
     this.stateService.updateDiliAgent({
       form: {
         ...this.vm.form,
         [key]: value,
       },
+      ...(shouldClearValidationMessage ? { message: '' } : {}),
     });
   }
 

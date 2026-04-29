@@ -37,10 +37,8 @@
     "embedding_max_workers": 4
   },
   "external_data": {
+    "llm_timeout": 3600.0,
     "default_llm_timeout": 3600.0,
-    "parser_llm_timeout": 3600.0,
-    "disease_llm_timeout": 3600.0,
-    "clinical_llm_timeout": 3600.0,
     "livertox_llm_timeout": 3600.0,
     "ollama_server_start_timeout": 15.0,
     "livertox_archive": "livertox_NBK547852.tar.gz",

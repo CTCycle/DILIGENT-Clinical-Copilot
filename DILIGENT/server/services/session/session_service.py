@@ -74,9 +74,9 @@ from DILIGENT.server.services.session.session_shared import NarrativeBuilder, ru
 from DILIGENT.server.services.session_formatting_mixin import ClinicalSessionFormattingMixin
 from DILIGENT.server.services.text.normalization import normalize_drug_query_name
 
-drugs_parser = DrugsParser(timeout_s=server_settings.external_data.parser_llm_timeout)
-disease_extractor = DiseaseExtractor(timeout_s=server_settings.external_data.disease_llm_timeout)
-lab_extractor = ClinicalLabExtractor(timeout_s=server_settings.external_data.disease_llm_timeout)
+drugs_parser = DrugsParser(timeout_s=server_settings.external_data.default_llm_timeout)
+disease_extractor = DiseaseExtractor(timeout_s=server_settings.external_data.default_llm_timeout)
+lab_extractor = ClinicalLabExtractor(timeout_s=server_settings.external_data.default_llm_timeout)
 pattern_analyzer = HepatotoxicityPatternAnalyzer()
 rucam_estimator = RucamScoreEstimator()
 serializer = DataSerializer()
@@ -374,38 +374,69 @@ class ClinicalSessionService(ClinicalSessionFormattingMixin):
             end_value=48.0,
         )
         start_time = time.perf_counter()
-        try:
-            disease_context = await self.disease_extractor.extract_diseases_from_anamnesis(
-                anamnesis_text,
-                progress_callback=disease_progress_callback,
-            )
-            self.run_stop_check(stop_check)
-            elapsed = time.perf_counter() - start_time
-            logger.info("Anamnesis disease extraction required %.4f seconds", elapsed)
-            logger.info("Detected %s diseases from anamnesis", len(disease_context.entries))
-        except Exception as exc:
-            elapsed = time.perf_counter() - start_time
-            logger.warning(
-                (
-                    "Anamnesis disease extraction failed after %.4f seconds; "
-                    "continuing without structured disease timeline: %s"
-                ),
-                elapsed,
-                exc,
-            )
-            self.append_warning_issue(
-                issues,
-                code="anamnesis_disease_extraction_failed",
-                message=(
-                    "Disease extraction from anamnesis was unavailable; "
-                    "the analysis continued without structured disease timeline."
-                ),
-                field="anamnesis",
-            )
-            disease_context = PatientDiseaseContext(entries=[])
-        self.emit_progress(progress_callback, stage="anamnesis_disease_extraction", value=48.0)
-        self.run_stop_check(stop_check)
-        return disease_context
+        max_attempts = 2
+        backoff_seconds = 1.5
+        timeout_s = max(float(self.disease_extractor.timeout_s), 1.0)
+        for attempt in range(1, max_attempts + 1):
+            try:
+                disease_context = await asyncio.wait_for(
+                    self.disease_extractor.extract_diseases_from_anamnesis(
+                        anamnesis_text,
+                        progress_callback=disease_progress_callback,
+                    ),
+                    timeout=timeout_s,
+                )
+                self.run_stop_check(stop_check)
+                elapsed = time.perf_counter() - start_time
+                logger.info("Anamnesis disease extraction required %.4f seconds", elapsed)
+                logger.info("Detected %s diseases from anamnesis", len(disease_context.entries))
+                self.emit_progress(progress_callback, stage="anamnesis_disease_extraction", value=48.0)
+                self.run_stop_check(stop_check)
+                return disease_context
+            except TimeoutError as exc:
+                elapsed = time.perf_counter() - start_time
+                if attempt < max_attempts:
+                    logger.warning(
+                        (
+                            "Anamnesis disease extraction timed out after %.4fs "
+                            "(attempt %d/%d). Retrying in %.1fs."
+                        ),
+                        elapsed,
+                        attempt,
+                        max_attempts,
+                        backoff_seconds,
+                    )
+                    await asyncio.sleep(backoff_seconds)
+                    self.run_stop_check(stop_check)
+                    continue
+                raise RuntimeError(
+                    "Disease extraction timed out while waiting for Ollama. "
+                    "Please verify Ollama responsiveness and model readiness."
+                ) from exc
+            except Exception as exc:
+                elapsed = time.perf_counter() - start_time
+                logger.warning(
+                    (
+                        "Anamnesis disease extraction failed after %.4f seconds; "
+                        "continuing without structured disease timeline: %s"
+                    ),
+                    elapsed,
+                    exc,
+                )
+                self.append_warning_issue(
+                    issues,
+                    code="anamnesis_disease_extraction_failed",
+                    message=(
+                        "Disease extraction from anamnesis was unavailable; "
+                        "the analysis continued without structured disease timeline."
+                    ),
+                    field="anamnesis",
+                )
+                disease_context = PatientDiseaseContext(entries=[])
+                self.emit_progress(progress_callback, stage="anamnesis_disease_extraction", value=48.0)
+                self.run_stop_check(stop_check)
+                return disease_context
+        return PatientDiseaseContext(entries=[])
 
     # -------------------------------------------------------------------------
     async def extract_lab_timeline(

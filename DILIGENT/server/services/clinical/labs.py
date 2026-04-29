@@ -54,7 +54,7 @@ class ClinicalLabExtractor:
         *,
         client: Any | None = None,
         temperature: float = 0.0,
-        timeout_s: float = server_settings.external_data.disease_llm_timeout,
+        timeout_s: float = server_settings.external_data.default_llm_timeout,
     ) -> None:
         self.temperature = float(temperature)
         self.timeout_s = float(timeout_s)
@@ -384,6 +384,85 @@ class ClinicalLabExtractor:
         return min(8.0, 0.75 * (2 ** (normalized_attempt - 1)))
 
     # -------------------------------------------------------------------------
+    @staticmethod
+    def has_explicit_lab_signal(text: str) -> bool:
+        lowered = (text or "").casefold()
+        if not lowered:
+            return False
+        marker_tokens = (
+            "alat",
+            "alt",
+            "asat",
+            "ast",
+            "ggt",
+            "alp",
+            "bilirubina",
+            "bilirubin",
+            "inr",
+            "albumina",
+            "albumin",
+        )
+        unit_tokens = ("u/l", "ui/l", "micromol", "µmol", "mg/dl", "g/l")
+        has_marker = any(token in lowered for token in marker_tokens)
+        has_unit = any(token in lowered for token in unit_tokens)
+        has_number = NUMERIC_RE.search(lowered) is not None
+        return has_marker and has_number and has_unit
+
+    # -------------------------------------------------------------------------
+    async def llm_extract_chunk(
+        self,
+        *,
+        chunk: str,
+        chunk_index: int,
+        total_chunks: int,
+        reinforced: bool,
+    ) -> LabExtractionPayload:
+        user_prompt = (
+            "Extract longitudinal liver-related labs and onset clues from this clinical chunk.\n"
+            f"[Chunk {chunk_index}/{total_chunks}]\n{chunk}"
+        )
+        if reinforced:
+            user_prompt = (
+                f"{user_prompt}\n\n"
+                "Important: this chunk contains explicit lab values. "
+                "Extract every liver-related marker/value pair found (e.g., ALAT/ALT, ASAT/AST, GGT, ALP, "
+                "bilirubina totale/diretta), preserving unit text and available dates."
+            )
+        parsed: LabExtractionPayload | None = None
+        for attempt in range(1, self.extraction_retry_attempts + 1):
+            try:
+                parsed = await self.client.llm_structured_call(
+                    model=self.model,
+                    system_prompt=CLINICAL_LAB_EXTRACTION_PROMPT.strip(),
+                    user_prompt=user_prompt,
+                    schema=LabExtractionPayload,
+                    temperature=self.temperature,
+                    use_json_mode=True,
+                    max_repair_attempts=2,
+                )
+                break
+            except Exception as exc:
+                if attempt >= self.extraction_retry_attempts:
+                    raise
+                delay = self.retry_backoff_seconds(attempt, exc=exc)
+                logger.warning(
+                    (
+                        "Retrying clinical lab extraction for chunk %d/%d "
+                        "(attempt %d/%d, delay %.2fs): %s"
+                    ),
+                    chunk_index,
+                    total_chunks,
+                    attempt,
+                    self.extraction_retry_attempts,
+                    delay,
+                    exc,
+                )
+                await asyncio.sleep(delay)
+        if parsed is None:
+            raise RuntimeError("Failed to extract clinical labs from chunk")
+        return parsed
+
+    # -------------------------------------------------------------------------
     async def extract_from_payload(
         self,
         payload: PatientData,
@@ -427,61 +506,60 @@ class ClinicalLabExtractor:
                 llm_onset: LiverInjuryOnsetContext | None = None
                 llm_unavailable = False
                 for index, chunk in enumerate(chunks, start=1):
-                    user_prompt = (
-                        "Extract longitudinal liver-related labs and onset clues from this clinical chunk.\n"
-                        f"[Chunk {index}/{len(chunks)}]\n{chunk}"
-                    )
-                    parsed: LabExtractionPayload | None = None
-                    for attempt in range(1, self.extraction_retry_attempts + 1):
-                        try:
-                            parsed = await self.client.llm_structured_call(
-                                model=self.model,
-                                system_prompt=CLINICAL_LAB_EXTRACTION_PROMPT.strip(),
-                                user_prompt=user_prompt,
-                                schema=LabExtractionPayload,
-                                temperature=self.temperature,
-                                use_json_mode=True,
-                                max_repair_attempts=2,
-                            )
-                            break
-                        except Exception as exc:
-                            if attempt >= self.extraction_retry_attempts:
-                                logger.warning(
-                                    (
-                                        "Clinical lab extraction unavailable for chunk %d/%d "
-                                        "after %d attempts; using deterministic parser output only: %s"
-                                    ),
-                                    index,
-                                    len(chunks),
-                                    self.extraction_retry_attempts,
-                                    exc,
-                                )
-                                parsed = LabExtractionPayload(entries=[], onset_context=None)
-                                llm_unavailable = True
-                                break
-                            delay = self.retry_backoff_seconds(attempt, exc=exc)
-                            logger.warning(
-                                (
-                                "Retrying clinical lab extraction for chunk %d/%d "
-                                "(attempt %d/%d, delay %.2fs): %s"
+                    try:
+                        parsed = await self.llm_extract_chunk(
+                            chunk=chunk,
+                            chunk_index=index,
+                            total_chunks=len(chunks),
+                            reinforced=False,
+                        )
+                    except Exception as exc:
+                        logger.warning(
+                            (
+                                "Clinical lab extraction unavailable for chunk %d/%d "
+                                "after %d attempts; using deterministic parser output only: %s"
                             ),
-                                index,
-                                len(chunks),
-                                attempt,
-                                self.extraction_retry_attempts,
-                                delay,
-                                exc,
-                            )
-                            await asyncio.sleep(delay)
-                    if parsed is None:
+                            index,
+                            len(chunks),
+                            self.extraction_retry_attempts,
+                            exc,
+                        )
                         parsed = LabExtractionPayload(entries=[], onset_context=None)
                         llm_unavailable = True
+
+                    # If the first LLM pass returns empty despite clear lab cues, retry once
+                    # with a reinforced instruction before accepting an empty chunk.
+                    if (
+                        not parsed.entries
+                        and self.has_explicit_lab_signal(chunk)
+                    ):
+                        try:
+                            reinforced = await self.llm_extract_chunk(
+                                chunk=chunk,
+                                chunk_index=index,
+                                total_chunks=len(chunks),
+                                reinforced=True,
+                            )
+                            if reinforced.entries:
+                                parsed = reinforced
+                        except Exception as exc:
+                            logger.warning(
+                                "Reinforced clinical lab extraction failed for chunk %d/%d: %s",
+                                index,
+                                len(chunks),
+                                exc,
+                            )
+
                     llm_entries.extend(parsed.entries)
                     if llm_onset is None and parsed.onset_context is not None:
                         llm_onset = parsed.onset_context
                     self.emit_progress(progress_callback, 0.2 + ((index / max(len(chunks), 1)) * 0.5))
                 timeline_entries.extend(llm_entries)
-                if llm_unavailable:
+                if llm_unavailable or (not llm_entries and deterministic_entries):
+                    if not llm_entries and deterministic_entries:
+                        logger.warning(
+                            "LLM lab extraction returned no entries despite detectable lab markers; using deterministic lab parser output."
+                        )
                     timeline_entries.extend(deterministic_entries)
                 onset_context = llm_onset
             except Exception as exc:

@@ -50,6 +50,37 @@ const uiHost = resolveArg('--host', env.UI_HOST || defaults.UI_HOST);
 const uiPort = Number.parseInt(resolveArg('--port', env.UI_PORT || defaults.UI_PORT), 10);
 const apiHost = env.FASTAPI_HOST || defaults.FASTAPI_HOST;
 const apiPort = Number.parseInt(env.FASTAPI_PORT || defaults.FASTAPI_PORT, 10);
+const fallbackApiPort = defaults.FASTAPI_PORT;
+
+function forwardApiRequest({ req, res, port, allowFallback }) {
+  const upstream = request(
+    {
+      host: apiHost,
+      port,
+      path: req.url,
+      method: req.method,
+      headers: req.headers,
+    },
+    (upstreamRes) => {
+      res.writeHead(upstreamRes.statusCode || 502, upstreamRes.headers);
+      upstreamRes.pipe(res);
+    },
+  );
+  upstream.on('error', () => {
+    if (allowFallback && String(port) !== String(fallbackApiPort)) {
+      forwardApiRequest({
+        req,
+        res,
+        port: fallbackApiPort,
+        allowFallback: false,
+      });
+      return;
+    }
+    res.statusCode = 502;
+    res.end('Bad Gateway');
+  });
+  req.pipe(upstream);
+}
 
 const mime = {
   '.html': 'text/html; charset=utf-8',
@@ -74,24 +105,12 @@ const server = createServer((req, res) => {
   }
 
   if (req.url.startsWith('/api')) {
-    const upstream = request(
-      {
-        host: apiHost,
-        port: apiPort,
-        path: req.url,
-        method: req.method,
-        headers: req.headers,
-      },
-      (upstreamRes) => {
-        res.writeHead(upstreamRes.statusCode || 502, upstreamRes.headers);
-        upstreamRes.pipe(res);
-      },
-    );
-    upstream.on('error', () => {
-      res.statusCode = 502;
-      res.end('Bad Gateway');
+    forwardApiRequest({
+      req,
+      res,
+      port: apiPort,
+      allowFallback: true,
     });
-    req.pipe(upstream);
     return;
   }
 

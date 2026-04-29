@@ -118,7 +118,7 @@ class JobManager:
             state.update(stop_requested=True, status="cancelled", completed_at=monotonic())
             logger.info("Cancelled pending job %s", job_id)
             return True
-        state.update(stop_requested=True)
+        state.update(stop_requested=True, status="cancelled", completed_at=monotonic())
         logger.info("Cancellation requested for job %s", job_id)
         return True
 
