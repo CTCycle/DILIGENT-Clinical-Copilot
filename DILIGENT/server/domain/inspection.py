@@ -285,3 +285,22 @@ class RagUpdateJobSummary(BaseModel):
     documents: int = 0
     chunks: int = 0
     backend: str = "local"
+
+
+class TextNormalizationTermResponse(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+    id: int
+    category: str
+    term: str
+    replacement: str | None = None
+    source: str
+    encounter_count: int
+    is_active: bool
+
+
+class TextNormalizationTermUpsertRequest(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+    term: str
+    replacement: str | None = None
+    source: str = "runtime"
+    is_active: bool = True

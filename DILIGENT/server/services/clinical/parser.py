@@ -21,6 +21,7 @@ from DILIGENT.server.configurations.startup import server_settings
 from DILIGENT.server.configurations.llm_configs import LLMRuntimeConfig
 from DILIGENT.server.services.text.normalization import normalize_token
 from DILIGENT.server.common.utils.logger import logger
+from DILIGENT.server.services.text.vocabulary import get_text_normalization_snapshot
 from DILIGENT.server.common.utils.patterns import (
     DRUG_BRACKET_TRAIL_RE,
     DRUG_BULLET_RE,
@@ -270,9 +271,10 @@ class DrugsParser:
         self,
         text: str | None,
         *,
+        already_cleaned: bool = False,
         progress_callback: Callable[[float], None] | None = None,
     ) -> PatientDrugs:
-        cleaned = text or ""
+        cleaned = (text or "") if already_cleaned else self.clean_text(text)
         if not cleaned:
             return PatientDrugs(entries=[])
         lines = [
@@ -485,6 +487,7 @@ class DrugsParser:
         self,
         anamnesis: str | None,
         *,
+        already_cleaned: bool = False,
         progress_callback: Callable[[float], None] | None = None,
     ) -> PatientDrugs:
         """
@@ -501,7 +504,7 @@ class DrugsParser:
         if self.client is None:
             raise RuntimeError(self.LLM_CLIENT_NOT_INITIALIZED_ERROR)
 
-        cleaned_anamnesis = self.clean_text(anamnesis)
+        cleaned_anamnesis = (anamnesis or "") if already_cleaned else self.clean_text(anamnesis)
         chunks = self.chunk_anamnesis_text(cleaned_anamnesis)
         self.emit_progress(progress_callback, 0.0)
         parsed_entries: list[DrugEntry] = []
@@ -886,16 +889,22 @@ class DrugsParser:
     # -------------------------------------------------------------------------
     def is_non_drug_fragment_name(self, value: str) -> bool:
         normalized = self.normalize_filter_key(value)
+        snapshot = get_text_normalization_snapshot()
+        non_drug_exact = set(self.NON_DRUG_EXACT_NAMES) | set(snapshot.drug_non_mentions)
+        weekday_tokens = set(self.WEEKDAY_TOKENS) | set(snapshot.drug_weekday_words)
+        duration_words = set(snapshot.drug_duration_words)
         if not normalized:
             return True
-        if normalized in self.NON_DRUG_EXACT_NAMES:
+        if normalized in non_drug_exact:
             return True
         if any(normalized.startswith(prefix) for prefix in self.NON_DRUG_PREFIXES):
             return True
         if any(fragment in normalized for fragment in self.NON_DRUG_CONTAINS):
             return True
         tokens = normalized.split()
-        if tokens and all(token in self.WEEKDAY_TOKENS for token in tokens):
+        if tokens and all(token.isdigit() or token in duration_words for token in tokens):
+            return True
+        if tokens and all(token in weekday_tokens for token in tokens):
             return True
         return False
 

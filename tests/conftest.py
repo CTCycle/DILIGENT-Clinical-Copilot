@@ -5,7 +5,6 @@ Provides fixtures for Playwright page objects and API client.
 import os
 
 import pytest
-from playwright.sync_api import Page
 
 
 def _normalize_host_for_url(host: str) -> str:

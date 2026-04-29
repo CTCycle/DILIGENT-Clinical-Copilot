@@ -26,6 +26,7 @@ from DILIGENT.server.domain.settings.configuration import (
     JobsSettings,
     LLMRuntimeDefaults,
     RagSettings,
+    SessionPipelineSettings,
     ServerSettings,
 )
 
@@ -376,6 +377,27 @@ def _build_ingestion_settings(data: dict[str, Any]) -> IngestionSettings:
     )
 
 
+def _build_session_pipeline_settings(data: dict[str, Any]) -> SessionPipelineSettings:
+    payload = ensure_mapping(data)
+    return SessionPipelineSettings(
+        text_extraction_batch_size=coerce_positive_int(payload.get("text_extraction_batch_size"), 4),
+        text_extraction_max_concurrency=min(
+            coerce_positive_int(payload.get("text_extraction_max_concurrency"), 2),
+            4,
+        ),
+        retrieval_batch_size=coerce_positive_int(payload.get("retrieval_batch_size"), 8),
+        retrieval_max_concurrency=min(
+            coerce_positive_int(payload.get("retrieval_max_concurrency"), 4),
+            8,
+        ),
+        clinical_assessment_batch_size=coerce_positive_int(payload.get("clinical_assessment_batch_size"), 2),
+        clinical_assessment_max_concurrency=min(
+            coerce_positive_int(payload.get("clinical_assessment_max_concurrency"), 2),
+            4,
+        ),
+    )
+
+
 def build_settings_payload_from_json(config: dict[str, Any], env: EnvironmentSnapshot) -> dict[str, Any]:
     payload = ensure_mapping(config)
     llm_defaults = _default_llm_runtime_defaults(env)
@@ -386,6 +408,7 @@ def build_settings_payload_from_json(config: dict[str, Any], env: EnvironmentSna
     rag_payload = ensure_mapping(payload.get("rag"))
     external_data_payload = ensure_mapping(payload.get("external_data"))
     ingestion_payload = ensure_mapping(payload.get("ingestion"))
+    session_pipeline_payload = ensure_mapping(payload.get("session_pipeline"))
     return {
         "fastapi": _build_fastapi_settings(fastapi_payload).model_dump(),
         "jobs": _build_jobs_settings(jobs_payload).model_dump(),
@@ -397,5 +420,6 @@ def build_settings_payload_from_json(config: dict[str, Any], env: EnvironmentSna
             fallback_timeout=30.0,
         ).model_dump(),
         "ingestion": _build_ingestion_settings(ingestion_payload).model_dump(),
+        "session_pipeline": _build_session_pipeline_settings(session_pipeline_payload).model_dump(),
         "llm_defaults": llm_defaults.model_dump(),
     }
