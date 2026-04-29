@@ -1,49 +1,68 @@
 <main class="page-container stitch-dili-page">
-  <header class="stitch-dili-heading">
-    <h1>Drug-Induced Liver Injury analysis</h1>
-  </header>
   <div class="stitch-dili-grid">
-    <div class="stitch-dili-main">
-      <section class="stitch-dili-card">
-        <div class="stitch-dili-input-stack">
-          <div class="stitch-dili-input-group">
-            <h3>Anamnesis</h3>
-            <textarea
-              id="anamnesis"
-              aria-label="Anamnesis"
-              placeholder="Describe patient history, symptoms onset, and clinical observations..."
-              [ngModel]="vm.form.anamnesis"
-              (ngModelChange)="handleFormChange('anamnesis', $event)"
-            ></textarea>
-          </div>
-
-          <div class="stitch-dili-input-group">
-            <h3>Current Drugs</h3>
-            <textarea
-              id="drugs"
-              aria-label="Current Drugs"
-              placeholder="List medications, dosages, frequency, and duration of use..."
-              [ngModel]="vm.form.drugs"
-              (ngModelChange)="handleFormChange('drugs', $event)"
-            ></textarea>
-          </div>
-
-          <div class="stitch-dili-input-group">
-            <h3>Laboratory Analysis</h3>
-            <textarea
-              id="laboratory-analysis"
-              aria-label="Laboratory Analysis"
-              placeholder="Input raw lab results (ALT, AST, ALP, Bilirubin, etc.)..."
-              [ngModel]="vm.form.laboratoryAnalysis"
-              (ngModelChange)="handleFormChange('laboratoryAnalysis', $event)"
-            ></textarea>
-          </div>
+    <section class="stitch-dili-main stitch-dili-workbench">
+      <div class="stitch-dili-input-grid">
+        <div class="stitch-dili-input-group stitch-dili-input-group--wide">
+          <h3>
+            <svg class="stitch-dili-label-icon" viewBox="0 0 24 24" aria-hidden="true">
+              <path
+                fill="currentColor"
+                d="M7 2.75A2.75 2.75 0 0 0 4.25 5.5v13A2.75 2.75 0 0 0 7 21.25h10A2.75 2.75 0 0 0 19.75 18.5v-8.9a2.75 2.75 0 0 0-.807-1.943l-4.6-4.6A2.75 2.75 0 0 0 12.4 2.75H7Zm5.05 1.5 4.45 4.45c.16.16.26.36.3.57H13A1.25 1.25 0 0 1 11.75 8V4.26c.12.02.23.06.3.12ZM7 4.25h3.25V8A2.75 2.75 0 0 0 13 10.75h3.75v7.75A1.25 1.25 0 0 1 15.5 19.75H7a1.25 1.25 0 0 1-1.25-1.25v-13A1.25 1.25 0 0 1 7 4.25Z"
+              />
+            </svg>
+            Anamnesis
+          </h3>
+          <textarea
+            id="anamnesis"
+            aria-label="Anamnesis"
+            placeholder="Describe patient history, symptoms onset, and clinical observations..."
+            [ngModel]="vm.form.anamnesis"
+            (ngModelChange)="handleFormChange('anamnesis', $event)"
+          ></textarea>
         </div>
-      </section>
-    </div>
+
+        <div class="stitch-dili-input-group">
+          <h3>
+            <svg class="stitch-dili-label-icon" viewBox="0 0 24 24" aria-hidden="true">
+              <path
+                fill="currentColor"
+                d="M7.5 4.5A4 4 0 0 0 4 8.5v7A4 4 0 0 0 8 19.5h8a4 4 0 0 0 4-4v-7a4 4 0 0 0-4-4h-8Zm0 1.5h8a2.5 2.5 0 0 1 2.5 2.5v7A2.5 2.5 0 0 1 15.5 18H8a2.5 2.5 0 0 1-2.5-2.5v-7A2.5 2.5 0 0 1 8 6h-.5Zm.5 3.25a.75.75 0 0 1 .75-.75h7a.75.75 0 0 1 0 1.5h-7a.75.75 0 0 1-.75-.75Zm2.25 2.5a.75.75 0 0 1 .75-.75h4a.75.75 0 0 1 0 1.5h-4a.75.75 0 0 1-.75-.75Z"
+              />
+            </svg>
+            Therapy
+          </h3>
+          <textarea
+            id="drugs"
+            aria-label="Therapy"
+            placeholder="List therapies, dosages, frequency, and duration of use..."
+            [ngModel]="vm.form.drugs"
+            (ngModelChange)="handleFormChange('drugs', $event)"
+          ></textarea>
+        </div>
+
+        <div class="stitch-dili-input-group">
+          <h3>
+            <svg class="stitch-dili-label-icon" viewBox="0 0 24 24" aria-hidden="true">
+              <path
+                fill="currentColor"
+                d="M8.12 3.5h7.76a1 1 0 0 1 .84 1.54l-1.02 1.55v4.61l3.05 5.42A3.25 3.25 0 0 1 15.94 21H8.06a3.25 3.25 0 0 1-2.81-4.88l3.05-5.42V6.59L7.28 5.04a1 1 0 0 1 .84-1.54Zm2.12 4.1V6.63L9.59 5h4.82l-.65 1.63v1.6h-3.52Zm-1.7 4.17-2.64 4.7a1.75 1.75 0 0 0 1.52 2.63h7.88a1.75 1.75 0 0 0 1.52-2.63l-2.64-4.7H8.54Zm.78 1.75h5.36a.75.75 0 0 1 0 1.5H9.32a.75.75 0 0 1 0-1.5Z"
+              />
+            </svg>
+            Laboratory Analysis
+          </h3>
+          <textarea
+            id="laboratory-analysis"
+            aria-label="Laboratory Analysis"
+            placeholder="Input raw lab results (ALT, AST, ALP, Bilirubin, etc.)..."
+            [ngModel]="vm.form.laboratoryAnalysis"
+            (ngModelChange)="handleFormChange('laboratoryAnalysis', $event)"
+          ></textarea>
+        </div>
+      </div>
+    </section>
 
     <aside class="stitch-dili-sidebar">
-      <section class="stitch-dili-card stitch-dili-patient">
+      <section class="stitch-dili-patient">
         <div class="stitch-dili-patient-top">
           <button
             type="button"
@@ -134,18 +153,17 @@
   </div>
 
   <section class="report-section stitch-dili-report">
-    <div class="report-shell">
-      <div class="report-header">
-        <p class="report-eyebrow">Report Output</p>
-      </div>
-
+    <div class="report-shell stitch-dili-report-shell" [class.is-full-page]="vm.isExpanded" [attr.aria-expanded]="vm.isExpanded">
       <div class="report-toolbar">
+        <p class="report-toolbar-label">DILI Assessment</p>
         <button class="toolbar-btn" type="button" (click)="copyReport()" [disabled]="!vm.exportUrl">
           Copy
         </button>
-        <button class="toolbar-btn" type="button" (click)="toggleExpand()" [disabled]="!vm.exportUrl">
-          {{ vm.isExpanded ? 'Collapse' : 'Expand' }}
-        </button>
+        @if (vm.isExpanded) {
+          <button class="toolbar-btn" type="button" (click)="collapseReport()" [disabled]="!vm.exportUrl">Collapse</button>
+        } @else {
+          <button class="toolbar-btn" type="button" (click)="toggleReportExpanded()" [disabled]="!vm.exportUrl">Expand</button>
+        }
         <button class="toolbar-btn" type="button" (click)="downloadReport()" [disabled]="!vm.exportUrl">
           Download markdown
         </button>
@@ -160,7 +178,7 @@
             </p>
           </div>
         } @else {
-          <pre class="inspection-excerpt-text">{{ reportBody }}</pre>
+          <article id="rendered-report-content" class="report-markdown inspection-excerpt-text" [innerHTML]="renderedReport().html"></article>
         }
       </div>
     </div>
