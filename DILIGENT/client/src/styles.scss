@@ -5000,7 +5000,10 @@ input[type="date"]::-webkit-calendar-picker-indicator:hover {
   gap: 18px;
   align-items: start;
   min-block-size: auto;
+  min-height: auto;
+  height: auto;
   flex: 0 0 auto;
+  padding-bottom: 0;
 }
 
 .model-config-page .model-config-main-column {
@@ -5117,6 +5120,13 @@ input[type="date"]::-webkit-calendar-picker-indicator:hover {
 .model-config-loading-state {
   padding: 12px 0;
   min-height: 0;
+}
+
+.model-config-page {
+  min-height: auto;
+  height: auto;
+  flex: 0 0 auto;
+  padding-bottom: 0;
 }
 
 @media (max-width: 1120px) {
