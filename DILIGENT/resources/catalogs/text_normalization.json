@@ -402,5 +402,55 @@
       "term": "xanax",
       "replacement": "alprazolam"
     }
+  ],
+  "drug_non_mentions": [
+    "in riserva",
+    "al bisogno",
+    "se necessario",
+    "dopo",
+    "paziente femmina",
+    "paziente maschio"
+  ],
+  "drug_duration_words": [
+    "giorni",
+    "settimane",
+    "mesi",
+    "days",
+    "weeks",
+    "months"
+  ],
+  "drug_weekday_words": [
+    "il",
+    "la",
+    "lunedi",
+    "martedi",
+    "mercoledi",
+    "giovedi",
+    "venerdi",
+    "sabato",
+    "domenica",
+    "monday",
+    "tuesday",
+    "wednesday",
+    "thursday",
+    "friday",
+    "saturday",
+    "sunday"
+  ],
+  "lab_marker_aliases": [
+    { "term": "alat", "replacement": "alt" },
+    { "term": "asat", "replacement": "ast" },
+    { "term": "got", "replacement": "ast" },
+    { "term": "gpt", "replacement": "alt" },
+    { "term": "alkp", "replacement": "alp" },
+    { "term": "gamma gt", "replacement": "ggt" }
+  ],
+  "brand_combo_preferences": [
+    { "term": "bactrim", "replacement": "trimethoprim sulfamethoxazole" },
+    { "term": "co amoxi", "replacement": "amoxicillin clavulanate" },
+    { "term": "coamoxi", "replacement": "amoxicillin clavulanate" }
+  ],
+  "knowledge_source_references": [
+    { "term": "livertox", "replacement": "LiverTox" }
   ]
 }

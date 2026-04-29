@@ -11,7 +11,6 @@ from DILIGENT.server.domain.clinical import (
     ClinicalPipelineValidationError,
     DrugEntry,
     DrugRucamAssessment,
-    HepatotoxicityPatternScore,
     LiverInjuryOnsetContext,
     PatientData,
     PatientDiseaseContext,

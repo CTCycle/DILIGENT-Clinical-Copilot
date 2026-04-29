@@ -83,11 +83,7 @@ class DrugsLookup:
     SPELLING_SHORT_MAX_DISTANCE = server_settings.drugs_matcher.spelling_short_max_distance
     SPELLING_LONG_MAX_DISTANCE = server_settings.drugs_matcher.spelling_long_max_distance
     REGIMEN_SPLIT_RE = re.compile(r"(?:\s*\+\s*|\s*/\s*|\s+\bplus\b\s+)", re.IGNORECASE)
-    BRAND_COMBO_PREFERENCES: dict[str, str] = {
-        "bactrim": "trimethoprim sulfamethoxazole",
-        "co amoxi": "amoxicillin clavulanate",
-        "coamoxi": "amoxicillin clavulanate",
-    }
+    BRAND_COMBO_PREFERENCES: dict[str, str] = {}
 
     # -------------------------------------------------------------------------
     def __init__(self) -> None:
@@ -460,7 +456,7 @@ class DrugsLookup:
                 list(dict.fromkeys(existing[2] + notes)),
             )
         ordered = list(merged.values())
-        ordered.sort(key=lambda item: (item[0].drug_name.casefold(), item[0].nbk_id.casefold()))
+        ordered.sort(key=lambda item: self.result_sort_key(item[0], item[1]))
         return ordered
 
     # -------------------------------------------------------------------------
@@ -485,7 +481,7 @@ class DrugsLookup:
                     combined = list(dict.fromkeys(existing[2] + notes))
                     merged[record_key] = (existing[0], existing[1], combined)
         ordered = list(merged.values())
-        ordered.sort(key=lambda item: (item[0].drug_name.casefold(), item[0].nbk_id.casefold()))
+        ordered.sort(key=lambda item: self.result_sort_key(item[0], item[1]))
         return ordered
 
     # -------------------------------------------------------------------------
@@ -548,8 +544,7 @@ class DrugsLookup:
 
     # -------------------------------------------------------------------------
     def record_identity_key(self, record: MonographRecord) -> str:
-        normalized_name = self.normalize_name(record.drug_name)
-        return f"{normalized_name}|{record.nbk_id}|{record.drug_name.casefold()}"
+        return record.stable_key
 
     # -------------------------------------------------------------------------
     def rank_stage_matches(
@@ -635,8 +630,9 @@ class DrugsLookup:
         normalized_query: str,
     ) -> str | None:
         normalized_raw = self.normalize_name(raw_name)
+        preferences = get_text_normalization_snapshot().brand_combo_preferences
         for candidate in (normalized_raw, normalized_query, self.normalize_name(canonical_query)):
-            preferred = self.BRAND_COMBO_PREFERENCES.get(candidate)
+            preferred = preferences.get(candidate) or self.BRAND_COMBO_PREFERENCES.get(candidate)
             if preferred is None:
                 continue
             normalized_preferred = self.normalize_name(preferred)
@@ -696,7 +692,7 @@ class DrugsLookup:
                             [f"{alias_type}='{alias_value}'", f"drug='{primary_name}'"],
                         )
         ordered = list(matches.values())
-        ordered.sort(key=lambda item: (item[0].drug_name.casefold(), item[0].nbk_id.casefold()))
+        ordered.sort(key=lambda item: self.result_sort_key(item[0], item[1]))
         return ordered
 
     # -------------------------------------------------------------------------
@@ -708,10 +704,12 @@ class DrugsLookup:
         matches: dict[str, tuple[MonographRecord, float, list[str]]] = {}
 
         direct = data.primary_index.get(normalized_query, [])
-        for record in direct:
+        for stable_key in direct:
+            record = data.records_by_stable_key[stable_key]
             matches[self.record_identity_key(record)] = (record, self.DIRECT_CONFIDENCE, [])
 
-        for record, original in data.synonym_index.get(normalized_query, []):
+        for stable_key, original in data.synonym_index.get(normalized_query, []):
+            record = data.records_by_stable_key[stable_key]
             matches[self.record_identity_key(record)] = (
                 record,
                 self.SYNONYM_CONFIDENCE,
@@ -729,7 +727,7 @@ class DrugsLookup:
                     )
 
         ordered = list(matches.values())
-        ordered.sort(key=lambda item: (item[0].drug_name.casefold(), item[0].nbk_id.casefold()))
+        ordered.sort(key=lambda item: self.result_sort_key(item[0], item[1]))
         return ordered
 
     # -------------------------------------------------------------------------
@@ -923,7 +921,7 @@ class DrugsLookup:
         records = data.primary_index.get(normalized_query, [])
         if not records:
             return None
-        record = records[0]
+        record = data.records_by_stable_key[records[0]]
         return record, self.DIRECT_CONFIDENCE, "monograph_name", []
 
     # -------------------------------------------------------------------------
@@ -962,7 +960,8 @@ class DrugsLookup:
         aliases = data.synonym_index.get(normalized_query, [])
         if not aliases:
             return None
-        record, original = aliases[0]
+        stable_key, original = aliases[0]
+        record = data.records_by_stable_key[stable_key]
         notes = [f"synonym='{original}'"]
         return record, self.SYNONYM_CONFIDENCE, "synonym_match", notes
 
@@ -981,9 +980,23 @@ class DrugsLookup:
         aliases = data.synonym_index.get(normalized_name, [])
         if not aliases:
             return None
-        record, original = aliases[0]
+        stable_key, original = aliases[0]
+        record = data.records_by_stable_key[stable_key]
         notes = [f"synonym='{original}'"]
         return record, self.SYNONYM_CONFIDENCE, "drug_synonym", notes
+
+    # -------------------------------------------------------------------------
+    def result_sort_key(
+        self,
+        record: MonographRecord,
+        confidence: float,
+    ) -> tuple[float, str, str, str]:
+        return (
+            -float(confidence),
+            record.drug_name.casefold(),
+            record.monograph_key or "",
+            record.stable_key,
+        )
 
     # -------------------------------------------------------------------------
     def prepare_catalog_synonyms(self) -> None:

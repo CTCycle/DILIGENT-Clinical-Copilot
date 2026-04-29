@@ -40,6 +40,15 @@ test = [
 [tool.hatch.build.targets.wheel]
 packages = ["DILIGENT"]
 
+[tool.ruff]
+exclude = [
+    "DILIGENT/client/src-tauri/target",
+    "**/__pycache__",
+]
+
+[tool.pytest.ini_options]
+testpaths = ["tests/unit"]
+
 
 
 

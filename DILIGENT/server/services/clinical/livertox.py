@@ -28,11 +28,13 @@ class LiverToxData:
             self.master_list_df = self.derive_master_alias_source(livertox_df)
         self.drugs_catalog_df = self._prepare_catalog_source(drugs_catalog_df)
         self.records: list[Any] = []
-        self.primary_index: dict[str, list[Any]] = {}
-        self.synonym_index: dict[str, list[tuple[Any, str]]] = {}
-        self.variant_catalog: list[tuple[str, Any, str, bool]] = []
-        self.token_occurrences: dict[str, list[Any]] = {}
-        self.token_index: dict[str, list[Any]] = {}
+        self.records_by_stable_key: dict[str, Any] = {}
+        self.monograph_key_index: dict[str, str] = {}
+        self.primary_index: dict[str, list[str]] = {}
+        self.synonym_index: dict[str, list[tuple[str, str]]] = {}
+        self.variant_catalog: list[tuple[str, str, str, bool]] = []
+        self.token_occurrences: dict[str, list[str]] = {}
+        self.token_index: dict[str, list[str]] = {}
         self.brand_index: dict[str, list[tuple[str, str]]] = {}
         self.ingredient_index: dict[str, list[tuple[str, str]]] = {}
         self.rows_by_name: dict[str, dict[str, Any]] = {}
@@ -44,25 +46,51 @@ class LiverToxData:
     def build_records(self) -> None:
         if self.livertox_df is None or self.livertox_df.empty:
             return
-        token_occurrences: dict[str, list[Any]] = {}
-        for row in self.livertox_df.itertuples(index=False):
-            raw_name = coerce_text(getattr(row, "drug_name", None))
+        token_occurrences: dict[str, list[str]] = {}
+        prepared_rows: list[dict[str, Any]] = []
+        for original_row_index, row in enumerate(self.livertox_df.to_dict(orient="records")):
+            raw_name = coerce_text(row.get("drug_name"))
             if raw_name is None:
                 continue
             normalized_name = self.lookup.normalize_name(raw_name)
             if not normalized_name:
                 continue
-            nbk_id = coerce_text(getattr(row, "nbk_id", None))
-            # Some local database snapshots can contain valid monographs while
-            # `nbk_id` is null for every row; keep deterministic synthetic IDs
-            # so matching remains available instead of failing globally.
-            if nbk_id is None:
-                nbk_id = f"synthetic::{normalized_name}"
-            excerpt = coerce_text(getattr(row, "excerpt", None))
-            synonyms_value = getattr(row, "synonyms", None)
+            prepared_rows.append(
+                {
+                    "raw_row": row,
+                    "raw_name": raw_name,
+                    "normalized_name": normalized_name,
+                    "original_row_index": original_row_index,
+                }
+            )
+        prepared_rows.sort(
+            key=lambda item: (
+                item["normalized_name"],
+                item["raw_name"].casefold(),
+                0 if coerce_text(item["raw_row"].get("excerpt")) else 1,
+                -self.coerce_int(item["raw_row"].get("reference_count")),
+                -self.coerce_int(item["raw_row"].get("year_approved")),
+                item["original_row_index"],
+            )
+        )
+        for row_index, prepared in enumerate(prepared_rows):
+            row = prepared["raw_row"]
+            raw_name = prepared["raw_name"]
+            normalized_name = prepared["normalized_name"]
+            monograph_key, stable_key = self.build_stable_livertox_row_key(
+                row=row,
+                normalized_drug_name=normalized_name,
+                row_index=row_index,
+            )
+            row["stable_key"] = stable_key
+            nbk_id = coerce_text(row.get("nbk_id"))
+            excerpt = coerce_text(row.get("excerpt"))
+            synonyms_value = row.get("synonyms")
             synonyms = self.lookup.parse_synonyms(synonyms_value)
             tokens = self.lookup.collect_tokens(raw_name, list(synonyms.values()))
             record = self.record_factory(
+                stable_key=stable_key,
+                monograph_key=monograph_key,
                 nbk_id=nbk_id,
                 drug_name=raw_name,
                 normalized_name=normalized_name,
@@ -71,40 +99,59 @@ class LiverToxData:
                 tokens=tokens,
             )
             self.records.append(record)
+            self.records_by_stable_key[stable_key] = record
+            if monograph_key:
+                self.monograph_key_index[monograph_key] = stable_key
             primary_bucket = self.primary_index.setdefault(normalized_name, [])
-            if all(existing.nbk_id != record.nbk_id for existing in primary_bucket):
-                primary_bucket.append(record)
+            if stable_key not in primary_bucket:
+                primary_bucket.append(stable_key)
             self.variant_catalog.append(
-                (normalized_name, record, record.drug_name, True)
+                (normalized_name, stable_key, record.drug_name, True)
             )
             for normalized_synonym, original in synonyms.items():
                 synonym_bucket = self.synonym_index.setdefault(normalized_synonym, [])
-                if all(existing[0].nbk_id != record.nbk_id for existing in synonym_bucket):
-                    synonym_bucket.append((record, original))
+                if all(existing[0] != stable_key for existing in synonym_bucket):
+                    synonym_bucket.append((stable_key, original))
                 self.variant_catalog.append(
-                    (normalized_synonym, record, original, False)
+                    (normalized_synonym, stable_key, original, False)
                 )
             for token in tokens:
                 bucket = token_occurrences.setdefault(token, [])
-                if record not in bucket:
-                    bucket.append(record)
-        self.records.sort(key=lambda record: record.drug_name.lower())
+                if stable_key not in bucket:
+                    bucket.append(stable_key)
+        self.records.sort(
+            key=lambda record: (
+                record.drug_name.casefold(),
+                record.monograph_key or "",
+                record.stable_key,
+            )
+        )
         for key, bucket in self.primary_index.items():
             self.primary_index[key] = sorted(
                 bucket,
-                key=lambda record: (record.drug_name.casefold(), record.nbk_id.casefold()),
+                key=lambda stable_key: (
+                    self.records_by_stable_key[stable_key].drug_name.casefold(),
+                    self.records_by_stable_key[stable_key].monograph_key or "",
+                    stable_key,
+                ),
             )
         for key, bucket in self.synonym_index.items():
             self.synonym_index[key] = sorted(
                 bucket,
                 key=lambda item: (
-                    item[0].drug_name.casefold(),
-                    item[0].nbk_id.casefold(),
+                    self.records_by_stable_key[item[0]].drug_name.casefold(),
+                    self.records_by_stable_key[item[0]].monograph_key or "",
+                    item[0],
                     item[1].casefold(),
                 ),
             )
         self.variant_catalog.sort(
-            key=lambda item: (item[0], item[1].drug_name.casefold(), item[1].nbk_id.casefold())
+            key=lambda item: (
+                item[0],
+                self.records_by_stable_key[item[1]].drug_name.casefold(),
+                self.records_by_stable_key[item[1]].monograph_key or "",
+                item[1],
+            )
         )
         self.token_occurrences = token_occurrences
 
@@ -150,14 +197,28 @@ class LiverToxData:
         if not self.token_occurrences:
             self.token_index = {}
             return
-        filtered: dict[str, list[Any]] = {}
+        filtered: dict[str, list[str]] = {}
         for token, records in self.token_occurrences.items():
             if len(records) > 3:
                 continue
             filtered[token] = sorted(
-                records, key=lambda record: record.drug_name.lower()
+                records,
+                key=lambda stable_key: self.records_by_stable_key[stable_key].drug_name.casefold(),
             )
         self.token_index = filtered
+
+    # -------------------------------------------------------------------------
+    def build_stable_livertox_row_key(
+        self,
+        *,
+        row: dict[str, Any],
+        normalized_drug_name: str,
+        row_index: int,
+    ) -> tuple[str | None, str]:
+        monograph_key = coerce_text(row.get("monograph_key"))
+        if monograph_key:
+            return monograph_key, monograph_key
+        return None, f"{normalized_drug_name}::{row_index}"
 
     # -------------------------------------------------------------------------
     def build_drugs_to_excerpt_mapping(
@@ -342,9 +403,10 @@ class LiverToxData:
     # -------------------------------------------------------------------------
     @staticmethod
     def row_tie_break_key(row: dict[str, Any]) -> tuple[str, str]:
-        nbk_id = (coerce_text(row.get("nbk_id")) or "~").casefold()
         drug_name = (coerce_text(row.get("drug_name")) or "~").casefold()
-        return nbk_id, drug_name
+        monograph_key = (coerce_text(row.get("monograph_key")) or "").casefold()
+        stable_key = (coerce_text(row.get("stable_key")) or "").casefold()
+        return drug_name, monograph_key, stable_key
 
     # -------------------------------------------------------------------------
     @staticmethod

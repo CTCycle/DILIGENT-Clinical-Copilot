@@ -195,7 +195,7 @@ def test_matcher_keeps_matching_when_nbk_id_is_missing() -> None:
 
     assert result.status == "matched"
     assert result.matched_name == "Diazepam"
-    assert result.nbk_id == "synthetic::diazepam"
+    assert result.nbk_id is None
 
 
 def test_repeated_nbk_ids_are_not_collapsed_across_monographs() -> None:

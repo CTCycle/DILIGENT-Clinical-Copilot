@@ -61,6 +61,14 @@
     "drug_name_max_length": 200,
     "drug_name_max_tokens": 8
   },
+  "session_pipeline": {
+    "text_extraction_batch_size": 4,
+    "text_extraction_max_concurrency": 2,
+    "retrieval_batch_size": 8,
+    "retrieval_max_concurrency": 4,
+    "clinical_assessment_batch_size": 2,
+    "clinical_assessment_max_concurrency": 2
+  },
   "clinical_language_detection": {
     "min_best_score": 2.0,
     "high_confidence_min_score": 8.0,

@@ -12,6 +12,8 @@ class AliasCacheEntry:
 
 @dataclass(slots=True)
 class MonographRecord:
+    stable_key: str
+    monograph_key: str | None
     nbk_id: str
     drug_name: str
     normalized_name: str

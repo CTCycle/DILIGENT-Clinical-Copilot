@@ -16,6 +16,12 @@ class TextNormalizationSnapshot:
     rxnav_name_stopwords: frozenset[str]
     trailing_temporal_tokens: frozenset[str]
     query_aliases: dict[str, str]
+    drug_non_mentions: frozenset[str]
+    drug_duration_words: frozenset[str]
+    drug_weekday_words: frozenset[str]
+    lab_marker_aliases: dict[str, str]
+    brand_combo_preferences: dict[str, str]
+    knowledge_source_references: dict[str, str]
 
     @property
     def rxnav_synonym_stopwords(self) -> frozenset[str]:

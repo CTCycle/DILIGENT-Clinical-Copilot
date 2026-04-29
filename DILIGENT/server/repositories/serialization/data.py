@@ -15,7 +15,7 @@ from xml.etree import ElementTree
 import pandas as pd
 from pypdf import PdfReader
 from sqlalchemy.engine import Engine
-from sqlalchemy import and_, case, delete, exists, func, inspect, or_, select, update
+from sqlalchemy import and_, delete, exists, func, inspect, or_, select, update
 from sqlalchemy.orm import Session, selectinload, sessionmaker
 
 from DILIGENT.server.configurations.startup import server_settings
@@ -1880,6 +1880,7 @@ class _RepositorySerializationService:
         rxnorm_rxcui: str | None,
         livertox_nbk_id: str | None,
         rxnav_last_update: str | None = None,
+        use_livertox_nbk_lookup: bool = True,
     ) -> Drug:
         candidate_by_rxcui = self.get_drug_by_rxcui(db_session, rxnorm_rxcui)
         candidate_by_name = self.get_drug_by_canonical_name_norm(
@@ -1902,7 +1903,7 @@ class _RepositorySerializationService:
                 canonical_name=canonical_name,
                 canonical_name_norm=canonical_name_norm,
                 rxnorm_rxcui=rxnorm_rxcui,
-                livertox_nbk_id=livertox_nbk_id,
+                livertox_nbk_id=livertox_nbk_id if use_livertox_nbk_lookup else None,
                 rxnav_last_update=self.normalize_date(rxnav_last_update),
             )
             db_session.add(candidate)
@@ -1922,11 +1923,12 @@ class _RepositorySerializationService:
             drug_id=int(candidate.id),
             rxcui=rxnorm_rxcui,
         )
-        self.try_assign_livertox_nbk_id(
-            db_session,
-            drug=candidate,
-            livertox_nbk_id=livertox_nbk_id or "",
-        )
+        if use_livertox_nbk_lookup:
+            self.try_assign_livertox_nbk_id(
+                db_session,
+                drug=candidate,
+                livertox_nbk_id=livertox_nbk_id or "",
+            )
         normalized_rxnav_last_update = self.normalize_date(rxnav_last_update)
         if normalized_rxnav_last_update is not None:
             candidate.rxnav_last_update = normalized_rxnav_last_update

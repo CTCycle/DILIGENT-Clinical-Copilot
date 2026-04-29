@@ -24,6 +24,8 @@ from DILIGENT.server.domain.inspection import (
     SessionReportResponse,
     SessionListFilters,
     SessionStatus,
+    TextNormalizationTermResponse,
+    TextNormalizationTermUpsertRequest,
 )
 from DILIGENT.server.domain.jobs import JobCancelResponse, JobStartResponse, JobStatusResponse
 from DILIGENT.server.domain.patient_timeline import (
@@ -398,6 +400,37 @@ class DataInspectionEndpoint:
     def cancel_rag_update_job(self, job_id: str) -> JobCancelResponse:
         return self.cancel_update_job(job_id=job_id, job_type=self.service.RAG_JOB_TYPE)
 
+    def list_text_normalization(self) -> list[TextNormalizationTermResponse]:
+        return [
+            TextNormalizationTermResponse(**row)
+            for row in self.service.list_text_normalization_terms()
+        ]
+
+    def list_text_normalization_category(self, category: str) -> list[TextNormalizationTermResponse]:
+        return [
+            TextNormalizationTermResponse(**row)
+            for row in self.service.list_text_normalization_terms(category=category)
+        ]
+
+    def upsert_text_normalization_category(
+        self,
+        category: str,
+        request: TextNormalizationTermUpsertRequest = Body(default=TextNormalizationTermUpsertRequest(term="")),
+    ) -> TextNormalizationTermResponse:
+        return TextNormalizationTermResponse(
+            **self.service.upsert_text_normalization_term(
+                category=category,
+                term=request.term,
+                replacement=request.replacement,
+                source=request.source,
+                is_active=request.is_active,
+            )
+        )
+
+    def delete_text_normalization_category_term(self, category: str, term: str) -> DeleteEntityResponse:
+        deleted = self.service.deactivate_text_normalization_term(category=category, term=term)
+        return DeleteEntityResponse(deleted=deleted)
+
     # -------------------------------------------------------------------------
     def add_routes(self) -> None:
         self.router.add_api_route(
@@ -533,6 +566,34 @@ class DataInspectionEndpoint:
             self.cancel_livertox_update_job,
             methods=["DELETE"],
             response_model=JobCancelResponse,
+            status_code=status.HTTP_200_OK,
+        )
+        self.router.add_api_route(
+            "/text-normalization",
+            self.list_text_normalization,
+            methods=["GET"],
+            response_model=list[TextNormalizationTermResponse],
+            status_code=status.HTTP_200_OK,
+        )
+        self.router.add_api_route(
+            "/text-normalization/{category}",
+            self.list_text_normalization_category,
+            methods=["GET"],
+            response_model=list[TextNormalizationTermResponse],
+            status_code=status.HTTP_200_OK,
+        )
+        self.router.add_api_route(
+            "/text-normalization/{category}",
+            self.upsert_text_normalization_category,
+            methods=["PUT"],
+            response_model=TextNormalizationTermResponse,
+            status_code=status.HTTP_200_OK,
+        )
+        self.router.add_api_route(
+            "/text-normalization/{category}/{term}",
+            self.delete_text_normalization_category_term,
+            methods=["DELETE"],
+            response_model=DeleteEntityResponse,
             status_code=status.HTTP_200_OK,
         )
         self.router.add_api_route(

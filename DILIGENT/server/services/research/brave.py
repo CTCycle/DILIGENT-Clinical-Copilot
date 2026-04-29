@@ -10,7 +10,6 @@ from urllib.parse import urlparse
 
 import httpx
 
-from DILIGENT.server.common.utils.logger import logger
 from DILIGENT.server.configurations.startup import server_settings
 from DILIGENT.server.domain.research.entities import (
     ResearchAnswerPayload,

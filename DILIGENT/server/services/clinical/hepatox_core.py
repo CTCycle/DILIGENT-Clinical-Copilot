@@ -13,7 +13,7 @@ from DILIGENT.server.services.prompts import (
     LIVERTOX_CONCLUSION_USER_PROMPT,
     LIVERTOX_CLINICAL_SYSTEM_PROMPT,
     LIVERTOX_CLINICAL_USER_PROMPT,
-    LIVERTOX_REPORT_EXAMPLE,
+    LIVERTOX_REPORT_EXAMPLE_TEMPLATE,
 )
 from DILIGENT.server.services.llm.providers import initialize_llm_client
 from DILIGENT.server.domain.clinical.entities import (
@@ -44,6 +44,7 @@ from DILIGENT.server.services.retrieval.embeddings import SimilaritySearch
 from DILIGENT.server.services.clinical.preparation import HepatoxPreparedInputs
 from DILIGENT.server.services.text.normalization import normalize_drug_query_name
 from DILIGENT.server.services.research.brave import brave_research_service
+from DILIGENT.server.services.text.vocabulary import get_text_normalization_snapshot
 
 
 ###############################################################################
@@ -1280,7 +1281,12 @@ class HepatoxConsultation:
             knowledge_prompt=self.escape_braces(knowledge_prompt),
             metadata_block=self.escape_braces(metadata_block),
             livertox_score=self.escape_braces(score),
-            example_block=self.escape_braces(LIVERTOX_REPORT_EXAMPLE),
+            bibliography_source=self.escape_braces(self.bibliography_source_label()),
+            example_block=self.escape_braces(
+                LIVERTOX_REPORT_EXAMPLE_TEMPLATE.format(
+                    bibliography_source=self.bibliography_source_label()
+                )
+            ),
         )
         messages = [
             {"role": "system", "content": LIVERTOX_CLINICAL_SYSTEM_PROMPT.strip()},
@@ -1471,7 +1477,7 @@ class HepatoxConsultation:
             f"**RUCAM limitations**: {limitations}\n\n"
             f"**Report**\n\n"
             f"{body}\n\n"
-            f"**Bibliography source**: LiverTox"
+            f"**Bibliography source**: {self.bibliography_source_label()}"
         ).strip()
 
     # -------------------------------------------------------------------------
@@ -1688,3 +1694,5 @@ class HepatoxConsultation:
 
 
 
+    def bibliography_source_label(self) -> str:
+        return get_text_normalization_snapshot().knowledge_source_references.get("livertox", "LiverTox")
