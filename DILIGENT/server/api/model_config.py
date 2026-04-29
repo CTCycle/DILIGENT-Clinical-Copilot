@@ -6,7 +6,7 @@ from fastapi import APIRouter, Body, status
 from fastapi import Query
 
 from DILIGENT.server.domain.model_configs import ModelConfigStateResponse, ModelConfigUpdateRequest
-from DILIGENT.server.services.model_config_service import ModelConfigService
+from DILIGENT.server.services.llm.model_config import ModelConfigService
 
 router = APIRouter(prefix="/model-config", tags=["model-config"])
 service = ModelConfigService()
@@ -65,3 +65,4 @@ class ModelConfigEndpoint:
 
 endpoint = ModelConfigEndpoint(router=router, service=service)
 endpoint.add_routes()
+

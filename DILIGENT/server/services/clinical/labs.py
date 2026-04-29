@@ -17,7 +17,7 @@ from DILIGENT.server.domain.clinical.entities import (
     PatientData,
     PatientLabTimeline,
 )
-from DILIGENT.server.services.prompts import CLINICAL_LAB_EXTRACTION_PROMPT
+from DILIGENT.server.services.clinical.prompts import CLINICAL_LAB_EXTRACTION_PROMPT
 from DILIGENT.server.services.llm.client_runtime import ensure_runtime_client
 from DILIGENT.server.services.llm.providers import select_llm_provider
 from DILIGENT.server.services.text.vocabulary import get_text_normalization_snapshot
@@ -588,6 +588,7 @@ class ClinicalLabExtractor:
         normalized.sort(key=self.lab_entry_sort_key)
         self.emit_progress(progress_callback, 1.0)
         return PatientLabTimeline(entries=normalized), onset_context
+
 
 
 

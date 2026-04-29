@@ -8,7 +8,7 @@ from collections.abc import Callable
 from datetime import date, datetime
 from typing import Any
 
-from DILIGENT.server.services.prompts import (
+from DILIGENT.server.services.clinical.prompts import (
     LIVERTOX_CONCLUSION_SYSTEM_PROMPT,
     LIVERTOX_CONCLUSION_USER_PROMPT,
     LIVERTOX_CLINICAL_SYSTEM_PROMPT,
@@ -1696,3 +1696,4 @@ class HepatoxConsultation:
 
     def bibliography_source_label(self) -> str:
         return get_text_normalization_snapshot().knowledge_source_references.get("livertox", "LiverTox")
+

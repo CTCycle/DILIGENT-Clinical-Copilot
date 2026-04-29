@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from collections.abc import Callable
 
-from DILIGENT.server.services.jobs import job_manager
+from DILIGENT.server.services.runtime.jobs import job_manager
 
 
 CLINICAL_PROGRESS_MESSAGES: dict[str, str] = {
@@ -87,3 +87,4 @@ def report_clinical_job_progress(job_id: str, *, stage: str, progress: float) ->
             "progress_message": message,
         },
     )
+

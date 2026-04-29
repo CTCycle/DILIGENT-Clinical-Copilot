@@ -10,7 +10,7 @@ from DILIGENT.server.domain.clinical.entities import (
 from DILIGENT.server.domain.jobs import JobCancelResponse, JobStartResponse, JobStatusResponse
 from DILIGENT.server.services.clinical.hepatox_core import HepatoxConsultation
 from DILIGENT.server.services.clinical.preparation import ClinicalKnowledgePreparation
-from DILIGENT.server.services.jobs import job_manager
+from DILIGENT.server.services.runtime.jobs import job_manager
 from DILIGENT.server.services.session.session_service import (
     ClinicalSessionService,
     disease_extractor,
@@ -92,3 +92,4 @@ router.add_api_route(
     response_model=JobCancelResponse,
     status_code=status.HTTP_200_OK,
 )
+

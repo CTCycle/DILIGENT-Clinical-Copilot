@@ -13,7 +13,7 @@ from DILIGENT.server.domain.clinical.entities import (
     PipelineIssue,
 )
 from DILIGENT.server.configurations.llm_configs import LLMRuntimeConfig
-from DILIGENT.server.services.jobs import JobManager
+from DILIGENT.server.services.runtime.jobs import JobManager
 from DILIGENT.server.services.clinical.job_progress import (
     CLINICAL_PROGRESS_MESSAGES,
     ClinicalJobCancelled,
@@ -474,4 +474,5 @@ def run_clinical_job(
     if not result:
         return {}
     return result
+
 

@@ -16,7 +16,7 @@ from DILIGENT.server.common.utils.logger import logger
 from DILIGENT.server.configurations.startup import server_settings
 from DILIGENT.server.domain.jobs import JobCancelResponse, JobStartResponse, JobStatusResponse
 from DILIGENT.server.domain.models import ModelListResponse, ModelPullResponse
-from DILIGENT.server.services.jobs import JobManager, job_manager as default_job_manager
+from DILIGENT.server.services.runtime.jobs import JobManager, job_manager as default_job_manager
 from DILIGENT.server.services.llm.providers import OllamaClient, OllamaError, OllamaTimeout
 
 SAFE_OLLAMA_MODEL_RE = re.compile(r"^[A-Za-z0-9][A-Za-z0-9._:/+\-]{0,199}$")
@@ -324,3 +324,4 @@ class OllamaService:
             return ModelListResponse(models=models, count=len(models))
         except (OllamaTimeout, OllamaError, Exception) as exc:
             self.raise_ollama_service_error(exc, action="listing models")
+

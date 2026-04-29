@@ -5,8 +5,8 @@ from fastapi import APIRouter, Query, status
 from DILIGENT.server.domain.jobs import JobCancelResponse, JobStartResponse, JobStatusResponse
 from DILIGENT.server.domain.models import ModelListResponse, ModelPullResponse
 from DILIGENT.server.services.llm.providers import OllamaClient
-from DILIGENT.server.services.jobs import job_manager
-from DILIGENT.server.services.ollama_service import OllamaService
+from DILIGENT.server.services.runtime.jobs import job_manager
+from DILIGENT.server.services.llm.ollama import OllamaService
 
 router = APIRouter(prefix="/models", tags=["models"])
 service = OllamaService(job_manager=job_manager, client_factory=lambda: OllamaClient())
@@ -108,3 +108,4 @@ class OllamaEndpoint:
 
 endpoint = OllamaEndpoint(router=router, service=service)
 endpoint.add_routes()
+

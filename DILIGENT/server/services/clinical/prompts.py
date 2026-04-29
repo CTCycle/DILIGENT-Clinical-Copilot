@@ -108,8 +108,6 @@ Return:
   }
 """
 
-ANAMNESIS_LAB_EXTRACTION_PROMPT = CLINICAL_LAB_EXTRACTION_PROMPT
-
 PATIENT_TIMELINE_EXTRACTION_PROMPT = """
 You are a clinical timeline extraction assistant.
 Extract chronological, patient-specific events from the provided case context.
@@ -199,6 +197,9 @@ Keep every section quantitative, evidence-based, and tied to the supplied clinic
 - Mixed-language output is forbidden except for drug names, source titles, or direct quoted terminology when necessary.
 - Integrate RUCAM directly into causality reasoning; do not create a standalone RUCAM subsection.
 - State clearly that RUCAM is often estimated due to incomplete clinical data, is initial decision support, and is not definitive on its own.
+- Prioritize robust semantic content over probabilistic layout formatting whenever deterministic rendering is available upstream.
+- Do not force specific opening sentence wrappers, bolding, or rigid markdown ornamentation unless strictly required for clinical meaning.
+- Output only the narrative clinical assessment body; do not emit title lines, section headings (for example "Report"), or bibliography labels.
 
 """
 
@@ -248,12 +249,9 @@ LIVERTOX_CLINICAL_USER_PROMPT = """
 - Timeline interpretation note: {timeline_note}
 
 # Output Requirements
-Write a clinician-facing assessment (≤500 words) for this drug by **reproducing the template below exactly**. Do not rearrange, rename, or omit headings; when a heading lacks data, state "Not reported" immediately after it. Always end with "Bibliography source: {bibliography_source}".
-
-{example_block}
+Write a clinician-facing assessment body (≤500 words) for this drug. Provide narrative clinical reasoning only; do not output wrapper headings or bibliography labels because those are rendered deterministically by the application.
 
 Guidelines:
-- Begin the first sentence with "{drug_name} - LiverTox score {livertox_score}" in bold letters.
 - Use quantitative data from the excerpt whenever available (e.g., incidence rates, case counts, study sizes) and cite the referenced study or report if mentioned.
 - Compare the findings with closely related agents when the excerpt mentions them; otherwise, briefly reference the agent or class listed in the metadata.
 - Do not provide drug-level monitoring or management recommendations and do not recommend starting or stopping therapy in this section.

@@ -14,7 +14,7 @@ from DILIGENT.server.domain.patient_timeline import (
     PatientTimelineEvent,
     PatientTimelineExtraction,
 )
-from DILIGENT.server.services.prompts import PATIENT_TIMELINE_EXTRACTION_PROMPT
+from DILIGENT.server.services.clinical.prompts import PATIENT_TIMELINE_EXTRACTION_PROMPT
 from DILIGENT.server.services.llm.client_runtime import ensure_runtime_client
 from DILIGENT.server.services.llm.providers import initialize_llm_client, select_llm_provider
 
@@ -222,3 +222,4 @@ class PatientTimelineExtractor:
             generated_at=datetime.now(UTC),
             events=normalized_events,
         )
+
