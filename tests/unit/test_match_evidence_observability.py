@@ -45,11 +45,18 @@ def test_matched_drug_payload_exposes_evidence_quality() -> None:
     )
 
     assert payload[0]["evidence_quality"] == "weak_alias_or_class_match"
-    assert "Drug match is not a direct canonical match." in payload[0]["evidence_warnings"]
-    assert "Matched local drug record has no LiverTox excerpt." in payload[0]["evidence_warnings"]
+    assert (
+        "Drug match is not a direct canonical match." in payload[0]["evidence_warnings"]
+    )
+    assert (
+        "Matched local drug record has no LiverTox excerpt."
+        in payload[0]["evidence_warnings"]
+    )
 
 
-def test_matched_drug_payload_marks_missing_evidence_when_knowledge_base_unavailable() -> None:
+def test_matched_drug_payload_marks_missing_evidence_when_knowledge_base_unavailable() -> (
+    None
+):
     payload = ClinicalSessionService.build_matched_drugs_payload(
         detected_drugs=["Amoxicillin"],
         prepared_inputs=None,
@@ -59,7 +66,9 @@ def test_matched_drug_payload_marks_missing_evidence_when_knowledge_base_unavail
     assert payload[0]["match_status"] == "missing_match"
     assert payload[0]["match_reason"] == "knowledge_base_unavailable"
     assert payload[0]["evidence_quality"] == "missing_match"
-    assert payload[0]["evidence_warnings"] == ["No local RxNav/LiverTox match was found."]
+    assert payload[0]["evidence_warnings"] == [
+        "No local RxNav/LiverTox match was found."
+    ]
 
 
 def test_knowledge_base_unavailable_issue_is_structured_for_persistence() -> None:

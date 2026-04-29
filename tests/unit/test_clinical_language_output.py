@@ -57,4 +57,3 @@ def test_narrative_builder_does_not_force_english_for_italian() -> None:
     )
     assert "# Sintesi Visita Clinica" in report
     assert "## Report Clinico" in report
-

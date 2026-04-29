@@ -35,22 +35,14 @@ def build_failed_session_payload(
 ) -> dict[str, Any]:
     language_result = ClinicalLanguageDetector.detect(payload)
     runtime_settings = {
-        "use_cloud_services": bool(
-            LLMRuntimeConfig.is_cloud_enabled()
-        ),
+        "use_cloud_services": bool(LLMRuntimeConfig.is_cloud_enabled()),
         "llm_provider": LLMRuntimeConfig.get_llm_provider(),
         "cloud_model": LLMRuntimeConfig.get_cloud_model(),
         "text_extraction_model": LLMRuntimeConfig.get_text_extraction_model(),
         "clinical_model": LLMRuntimeConfig.get_clinical_model(),
-        "ollama_temperature": (
-            LLMRuntimeConfig.get_ollama_temperature()
-        ),
-        "cloud_temperature": (
-            LLMRuntimeConfig.get_cloud_temperature()
-        ),
-        "ollama_reasoning": bool(
-            LLMRuntimeConfig.is_ollama_reasoning_enabled()
-        ),
+        "ollama_temperature": (LLMRuntimeConfig.get_ollama_temperature()),
+        "cloud_temperature": (LLMRuntimeConfig.get_cloud_temperature()),
+        "ollama_reasoning": bool(LLMRuntimeConfig.is_ollama_reasoning_enabled()),
     }
     return {
         "patient_name": payload.name,
@@ -265,7 +257,9 @@ class NarrativeBuilder:
         bundle = NarrativeBuilder.bundle(report_language)
         classification = getattr(pattern_score, "classification", NOT_AVAILABLE)
         r_score = pattern_strings.get("r_score", NOT_AVAILABLE)
-        drug_summary = ", ".join(detected_drugs) if detected_drugs else bundle["none_detected"]
+        drug_summary = (
+            ", ".join(detected_drugs) if detected_drugs else bundle["none_detected"]
+        )
 
         sections: list[str] = []
 
@@ -298,13 +292,17 @@ class NarrativeBuilder:
         therapy_section.extend(
             [
                 "",
-                bundle["detected_drugs"].format(count=len(detected_drugs), value=drug_summary),
+                bundle["detected_drugs"].format(
+                    count=len(detected_drugs), value=drug_summary
+                ),
             ]
         )
         sections.append("\n".join(therapy_section))
 
         anamnesis_drug_summary = (
-            ", ".join(anamnesis_detected_drugs) if anamnesis_detected_drugs else bundle["none_detected"]
+            ", ".join(anamnesis_detected_drugs)
+            if anamnesis_detected_drugs
+            else bundle["none_detected"]
         )
         sections.append(
             "\n".join(
@@ -474,5 +472,3 @@ def run_clinical_job(
     if not result:
         return {}
     return result
-
-

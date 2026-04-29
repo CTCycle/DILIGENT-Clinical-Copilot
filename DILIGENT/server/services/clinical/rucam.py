@@ -34,6 +34,7 @@ RECHALLENGE_RE = re.compile(
 RECURRENCE_RE = re.compile(r"\b(recur|rise|worsen|flare|peggior)\b", re.IGNORECASE)
 AGE_RE = re.compile(r"\b(\d{2})\s*(?:years?|yo|anni)\b", re.IGNORECASE)
 
+
 class RucamScoreEstimator:
     def estimate(
         self,
@@ -50,7 +51,9 @@ class RucamScoreEstimator:
         resolved_mapping = resolved_drugs or {}
         all_drugs = [*analysis_drugs.entries, *anamnesis_drugs.entries]
         anchor = self.select_pattern_anchor(payload=payload, lab_timeline=lab_timeline)
-        injury_type = self.resolve_injury_type(pattern_score=pattern_score, anchor=anchor)
+        injury_type = self.resolve_injury_type(
+            pattern_score=pattern_score, anchor=anchor
+        )
 
         entries: list[DrugRucamAssessment] = []
         seen: set[str] = set()
@@ -132,7 +135,9 @@ class RucamScoreEstimator:
                 continue
             bucket = grouped.setdefault(parsed_date, {})
             current = bucket.get(marker)
-            if current is None or (entry.value or float("-inf")) > (current.value or float("-inf")):
+            if current is None or (entry.value or float("-inf")) > (
+                current.value or float("-inf")
+            ):
                 bucket[marker] = entry
 
         for sample_date in sorted(grouped.keys()):
@@ -148,24 +153,27 @@ class RucamScoreEstimator:
                 or (alp_mult is not None and alp_mult >= 2.0)
                 or (
                     tbil is not None
-                    and ((tbil_mult is not None and tbil_mult > 1.0) or ((tbil.value or 0.0) >= 2.0))
+                    and (
+                        (tbil_mult is not None and tbil_mult > 1.0)
+                        or ((tbil.value or 0.0) >= 2.0)
+                    )
                     and (alt_like is not None or alp is not None)
                 )
             )
             if not qualifies:
                 continue
                 return RucamAnchor(
-                onset_date=sample_date,
-                used_alt=alt_like.value if alt_like else None,
-                used_alt_uln=alt_like.upper_limit_normal if alt_like else None,
-                used_alp=alp.value if alp else None,
-                used_alp_uln=alp.upper_limit_normal if alp else None,
-                rationale=(
-                    "Earliest qualifying timeline anchor selected on "
-                    f"{sample_date.isoformat()} (ALT/AST={alt_like.value if alt_like else 'n/a'}, "
-                    f"ALP={alp.value if alp else 'n/a'})."
-                ),
-            )
+                    onset_date=sample_date,
+                    used_alt=alt_like.value if alt_like else None,
+                    used_alt_uln=alt_like.upper_limit_normal if alt_like else None,
+                    used_alp=alp.value if alp else None,
+                    used_alp_uln=alp.upper_limit_normal if alp else None,
+                    rationale=(
+                        "Earliest qualifying timeline anchor selected on "
+                        f"{sample_date.isoformat()} (ALT/AST={alt_like.value if alt_like else 'n/a'}, "
+                        f"ALP={alp.value if alp else 'n/a'})."
+                    ),
+                )
 
         return RucamAnchor(
             onset_date=payload.visit_date,
@@ -182,7 +190,9 @@ class RucamScoreEstimator:
         pattern_score: HepatotoxicityPatternScore,
         anchor: RucamAnchor,
     ) -> str:
-        classification = (pattern_score.classification or "indeterminate").strip().lower()
+        classification = (
+            (pattern_score.classification or "indeterminate").strip().lower()
+        )
         if classification == "mixed":
             return "cholestatic"
         if classification in {"hepatocellular", "cholestatic"}:
@@ -240,20 +250,34 @@ class RucamScoreEstimator:
         )
         components.append(course_component)
         if course_component.status != "scored":
-            limitations.append("Serial follow-up liver labs were insufficient for course scoring.")
+            limitations.append(
+                "Serial follow-up liver labs were insufficient for course scoring."
+            )
 
-        risk_component = self.score_risk_factors(payload=payload, injury_type=injury_type)
+        risk_component = self.score_risk_factors(
+            payload=payload, injury_type=injury_type
+        )
         components.append(risk_component)
-        components.append(self.score_concomitant_drugs(target_drug=drug, all_drugs=all_drugs))
-        non_drug = self.score_non_drug_causes(payload=payload, disease_context=disease_context)
+        components.append(
+            self.score_concomitant_drugs(target_drug=drug, all_drugs=all_drugs)
+        )
+        non_drug = self.score_non_drug_causes(
+            payload=payload, disease_context=disease_context
+        )
         components.append(non_drug)
-        components.append(self.score_previous_hepatotoxicity(resolved_item=resolved_item))
+        components.append(
+            self.score_previous_hepatotoxicity(resolved_item=resolved_item)
+        )
         components.append(self.score_rechallenge(payload=payload, drug=drug))
 
         if non_drug.score == 0:
-            limitations.append("Competing non-drug causes were only partially represented.")
+            limitations.append(
+                "Competing non-drug causes were only partially represented."
+            )
         if injury_type == "indeterminate":
-            limitations.append("Injury type remained indeterminate; conservative scoring applied.")
+            limitations.append(
+                "Injury type remained indeterminate; conservative scoring applied."
+            )
 
         total = int(sum(component.score for component in components))
         category = self.resolve_causality_bucket(total)
@@ -298,7 +322,9 @@ class RucamScoreEstimator:
         injury_type: str,
     ) -> tuple[RucamComponentAssessment, date | None]:
         start_date = self.try_parse_date(drug.therapy_start_date)
-        onset_date = self.try_parse_date(onset_context.onset_date) if onset_context else None
+        onset_date = (
+            self.try_parse_date(onset_context.onset_date) if onset_context else None
+        )
         rationale: list[str] = []
         evidence = onset_context.evidence if onset_context else None
 
@@ -308,7 +334,9 @@ class RucamScoreEstimator:
             rationale.append(f"Onset from extraction: {onset_date.isoformat()}.")
         elif anchor.onset_date is not None:
             onset_date = anchor.onset_date
-            rationale.append(f"Onset fallback used lab anchor: {anchor.onset_date.isoformat()}.")
+            rationale.append(
+                f"Onset fallback used lab anchor: {anchor.onset_date.isoformat()}."
+            )
         elif payload.visit_date is not None:
             onset_date = payload.visit_date
             rationale.append("Onset fallback used visit-date proxy.")
@@ -364,8 +392,12 @@ class RucamScoreEstimator:
                 rationale="No onset anchor date available.",
             )
         if injury_type == "hepatocellular":
-            return self._score_hepatocellular_course(lab_timeline=lab_timeline, onset_date=onset_date)
-        return self._score_cholestatic_course(lab_timeline=lab_timeline, onset_date=onset_date)
+            return self._score_hepatocellular_course(
+                lab_timeline=lab_timeline, onset_date=onset_date
+            )
+        return self._score_cholestatic_course(
+            lab_timeline=lab_timeline, onset_date=onset_date
+        )
 
     def _dated_entries(
         self,
@@ -404,7 +436,9 @@ class RucamScoreEstimator:
                 status="not_assessable",
                 rationale="ALT/AST serial trend after onset was insufficient.",
             )
-        peak_date, peak_entry = max(series, key=lambda pair: pair[1].value or float("-inf"))
+        peak_date, peak_entry = max(
+            series, key=lambda pair: pair[1].value or float("-inf")
+        )
         if peak_entry.value is None or peak_entry.value <= 0:
             return RucamComponentAssessment(
                 component_key="course",
@@ -469,9 +503,15 @@ class RucamScoreEstimator:
                 status="not_assessable",
                 rationale="ALP/TBIL serial trend after onset was insufficient.",
             )
-        peak_date, peak_entry = max(series, key=lambda pair: pair[1].value or float("-inf"))
+        peak_date, peak_entry = max(
+            series, key=lambda pair: pair[1].value or float("-inf")
+        )
         latest_date, latest_entry = series[-1]
-        if peak_entry.value is None or latest_entry.value is None or peak_entry.value <= 0:
+        if (
+            peak_entry.value is None
+            or latest_entry.value is None
+            or peak_entry.value <= 0
+        ):
             return RucamComponentAssessment(
                 component_key="course",
                 label="Course after withdrawal",
@@ -498,7 +538,9 @@ class RucamScoreEstimator:
             ),
         )
 
-    def score_risk_factors(self, *, payload: PatientData, injury_type: str) -> RucamComponentAssessment:
+    def score_risk_factors(
+        self, *, payload: PatientData, injury_type: str
+    ) -> RucamComponentAssessment:
         text = (payload.anamnesis or "").strip()
         age_score = 0
         age_match = AGE_RE.search(text)
@@ -532,7 +574,11 @@ class RucamScoreEstimator:
         all_drugs: list[DrugEntry],
     ) -> RucamComponentAssessment:
         target_key = normalize_drug_query_name(target_drug.name or "")
-        other = [d for d in all_drugs if normalize_drug_query_name(d.name or "") != target_key]
+        other = [
+            d
+            for d in all_drugs
+            if normalize_drug_query_name(d.name or "") != target_key
+        ]
         if not other:
             return RucamComponentAssessment(
                 component_key="concomitant_drugs",
@@ -541,11 +587,17 @@ class RucamScoreEstimator:
                 status="scored",
                 rationale="No aligned concomitant drug detected.",
             )
-        strong = sum(1 for item in other if item.suspension_status and item.therapy_start_status)
-        weak = sum(1 for item in other if item.therapy_start_date or item.suspension_date)
+        strong = sum(
+            1 for item in other if item.suspension_status and item.therapy_start_status
+        )
+        weak = sum(
+            1 for item in other if item.therapy_start_date or item.suspension_date
+        )
         if strong > 0:
             score = -2
-            rationale = "At least one concomitant drug had stronger aligned temporal metadata."
+            rationale = (
+                "At least one concomitant drug had stronger aligned temporal metadata."
+            )
         elif weak > 0:
             score = -1
             rationale = "Concomitant drug exposure was temporally aligned but weakly documented."
@@ -578,7 +630,9 @@ class RucamScoreEstimator:
                 label="Non-drug causes",
                 score=-3,
                 status="scored",
-                evidence="; ".join((item.evidence or item.name) for item in hepatic_entries),
+                evidence="; ".join(
+                    (item.evidence or item.name) for item in hepatic_entries
+                ),
                 rationale="Another hepatic diagnosis is explicitly supported.",
             )
         clues = len(EXCLUSION_RE.findall(text))
@@ -598,7 +652,9 @@ class RucamScoreEstimator:
             rationale=rationale,
         )
 
-    def score_previous_hepatotoxicity(self, *, resolved_item: dict[str, Any]) -> RucamComponentAssessment:
+    def score_previous_hepatotoxicity(
+        self, *, resolved_item: dict[str, Any]
+    ) -> RucamComponentAssessment:
         metadata = resolved_item.get("matched_livertox_row")
         token = ""
         if isinstance(metadata, dict):
@@ -623,7 +679,9 @@ class RucamScoreEstimator:
             rationale=rationale,
         )
 
-    def score_rechallenge(self, *, payload: PatientData, drug: DrugEntry) -> RucamComponentAssessment:
+    def score_rechallenge(
+        self, *, payload: PatientData, drug: DrugEntry
+    ) -> RucamComponentAssessment:
         text = (payload.anamnesis or "").strip()
         drug_name = (drug.name or "").strip()
         if not text or not drug_name:
@@ -634,7 +692,11 @@ class RucamScoreEstimator:
                 status="not_assessable",
                 rationale="Insufficient detail for rechallenge assessment.",
             )
-        if drug_name.lower() in text.lower() and RECHALLENGE_RE.search(text) and RECURRENCE_RE.search(text):
+        if (
+            drug_name.lower() in text.lower()
+            and RECHALLENGE_RE.search(text)
+            and RECURRENCE_RE.search(text)
+        ):
             return RucamComponentAssessment(
                 component_key="rechallenge",
                 label="Rechallenge",
@@ -670,17 +732,27 @@ class RucamScoreEstimator:
         drug: DrugEntry,
     ) -> str:
         assessable = sum(1 for component in components if component.status == "scored")
-        not_assessable = sum(1 for component in components if component.status == "not_assessable")
+        not_assessable = sum(
+            1 for component in components if component.status == "not_assessable"
+        )
         course_component = next(
-            (component for component in components if component.component_key == "course"),
+            (
+                component
+                for component in components
+                if component.component_key == "course"
+            ),
             None,
         )
         has_exposure_dates = bool(drug.therapy_start_date or drug.suspension_date)
         if course_component is None or course_component.status != "scored":
             return "low"
-        if assessable >= 6 and onset_date is not None and has_exposure_dates and not_assessable <= 1:
+        if (
+            assessable >= 6
+            and onset_date is not None
+            and has_exposure_dates
+            and not_assessable <= 1
+        ):
             return "high"
         if assessable >= 4 and (onset_date is not None or has_exposure_dates):
             return "moderate"
         return "low"
-

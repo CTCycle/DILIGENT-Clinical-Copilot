@@ -15,14 +15,12 @@ def try_parse_json(value: str) -> Any:
         return None
     try:
         return json.loads(value)
-    except (TypeError, ValueError):
+    except TypeError, ValueError:
         return None
 
 
 # -----------------------------------------------------------------------------
-def extract_synonym_strings(
-    value: Any, seen_refs: set[int] | None = None
-) -> list[str]:
+def extract_synonym_strings(value: Any, seen_refs: set[int] | None = None) -> list[str]:
     if seen_refs is None:
         seen_refs = set()
     if value is None:

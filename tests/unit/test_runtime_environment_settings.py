@@ -5,12 +5,19 @@ import os
 
 from DILIGENT.server.common import constants
 from DILIGENT.server.configurations import environment
-from DILIGENT.server.configurations.startup import get_server_settings, reset_app_settings_cache
+from DILIGENT.server.configurations.startup import (
+    get_server_settings,
+    reset_app_settings_cache,
+)
 
 
-def test_initialize_environment_loads_dotenv_with_override_precedence(tmp_path, monkeypatch) -> None:
+def test_initialize_environment_loads_dotenv_with_override_precedence(
+    tmp_path, monkeypatch
+) -> None:
     dotenv_path = tmp_path / ".env"
-    dotenv_path.write_text("DILIGENT_TAURI_MODE=true\nFASTAPI_HOST=0.0.0.0\n", encoding="utf-8")
+    dotenv_path.write_text(
+        "DILIGENT_TAURI_MODE=true\nFASTAPI_HOST=0.0.0.0\n", encoding="utf-8"
+    )
     monkeypatch.setattr(constants, "ENV_FILE_PATH", str(dotenv_path))
     monkeypatch.setenv("FASTAPI_HOST", "127.0.0.1")
     environment.reset_environment_bootstrap_for_tests()
@@ -22,7 +29,9 @@ def test_initialize_environment_loads_dotenv_with_override_precedence(tmp_path, 
     assert os.environ.get("FASTAPI_HOST") == "0.0.0.0"
 
 
-def test_ui_owned_env_keys_do_not_override_json_runtime_defaults(monkeypatch, tmp_path) -> None:
+def test_ui_owned_env_keys_do_not_override_json_runtime_defaults(
+    monkeypatch, tmp_path
+) -> None:
     config_path = tmp_path / "configurations.json"
     config_path.write_text("{}", encoding="utf-8")
     monkeypatch.setattr(constants, "CONFIGURATIONS_FILE", str(config_path))
@@ -49,5 +58,3 @@ def test_ui_owned_json_keys_are_ignored(monkeypatch, tmp_path) -> None:
     assert settings.llm_defaults.cloud_model == constants.OPENAI_CLOUD_MODELS[0]
 
     reset_app_settings_cache()
-
-

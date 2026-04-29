@@ -74,7 +74,9 @@ def test_assess_payload_raises_when_labs_missing_and_not_overridden() -> None:
     with pytest.raises(ClinicalPipelineValidationError) as exc_info:
         analyzer.assess_payload(timeline)
 
-    assert any(issue.code == "missing_hepatotoxicity_inputs" for issue in exc_info.value.issues)
+    assert any(
+        issue.code == "missing_hepatotoxicity_inputs" for issue in exc_info.value.issues
+    )
 
 
 def test_evaluate_suspension_marks_anamnesis_mentions_as_uncertain_exposure() -> None:
@@ -96,8 +98,7 @@ def test_evaluate_suspension_marks_anamnesis_mentions_as_uncertain_exposure() ->
 def test_format_visit_date_anchor_handles_missing_and_present_values() -> None:
     assert HepatoxConsultation.format_visit_date_anchor(None) == "Not provided."
     assert (
-        HepatoxConsultation.format_visit_date_anchor(date(2025, 4, 14))
-        == "2025-04-14"
+        HepatoxConsultation.format_visit_date_anchor(date(2025, 4, 14)) == "2025-04-14"
     )
 
 
@@ -153,10 +154,22 @@ def test_request_drug_analysis_retries_on_transient_failure() -> None:
 
 
 def test_livertox_prompt_removes_per_drug_management_recommendation_directive() -> None:
-    assert "Provide monitoring or clinical management recommendations" not in LIVERTOX_CLINICAL_USER_PROMPT
-    assert "Do not provide drug-level monitoring or management recommendations" in LIVERTOX_CLINICAL_USER_PROMPT
-    assert "Do not add any appendix or extra section after the bibliography line." in LIVERTOX_CLINICAL_USER_PROMPT
-    assert "Do not output JSON, YAML, XML, tables, or fenced code blocks" in LIVERTOX_CLINICAL_USER_PROMPT
+    assert (
+        "Provide monitoring or clinical management recommendations"
+        not in LIVERTOX_CLINICAL_USER_PROMPT
+    )
+    assert (
+        "Do not provide drug-level monitoring or management recommendations"
+        in LIVERTOX_CLINICAL_USER_PROMPT
+    )
+    assert (
+        "Do not add any appendix or extra section after the bibliography line."
+        in LIVERTOX_CLINICAL_USER_PROMPT
+    )
+    assert (
+        "Do not output JSON, YAML, XML, tables, or fenced code blocks"
+        in LIVERTOX_CLINICAL_USER_PROMPT
+    )
     assert "# Estimated RUCAM" in LIVERTOX_CLINICAL_USER_PROMPT
     assert "Integrate the supplied estimated RUCAM" in LIVERTOX_CLINICAL_USER_PROMPT
 
@@ -228,7 +241,9 @@ def test_finalize_patient_report_uses_global_synthesis_section_header() -> None:
     assert "## Conclusion" not in report
 
 
-def test_finalize_patient_report_renders_deterministic_matched_and_unresolved_sections() -> None:
+def test_finalize_patient_report_renders_deterministic_matched_and_unresolved_sections() -> (
+    None
+):
     consultation = HepatoxConsultation.__new__(HepatoxConsultation)
 
     async def fake_generate_conclusion(**kwargs):  # type: ignore[no-untyped-def]

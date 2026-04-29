@@ -6,7 +6,10 @@ from typing import Any
 from sqlalchemy import create_engine, select
 from sqlalchemy.orm import sessionmaker
 
-from DILIGENT.server.domain.patient_timeline import PatientTimeline, PatientTimelineEvent
+from DILIGENT.server.domain.patient_timeline import (
+    PatientTimeline,
+    PatientTimelineEvent,
+)
 from DILIGENT.server.repositories.schemas.models import (
     Base,
     ClinicalSession,
@@ -107,7 +110,10 @@ def test_session_list_filters_and_search() -> None:
         limit=10,
     )
     assert total == 2
-    assert {item["patient_name"] for item in items} == {"Alice Example", "Carol Archive"}
+    assert {item["patient_name"] for item in items} == {
+        "Alice Example",
+        "Carol Archive",
+    }
 
     items, total = serializer.list_sessions(
         search="failure report",
@@ -275,19 +281,28 @@ def test_update_job_lifecycle_with_cooperative_cancel() -> None:
     started = service.start_update_job(service.RXNAV_JOB_TYPE)
     rxnav_job_id = str(started["job_id"])
     for _ in range(80):
-        payload = service.get_job_status(rxnav_job_id, expected_type=service.RXNAV_JOB_TYPE)
+        payload = service.get_job_status(
+            rxnav_job_id, expected_type=service.RXNAV_JOB_TYPE
+        )
         if payload and payload["status"] in {"completed", "failed", "cancelled"}:
             break
         time.sleep(0.01)
-    final_rxnav = service.get_job_status(rxnav_job_id, expected_type=service.RXNAV_JOB_TYPE)
+    final_rxnav = service.get_job_status(
+        rxnav_job_id, expected_type=service.RXNAV_JOB_TYPE
+    )
     assert final_rxnav is not None
     assert final_rxnav["status"] == "completed"
 
     started = service.start_update_job(service.LIVERTOX_JOB_TYPE)
     livertox_job_id = str(started["job_id"])
-    assert service.cancel_job(livertox_job_id, expected_type=service.LIVERTOX_JOB_TYPE) is True
+    assert (
+        service.cancel_job(livertox_job_id, expected_type=service.LIVERTOX_JOB_TYPE)
+        is True
+    )
     for _ in range(120):
-        payload = service.get_job_status(livertox_job_id, expected_type=service.LIVERTOX_JOB_TYPE)
+        payload = service.get_job_status(
+            livertox_job_id, expected_type=service.LIVERTOX_JOB_TYPE
+        )
         if payload and payload["status"] in {"completed", "failed", "cancelled"}:
             break
         time.sleep(0.01)

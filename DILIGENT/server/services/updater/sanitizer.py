@@ -43,4 +43,3 @@ class LiverToxExcerptSanitizer:
     # -------------------------------------------------------------------------
     def normalize_whitespace(self, value: str) -> str:
         return self.WHITESPACE_RE.sub(" ", str(value)).strip()
-

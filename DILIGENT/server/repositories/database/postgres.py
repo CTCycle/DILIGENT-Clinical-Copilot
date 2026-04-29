@@ -21,7 +21,9 @@ class PostgresRepository:
         if not settings.database_name:
             raise ValueError("Database name must be provided for external database.")
         if not settings.username:
-            raise ValueError("Database username must be provided for external database.")
+            raise ValueError(
+                "Database username must be provided for external database."
+            )
 
         port = settings.port or 5432
         engine_name = normalize_postgres_engine(settings.engine)

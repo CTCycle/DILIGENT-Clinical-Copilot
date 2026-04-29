@@ -20,9 +20,12 @@ from DILIGENT.server.services.text.normalization import (
     normalize_drug_query_name,
 )
 
+
 ###############################################################################
 class ClinicalKnowledgePreparation:
-    REGIMEN_SEPARATOR_RE = re.compile(r"(?:\s*\+\s*|\s*/\s*|\s+\bplus\b\s+|\s+\band\b\s+)", re.IGNORECASE)
+    REGIMEN_SEPARATOR_RE = re.compile(
+        r"(?:\s*\+\s*|\s*/\s*|\s+\bplus\b\s+|\s+\band\b\s+)", re.IGNORECASE
+    )
 
     def __init__(self) -> None:
         self.serializer = DataSerializer()
@@ -212,7 +215,9 @@ class ClinicalKnowledgePreparation:
                     if regimen_component not in existing["regimen_components"]:
                         existing["regimen_components"].append(regimen_component)
                 if candidate["extraction_metadata"]:
-                    existing["extraction_metadata"].extend(candidate["extraction_metadata"])
+                    existing["extraction_metadata"].extend(
+                        candidate["extraction_metadata"]
+                    )
         for candidate in ordered:
             candidate["origins"] = sorted(
                 dict.fromkeys(candidate["origins"]),
@@ -270,10 +275,14 @@ class ClinicalKnowledgePreparation:
         }
 
     # -------------------------------------------------------------------------
-    def expand_regimen_candidate(self, candidate: dict[str, Any]) -> list[dict[str, Any]]:
+    def expand_regimen_candidate(
+        self, candidate: dict[str, Any]
+    ) -> list[dict[str, Any]]:
         canonical_name = str(candidate.get("canonical_name") or "").strip()
         raw_mentions = [
-            mention for mention in candidate.get("raw_mentions", []) if isinstance(mention, str)
+            mention
+            for mention in candidate.get("raw_mentions", [])
+            if isinstance(mention, str)
         ]
         source_text = raw_mentions[0] if raw_mentions else canonical_name
         components = self.split_regimen_components(source_text)
@@ -282,7 +291,10 @@ class ClinicalKnowledgePreparation:
         canonical_components: list[str] = []
         for component in components:
             normalized_component = canonicalize_drug_query(component)
-            if normalized_component and normalized_component not in canonical_components:
+            if (
+                normalized_component
+                and normalized_component not in canonical_components
+            ):
                 canonical_components.append(normalized_component)
         if len(canonical_components) <= 1:
             return [candidate]
@@ -317,12 +329,16 @@ class ClinicalKnowledgePreparation:
             return []
         if not self.REGIMEN_SEPARATOR_RE.search(text):
             return [text]
-        parts = [part.strip(" \t,;:.") for part in self.REGIMEN_SEPARATOR_RE.split(text)]
+        parts = [
+            part.strip(" \t,;:.") for part in self.REGIMEN_SEPARATOR_RE.split(text)
+        ]
         components = [part for part in parts if part]
         return components or [text]
 
     # -------------------------------------------------------------------------
-    def compact_entry_metadata(self, metadata: list[dict[str, Any]]) -> list[dict[str, Any]]:
+    def compact_entry_metadata(
+        self, metadata: list[dict[str, Any]]
+    ) -> list[dict[str, Any]]:
         compacted: list[dict[str, Any]] = []
         seen: set[str] = set()
         for item in metadata:
@@ -436,5 +452,3 @@ class ClinicalKnowledgePreparation:
             "Treat drugs whose known hepatotoxicity pattern matches this classification as stronger causal candidates, and downgrade mismatches."
         )
         return " ".join(segments)
-
-

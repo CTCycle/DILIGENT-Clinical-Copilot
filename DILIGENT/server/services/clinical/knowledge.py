@@ -50,7 +50,6 @@ class ClinicalKnowledgeComposer:
         *,
         livertox_excerpt: str,
     ) -> str:
-        return (
-            "LiverTox excerpt:\n"
-            + (livertox_excerpt.strip() or "No local LiverTox excerpt available.")
+        return "LiverTox excerpt:\n" + (
+            livertox_excerpt.strip() or "No local LiverTox excerpt available."
         )

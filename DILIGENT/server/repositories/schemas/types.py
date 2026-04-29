@@ -21,4 +21,3 @@ class JSONSequence(TypeDecorator):
     # -------------------------------------------------------------------------
     def process_result_value(self, value: Any, dialect: Any) -> Any:
         return value
-

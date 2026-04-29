@@ -170,7 +170,9 @@ def test_search_with_reranking_enforces_candidate_floor_against_top_n() -> None:
 def test_search_with_reranking_falls_back_when_rerank_embedding_fails() -> None:
     search = SimilaritySearch(
         vector_database=VectorDatabaseStub(sample_rows()),
-        embedding_generator=FlakyEmbeddingGeneratorStub(sample_vectors(), fail_on_call=2),
+        embedding_generator=FlakyEmbeddingGeneratorStub(
+            sample_vectors(), fail_on_call=2
+        ),
         default_top_k=3,
     )
 
@@ -183,4 +185,3 @@ def test_search_with_reranking_falls_back_when_rerank_embedding_fails() -> None:
 
     assert [item.get("text") for item in results] == ["alpha", "beta"]
     assert all("rerank_score" not in item for item in results)
-

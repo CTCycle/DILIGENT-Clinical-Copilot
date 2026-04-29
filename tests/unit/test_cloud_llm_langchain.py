@@ -185,7 +185,9 @@ def test_llm_text_call_uses_openai_responses_api(monkeypatch) -> None:
 
     patch_access_key(monkeypatch, "key-openai")
     monkeypatch.setattr(cloud_module, "AsyncOpenAI", FakeAsyncOpenAI)
-    client = cloud_module.CloudLLMClient(provider="openai", default_model="gpt-4.1-mini")
+    client = cloud_module.CloudLLMClient(
+        provider="openai", default_model="gpt-4.1-mini"
+    )
 
     text = asyncio.run(
         client.llm_text_call(
@@ -211,7 +213,9 @@ def test_openai_structured_call_uses_responses_parse(monkeypatch) -> None:
             )
 
         async def create(self, **kwargs: Any) -> FakeOpenAIResponse:
-            raise AssertionError("structured OpenAI calls should prefer responses.parse")
+            raise AssertionError(
+                "structured OpenAI calls should prefer responses.parse"
+            )
 
     class FakeAsyncOpenAI:
         def __init__(self, **kwargs: Any) -> None:
@@ -222,7 +226,9 @@ def test_openai_structured_call_uses_responses_parse(monkeypatch) -> None:
 
     patch_access_key(monkeypatch, "key-openai")
     monkeypatch.setattr(cloud_module, "AsyncOpenAI", FakeAsyncOpenAI)
-    client = cloud_module.CloudLLMClient(provider="openai", default_model="gpt-4.1-mini")
+    client = cloud_module.CloudLLMClient(
+        provider="openai", default_model="gpt-4.1-mini"
+    )
 
     parsed = asyncio.run(
         client.llm_structured_call(
@@ -263,7 +269,9 @@ def test_gemini_structured_call_passes_response_schema(monkeypatch) -> None:
     patch_access_key(monkeypatch, "key-gemini")
     monkeypatch.setattr(cloud_module, "genai", FakeGenAI)
     monkeypatch.setattr(cloud_module, "genai_types", FakeTypes)
-    client = cloud_module.CloudLLMClient(provider="gemini", default_model="gemini-2.5-pro")
+    client = cloud_module.CloudLLMClient(
+        provider="gemini", default_model="gemini-2.5-pro"
+    )
 
     parsed = asyncio.run(
         client.llm_structured_call(
@@ -297,10 +305,16 @@ def test_provider_exception_maps_to_existing_error_types(monkeypatch) -> None:
 
     patch_access_key(monkeypatch, "key-openai")
     monkeypatch.setattr(cloud_module, "AsyncOpenAI", FakeAsyncOpenAI)
-    client = cloud_module.CloudLLMClient(provider="openai", default_model="gpt-4.1-mini")
+    client = cloud_module.CloudLLMClient(
+        provider="openai", default_model="gpt-4.1-mini"
+    )
 
     try:
-        asyncio.run(client.chat(model="gpt-4.1-mini", messages=[{"role": "user", "content": "x"}]))
+        asyncio.run(
+            client.chat(
+                model="gpt-4.1-mini", messages=[{"role": "user", "content": "x"}]
+            )
+        )
         assert False, "Expected timeout mapping"
     except cloud_module.LLMTimeout:
         pass

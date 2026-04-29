@@ -8,7 +8,10 @@ from DILIGENT.server.services.session.session_service import (
     rucam_estimator,
     serializer,
 )
-from DILIGENT.server.services.session.session_shared import NarrativeBuilder, run_clinical_job
+from DILIGENT.server.services.session.session_shared import (
+    NarrativeBuilder,
+    run_clinical_job,
+)
 
 __all__ = [
     "ClinicalSessionService",

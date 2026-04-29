@@ -48,7 +48,9 @@ def test_insufficient_pattern_labs_raise_blocker() -> None:
     analyzer = HepatotoxicityPatternAnalyzer()
     with pytest.raises(ClinicalPipelineValidationError) as exc_info:
         analyzer.assess_payload(PatientLabTimeline(entries=[]))
-    assert any(issue.code == "missing_hepatotoxicity_inputs" for issue in exc_info.value.issues)
+    assert any(
+        issue.code == "missing_hepatotoxicity_inputs" for issue in exc_info.value.issues
+    )
 
 
 def test_non_critical_missing_data_does_not_block() -> None:
@@ -93,4 +95,3 @@ def test_non_critical_missing_data_does_not_block() -> None:
         )
     )
     assert assessment.status == "ok"
-

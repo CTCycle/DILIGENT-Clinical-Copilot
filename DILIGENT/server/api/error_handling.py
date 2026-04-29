@@ -171,7 +171,9 @@ def service_error_handler(
         request.url.path,
         type(exc).__name__,
     )
-    detail = exc.detail if isinstance(exc.detail, (str, list, dict)) else str(exc.detail)
+    detail = (
+        exc.detail if isinstance(exc.detail, (str, list, dict)) else str(exc.detail)
+    )
     response = JSONResponse(
         status_code=int(exc.status_code),
         content=build_error_payload(

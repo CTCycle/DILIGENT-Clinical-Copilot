@@ -6,7 +6,11 @@ from fastapi.responses import PlainTextResponse
 from DILIGENT.server.domain.clinical.entities import (
     ClinicalSessionRequest,
 )
-from DILIGENT.server.domain.jobs import JobCancelResponse, JobStartResponse, JobStatusResponse
+from DILIGENT.server.domain.jobs import (
+    JobCancelResponse,
+    JobStartResponse,
+    JobStatusResponse,
+)
 from DILIGENT.server.services.clinical.hepatox_core import HepatoxConsultation
 from DILIGENT.server.services.clinical.preparation import ClinicalKnowledgePreparation
 from DILIGENT.server.services.runtime.jobs import job_manager
@@ -90,4 +94,3 @@ router.add_api_route(
     response_model=JobCancelResponse,
     status_code=status.HTTP_200_OK,
 )
-

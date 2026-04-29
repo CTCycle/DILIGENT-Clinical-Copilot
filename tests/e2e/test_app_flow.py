@@ -1,6 +1,7 @@
 """
 E2E tests for UI navigation and key UI workflows.
 """
+
 import re
 
 from playwright.sync_api import Page, Route, expect
@@ -9,7 +10,9 @@ from playwright.sync_api import Page, Route, expect
 def _fill_required_dili_fields(page: Page) -> None:
     page.get_by_label("Anamnesis").fill("Acute abdominal discomfort with fatigue.")
     page.get_by_label("Current Drugs").fill("Amoxicillin 500 mg BID for 7 days.")
-    page.get_by_label("Laboratory Analysis").fill("ALT 210 U/L; AST 180 U/L; ALP 130 U/L.")
+    page.get_by_label("Laboratory Analysis").fill(
+        "ALT 210 U/L; AST 180 U/L; ALP 130 U/L."
+    )
     page.get_by_label("Patient Name").fill("Marco Rossi")
     page.get_by_label("Visit Date").fill("2026-04-20")
 

@@ -19,4 +19,3 @@ if __name__ == "__main__":
     initialize_database()
     elapsed = time.perf_counter() - start
     logger.info("Database initialization completed in %.2f seconds", elapsed)
-

@@ -86,10 +86,7 @@ def test_extract_drugs_from_anamnesis_chunks_long_input() -> None:
     )
     parser = DrugsParser(client=client)
     long_text = "\n".join(
-        [
-            "Anamnesis line without medication details."
-            for _ in range(80)
-        ]
+        ["Anamnesis line without medication details." for _ in range(80)]
     )
 
     parsed = asyncio.run(parser.extract_drugs_from_anamnesis(long_text))

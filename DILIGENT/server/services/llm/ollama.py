@@ -14,10 +14,21 @@ from DILIGENT.server.common.exceptions import (
 )
 from DILIGENT.server.common.utils.logger import logger
 from DILIGENT.server.configurations.startup import server_settings
-from DILIGENT.server.domain.jobs import JobCancelResponse, JobStartResponse, JobStatusResponse
+from DILIGENT.server.domain.jobs import (
+    JobCancelResponse,
+    JobStartResponse,
+    JobStatusResponse,
+)
 from DILIGENT.server.domain.models import ModelListResponse, ModelPullResponse
-from DILIGENT.server.services.runtime.jobs import JobManager, job_manager as default_job_manager
-from DILIGENT.server.services.llm.providers import OllamaClient, OllamaError, OllamaTimeout
+from DILIGENT.server.services.runtime.jobs import (
+    JobManager,
+    job_manager as default_job_manager,
+)
+from DILIGENT.server.services.llm.providers import (
+    OllamaClient,
+    OllamaError,
+    OllamaTimeout,
+)
 
 SAFE_OLLAMA_MODEL_RE = re.compile(r"^[A-Za-z0-9][A-Za-z0-9._:/+\-]{0,199}$")
 
@@ -120,7 +131,8 @@ class PullProgressUpdater:
         total = coerce_positive_float(event.get("total"))
         completed = coerce_positive_float(event.get("completed"))
         progress_patch: dict[str, Any] = {
-            "progress_status": str(event.get("status", "")).strip().lower() or "running",
+            "progress_status": str(event.get("status", "")).strip().lower()
+            or "running",
             "progress_message": resolve_pull_progress_message(self.name, event),
         }
         if total is not None:
@@ -166,7 +178,9 @@ async def pull_model_async(
                     initial_progress=initial_progress,
                     jobs=jobs,
                 )
-                await client.pull(name, stream=stream, progress_callback=progress_updater)
+                await client.pull(
+                    name, stream=stream, progress_callback=progress_updater
+                )
             else:
                 await client.pull(name, stream=stream)
 
@@ -324,4 +338,3 @@ class OllamaService:
             return ModelListResponse(models=models, count=len(models))
         except (OllamaTimeout, OllamaError, Exception) as exc:
             self.raise_ollama_service_error(exc, action="listing models")
-

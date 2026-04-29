@@ -37,14 +37,18 @@ class AccessKeyEncryptionMaterialSerializer:
     ) -> AccessKeyEncryptionMaterial:
         db_session = self.session_factory()
         try:
-            existing = db_session.execute(
-                select(AccessKeyEncryptionMaterial)
-                .where(AccessKeyEncryptionMaterial.key_purpose == purpose)
-                .order_by(
-                    AccessKeyEncryptionMaterial.key_version.desc(),
-                    AccessKeyEncryptionMaterial.id.desc(),
+            existing = (
+                db_session.execute(
+                    select(AccessKeyEncryptionMaterial)
+                    .where(AccessKeyEncryptionMaterial.key_purpose == purpose)
+                    .order_by(
+                        AccessKeyEncryptionMaterial.key_version.desc(),
+                        AccessKeyEncryptionMaterial.id.desc(),
+                    )
                 )
-            ).scalars().first()
+                .scalars()
+                .first()
+            )
             if existing is not None:
                 return existing
 
@@ -73,14 +77,20 @@ class AccessKeyEncryptionMaterialSerializer:
     ) -> AccessKeyEncryptionMaterial:
         db_session = self.session_factory()
         try:
-            row = db_session.execute(
-                select(AccessKeyEncryptionMaterial).where(
-                    AccessKeyEncryptionMaterial.key_purpose == purpose,
-                    AccessKeyEncryptionMaterial.is_active.is_(True),
+            row = (
+                db_session.execute(
+                    select(AccessKeyEncryptionMaterial).where(
+                        AccessKeyEncryptionMaterial.key_purpose == purpose,
+                        AccessKeyEncryptionMaterial.is_active.is_(True),
+                    )
                 )
-            ).scalars().first()
+                .scalars()
+                .first()
+            )
             if row is None:
-                raise RuntimeError(f"No active encryption material configured for {purpose}")
+                raise RuntimeError(
+                    f"No active encryption material configured for {purpose}"
+                )
             return row
         finally:
             db_session.close()
@@ -93,12 +103,16 @@ class AccessKeyEncryptionMaterialSerializer:
     ) -> AccessKeyEncryptionMaterial | None:
         db_session = self.session_factory()
         try:
-            return db_session.execute(
-                select(AccessKeyEncryptionMaterial).where(
-                    AccessKeyEncryptionMaterial.key_purpose == purpose,
-                    AccessKeyEncryptionMaterial.key_version == version,
+            return (
+                db_session.execute(
+                    select(AccessKeyEncryptionMaterial).where(
+                        AccessKeyEncryptionMaterial.key_purpose == purpose,
+                        AccessKeyEncryptionMaterial.key_version == version,
+                    )
                 )
-            ).scalars().first()
+                .scalars()
+                .first()
+            )
         finally:
             db_session.close()
 
@@ -108,14 +122,20 @@ class AccessKeyEncryptionMaterialSerializer:
     ) -> AccessKeyEncryptionMaterial:
         db_session = self.session_factory()
         try:
-            active = db_session.execute(
-                select(AccessKeyEncryptionMaterial).where(
-                    AccessKeyEncryptionMaterial.key_purpose == purpose,
-                    AccessKeyEncryptionMaterial.is_active.is_(True),
+            active = (
+                db_session.execute(
+                    select(AccessKeyEncryptionMaterial).where(
+                        AccessKeyEncryptionMaterial.key_purpose == purpose,
+                        AccessKeyEncryptionMaterial.is_active.is_(True),
+                    )
                 )
-            ).scalars().first()
+                .scalars()
+                .first()
+            )
             if active is None:
-                raise RuntimeError(f"No active encryption material configured for {purpose}")
+                raise RuntimeError(
+                    f"No active encryption material configured for {purpose}"
+                )
 
             now = datetime.now(UTC).replace(tzinfo=None)
             next_version = int(active.key_version) + 1

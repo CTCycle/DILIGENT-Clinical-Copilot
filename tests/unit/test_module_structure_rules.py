@@ -24,9 +24,17 @@ def _is_dataclass_decorator(decorator: ast.expr) -> bool:
 
 def _is_pydantic_model(class_node: ast.ClassDef) -> bool:
     for base in class_node.bases:
-        if isinstance(base, ast.Name) and base.id in {"BaseModel", "BaseSettings", "RootModel"}:
+        if isinstance(base, ast.Name) and base.id in {
+            "BaseModel",
+            "BaseSettings",
+            "RootModel",
+        }:
             return True
-        if isinstance(base, ast.Attribute) and base.attr in {"BaseModel", "BaseSettings", "RootModel"}:
+        if isinstance(base, ast.Attribute) and base.attr in {
+            "BaseModel",
+            "BaseSettings",
+            "RootModel",
+        }:
             return True
     return False
 
@@ -36,7 +44,9 @@ def _format_violation(path: Path, node: ast.AST, label: str) -> str:
     return f"{path.as_posix()}:{line} ({label})"
 
 
-def _is_top_level_import(tree: ast.Module, import_node: ast.Import | ast.ImportFrom) -> bool:
+def _is_top_level_import(
+    tree: ast.Module, import_node: ast.Import | ast.ImportFrom
+) -> bool:
     return import_node in tree.body
 
 
@@ -64,7 +74,9 @@ def test_no_nested_local_python_functions() -> None:
                 self.function_depth -= 1
 
         Visitor().visit(tree)
-    assert not violations, "Nested local functions are forbidden:\n" + "\n".join(violations)
+    assert not violations, "Nested local functions are forbidden:\n" + "\n".join(
+        violations
+    )
 
 
 def test_no_conditional_python_imports() -> None:
@@ -83,16 +95,22 @@ def test_no_conditional_python_imports() -> None:
 
             def visit_Import(self, node: ast.Import) -> None:
                 if self.if_depth > 0:
-                    violations.append(_format_violation(path, node, "conditional import"))
+                    violations.append(
+                        _format_violation(path, node, "conditional import")
+                    )
                 self.generic_visit(node)
 
             def visit_ImportFrom(self, node: ast.ImportFrom) -> None:
                 if self.if_depth > 0:
-                    violations.append(_format_violation(path, node, "conditional import"))
+                    violations.append(
+                        _format_violation(path, node, "conditional import")
+                    )
                 self.generic_visit(node)
 
         Visitor().visit(tree)
-    assert not violations, "Conditional imports are forbidden:\n" + "\n".join(violations)
+    assert not violations, "Conditional imports are forbidden:\n" + "\n".join(
+        violations
+    )
 
 
 def test_models_live_under_domain() -> None:
@@ -104,11 +122,17 @@ def test_models_live_under_domain() -> None:
         for node in ast.walk(tree):
             if not isinstance(node, ast.ClassDef):
                 continue
-            if any(_is_dataclass_decorator(decorator) for decorator in node.decorator_list):
-                violations.append(_format_violation(path, node, "dataclass outside domain"))
+            if any(
+                _is_dataclass_decorator(decorator) for decorator in node.decorator_list
+            ):
+                violations.append(
+                    _format_violation(path, node, "dataclass outside domain")
+                )
                 continue
             if _is_pydantic_model(node):
-                violations.append(_format_violation(path, node, "pydantic model outside domain"))
+                violations.append(
+                    _format_violation(path, node, "pydantic model outside domain")
+                )
     assert not violations, (
         "Dataclasses and Pydantic models must be defined under DILIGENT/server/domain:\n"
         + "\n".join(violations)
@@ -125,12 +149,19 @@ def test_services_do_not_import_fastapi() -> None:
                 for alias in node.names:
                     name = alias.name
                     if name == "fastapi" or name.startswith("fastapi."):
-                        violations.append(_format_violation(path, node, "fastapi import in services"))
+                        violations.append(
+                            _format_violation(path, node, "fastapi import in services")
+                        )
             elif isinstance(node, ast.ImportFrom):
                 module = node.module or ""
                 if module == "fastapi" or module.startswith("fastapi."):
-                    violations.append(_format_violation(path, node, "fastapi import in services"))
-    assert not violations, "FastAPI imports are forbidden under DILIGENT/server/services:\n" + "\n".join(violations)
+                    violations.append(
+                        _format_violation(path, node, "fastapi import in services")
+                    )
+    assert not violations, (
+        "FastAPI imports are forbidden under DILIGENT/server/services:\n"
+        + "\n".join(violations)
+    )
 
 
 def test_backend_imports_are_top_level_only() -> None:
@@ -149,4 +180,6 @@ def test_backend_imports_are_top_level_only() -> None:
             if not _is_top_level_import(tree, node):
                 violations.append(f"{path.as_posix()}:{node.lineno}")
 
-    assert not violations, "Imports inside functions/classes are forbidden:\n" + "\n".join(violations)
+    assert not violations, (
+        "Imports inside functions/classes are forbidden:\n" + "\n".join(violations)
+    )

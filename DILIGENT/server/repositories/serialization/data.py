@@ -56,7 +56,10 @@ from DILIGENT.server.repositories.serialization.text_normalization import (
 from DILIGENT.server.repositories.vectors import LanceVectorDatabase
 from DILIGENT.server.services.retrieval.embeddings import EmbeddingGenerator
 from DILIGENT.server.services.text.normalization import coerce_text, normalize_drug_name
-from DILIGENT.server.services.text.synonyms import parse_synonym_list, split_synonym_variants
+from DILIGENT.server.services.text.synonyms import (
+    parse_synonym_list,
+    split_synonym_variants,
+)
 from DILIGENT.server.services.text.vocabulary import (
     invalidate_text_normalization_snapshot,
 )
@@ -89,9 +92,15 @@ class _RepositorySerializationService:
                 session_timestamp=self.parse_datetime(
                     session_data.get("session_timestamp")
                 ),
-                hepatic_pattern=self.normalize_string(session_data.get("hepatic_pattern")),
-                text_extraction_model=self.normalize_string(session_data.get("text_extraction_model")),
-                clinical_model=self.normalize_string(session_data.get("clinical_model")),
+                hepatic_pattern=self.normalize_string(
+                    session_data.get("hepatic_pattern")
+                ),
+                text_extraction_model=self.normalize_string(
+                    session_data.get("text_extraction_model")
+                ),
+                clinical_model=self.normalize_string(
+                    session_data.get("clinical_model")
+                ),
                 total_duration=self.to_float(session_data.get("total_duration")),
                 session_status=self.normalize_session_status(
                     session_data.get("session_status")
@@ -125,7 +134,9 @@ class _RepositorySerializationService:
             KbMatchCache.__tablename__,
         )
         missing_tables = [
-            table_name for table_name in required_tables if not inspector.has_table(table_name)
+            table_name
+            for table_name in required_tables
+            if not inspector.has_table(table_name)
         ]
         if missing_tables:
             joined = ", ".join(missing_tables)
@@ -139,7 +150,9 @@ class _RepositorySerializationService:
             Drug.__tablename__: {"rxnav_last_update"},
         }
         for table_name, columns in required_columns.items():
-            existing = {str(item.get("name")) for item in inspector.get_columns(table_name)}
+            existing = {
+                str(item.get("name")) for item in inspector.get_columns(table_name)
+            }
             missing = sorted(columns - existing)
             if missing:
                 joined = ", ".join(missing)
@@ -159,14 +172,22 @@ class _RepositorySerializationService:
         return "successful"
 
     # -----------------------------------------------------------------------------
-    def persist_patient(self, db_session: Session, session_data: dict[str, Any]) -> Patient:
+    def persist_patient(
+        self, db_session: Session, session_data: dict[str, Any]
+    ) -> Patient:
         patient = Patient(
             name=self.normalize_string(session_data.get("patient_name")),
-            visit_date=self.normalize_date_value(session_data.get("patient_visit_date")),
+            visit_date=self.normalize_date_value(
+                session_data.get("patient_visit_date")
+            ),
             anamnesis=self.normalize_string(session_data.get("anamnesis")),
             drugs=self.normalize_string(session_data.get("drugs")),
-            laboratory_analysis=self.normalize_string(session_data.get("laboratory_analysis")),
-            image_blob=self.decode_patient_image(session_data.get("patient_image_base64")),
+            laboratory_analysis=self.normalize_string(
+                session_data.get("laboratory_analysis")
+            ),
+            image_blob=self.decode_patient_image(
+                session_data.get("patient_image_base64")
+            ),
         )
         db_session.add(patient)
         db_session.flush()
@@ -182,7 +203,7 @@ class _RepositorySerializationService:
             payload = payload.split(",", maxsplit=1)[1].strip()
         try:
             return base64.b64decode(payload, validate=True)
-        except (binascii.Error, ValueError):
+        except binascii.Error, ValueError:
             logger.warning("Skipping invalid patient image payload during session save")
             return None
 
@@ -313,7 +334,9 @@ class _RepositorySerializationService:
             row.get("secondary_classification")
         )
         include_flag = self.normalize_flag(row.get("include_in_livertox"))
-        monograph.include_in_livertox = None if include_flag is None else include_flag == 1
+        monograph.include_in_livertox = (
+            None if include_flag is None else include_flag == 1
+        )
         monograph.source_url = self.normalize_string(row.get("source_url"))
         monograph.source_last_modified = self.normalize_string(
             row.get("source_last_modified")
@@ -345,10 +368,14 @@ class _RepositorySerializationService:
     # -----------------------------------------------------------------------------
     def build_livertox_monograph_key(self, row: dict[str, Any]) -> str:
         identity_payload = {
-            "drug_name_norm": self.normalize_string(row.get("_canonical_name_norm")) or "",
+            "drug_name_norm": self.normalize_string(row.get("_canonical_name_norm"))
+            or "",
             "nbk_id": self.normalize_string(row.get("nbk_id")) or "",
             "source_url": self.normalize_string(row.get("source_url")) or "",
-            "source_last_modified": self.normalize_string(row.get("source_last_modified")) or "",
+            "source_last_modified": self.normalize_string(
+                row.get("source_last_modified")
+            )
+            or "",
         }
         serialized = json.dumps(identity_payload, sort_keys=True, separators=(",", ":"))
         return hashlib.sha256(serialized.encode("utf-8")).hexdigest()
@@ -607,11 +634,19 @@ class _RepositorySerializationService:
                     {
                         "drug_name": self.normalize_string(drug.canonical_name),
                         "nbk_id": self.normalize_string(monograph.nbk_id),
-                        "ingredient": self.join_values(grouped_aliases.get("ingredient", set())),
-                        "brand_name": self.join_values(grouped_aliases.get("brand", set())),
-                        "synonyms": self.join_values(grouped_aliases.get("synonym", set())),
+                        "ingredient": self.join_values(
+                            grouped_aliases.get("ingredient", set())
+                        ),
+                        "brand_name": self.join_values(
+                            grouped_aliases.get("brand", set())
+                        ),
+                        "synonyms": self.join_values(
+                            grouped_aliases.get("synonym", set())
+                        ),
                         "excerpt": self.normalize_string(monograph.excerpt),
-                        "likelihood_score": self.normalize_string(monograph.likelihood_score),
+                        "likelihood_score": self.normalize_string(
+                            monograph.likelihood_score
+                        ),
                         "last_update": self.normalize_string(monograph.last_update),
                         "reference_count": monograph.reference_count,
                         "year_approved": monograph.year_approved,
@@ -642,11 +677,15 @@ class _RepositorySerializationService:
         frame = self.get_livertox_records()
         if frame.empty:
             return pd.DataFrame(columns=LIVERTOX_MASTER_COLUMNS)
-        available = [column for column in LIVERTOX_MASTER_COLUMNS if column in frame.columns]
+        available = [
+            column for column in LIVERTOX_MASTER_COLUMNS if column in frame.columns
+        ]
         if not available:
             return pd.DataFrame(columns=["drug_name"])
-        return frame.reindex(columns=available).dropna(subset=["drug_name"]).reset_index(
-            drop=True
+        return (
+            frame.reindex(columns=available)
+            .dropna(subset=["drug_name"])
+            .reset_index(drop=True)
         )
 
     # -----------------------------------------------------------------------------
@@ -683,7 +722,8 @@ class _RepositorySerializationService:
             rxcui_values = {
                 normalized_rxcui
                 for normalized_rxcui in (
-                    self.normalize_string(mapping.rxcui) for mapping in drug.rxnorm_codes
+                    self.normalize_string(mapping.rxcui)
+                    for mapping in drug.rxnorm_codes
                 )
                 if normalized_rxcui is not None
             }
@@ -693,19 +733,25 @@ class _RepositorySerializationService:
             if not rxcui_values:
                 continue
             raw_name = self.first_alias_model_value(rxnorm_aliases, "raw_name")
-            standard_name = self.first_alias_model_value(rxnorm_aliases, "standard_name")
+            standard_name = self.first_alias_model_value(
+                rxnorm_aliases, "standard_name"
+            )
             term_type = self.first_alias_model_term_type(rxnorm_aliases)
             brand_names = self.join_values(
                 self.alias_model_values_for_kind(rxnorm_aliases, "brand")
             )
-            synonyms = sorted(self.alias_model_values_for_kind(rxnorm_aliases, "synonym"))
+            synonyms = sorted(
+                self.alias_model_values_for_kind(rxnorm_aliases, "synonym")
+            )
             for rxcui in sorted(rxcui_values):
                 records.append(
                     {
                         "rxcui": rxcui,
-                        "raw_name": raw_name or self.normalize_string(drug.canonical_name),
+                        "raw_name": raw_name
+                        or self.normalize_string(drug.canonical_name),
                         "term_type": term_type,
-                        "name": standard_name or self.normalize_string(drug.canonical_name),
+                        "name": standard_name
+                        or self.normalize_string(drug.canonical_name),
                         "brand_names": brand_names,
                         "synonyms": json.dumps(synonyms, ensure_ascii=False),
                     }
@@ -794,9 +840,7 @@ class _RepositorySerializationService:
         )
         if normalized_status_filter in {"successful", "failed"}:
             conditions.append(
-                func.lower(
-                    func.coalesce(ClinicalSession.session_status, "successful")
-                )
+                func.lower(func.coalesce(ClinicalSession.session_status, "successful"))
                 == normalized_status_filter
             )
         if filter_date is not None and date_mode in {"before", "after", "exact"}:
@@ -826,17 +870,14 @@ class _RepositorySerializationService:
                 sessions_stmt = sessions_stmt.where(combined)
                 count_stmt = count_stmt.where(combined)
             total_rows = int(db_session.execute(count_stmt).scalar_one())
-            rows = (
-                db_session.execute(
-                    sessions_stmt.order_by(
-                        ClinicalSession.session_timestamp.desc(),
-                        ClinicalSession.id.desc(),
-                    )
-                    .offset(safe_offset)
-                    .limit(safe_limit)
+            rows = db_session.execute(
+                sessions_stmt.order_by(
+                    ClinicalSession.session_timestamp.desc(),
+                    ClinicalSession.id.desc(),
                 )
-                .all()
-            )
+                .offset(safe_offset)
+                .limit(safe_limit)
+            ).all()
             session_ids = [int(session_row.id) for session_row, _ in rows]
             report_session_ids: set[int] = set()
             timeline_session_ids: set[int] = set()
@@ -923,7 +964,9 @@ class _RepositorySerializationService:
             db_session.close()
 
     # -----------------------------------------------------------------------------
-    def parse_session_result_payload(self, payload_json: str | None) -> dict[str, Any] | None:
+    def parse_session_result_payload(
+        self, payload_json: str | None
+    ) -> dict[str, Any] | None:
         normalized_payload = self.normalize_string(payload_json)
         if normalized_payload is None:
             return None
@@ -949,7 +992,9 @@ class _RepositorySerializationService:
             db_session.close()
 
     # -----------------------------------------------------------------------------
-    def upsert_session_result_payload(self, session_id: int, payload: dict[str, Any]) -> bool:
+    def upsert_session_result_payload(
+        self, session_id: int, payload: dict[str, Any]
+    ) -> bool:
         self.ensure_session_result_table()
         safe_session_id = int(session_id)
         serialized_payload = self.serialize_json_payload(payload)
@@ -1003,9 +1048,9 @@ class _RepositorySerializationService:
             ).scalar_one_or_none()
             session_payload = self.parse_session_result_payload(payload_json) or {}
             section_rows = db_session.execute(
-                select(ClinicalSessionSection.section_kind, ClinicalSessionSection.content).where(
-                    ClinicalSessionSection.session_id == safe_session_id
-                )
+                select(
+                    ClinicalSessionSection.section_kind, ClinicalSessionSection.content
+                ).where(ClinicalSessionSection.session_id == safe_session_id)
             ).all()
             sections = {
                 str(kind): self.normalize_string(content)
@@ -1015,7 +1060,9 @@ class _RepositorySerializationService:
             return {
                 "session_id": safe_session_id,
                 "patient_name": self.normalize_string(patient_row.name),
-                "visit_date": patient_row.visit_date.isoformat() if patient_row.visit_date else None,
+                "visit_date": patient_row.visit_date.isoformat()
+                if patient_row.visit_date
+                else None,
                 "session_timestamp": (
                     session_row.session_timestamp.isoformat()
                     if session_row.session_timestamp
@@ -1023,8 +1070,12 @@ class _RepositorySerializationService:
                 ),
                 "anamnesis": self.normalize_string(patient_row.anamnesis),
                 "drugs": self.normalize_string(patient_row.drugs),
-                "laboratory_analysis": self.normalize_string(patient_row.laboratory_analysis),
-                "text_extraction_model": self.normalize_string(session_row.text_extraction_model),
+                "laboratory_analysis": self.normalize_string(
+                    patient_row.laboratory_analysis
+                ),
+                "text_extraction_model": self.normalize_string(
+                    session_row.text_extraction_model
+                ),
                 "clinical_model": self.normalize_string(session_row.clinical_model),
                 "sections": sections,
                 "session_result_payload": session_payload,
@@ -1312,15 +1363,19 @@ class _RepositorySerializationService:
                     "drug_name": None,
                     "livertox_excerpt": None,
                 }
-            monographs = db_session.execute(
-                select(LiverToxMonograph)
-                .where(LiverToxMonograph.drug_id == safe_drug_id)
-                .order_by(
-                    LiverToxMonograph.last_update.desc(),
-                    LiverToxMonograph.source_last_modified.desc(),
-                    LiverToxMonograph.id.asc(),
+            monographs = (
+                db_session.execute(
+                    select(LiverToxMonograph)
+                    .where(LiverToxMonograph.drug_id == safe_drug_id)
+                    .order_by(
+                        LiverToxMonograph.last_update.desc(),
+                        LiverToxMonograph.source_last_modified.desc(),
+                        LiverToxMonograph.id.asc(),
+                    )
                 )
-            ).scalars().all()
+                .scalars()
+                .all()
+            )
             livertox_excerpt = next(
                 (
                     self.normalize_string(monograph.excerpt)
@@ -1362,14 +1417,20 @@ class _RepositorySerializationService:
                 .where(ClinicalSessionDrug.drug_id == safe_drug_id)
                 .values(drug_id=None)
             )
-            db_session.execute(delete(DrugAlias).where(DrugAlias.drug_id == safe_drug_id))
+            db_session.execute(
+                delete(DrugAlias).where(DrugAlias.drug_id == safe_drug_id)
+            )
             db_session.execute(
                 delete(DrugRxnormCode).where(DrugRxnormCode.drug_id == safe_drug_id)
             )
             db_session.execute(
-                delete(LiverToxMonograph).where(LiverToxMonograph.drug_id == safe_drug_id)
+                delete(LiverToxMonograph).where(
+                    LiverToxMonograph.drug_id == safe_drug_id
+                )
             )
-            db_session.execute(delete(KbMatchCache).where(KbMatchCache.drug_id == safe_drug_id))
+            db_session.execute(
+                delete(KbMatchCache).where(KbMatchCache.drug_id == safe_drug_id)
+            )
             db_session.execute(delete(Drug).where(Drug.id == safe_drug_id))
             db_session.commit()
             return True
@@ -1413,7 +1474,7 @@ class _RepositorySerializationService:
             return 0
         try:
             numeric = int(normalized)
-        except (TypeError, ValueError):
+        except TypeError, ValueError:
             return None
         return 1 if numeric != 0 else 0
 
@@ -1471,7 +1532,7 @@ class _RepositorySerializationService:
             return None
         try:
             return int(float(normalized))
-        except (TypeError, ValueError):
+        except TypeError, ValueError:
             return None
 
     # -----------------------------------------------------------------------------
@@ -1481,7 +1542,7 @@ class _RepositorySerializationService:
             return None
         try:
             return float(normalized)
-        except (TypeError, ValueError):
+        except TypeError, ValueError:
             return None
 
     # -----------------------------------------------------------------------------
@@ -1558,8 +1619,12 @@ class _RepositorySerializationService:
             lab_code = persisted_codes.get(marker_name.upper())
             if lab_code is None:
                 continue
-            value_raw = self.normalize_string(item.get("value")) or self.normalize_string(item.get("value_text"))
-            upper_limit_raw = self.normalize_string(item.get("upper_limit_normal")) or self.normalize_string(item.get("upper_limit_text"))
+            value_raw = self.normalize_string(
+                item.get("value")
+            ) or self.normalize_string(item.get("value_text"))
+            upper_limit_raw = self.normalize_string(
+                item.get("upper_limit_normal")
+            ) or self.normalize_string(item.get("upper_limit_text"))
             if value_raw is None and upper_limit_raw is None:
                 continue
             existing_value_raw, existing_upper_limit_raw = rows_by_lab_code.get(
@@ -1720,7 +1785,10 @@ class _RepositorySerializationService:
             cache.invalidated_at = datetime.utcnow()
             cache.invalidation_reason = "matched_drug_deleted"
             return None
-        if cache.rxnorm_rxcui and self.get_drug_by_rxcui(db_session, cache.rxnorm_rxcui) is None:
+        if (
+            cache.rxnorm_rxcui
+            and self.get_drug_by_rxcui(db_session, cache.rxnorm_rxcui) is None
+        ):
             cache.invalidated_at = datetime.utcnow()
             cache.invalidation_reason = "rxnorm_code_no_longer_resolves"
             return None
@@ -1796,7 +1864,9 @@ class _RepositorySerializationService:
                     normalized_drug_key=normalized_drug_key,
                     drug_id=drug_id,
                     rxnorm_rxcui=rxnorm_rxcui,
-                    livertox_monograph_key=monograph.monograph_key if monograph else None,
+                    livertox_monograph_key=monograph.monograph_key
+                    if monograph
+                    else None,
                     livertox_nbk_id=livertox_nbk_id,
                     source=source,
                     confidence=confidence,
@@ -1842,7 +1912,7 @@ class _RepositorySerializationService:
             return self.normalize_string(payload)
         try:
             return json.dumps(payload, ensure_ascii=False, default=str)
-        except (TypeError, ValueError):
+        except TypeError, ValueError:
             return self.normalize_string(payload)
 
     # -----------------------------------------------------------------------------
@@ -1978,7 +2048,9 @@ class _RepositorySerializationService:
         if normalized_rxcui is None:
             return
         existing = (
-            db_session.execute(DrugRepositoryQueries.drug_rxcui_mapping(normalized_rxcui))
+            db_session.execute(
+                DrugRepositoryQueries.drug_rxcui_mapping(normalized_rxcui)
+            )
             .scalars()
             .first()
         )
@@ -2001,14 +2073,18 @@ class _RepositorySerializationService:
         if normalized_rxcui is None:
             return None
         mapped = (
-            db_session.execute(DrugRepositoryQueries.drug_by_joined_rxcui(normalized_rxcui))
+            db_session.execute(
+                DrugRepositoryQueries.drug_by_joined_rxcui(normalized_rxcui)
+            )
             .scalars()
             .first()
         )
         if mapped is not None:
             return mapped
         return (
-            db_session.execute(DrugRepositoryQueries.drug_by_rxnorm_rxcui(normalized_rxcui))
+            db_session.execute(
+                DrugRepositoryQueries.drug_by_rxnorm_rxcui(normalized_rxcui)
+            )
             .scalars()
             .first()
         )
@@ -2229,7 +2305,9 @@ class _RepositorySerializationService:
     ) -> set[str]:
         values: set[str] = set()
         for alias in aliases:
-            if (self.normalize_string(alias.alias_kind) or "").casefold() != alias_kind.casefold():
+            if (
+                self.normalize_string(alias.alias_kind) or ""
+            ).casefold() != alias_kind.casefold():
                 continue
             normalized = self.normalize_string(alias.alias)
             if normalized is not None:
@@ -2238,7 +2316,9 @@ class _RepositorySerializationService:
 
     # -----------------------------------------------------------------------------
     def first_alias_value(self, aliases: pd.DataFrame, alias_kind: str) -> str | None:
-        values = sorted(self.alias_values_for_kind(aliases, alias_kind), key=str.casefold)
+        values = sorted(
+            self.alias_values_for_kind(aliases, alias_kind), key=str.casefold
+        )
         return values[0] if values else None
 
     # -----------------------------------------------------------------------------
@@ -2257,7 +2337,9 @@ class _RepositorySerializationService:
         aliases: list[DrugAlias],
         alias_kind: str,
     ) -> str | None:
-        values = sorted(self.alias_model_values_for_kind(aliases, alias_kind), key=str.casefold)
+        values = sorted(
+            self.alias_model_values_for_kind(aliases, alias_kind), key=str.casefold
+        )
         return values[0] if values else None
 
     # -----------------------------------------------------------------------------
@@ -2285,7 +2367,6 @@ class DataSerializer:
     # -------------------------------------------------------------------------
     def __getattr__(self, name: str) -> Any:
         return getattr(self.service, name)
-
 
 
 ###############################################################################
@@ -2381,7 +2462,9 @@ class DocumentSerializer:
         content = "\n".join(paragraphs).strip()
         if not content:
             return []
-        document = Document(page_content=content, metadata=self.build_metadata(file_path))
+        document = Document(
+            page_content=content, metadata=self.build_metadata(file_path)
+        )
         return [document]
 
     # -------------------------------------------------------------------------
@@ -2400,7 +2483,7 @@ class DocumentSerializer:
             try:
                 with open(file_path, "r", encoding=encoding) as handle:
                     text = handle.read()
-            except (OSError, UnicodeDecodeError):
+            except OSError, UnicodeDecodeError:
                 continue
             return text.strip()
         logger.error("Failed to read text file '%s'", file_path)
@@ -2467,7 +2550,9 @@ class DocumentChunker:
             for chunk_text, start_index in self.split_text(document.page_content):
                 chunk_metadata = dict(metadata)
                 chunk_metadata["start_index"] = start_index
-                chunks.append(Document(page_content=chunk_text, metadata=chunk_metadata))
+                chunks.append(
+                    Document(page_content=chunk_text, metadata=chunk_metadata)
+                )
         for index, chunk in enumerate(chunks):
             chunk.metadata["chunk_index"] = index
         return chunks
@@ -2501,13 +2586,15 @@ class VectorSerializer:
         self.embedding_generator = EmbeddingGenerator(
             backend=embedding_backend,
             ollama_base_url=ollama_base_url,
-            ollama_model=ollama_model,            
+            ollama_model=ollama_model,
             use_cloud_embeddings=use_cloud_embeddings,
             cloud_provider=cloud_provider,
             cloud_embedding_model=cloud_embedding_model,
         )
         resolved_batch_size = (
-            DEFAULT_EMBEDDING_BATCH_SIZE if embedding_batch_size is None else embedding_batch_size
+            DEFAULT_EMBEDDING_BATCH_SIZE
+            if embedding_batch_size is None
+            else embedding_batch_size
         )
         self.embedding_batch_size = max(int(resolved_batch_size), 1)
         resolved_workers = (
@@ -2585,7 +2672,9 @@ class VectorSerializer:
             document_id = str(chunk.metadata.get("document_id", ""))
             chunk_index = chunk.metadata.get("chunk_index")
             chunk_id = (
-                f"{document_id}:{chunk_index}" if chunk_index is not None else document_id
+                f"{document_id}:{chunk_index}"
+                if chunk_index is not None
+                else document_id
             )
             metadata = self.serialize_metadata(chunk.metadata)
             records.append(
@@ -2611,10 +2700,3 @@ class VectorSerializer:
             else:
                 serialized[key] = str(value)
         return serialized
-
-
-    
-
-
-
-
