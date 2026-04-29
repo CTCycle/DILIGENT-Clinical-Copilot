@@ -589,6 +589,7 @@ class ClinicalSessionService(ClinicalSessionFormattingMixin):
         lab_timeline: PatientLabTimeline,
         onset_context: LiverInjuryOnsetContext | None,
         pattern_score,
+        report_language: str,
         issues: list[PipelineIssue],
         progress_callback: Callable[[str, float], None] | None,
         stop_check: Callable[[], None] | None,
@@ -605,6 +606,7 @@ class ClinicalSessionService(ClinicalSessionFormattingMixin):
                 onset_context=onset_context,
                 pattern_score=pattern_score,
                 resolved_drugs=None,
+                report_language=report_language,
             )
             elapsed = time.perf_counter() - start_time
             logger.info("RUCAM estimation required %.4f seconds", elapsed)
@@ -698,6 +700,7 @@ class ClinicalSessionService(ClinicalSessionFormattingMixin):
         lab_timeline: PatientLabTimeline,
         onset_context: LiverInjuryOnsetContext | None,
         pattern_score,
+        report_language: str,
         prepared_inputs,
         rucam_bundle: PatientRucamAssessmentBundle,
         issues: list[PipelineIssue],
@@ -714,6 +717,7 @@ class ClinicalSessionService(ClinicalSessionFormattingMixin):
                 resolved_drugs=prepared_inputs.resolved_drugs
                 if prepared_inputs
                 else None,
+                report_language=report_language,
             )
         except Exception as exc:
             logger.warning("RUCAM re-estimation with LiverTox metadata failed: %s", exc)
@@ -978,6 +982,7 @@ class ClinicalSessionService(ClinicalSessionFormattingMixin):
             lab_timeline=lab_timeline,
             onset_context=onset_context,
             pattern_score=pattern_score,
+            report_language=report_language,
             issues=issues,
             progress_callback=progress_callback,
             stop_check=stop_check,
@@ -1015,6 +1020,7 @@ class ClinicalSessionService(ClinicalSessionFormattingMixin):
             lab_timeline=lab_timeline,
             onset_context=onset_context,
             pattern_score=pattern_score,
+            report_language=report_language,
             prepared_inputs=prepared_inputs,
             rucam_bundle=rucam_bundle,
             issues=issues,

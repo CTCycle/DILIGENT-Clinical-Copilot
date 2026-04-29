@@ -398,19 +398,27 @@ class DrugRucamAssessment(BaseModel):
         "mixed",
         "indeterminate",
     ] = Field(default="indeterminate")
-    total_score: int = Field(default=0)
+    total_score: int | None = Field(default=None)
     causality_category: Literal[
         "excluded",
         "unlikely",
         "possible",
         "probable",
         "highly probable",
+        "not assessable",
     ] = Field(default="excluded")
     confidence: Literal["low", "moderate", "high"] = Field(default="low")
     estimated: bool = Field(default=True)
     components: list[RucamComponentAssessment] = Field(default_factory=list)
     limitations: list[str] = Field(default_factory=list)
     summary: str | None = Field(default=None, max_length=2000)
+    calculation_method: Literal[
+        "source_reported",
+        "structured_rucam",
+        "not_calculated",
+    ] = Field(default="not_calculated")
+    score_source: str | None = Field(default=None, max_length=500)
+    data_sufficient: bool = Field(default=False)
 
     @field_validator("drug_name", "summary", mode="before")
     @classmethod

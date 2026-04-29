@@ -1,233 +1,58 @@
 from __future__ import annotations
 
-from DILIGENT.server.domain.clinical import (
-    ClinicalLabEntry,
-    DiseaseContextEntry,
-    DrugEntry,
-    HepatotoxicityPatternScore,
-    LiverInjuryOnsetContext,
-    PatientData,
-    PatientDiseaseContext,
-    PatientDrugs,
-    PatientLabTimeline,
-)
+from DILIGENT.server.domain.clinical import ClinicalLabEntry, DrugEntry, HepatotoxicityPatternScore, LiverInjuryOnsetContext, PatientData, PatientDiseaseContext, PatientDrugs, PatientLabTimeline
 from DILIGENT.server.services.clinical.rucam import RucamScoreEstimator
 
 
-def test_hepatocellular_case_uses_serial_alt_decline() -> None:
+def _base_inputs() -> tuple[PatientData, PatientDrugs, PatientLabTimeline]:
+    payload = PatientData(anamnesis='Viral causes excluded by serology.', drugs='Drug A')
+    drugs = PatientDrugs(entries=[DrugEntry(name='Drug A', therapy_start_date='2025-01-01', suspension_status=True)])
+    timeline = PatientLabTimeline(entries=[
+        ClinicalLabEntry(marker_name='ALT', value=320, upper_limit_normal=40, sample_date='2025-01-10', source='anamnesis'),
+        ClinicalLabEntry(marker_name='ALT', value=180, upper_limit_normal=40, sample_date='2025-01-20', source='anamnesis'),
+    ])
+    return payload, drugs, timeline
+
+
+def test_source_reported_rucam_score_is_used_directly() -> None:
     estimator = RucamScoreEstimator()
-    payload = PatientData(anamnesis="No alcohol use.", drugs="Drug A")
-    analysis = PatientDrugs(
-        entries=[DrugEntry(name="Drug A", therapy_start_date="2025-01-01")]
-    )
-    timeline = PatientLabTimeline(
-        entries=[
-            ClinicalLabEntry(
-                marker_name="ALT",
-                value=400,
-                upper_limit_normal=40,
-                sample_date="2025-01-10",
-                source="anamnesis",
-            ),
-            ClinicalLabEntry(
-                marker_name="ALT",
-                value=150,
-                upper_limit_normal=40,
-                sample_date="2025-01-18",
-                source="anamnesis",
-            ),
-        ]
-    )
-    bundle = estimator.estimate(
-        payload=payload,
-        analysis_drugs=analysis,
-        anamnesis_drugs=PatientDrugs(entries=[]),
-        disease_context=PatientDiseaseContext(entries=[]),
-        lab_timeline=timeline,
-        onset_context=LiverInjuryOnsetContext(
-            onset_date="2025-01-10", onset_basis="first_abnormal_lab"
-        ),
-        pattern_score=HepatotoxicityPatternScore(classification="hepatocellular"),
-        resolved_drugs={"drug a": {"matched_livertox_row": {"likelihood_score": "B"}}},
-    )
+    payload, analysis, timeline = _base_inputs()
+    bundle = estimator.estimate(payload=payload, analysis_drugs=analysis, anamnesis_drugs=PatientDrugs(entries=[]), disease_context=PatientDiseaseContext(entries=[]), lab_timeline=timeline, onset_context=LiverInjuryOnsetContext(onset_date='2025-01-10', onset_basis='first_abnormal_lab'), pattern_score=HepatotoxicityPatternScore(classification='hepatocellular'), resolved_drugs={'drug a': {'extracted_excerpts': ['LiverTox monograph: RUCAM score 8 in representative case.']}}, report_language='en')
     item = bundle.entries[0]
-    course = next(
-        component
-        for component in item.components
-        if component.component_key == "course"
-    )
-    assert course.status == "scored"
-    assert course.score >= 2
+    assert item.total_score == 8
+    assert item.calculation_method == 'source_reported'
+    assert item.data_sufficient is True
 
 
-def test_cholestatic_or_mixed_uses_alp_or_bilirubin_decline() -> None:
+def test_livertox_likelihood_score_is_not_treated_as_rucam() -> None:
     estimator = RucamScoreEstimator()
-    payload = PatientData(anamnesis="No notable history.", drugs="Drug A")
-    analysis = PatientDrugs(
-        entries=[DrugEntry(name="Drug A", therapy_start_date="2025-01-01")]
-    )
-    timeline = PatientLabTimeline(
-        entries=[
-            ClinicalLabEntry(
-                marker_name="ALP",
-                value=400,
-                upper_limit_normal=120,
-                sample_date="2025-01-10",
-                source="anamnesis",
-            ),
-            ClinicalLabEntry(
-                marker_name="ALP",
-                value=180,
-                upper_limit_normal=120,
-                sample_date="2025-03-10",
-                source="anamnesis",
-            ),
-        ]
-    )
-    bundle = estimator.estimate(
-        payload=payload,
-        analysis_drugs=analysis,
-        anamnesis_drugs=PatientDrugs(entries=[]),
-        disease_context=PatientDiseaseContext(entries=[]),
-        lab_timeline=timeline,
-        onset_context=LiverInjuryOnsetContext(
-            onset_date="2025-01-10", onset_basis="first_abnormal_lab"
-        ),
-        pattern_score=HepatotoxicityPatternScore(classification="mixed"),
-        resolved_drugs={},
-    )
+    payload, analysis, timeline = _base_inputs()
+    bundle = estimator.estimate(payload=payload, analysis_drugs=analysis, anamnesis_drugs=PatientDrugs(entries=[]), disease_context=PatientDiseaseContext(entries=[]), lab_timeline=timeline, onset_context=LiverInjuryOnsetContext(onset_date='2025-01-10', onset_basis='first_abnormal_lab'), pattern_score=HepatotoxicityPatternScore(classification='hepatocellular'), resolved_drugs={'drug a': {'matched_livertox_row': {'likelihood_score': 'B'}}}, report_language='en')
     item = bundle.entries[0]
-    assert item.injury_type_for_rucam == "cholestatic"
-    course = next(
-        component
-        for component in item.components
-        if component.component_key == "course"
-    )
-    assert course.score >= 1
+    assert item.calculation_method != 'source_reported'
 
 
-def test_visit_date_fallback_when_onset_missing() -> None:
+def test_insufficient_data_returns_not_calculated_assessment() -> None:
     estimator = RucamScoreEstimator()
-    payload = PatientData(
-        anamnesis="No onset clue.", drugs="Drug A", visit_date="2025-01-20"
-    )
-    analysis = PatientDrugs(
-        entries=[DrugEntry(name="Drug A", therapy_start_date="2025-01-01")]
-    )
-    bundle = estimator.estimate(
-        payload=payload,
-        analysis_drugs=analysis,
-        anamnesis_drugs=PatientDrugs(entries=[]),
-        disease_context=PatientDiseaseContext(entries=[]),
-        lab_timeline=PatientLabTimeline(entries=[]),
-        onset_context=None,
-        pattern_score=HepatotoxicityPatternScore(classification="indeterminate"),
-        resolved_drugs={},
-    )
-    onset = next(
-        component
-        for component in bundle.entries[0].components
-        if component.component_key == "time_to_onset"
-    )
-    assert onset.status == "scored"
-
-
-def test_missing_longitudinal_data_yields_course_zero_and_low_confidence() -> None:
-    estimator = RucamScoreEstimator()
-    payload = PatientData(anamnesis="Sparse follow-up.", drugs="Drug A")
-    analysis = PatientDrugs(
-        entries=[DrugEntry(name="Drug A", therapy_start_date="2025-01-01")]
-    )
-    timeline = PatientLabTimeline(
-        entries=[
-            ClinicalLabEntry(
-                marker_name="ALT",
-                value=300,
-                upper_limit_normal=40,
-                sample_date="2025-01-10",
-                source="anamnesis",
-            )
-        ]
-    )
-    bundle = estimator.estimate(
-        payload=payload,
-        analysis_drugs=analysis,
-        anamnesis_drugs=PatientDrugs(entries=[]),
-        disease_context=PatientDiseaseContext(entries=[]),
-        lab_timeline=timeline,
-        onset_context=LiverInjuryOnsetContext(
-            onset_date="2025-01-10", onset_basis="first_abnormal_lab"
-        ),
-        pattern_score=HepatotoxicityPatternScore(classification="hepatocellular"),
-        resolved_drugs={},
-    )
+    payload = PatientData(anamnesis='No exclusion details.', drugs='Drug A')
+    analysis = PatientDrugs(entries=[DrugEntry(name='Drug A')])
+    bundle = estimator.estimate(payload=payload, analysis_drugs=analysis, anamnesis_drugs=PatientDrugs(entries=[]), disease_context=PatientDiseaseContext(entries=[]), lab_timeline=PatientLabTimeline(entries=[]), onset_context=None, pattern_score=HepatotoxicityPatternScore(classification='indeterminate'), resolved_drugs={}, report_language='en')
     item = bundle.entries[0]
-    course = next(
-        component
-        for component in item.components
-        if component.component_key == "course"
-    )
-    assert course.score == 0
-    assert item.confidence == "low"
+    assert item.total_score is None
+    assert item.causality_category == 'not assessable'
+    assert item.calculation_method == 'not_calculated'
+    assert item.data_sufficient is False
 
 
-def test_alternative_cause_negative_scoring() -> None:
+def test_select_pattern_anchor_returns_qualifying_lab() -> None:
     estimator = RucamScoreEstimator()
-    payload = PatientData(anamnesis="Known chronic viral hepatitis.", drugs="Drug A")
-    analysis = PatientDrugs(entries=[DrugEntry(name="Drug A")])
-    disease_context = PatientDiseaseContext(
-        entries=[
-            DiseaseContextEntry(
-                name="Chronic viral hepatitis",
-                hepatic_related=True,
-                evidence="HBV chronic infection.",
-            )
-        ]
-    )
-    bundle = estimator.estimate(
-        payload=payload,
-        analysis_drugs=analysis,
-        anamnesis_drugs=PatientDrugs(entries=[]),
-        disease_context=disease_context,
-        lab_timeline=PatientLabTimeline(entries=[]),
-        onset_context=None,
-        pattern_score=HepatotoxicityPatternScore(classification="indeterminate"),
-        resolved_drugs={},
-    )
-    non_drug = next(
-        component
-        for component in bundle.entries[0].components
-        if component.component_key == "non_drug_causes"
-    )
-    assert non_drug.score == -3
+    anchor = estimator.select_pattern_anchor(payload=PatientData(drugs='x'), lab_timeline=PatientLabTimeline(entries=[ClinicalLabEntry(marker_name='ALT', value=200, upper_limit_normal=40, sample_date='2025-01-10', source='anamnesis')]))
+    assert anchor.source == 'qualifying_lab'
+    assert anchor.is_score_eligible is True
 
 
-def test_risk_factor_extraction_and_prior_hepatotoxicity_proxy() -> None:
+def test_visit_proxy_anchor_is_not_score_eligible() -> None:
     estimator = RucamScoreEstimator()
-    payload = PatientData(
-        anamnesis="67 years old, occasional alcohol use.", drugs="Drug A"
-    )
-    analysis = PatientDrugs(entries=[DrugEntry(name="Drug A")])
-    bundle = estimator.estimate(
-        payload=payload,
-        analysis_drugs=analysis,
-        anamnesis_drugs=PatientDrugs(entries=[]),
-        disease_context=PatientDiseaseContext(entries=[]),
-        lab_timeline=PatientLabTimeline(entries=[]),
-        onset_context=None,
-        pattern_score=HepatotoxicityPatternScore(classification="hepatocellular"),
-        resolved_drugs={"drug a": {"matched_livertox_row": {"likelihood_score": "A"}}},
-    )
-    item = bundle.entries[0]
-    risk = next(
-        component
-        for component in item.components
-        if component.component_key == "risk_factors"
-    )
-    prev = next(
-        component
-        for component in item.components
-        if component.component_key == "previous_hepatotoxicity"
-    )
-    assert risk.score >= 1
-    assert prev.score == 2
+    anchor = estimator.select_pattern_anchor(payload=PatientData(drugs='x', visit_date='2025-01-10'), lab_timeline=PatientLabTimeline(entries=[]))
+    assert anchor.source == 'visit_proxy'
+    assert anchor.is_score_eligible is False

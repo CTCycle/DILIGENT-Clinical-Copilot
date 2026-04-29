@@ -45,6 +45,11 @@ from DILIGENT.server.services.clinical.preparation import HepatoxPreparedInputs
 from DILIGENT.server.services.text.normalization import normalize_drug_query_name
 from DILIGENT.server.services.research.brave import brave_research_service
 from DILIGENT.server.services.text.vocabulary import get_text_normalization_snapshot
+from DILIGENT.server.services.clinical.report_language import (
+    phrase,
+    report_heading,
+    rucam_summary_text,
+)
 
 
 ###############################################################################
@@ -1440,10 +1445,14 @@ class HepatoxConsultation:
             unresolved_entries.append(entry)
 
         matched_sections = [
-            self.render_matched_drug_section(entry) for entry in matched_entries
+            self.render_matched_drug_section(entry, report_language=report_language)
+            for entry in matched_entries
         ]
         matched_sections = [section for section in matched_sections if section]
-        unresolved_section = self.render_unresolved_mentions_section(unresolved_entries)
+        unresolved_section = self.render_unresolved_mentions_section(
+            unresolved_entries,
+            report_language=report_language,
+        )
         sections: list[str] = []
         if matched_sections:
             sections.append("\n\n---\n\n".join(matched_sections))
@@ -1470,42 +1479,28 @@ class HepatoxConsultation:
         return status in {"matched", "matched_with_excerpt", "matched_no_excerpt"}
 
     # -------------------------------------------------------------------------
-    def render_matched_drug_section(self, entry: DrugClinicalAssessment) -> str:
+    def render_matched_drug_section(
+        self,
+        entry: DrugClinicalAssessment,
+        *,
+        report_language: str = "en",
+    ) -> str:
         score = self.resolve_livertox_score(entry.matched_livertox_row)
         title = self.format_drug_heading(entry.drug_name, score)
         body = self.sanitize_renderable_body(entry)
         if not body:
             body = self.build_fallback_technical_note(entry)
         rucam = entry.rucam
-        rucam_score = rucam.total_score if rucam is not None else "n/a"
-        rucam_category = (
-            rucam.causality_category if rucam is not None else "not available"
-        )
-        rucam_confidence = rucam.confidence if rucam is not None else "not available"
-        component_summary = (
-            ", ".join(
-                f"{component.label}: {component.score}"
-                for component in (rucam.components or [])
-                if component is not None
-            )
+        localized_rucam = (
+            rucam_summary_text(rucam, report_language)
             if rucam is not None
-            else ""
-        )
-        if not component_summary:
-            component_summary = "Not available"
-        limitations = (
-            ", ".join((rucam.limitations or [])[:3])
-            if rucam is not None and rucam.limitations
-            else "incomplete serial labs and/or missing rechallenge data"
+            else phrase("rucam_not_calculated", report_language)
         )
         evidence_lines = self.render_evidence_quality_lines(entry)
         return (
             f"**{title}**\n\n"
             f"{evidence_lines}\n\n"
-            f"**Estimated RUCAM**: {rucam_score}, {rucam_category}, confidence {rucam_confidence}. "
-            f"Estimated due to incomplete clinical data; key limitations: {limitations}.\n\n"
-            f"**RUCAM component summary**: {component_summary}\n\n"
-            f"**RUCAM limitations**: {limitations}\n\n"
+            f"**RUCAM**: {localized_rucam}\n\n"
             f"**Report**\n\n"
             f"{body}\n\n"
             f"**Bibliography source**: {self.bibliography_source_label()}"
@@ -1584,43 +1579,50 @@ class HepatoxConsultation:
 
     # -------------------------------------------------------------------------
     def render_unresolved_mentions_section(
-        self, entries: list[DrugClinicalAssessment]
+        self,
+        entries: list[DrugClinicalAssessment],
+        *,
+        report_language: str = "en",
     ) -> str | None:
         if not entries:
             return None
-        lines: list[str] = ["## Unresolved Drug Mentions", ""]
+        lines: list[str] = [f"## {report_heading('unresolved_mentions', report_language)}", ""]
         for entry in entries:
-            label = (entry.drug_name or "").strip() or "Unnamed drug"
-            reason = self.describe_unresolved_entry(entry)
+            label = (entry.drug_name or "").strip() or phrase("unnamed_drug", report_language)
+            reason = self.describe_unresolved_entry(entry, report_language=report_language)
             rucam_summary = (
-                f"Estimated RUCAM {entry.rucam.total_score} ({entry.rucam.causality_category}, confidence {entry.rucam.confidence})"
+                rucam_summary_text(entry.rucam, report_language)
                 if entry.rucam is not None
-                else "Estimated RUCAM not available"
+                else phrase("rucam_not_calculated", report_language)
             )
             lines.append(f"- **{label}**: {reason} {rucam_summary}.")
         return "\n".join(lines).strip()
 
     # -------------------------------------------------------------------------
-    def describe_unresolved_entry(self, entry: DrugClinicalAssessment) -> str:
+    def describe_unresolved_entry(
+        self,
+        entry: DrugClinicalAssessment,
+        report_language: str = "en",
+    ) -> str:
         status = (entry.match_status or "").strip().lower()
         if status in {"ambiguous", "ambiguous_match"} or entry.ambiguous_match:
             candidates = (
                 ", ".join(entry.match_candidates)
                 if entry.match_candidates
-                else "not available"
+                else phrase("rucam_insufficient_data", report_language)
             )
             return (
-                f"Ambiguous match in local knowledge base (candidates: {candidates})."
+                f"{phrase('livertox_ambiguous', report_language)} "
+                f"{phrase('candidate_matches', report_language, candidates=candidates)} "
+                f"{phrase('manual_curation', report_language)}"
             )
         if status in {"missing", "missing_match"}:
-            return "No matching drug record found in the local knowledge base."
+            return phrase("no_matching_record", report_language)
         if status == "matched_no_excerpt":
-            return (
-                "Matched drug record found, but no local LiverTox excerpt is available."
-            )
+            return phrase("matched_no_excerpt", report_language)
         if entry.missing_livertox:
-            return "Matched record found, but no local LiverTox excerpt is available."
-        return "Could not produce a deterministic matched-drug section."
+            return phrase("matched_no_excerpt", report_language)
+        return phrase("deterministic_section_unavailable", report_language)
 
     # -------------------------------------------------------------------------
     async def generate_conclusion(
@@ -1707,32 +1709,38 @@ class HepatoxConsultation:
         return f"{detail} {recommendation}"
 
     # -------------------------------------------------------------------------
-    def build_missing_excerpt_paragraph(self, entry: DrugClinicalAssessment) -> str:
+    def build_missing_excerpt_paragraph(
+        self,
+        entry: DrugClinicalAssessment,
+        report_language: str = "en",
+    ) -> str:
         _ = entry
-        return (
-            "No local LiverTox excerpt is currently available for this matched drug, "
-            "so automated causality narration could not be generated."
-        )
+        return phrase("livertox_missing", report_language)
 
     # -------------------------------------------------------------------------
-    def build_ambiguous_match_paragraph(self, entry: DrugClinicalAssessment) -> str:
+    def build_ambiguous_match_paragraph(
+        self,
+        entry: DrugClinicalAssessment,
+        report_language: str = "en",
+    ) -> str:
         candidates = (
             ", ".join(entry.match_candidates)
             if entry.match_candidates
-            else "not available"
+            else phrase("rucam_insufficient_data", report_language)
         )
-        note = (
-            "Drug matching was ambiguous; no LiverTox excerpt was injected to avoid an "
-            "incorrect attribution."
-        )
-        details = f"Candidate matches: {candidates}."
-        guidance = "Manual curation is required before causality assessment."
+        note = phrase("livertox_ambiguous", report_language)
+        details = phrase("candidate_matches", report_language, candidates=candidates)
+        guidance = phrase("manual_curation", report_language)
         return f"{note} {details} {guidance}"
 
     # -------------------------------------------------------------------------
-    def build_error_paragraph(self, entry: DrugClinicalAssessment) -> str:
+    def build_error_paragraph(
+        self,
+        entry: DrugClinicalAssessment,
+        report_language: str = "en",
+    ) -> str:
         _ = entry
-        message = "Automated analysis was unavailable due to a technical issue; a clinician should review the LiverTox documentation manually."
+        message = phrase("rucam_insufficient_data", report_language)
         return message
 
     def bibliography_source_label(self) -> str:

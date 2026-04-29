@@ -1,6 +1,6 @@
 # UI Standards
 
-Last updated: 2026-04-24
+Last updated: 2026-04-29
 
 Scope: `DILIGENT/client/src` (Angular + SCSS).
 
@@ -106,3 +106,7 @@ Scope: `DILIGENT/client/src` (Angular + SCSS).
 - Clarity and predictability over decorative complexity.
 - Reuse tokens first; add new tokens only when reusable across multiple views.
 - Consolidate overrides when touching older blocks; avoid layered duplicate rules.
+
+- Report output renders Markdown as formatted content in-app.
+- Expanded report view uses full-page layout and only shows Collapse, Copy, Download controls.
+- Raw Markdown is export data and should not be shown as the primary report presentation.
