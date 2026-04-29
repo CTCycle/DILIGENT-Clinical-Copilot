@@ -4,6 +4,7 @@ import asyncio
 from datetime import date, datetime, UTC
 from functools import partial
 from pathlib import Path
+import re
 import time
 from threading import Lock
 from typing import Any, Literal
@@ -18,7 +19,7 @@ from DILIGENT.server.common.utils.logger import logger
 from DILIGENT.server.configurations.llm_configs import LLMRuntimeConfig
 from DILIGENT.server.configurations.startup import server_settings
 from DILIGENT.server.domain.inspection import InspectionJobPhase
-from DILIGENT.server.domain.patient_timeline import PatientTimeline
+from DILIGENT.server.domain.patient_timeline import PatientTimeline, PatientTimelineEvent
 from DILIGENT.server.repositories.serialization.data import DataSerializer, DocumentSerializer
 from DILIGENT.server.repositories.vectors import LanceVectorDatabase
 from DILIGENT.server.services.clinical.timeline import PatientTimelineExtractor
@@ -319,16 +320,16 @@ class DataInspectionService:
                         timeout=timeline_timeout_s,
                     )
                 )
-            except TimeoutError as exc:
-                with self.timeline_generation_lock:
-                    self.timeline_generation_cooldown_until[safe_session_id] = time.monotonic() + 2.0
-                raise RuntimeError(
-                    f"Timeline generation timed out after {int(timeline_timeout_s)}s"
-                ) from exc
             except Exception as exc:  # noqa: BLE001
-                with self.timeline_generation_lock:
-                    self.timeline_generation_cooldown_until[safe_session_id] = time.monotonic() + 2.0
-                raise RuntimeError(f"Timeline generation failed: {exc}") from exc
+                logger.warning(
+                    "Timeline extraction unavailable for session_id=%s, using deterministic fallback: %s",
+                    session_id,
+                    exc,
+                )
+                timeline = self.build_fallback_timeline(
+                    session_id=safe_session_id,
+                    source=source,
+                )
 
             session_payload["runtime_settings"] = {
                 "use_cloud_services": (
@@ -380,6 +381,110 @@ class DataInspectionService:
         finally:
             with self.timeline_generation_lock:
                 self.timeline_generation_inflight.discard(safe_session_id)
+
+    # -------------------------------------------------------------------------
+    def build_fallback_timeline(
+        self,
+        *,
+        session_id: int,
+        source: dict[str, Any],
+    ) -> PatientTimeline:
+        events: list[PatientTimelineEvent] = []
+        visit_date = self.first_iso_date(source.get("visit_date"))
+
+        drugs_text = self.normalize_text(source.get("drugs"))
+        if drugs_text:
+            events.append(
+                PatientTimelineEvent(
+                    event_id="therapy-1",
+                    title="Therapy context",
+                    description=drugs_text[:450],
+                    event_type="therapy",
+                    timing_type="relative",
+                    event_date=visit_date,
+                    extracted_timing_text=visit_date,
+                    source="fallback_parser",
+                    source_evidence=drugs_text[:1000],
+                    sort_order=10,
+                )
+            )
+
+        anamnesis_text = self.normalize_text(source.get("anamnesis"))
+        if anamnesis_text:
+            events.append(
+                PatientTimelineEvent(
+                    event_id="disease-1",
+                    title="Clinical symptom context",
+                    description=anamnesis_text[:450],
+                    event_type="disease",
+                    timing_type="relative",
+                    event_date=visit_date,
+                    extracted_timing_text=visit_date,
+                    source="fallback_parser",
+                    source_evidence=anamnesis_text[:1000],
+                    sort_order=20,
+                )
+            )
+
+        labs_text = self.normalize_text(source.get("laboratory_analysis"))
+        if labs_text:
+            marker = self.extract_lab_marker(labs_text)
+            events.append(
+                PatientTimelineEvent(
+                    event_id="lab-1",
+                    title=marker or "Laboratory findings",
+                    description=labs_text[:450],
+                    event_type="lab",
+                    timing_type="explicit_date" if visit_date else "relative",
+                    event_date=visit_date,
+                    extracted_timing_text=visit_date,
+                    source="fallback_parser",
+                    source_evidence=labs_text[:1000],
+                    sort_order=30,
+                )
+            )
+
+        if not events:
+            events.append(
+                PatientTimelineEvent(
+                    event_id="other-1",
+                    title="Session clinical context",
+                    description="Structured timeline was unavailable; fallback summary retained.",
+                    event_type="other",
+                    timing_type="uncertain",
+                    source="fallback_parser",
+                    source_evidence="No structured timeline-relevant fields were available.",
+                    sort_order=100,
+                )
+            )
+
+        return PatientTimeline(
+            session_id=session_id,
+            generated_at=datetime.now(UTC),
+            events=events,
+        )
+
+    # -------------------------------------------------------------------------
+    def normalize_text(self, value: Any) -> str | None:
+        if not isinstance(value, str):
+            return None
+        normalized = " ".join(value.split()).strip()
+        return normalized or None
+
+    # -------------------------------------------------------------------------
+    def first_iso_date(self, value: Any) -> str | None:
+        text = self.normalize_text(value)
+        if not text:
+            return None
+        matched = re.search(r"\b\d{4}-\d{2}-\d{2}\b", text)
+        return matched.group(0) if matched else None
+
+    # -------------------------------------------------------------------------
+    def extract_lab_marker(self, text: str) -> str | None:
+        matched = re.search(r"\b(ALT|AST|ALP|TBIL|DBIL|GGT)\b[^.;,\n]*", text, re.IGNORECASE)
+        if not matched:
+            return None
+        return matched.group(0).strip()[:120]
 
     # -------------------------------------------------------------------------
     def list_rxnav_catalog(

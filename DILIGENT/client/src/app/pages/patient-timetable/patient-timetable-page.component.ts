@@ -4,7 +4,6 @@ import { ActivatedRoute, RouterLink } from '@angular/router';
 
 import {
   generateInspectionSessionTimeline,
-  fetchInspectionSessionTimeline,
 } from '../../core/services/inspection-api';
 import {
   InspectionSessionTimeline,
@@ -95,12 +94,10 @@ export class PatientTimetablePageComponent implements OnInit {
     this.loading.set(true);
     this.error.set(null);
     try {
-      let payload: InspectionSessionTimeline;
-      try {
-        payload = await fetchInspectionSessionTimeline(sessionId);
-      } catch {
-        payload = await generateInspectionSessionTimeline(sessionId);
-      }
+      // Single-call path: backend returns cached timeline when present,
+      // otherwise attempts generation, avoiding an expected GET 404 first.
+      const payload: InspectionSessionTimeline =
+        await generateInspectionSessionTimeline(sessionId);
       this.timeline.set(payload);
       this.selectedEventId.set(payload.events[0]?.event_id ?? null);
     } catch (error) {
