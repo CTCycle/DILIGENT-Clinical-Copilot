@@ -8,7 +8,27 @@ from typing import Any
 
 from pydantic import ValidationError
 
-from DILIGENT.server.common import constants
+from DILIGENT.server.common.constants import (
+    CLINICAL_MODEL_CHOICES,
+    CLOUD_MODEL_CHOICES,
+    CONFIGURATIONS_FILE,
+    DEFAULT_DRUG_MATCH_CATALOG_EXCLUDED_TERM_SUFFIXES,
+    DEFAULT_DRUG_MATCH_CATALOG_INDEX_LIMIT,
+    DEFAULT_DRUG_MATCH_SPELLING_CONFIDENCE,
+    DEFAULT_DRUG_MATCH_SPELLING_LONG_MAX_DISTANCE,
+    DEFAULT_DRUG_MATCH_SPELLING_MIN_QUERY_LENGTH,
+    DEFAULT_DRUG_MATCH_SPELLING_SHORT_MAX_DISTANCE,
+    DEFAULT_DRUG_MATCH_SPELLING_SHORT_NAME_LENGTH,
+    DEFAULT_DRUG_MATCH_TOKEN_MIN_LENGTH,
+    DEFAULT_EMBEDDING_BATCH_SIZE,
+    FASTAPI_DESCRIPTION,
+    FASTAPI_TITLE,
+    FASTAPI_VERSION,
+    OLLAMA_DEFAULT_HOST,
+    OLLAMA_DEFAULT_PORT,
+    OLLAMA_DEFAULT_SCHEME,
+    TEXT_EXTRACTION_MODEL_CHOICES,
+)
 from DILIGENT.server.common.utils.types import (
     coerce_bool,
     coerce_float,
@@ -50,6 +70,7 @@ def load_configuration_data(path: str) -> dict[str, Any]:
 
 
 ###############################################################################
+###############################################################################
 class EnvironmentSnapshot:
     def __init__(
         self,
@@ -63,9 +84,10 @@ class EnvironmentSnapshot:
         self.ollama_port = ollama_port
 
 
+###############################################################################
 class ConfigurationManager:
     def __init__(self, config_path: str | None = None) -> None:
-        self._config_path = Path(config_path or constants.CONFIGURATIONS_FILE)
+        self._config_path = Path(config_path or CONFIGURATIONS_FILE)
         self._lock = RLock()
         self._raw_data: dict[str, Any] = {}
         self._settings: ServerSettings | None = None
@@ -119,10 +141,10 @@ def _resolve_ollama_url_with_scheme(
         resolved_port = (
             port_value
             if port_value is not None
-            else coerce_int(parsed_port, constants.OLLAMA_DEFAULT_PORT, minimum=1, maximum=65535)
+            else coerce_int(parsed_port, OLLAMA_DEFAULT_PORT, minimum=1, maximum=65535)
         )
         return f"{scheme}://{host_only}:{resolved_port}"
-    resolved_port = port_value if port_value is not None else constants.OLLAMA_DEFAULT_PORT
+    resolved_port = port_value if port_value is not None else OLLAMA_DEFAULT_PORT
     return f"{scheme}://{host_port}:{resolved_port}"
 
 
@@ -132,8 +154,8 @@ def resolve_ollama_base_url(
     ollama_host: str | None,
     ollama_port: int | None,
     fallback: str = (
-        f"{constants.OLLAMA_DEFAULT_SCHEME}://"
-        f"{constants.OLLAMA_DEFAULT_HOST}:{constants.OLLAMA_DEFAULT_PORT}"
+        f"{OLLAMA_DEFAULT_SCHEME}://"
+        f"{OLLAMA_DEFAULT_HOST}:{OLLAMA_DEFAULT_PORT}"
     ),
 ) -> str:
     if ollama_url:
@@ -144,10 +166,10 @@ def resolve_ollama_base_url(
         normalized_host = host_value.strip().rstrip("/")
         if "://" in normalized_host:
             return _resolve_ollama_url_with_scheme(normalized_host, port_value=port_value)
-        resolved_port = port_value if port_value is not None else constants.OLLAMA_DEFAULT_PORT
-        return f"{constants.OLLAMA_DEFAULT_SCHEME}://{normalized_host}:{resolved_port}"
+        resolved_port = port_value if port_value is not None else OLLAMA_DEFAULT_PORT
+        return f"{OLLAMA_DEFAULT_SCHEME}://{normalized_host}:{resolved_port}"
     if port_value is not None:
-        return f"{constants.OLLAMA_DEFAULT_SCHEME}://{constants.OLLAMA_DEFAULT_HOST}:{port_value}"
+        return f"{OLLAMA_DEFAULT_SCHEME}://{OLLAMA_DEFAULT_HOST}:{port_value}"
     return fallback.rstrip("/")
 
 
@@ -163,13 +185,13 @@ def environment_snapshot_from_os_env() -> EnvironmentSnapshot:
 
 def _default_llm_runtime_defaults(environment: EnvironmentSnapshot) -> LLMRuntimeDefaults:
     text_extraction_default = (
-        constants.TEXT_EXTRACTION_MODEL_CHOICES[0]
-        if constants.TEXT_EXTRACTION_MODEL_CHOICES
+        TEXT_EXTRACTION_MODEL_CHOICES[0]
+        if TEXT_EXTRACTION_MODEL_CHOICES
         else ""
     )
-    clinical_default = constants.CLINICAL_MODEL_CHOICES[0] if constants.CLINICAL_MODEL_CHOICES else ""
+    clinical_default = CLINICAL_MODEL_CHOICES[0] if CLINICAL_MODEL_CHOICES else ""
     provider_default = "openai"
-    provider_models = constants.CLOUD_MODEL_CHOICES.get(provider_default, [])
+    provider_models = CLOUD_MODEL_CHOICES.get(provider_default, [])
     cloud_default = provider_models[0] if provider_models else ""
     return LLMRuntimeDefaults(
         text_extraction_model=text_extraction_default,
@@ -188,12 +210,11 @@ def _default_llm_runtime_defaults(environment: EnvironmentSnapshot) -> LLMRuntim
     )
 
 
-def _build_fastapi_settings(data: dict[str, Any]) -> FastAPISettings:
-    payload = ensure_mapping(data)
+def _build_fastapi_settings() -> FastAPISettings:
     return FastAPISettings(
-        title=coerce_str(payload.get("title"), constants.FASTAPI_TITLE),
-        version=coerce_str(payload.get("version"), constants.FASTAPI_VERSION),
-        description=coerce_str(payload.get("description"), constants.FASTAPI_DESCRIPTION),
+        title=FASTAPI_TITLE,
+        version=FASTAPI_VERSION,
+        description=FASTAPI_DESCRIPTION,
     )
 
 
@@ -247,7 +268,7 @@ def _build_database_settings(payload: dict[str, Any]) -> DatabaseSettings:
 def _build_drugs_matcher_settings(data: dict[str, Any]) -> DrugsMatcherSettings:
     suffixes_value = data.get(
         "catalog_excluded_term_suffixes",
-        constants.DEFAULT_DRUG_MATCH_CATALOG_EXCLUDED_TERM_SUFFIXES,
+        DEFAULT_DRUG_MATCH_CATALOG_EXCLUDED_TERM_SUFFIXES,
     )
     suffix_candidates = (
         list(suffixes_value)
@@ -269,34 +290,34 @@ def _build_drugs_matcher_settings(data: dict[str, Any]) -> DrugsMatcherSettings:
         min_confidence=coerce_float(data.get("min_confidence"), 0.90),
         token_min_length=coerce_positive_int(
             data.get("token_min_length"),
-            constants.DEFAULT_DRUG_MATCH_TOKEN_MIN_LENGTH,
+            DEFAULT_DRUG_MATCH_TOKEN_MIN_LENGTH,
         ),
         catalog_excluded_term_suffixes=(
-            suffixes or constants.DEFAULT_DRUG_MATCH_CATALOG_EXCLUDED_TERM_SUFFIXES
+            suffixes or DEFAULT_DRUG_MATCH_CATALOG_EXCLUDED_TERM_SUFFIXES
         ),
         catalog_index_limit=coerce_positive_int(
             data.get("catalog_index_limit"),
-            constants.DEFAULT_DRUG_MATCH_CATALOG_INDEX_LIMIT,
+            DEFAULT_DRUG_MATCH_CATALOG_INDEX_LIMIT,
         ),
         spelling_confidence=coerce_float(
             data.get("spelling_confidence"),
-            constants.DEFAULT_DRUG_MATCH_SPELLING_CONFIDENCE,
+            DEFAULT_DRUG_MATCH_SPELLING_CONFIDENCE,
         ),
         spelling_min_query_length=coerce_positive_int(
             data.get("spelling_min_query_length"),
-            constants.DEFAULT_DRUG_MATCH_SPELLING_MIN_QUERY_LENGTH,
+            DEFAULT_DRUG_MATCH_SPELLING_MIN_QUERY_LENGTH,
         ),
         spelling_short_name_length=coerce_positive_int(
             data.get("spelling_short_name_length"),
-            constants.DEFAULT_DRUG_MATCH_SPELLING_SHORT_NAME_LENGTH,
+            DEFAULT_DRUG_MATCH_SPELLING_SHORT_NAME_LENGTH,
         ),
         spelling_short_max_distance=coerce_positive_int(
             data.get("spelling_short_max_distance"),
-            constants.DEFAULT_DRUG_MATCH_SPELLING_SHORT_MAX_DISTANCE,
+            DEFAULT_DRUG_MATCH_SPELLING_SHORT_MAX_DISTANCE,
         ),
         spelling_long_max_distance=coerce_positive_int(
             data.get("spelling_long_max_distance"),
-            constants.DEFAULT_DRUG_MATCH_SPELLING_LONG_MAX_DISTANCE,
+            DEFAULT_DRUG_MATCH_SPELLING_LONG_MAX_DISTANCE,
         ),
     )
 
@@ -312,7 +333,7 @@ def _build_rag_settings(data: dict[str, Any], defaults: LLMRuntimeDefaults) -> R
         chunk_overlap=coerce_positive_int(data.get("chunk_overlap"), 128),
         embedding_batch_size=coerce_positive_int(
             data.get("embedding_batch_size"),
-            constants.DEFAULT_EMBEDDING_BATCH_SIZE,
+            DEFAULT_EMBEDDING_BATCH_SIZE,
         ),
         use_reranking=coerce_bool(data.get("use_reranking"), True),
         rerank_candidate_k=rerank_candidate_k,
@@ -401,7 +422,6 @@ def _build_session_pipeline_settings(data: dict[str, Any]) -> SessionPipelineSet
 def build_settings_payload_from_json(config: dict[str, Any], env: EnvironmentSnapshot) -> dict[str, Any]:
     payload = ensure_mapping(config)
     llm_defaults = _default_llm_runtime_defaults(env)
-    fastapi_payload = ensure_mapping(payload.get("fastapi"))
     jobs_payload = ensure_mapping(payload.get("jobs"))
     database_payload = ensure_mapping(payload.get("database"))
     drugs_matcher_payload = ensure_mapping(payload.get("drugs_matcher"))
@@ -410,7 +430,7 @@ def build_settings_payload_from_json(config: dict[str, Any], env: EnvironmentSna
     ingestion_payload = ensure_mapping(payload.get("ingestion"))
     session_pipeline_payload = ensure_mapping(payload.get("session_pipeline"))
     return {
-        "fastapi": _build_fastapi_settings(fastapi_payload).model_dump(),
+        "fastapi": _build_fastapi_settings().model_dump(),
         "jobs": _build_jobs_settings(jobs_payload).model_dump(),
         "database": _build_database_settings(database_payload).model_dump(),
         "drugs_matcher": _build_drugs_matcher_settings(drugs_matcher_payload).model_dump(),
