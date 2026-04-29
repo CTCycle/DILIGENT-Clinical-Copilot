@@ -19,6 +19,8 @@ import {
   GENERIC_REQUEST_ERROR,
 } from "./http-api";
 
+const ACCESS_KEYS_TIMEOUT_SECONDS = 15;
+
 export async function fetchModelConfigState(
   includeLocalAvailability?: boolean,
 ): Promise<ModelConfigStateResponse> {
@@ -111,6 +113,7 @@ export async function fetchAccessKeys(
     {
       method: "GET",
     },
+    ACCESS_KEYS_TIMEOUT_SECONDS,
   );
 }
 
