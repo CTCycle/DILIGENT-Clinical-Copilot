@@ -75,7 +75,7 @@ def _env_float(name: str, default: float) -> float:
         return default
     try:
         return float(raw)
-    except TypeError, ValueError:
+    except (TypeError, ValueError):
         return default
 
 
@@ -386,7 +386,7 @@ class OllamaClient:
     async def list_running_models(self) -> dict[str, dict[str, Any]]:
         try:
             resp = await self.client.get("/api/ps")
-        except httpx.TimeoutException, httpx.RequestError:
+        except (httpx.TimeoutException, httpx.RequestError):
             return {}
         if resp.status_code == 404:
             return {}
@@ -728,13 +728,13 @@ class OllamaClient:
         if temperature is not None:
             try:
                 temp_value = float(temperature)
-            except TypeError, ValueError:
+            except (TypeError, ValueError):
                 temp_value = default_temp
         if options_payload and "temperature" in options_payload:
             if temperature is None:
                 try:
                     temp_value = float(options_payload["temperature"])
-                except TypeError, ValueError:
+                except (TypeError, ValueError):
                     temp_value = default_temp
             options_payload.pop("temperature", None)
             if not options_payload:
@@ -1148,7 +1148,7 @@ class OllamaClient:
         try:
             resp = await self.client.get("/api/tags")
             resp.raise_for_status()
-        except httpx.RequestError, httpx.HTTPStatusError:
+        except (httpx.RequestError, httpx.HTTPStatusError):
             return False
         return True
 
@@ -1273,7 +1273,7 @@ class OllamaClient:
                 text=True,
                 timeout=1.5,
             )
-        except OSError, subprocess.SubprocessError:
+        except (OSError, subprocess.SubprocessError):
             return 0
         if result.returncode != 0:
             return 0
@@ -1332,7 +1332,7 @@ class OllamaClient:
                 pages = sysconf("SC_PHYS_PAGES")
             if isinstance(page_size, int) and isinstance(pages, int):
                 return page_size * pages
-        except ValueError, OSError, AttributeError:
+        except (ValueError, OSError, AttributeError):
             pass
         return 0
 
@@ -1368,7 +1368,7 @@ class OllamaClient:
                     parsed = OllamaClient._parse_meminfo_line(line)
                     if parsed is not None:
                         return parsed
-        except FileNotFoundError, PermissionError, ValueError:
+        except (FileNotFoundError, PermissionError, ValueError):
             pass
         return 0
 

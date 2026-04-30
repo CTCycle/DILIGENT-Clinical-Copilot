@@ -23,7 +23,7 @@ from repositories.schemas.models import (
 )
 from repositories.serialization.data import DataSerializer
 from services.inspection import DataInspectionService
-from services.jobs import JobManager
+from services.runtime.jobs import JobManager
 
 
 # -----------------------------------------------------------------------------

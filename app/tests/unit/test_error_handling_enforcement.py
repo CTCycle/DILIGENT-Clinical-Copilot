@@ -19,7 +19,7 @@ from api.error_handling import (
     register_error_handling,
 )
 from services.llm.providers import OllamaError
-from services.jobs import JobManager
+from services.runtime.jobs import JobManager
 from services.research import brave as brave_module
 from services.research.brave import BraveResearchService
 

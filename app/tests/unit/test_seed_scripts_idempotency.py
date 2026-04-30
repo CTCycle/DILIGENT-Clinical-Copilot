@@ -15,7 +15,7 @@ from repositories.schemas.models import (
     DrugRxnormCode,
     LiverToxMonograph,
 )
-from services.updater.livertox import LiverToxUpdater
+from services.updater.livertox_core import LiverToxUpdater
 
 
 # -----------------------------------------------------------------------------

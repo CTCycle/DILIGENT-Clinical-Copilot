@@ -1,13 +1,13 @@
 # DILIGENT Clinical Copilot Architecture
 
-Last updated: 2026-04-29
+Last updated: 2026-04-30
 
 ## 1. System Summary
 
 DILIGENT is a local-first clinical application with:
-- Backend: FastAPI (`DILIGENT/server`)
-- Frontend: Angular standalone + TypeScript (`DILIGENT/client`)
-- Optional desktop shell: Tauri (`DILIGENT/client/src-tauri`)
+- Backend: FastAPI (`app/server`)
+- Frontend: Angular standalone + TypeScript (`app/client`)
+- Optional desktop shell: Tauri (`app/client/src-tauri`)
 
 Primary flow:
 1. User submits clinical data in the Angular UI.
@@ -19,14 +19,13 @@ Primary flow:
 
 ```text
 .
-|-- pyproject.toml
-|-- DILIGENT/
-|   |-- start_on_windows.bat
-|   |-- setup_and_maintenance.bat
-|   |-- settings/
-|   |   |-- .env
-|   |   |-- .env.local.example
-|   |   `-- configurations.json
+|-- start_on_windows.bat
+|-- setup_and_maintenance.bat
+|-- settings/
+|   |-- .env
+|   |-- .env.local.example
+|   `-- configurations.json
+|-- app/
 |   |-- resources/
 |   |   |-- models/
 |   |   `-- sources/
@@ -39,25 +38,25 @@ Primary flow:
 |   |   |-- services/
 |   |   |-- common/
 |   |   `-- models/
-|   `-- client/
-|       |-- package.json
-|       |-- src/
-|       |   |-- main.ts
-|       |   |-- styles.scss
-|       |   `-- app/
-|       |       |-- app.ts
-|       |       |-- app.routes.ts
-|       |       |-- core/
-|       |       |-- components/
-|       |       `-- pages/
-|       `-- src-tauri/
-|           |-- tauri.conf.json
-|           `-- src/main.rs
-|-- tests/
-|   |-- run_tests.bat
-|   |-- conftest.py
-|   |-- unit/
-|   `-- e2e/
+|   |-- client/
+|   |   |-- package.json
+|   |   |-- src/
+|   |   |   |-- main.ts
+|   |   |   |-- styles.scss
+|   |   |   `-- app/
+|   |   |       |-- app.ts
+|   |   |       |-- app.routes.ts
+|   |   |       |-- core/
+|   |   |       |-- components/
+|   |   |       `-- pages/
+|   |   `-- src-tauri/
+|   |       |-- tauri.conf.json
+|   |       `-- src/main.rs
+|   `-- tests/
+|       |-- run_tests.bat
+|       |-- conftest.py
+|       |-- unit/
+|       `-- e2e/
 `-- release/
     `-- tauri/
         `-- build_with_tauri.bat
@@ -68,14 +67,14 @@ Notes:
 
 ## 3. Application Entry Points
 
-- Backend app: `DILIGENT/server/app.py`
+- Backend app: `app/server/app.py`
   - Builds the FastAPI app through `create_app()`, initializes settings, registers middleware/error handlers, mounts routers under `/api`, and initializes DB/runtime model config through the FastAPI lifespan startup path.
-- Frontend app: `DILIGENT/client/src/main.ts`
+- Frontend app: `app/client/src/main.ts`
   - Bootstraps Angular `App` with `appConfig`.
-- Frontend routing: `DILIGENT/client/src/app/app.routes.ts`
+- Frontend routing: `app/client/src/app/app.routes.ts`
   - Routes: `/`, `/data`, `/model-config`.
-- Desktop runtime: `DILIGENT/client/src-tauri/src/main.rs` + `tauri.conf.json`.
-- Windows launcher: `DILIGENT/start_on_windows.bat`.
+- Desktop runtime: `app/client/src-tauri/src/main.rs` + `tauri.conf.json`.
+- Windows launcher: `start_on_windows.bat`.
 
 ## 4. API Endpoints
 
@@ -148,47 +147,47 @@ Inspection:
 
 ## 5. Responsibilities by Layer
 
-- Endpoint layer (`server/api/*`)
+- Endpoint layer (`app/server/api/*`)
   - HTTP contracts, request parsing, status codes, safe exception translation.
-- Service layer (`server/services/*`)
+- Service layer (`app/server/services/*`)
   - Clinical orchestration, model orchestration, inspection workflows, job control.
-- Domain models (`server/domain/*`)
+- Domain models (`app/server/domain/*`)
   - Pydantic/domain request-response schemas and typed contracts.
-- Repository layer (`server/repositories/*`)
+- Repository layer (`app/server/repositories/*`)
   - SQL persistence, serialization, vector store access.
-- Config/common layers (`server/configurations/*`, `server/common/*`)
+- Config/common layers (`app/server/configurations/*`, `app/server/common/*`)
   - Runtime settings, constants, environment/bootstrap, logging.
 
 Frontend boundaries:
-- `client/src/app/pages/*`: page orchestration and user journeys.
-- `client/src/app/components/*`: reusable visual/interaction components.
-- `client/src/app/core/services/*`: API transport and domain-specific API clients.
-- `client/src/app/core/state/app-state.service.ts`: shared app state and theme/page state.
+- `app/client/src/app/pages/*`: page orchestration and user journeys.
+- `app/client/src/app/components/*`: reusable visual/interaction components.
+- `app/client/src/app/core/services/*`: API transport and domain-specific API clients.
+- `app/client/src/app/core/state/app-state.service.ts`: shared app state and theme/page state.
 
 ## 6. Layered Request Path (example)
 
 Endpoint -> service -> repository:
 
 - `POST /api/clinical/jobs`
-  - `server/api/session.py`
-  - `server/services/session/session_service.py`
-  - `server/repositories/serialization/data.py` + DB repositories
+  - `app/server/api/session.py`
+  - `app/server/services/session/session_service.py`
+  - `app/server/repositories/serialization/data.py` + DB repositories
 
 - `GET /api/inspection/sessions`
-  - `server/api/data_inspection.py`
-  - `server/services/inspection.py`
-  - `server/repositories/serialization/data.py`
+  - `app/server/api/data_inspection.py`
+  - `app/server/services/inspection/service.py`
+  - `app/server/repositories/serialization/data.py`
 
 ## 7. Persistence Mechanisms
 
 - Relational DB (SQLAlchemy):
-  - SQLite file at `DILIGENT/resources/database.db` when `database.embedded_database=true`
+  - SQLite file at `app/resources/database.db` when `database.embedded_database=true`
   - PostgreSQL when external DB mode is configured
 - Vector persistence:
-  - LanceDB collection under `DILIGENT/resources/sources/vectors`
+  - LanceDB collection under `app/resources/sources/vectors`
 - Filesystem resources:
-  - `DILIGENT/resources/sources` for source catalogs/documents/archives
-  - `DILIGENT/resources/models` for model-related assets
+  - `app/resources/sources` for source catalogs/documents/archives
+  - `app/resources/models` for model-related assets
 - Access key encryption:
   - Encrypted provider keys persisted in DB tables with seeded encryption material.
 
@@ -198,7 +197,7 @@ Endpoint -> service -> repository:
   - `async def` for network-bound paths (model listing/pull, research, some config/session paths).
   - `def` for lightweight synchronous handlers and job-status/control paths.
 - Long-running tasks are not held in request lifecycle:
-  - Managed by `JobManager` (`server/services/jobs.py`) using daemon threads.
+  - Managed by `JobManager` (`app/server/services/runtime/jobs.py`) using daemon threads.
   - Exposed via start/poll/cancel endpoints.
 - Constraint:
   - CPU-heavy or blocking operations should run via job system instead of blocking request handlers.
@@ -206,5 +205,6 @@ Endpoint -> service -> repository:
 ## 9. Architectural Constraints
 
 - `/api` is the stable frontend-backend boundary (`API_BASE_URL="/api"` in frontend constants).
-- Runtime settings come from `DILIGENT/settings/.env` and `DILIGENT/settings/configurations.json`.
+- Runtime settings come from `settings/.env` and `settings/configurations.json`.
+- Runtime and security helpers have canonical service modules; transitional shims are not maintained.
 - No containerized runtime is currently implemented (no Dockerfile/compose in repository).
