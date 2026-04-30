@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from datetime import datetime
 
-from sqlalchemy import select, update
+from sqlalchemy import Select, Update, select, update
 
 from repositories.schemas.models import AccessKey, ResearchAccessKey
 
@@ -13,7 +13,7 @@ AccessKeyTable = type[AccessKey] | type[ResearchAccessKey]
 class AccessKeyRepositoryQueries:
     # -------------------------------------------------------------------------
     @staticmethod
-    def list_for_provider(table: AccessKeyTable, provider: str):
+    def list_for_provider(table: AccessKeyTable, provider: str) -> Select[tuple[AccessKey | ResearchAccessKey]]:
         return (
             select(table)
             .where(table.provider == provider)
@@ -24,7 +24,7 @@ class AccessKeyRepositoryQueries:
     @staticmethod
     def deactivate_provider_keys(
         table: AccessKeyTable, provider: str, *, now: datetime
-    ):
+    ) -> Update:
         return (
             update(table)
             .where(table.provider == provider)
@@ -33,7 +33,7 @@ class AccessKeyRepositoryQueries:
 
     # -------------------------------------------------------------------------
     @staticmethod
-    def active_for_provider(table: AccessKeyTable, provider: str):
+    def active_for_provider(table: AccessKeyTable, provider: str) -> Select[tuple[AccessKey | ResearchAccessKey]]:
         return (
             select(table)
             .where(

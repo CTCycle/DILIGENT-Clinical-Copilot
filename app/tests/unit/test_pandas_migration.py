@@ -17,7 +17,7 @@ from repositories.schemas.models import (
     ClinicalSessionResult,
     Patient,
 )
-from services.updater.livertox import LiverToxUpdater
+from services.updater.livertox_core import LiverToxUpdater
 
 
 ###############################################################################

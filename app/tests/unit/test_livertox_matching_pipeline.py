@@ -5,7 +5,7 @@ import asyncio
 import pandas as pd
 
 from domain.clinical import DrugEntry, PatientDrugs
-from services.clinical.matches import LiverToxMatcher
+from services.clinical.matches_core import LiverToxMatcher
 from services.clinical.preparation import ClinicalKnowledgePreparation
 from services.text.normalization import normalize_drug_query_name
 

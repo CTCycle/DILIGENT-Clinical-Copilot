@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import asyncio
 
-from services.async_batches import run_batched_in_order
+from services.runtime.async_batches import run_batched_in_order
 
 
 def test_parallelization_runner_preserves_input_order() -> None:

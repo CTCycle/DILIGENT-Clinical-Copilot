@@ -52,7 +52,7 @@ def load_json(path: str) -> dict[str, Any] | None:
     try:
         with open(path, "r", encoding="utf-8") as handle:
             return json.load(handle)
-    except json.JSONDecodeError, OSError:
+    except (json.JSONDecodeError, OSError):
         return None
 
 

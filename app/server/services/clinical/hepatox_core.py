@@ -322,7 +322,7 @@ class HepatoxConsultation:
         self.llm_model = model_candidate or LLMRuntimeConfig.get_clinical_model()
         try:
             chat_signature = inspect.signature(self.llm_client.chat)
-        except TypeError, ValueError:
+        except (TypeError, ValueError):
             chat_signature = None
         self.chat_supports_temperature = (
             chat_signature is not None and "temperature" in chat_signature.parameters
@@ -584,7 +584,7 @@ class HepatoxConsultation:
         if match_confidence is not None:
             try:
                 match_confidence = float(match_confidence)
-            except TypeError, ValueError:
+            except (TypeError, ValueError):
                 match_confidence = None
         match_reason = livertox_data.get("match_reason")
         match_quality = classify_match_evidence(
@@ -1394,7 +1394,7 @@ class HepatoxConsultation:
             return None
         try:
             parsed = float(match.group(1))
-        except TypeError, ValueError:
+        except (TypeError, ValueError):
             return None
         if parsed <= 0:
             return None

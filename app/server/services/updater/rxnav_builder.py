@@ -247,7 +247,7 @@ class RxNavDrugCatalogBuilder:
         headers = response.headers
         try:
             content_length = int(headers.get("Content-Length", 0) or 0)
-        except TypeError, ValueError:
+        except (TypeError, ValueError):
             content_length = 0
         payload = {
             "source_url": str(response.request.url)

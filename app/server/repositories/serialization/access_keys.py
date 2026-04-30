@@ -4,7 +4,7 @@ from datetime import datetime
 from typing import Literal
 
 from sqlalchemy.engine import Engine
-from sqlalchemy.orm import sessionmaker
+from sqlalchemy.orm import Session, sessionmaker
 
 from repositories.database.session import (
     resolve_engine,
@@ -46,7 +46,7 @@ class AccessKeySerializer:
         )
 
     # -------------------------------------------------------------------------
-    def resolve_table(self, provider: ProviderName):
+    def resolve_table(self, provider: ProviderName) -> type[AccessKey] | type[ResearchAccessKey]:
         if provider == RESEARCH_PROVIDER:
             return ResearchAccessKey
         return AccessKey
@@ -63,7 +63,7 @@ class AccessKeySerializer:
     # -------------------------------------------------------------------------
     def get_key_by_id(
         self,
-        db_session,
+        db_session: Session,
         key_id: int,
         *,
         provider: str,
