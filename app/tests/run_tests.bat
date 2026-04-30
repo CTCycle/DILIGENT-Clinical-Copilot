@@ -16,11 +16,6 @@ set "FASTAPI_PORT=8000"
 set "UI_HOST=127.0.0.1"
 set "UI_PORT=7861"
 set "TEST_RESULT=0"
-set "LIVE_SERVER_PHASE=SKIPPED"
-set "PYTEST_PHASE=SKIPPED"
-set "FRONTEND_BOOTSTRAP_PHASE=SKIPPED"
-set "FRONTEND_UNIT_PHASE=SKIPPED"
-set "FRONTEND_E2E_PHASE=SKIPPED"
 set "STARTED_BACKEND=0"
 set "STARTED_FRONTEND=0"
 
@@ -50,12 +45,11 @@ set "APP_TEST_FRONTEND_URL=http://%TEST_UI_HOST%:%UI_PORT%"
 set "API_BASE_URL=%APP_TEST_BACKEND_URL%"
 set "UI_BASE_URL=%APP_TEST_FRONTEND_URL%"
 
-if exist "%VENV_PYTHON%" (
-  set "PYTHON_CMD=%VENV_PYTHON%"
-) else (
+if not exist "%VENV_PYTHON%" (
   echo [ERROR] Missing backend venv: "%VENV_PYTHON%"
   exit /b 1
 )
+set "PYTHON_CMD=%VENV_PYTHON%"
 
 if exist "%RUNTIME_NPM%" (
   set "NPM_CMD=%RUNTIME_NPM%"
@@ -69,34 +63,90 @@ set "PYTHONPATH=%SERVER_DIR%;%APP_DIR%"
 "%PYTHON_CMD%" -c "import importlib; importlib.import_module('app')" >nul 2>&1
 if errorlevel 1 (
   set "UVICORN_APP=server.app:app"
-  set "BACKEND_WORKDIR=%SERVER_DIR%"
   set "PYTHONPATH=%APP_DIR%"
 )
 
-set "PYTEST_TARGET=%TESTS_DIR%\unit"
-if not "%STANDARD_TEST_PYTEST_TARGET%"=="" set "PYTEST_TARGET=%STANDARD_TEST_PYTEST_TARGET%"
+set "SUITE=%~1"
+if "%SUITE%"=="" goto :choose_suite
+shift
+goto :suite_selected
 
-set "NEED_FRONTEND=0"
-echo %PYTEST_TARGET% | findstr /I "\\e2e" >nul 2>&1
-if not errorlevel 1 set "NEED_FRONTEND=1"
-
-
+:choose_suite
 echo.
 echo ============================================================
-echo  Standard Test Runner
+echo  Test Runner
 echo ============================================================
-echo [INFO] Project root: %PROJECT_ROOT%
+echo 1. Unit tests
+echo 2. Integration tests
+echo 3. End-to-end tests
+echo 4. Regression tests
+echo 5. Stress tests
+echo 6. All tests
+echo.
+set /p SUITE="Select an option (1-6): "
+
+if "%SUITE%"=="1" set "SUITE=unit"
+if "%SUITE%"=="2" set "SUITE=integration"
+if "%SUITE%"=="3" set "SUITE=e2e"
+if "%SUITE%"=="4" set "SUITE=regression"
+if "%SUITE%"=="5" set "SUITE=stress"
+if "%SUITE%"=="6" set "SUITE=all"
+
+:suite_selected
+set "PYTEST_TARGET=%TESTS_DIR%\unit"
+set "NEED_BACKEND=0"
+set "NEED_FRONTEND=0"
+set "EXTRA_PYTEST_ARGS="
+
+if /i "%SUITE%"=="unit" goto :suite_done
+if /i "%SUITE%"=="integration" (
+  set "PYTEST_TARGET=%TESTS_DIR%\e2e"
+  set "NEED_BACKEND=1"
+  goto :suite_done
+)
+if /i "%SUITE%"=="e2e" (
+  set "PYTEST_TARGET=%TESTS_DIR%\e2e\test_app_flow.py"
+  set "NEED_BACKEND=1"
+  set "NEED_FRONTEND=1"
+  goto :suite_done
+)
+if /i "%SUITE%"=="regression" (
+  set "PYTEST_TARGET=%TESTS_DIR%\unit"
+  set "EXTRA_PYTEST_ARGS=-k cloud_llm_langchain or langchain_embeddings or ollama_langchain"
+  goto :suite_done
+)
+if /i "%SUITE%"=="stress" (
+  set "PYTEST_TARGET=%TESTS_DIR%\e2e\test_rxnav_concurrency_diagnostic.py"
+  set "NEED_BACKEND=1"
+  goto :suite_done
+)
+if /i "%SUITE%"=="all" (
+  set "PYTEST_TARGET=%TESTS_DIR%"
+  set "NEED_BACKEND=1"
+  set "NEED_FRONTEND=1"
+  goto :suite_done
+)
+
+echo [ERROR] Unknown suite: %SUITE%
+exit /b 1
+
+:suite_done
+echo.
+echo ============================================================
+echo  Selected suite: %SUITE%
+echo ============================================================
+echo [INFO] Target      : %PYTEST_TARGET%
 echo [INFO] Backend URL : %APP_TEST_BACKEND_URL%
 echo [INFO] Frontend URL: %APP_TEST_FRONTEND_URL%
-echo [INFO] Target      : %PYTEST_TARGET%
 echo.
 
-set "LIVE_SERVER_PHASE=PASS"
-curl -s --max-time 2 "%APP_TEST_BACKEND_URL%/docs" >nul 2>&1
-if errorlevel 1 (
-  echo [INFO] Starting backend server...
-  start "" /B /D "%BACKEND_WORKDIR%" "%PYTHON_CMD%" -m uvicorn %UVICORN_APP% --host %FASTAPI_HOST% --port %FASTAPI_PORT% --log-level warning
-  set "STARTED_BACKEND=1"
+if "%NEED_BACKEND%"=="1" (
+  curl -s --max-time 2 "%APP_TEST_BACKEND_URL%/docs" >nul 2>&1
+  if errorlevel 1 (
+    echo [INFO] Starting backend server...
+    start "" /B /D "%BACKEND_WORKDIR%" "%PYTHON_CMD%" -m uvicorn %UVICORN_APP% --host %FASTAPI_HOST% --port %FASTAPI_PORT% --log-level warning
+    set "STARTED_BACKEND=1"
+  )
 )
 
 if "%NEED_FRONTEND%"=="1" (
@@ -110,36 +160,39 @@ if "%NEED_FRONTEND%"=="1" (
   set "STARTED_FRONTEND=1"
 )
 
-set "ATTEMPTS=0"
-:wait_loop
-if %ATTEMPTS% geq 90 (
-  set "LIVE_SERVER_PHASE=FAIL"
-  set "TEST_RESULT=1"
-  goto cleanup
-)
-curl -s --max-time 2 "%APP_TEST_BACKEND_URL%/docs" >nul 2>&1
-if errorlevel 1 (
-  set /a ATTEMPTS+=1
-  timeout /t 1 /nobreak >nul
-  goto wait_loop
-)
-if "%NEED_FRONTEND%"=="1" (
-  curl -s --max-time 2 "%APP_TEST_FRONTEND_URL%" >nul 2>&1
-  if errorlevel 1 (
-    set /a ATTEMPTS+=1
-    timeout /t 1 /nobreak >nul
-    goto wait_loop
+if "%NEED_BACKEND%"=="1" (
+  set "BACKEND_READY=0"
+  for /l %%I in (1,1,90) do (
+    if "!BACKEND_READY!"=="0" (
+      curl -s --max-time 2 "%APP_TEST_BACKEND_URL%/docs" >nul 2>&1
+      if not errorlevel 1 (
+        set "BACKEND_READY=1"
+      ) else (
+        timeout /t 1 /nobreak >nul
+      )
+    )
   )
+  if not "!BACKEND_READY!"=="1" set "TEST_RESULT=1" & goto cleanup
 )
 
-echo [STEP] Running Python tests...
-"%PYTHON_CMD%" -m pytest "%PYTEST_TARGET%" -v --tb=short %*
-if errorlevel 1 (
-  set "PYTEST_PHASE=FAIL"
-  set "TEST_RESULT=1"
-) else (
-  set "PYTEST_PHASE=PASS"
+if "%NEED_FRONTEND%"=="1" (
+  set "FRONTEND_READY=0"
+  for /l %%I in (1,1,90) do (
+    if "!FRONTEND_READY!"=="0" (
+      curl -s --max-time 2 "%APP_TEST_FRONTEND_URL%" >nul 2>&1
+      if not errorlevel 1 (
+        set "FRONTEND_READY=1"
+      ) else (
+        timeout /t 1 /nobreak >nul
+      )
+    )
+  )
+  if not "!FRONTEND_READY!"=="1" set "TEST_RESULT=1" & goto cleanup
 )
+
+echo [STEP] Running pytest...
+"%PYTHON_CMD%" -m pytest "%PYTEST_TARGET%" -v --tb=short %EXTRA_PYTEST_ARGS% %*
+if errorlevel 1 set "TEST_RESULT=1"
 
 :cleanup
 if "%STARTED_BACKEND%"=="1" (
@@ -148,17 +201,5 @@ if "%STARTED_BACKEND%"=="1" (
 if "%STARTED_FRONTEND%"=="1" (
   for /f "tokens=5" %%P in ('netstat -ano ^| findstr LISTENING ^| findstr ":%UI_PORT%"') do taskkill /PID %%P /F >nul 2>&1
 )
-
-echo.
-echo ============================================================
-echo  Test Summary
-echo ============================================================
-echo  Live server phase   : %LIVE_SERVER_PHASE%
-echo  Python tests        : %PYTEST_PHASE%
-echo  Frontend bootstrap  : %FRONTEND_BOOTSTRAP_PHASE%
-echo  Frontend unit tests : %FRONTEND_UNIT_PHASE%
-echo  Frontend E2E tests  : %FRONTEND_E2E_PHASE%
-echo ============================================================
-echo.
 
 exit /b %TEST_RESULT%
