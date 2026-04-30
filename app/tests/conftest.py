@@ -5,6 +5,7 @@ Provides fixtures for Playwright page objects and API client.
 
 import os
 import sys
+import threading
 from pathlib import Path
 
 import pytest
@@ -64,3 +65,41 @@ def api_context(playwright):
     context = playwright.request.new_context(base_url=API_BASE_URL)
     yield context
     context.dispose()
+
+
+@pytest.fixture(autouse=True, scope="session")
+def _patch_asyncio_run_for_nested_loops():
+    """
+    Make asyncio.run() resilient when tests execute under an already-running loop.
+    Several unit tests use asyncio.run() from synchronous test bodies.
+    """
+    import asyncio
+
+    original_run = asyncio.run
+
+    def safe_run(coro, *args, **kwargs):
+        try:
+            asyncio.get_running_loop()
+        except RuntimeError:
+            return original_run(coro, *args, **kwargs)
+
+        box: dict[str, object] = {}
+
+        def _runner() -> None:
+            try:
+                box["result"] = original_run(coro, *args, **kwargs)
+            except BaseException as exc:  # propagate original test error
+                box["error"] = exc
+
+        thread = threading.Thread(target=_runner, daemon=True)
+        thread.start()
+        thread.join()
+        if "error" in box:
+            raise box["error"]  # type: ignore[misc]
+        return box.get("result")
+
+    asyncio.run = safe_run
+    try:
+        yield
+    finally:
+        asyncio.run = original_run
