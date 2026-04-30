@@ -293,8 +293,12 @@
                 class="btn btn-secondary inspection-mini-btn"
                 type="button"
                 (click)="openRagFolderPicker()"
+                aria-label="Select RAG folder"
+                title="Select RAG folder"
               >
-                Select Folder
+                <svg class="inspection-icon" viewBox="0 0 24 24" aria-hidden="true">
+                  <path fill="currentColor" d="M10 4a2 2 0 0 1 1.41.59L13 6h7a2 2 0 0 1 2 2v1H2V6a2 2 0 0 1 2-2h6Zm12 7v7a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2v-7h20Zm-6.2 2.22a1 1 0 0 0-1.42 0L13 14.59V13a1 1 0 0 0-2 0v1.59l-1.38-1.37a1 1 0 1 0-1.42 1.41l3.08 3.09a1 1 0 0 0 1.42 0l3.1-3.09a1 1 0 0 0 0-1.41Z"/>
+                </svg>
               </button>
               <input
                 #ragFolderInput
