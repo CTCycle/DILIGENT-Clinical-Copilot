@@ -4599,6 +4599,145 @@ input[type="date"]::-webkit-calendar-picker-indicator:hover {
   display: block;
 }
 
+/* ============================================
+   Annotation Fix Pack (Round 2)
+   ============================================ */
+
+/* Global scrollbar skin */
+* {
+  scrollbar-width: thin;
+  scrollbar-color: rgba(15, 125, 90, 0.52) rgba(143, 165, 158, 0.2);
+}
+
+*::-webkit-scrollbar {
+  width: 10px;
+  height: 10px;
+}
+
+*::-webkit-scrollbar-track {
+  background: rgba(143, 165, 158, 0.2);
+  border-radius: 999px;
+}
+
+*::-webkit-scrollbar-thumb {
+  background: linear-gradient(180deg, rgba(15, 125, 90, 0.58), rgba(44, 160, 127, 0.56));
+  border: 2px solid transparent;
+  border-radius: 999px;
+  background-clip: padding-box;
+}
+
+*::-webkit-scrollbar-thumb:hover {
+  background: linear-gradient(180deg, rgba(15, 125, 90, 0.74), rgba(44, 160, 127, 0.7));
+  background-clip: padding-box;
+}
+
+:root[data-theme="dark"] * {
+  scrollbar-color: rgba(104, 211, 170, 0.6) rgba(24, 46, 55, 0.65);
+}
+
+:root[data-theme="dark"] *::-webkit-scrollbar-track {
+  background: rgba(24, 46, 55, 0.65);
+}
+
+:root[data-theme="dark"] *::-webkit-scrollbar-thumb {
+  background: linear-gradient(180deg, rgba(104, 211, 170, 0.66), rgba(65, 173, 135, 0.64));
+  background-clip: padding-box;
+}
+
+/* DILI sidebar texture without hard rectangular clipping */
+.stitch-dili-sidebar {
+  overflow: visible;
+}
+
+.stitch-dili-sidebar::after {
+  width: 300px;
+  height: 300px;
+  right: -8px;
+  bottom: -6px;
+  opacity: 0.96;
+  -webkit-mask-image: radial-gradient(circle at 100% 100%, #000 36%, rgba(0, 0, 0, 0.72) 54%, transparent 83%);
+  mask-image: radial-gradient(circle at 100% 100%, #000 36%, rgba(0, 0, 0, 0.72) 54%, transparent 83%);
+}
+
+:root[data-theme="dark"] .stitch-dili-sidebar::after {
+  width: 300px;
+  height: 300px;
+}
+
+/* Icon-only RAG folder picker */
+.inspection-mini-btn[aria-label="Select RAG folder"] {
+  width: var(--inspection-control-height);
+  min-width: var(--inspection-control-height);
+  padding: 0;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.inspection-mini-btn[aria-label="Select RAG folder"] .inspection-icon {
+  width: 16px;
+  height: 16px;
+}
+
+/* Model config page header: remove divider line */
+.model-config-header-compact {
+  border-bottom: 0 !important;
+  box-shadow: none;
+}
+
+.model-config-page .page-header.model-config-header-compact {
+  border-bottom: none !important;
+  padding-bottom: 0;
+  margin-bottom: var(--space-lg);
+}
+
+.model-config-header-compact h1 {
+  margin: 0;
+  font-size: var(--font-2xl);
+  line-height: 1.15;
+  color: var(--color-text-primary);
+}
+
+.model-config-header-compact .lede {
+  margin: var(--space-sm) 0 0;
+  max-width: 720px;
+  color: var(--color-text-secondary);
+  font-size: var(--font-base);
+  line-height: 1.5;
+}
+
+/* Prevent overlap between search and filter controls in local catalog header */
+.model-config-row-header-top {
+  grid-template-columns: 1fr;
+  align-items: start;
+}
+
+.model-config-row-heading {
+  flex-wrap: wrap;
+  gap: 8px 14px;
+}
+
+.model-config-caption {
+  white-space: normal;
+}
+
+.model-config-search-and-filters {
+  justify-content: flex-start;
+  flex-wrap: wrap;
+  gap: 10px 12px;
+}
+
+.model-config-search {
+  flex: 1 1 280px;
+  width: min(360px, 100%);
+}
+
+.model-config-filter-pills {
+  flex-wrap: wrap;
+  justify-content: flex-start;
+  gap: 8px;
+}
+
 .inspection-empty-note {
   text-align: center;
   padding: 10px 12px;
