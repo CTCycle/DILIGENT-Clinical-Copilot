@@ -48,7 +48,7 @@ class LLMRuntimeConfig:
     def _normalize_temperature(value: float | None, fallback: float) -> float:
         try:
             parsed = float(value)
-        except TypeError, ValueError:
+        except (TypeError, ValueError):
             parsed = fallback
         return round(max(0.0, min(2.0, parsed)), 2)
 

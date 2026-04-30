@@ -6,7 +6,7 @@ from typing import Any
 
 import httpx
 
-from services.updater.rxnav import RxNavDrugCatalogBuilder
+from services.updater.rxnav_builder import RxNavDrugCatalogBuilder
 
 
 ###############################################################################

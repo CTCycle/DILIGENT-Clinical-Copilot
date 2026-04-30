@@ -7,8 +7,8 @@ from pathlib import Path
 
 import pytest
 
-from services.updater import livertox as livertox_module
-from services.updater.livertox import LiverToxUpdater
+from services.updater import livertox_core as livertox_module
+from services.updater.livertox_core import LiverToxUpdater
 
 
 def build_archive(path: Path, members: list[tuple[str, str]]) -> None:

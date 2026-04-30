@@ -14,7 +14,7 @@ from domain.clinical.extras import HepatoxPreparedInputs
 from common.utils.logger import logger
 from repositories.serialization.data import DataSerializer
 from services.clinical.knowledge import ClinicalKnowledgeComposer
-from services.clinical.matches import LiverToxMatcher
+from services.clinical.matches_core import LiverToxMatcher
 from services.text.normalization import (
     canonicalize_drug_query,
     normalize_drug_query_name,

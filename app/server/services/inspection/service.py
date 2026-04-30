@@ -34,8 +34,9 @@ from services.inspection.runtime import (
     coerce_optional_str,
 )
 from services.updater.embeddings import RagEmbeddingUpdater
-from services.updater.livertox import LiverToxUpdater
-from services.updater.rxnav import RxNavClient, RxNavDrugCatalogBuilder
+from services.updater.livertox_core import LiverToxUpdater
+from services.updater.rxnav_builder import RxNavDrugCatalogBuilder
+from services.updater.rxnav_client import RxNavClient
 from repositories.serialization.text_normalization import (
     TextNormalizationVocabularySerializer,
 )

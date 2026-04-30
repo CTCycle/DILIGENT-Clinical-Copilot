@@ -30,6 +30,7 @@ from domain.clinical.entities import (
     PatientRucamAssessmentBundle,
     PipelineIssue,
 )
+from domain.clinical.validation import ValidationMessageBundle
 from domain.jobs import (
     JobCancelResponse,
     JobStartResponse,
@@ -205,7 +206,9 @@ class ClinicalSessionService(ClinicalSessionFormattingMixin):
             ) from exc
 
     # -------------------------------------------------------------------------
-    def build_validation_bundle_for_payload(self, payload: PatientData):
+    def build_validation_bundle_for_payload(
+        self, payload: PatientData
+    ) -> ValidationMessageBundle:
         language_result = ClinicalLanguageDetector.detect(payload)
         return build_validation_bundle(language_result.report_language)
 
@@ -844,7 +847,7 @@ class ClinicalSessionService(ClinicalSessionFormattingMixin):
         if match_confidence is not None:
             try:
                 match_confidence = float(match_confidence)
-            except TypeError, ValueError:
+            except (TypeError, ValueError):
                 match_confidence = None
         match_quality = classify_match_evidence(
             match_status=resolved.get("match_status"),

@@ -16,7 +16,7 @@ from domain.clinical import (
     DrugSuspensionContext,
     PatientLabTimeline,
 )
-from services.clinical.hepatox import (
+from services.clinical.hepatox_core import (
     HepatotoxicityPatternAnalyzer,
     HepatoxConsultation,
 )

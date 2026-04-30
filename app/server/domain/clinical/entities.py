@@ -104,7 +104,7 @@ class PatientData(BaseModel):
             day = int(str(value.get("day", "")).strip())
             month = int(str(value.get("month", "")).strip())
             year = int(str(value.get("year", "")).strip())
-        except TypeError, ValueError:
+        except (TypeError, ValueError):
             return None
         try:
             return date(year, month, day)
@@ -250,7 +250,7 @@ class DrugEntry(BaseModel):
                 continue
             try:
                 cleaned.append(float(slot))
-            except TypeError, ValueError:
+            except (TypeError, ValueError):
                 continue
         if not cleaned:
             return []

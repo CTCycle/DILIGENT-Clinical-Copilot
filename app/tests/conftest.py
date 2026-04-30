@@ -4,8 +4,15 @@ Provides fixtures for Playwright page objects and API client.
 """
 
 import os
+import sys
+from pathlib import Path
 
 import pytest
+
+APP_DIR = Path(__file__).resolve().parents[1]
+SERVER_DIR = APP_DIR / "server"
+if str(SERVER_DIR) not in sys.path:
+    sys.path.insert(0, str(SERVER_DIR))
 
 
 def _normalize_host_for_url(host: str) -> str:

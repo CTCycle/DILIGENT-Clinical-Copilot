@@ -1,9 +1,9 @@
 from __future__ import annotations
 
+import asyncio
 import inspect
 import threading
 import uuid
-import asyncio
 from time import monotonic
 from typing import Any
 
@@ -221,7 +221,7 @@ class JobManager:
     def runner_accepts_job_id(self, runner: Callable[..., dict[str, Any]]) -> bool:
         try:
             signature = inspect.signature(runner)
-        except TypeError, ValueError:
+        except (TypeError, ValueError):
             return False
         parameters = list(signature.parameters.values())
         for param in parameters:

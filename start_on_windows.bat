@@ -39,7 +39,7 @@ if not exist "%pyproject%" exit /b 1
 echo [1/4] uv sync in app/server
 pushd "%server_dir%" >nul
 set "uv_extras="
-if /i "%OPTIONAL_DEPENDENCIES%"=="true" set "uv_extras=--all-extras"
+if /i "%OPTIONAL_DEPENDENCIES%"=="true" set "uv_extras=--all-extras --extra test"
 "%uv_exe%" sync --python "%python_exe%" %uv_extras%
 if errorlevel 1 (
   popd >nul
@@ -61,4 +61,5 @@ start "" /b /D "%client_dir%" "%npm_cmd%" run preview -- --host %UI_HOST% --port
 start "" "http://%UI_HOST%:%UI_PORT%"
 
 endlocal & exit /b 0
+
 

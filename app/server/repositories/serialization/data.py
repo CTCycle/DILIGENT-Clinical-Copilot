@@ -203,7 +203,7 @@ class _RepositorySerializationService:
             payload = payload.split(",", maxsplit=1)[1].strip()
         try:
             return base64.b64decode(payload, validate=True)
-        except binascii.Error, ValueError:
+        except (binascii.Error, ValueError):
             logger.warning("Skipping invalid patient image payload during session save")
             return None
 
@@ -1474,7 +1474,7 @@ class _RepositorySerializationService:
             return 0
         try:
             numeric = int(normalized)
-        except TypeError, ValueError:
+        except (TypeError, ValueError):
             return None
         return 1 if numeric != 0 else 0
 
@@ -1532,7 +1532,7 @@ class _RepositorySerializationService:
             return None
         try:
             return int(float(normalized))
-        except TypeError, ValueError:
+        except (TypeError, ValueError):
             return None
 
     # -----------------------------------------------------------------------------
@@ -1542,7 +1542,7 @@ class _RepositorySerializationService:
             return None
         try:
             return float(normalized)
-        except TypeError, ValueError:
+        except (TypeError, ValueError):
             return None
 
     # -----------------------------------------------------------------------------
@@ -1912,7 +1912,7 @@ class _RepositorySerializationService:
             return self.normalize_string(payload)
         try:
             return json.dumps(payload, ensure_ascii=False, default=str)
-        except TypeError, ValueError:
+        except (TypeError, ValueError):
             return self.normalize_string(payload)
 
     # -----------------------------------------------------------------------------
@@ -2483,7 +2483,7 @@ class DocumentSerializer:
             try:
                 with open(file_path, "r", encoding=encoding) as handle:
                     text = handle.read()
-            except OSError, UnicodeDecodeError:
+            except (OSError, UnicodeDecodeError):
                 continue
             return text.strip()
         logger.error("Failed to read text file '%s'", file_path)
