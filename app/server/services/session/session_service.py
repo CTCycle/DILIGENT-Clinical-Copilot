@@ -200,9 +200,21 @@ class ClinicalSessionService(ClinicalSessionFormattingMixin):
             raise ClinicalInputExtractionError(
                 "Clinical input is required."
             )
-        extraction = await self.clinical_input_extractor.extract(
-            clinical_input=clinical_input
-        )
+        try:
+            extraction = await self.clinical_input_extractor.extract(
+                clinical_input=clinical_input
+            )
+        except ClinicalInputExtractionError as exc:
+            raise ServiceValidationError(str(exc)) from exc
+
+        if (
+            not extraction.anamnesis
+            or not extraction.drugs
+            or not extraction.laboratory_analysis
+        ):
+            raise ServiceValidationError(
+                "Clinical input must contain anamnesis, current therapy, and laboratory analysis sections."
+            )
         return (
             request_payload.model_copy(
                 update={
