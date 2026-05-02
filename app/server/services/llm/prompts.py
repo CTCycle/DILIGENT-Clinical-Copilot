@@ -126,11 +126,11 @@ A section may appear in multiple non-contiguous fragments.
 Return JSON matching the provided schema.
 
 Rules:
-- source_text must be exactly equal to the full input.
 - fragments must contain one item per extracted source slice.
 - Every fragment must include section, start, end, and text.
-- start and end use Python slicing semantics: start inclusive, end exclusive.
-- source_text[start:end] must exactly equal fragment.text.
+- Do not return the full original source text in the output.
+- start and end use Python slicing semantics: start inclusive, end exclusive, when available.
+- fragment.text must be copied from the source input.
 - Do not paraphrase.
 - Do not summarize.
 - Do not translate.

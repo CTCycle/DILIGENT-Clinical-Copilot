@@ -1,17 +1,19 @@
 from __future__ import annotations
 
 import asyncio
+import re
 from difflib import SequenceMatcher
 from collections.abc import Callable
 from typing import Any
 
+from pydantic import BaseModel, Field, field_validator, model_validator
 from configurations.llm_configs import LLMRuntimeConfig
 from configurations.startup import server_settings
 from domain.clinical.entities import (
     ClinicalSectionExtractionResult,
     ClinicalSectionFragment,
 )
-from domain.clinical.sections import SECTION_FRAGMENT_JOINER, SECTION_KEYS
+from domain.clinical.sections import ClinicalSectionKey, SECTION_FRAGMENT_JOINER, SECTION_KEYS
 from services.llm.client_runtime import ensure_runtime_client
 from services.llm.prompts import CLINICAL_SECTION_EXTRACTION_PROMPT
 from services.llm.providers import select_llm_provider
@@ -26,12 +28,62 @@ class ClinicalInputExtractionError(RuntimeError):
     pass
 
 
+class LlmClinicalSectionFragmentDraft(BaseModel):
+    section: ClinicalSectionKey
+    start: int = Field(default=0, ge=0)
+    end: int = Field(default=0, ge=0)
+    text: str | None = Field(default=None, max_length=100000)
+
+
+class LlmClinicalSectionExtractionDraft(BaseModel):
+    anamnesis: str | None = Field(default=None, max_length=100000)
+    drugs: str | None = Field(default=None, max_length=100000)
+    laboratory_analysis: str | None = Field(default=None, max_length=100000)
+    fragments: list[LlmClinicalSectionFragmentDraft] = Field(default_factory=list)
+    confidence: float = Field(default=0.0, ge=0.0, le=1.0)
+
+    @field_validator("anamnesis", "drugs", "laboratory_analysis", mode="before")
+    @classmethod
+    def coerce_section_text(
+        cls,
+        value: Any,
+    ) -> str | None:
+        if value is None:
+            return None
+        if isinstance(value, str):
+            stripped = value.strip()
+            return stripped if stripped else None
+        if isinstance(value, list):
+            collected: list[str] = []
+            for item in value:
+                if isinstance(item, str) and item.strip():
+                    collected.append(item)
+                    continue
+                if isinstance(item, dict):
+                    text_value = item.get("text")
+                    if isinstance(text_value, str) and text_value.strip():
+                        collected.append(text_value)
+            if not collected:
+                return None
+            return SECTION_FRAGMENT_JOINER.join(collected)
+        return str(value)
+
+    @model_validator(mode="after")
+    def validate_section_texts(self) -> "LlmClinicalSectionExtractionDraft":
+        for value in (self.anamnesis, self.drugs, self.laboratory_analysis):
+            if value is not None and not value.strip():
+                raise ValueError("section text fields cannot be blank strings")
+        return self
+
+
 ###############################################################################
 class ClinicalInputExtractor:
     MIN_SIMILARITY_RATIO = 0.96
     MAX_ABSOLUTE_CHAR_DRIFT = 12
     MAX_WORD_DELTA = 2
     MAX_ABSOLUTE_EDIT_DRIFT = 2
+    REPAIR_MIN_SIMILARITY = 0.9
+    REPAIR_SCAN_RADIUS = 600
 
     def __init__(
         self,
@@ -81,8 +133,8 @@ class ClinicalInputExtractor:
         return (
             "Extract clinical section fragments from the source text.\n"
             "Sections may be non-contiguous and may appear multiple times.\n"
-            "Use Python slicing offsets: start is inclusive, end is exclusive.\n"
-            "For every fragment, source_text[start:end] must exactly equal fragment.text.\n"
+            "For every fragment, set section and fragment.text.\n"
+            "If you provide start/end offsets, use Python slicing semantics (start inclusive, end exclusive).\n"
             "Build anamnesis, drugs, and laboratory_analysis by joining fragments from the same section with two newline characters.\n"
             "Never paraphrase, summarize, translate, normalize whitespace, redact, repair typos, or reorder source text.\n"
             "Use this exact source text:\n\n"
@@ -162,11 +214,6 @@ class ClinicalInputExtractor:
         source_text: str,
         extraction: ClinicalSectionExtractionResult,
     ) -> ClinicalSectionExtractionResult:
-        if not cls._is_near_match(extraction.source_text, source_text):
-            raise ClinicalInputExtractionError(
-                "Clinical input extraction returned mismatched source_text."
-            )
-
         fragments = [
             SectionFragmentSlice(
                 section=fragment.section,
@@ -201,6 +248,190 @@ class ClinicalInputExtractor:
             raise ClinicalInputExtractionError("Clinical input extraction returned inconsistent current therapy.")
         if not cls._is_near_match(extraction.laboratory_analysis, rebuilt.laboratory_analysis):
             raise ClinicalInputExtractionError("Clinical input extraction returned inconsistent laboratory analysis.")
+
+        return rebuilt
+
+    # -------------------------------------------------------------------------
+    @staticmethod
+    def _coerce_llm_draft(payload: Any) -> LlmClinicalSectionExtractionDraft:
+        if isinstance(payload, LlmClinicalSectionExtractionDraft):
+            return payload
+        if isinstance(payload, ClinicalSectionExtractionResult):
+            return LlmClinicalSectionExtractionDraft(
+                anamnesis=payload.anamnesis,
+                drugs=payload.drugs,
+                laboratory_analysis=payload.laboratory_analysis,
+                fragments=[
+                    LlmClinicalSectionFragmentDraft(
+                        section=fragment.section,
+                        start=fragment.start,
+                        end=fragment.end,
+                        text=fragment.text,
+                    )
+                    for fragment in payload.fragments
+                ],
+                confidence=payload.confidence,
+            )
+        if isinstance(payload, dict):
+            return LlmClinicalSectionExtractionDraft.model_validate(payload)
+        raise ClinicalInputExtractionError("Clinical input extraction returned an unsupported payload.")
+
+    # -------------------------------------------------------------------------
+    @classmethod
+    def _build_snippets_by_section(
+        cls,
+        draft: LlmClinicalSectionExtractionDraft,
+    ) -> dict[str, list[str]]:
+        snippets: dict[str, list[str]] = {section: [] for section in SECTION_KEYS}
+        for fragment in draft.fragments:
+            text = (fragment.text or "").strip()
+            if not text:
+                continue
+            snippets[fragment.section].append(fragment.text)
+
+        for section in SECTION_KEYS:
+            if snippets[section]:
+                continue
+            section_text = getattr(draft, section)
+            if section_text is None or not section_text.strip():
+                continue
+            snippets[section].append(section_text)
+        return snippets
+
+    # -------------------------------------------------------------------------
+    @classmethod
+    def _locate_snippet_span(
+        cls,
+        *,
+        source_text: str,
+        snippet: str,
+        start_cursor: int,
+    ) -> tuple[int, int] | None:
+        if not snippet:
+            return None
+
+        direct = source_text.find(snippet, start_cursor)
+        if direct >= 0:
+            return direct, direct + len(snippet)
+        direct_anywhere = source_text.find(snippet)
+        if direct_anywhere >= 0:
+            return direct_anywhere, direct_anywhere + len(snippet)
+
+        stripped = snippet.strip()
+        if not stripped:
+            return None
+
+        whitespace_pattern = re.sub(r"\s+", r"\\s+", re.escape(stripped))
+        regex_match = re.search(whitespace_pattern, source_text[start_cursor:], re.IGNORECASE)
+        if regex_match:
+            start = start_cursor + regex_match.start()
+            end = start_cursor + regex_match.end()
+            return start, end
+
+        if len(stripped) <= 64:
+            best_small: tuple[int, int] | None = None
+            best_small_ratio = 0.0
+            for length_delta in range(-cls.MAX_ABSOLUTE_CHAR_DRIFT, cls.MAX_ABSOLUTE_CHAR_DRIFT + 1):
+                candidate_length = len(stripped) + length_delta
+                if candidate_length <= 0:
+                    continue
+                for pos in range(start_cursor, max(start_cursor, len(source_text) - candidate_length + 1)):
+                    candidate = source_text[pos : pos + candidate_length]
+                    score = SequenceMatcher(a=stripped, b=candidate.strip()).ratio()
+                    if score > best_small_ratio:
+                        best_small_ratio = score
+                        best_small = (pos, pos + candidate_length)
+            if best_small is not None and best_small_ratio >= cls.REPAIR_MIN_SIMILARITY:
+                return best_small
+
+        if len(stripped) < 6:
+            return None
+
+        anchor = stripped[: min(28, len(stripped))]
+        candidate_starts = [match.start() for match in re.finditer(re.escape(anchor), source_text, re.IGNORECASE)]
+        best: tuple[int, int] | None = None
+        best_ratio = 0.0
+        for anchor_start in candidate_starts[:50]:
+            scan_start = max(0, anchor_start - cls.REPAIR_SCAN_RADIUS)
+            scan_end = min(len(source_text), anchor_start + len(stripped) + cls.REPAIR_SCAN_RADIUS)
+            for length_delta in range(-cls.MAX_ABSOLUTE_CHAR_DRIFT, cls.MAX_ABSOLUTE_CHAR_DRIFT + 1):
+                candidate_length = len(stripped) + length_delta
+                if candidate_length <= 0:
+                    continue
+                for pos in range(scan_start, max(scan_start, scan_end - candidate_length + 1)):
+                    candidate = source_text[pos : pos + candidate_length]
+                    score = SequenceMatcher(a=stripped, b=candidate.strip()).ratio()
+                    if score > best_ratio:
+                        best_ratio = score
+                        best = (pos, pos + candidate_length)
+
+        if best is None or best_ratio < cls.REPAIR_MIN_SIMILARITY:
+            return None
+        return best
+
+    # -------------------------------------------------------------------------
+    @classmethod
+    def _repair_and_build_from_draft(
+        cls,
+        *,
+        source_text: str,
+        draft: LlmClinicalSectionExtractionDraft,
+    ) -> ClinicalSectionExtractionResult:
+        snippets_by_section = cls._build_snippets_by_section(draft)
+        missing_sections = [section for section in SECTION_KEYS if not snippets_by_section[section]]
+        if missing_sections:
+            raise ClinicalInputExtractionError(
+                "Clinical input must contain anamnesis, current therapy, and laboratory analysis sections."
+            )
+
+        repaired: list[SectionFragmentSlice] = []
+        used_spans: set[tuple[int, int]] = set()
+        cursor = 0
+
+        for section in SECTION_KEYS:
+            for snippet in snippets_by_section[section]:
+                span = cls._locate_snippet_span(
+                    source_text=source_text,
+                    snippet=snippet,
+                    start_cursor=cursor,
+                )
+                if span is None:
+                    raise ClinicalInputExtractionError(
+                        "Clinical input extraction could not align extracted fragments to source text."
+                    )
+                start, end = span
+                if (start, end) in used_spans:
+                    fallback_span = cls._locate_snippet_span(
+                        source_text=source_text,
+                        snippet=snippet,
+                        start_cursor=end,
+                    )
+                    if fallback_span is None:
+                        raise ClinicalInputExtractionError(
+                            "Clinical input extraction produced duplicate non-repairable fragments."
+                        )
+                    start, end = fallback_span
+                used_spans.add((start, end))
+                repaired.append(SectionFragmentSlice(section=section, start=start, end=end))
+                cursor = max(cursor, end)
+
+        rebuilt = cls._build_result_from_fragments(
+            source_text=source_text,
+            fragments=repaired,
+            confidence=draft.confidence,
+        )
+
+        for section in SECTION_KEYS:
+            model_section = getattr(draft, section)
+            rebuilt_section = getattr(rebuilt, section)
+            if model_section is None:
+                raise ClinicalInputExtractionError(
+                    "Clinical input must contain anamnesis, current therapy, and laboratory analysis sections."
+                )
+            if not cls._is_near_match(model_section, rebuilt_section):
+                raise ClinicalInputExtractionError(
+                    f"Clinical input extraction returned inconsistent {section}."
+                )
 
         return rebuilt
 
@@ -303,7 +534,7 @@ class ClinicalInputExtractor:
                 model=self.model,
                 system_prompt=CLINICAL_SECTION_EXTRACTION_PROMPT,
                 user_prompt=self._build_prompt(clinical_input),
-                schema=ClinicalSectionExtractionResult,
+                schema=LlmClinicalSectionExtractionDraft,
                 temperature=0.0,
                 use_json_mode=True,
                 max_repair_attempts=1,
@@ -313,9 +544,14 @@ class ClinicalInputExtractor:
                 f"Clinical input extraction failed: {exc}"
             ) from exc
 
+        draft = self._coerce_llm_draft(extraction)
+        repaired = self._repair_and_build_from_draft(
+            source_text=clinical_input,
+            draft=draft,
+        )
         validated = self._validate_complete_preserved_result(
             source_text=clinical_input,
-            extraction=extraction,
+            extraction=repaired,
         )
 
         if progress_callback is not None:
