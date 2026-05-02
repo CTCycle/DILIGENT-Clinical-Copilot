@@ -109,18 +109,39 @@ Return:
 """
 
 CLINICAL_SECTION_EXTRACTION_PROMPT = """
-You extract structured clinical sections from a single unified clinical input.
-Always return data matching the provided JSON schema.
+You extract mandatory clinical sections from one unified clinical input.
 
-Instructions:
-- Extract these plain text fields: anamnesis, drugs, laboratory_analysis.
-- `source_text` must be exactly the full user input text.
-- Never rewrite, normalize, paraphrase, translate, or redact any text from source_text.
-- If a section is absent, return null for that section.
-- Return `confidence` as a float between 0.0 and 1.0 representing confidence in section assignment quality.
+Required output sections:
+- anamnesis
+- drugs
+- laboratory_analysis
 
-Return:
-- A JSON object conforming strictly to the supplied schema.
+Section meanings:
+- anamnesis: patient history and clinical narrative
+- drugs: current therapy, medications, active drug list, dosage notes
+- laboratory_analysis: laboratory results, dated lab values, liver enzymes, bilirubin, INR, and related lab evidence
+
+A section may appear in multiple non-contiguous fragments.
+
+Return JSON matching the provided schema.
+
+Rules:
+- source_text must be exactly equal to the full input.
+- fragments must contain one item per extracted source slice.
+- Every fragment must include section, start, end, and text.
+- start and end use Python slicing semantics: start inclusive, end exclusive.
+- source_text[start:end] must exactly equal fragment.text.
+- Do not paraphrase.
+- Do not summarize.
+- Do not translate.
+- Do not normalize whitespace.
+- Do not redact.
+- Do not repair typos.
+- Do not reorder text inside a section.
+- Build anamnesis by joining all anamnesis fragments in source order with two newline characters.
+- Build drugs by joining all drugs fragments in source order with two newline characters.
+- Build laboratory_analysis by joining all laboratory_analysis fragments in source order with two newline characters.
+- If any required section cannot be found, return null for that section and confidence below 0.5.
 """
 
 PATIENT_TIMELINE_EXTRACTION_PROMPT = """

@@ -1,16 +1,23 @@
 from __future__ import annotations
 
 import asyncio
-import re
 from collections.abc import Callable
 from typing import Any
 
 from configurations.llm_configs import LLMRuntimeConfig
 from configurations.startup import server_settings
-from domain.clinical.entities import ClinicalSectionExtractionResult
+from domain.clinical.entities import (
+    ClinicalSectionExtractionResult,
+    ClinicalSectionFragment,
+)
+from domain.clinical.sections import SECTION_FRAGMENT_JOINER, SECTION_KEYS
 from services.llm.client_runtime import ensure_runtime_client
 from services.llm.prompts import CLINICAL_SECTION_EXTRACTION_PROMPT
 from services.llm.providers import select_llm_provider
+from services.session.clinical_section_parsers import (
+    DETERMINISTIC_SECTION_PARSERS,
+    SectionFragmentSlice,
+)
 
 
 ###############################################################################
@@ -20,58 +27,6 @@ class ClinicalInputExtractionError(RuntimeError):
 
 ###############################################################################
 class ClinicalInputExtractor:
-    SECTION_ALIASES: dict[str, tuple[str, ...]] = {
-        "anamnesis": (
-            "anamnesis",
-            "anamnesi",
-            "anamnese",
-            "antecedentes",
-            "historia clinica",
-            "clinical history",
-            "history",
-            "storia clinica",
-            "storia",
-            "anamnesis and history",
-        ),
-        "drugs": (
-            "therapy",
-            "current drugs",
-            "drugs",
-            "medicamentos",
-            "medicamento",
-            "medikamente",
-            "medications",
-            "medication",
-            "farmaci",
-            "farmaci attuali",
-            "farmaci in uso",
-            "terapia",
-            "terapie",
-        ),
-        "laboratory_analysis": (
-            "laboratory analysis",
-            "laboratory",
-            "lab results",
-            "lab",
-            "labs",
-            "esami",
-            "esami di laboratorio",
-            "esami ematici",
-            "laboratorio",
-            "analisi laboratorio",
-            "analisi di laboratorio",
-        ),
-    }
-    MARKDOWN_HEADER_RE = re.compile(r"^\s{0,3}#{1,6}\s*(?P<label>[^#\n]+?)\s*$")
-    INDEXED_HEADER_RE = re.compile(
-        r"^\s*(?:\d+|[ivxlcdm]+|[abc])[\)\.\-]\s*(?P<label>[^:\n]+)\s*:?\s*$",
-        re.IGNORECASE,
-    )
-    INLINE_HEADER_RE = re.compile(
-        r"^\s*(?P<label>[A-Za-zÀ-ÿ ]{3,40})\s*:\s*(?P<tail>.*)$"
-    )
-    WHITESPACE_RE = re.compile(r"\s+")
-
     def __init__(
         self,
         *,
@@ -118,119 +73,127 @@ class ClinicalInputExtractor:
     @staticmethod
     def _build_prompt(clinical_input: str) -> str:
         return (
-            "Extract the three text blocks anamnesis, drugs, laboratory_analysis.\n"
-            "Return valid JSON matching the provided schema, with plain text fields and an overall confidence score between 0 and 1.\n"
-            "Do not include span coordinates.\n"
+            "Extract clinical section fragments from the source text.\n"
+            "Sections may be non-contiguous and may appear multiple times.\n"
+            "Use Python slicing offsets: start is inclusive, end is exclusive.\n"
+            "For every fragment, source_text[start:end] must exactly equal fragment.text.\n"
+            "Build anamnesis, drugs, and laboratory_analysis by joining fragments from the same section with two newline characters.\n"
+            "Never paraphrase, summarize, translate, normalize whitespace, redact, repair typos, or reorder source text.\n"
             "Use this exact source text:\n\n"
             f"{clinical_input}"
         )
 
     # -------------------------------------------------------------------------
     @classmethod
-    def _normalize_label(cls, value: str) -> str:
-        normalized = re.sub(r"[\*\_`~\[\]\(\)]", " ", value or "")
-        normalized = re.sub(r"[^A-Za-zÀ-ÿ0-9 ]+", " ", normalized)
-        normalized = cls.WHITESPACE_RE.sub(" ", normalized).strip().lower()
-        return normalized
-
-    # -------------------------------------------------------------------------
-    @classmethod
-    def _match_section_key(cls, label: str) -> str | None:
-        normalized = cls._normalize_label(label)
-        if not normalized:
-            return None
-        for section_key, aliases in cls.SECTION_ALIASES.items():
-            if normalized in aliases:
-                return section_key
-        return None
-
-    # -------------------------------------------------------------------------
-    @staticmethod
-    def _split_blocks(text: str) -> list[str]:
-        blocks = [part.strip() for part in re.split(r"\n\s*\n+", text) if part.strip()]
-        return blocks
-
-    # -------------------------------------------------------------------------
-    @classmethod
-    def _score_block(cls, block: str) -> dict[str, int]:
-        lowered = block.lower()
-        scores = {"anamnesis": 0, "drugs": 0, "laboratory_analysis": 0}
-        if any(
-            token in lowered
-            for token in (
-                "alt",
-                "ast",
-                "alp",
-                "ggt",
-                "bilirubin",
-                "bilirubina",
-                "inr",
-                "uln",
-                "u/l",
-                "umol/l",
-                "prelievo",
-                "follow-up",
-            )
-        ):
-            scores["laboratory_analysis"] += 3
-        if any(
-            token in lowered
-            for token in (
-                " mg ",
-                " ev",
-                " iv",
-                " po",
-                " bid",
-                "tid",
-                "q8h",
-                "farmac",
-                "terap",
-                "drug",
-                "medication",
-            )
-        ):
-            scores["drugs"] += 3
-        if any(
-            token in lowered
-            for token in (
-                "paziente",
-                "patient",
-                "anamnes",
-                "history",
-                "storia clinica",
-                "symptom",
-                "nausea",
-                "ittero",
-                "prurito",
-            )
-        ):
-            scores["anamnesis"] += 2
-        return scores
-
-    # -------------------------------------------------------------------------
-    @classmethod
-    def _build_result(
+    def _build_result_from_fragments(
         cls,
         *,
         source_text: str,
-        sections: dict[str, list[str]],
+        fragments: list[SectionFragmentSlice],
         confidence: float,
     ) -> ClinicalSectionExtractionResult:
+        if not fragments:
+            raise ClinicalInputExtractionError("Clinical input does not contain structured sections.")
+
+        section_fragments: dict[str, list[SectionFragmentSlice]] = {
+            section: [] for section in SECTION_KEYS
+        }
+
+        occupied_spans: set[tuple[int, int]] = set()
+        for fragment in fragments:
+            if fragment.start < 0 or fragment.end > len(source_text) or fragment.start >= fragment.end:
+                raise ClinicalInputExtractionError("Clinical input extraction produced invalid fragment offsets.")
+            if (fragment.start, fragment.end) in occupied_spans:
+                raise ClinicalInputExtractionError("Clinical input extraction produced duplicate fragments.")
+            occupied_spans.add((fragment.start, fragment.end))
+
+            fragment_text = source_text[fragment.start : fragment.end]
+            if not fragment_text.strip():
+                raise ClinicalInputExtractionError("Clinical input extraction produced an empty section fragment.")
+            section_fragments[fragment.section].append(fragment)
+
+        missing_sections = [
+            section for section, values in section_fragments.items() if not values
+        ]
+        if missing_sections:
+            raise ClinicalInputExtractionError(
+                "Clinical input must contain anamnesis, current therapy, and laboratory analysis sections."
+            )
+
+        extracted_fragments: list[ClinicalSectionFragment] = []
+        section_texts: dict[str, str] = {}
+
+        for section in SECTION_KEYS:
+            ordered = sorted(section_fragments[section], key=lambda item: (item.start, item.end))
+            texts = []
+            for fragment in ordered:
+                text = source_text[fragment.start : fragment.end]
+                texts.append(text)
+                extracted_fragments.append(
+                    ClinicalSectionFragment(
+                        section=section,
+                        start=fragment.start,
+                        end=fragment.end,
+                        text=text,
+                    )
+                )
+            section_texts[section] = SECTION_FRAGMENT_JOINER.join(texts)
+
         return ClinicalSectionExtractionResult(
             source_text=source_text,
-            anamnesis=cls._join_section_lines(sections, "anamnesis"),
-            drugs=cls._join_section_lines(sections, "drugs"),
-            laboratory_analysis=cls._join_section_lines(sections, "laboratory_analysis"),
+            anamnesis=section_texts["anamnesis"],
+            drugs=section_texts["drugs"],
+            laboratory_analysis=section_texts["laboratory_analysis"],
+            fragments=sorted(extracted_fragments, key=lambda item: (item.start, item.end, item.section)),
             confidence=max(0.0, min(1.0, float(confidence))),
         )
 
     # -------------------------------------------------------------------------
-    @staticmethod
-    def _join_section_lines(sections: dict[str, list[str]], section_key: str) -> str | None:
-        lines = [line.strip() for line in sections.get(section_key, []) if line.strip()]
-        if not lines:
-            return None
-        return "\n".join(lines)
+    @classmethod
+    def _validate_complete_preserved_result(
+        cls,
+        *,
+        source_text: str,
+        extraction: ClinicalSectionExtractionResult,
+    ) -> ClinicalSectionExtractionResult:
+        if extraction.source_text != source_text:
+            raise ClinicalInputExtractionError(
+                "Clinical input extraction returned mismatched source_text."
+            )
+
+        fragments = [
+            SectionFragmentSlice(
+                section=fragment.section,
+                start=fragment.start,
+                end=fragment.end,
+            )
+            for fragment in extraction.fragments
+        ]
+
+        rebuilt = cls._build_result_from_fragments(
+            source_text=source_text,
+            fragments=fragments,
+            confidence=extraction.confidence,
+        )
+
+        for original_fragment, rebuilt_fragment in zip(extraction.fragments, rebuilt.fragments, strict=True):
+            if source_text[original_fragment.start : original_fragment.end] != original_fragment.text:
+                raise ClinicalInputExtractionError(
+                    "Clinical input extraction changed a source fragment."
+                )
+            if original_fragment.text != rebuilt_fragment.text:
+                raise ClinicalInputExtractionError(
+                    "Clinical input extraction returned inconsistent fragment text."
+                )
+
+        if extraction.anamnesis != rebuilt.anamnesis:
+            raise ClinicalInputExtractionError("Clinical input extraction returned inconsistent anamnesis.")
+        if extraction.drugs != rebuilt.drugs:
+            raise ClinicalInputExtractionError("Clinical input extraction returned inconsistent current therapy.")
+        if extraction.laboratory_analysis != rebuilt.laboratory_analysis:
+            raise ClinicalInputExtractionError("Clinical input extraction returned inconsistent laboratory analysis.")
+
+        return rebuilt
 
     # -------------------------------------------------------------------------
     @classmethod
@@ -238,133 +201,19 @@ class ClinicalInputExtractor:
         cls,
         clinical_input: str,
     ) -> ClinicalSectionExtractionResult | None:
-        source_text = clinical_input
-        sections: dict[str, list[str]] = {
-            "anamnesis": [],
-            "drugs": [],
-            "laboratory_analysis": [],
-        }
-        current_section: str | None = None
-        explicit_markers = 0
-        indexed_markers = 0
-        inline_markers = 0
-        found_any = False
-        orphan_lines: list[str] = []
-
-        for raw_line in clinical_input.replace("\r\n", "\n").replace("\r", "\n").split("\n"):
-            line = raw_line.strip()
-            if not line:
-                if current_section is not None and sections[current_section]:
-                    sections[current_section].append("")
+        for parser in DETERMINISTIC_SECTION_PARSERS:
+            fragments = parser(clinical_input)
+            if fragments is None:
                 continue
-            header_match = cls.MARKDOWN_HEADER_RE.match(line)
-            if header_match:
-                maybe_section = cls._match_section_key(header_match.group("label"))
-                if maybe_section is not None:
-                    current_section = maybe_section
-                    explicit_markers += 1
-                    found_any = True
-                    continue
-            indexed_match = cls.INDEXED_HEADER_RE.match(line)
-            if indexed_match:
-                maybe_section = cls._match_section_key(indexed_match.group("label"))
-                if maybe_section is not None:
-                    current_section = maybe_section
-                    indexed_markers += 1
-                    found_any = True
-                    continue
-            inline_match = cls.INLINE_HEADER_RE.match(line)
-            if inline_match:
-                maybe_section = cls._match_section_key(inline_match.group("label"))
-                if maybe_section is not None:
-                    current_section = maybe_section
-                    inline_markers += 1
-                    found_any = True
-                    tail = (inline_match.group("tail") or "").strip()
-                    if tail:
-                        sections[current_section].append(tail)
-                    continue
-            if current_section is not None:
-                sections[current_section].append(line)
-            else:
-                orphan_lines.append(line)
-
-        if orphan_lines:
-            for line in orphan_lines:
-                scores = cls._score_block(line)
-                ranked = sorted(scores.items(), key=lambda item: item[1], reverse=True)
-                if not ranked or ranked[0][1] <= 0:
-                    continue
-                sections[ranked[0][0]].append(line)
-
-        if found_any:
-            confidence = 0.92
-            if explicit_markers == 0:
-                confidence = 0.85
-            if explicit_markers == 0 and indexed_markers == 0:
-                confidence = 0.8
-            return cls._build_result(
-                source_text=source_text,
-                sections=sections,
-                confidence=confidence,
-            )
-
-        # Fallback deterministic split: classify high-level blocks by keywords.
-        blocks = cls._split_blocks(clinical_input)
-        if not blocks:
-            return None
-        assigned = False
-        if len(blocks) == 1:
-            for line in (
-                part.strip()
-                for part in clinical_input.replace("\r\n", "\n").replace("\r", "\n").split("\n")
-            ):
-                if not line:
-                    continue
-                scores = cls._score_block(line)
-                ranked = sorted(scores.items(), key=lambda item: item[1], reverse=True)
-                if not ranked or ranked[0][1] <= 0:
-                    continue
-                sections[ranked[0][0]].append(line)
-                assigned = True
-            if assigned:
-                return cls._build_result(
-                    source_text=source_text,
-                    sections=sections,
-                    confidence=0.68,
+            try:
+                return cls._build_result_from_fragments(
+                    source_text=clinical_input,
+                    fragments=fragments,
+                    confidence=parser.confidence,
                 )
-        for block in blocks:
-            scores = cls._score_block(block)
-            ranked = sorted(scores.items(), key=lambda item: item[1], reverse=True)
-            if not ranked or ranked[0][1] <= 0:
+            except ClinicalInputExtractionError:
                 continue
-            sections[ranked[0][0]].append(block.strip())
-            assigned = True
-        if not assigned:
-            return None
-        return cls._build_result(
-            source_text=source_text,
-            sections=sections,
-            confidence=0.65,
-        )
-
-    # -------------------------------------------------------------------------
-    @classmethod
-    def _is_source_text_compatible(cls, expected_text: str, received_text: str) -> bool:
-        if received_text == expected_text:
-            return True
-        expected = expected_text.replace("\r\n", "\n").replace("\r", "\n")
-        received = received_text.replace("\r\n", "\n").replace("\r", "\n")
-        if received == expected:
-            return True
-        if received.rstrip() == expected.rstrip():
-            return True
-        expected_compact = cls.WHITESPACE_RE.sub("", expected)
-        received_compact = cls.WHITESPACE_RE.sub("", received)
-        if expected_compact != received_compact:
-            return False
-        # Allow only tiny formatting drift (trailing newline, extra spaces, etc.).
-        return abs(len(expected) - len(received)) <= 8
+        return None
 
     # -------------------------------------------------------------------------
     async def extract(
@@ -380,16 +229,13 @@ class ClinicalInputExtractor:
             progress_callback(0.0)
 
         deterministic = self._deterministic_extract(clinical_input)
-        if deterministic is not None and (
-            deterministic.anamnesis is not None
-            or deterministic.drugs is not None
-            or deterministic.laboratory_analysis is not None
-        ):
+        if deterministic is not None:
             if progress_callback is not None:
                 progress_callback(1.0)
             return deterministic
 
         await self.ensure_client()
+
         if self.client is None:
             raise ClinicalInputExtractionError(
                 "LLM client is not initialized for input extraction"
@@ -403,16 +249,19 @@ class ClinicalInputExtractor:
                 schema=ClinicalSectionExtractionResult,
                 temperature=0.0,
                 use_json_mode=True,
-                max_repair_attempts=2,
+                max_repair_attempts=1,
             )
         except Exception as exc:  # noqa: BLE001
             raise ClinicalInputExtractionError(
                 f"Clinical input extraction failed: {exc}"
             ) from exc
-        if not self._is_source_text_compatible(clinical_input, extraction.source_text):
-            raise ClinicalInputExtractionError(
-                "Clinical input extraction returned mismatched source_text."
-            )
+
+        validated = self._validate_complete_preserved_result(
+            source_text=clinical_input,
+            extraction=extraction,
+        )
+
         if progress_callback is not None:
             progress_callback(1.0)
-        return extraction
+
+        return validated

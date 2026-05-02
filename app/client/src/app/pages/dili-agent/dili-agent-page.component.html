@@ -16,7 +16,7 @@
             id="clinical-input"
             aria-label="Clinical Input"
             class="stitch-dili-input-unified"
-            placeholder="Suggested template (EN/IT):&#10;## Anamnesis (or: Anamnesi / Clinical History)&#10;Describe patient history, symptom onset, and clinical observations.&#10;&#10;## Therapy (or: Current Drugs / Farmaci in uso)&#10;List therapies with dosage, route, schedule, and start/stop timing.&#10;&#10;## Laboratory Analysis (or: Lab Results / Esami di laboratorio)&#10;Insert ALT/AST/ALP/Bilirubin and other relevant results with dates and ULN.&#10;&#10;Also accepted indexing: 1) Anamnesis 2) Therapy 3) Laboratory Analysis."
+            [placeholder]="clinicalInputTemplate"
             [ngModel]="vm.form.clinicalInput"
             (ngModelChange)="handleFormChange('clinicalInput', $event)"
           ></textarea>
