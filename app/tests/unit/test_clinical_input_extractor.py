@@ -157,3 +157,28 @@ def test_llm_requires_all_three_sections() -> None:
     extractor = ClinicalInputExtractor(client=FakeClient())
     with pytest.raises(ClinicalInputExtractionError):
         asyncio.run(extractor.extract(clinical_input=input_text))
+
+
+def test_llm_allows_minimal_fragment_text_discrepancy() -> None:
+    input_text = "Unstructured text that forces fallback."
+
+    class FakeClient:
+        async def llm_structured_call(self, **_: object) -> ClinicalSectionExtractionResult:
+            return ClinicalSectionExtractionResult(
+                source_text="Unstructured text that force fallback.",
+                anamnesis="Unstructured",
+                drugs="text",
+                laboratory_analysis="forces fallback.",
+                fragments=[
+                    ClinicalSectionFragment(section="anamnesis", start=0, end=12, text="Unstructurad"),
+                    ClinicalSectionFragment(section="drugs", start=13, end=17, text="text"),
+                    ClinicalSectionFragment(section="laboratory_analysis", start=23, end=39, text="forces fallback."),
+                ],
+                confidence=0.4,
+            )
+
+    extractor = ClinicalInputExtractor(client=FakeClient())
+    result = asyncio.run(extractor.extract(clinical_input=input_text))
+    assert result.anamnesis == "Unstructured"
+    assert result.drugs == "text"
+    assert result.laboratory_analysis == "forces fallback."
