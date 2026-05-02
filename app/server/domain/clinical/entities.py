@@ -13,6 +13,7 @@ from pydantic import (
     field_validator,
     model_validator,
 )
+from domain.clinical.sections import ClinicalSectionKey
 
 Comparator = Literal["<=", "<", ">=", ">"]
 CONTROL_CHARACTERS_RE = re.compile(r"[\x00-\x08\x0B\x0C\x0E-\x1F\x7F]")
@@ -178,12 +179,26 @@ class ClinicalSessionRequest(BaseModel):
         return stripped or None
 
 
+class ClinicalSectionFragment(BaseModel):
+    section: ClinicalSectionKey
+    start: int = Field(..., ge=0)
+    end: int = Field(..., ge=0)
+    text: str = Field(..., min_length=1, max_length=100000)
+
+    @model_validator(mode="after")
+    def validate_span(self) -> "ClinicalSectionFragment":
+        if self.start >= self.end:
+            raise ValueError("fragment start must be less than fragment end")
+        return self
+
+
 ###############################################################################
 class ClinicalSectionExtractionResult(BaseModel):
     source_text: str = Field(..., max_length=100000)
     anamnesis: str | None = Field(default=None, max_length=100000)
     drugs: str | None = Field(default=None, max_length=100000)
     laboratory_analysis: str | None = Field(default=None, max_length=100000)
+    fragments: list[ClinicalSectionFragment] = Field(default_factory=list)
     confidence: float = Field(
         default=0.0,
         ge=0.0,
@@ -192,15 +207,9 @@ class ClinicalSectionExtractionResult(BaseModel):
     )
 
     @model_validator(mode="after")
-    def normalize_section_fields(self) -> "ClinicalSectionExtractionResult":
-        for field_name in (
-            self.anamnesis,
-            self.drugs,
-            self.laboratory_analysis,
-        ):
-            if field_name is None:
-                continue
-            if not field_name.strip():
+    def validate_section_texts(self) -> "ClinicalSectionExtractionResult":
+        for value in (self.anamnesis, self.drugs, self.laboratory_analysis):
+            if value is not None and not value.strip():
                 raise ValueError("section text fields cannot be blank strings")
         return self
 
