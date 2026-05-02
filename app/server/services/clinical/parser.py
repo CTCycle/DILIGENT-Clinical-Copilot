@@ -7,7 +7,7 @@ from collections.abc import Callable
 from datetime import date
 from typing import Any, Literal
 
-from services.clinical.prompts import (
+from services.llm.prompts import (
     ANAMNESIS_DRUG_EXTRACTION_PROMPT,
     DRUG_EXTRACTION_PROMPT,
 )

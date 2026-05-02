@@ -8,7 +8,7 @@ from collections.abc import Callable
 from datetime import date, datetime
 from typing import Any
 
-from services.clinical.prompts import (
+from services.llm.prompts import (
     LIVERTOX_CONCLUSION_SYSTEM_PROMPT,
     LIVERTOX_CONCLUSION_USER_PROMPT,
     LIVERTOX_CLINICAL_SYSTEM_PROMPT,

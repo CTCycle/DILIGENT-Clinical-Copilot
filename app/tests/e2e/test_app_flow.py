@@ -8,12 +8,10 @@ from playwright.sync_api import Page, Route, expect
 
 
 def _fill_required_dili_fields(page: Page) -> None:
-    page.get_by_label("Anamnesis").fill("Acute abdominal discomfort with fatigue.")
-    page.get_by_label("Therapy").fill(
-        "Amoxicillin 500 mg BID, started on 2026-04-13, stopped on 2026-04-20."
-    )
-    page.get_by_label("Laboratory Analysis").fill(
-        "ALT 210 U/L; AST 180 U/L; ALP 130 U/L."
+    page.get_by_label("Clinical Input").fill(
+        "## Anamnesis\nAcute abdominal discomfort with fatigue.\n\n"
+        "## Therapy\nAmoxicillin 500 mg BID, started on 2026-04-13, stopped on 2026-04-20.\n\n"
+        "## Laboratory Analysis\nALT 210 U/L; AST 180 U/L; ALP 130 U/L."
     )
     page.get_by_label("Patient Name").fill("Marco Rossi")
     page.get_by_label("Visit Date").fill("2026-04-20")
@@ -23,8 +21,7 @@ def test_dilu_agent_page_loads(page: Page, base_url: str):
     page.goto(base_url)
 
     expect(page.get_by_text("DILI Assessment")).to_be_visible()
-    expect(page.get_by_label("Anamnesis")).to_be_visible()
-    expect(page.get_by_label("Therapy")).to_be_visible()
+    expect(page.get_by_label("Clinical Input")).to_be_visible()
     expect(page.get_by_label("Patient Name")).to_be_visible()
     expect(page.get_by_role("button", name="Run DILI analysis")).to_be_visible()
 
@@ -67,9 +64,7 @@ def test_dili_report_state_restores_after_refresh(page: Page, base_url: str):
                     patientName: "Persisted User",
                     visitDate: "2026-04-20",
                     patientImageDataUrl: null,
-                    anamnesis: "Persisted anamnesis",
-                    drugs: "Persisted drugs",
-                    laboratoryAnalysis: "Persisted labs",
+                    clinicalInput: "Persisted clinical input",
                     useRag: false,
                     useWebSearch: false
                 },

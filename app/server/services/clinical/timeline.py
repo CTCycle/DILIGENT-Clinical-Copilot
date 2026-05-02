@@ -14,7 +14,7 @@ from domain.patient_timeline import (
     PatientTimelineEvent,
     PatientTimelineExtraction,
 )
-from services.clinical.prompts import PATIENT_TIMELINE_EXTRACTION_PROMPT
+from services.llm.prompts import PATIENT_TIMELINE_EXTRACTION_PROMPT
 from services.llm.client_runtime import ensure_runtime_client
 from services.llm.providers import (
     initialize_llm_client,

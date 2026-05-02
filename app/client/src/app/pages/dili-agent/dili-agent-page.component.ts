@@ -2,7 +2,6 @@ import { CommonModule } from '@angular/common';
 import { Component, ElementRef, HostListener, OnDestroy, ViewChild, computed, effect, inject, signal } from '@angular/core';
 import { FormsModule } from '@angular/forms';
 
-import { ModalShellComponent } from '../../components/modal-shell/modal-shell.component';
 import { DEFAULT_FORM_STATE, REPORT_EXPORT_FILENAME } from '../../core/constants';
 import { AppStateService } from '../../core/state/app-state.service';
 import {
@@ -10,7 +9,6 @@ import {
   createDownloadUrl,
   formatErrorMessage,
   formatUnknownError,
-  hasDrugTimingCue,
   normalizeVisitDateInput,
 } from '../../core/utils';
 import {
@@ -33,7 +31,7 @@ function isTerminalJobStatus(status: JobStatus | null): boolean {
 
 @Component({
   selector: 'app-dili-agent-page',
-  imports: [CommonModule, FormsModule, ModalShellComponent],
+  imports: [CommonModule, FormsModule],
   templateUrl: './dili-agent-page.component.html',
   styleUrl: './dili-agent-page.component.scss',
 })
@@ -45,7 +43,6 @@ export class DiliAgentPageComponent implements OnDestroy {
 
   readonly isCancelling = signal(false);
   readonly isRunActionLocked = signal(false);
-  readonly isMissingLabsModalOpen = signal(false);
   readonly todayIso = todayIso;
   readonly finalReportMarkdown = computed(() => this.stateService.state().diliAgent.message ?? '');
   readonly renderedReport = computed(() => this.markdownRenderer.render(this.finalReportMarkdown()));
@@ -288,9 +285,8 @@ export class DiliAgentPageComponent implements OnDestroy {
   async runSession(): Promise<void> {
     const form = this.vm.form;
     const missingMessageByField: Array<[keyof typeof form, string]> = [
-      ['anamnesis', '[ERROR] Provide the anamnesis.'],
+      ['clinicalInput', '[ERROR] Provide the clinical input.'],
       ['visitDate', '[ERROR] Provide the visit date.'],
-      ['drugs', '[ERROR] Provide current drugs.'],
     ];
 
     const firstMissing = missingMessageByField.find(([field]) => !String(form[field]).trim());
@@ -303,30 +299,6 @@ export class DiliAgentPageComponent implements OnDestroy {
       return;
     }
 
-    if (!hasDrugTimingCue(form.drugs)) {
-      this.resetOutputs();
-      this.stateService.updateDiliAgent({
-        isRunning: false,
-        message: '[ERROR] Provide at least one drug with start, stop, or other timing information.',
-      });
-      return;
-    }
-
-    if (!form.laboratoryAnalysis.trim()) {
-      this.resetOutputs();
-      this.isMissingLabsModalOpen.set(true);
-      return;
-    }
-
-    await this.executeRunSession();
-  }
-
-  cancelMissingLabs(): void {
-    this.isMissingLabsModalOpen.set(false);
-  }
-
-  async confirmMissingLabs(): Promise<void> {
-    this.isMissingLabsModalOpen.set(false);
     await this.executeRunSession();
   }
 

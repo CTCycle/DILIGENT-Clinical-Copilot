@@ -59,9 +59,7 @@ export type ClinicalFormState = {
   patientName: string;
   visitDate: string;
   patientImageDataUrl: string | null;
-  anamnesis: string;
-  drugs: string;
-  laboratoryAnalysis: string;
+  clinicalInput: string;
   useRag: boolean;
   useWebSearch: boolean;
 };
@@ -69,9 +67,7 @@ export type ClinicalFormState = {
 export type ClinicalRequestPayload = {
   name: string | null;
   visit_date: { day: number; month: number; year: number } | null;
-  anamnesis: string | null;
-  drugs: string | null;
-  laboratory_analysis: string | null;
+  clinical_input: string | null;
   patient_image_base64?: string | null;
   use_rag: boolean;
   use_web_search: boolean;

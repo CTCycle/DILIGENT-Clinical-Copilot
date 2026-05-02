@@ -149,6 +149,7 @@ class ClinicalSessionRequest(BaseModel):
 
     name: str | None = Field(default=None, max_length=200)
     visit_date: date | dict[str, int] | str | None = None
+    clinical_input: str | None = Field(default=None, max_length=100000)
     anamnesis: str | None = Field(default=None, max_length=20000)
     use_rag: bool = False
     use_web_search: bool = False
@@ -161,6 +162,7 @@ class ClinicalSessionRequest(BaseModel):
     # -------------------------------------------------------------------------
     @field_validator(
         "name",
+        "clinical_input",
         "anamnesis",
         "drugs",
         "laboratory_analysis",
@@ -174,6 +176,33 @@ class ClinicalSessionRequest(BaseModel):
         without_controls = CONTROL_CHARACTERS_RE.sub(" ", str(value))
         stripped = without_controls.strip()
         return stripped or None
+
+
+###############################################################################
+class ClinicalSectionExtractionResult(BaseModel):
+    source_text: str = Field(..., max_length=100000)
+    anamnesis: str | None = Field(default=None, max_length=100000)
+    drugs: str | None = Field(default=None, max_length=100000)
+    laboratory_analysis: str | None = Field(default=None, max_length=100000)
+    confidence: float = Field(
+        default=0.0,
+        ge=0.0,
+        le=1.0,
+        description="Overall confidence in section assignment quality.",
+    )
+
+    @model_validator(mode="after")
+    def normalize_section_fields(self) -> "ClinicalSectionExtractionResult":
+        for field_name in (
+            self.anamnesis,
+            self.drugs,
+            self.laboratory_analysis,
+        ):
+            if field_name is None:
+                continue
+            if not field_name.strip():
+                raise ValueError("section text fields cannot be blank strings")
+        return self
 
 
 ###############################################################################

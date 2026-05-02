@@ -1,11 +1,4 @@
-import {
-  ClinicalFormState,
-  ClinicalRequestPayload,
-} from "./models/types";
-
-const DRUG_TIMING_CUE_RE =
-  /\b(?:\d{1,2}[./-]\d{1,2}(?:[./-]\d{2,4})?|\d{4}[./-]\d{1,2}[./-]\d{1,2}|start(?:ed|ing)?|begin|began|since|from|on|until|stop(?:ped|ping)?|suspend(?:ed|ing)?|discontinu(?:e|ed)|interrott|sospes|inizi|avviat|ripres|terapia|treatment)\b/i;
-const DRUG_SCHEDULE_CUE_RE = /\b\d+(?:[.,]\d+)?\s*-\s*\d+(?:[.,]\d+)?(?:\s*-\s*\d+(?:[.,]\d+)?){1,2}\b/;
+import { ClinicalFormState, ClinicalRequestPayload } from "./models/types";
 
 export function sanitizeField(value: string): string | null {
   const normalized = value.trim();
@@ -121,24 +114,11 @@ export function buildClinicalPayload(
   return {
     name: sanitizeField(form.patientName),
     visit_date: buildVisitDatePayload(form.visitDate),
-    anamnesis: sanitizeField(form.anamnesis),
-    drugs: sanitizeField(form.drugs),
-    laboratory_analysis: sanitizeField(form.laboratoryAnalysis),
+    clinical_input: sanitizeField(form.clinicalInput),
     patient_image_base64: extractBase64Payload(form.patientImageDataUrl),
     use_rag: form.useRag,
     use_web_search: form.useWebSearch,
   };
-}
-
-export function hasDrugTimingCue(value: string): boolean {
-  const normalized = value.trim();
-  if (!normalized) {
-    return false;
-  }
-  if (DRUG_SCHEDULE_CUE_RE.test(normalized)) {
-    return true;
-  }
-  return DRUG_TIMING_CUE_RE.test(normalized);
 }
 
 export function createDownloadUrl(content: string, filename: string): string {

@@ -51,9 +51,11 @@ def test_start_clinical_job_uses_centralized_poll_interval(monkeypatch) -> None:
 
     response = session_routes.service.start_clinical_job(
         ClinicalSessionRequest(
-            anamnesis="Clinical context",
+            clinical_input=(
+                "Anamnesis: Clinical context\n"
+                "Drugs: Acetaminophen 500 mg 1 - 0 - 0 - 0 po started from 01/01/2024"
+            ),
             visit_date=date(2026, 4, 24),
-            drugs="Acetaminophen 500 mg 1 - 0 - 0 - 0 po started from 01/01/2024",
         )
     )
 

@@ -7,6 +7,7 @@ from functools import partial
 from typing import Any
 
 from domain.clinical.entities import (
+    ClinicalSectionExtractionResult,
     ClinicalPipelineValidationError,
     DrugRucamAssessment,
     PatientData,
@@ -32,6 +33,7 @@ def build_failed_session_payload(
     issues: list[dict[str, Any]],
     error_message: str,
     elapsed_seconds: float,
+    section_extraction: ClinicalSectionExtractionResult | None = None,
 ) -> dict[str, Any]:
     language_result = ClinicalLanguageDetector.detect(payload)
     runtime_settings = {
@@ -79,6 +81,9 @@ def build_failed_session_payload(
             "excluded_drugs": [],
             "unresolved_drugs": [],
             "structured_case": {},
+            "section_extraction": (
+                section_extraction.model_dump() if section_extraction is not None else None
+            ),
             "runtime_settings": runtime_settings,
         },
     }
@@ -350,6 +355,7 @@ async def execute_clinical_job(
     payload: PatientData,
     patient_image_base64: str | None,
     job_id: str,
+    section_extraction: ClinicalSectionExtractionResult | None = None,
 ) -> dict[str, Any]:
     service.apply_persisted_runtime_configuration()
     ensure_not_cancelled = partial(
@@ -373,6 +379,7 @@ async def execute_clinical_job(
         result = await service.process_single_patient(
             payload,
             patient_image_base64=patient_image_base64,
+            section_extraction=section_extraction,
             progress_callback=progress_callback,
             stop_check=ensure_not_cancelled,
         )
@@ -395,6 +402,7 @@ async def execute_clinical_job(
                 issues=serialized_issues,
                 error_message=str(exc),
                 elapsed_seconds=(time.perf_counter() - job_started_at),
+                section_extraction=section_extraction,
             ),
         )
         service.job_manager.update_result(
@@ -421,6 +429,7 @@ async def execute_clinical_job(
                 issues=[failure_issue],
                 error_message=str(exc),
                 elapsed_seconds=(time.perf_counter() - job_started_at),
+                section_extraction=section_extraction,
             ),
         )
         raise
@@ -460,6 +469,7 @@ def run_clinical_job(
     payload: PatientData,
     patient_image_base64: str | None,
     job_id: str,
+    section_extraction: ClinicalSectionExtractionResult | None = None,
 ) -> dict[str, Any]:
     result = asyncio.run(
         execute_clinical_job(
@@ -467,6 +477,7 @@ def run_clinical_job(
             payload=payload,
             patient_image_base64=patient_image_base64,
             job_id=job_id,
+            section_extraction=section_extraction,
         )
     )
     if not result:

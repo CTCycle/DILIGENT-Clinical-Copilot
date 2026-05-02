@@ -216,19 +216,21 @@ class ClinicalInputExtractor:
         sections: dict[str, list[str]],
         confidence: float,
     ) -> ClinicalSectionExtractionResult:
-        def join_lines(section_key: str) -> str | None:
-            lines = [line.strip() for line in sections.get(section_key, []) if line.strip()]
-            if not lines:
-                return None
-            return "\n".join(lines)
-
         return ClinicalSectionExtractionResult(
             source_text=source_text,
-            anamnesis=join_lines("anamnesis"),
-            drugs=join_lines("drugs"),
-            laboratory_analysis=join_lines("laboratory_analysis"),
+            anamnesis=cls._join_section_lines(sections, "anamnesis"),
+            drugs=cls._join_section_lines(sections, "drugs"),
+            laboratory_analysis=cls._join_section_lines(sections, "laboratory_analysis"),
             confidence=max(0.0, min(1.0, float(confidence))),
         )
+
+    # -------------------------------------------------------------------------
+    @staticmethod
+    def _join_section_lines(sections: dict[str, list[str]], section_key: str) -> str | None:
+        lines = [line.strip() for line in sections.get(section_key, []) if line.strip()]
+        if not lines:
+            return None
+        return "\n".join(lines)
 
     # -------------------------------------------------------------------------
     @classmethod
