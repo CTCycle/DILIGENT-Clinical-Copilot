@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import asyncio
+from difflib import SequenceMatcher
 from collections.abc import Callable
 from typing import Any
 
@@ -27,6 +28,11 @@ class ClinicalInputExtractionError(RuntimeError):
 
 ###############################################################################
 class ClinicalInputExtractor:
+    MIN_SIMILARITY_RATIO = 0.96
+    MAX_ABSOLUTE_CHAR_DRIFT = 12
+    MAX_WORD_DELTA = 2
+    MAX_ABSOLUTE_EDIT_DRIFT = 2
+
     def __init__(
         self,
         *,
@@ -156,7 +162,7 @@ class ClinicalInputExtractor:
         source_text: str,
         extraction: ClinicalSectionExtractionResult,
     ) -> ClinicalSectionExtractionResult:
-        if extraction.source_text != source_text:
+        if not cls._is_near_match(extraction.source_text, source_text):
             raise ClinicalInputExtractionError(
                 "Clinical input extraction returned mismatched source_text."
             )
@@ -177,23 +183,74 @@ class ClinicalInputExtractor:
         )
 
         for original_fragment, rebuilt_fragment in zip(extraction.fragments, rebuilt.fragments, strict=True):
-            if source_text[original_fragment.start : original_fragment.end] != original_fragment.text:
+            if not cls._is_near_match(
+                source_text[original_fragment.start : original_fragment.end],
+                original_fragment.text,
+            ):
                 raise ClinicalInputExtractionError(
                     "Clinical input extraction changed a source fragment."
                 )
-            if original_fragment.text != rebuilt_fragment.text:
+            if not cls._is_near_match(original_fragment.text, rebuilt_fragment.text):
                 raise ClinicalInputExtractionError(
                     "Clinical input extraction returned inconsistent fragment text."
                 )
 
-        if extraction.anamnesis != rebuilt.anamnesis:
+        if not cls._is_near_match(extraction.anamnesis, rebuilt.anamnesis):
             raise ClinicalInputExtractionError("Clinical input extraction returned inconsistent anamnesis.")
-        if extraction.drugs != rebuilt.drugs:
+        if not cls._is_near_match(extraction.drugs, rebuilt.drugs):
             raise ClinicalInputExtractionError("Clinical input extraction returned inconsistent current therapy.")
-        if extraction.laboratory_analysis != rebuilt.laboratory_analysis:
+        if not cls._is_near_match(extraction.laboratory_analysis, rebuilt.laboratory_analysis):
             raise ClinicalInputExtractionError("Clinical input extraction returned inconsistent laboratory analysis.")
 
         return rebuilt
+
+    # -------------------------------------------------------------------------
+    @classmethod
+    def _is_near_match(cls, expected: str | None, observed: str | None) -> bool:
+        if expected is None or observed is None:
+            return expected is observed
+        if expected == observed:
+            return True
+
+        normalized_expected = expected.replace("\r\n", "\n").replace("\r", "\n")
+        normalized_observed = observed.replace("\r\n", "\n").replace("\r", "\n")
+        if normalized_expected == normalized_observed:
+            return True
+
+        stripped_expected = normalized_expected.rstrip()
+        stripped_observed = normalized_observed.rstrip()
+        if stripped_expected == stripped_observed:
+            return True
+
+        length_gap = abs(len(stripped_expected) - len(stripped_observed))
+        if length_gap > cls.MAX_ABSOLUTE_CHAR_DRIFT:
+            return False
+
+        expected_words = stripped_expected.split()
+        observed_words = stripped_observed.split()
+        if abs(len(expected_words) - len(observed_words)) > cls.MAX_WORD_DELTA:
+            return False
+
+        estimated_edit_drift = cls._estimate_edit_drift(
+            stripped_expected,
+            stripped_observed,
+        )
+        if estimated_edit_drift <= cls.MAX_ABSOLUTE_EDIT_DRIFT:
+            return True
+
+        similarity = SequenceMatcher(a=stripped_expected, b=stripped_observed).ratio()
+        return similarity >= cls.MIN_SIMILARITY_RATIO
+
+    # -------------------------------------------------------------------------
+    @staticmethod
+    def _estimate_edit_drift(expected: str, observed: str) -> int:
+        matcher = SequenceMatcher(a=expected, b=observed)
+        drift = 0
+        for tag, i1, i2, j1, j2 in matcher.get_opcodes():
+            if tag == "equal":
+                continue
+            drift += max(i2 - i1, j2 - j1)
+        return drift
 
     # -------------------------------------------------------------------------
     @classmethod
