@@ -296,6 +296,10 @@ app-root {
   resize: vertical;
 }
 
+.stitch-dili-input-unified {
+  min-height: 474px !important;
+}
+
 .stitch-dili-card textarea:focus-visible,
 .stitch-dili-workbench textarea:focus-visible {
   outline: none;

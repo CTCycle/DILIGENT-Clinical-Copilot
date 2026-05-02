@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from collections import defaultdict
 
-from services.clinical.prompts import DILI_RAG_QUERY_PROMPT
+from services.llm.prompts import DILI_RAG_QUERY_PROMPT
 from domain.clinical.entities import PatientDrugs
 from common.constants import (
     DEFAULT_DILI_CLASSIFICATION,

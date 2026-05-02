@@ -5,7 +5,7 @@ from datetime import date
 
 import pytest
 
-from services.clinical.prompts import LIVERTOX_CLINICAL_USER_PROMPT
+from services.llm.prompts import LIVERTOX_CLINICAL_USER_PROMPT
 from domain.clinical import (
     ClinicalLabEntry,
     ClinicalPipelineValidationError,

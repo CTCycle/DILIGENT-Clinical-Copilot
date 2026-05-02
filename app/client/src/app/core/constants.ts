@@ -114,9 +114,7 @@ export const DEFAULT_FORM_STATE: ClinicalFormState = {
   patientName: "",
   visitDate: "",
   patientImageDataUrl: null,
-  anamnesis: "",
-  drugs: "",
-  laboratoryAnalysis: "",
+  clinicalInput: "",
   useRag: false,
   useWebSearch: false,
 };

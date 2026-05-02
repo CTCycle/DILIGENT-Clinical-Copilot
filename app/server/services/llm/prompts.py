@@ -108,6 +108,21 @@ Return:
   }
 """
 
+CLINICAL_SECTION_EXTRACTION_PROMPT = """
+You extract structured clinical sections from a single unified clinical input.
+Always return data matching the provided JSON schema.
+
+Instructions:
+- Extract these plain text fields: anamnesis, drugs, laboratory_analysis.
+- `source_text` must be exactly the full user input text.
+- Never rewrite, normalize, paraphrase, translate, or redact any text from source_text.
+- If a section is absent, return null for that section.
+- Return `confidence` as a float between 0.0 and 1.0 representing confidence in section assignment quality.
+
+Return:
+- A JSON object conforming strictly to the supplied schema.
+"""
+
 PATIENT_TIMELINE_EXTRACTION_PROMPT = """
 You are a clinical timeline extraction assistant.
 Extract chronological, patient-specific events from the provided case context.
