@@ -17,7 +17,7 @@ from domain.clinical.entities import (
     PatientData,
     PatientLabTimeline,
 )
-from services.clinical.prompts import CLINICAL_LAB_EXTRACTION_PROMPT
+from services.llm.prompts import CLINICAL_LAB_EXTRACTION_PROMPT
 from services.llm.client_runtime import ensure_runtime_client
 from services.llm.providers import select_llm_provider
 from services.text.vocabulary import get_text_normalization_snapshot

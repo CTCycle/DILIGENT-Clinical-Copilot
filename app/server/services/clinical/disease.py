@@ -13,7 +13,7 @@ from domain.clinical.entities import (
     DiseaseContextEntry,
     PatientDiseaseContext,
 )
-from services.clinical.prompts import (
+from services.llm.prompts import (
     ANAMNESIS_DISEASE_EXTRACTION_PROMPT,
 )
 from services.llm.client_runtime import ensure_runtime_client

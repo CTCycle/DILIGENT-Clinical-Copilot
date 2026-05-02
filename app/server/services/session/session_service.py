@@ -18,6 +18,7 @@ from domain.clinical.extras import HepatoxPreparedInputs
 from services.llm.cloud import LLMError
 
 from domain.clinical.entities import (
+    ClinicalSectionExtractionResult,
     ClinicalPipelineValidationError,
     ClinicalSessionRequest,
     DrugRucamAssessment,
@@ -76,6 +77,10 @@ from services.clinical.validation import (
     has_timing_information,
 )
 from services.session.payload import PayloadSanitizationService
+from services.session.clinical_input_extractor import (
+    ClinicalInputExtractionError,
+    ClinicalInputExtractor,
+)
 from services.llm.model_config import ModelConfigService
 from services.retrieval.query import DILIQueryBuilder
 from services.session.session_shared import (
@@ -115,6 +120,7 @@ class ClinicalSessionService(ClinicalSessionFormattingMixin):
         serializer: DataSerializer,
         payload_sanitizer: PayloadSanitizationService,
         input_preparator: ClinicalKnowledgePreparation | None = None,
+        clinical_input_extractor: ClinicalInputExtractor | None = None,
         hepatox_consultation_cls: type[HepatoxConsultation] | None = None,
         job_manager: JobManager | None = None,
     ) -> None:
@@ -126,6 +132,7 @@ class ClinicalSessionService(ClinicalSessionFormattingMixin):
         self.serializer = serializer
         self.payload_sanitizer = payload_sanitizer
         self.input_preparator = input_preparator or ClinicalKnowledgePreparation()
+        self.clinical_input_extractor = clinical_input_extractor or ClinicalInputExtractor()
         self.hepatox_consultation_cls = hepatox_consultation_cls or HepatoxConsultation
         self.job_manager = job_manager or default_job_manager
         self.model_config_service = ModelConfigService(
@@ -182,6 +189,29 @@ class ClinicalSessionService(ClinicalSessionFormattingMixin):
             LLMRuntimeConfig.get_ollama_temperature(),
             LLMRuntimeConfig.get_cloud_temperature(),
             LLMRuntimeConfig.is_ollama_reasoning_enabled(),
+        )
+
+    # -------------------------------------------------------------------------
+    async def preprocess_unified_input(
+        self, request_payload: ClinicalSessionRequest
+    ) -> tuple[ClinicalSessionRequest, ClinicalSectionExtractionResult | None]:
+        clinical_input = (request_payload.clinical_input or "").strip()
+        if not clinical_input:
+            raise ClinicalInputExtractionError(
+                "Clinical input is required."
+            )
+        extraction = await self.clinical_input_extractor.extract(
+            clinical_input=clinical_input
+        )
+        return (
+            request_payload.model_copy(
+                update={
+                    "anamnesis": extraction.anamnesis,
+                    "drugs": extraction.drugs,
+                    "laboratory_analysis": extraction.laboratory_analysis,
+                }
+            ),
+            extraction,
         )
 
     # -------------------------------------------------------------------------
@@ -912,6 +942,7 @@ class ClinicalSessionService(ClinicalSessionFormattingMixin):
         payload: PatientData,
         *,
         patient_image_base64: str | None = None,
+        section_extraction: ClinicalSectionExtractionResult | None = None,
         progress_callback: Callable[[str, float], None] | None = None,
         stop_check: Callable[[], None] | None = None,
     ) -> dict[str, Any]:
@@ -1109,6 +1140,9 @@ class ClinicalSessionService(ClinicalSessionFormattingMixin):
                     entry.model_dump() for entry in disease_context.entries
                 ],
             },
+            "section_extraction": (
+                section_extraction.model_dump() if section_extraction is not None else None
+            ),
             "runtime_settings": {
                 "use_cloud_services": LLMRuntimeConfig.is_cloud_enabled(),
                 "llm_provider": LLMRuntimeConfig.get_llm_provider(),
@@ -1133,6 +1167,11 @@ class ClinicalSessionService(ClinicalSessionFormattingMixin):
                 "anamnesis": payload.anamnesis,
                 "drugs": payload.drugs,
                 "laboratory_analysis": payload.laboratory_analysis,
+                "section_extraction": (
+                    section_extraction.model_dump()
+                    if section_extraction is not None
+                    else None
+                ),
                 "text_extraction_model": getattr(self.drugs_parser, "model", None),
                 "clinical_model": getattr(clinical_session, "llm_model", None),
                 "total_duration": global_elapsed,
@@ -1153,7 +1192,13 @@ class ClinicalSessionService(ClinicalSessionFormattingMixin):
         self,
         request_payload: ClinicalSessionRequest,
     ) -> str:
-        patient_payload = self.build_patient_payload(request_payload)
+        try:
+            preprocessed_request, section_extraction = (
+                await self.preprocess_unified_input(request_payload)
+            )
+        except ClinicalInputExtractionError as exc:
+            raise ServiceValidationError(str(exc)) from exc
+        patient_payload = self.build_patient_payload(preprocessed_request)
         try:
             self.ensure_submission_requirements(patient_payload)
         except ClinicalPipelineValidationError as exc:
@@ -1165,6 +1210,7 @@ class ClinicalSessionService(ClinicalSessionFormattingMixin):
             single_result = await self.process_single_patient(
                 patient_payload,
                 patient_image_base64=request_payload.patient_image_base64,
+                section_extraction=section_extraction,
             )
         except ClinicalPipelineValidationError as exc:
             raise ServiceValidationError(
@@ -1183,7 +1229,13 @@ class ClinicalSessionService(ClinicalSessionFormattingMixin):
                 "Clinical analysis is already in progress",
             )
 
-        patient_payload = self.build_patient_payload(request_payload)
+        try:
+            preprocessed_request, section_extraction = asyncio.run(
+                self.preprocess_unified_input(request_payload)
+            )
+        except ClinicalInputExtractionError as exc:
+            raise ServiceValidationError(str(exc)) from exc
+        patient_payload = self.build_patient_payload(preprocessed_request)
         try:
             self.ensure_submission_requirements(patient_payload)
         except ClinicalPipelineValidationError as exc:
@@ -1199,6 +1251,7 @@ class ClinicalSessionService(ClinicalSessionFormattingMixin):
                 "service": self,
                 "payload": patient_payload,
                 "patient_image_base64": request_payload.patient_image_base64,
+                "section_extraction": section_extraction,
             },
         )
 

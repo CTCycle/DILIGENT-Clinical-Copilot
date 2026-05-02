@@ -11,9 +11,12 @@ def build_minimal_payload() -> dict:
     return {
         "name": "Test Patient",
         "visit_date": "2024-01-15",
-        "anamnesis": "Patient with jaundice and fatigue.",
-        "drugs": "Zetamycin 10 mg 1-0-0-0",
-        "laboratory_analysis": "Lab 2024-01-15: ALT 100 U/L (ULN 50), ALP 200 U/L (ULN 100), bilirubin 2.0 mg/dL",
+        "clinical_input": (
+            "## Anamnesis\nPatient with jaundice and fatigue.\n\n"
+            "## Therapy\nZetamycin 10 mg 1-0-0-0\n\n"
+            "## Laboratory Analysis\n"
+            "Lab 2024-01-15: ALT 100 U/L (ULN 50), ALP 200 U/L (ULN 100), bilirubin 2.0 mg/dL"
+        ),
         "use_rag": False,
     }
 
@@ -34,16 +37,13 @@ def extract_issue_codes(payload: dict) -> set[str]:
 def test_clinical_requires_sections(api_context: APIRequestContext):
     response = api_context.post("/api/clinical", data={"name": "Test"})
     assert response.status == 422
-
-    codes = extract_issue_codes(response.json())
-    assert "missing_anamnesis" in codes
-    assert "missing_visit_date" in codes
+    assert "Clinical input is required." in response.text()
 
 
 def test_clinical_rejects_blank_sections(api_context: APIRequestContext):
     response = api_context.post(
         "/api/clinical",
-        data={"anamnesis": "  \n", "drugs": "   ", "visit_date": None},
+        data={"clinical_input": "  \n", "visit_date": None},
     )
     assert response.status == 422
 
@@ -75,8 +75,7 @@ def test_clinical_requires_therapy_drugs_even_with_anamnesis(
     api_context: APIRequestContext,
 ):
     payload = build_minimal_payload()
-    payload["anamnesis"] = "History mentions aspirin."
-    payload["drugs"] = "   "
+    payload["clinical_input"] = "## Anamnesis\nHistory mentions aspirin."
 
     response = api_context.post("/api/clinical", data=payload)
     assert response.status == 422
@@ -87,7 +86,11 @@ def test_clinical_requires_therapy_drugs_even_with_anamnesis(
 
 def test_clinical_missing_labs_blocks_by_default(api_context: APIRequestContext):
     payload = build_minimal_payload()
-    payload["laboratory_analysis"] = "Labs unavailable."
+    payload["clinical_input"] = (
+        "## Anamnesis\nPatient with jaundice.\n\n"
+        "## Therapy\nZetamycin 10 mg 1-0-0-0\n\n"
+        "## Laboratory Analysis\nLabs unavailable."
+    )
 
     response = api_context.post("/api/clinical", data=payload)
     assert response.status == 422
@@ -108,7 +111,10 @@ def test_clinical_missing_visit_date_blocks(api_context: APIRequestContext):
 
 def test_clinical_missing_anamnesis_blocks(api_context: APIRequestContext):
     payload = build_minimal_payload()
-    payload["anamnesis"] = None
+    payload["clinical_input"] = (
+        "## Therapy\nZetamycin 10 mg 1-0-0-0\n\n"
+        "## Laboratory Analysis\nALT 100 U/L (ULN 50)"
+    )
 
     response = api_context.post("/api/clinical", data=payload)
     assert response.status == 422
@@ -118,7 +124,11 @@ def test_clinical_missing_anamnesis_blocks(api_context: APIRequestContext):
 
 def test_clinical_missing_timing_blocks(api_context: APIRequestContext):
     payload = build_minimal_payload()
-    payload["drugs"] = "Zetamycin"
+    payload["clinical_input"] = (
+        "## Anamnesis\nPatient with jaundice and fatigue.\n\n"
+        "## Therapy\nZetamycin\n\n"
+        "## Laboratory Analysis\nALT 100 U/L (ULN 50)"
+    )
 
     response = api_context.post("/api/clinical", data=payload)
     assert response.status == 422
@@ -128,11 +138,12 @@ def test_clinical_missing_timing_blocks(api_context: APIRequestContext):
 
 def test_clinical_report_includes_estimated_rucam(api_context: APIRequestContext):
     payload = build_minimal_payload()
-    payload["anamnesis"] = (
+    payload["clinical_input"] = (
+        "## Anamnesis\n"
         "ALT 320 U/L (ULN 40) on 2025-01-10, ALT 150 U/L on 2025-01-20. "
-        "Jaundice started on 2025-01-11."
-    )
-    payload["laboratory_analysis"] = (
+        "Jaundice started on 2025-01-11.\n\n"
+        "## Therapy\nZetamycin 10 mg 1-0-0-0\n\n"
+        "## Laboratory Analysis\n"
         "Lab 2025-01-10: ALT 320 U/L (ULN 40), ALP 140 U/L (ULN 120), bilirubin 2.1 mg/dL\n"
         "Lab 2025-01-20: ALT 150 U/L (ULN 40), ALP 120 U/L (ULN 120)"
     )
@@ -147,8 +158,11 @@ def test_clinical_endpoint_stable_without_usable_longitudinal_labs(
     api_context: APIRequestContext,
 ):
     payload = build_minimal_payload()
-    payload["anamnesis"] = "Patient reports fatigue but no explicit longitudinal labs."
-    payload["laboratory_analysis"] = "No measurable values."
+    payload["clinical_input"] = (
+        "## Anamnesis\nPatient reports fatigue but no explicit longitudinal labs.\n\n"
+        "## Therapy\nZetamycin 10 mg 1-0-0-0\n\n"
+        "## Laboratory Analysis\nNo measurable values."
+    )
 
     response = api_context.post("/api/clinical", data=payload)
     assert response.status == 422
@@ -160,9 +174,10 @@ def test_clinical_preserves_italian_output_language(api_context: APIRequestConte
     payload = {
         "name": "Mario Rossi",
         "visit_date": "2025-01-15",
-        "anamnesis": "Paziente con ittero e dolore addominale.",
-        "drugs": "Paracetamolo sospeso dal 2025-01-11",
-        "laboratory_analysis": (
+        "clinical_input": (
+            "## Anamnesi\nPaziente con ittero e dolore addominale.\n\n"
+            "## Terapia\nParacetamolo sospeso dal 2025-01-11\n\n"
+            "## Esami di laboratorio\n"
             "Laboratorio 2025-01-10: ALT 320 U/L (ULN 40), ALP 140 U/L (ULN 120), bilirubina 2.1 mg/dL"
         ),
         "use_rag": False,
