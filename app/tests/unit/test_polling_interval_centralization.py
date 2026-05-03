@@ -10,6 +10,15 @@ from api import session as session_routes
 from services.clinical import job_progress as clinical_job_progress
 
 
+def get_route_owner(router: Any, route_path: str) -> Any:
+    for route in router.routes:
+        if getattr(route, "path", "").endswith(route_path):
+            owner = getattr(route.endpoint, "__self__", None)
+            if owner is not None:
+                return owner
+    raise AssertionError(f"Route not found: {route_path}")
+
+
 ###############################################################################
 class JobManagerStub:
     def __init__(self) -> None:
@@ -47,9 +56,10 @@ class JobManagerStub:
 # -----------------------------------------------------------------------------
 def test_start_clinical_job_uses_centralized_poll_interval(monkeypatch) -> None:
     job_manager_stub = JobManagerStub()
-    monkeypatch.setattr(session_routes.service, "job_manager", job_manager_stub)
+    endpoint = get_route_owner(session_routes.router, "/clinical/jobs")
+    monkeypatch.setattr(endpoint.service, "job_manager", job_manager_stub)
 
-    response = session_routes.service.start_clinical_job(
+    response = endpoint.service.start_clinical_job(
         ClinicalSessionRequest(
             clinical_input=(
                 "Anamnesis: Clinical context\n"
@@ -66,9 +76,10 @@ def test_start_clinical_job_uses_centralized_poll_interval(monkeypatch) -> None:
 # -----------------------------------------------------------------------------
 def test_start_pull_job_uses_centralized_poll_interval(monkeypatch) -> None:
     job_manager_stub = JobManagerStub()
-    monkeypatch.setattr(ollama_routes.service, "job_manager", job_manager_stub)
+    endpoint = get_route_owner(ollama_routes.router, "/pull/jobs")
+    monkeypatch.setattr(endpoint.service, "job_manager", job_manager_stub)
 
-    response = ollama_routes.endpoint.start_pull_job(
+    response = endpoint.start_pull_job(
         name="llama3.1:8b",
         stream=False,
     )
@@ -84,8 +95,8 @@ def test_clinical_progress_callback_raises_when_stop_requested(monkeypatch) -> N
 
     monkeypatch.setattr(
         clinical_job_progress,
-        "job_manager",
-        StopRequestedJobManagerStub(),
+        "get_job_manager",
+        lambda: StopRequestedJobManagerStub(),
     )
 
     try:

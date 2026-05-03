@@ -18,11 +18,11 @@ from domain.research.entities import (
 )
 from domain.research.extras import BraveSearchOutcome
 from repositories.serialization.access_keys import AccessKeySerializer
-from services.llm.providers import initialize_llm_client
+from services.llm.provider_factory import initialize_llm_client
 
 
 BRAVE_SEARCH_URL = "https://api.search.brave.com/res/v1/web/search"
-TRANSIENT_HTTP_STATUS_CODES: set[int] = {408, 429, 500, 502, 503, 504}
+TRANSIENT_HTTP_STATUS_CODES: frozenset[int] = frozenset((408, 429, 500, 502, 503, 504))
 DEFAULT_WEB_SNIPPET_MAX_CHARS = 420
 DEFAULT_QUERY_MAX_LEN = 180
 PROMPTY_PREFIX_RE = re.compile(
@@ -397,7 +397,4 @@ class BraveResearchService:
         self, cache: dict[str, tuple[float, Any]], key: str, value: Any, ttl_s: int
     ) -> None:
         cache[key] = (time.monotonic() + max(int(ttl_s), 1), value)
-
-
-brave_research_service = BraveResearchService()
 

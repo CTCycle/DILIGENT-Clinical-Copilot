@@ -9,20 +9,11 @@ from typing import Any
 
 from collections.abc import Callable
 
+from common.constants import SENSITIVE_ERROR_TOKENS
 from common.utils.logger import logger
 from domain.jobs import JobState
 
-
-SENSITIVE_ERROR_TOKENS: tuple[str, ...] = (
-    "traceback",
-    "stack",
-    "token",
-    "secret",
-    "password",
-    "authorization",
-    "api key",
-    "access key",
-)
+from functools import lru_cache
 
 
 ###############################################################################
@@ -231,5 +222,7 @@ class JobManager:
 
 
 ###############################################################################
-job_manager = JobManager()
+@lru_cache(maxsize=1)
+def get_job_manager() -> JobManager:
+    return JobManager()
 

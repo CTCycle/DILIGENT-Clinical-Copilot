@@ -7,10 +7,6 @@ from sqlalchemy import select, update
 from sqlalchemy.engine import Engine
 from sqlalchemy.orm import sessionmaker
 
-from repositories.database.session import (
-    resolve_engine,
-    resolve_session_factory,
-)
 from repositories.schemas.models import AccessKeyEncryptionMaterial
 
 DEFAULT_KEY_PURPOSE = "provider_access_keys"
@@ -24,10 +20,12 @@ class AccessKeyEncryptionMaterialSerializer:
         engine: Engine | None = None,
         session_factory: sessionmaker | None = None,
     ) -> None:
-        self.engine = resolve_engine(engine)
-        self.session_factory = resolve_session_factory(
-            engine=self.engine,
-            session_factory=session_factory,
+        if engine is None and session_factory is None:
+            raise ValueError("engine or session_factory is required")
+        self.engine = engine
+        self.session_factory = session_factory or sessionmaker(
+            bind=engine,
+            future=True,
             expire_on_commit=False,
         )
 

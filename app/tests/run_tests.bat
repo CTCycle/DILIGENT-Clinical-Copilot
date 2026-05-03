@@ -62,8 +62,8 @@ set "BACKEND_WORKDIR=%SERVER_DIR%"
 set "PYTHONPATH=%SERVER_DIR%;%APP_DIR%"
 "%PYTHON_CMD%" -c "import importlib; importlib.import_module('app')" >nul 2>&1
 if errorlevel 1 (
-  set "UVICORN_APP=server.app:app"
-  set "PYTHONPATH=%APP_DIR%"
+  echo [ERROR] Backend import check failed for app:app.
+  exit /b 1
 )
 
 set "SUITE=%~1"

@@ -29,7 +29,7 @@ from repositories.serialization.data import (
 )
 from repositories.vectors import LanceVectorDatabase
 from services.clinical.timeline import PatientTimelineExtractor
-from services.runtime.jobs import JobManager, job_manager
+from services.runtime.jobs import JobManager
 from services.inspection.runtime import (
     coerce_optional_str,
 )
@@ -103,7 +103,7 @@ class DataInspectionService:
         *,
         serializer: DataSerializer | None = None,
         timeline_extractor: PatientTimelineExtractor | None = None,
-        jobs: JobManager = job_manager,
+        jobs: JobManager,
     ) -> None:
         self.serializer = serializer or DataSerializer()
         self.timeline_extractor = timeline_extractor or PatientTimelineExtractor()

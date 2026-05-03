@@ -6,22 +6,23 @@ from domain.research.entities import (
     ResearchRequest,
     ResearchResponse,
 )
-from services.research.brave import brave_research_service
+from services.research.brave import BraveResearchService
 
 router = APIRouter(tags=["research"])
 
 
 ###############################################################################
 class ResearchEndpoint:
-    def __init__(self, *, router: APIRouter) -> None:
+    def __init__(self, *, router: APIRouter, service: BraveResearchService) -> None:
         self.router = router
+        self.service = service
 
     # -------------------------------------------------------------------------
     async def run_research(
         self,
         payload: ResearchRequest = Body(...),
     ) -> ResearchResponse:
-        if not brave_research_service.is_configured():
+        if not self.service.is_configured():
             raise HTTPException(
                 status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
                 detail=(
@@ -29,13 +30,13 @@ class ResearchEndpoint:
                     "Add and activate a Brave Search key in the access-key manager."
                 ),
             )
-        outcome = await brave_research_service.search_sources(
+        outcome = await self.service.search_sources(
             question=payload.question,
             mode=payload.mode,
             allowed_domains=payload.allowed_domains,
             blocked_domains=payload.blocked_domains,
         )
-        answer, citations = await brave_research_service.generate_answer_with_citations(
+        answer, citations = await self.service.generate_answer_with_citations(
             question=payload.question,
             sources=outcome.sources,
         )
@@ -57,6 +58,5 @@ class ResearchEndpoint:
         )
 
 
-endpoint = ResearchEndpoint(router=router)
-endpoint.add_routes()
+ResearchEndpoint(router=router, service=BraveResearchService()).add_routes()
 

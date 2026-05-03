@@ -3,17 +3,40 @@ Pytest configuration for DILIGENT E2E tests.
 Provides fixtures for Playwright page objects and API client.
 """
 
+from __future__ import annotations
+
+import asyncio
 import os
-import sys
 import threading
-from pathlib import Path
+from collections.abc import Coroutine
+from typing import Any
 
 import pytest
 
-APP_DIR = Path(__file__).resolve().parents[1]
-SERVER_DIR = APP_DIR / "server"
-if str(SERVER_DIR) not in sys.path:
-    sys.path.insert(0, str(SERVER_DIR))
+
+class CoroutineThreadRunner:
+    def __init__(
+        self,
+        run_callable: Any,
+        coro: Coroutine[Any, Any, Any],
+        args: tuple[Any, ...],
+        kwargs: dict[str, Any],
+    ) -> None:
+        self.run_callable = run_callable
+        self.coro = coro
+        self.args = args
+        self.kwargs = kwargs
+        self.box: dict[str, Any] = {}
+
+    def __call__(self) -> None:
+        try:
+            self.box["result"] = self.run_callable(
+                self.coro,
+                *self.args,
+                **self.kwargs,
+            )
+        except BaseException as exc:
+            self.box["error"] = exc
 
 
 def _normalize_host_for_url(host: str) -> str:
@@ -23,14 +46,48 @@ def _normalize_host_for_url(host: str) -> str:
 
 
 def _build_base_url(
-    host_env: str, port_env: str, default_host: str, default_port: str
+    host_env: str,
+    port_env: str,
+    default_host: str,
+    default_port: str,
 ) -> str:
     host = _normalize_host_for_url(os.getenv(host_env, default_host))
     port = os.getenv(port_env, default_port)
     return f"http://{host}:{port}"
 
 
-# Base URLs - prefer explicit env vars, then fall back to host/port pairs.
+def run_coroutine_in_thread(
+    run_callable: Any,
+    coro: Coroutine[Any, Any, Any],
+    *args: Any,
+    **kwargs: Any,
+) -> Any:
+    runner = CoroutineThreadRunner(run_callable, coro, args, kwargs)
+    thread = threading.Thread(target=runner, daemon=True)
+    thread.start()
+    thread.join()
+    if "error" in runner.box:
+        raise runner.box["error"]
+    return runner.box.get("result")
+
+
+class AsyncioRunPatch:
+    def __init__(self, original_run: Any) -> None:
+        self.original_run = original_run
+
+    def __call__(
+        self,
+        coro: Coroutine[Any, Any, Any],
+        *args: Any,
+        **kwargs: Any,
+    ) -> Any:
+        try:
+            asyncio.get_running_loop()
+        except RuntimeError:
+            return self.original_run(coro, *args, **kwargs)
+        return run_coroutine_in_thread(self.original_run, coro, *args, **kwargs)
+
+
 UI_BASE_URL = (
     os.getenv("APP_TEST_FRONTEND_URL")
     or os.getenv("UI_BASE_URL")
@@ -67,39 +124,11 @@ def api_context(playwright):
     context.dispose()
 
 
-@pytest.fixture(autouse=True, scope="session")
-def _patch_asyncio_run_for_nested_loops():
+@pytest.fixture(autouse=True)
+def patch_asyncio_run(monkeypatch: pytest.MonkeyPatch):
     """
     Make asyncio.run() resilient when tests execute under an already-running loop.
     Several unit tests use asyncio.run() from synchronous test bodies.
     """
-    import asyncio
-
-    original_run = asyncio.run
-
-    def safe_run(coro, *args, **kwargs):
-        try:
-            asyncio.get_running_loop()
-        except RuntimeError:
-            return original_run(coro, *args, **kwargs)
-
-        box: dict[str, object] = {}
-
-        def _runner() -> None:
-            try:
-                box["result"] = original_run(coro, *args, **kwargs)
-            except BaseException as exc:  # propagate original test error
-                box["error"] = exc
-
-        thread = threading.Thread(target=_runner, daemon=True)
-        thread.start()
-        thread.join()
-        if "error" in box:
-            raise box["error"]  # type: ignore[misc]
-        return box.get("result")
-
-    asyncio.run = safe_run
-    try:
-        yield
-    finally:
-        asyncio.run = original_run
+    monkeypatch.setattr(asyncio, "run", AsyncioRunPatch(asyncio.run))
+    yield

@@ -1,19 +1,18 @@
 from __future__ import annotations
 
-from configurations import model_runtime
+from services.llm.model_config import ModelConfigService
 
 
-def test_sync_runtime_model_config_applies_snapshot(monkeypatch) -> None:
+def test_model_config_service_ensure_defaults_applies_snapshot(monkeypatch) -> None:
     sentinel_snapshot = object()
     observed: dict[str, object] = {}
 
     monkeypatch.setattr(
-        model_runtime.ModelConfigService,
+        ModelConfigService,
         "ensure_defaults",
         lambda self: observed.setdefault("snapshot", sentinel_snapshot),
     )
 
-    model_runtime.sync_runtime_model_config()
+    ModelConfigService().ensure_defaults()
 
     assert observed["snapshot"] is sentinel_snapshot
-

@@ -5,7 +5,7 @@ import time
 from unittest.mock import AsyncMock
 
 from configurations.llm_configs import LLMRuntimeConfig
-from services.llm.providers import OllamaClient
+from services.llm.ollama_client import OllamaClient
 
 
 # -----------------------------------------------------------------------------

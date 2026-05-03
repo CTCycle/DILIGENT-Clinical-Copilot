@@ -71,7 +71,7 @@ def test_decryption_fails_when_referenced_version_does_not_exist() -> None:
 # -----------------------------------------------------------------------------
 def test_code_never_reads_access_key_encryption_key_env_var() -> None:
     app_dir = Path(__file__).resolve().parents[2]
-    source = (app_dir / "server/services/security/cryptography.py").read_text(
+    source = (app_dir / "server/common/security/cryptography.py").read_text(
         encoding="utf-8"
     )
     assert "ACCESS_KEY_ENCRYPTION_KEY" not in source

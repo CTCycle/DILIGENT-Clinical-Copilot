@@ -18,18 +18,7 @@ from domain.model_configs import (
 from repositories.serialization.model_configs import (
     ModelConfigSerializer,
 )
-from services.llm.providers import OllamaClient, OllamaError
-
-LOCAL_MODEL_CATALOG = cast(
-    tuple[tuple[str, str, str], ...],
-    CatalogLoader.get_catalog_records(
-        "local_models.json",
-        "local_model_catalog",
-        ("name", "family", "description"),
-    ),
-)
-LOCAL_MODEL_CATALOG_NAMES = {name for name, _, _ in LOCAL_MODEL_CATALOG}
-
+from services.llm.ollama_client import OllamaClient, OllamaError
 
 ###############################################################################
 class ModelConfigSnapshotStore(Protocol):
@@ -52,6 +41,15 @@ class ModelConfigSnapshotStore(Protocol):
 class ModelConfigService:
     def __init__(self, serializer: ModelConfigSnapshotStore | None = None) -> None:
         self.serializer = serializer or ModelConfigSerializer()
+        self.local_model_catalog = cast(
+            tuple[tuple[str, str, str], ...],
+            CatalogLoader.get_catalog_records(
+                "local_models.json",
+                "local_model_catalog",
+                ("name", "family", "description"),
+            ),
+        )
+        self.local_model_names = {name for name, _, _ in self.local_model_catalog}
 
     # -------------------------------------------------------------------------
     async def get_state(
@@ -113,7 +111,7 @@ class ModelConfigService:
         snapshot: ModelConfigSnapshot,
         refresh_from_ollama: bool,
     ) -> set[str]:
-        local_model_names = {name for name, _, _ in LOCAL_MODEL_CATALOG}
+        local_model_names = set(self.local_model_names)
         if snapshot.clinical_model:
             local_model_names.add(snapshot.clinical_model)
         if snapshot.text_extraction_model:
@@ -363,7 +361,7 @@ class ModelConfigService:
                 description=description,
                 available_in_ollama=name in available_models,
             )
-            for name, family, description in LOCAL_MODEL_CATALOG
+            for name, family, description in self.local_model_catalog
         ]
 
         selected_candidates = {
@@ -372,7 +370,7 @@ class ModelConfigService:
             if isinstance(candidate, str) and candidate.strip()
         }
         extra_models = sorted(
-            (available_models | selected_candidates) - LOCAL_MODEL_CATALOG_NAMES,
+            (available_models | selected_candidates) - self.local_model_names,
             key=str.casefold,
         )
         cards.extend(

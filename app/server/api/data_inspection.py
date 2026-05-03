@@ -37,10 +37,10 @@ from domain.patient_timeline import (
     SessionTimelineRegenerateRequest,
 )
 from services.inspection.service import DataInspectionService
+from services.runtime.jobs import get_job_manager
 
 
 router = APIRouter(prefix="/inspection", tags=["inspection"])
-service = DataInspectionService()
 
 
 ###############################################################################
@@ -181,11 +181,10 @@ class DataInspectionEndpoint:
     def generate_session_timeline(
         self,
         session_id: int,
-        request: SessionTimelineRegenerateRequest = Body(
-            default=SessionTimelineRegenerateRequest()
-        ),
+        request: SessionTimelineRegenerateRequest | None = Body(default=None),
         force_regenerate_query: bool = Query(default=False, alias="force_regenerate"),
     ) -> PatientTimeline:
+        request = request or SessionTimelineRegenerateRequest()
         force_regenerate = bool(force_regenerate_query or request.force_regenerate)
         try:
             timeline = self.service.generate_session_timeline(
@@ -280,10 +279,9 @@ class DataInspectionEndpoint:
     # -------------------------------------------------------------------------
     def start_rxnav_update_job(
         self,
-        overrides: InspectionRxNavOverrideRequest = Body(
-            default=InspectionRxNavOverrideRequest()
-        ),
+        overrides: InspectionRxNavOverrideRequest | None = Body(default=None),
     ) -> JobStartResponse:
+        overrides = overrides or InspectionRxNavOverrideRequest()
         return self.start_update_job(
             job_type=self.service.RXNAV_JOB_TYPE,
             message="RxNav update job started",
@@ -347,10 +345,9 @@ class DataInspectionEndpoint:
     # -------------------------------------------------------------------------
     def start_livertox_update_job(
         self,
-        overrides: InspectionLiverToxOverrideRequest = Body(
-            default=InspectionLiverToxOverrideRequest()
-        ),
+        overrides: InspectionLiverToxOverrideRequest | None = Body(default=None),
     ) -> JobStartResponse:
+        overrides = overrides or InspectionLiverToxOverrideRequest()
         return self.start_update_job(
             job_type=self.service.LIVERTOX_JOB_TYPE,
             message="LiverTox update job started",
@@ -401,10 +398,9 @@ class DataInspectionEndpoint:
     # -------------------------------------------------------------------------
     def start_rag_update_job(
         self,
-        overrides: InspectionRagOverrideRequest = Body(
-            default=InspectionRagOverrideRequest()
-        ),
+        overrides: InspectionRagOverrideRequest | None = Body(default=None),
     ) -> JobStartResponse:
+        overrides = overrides or InspectionRagOverrideRequest()
         return self.start_update_job(
             job_type=self.service.RAG_JOB_TYPE,
             message="RAG embeddings update job started",
@@ -438,10 +434,9 @@ class DataInspectionEndpoint:
     def upsert_text_normalization_category(
         self,
         category: str,
-        request: TextNormalizationTermUpsertRequest = Body(
-            default=TextNormalizationTermUpsertRequest(term="")
-        ),
+        request: TextNormalizationTermUpsertRequest | None = Body(default=None),
     ) -> TextNormalizationTermResponse:
+        request = request or TextNormalizationTermUpsertRequest(term="")
         return TextNormalizationTermResponse(
             **self.service.upsert_text_normalization_term(
                 category=category,
@@ -669,6 +664,8 @@ class DataInspectionEndpoint:
         )
 
 
-endpoint = DataInspectionEndpoint(router=router, service=service)
-endpoint.add_routes()
+DataInspectionEndpoint(
+    router=router,
+    service=DataInspectionService(jobs=get_job_manager()),
+).add_routes()
 

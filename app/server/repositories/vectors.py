@@ -2,17 +2,14 @@ from __future__ import annotations
 
 import json
 import os
-import importlib
 from typing import Any, Iterator, Literal, cast
 
 import pyarrow as pa
 
 try:
-    lancedb = importlib.import_module("lancedb")
-    lancedb_db = importlib.import_module("lancedb.db")
-    lancedb_table = importlib.import_module("lancedb.table")
-    DBConnection = getattr(lancedb_db, "DBConnection")
-    Table = getattr(lancedb_table, "Table")
+    import lancedb
+    from lancedb.db import DBConnection
+    from lancedb.table import Table
 except Exception:  # noqa: BLE001
     lancedb = None
     DBConnection = Any  # type: ignore[misc,assignment]

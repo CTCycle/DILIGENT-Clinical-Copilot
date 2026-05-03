@@ -1,8 +1,6 @@
 from __future__ import annotations
 
 from datetime import datetime
-from typing import Literal
-
 from sqlalchemy.engine import Engine
 from sqlalchemy.orm import Session, sessionmaker
 
@@ -15,15 +13,12 @@ from repositories.serialization.access_key_encryption import (
     AccessKeyEncryptionMaterialSerializer,
 )
 from repositories.schemas.models import AccessKey, ResearchAccessKey
-from services.security.cryptography import (
+from common.security.cryptography import (
     decrypt_with_key_material,
     encrypt_with_key_material,
     fingerprint_plaintext,
 )
-
-ProviderName = Literal["openai", "gemini", "brave"]
-SUPPORTED_PROVIDERS = {"openai", "gemini", "brave"}
-RESEARCH_PROVIDER = "brave"
+from domain.keys import ProviderName, RESEARCH_PROVIDER, normalize_provider_name
 
 
 ###############################################################################
@@ -219,8 +214,5 @@ class AccessKeySerializer:
     # -------------------------------------------------------------------------
     @staticmethod
     def normalize_provider(provider: str) -> ProviderName:
-        normalized = str(provider or "").strip().lower()
-        if normalized not in SUPPORTED_PROVIDERS:
-            raise ValueError("Unsupported provider")
-        return normalized  # type: ignore[return-value]
+        return normalize_provider_name(provider)
 
