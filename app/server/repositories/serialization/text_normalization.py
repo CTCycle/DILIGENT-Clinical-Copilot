@@ -40,6 +40,11 @@ MAPPING_CATEGORIES = {
     "brand_combo_preferences": "brand_combo_preference",
     "knowledge_source_references": "knowledge_source_reference",
 }
+SECTION_TITLE_ALIAS_CATEGORIES = {
+    "anamnesis": "section_title_alias_anamnesis",
+    "drugs": "section_title_alias_drugs",
+    "laboratory_analysis": "section_title_alias_laboratory_analysis",
+}
 
 
 def normalize_term(value: str | None) -> str:
@@ -100,6 +105,18 @@ class TextNormalizationVocabularySerializer:
                 rows=rows,
                 source="seed",
             )
+        section_aliases = payload.get("section_title_aliases", {})
+        if isinstance(section_aliases, dict):
+            for section_key, category in SECTION_TITLE_ALIAS_CATEGORIES.items():
+                values = section_aliases.get(section_key, [])
+                if not isinstance(values, list):
+                    continue
+                seeded += self.upsert_terms(
+                    db_session,
+                    category=category,
+                    values=(str(value) for value in values),
+                    source="seed",
+                )
         logger.info("Seeded text normalization vocabulary (%s entries checked)", seeded)
 
     def upsert_terms(

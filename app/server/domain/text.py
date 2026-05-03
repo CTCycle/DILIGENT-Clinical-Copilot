@@ -22,6 +22,7 @@ class TextNormalizationSnapshot:
     lab_marker_aliases: dict[str, str]
     brand_combo_preferences: dict[str, str]
     knowledge_source_references: dict[str, str]
+    section_title_aliases: dict[str, frozenset[str]]
 
     @property
     def rxnav_synonym_stopwords(self) -> frozenset[str]:
