@@ -10,28 +10,13 @@ from domain.clinical.entities import (
     ClinicalSessionRequest,
 )
 from services.session.clinical_input_extractor import ClinicalInputExtractionError
-from services.session.session_service import (
-    ClinicalSessionService,
-    disease_extractor,
-    drugs_parser,
-    lab_extractor,
-    pattern_analyzer,
-    payload_sanitization_service,
-    rucam_estimator,
-    serializer,
-)
+from services.runtime.jobs import get_job_manager
+from services.session.factory import build_clinical_session_service
+from services.session.session_service import ClinicalSessionService
 
 
 def _build_service() -> ClinicalSessionService:
-    return ClinicalSessionService(
-        drugs_parser=drugs_parser,
-        disease_extractor=disease_extractor,
-        lab_extractor=lab_extractor,
-        pattern_analyzer=pattern_analyzer,
-        rucam_estimator=rucam_estimator,
-        serializer=serializer,
-        payload_sanitizer=payload_sanitization_service,
-    )
+    return build_clinical_session_service(get_job_manager())
 
 
 def test_preprocess_unified_input_accepts_fragment_aggregated_sections() -> None:

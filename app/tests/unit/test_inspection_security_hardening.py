@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+from typing import Any
+
 import pytest
 from pydantic import ValidationError
 from fastapi import FastAPI
@@ -20,6 +22,15 @@ from repositories.serialization.data import (
     _RepositorySerializationService,
 )
 from repositories.schemas.models import Base
+
+
+def get_route_owner(router: Any, route_path: str) -> Any:
+    for route in router.routes:
+        if getattr(route, "path", "").endswith(route_path):
+            owner = getattr(route.endpoint, "__self__", None)
+            if owner is not None:
+                return owner
+    raise AssertionError(f"Route not found: {route_path}")
 
 
 # -----------------------------------------------------------------------------
@@ -104,14 +115,15 @@ def test_livertox_update_config_route_is_not_shadowed() -> None:
             }
 
     app = FastAPI()
-    original_service = data_inspection.endpoint.service
-    data_inspection.endpoint.service = ServiceStub()  # type: ignore[assignment]
+    endpoint = get_route_owner(data_inspection.router, "/livertox/update-config")
+    original_service = endpoint.service
+    endpoint.service = ServiceStub()  # type: ignore[assignment]
     try:
         app.include_router(data_inspection.router)
         client = TestClient(app)
         response = client.get("/inspection/livertox/update-config")
     finally:
-        data_inspection.endpoint.service = original_service
+        endpoint.service = original_service
 
     assert response.status_code == 200
     assert response.json()["target"] == "livertox"

@@ -33,14 +33,24 @@ dependencies = [
 
 [project.optional-dependencies]
 test = [
-    "pytest>=8.0",
-    "pytest-playwright>=0.5.0",
-    "psutil>=6.1.1",
-    "ruff==0.15.9"
+    "pytest>=8.4.2",
+    "pytest-cov>=7.0.0",
+    "ruff>=0.14.2",
+    "pyright>=1.1.407",
+    "playwright>=1.55.0",
 ]
 
 [tool.hatch.build.targets.wheel]
-packages = ["server"]
+only-include = [
+    "app.py",
+    "api",
+    "common",
+    "configurations",
+    "domain",
+    "models",
+    "repositories",
+    "services",
+]
 
 [tool.ruff]
 exclude = [

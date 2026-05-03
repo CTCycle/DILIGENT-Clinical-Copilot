@@ -198,4 +198,14 @@ R_SCORE_HEPATOCELLULAR_THRESHOLD = 5.0
 R_SCORE_CHOLESTATIC_THRESHOLD = 2.0
 TRUTHY_ENV_VALUES = {"1", "true", "yes", "on"}
 FALSY_ENV_VALUES = {"0", "false", "no", "off"}
+SENSITIVE_ERROR_TOKENS: tuple[str, ...] = (
+    "traceback",
+    "stack",
+    "token",
+    "secret",
+    "password",
+    "authorization",
+    "api key",
+    "access key",
+)
 

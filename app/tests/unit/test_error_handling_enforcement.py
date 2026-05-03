@@ -18,7 +18,7 @@ from api.error_handling import (
     REQUEST_ID_HEADER,
     register_error_handling,
 )
-from services.llm.providers import OllamaError
+from services.llm.ollama_client import OllamaError
 from services.runtime.jobs import JobManager
 from services.research import brave as brave_module
 from services.research.brave import BraveResearchService
@@ -30,6 +30,15 @@ EXCLUDED_DIRS = {
     "node_modules",
     "dist",
 }
+
+
+def get_route_service(router: Any, route_path: str) -> Any:
+    for route in router.routes:
+        if getattr(route, "path", "").endswith(route_path):
+            endpoint_owner = getattr(route.endpoint, "__self__", None)
+            if endpoint_owner is not None:
+                return endpoint_owner.service
+    raise AssertionError(f"Route not found: {route_path}")
 
 
 # -----------------------------------------------------------------------------
@@ -152,9 +161,8 @@ def test_access_key_endpoint_sanitizes_dependency_failure(monkeypatch) -> None:
     def fake_create_key(provider: str, access_key: str):
         raise RuntimeError("encryption material registry unavailable token=abc123")
 
-    monkeypatch.setattr(
-        access_keys_api.service.serializer, "create_key", fake_create_key
-    )
+    service = get_route_service(access_keys_api.router, "")
+    monkeypatch.setattr(service.serializer, "create_key", fake_create_key)
 
     with TestClient(server_app_module.app, raise_server_exceptions=False) as client:
         response = client.post(
@@ -174,11 +182,8 @@ def test_data_inspection_endpoint_sanitizes_runtime_failure(monkeypatch) -> None
     def fake_start_update_job(job_type: str, overrides: dict[str, Any] | None = None):
         raise RuntimeError("traceback secret=value")
 
-    monkeypatch.setattr(
-        data_inspection_api.service,
-        "start_update_job",
-        fake_start_update_job,
-    )
+    service = get_route_service(data_inspection_api.router, "/rxnav/jobs")
+    monkeypatch.setattr(service, "start_update_job", fake_start_update_job)
 
     with TestClient(server_app_module.app, raise_server_exceptions=False) as client:
         response = client.post("/api/inspection/rxnav/jobs")

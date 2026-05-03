@@ -15,7 +15,7 @@ from services.llm.prompts import (
     LIVERTOX_CLINICAL_USER_PROMPT,
     LIVERTOX_REPORT_EXAMPLE_TEMPLATE,
 )
-from services.llm.providers import initialize_llm_client
+from services.llm.provider_factory import initialize_llm_client
 from domain.clinical.entities import (
     ClinicalLabEntry,
     ClinicalPipelineValidationError,
@@ -43,7 +43,7 @@ from services.clinical.match_quality import classify_match_evidence
 from services.retrieval.embeddings import SimilaritySearch
 from services.clinical.preparation import HepatoxPreparedInputs
 from services.text.normalization import normalize_drug_query_name
-from services.research.brave import brave_research_service
+from services.research.brave import BraveResearchService
 from services.text.vocabulary import get_text_normalization_snapshot
 from services.clinical.report_language import (
     phrase,
@@ -315,6 +315,7 @@ class HepatoxConsultation:
         self.timeout_s = timeout_s
         self.llm_client = initialize_llm_client(purpose="clinical", timeout_s=timeout_s)
         self.MAX_EXCERPT_LENGTH = server_settings.external_data.max_excerpt_length
+        self.research_service = BraveResearchService()
         self.patient_name = (patient_name or "").strip() or None
         provider, model_candidate = LLMRuntimeConfig.resolve_provider_and_model(
             "clinical"
@@ -780,7 +781,7 @@ class HepatoxConsultation:
         if not normalized_name:
             return "No web evidence available (reason: missing drug name)."
         try:
-            outcome = await brave_research_service.search_sources(
+            outcome = await self.research_service.search_sources(
                 question=f"{normalized_name} drug induced liver injury evidence",
                 mode="fast",
                 allowed_domains=None,
@@ -788,7 +789,7 @@ class HepatoxConsultation:
             )
         except Exception as exc:  # noqa: BLE001
             return f"No web evidence available (reason: {exc})."
-        return brave_research_service.format_clinical_evidence_block(
+        return self.research_service.format_clinical_evidence_block(
             sources=outcome.sources,
             message=outcome.message,
         )

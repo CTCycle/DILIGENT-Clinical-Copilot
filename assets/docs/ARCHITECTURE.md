@@ -149,6 +149,7 @@ Inspection:
 
 - Endpoint layer (`app/server/api/*`)
   - HTTP contracts, request parsing, status codes, safe exception translation.
+  - Endpoint classes are wired inline during router setup and do not retain named module-level service globals.
 - Service layer (`app/server/services/*`)
   - Clinical orchestration, model orchestration, inspection workflows, job control.
 - Domain models (`app/server/domain/*`)
@@ -157,6 +158,7 @@ Inspection:
   - SQL persistence, serialization, vector store access.
 - Config/common layers (`app/server/configurations/*`, `app/server/common/*`)
   - Runtime settings, constants, environment/bootstrap, logging.
+  - Shared security helpers, including provider-key cryptography, live under `app/server/common/security/cryptography.py`.
 
 Frontend boundaries:
 - `app/client/src/app/pages/*`: page orchestration and user journeys.
@@ -198,6 +200,7 @@ Endpoint -> service -> repository:
   - `def` for lightweight synchronous handlers and job-status/control paths.
 - Long-running tasks are not held in request lifecycle:
   - Managed by `JobManager` (`app/server/services/runtime/jobs.py`) using daemon threads.
+  - Access the shared in-process manager through `get_job_manager()`.
   - Exposed via start/poll/cancel endpoints.
 - Constraint:
   - CPU-heavy or blocking operations should run via job system instead of blocking request handlers.

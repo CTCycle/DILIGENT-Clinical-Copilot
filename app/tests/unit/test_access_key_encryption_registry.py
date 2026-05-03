@@ -10,7 +10,7 @@ from repositories.schemas.models import (
 from repositories.serialization.access_key_encryption import (
     AccessKeyEncryptionMaterialSerializer,
 )
-from services.security.cryptography import (
+from common.security.cryptography import (
     decrypt_with_key_material,
     encrypt_with_key_material,
 )

@@ -5,14 +5,14 @@ Last updated: 2026-04-24
 ## 1. Supported Modes
 
 ### Local development (web + API)
-- Backend: FastAPI (`DILIGENT/server/app.py`)
-- Frontend: Angular app served from `DILIGENT/client`
+- Backend: FastAPI (`app/server/app.py`)
+- Frontend: Angular app served from `app/client`
 - Default ports from `.env.local.example`:
   - API: `127.0.0.1:8000`
   - UI: `127.0.0.1:7861`
 
 ### Desktop runtime (Tauri)
-- Tauri wrapper (`DILIGENT/client/src-tauri`) bundles:
+- Tauri wrapper (`app/client/src-tauri`) bundles:
   - backend code
   - built frontend dist
   - portable Python/uv/Node runtimes
@@ -41,7 +41,7 @@ What it does:
 ### Manual backend startup (PowerShell)
 
 ```powershell
-runtimes\uv\uv.exe run --python runtimes\python\python.exe python -m uvicorn DILIGENT.server.app:app --host 127.0.0.1 --port 8000
+runtimes\uv\uv.exe run --python runtimes\python\python.exe python -m uvicorn DILIGENT.app:app --host 127.0.0.1 --port 8000
 ```
 
 ### Manual frontend startup (PowerShell)
@@ -123,4 +123,4 @@ Feature toggles/settings:
   - `release/windows/portable`
 - Lockfiles used for deterministic dependency state:
   - `runtimes/uv.lock`
-  - `DILIGENT/client/package-lock.json`
+  - `app/client/package-lock.json`

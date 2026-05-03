@@ -12,7 +12,7 @@ from services.llm.prompts import (
     DRUG_EXTRACTION_PROMPT,
 )
 from services.llm.client_runtime import ensure_runtime_client
-from services.llm.providers import select_llm_provider
+from services.llm.provider_factory import select_llm_provider
 from domain.clinical.entities import (
     DrugEntry,
     PatientDrugs,
