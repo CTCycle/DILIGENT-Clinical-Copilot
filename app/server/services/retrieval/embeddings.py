@@ -16,7 +16,7 @@ from common.constants import CLOUD_MODEL_CHOICES, VECTOR_DB_PATH
 from common.utils.logger import logger
 from repositories.serialization.access_keys import AccessKeySerializer
 from services.llm.cloud import LLMError, LLMTimeout
-from services.llm.providers import OllamaError, OllamaTimeout
+from services.llm.ollama_client import OllamaError, OllamaTimeout
 from repositories.vectors import LanceVectorDatabase
 
 ProviderName = Literal["openai", "gemini"]

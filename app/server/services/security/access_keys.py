@@ -1,13 +1,11 @@
 from __future__ import annotations
 
-from typing import Literal
-
-from domain.keys import AccessKeyResponse
+from domain.keys import (
+    AccessKeyResponse,
+    ProviderName,
+)
 from repositories.serialization.access_keys import AccessKeySerializer
 from repositories.schemas.models import AccessKey, ResearchAccessKey
-
-ProviderName = Literal["openai", "gemini", "brave"]
-
 
 ###############################################################################
 class AccessKeyService:
@@ -19,7 +17,7 @@ class AccessKeyService:
     def to_response(row: AccessKey | ResearchAccessKey) -> AccessKeyResponse:
         return AccessKeyResponse(
             id=int(row.id),
-            provider=str(row.provider),  # type: ignore[arg-type]
+            provider=row.provider,
             is_active=bool(row.is_active),
             fingerprint=str(row.fingerprint),
             created_at=row.created_at,

@@ -27,11 +27,9 @@ Prerequisites:
 
 Backend:
 ```bash
-python -m venv runtimes/.venv
-source runtimes/.venv/bin/activate
-pip install --upgrade pip
-pip install -e .
-uvicorn server.app:app --host 127.0.0.1 --port 8000
+cd app/server
+python -m pip install -e ".[test]"
+uvicorn app:app --host 127.0.0.1 --port 8000
 ```
 
 Frontend:
@@ -55,7 +53,7 @@ Switch to local Tauri profile:
 copy /Y settings\.env.local.tauri.example settings\.env
 ```
 
-See `assets/docs/PACKAGING_AND_RUNTIME_MODES.md` for full runtime and packaging details.
+See `assets/docs/RUNTIME_MODES.md` for full runtime and packaging details.
 
 ## 4. Using the Application
 Typical workflow:
@@ -119,7 +117,7 @@ Use this script for offline maintenance operations (for example DB initializatio
 - `assets/docs/USER_MANUAL.md`: end-user operation, journeys, key commands.
 - `assets/docs/ARCHITECTURE.md`: system boundaries and data flow.
 - `assets/docs/BACKGROUND_JOBS.md`: job lifecycle and semantics.
-- `assets/docs/PACKAGING_AND_RUNTIME_MODES.md`: runtime profiles and packaging.
+- `assets/docs/RUNTIME_MODES.md`: runtime profiles and packaging.
 - `assets/docs/ERROR_HANDLING.md`: backend/frontend error strategy.
 - `assets/docs/UI_STANDARDS.md`: frontend design standards.
 
@@ -166,5 +164,4 @@ At the end, provide a concise validation report listing:
 * Any fixes made after failures.
 * Any remaining warnings or limitations.
 * Final green status once all required checks pass.
-
 

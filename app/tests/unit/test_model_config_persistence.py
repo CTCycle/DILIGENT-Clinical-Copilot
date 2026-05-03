@@ -3,10 +3,11 @@ from __future__ import annotations
 from datetime import datetime
 from typing import Any
 
-from api.session import service as clinical_service
 from configurations.llm_configs import LLMRuntimeConfig
 from domain.model_configs import ModelConfigSnapshot
 from services.llm.model_config import ModelConfigService
+from services.runtime.jobs import get_job_manager
+from services.session.factory import build_clinical_session_service
 
 
 class InMemorySerializer:
@@ -55,6 +56,7 @@ def test_model_config_roundtrip_preserves_cloud_selection() -> None:
 
 
 def test_clinical_service_reads_runtime_from_persisted_config() -> None:
+    clinical_service = build_clinical_session_service(get_job_manager())
     clinical_service.apply_persisted_runtime_configuration()
     parser_provider, parser_model = LLMRuntimeConfig.resolve_provider_and_model(
         "parser"

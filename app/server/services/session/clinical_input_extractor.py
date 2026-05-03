@@ -16,7 +16,7 @@ from domain.clinical.entities import (
 from domain.clinical.sections import ClinicalSectionKey, SECTION_FRAGMENT_JOINER, SECTION_KEYS
 from services.llm.client_runtime import ensure_runtime_client
 from services.llm.prompts import CLINICAL_SECTION_EXTRACTION_PROMPT
-from services.llm.providers import select_llm_provider
+from services.llm.provider_factory import select_llm_provider
 from services.session.clinical_section_parsers import (
     PlainTextSectionParser,
     SectionFragmentSlice,

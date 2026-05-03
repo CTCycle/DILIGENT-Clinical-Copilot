@@ -9,6 +9,16 @@ from api import session as session_module
 from domain.clinical import ClinicalLabEntry, DrugEntry, DrugRucamAssessment, LiverInjuryOnsetContext, PatientData, PatientDiseaseContext, PatientDrugs, PatientLabTimeline, PatientRucamAssessmentBundle
 from services.clinical.preparation import HepatoxPreparedInputs
 
+
+def get_session_service() -> Any:
+    for route in session_module.router.routes:
+        if getattr(route, "path", "").endswith("/clinical"):
+            owner = getattr(route.endpoint, "__self__", None)
+            if owner is not None:
+                return owner.service
+    raise AssertionError("Clinical route not found")
+
+
 class FakeSerializer:
     def save_clinical_session(self, payload: dict[str, Any]) -> None:
         _ = payload
@@ -71,7 +81,7 @@ def _payload() -> PatientData:
 
 
 def test_session_passes_report_language_to_rucam_estimator(monkeypatch) -> None:
-    endpoint = session_module.service
+    endpoint = get_session_service()
     endpoint.serializer = FakeSerializer()
     endpoint.drugs_parser = FakeDrugsParser()
     endpoint.disease_extractor = FakeDiseaseExtractor()

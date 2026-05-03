@@ -22,9 +22,8 @@ from domain.jobs import (
 from domain.models import ModelListResponse, ModelPullResponse
 from services.runtime.jobs import (
     JobManager,
-    job_manager as default_job_manager,
 )
-from services.llm.providers import (
+from services.llm.ollama_client import (
     OllamaClient,
     OllamaError,
     OllamaTimeout,
@@ -241,10 +240,10 @@ class OllamaService:
     def __init__(
         self,
         *,
-        job_manager: JobManager | None = None,
+        job_manager: JobManager,
         client_factory: Callable[[], Any] | None = None,
     ) -> None:
-        self.job_manager = job_manager or default_job_manager
+        self.job_manager = job_manager
         self.client_factory = client_factory or OllamaClient
 
     # -------------------------------------------------------------------------

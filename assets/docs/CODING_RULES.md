@@ -1,6 +1,6 @@
 # Coding Rules
 
-Last updated: 2026-04-24
+Last updated: 2026-05-04
 
 ## 1. Shared Rules (all languages)
 
@@ -46,7 +46,7 @@ Last updated: 2026-04-24
 
 - Use async only with non-blocking dependencies.
 - Do not run CPU-heavy work directly in async handlers.
-- Use existing job system (`server/services/jobs.py`) for long-running work.
+- Use existing job system (`app/server/services/runtime/jobs.py`) for long-running work.
 - For long-running operations, provide:
   - start endpoint
   - poll/status endpoint
@@ -56,9 +56,12 @@ Last updated: 2026-04-24
 
 - Keep functions small and focused.
 - Prefer composable logic over deeply nested branching.
-- Avoid nested functions unless strictly necessary.
+- Do not define nested functions or nested async functions.
+- Do not place imports inside functions or classes.
+- Do not use conditional imports for application modules.
+- Do not retain module-level mutable service instances.
+- Keep Python files at or below 1000 physical lines.
 - Use classes to group cohesive behavior where appropriate.
-- Keep modules under approximately 1000 LOC when practical.
 - Comment only where needed for clarity/safety.
 
 ## 3. TypeScript Rules (Angular client)
@@ -86,9 +89,9 @@ Last updated: 2026-04-24
 
 ### Tooling and verification
 
-- Use project scripts in `DILIGENT/client/package.json`.
+- Use project scripts in `app/client/package.json`.
 - Run build validation when frontend code changes:
-  - `npm run build` (from `DILIGENT/client`)
+  - `npm run build` (from `app/client`)
 
 ## 4. Testing Standards
 

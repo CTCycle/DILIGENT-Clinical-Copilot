@@ -8,12 +8,11 @@ from domain.jobs import (
     JobStatusResponse,
 )
 from domain.models import ModelListResponse, ModelPullResponse
-from services.llm.providers import OllamaClient
-from services.runtime.jobs import job_manager
+from services.llm.ollama_client import OllamaClient
+from services.runtime.jobs import get_job_manager
 from services.llm.ollama import OllamaService
 
 router = APIRouter(prefix="/models", tags=["models"])
-service = OllamaService(job_manager=job_manager, client_factory=lambda: OllamaClient())
 
 
 ###############################################################################
@@ -105,6 +104,11 @@ class OllamaEndpoint:
         )
 
 
-endpoint = OllamaEndpoint(router=router, service=service)
-endpoint.add_routes()
+OllamaEndpoint(
+    router=router,
+    service=OllamaService(
+        job_manager=get_job_manager(),
+        client_factory=lambda: OllamaClient(),
+    ),
+).add_routes()
 

@@ -1,14 +1,14 @@
 # Background Job Management
 
-Last updated: 2026-04-09
+Last updated: 2026-05-04
 
 DILIGENT uses a centralized thread-based job manager for long-running operations.
 
 ## 1. Core components
 
-- Manager: `DILIGENT/server/services/jobs.py`
-- Shared singleton: `job_manager`
-- API models: `DILIGENT/server/domain/jobs.py`
+- Manager: `app/server/services/runtime/jobs.py`
+- Shared in-process access point: `get_job_manager()`
+- API models: `app/server/domain/jobs.py`
 
 ## 2. Job state contract
 
@@ -59,14 +59,14 @@ Standard contract:
    - `phase`, `step_index`, `step_count`, `progress_message`, `summary`.
 5. Inspection updater runners use cooperative cancellation (`should_stop`) and progress callbacks consistently across `rxnav`, `livertox`, and `rag`.
 
-Frontend polling is implemented in `DILIGENT/client/src/app/core/services/api.ts` and stops on terminal states.
+Frontend polling is implemented in `app/client/src/app/core/services/api.ts` and stops on terminal states.
 
 ## 6. Cancellation rules
 
 Cancellation is cooperative:
 - Pending jobs can be set to `cancelled` immediately.
 - Running jobs receive `stop_requested=True`.
-- Runner code must check `job_manager.should_stop(job_id)` at safe checkpoints.
+- Runner code must check `get_job_manager().should_stop(job_id)` or its injected `JobManager` at safe checkpoints.
 
 If a runner does not check stop requests, cancellation is delayed.
 
@@ -75,7 +75,7 @@ Current inspection cancellation/progress checkpoints are implemented by the RxNa
 ## 7. New job implementation checklist
 
 1. Add runner function returning `dict[str, Any]`.
-2. Check `job_manager.should_stop(job_id)` during long steps.
+2. Check `get_job_manager().should_stop(job_id)` or an injected `JobManager` during long steps.
 3. Publish interim progress/result updates.
 4. Expose start/poll/cancel routes.
 5. Prevent conflicting duplicates where needed (`is_job_running(job_type)`).

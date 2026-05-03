@@ -1,14 +1,25 @@
 from __future__ import annotations
 
 from datetime import datetime
-from typing import Literal
+from typing import Literal, cast
 import re
 
 from pydantic import BaseModel, ConfigDict, Field, field_validator
 
 
-ProviderName = Literal["openai", "gemini", "brave"]
+ProviderName = Literal["openai", "gemini", "openrouter", "brave"]
+SUPPORTED_PROVIDERS: frozenset[ProviderName] = frozenset(
+    ("openai", "gemini", "openrouter", "brave")
+)
+RESEARCH_PROVIDER: ProviderName = "brave"
 CONTROL_CHARACTERS_RE = re.compile(r"[\x00-\x08\x0B\x0C\x0E-\x1F\x7F]")
+
+
+def normalize_provider_name(provider: str) -> ProviderName:
+    normalized = str(provider or "").strip().lower()
+    if normalized not in SUPPORTED_PROVIDERS:
+        raise ValueError("Unsupported provider")
+    return cast(ProviderName, normalized)
 
 
 ###############################################################################

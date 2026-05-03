@@ -1,30 +1,18 @@
 from __future__ import annotations
 
-import importlib
 from functools import lru_cache
 
 from sqlalchemy.engine import Engine
 from sqlalchemy.orm import sessionmaker
 
 from configurations.startup import server_settings
-
-
-REPOSITORY_CLASS_PATHS = {
-    True: ("repositories.database.sqlite", "SQLiteRepository"),
-    False: ("repositories.database.postgres", "PostgresRepository"),
-}
-
-
-def _resolve_repository_class(embedded_database: bool):
-    module_name, class_name = REPOSITORY_CLASS_PATHS[bool(embedded_database)]
-    module = importlib.import_module(module_name)
-    return getattr(module, class_name)
-
+from repositories.database.postgres import PostgresRepository
+from repositories.database.sqlite import SQLiteRepository
 
 @lru_cache(maxsize=1)
 def get_default_repository():
     settings = server_settings.database
-    repository_cls = _resolve_repository_class(settings.embedded_database)
+    repository_cls = SQLiteRepository if settings.embedded_database else PostgresRepository
     return repository_cls(settings)
 
 

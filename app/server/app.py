@@ -19,20 +19,20 @@ from api.access_keys import router as access_keys_router
 from api.data_inspection import router as data_inspection_router
 from api.health import router as health_router
 from api.model_config import router as model_config_router
-from configurations.model_runtime import sync_runtime_model_config
 from api.session import router as session_router
 from api.ollama import router as ollama_router
 from api.research import router as research_router
 from api.root import RootEndpoint
 from api.error_handling import register_error_handling
 from repositories.database.initializer import initialize_database
+from services.llm.model_config import ModelConfigService
 
 
 ###############################################################################
 @asynccontextmanager
 async def app_lifespan(_app: FastAPI) -> AsyncIterator[None]:
     initialize_database()
-    sync_runtime_model_config()
+    ModelConfigService().ensure_defaults()
     yield
 
 

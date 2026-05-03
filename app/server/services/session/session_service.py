@@ -49,7 +49,6 @@ from repositories.serialization.model_configs import (
 )
 from services.runtime.jobs import (
     JobManager,
-    job_manager as default_job_manager,
 )
 from common.utils.logger import logger
 from services.clinical.hepatox_core import (
@@ -92,19 +91,6 @@ from services.session.formatting_mixin import (
 )
 from services.text.normalization import normalize_drug_query_name
 
-drugs_parser = DrugsParser(timeout_s=server_settings.external_data.default_llm_timeout)
-disease_extractor = DiseaseExtractor(
-    timeout_s=server_settings.external_data.default_llm_timeout
-)
-lab_extractor = ClinicalLabExtractor(
-    timeout_s=server_settings.external_data.default_llm_timeout
-)
-pattern_analyzer = HepatotoxicityPatternAnalyzer()
-rucam_estimator = RucamScoreEstimator()
-serializer = DataSerializer()
-payload_sanitization_service = PayloadSanitizationService()
-
-
 ###############################################################################
 class ClinicalSessionService(ClinicalSessionFormattingMixin):
     JOB_TYPE = "clinical"
@@ -122,7 +108,7 @@ class ClinicalSessionService(ClinicalSessionFormattingMixin):
         input_preparator: ClinicalKnowledgePreparation | None = None,
         clinical_input_extractor: ClinicalInputExtractor | None = None,
         hepatox_consultation_cls: type[HepatoxConsultation] | None = None,
-        job_manager: JobManager | None = None,
+        job_manager: JobManager,
     ) -> None:
         self.drugs_parser = drugs_parser
         self.disease_extractor = disease_extractor
@@ -134,7 +120,7 @@ class ClinicalSessionService(ClinicalSessionFormattingMixin):
         self.input_preparator = input_preparator or ClinicalKnowledgePreparation()
         self.clinical_input_extractor = clinical_input_extractor or ClinicalInputExtractor()
         self.hepatox_consultation_cls = hepatox_consultation_cls or HepatoxConsultation
-        self.job_manager = job_manager or default_job_manager
+        self.job_manager = job_manager
         self.model_config_service = ModelConfigService(
             serializer=ModelConfigSerializer()
         )

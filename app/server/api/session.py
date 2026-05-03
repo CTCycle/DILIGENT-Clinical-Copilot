@@ -3,96 +3,82 @@ from __future__ import annotations
 from fastapi import APIRouter, Body, status
 from fastapi.responses import PlainTextResponse
 
-from domain.clinical.entities import (
-    ClinicalSessionRequest,
-)
+from domain.clinical.entities import ClinicalSessionRequest
 from domain.jobs import (
     JobCancelResponse,
     JobStartResponse,
     JobStatusResponse,
 )
-from services.clinical.hepatox_core import HepatoxConsultation
-from services.clinical.preparation import ClinicalKnowledgePreparation
-from services.runtime.jobs import job_manager
-from services.session.session_service import (
-    ClinicalSessionService,
-    disease_extractor,
-    drugs_parser,
-    lab_extractor,
-    pattern_analyzer,
-    payload_sanitization_service,
-    rucam_estimator,
-    serializer,
-)
-
+from services.runtime.jobs import get_job_manager
+from services.session.factory import build_clinical_session_service
+from services.session.session_service import ClinicalSessionService
 
 router = APIRouter(tags=["session"])
-service = ClinicalSessionService(
-    drugs_parser=drugs_parser,
-    disease_extractor=disease_extractor,
-    lab_extractor=lab_extractor,
-    pattern_analyzer=pattern_analyzer,
-    rucam_estimator=rucam_estimator,
-    serializer=serializer,
-    payload_sanitizer=payload_sanitization_service,
-    input_preparator=ClinicalKnowledgePreparation(),
-    hepatox_consultation_cls=HepatoxConsultation,
-    job_manager=job_manager,
-)
 
 
 ###############################################################################
-async def start_clinical_session(
-    request_payload: ClinicalSessionRequest = Body(...),
-) -> PlainTextResponse:
-    report = await service.start_clinical_session(request_payload)
-    return PlainTextResponse(content=report, status_code=status.HTTP_202_ACCEPTED)
+class ClinicalSessionEndpoint:
+    def __init__(self, *, router: APIRouter, service: ClinicalSessionService) -> None:
+        self.router = router
+        self.service = service
+
+    # -------------------------------------------------------------------------
+    async def start_clinical_session(
+        self,
+        request_payload: ClinicalSessionRequest = Body(...),
+    ) -> PlainTextResponse:
+        report = await self.service.start_clinical_session(request_payload)
+        return PlainTextResponse(content=report, status_code=status.HTTP_202_ACCEPTED)
+
+    # -------------------------------------------------------------------------
+    def start_clinical_job(
+        self,
+        request_payload: ClinicalSessionRequest = Body(...),
+    ) -> JobStartResponse:
+        return self.service.start_clinical_job(request_payload)
+
+    # -------------------------------------------------------------------------
+    def get_clinical_job_status(self, job_id: str) -> JobStatusResponse:
+        return self.service.get_clinical_job_status(job_id)
+
+    # -------------------------------------------------------------------------
+    def cancel_clinical_job(self, job_id: str) -> JobCancelResponse:
+        return self.service.cancel_clinical_job(job_id)
+
+    # -------------------------------------------------------------------------
+    def add_routes(self) -> None:
+        self.router.add_api_route(
+            "/clinical",
+            self.start_clinical_session,
+            methods=["POST"],
+            status_code=status.HTTP_202_ACCEPTED,
+            response_model=str,
+            response_class=PlainTextResponse,
+        )
+        self.router.add_api_route(
+            "/clinical/jobs",
+            self.start_clinical_job,
+            methods=["POST"],
+            response_model=JobStartResponse,
+            status_code=status.HTTP_202_ACCEPTED,
+        )
+        self.router.add_api_route(
+            "/clinical/jobs/{job_id}",
+            self.get_clinical_job_status,
+            methods=["GET"],
+            response_model=JobStatusResponse,
+            status_code=status.HTTP_200_OK,
+        )
+        self.router.add_api_route(
+            "/clinical/jobs/{job_id}",
+            self.cancel_clinical_job,
+            methods=["DELETE"],
+            response_model=JobCancelResponse,
+            status_code=status.HTTP_200_OK,
+        )
 
 
-###############################################################################
-def start_clinical_job(
-    request_payload: ClinicalSessionRequest = Body(...),
-) -> JobStartResponse:
-    return service.start_clinical_job(request_payload)
-
-
-###############################################################################
-def get_clinical_job_status(job_id: str) -> JobStatusResponse:
-    return service.get_clinical_job_status(job_id)
-
-
-###############################################################################
-def cancel_clinical_job(job_id: str) -> JobCancelResponse:
-    return service.cancel_clinical_job(job_id)
-
-
-router.add_api_route(
-    "/clinical",
-    start_clinical_session,
-    methods=["POST"],
-    status_code=status.HTTP_202_ACCEPTED,
-    response_model=str,
-    response_class=PlainTextResponse,
-)
-router.add_api_route(
-    "/clinical/jobs",
-    start_clinical_job,
-    methods=["POST"],
-    response_model=JobStartResponse,
-    status_code=status.HTTP_202_ACCEPTED,
-)
-router.add_api_route(
-    "/clinical/jobs/{job_id}",
-    get_clinical_job_status,
-    methods=["GET"],
-    response_model=JobStatusResponse,
-    status_code=status.HTTP_200_OK,
-)
-router.add_api_route(
-    "/clinical/jobs/{job_id}",
-    cancel_clinical_job,
-    methods=["DELETE"],
-    response_model=JobCancelResponse,
-    status_code=status.HTTP_200_OK,
-)
-
+ClinicalSessionEndpoint(
+    router=router,
+    service=build_clinical_session_service(get_job_manager()),
+).add_routes()

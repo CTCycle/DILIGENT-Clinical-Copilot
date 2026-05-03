@@ -365,7 +365,11 @@ def test_timeline_generation_persists_and_reuses_payload() -> None:
     )
     session_id = int(session_rows[0]["session_id"])
     extractor = FakeTimelineExtractor()
-    service = DataInspectionService(serializer=serializer, timeline_extractor=extractor)
+    service = DataInspectionService(
+        serializer=serializer,
+        timeline_extractor=extractor,
+        jobs=JobManager(),
+    )
 
     generated = service.generate_session_timeline(session_id)
     assert generated is not None

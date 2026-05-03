@@ -13,7 +13,6 @@ from domain.model_configs import (
 from services.llm.model_config import ModelConfigService
 
 router = APIRouter(prefix="/model-config", tags=["model-config"])
-service = ModelConfigService()
 
 
 ###############################################################################
@@ -65,6 +64,5 @@ class ModelConfigEndpoint:
         )
 
 
-endpoint = ModelConfigEndpoint(router=router, service=service)
-endpoint.add_routes()
+ModelConfigEndpoint(router=router, service=ModelConfigService()).add_routes()
 

@@ -6,7 +6,7 @@ from typing import Any
 
 from pydantic import BaseModel
 
-from services.llm import providers as providers_module
+import services.llm.ollama_client as providers_module
 from services.llm.structured import StructuredOutputParser
 
 

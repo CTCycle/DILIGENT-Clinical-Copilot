@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from collections.abc import Callable
 
-from services.runtime.jobs import job_manager
+from services.runtime.jobs import get_job_manager
 
 
 CLINICAL_PROGRESS_MESSAGES: dict[str, str] = {
@@ -73,7 +73,7 @@ class StageProgressFractionCallback:
 
 
 def ensure_clinical_job_not_cancelled(job_id: str) -> None:
-    if job_manager.should_stop(job_id):
+    if get_job_manager().should_stop(job_id):
         raise ClinicalJobCancelled("Clinical job stop requested.")
 
 
@@ -81,8 +81,9 @@ def report_clinical_job_progress(job_id: str, *, stage: str, progress: float) ->
     ensure_clinical_job_not_cancelled(job_id)
     bounded = min(100.0, max(0.0, float(progress)))
     message = CLINICAL_PROGRESS_MESSAGES.get(stage, stage.replace("_", " ").strip())
-    job_manager.update_progress(job_id, bounded)
-    job_manager.update_result(
+    jobs = get_job_manager()
+    jobs.update_progress(job_id, bounded)
+    jobs.update_result(
         job_id,
         {
             "progress_stage": stage,

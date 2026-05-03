@@ -1,13 +1,5 @@
-from services.session.session_service import (
-    ClinicalSessionService,
-    disease_extractor,
-    drugs_parser,
-    lab_extractor,
-    pattern_analyzer,
-    payload_sanitization_service,
-    rucam_estimator,
-    serializer,
-)
+from services.session.factory import build_clinical_session_service
+from services.session.session_service import ClinicalSessionService
 from services.session.session_shared import (
     NarrativeBuilder,
     run_clinical_job,
@@ -16,13 +8,6 @@ from services.session.session_shared import (
 __all__ = [
     "ClinicalSessionService",
     "NarrativeBuilder",
-    "disease_extractor",
-    "drugs_parser",
-    "lab_extractor",
-    "pattern_analyzer",
-    "payload_sanitization_service",
-    "rucam_estimator",
+    "build_clinical_session_service",
     "run_clinical_job",
-    "serializer",
 ]
-
