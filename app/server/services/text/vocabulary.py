@@ -33,6 +33,7 @@ EMPTY_SNAPSHOT = TextNormalizationSnapshot(
     lab_marker_aliases={},
     brand_combo_preferences={},
     knowledge_source_references={},
+    section_title_aliases={},
 )
 
 
@@ -75,6 +76,9 @@ def get_text_normalization_snapshot() -> TextNormalizationSnapshot:
         "drug_non_mention": set(),
         "drug_duration_word": set(),
         "drug_weekday_word": set(),
+        "section_title_alias_anamnesis": set(),
+        "section_title_alias_drugs": set(),
+        "section_title_alias_laboratory_analysis": set(),
     }
     query_aliases: dict[str, str] = {}
     lab_marker_aliases: dict[str, str] = {}
@@ -119,6 +123,11 @@ def get_text_normalization_snapshot() -> TextNormalizationSnapshot:
         | grouped["rxnav_form_stopword"]
         | grouped["rxnav_unit_stopword"]
     )
+    section_title_aliases = {
+        "anamnesis": frozenset(grouped["section_title_alias_anamnesis"]),
+        "drugs": frozenset(grouped["section_title_alias_drugs"]),
+        "laboratory_analysis": frozenset(grouped["section_title_alias_laboratory_analysis"]),
+    }
     return TextNormalizationSnapshot(
         matching_stopwords=frozenset(grouped["matching_stopword"]),
         clinical_generic_terms=frozenset(grouped["clinical_generic_term"]),
@@ -137,6 +146,7 @@ def get_text_normalization_snapshot() -> TextNormalizationSnapshot:
         lab_marker_aliases=lab_marker_aliases,
         brand_combo_preferences=brand_combo_preferences,
         knowledge_source_references=knowledge_source_references,
+        section_title_aliases=section_title_aliases,
     )
 
 

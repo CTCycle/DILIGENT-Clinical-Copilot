@@ -1,224 +1,158 @@
 from __future__ import annotations
 
-import json
 import re
-from dataclasses import dataclass
-from typing import Protocol
+from collections.abc import Mapping
+from typing import NamedTuple
 
-from domain.clinical.sections import (
-    SECTION_KEY_BY_INDEX,
-    SECTION_KEY_BY_JSON_KEY,
-    SECTION_KEY_BY_LABEL,
-    SECTION_KEY_BY_XML_TAG,
-    ClinicalSectionKey,
-)
+from domain.clinical.sections import ClinicalSectionKey, SECTION_KEYS
 
 
-@dataclass(frozen=True)
-class SectionFragmentSlice:
+WHITESPACE_RE = re.compile(r"\s+")
+SENTENCE_PUNCTUATION_RE = re.compile(r"[.!?]")
+
+
+class SectionFragmentSlice(NamedTuple):
     section: ClinicalSectionKey
     start: int
     end: int
 
 
-class SectionParser(Protocol):
-    confidence: float
-
-    def __call__(self, source_text: str) -> list[SectionFragmentSlice] | None:
-        ...
-
-
-WHITESPACE_RE = re.compile(r"\s+")
+class SectionBoundary(NamedTuple):
+    section: ClinicalSectionKey
+    heading_line_index: int
+    content_start_line_index: int
 
 
-def normalize_label(value: str) -> str:
+def normalize_section_title(value: str) -> str:
     normalized = re.sub(r"[\*\_`~\[\]\(\)]", " ", value or "")
     normalized = re.sub(r"[^A-Za-z0-9 ]+", " ", normalized)
     return WHITESPACE_RE.sub(" ", normalized).strip().lower()
 
 
-def line_body_start(source_text: str, line_end: int) -> int:
-    if line_end < len(source_text) and source_text[line_end : line_end + 2] == "\r\n":
-        return line_end + 2
-    if line_end < len(source_text) and source_text[line_end] in "\r\n":
-        return line_end + 1
-    return line_end
+def strip_heading_decoration(line: str) -> str:
+    value = line.strip()
+    value = re.sub(r"^#{1,6}\s+", "", value)
+    value = re.sub(r"^[-*]\s+", "", value)
+    value = re.sub(r"^\d+\s*[\.)\-]\s*", "", value)
+    value = re.sub(r"\s*:\s*$", "", value)
+    value = value.strip()
+    if re.match(r"^\*\*[^*]+\*\*$", value):
+        value = value[2:-2].strip()
+    return value
 
 
-def contains_all_sections(fragments: list[SectionFragmentSlice]) -> bool:
-    return set(SECTION_KEY_BY_INDEX.values()).issubset(
-        {fragment.section for fragment in fragments}
-    )
+def line_offsets(source_text: str) -> list[tuple[int, int, int]]:
+    lines = source_text.splitlines(keepends=True)
+    offsets: list[tuple[int, int, int]] = []
+    cursor = 0
+    for line in lines:
+        line_start = cursor
+        line_end = line_start + len(line.rstrip("\r\n"))
+        cursor = line_start + len(line)
+        offsets.append((line_start, line_end, cursor))
+    return offsets
 
 
-class MarkdownSectionParser:
-    confidence = 0.94
-    header_re = re.compile(r"^ {0,3}#{1,6}\s+(?P<label>.+?)\s*$", re.MULTILINE)
+class PlainTextSectionParser:
+    confidence = 0.93
 
-    def __call__(self, source_text: str) -> list[SectionFragmentSlice] | None:
-        markers = []
-        for match in self.header_re.finditer(source_text):
-            label = normalize_label(match.group("label"))
-            section = SECTION_KEY_BY_LABEL.get(label)
-            if section is None:
-                continue
-            markers.append((match.start(), match.end(), section))
+    def __init__(self, section_title_aliases: Mapping[str, frozenset[str]]) -> None:
+        self._alias_to_section = self._build_alias_index(section_title_aliases)
 
-        if not markers:
+    def _build_alias_index(
+        self,
+        section_title_aliases: Mapping[str, frozenset[str]],
+    ) -> dict[str, ClinicalSectionKey]:
+        alias_to_section: dict[str, ClinicalSectionKey] = {}
+        for section_key in SECTION_KEYS:
+            aliases = section_title_aliases.get(section_key, frozenset())
+            for alias in aliases:
+                normalized = normalize_section_title(alias)
+                if normalized:
+                    alias_to_section[normalized] = section_key
+        return alias_to_section
+
+    def _match_heading(self, line: str) -> ClinicalSectionKey | None:
+        if not line.strip() or len(line) > 120:
             return None
 
-        fragments: list[SectionFragmentSlice] = []
-        for index, (_, header_end, section) in enumerate(markers):
-            body_start = line_body_start(source_text, header_end)
-            body_end = markers[index + 1][0] if index + 1 < len(markers) else len(source_text)
-            fragments.append(SectionFragmentSlice(section=section, start=body_start, end=body_end))
+        cleaned = strip_heading_decoration(line)
+        if not cleaned:
+            return None
 
-        return fragments if contains_all_sections(fragments) else None
+        if len(SENTENCE_PUNCTUATION_RE.findall(cleaned)) > 1:
+            return None
 
-
-class XmlLikeSectionParser:
-    confidence = 0.97
-    tag_re = re.compile(
-        r"<(?P<tag>[A-Za-z_][A-Za-z0-9_\-]*)>(?P<body>.*?)</(?P=tag)>",
-        re.DOTALL,
-    )
+        normalized = normalize_section_title(cleaned)
+        if not normalized:
+            return None
+        return self._alias_to_section.get(normalized)
 
     def __call__(self, source_text: str) -> list[SectionFragmentSlice] | None:
-        fragments: list[SectionFragmentSlice] = []
-        for match in self.tag_re.finditer(source_text):
-            tag = normalize_label(match.group("tag")).replace(" ", "_")
-            section = SECTION_KEY_BY_XML_TAG.get(tag)
+        if not self._alias_to_section:
+            return None
+
+        lines = source_text.splitlines(keepends=True)
+        offsets = line_offsets(source_text)
+
+        boundaries: list[SectionBoundary] = []
+        for index, line in enumerate(lines):
+            section = self._match_heading(line)
             if section is None:
                 continue
-            fragments.append(
-                SectionFragmentSlice(
+            boundaries.append(
+                SectionBoundary(
                     section=section,
-                    start=match.start("body"),
-                    end=match.end("body"),
+                    heading_line_index=index,
+                    content_start_line_index=index + 1,
                 )
             )
 
-        return fragments if contains_all_sections(fragments) else None
-
-
-class ColonSectionParser:
-    confidence = 0.90
-    header_re = re.compile(
-        r"^(?P<label>[A-Za-z][A-Za-z0-9_ ]{2,60})\s*:\s*(?P<tail>.*)$",
-        re.MULTILINE,
-    )
-
-    def __call__(self, source_text: str) -> list[SectionFragmentSlice] | None:
-        markers = []
-        for match in self.header_re.finditer(source_text):
-            label = normalize_label(match.group("label"))
-            section = SECTION_KEY_BY_LABEL.get(label)
-            if section is None:
-                continue
-            body_start = match.start("tail")
-            markers.append((match.start(), body_start, section))
-
-        if not markers:
+        if not boundaries:
             return None
 
         fragments: list[SectionFragmentSlice] = []
-        for index, (_, body_start, section) in enumerate(markers):
-            body_end = markers[index + 1][0] if index + 1 < len(markers) else len(source_text)
-            fragments.append(SectionFragmentSlice(section=section, start=body_start, end=body_end))
-
-        return fragments if contains_all_sections(fragments) else None
-
-
-class IndexedSectionParser:
-    confidence = 0.88
-    header_re = re.compile(
-        r"^\s*(?P<index>[123])[\)\.\-]\s*(?P<label>[A-Za-z][A-Za-z0-9_ ]{2,60})?\s*:?\s*$",
-        re.MULTILINE,
-    )
-
-    def __call__(self, source_text: str) -> list[SectionFragmentSlice] | None:
-        markers = []
-        seen_numeric_only: set[int] = set()
-
-        for match in self.header_re.finditer(source_text):
-            index = int(match.group("index"))
-            indexed_section = SECTION_KEY_BY_INDEX[index]
-            raw_label = match.group("label")
-
-            if raw_label is None or not raw_label.strip():
-                if index in seen_numeric_only:
-                    return None
-                seen_numeric_only.add(index)
-                section = indexed_section
-            else:
-                label = normalize_label(raw_label)
-                label_section = SECTION_KEY_BY_LABEL.get(label)
-                if label_section is None:
-                    section = indexed_section
-                elif label_section != indexed_section:
-                    return None
-                else:
-                    section = label_section
-
-            markers.append((match.start(), match.end(), section))
-
-        if not markers:
-            return None
-
-        fragments: list[SectionFragmentSlice] = []
-        for marker_index, (_, header_end, section) in enumerate(markers):
-            body_start = line_body_start(source_text, header_end)
-            body_end = markers[marker_index + 1][0] if marker_index + 1 < len(markers) else len(source_text)
-            fragments.append(SectionFragmentSlice(section=section, start=body_start, end=body_end))
-
-        return fragments if contains_all_sections(fragments) else None
-
-
-class JsonLikeSectionParser:
-    confidence = 0.98
-
-    def __call__(self, source_text: str) -> list[SectionFragmentSlice] | None:
-        try:
-            parsed = json.loads(source_text)
-        except json.JSONDecodeError:
-            return None
-
-        if not isinstance(parsed, dict):
-            return None
-
-        fragments: list[SectionFragmentSlice] = []
-        cursor = 0
-
-        for raw_key, raw_value in parsed.items():
-            section = SECTION_KEY_BY_JSON_KEY.get(str(raw_key))
-            if section is None:
+        for index, boundary in enumerate(boundaries):
+            content_start_line = boundary.content_start_line_index
+            next_heading_line = (
+                boundaries[index + 1].heading_line_index
+                if index + 1 < len(boundaries)
+                else len(lines)
+            )
+            if content_start_line >= len(lines):
                 continue
 
-            values: list[str]
-            if isinstance(raw_value, str):
-                values = [raw_value]
-            elif isinstance(raw_value, list) and all(isinstance(item, str) for item in raw_value):
-                values = list(raw_value)
-            else:
-                return None
+            start = offsets[content_start_line][0]
+            end = (
+                offsets[next_heading_line - 1][2]
+                if next_heading_line > 0
+                else start
+            )
+            if end <= start:
+                continue
 
-            for value in values:
-                if not value:
-                    return None
-                start = source_text.find(value, cursor)
-                if start < 0:
-                    return None
-                end = start + len(value)
-                fragments.append(SectionFragmentSlice(section=section, start=start, end=end))
-                cursor = end
+            while start < end and source_text[start] in "\r\n":
+                start += 1
+            while end > start and source_text[end - 1] in "\r\n":
+                end -= 1
 
-        return fragments if contains_all_sections(fragments) else None
+            if start >= end or not source_text[start:end].strip():
+                continue
+
+            fragments.append(
+                SectionFragmentSlice(section=boundary.section, start=start, end=end)
+            )
+
+        required = set(SECTION_KEYS)
+        present = {fragment.section for fragment in fragments}
+        if not required.issubset(present):
+            return None
+        return fragments
 
 
-DETERMINISTIC_SECTION_PARSERS: tuple[SectionParser, ...] = (
-    JsonLikeSectionParser(),
-    XmlLikeSectionParser(),
-    MarkdownSectionParser(),
-    IndexedSectionParser(),
-    ColonSectionParser(),
-)
+__all__ = [
+    "PlainTextSectionParser",
+    "SectionBoundary",
+    "SectionFragmentSlice",
+    "normalize_section_title",
+]

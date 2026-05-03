@@ -300,6 +300,13 @@ app-root {
   min-height: 474px !important;
 }
 
+.stitch-dili-input-unified::placeholder {
+  color: color-mix(in srgb, var(--color-text-secondary) 72%, transparent);
+  opacity: 0.72;
+  font-size: var(--font-sm);
+  line-height: 1.6;
+}
+
 .stitch-dili-card textarea:focus-visible,
 .stitch-dili-workbench textarea:focus-visible {
   outline: none;

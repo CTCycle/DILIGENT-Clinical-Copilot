@@ -1,27 +1,14 @@
-export const DILI_CLINICAL_INPUT_TEMPLATE = `Use a structured format so the text can be split safely.
-
-Markdown:
-# Anamnesis
-Patient history block one.
-
-# Current therapy
-Current therapy block.
-
-# Anamnesis
-Patient history block two.
-
-# Laboratory analysis
-Laboratory analysis block.
-
-XML:
-<anamnesis>Patient history block one.</anamnesis>
-<current_therapy>Current therapy block.</current_therapy>
-<anamnesis>Patient history block two.</anamnesis>
-<laboratory_analysis>Laboratory analysis block.</laboratory_analysis>
-
-JSON:
-{
-  "anamnesis": ["Patient history block one.", "Patient history block two."],
-  "current_therapy": ["Current therapy block."],
-  "laboratory_analysis": ["Laboratory analysis block."]
-}`;
+export const CLINICAL_SECTION_TEMPLATE = [
+  'Provide plain text with three sections.',
+  '',
+  '1. Anamnesis',
+  'Patient history, clinical narrative, symptoms, comorbidities, and exam findings.',
+  '',
+  '2. Drugs',
+  'Medication list, dosage notes, therapy start or stop details.',
+  '',
+  '3. Lab analysis',
+  'Laboratory results, dates, units, ULN values, liver enzymes, bilirubin, INR, and related findings.',
+  '',
+  'Clear section headings are recommended. Markdown headings are also supported.',
+].join('\n');

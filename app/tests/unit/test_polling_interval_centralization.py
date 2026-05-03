@@ -53,7 +53,8 @@ def test_start_clinical_job_uses_centralized_poll_interval(monkeypatch) -> None:
         ClinicalSessionRequest(
             clinical_input=(
                 "Anamnesis: Clinical context\n"
-                "Drugs: Acetaminophen 500 mg 1 - 0 - 0 - 0 po started from 01/01/2024"
+                "Drugs: Acetaminophen 500 mg 1 - 0 - 0 - 0 po started from 01/01/2024\n"
+                "Lab analysis: ALT 300 U/L"
             ),
             visit_date=date(2026, 4, 24),
         )

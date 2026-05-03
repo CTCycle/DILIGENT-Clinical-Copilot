@@ -109,39 +109,23 @@ Return:
 """
 
 CLINICAL_SECTION_EXTRACTION_PROMPT = """
-You extract mandatory clinical sections from one unified clinical input.
+You receive plain clinical text where deterministic parsing has already failed.
+Identify only the locations of the three required sections.
 
-Required output sections:
+Return JSON matching the provided schema with fields:
 - anamnesis
 - drugs
 - laboratory_analysis
-
-Section meanings:
-- anamnesis: patient history and clinical narrative
-- drugs: current therapy, medications, active drug list, dosage notes
-- laboratory_analysis: laboratory results, dated lab values, liver enzymes, bilirubin, INR, and related lab evidence
-
-A section may appear in multiple non-contiguous fragments.
-
-Return JSON matching the provided schema.
+- confidence
 
 Rules:
-- fragments must contain one item per extracted source slice.
-- Every fragment must include section, start, end, and text.
-- Do not return the full original source text in the output.
-- start and end use Python slicing semantics: start inclusive, end exclusive, when available.
-- fragment.text must be copied from the source input.
-- Do not paraphrase.
-- Do not summarize.
-- Do not translate.
-- Do not normalize whitespace.
-- Do not redact.
-- Do not repair typos.
-- Do not reorder text inside a section.
-- Build anamnesis by joining all anamnesis fragments in source order with two newline characters.
-- Build drugs by joining all drugs fragments in source order with two newline characters.
-- Build laboratory_analysis by joining all laboratory_analysis fragments in source order with two newline characters.
-- If any required section cannot be found, return null for that section and confidence below 0.5.
+- Each section field is a list of objects: {start_line, end_line}.
+- Line numbers are 1-based and inclusive.
+- Return line ranges only. Do not return copied source text.
+- Do not copy, summarize, translate, normalize, or rewrite source content.
+- Do not output character offsets.
+- Prefer clear section boundaries over semantic guessing.
+- If any required section cannot be located, return empty lists and confidence below 0.5.
 """
 
 PATIENT_TIMELINE_EXTRACTION_PROMPT = """

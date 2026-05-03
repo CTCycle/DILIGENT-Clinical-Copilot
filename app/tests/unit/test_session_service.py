@@ -7,7 +7,6 @@ import pytest
 from common.exceptions import ServiceValidationError
 from domain.clinical.entities import (
     ClinicalSectionExtractionResult,
-    ClinicalSectionFragment,
     ClinicalSessionRequest,
 )
 from services.session.clinical_input_extractor import ClinicalInputExtractionError
@@ -44,12 +43,7 @@ def test_preprocess_unified_input_accepts_fragment_aggregated_sections() -> None
         anamnesis="A1\n\n\n\nA2\n\n",
         drugs="D\n\n",
         laboratory_analysis="L",
-        fragments=[
-            ClinicalSectionFragment(section="anamnesis", start=12, end=16, text="A1\n\n"),
-            ClinicalSectionFragment(section="drugs", start=35, end=38, text="D\n\n"),
-            ClinicalSectionFragment(section="anamnesis", start=52, end=56, text="A2\n\n"),
-            ClinicalSectionFragment(section="laboratory_analysis", start=78, end=79, text="L"),
-        ],
+        line_ranges={},
         confidence=0.94,
     )
 
