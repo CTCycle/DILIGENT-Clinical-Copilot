@@ -179,26 +179,44 @@ class ClinicalSessionRequest(BaseModel):
         return stripped or None
 
 
-class ClinicalSectionFragment(BaseModel):
-    section: ClinicalSectionKey
-    start: int = Field(..., ge=0)
-    end: int = Field(..., ge=0)
-    text: str = Field(..., min_length=1, max_length=100000)
+class ClinicalSectionLineRange(BaseModel):
+    start_line: int = Field(..., ge=1)
+    end_line: int = Field(..., ge=1)
 
     @model_validator(mode="after")
-    def validate_span(self) -> "ClinicalSectionFragment":
-        if self.start >= self.end:
-            raise ValueError("fragment start must be less than fragment end")
+    def validate_line_range(self) -> "ClinicalSectionLineRange":
+        if self.start_line > self.end_line:
+            raise ValueError("start_line must be less than or equal to end_line")
         return self
+
+
+class LlmClinicalSectionLineRangeDraft(BaseModel):
+    start_line: int = Field(..., ge=1)
+    end_line: int = Field(..., ge=1)
+
+    @model_validator(mode="after")
+    def validate_line_range(self) -> "LlmClinicalSectionLineRangeDraft":
+        if self.start_line > self.end_line:
+            raise ValueError("start_line must be less than or equal to end_line")
+        return self
+
+
+class LlmClinicalSectionExtractionDraft(BaseModel):
+    anamnesis: list[LlmClinicalSectionLineRangeDraft] = Field(default_factory=list)
+    drugs: list[LlmClinicalSectionLineRangeDraft] = Field(default_factory=list)
+    laboratory_analysis: list[LlmClinicalSectionLineRangeDraft] = Field(default_factory=list)
+    confidence: float = Field(default=0.0, ge=0.0, le=1.0)
 
 
 ###############################################################################
 class ClinicalSectionExtractionResult(BaseModel):
     source_text: str = Field(..., max_length=100000)
-    anamnesis: str | None = Field(default=None, max_length=100000)
-    drugs: str | None = Field(default=None, max_length=100000)
-    laboratory_analysis: str | None = Field(default=None, max_length=100000)
-    fragments: list[ClinicalSectionFragment] = Field(default_factory=list)
+    anamnesis: str = Field(..., max_length=100000)
+    drugs: str = Field(..., max_length=100000)
+    laboratory_analysis: str = Field(..., max_length=100000)
+    line_ranges: dict[ClinicalSectionKey, list[ClinicalSectionLineRange]] = Field(
+        default_factory=dict
+    )
     confidence: float = Field(
         default=0.0,
         ge=0.0,

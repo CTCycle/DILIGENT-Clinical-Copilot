@@ -1,6 +1,6 @@
 # DILIGENT Clinical Copilot User Manual
 
-Last updated: 2026-04-29
+Last updated: 2026-05-03
 
 This manual describes practical use of DILIGENT Clinical Copilot for clinical DILI assessment workflows.
 
@@ -89,6 +89,10 @@ release\tauri\build_with_tauri.bat
 
 ## 5. Usage patterns and best practices
 
+- Clinical input textbox accepts plain text only.
+- Recommended section headings are `Anamnesis`, `Drugs`, and `Lab analysis`.
+- Numbered headings and Markdown headings are supported.
+- Additional heading aliases are supported through seeded section-title vocabulary.
 - Enter complete medication timing details before running analysis.
 - Provide structured, clinically specific lab context to improve pattern derivation.
 - Treat missing-core-field warnings as blockers and resolve before re-running.

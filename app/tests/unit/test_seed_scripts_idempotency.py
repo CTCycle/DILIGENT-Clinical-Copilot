@@ -14,7 +14,9 @@ from repositories.schemas.models import (
     DrugAlias,
     DrugRxnormCode,
     LiverToxMonograph,
+    TextNormalizationTerm,
 )
+from repositories.serialization.text_normalization import TextNormalizationVocabularySerializer
 from services.updater.livertox_core import LiverToxUpdater
 
 
@@ -334,4 +336,43 @@ def test_ensure_drug_conflict_raises() -> None:
     with factory() as db_session:
         rows = db_session.execute(select(Drug)).scalars().all()
         assert len(rows) == 2
+
+
+def test_text_normalization_seed_includes_section_title_alias_categories() -> None:
+    _, engine = build_serializer()
+    factory = sessionmaker(bind=engine, future=True)
+    vocabulary = TextNormalizationVocabularySerializer(engine=engine, session_factory=factory)
+    vocabulary.ensure_seeded()
+
+    categories = [
+        "section_title_alias_anamnesis",
+        "section_title_alias_drugs",
+        "section_title_alias_laboratory_analysis",
+    ]
+
+    with factory() as db_session:
+        rows = (
+            db_session.execute(
+                select(TextNormalizationTerm).where(
+                    TextNormalizationTerm.category.in_(categories),
+                    TextNormalizationTerm.is_active.is_(True),
+                )
+            )
+            .scalars()
+            .all()
+        )
+
+    assert rows
+    by_category = {category: [row for row in rows if row.category == category] for category in categories}
+    for category in categories:
+        assert by_category[category]
+        assert all(row.replacement is None for row in by_category[category])
+
+    all_terms = {row.term_norm for row in rows}
+    assert "anamnesis" in all_terms
+    assert "drugs" in all_terms
+    assert "lab analysis" in all_terms
+    assert "anamnesi" in all_terms
+    assert "farmaci" in all_terms
+    assert "analisi di laboratorio" in all_terms
 

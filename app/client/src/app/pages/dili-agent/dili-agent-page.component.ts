@@ -3,7 +3,7 @@ import { Component, ElementRef, HostListener, OnDestroy, ViewChild, computed, ef
 import { FormsModule } from '@angular/forms';
 
 import { DEFAULT_FORM_STATE, REPORT_EXPORT_FILENAME } from '../../core/constants';
-import { DILI_CLINICAL_INPUT_TEMPLATE } from '../../core/clinical-section-template';
+import { CLINICAL_SECTION_TEMPLATE } from '../../core/clinical-section-template';
 import { AppStateService } from '../../core/state/app-state.service';
 import {
   buildClinicalPayload,
@@ -47,7 +47,7 @@ export class DiliAgentPageComponent implements OnDestroy {
   readonly todayIso = todayIso;
   readonly finalReportMarkdown = computed(() => this.stateService.state().diliAgent.message ?? '');
   readonly renderedReport = computed(() => this.markdownRenderer.render(this.finalReportMarkdown()));
-  readonly clinicalInputTemplate = DILI_CLINICAL_INPUT_TEMPLATE;
+  readonly clinicalInputTemplate = CLINICAL_SECTION_TEMPLATE;
 
   private poller: { stop: () => void } | null = null;
   private runActionLockTimer: ReturnType<typeof globalThis.setTimeout> | null = null;
