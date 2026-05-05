@@ -6,7 +6,7 @@ const rootDir = process.cwd();
 const distDir = path.resolve(rootDir, 'dist/browser');
 const fallbackDistDir = path.resolve(rootDir, 'dist');
 const staticRoot = existsSync(distDir) ? distDir : fallbackDistDir;
-const envPath = path.resolve(rootDir, '../../../settings/.env');
+const envPath = path.resolve(rootDir, '../../settings/.env');
 
 const defaults = {
   FASTAPI_HOST: '127.0.0.1',

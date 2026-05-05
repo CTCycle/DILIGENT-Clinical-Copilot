@@ -187,10 +187,10 @@ export class ModelConfigPageComponent implements OnInit {
   });
 
   async ngOnInit(): Promise<void> {
-    await this.loadModelConfig();
+    await this.loadModelConfig(true, true);
   }
 
-  async loadModelConfig(syncDraft = true, includeLocalAvailability?: boolean): Promise<void> {
+  async loadModelConfig(syncDraft = true, includeLocalAvailability: boolean = true): Promise<void> {
     this.isLoading.set(true);
     try {
       const payload = await fetchModelConfigState(includeLocalAvailability);
@@ -363,7 +363,7 @@ export class ModelConfigPageComponent implements OnInit {
         );
       }
     } finally {
-      await this.loadModelConfig(false);
+      await this.loadModelConfig(false, true);
       if (failureMessage) {
         this.statusMessage.set(failureMessage);
       }

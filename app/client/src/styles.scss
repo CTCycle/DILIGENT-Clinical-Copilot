@@ -5305,3 +5305,19 @@ input[type="date"]::-webkit-calendar-picker-indicator:hover {
     max-height: min(64vh, 720px);
   }
 }
+
+/* Model config background smoothing: avoid hard left/right contrast */
+.model-config-page {
+  position: relative;
+  isolation: isolate;
+  background:
+    radial-gradient(120% 96% at -10% -18%, rgba(128, 196, 171, 0.22) 0%, rgba(128, 196, 171, 0) 52%),
+    radial-gradient(104% 84% at 112% 8%, rgba(85, 166, 134, 0.2) 0%, rgba(85, 166, 134, 0) 58%),
+    linear-gradient(150deg, #f4f9f6 0%, #eef5f1 44%, #e9f2ed 100%);
+  border-radius: 0;
+}
+
+.model-config-page .model-config-main-column,
+.model-config-page .model-config-summary-panel {
+  background: transparent;
+}
