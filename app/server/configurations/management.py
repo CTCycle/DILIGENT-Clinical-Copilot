@@ -139,14 +139,23 @@ def _resolve_ollama_url_with_scheme(
     scheme, host_port = normalized_host.split("://", maxsplit=1)
     if ":" in host_port:
         host_only, parsed_port = host_port.split(":", maxsplit=1)
+        host_only = _normalize_ollama_host(host_only)
         resolved_port = (
             port_value
             if port_value is not None
             else coerce_int(parsed_port, OLLAMA_DEFAULT_PORT, minimum=1, maximum=65535)
         )
         return f"{scheme}://{host_only}:{resolved_port}"
+    host_port = _normalize_ollama_host(host_port)
     resolved_port = port_value if port_value is not None else OLLAMA_DEFAULT_PORT
     return f"{scheme}://{host_port}:{resolved_port}"
+
+
+def _normalize_ollama_host(host: str) -> str:
+    normalized = host.strip()
+    if normalized.lower() in {"localhost", "::1", "[::1]"}:
+        return "127.0.0.1"
+    return normalized
 
 
 def resolve_ollama_base_url(
@@ -163,7 +172,7 @@ def resolve_ollama_base_url(
     host_value = coerce_str_or_none(ollama_host)
     port_value = ollama_port
     if host_value:
-        normalized_host = host_value.strip().rstrip("/")
+        normalized_host = _normalize_ollama_host(host_value.strip().rstrip("/"))
         if "://" in normalized_host:
             return _resolve_ollama_url_with_scheme(
                 normalized_host, port_value=port_value

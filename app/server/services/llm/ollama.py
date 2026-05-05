@@ -151,6 +151,7 @@ async def pull_model_async(
     job_id: str | None = None,
 ) -> dict[str, Any]:
     async with client_factory() as client:
+        await client.start_server()
         local = set(await client.list_models())
         already = name in local
         if job_id is not None:
@@ -333,6 +334,7 @@ class OllamaService:
     async def list_available_models(self) -> ModelListResponse:
         try:
             async with self.client_factory() as client:
+                await client.start_server()
                 models = await client.list_models()
             return ModelListResponse(models=models, count=len(models))
         except (OllamaTimeout, OllamaError, Exception) as exc:
