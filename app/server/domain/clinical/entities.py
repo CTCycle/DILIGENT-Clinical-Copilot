@@ -159,6 +159,7 @@ class ClinicalSessionRequest(BaseModel):
         default=None, max_length=MAX_LAB_TEXT_LENGTH
     )
     patient_image_base64: str | None = Field(default=None, max_length=8_000_000)
+    selected_model_providers: list[str] = Field(default_factory=list)
 
     # -------------------------------------------------------------------------
     @field_validator(
@@ -177,6 +178,28 @@ class ClinicalSessionRequest(BaseModel):
         without_controls = CONTROL_CHARACTERS_RE.sub(" ", str(value))
         stripped = without_controls.strip()
         return stripped or None
+
+    @field_validator("selected_model_providers", mode="before")
+    @classmethod
+    def normalize_selected_model_providers(cls, value: Any) -> list[str]:
+        if value is None:
+            return []
+        raw_values: list[Any]
+        if isinstance(value, str):
+            raw_values = [value]
+        elif isinstance(value, list):
+            raw_values = value
+        else:
+            raise ValueError("selected_model_providers must be a string or list of strings")
+
+        normalized: list[str] = []
+        for item in raw_values:
+            if not isinstance(item, str):
+                raise ValueError("selected_model_providers must contain only strings")
+            cleaned = item.strip()
+            if cleaned:
+                normalized.append(cleaned)
+        return normalized
 
 
 class ClinicalSectionLineRange(BaseModel):

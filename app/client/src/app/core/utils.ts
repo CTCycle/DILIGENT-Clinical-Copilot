@@ -1,4 +1,4 @@
-import { ClinicalFormState, ClinicalRequestPayload } from "./models/types";
+import { ClinicalFormState, ClinicalRequestPayload, RuntimeSettings } from "./models/types";
 
 export function sanitizeField(value: string): string | null {
   const normalized = value.trim();
@@ -110,11 +110,13 @@ function extractBase64Payload(dataUrl: string | null): string | null {
 
 export function buildClinicalPayload(
   form: ClinicalFormState,
+  settings: RuntimeSettings,
 ): ClinicalRequestPayload {
   return {
     name: sanitizeField(form.patientName),
     visit_date: buildVisitDatePayload(form.visitDate),
     clinical_input: sanitizeField(form.clinicalInput),
+    selected_model_providers: settings.provider ? [settings.provider] : [],
     patient_image_base64: extractBase64Payload(form.patientImageDataUrl),
     use_rag: form.useRag,
     use_web_search: form.useWebSearch,

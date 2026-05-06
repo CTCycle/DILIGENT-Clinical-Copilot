@@ -1,158 +1,131 @@
 from __future__ import annotations
 
+from dataclasses import dataclass
 import re
-from collections.abc import Mapping
-from typing import NamedTuple
 
-from domain.clinical.sections import ClinicalSectionKey, SECTION_KEYS
+from domain.clinical.sections import ClinicalSectionKey
 
 
-WHITESPACE_RE = re.compile(r"\s+")
-SENTENCE_PUNCTUATION_RE = re.compile(r"[.!?]")
+NORMALIZE_RE = re.compile(r"[^A-Za-zÀ-ÖØ-öø-ÿ0-9 ]+")
+WS_RE = re.compile(r"\s+")
+HSEP_HEADING_RE = re.compile(
+    r"(?m)^[ \t]*---[ \t]*\r?\n[ \t]*(?P<title>[^\r\n]{1,100}?)[ \t]*\r?\n[ \t]*---[ \t]*$"
+)
+MARKER_PATTERNS: tuple[re.Pattern[str], ...] = (
+    re.compile(r"(?m)^[ \t]*#{1,6}[ \t]+(?P<title>[^\r\n]{1,100})$"),
+    re.compile(r"(?m)^[ \t]*\d+[ \t]*[.):][ \t]*(?P<title>[^\r\n]{1,100})$"),
+    re.compile(r"(?m)^[ \t]*(?:I|II|III|IV|V|VI|VII|VIII|IX|X)[ \t]*[.):][ \t]*(?P<title>[^\r\n]{1,100})$", re.IGNORECASE),
+    re.compile(r"(?m)^[ \t]*(?P<title>[A-Za-zÀ-ÖØ-öø-ÿ][^\r\n:]{0,98})[ \t]*:[ \t]*$"),
+    HSEP_HEADING_RE,
+)
+
+ANAMNESIS_ALIASES = {
+    "anamnesis",
+    "anamnesi",
+    "history",
+    "clinical history",
+}
+THERAPY_ALIASES = {
+    "therapy",
+    "therapies",
+    "drugs",
+    "current drugs",
+    "current medications",
+    "medications",
+    "farmaci",
+    "terapia",
+}
+LAB_ALIASES = {
+    "lab analysis",
+    "laboratory analysis",
+    "laboratory",
+    "labs",
+    "lab",
+    "analisi",
+    "esami",
+    "esami di laboratorio",
+}
 
 
-class SectionFragmentSlice(NamedTuple):
-    section: ClinicalSectionKey
-    start: int
-    end: int
+@dataclass(frozen=True)
+class SectionMarker:
+    key: ClinicalSectionKey
+    title: str
+    marker_start: int
+    marker_end: int
 
 
-class SectionBoundary(NamedTuple):
-    section: ClinicalSectionKey
-    heading_line_index: int
-    content_start_line_index: int
+def normalize_section_title(title: str) -> str | None:
+    normalized = NORMALIZE_RE.sub(" ", title or "")
+    normalized = WS_RE.sub(" ", normalized).strip().lower()
+    if not normalized:
+        return None
+    return normalized
 
 
-def normalize_section_title(value: str) -> str:
-    normalized = re.sub(r"[\*\_`~\[\]\(\)]", " ", value or "")
-    normalized = re.sub(r"[^A-Za-z0-9 ]+", " ", normalized)
-    return WHITESPACE_RE.sub(" ", normalized).strip().lower()
+def _map_title_to_key(title: str) -> ClinicalSectionKey | None:
+    normalized = normalize_section_title(title)
+    if normalized is None:
+        return None
+    if normalized in ANAMNESIS_ALIASES:
+        return "anamnesis"
+    if normalized in THERAPY_ALIASES:
+        return "drugs"
+    if normalized in LAB_ALIASES:
+        return "laboratory_analysis"
+    return None
 
 
-def strip_heading_decoration(line: str) -> str:
-    value = line.strip()
-    value = re.sub(r"^#{1,6}\s+", "", value)
-    value = re.sub(r"^[-*]\s+", "", value)
-    value = re.sub(r"^\d+\s*[\.)\-]\s*", "", value)
-    value = re.sub(r"\s*:\s*$", "", value)
-    value = value.strip()
-    if re.match(r"^\*\*[^*]+\*\*$", value):
-        value = value[2:-2].strip()
-    return value
-
-
-def line_offsets(source_text: str) -> list[tuple[int, int, int]]:
-    lines = source_text.splitlines(keepends=True)
-    offsets: list[tuple[int, int, int]] = []
-    cursor = 0
-    for line in lines:
-        line_start = cursor
-        line_end = line_start + len(line.rstrip("\r\n"))
-        cursor = line_start + len(line)
-        offsets.append((line_start, line_end, cursor))
-    return offsets
-
-
-class PlainTextSectionParser:
-    confidence = 0.93
-
-    def __init__(self, section_title_aliases: Mapping[str, frozenset[str]]) -> None:
-        self._alias_to_section = self._build_alias_index(section_title_aliases)
-
-    def _build_alias_index(
-        self,
-        section_title_aliases: Mapping[str, frozenset[str]],
-    ) -> dict[str, ClinicalSectionKey]:
-        alias_to_section: dict[str, ClinicalSectionKey] = {}
-        for section_key in SECTION_KEYS:
-            aliases = section_title_aliases.get(section_key, frozenset())
-            for alias in aliases:
-                normalized = normalize_section_title(alias)
-                if normalized:
-                    alias_to_section[normalized] = section_key
-        return alias_to_section
-
-    def _match_heading(self, line: str) -> ClinicalSectionKey | None:
-        if not line.strip() or len(line) > 120:
-            return None
-
-        cleaned = strip_heading_decoration(line)
-        if not cleaned:
-            return None
-
-        if len(SENTENCE_PUNCTUATION_RE.findall(cleaned)) > 1:
-            return None
-
-        normalized = normalize_section_title(cleaned)
-        if not normalized:
-            return None
-        return self._alias_to_section.get(normalized)
-
-    def __call__(self, source_text: str) -> list[SectionFragmentSlice] | None:
-        if not self._alias_to_section:
-            return None
-
-        lines = source_text.splitlines(keepends=True)
-        offsets = line_offsets(source_text)
-
-        boundaries: list[SectionBoundary] = []
-        for index, line in enumerate(lines):
-            section = self._match_heading(line)
-            if section is None:
+def find_section_markers(text: str) -> list[SectionMarker]:
+    markers: list[SectionMarker] = []
+    for pattern in MARKER_PATTERNS:
+        for match in pattern.finditer(text):
+            title = (match.group("title") or "").strip()
+            key = _map_title_to_key(title)
+            if key is None:
                 continue
-            boundaries.append(
-                SectionBoundary(
-                    section=section,
-                    heading_line_index=index,
-                    content_start_line_index=index + 1,
+            markers.append(
+                SectionMarker(
+                    key=key,
+                    title=title,
+                    marker_start=match.start(),
+                    marker_end=match.end(),
                 )
             )
-
-        if not boundaries:
-            return None
-
-        fragments: list[SectionFragmentSlice] = []
-        for index, boundary in enumerate(boundaries):
-            content_start_line = boundary.content_start_line_index
-            next_heading_line = (
-                boundaries[index + 1].heading_line_index
-                if index + 1 < len(boundaries)
-                else len(lines)
-            )
-            if content_start_line >= len(lines):
-                continue
-
-            start = offsets[content_start_line][0]
-            end = (
-                offsets[next_heading_line - 1][2]
-                if next_heading_line > 0
-                else start
-            )
-            if end <= start:
-                continue
-
-            while start < end and source_text[start] in "\r\n":
-                start += 1
-            while end > start and source_text[end - 1] in "\r\n":
-                end -= 1
-
-            if start >= end or not source_text[start:end].strip():
-                continue
-
-            fragments.append(
-                SectionFragmentSlice(section=boundary.section, start=start, end=end)
-            )
-
-        required = set(SECTION_KEYS)
-        present = {fragment.section for fragment in fragments}
-        if not required.issubset(present):
-            return None
-        return fragments
+    unique: dict[tuple[int, int, ClinicalSectionKey], SectionMarker] = {}
+    for marker in markers:
+        unique[(marker.marker_start, marker.marker_end, marker.key)] = marker
+    return sorted(unique.values(), key=lambda marker: marker.marker_start)
 
 
-__all__ = [
-    "PlainTextSectionParser",
-    "SectionBoundary",
-    "SectionFragmentSlice",
-    "normalize_section_title",
-]
+def extract_sections_from_markers(text: str, markers: list[SectionMarker]) -> dict[ClinicalSectionKey, str] | None:
+    if not markers:
+        return None
+    extracted: dict[ClinicalSectionKey, str] = {}
+    ordered = sorted(markers, key=lambda item: item.marker_start)
+    for index, marker in enumerate(ordered):
+        body_start = marker.marker_end
+        body_end = ordered[index + 1].marker_start if index + 1 < len(ordered) else len(text)
+        content = text[body_start:body_end].strip()
+        if not content:
+            continue
+        existing = extracted.get(marker.key)
+        extracted[marker.key] = f"{existing}\n\n{content}" if existing else content
+    if not extracted.get("anamnesis") or not extracted.get("drugs") or not extracted.get("laboratory_analysis"):
+        return None
+    return extracted
+
+
+def validate_sections_against_source(text: str, sections: dict[ClinicalSectionKey, str]) -> bool:
+    normalized_source = WS_RE.sub(" ", text).strip()
+    for key in ("anamnesis", "drugs", "laboratory_analysis"):
+        value = (sections.get(key) or "").strip()
+        if not value:
+            return False
+        if value in text:
+            continue
+        normalized_value = WS_RE.sub(" ", value).strip()
+        if not normalized_value or normalized_value not in normalized_source:
+            return False
+    return True
+
