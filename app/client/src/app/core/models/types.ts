@@ -68,6 +68,7 @@ export type ClinicalRequestPayload = {
   name: string | null;
   visit_date: { day: number; month: number; year: number } | null;
   clinical_input: string | null;
+  selected_model_providers: string[];
   patient_image_base64?: string | null;
   use_rag: boolean;
   use_web_search: boolean;
