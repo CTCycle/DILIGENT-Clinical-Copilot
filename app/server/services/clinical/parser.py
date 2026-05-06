@@ -20,6 +20,7 @@ from domain.clinical.entities import (
 from configurations.startup import server_settings
 from configurations.llm_configs import LLMRuntimeConfig
 from services.text.normalization import normalize_token
+from services.clinical.drug_blocks import isolate_drug_blocks
 from common.utils.logger import logger
 from services.text.vocabulary import get_text_normalization_snapshot
 from common.utils.patterns import (
@@ -281,16 +282,16 @@ class DrugsParser:
         cleaned = (text or "") if already_cleaned else self.clean_text(text)
         if not cleaned:
             return PatientDrugs(entries=[])
-        lines = [
-            segment
-            for segment in (entry.strip() for entry in cleaned.split("\n"))
-            if segment and not self.is_non_therapy_line(segment)
+        blocks = [
+            block.text.strip()
+            for block in isolate_drug_blocks(cleaned)
+            if block.text.strip() and not self.is_non_therapy_line(block.text.strip())
         ]
-        total_chunks = max(len(lines), 1)
+        total_chunks = max(len(blocks), 1)
         processed_chunks = 0
         self.emit_progress(progress_callback, 0.0)
-        parsed_chunks, fallback_chunks = self.rule_based_parse(lines)
-        ordered_entries: list[DrugEntry | None] = [None] * len(lines)
+        parsed_chunks, fallback_chunks = self.rule_based_parse(blocks)
+        ordered_entries: list[DrugEntry | None] = [None] * len(blocks)
         for index, entry in parsed_chunks:
             normalized = self.normalize_entry(
                 entry,

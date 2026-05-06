@@ -334,7 +334,8 @@ class OllamaService:
     async def list_available_models(self) -> ModelListResponse:
         try:
             async with self.client_factory() as client:
-                await client.start_server()
+                if hasattr(client, "start_server"):
+                    await client.start_server()
                 models = await client.list_models()
             return ModelListResponse(models=models, count=len(models))
         except (OllamaTimeout, OllamaError, Exception) as exc:

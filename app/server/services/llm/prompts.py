@@ -110,22 +110,18 @@ Return:
 
 CLINICAL_SECTION_EXTRACTION_PROMPT = """
 You receive plain clinical text where deterministic parsing has already failed.
-Identify only the locations of the three required sections.
-
-Return JSON matching the provided schema with fields:
+Return JSON only with exactly these keys:
 - anamnesis
-- drugs
-- laboratory_analysis
-- confidence
+- therapy
+- lab_analysis
 
 Rules:
-- Each section field is a list of objects: {start_line, end_line}.
-- Line numbers are 1-based and inclusive.
-- Return line ranges only. Do not return copied source text.
-- Do not copy, summarize, translate, normalize, or rewrite source content.
-- Do not output character offsets.
-- Prefer clear section boundaries over semantic guessing.
-- If any required section cannot be located, return empty lists and confidence below 0.5.
+- Each value must be a verbatim excerpt copied from the source text.
+- Preserve original language and wording.
+- Do not summarize, translate, infer, normalize, or fabricate content.
+- Do not normalize drug names.
+- If a section is missing, return an empty string for that key.
+- Do not wrap output in markdown fences.
 """
 
 PATIENT_TIMELINE_EXTRACTION_PROMPT = """

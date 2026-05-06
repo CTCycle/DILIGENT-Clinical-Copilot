@@ -260,7 +260,7 @@ export class DiliAgentPageComponent implements OnDestroy {
     this.stopPoller();
 
     try {
-      const payload = buildClinicalPayload(this.vm.form);
+      const payload = buildClinicalPayload(this.vm.form, this.vm.settings);
       const startResult = await startClinicalJob(payload);
       this.stateService.updateDiliAgent({
         jobId: startResult.job_id,
@@ -285,18 +285,12 @@ export class DiliAgentPageComponent implements OnDestroy {
   }
 
   async runSession(): Promise<void> {
-    const form = this.vm.form;
-    const missingMessageByField: Array<[keyof typeof form, string]> = [
-      ['clinicalInput', '[ERROR] Provide the clinical input.'],
-      ['visitDate', '[ERROR] Provide the visit date.'],
-    ];
-
-    const firstMissing = missingMessageByField.find(([field]) => !String(form[field]).trim());
-    if (firstMissing) {
+    const message = this.validationMessage();
+    if (message) {
       this.resetOutputs();
       this.stateService.updateDiliAgent({
         isRunning: false,
-        message: firstMissing[1],
+        message,
       });
       return;
     }
@@ -433,5 +427,45 @@ export class DiliAgentPageComponent implements OnDestroy {
   get defaultPollIntervalMs(): number {
     return DEFAULT_POLL_INTERVAL_MS;
   }
-}
 
+  private countClinicalWords(value: string): number {
+    const matches = value.match(/\b[\wÀ-ÖØ-öø-ÿ']+\b/gu);
+    return matches ? matches.length : 0;
+  }
+
+  private selectedModelProviders(): string[] {
+    const provider = this.vm.settings.provider?.trim();
+    return provider ? [provider] : [];
+  }
+
+  private clinicalInputMeetsMinimumLength(): boolean {
+    return this.countClinicalWords(this.vm.form.clinicalInput.trim()) >= 60;
+  }
+
+  private hasSelectedModelProvider(): boolean {
+    return this.selectedModelProviders().length > 0;
+  }
+
+  canStartSession(): boolean {
+    return Boolean(this.vm.form.visitDate.trim())
+      && Boolean(this.vm.form.clinicalInput.trim())
+      && this.clinicalInputMeetsMinimumLength()
+      && this.hasSelectedModelProvider();
+  }
+
+  validationMessage(): string | null {
+    if (!this.vm.form.visitDate.trim()) {
+      return '[ERROR] Provide the visit date.';
+    }
+    if (!this.vm.form.clinicalInput.trim()) {
+      return '[ERROR] Provide the clinical input.';
+    }
+    if (!this.clinicalInputMeetsMinimumLength()) {
+      return '[ERROR] Clinical input must contain at least 60 words.';
+    }
+    if (!this.hasSelectedModelProvider()) {
+      return '[ERROR] Select at least one model provider.';
+    }
+    return null;
+  }
+}

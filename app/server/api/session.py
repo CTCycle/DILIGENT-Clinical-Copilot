@@ -11,6 +11,7 @@ from domain.jobs import (
 )
 from services.runtime.jobs import get_job_manager
 from services.session.factory import build_clinical_session_service
+from services.session.session_request_validation import validate_clinical_session_request
 from services.session.session_service import ClinicalSessionService
 
 router = APIRouter(tags=["session"])
@@ -27,6 +28,7 @@ class ClinicalSessionEndpoint:
         self,
         request_payload: ClinicalSessionRequest = Body(...),
     ) -> PlainTextResponse:
+        validate_clinical_session_request(request_payload)
         report = await self.service.start_clinical_session(request_payload)
         return PlainTextResponse(content=report, status_code=status.HTTP_202_ACCEPTED)
 
@@ -35,6 +37,7 @@ class ClinicalSessionEndpoint:
         self,
         request_payload: ClinicalSessionRequest = Body(...),
     ) -> JobStartResponse:
+        validate_clinical_session_request(request_payload)
         return self.service.start_clinical_job(request_payload)
 
     # -------------------------------------------------------------------------

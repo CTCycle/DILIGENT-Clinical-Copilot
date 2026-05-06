@@ -68,6 +68,7 @@ from services.clinical.candidate_selection import (
 from services.clinical.disease import DiseaseExtractor
 from services.clinical.labs import ClinicalLabExtractor
 from services.clinical.parser import DrugsParser
+from services.clinical.drug_blocks import isolate_drug_blocks
 from services.clinical.rucam import RucamScoreEstimator
 from services.clinical.validation import (
     build_validation_bundle,
@@ -253,11 +254,7 @@ class ClinicalSessionService(ClinicalSessionFormattingMixin):
             )
             return
 
-        lines = [
-            segment.strip()
-            for segment in cleaned_therapy_text.split("\n")
-            if segment.strip()
-        ]
+        lines = [block.text.strip() for block in isolate_drug_blocks(cleaned_therapy_text) if block.text.strip()]
         parsed_entries = [
             parsed
             for parsed in (self.drugs_parser.parse_line(line) for line in lines)
