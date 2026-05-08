@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import asyncio
 import re
-from typing import Any
+from typing import Any, NoReturn
 from collections.abc import Callable
 
 from common.exceptions import (
@@ -249,7 +249,7 @@ class OllamaService:
 
     # -------------------------------------------------------------------------
     @staticmethod
-    def raise_ollama_service_error(exc: Exception, *, action: str) -> None:
+    def raise_ollama_service_error(exc: Exception, *, action: str) -> NoReturn:
         if isinstance(exc, OllamaTimeout):
             raise ServiceDependencyError(
                 "Ollama request timed out. Please retry.",

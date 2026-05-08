@@ -212,9 +212,11 @@ class ModelConfigSerializer:
     # -------------------------------------------------------------------------
     @staticmethod
     def normalize_temperature(value: object) -> float:
+        if not isinstance(value, (int, float, str)):
+            return 0.7
         try:
             parsed = float(value)
-        except (TypeError, ValueError):
+        except ValueError:
             parsed = 0.7
         return round(max(0.0, min(2.0, parsed)), 2)
 

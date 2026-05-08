@@ -2,11 +2,13 @@ from __future__ import annotations
 
 import asyncio
 import uuid
+from typing import cast
 
 import httpx
 from fastapi import FastAPI, Request, status
 from fastapi.exceptions import RequestValidationError
 from fastapi.responses import JSONResponse
+from starlette.types import ExceptionHandler
 from starlette.middleware.base import BaseHTTPMiddleware, RequestResponseEndpoint
 from starlette.responses import Response
 
@@ -214,12 +216,21 @@ def unhandled_error_handler(
 ###############################################################################
 def register_error_handling(app: FastAPI) -> None:
     app.add_middleware(RequestIdMiddleware)
-    app.add_exception_handler(RequestValidationError, request_validation_error_handler)
+    app.add_exception_handler(
+        RequestValidationError,
+        cast(ExceptionHandler, request_validation_error_handler),
+    )
     app.add_exception_handler(TimeoutError, timeout_error_handler)
     app.add_exception_handler(asyncio.TimeoutError, timeout_error_handler)
     app.add_exception_handler(httpx.TimeoutException, timeout_error_handler)
-    app.add_exception_handler(httpx.RequestError, dependency_error_handler)
-    app.add_exception_handler(FileNotFoundError, missing_resource_error_handler)
-    app.add_exception_handler(ServiceError, service_error_handler)
+    app.add_exception_handler(
+        httpx.RequestError,
+        cast(ExceptionHandler, dependency_error_handler),
+    )
+    app.add_exception_handler(
+        FileNotFoundError,
+        cast(ExceptionHandler, missing_resource_error_handler),
+    )
+    app.add_exception_handler(ServiceError, cast(ExceptionHandler, service_error_handler))
     app.add_exception_handler(Exception, unhandled_error_handler)
 

@@ -3,6 +3,7 @@ from __future__ import annotations
 from domain.keys import (
     AccessKeyResponse,
     ProviderName,
+    normalize_provider_name,
 )
 from repositories.serialization.access_keys import AccessKeySerializer
 from repositories.schemas.models import AccessKey, ResearchAccessKey
@@ -17,7 +18,7 @@ class AccessKeyService:
     def to_response(row: AccessKey | ResearchAccessKey) -> AccessKeyResponse:
         return AccessKeyResponse(
             id=int(row.id),
-            provider=row.provider,
+            provider=normalize_provider_name(str(row.provider)),
             is_active=bool(row.is_active),
             fingerprint=str(row.fingerprint),
             created_at=row.created_at,

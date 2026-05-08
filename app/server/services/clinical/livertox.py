@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from collections.abc import Callable, Iterable, Iterator
 from types import SimpleNamespace
-from typing import Any
+from typing import Any, cast
 
 import pandas as pd
 from services.text.normalization import coerce_text
@@ -418,7 +418,7 @@ class LiverToxData:
 
     # -------------------------------------------------------------------------
     @staticmethod
-    def row_tie_break_key(row: dict[str, Any]) -> tuple[str, str]:
+    def row_tie_break_key(row: dict[str, Any]) -> tuple[str, str, str]:
         drug_name = (coerce_text(row.get("drug_name")) or "~").casefold()
         monograph_key = (coerce_text(row.get("monograph_key")) or "").casefold()
         stable_key = (coerce_text(row.get("stable_key")) or "").casefold()
@@ -455,10 +455,13 @@ class LiverToxData:
         required = {"drug_name", "ingredient", "brand_name"}
         if not required.issubset(dataset.columns):
             return None
-        alias = dataset[list(required)].copy()
-        alias = alias.dropna(subset=["drug_name"])
+        alias = cast(pd.DataFrame, dataset[list(required)].copy())
+        alias = cast(pd.DataFrame, alias.dropna(subset=["drug_name"]))
         alias = alias.replace("Not available", pd.NA)
-        alias = alias.dropna(how="all", subset=["ingredient", "brand_name"])
+        alias = cast(
+            pd.DataFrame,
+            alias.dropna(how="all", subset=["ingredient", "brand_name"]),
+        )
         return alias.reset_index(drop=True)
 
     # -------------------------------------------------------------------------
