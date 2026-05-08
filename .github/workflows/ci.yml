@@ -8,7 +8,7 @@ on:
   pull_request:
 
 jobs:
-  python-sanity:
+  backend:
     runs-on: ubuntu-latest
     steps:
       - name: Checkout
@@ -16,6 +16,24 @@ jobs:
       - name: Setup Python
         uses: actions/setup-python@v5
         with:
-          python-version: '3.x'
-      - name: Sanity
-        run: python -c "print('CI sanity check passed')"
+          python-version: '3.14'
+      - name: Install backend
+        working-directory: app/server
+        run: python -m pip install -e ".[test]"
+      - name: Compile backend
+        working-directory: app/server
+        run: python -m compileall .
+      - name: Check backend constraints
+        run: python app/server/scripts/check_backend_constraints.py
+      - name: Lint backend
+        working-directory: app/server
+        run: ruff check .
+      - name: Type check backend
+        working-directory: app/server
+        run: pyright .
+      - name: Test backend
+        working-directory: app/server
+        run: pytest ../tests
+      - name: Validate OpenAPI generation
+        working-directory: app/server
+        run: python -c "from app import app; app.openapi()"

@@ -1,0 +1,36 @@
+<div [class]="className">
+  @if (isCompact) {
+    <button
+      class="model-config-provider-button"
+      type="button"
+      (click)="manageKeys.emit()"
+      [disabled]="disabled"
+    >
+      <span>{{ label }}</span>
+      <span class="model-config-provider-hint">{{ hint }}</span>
+    </button>
+  } @else {
+    <button
+      class="model-config-provider-button"
+      type="button"
+      (click)="select.emit()"
+      [disabled]="disabled"
+    >
+      <span>{{ label }}</span>
+    </button>
+  }
+  <button
+    class="model-config-provider-key"
+    type="button"
+    (click)="manageKeys.emit()"
+    [disabled]="disabled"
+    [attr.aria-label]="manageKeyAriaLabel"
+  >
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+      <circle cx="7.5" cy="12" r="2.5" />
+      <path d="M10 12h10" />
+      <path d="M16 12v3" />
+      <path d="M19 12v2" />
+    </svg>
+  </button>
+</div>

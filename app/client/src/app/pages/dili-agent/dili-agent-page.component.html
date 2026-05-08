@@ -1,0 +1,149 @@
+<main class="page-container stitch-dili-page">
+  <div class="stitch-dili-grid">
+    <section class="stitch-dili-main stitch-dili-workbench">
+      <div class="stitch-dili-input-grid">
+        <div class="stitch-dili-input-group stitch-dili-input-group--wide">
+          <h3>
+            <svg class="stitch-dili-label-icon" viewBox="0 0 24 24" aria-hidden="true">
+              <path
+                fill="currentColor"
+                d="M7 2.75A2.75 2.75 0 0 0 4.25 5.5v13A2.75 2.75 0 0 0 7 21.25h10A2.75 2.75 0 0 0 19.75 18.5v-8.9a2.75 2.75 0 0 0-.807-1.943l-4.6-4.6A2.75 2.75 0 0 0 12.4 2.75H7Zm5.05 1.5 4.45 4.45c.16.16.26.36.3.57H13A1.25 1.25 0 0 1 11.75 8V4.26c.12.02.23.06.3.12ZM7 4.25h3.25V8A2.75 2.75 0 0 0 13 10.75h3.75v7.75A1.25 1.25 0 0 1 15.5 19.75H7a1.25 1.25 0 0 1-1.25-1.25v-13A1.25 1.25 0 0 1 7 4.25Z"
+              />
+            </svg>
+            Clinical Input
+          </h3>
+          <textarea
+            id="clinical-input"
+            aria-label="Clinical Input"
+            class="stitch-dili-input-unified"
+            [placeholder]="clinicalInputTemplate"
+            [ngModel]="vm.form.clinicalInput"
+            (ngModelChange)="handleFormChange('clinicalInput', $event)"
+          ></textarea>
+        </div>
+      </div>
+    </section>
+
+    <aside class="stitch-dili-sidebar">
+      <section class="stitch-dili-patient">
+        <div class="stitch-dili-patient-top">
+          <button
+            type="button"
+            class="stitch-dili-avatar stitch-dili-avatar-button"
+            (click)="openPatientImagePicker()"
+            aria-label="Upload patient profile image"
+            title="Upload patient profile image"
+          >
+            @if (patientImageDataUrl) {
+              <img [src]="patientImageDataUrl" alt="Patient profile preview" class="stitch-dili-avatar-image" />
+            } @else {
+              <span aria-hidden="true">{{ patientNameLabel.charAt(0).toUpperCase() }}</span>
+            }
+          </button>
+          <input
+            #patientImageInput
+            type="file"
+            accept="image/*"
+            class="inspection-folder-input"
+            aria-label="Patient profile image file picker"
+            (change)="handlePatientImageSelection($event)"
+          />
+          <div>
+            <h3>{{ patientNameLabel }}</h3>
+            <p>Recorded: {{ recordedDateLabel }}</p>
+          </div>
+        </div>
+
+        <div class="stitch-dili-inline-fields">
+          <div class="field">
+            <label class="field-label" for="patient-name">Patient Name</label>
+            <input
+              id="patient-name"
+              type="text"
+              placeholder="e.g., Marco Rossi"
+              [ngModel]="vm.form.patientName"
+              (ngModelChange)="handleFormChange('patientName', $event)"
+            />
+          </div>
+          <div class="field">
+            <label class="field-label" for="visit-date">Visit Date</label>
+            <input
+              id="visit-date"
+              type="date"
+              lang="en-CA"
+              [max]="todayIso"
+              [ngModel]="vm.form.visitDate"
+              (ngModelChange)="handleVisitDateChange($event)"
+            />
+          </div>
+        </div>
+
+        <div class="stitch-dili-controls">
+          <p>Retrieval Controls</p>
+          <label class="toggle-row">
+            <input
+              type="checkbox"
+              [ngModel]="vm.form.useRag"
+              (ngModelChange)="handleFormChange('useRag', $event)"
+            />
+            <span class="toggle-label">Internal RAG</span>
+          </label>
+          <label class="toggle-row">
+            <input
+              type="checkbox"
+              [ngModel]="vm.form.useWebSearch"
+              (ngModelChange)="handleFormChange('useWebSearch', $event)"
+            />
+            <span class="toggle-label">Web Search</span>
+          </label>
+        </div>
+
+        <div class="stitch-dili-actions">
+          <button class="btn btn-primary" type="button" [disabled]="isCancelling() || vm.isStarting || isRunActionLocked()" (click)="runOrStop()">
+            @if (vm.isRunning) {
+              {{ vm.isStarting || isRunActionLocked() ? 'Starting...' : (isCancelling() ? 'Stopping...' : 'Stop analysis') }}
+            } @else {
+              Run DILI analysis
+            }
+          </button>
+          <button class="stitch-dili-clear" type="button" (click)="clearAll()" [disabled]="vm.isRunning">
+            Clear all
+          </button>
+        </div>
+      </section>
+
+    </aside>
+  </div>
+
+  <section class="report-section stitch-dili-report">
+    <div class="report-shell stitch-dili-report-shell" [class.is-full-page]="vm.isExpanded" [attr.aria-expanded]="vm.isExpanded">
+      <div class="report-toolbar">
+        <p class="report-toolbar-label">DILI Assessment</p>
+        <button class="toolbar-btn" type="button" (click)="copyReport()" [disabled]="!vm.exportUrl">
+          Copy
+        </button>
+        @if (vm.isExpanded) {
+          <button class="toolbar-btn" type="button" (click)="collapseReport()" [disabled]="!vm.exportUrl">Collapse</button>
+        } @else {
+          <button class="toolbar-btn" type="button" (click)="toggleReportExpanded()" [disabled]="!vm.exportUrl">Expand</button>
+        }
+        <button class="toolbar-btn" type="button" (click)="downloadReport()" [disabled]="!vm.exportUrl">
+          Download markdown
+        </button>
+      </div>
+
+      <div class="report-content" [class.is-expanded]="vm.isExpanded">
+        @if (showSpinner) {
+          <div class="session-spinner" role="status" aria-live="polite">
+            <div class="spinner-wheel"></div>
+            <p class="spinner-label">
+              {{ (vm.jobStageMessage || 'Generating report') + (vm.jobProgress > 0 ? ('... ' + (vm.jobProgress | number:'1.0-0') + '%') : '...') }}
+            </p>
+          </div>
+        } @else {
+          <article id="rendered-report-content" class="report-markdown inspection-excerpt-text" [innerHTML]="renderedReport().html"></article>
+        }
+      </div>
+    </div>
+  </section>
+</main>

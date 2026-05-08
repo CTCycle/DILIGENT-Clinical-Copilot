@@ -1,15 +1,15 @@
 # Project-specific generated/runtime artifacts
-DILIGENT/resources/sources/archives/**
-DILIGENT/resources/sources/documents/**
-DILIGENT/resources/sources/vectors/**
-DILIGENT/resources/logs/**
-DILIGENT/client/node_modules/
-DILIGENT/client/dist/
-DILIGENT/client/dist-ssr/
-DILIGENT/client/logs/
-DILIGENT/client/src-tauri/r/
-DILIGENT/client/src-tauri/target/
-DILIGENT/client/src-tauri/gen/
+app/resources/sources/archives/**
+app/resources/sources/documents/**
+app/resources/sources/vectors/**
+app/resources/logs/**
+app/client/node_modules/
+app/client/dist/
+app/client/dist-ssr/
+app/client/logs/
+app/client/src-tauri/r/
+app/client/src-tauri/target/
+app/client/src-tauri/gen/
 release/windows/
 runtimes/**
 
@@ -58,4 +58,5 @@ Cargo.toml
 *.gz
 
 !.gitkeep
+
 

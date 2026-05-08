@@ -1,6 +1,6 @@
 # DILIGENT Clinical Copilot User Manual
 
-Last updated: 2026-04-08
+Last updated: 2026-05-03
 
 This manual describes practical use of DILIGENT Clinical Copilot for clinical DILI assessment workflows.
 
@@ -21,7 +21,7 @@ Typical local URLs:
 - Frontend UI: `http://127.0.0.1:7861`
 - Backend API: `http://127.0.0.1:8000`
 
-Desktop packaged mode is available through Tauri builds. See `assets/docs/PACKAGING_AND_RUNTIME_MODES.md`.
+Desktop packaged mode is available through Tauri builds. See `assets/docs/RUNTIME_MODES.md`.
 
 ## 3. Primary user journeys
 
@@ -89,6 +89,10 @@ release\tauri\build_with_tauri.bat
 
 ## 5. Usage patterns and best practices
 
+- Clinical input textbox accepts plain text only.
+- Recommended section headings are `Anamnesis`, `Drugs`, and `Lab analysis`.
+- Numbered headings and Markdown headings are supported.
+- Additional heading aliases are supported through seeded section-title vocabulary.
 - Enter complete medication timing details before running analysis.
 - Provide structured, clinically specific lab context to improve pattern derivation.
 - Treat missing-core-field warnings as blockers and resolve before re-running.
@@ -119,4 +123,9 @@ release\tauri\build_with_tauri.bat
 - `README.md` for installation and setup overview.
 - `assets/docs/ARCHITECTURE.md` for module boundaries and data flow.
 - `assets/docs/BACKGROUND_JOBS.md` for job behavior.
-- `assets/docs/PACKAGING_AND_RUNTIME_MODES.md` for local/desktop runtime modes.
+- `assets/docs/RUNTIME_MODES.md` for local/desktop runtime modes.
+
+- Report output is formatted in-app; downloads remain raw Markdown (.md).
+- Copy action includes formatted HTML with plain-text fallback.
+- Expanded report opens a full-page reading view.
+- RUCAM may be unavailable when criteria-level evidence is insufficient; explicit trusted-source RUCAM scores are used directly when present.

@@ -1,0 +1,378 @@
+from __future__ import annotations
+
+from typing import Any
+
+import pandas as pd
+import pytest
+from sqlalchemy import create_engine, select
+from sqlalchemy.orm import sessionmaker
+
+from repositories.serialization.data import DataSerializer
+from repositories.schemas.models import (
+    Base,
+    Drug,
+    DrugAlias,
+    DrugRxnormCode,
+    LiverToxMonograph,
+    TextNormalizationTerm,
+)
+from repositories.serialization.text_normalization import TextNormalizationVocabularySerializer
+from services.updater.livertox_core import LiverToxUpdater
+
+
+# -----------------------------------------------------------------------------
+def build_serializer() -> tuple[Any, Any]:
+    engine = create_engine("sqlite+pysqlite:///:memory:", future=True)
+    Base.metadata.create_all(engine)
+    serializer = DataSerializer(engine=engine)
+    return serializer, engine
+
+
+# -----------------------------------------------------------------------------
+def fetch_counts(engine: Any) -> tuple[int, int, int, int]:
+    factory = sessionmaker(bind=engine, future=True)
+    with factory() as db_session:
+        drugs = len(db_session.execute(select(Drug)).scalars().all())
+        rxcui_codes = len(db_session.execute(select(DrugRxnormCode)).scalars().all())
+        aliases = len(db_session.execute(select(DrugAlias)).scalars().all())
+        monographs = len(db_session.execute(select(LiverToxMonograph)).scalars().all())
+    return drugs, rxcui_codes, aliases, monographs
+
+
+# -----------------------------------------------------------------------------
+def test_rxnav_upsert_idempotent_twice() -> None:
+    serializer, engine = build_serializer()
+    payload = [
+        {
+            "rxcui": "100",
+            "raw_name": "Acetaminophen [Tylenol] 500 MG Tablet",
+            "term_type": "SCD",
+            "name": "Acetaminophen",
+            "brand_names": "Tylenol",
+            "synonyms": '["Paracetamol"]',
+        },
+        {
+            "rxcui": "200",
+            "raw_name": "Ibuprofen 200 MG Tablet",
+            "term_type": "SCD",
+            "name": "Ibuprofen",
+            "brand_names": "Advil",
+            "synonyms": '["Advil"]',
+        },
+    ]
+
+    serializer.upsert_drugs_catalog_records(payload)
+    first_counts = fetch_counts(engine)
+    serializer.upsert_drugs_catalog_records(payload)
+    second_counts = fetch_counts(engine)
+
+    assert first_counts == second_counts
+
+
+# -----------------------------------------------------------------------------
+def test_rxnav_upsert_allows_multiple_rxcui_for_same_canonical() -> None:
+    serializer, engine = build_serializer()
+    payload = [
+        {
+            "rxcui": "1098122",
+            "raw_name": "0.35 ML chondroitin sulfates 40 MG/ML / sodium hyaluronate 30 MG/ML Prefilled Syringe",
+            "term_type": "SCD",
+            "name": "chondroitin hyaluronate",
+            "brand_names": None,
+            "synonyms": '["chondroitin hyaluronate"]',
+        },
+        {
+            "rxcui": "1098124",
+            "raw_name": "0.35 ML chondroitin sulfates 40 MG/ML / sodium hyaluronate 30 MG/ML Prefilled Syringe [Viscoat]",
+            "term_type": "SBD",
+            "name": "chondroitin hyaluronate",
+            "brand_names": "Viscoat",
+            "synonyms": '["chondroitin hyaluronate"]',
+        },
+    ]
+
+    serializer.upsert_drugs_catalog_records(payload)
+
+    factory = sessionmaker(bind=engine, future=True)
+    with factory() as db_session:
+        drugs = db_session.execute(select(Drug)).scalars().all()
+        rxcui_codes = db_session.execute(select(DrugRxnormCode)).scalars().all()
+
+    assert len(drugs) == 1
+    assert sorted(code.rxcui for code in rxcui_codes) == ["1098122", "1098124"]
+
+
+# -----------------------------------------------------------------------------
+def test_rxnav_upsert_persists_curated_aliases_with_separate_provenance() -> None:
+    serializer, engine = build_serializer()
+    payload = [
+        {
+            "rxcui": "860975",
+            "raw_name": "Metformin 500 MG Tablet",
+            "term_type": "SCD",
+            "name": "Metformin",
+            "brand_names": None,
+            "synonyms": "[]",
+        }
+    ]
+    curated_aliases = {
+        "metformin": [
+            ("Metformina", "synonym"),
+            ("Glucophage", "brand"),
+        ]
+    }
+
+    serializer.upsert_drugs_catalog_records(
+        payload,
+        curated_aliases_by_canonical=curated_aliases,
+    )
+
+    factory = sessionmaker(bind=engine, future=True)
+    with factory() as db_session:
+        aliases = (
+            db_session.execute(
+                select(DrugAlias).order_by(DrugAlias.alias_kind, DrugAlias.alias)
+            )
+            .scalars()
+            .all()
+        )
+
+    curated = [alias for alias in aliases if alias.source == "curated"]
+    assert len(curated) == 2
+    assert {(row.alias, row.alias_kind) for row in curated} == {
+        ("Glucophage", "brand"),
+        ("Metformina", "synonym"),
+    }
+    assert all(row.source == "curated" for row in curated)
+
+
+# -----------------------------------------------------------------------------
+def test_rxnav_upsert_commits_by_interval() -> None:
+    serializer, engine = build_serializer()
+    factory = sessionmaker(bind=engine, future=True)
+
+    with factory() as db_session:
+        serializer.ensure_drug(
+            db_session,
+            canonical_name="Drug One",
+            canonical_name_norm="drug one",
+            rxnorm_rxcui="111",
+            livertox_nbk_id=None,
+        )
+        serializer.ensure_drug(
+            db_session,
+            canonical_name="Drug Two",
+            canonical_name_norm="drug two",
+            rxnorm_rxcui="222",
+            livertox_nbk_id=None,
+        )
+        db_session.commit()
+
+    payload = [
+        {
+            "rxcui": "001",
+            "raw_name": "Drug Three 10 MG Tablet",
+            "term_type": "SCD",
+            "name": "Drug Three",
+            "brand_names": None,
+            "synonyms": "[]",
+        },
+        {
+            "rxcui": "111",
+            "raw_name": "Drug Two 20 MG Tablet",
+            "term_type": "SCD",
+            "name": "Drug Two",
+            "brand_names": None,
+            "synonyms": "[]",
+        },
+    ]
+
+    with pytest.raises(RuntimeError):
+        serializer.upsert_drugs_catalog_records(payload, commit_interval=1)
+
+    with factory() as db_session:
+        drugs = db_session.execute(select(Drug)).scalars().all()
+
+    assert len(drugs) == 3
+
+
+# -----------------------------------------------------------------------------
+def test_livertox_upsert_idempotent_twice() -> None:
+    serializer, engine = build_serializer()
+    frame = pd.DataFrame(
+        [
+            {
+                "drug_name": "Acetaminophen",
+                "nbk_id": pd.NA,
+                "ingredient": "Acetaminophen",
+                "brand_name": "Tylenol",
+                "synonyms": "Paracetamol",
+                "excerpt": "LiverTox excerpt",
+                "likelihood_score": "A",
+                "last_update": "2025-01-01",
+                "reference_count": 10,
+                "year_approved": 1955,
+                "agent_classification": "Drug",
+                "primary_classification": "Analgesic",
+                "secondary_classification": "Acetanilide",
+                "include_in_livertox": "yes",
+                "source_url": "https://example.test/livertox",
+                "source_last_modified": "2025-01-01",
+            }
+        ]
+    )
+
+    serializer.save_livertox_records(frame)
+    first_counts = fetch_counts(engine)
+    serializer.save_livertox_records(frame)
+    second_counts = fetch_counts(engine)
+
+    assert first_counts == second_counts
+
+
+# -----------------------------------------------------------------------------
+def test_livertox_duplicate_nbk_is_nulled() -> None:
+    serializer, _ = build_serializer()
+    updater = LiverToxUpdater(sources_path=".", redownload=False, serializer=serializer)
+    frame = pd.DataFrame(
+        [
+            {
+                "drug_name": "Drug Alpha",
+                "nbk_id": "NBK547852",
+                "ingredient": pd.NA,
+                "brand_name": pd.NA,
+                "synonyms": pd.NA,
+                "excerpt": "Excerpt A",
+                "source_url": "https://example.test/a",
+                "source_last_modified": "2025-01-01",
+                "last_update": "2025-01-01",
+            },
+            {
+                "drug_name": "Drug Beta",
+                "nbk_id": "NBK547852",
+                "ingredient": pd.NA,
+                "brand_name": pd.NA,
+                "synonyms": pd.NA,
+                "excerpt": "Excerpt B",
+                "source_url": "https://example.test/b",
+                "source_last_modified": "2025-01-02",
+                "last_update": "2025-01-02",
+            },
+        ]
+    )
+
+    finalized = updater.finalize_dataset(frame)
+
+    assert finalized["nbk_id"].isna().all()
+
+
+# -----------------------------------------------------------------------------
+def test_livertox_does_not_match_by_nbk() -> None:
+    serializer, engine = build_serializer()
+    factory = sessionmaker(bind=engine, future=True)
+    with factory() as db_session:
+        existing = serializer.ensure_drug(
+            db_session,
+            canonical_name="Drug Alpha",
+            canonical_name_norm="drug alpha",
+            rxnorm_rxcui=None,
+            livertox_nbk_id="NBK999999",
+        )
+        existing_id = int(existing.id)
+        db_session.commit()
+
+    with factory() as db_session:
+        created = serializer.ensure_drug(
+            db_session,
+            canonical_name="Drug Beta",
+            canonical_name_norm="drug beta",
+            rxnorm_rxcui=None,
+            livertox_nbk_id="NBK999999",
+            use_livertox_nbk_lookup=False,
+        )
+        db_session.commit()
+        assert int(created.id) != existing_id
+
+    with factory() as db_session:
+        drugs = db_session.execute(select(Drug).order_by(Drug.id)).scalars().all()
+        assert len(drugs) == 2
+        assert drugs[0].livertox_nbk_id == "NBK999999"
+        assert drugs[1].livertox_nbk_id is None
+
+
+# -----------------------------------------------------------------------------
+def test_ensure_drug_conflict_raises() -> None:
+    serializer, engine = build_serializer()
+    factory = sessionmaker(bind=engine, future=True)
+
+    with factory() as db_session:
+        serializer.ensure_drug(
+            db_session,
+            canonical_name="Drug One",
+            canonical_name_norm="drug one",
+            rxnorm_rxcui="111",
+            livertox_nbk_id=None,
+        )
+        serializer.ensure_drug(
+            db_session,
+            canonical_name="Drug Two",
+            canonical_name_norm="drug two",
+            rxnorm_rxcui=None,
+            livertox_nbk_id=None,
+        )
+        db_session.commit()
+
+    with factory() as db_session:
+        with pytest.raises(RuntimeError):
+            serializer.ensure_drug(
+                db_session,
+                canonical_name="Drug Two",
+                canonical_name_norm="drug two",
+                rxnorm_rxcui="111",
+                livertox_nbk_id=None,
+            )
+        db_session.rollback()
+
+    with factory() as db_session:
+        rows = db_session.execute(select(Drug)).scalars().all()
+        assert len(rows) == 2
+
+
+def test_text_normalization_seed_includes_section_title_alias_categories() -> None:
+    _, engine = build_serializer()
+    factory = sessionmaker(bind=engine, future=True)
+    vocabulary = TextNormalizationVocabularySerializer(engine=engine, session_factory=factory)
+    vocabulary.ensure_seeded()
+
+    categories = [
+        "section_title_alias_anamnesis",
+        "section_title_alias_drugs",
+        "section_title_alias_laboratory_analysis",
+    ]
+
+    with factory() as db_session:
+        rows = (
+            db_session.execute(
+                select(TextNormalizationTerm).where(
+                    TextNormalizationTerm.category.in_(categories),
+                    TextNormalizationTerm.is_active.is_(True),
+                )
+            )
+            .scalars()
+            .all()
+        )
+
+    assert rows
+    by_category = {category: [row for row in rows if row.category == category] for category in categories}
+    for category in categories:
+        assert by_category[category]
+        assert all(row.replacement is None for row in by_category[category])
+
+    all_terms = {row.term_norm for row in rows}
+    assert "anamnesis" in all_terms
+    assert "drugs" in all_terms
+    assert "lab analysis" in all_terms
+    assert "anamnesi" in all_terms
+    assert "farmaci" in all_terms
+    assert "analisi di laboratorio" in all_terms
+

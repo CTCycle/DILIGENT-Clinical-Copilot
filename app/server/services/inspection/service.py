@@ -1,0 +1,1097 @@
+from __future__ import annotations
+
+import asyncio
+from datetime import date, datetime, UTC
+from functools import partial
+from pathlib import Path
+import re
+import time
+from threading import Lock
+from typing import Any, Literal
+
+from common.constants import (
+    ARCHIVES_PATH,
+    DOCS_PATH,
+    DOCUMENT_SUPPORTED_EXTENSIONS,
+    VECTOR_DB_PATH,
+)
+from common.utils.logger import logger
+from configurations.llm_configs import LLMRuntimeConfig
+from configurations.startup import server_settings
+from domain.inspection import InspectionJobPhase
+from domain.patient_timeline import (
+    PatientTimeline,
+    PatientTimelineEvent,
+)
+from repositories.serialization.data import (
+    DataSerializer,
+    DocumentSerializer,
+)
+from repositories.vectors import LanceVectorDatabase
+from services.clinical.timeline import PatientTimelineExtractor
+from services.runtime.jobs import JobManager
+from services.inspection.runtime import (
+    coerce_optional_str,
+)
+from services.updater.embeddings import RagEmbeddingUpdater
+from services.updater.livertox_core import LiverToxUpdater
+from services.updater.rxnav_builder import RxNavDrugCatalogBuilder
+from services.updater.rxnav_client import RxNavClient
+from repositories.serialization.text_normalization import (
+    TextNormalizationVocabularySerializer,
+)
+from services.text.vocabulary import (
+    invalidate_text_normalization_snapshot,
+)
+
+PhaseStep = tuple[InspectionJobPhase, int, int, str]
+UpdateTarget = Literal["rxnav", "livertox", "rag"]
+
+
+###############################################################################
+class DataInspectionProgressReporter:
+    def __init__(self, *, service: "DataInspectionService", job_id: str) -> None:
+        self.service = service
+        self.job_id = job_id
+
+    # -------------------------------------------------------------------------
+    def __call__(self, progress: float, message: str) -> None:
+        self.service.report_job_progress(
+            job_id=self.job_id,
+            progress=progress,
+            message=message,
+        )
+
+
+###############################################################################
+class DataInspectionService:
+    RXNAV_JOB_TYPE = "rxnav_update"
+    LIVERTOX_JOB_TYPE = "livertox_update"
+    RAG_JOB_TYPE = "rag_update"
+    UPDATE_PHASES: dict[UpdateTarget, list[PhaseStep]] = {
+        "rxnav": [
+            ("configuration_accepted", 1, 7, "Configuration accepted"),
+            ("update_started", 2, 7, "Update started"),
+            ("source_data_loading", 3, 7, "Downloading source catalog data"),
+            ("processing_extraction", 4, 7, "Loading aliases and synonyms"),
+            ("persistence_indexing", 5, 7, "Persisting catalog updates"),
+            ("finalization", 6, 7, "Finalizing RxNav update"),
+            ("completed", 7, 7, "RxNav update completed"),
+        ],
+        "livertox": [
+            ("configuration_accepted", 1, 7, "Configuration accepted"),
+            ("update_started", 2, 7, "Update started"),
+            ("source_data_loading", 3, 7, "Loading archive and source metadata"),
+            ("processing_extraction", 4, 7, "Extracting and processing monographs"),
+            ("persistence_indexing", 5, 7, "Persisting extracted LiverTox data"),
+            ("finalization", 6, 7, "Finalizing LiverTox update"),
+            ("completed", 7, 7, "LiverTox update completed"),
+        ],
+        "rag": [
+            ("configuration_accepted", 1, 7, "Configuration accepted"),
+            ("update_started", 2, 7, "Update started"),
+            ("source_data_loading", 3, 7, "Loading RAG source documents"),
+            ("processing_extraction", 4, 7, "Chunking and embedding documents"),
+            ("persistence_indexing", 5, 7, "Persisting embeddings and index state"),
+            ("finalization", 6, 7, "Finalizing vector store update"),
+            ("completed", 7, 7, "RAG embeddings update completed"),
+        ],
+    }
+
+    def __init__(
+        self,
+        *,
+        serializer: DataSerializer | None = None,
+        timeline_extractor: PatientTimelineExtractor | None = None,
+        jobs: JobManager,
+    ) -> None:
+        self.serializer = serializer or DataSerializer()
+        self.timeline_extractor = timeline_extractor or PatientTimelineExtractor()
+        self.jobs = jobs
+        self.timeline_generation_lock = Lock()
+        self.timeline_generation_inflight: set[int] = set()
+        self.timeline_generation_cooldown_until: dict[int, float] = {}
+
+    # -------------------------------------------------------------------------
+    def load_runtime_config(self) -> dict[str, Any]:
+        return server_settings.model_dump()
+
+    def list_text_normalization_terms(
+        self, category: str | None = None
+    ) -> list[dict[str, Any]]:
+        vocabulary = TextNormalizationVocabularySerializer(
+            engine=self.serializer.engine,
+            session_factory=self.serializer.session_factory,
+        )
+        session = self.serializer.session_factory()
+        try:
+            rows = vocabulary.list_terms(session, category=category)
+            return [
+                {
+                    "id": row.id,
+                    "category": row.category,
+                    "term": row.term,
+                    "replacement": row.replacement,
+                    "source": row.source,
+                    "encounter_count": int(row.encounter_count or 0),
+                    "is_active": bool(row.is_active),
+                }
+                for row in rows
+            ]
+        finally:
+            session.close()
+
+    def upsert_text_normalization_term(
+        self,
+        *,
+        category: str,
+        term: str,
+        replacement: str | None,
+        source: str,
+        is_active: bool,
+    ) -> dict[str, Any]:
+        vocabulary = TextNormalizationVocabularySerializer(
+            engine=self.serializer.engine,
+            session_factory=self.serializer.session_factory,
+        )
+        session = self.serializer.session_factory()
+        try:
+            vocabulary.upsert_term(
+                session,
+                category=category,
+                term=term,
+                replacement=replacement,
+                source=source,
+            )
+            vocabulary.set_term_active(
+                session,
+                category=category,
+                term=term,
+                is_active=is_active,
+            )
+            session.commit()
+            invalidate_text_normalization_snapshot()
+            rows = vocabulary.list_terms(session, category=category)
+            term_norm = term.strip().lower()
+            for row in rows:
+                if row.term.strip().lower() == term_norm:
+                    return {
+                        "id": row.id,
+                        "category": row.category,
+                        "term": row.term,
+                        "replacement": row.replacement,
+                        "source": row.source,
+                        "encounter_count": int(row.encounter_count or 0),
+                        "is_active": bool(row.is_active),
+                    }
+            raise RuntimeError("Term upsert did not return persisted row")
+        except Exception:
+            session.rollback()
+            raise
+        finally:
+            session.close()
+
+    def deactivate_text_normalization_term(self, *, category: str, term: str) -> bool:
+        vocabulary = TextNormalizationVocabularySerializer(
+            engine=self.serializer.engine,
+            session_factory=self.serializer.session_factory,
+        )
+        session = self.serializer.session_factory()
+        try:
+            updated = vocabulary.set_term_active(
+                session,
+                category=category,
+                term=term,
+                is_active=False,
+            )
+            if updated:
+                session.commit()
+                invalidate_text_normalization_snapshot()
+            else:
+                session.rollback()
+            return updated
+        finally:
+            session.close()
+
+    # -------------------------------------------------------------------------
+    def build_update_config_response(self, target: UpdateTarget) -> dict[str, Any]:
+        config = self.load_runtime_config()
+        if target == "rxnav":
+            source = config.get("external_data", {})
+            defaults = {
+                "rxnav_request_timeout": float(
+                    source.get(
+                        "rxnav_request_timeout",
+                        server_settings.external_data.rxnav_request_timeout,
+                    )
+                ),
+                "rxnav_max_concurrency": int(
+                    source.get(
+                        "rxnav_max_concurrency",
+                        server_settings.external_data.rxnav_max_concurrency,
+                    )
+                ),
+            }
+            allowed_fields = list(defaults.keys())
+        elif target == "livertox":
+            source = config.get("external_data", {})
+            defaults = {
+                "livertox_monograph_max_workers": int(
+                    source.get(
+                        "livertox_monograph_max_workers",
+                        server_settings.external_data.livertox_monograph_max_workers,
+                    )
+                ),
+                "livertox_archive": str(
+                    source.get(
+                        "livertox_archive",
+                        server_settings.external_data.livertox_archive,
+                    )
+                ),
+                "redownload": False,
+            }
+            allowed_fields = list(defaults.keys())
+        else:
+            source = config.get("rag", {})
+            defaults = {
+                "documents_path": str(source.get("documents_path", DOCS_PATH)),
+                "chunk_size": int(
+                    source.get("chunk_size", server_settings.rag.chunk_size)
+                ),
+                "chunk_overlap": int(
+                    source.get("chunk_overlap", server_settings.rag.chunk_overlap)
+                ),
+                "embedding_batch_size": int(
+                    source.get(
+                        "embedding_batch_size", server_settings.rag.embedding_batch_size
+                    )
+                ),
+                "vector_stream_batch_size": int(
+                    source.get(
+                        "vector_stream_batch_size",
+                        server_settings.rag.vector_stream_batch_size,
+                    )
+                ),
+                "embedding_max_workers": int(
+                    source.get(
+                        "embedding_max_workers",
+                        server_settings.rag.embedding_max_workers,
+                    )
+                ),
+                "embedding_backend": str(
+                    source.get(
+                        "embedding_backend", server_settings.rag.embedding_backend
+                    )
+                ),
+                "ollama_embedding_model": str(
+                    source.get(
+                        "ollama_embedding_model",
+                        server_settings.rag.ollama_embedding_model,
+                    )
+                ),
+                "hf_embedding_model": str(
+                    source.get(
+                        "hf_embedding_model", server_settings.rag.hf_embedding_model
+                    )
+                ),
+                "cloud_provider": str(
+                    source.get("cloud_provider", server_settings.rag.cloud_provider)
+                ),
+                "cloud_embedding_model": str(
+                    source.get(
+                        "cloud_embedding_model",
+                        server_settings.rag.cloud_embedding_model,
+                    )
+                ),
+                "use_cloud_embeddings": bool(
+                    source.get(
+                        "use_cloud_embeddings", server_settings.rag.use_cloud_embeddings
+                    )
+                ),
+                "reset_vector_collection": bool(
+                    source.get(
+                        "reset_vector_collection",
+                        server_settings.rag.reset_vector_collection,
+                    )
+                ),
+            }
+            allowed_fields = list(defaults.keys())
+
+        return {
+            "target": target,
+            "defaults": defaults,
+            "allowed_fields": allowed_fields,
+        }
+
+    # -------------------------------------------------------------------------
+    def list_sessions(
+        self,
+        *,
+        search: str | None,
+        status_filter: str | None,
+        date_mode: str | None,
+        filter_date: date | None,
+        offset: int,
+        limit: int,
+    ) -> dict[str, Any]:
+        items, total = self.serializer.list_sessions(
+            search=search,
+            status_filter=status_filter,
+            date_mode=date_mode,
+            filter_date=filter_date,
+            offset=offset,
+            limit=limit,
+        )
+        return {
+            "items": items,
+            "total": total,
+            "offset": max(int(offset), 0),
+            "limit": max(int(limit), 1),
+        }
+
+    # -------------------------------------------------------------------------
+    def get_session_report(self, session_id: int) -> str | None:
+        return self.serializer.get_session_report(session_id)
+
+    # -------------------------------------------------------------------------
+    def delete_session(self, session_id: int) -> bool:
+        return self.serializer.delete_session(session_id)
+
+    # -------------------------------------------------------------------------
+    def get_session_timeline(self, session_id: int) -> PatientTimeline | None:
+        payload = self.serializer.get_session_result_payload(session_id)
+        if not isinstance(payload, dict):
+            return None
+        timeline_payload = payload.get("patient_timeline")
+        if not isinstance(timeline_payload, dict):
+            return None
+        try:
+            return PatientTimeline.model_validate(timeline_payload)
+        except Exception as exc:  # noqa: BLE001
+            logger.warning(
+                "Invalid persisted timeline payload for session_id=%s: %s",
+                session_id,
+                exc,
+            )
+            return None
+
+    # -------------------------------------------------------------------------
+    def generate_session_timeline(
+        self,
+        session_id: int,
+        *,
+        force_regenerate: bool = False,
+    ) -> PatientTimeline | None:
+        safe_session_id = int(session_id)
+        now = time.monotonic()
+        with self.timeline_generation_lock:
+            cooldown_until = self.timeline_generation_cooldown_until.get(
+                safe_session_id, 0.0
+            )
+            if now < cooldown_until:
+                raise RuntimeError(
+                    "Timeline regeneration is cooling down. Please wait a few seconds and retry."
+                )
+            if safe_session_id in self.timeline_generation_inflight:
+                raise RuntimeError(
+                    "Timeline regeneration is already in progress for this session."
+                )
+            self.timeline_generation_inflight.add(safe_session_id)
+        if not force_regenerate:
+            cached = self.get_session_timeline(session_id)
+            if cached is not None:
+                with self.timeline_generation_lock:
+                    self.timeline_generation_inflight.discard(safe_session_id)
+                return cached
+        try:
+            source = self.serializer.get_session_timeline_source(session_id)
+            if source is None:
+                return None
+            session_payload = source.get("session_result_payload")
+            if not isinstance(session_payload, dict):
+                session_payload = {}
+            runtime_settings = session_payload.get("runtime_settings")
+            if not isinstance(runtime_settings, dict):
+                runtime_settings = {}
+
+            timeline_timeout_s = max(
+                20.0,
+                min(
+                    300.0,
+                    float(getattr(self.timeline_extractor, "timeout_s", 90.0)) + 20.0,
+                ),
+            )
+            text_extraction_model = coerce_optional_str(
+                runtime_settings.get("text_extraction_model")
+            ) or coerce_optional_str(source.get("text_extraction_model"))
+            clinical_model = coerce_optional_str(
+                runtime_settings.get("clinical_model")
+            ) or coerce_optional_str(source.get("clinical_model"))
+            requested_runtime_settings = {
+                # Use the single persisted runtime configuration applied at startup/runtime.
+                "use_cloud_services": LLMRuntimeConfig.is_cloud_enabled(),
+                "llm_provider": LLMRuntimeConfig.get_llm_provider(),
+                "cloud_model": LLMRuntimeConfig.get_cloud_model(),
+                "text_extraction_model": LLMRuntimeConfig.get_text_extraction_model()
+                or text_extraction_model,
+                "clinical_model": LLMRuntimeConfig.get_clinical_model()
+                or clinical_model,
+                "ollama_temperature": LLMRuntimeConfig.get_ollama_temperature(),
+                "cloud_temperature": LLMRuntimeConfig.get_cloud_temperature(),
+                "ollama_reasoning": LLMRuntimeConfig.is_ollama_reasoning_enabled(),
+            }
+
+            try:
+                timeline = asyncio.run(
+                    asyncio.wait_for(
+                        self.timeline_extractor.extract_timeline(
+                            session_id=session_id,
+                            source_payload=source,
+                            runtime_settings=requested_runtime_settings,
+                        ),
+                        timeout=timeline_timeout_s,
+                    )
+                )
+            except Exception as exc:  # noqa: BLE001
+                logger.warning(
+                    "Timeline extraction unavailable for session_id=%s, using deterministic fallback: %s",
+                    session_id,
+                    exc,
+                )
+                timeline = self.build_fallback_timeline(
+                    session_id=safe_session_id,
+                    source=source,
+                )
+
+            session_payload["runtime_settings"] = {
+                "use_cloud_services": (
+                    requested_runtime_settings["use_cloud_services"]
+                    if requested_runtime_settings["use_cloud_services"] is not None
+                    else LLMRuntimeConfig.is_cloud_enabled()
+                ),
+                "llm_provider": (
+                    requested_runtime_settings["llm_provider"]
+                    if requested_runtime_settings["llm_provider"]
+                    else LLMRuntimeConfig.get_llm_provider()
+                ),
+                "cloud_model": (
+                    requested_runtime_settings["cloud_model"]
+                    if requested_runtime_settings["cloud_model"]
+                    else LLMRuntimeConfig.get_cloud_model()
+                ),
+                "text_extraction_model": (
+                    requested_runtime_settings["text_extraction_model"]
+                    if requested_runtime_settings["text_extraction_model"]
+                    else LLMRuntimeConfig.get_text_extraction_model()
+                ),
+                "clinical_model": (
+                    requested_runtime_settings["clinical_model"]
+                    if requested_runtime_settings["clinical_model"]
+                    else LLMRuntimeConfig.get_clinical_model()
+                ),
+                "ollama_temperature": (
+                    requested_runtime_settings["ollama_temperature"]
+                    if requested_runtime_settings["ollama_temperature"] is not None
+                    else LLMRuntimeConfig.get_ollama_temperature()
+                ),
+                "cloud_temperature": (
+                    requested_runtime_settings["cloud_temperature"]
+                    if requested_runtime_settings["cloud_temperature"] is not None
+                    else LLMRuntimeConfig.get_cloud_temperature()
+                ),
+                "ollama_reasoning": (
+                    requested_runtime_settings["ollama_reasoning"]
+                    if requested_runtime_settings["ollama_reasoning"] is not None
+                    else LLMRuntimeConfig.is_ollama_reasoning_enabled()
+                ),
+            }
+            session_payload["patient_timeline"] = timeline.model_dump(mode="json")
+            self.serializer.upsert_session_result_payload(session_id, session_payload)
+            with self.timeline_generation_lock:
+                self.timeline_generation_cooldown_until.pop(safe_session_id, None)
+            return timeline
+        finally:
+            with self.timeline_generation_lock:
+                self.timeline_generation_inflight.discard(safe_session_id)
+
+    # -------------------------------------------------------------------------
+    def build_fallback_timeline(
+        self,
+        *,
+        session_id: int,
+        source: dict[str, Any],
+    ) -> PatientTimeline:
+        events: list[PatientTimelineEvent] = []
+        visit_date = self.first_iso_date(source.get("visit_date"))
+
+        drugs_text = self.normalize_text(source.get("drugs"))
+        if drugs_text:
+            events.append(
+                PatientTimelineEvent(
+                    event_id="therapy-1",
+                    title="Therapy context",
+                    description=drugs_text[:450],
+                    event_type="therapy",
+                    timing_type="relative",
+                    event_date=visit_date,
+                    extracted_timing_text=visit_date,
+                    source="fallback_parser",
+                    source_evidence=drugs_text[:1000],
+                    sort_order=10,
+                )
+            )
+
+        anamnesis_text = self.normalize_text(source.get("anamnesis"))
+        if anamnesis_text:
+            events.append(
+                PatientTimelineEvent(
+                    event_id="disease-1",
+                    title="Clinical symptom context",
+                    description=anamnesis_text[:450],
+                    event_type="disease",
+                    timing_type="relative",
+                    event_date=visit_date,
+                    extracted_timing_text=visit_date,
+                    source="fallback_parser",
+                    source_evidence=anamnesis_text[:1000],
+                    sort_order=20,
+                )
+            )
+
+        labs_text = self.normalize_text(source.get("laboratory_analysis"))
+        if labs_text:
+            marker = self.extract_lab_marker(labs_text)
+            events.append(
+                PatientTimelineEvent(
+                    event_id="lab-1",
+                    title=marker or "Laboratory findings",
+                    description=labs_text[:450],
+                    event_type="lab",
+                    timing_type="explicit_date" if visit_date else "relative",
+                    event_date=visit_date,
+                    extracted_timing_text=visit_date,
+                    source="fallback_parser",
+                    source_evidence=labs_text[:1000],
+                    sort_order=30,
+                )
+            )
+
+        if not events:
+            events.append(
+                PatientTimelineEvent(
+                    event_id="other-1",
+                    title="Session clinical context",
+                    description="Structured timeline was unavailable; fallback summary retained.",
+                    event_type="other",
+                    timing_type="uncertain",
+                    source="fallback_parser",
+                    source_evidence="No structured timeline-relevant fields were available.",
+                    sort_order=100,
+                )
+            )
+
+        return PatientTimeline(
+            session_id=session_id,
+            generated_at=datetime.now(UTC),
+            events=events,
+        )
+
+    # -------------------------------------------------------------------------
+    def normalize_text(self, value: Any) -> str | None:
+        if not isinstance(value, str):
+            return None
+        normalized = " ".join(value.split()).strip()
+        return normalized or None
+
+    # -------------------------------------------------------------------------
+    def first_iso_date(self, value: Any) -> str | None:
+        text = self.normalize_text(value)
+        if not text:
+            return None
+        matched = re.search(r"\b\d{4}-\d{2}-\d{2}\b", text)
+        return matched.group(0) if matched else None
+
+    # -------------------------------------------------------------------------
+    def extract_lab_marker(self, text: str) -> str | None:
+        matched = re.search(
+            r"\b(ALT|AST|ALP|TBIL|DBIL|GGT)\b[^.;,\n]*", text, re.IGNORECASE
+        )
+        if not matched:
+            return None
+        return matched.group(0).strip()[:120]
+
+    # -------------------------------------------------------------------------
+    def list_rxnav_catalog(
+        self,
+        *,
+        search: str | None,
+        offset: int,
+        limit: int,
+    ) -> dict[str, Any]:
+        items, total = self.serializer.list_rxnav_catalog(
+            search=search,
+            offset=offset,
+            limit=limit,
+        )
+        return {
+            "items": items,
+            "total": total,
+            "offset": max(int(offset), 0),
+            "limit": max(int(limit), 1),
+        }
+
+    # -------------------------------------------------------------------------
+    def get_rxnav_alias_groups(self, drug_id: int) -> dict[str, Any] | None:
+        return self.serializer.get_rxnav_alias_groups(drug_id)
+
+    # -------------------------------------------------------------------------
+    def list_livertox_catalog(
+        self,
+        *,
+        search: str | None,
+        offset: int,
+        limit: int,
+    ) -> dict[str, Any]:
+        items, total = self.serializer.list_livertox_catalog(
+            search=search,
+            offset=offset,
+            limit=limit,
+        )
+        return {
+            "items": items,
+            "total": total,
+            "offset": max(int(offset), 0),
+            "limit": max(int(limit), 1),
+        }
+
+    # -------------------------------------------------------------------------
+    def get_livertox_excerpt(self, drug_id: int) -> dict[str, Any] | None:
+        return self.serializer.get_livertox_excerpt(drug_id)
+
+    # -------------------------------------------------------------------------
+    def delete_drug(self, drug_id: int) -> bool:
+        return self.serializer.delete_drug_with_cleanup(drug_id)
+
+    # -------------------------------------------------------------------------
+    def list_rag_documents(
+        self,
+        *,
+        search: str | None,
+        offset: int,
+        limit: int,
+    ) -> dict[str, Any]:
+        serializer = DocumentSerializer(DOCS_PATH)
+        items: list[dict[str, Any]] = []
+        supported_ext = {entry.lower() for entry in DOCUMENT_SUPPORTED_EXTENSIONS}
+        for path in serializer.collect_document_paths():
+            file_path = Path(path)
+            suffix = file_path.suffix.lower()
+            try:
+                stat = file_path.stat()
+                modified = datetime.fromtimestamp(stat.st_mtime, UTC).isoformat()
+                size = int(stat.st_size)
+            except OSError:
+                modified = datetime.fromtimestamp(0, UTC).isoformat()
+                size = 0
+            items.append(
+                {
+                    "path": str(file_path),
+                    "file_name": file_path.name,
+                    "extension": suffix,
+                    "file_size": size,
+                    "last_modified": modified,
+                    "supported_for_ingestion": suffix in supported_ext,
+                }
+            )
+        items.sort(key=lambda item: str(item["path"]).casefold())
+        normalized_search = (search or "").strip().casefold()
+        if normalized_search:
+            items = [
+                item
+                for item in items
+                if normalized_search in str(item["file_name"]).casefold()
+                or normalized_search in str(item["path"]).casefold()
+                or normalized_search in str(item["extension"]).casefold()
+            ]
+
+        total = len(items)
+        bounded_offset = max(int(offset), 0)
+        bounded_limit = max(int(limit), 1)
+        paged = items[bounded_offset : bounded_offset + bounded_limit]
+        return {
+            "items": paged,
+            "total": total,
+            "offset": bounded_offset,
+            "limit": bounded_limit,
+        }
+
+    # -------------------------------------------------------------------------
+    def get_rag_vector_store_summary(self) -> dict[str, Any]:
+        config = self.load_runtime_config()
+        rag_cfg = config.get("rag", {}) if isinstance(config, dict) else {}
+        documents_path = str(rag_cfg.get("documents_path", DOCS_PATH))
+        collection_name = str(
+            rag_cfg.get(
+                "vector_collection_name", server_settings.rag.vector_collection_name
+            )
+        )
+        vector_db = LanceVectorDatabase(
+            database_path=VECTOR_DB_PATH,
+            collection_name=collection_name,
+            metric=server_settings.rag.vector_index_metric,
+            index_type=server_settings.rag.vector_index_type,
+            stream_batch_size=server_settings.rag.vector_stream_batch_size,
+        )
+        exists = vector_db.has_collection()
+        embedding_count = 0
+        distinct_document_count = 0
+        embedding_dimension: int | None = None
+        if exists:
+            try:
+                vector_db.get_table()
+                embedding_count = vector_db.count_embeddings()
+                distinct_document_count = vector_db.count_distinct_documents()
+                embedding_dimension = vector_db.read_embedding_dimension()
+                if embedding_count > 0:
+                    vector_db.ensure_vector_index()
+            except Exception as exc:  # noqa: BLE001
+                logger.warning("Unable to load LanceDB inspection summary: %s", exc)
+        return {
+            "source_documents_path": documents_path,
+            "vector_db_path": VECTOR_DB_PATH,
+            "collection_name": collection_name,
+            "collection_exists": exists,
+            "embedding_count": embedding_count,
+            "distinct_document_count": distinct_document_count,
+            "embedding_dimension": embedding_dimension,
+            "index_ready": bool(vector_db.index_ready) if exists else False,
+            "configured_metric": server_settings.rag.vector_index_metric,
+            "configured_index_type": server_settings.rag.vector_index_type,
+        }
+
+    # -------------------------------------------------------------------------
+    def patch_job_result(self, *, job_id: str, patch: dict[str, Any]) -> None:
+        self.jobs.update_result(job_id, patch)
+
+    # -------------------------------------------------------------------------
+    def report_job_progress(
+        self, *, job_id: str, progress: float, message: str
+    ) -> None:
+        bounded_progress = min(100.0, max(0.0, float(progress)))
+        self.jobs.update_progress(job_id, bounded_progress)
+        self.patch_job_result(job_id=job_id, patch={"progress_message": message})
+
+    # -------------------------------------------------------------------------
+    def report_phase(
+        self,
+        *,
+        job_id: str,
+        phase: InspectionJobPhase,
+        step_index: int,
+        step_count: int,
+        progress: float,
+        message: str,
+    ) -> None:
+        self.jobs.update_progress(job_id, min(100.0, max(0.0, float(progress))))
+        self.patch_job_result(
+            job_id=job_id,
+            patch={
+                "phase": phase,
+                "step_index": step_index,
+                "step_count": step_count,
+                "progress_message": message,
+            },
+        )
+
+    # -------------------------------------------------------------------------
+    def report_phase_by_target(
+        self,
+        *,
+        job_id: str,
+        target: UpdateTarget,
+        phase: InspectionJobPhase,
+        progress: float,
+        fallback_message: str,
+    ) -> None:
+        step = next(
+            (entry for entry in self.UPDATE_PHASES[target] if entry[0] == phase),
+            None,
+        )
+        if step is None:
+            self.report_job_progress(
+                job_id=job_id, progress=progress, message=fallback_message
+            )
+            return
+        self.report_phase(
+            job_id=job_id,
+            phase=step[0],
+            step_index=step[1],
+            step_count=step[2],
+            progress=progress,
+            message=step[3] or fallback_message,
+        )
+
+    # -------------------------------------------------------------------------
+    def run_rxnav_update_job(
+        self, job_id: str, overrides: dict[str, Any] | None = None
+    ) -> dict[str, Any]:
+        stop_check = partial(self.jobs.should_stop, job_id)
+        progress_callback = DataInspectionProgressReporter(service=self, job_id=job_id)
+        override_values = overrides or {}
+        self.report_phase_by_target(
+            job_id=job_id,
+            target="rxnav",
+            phase="configuration_accepted",
+            progress=1.0,
+            fallback_message="Configuration accepted",
+        )
+        if stop_check():
+            return {}
+        self.report_phase_by_target(
+            job_id=job_id,
+            target="rxnav",
+            phase="update_started",
+            progress=4.0,
+            fallback_message="RxNav update started",
+        )
+        self.report_phase_by_target(
+            job_id=job_id,
+            target="rxnav",
+            phase="source_data_loading",
+            progress=10.0,
+            fallback_message="Downloading source catalog data",
+        )
+        rx_client = RxNavClient(
+            request_timeout=override_values.get("rxnav_request_timeout"),
+            max_concurrency=override_values.get("rxnav_max_concurrency"),
+        )
+        builder = RxNavDrugCatalogBuilder(
+            serializer=self.serializer,
+            rx_client=rx_client,
+        )
+        self.report_phase_by_target(
+            job_id=job_id,
+            target="rxnav",
+            phase="processing_extraction",
+            progress=20.0,
+            fallback_message="Processing aliases and synonyms",
+        )
+        result = builder.update_drug_catalog(
+            progress_callback=progress_callback,
+            should_stop=stop_check,
+        )
+        self.report_phase_by_target(
+            job_id=job_id,
+            target="rxnav",
+            phase="persistence_indexing",
+            progress=88.0,
+            fallback_message="Persisting catalog updates",
+        )
+        self.report_phase_by_target(
+            job_id=job_id,
+            target="rxnav",
+            phase="finalization",
+            progress=96.0,
+            fallback_message="Finalizing update",
+        )
+        self.report_phase_by_target(
+            job_id=job_id,
+            target="rxnav",
+            phase="completed",
+            progress=100.0,
+            fallback_message="Completed",
+        )
+        return {"summary": result}
+
+    # -------------------------------------------------------------------------
+    def run_livertox_update_job(
+        self, job_id: str, overrides: dict[str, Any] | None = None
+    ) -> dict[str, Any]:
+        stop_check = partial(self.jobs.should_stop, job_id)
+        progress_callback = DataInspectionProgressReporter(service=self, job_id=job_id)
+        override_values = overrides or {}
+        self.report_phase_by_target(
+            job_id=job_id,
+            target="livertox",
+            phase="configuration_accepted",
+            progress=1.0,
+            fallback_message="Configuration accepted",
+        )
+        if stop_check():
+            return {}
+        self.report_phase_by_target(
+            job_id=job_id,
+            target="livertox",
+            phase="update_started",
+            progress=4.0,
+            fallback_message="LiverTox update started",
+        )
+        updater = LiverToxUpdater(
+            ARCHIVES_PATH,
+            redownload=bool(override_values.get("redownload", False)),
+            serializer=self.serializer,
+            archive_name=override_values.get("livertox_archive"),
+            monograph_max_workers=override_values.get("livertox_monograph_max_workers"),
+        )
+        self.report_phase_by_target(
+            job_id=job_id,
+            target="livertox",
+            phase="source_data_loading",
+            progress=10.0,
+            fallback_message="Loading source archive",
+        )
+        result = updater.update_from_livertox(
+            progress_callback=progress_callback,
+            should_stop=stop_check,
+        )
+        self.report_phase_by_target(
+            job_id=job_id,
+            target="livertox",
+            phase="persistence_indexing",
+            progress=88.0,
+            fallback_message="Persisting extracted data",
+        )
+        self.report_phase_by_target(
+            job_id=job_id,
+            target="livertox",
+            phase="finalization",
+            progress=96.0,
+            fallback_message="Finalizing update",
+        )
+        self.report_phase_by_target(
+            job_id=job_id,
+            target="livertox",
+            phase="completed",
+            progress=100.0,
+            fallback_message="Completed",
+        )
+        return {"summary": result}
+
+    # -------------------------------------------------------------------------
+    def run_rag_update_job(
+        self, job_id: str, overrides: dict[str, Any] | None = None
+    ) -> dict[str, Any]:
+        stop_check = partial(self.jobs.should_stop, job_id)
+        override_values = overrides or {}
+        self.report_phase_by_target(
+            job_id=job_id,
+            target="rag",
+            phase="configuration_accepted",
+            progress=1.0,
+            fallback_message="Configuration accepted",
+        )
+        if stop_check():
+            return {}
+        self.report_phase_by_target(
+            job_id=job_id,
+            target="rag",
+            phase="update_started",
+            progress=4.0,
+            fallback_message="RAG update started",
+        )
+        updater = RagEmbeddingUpdater(
+            documents_path=override_values.get("documents_path"),
+            use_cloud_embeddings=override_values.get("use_cloud_embeddings"),
+            cloud_provider=override_values.get("cloud_provider"),
+            cloud_embedding_model=override_values.get("cloud_embedding_model"),
+            chunk_size=override_values.get("chunk_size"),
+            chunk_overlap=override_values.get("chunk_overlap"),
+            embedding_batch_size=override_values.get("embedding_batch_size"),
+            vector_stream_batch_size=override_values.get("vector_stream_batch_size"),
+            embedding_max_workers=override_values.get("embedding_max_workers"),
+            embedding_backend=override_values.get("embedding_backend"),
+            ollama_embedding_model=override_values.get("ollama_embedding_model"),
+            hf_embedding_model=override_values.get("hf_embedding_model"),
+            reset_vector_collection=override_values.get("reset_vector_collection"),
+        )
+        self.report_phase_by_target(
+            job_id=job_id,
+            target="rag",
+            phase="source_data_loading",
+            progress=12.0,
+            fallback_message="Loading source documents",
+        )
+        updater.prepare_vector_database()
+        if stop_check():
+            return {}
+        self.report_phase_by_target(
+            job_id=job_id,
+            target="rag",
+            phase="processing_extraction",
+            progress=30.0,
+            fallback_message="Generating embeddings",
+        )
+        result = updater.refresh_embeddings()
+        self.report_phase_by_target(
+            job_id=job_id,
+            target="rag",
+            phase="persistence_indexing",
+            progress=90.0,
+            fallback_message="Persisting embeddings and index",
+        )
+        self.report_phase_by_target(
+            job_id=job_id,
+            target="rag",
+            phase="finalization",
+            progress=96.0,
+            fallback_message="Finalizing update",
+        )
+        self.report_phase_by_target(
+            job_id=job_id,
+            target="rag",
+            phase="completed",
+            progress=100.0,
+            fallback_message="Completed",
+        )
+        backend = (
+            "cloud" if bool(override_values.get("use_cloud_embeddings")) else "local"
+        )
+        result_with_backend = {**result, "backend": backend}
+        return {"summary": result_with_backend}
+
+    # -------------------------------------------------------------------------
+    def start_update_job(
+        self, job_type: str, overrides: dict[str, Any] | None = None
+    ) -> dict[str, Any]:
+        if self.jobs.is_job_running(job_type):
+            raise ValueError(f"Job type '{job_type}' is already running")
+        override_values = dict(overrides or {})
+        if job_type == self.RXNAV_JOB_TYPE:
+            runner = partial(self.run_rxnav_update_job, overrides=override_values)
+        elif job_type == self.LIVERTOX_JOB_TYPE:
+            runner = partial(self.run_livertox_update_job, overrides=override_values)
+        elif job_type == self.RAG_JOB_TYPE:
+            runner = partial(self.run_rag_update_job, overrides=override_values)
+        else:
+            raise ValueError(f"Unsupported job type: {job_type}")
+        job_id = self.jobs.start_job(job_type=job_type, runner=runner)
+        status_payload = self.jobs.get_job_status(job_id)
+        if status_payload is None:
+            raise RuntimeError(f"Failed to initialize {job_type} job")
+        return status_payload
+
+    # -------------------------------------------------------------------------
+    def get_job_status(
+        self, job_id: str, *, expected_type: str
+    ) -> dict[str, Any] | None:
+        payload = self.jobs.get_job_status(job_id)
+        if payload is None:
+            return None
+        job_type = str(payload.get("job_type") or "")
+        if job_type != expected_type:
+            logger.warning(
+                "Job type mismatch for %s: expected %s, got %s",
+                job_id,
+                expected_type,
+                job_type,
+            )
+            return None
+        return payload
+
+    # -------------------------------------------------------------------------
+    def cancel_job(self, job_id: str, *, expected_type: str) -> bool:
+        payload = self.get_job_status(job_id, expected_type=expected_type)
+        if payload is None:
+            return False
+        return self.jobs.cancel_job(job_id)
+
