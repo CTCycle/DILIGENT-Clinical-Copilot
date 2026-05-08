@@ -1,0 +1,42 @@
+{
+  "text_extraction_model_choices": [
+    "qwen3:1.7b",
+    "qwen3:8b",
+    "qwen3:14b",
+    "llama3.1:8b",
+    "mistral-nemo:12b",
+    "gemma2:9b",
+    "phi3.5:mini",
+    "phi3:medium"
+  ],
+  "clinical_model_choices": [
+    "gpt-oss:20b",
+    "llama3.1:8b",
+    "llama3.1:70b",
+    "phi3.5:mini",
+    "phi3.5:moe",
+    "deepseek-r1:14b",
+    "alibayram/medgemma:4b",
+    "alibayram/medgemma:27b",
+    "gemma3:9b",
+    "gemma3:27b"
+  ],
+  "openai_cloud_models": [
+    "gpt-5.4",
+    "gpt-5.4-pro",
+    "gpt-5.4-mini",
+    "gpt-5.4-nano",
+    "gpt-5.2",
+    "gpt-5.2-pro",
+    "gpt-5",
+    "gpt-5-mini",
+    "gpt-5-nano",
+    "gpt-4.1",
+    "gpt-4.1-mini"
+  ],
+  "gemini_cloud_models": [
+    "gemini-2.5-pro",
+    "gemini-2.5-flash",
+    "gemini-2.5-flash-lite"
+  ]
+}
