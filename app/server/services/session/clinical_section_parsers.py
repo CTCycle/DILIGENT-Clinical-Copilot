@@ -28,6 +28,7 @@ ANAMNESIS_ALIASES = {
 THERAPY_ALIASES = {
     "therapy",
     "therapies",
+    "current therapy",
     "drugs",
     "current drugs",
     "current medications",
@@ -92,6 +93,29 @@ def find_section_markers(text: str) -> list[SectionMarker]:
                     marker_end=match.end(),
                 )
             )
+    # Also support standalone heading lines without markdown/colon markers,
+    # e.g. "Anamnesis" followed by section content on next lines.
+    offset = 0
+    for raw_line in text.splitlines(keepends=True):
+        line = raw_line.strip()
+        line_key = _map_title_to_key(line)
+        if (
+            line_key is not None
+            and line
+            and not line.startswith(("-", "*", "+"))
+            and ":" not in line
+        ):
+            marker_start = offset + raw_line.find(line)
+            marker_end = marker_start + len(line)
+            markers.append(
+                SectionMarker(
+                    key=line_key,
+                    title=line,
+                    marker_start=marker_start,
+                    marker_end=marker_end,
+                )
+            )
+        offset += len(raw_line)
     unique: dict[tuple[int, int, ClinicalSectionKey], SectionMarker] = {}
     for marker in markers:
         unique[(marker.marker_start, marker.marker_end, marker.key)] = marker
@@ -128,4 +152,3 @@ def validate_sections_against_source(text: str, sections: dict[ClinicalSectionKe
         if not normalized_value or normalized_value not in normalized_source:
             return False
     return True
-
