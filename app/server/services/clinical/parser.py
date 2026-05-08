@@ -5,7 +5,7 @@ import re
 import unicodedata
 from collections.abc import Callable
 from datetime import date
-from typing import Any, Literal
+from typing import Any, Literal, cast
 
 from services.llm.prompts import (
     ANAMNESIS_DRUG_EXTRACTION_PROMPT,
@@ -982,8 +982,9 @@ class DrugsParser:
         )
         normalized.source = source
         normalized.historical_flag = historical_flag
-        normalized.temporal_classification = self.derive_temporal_classification(
-            normalized
+        normalized.temporal_classification = cast(
+            Literal["temporal_known", "temporal_uncertain"] | None,
+            self.derive_temporal_classification(normalized),
         )
         return normalized
 

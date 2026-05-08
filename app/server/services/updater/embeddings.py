@@ -5,7 +5,7 @@ import os
 from configurations.startup import server_settings
 from common.constants import DOCS_PATH, VECTOR_DB_PATH
 from common.utils.logger import logger
-from repositories.serialization.data import VectorSerializer
+from repositories.serialization.vectors import VectorSerializer
 from repositories.vectors import LanceVectorDatabase
 
 

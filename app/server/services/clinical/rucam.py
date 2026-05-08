@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import re
 from datetime import date, datetime
-from typing import Any
+from typing import Any, Literal, cast
 
 from domain.clinical.entities import (
     ClinicalLabEntry,
@@ -29,6 +29,21 @@ ALCOHOL_RE = re.compile(r"\b(alcohol|ethanol|wine|beer|abuse)\b", re.IGNORECASE)
 PREGNANCY_RE = re.compile(r"\b(pregnan|gestation|gravida)\b", re.IGNORECASE)
 EXCLUSION_RE = re.compile(r"(viral|hepatitis|serolog|autoimmune|imaging|ultrasound|mr[ci]|ct)\s+(negative|excluded|normal|without)", re.IGNORECASE)
 RUCAM_SCORE_RE = re.compile(r"\brucam\b\s*(?:score)?\s*[:=]?\s*(-?\d{1,2})", re.IGNORECASE)
+
+RucamInjuryType = Literal[
+    "hepatocellular",
+    "cholestatic",
+    "mixed",
+    "indeterminate",
+]
+RucamCausalityCategory = Literal[
+    "excluded",
+    "unlikely",
+    "possible",
+    "probable",
+    "highly probable",
+    "not assessable",
+]
 
 
 class RucamScoreEstimator:
@@ -136,12 +151,12 @@ class RucamScoreEstimator:
 
         return RucamAnchor(onset_date=payload.visit_date, used_alt=None, used_alt_uln=None, used_alp=None, used_alp_uln=None, rationale="No qualifying timeline anchor; visit-date proxy used for context only.", source="visit_proxy", is_score_eligible=False)
 
-    def resolve_injury_type(self, *, pattern_score: HepatotoxicityPatternScore, anchor: RucamAnchor) -> str:
+    def resolve_injury_type(self, *, pattern_score: HepatotoxicityPatternScore, anchor: RucamAnchor) -> RucamInjuryType:
         classification = (pattern_score.classification or "indeterminate").strip().lower()
         if classification == "mixed":
             return "cholestatic"
         if classification in {"hepatocellular", "cholestatic"}:
-            return classification
+            return cast(RucamInjuryType, classification)
         return "indeterminate"
 
     def evaluate_data_sufficiency(self, *, injury_type: str, anchor: RucamAnchor, drug: DrugEntry, lab_timeline: PatientLabTimeline, payload: PatientData, disease_context: PatientDiseaseContext) -> RucamDataSufficiency:
@@ -163,11 +178,11 @@ class RucamScoreEstimator:
 
     def build_not_calculated_assessment(self, *, drug: DrugEntry, injury_type: str, reasons: list[str], report_language: str) -> DrugRucamAssessment:
         limitations = reasons or [phrase("rucam_insufficient_data", report_language)]
-        return DrugRucamAssessment(drug_name=drug.name, injury_type_for_rucam=injury_type, total_score=None, causality_category="not assessable", confidence="low", estimated=False, components=[RucamComponentAssessment(component_key="rucam", label="RUCAM", score=0, status="not_assessable", rationale="; ".join(limitations))], limitations=limitations, summary=phrase("rucam_not_calculated", report_language), calculation_method="not_calculated", score_source=None, data_sufficient=False)
+        return DrugRucamAssessment(drug_name=drug.name, injury_type_for_rucam=cast(RucamInjuryType, injury_type), total_score=None, causality_category="not assessable", confidence="low", estimated=False, components=[RucamComponentAssessment(component_key="rucam", label="RUCAM", score=0, status="not_assessable", rationale="; ".join(limitations))], limitations=limitations, summary=phrase("rucam_not_calculated", report_language), calculation_method="not_calculated", score_source=None, data_sufficient=False)
 
     def build_source_reported_assessment(self, *, drug: DrugEntry, injury_type: str, source: RucamSourceReportedScore, report_language: str) -> DrugRucamAssessment:
         category = source.causality_category or self.resolve_causality_bucket(source.score)
-        return DrugRucamAssessment(drug_name=drug.name, injury_type_for_rucam=injury_type, total_score=source.score, causality_category=category, confidence="moderate", estimated=False, components=[RucamComponentAssessment(component_key="source_reported", label="Source-reported RUCAM", score=source.score, status="scored", evidence=source.evidence, rationale=phrase("rucam_source_reported", report_language))], limitations=[], summary=phrase("rucam_source_reported", report_language), calculation_method="source_reported", score_source=source.source_name, data_sufficient=True)
+        return DrugRucamAssessment(drug_name=drug.name, injury_type_for_rucam=cast(RucamInjuryType, injury_type), total_score=source.score, causality_category=cast(RucamCausalityCategory, category), confidence="moderate", estimated=False, components=[RucamComponentAssessment(component_key="source_reported", label="Source-reported RUCAM", score=source.score, status="scored", evidence=source.evidence, rationale=phrase("rucam_source_reported", report_language))], limitations=[], summary=phrase("rucam_source_reported", report_language), calculation_method="source_reported", score_source=source.source_name, data_sufficient=True)
 
     def estimate_for_drug(self, *, payload: PatientData, drug: DrugEntry, all_drugs: list[DrugEntry], disease_context: PatientDiseaseContext, lab_timeline: PatientLabTimeline, onset_context: LiverInjuryOnsetContext | None, injury_type: str, anchor: RucamAnchor, resolved_item: dict[str, Any], report_language: str = "en") -> DrugRucamAssessment:
         source_reported = self.extract_source_reported_rucam(resolved_item)
@@ -191,7 +206,7 @@ class RucamScoreEstimator:
         total = int(sum(component.score for component in components if component.status == "scored"))
         category = self.resolve_causality_bucket(total)
         summary = phrase("rucam_structured_score", report_language, score=total, category=category)
-        return DrugRucamAssessment(drug_name=drug.name, injury_type_for_rucam=injury_type, total_score=total, causality_category=category, confidence="moderate", estimated=True, components=components, limitations=[], summary=summary, calculation_method="structured_rucam", score_source=None, data_sufficient=True)
+        return DrugRucamAssessment(drug_name=drug.name, injury_type_for_rucam=cast(RucamInjuryType, injury_type), total_score=total, causality_category=cast(RucamCausalityCategory, category), confidence="moderate", estimated=True, components=components, limitations=[], summary=summary, calculation_method="structured_rucam", score_source=None, data_sufficient=True)
 
     def score_time_to_onset(self, *, payload: PatientData, drug: DrugEntry, onset_context: LiverInjuryOnsetContext | None, anchor: RucamAnchor, injury_type: str) -> tuple[RucamComponentAssessment, date | None]:
         _ = injury_type

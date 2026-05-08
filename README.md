@@ -84,7 +84,7 @@ _Scrollable local model catalog with install and role-assignment actions._
 
 #### Provider Access Key Management
 ![Provider key detail](assets/figures/model-detail.png)
-_Brave Search access-key management entry point within the configuration panel._
+_External provider access-key management entry point within the configuration panel._
 
 #### Data Inspection
 ![Data inspection](assets/figures/data-inspection.png)

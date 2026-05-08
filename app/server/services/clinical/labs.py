@@ -451,6 +451,8 @@ class ClinicalLabExtractor:
                 "bilirubina totale/diretta), preserving unit text and available dates."
             )
         parsed: LabExtractionPayload | None = None
+        if self.client is None:
+            raise RuntimeError("LLM client is not initialized for lab extraction")
         for attempt in range(1, self.extraction_retry_attempts + 1):
             try:
                 parsed = await self.client.llm_structured_call(

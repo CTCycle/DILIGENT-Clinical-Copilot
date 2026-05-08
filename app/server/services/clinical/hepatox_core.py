@@ -1333,6 +1333,7 @@ class HepatoxConsultation:
             chat_kwargs["temperature"] = self.temperature
         else:
             chat_kwargs["options"] = {"temperature": self.temperature}
+        raw_response: Any = None
         for attempt in range(1, self.analysis_retry_attempts + 1):
             try:
                 # Ask the clinical model to synthesise findings for this drug
@@ -1656,6 +1657,7 @@ class HepatoxConsultation:
             chat_kwargs["temperature"] = self.temperature
         else:
             chat_kwargs["options"] = {"temperature": self.temperature}
+        raw_response: Any = None
         for attempt in range(1, self.analysis_retry_attempts + 1):
             try:
                 raw_response = await self.llm_client.chat(**chat_kwargs)

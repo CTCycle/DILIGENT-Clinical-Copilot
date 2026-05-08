@@ -17,7 +17,7 @@ from concurrent.futures import (
     wait,
 )
 from datetime import UTC, datetime
-from typing import Any
+from typing import Any, cast
 from collections.abc import Callable
 
 import httpx
@@ -186,15 +186,18 @@ class LiverToxUpdater:
             "Secondary Classification": "secondary_classification",
         }
 
-        data = data.rename(columns=lambda s: re.sub(r"\s+", " ", s).strip())
-        data = data.rename(columns=column_mapping)
+        data = cast(
+            pd.DataFrame,
+            data.rename(columns=lambda s: re.sub(r"\s+", " ", s).strip()),
+        )
+        data = cast(pd.DataFrame, data.rename(columns=column_mapping))
 
         required_columns = list(column_mapping.values())
         for column in required_columns:
             if column not in data.columns:
                 data[column] = pd.NA
 
-        data = data[required_columns]
+        data = cast(pd.DataFrame, data[required_columns])
 
         text_columns = [
             "ingredient",
@@ -206,16 +209,17 @@ class LiverToxUpdater:
             "secondary_classification",
         ]
         for column in text_columns:
-            data[column] = self.clean_master_list_column(data[column])
+            data[column] = self.clean_master_list_column(cast(pd.Series, data[column]))
 
-        data = data.dropna(subset=["chapter_title"])
+        data = cast(pd.DataFrame, data.dropna(subset=["chapter_title"]))
 
         invalid_headers = {
             "ingredient": {"ingredient", "count"},
             "brand_name": {"brand name"},
         }
         for column, values in invalid_headers.items():
-            data = data[~data[column].fillna("").str.lower().isin(values)]
+            column_values = cast(pd.Series, data[column]).fillna("").str.lower()
+            data = cast(pd.DataFrame, data[~column_values.isin(values)])
 
         data["last_update"] = pd.to_datetime(data["last_update"], errors="coerce")
         data["reference_count"] = pd.to_numeric(
@@ -223,7 +227,10 @@ class LiverToxUpdater:
         )
         data["year_approved"] = pd.to_numeric(data["year_approved"], errors="coerce")
 
-        data = data.drop_duplicates(subset=["ingredient", "brand_name"], keep="last")
+        data = cast(
+            pd.DataFrame,
+            data.drop_duplicates(subset=["ingredient", "brand_name"], keep="last"),
+        )
 
         return data.reset_index(drop=True)
 
@@ -781,11 +788,15 @@ class LiverToxUpdater:
         else:
             master = master_frame.copy()
             if "chapter_title" in master.columns:
-                master = master.rename(columns={"chapter_title": "drug_name"})
+                master = cast(
+                    pd.DataFrame,
+                    master.rename(columns={"chapter_title": "drug_name"}),
+                )
             if "drug_name" not in master.columns:
                 master["drug_name"] = pd.NA
-            master["drug_name"] = master["drug_name"].astype(str).str.strip()
-            master = master[master["drug_name"] != ""]
+            master_drug_names = cast(pd.Series, master["drug_name"]).astype(str).str.strip()
+            master["drug_name"] = master_drug_names
+            master = cast(pd.DataFrame, master[master_drug_names != ""])
             for column in base_columns:
                 if column not in master.columns:
                     master[column] = pd.NA
@@ -795,14 +806,14 @@ class LiverToxUpdater:
                 metadata_source_url = master_metadata.get("source_url")
                 metadata_last_modified = master_metadata.get("last_modified")
                 if metadata_source_url is not None:
-                    master["source_url"] = master["source_url"].fillna(
+                    master["source_url"] = cast(pd.Series, master["source_url"]).fillna(
                         metadata_source_url
                     )
                 if metadata_last_modified is not None:
-                    master["source_last_modified"] = master[
-                        "source_last_modified"
-                    ].fillna(metadata_last_modified)
-            master = master[base_columns]
+                    master["source_last_modified"] = cast(
+                        pd.Series, master["source_last_modified"]
+                    ).fillna(metadata_last_modified)
+            master = cast(pd.DataFrame, master[base_columns])
 
         if monographs.empty:
             monograph_df = pd.DataFrame(columns=monograph_columns)
@@ -811,28 +822,31 @@ class LiverToxUpdater:
         for column in monograph_columns:
             if column not in monograph_df.columns:
                 monograph_df[column] = pd.NA
-        monograph_df = monograph_df[monograph_columns]
+        monograph_df = cast(pd.DataFrame, monograph_df[monograph_columns])
 
         if master.empty:
             dataset = monograph_df.copy()
             for column in base_columns:
                 if column not in dataset.columns:
                     dataset[column] = pd.NA
-            dataset = dataset[final_columns]
+            dataset = cast(pd.DataFrame, dataset[final_columns])
             return self.sanitize_unified_dataset(dataset)
 
-        dataset = master.merge(monograph_df, on="drug_name", how="left")
+        dataset = cast(pd.DataFrame, master.merge(monograph_df, on="drug_name", how="left"))
         if not monograph_df.empty:
-            matched = dataset["drug_name"].unique().tolist()
-            unmatched = monograph_df[~monograph_df["drug_name"].isin(matched)]
+            matched = cast(pd.Series, dataset["drug_name"]).unique().tolist()
+            unmatched = cast(
+                pd.DataFrame,
+                monograph_df[~cast(pd.Series, monograph_df["drug_name"]).isin(matched)],
+            )
             if not unmatched.empty:
                 filler = unmatched.copy()
                 for column in base_columns:
                     if column not in filler.columns:
                         filler[column] = pd.NA
-                filler = filler[dataset.columns]
-                dataset = pd.concat([dataset, filler], ignore_index=True)
-        dataset = dataset[final_columns]
+                filler = cast(pd.DataFrame, filler[dataset.columns])
+                dataset = cast(pd.DataFrame, pd.concat([dataset, filler], ignore_index=True))
+        dataset = cast(pd.DataFrame, dataset[final_columns])
         return self.sanitize_unified_dataset(dataset)
 
     # -------------------------------------------------------------------------
@@ -846,34 +860,39 @@ class LiverToxUpdater:
         if frame.empty:
             return frame.copy()
         sanitized = frame.copy()
-        sanitized["drug_name"] = sanitized["drug_name"].astype(str).str.strip()
-        sanitized = sanitized[sanitized["drug_name"] != ""]
-        numeric_mask = sanitized["drug_name"].str.fullmatch(r"\d+")
-        sanitized = sanitized[~numeric_mask]
-        symbol_mask = sanitized["drug_name"].apply(self.contains_symbol)
-        sanitized = sanitized[~symbol_mask]
+        sanitized_drug_names = cast(pd.Series, sanitized["drug_name"]).astype(str).str.strip()
+        sanitized["drug_name"] = sanitized_drug_names
+        sanitized = cast(pd.DataFrame, sanitized[sanitized_drug_names != ""])
+        numeric_mask = cast(pd.Series, sanitized["drug_name"]).str.fullmatch(r"\d+")
+        sanitized = cast(pd.DataFrame, sanitized[~numeric_mask])
+        symbol_mask = cast(pd.Series, sanitized["drug_name"]).apply(self.contains_symbol)
+        sanitized = cast(pd.DataFrame, sanitized[~symbol_mask])
 
         for column in ("ingredient", "brand_name"):
             if column not in sanitized.columns:
                 sanitized[column] = pd.NA
-            sanitized[column] = sanitized[column].where(
-                pd.notnull(sanitized[column]), pd.NA
+            column_values = cast(pd.Series, sanitized[column])
+            sanitized[column] = column_values.where(
+                pd.notnull(column_values), pd.NA
             )
-            sanitized[column] = sanitized[column].astype(str).str.strip()
+            column_values = cast(pd.Series, sanitized[column]).astype(str).str.strip()
+            sanitized[column] = column_values
             sanitized.loc[
-                sanitized[column].isin(["", "nan", "None", "<NA>"]), column
+                column_values.isin(["", "nan", "None", "<NA>"]), column
             ] = pd.NA
-            invalid_mask = sanitized[column].notna() & sanitized[column].apply(
+            column_values = cast(pd.Series, sanitized[column])
+            invalid_mask = column_values.notna() & column_values.apply(
                 self.contains_symbol
             )
             invalid_mask = invalid_mask.fillna(False)
-            sanitized = sanitized[~invalid_mask]
+            sanitized = cast(pd.DataFrame, sanitized[~invalid_mask])
 
-        sanitized["excerpt"] = sanitized["excerpt"].astype(str).str.strip()
+        excerpt_values = cast(pd.Series, sanitized["excerpt"]).astype(str).str.strip()
+        sanitized["excerpt"] = excerpt_values
         sanitized.loc[
-            sanitized["excerpt"].isin(["", "nan", "None", "NaT"]), "excerpt"
+            excerpt_values.isin(["", "nan", "None", "NaT"]), "excerpt"
         ] = pd.NA
-        sanitized.loc[sanitized["excerpt"].isna(), "excerpt"] = pd.NA
+        sanitized.loc[cast(pd.Series, sanitized["excerpt"]).isna(), "excerpt"] = pd.NA
         return sanitized.reset_index(drop=True)
 
     # -----------------------------------------------------------------------------
@@ -1261,16 +1280,20 @@ class LiverToxUpdater:
                 columns=["nbk_id", "drug_name", "excerpt", "synonyms"]
             )
         sanitized = sanitized.copy()
-        sanitized["drug_name"] = sanitized["drug_name"].astype(str).str.strip()
-        sanitized = sanitized[sanitized["drug_name"] != ""]
-        numeric_mask = sanitized["drug_name"].str.fullmatch(r"\d+")
-        sanitized = sanitized[~numeric_mask]
-        sanitized["excerpt"] = sanitized["excerpt"].apply(self.sanitize_excerpt)
+        drug_names = cast(pd.Series, sanitized["drug_name"]).astype(str).str.strip()
+        sanitized["drug_name"] = drug_names
+        sanitized = cast(pd.DataFrame, sanitized[drug_names != ""])
+        numeric_mask = cast(pd.Series, sanitized["drug_name"]).str.fullmatch(r"\d+")
+        sanitized = cast(pd.DataFrame, sanitized[~numeric_mask])
+        sanitized["excerpt"] = cast(pd.Series, sanitized["excerpt"]).apply(
+            self.sanitize_excerpt
+        )
         sanitized.loc[sanitized["excerpt"] == "", "excerpt"] = pd.NA
         if "synonyms" not in sanitized.columns:
             sanitized["synonyms"] = pd.NA
-        sanitized["synonyms"] = sanitized["synonyms"].where(
-            pd.notnull(sanitized["synonyms"]), pd.NA
+        synonyms = cast(pd.Series, sanitized["synonyms"])
+        sanitized["synonyms"] = synonyms.where(
+            pd.notnull(synonyms), pd.NA
         )
         return sanitized.reset_index(drop=True)
 
@@ -1294,14 +1317,16 @@ class LiverToxUpdater:
         for column in finalized.columns:
             if column == "drug_name":
                 continue
-            finalized[column] = finalized[column].where(
-                pd.notnull(finalized[column]), pd.NA
+            column_values = cast(pd.Series, finalized[column])
+            finalized[column] = column_values.where(
+                pd.notnull(column_values), pd.NA
             )
-            finalized[column] = finalized[column].astype(str).str.strip()
+            column_values = cast(pd.Series, finalized[column]).astype(str).str.strip()
+            finalized[column] = column_values
             finalized.loc[
-                finalized[column].isin(["", "nan", "NaT", "None", "<NA>"]), column
+                column_values.isin(["", "nan", "NaT", "None", "<NA>"]), column
             ] = pd.NA
-        finalized["synonyms"] = finalized["synonyms"].apply(
+        finalized["synonyms"] = cast(pd.Series, finalized["synonyms"]).apply(
             lambda value: (
                 value.strip()
                 if isinstance(value, str)
@@ -1310,18 +1335,21 @@ class LiverToxUpdater:
                 else pd.NA
             )
         )
-        finalized["excerpt"] = finalized["excerpt"].astype(str).str.strip()
+        excerpt_values = cast(pd.Series, finalized["excerpt"]).astype(str).str.strip()
+        finalized["excerpt"] = excerpt_values
         finalized.loc[
-            finalized["excerpt"].isin(["", "nan", "NaT", "None", "<NA>"]), "excerpt"
+            excerpt_values.isin(["", "nan", "NaT", "None", "<NA>"]), "excerpt"
         ] = pd.NA
         if "nbk_id" not in finalized.columns:
             finalized["nbk_id"] = pd.NA
-        nbk_series = finalized["nbk_id"].apply(self.normalize_nbk_id)
-        counts = nbk_series.dropna().value_counts()
-        safe_nbk_values = set(counts[counts == 1].index.tolist())
-        safe_mask = nbk_series.isin(safe_nbk_values)
-        nulled_nbk_count = int((nbk_series.notna() & ~safe_mask).sum())
-        safe_nbk_count = int(safe_mask.sum())
+        nbk_series = cast(pd.Series, finalized["nbk_id"]).apply(self.normalize_nbk_id)
+        present_nbk_series = cast(pd.Series, nbk_series.dropna())
+        counts = cast(pd.Series, present_nbk_series.value_counts())
+        unique_counts = cast(pd.Series, counts[counts == 1])
+        safe_nbk_values = set(unique_counts.index.tolist())
+        safe_mask = nbk_series.isin(list(safe_nbk_values))
+        nulled_nbk_count = int(cast(Any, (nbk_series.notna() & ~safe_mask).sum()))
+        safe_nbk_count = int(cast(Any, safe_mask.sum()))
         finalized["nbk_id"] = nbk_series.where(safe_mask, pd.NA)
         logger.info(
             "LiverTox NBK audit: total_rows=%d safe_nbk_count=%d nulled_nbk_count=%d",
