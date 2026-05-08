@@ -95,6 +95,10 @@ from services.text.normalization import normalize_drug_query_name
 ###############################################################################
 class ClinicalSessionService(ClinicalSessionFormattingMixin):
     JOB_TYPE = "clinical"
+    CLOUD_STEP_TIMEOUT_CAP_S = 180.0
+    LOCAL_STEP_TIMEOUT_CAP_S = 1800.0
+    CLOUD_CONSULTATION_TIMEOUT_S = 600.0
+    LOCAL_CONSULTATION_TIMEOUT_S = 3600.0
 
     def __init__(
         self,
@@ -155,6 +159,21 @@ class ClinicalSessionService(ClinicalSessionFormattingMixin):
             start_value=start_value,
             end_value=end_value,
         )
+
+    # -------------------------------------------------------------------------
+    @staticmethod
+    def _resolve_runtime_timeout(
+        *,
+        base_timeout_s: float,
+        cloud_cap_s: float | None = None,
+        local_cap_s: float | None = None,
+    ) -> float:
+        base = max(float(base_timeout_s), 1.0)
+        if LLMRuntimeConfig.is_cloud_enabled():
+            cap = cloud_cap_s if cloud_cap_s is not None else ClinicalSessionService.CLOUD_STEP_TIMEOUT_CAP_S
+        else:
+            cap = local_cap_s if local_cap_s is not None else ClinicalSessionService.LOCAL_STEP_TIMEOUT_CAP_S
+        return min(base, max(float(cap), 1.0))
 
     def apply_persisted_runtime_configuration(self) -> None:
         self.model_config_service.ensure_defaults()
@@ -325,8 +344,8 @@ class ClinicalSessionService(ClinicalSessionFormattingMixin):
             end_value=30.0,
         )
         start_time = time.perf_counter()
-        timeout_s = min(
-            max(float(getattr(self.drugs_parser, "timeout_s", 1.0)), 1.0), 120.0
+        timeout_s = self._resolve_runtime_timeout(
+            base_timeout_s=float(getattr(self.drugs_parser, "timeout_s", 1.0))
         )
         try:
             therapy_drugs = await asyncio.wait_for(
@@ -383,8 +402,8 @@ class ClinicalSessionService(ClinicalSessionFormattingMixin):
             end_value=42.0,
         )
         start_time = time.perf_counter()
-        timeout_s = min(
-            max(float(getattr(self.drugs_parser, "timeout_s", 1.0)), 1.0), 120.0
+        timeout_s = self._resolve_runtime_timeout(
+            base_timeout_s=float(getattr(self.drugs_parser, "timeout_s", 1.0))
         )
         try:
             anamnesis_drugs = await asyncio.wait_for(
@@ -436,21 +455,6 @@ class ClinicalSessionService(ClinicalSessionFormattingMixin):
         self.emit_progress(
             progress_callback, stage="anamnesis_disease_extraction", value=42.0
         )
-        if not LLMRuntimeConfig.is_cloud_enabled():
-            self.append_warning_issue(
-                issues,
-                code="anamnesis_disease_extraction_skipped_local_runtime",
-                message=(
-                    "Disease extraction from anamnesis was skipped in local runtime "
-                    "to avoid long-running model stalls."
-                ),
-                field="anamnesis",
-            )
-            self.emit_progress(
-                progress_callback, stage="anamnesis_disease_extraction", value=48.0
-            )
-            self.run_stop_check(stop_check)
-            return PatientDiseaseContext(entries=[])
         disease_progress_callback = self.build_stage_progress_callback(
             progress_callback,
             stage="anamnesis_disease_extraction",
@@ -460,9 +464,9 @@ class ClinicalSessionService(ClinicalSessionFormattingMixin):
         start_time = time.perf_counter()
         max_attempts = 2
         backoff_seconds = 1.5
-        # Prevent a single local-model stall from blocking the full session for up to
-        # the global LLM timeout (which may be configured to very high values).
-        timeout_s = min(max(float(self.disease_extractor.timeout_s), 1.0), 120.0)
+        timeout_s = self._resolve_runtime_timeout(
+            base_timeout_s=float(self.disease_extractor.timeout_s)
+        )
         for attempt in range(1, max_attempts + 1):
             try:
                 disease_context = await asyncio.wait_for(
@@ -544,49 +548,6 @@ class ClinicalSessionService(ClinicalSessionFormattingMixin):
         self.emit_progress(
             progress_callback, stage="anamnesis_lab_extraction", value=48.0
         )
-        if not LLMRuntimeConfig.is_cloud_enabled():
-            self.append_warning_issue(
-                issues,
-                code="anamnesis_lab_extraction_skipped_local_runtime",
-                message=(
-                    "Longitudinal lab extraction LLM enrichment was skipped in local runtime "
-                    "to avoid long-running model stalls; deterministic lab parsing was used."
-                ),
-                field="anamnesis",
-            )
-            primary_labs_text = self.lab_extractor.clean_text(payload.laboratory_analysis)
-            supplemental_anamnesis_text = self.lab_extractor.clean_text(payload.anamnesis)
-            timeline_entries = self.lab_extractor.extract_entries_from_text(
-                text=primary_labs_text,
-                source="laboratory_analysis",
-                visit_date=payload.visit_date,
-            )
-            timeline_entries.extend(
-                self.lab_extractor.extract_entries_from_text(
-                    text=supplemental_anamnesis_text,
-                    source="anamnesis",
-                    visit_date=payload.visit_date,
-                )
-            )
-            normalized_entries = []
-            seen: set[tuple[str, str, str, str]] = set()
-            for entry in timeline_entries:
-                prepared = self.lab_extractor.normalize_entry(
-                    entry, visit_date=payload.visit_date
-                )
-                if prepared is None:
-                    continue
-                key = self.lab_extractor.dedupe_key(prepared)
-                if key in seen:
-                    continue
-                seen.add(key)
-                normalized_entries.append(prepared)
-            normalized_entries.sort(key=self.lab_extractor.lab_entry_sort_key)
-            self.emit_progress(
-                progress_callback, stage="anamnesis_lab_extraction", value=52.0
-            )
-            self.run_stop_check(stop_check)
-            return PatientLabTimeline(entries=normalized_entries), None
         lab_progress_callback = self.build_stage_progress_callback(
             progress_callback,
             stage="anamnesis_lab_extraction",
@@ -594,8 +555,8 @@ class ClinicalSessionService(ClinicalSessionFormattingMixin):
             end_value=52.0,
         )
         start_time = time.perf_counter()
-        timeout_s = min(
-            max(float(getattr(self.lab_extractor, "timeout_s", 1.0)), 1.0), 120.0
+        timeout_s = self._resolve_runtime_timeout(
+            base_timeout_s=float(getattr(self.lab_extractor, "timeout_s", 1.0))
         )
         try:
             lab_timeline, onset_context = await asyncio.wait_for(
@@ -861,7 +822,11 @@ class ClinicalSessionService(ClinicalSessionFormattingMixin):
             consultation_progress_callback = ClinicalConsultationProgressCallback(
                 progress_callback=progress_callback,
             )
-            consultation_timeout_s = 600.0 if LLMRuntimeConfig.is_cloud_enabled() else 180.0
+            consultation_timeout_s = (
+                self.CLOUD_CONSULTATION_TIMEOUT_S
+                if LLMRuntimeConfig.is_cloud_enabled()
+                else self.LOCAL_CONSULTATION_TIMEOUT_S
+            )
             drug_assessment = await asyncio.wait_for(
                 clinical_session.run_analysis(
                     prepared_inputs=prepared_inputs,
@@ -898,7 +863,7 @@ class ClinicalSessionService(ClinicalSessionFormattingMixin):
             logger.warning(
                 "Clinical LLM timeout for patient '%s' after %.1fs: %s",
                 payload.name or "unknown",
-                600.0 if LLMRuntimeConfig.is_cloud_enabled() else 180.0,
+                consultation_timeout_s,
                 exc,
             )
         except LLMError as exc:
