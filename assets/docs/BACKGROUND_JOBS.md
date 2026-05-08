@@ -1,14 +1,14 @@
 # Background Job Management
 
-Last updated: 2026-04-09
+Last updated: 2026-05-04
 
 DILIGENT uses a centralized thread-based job manager for long-running operations.
 
 ## 1. Core components
 
-- Manager: `DILIGENT/server/services/jobs.py`
-- Shared singleton: `job_manager`
-- API models: `DILIGENT/server/domain/jobs.py`
+- Manager: `app/server/services/runtime/jobs.py`
+- Shared in-process access point: `get_job_manager()`
+- API models: `app/server/domain/jobs.py`
 
 ## 2. Job state contract
 
@@ -33,23 +33,21 @@ Each job tracks:
 ## 4. Active job types and endpoints
 
 - `clinical`
-  - Start: `POST /clinical/jobs`
-  - Poll/cancel: `GET|DELETE /clinical/jobs/{job_id}`
+  - Start: `POST /api/clinical/jobs`
+  - Poll/cancel: `GET|DELETE /api/clinical/jobs/{job_id}`
 - `ollama_pull`
-  - Start: `POST /models/pull/jobs`
-  - Poll/cancel: `GET|DELETE /models/jobs/{job_id}`
+  - Start: `POST /api/models/pull/jobs`
+  - Poll/cancel: `GET|DELETE /api/models/jobs/{job_id}`
 - `rxnav_update`
-  - Start: `POST /inspection/rxnav/jobs`
-  - Poll/cancel: `GET|DELETE /inspection/rxnav/jobs/{job_id}`
+  - Start: `POST /api/inspection/rxnav/jobs`
+  - Poll/cancel: `GET|DELETE /api/inspection/rxnav/jobs/{job_id}`
 - `livertox_update`
-  - Start: `POST /inspection/livertox/jobs`
-  - Poll/cancel: `GET|DELETE /inspection/livertox/jobs/{job_id}`
+  - Start: `POST /api/inspection/livertox/jobs`
+  - Poll/cancel: `GET|DELETE /api/inspection/livertox/jobs/{job_id}`
 - `rag_update`
-  - Start: `POST /inspection/rag/jobs`
-  - Poll: `GET /inspection/rag/jobs/{job_id}`
-  - Cancel: `POST /inspection/rag/jobs/{job_id}/cancel`
-
-Equivalent `/api/*` prefixed routes are always available.
+  - Start: `POST /api/inspection/rag/jobs`
+  - Poll: `GET /api/inspection/rag/jobs/{job_id}`
+  - Cancel: `POST /api/inspection/rag/jobs/{job_id}/cancel`
 
 ## 5. Polling pattern
 
@@ -59,22 +57,25 @@ Standard contract:
 3. Cancel endpoint returns `JobCancelResponse`.
 4. Inspection update jobs may include phase-aware result fields:
    - `phase`, `step_index`, `step_count`, `progress_message`, `summary`.
+5. Inspection updater runners use cooperative cancellation (`should_stop`) and progress callbacks consistently across `rxnav`, `livertox`, and `rag`.
 
-Frontend polling is implemented in `DILIGENT/client/src/app/core/services/api.ts` and stops on terminal states.
+Frontend polling is implemented in `app/client/src/app/core/services/api.ts` and stops on terminal states.
 
 ## 6. Cancellation rules
 
 Cancellation is cooperative:
 - Pending jobs can be set to `cancelled` immediately.
 - Running jobs receive `stop_requested=True`.
-- Runner code must check `job_manager.should_stop(job_id)` at safe checkpoints.
+- Runner code must check `get_job_manager().should_stop(job_id)` or its injected `JobManager` at safe checkpoints.
 
 If a runner does not check stop requests, cancellation is delayed.
+
+Current inspection cancellation/progress checkpoints are implemented by the RxNav/RxNorm, LiverTox, and RAG update runners.
 
 ## 7. New job implementation checklist
 
 1. Add runner function returning `dict[str, Any]`.
-2. Check `job_manager.should_stop(job_id)` during long steps.
+2. Check `get_job_manager().should_stop(job_id)` or an injected `JobManager` during long steps.
 3. Publish interim progress/result updates.
 4. Expose start/poll/cancel routes.
 5. Prevent conflicting duplicates where needed (`is_job_running(job_type)`).

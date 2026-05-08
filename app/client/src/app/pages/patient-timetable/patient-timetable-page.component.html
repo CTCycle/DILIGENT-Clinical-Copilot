@@ -1,0 +1,120 @@
+<main class="timetable-page">
+  <aside class="timetable-rail" aria-label="Navigation">
+    <a class="rail-button" routerLink="/data" title="Back to data inspection">‹</a>
+    <span class="rail-button is-active" title="Timetable">▦</span>
+  </aside>
+
+  <section class="timetable-shell">
+    <header class="timetable-header">
+      <div>
+        <p class="eyebrow">Session {{ sessionId() ?? '' }}</p>
+        <h1>Patient Timetable</h1>
+      </div>
+      <div class="timetable-actions">
+        <button type="button" class="btn-secondary" routerLink="/data">Back</button>
+        <button type="button" class="btn-primary" (click)="regenerate()" [disabled]="loading()">Regenerate</button>
+      </div>
+    </header>
+
+    <section class="timetable-toolbar" aria-label="Timetable controls">
+      <button type="button">Jan 2024 - May 2025</button>
+      <span class="toolbar-group">Zoom <strong>6m</strong></span>
+      <span class="toolbar-group">Display <strong>All event types</strong></span>
+      <span class="toolbar-group">Group by <strong>None</strong></span>
+      <button type="button">Today</button>
+    </section>
+
+    @if (loading()) {
+      <p class="status-note">Loading timetable...</p>
+    }
+    @if (error()) {
+      <p class="error-note">{{ error() }}</p>
+    }
+
+    <section class="timetable-content">
+      <div class="timeline-area">
+        <div class="timeline-scale">
+          <span>Dec</span><span>Jan</span><span>Feb</span><span>Mar</span><span>Apr</span><span>May</span>
+        </div>
+        <div class="lane-grid">
+          <div class="lane-label">Clinical Events</div>
+          <div class="lane-track">
+            @for (item of renderedEvents(); track item.event.event_id) {
+              @if (item.lane === 'clinical') {
+                <button type="button" class="event-chip" [class.is-selected]="selectedEventId() === item.event.event_id" [style.left.%]="item.left" [style.--event-color]="item.color" (click)="selectEvent(item.event)">
+                  {{ item.event.title }}
+                </button>
+              }
+            }
+          </div>
+
+          <div class="lane-label">Medications</div>
+          <div class="lane-track">
+            @for (item of renderedEvents(); track item.event.event_id) {
+              @if (item.lane === 'therapy') {
+                <button type="button" class="event-bar" [class.is-selected]="selectedEventId() === item.event.event_id" [style.left.%]="item.left" [style.width.%]="item.width" [style.--event-color]="item.color" (click)="selectEvent(item.event)">
+                  {{ item.event.title }}
+                </button>
+              }
+            }
+          </div>
+
+          <div class="lane-label">Labs & Measurements</div>
+          <div class="lane-track">
+            @for (item of renderedEvents(); track item.event.event_id) {
+              @if (item.lane === 'labs') {
+                <button type="button" class="event-pin" [class.is-selected]="selectedEventId() === item.event.event_id" [style.left.%]="item.left" [style.--event-color]="item.color" (click)="selectEvent(item.event)">
+                  {{ item.event.title }}
+                </button>
+              }
+            }
+          </div>
+
+          <div class="lane-label">Uncertainty</div>
+          <div class="lane-track">
+            @for (item of renderedEvents(); track item.event.event_id) {
+              @if (item.lane === 'uncertainty') {
+                <button type="button" class="event-uncertain" [class.is-selected]="selectedEventId() === item.event.event_id" [style.left.%]="item.left" (click)="selectEvent(item.event)">
+                  {{ item.event.title }}
+                </button>
+              }
+            }
+          </div>
+        </div>
+      </div>
+
+      <aside class="evidence-panel">
+        <h2>Evidence</h2>
+        @if (selectedEvent(); as event) {
+          <section>
+            <h3>{{ event.title }}</h3>
+            <p>{{ event.description || 'No description supplied.' }}</p>
+          </section>
+          <dl>
+            <dt>Timing</dt>
+            <dd>{{ timingLabel(event.timing_type) }}</dd>
+            <dt>Extracted text</dt>
+            <dd>{{ event.extracted_timing_text || event.relative_time || event.event_date || 'Not reported' }}</dd>
+            <dt>Source</dt>
+            <dd>{{ event.source || 'Not reported' }}</dd>
+            <dt>Confidence</dt>
+            <dd>{{ confidenceLabel(event.confidence) }}</dd>
+            <dt>Rationale</dt>
+            <dd>{{ event.confidence_rationale || 'Not reported' }}</dd>
+            <dt>Source evidence</dt>
+            <dd>{{ event.source_evidence || 'Not reported' }}</dd>
+          </dl>
+          @if (event.linked_patient_event_ids.length > 0) {
+            <div class="linked-events">
+              @for (id of event.linked_patient_event_ids; track id) {
+                <span>{{ id }}</span>
+              }
+            </div>
+          }
+        } @else {
+          <p>Select an item on the timetable to inspect supporting evidence.</p>
+        }
+      </aside>
+    </section>
+  </section>
+</main>

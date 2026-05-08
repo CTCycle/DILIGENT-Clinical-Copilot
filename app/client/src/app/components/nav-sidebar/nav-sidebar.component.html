@@ -1,0 +1,57 @@
+<div class="app-top-nav">
+  <header class="app-header">
+    <div class="app-header-content">
+      <div class="app-header-brand">
+        <span class="app-header-logo">
+          <img src="/diligent-logo.png" alt="Diligent logo" />
+        </span>
+        <span class="app-header-wordmark">DILIGENT Clinical Copilot</span>
+      </div>
+      <nav class="tab-bar" aria-label="Main navigation">
+        <div class="tab-items" role="tablist" aria-label="Main navigation tabs">
+          @for (item of navItems; track item.pageId) {
+            <button
+              type="button"
+              class="tab-item"
+              [class.active]="stateService.state().activePage === item.pageId"
+              role="tab"
+              [attr.aria-selected]="stateService.state().activePage === item.pageId"
+              [attr.tabindex]="stateService.state().activePage === item.pageId ? '0' : '-1'"
+              (click)="onNavigate(item.pageId)"
+              (keydown)="onNavTabKeydown($event, item.pageId)"
+              [attr.aria-current]="stateService.state().activePage === item.pageId ? 'page' : null"
+              [title]="item.label"
+            >
+              <span class="tab-label">{{ item.label }}</span>
+            </button>
+          }
+        </div>
+      </nav>
+      <div class="app-header-actions">
+        <button
+          type="button"
+          class="app-header-icon-btn"
+          (click)="toggleTheme()"
+          [attr.aria-label]="themeAriaLabel"
+          [attr.title]="themeAriaLabel"
+        >
+          @if (isDarkTheme) {
+            <svg class="theme-icon" viewBox="0 0 24 24" aria-hidden="true">
+              <defs>
+                <linearGradient id="themeSunCore" x1="4" y1="4" x2="20" y2="20" gradientUnits="userSpaceOnUse">
+                  <stop offset="0" stop-color="#fde68a" />
+                  <stop offset="1" stop-color="#fbbf24" />
+                </linearGradient>
+              </defs>
+              <circle cx="12" cy="12" r="4.45" fill="url(#themeSunCore)" />
+              <path fill="#f59e0b" d="M12 1.6a.85.85 0 0 1 .85.85V5.1a.85.85 0 0 1-1.7 0V2.45A.85.85 0 0 1 12 1.6Zm0 17.3a.85.85 0 0 1 .85.85v1.8a.85.85 0 1 1-1.7 0v-1.8a.85.85 0 0 1 .85-.85ZM4.09 4.08a.85.85 0 0 1 1.2 0L7.16 5.96a.85.85 0 0 1-1.2 1.2L4.1 5.29a.85.85 0 0 1 0-1.21Zm12.75 12.76a.85.85 0 0 1 1.2 0l1.87 1.88a.85.85 0 1 1-1.2 1.2l-1.87-1.88a.85.85 0 0 1 0-1.2Z" />
+              <path fill="#5bc8ac" d="M1.6 12a.85.85 0 0 1 .85-.85h2.66a.85.85 0 1 1 0 1.7H2.45A.85.85 0 0 1 1.6 12Zm17.3 0a.85.85 0 0 1 .85-.85h1.8a.85.85 0 1 1 0 1.7h-1.8a.85.85 0 0 1-.85-.85ZM4.09 19.92a.85.85 0 0 1 0-1.2l1.87-1.88a.85.85 0 1 1 1.2 1.2l-1.87 1.88a.85.85 0 0 1-1.2 0Zm12.75-12.76a.85.85 0 0 1 0-1.2l1.87-1.88a.85.85 0 1 1 1.2 1.2l-1.87 1.88a.85.85 0 0 1-1.2 0Z" />
+            </svg>
+          } @else {
+            <img class="theme-icon theme-icon-image" src="/dark-mode-icon.png" alt="" aria-hidden="true" />
+          }
+        </button>
+      </div>
+    </div>
+  </header>
+</div>
