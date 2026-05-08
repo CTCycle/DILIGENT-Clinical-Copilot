@@ -818,14 +818,14 @@ class ClinicalSessionService(ClinicalSessionFormattingMixin):
         )
         final_report: str | None = None
         start_time = time.perf_counter()
+        consultation_timeout_s = (
+            self.CLOUD_CONSULTATION_TIMEOUT_S
+            if LLMRuntimeConfig.is_cloud_enabled()
+            else self.LOCAL_CONSULTATION_TIMEOUT_S
+        )
         try:
             consultation_progress_callback = ClinicalConsultationProgressCallback(
                 progress_callback=progress_callback,
-            )
-            consultation_timeout_s = (
-                self.CLOUD_CONSULTATION_TIMEOUT_S
-                if LLMRuntimeConfig.is_cloud_enabled()
-                else self.LOCAL_CONSULTATION_TIMEOUT_S
             )
             drug_assessment = await asyncio.wait_for(
                 clinical_session.run_analysis(
@@ -1026,14 +1026,15 @@ class ClinicalSessionService(ClinicalSessionFormattingMixin):
             stop_check=stop_check,
         )
         ensure_timed_therapy_drug(therapy_drugs, bundle=validation_bundle)
+        anamnesis_text = payload.anamnesis or ""
         anamnesis_drugs = await self.extract_anamnesis_drugs(
-            anamnesis_text=payload.anamnesis,
+            anamnesis_text=anamnesis_text,
             issues=issues,
             progress_callback=progress_callback,
             stop_check=stop_check,
         )
         disease_context = await self.extract_disease_context(
-            anamnesis_text=payload.anamnesis,
+            anamnesis_text=anamnesis_text,
             issues=issues,
             progress_callback=progress_callback,
             stop_check=stop_check,

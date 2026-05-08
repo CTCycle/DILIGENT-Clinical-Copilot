@@ -4,16 +4,10 @@ import json
 import os
 from typing import Any, Iterator, Literal, cast
 
+import lancedb
 import pyarrow as pa
-
-try:
-    import lancedb
-    from lancedb.db import DBConnection
-    from lancedb.table import Table
-except Exception:  # noqa: BLE001
-    lancedb = None
-    DBConnection = Any  # type: ignore[misc,assignment]
-    Table = Any  # type: ignore[misc,assignment]
+from lancedb.db import DBConnection
+from lancedb.table import Table
 
 from common.utils.logger import logger
 
@@ -62,10 +56,6 @@ class LanceVectorDatabase:
 
     # -------------------------------------------------------------------------
     def connect(self) -> DBConnection:
-        if lancedb is None:
-            raise RuntimeError(
-                "LanceDB runtime is unavailable. Install compatible lancedb/lance-namespace packages."
-            )
         if self.connection is None:
             path = self.database_path
             suffix = os.path.splitext(path)[1]

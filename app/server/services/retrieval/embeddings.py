@@ -10,6 +10,7 @@ import httpx
 from langchain_google_genai import GoogleGenerativeAIEmbeddings
 from langchain_ollama import OllamaEmbeddings
 from langchain_openai import OpenAIEmbeddings
+from pydantic import SecretStr
 
 from configurations.startup import server_settings
 from common.constants import CLOUD_MODEL_CHOICES, VECTOR_DB_PATH
@@ -31,9 +32,9 @@ def _build_openai_embeddings_model(
     timeout_s: float,
 ) -> OpenAIEmbeddings:
     return OpenAIEmbeddings(
-        api_key=api_key,
+        api_key=SecretStr(api_key),
         model=model,
-        request_timeout=timeout_s,
+        timeout=timeout_s,
     )
 
 
@@ -45,9 +46,9 @@ def _build_gemini_embeddings_model(
     timeout_s: float,
 ) -> GoogleGenerativeAIEmbeddings:
     return GoogleGenerativeAIEmbeddings(
-        google_api_key=api_key,
+        google_api_key=SecretStr(api_key),
         model=model,
-        request_timeout=timeout_s,
+        request_options={"timeout": timeout_s},
     )
 
 

@@ -186,7 +186,11 @@ def resolve_ollama_base_url(
 
 def environment_snapshot_from_os_env() -> EnvironmentSnapshot:
     raw_port = os.getenv("OLLAMA_PORT")
-    port = coerce_int(raw_port, None, minimum=1, maximum=65535) if raw_port else None
+    port = (
+        coerce_int(raw_port, OLLAMA_DEFAULT_PORT, minimum=1, maximum=65535)
+        if raw_port
+        else None
+    )
     return EnvironmentSnapshot(
         ollama_url=coerce_str_or_none(os.getenv("OLLAMA_URL")),
         ollama_host=coerce_str_or_none(os.getenv("OLLAMA_HOST")),
