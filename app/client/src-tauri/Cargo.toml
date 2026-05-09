@@ -1,6 +1,6 @@
 [package]
 name = "diligent-desktop"
-version = "1.0.0"
+version = "2.0.0"
 description = "DILIGENT desktop shell"
 authors = ["DILIGENT"]
 edition = "2021"
