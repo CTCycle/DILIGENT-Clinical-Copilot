@@ -1,7 +1,7 @@
 {
   "$schema": "https://schema.tauri.app/config/2",
   "productName": "DILIGENT Desktop",
-  "version": "1.0.0",
+  "version": "2.0.0",
   "identifier": "com.diligent.desktop",
   "build": {
     "beforeBuildCommand": "npm run build",
@@ -33,17 +33,17 @@
       "icons/icon.ico"
     ],
     "resources": {
-      "../../../app/server/pyproject.toml": "r/pyproject.toml",
-      "../../server": "r/server",
-      "../../scripts": "r/scripts",
-      "../../../settings": "r/settings",
-      "../dist": "r/client/dist",
-      "../../resources/models": "r/resources/models",
-      "../../resources/sources": "r/resources/sources",
-      "../../server/uv.lock": "r/runtimes/uv.lock",
-      "../../../runtimes/python": "r/runtimes/python",
-      "../../../runtimes/uv": "r/runtimes/uv",
-      "../../../runtimes/nodejs": "r/runtimes/nodejs"
+      "r/pyproject.toml": "r/pyproject.toml",
+      "r/server": "r/server",
+      "r/scripts": "r/scripts",
+      "r/settings": "r/settings",
+      "r/client/dist": "r/client/dist",
+      "r/resources/models": "r/resources/models",
+      "r/resources/sources": "r/resources/sources",
+      "r/runtimes/uv.lock": "r/runtimes/uv.lock",
+      "r/runtimes/python": "r/runtimes/python",
+      "r/runtimes/uv": "r/runtimes/uv",
+      "r/runtimes/nodejs": "r/runtimes/nodejs"
     }
   }
 }

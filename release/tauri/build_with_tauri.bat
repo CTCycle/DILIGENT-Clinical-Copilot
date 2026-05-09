@@ -4,7 +4,7 @@ setlocal enabledelayedexpansion
 set "script_dir=%~dp0"
 for %%I in ("%script_dir%..") do set "release_dir=%%~fI"
 for %%I in ("%release_dir%\..") do set "repo_root=%%~fI"
-set "project_folder=%repo_root%\DILIGENT\"
+set "project_folder=%repo_root%\app\"
 set "client_dir=%project_folder%client"
 set "tauri_dir=%client_dir%\src-tauri"
 set "bundle_source_dir=%tauri_dir%\r"
@@ -69,13 +69,8 @@ set "CARGO_TERM_PROGRESS_WHEN=auto"
 
 echo [STEP 1/2] Installing frontend dependencies
 pushd "%client_dir%" >nul
-if exist "package-lock.json" (
-  echo [CMD] "%npm_cmd%" ci --foreground-scripts
-  call "%npm_cmd%" ci --foreground-scripts
-) else (
-  echo [CMD] "%npm_cmd%" install --foreground-scripts
-  call "%npm_cmd%" install --foreground-scripts
-)
+echo [CMD] "%npm_cmd%" install --foreground-scripts
+call "%npm_cmd%" install --foreground-scripts
 if errorlevel 1 (
   popd >nul
   echo [FATAL] npm dependency installation failed.
@@ -134,7 +129,7 @@ md "%bundle_source_dir%\resources" >nul 2>&1
 md "%bundle_source_dir%\client" >nul 2>&1
 md "%bundle_source_dir%\runtimes" >nul 2>&1
 
-copy /y "%repo_root%\pyproject.toml" "%bundle_source_dir%\pyproject.toml" >nul
+copy /y "%repo_root%\app\server\pyproject.toml" "%bundle_source_dir%\pyproject.toml" >nul
 if errorlevel 1 (
   echo [FATAL] Failed to stage pyproject.toml for Tauri bundling.
   exit /b 1
@@ -151,9 +146,9 @@ if errorlevel 1 (
 )
 echo [OK] Staged runtime lockfile for bundle root and runtimes\uv.lock.
 
-call :make_junction "%bundle_source_dir%\server" "%project_folder%server" || exit /b 1
+call :stage_server_tree || exit /b 1
 call :make_junction "%bundle_source_dir%\scripts" "%project_folder%scripts" || exit /b 1
-call :make_junction "%bundle_source_dir%\settings" "%project_folder%settings" || exit /b 1
+call :make_junction "%bundle_source_dir%\settings" "%repo_root%\settings" || exit /b 1
 call :make_junction "%bundle_source_dir%\client\dist" "%client_dir%\dist" || exit /b 1
 call :make_junction "%bundle_source_dir%\resources\models" "%project_folder%resources\models" || exit /b 1
 call :make_junction "%bundle_source_dir%\resources\sources" "%project_folder%resources\sources" || exit /b 1
@@ -204,6 +199,14 @@ exit /b 0
 cmd /c mklink /J "%~1" "%~2" >nul
 if errorlevel 1 (
   echo [FATAL] Failed to create junction "%~1" -> "%~2".
+  exit /b 1
+)
+exit /b 0
+
+:stage_server_tree
+robocopy "%project_folder%server" "%bundle_source_dir%\server" /E /NP /NJH /NJS /NDL /NFL /XD ".tmp_pytest" ".pytest_cache" ".ruff_cache" ".uv-cache" ".venv" "__pycache__" >nul
+if errorlevel 8 (
+  echo [FATAL] Failed to stage filtered server tree.
   exit /b 1
 )
 exit /b 0
