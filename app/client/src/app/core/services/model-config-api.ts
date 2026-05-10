@@ -2,7 +2,6 @@ import { API_BASE_URL } from "../constants";
 import {
   AccessKeyProvider,
   AccessKeyRecord,
-  ApiResult,
   JobStartResponse,
   JobStatusResponse,
   ModelConfigStateResponse,
@@ -11,12 +10,8 @@ import {
 } from "../models/types";
 import {
   buildQueryString,
-  fetchWithTimeout,
   HTTP_TIMEOUT,
-  normalizeThrownError,
-  parseApiResponse,
   requestJson,
-  GENERIC_REQUEST_ERROR,
 } from "./http-api";
 
 const ACCESS_KEYS_TIMEOUT_SECONDS = 15;
@@ -70,38 +65,6 @@ export async function fetchModelPullJobStatus(
     { method: "GET" },
     timeoutSeconds,
   );
-}
-
-export async function pullModels(models: string[]): Promise<ApiResult> {
-  const selected = Array.from(new Set(models.filter((item) => !!item)));
-  if (!selected.length) {
-    return { message: "[ERROR] No models selected to pull.", json: null };
-  }
-
-  try {
-    for (const model of selected) {
-      const response = await fetchWithTimeout(
-        `${API_BASE_URL}/models/pull?name=${encodeURIComponent(
-          model,
-        )}&stream=false`,
-        { method: "GET" },
-      );
-
-      if (!response.ok) {
-        return await parseApiResponse(response);
-      }
-    }
-  } catch (error) {
-    return {
-      message: normalizeThrownError(error, GENERIC_REQUEST_ERROR),
-      json: null,
-    };
-  }
-
-  return {
-    message: `[INFO] Models available locally: ${selected.join(", ")}.`,
-    json: null,
-  };
 }
 
 export async function fetchAccessKeys(

@@ -3,18 +3,15 @@ from __future__ import annotations
 import ast
 from pathlib import Path
 
-EXCLUDED_DIRS = {".venv", "__pycache__", ".pytest_cache"}
-MAX_PHYSICAL_LINES = 1000
-LEGACY_OVERSIZED_FILES = {
-    Path("app/server/repositories/serialization/data.py"),
-    Path("app/server/services/clinical/hepatox_core.py"),
-    Path("app/server/services/clinical/matches_core.py"),
-    Path("app/server/services/clinical/parser.py"),
-    Path("app/server/services/inspection/service.py"),
-    Path("app/server/services/llm/ollama_client.py"),
-    Path("app/server/services/session/session_service.py"),
-    Path("app/server/services/updater/livertox_core.py"),
+EXCLUDED_DIRS = {
+    ".venv",
+    "__pycache__",
+    ".pytest_cache",
+    ".uv-cache",
+    ".tmp_pytest",
+    ".ruff_cache",
 }
+MAX_PHYSICAL_LINES = 1000
 
 
 class ConstraintVisitor(ast.NodeVisitor):
@@ -64,8 +61,7 @@ def check_file(path: Path, repo_root: Path) -> list[str]:
     violations: list[str] = []
     text = path.read_text(encoding="utf-8")
     line_count = text.count("\n") + (0 if text.endswith("\n") else 1)
-    relative_path = path.relative_to(repo_root)
-    if line_count > MAX_PHYSICAL_LINES and relative_path not in LEGACY_OVERSIZED_FILES:
+    if line_count > MAX_PHYSICAL_LINES:
         violations.append(
             f"{path}:1: file has {line_count} physical lines; max is {MAX_PHYSICAL_LINES}"
         )

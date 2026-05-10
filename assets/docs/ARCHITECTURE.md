@@ -1,6 +1,6 @@
 # DILIGENT Clinical Copilot Architecture
 
-Last updated: 2026-04-30
+Last updated: 2026-05-10
 
 ## 1. System Summary
 
@@ -89,14 +89,12 @@ Root/OpenAPI routes:
 
 Session and clinical:
 - `GET /api/health`
-- `POST /api/clinical`
 - `POST /api/clinical/jobs`
 - `GET /api/clinical/jobs/{job_id}`
 - `DELETE /api/clinical/jobs/{job_id}`
 
 Model catalog and pull:
 - `GET /api/models/list`
-- `GET /api/models/pull`
 - `POST /api/models/pull/jobs`
 - `GET /api/models/jobs/{job_id}`
 - `DELETE /api/models/jobs/{job_id}`

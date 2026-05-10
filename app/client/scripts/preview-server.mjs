@@ -4,8 +4,7 @@ import path from 'node:path';
 
 const rootDir = process.cwd();
 const distDir = path.resolve(rootDir, 'dist/browser');
-const fallbackDistDir = path.resolve(rootDir, 'dist');
-const staticRoot = existsSync(distDir) ? distDir : fallbackDistDir;
+const staticRoot = distDir;
 const envPath = path.resolve(rootDir, '../../settings/.env');
 
 const defaults = {
@@ -50,9 +49,12 @@ const uiHost = resolveArg('--host', env.UI_HOST || defaults.UI_HOST);
 const uiPort = Number.parseInt(resolveArg('--port', env.UI_PORT || defaults.UI_PORT), 10);
 const apiHost = env.FASTAPI_HOST || defaults.FASTAPI_HOST;
 const apiPort = Number.parseInt(env.FASTAPI_PORT || defaults.FASTAPI_PORT, 10);
-const fallbackApiPort = defaults.FASTAPI_PORT;
 
-function forwardApiRequest({ req, res, port, allowFallback }) {
+if (!existsSync(staticRoot)) {
+  throw new Error(`Missing Angular build output: ${staticRoot}`);
+}
+
+function forwardApiRequest({ req, res, port }) {
   const upstream = request(
     {
       host: apiHost,
@@ -67,19 +69,26 @@ function forwardApiRequest({ req, res, port, allowFallback }) {
     },
   );
   upstream.on('error', () => {
-    if (allowFallback && String(port) !== String(fallbackApiPort)) {
-      forwardApiRequest({
-        req,
-        res,
-        port: fallbackApiPort,
-        allowFallback: false,
-      });
-      return;
-    }
     res.statusCode = 502;
     res.end('Bad Gateway');
   });
   req.pipe(upstream);
+}
+
+function verifyBackendReachable(port) {
+  return new Promise((resolve, reject) => {
+    const probe = request(
+      {
+        host: apiHost,
+        port,
+        path: '/api/health',
+        method: 'GET',
+      },
+      () => resolve(),
+    );
+    probe.on('error', () => reject(new Error(`Configured backend is unreachable at http://${apiHost}:${port}`)));
+    probe.end();
+  });
 }
 
 const mime = {
@@ -109,7 +118,6 @@ const server = createServer((req, res) => {
       req,
       res,
       port: apiPort,
-      allowFallback: true,
     });
     return;
   }
@@ -140,8 +148,16 @@ const server = createServer((req, res) => {
   createReadStream(chosen).pipe(res);
 });
 
-server.listen(uiPort, uiHost, () => {
-  // eslint-disable-next-line no-console
-  console.log(`Preview server running at http://${uiHost}:${uiPort}`);
-});
+verifyBackendReachable(apiPort)
+  .then(() => {
+    server.listen(uiPort, uiHost, () => {
+      // eslint-disable-next-line no-console
+      console.log(`Preview server running at http://${uiHost}:${uiPort}`);
+    });
+  })
+  .catch((error) => {
+    // eslint-disable-next-line no-console
+    console.error(error.message);
+    process.exit(1);
+  });
 

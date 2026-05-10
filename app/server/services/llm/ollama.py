@@ -19,7 +19,7 @@ from domain.jobs import (
     JobStartResponse,
     JobStatusResponse,
 )
-from domain.models import ModelListResponse, ModelPullResponse
+from domain.models import ModelListResponse
 from services.runtime.jobs import (
     JobManager,
 )
@@ -263,24 +263,6 @@ class OllamaService:
         raise ServiceError(
             f"Unexpected error while {action}.",
         ) from exc
-
-    # -------------------------------------------------------------------------
-    async def pull_model(self, *, name: str, stream: bool) -> ModelPullResponse:
-        model_name = sanitize_model_name(name)
-        try:
-            result = await pull_model_async(
-                name=model_name,
-                stream=stream,
-                jobs=self.job_manager,
-                client_factory=self.client_factory,
-            )
-            return ModelPullResponse(
-                status="success",
-                pulled=bool(result.get("pulled", False)),
-                model=model_name,
-            )
-        except (OllamaTimeout, OllamaError, Exception) as exc:
-            self.raise_ollama_service_error(exc, action="pulling model")
 
     # -------------------------------------------------------------------------
     def start_pull_job(self, *, name: str, stream: bool) -> JobStartResponse:

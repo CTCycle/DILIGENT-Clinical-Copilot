@@ -23,10 +23,6 @@ DATABASE_FILENAME = "database.db"
 ###############################################################################
 CONFIGURATIONS_FILE = str(Path(SETTING_PATH) / "configurations.json")
 
-# [ENDPOINTS]
-###############################################################################
-CLINICAL_API_URL = "/clinical"
-
 # [APP DEFAULTS]
 ###############################################################################
 FASTAPI_TITLE = "DILI Backend"

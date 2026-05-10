@@ -19,10 +19,10 @@ def test_health_route_uses_response_model() -> None:
     assert content["schema"]["$ref"].endswith("/HealthResponse")
 
 
-def test_clinical_plain_text_route_does_not_advertise_json_response_model() -> None:
+def test_clinical_job_route_advertises_response_model() -> None:
     schema = app.openapi()
-    response = schema["paths"]["/api/clinical"]["post"]["responses"]["202"]
-    assert "text/plain" in response["content"]
+    response = schema["paths"]["/api/clinical/jobs"]["post"]["responses"]["202"]
+    assert "application/json" in response["content"]
 
 
 def test_stable_json_routes_declare_response_models() -> None:
