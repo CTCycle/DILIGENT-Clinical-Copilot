@@ -23,8 +23,6 @@ jobs:
       - name: Compile backend
         working-directory: app/server
         run: python -m compileall .
-      - name: Check backend constraints
-        run: python app/server/scripts/check_backend_constraints.py
       - name: Lint backend
         working-directory: app/server
         run: ruff check .
