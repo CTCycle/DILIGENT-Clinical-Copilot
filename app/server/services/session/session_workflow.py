@@ -94,6 +94,12 @@ def build_matched_drugs_payload_workflow(
     for detected_name in detected_drugs:
         normalized_name = normalize_drug_query_name(detected_name)
         resolved = resolved_drug_map.get(normalized_name, {})
+        if prepared_inputs is None:
+            resolved = {
+                "match_status": "missing_match",
+                "match_reason": "knowledge_base_unavailable",
+                "missing_livertox": True,
+            }
         rucam_entry = rucam_by_name.get(normalized_name)
         matched_drugs_payload.append(
             build_single_matched_drug_row_workflow(
