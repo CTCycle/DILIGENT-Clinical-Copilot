@@ -7,7 +7,7 @@ from domain.jobs import (
     JobStartResponse,
     JobStatusResponse,
 )
-from domain.models import ModelListResponse, ModelPullResponse
+from domain.models import ModelListResponse
 from services.llm.ollama_client import OllamaClient
 from services.runtime.jobs import get_job_manager
 from services.llm.ollama import OllamaService
@@ -21,23 +21,6 @@ class OllamaEndpoint:
         self.router = router
         self.service = service
 
-    # -------------------------------------------------------------------------
-    async def pull_model(
-        self,
-        name: str = Query(
-            ...,
-            min_length=1,
-            max_length=200,
-            description="Exact Ollama model name, e.g. 'llama3.1:8b'",
-        ),
-        stream: bool = Query(
-            False,
-            description="If True, stream pull from Ollama. Endpoint returns only final status (no SSE).",
-        ),
-    ) -> ModelPullResponse:
-        return await self.service.pull_model(name=name, stream=stream)
-
-    # -------------------------------------------------------------------------
     def start_pull_job(
         self,
         name: str = Query(
@@ -67,13 +50,6 @@ class OllamaEndpoint:
 
     # -------------------------------------------------------------------------
     def add_routes(self) -> None:
-        self.router.add_api_route(
-            "/pull",
-            self.pull_model,
-            methods=["GET"],
-            response_model=ModelPullResponse,
-            status_code=status.HTTP_200_OK,
-        )
         self.router.add_api_route(
             "/pull/jobs",
             self.start_pull_job,

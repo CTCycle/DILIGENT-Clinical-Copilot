@@ -1,40 +1,15 @@
 import { API_BASE_URL } from "../constants";
 import {
-  ApiResult,
   ClinicalRequestPayload,
   JobCancelResponse,
   JobStartResponse,
   JobStatusResponse,
 } from "../models/types";
 import {
-  fetchWithTimeout,
-  GENERIC_REQUEST_ERROR,
   HTTP_TIMEOUT,
   normalizeThrownError,
-  parseApiResponse,
   requestJson,
 } from "./http-api";
-
-export async function runClinicalSession(
-  payload: ClinicalRequestPayload,
-): Promise<ApiResult> {
-  try {
-    const response = await fetchWithTimeout(`${API_BASE_URL}/clinical`, {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-      },
-      body: JSON.stringify(payload),
-    });
-
-    return await parseApiResponse(response);
-  } catch (error) {
-    return {
-      message: normalizeThrownError(error, GENERIC_REQUEST_ERROR),
-      json: null,
-    };
-  }
-}
 
 export async function startClinicalJob(
   payload: ClinicalRequestPayload,

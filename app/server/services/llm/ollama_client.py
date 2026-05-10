@@ -890,7 +890,7 @@ class OllamaClient:
         if keep_alive:
             kwargs["keep_alive"] = keep_alive
         if think:
-            kwargs["think"] = True
+            kwargs["reasoning"] = True
 
         supported_options = {
             "mirostat",
@@ -913,17 +913,7 @@ class OllamaClient:
             if key in supported_options and key not in kwargs:
                 kwargs[key] = value
 
-        while True:
-            try:
-                return ChatOllama(**kwargs)
-            except TypeError as exc:
-                match = re.search(r"unexpected keyword argument '([^']+)'", str(exc))
-                if not match:
-                    raise
-                rejected = match.group(1)
-                if rejected not in kwargs:
-                    raise
-                kwargs.pop(rejected, None)
+        return ChatOllama(**kwargs)
 
     # -------------------------------------------------------------------------
     def _build_ollama_embeddings_model(

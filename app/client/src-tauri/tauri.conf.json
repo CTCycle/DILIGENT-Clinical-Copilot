@@ -5,7 +5,7 @@
   "identifier": "com.diligent.desktop",
   "build": {
     "beforeBuildCommand": "npm run build",
-    "frontendDist": "../dist",
+    "frontendDist": "../dist/browser",
     "devUrl": "about:blank"
   },
   "app": {
