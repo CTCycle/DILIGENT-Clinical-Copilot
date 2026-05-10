@@ -1245,39 +1245,6 @@ class ClinicalSessionService(ClinicalSessionFormattingMixin):
         self.run_stop_check(stop_check)
         return result_payload
 
-    # -------------------------------------------------------------------------
-    async def start_clinical_session(
-        self,
-        request_payload: ClinicalSessionRequest,
-    ) -> str:
-        try:
-            preprocessed_request, section_extraction = (
-                await self.preprocess_unified_input(request_payload)
-            )
-        except ClinicalInputExtractionError as exc:
-            raise ServiceValidationError(str(exc)) from exc
-        patient_payload = self.build_patient_payload(preprocessed_request)
-        try:
-            self.ensure_submission_requirements(patient_payload)
-        except ClinicalPipelineValidationError as exc:
-            raise ServiceValidationError(
-                self.serialize_pipeline_issues(exc.issues),
-            ) from exc
-        self.apply_persisted_runtime_configuration()
-        try:
-            single_result = await self.process_single_patient(
-                patient_payload,
-                patient_image_base64=request_payload.patient_image_base64,
-                section_extraction=section_extraction,
-            )
-        except ClinicalPipelineValidationError as exc:
-            raise ServiceValidationError(
-                self.serialize_pipeline_issues(exc.issues),
-            ) from exc
-        report = str(single_result.get("report", "")).strip()
-        return report
-
-    # -------------------------------------------------------------------------
     def start_clinical_job(
         self,
         request_payload: ClinicalSessionRequest,

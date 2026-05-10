@@ -1,7 +1,6 @@
 from __future__ import annotations
 
 from fastapi import APIRouter, Body, status
-from fastapi.responses import PlainTextResponse
 
 from domain.clinical.entities import ClinicalSessionRequest
 from domain.jobs import (
@@ -23,16 +22,6 @@ class ClinicalSessionEndpoint:
         self.router = router
         self.service = service
 
-    # -------------------------------------------------------------------------
-    async def start_clinical_session(
-        self,
-        request_payload: ClinicalSessionRequest = Body(...),
-    ) -> PlainTextResponse:
-        validate_clinical_session_request(request_payload)
-        report = await self.service.start_clinical_session(request_payload)
-        return PlainTextResponse(content=report, status_code=status.HTTP_202_ACCEPTED)
-
-    # -------------------------------------------------------------------------
     def start_clinical_job(
         self,
         request_payload: ClinicalSessionRequest = Body(...),
@@ -50,14 +39,6 @@ class ClinicalSessionEndpoint:
 
     # -------------------------------------------------------------------------
     def add_routes(self) -> None:
-        self.router.add_api_route(
-            "/clinical",
-            self.start_clinical_session,
-            methods=["POST"],
-            status_code=status.HTTP_202_ACCEPTED,
-            response_model=str,
-            response_class=PlainTextResponse,
-        )
         self.router.add_api_route(
             "/clinical/jobs",
             self.start_clinical_job,
