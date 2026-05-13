@@ -27,3 +27,26 @@ class TextNormalizationSnapshot:
     @property
     def rxnav_synonym_stopwords(self) -> frozenset[str]:
         return self.matching_stopwords | self.clinical_generic_terms
+
+
+def empty_text_normalization_snapshot() -> TextNormalizationSnapshot:
+    return TextNormalizationSnapshot(
+        matching_stopwords=frozenset(),
+        clinical_generic_terms=frozenset(),
+        formulation_stopwords=frozenset(),
+        manufacturer_tokens=frozenset(),
+        manufacturer_suffixes=(),
+        rxnav_salt_stopwords=frozenset(),
+        rxnav_form_stopwords=frozenset(),
+        rxnav_unit_stopwords=frozenset(),
+        rxnav_name_stopwords=frozenset(),
+        trailing_temporal_tokens=frozenset(),
+        query_aliases={},
+        drug_non_mentions=frozenset(),
+        drug_duration_words=frozenset(),
+        drug_weekday_words=frozenset(),
+        lab_marker_aliases={},
+        brand_combo_preferences={},
+        knowledge_source_references={},
+        section_title_aliases={},
+    )

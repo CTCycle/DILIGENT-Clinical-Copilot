@@ -34,6 +34,7 @@ from domain.clinical.entities import (
     RucamComponentAssessment,
     create_drug_suspension_context,
 )
+from domain.clinical.extraction import LlmClinicalSectionTextDraft
 from domain.clinical.extras import (
     CandidateSelectionResult,
     HepatoxPreparedInputs,
@@ -88,6 +89,7 @@ __all__ = [
     "CandidateSelectionResult",
     "HepatoxPreparedInputs",
     "LabExtractionPayload",
+    "LlmClinicalSectionTextDraft",
     "MonographRecord",
     "create_drug_suspension_context",
 ]

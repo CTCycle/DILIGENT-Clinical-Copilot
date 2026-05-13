@@ -7,8 +7,8 @@ from typing import Any
 
 from configurations.llm_configs import LLMRuntimeConfig
 from configurations.startup import server_settings
+from domain.clinical.extraction import LlmClinicalSectionTextDraft
 from domain.clinical.entities import ClinicalSectionExtractionResult
-from pydantic import BaseModel
 from services.llm.client_runtime import ensure_runtime_client
 from services.llm.prompts import CLINICAL_SECTION_EXTRACTION_PROMPT
 from services.llm.provider_factory import select_llm_provider
@@ -21,12 +21,6 @@ from services.session.clinical_section_parsers import (
 
 class ClinicalInputExtractionError(RuntimeError):
     pass
-
-
-class LlmClinicalSectionTextDraft(BaseModel):
-    anamnesis: str = ""
-    therapy: str = ""
-    lab_analysis: str = ""
 
 
 def validate_extracted_sections_against_source(
