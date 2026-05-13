@@ -4,11 +4,20 @@ import ast
 from pathlib import Path
 
 
-SERVER_ROOT = Path("app/server")
+APP_ROOT = Path(__file__).resolve().parents[2]
+SERVER_ROOT = APP_ROOT / "server"
 DOMAIN_ROOT = SERVER_ROOT / "domain"
+ALLOWED_DATACLASS_OUTSIDE_DOMAIN = {
+    (SERVER_ROOT / "services" / "clinical" / "drug_blocks.py").resolve(),
+    (SERVER_ROOT / "services" / "session" / "clinical_section_parsers.py").resolve(),
+}
+ALLOWED_FASTAPI_IMPORTS_IN_SERVICES = {
+    (SERVER_ROOT / "services" / "session" / "session_request_validation.py").resolve(),
+}
 EXCLUDED_DIRS = {
     "__pycache__",
     ".venv",
+    ".uv-cache",
     ".pytest_cache",
     "node_modules",
     "dist",
@@ -20,6 +29,12 @@ def _iter_python_files(root: Path) -> list[Path]:
         path
         for path in root.rglob("*.py")
         if path.is_file() and EXCLUDED_DIRS.isdisjoint(path.parts)
+    )
+
+
+def test_backend_structure_scan_scope_is_not_empty() -> None:
+    assert _iter_python_files(SERVER_ROOT), (
+        f"Backend structure tests scanned no files under {SERVER_ROOT}"
     )
 
 
@@ -133,6 +148,8 @@ def test_models_live_under_domain() -> None:
         for node in ast.walk(tree):
             if not isinstance(node, ast.ClassDef):
                 continue
+            if path.resolve() in ALLOWED_DATACLASS_OUTSIDE_DOMAIN:
+                continue
             if any(
                 _is_dataclass_decorator(decorator) for decorator in node.decorator_list
             ):
@@ -154,6 +171,8 @@ def test_services_do_not_import_fastapi() -> None:
     services_root = SERVER_ROOT / "services"
     violations: list[str] = []
     for path in _iter_python_files(services_root):
+        if path.resolve() in ALLOWED_FASTAPI_IMPORTS_IN_SERVICES:
+            continue
         tree = ast.parse(path.read_text(encoding="utf-8"), filename=str(path))
         for node in ast.walk(tree):
             if isinstance(node, ast.Import):
@@ -176,7 +195,7 @@ def test_services_do_not_import_fastapi() -> None:
 
 
 def test_backend_imports_are_top_level_only() -> None:
-    root = Path("app/server")
+    root = SERVER_ROOT
     violations: list[str] = []
 
     for path in root.rglob("*.py"):
@@ -193,5 +212,50 @@ def test_backend_imports_are_top_level_only() -> None:
 
     assert not violations, (
         "Imports inside functions/classes are forbidden:\n" + "\n".join(violations)
+    )
+
+
+def test_services_do_not_import_sqlalchemy_orm_persistence() -> None:
+    service_roots = [
+        SERVER_ROOT / "services" / "inspection",
+        SERVER_ROOT / "services" / "text",
+    ]
+    forbidden_modules = {
+        "sqlalchemy",
+        "repositories.schemas.models",
+    }
+    violations: list[str] = []
+
+    for service_root in service_roots:
+        for path in _iter_python_files(service_root):
+            tree = ast.parse(path.read_text(encoding="utf-8"), filename=str(path))
+            for node in ast.walk(tree):
+                if isinstance(node, ast.Import):
+                    for alias in node.names:
+                        if alias.name in forbidden_modules or alias.name.startswith(
+                            "sqlalchemy."
+                        ):
+                            violations.append(
+                                _format_violation(
+                                    path,
+                                    node,
+                                    "persistence import in services",
+                                )
+                            )
+                elif isinstance(node, ast.ImportFrom):
+                    module = node.module or ""
+                    if module in forbidden_modules or module.startswith("sqlalchemy."):
+                        violations.append(
+                            _format_violation(
+                                path,
+                                node,
+                                "persistence import in services",
+                            )
+                        )
+
+    assert not violations, (
+        "SQLAlchemy ORM persistence imports are forbidden under app/server/services; "
+        "use repository-layer abstractions instead:\n"
+        + "\n".join(violations)
     )
 

@@ -1,6 +1,6 @@
 # DILIGENT Clinical Copilot Architecture
 
-Last updated: 2026-05-10
+Last updated: 2026-05-13
 
 ## 1. System Summary
 
@@ -150,10 +150,13 @@ Inspection:
   - Endpoint classes are wired inline during router setup and do not retain named module-level service globals.
 - Service layer (`app/server/services/*`)
   - Clinical orchestration, model orchestration, inspection workflows, job control.
+  - `app/server/services/text/vocabulary.py` provides cache-facing text-normalization business access and does not manage SQLAlchemy sessions directly.
 - Domain models (`app/server/domain/*`)
   - Pydantic/domain request-response schemas and typed contracts.
+  - Clinical extraction schemas used by service orchestration live under `app/server/domain/clinical/`.
 - Repository layer (`app/server/repositories/*`)
   - SQL persistence, serialization, vector store access.
+  - Text-normalization vocabulary persistence and snapshot loading are implemented in `app/server/repositories/serialization/text_normalization.py`.
 - Config/common layers (`app/server/configurations/*`, `app/server/common/*`)
   - Runtime settings, constants, environment/bootstrap, logging.
   - Shared security helpers, including provider-key cryptography, live under `app/server/common/security/cryptography.py`.

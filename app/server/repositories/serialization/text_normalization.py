@@ -7,10 +7,12 @@ from typing import Any
 
 from sqlalchemy import select
 from sqlalchemy.engine import Engine
+from sqlalchemy.exc import SQLAlchemyError
 from sqlalchemy.orm import Session, sessionmaker
 
 from common.utils.catalog_loader import CatalogLoader
 from common.utils.logger import logger
+from domain.text import TextNormalizationSnapshot, empty_text_normalization_snapshot
 from repositories.schemas.models import TextNormalizationTerm
 
 
@@ -41,6 +43,10 @@ SECTION_TITLE_ALIAS_CATEGORIES = {
     "drugs": "section_title_alias_drugs",
     "laboratory_analysis": "section_title_alias_laboratory_analysis",
 }
+QUERY_ALIAS_CATEGORY = "query_alias"
+LAB_MARKER_ALIAS_CATEGORY = "lab_marker_alias"
+BRAND_COMBO_PREFERENCE_CATEGORY = "brand_combo_preference"
+KNOWLEDGE_SOURCE_REFERENCE_CATEGORY = "knowledge_source_reference"
 
 
 def normalize_term(value: str | None) -> str:
@@ -75,6 +81,101 @@ class TextNormalizationVocabularySerializer:
             self.seed_from_catalog(db_session)
             db_session.commit()
         except Exception:
+            db_session.rollback()
+            raise
+        finally:
+            db_session.close()
+
+    def load_snapshot(self) -> TextNormalizationSnapshot:
+        db_session = self.session_factory()
+        try:
+            rows = self.list_terms(db_session)
+            return self._build_snapshot(rows)
+        except SQLAlchemyError:
+            logger.warning(
+                "Text normalization vocabulary unavailable; using empty snapshot.",
+                exc_info=True,
+            )
+            return empty_text_normalization_snapshot()
+        finally:
+            db_session.close()
+
+    def list_term_payloads(self, *, category: str | None = None) -> list[dict[str, Any]]:
+        db_session = self.session_factory()
+        try:
+            rows = self.list_terms(db_session, category=category)
+            return [self.term_to_payload(row) for row in rows]
+        finally:
+            db_session.close()
+
+    def upsert_term_payload(
+        self,
+        *,
+        category: str,
+        term: str,
+        replacement: str | None,
+        source: str,
+        is_active: bool,
+    ) -> dict[str, Any]:
+        db_session = self.session_factory()
+        try:
+            self.upsert_term(
+                db_session,
+                category=category,
+                term=term,
+                replacement=replacement,
+                source=source,
+            )
+            self.set_term_active(
+                db_session,
+                category=category,
+                term=term,
+                is_active=is_active,
+            )
+            db_session.commit()
+            row = self.get_term(db_session, category=category, term=term)
+            if row is None:
+                raise RuntimeError("Term upsert did not return persisted row")
+            return self.term_to_payload(row)
+        except SQLAlchemyError:
+            db_session.rollback()
+            raise
+        finally:
+            db_session.close()
+
+    def deactivate_term(self, *, category: str, term: str) -> bool:
+        db_session = self.session_factory()
+        try:
+            updated = self.set_term_active(
+                db_session,
+                category=category,
+                term=term,
+                is_active=False,
+            )
+            if updated:
+                db_session.commit()
+            else:
+                db_session.rollback()
+            return updated
+        except SQLAlchemyError:
+            db_session.rollback()
+            raise
+        finally:
+            db_session.close()
+
+    def record_observation(self, *, category: str, term: str) -> None:
+        db_session = self.session_factory()
+        try:
+            self.upsert_term(
+                db_session,
+                category=category,
+                term=term,
+                replacement=None,
+                source="session",
+                increment=True,
+            )
+            db_session.commit()
+        except SQLAlchemyError:
             db_session.rollback()
             raise
         finally:
@@ -205,6 +306,27 @@ class TextNormalizationVocabularySerializer:
             .all()
         )
 
+    def get_term(
+        self,
+        db_session: Session,
+        *,
+        category: str,
+        term: str,
+    ) -> TextNormalizationTerm | None:
+        term_norm = normalize_term(term)
+        if not term_norm:
+            return None
+        return (
+            db_session.execute(
+                select(TextNormalizationTerm).where(
+                    TextNormalizationTerm.category == category,
+                    TextNormalizationTerm.term_norm == term_norm,
+                )
+            )
+            .scalars()
+            .first()
+        )
+
     def set_term_active(
         self,
         db_session: Session,
@@ -261,6 +383,111 @@ class TextNormalizationVocabularySerializer:
             return None
         text = str(value).strip()
         return text or None
+
+    @staticmethod
+    def term_to_payload(row: TextNormalizationTerm) -> dict[str, Any]:
+        return {
+            "id": row.id,
+            "category": row.category,
+            "term": row.term,
+            "replacement": row.replacement,
+            "source": row.source,
+            "encounter_count": int(row.encounter_count or 0),
+            "is_active": bool(row.is_active),
+        }
+
+    @staticmethod
+    def _build_snapshot(rows: list[TextNormalizationTerm]) -> TextNormalizationSnapshot:
+        grouped: dict[str, set[str]] = {
+            "matching_stopword": set(),
+            "clinical_generic_term": set(),
+            "formulation_stopword": set(),
+            "manufacturer_token": set(),
+            "manufacturer_suffix": set(),
+            "rxnav_salt_stopword": set(),
+            "rxnav_form_stopword": set(),
+            "rxnav_unit_stopword": set(),
+            "rxnav_name_stopword": set(),
+            "trailing_temporal_token": set(),
+            "drug_non_mention": set(),
+            "drug_duration_word": set(),
+            "drug_weekday_word": set(),
+            "section_title_alias_anamnesis": set(),
+            "section_title_alias_drugs": set(),
+            "section_title_alias_laboratory_analysis": set(),
+        }
+        query_aliases: dict[str, str] = {}
+        lab_marker_aliases: dict[str, str] = {}
+        brand_combo_preferences: dict[str, str] = {}
+        knowledge_source_references: dict[str, str] = {}
+        for row in rows:
+            if not bool(row.is_active):
+                continue
+            term_norm = normalize_term(row.term)
+            if not term_norm:
+                continue
+            if row.category == QUERY_ALIAS_CATEGORY:
+                replacement = normalize_term(row.replacement)
+                if replacement:
+                    query_aliases[term_norm] = replacement
+                continue
+            if row.category == LAB_MARKER_ALIAS_CATEGORY:
+                replacement = normalize_term(row.replacement)
+                if replacement:
+                    lab_marker_aliases[term_norm] = replacement
+                continue
+            if row.category == BRAND_COMBO_PREFERENCE_CATEGORY:
+                replacement = normalize_term(row.replacement)
+                if replacement:
+                    brand_combo_preferences[term_norm] = replacement
+                continue
+            if row.category == KNOWLEDGE_SOURCE_REFERENCE_CATEGORY:
+                replacement = (row.replacement or "").strip()
+                if replacement:
+                    knowledge_source_references[term_norm] = replacement
+                continue
+            bucket = grouped.get(row.category)
+            if bucket is not None:
+                bucket.add(term_norm)
+
+        formulation_stopwords = (
+            grouped["formulation_stopword"]
+            | grouped["matching_stopword"]
+            | grouped["clinical_generic_term"]
+        )
+        rxnav_name_stopwords = (
+            grouped["rxnav_name_stopword"]
+            | grouped["rxnav_salt_stopword"]
+            | grouped["rxnav_form_stopword"]
+            | grouped["rxnav_unit_stopword"]
+        )
+        section_title_aliases = {
+            "anamnesis": frozenset(grouped["section_title_alias_anamnesis"]),
+            "drugs": frozenset(grouped["section_title_alias_drugs"]),
+            "laboratory_analysis": frozenset(
+                grouped["section_title_alias_laboratory_analysis"]
+            ),
+        }
+        return TextNormalizationSnapshot(
+            matching_stopwords=frozenset(grouped["matching_stopword"]),
+            clinical_generic_terms=frozenset(grouped["clinical_generic_term"]),
+            formulation_stopwords=frozenset(formulation_stopwords),
+            manufacturer_tokens=frozenset(grouped["manufacturer_token"]),
+            manufacturer_suffixes=tuple(sorted(grouped["manufacturer_suffix"])),
+            rxnav_salt_stopwords=frozenset(grouped["rxnav_salt_stopword"]),
+            rxnav_form_stopwords=frozenset(grouped["rxnav_form_stopword"]),
+            rxnav_unit_stopwords=frozenset(grouped["rxnav_unit_stopword"]),
+            rxnav_name_stopwords=frozenset(rxnav_name_stopwords),
+            trailing_temporal_tokens=frozenset(grouped["trailing_temporal_token"]),
+            query_aliases=query_aliases,
+            drug_non_mentions=frozenset(grouped["drug_non_mention"]),
+            drug_duration_words=frozenset(grouped["drug_duration_word"]),
+            drug_weekday_words=frozenset(grouped["drug_weekday_word"]),
+            lab_marker_aliases=lab_marker_aliases,
+            brand_combo_preferences=brand_combo_preferences,
+            knowledge_source_references=knowledge_source_references,
+            section_title_aliases=section_title_aliases,
+        )
 
 
 __all__ = ["TextNormalizationVocabularySerializer", "normalize_term"]

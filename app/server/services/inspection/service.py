@@ -1,11 +1,8 @@
 from __future__ import annotations
 
-import asyncio
 from datetime import date, datetime, UTC
 from functools import partial
 from pathlib import Path
-import re
-import time
 from threading import Lock
 from typing import Any, Literal
 
@@ -16,13 +13,9 @@ from common.constants import (
     VECTOR_DB_PATH,
 )
 from common.utils.logger import logger
-from configurations.llm_configs import LLMRuntimeConfig
 from configurations.startup import server_settings
 from domain.inspection import InspectionJobPhase
-from domain.patient_timeline import (
-    PatientTimeline,
-    PatientTimelineEvent,
-)
+from domain.patient_timeline import PatientTimeline
 from repositories.serialization.data import (
     DataSerializer,
     DocumentSerializer,
@@ -30,9 +23,6 @@ from repositories.serialization.data import (
 from repositories.vectors import LanceVectorDatabase
 from services.clinical.timeline import PatientTimelineExtractor
 from services.runtime.jobs import JobManager
-from services.inspection.runtime import (
-    coerce_optional_str,
-)
 from services.inspection.normalization import (
     extract_lab_marker as extract_lab_marker_value,
     first_iso_date as first_iso_date_value,
@@ -114,10 +104,15 @@ class DataInspectionService:
         serializer: DataSerializer | None = None,
         timeline_extractor: PatientTimelineExtractor | None = None,
         jobs: JobManager,
+        text_vocabulary_serializer: TextNormalizationVocabularySerializer | None = None,
     ) -> None:
         self.serializer = serializer or DataSerializer()
         self.timeline_extractor = timeline_extractor or PatientTimelineExtractor()
         self.jobs = jobs
+        self.text_vocabulary_serializer = text_vocabulary_serializer or TextNormalizationVocabularySerializer(
+            engine=self.serializer.engine,
+            session_factory=self.serializer.session_factory,
+        )
         self.timeline_generation_lock = Lock()
         self.timeline_generation_inflight: set[int] = set()
         self.timeline_generation_cooldown_until: dict[int, float] = {}
@@ -129,27 +124,7 @@ class DataInspectionService:
     def list_text_normalization_terms(
         self, category: str | None = None
     ) -> list[dict[str, Any]]:
-        vocabulary = TextNormalizationVocabularySerializer(
-            engine=self.serializer.engine,
-            session_factory=self.serializer.session_factory,
-        )
-        session = self.serializer.session_factory()
-        try:
-            rows = vocabulary.list_terms(session, category=category)
-            return [
-                {
-                    "id": row.id,
-                    "category": row.category,
-                    "term": row.term,
-                    "replacement": row.replacement,
-                    "source": row.source,
-                    "encounter_count": int(row.encounter_count or 0),
-                    "is_active": bool(row.is_active),
-                }
-                for row in rows
-            ]
-        finally:
-            session.close()
+        return self.text_vocabulary_serializer.list_term_payloads(category=category)
 
     def upsert_text_normalization_term(
         self,
@@ -160,68 +135,24 @@ class DataInspectionService:
         source: str,
         is_active: bool,
     ) -> dict[str, Any]:
-        vocabulary = TextNormalizationVocabularySerializer(
-            engine=self.serializer.engine,
-            session_factory=self.serializer.session_factory,
+        payload = self.text_vocabulary_serializer.upsert_term_payload(
+            category=category,
+            term=term,
+            replacement=replacement,
+            source=source,
+            is_active=is_active,
         )
-        session = self.serializer.session_factory()
-        try:
-            vocabulary.upsert_term(
-                session,
-                category=category,
-                term=term,
-                replacement=replacement,
-                source=source,
-            )
-            vocabulary.set_term_active(
-                session,
-                category=category,
-                term=term,
-                is_active=is_active,
-            )
-            session.commit()
-            invalidate_text_normalization_snapshot()
-            rows = vocabulary.list_terms(session, category=category)
-            term_norm = term.strip().lower()
-            for row in rows:
-                if row.term.strip().lower() == term_norm:
-                    return {
-                        "id": row.id,
-                        "category": row.category,
-                        "term": row.term,
-                        "replacement": row.replacement,
-                        "source": row.source,
-                        "encounter_count": int(row.encounter_count or 0),
-                        "is_active": bool(row.is_active),
-                    }
-            raise RuntimeError("Term upsert did not return persisted row")
-        except Exception:
-            session.rollback()
-            raise
-        finally:
-            session.close()
+        invalidate_text_normalization_snapshot()
+        return payload
 
     def deactivate_text_normalization_term(self, *, category: str, term: str) -> bool:
-        vocabulary = TextNormalizationVocabularySerializer(
-            engine=self.serializer.engine,
-            session_factory=self.serializer.session_factory,
+        updated = self.text_vocabulary_serializer.deactivate_term(
+            category=category,
+            term=term,
         )
-        session = self.serializer.session_factory()
-        try:
-            updated = vocabulary.set_term_active(
-                session,
-                category=category,
-                term=term,
-                is_active=False,
-            )
-            if updated:
-                session.commit()
-                invalidate_text_normalization_snapshot()
-            else:
-                session.rollback()
-            return updated
-        finally:
-            session.close()
+        if updated:
+            invalidate_text_normalization_snapshot()
+        return updated
 
     # -------------------------------------------------------------------------
     def build_update_config_response(self, target: UpdateTarget) -> dict[str, Any]:
