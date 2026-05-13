@@ -6,7 +6,6 @@ from fastapi import APIRouter, Body, status
 from fastapi import Query
 
 from domain.model_configs import (
-    ModelConfigSnapshot,
     ModelConfigStateResponse,
     ModelConfigUpdateRequest,
 )
@@ -25,10 +24,6 @@ class ModelConfigEndpoint:
     ) -> None:
         self.router = router
         self.service = service or ModelConfigService()
-
-    # -------------------------------------------------------------------------
-    def ensure_defaults(self) -> ModelConfigSnapshot:
-        return self.service.ensure_defaults()
 
     # -------------------------------------------------------------------------
     async def get_state(

@@ -26,10 +26,13 @@ from services.research.brave import BraveResearchService
 EXCLUDED_DIRS = {
     "__pycache__",
     ".venv",
+    ".uv-cache",
     ".pytest_cache",
     "node_modules",
     "dist",
 }
+APP_ROOT = pathlib.Path(__file__).resolve().parents[2]
+SERVER_ROOT = APP_ROOT / "server"
 
 
 def get_route_service(router: Any, route_path: str) -> Any:
@@ -43,7 +46,8 @@ def get_route_service(router: Any, route_path: str) -> Any:
 
 # -----------------------------------------------------------------------------
 def test_backend_httpx_asyncclient_calls_require_explicit_timeout() -> None:
-    root = pathlib.Path("app/server")
+    root = SERVER_ROOT
+    assert list(root.rglob("*.py")), f"No backend Python files found under {root}"
     violations: list[str] = []
     for path in root.rglob("*.py"):
         if not EXCLUDED_DIRS.isdisjoint(path.parts):
