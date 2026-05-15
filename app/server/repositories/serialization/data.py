@@ -1,32 +1,20 @@
 from __future__ import annotations
 
-import base64
-import binascii
 import hashlib
-import json
 import os
-import re
 import zipfile
-from datetime import date, datetime, timedelta
-from typing import Any, Iterator, cast
+from datetime import date
+from typing import Any, Iterator
 from xml.etree import ElementTree
 
 import pandas as pd
 from pypdf import PdfReader
 from sqlalchemy.engine import Engine
-from sqlalchemy import and_, delete, exists, func, inspect, or_, select, update
-from sqlalchemy.orm import Session, selectinload, sessionmaker
+from sqlalchemy.orm import Session, sessionmaker
 
-from configurations.startup import server_settings
 from domain.documents import Document
 from common.constants import (
-    DRUG_NAME_ALLOWED_PATTERN,
     DOCUMENT_SUPPORTED_EXTENSIONS,
-    LIVERTOX_COLUMNS,
-    LIVERTOX_MASTER_COLUMNS,
-    LIVERTOX_OPTIONAL_COLUMNS,
-    LIVERTOX_REQUIRED_COLUMNS,
-    RXNORM_CATALOG_COLUMNS,
     TEXT_FILE_FALLBACK_ENCODINGS,
 )
 from common.utils.logger import logger
@@ -34,30 +22,11 @@ from repositories.database.session import (
     resolve_engine,
     resolve_session_factory,
 )
-from repositories.queries.drugs import DrugRepositoryQueries
 from repositories.schemas.models import (
-    ClinicalSession,
-    ClinicalSessionDrug,
-    ClinicalSessionLab,
-    ClinicalSessionResult,
-    ClinicalSessionSection,
     Drug,
     DrugAlias,
-    DrugRxnormCode,
-    KbMatchCache,
     LiverToxMonograph,
     Patient,
-)
-from repositories.serialization.text_normalization import (
-    TextNormalizationVocabularySerializer,
-)
-from services.text.normalization import coerce_text, normalize_drug_name
-from services.text.synonyms import (
-    parse_synonym_list,
-    split_synonym_variants,
-)
-from services.text.vocabulary import (
-    invalidate_text_normalization_snapshot,
 )
 
 

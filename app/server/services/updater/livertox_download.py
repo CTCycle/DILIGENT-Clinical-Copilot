@@ -1,37 +1,18 @@
 from __future__ import annotations
 
 import asyncio
-import html
-import io
 import json
-import multiprocessing
 import os
 import re
-import tarfile
-import unicodedata
-from concurrent.futures import (
-    ALL_COMPLETED,
-    FIRST_COMPLETED,
-    Future,
-    ProcessPoolExecutor,
-    wait,
-)
 from datetime import UTC, datetime
-from typing import Any, cast
-from collections.abc import Callable
+from typing import Any
 
 import httpx
 import pandas as pd
-from pdfminer.high_level import extract_text as pdfminer_extract_text
-from pypdf import PdfReader
 from tqdm import tqdm
 
-from configurations.startup import server_settings
-from common.constants import LIVERTOX_BASE_URL, ARCHIVES_PATH
 from common.utils.logger import logger
-from services.text.normalization import normalize_whitespace
-from services.updater.sanitizer import LiverToxExcerptSanitizer
-from repositories.serialization.data import DataSerializer
+from services.updater import livertox_parse
 
 SUPPORTED_MONOGRAPH_EXTENSIONS = (".html", ".htm", ".xhtml", ".xml", ".nxml", ".pdf")
 NBK_ID_PATTERN = re.compile(r"^NBK\d+$", re.IGNORECASE)
@@ -74,7 +55,7 @@ def process_monograph_payload(
     member_name: str,
     data: bytes,
 ) -> dict[str, str] | None:
-    return LiverToxUpdater.process_monograph_member(member_name, data)
+    return livertox_parse.process_monograph_member(member_name, data)
 
 
 ###############################################################################
