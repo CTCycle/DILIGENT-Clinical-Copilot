@@ -99,12 +99,8 @@
         </div>
 
         <div class="stitch-dili-actions">
-          <button class="btn btn-primary" type="button" [disabled]="isCancelling() || vm.isStarting || isRunActionLocked()" (click)="runOrStop()">
-            @if (vm.isRunning) {
-              {{ vm.isStarting || isRunActionLocked() ? 'Starting...' : (isCancelling() ? 'Stopping...' : 'Stop analysis') }}
-            } @else {
-              Run DILI analysis
-            }
+          <button class="btn btn-primary" type="button" [disabled]="runActionDisabled" (click)="runOrStop()">
+            {{ runActionLabel }}
           </button>
           <button class="stitch-dili-clear" type="button" (click)="clearAll()" [disabled]="vm.isRunning">
             Clear all
@@ -137,7 +133,7 @@
           <div class="session-spinner" role="status" aria-live="polite">
             <div class="spinner-wheel"></div>
             <p class="spinner-label">
-              {{ (vm.jobStageMessage || 'Generating report') + (vm.jobProgress > 0 ? ('... ' + (vm.jobProgress | number:'1.0-0') + '%') : '...') }}
+              {{ spinnerStatusLabel }}
             </p>
           </div>
         } @else {
