@@ -742,6 +742,24 @@ class DataInspectionService:
             fallback_message="Generating embeddings",
         )
         result = updater.refresh_embeddings()
+        documents_count = int(result.get("documents", 0) or 0)
+        chunks_count = int(result.get("chunks", 0) or 0)
+        supported_files = int(result.get("supported_files", 0) or 0)
+        if chunks_count <= 0:
+            sample_paths = result.get("sample_supported_paths", [])
+            sample_details = ""
+            if isinstance(sample_paths, list) and sample_paths:
+                rendered = ", ".join(str(entry) for entry in sample_paths[:3])
+                sample_details = f" Sample files: {rendered}."
+            if supported_files > 0:
+                raise ValueError(
+                    f"RAG update produced zero chunks from {supported_files} supported files. "
+                    "Verify document text extraction support and source contents."
+                    f"{sample_details}"
+                )
+            raise ValueError(
+                "RAG update found zero supported files in the selected folder."
+            )
         self.report_phase_by_target(
             job_id=job_id,
             target="rag",
@@ -766,7 +784,13 @@ class DataInspectionService:
         backend = (
             "cloud" if bool(override_values.get("use_cloud_embeddings")) else "local"
         )
-        result_with_backend = {**result, "backend": backend}
+        result_with_backend = {
+            **result,
+            "backend": backend,
+            "documents": documents_count,
+            "chunks": chunks_count,
+            "supported_files": supported_files,
+        }
         return {"summary": result_with_backend}
 
     # -------------------------------------------------------------------------
