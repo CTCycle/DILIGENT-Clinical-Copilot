@@ -6,18 +6,18 @@ from services.runtime.jobs import get_job_manager
 
 
 CLINICAL_PROGRESS_MESSAGES: dict[str, str] = {
-    "session_initialization": "Initializing clinical session",
-    "hepatotoxicity_pattern": "Calculating hepatotoxicity pattern",
-    "therapy_extraction": "Extracting drugs from therapy",
-    "anamnesis_extraction": "Extracting drugs from anamnesis",
-    "anamnesis_disease_extraction": "Extracting diseases from anamnesis",
-    "anamnesis_lab_extraction": "Extracting longitudinal labs from clinical text",
-    "rag_query_building": "Building RAG queries",
-    "livertox_lookup": "Consulting LiverTox knowledge base",
-    "rucam_estimation": "Estimating per-drug RUCAM",
-    "llm_analysis": "Running LLM drug-by-drug assessment",
-    "report_composition": "Composing final clinical report",
-    "finalization": "Finalizing and persisting session",
+    "session_initialization": "Step 1/12 - Initializing session context and validating clinical inputs",
+    "therapy_extraction": "Step 2/12 - Parsing THERAPY section to extract active treatment lines",
+    "anamnesis_extraction": "Step 3/12 - Parsing ANAMNESIS section to identify historical drug exposures",
+    "anamnesis_disease_extraction": "Step 4/12 - Parsing ANAMNESIS section to extract comorbidities and risk context",
+    "anamnesis_lab_extraction": "Step 5/12 - Parsing LAB ANALYSIS history to reconstruct longitudinal trends",
+    "hepatotoxicity_pattern": "Step 6/12 - Computing hepatotoxicity pattern from laboratory trajectory",
+    "rag_query_building": "Step 7/12 - Preparing evidence-retrieval query context",
+    "livertox_lookup": "Step 8/12 - Cross-checking candidate drugs against LiverTox evidence",
+    "rucam_estimation": "Step 9/12 - Estimating per-drug RUCAM scores",
+    "llm_analysis": "Step 10/12 - Performing structured LLM causality assessment per candidate drug",
+    "report_composition": "Step 11/12 - Drafting integrated clinical assessment and recommendations",
+    "finalization": "Step 12/12 - Final consistency checks and session persistence",
 }
 
 
