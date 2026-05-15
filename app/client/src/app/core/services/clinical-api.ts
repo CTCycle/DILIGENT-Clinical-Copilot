@@ -43,6 +43,13 @@ export async function cancelClinicalJob(
   );
 }
 
+export function resolvePollIntervalMs(pollIntervalSeconds: number): number {
+  if (!Number.isFinite(pollIntervalSeconds) || pollIntervalSeconds <= 0) {
+    return 1000;
+  }
+  return Math.max(250, Math.round(pollIntervalSeconds * 1000));
+}
+
 export function pollClinicalJobStatus(
   jobId: string,
   intervalMs: number,
@@ -54,7 +61,7 @@ export function pollClinicalJobStatus(
     30,
     Math.max(5, Math.ceil((safeIntervalMs / 1000) * 4)),
   );
-  const maxConsecutivePollErrors = 3;
+  const maxConsecutivePollErrors = 30;
   let timeoutId: ReturnType<typeof globalThis.setTimeout> | null = null;
   let stopped = false;
   let consecutivePollErrors = 0;
@@ -77,7 +84,11 @@ export function pollClinicalJobStatus(
       if (stopped) return;
       consecutivePollErrors += 1;
       if (consecutivePollErrors < maxConsecutivePollErrors) {
-        timeoutId = globalThis.setTimeout(poll, safeIntervalMs);
+        const retryDelayMs = Math.min(
+          safeIntervalMs * 8,
+          safeIntervalMs * Math.max(1, consecutivePollErrors),
+        );
+        timeoutId = globalThis.setTimeout(poll, retryDelayMs);
         return;
       }
       const message =
@@ -86,7 +97,7 @@ export function pollClinicalJobStatus(
           "[ERROR] Polling could not continue. Please retry.",
         );
       onError(
-        `Polling failed after ${maxConsecutivePollErrors} attempts. ${message}`,
+        `Polling failed after ${maxConsecutivePollErrors} consecutive attempts. ${message}`,
       );
       return;
     }
