@@ -526,10 +526,14 @@ export class DataInspectionPageComponent implements OnInit, OnDestroy {
     const webkitPath = firstFile.webkitRelativePath || '';
     const rootFolder = webkitPath.split('/')[0]?.trim() || '';
     const absoluteCandidate = this.resolveAbsoluteFolderPath(firstFile, webkitPath, rootFolder);
-    const resolvedPath = absoluteCandidate || rootFolder;
-    if (resolvedPath) {
-      this.ragSelectedFolderPath.set(resolvedPath);
+    if (absoluteCandidate) {
+      this.ragSelectedFolderPath.set(absoluteCandidate);
+      this.ragError.set(null);
+      return;
     }
+    this.ragError.set(
+      'Unable to resolve an absolute folder path from this browser selection. Paste an absolute path in JSON overrides.',
+    );
   }
 
   private resolveAbsoluteFolderPath(
