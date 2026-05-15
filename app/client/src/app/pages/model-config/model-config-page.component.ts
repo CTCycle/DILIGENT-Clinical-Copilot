@@ -31,6 +31,7 @@ import {
   updateModelConfigState,
 } from '../../core/services/model-config-api';
 import { JobPollingService } from '../../core/services/job-polling.service';
+import { resolvePollIntervalMs } from '../../core/services/clinical-api';
 import { AccessKeyModalComponent } from './components/access-key-modal.component';
 import { ModelRoleActionButtonComponent } from './components/model-role-action-button.component';
 import {
@@ -343,7 +344,7 @@ export class ModelConfigPageComponent implements OnInit {
 
         try {
           const start = await startModelPullJob(modelName);
-          const intervalMs = Math.max(250, Math.round(start.poll_interval * 1000));
+          const intervalMs = resolvePollIntervalMs(start.poll_interval);
           await this.pollPullJob(modelName, start.job_id, intervalMs);
           completed.push(modelName);
         } catch (error) {

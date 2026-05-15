@@ -528,9 +528,9 @@ def parse_size_to_bytes(value: Any) -> int:
 
 def get_available_memory_bytes() -> int:
     for getter in (
-        OllamaClient._get_available_memory_windows,
-        OllamaClient._get_available_memory_sysconf,
-        OllamaClient._get_available_memory_proc,
+        _get_available_memory_windows,
+        _get_available_memory_sysconf,
+        _get_available_memory_proc,
     ):
         available = getter()
         if available:
@@ -540,10 +540,10 @@ def get_available_memory_bytes() -> int:
 def get_available_vram_bytes() -> int:
     env_value = (os.getenv("OLLAMA_AVAILABLE_VRAM_BYTES") or "").strip()
     if env_value:
-        parsed = OllamaClient.parse_size_to_bytes(env_value)
+        parsed = parse_size_to_bytes(env_value)
         if parsed > 0:
             return parsed
-    return OllamaClient._get_available_vram_nvidia_smi()
+    return _get_available_vram_nvidia_smi()
 
 def _get_available_vram_nvidia_smi() -> int:
     if shutil.which("nvidia-smi") is None:
@@ -645,7 +645,7 @@ def _get_available_memory_proc() -> int:
     try:
         with open("/proc/meminfo", "r", encoding="utf-8") as handle:
             for line in handle:
-                parsed = OllamaClient._parse_meminfo_line(line)
+                parsed = _parse_meminfo_line(line)
                 if parsed is not None:
                     return parsed
     except (FileNotFoundError, PermissionError, ValueError):

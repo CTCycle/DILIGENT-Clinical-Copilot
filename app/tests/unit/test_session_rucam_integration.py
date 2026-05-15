@@ -12,7 +12,7 @@ from services.clinical.preparation import HepatoxPreparedInputs
 
 def get_session_service() -> Any:
     for route in session_module.router.routes:
-        if getattr(route, "path", "").endswith("/clinical"):
+        if getattr(route, "path", "") == "/clinical/jobs":
             owner = getattr(route.endpoint, "__self__", None)
             if owner is not None:
                 return owner.service
@@ -43,6 +43,14 @@ class FakeDrugsParser:
     model = 'fake-parser'
     def clean_text(self, text: str) -> str:
         return text
+    def parse_line(self, line: str) -> DrugEntry | None:
+        _ = line
+        return DrugEntry(
+            name='Drug A',
+            therapy_start_date='2024-12-20',
+            suspension_status=True,
+            source='therapy',
+        )
     async def extract_drugs_from_therapy(self, text: str, **kwargs: Any) -> PatientDrugs:
         _ = text
         _ = kwargs

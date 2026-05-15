@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from pydantic import BaseModel, ConfigDict
+from pydantic import BaseModel, ConfigDict, Field
 
 
 class FastAPISettings(BaseModel):
@@ -12,7 +12,7 @@ class FastAPISettings(BaseModel):
 
 class JobsSettings(BaseModel):
     model_config = ConfigDict(frozen=True)
-    polling_interval: float
+    polling_interval: float = Field(gt=0)
 
 
 class DatabaseSettings(BaseModel):

@@ -1,36 +1,23 @@
 from __future__ import annotations
 
-import asyncio
-import html
-import io
 import json
-import multiprocessing
 import os
 import re
-import tarfile
-import unicodedata
 from concurrent.futures import (
-    ALL_COMPLETED,
-    FIRST_COMPLETED,
     Future,
     ProcessPoolExecutor,
-    wait,
 )
-from datetime import UTC, datetime
-from typing import Any, cast
+from typing import Any
 from collections.abc import Callable
 
 import httpx
 import pandas as pd
-from pdfminer.high_level import extract_text as pdfminer_extract_text
-from pypdf import PdfReader
 from tqdm import tqdm
 
 from configurations.startup import server_settings
 from common.constants import LIVERTOX_BASE_URL, ARCHIVES_PATH
-from common.utils.logger import logger
-from services.text.normalization import normalize_whitespace
 from services.updater.sanitizer import LiverToxExcerptSanitizer
+from services.updater import livertox_download, livertox_index, livertox_parse
 from repositories.serialization.data import DataSerializer
 
 SUPPORTED_MONOGRAPH_EXTENSIONS = (".html", ".htm", ".xhtml", ".xml", ".nxml", ".pdf")
@@ -104,9 +91,6 @@ async def download_file(
                     output.write(chunk)
                     progress.update(len(chunk))
 
-
-###############################################################################
-from services.updater import livertox_download, livertox_index, livertox_parse
 
 class LiverToxUpdater:
     def __init__(

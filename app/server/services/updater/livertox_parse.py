@@ -1,6 +1,5 @@
 from __future__ import annotations
 
-import asyncio
 import html
 import io
 import json
@@ -16,7 +15,6 @@ from concurrent.futures import (
     ProcessPoolExecutor,
     wait,
 )
-from datetime import UTC, datetime
 from typing import Any, cast
 from collections.abc import Callable
 
@@ -26,12 +24,8 @@ from pdfminer.high_level import extract_text as pdfminer_extract_text
 from pypdf import PdfReader
 from tqdm import tqdm
 
-from configurations.startup import server_settings
-from common.constants import LIVERTOX_BASE_URL, ARCHIVES_PATH
 from common.utils.logger import logger
 from services.text.normalization import normalize_whitespace
-from services.updater.sanitizer import LiverToxExcerptSanitizer
-from repositories.serialization.data import DataSerializer
 
 SUPPORTED_MONOGRAPH_EXTENSIONS = (".html", ".htm", ".xhtml", ".xml", ".nxml", ".pdf")
 NBK_ID_PATTERN = re.compile(r"^NBK\d+$", re.IGNORECASE)
