@@ -59,17 +59,32 @@ class VectorSerializer:
         self.embedding_workers = max(int(resolved_workers), 1)
 
     # -------------------------------------------------------------------------
-    def serialize(self) -> dict[str, int]:
+    def serialize(self) -> dict[str, Any]:
         self.vector_database.initialize()
         self.vector_database.get_table()
+        available_paths = self.document_serializer.collect_document_paths()
+        total_supported_files = len(available_paths)
+        diagnostic_paths = [path for path in available_paths[:5]]
         documents = self.document_serializer.load_documents()
         if not documents:
             logger.warning("No documents available for embedding serialization")
-            return {"documents": 0, "chunks": 0}
+            return {
+                "documents": 0,
+                "chunks": 0,
+                "supported_files": total_supported_files,
+                "loaded_documents": 0,
+                "sample_supported_paths": diagnostic_paths,
+            }
         chunks = self.chunker.chunk_documents(documents)
         if not chunks:
             logger.warning("Document chunking resulted in zero chunks")
-            return {"documents": 0, "chunks": 0}
+            return {
+                "documents": 0,
+                "chunks": 0,
+                "supported_files": total_supported_files,
+                "loaded_documents": len(documents),
+                "sample_supported_paths": diagnostic_paths,
+            }
         batch_size = self.embedding_batch_size
         total_records = 0
         document_ids: set[str] = set()
@@ -95,7 +110,13 @@ class VectorSerializer:
             len(document_ids),
             total_records,
         )
-        return {"documents": len(document_ids), "chunks": total_records}
+        return {
+            "documents": len(document_ids),
+            "chunks": total_records,
+            "supported_files": total_supported_files,
+            "loaded_documents": len(documents),
+            "sample_supported_paths": diagnostic_paths,
+        }
 
     # -------------------------------------------------------------------------
     def _embed_chunk_batch(

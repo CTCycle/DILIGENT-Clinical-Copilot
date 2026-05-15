@@ -97,6 +97,19 @@ function resolveUpdateProgressMessage(status: InspectionUpdateJobStatusResponse)
     return 'Update progress unavailable.';
   }
   const resultPayload = readRecordKey(payload, 'result');
+  const statusValue = readStringKey(payload, 'status') || 'unknown';
+  if (resultPayload && statusValue === "completed") {
+    const summary = readRecordKey(resultPayload, "summary");
+    const documents = summary ? readNumberKey(summary, "documents") : null;
+    const chunks = summary ? readNumberKey(summary, "chunks") : null;
+    const supportedFiles = summary ? readNumberKey(summary, "supported_files") : null;
+    if (typeof documents === "number" && typeof chunks === "number") {
+      const supportedSuffix = typeof supportedFiles === "number"
+        ? ` from ${supportedFiles} supported files`
+        : "";
+      return `RAG embeddings update completed: ${documents} documents, ${chunks} chunks${supportedSuffix}.`;
+    }
+  }
   const resultMessage = resultPayload
     ? readStringKey(resultPayload, 'progress_message', 'progressMessage')
     : null;
@@ -107,7 +120,6 @@ function resolveUpdateProgressMessage(status: InspectionUpdateJobStatusResponse)
   if (errorMessage) {
     return errorMessage;
   }
-  const statusValue = readStringKey(payload, 'status') || 'unknown';
   return `Job status: ${statusValue}`;
 }
 
@@ -298,9 +310,12 @@ export class InspectionUpdateJobResource {
     overrides: Record<string, unknown>,
   ): InspectionUpdateOverridesByTarget[TTarget] {
     if (target === 'rag') {
+      const requestedPath = typeof overrides["documents_path"] === "string"
+        ? overrides["documents_path"].trim()
+        : "";
       return {
         ...overrides,
-        documents_path: this.getRagDocumentsPath().trim() || undefined,
+        documents_path: requestedPath || this.getRagDocumentsPath().trim() || undefined,
       } as InspectionUpdateOverridesByTarget[TTarget];
     }
     return overrides as InspectionUpdateOverridesByTarget[TTarget];

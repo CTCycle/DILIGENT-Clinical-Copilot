@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-import os
+from pathlib import Path
 
 from configurations.startup import server_settings
 from common.constants import DOCS_PATH, VECTOR_DB_PATH
@@ -29,6 +29,16 @@ class RagEmbeddingUpdater:
         reset_vector_collection: bool | None = None,
     ) -> None:
         self.documents_path = documents_path or DOCS_PATH
+        resolved_documents_path = Path(self.documents_path)
+        if not resolved_documents_path.is_absolute():
+            raise ValueError(
+                "RAG documents_path must be an absolute path."
+            )
+        if not resolved_documents_path.exists() or not resolved_documents_path.is_dir():
+            raise ValueError(
+                "RAG documents_path does not exist or is not a directory."
+            )
+        self.documents_path = str(resolved_documents_path)
         default_use_cloud = server_settings.rag.use_cloud_embeddings
         self.use_cloud_embeddings = (
             default_use_cloud if use_cloud_embeddings is None else use_cloud_embeddings
@@ -77,7 +87,6 @@ class RagEmbeddingUpdater:
             if reset_vector_collection is None
             else bool(reset_vector_collection)
         )
-        os.makedirs(self.documents_path, exist_ok=True)
         self.vector_database = LanceVectorDatabase(
             database_path=VECTOR_DB_PATH,
             collection_name=self.vector_collection_name,
