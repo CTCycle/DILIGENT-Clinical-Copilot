@@ -19,12 +19,26 @@ import {
 import {
   cancelClinicalJob,
   pollClinicalJobStatus,
+  resolvePollIntervalMs,
   startClinicalJob,
 } from '../../core/services/clinical-api';
 import { MarkdownRendererService } from '../../core/services/markdown-renderer.service';
 
 const todayIso = new Date().toISOString().slice(0, 10);
-const DEFAULT_POLL_INTERVAL_MS = 1000;
+const STAGE_FALLBACK_LABELS: Record<string, string> = {
+  session_initialization: 'Step 1/12 - Initializing session context and validating clinical inputs',
+  therapy_extraction: 'Step 2/12 - Parsing THERAPY section to extract active treatment lines',
+  anamnesis_extraction: 'Step 3/12 - Parsing ANAMNESIS section to identify historical drug exposures',
+  anamnesis_disease_extraction: 'Step 4/12 - Parsing ANAMNESIS section to extract comorbidities and risk context',
+  anamnesis_lab_extraction: 'Step 5/12 - Parsing LAB ANALYSIS history to reconstruct longitudinal trends',
+  hepatotoxicity_pattern: 'Step 6/12 - Computing hepatotoxicity pattern from laboratory trajectory',
+  rag_query_building: 'Step 7/12 - Preparing evidence-retrieval query context',
+  livertox_lookup: 'Step 8/12 - Cross-checking candidate drugs against LiverTox evidence',
+  rucam_estimation: 'Step 9/12 - Estimating per-drug RUCAM scores',
+  llm_analysis: 'Step 10/12 - Performing structured LLM causality assessment per candidate drug',
+  report_composition: 'Step 11/12 - Drafting integrated clinical assessment and recommendations',
+  finalization: 'Step 12/12 - Final consistency checks and session persistence',
+};
 
 function isTerminalJobStatus(status: JobStatus | null): boolean {
   return status === 'completed' || status === 'failed' || status === 'cancelled';
@@ -267,10 +281,10 @@ export class DiliAgentPageComponent implements OnDestroy {
         jobProgress: 0,
         jobStatus: startResult.status,
         jobStage: 'session_initialization',
-        jobStageMessage: 'Initializing clinical session',
+        jobStageMessage: STAGE_FALLBACK_LABELS['session_initialization'],
         isStarting: false,
       });
-      const intervalMs = startResult.poll_interval * 1000;
+      const intervalMs = resolvePollIntervalMs(startResult.poll_interval);
       this.startPolling(startResult.job_id, intervalMs);
     } catch (error) {
       this.stateService.updateDiliAgent({
@@ -379,7 +393,14 @@ export class DiliAgentPageComponent implements OnDestroy {
   }
 
   runOrStop(): void {
-    if (this.runControlDebounced || this.vm.isStarting || this.isCancelling() || this.isRunActionLocked()) {
+    if (this.runControlDebounced || this.isCancelling()) {
+      return;
+    }
+    if (this.vm.isRunning) {
+      void this.stopSession();
+      return;
+    }
+    if (this.vm.isStarting || this.isRunActionLocked()) {
       return;
     }
     this.runControlDebounced = true;
@@ -390,15 +411,41 @@ export class DiliAgentPageComponent implements OnDestroy {
       this.runControlDebounced = false;
       this.runControlDebounceTimer = null;
     }, 1000);
-    if (this.vm.isRunning) {
-      void this.stopSession();
-      return;
-    }
     void this.runSession();
   }
 
   get showSpinner(): boolean {
     return this.vm.isRunning && !isTerminalJobStatus(this.vm.jobStatus);
+  }
+
+  get spinnerStatusLabel(): string {
+    const baseLabel = this.vm.jobStageMessage
+      || (this.vm.jobStage ? STAGE_FALLBACK_LABELS[this.vm.jobStage] : null)
+      || 'Starting clinical analysis';
+    const suffix = this.vm.jobProgress > 0
+      ? `... ${this.vm.jobProgress.toFixed(0)}%`
+      : '...';
+    return `${baseLabel}${suffix}`;
+  }
+
+  get runActionDisabled(): boolean {
+    if (this.vm.isRunning) {
+      return this.isCancelling();
+    }
+    return this.isCancelling() || this.vm.isStarting || this.isRunActionLocked();
+  }
+
+  get runActionLabel(): string {
+    if (!this.vm.isRunning) {
+      return 'Run DILI analysis';
+    }
+    if (this.isCancelling()) {
+      return 'Stopping...';
+    }
+    if (!this.vm.jobId) {
+      return 'Starting...';
+    }
+    return 'Stop analysis';
   }
 
   get reportBody(): string {
@@ -422,10 +469,6 @@ export class DiliAgentPageComponent implements OnDestroy {
       month: 'long',
       day: 'numeric',
     });
-  }
-
-  get defaultPollIntervalMs(): number {
-    return DEFAULT_POLL_INTERVAL_MS;
   }
 
   private countClinicalWords(value: string): number {
