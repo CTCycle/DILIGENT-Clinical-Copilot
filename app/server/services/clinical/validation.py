@@ -53,12 +53,16 @@ def ensure_required_sections(
 
 
 def has_timing_information(entry: DrugEntry) -> bool:
+    has_schedule = bool((entry.administration_pattern or "").strip()) or any(
+        slot > 0 for slot in (entry.daytime_administration or [])
+    )
     return bool(
         entry.therapy_start_date
         or entry.suspension_date
         or entry.temporal_classification == "temporal_known"
         or entry.therapy_start_status is True
         or entry.suspension_status is True
+        or has_schedule
     )
 
 

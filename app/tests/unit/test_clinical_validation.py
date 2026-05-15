@@ -44,6 +44,21 @@ def test_missing_timed_drug_raises_error() -> None:
     assert any(issue.code == "missing_timed_drug" for issue in exc_info.value.issues)
 
 
+def test_drug_schedule_counts_as_timing_information() -> None:
+    drugs = PatientDrugs(
+        entries=[
+            DrugEntry(
+                name="Levetiracetam",
+                source="therapy",
+                administration_pattern="1-0-0-1",
+                daytime_administration=[1, 0, 0, 1],
+            )
+        ]
+    )
+    bundle = build_validation_bundle("en")
+    ensure_timed_therapy_drug(drugs, bundle=bundle)
+
+
 def test_insufficient_pattern_labs_raise_blocker() -> None:
     analyzer = HepatotoxicityPatternAnalyzer()
     with pytest.raises(ClinicalPipelineValidationError) as exc_info:
