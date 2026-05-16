@@ -195,6 +195,10 @@ export class DataInspectionPageComponent implements OnInit, OnDestroy {
   readonly ragSearchInput = this.ragCatalog.searchInput;
   readonly ragVectorStore = signal<InspectionRagVectorStoreSummary | null>(null);
   readonly ragSelectedFolderPath = signal('');
+  readonly ragFolderPathInput = signal('');
+  readonly supportsNativeFolderSelection =
+    typeof globalThis !== 'undefined' &&
+    '__TAURI_INTERNALS__' in globalThis;
 
   readonly reportSession = signal<InspectionSessionItem | null>(null);
   readonly reportContent = signal('');
@@ -313,7 +317,9 @@ export class DataInspectionPageComponent implements OnInit, OnDestroy {
       const vectorStore = await fetchInspectionRagVectorStore();
       this.ragVectorStore.set(vectorStore);
       if (!this.ragSelectedFolderPath().trim()) {
-        this.ragSelectedFolderPath.set(resolveRagDocumentsPath(vectorStore));
+        const resolvedPath = resolveRagDocumentsPath(vectorStore);
+        this.ragSelectedFolderPath.set(resolvedPath);
+        this.ragFolderPathInput.set(resolvedPath);
       }
     } catch (error) {
       this.ragVectorStore.set(null);
@@ -517,6 +523,20 @@ export class DataInspectionPageComponent implements OnInit, OnDestroy {
     this.ragFolderInput?.nativeElement.click();
   }
 
+  updateRagFolderPath(value: string): void {
+    this.ragFolderPathInput.set(value);
+  }
+
+  applyRagFolderPath(): void {
+    const normalized = this.ragFolderPathInput().trim();
+    if (!normalized) {
+      this.ragError.set('Enter an absolute RAG folder path before using it.');
+      return;
+    }
+    this.ragSelectedFolderPath.set(normalized);
+    this.ragError.set(null);
+  }
+
   handleRagFolderSelection(event: Event): void {
     const target = event.target;
     if (!(target instanceof HTMLInputElement) || !target.files || target.files.length === 0) {
@@ -528,6 +548,7 @@ export class DataInspectionPageComponent implements OnInit, OnDestroy {
     const absoluteCandidate = this.resolveAbsoluteFolderPath(firstFile, webkitPath, rootFolder);
     if (absoluteCandidate) {
       this.ragSelectedFolderPath.set(absoluteCandidate);
+      this.ragFolderPathInput.set(absoluteCandidate);
       this.ragError.set(null);
       return;
     }
