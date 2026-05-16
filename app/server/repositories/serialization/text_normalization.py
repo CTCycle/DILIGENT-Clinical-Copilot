@@ -183,63 +183,123 @@ class TextNormalizationVocabularySerializer:
 
     def seed_from_catalog(self, db_session: Session) -> None:
         payload = CatalogLoader.load_catalog(SEED_CATALOG)
+        expected_terms = self.build_seed_terms(payload)
+        if self.seed_catalog_already_present(db_session, expected_terms):
+            logger.info(
+                "Text normalization seed vocabulary already present (%s entries)",
+                len(expected_terms),
+            )
+            return
+
         seeded = 0
-        for key, category in STRING_LIST_CATEGORIES.items():
-            values = payload.get(key, [])
-            if not isinstance(values, list):
-                continue
-            seeded += self.upsert_terms(
+        for (category, term_norm), seed_term in expected_terms.items():
+            self.upsert_term(
                 db_session,
                 category=category,
-                values=(str(value) for value in values),
+                term=seed_term["term"],
+                replacement=seed_term["replacement"],
                 source="seed",
             )
+            seeded += 1
+        logger.info("Seeded text normalization vocabulary (%s entries checked)", seeded)
+
+    def build_seed_terms(
+        self, payload: dict[str, Any]
+    ) -> dict[tuple[str, str], dict[str, str | None]]:
+        expected_terms: dict[tuple[str, str], dict[str, str | None]] = {}
+        for key, category in STRING_LIST_CATEGORIES.items():
+            values = payload.get(key, [])
+            if isinstance(values, list):
+                self.collect_seed_terms(
+                    expected_terms,
+                    category=category,
+                    values=(str(value) for value in values),
+                    replacement=None,
+                )
         for key, category in MAPPING_CATEGORIES.items():
             rows = payload.get(key, [])
             if not isinstance(rows, list):
                 continue
-            seeded += self.upsert_mapping_terms(
-                db_session,
-                category=category,
-                rows=rows,
-                source="seed",
-            )
+            for row in rows:
+                term = self.clean_text(row.get("term"))
+                replacement = self.clean_text(row.get("replacement"))
+                if term is None or replacement is None:
+                    continue
+                self.collect_seed_terms(
+                    expected_terms,
+                    category=category,
+                    values=(term,),
+                    replacement=replacement,
+                )
         section_aliases = payload.get("section_title_aliases", {})
         if isinstance(section_aliases, dict):
             for section_key, category in SECTION_TITLE_ALIAS_CATEGORIES.items():
                 values = section_aliases.get(section_key, [])
-                if not isinstance(values, list):
-                    continue
-                seeded += self.upsert_terms(
-                    db_session,
-                    category=category,
-                    values=(str(value) for value in values),
-                    source="seed",
-                )
-        logger.info("Seeded text normalization vocabulary (%s entries checked)", seeded)
+                if isinstance(values, list):
+                    self.collect_seed_terms(
+                        expected_terms,
+                        category=category,
+                        values=(str(value) for value in values),
+                        replacement=None,
+                    )
+        return expected_terms
 
-    def upsert_terms(
+    def collect_seed_terms(
         self,
-        db_session: Session,
+        expected_terms: dict[tuple[str, str], dict[str, str | None]],
         *,
         category: str,
         values: Iterable[str],
-        source: str,
-    ) -> int:
-        count = 0
+        replacement: str | None,
+    ) -> None:
         for value in values:
             term = self.clean_text(value)
             if term is None:
                 continue
-            self.upsert_term(
-                db_session,
-                category=category,
-                term=term,
-                replacement=None,
-                source=source,
+            term_norm = normalize_term(term)
+            if not term_norm:
+                continue
+            expected_terms[(category, term_norm)] = {
+                "term": term,
+                "replacement": replacement,
+            }
+
+    def seed_catalog_already_present(
+        self,
+        db_session: Session,
+        expected_terms: dict[tuple[str, str], dict[str, str | None]],
+    ) -> bool:
+        if not expected_terms:
+            return True
+        categories = sorted({category for category, _term_norm in expected_terms})
+        rows = (
+            db_session.execute(
+                select(
+                    TextNormalizationTerm.category,
+                    TextNormalizationTerm.term_norm,
+                    TextNormalizationTerm.replacement,
+                    TextNormalizationTerm.is_active,
+                ).where(TextNormalizationTerm.category.in_(categories))
             )
-            count += 1
-        return count
+            .tuples()
+            .all()
+        )
+        present = {
+            (category, term_norm): {
+                "replacement": replacement,
+                "is_active": bool(is_active),
+            }
+            for category, term_norm, replacement, is_active in rows
+        }
+        for key, seed_term in expected_terms.items():
+            row = present.get(key)
+            if row is None or not row["is_active"]:
+                return False
+            if seed_term["replacement"] is not None:
+                replacement = self.clean_text(row["replacement"])
+                if replacement != seed_term["replacement"]:
+                    return False
+        return True
 
     def upsert_term(
         self,
@@ -352,30 +412,6 @@ class TextNormalizationVocabularySerializer:
             return False
         existing.is_active = bool(is_active)
         return True
-
-    def upsert_mapping_terms(
-        self,
-        db_session: Session,
-        *,
-        category: str,
-        rows: Iterable[dict[str, Any]],
-        source: str,
-    ) -> int:
-        count = 0
-        for row in rows:
-            term = self.clean_text(row.get("term"))
-            replacement = self.clean_text(row.get("replacement"))
-            if term is None or replacement is None:
-                continue
-            self.upsert_term(
-                db_session,
-                category=category,
-                term=term,
-                replacement=replacement,
-                source=source,
-            )
-            count += 1
-        return count
 
     @staticmethod
     def clean_text(value: Any) -> str | None:

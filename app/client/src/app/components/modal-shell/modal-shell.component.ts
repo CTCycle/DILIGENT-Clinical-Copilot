@@ -1,6 +1,8 @@
 import { CommonModule } from '@angular/common';
 import { Component, EventEmitter, Input, Output } from '@angular/core';
 
+export type ModalShellDialogClassName = 'modal-container' | 'modal-container modal-container-wide' | string;
+
 @Component({
   selector: 'app-modal-shell',
   standalone: true,
@@ -15,7 +17,7 @@ export class ModalShellComponent {
   @Input() title = '';
   @Input() subtitle?: string;
   @Input() titleId?: string;
-  @Input() dialogClassName = 'modal-container';
+  @Input() dialogClassName: ModalShellDialogClassName = 'modal-container';
   @Input() closeLabel = 'Close modal';
   @Input() footer = false;
 
