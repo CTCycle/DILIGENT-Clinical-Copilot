@@ -133,6 +133,19 @@ def test_validation_error_keeps_detail_and_request_id() -> None:
 
 
 # -----------------------------------------------------------------------------
+def test_validation_error_with_value_error_context_is_json_safe() -> None:
+    with TestClient(server_app_module.app, raise_server_exceptions=False) as client:
+        response = client.post(
+            "/api/access-keys",
+            json={"provider": "openai", "access_key": "short"},
+        )
+
+    assert response.status_code == 422
+    payload = response.json()
+    assert payload["detail"][0]["ctx"]["error"] == "access_key is too short"
+
+
+# -----------------------------------------------------------------------------
 def test_job_manager_masks_sensitive_error_details() -> None:
     manager = JobManager()
 
@@ -171,7 +184,7 @@ def test_access_key_endpoint_sanitizes_dependency_failure(monkeypatch) -> None:
     with TestClient(server_app_module.app, raise_server_exceptions=False) as client:
         response = client.post(
             "/api/access-keys",
-            json={"provider": "openai", "access_key": "sk-test-value"},
+            json={"provider": "openai", "access_key": "sk-test-value-secret"},
         )
 
     assert response.status_code == 503

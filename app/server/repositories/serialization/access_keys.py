@@ -18,7 +18,12 @@ from common.security.cryptography import (
     encrypt_with_key_material,
     fingerprint_plaintext,
 )
-from domain.keys import ProviderName, RESEARCH_PROVIDER, normalize_provider_name
+from domain.keys import (
+    ProviderName,
+    RESEARCH_PROVIDER,
+    normalize_access_key,
+    normalize_provider_name,
+)
 
 
 ###############################################################################
@@ -85,16 +90,17 @@ class AccessKeySerializer:
         self, provider: str, plaintext_key: str
     ) -> AccessKey | ResearchAccessKey:
         normalized_provider = self.normalize_provider(provider)
+        normalized_key = normalize_access_key(plaintext_key)
         table = self.resolve_table(normalized_provider)
         active_material = self.encryption_material_serializer.get_active_material()
         ciphertext = encrypt_with_key_material(
-            plaintext_key, active_material.key_material
+            normalized_key, active_material.key_material
         )
         row = table(
             provider=normalized_provider,
             encrypted_value=ciphertext,
             encryption_key_version=int(active_material.key_version),
-            fingerprint=fingerprint_plaintext(plaintext_key),
+            fingerprint=fingerprint_plaintext(normalized_key),
             is_active=False,
         )
         db_session = self.session_factory()
