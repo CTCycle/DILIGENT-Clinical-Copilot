@@ -2,15 +2,16 @@ from __future__ import annotations
 
 import asyncio
 import json
-import math
 from collections.abc import Coroutine
-from typing import Any, Literal, cast
+from typing import Any, Literal, Protocol, cast
 
 import httpx
 from langchain_google_genai import GoogleGenerativeAIEmbeddings
 from langchain_ollama import OllamaEmbeddings
 from langchain_openai import OpenAIEmbeddings
 from pydantic import SecretStr
+from transformers import AutoModelForSequenceClassification, AutoTokenizer
+import torch
 
 from configurations.startup import server_settings
 from common.constants import CLOUD_MODEL_CHOICES, VECTOR_DB_PATH
@@ -25,6 +26,37 @@ EmbeddingBackend = Literal["ollama", "cloud"]
 
 
 ###############################################################################
+class Reranker(Protocol):
+    def predict(self, pairs: list[tuple[str, str]]) -> list[float]:
+        ...
+
+
+###############################################################################
+class LocalCrossEncoderReranker:
+    def __init__(self, model_name: str) -> None:
+        self.tokenizer = AutoTokenizer.from_pretrained(model_name)
+        self.model = AutoModelForSequenceClassification.from_pretrained(model_name)
+        self.model.eval()
+
+    # -------------------------------------------------------------------------
+    def predict(self, pairs: list[tuple[str, str]]) -> list[float]:
+        if not pairs:
+            return []
+        with torch.no_grad():
+            encoded = self.tokenizer(
+                pairs,
+                padding=True,
+                truncation=True,
+                return_tensors="pt",
+            )
+            outputs = self.model(**encoded)
+            logits = outputs.logits.squeeze(-1)
+            if logits.ndim == 0:
+                logits = logits.unsqueeze(0)
+            return [float(value) for value in logits.tolist()]
+
+
+###############################################################################
 def _build_openai_embeddings_model(
     *,
     api_key: str,
@@ -35,6 +67,7 @@ def _build_openai_embeddings_model(
         api_key=SecretStr(api_key),
         model=model,
         timeout=timeout_s,
+        check_embedding_ctx_length=False,
     )
 
 
@@ -344,6 +377,7 @@ class SimilaritySearch:
         default_top_k: int = server_settings.rag.rerank_candidate_k,
     ) -> None:
         self.default_top_k = max(int(default_top_k), 1)
+        self.reranker: Reranker | None = None
         self.vector_database = vector_database or LanceVectorDatabase(
             database_path=VECTOR_DB_PATH,
             collection_name=server_settings.rag.vector_collection_name,
@@ -381,10 +415,133 @@ class SimilaritySearch:
             logger.error("Failed to access LanceDB table: %s", exc)
             return []
         try:
-            results = table.search(embeddings[0]).limit(limit).to_list()
+            if server_settings.rag.use_hybrid_search:
+                results = self.hybrid_search(
+                    table=table,
+                    query=normalized,
+                    query_embedding=embeddings[0],
+                    limit=limit,
+                )
+            else:
+                results = self.vector_search(
+                    table=table,
+                    query_embedding=embeddings[0],
+                    limit=limit,
+                )
         except Exception as exc:  # noqa: BLE001
             logger.error("Similarity search failed: %s", exc)
             return []
+        return self.normalize_results(results)
+
+    # -------------------------------------------------------------------------
+    def vector_search(
+        self,
+        *,
+        table: Any,
+        query_embedding: list[float],
+        limit: int,
+    ) -> list[dict[str, Any]]:
+        return table.search(query_embedding).limit(limit).to_list()
+
+    # -------------------------------------------------------------------------
+    def text_search(self, *, table: Any, query: str, limit: int) -> list[dict[str, Any]]:
+        return table.search(query, query_type="fts").limit(limit).to_list()
+
+    # -------------------------------------------------------------------------
+    def hybrid_search(
+        self,
+        *,
+        table: Any,
+        query: str,
+        query_embedding: list[float],
+        limit: int,
+    ) -> list[dict[str, Any]]:
+        vector_results = self.vector_search(
+            table=table,
+            query_embedding=query_embedding,
+            limit=limit,
+        )
+        try:
+            text_results = self.text_search(table=table, query=query, limit=limit)
+        except Exception as exc:  # noqa: BLE001
+            logger.warning("Full-text search unavailable; using vector results: %s", exc)
+            text_results = []
+        return self.fuse_results(vector_results, text_results, query=query)[:limit]
+
+    # -------------------------------------------------------------------------
+    def fuse_results(
+        self,
+        vector_results: list[dict[str, Any]],
+        text_results: list[dict[str, Any]],
+        *,
+        query: str,
+    ) -> list[dict[str, Any]]:
+        fused: dict[str, dict[str, Any]] = {}
+        vector_weight = float(server_settings.rag.hybrid_vector_weight)
+        text_weight = float(server_settings.rag.hybrid_text_weight)
+        for rank, entry in enumerate(vector_results, start=1):
+            self.add_rank_score(
+                fused,
+                entry,
+                score=vector_weight / (60 + rank),
+                source="vector",
+            )
+        for rank, entry in enumerate(text_results, start=1):
+            self.add_rank_score(
+                fused,
+                entry,
+                score=text_weight / (60 + rank),
+                source="text",
+            )
+        for entry in fused.values():
+            entry["hybrid_score"] = float(entry.get("hybrid_score", 0.0)) + self.metadata_boost(
+                entry,
+                query,
+            )
+        return sorted(
+            fused.values(),
+            key=lambda item: float(item.get("hybrid_score", 0.0)),
+            reverse=True,
+        )
+
+    # -------------------------------------------------------------------------
+    def add_rank_score(
+        self,
+        fused: dict[str, dict[str, Any]],
+        entry: dict[str, Any],
+        *,
+        score: float,
+        source: str,
+    ) -> None:
+        key = str(entry.get("chunk_id") or entry.get("document_id") or id(entry))
+        existing = fused.get(key)
+        if existing is None:
+            existing = dict(entry)
+            existing["retrieval_sources"] = []
+            existing["hybrid_score"] = 0.0
+            fused[key] = existing
+        existing["hybrid_score"] = float(existing["hybrid_score"]) + score
+        retrieval_sources = existing.get("retrieval_sources")
+        if isinstance(retrieval_sources, list):
+            retrieval_sources.append(source)
+
+    # -------------------------------------------------------------------------
+    def metadata_boost(self, entry: dict[str, Any], query: str) -> float:
+        normalized = query.casefold()
+        boost = 0.0
+        file_name = str(entry.get("file_name") or "").casefold()
+        document_title = str(entry.get("document_title") or "").casefold()
+        section_title = str(entry.get("section_title") or "").casefold()
+        if file_name and file_name in normalized:
+            boost += 0.02
+        if document_title and document_title in normalized:
+            boost += 0.015
+        if section_title and section_title in normalized:
+            boost += 0.01
+        return boost
+
+    # -------------------------------------------------------------------------
+    def normalize_results(self, results: list[dict[str, Any]]) -> list[dict[str, Any]]:
         documents: list[dict[str, Any]] = []
         for entry in results:
             if not isinstance(entry, dict):
@@ -418,8 +575,16 @@ class SimilaritySearch:
                     "chunk_id": entry.get("chunk_id"),
                     "text": resolved_text,
                     "source": entry.get("source"),
+                    "file_name": entry.get("file_name"),
+                    "document_title": entry.get("document_title"),
+                    "page_number": entry.get("page_number"),
+                    "section_title": entry.get("section_title"),
+                    "heading_path": entry.get("heading_path"),
+                    "content_type": entry.get("content_type"),
                     "metadata": metadata,
                     "distance": distance_value,
+                    "hybrid_score": entry.get("hybrid_score"),
+                    "retrieval_sources": entry.get("retrieval_sources"),
                 }
             )
         return documents
@@ -479,37 +644,39 @@ class SimilaritySearch:
         if top_n <= 0:
             return []
 
-        texts = [str(item.get("text") or "").strip() for item in candidates]
         try:
-            vectors = self.embedding_generator.embed_texts([query, *texts])
+            model = self.get_reranker()
+            scores = model.predict(
+                [(query, str(item.get("text") or "").strip()) for item in candidates]
+            )
         except Exception as exc:  # noqa: BLE001
             logger.warning(
-                "Reranking fallback to retrieval order due to embedding error: %s", exc
+                "Reranking fallback to retrieval order due to reranker error: %s", exc
             )
             return candidates[:top_n]
 
-        expected_vectors = len(candidates) + 1
-        if len(vectors) != expected_vectors:
+        if len(scores) != len(candidates):
             logger.warning(
-                "Reranking fallback: expected %d vectors but got %d",
-                expected_vectors,
-                len(vectors),
+                "Reranking fallback: expected %d scores but got %d",
+                len(candidates),
+                len(scores),
             )
             return candidates[:top_n]
 
-        query_vector = vectors[0]
         scored: list[dict[str, Any]] = []
-        for candidate, candidate_vector in zip(candidates, vectors[1:], strict=False):
-            score = self.cosine_similarity(query_vector, candidate_vector)
-            if score is None:
-                logger.warning("Reranking fallback due to invalid vector shape or norm")
-                return candidates[:top_n]
+        for candidate, score in zip(candidates, scores, strict=False):
             enriched = dict(candidate)
-            enriched["rerank_score"] = score
+            enriched["rerank_score"] = float(score)
             scored.append(enriched)
 
         scored.sort(key=self.rerank_sort_key, reverse=True)
         return scored[:top_n]
+
+    # -------------------------------------------------------------------------
+    def get_reranker(self) -> Reranker:
+        if self.reranker is None:
+            self.reranker = LocalCrossEncoderReranker(server_settings.rag.reranker_model)
+        return self.reranker
 
     # -------------------------------------------------------------------------
     @staticmethod
@@ -519,31 +686,12 @@ class SimilaritySearch:
             return float(raw_score)
         return float("-inf")
 
-    # -------------------------------------------------------------------------
-    @staticmethod
-    def cosine_similarity(left: list[float], right: list[float]) -> float | None:
-        if not left or not right or len(left) != len(right):
-            return None
-        dot_product = 0.0
-        left_norm_sq = 0.0
-        right_norm_sq = 0.0
-        for left_value, right_value in zip(left, right, strict=False):
-            dot_product += left_value * right_value
-            left_norm_sq += left_value * left_value
-            right_norm_sq += right_value * right_value
-        if left_norm_sq <= 0.0 or right_norm_sq <= 0.0:
-            return None
-        denominator = math.sqrt(left_norm_sq) * math.sqrt(right_norm_sq)
-        if denominator <= 0.0:
-            return None
-        return dot_product / denominator
-
-
 __all__ = [
     "CloudEmbeddingGenerator",
     "OllamaEmbeddingGenerator",
     "select_embedding_provider",
     "EmbeddingGenerator",
+    "LocalCrossEncoderReranker",
     "SimilaritySearch",
 ]
 
