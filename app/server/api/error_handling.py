@@ -46,6 +46,18 @@ def build_error_payload(
     ).model_dump()
 
 
+def make_json_safe(value: object) -> object:
+    if isinstance(value, dict):
+        return {str(key): make_json_safe(item) for key, item in value.items()}
+    if isinstance(value, list):
+        return [make_json_safe(item) for item in value]
+    if isinstance(value, tuple):
+        return [make_json_safe(item) for item in value]
+    if isinstance(value, (str, int, float, bool)) or value is None:
+        return value
+    return str(value)
+
+
 ###############################################################################
 class RequestIdMiddleware(BaseHTTPMiddleware):
     # -------------------------------------------------------------------------
@@ -73,7 +85,7 @@ def request_validation_error_handler(
         request.url.path,
     )
     payload = build_error_payload(
-        detail=exc.errors(),
+        detail=make_json_safe(exc.errors()),
         request_id=request_id,
         retryable=False,
     )

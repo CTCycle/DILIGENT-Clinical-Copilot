@@ -18,6 +18,7 @@
             <input
               type="radio"
               name="runtime-source"
+              aria-label="Local Models (Ollama)"
               [checked]="!draftConfig().useCloudServices"
               (change)="handleCloudSwitchChange(false)"
               [disabled]="isSaving() || isLoading()"
@@ -31,6 +32,7 @@
             <input
               type="radio"
               name="runtime-source"
+              aria-label="Cloud Models (OpenAI / Gemini)"
               [checked]="draftConfig().useCloudServices"
               (change)="handleCloudSwitchChange(true)"
               [disabled]="isSaving() || isLoading()"
@@ -246,6 +248,7 @@
             <label class="field checkbox model-config-reasoning-field">
               <input
                 type="checkbox"
+                aria-label="Enable SDL/Reasoning"
                 [ngModel]="appState.state().diliAgent.settings.reasoning"
                 (ngModelChange)="handleReasoningChange($event)"
                 [disabled]="isSaving() || isLoading()"
