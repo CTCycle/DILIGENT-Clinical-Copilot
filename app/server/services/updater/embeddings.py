@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from pathlib import Path
+from collections.abc import Callable
 
 from configurations.startup import server_settings
 from common.constants import DOCS_PATH, VECTOR_DB_PATH
@@ -27,6 +28,7 @@ class RagEmbeddingUpdater:
         ollama_embedding_model: str | None = None,
         hf_embedding_model: str | None = None,
         reset_vector_collection: bool | None = None,
+        progress_callback: Callable[[float, str], None] | None = None,
     ) -> None:
         self.documents_path = documents_path or DOCS_PATH
         resolved_documents_path = Path(self.documents_path)
@@ -108,6 +110,7 @@ class RagEmbeddingUpdater:
             use_cloud_embeddings=self.use_cloud_embeddings,
             cloud_provider=resolved_provider,
             cloud_embedding_model=resolved_model,
+            progress_callback=progress_callback,
         )
 
     # -------------------------------------------------------------------------
