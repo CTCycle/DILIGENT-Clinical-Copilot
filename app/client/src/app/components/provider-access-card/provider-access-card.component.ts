@@ -1,6 +1,8 @@
 import { CommonModule } from '@angular/common';
 import { Component, EventEmitter, Input, Output } from '@angular/core';
 
+export type ProviderAccessCardVariant = 'selectable' | 'compact';
+
 @Component({
   selector: 'app-provider-access-card',
   standalone: true,
@@ -8,7 +10,7 @@ import { Component, EventEmitter, Input, Output } from '@angular/core';
   templateUrl: './provider-access-card.component.html',
 })
 export class ProviderAccessCardComponent {
-  @Input() variant: 'selectable' | 'compact' = 'selectable';
+  @Input() variant: ProviderAccessCardVariant = 'selectable';
   @Input() label = '';
   @Input() isActive = false;
   @Input() disabled = false;

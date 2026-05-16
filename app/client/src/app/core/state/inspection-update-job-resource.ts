@@ -8,8 +8,8 @@ import {
   InspectionUpdateJobStatusResponse,
   InspectionUpdateTarget,
   JobStartResponse,
-} from '../../core/models/types';
-import { JobPollingService } from '../../core/services/job-polling.service';
+} from '../models/types';
+import { JobPollingService } from '../services/job-polling.service';
 
 type InspectionUpdateOverridesByTarget = {
   rxnav: InspectionRxNavOverrideRequest;
@@ -35,6 +35,11 @@ type InspectionUpdateTargetState = {
   message: string;
   error: string | null;
   pollToken: number | null;
+};
+
+type InspectionUpdateParseResult<TTarget extends InspectionUpdateTarget> = {
+  value: InspectionUpdateOverridesByTarget[TTarget];
+  error: string | null;
 };
 
 export type InspectionUpdateTargetActionsMap = {
@@ -285,10 +290,7 @@ export class InspectionUpdateJobResource {
   private parseOverrides<TTarget extends InspectionUpdateTarget>(
     target: TTarget,
     raw: string,
-  ): {
-    value: InspectionUpdateOverridesByTarget[TTarget];
-    error: string | null;
-  } {
+  ): InspectionUpdateParseResult<TTarget> {
     const normalized = raw.trim();
     if (!normalized) {
       return { value: this.applyTargetDefaults(target, {}), error: null };
