@@ -1,4 +1,5 @@
 import { ComponentFixture, TestBed } from '@angular/core/testing';
+import { vi } from 'vitest';
 
 import { DiliAgentPageComponent } from './dili-agent-page.component';
 
@@ -37,5 +38,18 @@ describe('DiliAgentPageComponent', () => {
       settings: { ...component.vm.settings, provider: 'openai' },
     });
     expect(component.canStartSession()).toBeTruthy();
+  });
+
+  it('allows an active run to be stopped even while the start click debounce is still active', () => {
+    const stopSessionSpy = vi.spyOn(component, 'stopSession').mockResolvedValue();
+    component.stateService.updateDiliAgent({
+      isRunning: true,
+      jobId: 'job-123',
+    });
+    (component as unknown as { runControlDebounced: boolean }).runControlDebounced = true;
+
+    component.runOrStop();
+
+    expect(stopSessionSpy).toHaveBeenCalled();
   });
 });
