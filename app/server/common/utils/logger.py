@@ -11,8 +11,8 @@ from common.constants import LOGS_PATH
 # Generate timestamp for the log filename
 ###############################################################################
 os.makedirs(LOGS_PATH, exist_ok=True)
-current_timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
-log_filename = os.path.join(LOGS_PATH, f"DILIGENT_{current_timestamp}.log")
+current_timestamp = datetime.now().strftime("%Y%m%d_%H%M%S_%f")
+log_filename = os.path.join(LOGS_PATH, f"DILIGENT_{current_timestamp}_{os.getpid()}.log")
 
 # Define logger configuration
 ###############################################################################

@@ -18,6 +18,12 @@ VECTOR_TABLE_SCHEMA = pa.schema(
         pa.field("text", pa.string()),
         pa.field("embedding", pa.list_(pa.float32())),
         pa.field("source", pa.string()),
+        pa.field("file_name", pa.string()),
+        pa.field("document_title", pa.string()),
+        pa.field("page_number", pa.int32()),
+        pa.field("section_title", pa.string()),
+        pa.field("heading_path", pa.string()),
+        pa.field("content_type", pa.string()),
         pa.field("metadata", pa.string()),
     ]
 )
@@ -47,6 +53,8 @@ class LanceVectorDatabase:
         self.table: Table | None = None
         self.index_ready = False
         self.index_creation_attempted = False
+        self.fts_index_ready = False
+        self.scalar_indices_ready = False
         self.embedding_size: int | None = None
 
     # -------------------------------------------------------------------------
@@ -114,6 +122,8 @@ class LanceVectorDatabase:
         self.table = None
         self.index_ready = False
         self.index_creation_attempted = False
+        self.fts_index_ready = False
+        self.scalar_indices_ready = False
         self.embedding_size = None
 
     # -------------------------------------------------------------------------
@@ -191,7 +201,10 @@ class LanceVectorDatabase:
             )
             embedding_field = None
         if isinstance(getattr(embedding_field, "type", None), pa.FixedSizeListType):
-            return
+            required_fields = {field.name for field in self.schema}
+            existing_fields = set(table.schema.names)
+            if required_fields.issubset(existing_fields):
+                return
         target_schema = self._schema_with_embedding_size(embedding_size)
         self.schema = target_schema
         logger.info(
@@ -207,6 +220,8 @@ class LanceVectorDatabase:
         )
         self.index_ready = False
         self.index_creation_attempted = False
+        self.fts_index_ready = False
+        self.scalar_indices_ready = False
 
     # -------------------------------------------------------------------------
     def ensure_vector_index(self, table: Table | None = None) -> None:
@@ -251,6 +266,39 @@ class LanceVectorDatabase:
         except Exception as exc:  # noqa: BLE001
             logger.error("Failed to create LanceDB vector index: %s", exc)
             self.index_ready = False
+
+    # -------------------------------------------------------------------------
+    def ensure_full_text_index(self, table: Table | None = None) -> None:
+        if self.fts_index_ready:
+            return
+        table = table or self.get_table()
+        try:
+            table.create_fts_index("text", replace=True)
+            self.fts_index_ready = True
+        except Exception as exc:  # noqa: BLE001
+            logger.warning("Failed to create LanceDB full-text index: %s", exc)
+
+    # -------------------------------------------------------------------------
+    def ensure_scalar_indices(self, table: Table | None = None) -> None:
+        if self.scalar_indices_ready:
+            return
+        table = table or self.get_table()
+        for column in (
+            "file_name",
+            "document_title",
+            "page_number",
+            "section_title",
+            "content_type",
+        ):
+            try:
+                table.create_scalar_index(column, replace=True)
+            except Exception as exc:  # noqa: BLE001
+                logger.warning(
+                    "Failed to create LanceDB scalar index for '%s': %s",
+                    column,
+                    exc,
+                )
+        self.scalar_indices_ready = True
 
     # -------------------------------------------------------------------------
     def _read_existing_embedding_size(self) -> int | None:

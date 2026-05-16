@@ -10,10 +10,17 @@ class SearchTableStub:
     def __init__(self, rows: list[dict[str, Any]]) -> None:
         self.rows = rows
         self.limit_value: int | None = None
+        self.last_query_type: str | None = None
 
     # -------------------------------------------------------------------------
-    def search(self, vector: list[float]) -> SearchTableStub:
-        _ = vector
+    def search(
+        self,
+        query: list[float] | str,
+        *,
+        query_type: str | None = None,
+    ) -> SearchTableStub:
+        _ = query
+        self.last_query_type = query_type
         return self
 
     # -------------------------------------------------------------------------
@@ -53,18 +60,18 @@ class EmbeddingGeneratorStub:
 
 
 ###############################################################################
-class FlakyEmbeddingGeneratorStub:
-    def __init__(self, vectors: dict[str, list[float]], fail_on_call: int) -> None:
-        self.vectors = vectors
-        self.fail_on_call = fail_on_call
-        self.calls = 0
+###############################################################################
+class CrossEncoderStub:
+    def predict(self, pairs: list[tuple[str, str]]) -> list[float]:
+        lookup = {"alpha": 0.1, "beta": 0.8, "gamma": 0.9}
+        return [lookup[text] for _, text in pairs]
 
-    # -------------------------------------------------------------------------
-    def embed_texts(self, texts: list[str]) -> list[list[float]]:
-        self.calls += 1
-        if self.calls == self.fail_on_call:
-            raise RuntimeError("synthetic rerank failure")
-        return [self.vectors[text] for text in texts]
+
+###############################################################################
+class FailingCrossEncoderStub:
+    def predict(self, pairs: list[tuple[str, str]]) -> list[float]:
+        _ = pairs
+        raise RuntimeError("synthetic rerank failure")
 
 
 # -----------------------------------------------------------------------------
@@ -114,6 +121,7 @@ def test_search_with_reranking_reorders_and_trims_results() -> None:
         embedding_generator=EmbeddingGeneratorStub(sample_vectors()),
         default_top_k=3,
     )
+    search.reranker = CrossEncoderStub()  # type: ignore[assignment]
 
     results = search.search_with_reranking(
         "q",
@@ -167,14 +175,13 @@ def test_search_with_reranking_enforces_candidate_floor_against_top_n() -> None:
 
 
 # -----------------------------------------------------------------------------
-def test_search_with_reranking_falls_back_when_rerank_embedding_fails() -> None:
+def test_search_with_reranking_falls_back_when_reranker_fails() -> None:
     search = SimilaritySearch(
         vector_database=VectorDatabaseStub(sample_rows()),
-        embedding_generator=FlakyEmbeddingGeneratorStub(
-            sample_vectors(), fail_on_call=2
-        ),
+        embedding_generator=EmbeddingGeneratorStub(sample_vectors()),
         default_top_k=3,
     )
+    search.reranker = FailingCrossEncoderStub()  # type: ignore[assignment]
 
     results = search.search_with_reranking(
         "q",

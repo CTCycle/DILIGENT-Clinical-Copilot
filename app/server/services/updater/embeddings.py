@@ -115,10 +115,17 @@ class RagEmbeddingUpdater:
 
     # -------------------------------------------------------------------------
     def prepare_vector_database(self) -> None:
+        self.validate_embedding_backend()
         if self.reset_vector_collection:
             self.vector_database.clear_collection()
         self.vector_database.initialize()
         self.vector_database.get_table()
+
+    # -------------------------------------------------------------------------
+    def validate_embedding_backend(self) -> None:
+        self.serializer.embedding_generator.embed_texts(
+            ["RAG embedding backend readiness check."]
+        )
 
     # -------------------------------------------------------------------------
     def refresh_embeddings(self) -> dict[str, int]:

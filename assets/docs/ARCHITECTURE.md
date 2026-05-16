@@ -1,6 +1,6 @@
 # DILIGENT Clinical Copilot Architecture
 
-Last updated: 2026-05-13
+Last updated: 2026-05-16
 
 ## 1. System Summary
 
@@ -188,6 +188,7 @@ Endpoint -> service -> repository:
   - PostgreSQL when external DB mode is configured
 - Vector persistence:
   - LanceDB collection under `app/resources/sources/vectors`
+  - RAG retrieval uses vector search plus LanceDB full-text search with metadata-aware fusion and local cross-encoder reranking.
 - Filesystem resources:
   - `app/resources/sources` for source catalogs/documents/archives
   - `app/resources/models` for model-related assets

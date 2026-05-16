@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import hashlib
 import os
+import re
 import zipfile
 from datetime import date
 from typing import Any, Iterator
@@ -563,7 +564,11 @@ class DocumentSerializer:
             logger.error("Failed to load PDF '%s': %s", file_path, exc)
             return []
 
-        metadata = self.build_metadata(file_path)
+        metadata = self.build_metadata(
+            file_path,
+            content_type="pdf",
+            document_title=self.resolve_pdf_title(reader, file_path),
+        )
         pages: list[Document] = []
         for index, page in enumerate(reader.pages, start=1):
             try:
@@ -589,6 +594,7 @@ class DocumentSerializer:
         try:
             with zipfile.ZipFile(file_path) as archive:
                 xml_content = archive.read("word/document.xml")
+                title = self.resolve_docx_title(archive, file_path)
         except (KeyError, zipfile.BadZipFile, OSError) as exc:
             logger.error("Unable to read DOCX '%s': %s", file_path, exc)
             return []
@@ -610,9 +616,12 @@ class DocumentSerializer:
         content = "\n".join(paragraphs).strip()
         if not content:
             return []
-        document = Document(
-            page_content=content, metadata=self.build_metadata(file_path)
+        metadata = self.build_metadata(
+            file_path,
+            content_type="docx",
+            document_title=title or self.extract_first_heading(content),
         )
+        document = Document(page_content=content, metadata=metadata)
         return [document]
 
     # -------------------------------------------------------------------------
@@ -620,7 +629,14 @@ class DocumentSerializer:
         text = self.read_text_content(file_path, extension)
         if not text:
             return []
-        document = Document(page_content=text, metadata=self.build_metadata(file_path))
+        document = Document(
+            page_content=text,
+            metadata=self.build_metadata(
+                file_path,
+                content_type=extension.lstrip("."),
+                document_title=self.extract_first_heading(text),
+            ),
+        )
         return [document]
 
     # -------------------------------------------------------------------------
@@ -649,18 +665,87 @@ class DocumentSerializer:
         return ""
 
     # -------------------------------------------------------------------------
-    def build_metadata(self, file_path: str) -> dict[str, Any]:
+    def build_metadata(
+        self,
+        file_path: str,
+        *,
+        content_type: str,
+        document_title: str | None = None,
+    ) -> dict[str, Any]:
         document_id = self.compute_document_id(file_path)
+        resolved_title = self.normalize_title(document_title) or os.path.splitext(
+            os.path.basename(file_path)
+        )[0]
         return {
             "document_id": document_id,
             "source": file_path,
             "file_name": os.path.basename(file_path),
+            "document_title": resolved_title,
+            "content_type": content_type,
         }
 
     # -------------------------------------------------------------------------
     def compute_document_id(self, file_path: str) -> str:
         relative_path = os.path.relpath(file_path, self.documents_path)
         return hashlib.sha256(relative_path.encode("utf-8")).hexdigest()
+
+    # -------------------------------------------------------------------------
+    def resolve_pdf_title(self, reader: PdfReader, file_path: str) -> str:
+        raw_title = getattr(getattr(reader, "metadata", None), "title", None)
+        normalized = self.normalize_title(raw_title)
+        if normalized:
+            return normalized
+        for page in reader.pages[:2]:
+            try:
+                candidate = self.extract_first_heading(page.extract_text() or "")
+            except Exception:  # noqa: BLE001
+                candidate = None
+            if candidate:
+                return candidate
+        return os.path.splitext(os.path.basename(file_path))[0]
+
+    # -------------------------------------------------------------------------
+    def resolve_docx_title(self, archive: zipfile.ZipFile, file_path: str) -> str:
+        try:
+            core_xml = archive.read("docProps/core.xml")
+            tree = ElementTree.fromstring(core_xml)
+        except (KeyError, ElementTree.ParseError):
+            return os.path.splitext(os.path.basename(file_path))[0]
+        namespaces = {"dc": "http://purl.org/dc/elements/1.1/"}
+        node = tree.find("dc:title", namespaces)
+        return self.normalize_title(node.text if node is not None else None) or os.path.splitext(
+            os.path.basename(file_path)
+        )[0]
+
+    # -------------------------------------------------------------------------
+    def extract_first_heading(self, text: str) -> str | None:
+        for raw_line in text.splitlines():
+            line = raw_line.strip()
+            if not line:
+                continue
+            if self.is_heading_line(line):
+                return self.normalize_title(line)
+        return None
+
+    # -------------------------------------------------------------------------
+    def is_heading_line(self, line: str) -> bool:
+        if len(line) > 120:
+            return False
+        if line.startswith("#"):
+            return True
+        if re.match(r"^\d+(\.\d+)*\s+\S+", line):
+            return True
+        words = line.split()
+        return 1 <= len(words) <= 12 and line == line.upper()
+
+    # -------------------------------------------------------------------------
+    def normalize_title(self, value: Any) -> str | None:
+        if value is None:
+            return None
+        text = str(value).strip()
+        if not text:
+            return None
+        return re.sub(r"\s+", " ", text)
 
 
 ###############################################################################
@@ -670,23 +755,121 @@ class DocumentChunker:
         self.chunk_overlap = max(chunk_overlap, 0)
 
     # -------------------------------------------------------------------------
-    def split_text(self, content: str) -> list[tuple[str, int]]:
+    def split_text(self, content: str) -> list[tuple[str, int, str | None, str | None]]:
         text = content.strip()
         if not text:
             return []
+        sections = self.split_sections(text)
+        chunks: list[tuple[str, int, str | None, str | None]] = []
+        for section_text, section_start, section_title, heading_path in sections:
+            for chunk_text, relative_start in self.split_section(section_text):
+                chunks.append(
+                    (
+                        chunk_text,
+                        section_start + relative_start,
+                        section_title,
+                        heading_path,
+                    )
+                )
+        return chunks
+
+    # -------------------------------------------------------------------------
+    def split_sections(self, text: str) -> list[tuple[str, int, str | None, str | None]]:
+        sections: list[tuple[str, int, str | None, str | None]] = []
+        heading_stack: list[str] = []
+        current_lines: list[str] = []
+        current_start = 0
+        current_title: str | None = None
+        offset = 0
+        for raw_line in text.splitlines(keepends=True):
+            line = raw_line.strip()
+            if self.is_heading_line(line):
+                if current_lines:
+                    sections.append(
+                        (
+                            "".join(current_lines).strip(),
+                            current_start,
+                            current_title,
+                            " > ".join(heading_stack) or None,
+                        )
+                    )
+                    current_lines = []
+                heading = self.normalize_heading(line)
+                heading_stack = [heading]
+                current_title = heading
+                current_start = offset
+            current_lines.append(raw_line)
+            offset += len(raw_line)
+        if current_lines:
+            sections.append(
+                (
+                    "".join(current_lines).strip(),
+                    current_start,
+                    current_title,
+                    " > ".join(heading_stack) or None,
+                )
+            )
+        return sections
+
+    # -------------------------------------------------------------------------
+    def split_section(self, section_text: str) -> list[tuple[str, int]]:
+        if len(section_text) <= self.chunk_size:
+            return [(section_text, 0)]
+        paragraphs = re.split(r"(\n\s*\n)", section_text)
+        chunks: list[tuple[str, int]] = []
+        buffer = ""
+        buffer_start = 0
+        cursor = 0
+        for part in paragraphs:
+            if not part:
+                continue
+            candidate = f"{buffer}{part}"
+            if buffer and len(candidate) > self.chunk_size:
+                chunks.extend(self.split_oversized_text(buffer, buffer_start))
+                buffer = part.lstrip()
+                buffer_start = cursor + (len(part) - len(part.lstrip()))
+            else:
+                if not buffer:
+                    buffer_start = cursor
+                buffer = candidate
+            cursor += len(part)
+        if buffer.strip():
+            chunks.extend(self.split_oversized_text(buffer, buffer_start))
+        return chunks
+
+    # -------------------------------------------------------------------------
+    def split_oversized_text(self, text: str, start_offset: int) -> list[tuple[str, int]]:
+        normalized = text.strip()
+        if len(normalized) <= self.chunk_size:
+            return [(normalized, start_offset)]
         step = max(self.chunk_size - self.chunk_overlap, 1)
         chunks: list[tuple[str, int]] = []
         start = 0
-        text_length = len(text)
-        while start < text_length:
-            end = min(start + self.chunk_size, text_length)
-            chunk_text = text[start:end].strip()
+        while start < len(normalized):
+            end = min(start + self.chunk_size, len(normalized))
+            chunk_text = normalized[start:end].strip()
             if chunk_text:
-                chunks.append((chunk_text, start))
-            if end >= text_length:
+                chunks.append((chunk_text, start_offset + start))
+            if end >= len(normalized):
                 break
             start += step
         return chunks
+
+    # -------------------------------------------------------------------------
+    def is_heading_line(self, line: str) -> bool:
+        if not line or len(line) > 120:
+            return False
+        if line.startswith("#"):
+            return True
+        if re.match(r"^\d+(\.\d+)*\s+\S+", line):
+            return True
+        words = line.split()
+        return 1 <= len(words) <= 12 and line == line.upper()
+
+    # -------------------------------------------------------------------------
+    def normalize_heading(self, line: str) -> str:
+        stripped = line.lstrip("#").strip()
+        return re.sub(r"\s+", " ", stripped)
 
     # -------------------------------------------------------------------------
     def chunk_documents(self, documents: list[Document]) -> list[Document]:
@@ -695,9 +878,13 @@ class DocumentChunker:
         chunks: list[Document] = []
         for document in documents:
             metadata = dict(document.metadata)
-            for chunk_text, start_index in self.split_text(document.page_content):
+            for chunk_text, start_index, section_title, heading_path in self.split_text(
+                document.page_content
+            ):
                 chunk_metadata = dict(metadata)
                 chunk_metadata["start_index"] = start_index
+                chunk_metadata["section_title"] = section_title
+                chunk_metadata["heading_path"] = heading_path
                 chunks.append(
                     Document(page_content=chunk_text, metadata=chunk_metadata)
                 )
