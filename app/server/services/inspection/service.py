@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import json
 from datetime import date, datetime, UTC
 from functools import partial
 from pathlib import Path
@@ -68,6 +69,7 @@ class DataInspectionService:
     RXNAV_JOB_TYPE = "rxnav_update"
     LIVERTOX_JOB_TYPE = "livertox_update"
     RAG_JOB_TYPE = "rag_update"
+    RAG_MANIFEST_FILE_NAME = "rag_index_manifest.json"
     UPDATE_PHASES: dict[UpdateTarget, list[PhaseStep]] = {
         "rxnav": [
             ("configuration_accepted", 1, 7, "Configuration accepted"),
@@ -120,6 +122,47 @@ class DataInspectionService:
     # -------------------------------------------------------------------------
     def load_runtime_config(self) -> dict[str, Any]:
         return server_settings.model_dump()
+
+    def rag_manifest_path(self) -> Path:
+        return Path(VECTOR_DB_PATH) / self.RAG_MANIFEST_FILE_NAME
+
+    def read_rag_manifest(self) -> dict[str, Any]:
+        manifest_path = self.rag_manifest_path()
+        try:
+            payload = json.loads(manifest_path.read_text(encoding="utf-8"))
+        except (OSError, json.JSONDecodeError):
+            return {}
+        return payload if isinstance(payload, dict) else {}
+
+    def write_rag_manifest(
+        self,
+        *,
+        documents_path: str,
+        summary: dict[str, Any],
+    ) -> None:
+        manifest_path = self.rag_manifest_path()
+        manifest_path.parent.mkdir(parents=True, exist_ok=True)
+        payload = {
+            "documents_path": documents_path,
+            "documents": int(summary.get("documents", 0) or 0),
+            "chunks": int(summary.get("chunks", 0) or 0),
+            "supported_files": int(summary.get("supported_files", 0) or 0),
+            "loaded_documents": int(summary.get("loaded_documents", 0) or 0),
+            "built_at": datetime.now(UTC).isoformat(),
+        }
+        manifest_path.write_text(
+            json.dumps(payload, ensure_ascii=False, indent=2),
+            encoding="utf-8",
+        )
+
+    def get_effective_rag_documents_path(self) -> str:
+        manifest = self.read_rag_manifest()
+        manifest_path = str(manifest.get("documents_path") or "").strip()
+        if manifest_path:
+            return manifest_path
+        config = self.load_runtime_config()
+        rag_cfg = config.get("rag", {}) if isinstance(config, dict) else {}
+        return str(rag_cfg.get("documents_path", DOCS_PATH))
 
     def list_text_normalization_terms(
         self, category: str | None = None
@@ -400,7 +443,7 @@ class DataInspectionService:
         offset: int,
         limit: int,
     ) -> dict[str, Any]:
-        serializer = DocumentSerializer(DOCS_PATH)
+        serializer = DocumentSerializer(self.get_effective_rag_documents_path())
         items: list[dict[str, Any]] = []
         supported_ext = {entry.lower() for entry in DOCUMENT_SUPPORTED_EXTENSIONS}
         for path in serializer.collect_document_paths():
@@ -449,7 +492,7 @@ class DataInspectionService:
     def get_rag_vector_store_summary(self) -> dict[str, Any]:
         config = self.load_runtime_config()
         rag_cfg = config.get("rag", {}) if isinstance(config, dict) else {}
-        documents_path = str(rag_cfg.get("documents_path", DOCS_PATH))
+        documents_path = self.get_effective_rag_documents_path()
         collection_name = str(
             rag_cfg.get(
                 "vector_collection_name", server_settings.rag.vector_collection_name
@@ -723,6 +766,11 @@ class DataInspectionService:
             ollama_embedding_model=override_values.get("ollama_embedding_model"),
             hf_embedding_model=override_values.get("hf_embedding_model"),
             reset_vector_collection=override_values.get("reset_vector_collection"),
+            progress_callback=lambda progress, message: self.report_job_progress(
+                job_id=job_id,
+                progress=progress,
+                message=message,
+            ),
         )
         self.report_phase_by_target(
             job_id=job_id,
@@ -760,6 +808,10 @@ class DataInspectionService:
             raise ValueError(
                 "RAG update found zero supported files in the selected folder."
             )
+        self.write_rag_manifest(
+            documents_path=updater.documents_path,
+            summary=result,
+        )
         self.report_phase_by_target(
             job_id=job_id,
             target="rag",
