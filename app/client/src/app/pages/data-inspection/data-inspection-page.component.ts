@@ -44,58 +44,24 @@ import {
   InspectionSessionStatus,
   InspectionUpdateTarget,
 } from '../../core/models/types';
-import { InspectionDetailResource } from './inspection-detail-resource';
-import { InspectionPagedResource } from './inspection-paged-resource';
-import { InspectionUpdateJobResource, InspectionUpdateTargetActionsMap } from './inspection-update-job-resource';
+import { InspectionDetailResource } from '../../core/state/inspection-detail-resource';
+import { InspectionPagedResource } from '../../core/state/inspection-paged-resource';
+import { InspectionUpdateJobResource, InspectionUpdateTargetActionsMap } from '../../core/state/inspection-update-job-resource';
+import {
+  InspectionViewId,
+  InspectionViewOption,
+  formatInspectionDateTime,
+  formatInspectionDuration,
+  inspectionTabId,
+  resolveRagDocumentsPath,
+} from '../../core/utils/inspection-formatting';
 
-type InspectionViewId =
-  | 'sessions'
-  | 'rxnav'
-  | 'livertox'
-  | 'rag';
-
-const INSPECTION_VIEWS: Array<{ id: InspectionViewId; label: string }> = [
+const INSPECTION_VIEWS: InspectionViewOption[] = [
   { id: 'sessions', label: 'Sessions' },
   { id: 'rxnav', label: 'Drug Catalog' },
   { id: 'livertox', label: 'LiverTox' },
   { id: 'rag', label: 'RAG' },
 ];
-
-function inspectionTabId(view: InspectionViewId): string {
-  return `inspection-tab-${view}`;
-}
-
-function formatDateTime(value: string | null): string {
-  if (!value) return 'N/A';
-  const parsed = new Date(value);
-  return Number.isNaN(parsed.getTime()) ? value : parsed.toLocaleString();
-}
-
-function formatDuration(seconds: number | null): string {
-  if (typeof seconds !== 'number' || Number.isNaN(seconds) || seconds < 0) return 'N/A';
-  const rounded = Math.round(seconds);
-  if (rounded < 60) return `${rounded}s`;
-  return `${Math.floor(rounded / 60)}m ${rounded % 60}s`;
-}
-
-function resolveRagDocumentsPath(
-  vectorStore: InspectionRagVectorStoreSummary | null,
-): string {
-  if (!vectorStore) {
-    return '';
-  }
-  const explicitPath = vectorStore.source_documents_path?.trim();
-  if (explicitPath) {
-    return explicitPath;
-  }
-  const vectorDbPath = vectorStore.vector_db_path?.trim();
-  if (!vectorDbPath) {
-    return '';
-  }
-  return vectorDbPath.replace(new RegExp(String.raw`[\\/]vectors$`, 'i'), (match) =>
-    match.startsWith('\\') ? '\\documents' : '/documents',
-  );
-}
 
 @Component({
   selector: 'app-data-inspection-page',
@@ -283,11 +249,11 @@ export class DataInspectionPageComponent implements OnInit, OnDestroy {
   }
 
   formatDateTime(value: string | null): string {
-    return formatDateTime(value);
+    return formatInspectionDateTime(value);
   }
 
   formatDuration(value: number | null): string {
-    return formatDuration(value);
+    return formatInspectionDuration(value);
   }
 
   statusLabel(value: InspectionSessionStatus): string {

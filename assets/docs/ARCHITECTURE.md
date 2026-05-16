@@ -165,7 +165,7 @@ Frontend boundaries:
 - `app/client/src/app/pages/*`: page orchestration and user journeys.
 - `app/client/src/app/components/*`: reusable visual/interaction components.
 - `app/client/src/app/core/services/*`: API transport and domain-specific API clients.
-- `app/client/src/app/core/state/app-state.service.ts`: shared app state and theme/page state.
+- `app/client/src/app/core/state/*`: shared app state, theme/page state, and reusable frontend state resources.
 
 ## 6. Layered Request Path (example)
 
