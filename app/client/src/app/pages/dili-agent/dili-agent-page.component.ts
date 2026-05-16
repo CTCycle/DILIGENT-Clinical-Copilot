@@ -393,11 +393,14 @@ export class DiliAgentPageComponent implements OnDestroy {
   }
 
   runOrStop(): void {
-    if (this.runControlDebounced || this.isCancelling()) {
+    if (this.isCancelling()) {
       return;
     }
     if (this.vm.isRunning) {
       void this.stopSession();
+      return;
+    }
+    if (this.runControlDebounced) {
       return;
     }
     if (this.vm.isStarting || this.isRunActionLocked()) {
