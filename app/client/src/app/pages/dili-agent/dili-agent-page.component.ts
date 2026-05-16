@@ -435,7 +435,10 @@ export class DiliAgentPageComponent implements OnDestroy {
     if (this.vm.isRunning) {
       return this.isCancelling();
     }
-    return this.isCancelling() || this.vm.isStarting || this.isRunActionLocked();
+    return this.isCancelling()
+      || this.vm.isStarting
+      || this.isRunActionLocked()
+      || !this.canStartSession();
   }
 
   get runActionLabel(): string {

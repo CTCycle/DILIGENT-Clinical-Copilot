@@ -49,8 +49,8 @@ def test_stored_encrypted_value_never_contains_plaintext() -> None:
 def test_activation_keeps_only_one_active_key_per_provider() -> None:
     serializer, factory = build_serializer()
 
-    first = serializer.create_key("openai", "openai-key-1")
-    second = serializer.create_key("openai", "openai-key-2")
+    first = serializer.create_key("openai", "openai-key-1-secret")
+    second = serializer.create_key("openai", "openai-key-2-secret")
     serializer.activate_key(second.id, provider="openai")
 
     with factory() as db_session:
@@ -70,7 +70,7 @@ def test_activation_keeps_only_one_active_key_per_provider() -> None:
 def test_brave_keys_are_stored_in_research_table() -> None:
     serializer, factory = build_serializer()
 
-    created = serializer.create_key("brave", "brave-secret")
+    created = serializer.create_key("brave", "brave-secret-value")
 
     with factory() as db_session:
         stored = db_session.execute(
@@ -87,8 +87,8 @@ def test_brave_keys_are_stored_in_research_table() -> None:
 def test_provider_scoped_activate_and_delete_support_brave() -> None:
     serializer, factory = build_serializer()
 
-    openai = serializer.create_key("openai", "openai-key")
-    brave = serializer.create_key("brave", "brave-key")
+    openai = serializer.create_key("openai", "openai-key-secret")
+    brave = serializer.create_key("brave", "brave-key-secret")
 
     # Ids can overlap because keys are stored in different tables.
     assert openai.id == brave.id
@@ -116,10 +116,22 @@ def test_provider_scoped_activate_and_delete_support_brave() -> None:
 # -----------------------------------------------------------------------------
 def test_decrypt_key_row_uses_db_seeded_material() -> None:
     serializer, _factory = build_serializer()
-    plaintext = "sk-live-example"
+    plaintext = "sk-live-example-secret"
     created = serializer.create_key("openai", plaintext)
 
     restored = serializer.decrypt_key_row(created)
 
     assert restored == plaintext
+
+
+# -----------------------------------------------------------------------------
+def test_rejects_too_short_access_key() -> None:
+    serializer, _factory = build_serializer()
+
+    try:
+        serializer.create_key("openai", "short")
+    except ValueError:
+        pass
+    else:
+        raise AssertionError("Expected short access key to be rejected")
 

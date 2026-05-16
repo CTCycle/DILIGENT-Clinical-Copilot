@@ -13,6 +13,7 @@ import { ModalShellComponent } from '../../../components/modal-shell/modal-shell
 import { StatusMessageComponent } from '../../../components/status-message/status-message.component';
 
 const MASKED_KEY_LABEL = '********************';
+const MIN_ACCESS_KEY_LENGTH = 16;
 
 function obfuscateFingerprint(value: string): string {
   const fingerprint = (value || '').trim();
@@ -88,6 +89,10 @@ export class AccessKeyModalComponent implements OnChanges {
     const candidate = this.newKeyValue.trim();
     if (!candidate) {
       this.errorMessage = 'Please paste a key before adding.';
+      return;
+    }
+    if (candidate.length < MIN_ACCESS_KEY_LENGTH) {
+      this.errorMessage = `Access keys must be at least ${MIN_ACCESS_KEY_LENGTH} characters.`;
       return;
     }
     this.isSaving = true;

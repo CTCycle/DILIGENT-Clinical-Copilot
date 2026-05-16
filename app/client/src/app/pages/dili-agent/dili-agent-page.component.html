@@ -83,6 +83,7 @@
           <label class="toggle-row">
             <input
               type="checkbox"
+              aria-label="Internal RAG"
               [ngModel]="vm.form.useRag"
               (ngModelChange)="handleFormChange('useRag', $event)"
             />
@@ -91,6 +92,7 @@
           <label class="toggle-row">
             <input
               type="checkbox"
+              aria-label="Web Search"
               [ngModel]="vm.form.useWebSearch"
               (ngModelChange)="handleFormChange('useWebSearch', $event)"
             />
