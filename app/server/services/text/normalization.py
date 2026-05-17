@@ -18,6 +18,13 @@ _STRENGTH_FRAGMENT_RE = re.compile(
     r"\b\d+(?:[.,]\d+)?\s*(?:mg|mcg|ug|g|kg|ml|l|ui|iu|u|mmol|meq|%)\b",
     re.IGNORECASE,
 )
+_PARENTHETICAL_RE = re.compile(r"\([^)]*\)")
+_STATIC_QUERY_ALIASES = {
+    "bactrim": "sulfamethoxazole trimethoprim",
+    "bactrim forte": "sulfamethoxazole trimethoprim",
+    "co amoxicillina": "amoxicillin clavulanate",
+    "co amoxiclav": "amoxicillin clavulanate",
+}
 
 
 # ---------------------------------------------------------------------------
@@ -26,6 +33,7 @@ def canonicalize_drug_query(value: str | None) -> str:
         return ""
     normalized = unicodedata.normalize("NFKC", value).lower()
     normalized = normalized.replace("\r\n", " ").replace("\r", " ").replace("\n", " ")
+    normalized = _PARENTHETICAL_RE.sub(" ", normalized)
     normalized = re.sub(r"\[[^\]]*\]", " ", normalized)
     normalized = re.sub(r"(?<=\w)\s*(?:\+|/|&)\s*(?=\w)", " ", normalized)
     normalized = re.sub(r"[\(\)\{\},;:]+", " ", normalized)
@@ -167,6 +175,9 @@ def resolve_known_query_alias(value: str) -> str:
     alias = get_text_normalization_snapshot().query_aliases.get(normalized)
     if alias is not None:
         return alias
+    static_alias = _STATIC_QUERY_ALIASES.get(normalized)
+    if static_alias is not None:
+        return static_alias
 
     return normalized
 

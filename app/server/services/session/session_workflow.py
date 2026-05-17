@@ -31,6 +31,7 @@ from services.clinical.language import ClinicalLanguageDetector
 from services.clinical.match_quality import classify_match_evidence
 from services.session.clinical_input_extractor import ClinicalInputExtractionError
 from services.session.session_shared import NarrativeBuilder, run_clinical_job
+from services.security.access_keys import AccessKeyService
 from services.text.normalization import normalize_drug_query_name
 
 
@@ -368,6 +369,19 @@ def start_clinical_job_workflow(
     if service.job_manager.is_job_running(service.JOB_TYPE):
         raise ServiceConflictError("Clinical analysis is already in progress")
 
+    service.apply_persisted_runtime_configuration()
+    if LLMRuntimeConfig.is_cloud_enabled():
+        provider = LLMRuntimeConfig.get_llm_provider()
+        active_keys = [
+            item
+            for item in AccessKeyService().list_access_keys(provider)
+            if item.is_active
+        ]
+        if not active_keys:
+            raise ServiceValidationError(
+                f"Configure an active {provider.title()} access key before running cloud analysis."
+            )
+
     try:
         preprocessed_request, section_extraction = asyncio.run(
             service.preprocess_unified_input(request_payload)
@@ -379,7 +393,6 @@ def start_clinical_job_workflow(
         service.ensure_submission_requirements(patient_payload)
     except ClinicalPipelineValidationError as exc:
         raise ServiceValidationError(service.serialize_pipeline_issues(exc.issues)) from exc
-    service.apply_persisted_runtime_configuration()
     job_id = service.job_manager.start_job(
         job_type=service.JOB_TYPE,
         runner=run_clinical_job,

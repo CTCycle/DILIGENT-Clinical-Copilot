@@ -454,6 +454,25 @@ export class DiliAgentPageComponent implements OnDestroy {
     return 'Stop analysis';
   }
 
+  get runDisabledReason(): string | null {
+    if (this.vm.isRunning || this.vm.isStarting || this.isCancelling()) {
+      return null;
+    }
+    if (!this.vm.form.visitDate.trim()) {
+      return 'Add a visit date to run analysis.';
+    }
+    if (!this.vm.form.clinicalInput.trim()) {
+      return 'Add the clinical input to run analysis.';
+    }
+    if (!this.clinicalInputMeetsMinimumLength()) {
+      return 'Clinical input needs at least 60 words.';
+    }
+    if (!this.hasSelectedModelProvider()) {
+      return 'Select a model provider to run analysis.';
+    }
+    return null;
+  }
+
   get reportBody(): string {
     return this.vm.message || 'No report generated yet. Run analysis to see results.';
   }
