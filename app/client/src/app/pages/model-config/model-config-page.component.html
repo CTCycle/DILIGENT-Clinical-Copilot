@@ -104,12 +104,16 @@
               }
               @for (model of filteredLocalModels(); track model.name) {
                 <li class="model-config-model-item" [class.is-selected]="draftConfig().clinicalModel === model.name || draftConfig().textExtractionModel === model.name">
+                  <span
+                    class="model-config-availability-led"
+                    [class.is-available]="model.available_in_ollama"
+                    [class.is-unavailable]="!model.available_in_ollama"
+                    [attr.aria-label]="model.available_in_ollama ? 'Installed in Ollama' : 'Not installed in Ollama'"
+                    role="status"
+                  ></span>
                   <div class="model-config-model-details">
                     <div class="model-config-model-name-row">
                       <span class="model-config-model-name">{{ model.name }}</span>
-                      <span class="model-config-availability-pill" [class.is-available]="model.available_in_ollama" [class.is-unavailable]="!model.available_in_ollama">
-                        {{ model.available_in_ollama ? 'Installed' : 'Not installed' }}
-                      </span>
                     </div>
                     <span class="model-config-model-description" [title]="model.description">{{ model.description }}</span>
 
@@ -122,14 +126,6 @@
                       </div>
                     }
 
-                    <div class="model-config-role-pill-row" aria-live="polite">
-                      @if (draftConfig().clinicalModel === model.name) {
-                        <span class="model-config-role-pill">Clinical</span>
-                      }
-                      @if (draftConfig().textExtractionModel === model.name) {
-                        <span class="model-config-role-pill">Text extraction</span>
-                      }
-                    </div>
                   </div>
 
                   <div class="model-config-model-item-side">

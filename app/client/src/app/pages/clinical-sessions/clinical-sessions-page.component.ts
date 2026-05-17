@@ -25,7 +25,8 @@ type DetectedDrugEvidence = {
   name: string;
   liverTox: boolean;
   rxNav: boolean;
-  note: string;
+  inAnamnesis: boolean;
+  inTherapy: boolean;
 };
 
 @Component({
@@ -36,19 +37,17 @@ type DetectedDrugEvidence = {
   styleUrl: './clinical-sessions-page.component.scss',
 })
 export class ClinicalSessionsPageComponent implements OnInit, OnDestroy {
-  @ViewChild('sessionTextEditor') private sessionTextEditor?: ElementRef<HTMLTextAreaElement>;
+  @ViewChild('sessionTextEditor') private sessionTextEditor?: ElementRef<HTMLDivElement>;
 
   private readonly router = inject(Router);
   private pollCancelled = false;
 
   readonly sessions = signal<InspectionSessionItem[]>([]);
   readonly statusFilter = signal<'all' | InspectionSessionStatus>('all');
-  readonly sortOrder = signal<'newest' | 'oldest'>('newest');
   readonly dateFilterMode = signal<'any' | 'after' | 'before' | 'exact'>('any');
   readonly dateFilter = signal('');
   readonly filteredSessions = computed(() => {
     const status = this.statusFilter();
-    const order = this.sortOrder();
     const dateMode = this.dateFilterMode();
     const dateFilter = this.dateFilter();
     const filtered = this.sessions().filter((session) => {
@@ -63,7 +62,7 @@ export class ClinicalSessionsPageComponent implements OnInit, OnDestroy {
     return [...filtered].sort((left, right) => {
       const leftTime = Date.parse(left.session_timestamp || '') || 0;
       const rightTime = Date.parse(right.session_timestamp || '') || 0;
-      return order === 'newest' ? rightTime - leftTime : leftTime - rightTime;
+      return rightTime - leftTime;
     });
   });
   readonly selected = signal<ClinicalSessionDetail | null>(null);
@@ -73,6 +72,7 @@ export class ClinicalSessionsPageComponent implements OnInit, OnDestroy {
   readonly detailError = signal<string | null>(null);
   readonly query = signal('');
   readonly editorText = signal('');
+  readonly editorFontSize = signal(16);
   readonly metadataText = signal('{\n  "documents": [],\n  "images": []\n}');
   readonly revisionSelection = signal('');
   readonly revisionInstruction = signal('');
@@ -83,6 +83,9 @@ export class ClinicalSessionsPageComponent implements OnInit, OnDestroy {
   readonly revisionProgress = signal(0);
   readonly revisionJobStatus = signal<JobStatus | null>(null);
   readonly detectedDrugEvidence = signal<DetectedDrugEvidence[]>([]);
+  readonly detectedDiseases = signal<string[]>([]);
+  readonly labSummary = signal<Array<{ label: string; value: string }>>([]);
+  readonly hepatotoxicityPattern = signal<string>('N/A');
 
   ngOnInit(): void {
     void this.loadSessions();
@@ -118,11 +121,14 @@ export class ClinicalSessionsPageComponent implements OnInit, OnDestroy {
     try {
       const detail = await fetchClinicalSessionDetail(sessionId);
       this.selected.set(detail);
-      this.editorText.set(detail.session_text || '');
+      this.editorText.set(this.toEditorHtml(this.previewReport(detail)));
       this.metadataText.set(JSON.stringify(detail.metadata || {}, null, 2));
       this.revisionSelection.set('');
       this.revisionInstruction.set('');
       this.activeSection.set('preview');
+      this.detectedDiseases.set(this.previewDetectedDiseases(detail));
+      this.labSummary.set(this.previewLaboratorySummary(detail));
+      this.hepatotoxicityPattern.set(this.previewHepatotoxicityPattern(detail));
       void this.loadDetectedDrugEvidence(detail);
     } catch (error) {
       this.detailError.set(formatUnknownError(error, 'Failed to open session.'));
@@ -139,10 +145,6 @@ export class ClinicalSessionsPageComponent implements OnInit, OnDestroy {
     this.statusFilter.set(value);
   }
 
-  updateSortOrder(value: 'newest' | 'oldest'): void {
-    this.sortOrder.set(value);
-  }
-
   updateDateFilterMode(value: 'any' | 'after' | 'before' | 'exact'): void {
     this.dateFilterMode.set(value);
     if (value === 'any') {
@@ -156,6 +158,75 @@ export class ClinicalSessionsPageComponent implements OnInit, OnDestroy {
 
   updateEditorText(value: string): void {
     this.editorText.set(value);
+  }
+
+  setEditorFontSize(delta: number): void {
+    const next = Math.min(22, Math.max(12, this.editorFontSize() + delta));
+    this.editorFontSize.set(next);
+  }
+
+  runEditorCommand(command: string, value?: string): void {
+    const element = this.sessionTextEditor?.nativeElement;
+    if (!element) return;
+    element.focus();
+    document.execCommand(command, false, value);
+    this.editorText.set(element.innerHTML);
+  }
+
+  onEditorInput(event: Event): void {
+    const target = event.target as HTMLDivElement | null;
+    if (!target) return;
+    this.editorText.set(target.innerHTML);
+  }
+
+  onEditorKeydown(event: KeyboardEvent): void {
+    if ((event.ctrlKey || event.metaKey) && event.key.toLowerCase() === 's') {
+      event.preventDefault();
+      void this.saveSession();
+      return;
+    }
+    if ((event.ctrlKey || event.metaKey) && event.key.toLowerCase() === 'y') {
+      event.preventDefault();
+      this.runEditorCommand('redo');
+      return;
+    }
+    if ((event.ctrlKey || event.metaKey) && event.shiftKey && event.key.toLowerCase() === 'z') {
+      event.preventDefault();
+      this.runEditorCommand('redo');
+    }
+  }
+
+  insertLink(): void {
+    const url = globalThis.prompt('Enter URL');
+    if (!url) return;
+    this.runEditorCommand('createLink', url);
+  }
+
+  removeSelection(): void {
+    const element = this.sessionTextEditor?.nativeElement;
+    if (!element) return;
+    element.focus();
+    document.execCommand('delete');
+    this.editorText.set(element.innerHTML);
+  }
+
+  clearFormatting(): void {
+    this.runEditorCommand('removeFormat');
+    this.runEditorCommand('unlink');
+  }
+
+  private toEditorHtml(text: string): string {
+    const escaped = text
+      .replace(/&/g, '&amp;')
+      .replace(/</g, '&lt;')
+      .replace(/>/g, '&gt;');
+    return escaped.replace(/\r?\n/g, '<br>');
+  }
+
+  private editorValueToPersistedText(): string {
+    const element = this.sessionTextEditor?.nativeElement;
+    if (!element) return this.editorText();
+    return element.innerHTML.trim();
   }
 
   updateMetadataText(value: string): void {
@@ -178,19 +249,6 @@ export class ClinicalSessionsPageComponent implements OnInit, OnDestroy {
     this.activeSection.set(section);
   }
 
-  useEditorSelectionForRevision(): void {
-    const element = this.sessionTextEditor?.nativeElement;
-    if (!element) {
-      this.activeSection.set('revision');
-      return;
-    }
-    const selectedText = element.value.slice(element.selectionStart, element.selectionEnd).trim();
-    if (selectedText) {
-      this.revisionSelection.set(selectedText);
-    }
-    this.activeSection.set('revision');
-  }
-
   async saveSession(): Promise<void> {
     const detail = this.selected();
     if (!detail) return;
@@ -202,12 +260,21 @@ export class ClinicalSessionsPageComponent implements OnInit, OnDestroy {
       return;
     }
     this.saveStatus.set('Saving...');
+    const persistedEditorValue = this.editorValueToPersistedText();
     try {
       const updated = await updateClinicalSession(detail.session_id, {
-        session_text: this.editorText(),
+        session_text: persistedEditorValue,
         metadata,
       });
-      this.selected.set(updated);
+      this.selected.set({
+        ...updated,
+        report: persistedEditorValue,
+        result_payload: {
+          ...updated.result_payload,
+          report: persistedEditorValue,
+        },
+      });
+      this.editorText.set(persistedEditorValue);
       this.saveStatus.set('Saved.');
     } catch (error) {
       this.saveStatus.set(formatUnknownError(error, 'Failed to save session.'));
@@ -314,11 +381,13 @@ export class ClinicalSessionsPageComponent implements OnInit, OnDestroy {
 
   private async loadDetectedDrugEvidence(detail: ClinicalSessionDetail): Promise<void> {
     const drugs = this.previewDetectedDrugs(detail);
+    const sections = this.sectionTextMap(detail);
     this.detectedDrugEvidence.set(drugs.map((name) => ({
       name,
       liverTox: false,
       rxNav: false,
-      note: 'Checking catalogs',
+      inAnamnesis: this.textContainsDrug(sections.anamnesis, name),
+      inTherapy: this.textContainsDrug(sections.therapy, name),
     })));
     if (!drugs.length) return;
 
@@ -331,7 +400,8 @@ export class ClinicalSessionsPageComponent implements OnInit, OnDestroy {
         name,
         rxNav,
         liverTox,
-        note: rxNav || liverTox ? 'Catalog match found' : 'No catalog match',
+        inAnamnesis: this.textContainsDrug(sections.anamnesis, name),
+        inTherapy: this.textContainsDrug(sections.therapy, name),
       };
     }));
     if (this.selected()?.session_id === detail.session_id) {
@@ -354,6 +424,125 @@ export class ClinicalSessionsPageComponent implements OnInit, OnDestroy {
 
   private normalizeDrugName(value: string): string {
     return value.toLowerCase().replace(/\([^)]*\)/g, '').replace(/[^a-z0-9]+/g, ' ').trim();
+  }
+
+  private sectionTextMap(detail: ClinicalSessionDetail): { anamnesis: string; therapy: string } {
+    const sections = detail.sections || {};
+    const anamnesis = typeof sections['anamnesis'] === 'string' ? sections['anamnesis'] : '';
+    const therapy = typeof sections['therapy'] === 'string' ? sections['therapy'] : '';
+    return { anamnesis, therapy };
+  }
+
+  private textContainsDrug(text: string, drug: string): boolean {
+    if (!text.trim() || !drug.trim()) return false;
+    const normalizedText = this.normalizeDrugName(text);
+    const normalizedDrug = this.normalizeDrugName(drug);
+    if (!normalizedDrug) return false;
+    if (normalizedText.includes(normalizedDrug)) return true;
+    const firstToken = normalizedDrug.split(' ')[0] || '';
+    return firstToken.length > 3 && normalizedText.includes(firstToken);
+  }
+
+  private previewDetectedDiseases(detail: ClinicalSessionDetail): string[] {
+    const fromPayload = detail.result_payload?.['detected_diseases'];
+    if (Array.isArray(fromPayload)) {
+      const diseases = fromPayload
+        .filter((item): item is string => typeof item === 'string')
+        .map((item) => item.trim())
+        .filter((item) => item.length > 0);
+      if (diseases.length) return diseases;
+    }
+    const report = this.previewReport(detail);
+    const lines = report.split(/\r?\n/);
+    const diseaseLine = lines.find((line) => /detected diseases?/i.test(line));
+    if (!diseaseLine) return [];
+    return diseaseLine
+      .split(':')
+      .slice(1)
+      .join(':')
+      .split(',')
+      .map((item) => item.replace(/[*-]/g, '').trim())
+      .filter((item) => item.length > 0);
+  }
+
+  private previewLaboratorySummary(detail: ClinicalSessionDetail): Array<{ label: string; value: string }> {
+    const payload = detail.result_payload || {};
+    const flatPayload = this.flattenPayload(payload);
+    const fromPayload = this.collectLabValues(flatPayload);
+    if (fromPayload.length) return fromPayload;
+
+    const report = this.previewReport(detail).replace(/[*_`]/g, '');
+    const regexMap: Array<{ label: string; regex: RegExp }> = [
+      { label: 'ALT', regex: /\bALT\b\s*[:=]?\s*([0-9]+(?:\.[0-9]+)?\s*[A-Za-z/%µμ\.]*\/?[A-Za-z]*)/i },
+      { label: 'AST', regex: /\bAST\b\s*[:=]?\s*([0-9]+(?:\.[0-9]+)?\s*[A-Za-z/%µμ\.]*\/?[A-Za-z]*)/i },
+      { label: 'ALP', regex: /\bALP\b\s*[:=]?\s*([0-9]+(?:\.[0-9]+)?\s*[A-Za-z/%µμ\.]*\/?[A-Za-z]*)/i },
+      { label: 'Bilirubin', regex: /\b(?:total\s+)?bilirubin\b\s*[:=]?\s*([0-9]+(?:\.[0-9]+)?\s*[A-Za-z/%µμ\.]*\/?[A-Za-z]*)/i },
+      { label: 'INR', regex: /\bINR\b\s*[:=]?\s*([0-9]+(?:\.[0-9]+)?)/i },
+      { label: 'R-score', regex: /\bR-?score\b\s*[:=]?\s*([0-9]+(?:\.[0-9]+)?)/i },
+    ];
+    return regexMap
+      .map(({ label, regex }) => {
+        const match = report.match(regex);
+        return match?.[1] ? { label, value: match[1].trim() } : null;
+      })
+      .filter((item): item is { label: string; value: string } => item !== null);
+  }
+
+  private previewHepatotoxicityPattern(detail: ClinicalSessionDetail): string {
+    const payload = detail.result_payload || {};
+    const flatPayload = this.flattenPayload(payload);
+    const fromPayload = [
+      flatPayload['hepatotoxicity_pattern'],
+      flatPayload['pattern_classification'],
+      flatPayload['classification'],
+      flatPayload['hepatotoxicity.classification'],
+    ].find((value) => typeof value === 'string' && value.trim().length > 0);
+    if (typeof fromPayload === 'string') return fromPayload.trim();
+
+    const report = this.previewReport(detail).replace(/[*_`]/g, '');
+    const patternMatch = report.match(/\b(?:hepatotoxicity pattern|classification)\b\s*[:=]\s*([A-Za-z -]+)/i);
+    return patternMatch?.[1]?.trim() || 'N/A';
+  }
+
+  private flattenPayload(
+    value: unknown,
+    prefix = '',
+    acc: Record<string, unknown> = {},
+  ): Record<string, unknown> {
+    if (!value || typeof value !== 'object' || Array.isArray(value)) return acc;
+    const record = value as Record<string, unknown>;
+    for (const [key, nested] of Object.entries(record)) {
+      const fullKey = prefix ? `${prefix}.${key}` : key;
+      acc[fullKey.toLowerCase()] = nested;
+      if (nested && typeof nested === 'object' && !Array.isArray(nested)) {
+        this.flattenPayload(nested, fullKey, acc);
+      }
+    }
+    return acc;
+  }
+
+  private collectLabValues(flatPayload: Record<string, unknown>): Array<{ label: string; value: string }> {
+    const keys: Array<{ label: string; includes: string[] }> = [
+      { label: 'ALT', includes: ['alt'] },
+      { label: 'AST', includes: ['ast'] },
+      { label: 'ALP', includes: ['alp', 'alkaline_phosphatase'] },
+      { label: 'Bilirubin', includes: ['bilirubin', 'tbil'] },
+      { label: 'INR', includes: ['inr'] },
+      { label: 'R-score', includes: ['r_score', 'rscore', 'r-score'] },
+    ];
+
+    return keys
+      .map(({ label, includes }) => {
+        const payloadEntry = Object.entries(flatPayload).find(([key, val]) =>
+          includes.some((needle) => key.includes(needle)) &&
+          val !== null &&
+          val !== undefined &&
+          String(val).trim().length > 0,
+        );
+        if (!payloadEntry) return null;
+        return { label, value: String(payloadEntry[1]).trim() };
+      })
+      .filter((item): item is { label: string; value: string } => item !== null);
   }
 
   private dateKey(value: string | null): string {

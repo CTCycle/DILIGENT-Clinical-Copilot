@@ -723,27 +723,6 @@ app-root {
   fill: currentColor;
 }
 
-.model-config-availability-pill {
-  display: inline-flex;
-  align-items: center;
-  border-radius: 999px;
-  padding: 2px 8px;
-  font-size: var(--font-xs);
-  line-height: 1.3;
-  font-weight: 700;
-  white-space: nowrap;
-}
-
-.model-config-availability-pill.is-available {
-  color: #166534;
-  background: rgba(134, 239, 172, 0.4);
-}
-
-.model-config-availability-pill.is-unavailable {
-  color: #475569;
-  background: rgba(203, 213, 225, 0.45);
-}
-
 .model-config-family {
   margin: 0;
   color: var(--color-text-muted);
@@ -2801,9 +2780,9 @@ input[type="date"]::-webkit-calendar-picker-indicator:hover {
 
 .model-config-model-item {
   display: grid;
-  grid-template-columns: minmax(0, 1fr) auto;
+  grid-template-columns: 14px minmax(0, 1fr) auto;
   gap: var(--space-sm);
-  align-items: flex-start;
+  align-items: center;
   border: 1px solid rgba(148, 163, 184, 0.35);
   border-radius: var(--radius-lg);
   background: rgba(255, 255, 255, 0.64);
@@ -2845,25 +2824,6 @@ input[type="date"]::-webkit-calendar-picker-indicator:hover {
   min-width: 0;
 }
 
-.model-config-role-pill-row {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 6px;
-  min-height: 22px;
-}
-
-.model-config-role-pill {
-  display: inline-flex;
-  align-items: center;
-  border-radius: 999px;
-  padding: 2px 8px;
-  font-size: var(--font-xs);
-  line-height: 1.3;
-  font-weight: 700;
-  color: #166534;
-  background: rgba(134, 239, 172, 0.35);
-}
-
 .model-config-model-name {
   margin: 0;
   color: var(--color-text-primary);
@@ -2876,6 +2836,27 @@ input[type="date"]::-webkit-calendar-picker-indicator:hover {
   align-items: center;
   flex-wrap: wrap;
   gap: var(--space-xs);
+}
+
+.model-config-availability-led {
+  width: 10px;
+  height: 10px;
+  border-radius: 999px;
+  align-self: flex-start;
+  margin-top: 6px;
+  box-shadow: 0 0 0 2px rgba(255, 255, 255, 0.74), 0 0 0 1px rgba(15, 23, 42, 0.12);
+}
+
+.model-config-availability-led.is-available {
+  background: #16a34a;
+}
+
+.model-config-availability-led.is-unavailable {
+  background: #dc2626;
+}
+
+:root[data-theme="dark"] .model-config-availability-led {
+  box-shadow: 0 0 0 2px rgba(16, 34, 49, 0.95), 0 0 0 1px rgba(128, 158, 174, 0.38);
 }
 
 .model-config-model-description {
@@ -5333,7 +5314,8 @@ input[type="date"]::-webkit-calendar-picker-indicator:hover {
 }
 
 .model-config-page .model-config-local-row .model-config-model-item {
-  padding: 8px 10px;
+  min-height: 68px;
+  padding: 10px 12px;
   gap: 8px;
 }
 
@@ -5507,8 +5489,8 @@ input[type="date"]::-webkit-calendar-picker-indicator:hover {
 }
 
 :root[data-theme="dark"] .model-config-page .model-config-summary-panel {
-  background: #213848;
-  border-color: rgba(150, 179, 194, 0.34);
+  background: #182d3b;
+  border-color: rgba(128, 158, 174, 0.28);
   box-shadow: 0 20px 48px -34px rgba(0, 0, 0, 0.88);
   color: #eef6f8;
 }
@@ -5518,13 +5500,20 @@ input[type="date"]::-webkit-calendar-picker-indicator:hover {
 :root[data-theme="dark"] .model-config-page .model-config-model-item,
 :root[data-theme="dark"] .model-config-page .model-config-provider-card,
 :root[data-theme="dark"] .model-config-page .model-config-provider-menu,
+:root[data-theme="dark"] .model-config-page .model-config-list-shell,
 :root[data-theme="dark"] .model-config-page .model-config-summary-list,
+:root[data-theme="dark"] .model-config-page .model-config-missing,
+:root[data-theme="dark"] .model-config-page .model-config-extra-row--side,
 :root[data-theme="dark"] .model-config-page .model-config-summary-table,
 :root[data-theme="dark"] .model-config-page .model-config-empty-note,
 :root[data-theme="dark"] .model-config-page .model-config-status-message {
   background: #102231;
   border-color: rgba(123, 151, 168, 0.3);
   color: #d6e3e6;
+}
+
+:root[data-theme="dark"] .model-config-page .model-config-list-shell {
+  box-shadow: inset 0 0 0 1px rgba(123, 151, 168, 0.18);
 }
 
 :root[data-theme="dark"] .model-config-page .model-config-runtime-option.is-active,
@@ -5785,8 +5774,8 @@ input[type="date"]::-webkit-calendar-picker-indicator:hover {
 }
 
 .model-config-page .model-config-model-item {
-  min-height: 56px;
-  padding: 8px 12px;
+  min-height: 68px;
+  padding: 10px 12px;
 }
 
 .model-config-page .model-config-model-name-row {

@@ -77,11 +77,10 @@
 
 .clinical-sessions-filter-controls {
   display: grid;
-  grid-template-columns: 0.78fr 0.94fr 1fr;
+  grid-template-columns: 1fr 1fr;
   gap: 6px;
 }
 
-.clinical-sessions-sort,
 .clinical-sessions-date-mode,
 .clinical-sessions-date-input {
   min-width: 0;
@@ -207,33 +206,6 @@
   color: #65726e;
 }
 
-.clinical-session-save-btn {
-  width: 40px;
-  height: 40px;
-  flex: 0 0 auto;
-  display: inline-grid;
-  place-items: center;
-  border: 1px solid #c9ddd5;
-  border-radius: 8px;
-  background: rgba(255, 255, 255, 0.76);
-  color: #087b5d;
-  cursor: pointer;
-  transition: background 0.18s ease, border-color 0.18s ease, color 0.18s ease;
-}
-
-.clinical-session-save-btn svg {
-  width: 18px;
-  height: 18px;
-  display: block;
-  fill: currentColor;
-}
-
-.clinical-session-save-btn:hover {
-  border-color: #8bd4b7;
-  background: #eefaf4;
-  color: #075f49;
-}
-
 .clinical-session-tabs {
   display: flex;
   gap: 8px;
@@ -271,14 +243,93 @@
   resize: vertical;
 }
 
-.clinical-session-editor-actions {
+.clinical-session-editor-toolbar {
   display: flex;
-  justify-content: flex-end;
+  align-items: center;
+  gap: 10px;
+  flex-wrap: wrap;
   margin-bottom: 10px;
+  padding: 8px 10px;
+  border: 1px solid #d4e4dd;
+  border-radius: 8px;
+  background: #f7fbf9;
+}
+
+.clinical-session-toolbar-group {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 4px;
+  border: 1px solid #d6e5df;
+  border-radius: 7px;
+  background: #fff;
+}
+
+.clinical-session-toolbar-group-format select {
+  min-height: 30px;
+  border: 1px solid #cfe0da;
+  border-radius: 6px;
+  background: #fff;
+  color: #32433f;
+  font-size: 12px;
+  font-weight: 700;
+  padding: 4px 10px;
+}
+
+.clinical-session-toolbar-group-standalone {
+  margin-left: auto;
+}
+
+.clinical-session-editor-toolbar button {
+  min-height: 30px;
+  border: 1px solid #cfe0da;
+  border-radius: 6px;
+  background: #fff;
+  color: #32433f;
+  font-size: 12px;
+  font-weight: 700;
+  padding: 4px 10px;
+}
+
+.clinical-session-editor-toolbar .btn {
+  min-height: 30px;
+  padding: 4px 12px;
+}
+
+.clinical-session-editor-toolbar button:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.clinical-session-editor-font-size {
+  color: #4f605b;
+  font-size: 12px;
+  font-weight: 700;
+  min-width: 42px;
+  text-align: center;
+}
+
+.clinical-session-toolbar-divider {
+  width: 1px;
+  height: 22px;
+  background: #d6e5df;
 }
 
 .clinical-session-editor {
   min-height: 560px;
+}
+
+.clinical-session-editor-surface {
+  min-height: 560px;
+  resize: none;
+  overflow: auto;
+  white-space: pre-wrap;
+  word-break: break-word;
+}
+
+.clinical-session-editor-surface:focus {
+  outline: 2px solid rgba(15, 159, 120, 0.28);
+  outline-offset: 1px;
 }
 
 .clinical-session-preview {
@@ -342,6 +393,7 @@
 
 .clinical-session-drug-table {
   width: 100%;
+  table-layout: auto;
   border-collapse: collapse;
   color: #25312f;
   font-size: 12px;
@@ -357,16 +409,46 @@
 
 .clinical-session-drug-table th {
   color: #65726e;
-  font-size: 10px;
+  font-size: 11px;
   font-weight: 800;
-  letter-spacing: 0.04em;
-  text-transform: uppercase;
+  letter-spacing: 0;
+  text-transform: none;
+  white-space: normal;
+  line-height: 1.2;
+  word-break: break-word;
 }
 
 .clinical-session-drug-table td:first-child {
-  max-width: 150px;
+  width: 40%;
   font-weight: 750;
-  overflow-wrap: anywhere;
+  overflow-wrap: break-word;
+  word-break: normal;
+  hyphens: auto;
+}
+
+.clinical-session-drug-table th:nth-child(2),
+.clinical-session-drug-table td:nth-child(2),
+.clinical-session-drug-table th:nth-child(3),
+.clinical-session-drug-table td:nth-child(3) {
+  width: 15%;
+}
+
+.clinical-session-drug-table th:nth-child(4),
+.clinical-session-drug-table td:nth-child(4),
+.clinical-session-drug-table th:nth-child(5),
+.clinical-session-drug-table td:nth-child(5) {
+  width: 15%;
+}
+
+.clinical-session-drug-table th:nth-child(2),
+.clinical-session-drug-table th:nth-child(3),
+.clinical-session-drug-table td:nth-child(2),
+.clinical-session-drug-table td:nth-child(3),
+.clinical-session-drug-table th:nth-child(4),
+.clinical-session-drug-table th:nth-child(5),
+.clinical-session-drug-table td:nth-child(4),
+.clinical-session-drug-table td:nth-child(5) {
+  text-align: center;
 }
 
 .clinical-session-source-pill {
@@ -410,6 +492,22 @@
   color: #25312f;
   font-size: 13px;
   overflow-wrap: anywhere;
+}
+
+.clinical-session-side-list {
+  margin: 12px 0 0;
+  padding-left: 18px;
+  display: grid;
+  gap: 6px;
+}
+
+.clinical-session-side-list li {
+  color: #2f3f3b;
+  font-size: 13px;
+}
+
+.clinical-session-compact-list {
+  margin-top: 10px;
 }
 
 .clinical-session-json {
@@ -534,9 +632,9 @@
 
 :host-context([data-theme="dark"]) .clinical-sessions-search input,
 :host-context([data-theme="dark"]) .clinical-sessions-search .btn,
-:host-context([data-theme="dark"]) .clinical-sessions-sort,
 :host-context([data-theme="dark"]) .clinical-sessions-date-mode,
 :host-context([data-theme="dark"]) .clinical-sessions-date-input,
+:host-context([data-theme="dark"]) .clinical-session-editor-toolbar,
 :host-context([data-theme="dark"]) .clinical-session-editor,
 :host-context([data-theme="dark"]) .clinical-session-json,
 :host-context([data-theme="dark"]) .clinical-session-focus,
@@ -545,6 +643,31 @@
   background: #102231;
   border-color: rgba(123, 151, 168, 0.34);
   color: #e7f0f2;
+}
+
+:host-context([data-theme="dark"]) .clinical-session-editor-toolbar button {
+  background: #0f1f2d;
+  border-color: rgba(123, 151, 168, 0.34);
+  color: #e7f0f2;
+}
+
+:host-context([data-theme="dark"]) .clinical-session-toolbar-group {
+  background: #0f1f2d;
+  border-color: rgba(123, 151, 168, 0.34);
+}
+
+:host-context([data-theme="dark"]) .clinical-session-toolbar-group-format select {
+  background: #0f1f2d;
+  border-color: rgba(123, 151, 168, 0.34);
+  color: #e7f0f2;
+}
+
+:host-context([data-theme="dark"]) .clinical-session-editor-font-size {
+  color: #b8c9ce;
+}
+
+:host-context([data-theme="dark"]) .clinical-session-toolbar-divider {
+  background: rgba(128, 158, 174, 0.32);
 }
 
 :host-context([data-theme="dark"]) .clinical-sessions-date-input:disabled {
@@ -574,12 +697,6 @@
   border-color: rgba(83, 220, 170, 0.58);
 }
 
-:host-context([data-theme="dark"]) .clinical-session-save-btn {
-  background: #102231;
-  border-color: rgba(123, 151, 168, 0.34);
-  color: #7ee7bd;
-}
-
 :host-context([data-theme="dark"]) .clinical-session-drug-table {
   color: #d6e3e6;
 }
@@ -591,6 +708,10 @@
 :host-context([data-theme="dark"]) .clinical-session-drug-table th,
 :host-context([data-theme="dark"]) .clinical-session-drug-table td {
   border-bottom-color: rgba(128, 158, 174, 0.2);
+}
+
+:host-context([data-theme="dark"]) .clinical-session-side-list li {
+  color: #d6e3e6;
 }
 
 @media (max-width: 920px) {
