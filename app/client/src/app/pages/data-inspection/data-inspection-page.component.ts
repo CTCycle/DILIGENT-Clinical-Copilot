@@ -1,7 +1,6 @@
 import { CommonModule } from '@angular/common';
 import { Component, ElementRef, OnDestroy, OnInit, ViewChild, inject, signal } from '@angular/core';
 import { FormsModule } from '@angular/forms';
-import { Router } from '@angular/router';
 
 import { InspectionActionIconButtonComponent } from '../../components/inspection-action-icon-button/inspection-action-icon-button.component';
 import { ModalShellComponent } from '../../components/modal-shell/modal-shell.component';
@@ -12,7 +11,6 @@ import {
   cancelInspectionRxNavUpdateJob,
   deleteInspectionLiverToxDrug,
   deleteInspectionRxNavDrug,
-  deleteInspectionSession,
   fetchInspectionLiverToxCatalog,
   fetchInspectionLiverToxExcerpt,
   fetchInspectionLiverToxUpdateConfig,
@@ -25,23 +23,18 @@ import {
   fetchInspectionRxNavCatalog,
   fetchInspectionRxNavUpdateConfig,
   fetchInspectionRxNavUpdateJobStatus,
-  fetchInspectionSessionReport,
-  fetchInspectionSessions,
   startInspectionLiverToxUpdateJob,
   startInspectionRagUpdateJob,
   startInspectionRxNavUpdateJob,
 } from '../../core/services/inspection-api';
 import { JobPollingService } from '../../core/services/job-polling.service';
 import {
-  InspectionDateFilterMode,
   InspectionDrugAliasesResponse,
   InspectionLiverToxExcerptResponse,
   InspectionLiverToxItem,
   InspectionRagDocumentRow,
   InspectionRagVectorStoreSummary,
   InspectionRxNavItem,
-  InspectionSessionItem,
-  InspectionSessionStatus,
   InspectionUpdateTarget,
 } from '../../core/models/types';
 import { InspectionDetailResource } from '../../core/state/inspection-detail-resource';
@@ -51,13 +44,11 @@ import {
   InspectionViewId,
   InspectionViewOption,
   formatInspectionDateTime,
-  formatInspectionDuration,
   inspectionTabId,
   resolveRagDocumentsPath,
 } from '../../core/utils/inspection-formatting';
 
 const INSPECTION_VIEWS: InspectionViewOption[] = [
-  { id: 'sessions', label: 'Sessions' },
   { id: 'rxnav', label: 'Drug Catalog' },
   { id: 'livertox', label: 'LiverTox' },
   { id: 'rag', label: 'RAG' },
@@ -80,37 +71,8 @@ export class DataInspectionPageComponent implements OnInit, OnDestroy {
   @ViewChild('ragFolderInput') private ragFolderInput?: ElementRef<HTMLInputElement>;
 
   private readonly jobPolling = inject(JobPollingService);
-  private readonly router = inject(Router);
   readonly inspectionViews = INSPECTION_VIEWS;
-  readonly activeView = signal<InspectionViewId>('sessions');
-
-  readonly sessionStatusFilter = signal<InspectionSessionStatus | 'all'>('all');
-  readonly sessionDateMode = signal<InspectionDateFilterMode | 'none'>('none');
-  readonly sessionDate = signal('');
-  private readonly sessionCatalog = new InspectionPagedResource<InspectionSessionItem>(
-    (params) => {
-      const statusFilter = this.sessionStatusFilter();
-      const dateModeFilter = this.sessionDateMode();
-      return fetchInspectionSessions({
-        ...params,
-        status: statusFilter === 'all' ? undefined : statusFilter,
-        date_mode: dateModeFilter === 'none' ? undefined : dateModeFilter,
-        date: dateModeFilter === 'none' ? undefined : this.sessionDate() || undefined,
-      });
-    },
-    'Failed to load sessions.',
-  );
-  readonly sessionItems = this.sessionCatalog.items;
-  readonly sessionVisibleItems = this.sessionCatalog.visibleItems;
-  readonly sessionVisibleStartIndex = this.sessionCatalog.visibleStartIndex;
-  readonly sessionTopPaddingPx = this.sessionCatalog.topPaddingPx;
-  readonly sessionBottomPaddingPx = this.sessionCatalog.bottomPaddingPx;
-  readonly sessionTotal = this.sessionCatalog.total;
-  readonly sessionLoading = this.sessionCatalog.loading;
-  readonly sessionLoadingMore = this.sessionCatalog.loadingMore;
-  readonly sessionHasMore = this.sessionCatalog.hasMore;
-  readonly sessionError = this.sessionCatalog.error;
-  readonly sessionSearchInput = this.sessionCatalog.searchInput;
+  readonly activeView = signal<InspectionViewId>('rxnav');
 
   private readonly rxnavCatalog = new InspectionPagedResource<InspectionRxNavItem>(
     (params) => fetchInspectionRxNavCatalog(params),
@@ -165,11 +127,6 @@ export class DataInspectionPageComponent implements OnInit, OnDestroy {
   readonly supportsNativeFolderSelection =
     typeof globalThis !== 'undefined' &&
     '__TAURI_INTERNALS__' in globalThis;
-
-  readonly reportSession = signal<InspectionSessionItem | null>(null);
-  readonly reportContent = signal('');
-  readonly reportLoading = signal(false);
-  readonly reportError = signal<string | null>(null);
 
   private readonly aliasDetail = new InspectionDetailResource<InspectionDrugAliasesResponse>();
   readonly aliasData = this.aliasDetail.data;
@@ -237,7 +194,6 @@ export class DataInspectionPageComponent implements OnInit, OnDestroy {
 
   private async initializePageData(): Promise<void> {
     await Promise.all([
-      this.loadSessions(),
       this.loadRxNav(),
       this.loadLiverTox(),
       this.loadRag(),
@@ -252,21 +208,9 @@ export class DataInspectionPageComponent implements OnInit, OnDestroy {
     return formatInspectionDateTime(value);
   }
 
-  formatDuration(value: number | null): string {
-    return formatInspectionDuration(value);
-  }
-
-  statusLabel(value: InspectionSessionStatus): string {
-    return value === 'failed' ? 'Failed' : 'Successful';
-  }
-
   get displayedRagFolderPath(): string {
     const manualPath = this.ragSelectedFolderPath().trim();
     return manualPath || resolveRagDocumentsPath(this.ragVectorStore()) || 'N/A';
-  }
-
-  async loadSessions(): Promise<void> {
-    await this.sessionCatalog.loadInitial();
   }
 
   async loadRxNav(): Promise<void> {
@@ -293,69 +237,8 @@ export class DataInspectionPageComponent implements OnInit, OnDestroy {
     }
   }
 
-  async openSessionReport(row: InspectionSessionItem): Promise<void> {
-    if (!row.has_report) {
-      this.reportSession.set(row);
-      this.reportContent.set('');
-      this.reportLoading.set(false);
-      this.reportError.set('[ERROR] Report is not available for this session.');
-      return;
-    }
-    this.reportSession.set(row);
-    this.reportLoading.set(true);
-    this.reportError.set(null);
-    try {
-      const payload = await fetchInspectionSessionReport(row.session_id);
-      this.reportContent.set(payload.report);
-    } catch (error) {
-      this.reportContent.set('');
-      this.reportError.set(error instanceof Error ? error.message : 'Failed to load session report.');
-    } finally {
-      this.reportLoading.set(false);
-    }
-  }
-
-  closeSessionReport(): void {
-    this.reportSession.set(null);
-    this.reportContent.set('');
-    this.reportError.set(null);
-  }
-
-  async openPatientTimeline(row: InspectionSessionItem): Promise<void> {
-    if (this.canOpenTimeline(row)) {
-      await this.router.navigate(['/sessions', row.session_id, 'timetable']);
-    }
-  }
-
-  async confirmAndRemoveSession(row: InspectionSessionItem): Promise<void> {
-    const patientLabel = row.patient_name?.trim() || 'Unknown patient';
-    const confirmed = globalThis.confirm(
-      `Delete session #${row.session_id} for ${patientLabel}? This action cannot be undone.`,
-    );
-    if (!confirmed) {
-      return;
-    }
-
-    try {
-      await deleteInspectionSession(row.session_id);
-      await this.loadSessions();
-    } catch (error) {
-      this.sessionError.set(
-        error instanceof Error ? error.message : 'Failed to delete session.',
-      );
-    }
-  }
-
   async openAliases(drugId: number): Promise<void> {
     await this.aliasDetail.load(() => fetchInspectionRxNavAliases(drugId), 'Failed to load aliases.');
-  }
-
-  canOpenSessionReport(row: InspectionSessionItem): boolean {
-    return row.has_report;
-  }
-
-  canOpenTimeline(row: InspectionSessionItem): boolean {
-    return row.has_timeline || row.can_generate_timeline;
   }
 
   closeAliases(): void {
@@ -438,25 +321,6 @@ export class DataInspectionPageComponent implements OnInit, OnDestroy {
     this.changeView(nextView);
   }
 
-  async updateSessionsSearch(value: string): Promise<void> {
-    await this.sessionCatalog.updateSearch(value);
-  }
-
-  async updateSessionsStatus(value: InspectionSessionStatus | 'all'): Promise<void> {
-    this.sessionStatusFilter.set(value);
-    await this.loadSessions();
-  }
-
-  async updateSessionsDateMode(value: InspectionDateFilterMode | 'none'): Promise<void> {
-    this.sessionDateMode.set(value);
-    await this.loadSessions();
-  }
-
-  async updateSessionsDate(value: string): Promise<void> {
-    this.sessionDate.set(value);
-    await this.loadSessions();
-  }
-
   async updateRxNavSearch(value: string): Promise<void> {
     await this.rxnavCatalog.updateSearch(value);
   }
@@ -467,10 +331,6 @@ export class DataInspectionPageComponent implements OnInit, OnDestroy {
 
   async updateRagSearch(value: string): Promise<void> {
     await this.ragCatalog.updateSearch(value);
-  }
-
-  onSessionsScroll(event: Event): void {
-    this.sessionCatalog.handleScrollEvent(event);
   }
 
   onRxNavScroll(event: Event): void {

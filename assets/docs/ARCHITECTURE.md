@@ -1,6 +1,6 @@
 # DILIGENT Clinical Copilot Architecture
 
-Last updated: 2026-05-16
+Last updated: 2026-05-17
 
 ## 1. System Summary
 
@@ -72,7 +72,7 @@ Notes:
 - Frontend app: `app/client/src/main.ts`
   - Bootstraps Angular `App` with `appConfig`.
 - Frontend routing: `app/client/src/app/app.routes.ts`
-  - Routes: `/`, `/data`, `/model-config`.
+  - Routes: `/`, `/clinical-sessions`, `/data`, `/model-config`, `/sessions/:sessionId/timetable`.
 - Desktop runtime: `app/client/src-tauri/src/main.rs` + `tauri.conf.json`.
 - Windows launcher: `start_on_windows.bat`.
 
@@ -114,7 +114,11 @@ Research:
 
 Inspection:
 - `GET /api/inspection/sessions`
-- `GET /api/inspection/sessions/{session_id}/report`
+- `GET /api/inspection/sessions/{session_id}`
+- `PUT /api/inspection/sessions/{session_id}`
+- `POST /api/inspection/sessions/{session_id}/revision/jobs`
+- `GET /api/inspection/sessions/revision/jobs/{job_id}`
+- `DELETE /api/inspection/sessions/revision/jobs/{job_id}`
 - `GET /api/inspection/sessions/{session_id}/timeline`
 - `POST /api/inspection/sessions/{session_id}/timeline`
 - `DELETE /api/inspection/sessions/{session_id}`
@@ -181,11 +185,25 @@ Endpoint -> service -> repository:
   - `app/server/services/inspection/service.py`
   - `app/server/repositories/serialization/data.py`
 
+- `GET|PUT /api/inspection/sessions/{session_id}`
+  - `app/server/api/data_inspection.py`
+  - `app/server/services/inspection/service.py`
+  - `app/server/repositories/serialization/data.py`
+  - Session detail is the single session read surface for original text, parsed sections, metadata, AI preview payload, and revision audit data.
+
+- `POST /api/inspection/sessions/{session_id}/revision/jobs`
+  - `app/server/api/data_inspection.py`
+  - `app/server/services/inspection/service.py`
+  - `app/server/services/session/session_service.py`
+  - `app/server/repositories/serialization/data.py`
+
 ## 7. Persistence Mechanisms
 
 - Relational DB (SQLAlchemy):
   - SQLite file at `app/resources/database.db` when `database.embedded_database=true`
   - PostgreSQL when external DB mode is configured
+  - `clinical_sessions` is the single source of truth for session records, versioning, revision parentage, and session metadata. New sessions default to `version=1`; revised sessions store `original_session_id` and incremented `version`.
+  - Startup does not mutate existing schemas. During development, recreate the database from the current SQLAlchemy models instead of changing existing databases at application startup.
 - Vector persistence:
   - LanceDB collection under `app/resources/sources/vectors`
   - RAG retrieval uses vector search plus LanceDB full-text search with metadata-aware fusion and local cross-encoder reranking.

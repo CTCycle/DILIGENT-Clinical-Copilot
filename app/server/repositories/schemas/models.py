@@ -71,11 +71,18 @@ class ClinicalSession(Base):
         nullable=False,
     )
     session_timestamp: Mapped[datetime | None] = mapped_column(DateTime)
+    version: Mapped[int] = mapped_column(Integer, nullable=False, server_default=text("1"))
+    original_session_id: Mapped[int | None] = mapped_column(
+        Integer,
+        ForeignKey(CLINICAL_SESSIONS_ID_FK),
+        nullable=True,
+    )
     hepatic_pattern: Mapped[str | None] = mapped_column(String)
     text_extraction_model: Mapped[str | None] = mapped_column(String)
     clinical_model: Mapped[str | None] = mapped_column(String)
     total_duration: Mapped[float | None] = mapped_column(Float)
     session_status: Mapped[str | None] = mapped_column(String, nullable=True)
+    metadata_json: Mapped[str | None] = mapped_column(Text, nullable=True)
 
     patient: Mapped["Patient"] = relationship(
         "Patient",
@@ -98,9 +105,14 @@ class ClinicalSession(Base):
         back_populates="session",
         uselist=False,
     )
+    parent_session: Mapped["ClinicalSession | None"] = relationship(
+        "ClinicalSession",
+        remote_side=[id],
+    )
 
     __table_args__ = (
         Index("ix_clinical_sessions_patient_id", "patient_id"),
+        Index("ix_clinical_sessions_original_session_id", "original_session_id"),
         Index("ix_clinical_sessions_timestamp", "session_timestamp"),
         Index("ix_clinical_sessions_status", "session_status"),
     )

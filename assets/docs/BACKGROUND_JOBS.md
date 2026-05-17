@@ -1,6 +1,6 @@
 # Background Job Management
 
-Last updated: 2026-05-04
+Last updated: 2026-05-17
 
 DILIGENT uses a centralized thread-based job manager for long-running operations.
 
@@ -48,6 +48,9 @@ Each job tracks:
   - Start: `POST /api/inspection/rag/jobs`
   - Poll: `GET /api/inspection/rag/jobs/{job_id}`
   - Cancel: `POST /api/inspection/rag/jobs/{job_id}/cancel`
+- `session_revision`
+  - Start: `POST /api/inspection/sessions/{session_id}/revision/jobs`
+  - Poll/cancel: `GET|DELETE /api/inspection/sessions/revision/jobs/{job_id}`
 
 ## 5. Polling pattern
 
@@ -58,6 +61,7 @@ Standard contract:
 4. Inspection update jobs may include phase-aware result fields:
    - `phase`, `step_index`, `step_count`, `progress_message`, `summary`.
 5. Inspection updater runners use cooperative cancellation (`should_stop`) and progress callbacks consistently across `rxnav`, `livertox`, and `rag`.
+6. Session revision jobs report clinical pipeline progress, reprocess the full persisted session text, create a new session version, and persist a `revision_audit` payload with parser cross-validation, selected-focus context, user revision instruction, detected-drug diffs, model overrides, and conclusion action metadata.
 
 Frontend polling is implemented in `app/client/src/app/core/services/api.ts` and stops on terminal states.
 

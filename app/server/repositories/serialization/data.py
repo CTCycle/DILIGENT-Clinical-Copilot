@@ -48,7 +48,7 @@ class _RepositorySerializationService:
         )
 
     # -------------------------------------------------------------------------
-    def save_clinical_session(self, session_data: dict[str, Any]) -> None:
+    def save_clinical_session(self, session_data: dict[str, Any]) -> int | None:
         return session_result_data.save_clinical_session(self, session_data)
 
     # -----------------------------------------------------------------------------
@@ -182,10 +182,6 @@ class _RepositorySerializationService:
         return session_result_data.list_sessions(self, search=search, status_filter=status_filter, date_mode=date_mode, filter_date=filter_date, offset=offset, limit=limit)
 
     # -----------------------------------------------------------------------------
-    def get_session_report(self, session_id: int) -> str | None:
-        return session_result_data.get_session_report(self, session_id)
-
-    # -----------------------------------------------------------------------------
     def parse_session_result_payload(
         self, payload_json: str | None
     ) -> dict[str, Any] | None:
@@ -196,10 +192,33 @@ class _RepositorySerializationService:
         return session_result_data.get_session_result_payload(self, session_id)
 
     # -----------------------------------------------------------------------------
+    def get_session_detail(self, session_id: int) -> dict[str, Any] | None:
+        return session_result_data.get_session_detail(self, session_id)
+
+    # -----------------------------------------------------------------------------
     def upsert_session_result_payload(
         self, session_id: int, payload: dict[str, Any]
     ) -> bool:
         return session_result_data.upsert_session_result_payload(self, session_id, payload)
+
+    # -----------------------------------------------------------------------------
+    def update_session_text_and_metadata(
+        self,
+        session_id: int,
+        *,
+        session_text: str | None,
+        metadata: dict[str, Any] | None,
+    ) -> dict[str, Any] | None:
+        return session_result_data.update_session_text_and_metadata(
+            self,
+            session_id,
+            session_text=session_text,
+            metadata=metadata,
+        )
+
+    # -----------------------------------------------------------------------------
+    def get_next_session_version(self, original_session_id: int) -> int:
+        return session_result_data.get_next_session_version(self, original_session_id)
 
     # -----------------------------------------------------------------------------
     def get_session_timeline_source(self, session_id: int) -> dict[str, Any] | None:
