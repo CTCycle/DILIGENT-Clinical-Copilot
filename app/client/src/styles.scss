@@ -716,6 +716,13 @@ app-root {
   height: 14px;
 }
 
+.model-config-provider-key svg {
+  width: 16px;
+  height: 16px;
+  display: block;
+  fill: currentColor;
+}
+
 .model-config-availability-pill {
   display: inline-flex;
   align-items: center;
@@ -4086,7 +4093,7 @@ input[type="date"]::-webkit-calendar-picker-indicator:hover {
 
 .model-config-provider-list-narrow,
 .model-config-cloud-model-field-narrow {
-  width: min(320px, 100%);
+  width: 100%;
 }
 
 .model-config-cloud-model-field-narrow {
@@ -4394,6 +4401,7 @@ input[type="date"]::-webkit-calendar-picker-indicator:hover {
 
 .app-header-icon-btn .theme-icon-image {
   object-fit: contain;
+  transform: translateY(3px);
 }
 
 .app-header-icon-btn .theme-icon path {
@@ -4920,9 +4928,9 @@ input[type="date"]::-webkit-calendar-picker-indicator:hover {
 }
 
 .stitch-dili-actions .btn-primary {
-  min-height: var(--app-top-nav-height);
-  padding-top: 8px;
-  padding-bottom: 8px;
+  min-height: 40px;
+  padding-top: 6px;
+  padding-bottom: 6px;
 }
 
 .stitch-dili-report {
@@ -5265,6 +5273,30 @@ input[type="date"]::-webkit-calendar-picker-indicator:hover {
 /* Local catalog header: vertically centered */
 .model-config-page .model-config-row-header-top {
   align-items: center;
+}
+
+.model-config-page .model-config-search-and-filters {
+  display: grid;
+  grid-template-columns: minmax(220px, 1fr);
+  gap: 10px;
+  justify-content: stretch;
+}
+
+.model-config-page .model-config-filter-pills {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 8px;
+  justify-content: stretch;
+  width: 100%;
+}
+
+.model-config-page .model-config-filter-pill {
+  min-height: 30px;
+  padding: 4px 8px;
+  font-size: 11px;
+  line-height: 1;
+  text-align: center;
+  white-space: nowrap;
 }
 
 .model-config-page .model-config-row-heading {
@@ -5617,23 +5649,19 @@ input[type="date"]::-webkit-calendar-picker-indicator:hover {
 }
 
 .model-config-page .modal-section-title::before {
-  content: "";
-  width: 18px;
-  height: 18px;
-  flex: 0 0 18px;
-  background: #07825f;
-  mask:
-    radial-gradient(circle at 22% 22%, #000 0 3px, transparent 3.5px),
-    radial-gradient(circle at 78% 22%, #000 0 3px, transparent 3.5px),
-    radial-gradient(circle at 50% 78%, #000 0 3px, transparent 3.5px),
-    linear-gradient(#000 0 0) 22% 22% / 56% 2px no-repeat,
-    linear-gradient(#000 0 0) 50% 22% / 2px 56% no-repeat;
-  -webkit-mask:
-    radial-gradient(circle at 22% 22%, #000 0 3px, transparent 3.5px),
-    radial-gradient(circle at 78% 22%, #000 0 3px, transparent 3.5px),
-    radial-gradient(circle at 50% 78%, #000 0 3px, transparent 3.5px),
-    linear-gradient(#000 0 0) 22% 22% / 56% 2px no-repeat,
-    linear-gradient(#000 0 0) 50% 22% / 2px 56% no-repeat;
+  content: none;
+}
+
+.model-config-page .model-config-section-icon {
+  width: 20px;
+  height: 20px;
+  flex: 0 0 20px;
+  color: #20c997;
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 1.9;
+  stroke-linecap: round;
+  stroke-linejoin: round;
 }
 
 .model-config-page .model-config-runtime-row {
@@ -5662,23 +5690,27 @@ input[type="date"]::-webkit-calendar-picker-indicator:hover {
 
 .model-config-page .model-config-runtime-option > span {
   display: grid;
-  grid-template-columns: 52px minmax(0, 1fr);
+  grid-template-columns: 46px minmax(0, 1fr);
   grid-template-rows: auto auto;
-  column-gap: 14px;
+  column-gap: 16px;
   align-items: center;
 }
 
 .model-config-page .model-config-runtime-option > span::before {
-  content: "";
-  width: 52px;
-  height: 52px;
-  border-radius: 10px;
+  content: none;
+}
+
+.model-config-page .model-config-runtime-icon {
+  width: 32px;
+  height: 32px;
   grid-row: 1 / span 2;
-  background:
-    linear-gradient(#697886 0 0) center 15px / 24px 4px no-repeat,
-    linear-gradient(#697886 0 0) center 24px / 24px 4px no-repeat,
-    linear-gradient(#697886 0 0) center 33px / 24px 4px no-repeat,
-    #f0f4f6;
+  justify-self: center;
+  color: #7c8b97;
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 1.9;
+  stroke-linecap: round;
+  stroke-linejoin: round;
 }
 
 .model-config-page .model-config-runtime-option > span .field-label,
@@ -5687,10 +5719,11 @@ input[type="date"]::-webkit-calendar-picker-indicator:hover {
 }
 
 .model-config-page .model-config-runtime-option.is-active > span::before {
-  background:
-    radial-gradient(circle at 50% 62%, transparent 0 9px, #07825f 9.5px 12px, transparent 12.5px),
-    linear-gradient(#07825f 0 0) 18px 31px / 16px 4px no-repeat,
-    #e2f8ef;
+  content: none;
+}
+
+.model-config-page .model-config-runtime-option.is-active .model-config-runtime-icon {
+  color: #07825f;
 }
 
 .model-config-page .model-config-runtime-option.is-active,
@@ -5726,12 +5759,13 @@ input[type="date"]::-webkit-calendar-picker-indicator:hover {
 }
 
 .model-config-page .model-config-cloud-layout {
-  grid-template-columns: 310px minmax(0, 1fr);
-  align-items: center;
+  grid-template-columns: minmax(260px, 1fr) minmax(260px, 1fr);
+  align-items: start;
+  gap: 18px;
 }
 
 .model-config-page .model-config-cloud-model-field {
-  max-width: 520px;
+  max-width: none;
 }
 
 .model-config-page .model-config-cloud-model-field select,
