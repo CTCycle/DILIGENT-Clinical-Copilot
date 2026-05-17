@@ -1,11 +1,13 @@
 import { CommonModule } from '@angular/common';
-import { Component, ElementRef, OnDestroy, OnInit, ViewChild, inject, signal } from '@angular/core';
+import { Component, ElementRef, OnDestroy, OnInit, ViewChild, computed, inject, signal } from '@angular/core';
 import { FormsModule } from '@angular/forms';
 import { Router } from '@angular/router';
 
 import {
   fetchClinicalSessionDetail,
   fetchClinicalSessionRevisionJobStatus,
+  fetchInspectionLiverToxCatalog,
+  fetchInspectionRxNavCatalog,
   fetchInspectionSessions,
   generateInspectionSessionTimeline,
   startClinicalSessionRevisionJob,
@@ -18,6 +20,13 @@ import {
   JobStatus,
 } from '../../core/models/types';
 import { formatErrorMessage, formatUnknownError } from '../../core/utils';
+
+type DetectedDrugEvidence = {
+  name: string;
+  liverTox: boolean;
+  rxNav: boolean;
+  note: string;
+};
 
 @Component({
   selector: 'app-clinical-sessions-page',
@@ -33,6 +42,30 @@ export class ClinicalSessionsPageComponent implements OnInit, OnDestroy {
   private pollCancelled = false;
 
   readonly sessions = signal<InspectionSessionItem[]>([]);
+  readonly statusFilter = signal<'all' | InspectionSessionStatus>('all');
+  readonly sortOrder = signal<'newest' | 'oldest'>('newest');
+  readonly dateFilterMode = signal<'any' | 'after' | 'before' | 'exact'>('any');
+  readonly dateFilter = signal('');
+  readonly filteredSessions = computed(() => {
+    const status = this.statusFilter();
+    const order = this.sortOrder();
+    const dateMode = this.dateFilterMode();
+    const dateFilter = this.dateFilter();
+    const filtered = this.sessions().filter((session) => {
+      if (status !== 'all' && session.status !== status) return false;
+      if (dateMode === 'any' || !dateFilter) return true;
+      const sessionDate = this.dateKey(session.session_timestamp);
+      if (!sessionDate) return false;
+      if (dateMode === 'after') return sessionDate > dateFilter;
+      if (dateMode === 'before') return sessionDate < dateFilter;
+      return sessionDate === dateFilter;
+    });
+    return [...filtered].sort((left, right) => {
+      const leftTime = Date.parse(left.session_timestamp || '') || 0;
+      const rightTime = Date.parse(right.session_timestamp || '') || 0;
+      return order === 'newest' ? rightTime - leftTime : leftTime - rightTime;
+    });
+  });
   readonly selected = signal<ClinicalSessionDetail | null>(null);
   readonly loading = signal(false);
   readonly detailLoading = signal(false);
@@ -49,6 +82,7 @@ export class ClinicalSessionsPageComponent implements OnInit, OnDestroy {
   readonly revisionStatus = signal('');
   readonly revisionProgress = signal(0);
   readonly revisionJobStatus = signal<JobStatus | null>(null);
+  readonly detectedDrugEvidence = signal<DetectedDrugEvidence[]>([]);
 
   ngOnInit(): void {
     void this.loadSessions();
@@ -89,6 +123,7 @@ export class ClinicalSessionsPageComponent implements OnInit, OnDestroy {
       this.revisionSelection.set('');
       this.revisionInstruction.set('');
       this.activeSection.set('preview');
+      void this.loadDetectedDrugEvidence(detail);
     } catch (error) {
       this.detailError.set(formatUnknownError(error, 'Failed to open session.'));
     } finally {
@@ -98,6 +133,25 @@ export class ClinicalSessionsPageComponent implements OnInit, OnDestroy {
 
   updateQuery(value: string): void {
     this.query.set(value);
+  }
+
+  updateStatusFilter(value: 'all' | InspectionSessionStatus): void {
+    this.statusFilter.set(value);
+  }
+
+  updateSortOrder(value: 'newest' | 'oldest'): void {
+    this.sortOrder.set(value);
+  }
+
+  updateDateFilterMode(value: 'any' | 'after' | 'before' | 'exact'): void {
+    this.dateFilterMode.set(value);
+    if (value === 'any') {
+      this.dateFilter.set('');
+    }
+  }
+
+  updateDateFilter(value: string): void {
+    this.dateFilter.set(value);
   }
 
   updateEditorText(value: string): void {
@@ -256,6 +310,57 @@ export class ClinicalSessionsPageComponent implements OnInit, OnDestroy {
     return Array.isArray(detected)
       ? detected.filter((item): item is string => typeof item === 'string' && item.trim().length > 0)
       : [];
+  }
+
+  private async loadDetectedDrugEvidence(detail: ClinicalSessionDetail): Promise<void> {
+    const drugs = this.previewDetectedDrugs(detail);
+    this.detectedDrugEvidence.set(drugs.map((name) => ({
+      name,
+      liverTox: false,
+      rxNav: false,
+      note: 'Checking catalogs',
+    })));
+    if (!drugs.length) return;
+
+    const rows = await Promise.all(drugs.map(async (name): Promise<DetectedDrugEvidence> => {
+      const [rxNav, liverTox] = await Promise.all([
+        this.catalogHasDrug('rxnav', name),
+        this.catalogHasDrug('livertox', name),
+      ]);
+      return {
+        name,
+        rxNav,
+        liverTox,
+        note: rxNav || liverTox ? 'Catalog match found' : 'No catalog match',
+      };
+    }));
+    if (this.selected()?.session_id === detail.session_id) {
+      this.detectedDrugEvidence.set(rows);
+    }
+  }
+
+  private async catalogHasDrug(source: 'rxnav' | 'livertox', name: string): Promise<boolean> {
+    const normalized = this.normalizeDrugName(name);
+    const search = normalized || name;
+    try {
+      const payload = source === 'rxnav'
+        ? await fetchInspectionRxNavCatalog({ search, offset: 0, limit: 5 })
+        : await fetchInspectionLiverToxCatalog({ search, offset: 0, limit: 5 });
+      return payload.items.some((item) => this.normalizeDrugName(item.drug_name) === normalized);
+    } catch {
+      return false;
+    }
+  }
+
+  private normalizeDrugName(value: string): string {
+    return value.toLowerCase().replace(/\([^)]*\)/g, '').replace(/[^a-z0-9]+/g, ' ').trim();
+  }
+
+  private dateKey(value: string | null): string {
+    if (!value) return '';
+    const parsed = new Date(value);
+    if (Number.isNaN(parsed.getTime())) return '';
+    return parsed.toISOString().slice(0, 10);
   }
 
   previewRevisionAudit(detail: ClinicalSessionDetail): Record<string, unknown> | null {

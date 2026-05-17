@@ -6,10 +6,6 @@
 }
 
 .clinical-sessions-header {
-  display: flex;
-  align-items: flex-end;
-  justify-content: space-between;
-  gap: 20px;
   margin-bottom: 22px;
 }
 
@@ -21,26 +17,94 @@
 }
 
 .clinical-sessions-search {
-  display: flex;
-  gap: 10px;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 8px;
   align-items: center;
+  margin-bottom: 10px;
 }
 
 .clinical-sessions-search input {
-  min-width: 280px;
-  height: 42px;
+  min-width: 0;
+  width: 100%;
+  height: 34px;
   border: 1px solid #d2ded9;
   border-radius: 8px;
-  padding: 0 12px;
+  padding: 0 10px;
   background: #fff;
   color: var(--color-text-primary);
+  font-size: 13px;
+}
+
+.clinical-sessions-search .btn {
+  min-height: 34px;
+  height: 34px;
+  padding: 0 12px;
+  border-radius: 8px;
+  font-size: 13px;
+}
+
+.clinical-sessions-filters {
+  display: grid;
+  gap: 8px;
+  margin-bottom: 10px;
+}
+
+.clinical-sessions-filter-nav {
+  display: flex;
+  align-items: center;
+  min-width: 0;
+  border-bottom: 1px solid #dce7e2;
+}
+
+.clinical-sessions-filter-nav button {
+  min-height: 32px;
+  flex: 1 1 0;
+  border: 0;
+  border-bottom: 2px solid transparent;
+  background: transparent;
+  color: #596863;
+  cursor: pointer;
+  font-size: 12px;
+  font-weight: 800;
+  padding: 6px 8px;
+}
+
+.clinical-sessions-filter-nav button.is-active {
+  border-bottom-color: #0f9f78;
+  color: #087b5d;
+}
+
+.clinical-sessions-filter-controls {
+  display: grid;
+  grid-template-columns: 0.78fr 0.94fr 1fr;
+  gap: 6px;
+}
+
+.clinical-sessions-sort,
+.clinical-sessions-date-mode,
+.clinical-sessions-date-input {
+  min-width: 0;
+  min-height: 32px;
+  border: 1px solid #cfe0da;
+  border-radius: 8px;
+  background: rgba(255, 255, 255, 0.82);
+  color: #44534f;
+  font-size: 11px;
+  font-weight: 800;
+  padding: 4px 7px;
+}
+
+.clinical-sessions-date-input:disabled {
+  color: #94a3b8;
+  background: #eef4f1;
 }
 
 .clinical-sessions-layout {
   display: grid;
   grid-template-columns: minmax(280px, 360px) minmax(0, 1fr);
   gap: 18px;
-  align-items: start;
+  align-items: stretch;
 }
 
 .clinical-sessions-list,
@@ -52,7 +116,7 @@
 }
 
 .clinical-sessions-list {
-  max-height: calc(100vh - 176px);
+  min-height: calc(100vh - 176px);
   overflow: auto;
   padding: 8px;
 }
@@ -93,6 +157,30 @@
   font-size: 12px;
 }
 
+.clinical-session-row-main small {
+  white-space: nowrap;
+}
+
+.clinical-session-status-chip {
+  display: inline-flex;
+  align-items: center;
+  min-height: 22px;
+  border: 1px solid #9ddfbd;
+  border-radius: 999px;
+  background: #e7f8ef;
+  color: #087b5d;
+  font-size: 11px;
+  font-weight: 800;
+  line-height: 1;
+  padding: 4px 8px;
+}
+
+.clinical-session-status-chip.is-failed {
+  border-color: #fecaca;
+  background: #fef2f2;
+  color: #b91c1c;
+}
+
 .clinical-session-workspace {
   min-height: calc(100vh - 176px);
   padding: 18px;
@@ -117,6 +205,33 @@
 .clinical-sessions-empty {
   margin: 4px 0 0;
   color: #65726e;
+}
+
+.clinical-session-save-btn {
+  width: 40px;
+  height: 40px;
+  flex: 0 0 auto;
+  display: inline-grid;
+  place-items: center;
+  border: 1px solid #c9ddd5;
+  border-radius: 8px;
+  background: rgba(255, 255, 255, 0.76);
+  color: #087b5d;
+  cursor: pointer;
+  transition: background 0.18s ease, border-color 0.18s ease, color 0.18s ease;
+}
+
+.clinical-session-save-btn svg {
+  width: 18px;
+  height: 18px;
+  display: block;
+  fill: currentColor;
+}
+
+.clinical-session-save-btn:hover {
+  border-color: #8bd4b7;
+  background: #eefaf4;
+  color: #075f49;
 }
 
 .clinical-session-tabs {
@@ -168,7 +283,7 @@
 
 .clinical-session-preview {
   display: grid;
-  grid-template-columns: minmax(0, 1fr) 320px;
+  grid-template-columns: minmax(0, 1.45fr) minmax(240px, 0.8fr);
   gap: 16px;
   align-items: start;
 }
@@ -218,6 +333,59 @@
   font-size: 12px;
   font-weight: 700;
   padding: 6px 10px;
+}
+
+.clinical-session-drug-table-wrap {
+  margin-top: 12px;
+  overflow-x: auto;
+}
+
+.clinical-session-drug-table {
+  width: 100%;
+  border-collapse: collapse;
+  color: #25312f;
+  font-size: 12px;
+}
+
+.clinical-session-drug-table th,
+.clinical-session-drug-table td {
+  border-bottom: 1px solid #e2ece7;
+  padding: 8px 6px;
+  text-align: left;
+  vertical-align: middle;
+}
+
+.clinical-session-drug-table th {
+  color: #65726e;
+  font-size: 10px;
+  font-weight: 800;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+
+.clinical-session-drug-table td:first-child {
+  max-width: 150px;
+  font-weight: 750;
+  overflow-wrap: anywhere;
+}
+
+.clinical-session-source-pill {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 34px;
+  border-radius: 999px;
+  background: #f1f5f9;
+  color: #64748b;
+  font-size: 10px;
+  font-weight: 800;
+  line-height: 1;
+  padding: 4px 7px;
+}
+
+.clinical-session-source-pill.is-present {
+  background: #e7f8ef;
+  color: #087b5d;
 }
 
 .clinical-session-audit-list {
@@ -331,8 +499,101 @@
   color: #991b1b;
 }
 
+:host-context([data-theme="dark"]) .clinical-sessions-page {
+  background:
+    radial-gradient(80% 70% at 4% 0%, rgba(49, 195, 152, 0.1), transparent 54%),
+    linear-gradient(150deg, #071923 0%, #0d2230 56%, #102837 100%);
+  color: #e7f0f2;
+}
+
+:host-context([data-theme="dark"]) .clinical-sessions-header h1,
+:host-context([data-theme="dark"]) .clinical-session-toolbar h2,
+:host-context([data-theme="dark"]) .clinical-session-preview-card h3,
+:host-context([data-theme="dark"]) .clinical-session-row-main strong {
+  color: #f3faf9;
+}
+
+:host-context([data-theme="dark"]) .clinical-sessions-page .lede,
+:host-context([data-theme="dark"]) .clinical-session-toolbar p,
+:host-context([data-theme="dark"]) .clinical-session-panel-note,
+:host-context([data-theme="dark"]) .clinical-sessions-empty,
+:host-context([data-theme="dark"]) .clinical-session-row-main small,
+:host-context([data-theme="dark"]) .clinical-session-row-meta {
+  color: #b8c9ce;
+}
+
+:host-context([data-theme="dark"]) .clinical-sessions-list,
+:host-context([data-theme="dark"]) .clinical-session-workspace,
+:host-context([data-theme="dark"]) .clinical-session-preview-card,
+:host-context([data-theme="dark"]) .clinical-session-panel,
+:host-context([data-theme="dark"]) .clinical-session-metadata-summary section {
+  background: #132b37;
+  border-color: rgba(128, 158, 174, 0.28);
+  box-shadow: 0 18px 44px -34px rgba(0, 0, 0, 0.86);
+}
+
+:host-context([data-theme="dark"]) .clinical-sessions-search input,
+:host-context([data-theme="dark"]) .clinical-sessions-search .btn,
+:host-context([data-theme="dark"]) .clinical-sessions-sort,
+:host-context([data-theme="dark"]) .clinical-sessions-date-mode,
+:host-context([data-theme="dark"]) .clinical-sessions-date-input,
+:host-context([data-theme="dark"]) .clinical-session-editor,
+:host-context([data-theme="dark"]) .clinical-session-json,
+:host-context([data-theme="dark"]) .clinical-session-focus,
+:host-context([data-theme="dark"]) .clinical-session-instruction,
+:host-context([data-theme="dark"]) .clinical-session-overrides {
+  background: #102231;
+  border-color: rgba(123, 151, 168, 0.34);
+  color: #e7f0f2;
+}
+
+:host-context([data-theme="dark"]) .clinical-sessions-date-input:disabled {
+  background: #102231;
+  color: #71828b;
+}
+
+:host-context([data-theme="dark"]) .clinical-sessions-filter-nav,
+:host-context([data-theme="dark"]) .clinical-session-tabs {
+  border-bottom-color: rgba(128, 158, 174, 0.28);
+}
+
+:host-context([data-theme="dark"]) .clinical-sessions-filter-nav button,
+:host-context([data-theme="dark"]) .clinical-session-tabs button {
+  color: #b8c9ce;
+}
+
+:host-context([data-theme="dark"]) .clinical-sessions-filter-nav button.is-active,
+:host-context([data-theme="dark"]) .clinical-session-tabs button.is-active {
+  color: #7ee7bd;
+  border-bottom-color: #31c398;
+}
+
+:host-context([data-theme="dark"]) .clinical-session-row:hover,
+:host-context([data-theme="dark"]) .clinical-session-row.is-active {
+  background: rgba(26, 103, 78, 0.48);
+  border-color: rgba(83, 220, 170, 0.58);
+}
+
+:host-context([data-theme="dark"]) .clinical-session-save-btn {
+  background: #102231;
+  border-color: rgba(123, 151, 168, 0.34);
+  color: #7ee7bd;
+}
+
+:host-context([data-theme="dark"]) .clinical-session-drug-table {
+  color: #d6e3e6;
+}
+
+:host-context([data-theme="dark"]) .clinical-session-drug-table th {
+  color: #9fb0b8;
+}
+
+:host-context([data-theme="dark"]) .clinical-session-drug-table th,
+:host-context([data-theme="dark"]) .clinical-session-drug-table td {
+  border-bottom-color: rgba(128, 158, 174, 0.2);
+}
+
 @media (max-width: 920px) {
-  .clinical-sessions-header,
   .clinical-session-toolbar {
     flex-direction: column;
     align-items: stretch;
@@ -348,10 +609,5 @@
 
   .clinical-session-metadata-summary {
     grid-template-columns: 1fr;
-  }
-
-  .clinical-sessions-search input {
-    min-width: 0;
-    width: 100%;
   }
 }
