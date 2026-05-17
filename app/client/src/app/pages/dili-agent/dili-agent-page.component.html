@@ -104,9 +104,11 @@
           <button class="btn btn-primary" type="button" [disabled]="runActionDisabled" (click)="runOrStop()">
             {{ runActionLabel }}
           </button>
-          <button class="stitch-dili-clear" type="button" (click)="clearAll()" [disabled]="vm.isRunning">
-            Clear all
-          </button>
+          <div class="stitch-dili-clear-container">
+            <button class="stitch-dili-clear" type="button" (click)="clearAll()" [disabled]="vm.isRunning">
+              Clear all
+            </button>
+          </div>
         </div>
       </section>
 

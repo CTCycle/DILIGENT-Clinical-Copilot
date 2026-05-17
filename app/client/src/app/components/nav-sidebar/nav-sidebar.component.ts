@@ -16,6 +16,7 @@ export class NavSidebarComponent {
 
   readonly navItems: Array<{ pageId: PageId; label: string }> = [
     { pageId: 'dili-agent', label: 'DILI Agent' },
+    { pageId: 'clinical-sessions', label: 'Clinical Sessions' },
     { pageId: 'data-inspection', label: 'Data Inspection' },
     { pageId: 'model-config', label: 'Model Configurations' },
   ];

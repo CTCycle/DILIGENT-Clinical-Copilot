@@ -84,7 +84,8 @@ export type JobType =
   | "ollama_pull"
   | "rxnav_update"
   | "livertox_update"
-  | "rag_update";
+  | "rag_update"
+  | "session_revision";
 
 export type JobStatus =
   | "pending"
@@ -151,6 +152,8 @@ export type InspectionSessionItem = {
   session_id: number;
   patient_name: string | null;
   session_timestamp: string | null;
+  version: number;
+  original_session_id: number | null;
   status: InspectionSessionStatus;
   total_duration: number | null;
   has_report: boolean;
@@ -165,9 +168,33 @@ export type InspectionSessionCatalogResponse = {
   limit: number;
 };
 
-export type InspectionSessionReportResponse = {
+export type ClinicalSessionDetail = {
   session_id: number;
-  report: string;
+  patient_name: string | null;
+  visit_date: string | null;
+  session_timestamp: string | null;
+  version: number;
+  original_session_id: number | null;
+  status: InspectionSessionStatus;
+  text_extraction_model: string | null;
+  clinical_model: string | null;
+  metadata: Record<string, unknown>;
+  sections: Record<string, string>;
+  session_text: string;
+  result_payload: Record<string, unknown>;
+  report: string | null;
+};
+
+export type ClinicalSessionUpdateRequest = {
+  session_text?: string | null;
+  metadata?: Record<string, unknown> | null;
+};
+
+export type ClinicalSessionRevisionRequest = {
+  selected_text?: string | null;
+  revision_instruction?: string | null;
+  model_overrides?: Record<string, unknown>;
+  metadata?: Record<string, unknown>;
 };
 
 export type InspectionTimelineEventType = "therapy" | "disease" | "lab" | "other";

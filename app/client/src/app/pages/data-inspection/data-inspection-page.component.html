@@ -1,7 +1,7 @@
 <main class="page-container inspection-page inspection-page-workbench">
   <header class="page-header inspection-page-intro">
     <h1>Data Inspection</h1>
-    <p class="lede">Browse recorded sessions, review curated drug knowledge sources, inspect RAG indexing details, and track update status across all inspection views.</p>
+    <p class="lede">Review curated drug knowledge sources, inspect RAG indexing details, and track update status across all inspection views.</p>
   </header>
 
   <section class="inspection-layout">
@@ -33,122 +33,6 @@
       role="tabpanel"
       [attr.aria-labelledby]="inspectionTabId(activeView())"
     >
-      @if (activeView() === 'sessions') {
-        <section class="inspection-view-content">
-          <div class="inspection-widget">
-            <div class="inspection-widget-header inspection-widget-header-split">
-              <div class="inspection-controls inspection-controls-half">
-                <input
-                  type="search"
-                  class="inspection-search"
-                  placeholder="Search sessions..."
-                  [ngModel]="sessionSearchInput()"
-                  (ngModelChange)="updateSessionsSearch($event)"
-                  aria-label="Search sessions"
-                />
-              </div>
-              <div class="inspection-widget-header-actions inspection-header-actions-fixed">
-                <div class="inspection-toggle-group">
-                  <button type="button" class="inspection-toggle-pill" [class.is-active]="sessionStatusFilter() === 'all'" (click)="updateSessionsStatus('all')">All</button>
-                  <button type="button" class="inspection-toggle-pill" [class.is-active]="sessionStatusFilter() === 'successful'" (click)="updateSessionsStatus('successful')">Successful</button>
-                  <button type="button" class="inspection-toggle-pill" [class.is-active]="sessionStatusFilter() === 'failed'" (click)="updateSessionsStatus('failed')">Failed</button>
-                </div>
-                <select class="inspection-select" [ngModel]="sessionDateMode()" (ngModelChange)="updateSessionsDateMode($event)" aria-label="Date filter mode">
-                  <option value="none">Date filter</option>
-                  <option value="before">Before</option>
-                  <option value="after">After</option>
-                  <option value="exact">Exact</option>
-                </select>
-                <input
-                  type="date"
-                  class="inspection-date"
-                  [ngModel]="sessionDate()"
-                  (ngModelChange)="updateSessionsDate($event)"
-                  [disabled]="sessionDateMode() === 'none'"
-                  aria-label="Session date filter"
-                />
-              </div>
-            </div>
-
-            <div class="inspection-scroll-frame" (scroll)="onSessionsScroll($event)">
-              <table class="inspection-table inspection-table-dense inspection-table-sessions">
-                <thead>
-                  <tr>
-                    <th>#</th>
-                    <th>Patient</th>
-                    <th>Date</th>
-                    <th>Status</th>
-                    <th>Total time</th>
-                    <th aria-label="Actions"></th>
-                  </tr>
-                </thead>
-                <tbody>
-                  @if (sessionItems().length > 0) {
-                    <tr class="inspection-virtual-spacer-row">
-                      <td colspan="6" [style.height.px]="sessionTopPaddingPx()"></td>
-                    </tr>
-                  }
-                  @for (row of sessionVisibleItems(); track row.session_id; let i = $index) {
-                    <tr>
-                      <td>{{ sessionVisibleStartIndex() + i + 1 }}</td>
-                      <td>{{ row.patient_name || 'Unknown' }}</td>
-                      <td>{{ formatDateTime(row.session_timestamp) }}</td>
-                      <td>
-                        <span class="inspection-status-chip" [class.is-successful]="row.status === 'successful'" [class.is-failed]="row.status === 'failed'">
-                          {{ statusLabel(row.status) }}
-                        </span>
-                      </td>
-                      <td>{{ formatDuration(row.total_duration) }}</td>
-                      <td class="inspection-actions-cell">
-                        <app-inspection-action-icon-button
-                          [buttonClass]="'inspection-icon-button is-timeline'"
-                          [ariaLabel]="'Patient timeline for session ' + row.session_id"
-                          [title]="canOpenTimeline(row) ? ('Patient timeline for session ' + row.session_id) : 'Timeline unavailable for this session'"
-                          [iconPath]="'M3 12h18v2H3v-2Zm2-5h2v12H5V7Zm12 3h2v9h-2v-9Zm-6-6h2v15h-2V4Z'"
-                          [disabled]="!canOpenTimeline(row)"
-                          (activated)="openPatientTimeline(row)"
-                        />
-                        <app-inspection-action-icon-button
-                          [buttonClass]="'inspection-icon-button is-primary'"
-                          [ariaLabel]="'View report for session ' + row.session_id"
-                          [title]="canOpenSessionReport(row) ? ('View report for session ' + row.session_id) : 'Report unavailable for this session'"
-                          [iconPath]="'M12 5C7 5 2.73 8.11 1 12c1.73 3.89 6 7 11 7s9.27-3.11 11-7c-1.73-3.89-6-7-11-7Zm0 11a4 4 0 1 1 0-8 4 4 0 0 1 0 8Z'"
-                          [disabled]="!canOpenSessionReport(row)"
-                          (activated)="openSessionReport(row)"
-                        />
-                        <app-inspection-action-icon-button
-                          [buttonClass]="'inspection-icon-button is-danger'"
-                          [ariaLabel]="'Delete session ' + row.session_id"
-                          [title]="'Delete session ' + row.session_id"
-                          [iconPath]="'M16 9v10H8V9h8Zm-1.5-6h-5l-1 1H5v2h14V4h-3.5l-1-1ZM18 7H6v12c0 1.1.9 2 2 2h8c1.1 0 2-.9 2-2V7Z'"
-                          (activated)="confirmAndRemoveSession(row)"
-                        />
-                        <app-inspection-action-icon-button
-                          [ariaLabel]="'Modify session (not implemented)'"
-                          [title]="'Modify session (not implemented)'"
-                          [iconPath]="'m3 17.25 9.81-9.82 2.76 2.76L5.76 20H3v-2.75Zm14.71-8.04-2.92-2.92 1.41-1.41a2 2 0 0 1 2.83 0l.09.09a2 2 0 0 1 0 2.83l-1.41 1.41Z'"
-                          [disabled]="true"
-                        />
-                      </td>
-                    </tr>
-                  }
-                  @if (sessionItems().length > 0) {
-                    <tr class="inspection-virtual-spacer-row">
-                      <td colspan="6" [style.height.px]="sessionBottomPaddingPx()"></td>
-                    </tr>
-                  }
-                </tbody>
-              </table>
-              @if (sessionLoading()) { <p class="inspection-loading-note">Loading sessions...</p> }
-              @if (sessionLoadingMore()) { <p class="inspection-loading-note">Loading more sessions...</p> }
-              @if (!sessionLoading() && sessionHasMore()) { <p class="inspection-loading-note">Scroll to load more...</p> }
-              @if (!sessionLoading() && sessionItems().length === 0) { <p class="inspection-empty-note">No sessions found.</p> }
-              @if (sessionError()) { <p class="inspection-error-text">{{ sessionError() }}</p> }
-            </div>
-          </div>
-        </section>
-      }
-
       @if (activeView() === 'rxnav') {
         <section class="inspection-view-content">
           <div class="inspection-widget">
@@ -399,23 +283,6 @@
       }
     </section>
   </section>
-
-  <app-modal-shell
-    [isOpen]="!!reportSession()"
-    title="Session Report"
-    [subtitle]="'Session ' + (reportSession()?.session_id ?? '')"
-    dialogClassName="modal-container inspection-modal inspection-modal-large"
-    closeLabel="Close session report"
-    (close)="closeSessionReport()"
-  >
-    <div class="inspection-excerpt-body">
-      @if (reportLoading()) { <p>Loading report...</p> }
-      @if (reportError()) { <p class="inspection-error-text">{{ reportError() }}</p> }
-      @if (!reportLoading() && !reportError()) {
-        <pre class="inspection-excerpt-text">{{ reportContent() }}</pre>
-      }
-    </div>
-  </app-modal-shell>
 
   <app-modal-shell
     [isOpen]="!!aliasData() || !!aliasError() || aliasLoading()"

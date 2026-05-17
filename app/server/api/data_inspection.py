@@ -21,9 +21,11 @@ from domain.inspection import (
     RagDocumentListResponse,
     RxNavCatalogResponse,
     SessionCatalogResponse,
-    SessionReportResponse,
+    SessionDetailResponse,
+    SessionRevisionRequest,
     SessionListFilters,
     SessionStatus,
+    SessionUpdateRequest,
     TextNormalizationTermResponse,
     TextNormalizationTermUpsertRequest,
 )
@@ -158,14 +160,77 @@ class DataInspectionEndpoint:
         return SessionCatalogResponse(**payload)
 
     # -------------------------------------------------------------------------
-    def get_session_report(self, session_id: int) -> SessionReportResponse:
-        report = self.service.get_session_report(session_id)
-        if report is None:
+    def get_session_detail(self, session_id: int) -> SessionDetailResponse:
+        detail = self.service.get_session_detail(session_id)
+        if detail is None:
             raise HTTPException(
                 status_code=status.HTTP_404_NOT_FOUND,
-                detail="Session report not found.",
+                detail="Session not found.",
             )
-        return SessionReportResponse(session_id=session_id, report=report)
+        return SessionDetailResponse(**detail)
+
+    # -------------------------------------------------------------------------
+    def update_session(
+        self,
+        session_id: int,
+        request: SessionUpdateRequest | None = Body(default=None),
+    ) -> SessionDetailResponse:
+        request = request or SessionUpdateRequest()
+        detail = self.service.update_session(
+            session_id,
+            session_text=request.session_text,
+            metadata=request.metadata,
+        )
+        if detail is None:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail="Session not found.",
+            )
+        return SessionDetailResponse(**detail)
+
+    # -------------------------------------------------------------------------
+    def start_session_revision(
+        self,
+        session_id: int,
+        request: SessionRevisionRequest | None = Body(default=None),
+    ) -> JobStartResponse:
+        request = request or SessionRevisionRequest()
+        try:
+            payload = self.service.start_revision_job(
+                session_id,
+                selected_text=request.selected_text,
+                revision_instruction=request.revision_instruction,
+                model_overrides=request.model_overrides,
+                metadata=request.metadata,
+            )
+        except ValueError as exc:
+            detail = str(exc)
+            error_status = (
+                status.HTTP_409_CONFLICT
+                if "already running" in detail
+                else status.HTTP_404_NOT_FOUND
+                if "not found" in detail.casefold()
+                else status.HTTP_422_UNPROCESSABLE_ENTITY
+            )
+            raise HTTPException(status_code=error_status, detail=detail) from exc
+        return self.build_job_start_response(
+            payload=payload,
+            message="Session revision job started",
+        )
+
+    # -------------------------------------------------------------------------
+    def get_session_revision_status(self, job_id: str) -> JobStatusResponse:
+        return self.get_update_job_status(
+            job_id=job_id,
+            job_type=self.service.REVISION_JOB_TYPE,
+        )
+
+    # -------------------------------------------------------------------------
+    def cancel_session_revision(self, job_id: str) -> JobCancelResponse:
+        return self.cancel_update_job(
+            job_id=job_id,
+            job_type=self.service.REVISION_JOB_TYPE,
+        )
 
     # -------------------------------------------------------------------------
     def get_session_timeline(self, session_id: int) -> PatientTimeline:
@@ -465,10 +530,38 @@ class DataInspectionEndpoint:
             status_code=status.HTTP_200_OK,
         )
         self.router.add_api_route(
-            "/sessions/{session_id}/report",
-            self.get_session_report,
+            "/sessions/{session_id}",
+            self.get_session_detail,
             methods=["GET"],
-            response_model=SessionReportResponse,
+            response_model=SessionDetailResponse,
+            status_code=status.HTTP_200_OK,
+        )
+        self.router.add_api_route(
+            "/sessions/{session_id}",
+            self.update_session,
+            methods=["PUT"],
+            response_model=SessionDetailResponse,
+            status_code=status.HTTP_200_OK,
+        )
+        self.router.add_api_route(
+            "/sessions/{session_id}/revision/jobs",
+            self.start_session_revision,
+            methods=["POST"],
+            response_model=JobStartResponse,
+            status_code=status.HTTP_202_ACCEPTED,
+        )
+        self.router.add_api_route(
+            "/sessions/revision/jobs/{job_id}",
+            self.get_session_revision_status,
+            methods=["GET"],
+            response_model=JobStatusResponse,
+            status_code=status.HTTP_200_OK,
+        )
+        self.router.add_api_route(
+            "/sessions/revision/jobs/{job_id}",
+            self.cancel_session_revision,
+            methods=["DELETE"],
+            response_model=JobCancelResponse,
             status_code=status.HTTP_200_OK,
         )
         self.router.add_api_route(

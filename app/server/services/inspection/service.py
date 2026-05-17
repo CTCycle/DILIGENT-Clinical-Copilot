@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import json
+import asyncio
 from datetime import date, datetime, UTC
 from functools import partial
 from pathlib import Path
@@ -16,6 +17,7 @@ from common.constants import (
 from common.utils.logger import logger
 from configurations.startup import server_settings
 from domain.inspection import InspectionJobPhase
+from domain.clinical.entities import ClinicalSessionRequest
 from domain.patient_timeline import PatientTimeline
 from repositories.serialization.data import (
     DataSerializer,
@@ -24,6 +26,8 @@ from repositories.serialization.data import (
 from repositories.vectors import LanceVectorDatabase
 from services.clinical.timeline import PatientTimelineExtractor
 from services.runtime.jobs import JobManager
+from services.session.factory import build_clinical_session_service
+from repositories.serialization.model_configs import ModelConfigSerializer
 from services.inspection.normalization import (
     extract_lab_marker as extract_lab_marker_value,
     first_iso_date as first_iso_date_value,
@@ -44,6 +48,7 @@ from repositories.serialization.text_normalization import (
 from services.text.vocabulary import (
     invalidate_text_normalization_snapshot,
 )
+from services.text.normalization import normalize_drug_query_name
 
 PhaseStep = tuple[InspectionJobPhase, int, int, str]
 UpdateTarget = Literal["rxnav", "livertox", "rag"]
@@ -69,6 +74,7 @@ class DataInspectionService:
     RXNAV_JOB_TYPE = "rxnav_update"
     LIVERTOX_JOB_TYPE = "livertox_update"
     RAG_JOB_TYPE = "rag_update"
+    REVISION_JOB_TYPE = "session_revision"
     RAG_MANIFEST_FILE_NAME = "rag_index_manifest.json"
     UPDATE_PHASES: dict[UpdateTarget, list[PhaseStep]] = {
         "rxnav": [
@@ -334,8 +340,325 @@ class DataInspectionService:
         }
 
     # -------------------------------------------------------------------------
-    def get_session_report(self, session_id: int) -> str | None:
-        return self.serializer.get_session_report(session_id)
+    def get_session_detail(self, session_id: int) -> dict[str, Any] | None:
+        return self.serializer.get_session_detail(session_id)
+
+    # -------------------------------------------------------------------------
+    def update_session(
+        self,
+        session_id: int,
+        *,
+        session_text: str | None,
+        metadata: dict[str, Any] | None,
+    ) -> dict[str, Any] | None:
+        return self.serializer.update_session_text_and_metadata(
+            session_id,
+            session_text=session_text,
+            metadata=metadata,
+        )
+
+    # -------------------------------------------------------------------------
+    def build_revision_audit(
+        self,
+        *,
+        source_detail: dict[str, Any],
+        result_payload: dict[str, Any],
+        selected_text: str | None,
+        revision_instruction: str | None,
+        effective_overrides: dict[str, Any],
+    ) -> dict[str, Any]:
+        source_payload = (
+            source_detail.get("result_payload")
+            if isinstance(source_detail.get("result_payload"), dict)
+            else {}
+        )
+        original_detected = self.extract_revision_drug_names(source_payload)
+        revised_detected = self.extract_revision_drug_names(result_payload)
+        original_keys = {
+            normalize_drug_query_name(name) for name in original_detected if name
+        }
+        revised_keys = {
+            normalize_drug_query_name(name) for name in revised_detected if name
+        }
+        new_drug_keys = sorted(key for key in revised_keys - original_keys if key)
+        removed_drug_keys = sorted(key for key in original_keys - revised_keys if key)
+        section_extraction = result_payload.get("section_extraction")
+        source_sections = (
+            source_detail.get("sections")
+            if isinstance(source_detail.get("sections"), dict)
+            else {}
+        )
+        extracted_sections = section_extraction if isinstance(section_extraction, dict) else {}
+        section_validation = self.build_revision_section_validation(
+            source_sections=source_sections,
+            extracted_sections=extracted_sections,
+            selected_text=selected_text,
+        )
+        parser_cross_validation = {
+            "rerun_completed": True,
+            "source_scope": "selected_text" if selected_text else "full_session",
+            "selected_text_length": len(selected_text or ""),
+            "section_extraction_available": isinstance(section_extraction, dict),
+            "sections": section_validation["sections"],
+            "missing_sections_after_revision": section_validation[
+                "missing_sections_after_revision"
+            ],
+            "changed_sections_after_revision": section_validation[
+                "changed_sections_after_revision"
+            ],
+        }
+        matched_drugs = result_payload.get("matched_drugs")
+        rucam_assessments = result_payload.get("rucam_assessments")
+        return {
+            "source_session_id": source_detail.get("session_id"),
+            "source_version": source_detail.get("version"),
+            "focused_selection": bool(selected_text),
+            "revision_instruction": revision_instruction,
+            "model_overrides": effective_overrides,
+            "parser_cross_validation": parser_cross_validation,
+            "original_detected_drugs": original_detected,
+            "revised_detected_drugs": revised_detected,
+            "newly_identified_drugs": new_drug_keys,
+            "previously_identified_drugs_missing_after_revision": removed_drug_keys,
+            "drug_analysis_rerun": isinstance(rucam_assessments, list),
+            "livertox_retrieval_rerun": isinstance(matched_drugs, list),
+            "conclusion_action": (
+                "generated_new_conclusion_for_new_drugs"
+                if new_drug_keys
+                else "improved_existing_conclusion"
+            ),
+        }
+
+    # -------------------------------------------------------------------------
+    def build_revision_section_validation(
+        self,
+        *,
+        source_sections: dict[str, Any],
+        extracted_sections: dict[str, Any],
+        selected_text: str | None,
+    ) -> dict[str, Any]:
+        section_keys = ("anamnesis", "drugs", "laboratory_analysis")
+        validation: dict[str, dict[str, Any]] = {}
+        missing_after_revision: list[str] = []
+        changed_after_revision: list[str] = []
+        selected_norm = normalize_text_value(selected_text or "")
+        for key in section_keys:
+            original_text = normalize_text_value(source_sections.get(key))
+            extracted_text = normalize_text_value(extracted_sections.get(key))
+            original_in_scope = not selected_norm or bool(
+                extracted_text
+                or (original_text and selected_norm in original_text)
+                or (original_text and original_text in selected_norm)
+            )
+            changed = bool(original_in_scope and original_text != extracted_text)
+            if original_in_scope and original_text and not extracted_text:
+                missing_after_revision.append(key)
+            if changed:
+                changed_after_revision.append(key)
+            validation[key] = {
+                "original_length": len(original_text),
+                "revised_length": len(extracted_text),
+                "original_in_revision_scope": original_in_scope,
+                "present_after_revision": bool(extracted_text),
+                "changed_after_revision": changed,
+            }
+        return {
+            "sections": validation,
+            "missing_sections_after_revision": missing_after_revision,
+            "changed_sections_after_revision": changed_after_revision,
+        }
+
+    # -------------------------------------------------------------------------
+    def extract_revision_drug_names(self, payload: dict[str, Any]) -> list[str]:
+        names: list[str] = []
+        for value in payload.get("detected_drugs", []):
+            if isinstance(value, str) and value.strip():
+                names.append(value.strip())
+        for value in payload.get("matched_drugs", []):
+            if not isinstance(value, dict):
+                continue
+            for key in ("raw_drug_name", "matched_drug_name"):
+                candidate = value.get(key)
+                if isinstance(candidate, str) and candidate.strip():
+                    names.append(candidate.strip())
+        unique: list[str] = []
+        seen: set[str] = set()
+        for name in names:
+            normalized = normalize_drug_query_name(name)
+            if not normalized or normalized in seen:
+                continue
+            seen.add(normalized)
+            unique.append(name)
+        return unique
+
+    # -------------------------------------------------------------------------
+    def start_revision_job(
+        self,
+        session_id: int,
+        *,
+        selected_text: str | None,
+        revision_instruction: str | None,
+        model_overrides: dict[str, Any],
+        metadata: dict[str, Any],
+    ) -> dict[str, Any]:
+        if self.jobs.is_job_running(self.REVISION_JOB_TYPE):
+            raise ValueError("Session revision is already running")
+        detail = self.get_session_detail(session_id)
+        if detail is None:
+            raise ValueError("Session not found")
+        root_session_id = int(detail.get("original_session_id") or session_id)
+        version = self.serializer.get_next_session_version(root_session_id)
+        job_id = self.jobs.start_job(
+            job_type=self.REVISION_JOB_TYPE,
+            runner=self.run_revision_job,
+            kwargs={
+                "job_id": None,
+                "session_detail": detail,
+                "root_session_id": root_session_id,
+                "version": version,
+                "selected_text": selected_text,
+                "revision_instruction": revision_instruction,
+                "model_overrides": model_overrides,
+                "metadata": metadata,
+            },
+        )
+        status_payload = self.jobs.get_job_status(job_id)
+        if status_payload is None:
+            raise RuntimeError("Failed to initialize revision job")
+        return status_payload
+
+    # -------------------------------------------------------------------------
+    def run_revision_job(
+        self,
+        *,
+        job_id: str | None,
+        session_detail: dict[str, Any],
+        root_session_id: int,
+        version: int,
+        selected_text: str | None,
+        revision_instruction: str | None,
+        model_overrides: dict[str, Any],
+        metadata: dict[str, Any],
+    ) -> dict[str, Any]:
+        source_text = str(session_detail.get("session_text") or "").strip()
+        if not source_text:
+            raise ValueError("Session text is empty")
+        selected_focus_text = str(selected_text or "").strip() or None
+        focus_instruction = str(revision_instruction or "").strip() or None
+        revision_focus_context = self.build_revision_focus_context(
+            selected_text=selected_focus_text,
+            revision_instruction=focus_instruction,
+        )
+        clinical_service = build_clinical_session_service(self.jobs)
+        config_serializer = ModelConfigSerializer()
+        previous_snapshot = config_serializer.load_snapshot()
+        effective_overrides = {
+            key: value for key, value in (model_overrides or {}).items() if value is not None
+        }
+
+        def override_value(key: str, fallback: Any) -> Any:
+            return effective_overrides[key] if key in effective_overrides else fallback
+
+        try:
+            if effective_overrides:
+                config_serializer.save_snapshot(
+                    clinical_model=override_value("clinical_model", previous_snapshot.clinical_model),
+                    text_extraction_model=override_value("text_extraction_model", previous_snapshot.text_extraction_model),
+                    use_cloud_models=override_value("use_cloud_services", previous_snapshot.use_cloud_models),
+                    cloud_provider=override_value("provider", previous_snapshot.cloud_provider),
+                    cloud_model=override_value("cloud_model", previous_snapshot.cloud_model),
+                    ollama_temperature=override_value("ollama_temperature", previous_snapshot.ollama_temperature),
+                    cloud_temperature=override_value("cloud_temperature", previous_snapshot.cloud_temperature),
+                    ollama_reasoning=override_value("ollama_reasoning", previous_snapshot.ollama_reasoning),
+                )
+            clinical_service.apply_persisted_runtime_configuration()
+            request = ClinicalSessionRequest(
+                name=session_detail.get("patient_name"),
+                visit_date=session_detail.get("visit_date"),
+                clinical_input=source_text,
+                use_rag=True,
+                use_web_search=True,
+            )
+            preprocessed_request, section_extraction = asyncio.run(
+                clinical_service.preprocess_unified_input(request)
+            )
+            patient_payload = clinical_service.build_patient_payload(preprocessed_request)
+            result_payload = asyncio.run(
+                clinical_service.process_single_patient(
+                    patient_payload,
+                    section_extraction=section_extraction,
+                    session_version=version,
+                    original_session_id=root_session_id,
+                    session_metadata={
+                        **metadata,
+                        "revision_mode": True,
+                        "focused_selection": bool(selected_focus_text),
+                        "revision_instruction": focus_instruction,
+                        "model_overrides": effective_overrides,
+                        "revised_from_session_id": session_detail.get("session_id"),
+                    },
+                    original_session_text=source_text,
+                    revision_focus_context=revision_focus_context,
+                    progress_callback=lambda stage, progress: self.report_job_progress(
+                        job_id=job_id or "",
+                        progress=progress,
+                        message=f"Revision: {stage}",
+                    ) if job_id else None,
+                    stop_check=None,
+                )
+            )
+            revision_audit = self.build_revision_audit(
+                source_detail=session_detail,
+                result_payload=result_payload,
+                selected_text=selected_focus_text,
+                revision_instruction=focus_instruction,
+                effective_overrides=effective_overrides,
+            )
+            result_payload["revision_audit"] = revision_audit
+            persisted_session_id = result_payload.get("session_id")
+            if isinstance(persisted_session_id, int):
+                self.serializer.upsert_session_result_payload(
+                    persisted_session_id,
+                    result_payload,
+                )
+        finally:
+            if effective_overrides:
+                config_serializer.save_snapshot(
+                    clinical_model=previous_snapshot.clinical_model,
+                    text_extraction_model=previous_snapshot.text_extraction_model,
+                    use_cloud_models=previous_snapshot.use_cloud_models,
+                    cloud_provider=previous_snapshot.cloud_provider,
+                    cloud_model=previous_snapshot.cloud_model,
+                    ollama_temperature=previous_snapshot.ollama_temperature,
+                    cloud_temperature=previous_snapshot.cloud_temperature,
+                    ollama_reasoning=previous_snapshot.ollama_reasoning,
+                )
+        return {
+            "session_id": result_payload.get("session_id"),
+            "version": version,
+            "original_session_id": root_session_id,
+            "result_payload": result_payload,
+        }
+
+    # -------------------------------------------------------------------------
+    @staticmethod
+    def build_revision_focus_context(
+        *,
+        selected_text: str | None,
+        revision_instruction: str | None,
+    ) -> str | None:
+        chunks: list[str] = []
+        if selected_text:
+            chunks.append(
+                "Selected excerpt to scrutinize during this second pass:\n"
+                f"{selected_text}"
+            )
+        if revision_instruction:
+            chunks.append(
+                "User revision instruction:\n"
+                f"{revision_instruction}"
+            )
+        return "\n\n".join(chunks) if chunks else None
 
     # -------------------------------------------------------------------------
     def delete_session(self, session_id: int) -> bool:

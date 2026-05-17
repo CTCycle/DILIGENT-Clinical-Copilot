@@ -1,0 +1,221 @@
+<main class="page-container clinical-sessions-page">
+  <header class="clinical-sessions-header">
+    <div>
+      <h1>Clinical Sessions</h1>
+      <p class="lede">Browse, edit, annotate, revise, and build patient timelines from persisted sessions.</p>
+    </div>
+    <div class="clinical-sessions-search">
+      <input
+        type="search"
+        placeholder="Search sessions"
+        [ngModel]="query()"
+        (ngModelChange)="updateQuery($event)"
+        (keydown.enter)="loadSessions()"
+      />
+      <button class="btn btn-secondary" type="button" (click)="loadSessions()">Search</button>
+    </div>
+  </header>
+
+  @if (error()) {
+    <p class="clinical-sessions-status is-error">{{ error() }}</p>
+  }
+
+  <div class="clinical-sessions-layout">
+    <aside class="clinical-sessions-list" aria-label="Clinical session list">
+      @if (loading()) {
+        <p class="clinical-sessions-empty">Loading sessions...</p>
+      } @else if (!sessions().length) {
+        <p class="clinical-sessions-empty">No clinical sessions found.</p>
+      } @else {
+        @for (session of sessions(); track session.session_id) {
+          <button
+            type="button"
+            class="clinical-session-row"
+            [class.is-active]="selected()?.session_id === session.session_id"
+            (click)="openSession(session.session_id)"
+          >
+            <span class="clinical-session-row-main">
+              <strong>{{ session.patient_name || 'Unknown patient' }}</strong>
+              <small>Session #{{ session.session_id }} · v{{ session.version || 1 }}</small>
+            </span>
+            <span class="clinical-session-row-meta">
+              <span>{{ session.session_timestamp ? (session.session_timestamp | date:'medium') : 'No date' }}</span>
+              <span>{{ statusLabel(session.status) }}</span>
+            </span>
+          </button>
+        }
+      }
+    </aside>
+
+    <section class="clinical-session-workspace">
+      @if (detailLoading()) {
+        <p class="clinical-sessions-empty">Opening session...</p>
+      } @else if (selected(); as detail) {
+        <div class="clinical-session-toolbar">
+          <div>
+            <h2>{{ detail.patient_name || 'Unknown patient' }}</h2>
+            <p>Session #{{ detail.session_id }} · Version {{ detail.version }} · {{ detail.session_timestamp ? (detail.session_timestamp | date:'medium') : 'No timestamp' }}</p>
+          </div>
+          <button class="btn btn-primary" type="button" (click)="saveSession()">Save Session</button>
+        </div>
+
+        <nav class="clinical-session-tabs" aria-label="Session sections">
+          <button type="button" [class.is-active]="activeSection() === 'preview'" (click)="setSection('preview')">AI Preview</button>
+          <button type="button" [class.is-active]="activeSection() === 'editor'" (click)="setSection('editor')">Text Editor</button>
+          <button type="button" [class.is-active]="activeSection() === 'metadata'" (click)="setSection('metadata')">Metadata</button>
+          <button type="button" [class.is-active]="activeSection() === 'revision'" (click)="setSection('revision')">Revision Mode</button>
+          <button type="button" [class.is-active]="activeSection() === 'timeline'" (click)="setSection('timeline')">Timeline</button>
+        </nav>
+
+        @if (activeSection() === 'preview') {
+          <section class="clinical-session-preview">
+            <div class="clinical-session-preview-main">
+              <div class="clinical-session-preview-card">
+                <h3>AI-generated preview</h3>
+                <p class="clinical-session-panel-note">Generated from the persisted session result payload.</p>
+                <pre>{{ previewReport(detail) }}</pre>
+              </div>
+            </div>
+            <aside class="clinical-session-preview-side">
+              <div class="clinical-session-preview-card">
+                <h3>Detected drugs</h3>
+                @if (previewDetectedDrugs(detail).length) {
+                  <ul class="clinical-session-chip-list">
+                    @for (drug of previewDetectedDrugs(detail); track drug) {
+                      <li>{{ drug }}</li>
+                    }
+                  </ul>
+                } @else {
+                  <p class="clinical-session-panel-note">No detected drug list is available.</p>
+                }
+              </div>
+              <div class="clinical-session-preview-card">
+                <h3>Revision audit</h3>
+                @if (previewRevisionAudit(detail); as audit) {
+                  <dl class="clinical-session-audit-list">
+                    <div>
+                      <dt>Source</dt>
+                      <dd>{{ audit['source_session_id'] || 'N/A' }}</dd>
+                    </div>
+                    <div>
+                      <dt>New drugs</dt>
+                      <dd>{{ audit['newly_identified_drugs'] || 'None' }}</dd>
+                    </div>
+                    <div>
+                      <dt>Conclusion</dt>
+                      <dd>{{ audit['conclusion_action'] || 'N/A' }}</dd>
+                    </div>
+                  </dl>
+                } @else {
+                  <p class="clinical-session-panel-note">No revision audit has been recorded yet.</p>
+                }
+              </div>
+            </aside>
+          </section>
+        }
+
+        @if (activeSection() === 'editor') {
+          <div class="clinical-session-editor-actions">
+            <button class="btn btn-secondary" type="button" (click)="useEditorSelectionForRevision()">Revise Selection</button>
+          </div>
+          <textarea
+            #sessionTextEditor
+            class="clinical-session-editor"
+            aria-label="Session text editor"
+            [ngModel]="editorText()"
+            (ngModelChange)="updateEditorText($event)"
+          ></textarea>
+        }
+
+        @if (activeSection() === 'metadata') {
+          <div class="clinical-session-panel">
+            <div class="clinical-session-metadata-summary" aria-label="Session metadata summary">
+              <section>
+                <strong>Documents</strong>
+                @if (metadataEntries('documents').length) {
+                  <ul>
+                    @for (document of metadataEntries('documents'); track document) {
+                      <li>{{ document }}</li>
+                    }
+                  </ul>
+                } @else {
+                  <p>No documents attached.</p>
+                }
+              </section>
+              <section>
+                <strong>Images</strong>
+                @if (metadataEntries('images').length) {
+                  <ul>
+                    @for (image of metadataEntries('images'); track image) {
+                      <li>{{ image }}</li>
+                    }
+                  </ul>
+                } @else {
+                  <p>No images attached.</p>
+                }
+              </section>
+            </div>
+            <p class="clinical-session-panel-note">Edit session metadata JSON. Use documents and images arrays for attached evidence.</p>
+            <textarea
+              class="clinical-session-json"
+              aria-label="Session metadata JSON"
+              [ngModel]="metadataText()"
+              (ngModelChange)="updateMetadataText($event)"
+            ></textarea>
+          </div>
+        }
+
+        @if (activeSection() === 'revision') {
+          <div class="clinical-session-panel clinical-session-revision">
+            <label>
+              <span>Focused text selection</span>
+              <textarea
+                class="clinical-session-focus"
+                placeholder="Paste a selected excerpt to focus the revision, or leave empty to revise the full session."
+                [ngModel]="revisionSelection()"
+                (ngModelChange)="updateRevisionSelection($event)"
+              ></textarea>
+            </label>
+            <label>
+              <span>Revision instruction</span>
+              <textarea
+                class="clinical-session-instruction"
+                placeholder="Ask the model what to focus on during the second pass."
+                [ngModel]="revisionInstruction()"
+                (ngModelChange)="updateRevisionInstruction($event)"
+              ></textarea>
+            </label>
+            <label>
+              <span>Model overrides JSON</span>
+              <textarea
+                class="clinical-session-overrides"
+                [ngModel]="revisionModelOverrides()"
+                (ngModelChange)="updateRevisionModelOverrides($event)"
+              ></textarea>
+            </label>
+            <button class="btn btn-primary" type="button" (click)="startRevision()">Run Revision Pass</button>
+            @if (revisionStatus()) {
+              <div class="clinical-session-progress" role="status">
+                <span>{{ revisionStatus() }}</span>
+                <progress max="100" [value]="revisionProgress()"></progress>
+              </div>
+            }
+          </div>
+        }
+
+        @if (activeSection() === 'timeline') {
+          <div class="clinical-session-panel">
+            <p class="clinical-session-panel-note">Generate or regenerate the patient timeline from the current persisted session state.</p>
+            <button class="btn btn-secondary" type="button" (click)="createTimeline()">Create Patient Timeline</button>
+          </div>
+        }
+
+        @if (saveStatus()) {
+          <p class="clinical-sessions-status">{{ saveStatus() }}</p>
+        }
+      } @else {
+        <p class="clinical-sessions-empty">Select a session to begin.</p>
+      }
+    </section>
+  </div>
+</main>

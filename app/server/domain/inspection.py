@@ -38,6 +38,8 @@ class SessionCatalogItem(BaseModel):
     session_id: int
     patient_name: str | None = None
     session_timestamp: datetime | None = None
+    version: int = 1
+    original_session_id: int | None = None
     status: SessionStatus
     total_duration: float | None = None
     has_report: bool = False
@@ -55,10 +57,36 @@ class SessionCatalogResponse(BaseModel):
 
 
 ###############################################################################
-class SessionReportResponse(BaseModel):
+class SessionDetailResponse(BaseModel):
     model_config = ConfigDict(extra="forbid")
     session_id: int
-    report: str
+    patient_name: str | None = None
+    visit_date: DateValue | None = None
+    session_timestamp: datetime | None = None
+    version: int = 1
+    original_session_id: int | None = None
+    status: SessionStatus
+    text_extraction_model: str | None = None
+    clinical_model: str | None = None
+    metadata: dict[str, Any] = Field(default_factory=dict)
+    sections: dict[str, str] = Field(default_factory=dict)
+    session_text: str = ""
+    result_payload: dict[str, Any] = Field(default_factory=dict)
+    report: str | None = None
+
+
+class SessionUpdateRequest(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+    session_text: str | None = Field(default=None, max_length=100000)
+    metadata: dict[str, Any] | None = None
+
+
+class SessionRevisionRequest(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+    selected_text: str | None = Field(default=None, max_length=100000)
+    revision_instruction: str | None = Field(default=None, max_length=4000)
+    model_overrides: dict[str, Any] = Field(default_factory=dict)
+    metadata: dict[str, Any] = Field(default_factory=dict)
 
 
 ###############################################################################

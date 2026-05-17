@@ -1,7 +1,7 @@
 <main class="page-container model-config-page">
   <header class="model-config-header-compact">
     <h1>Model Configurations</h1>
-    <p class="lede">Adjust runtime preferences for DILI analysis.</p>
+    <p class="lede">Configure local Ollama or cloud AI models, provider access, temperature, and reasoning options for reliable DILI clinical analysis.</p>
   </header>
 
   @if (!hasLoadedConfig()) {
@@ -45,7 +45,6 @@
         </div>
       </section>
 
-      @if (!draftConfig().useCloudServices) {
         <section class="model-config-local-row" [class.is-disabled]="isSaving() || isLoading()" [attr.aria-disabled]="isSaving() || isLoading()">
           <div class="model-config-row-header">
             <div class="model-config-row-header-top">
@@ -147,8 +146,6 @@
             </ul>
           </div>
         </section>
-      }
-
       @if (draftConfig().useCloudServices) {
         <section class="model-config-cloud-row">
           <h2 class="modal-section-title">Cloud Model Configuration</h2>
@@ -167,9 +164,11 @@
                   ></app-provider-access-card>
                 }
               </div>
+            </div>
 
+            <div class="model-config-cloud-side">
               <div class="field model-config-cloud-model-field model-config-cloud-model-field-narrow">
-                <label class="field-label" for="cloud-model-select">Cloud Model</label>
+                <label class="field-label" for="cloud-model-select">Analysis Model</label>
                 <select
                   id="cloud-model-select"
                   [ngModel]="draftCloudModel() || ''"
@@ -181,9 +180,9 @@
                   }
                 </select>
               </div>
-            </div>
 
-            <p class="model-config-cloud-description">Provider configuration appears only when cloud runtime is selected.</p>
+              <p class="model-config-cloud-description">Choose the hosted model used for DILI analysis after selecting a provider.</p>
+            </div>
           </div>
         </section>
       }

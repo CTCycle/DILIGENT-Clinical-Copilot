@@ -9,7 +9,6 @@ from pydantic import (
     BaseModel,
     ConfigDict,
     Field,
-    RootModel,
     field_validator,
     model_validator,
 )
@@ -256,10 +255,6 @@ class ClinicalSectionExtractionResult(BaseModel):
 
 
 ###############################################################################
-class ClinicalSessionReportResponse(RootModel[str]):
-    pass
-
-
 ###############################################################################
 class DrugEntry(BaseModel):
     """A single drug prescription extracted from text."""

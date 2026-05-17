@@ -1,6 +1,6 @@
 # UI Standards
 
-Last updated: 2026-04-29
+Last updated: 2026-05-17
 
 Scope: `DILIGENT/client/src` (Angular + SCSS).
 
@@ -33,7 +33,8 @@ Scope: `DILIGENT/client/src` (Angular + SCSS).
 - Main page layouts:
   - DILI page uses responsive grid (`.stitch-dili-grid`) and sticky sidebar on desktop.
   - Model config uses two-column/two-row layout (`.model-config-layout`).
-  - Inspection page uses tabbed sections with scroll-aware tables/lists.
+  - Clinical Sessions uses a list/detail workspace with AI preview, session editing, document/image metadata summaries, revision, and timeline actions.
+  - Inspection page uses tabbed sections with scroll-aware tables/lists for reference data and RAG resources.
 
 ## 3. Color System
 
@@ -66,8 +67,10 @@ Scope: `DILIGENT/client/src` (Angular + SCSS).
 
 - Routes:
   - `/` -> DILI analysis page
+  - `/clinical-sessions` -> Clinical Sessions page
   - `/data` -> Data inspection page
   - `/model-config` -> Model configuration page
+  - `/sessions/:sessionId/timetable` -> patient timeline page
 - App shell:
   - Root shell plus shared navigation (`NavSidebarComponent`) with page-level composition.
 
@@ -75,14 +78,19 @@ Scope: `DILIGENT/client/src` (Angular + SCSS).
 
 - Core journeys must remain consistent:
   - Run clinical analysis job
+  - Browse, edit, annotate, revise, and generate timelines for clinical sessions
   - Configure models/providers and keys
-  - Inspect sessions/catalogs and run update jobs
+  - Inspect reference catalogs and run update jobs
 - Error feedback:
   - Use clear user-safe messages from centralized API error normalization.
 - Loading and empty states:
   - Always provide explicit loading status and empty-state messaging.
 - Job UX:
   - Keep terminal states explicit (`completed`, `failed`, `cancelled`).
+- Clinical Sessions:
+  - Session detail is the canonical UI source for report preview, parser output, metadata, revision audit, and timeline entry points.
+  - Metadata UI should summarize `documents` and `images` from the same persisted metadata JSON instead of storing parallel attachment state.
+  - Revision Mode should keep full-session reprocessing as the default while allowing a selected excerpt and free-text revision instruction to focus the second pass.
 
 ## 7. Responsiveness
 
