@@ -4,16 +4,6 @@
       <h1>Clinical Sessions</h1>
       <p class="lede">Browse, edit, annotate, revise, and build patient timelines from persisted sessions.</p>
     </div>
-    <div class="clinical-sessions-search">
-      <input
-        type="search"
-        placeholder="Search sessions"
-        [ngModel]="query()"
-        (ngModelChange)="updateQuery($event)"
-        (keydown.enter)="loadSessions()"
-      />
-      <button class="btn btn-secondary" type="button" (click)="loadSessions()">Search</button>
-    </div>
   </header>
 
   @if (listError()) {
@@ -22,12 +12,81 @@
 
   <div class="clinical-sessions-layout">
     <aside class="clinical-sessions-list" aria-label="Clinical session list">
+      <div class="clinical-sessions-search">
+        <input
+          type="search"
+          placeholder="Search sessions"
+          aria-label="Search sessions"
+          [ngModel]="query()"
+          (ngModelChange)="updateQuery($event)"
+          (keydown.enter)="loadSessions()"
+        />
+        <button class="btn btn-secondary" type="button" (click)="loadSessions()">Search</button>
+      </div>
+      <div class="clinical-sessions-filters" aria-label="Session filters">
+        <nav class="clinical-sessions-filter-nav" aria-label="Session status">
+          <button
+            type="button"
+            [attr.aria-current]="statusFilter() === 'all' ? 'page' : null"
+            [class.is-active]="statusFilter() === 'all'"
+            (click)="updateStatusFilter('all')"
+          >
+            All
+          </button>
+          <button
+            type="button"
+            [attr.aria-current]="statusFilter() === 'successful' ? 'page' : null"
+            [class.is-active]="statusFilter() === 'successful'"
+            (click)="updateStatusFilter('successful')"
+          >
+            Successful
+          </button>
+          <button
+            type="button"
+            [attr.aria-current]="statusFilter() === 'failed' ? 'page' : null"
+            [class.is-active]="statusFilter() === 'failed'"
+            (click)="updateStatusFilter('failed')"
+          >
+            Failed
+          </button>
+        </nav>
+        <div class="clinical-sessions-filter-controls">
+          <select
+            class="clinical-sessions-sort"
+            aria-label="Session date order"
+            [ngModel]="sortOrder()"
+            (ngModelChange)="updateSortOrder($event)"
+          >
+            <option value="newest">Newest</option>
+            <option value="oldest">Oldest</option>
+          </select>
+          <select
+            class="clinical-sessions-date-mode"
+            aria-label="Date filter mode"
+            [ngModel]="dateFilterMode()"
+            (ngModelChange)="updateDateFilterMode($event)"
+          >
+            <option value="any">Any date</option>
+            <option value="after">After</option>
+            <option value="before">Before</option>
+            <option value="exact">On date</option>
+          </select>
+          <input
+            class="clinical-sessions-date-input"
+            type="date"
+            aria-label="Session filter date"
+            [disabled]="dateFilterMode() === 'any'"
+            [ngModel]="dateFilter()"
+            (ngModelChange)="updateDateFilter($event)"
+          />
+        </div>
+      </div>
       @if (loading()) {
         <p class="clinical-sessions-empty">Loading sessions...</p>
-      } @else if (!sessions().length) {
+      } @else if (!filteredSessions().length) {
         <p class="clinical-sessions-empty">No clinical sessions found.</p>
       } @else {
-        @for (session of sessions(); track session.session_id) {
+        @for (session of filteredSessions(); track session.session_id) {
           <button
             type="button"
             class="clinical-session-row"
@@ -36,11 +95,13 @@
           >
             <span class="clinical-session-row-main">
               <strong>{{ session.patient_name || 'Unknown patient' }}</strong>
-              <small>Session #{{ session.session_id }} · v{{ session.version || 1 }}</small>
+              <small>Session {{ session.session_id }} · Version {{ session.version || 1 }}</small>
             </span>
             <span class="clinical-session-row-meta">
               <span>{{ session.session_timestamp ? (session.session_timestamp | date:'medium') : 'No date' }}</span>
-              <span>{{ statusLabel(session.status) }}</span>
+              <span class="clinical-session-status-chip" [class.is-failed]="session.status === 'failed'">
+                {{ statusLabel(session.status) }}
+              </span>
             </span>
           </button>
         }
@@ -57,9 +118,19 @@
         <div class="clinical-session-toolbar">
           <div>
             <h2>{{ detail.patient_name || 'Unknown patient' }}</h2>
-            <p>Session #{{ detail.session_id }} · Version {{ detail.version }} · {{ detail.session_timestamp ? (detail.session_timestamp | date:'medium') : 'No timestamp' }}</p>
+            <p>Session {{ detail.session_id }} · Version {{ detail.version }} · {{ detail.session_timestamp ? (detail.session_timestamp | date:'medium') : 'No timestamp' }}</p>
           </div>
-          <button class="btn btn-primary" type="button" (click)="saveSession()">Save Session</button>
+          <button
+            class="clinical-session-save-btn"
+            type="button"
+            (click)="saveSession()"
+            aria-label="Save session"
+            title="Save session"
+          >
+            <svg viewBox="0 0 24 24" aria-hidden="true">
+              <path d="M5 3h11.2L21 7.8V21H5V3Zm2 2v14h12V8.6L15.4 5H15v5H8V5H7Zm3 0v3h3V5h-3Zm-1 9h8v5H9v-5Zm2 2v1h4v-1h-4Z" />
+            </svg>
+          </button>
         </div>
 
         <nav class="clinical-session-tabs" aria-label="Session sections">
@@ -82,12 +153,37 @@
             <aside class="clinical-session-preview-side">
               <div class="clinical-session-preview-card">
                 <h3>Detected drugs</h3>
-                @if (previewDetectedDrugs(detail).length) {
-                  <ul class="clinical-session-chip-list">
-                    @for (drug of previewDetectedDrugs(detail); track drug) {
-                      <li>{{ drug }}</li>
-                    }
-                  </ul>
+                @if (detectedDrugEvidence().length) {
+                  <div class="clinical-session-drug-table-wrap">
+                    <table class="clinical-session-drug-table">
+                      <thead>
+                        <tr>
+                          <th>Drug</th>
+                          <th>LiverTox</th>
+                          <th>RxNav</th>
+                          <th>Note</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        @for (drug of detectedDrugEvidence(); track drug.name) {
+                          <tr>
+                            <td>{{ drug.name }}</td>
+                            <td>
+                              <span class="clinical-session-source-pill" [class.is-present]="drug.liverTox">
+                                {{ drug.liverTox ? 'Yes' : 'No' }}
+                              </span>
+                            </td>
+                            <td>
+                              <span class="clinical-session-source-pill" [class.is-present]="drug.rxNav">
+                                {{ drug.rxNav ? 'Yes' : 'No' }}
+                              </span>
+                            </td>
+                            <td>{{ drug.note }}</td>
+                          </tr>
+                        }
+                      </tbody>
+                    </table>
+                  </div>
                 } @else {
                   <p class="clinical-session-panel-note">No detected drug list is available.</p>
                 }
