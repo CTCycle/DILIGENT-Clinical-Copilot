@@ -1,9 +1,11 @@
 from __future__ import annotations
 
 import asyncio
+from contextlib import nullcontext
 import json
 import os
 import re
+import sys
 from datetime import UTC, datetime
 from typing import Any
 
@@ -70,20 +72,26 @@ async def download_file(
 ) -> None:
     async with client.stream("GET", url) as response:
         response.raise_for_status()
-        with (
-            open(destination, "wb") as output,
+        progress_context = (
             tqdm(
                 total=total_size,
                 unit="B",
                 unit_scale=True,
                 desc=label,
                 ncols=80,
-            ) as progress,
+            )
+            if sys.stderr is not None and sys.stderr.isatty()
+            else nullcontext()
+        )
+        with (
+            open(destination, "wb") as output,
+            progress_context as progress,
         ):
             async for chunk in response.aiter_bytes(chunk_size=chunk_size):
                 if chunk:
                     output.write(chunk)
-                    progress.update(len(chunk))
+                    if progress is not None:
+                        progress.update(len(chunk))
 
 
 ###############################################################################

@@ -64,6 +64,26 @@ LOG_CONFIG: dict[str, Any] = {
 
 # override logger configuration and load root logger
 ###############################################################################
-logging.config.dictConfig(LOG_CONFIG)
+try:
+    logging.config.dictConfig(LOG_CONFIG)
+except ValueError:
+    fallback_config = {
+        **LOG_CONFIG,
+        "handlers": {
+            "console": LOG_CONFIG["handlers"]["console"],
+        },
+        "loggers": {
+            name: {
+                **config,
+                "handlers": ["console"],
+            }
+            for name, config in LOG_CONFIG["loggers"].items()
+        },
+        "root": {
+            **LOG_CONFIG["root"],
+            "handlers": ["console"],
+        },
+    }
+    logging.config.dictConfig(fallback_config)
 logger = logging.getLogger()
 

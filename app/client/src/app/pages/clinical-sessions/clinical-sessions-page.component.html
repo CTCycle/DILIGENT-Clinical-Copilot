@@ -16,8 +16,8 @@
     </div>
   </header>
 
-  @if (error()) {
-    <p class="clinical-sessions-status is-error">{{ error() }}</p>
+  @if (listError()) {
+    <p class="clinical-sessions-status is-error">{{ listError() }}</p>
   }
 
   <div class="clinical-sessions-layout">
@@ -48,6 +48,9 @@
     </aside>
 
     <section class="clinical-session-workspace">
+      @if (detailError()) {
+        <p class="clinical-sessions-status is-error">{{ detailError() }}</p>
+      }
       @if (detailLoading()) {
         <p class="clinical-sessions-empty">Opening session...</p>
       } @else if (selected(); as detail) {

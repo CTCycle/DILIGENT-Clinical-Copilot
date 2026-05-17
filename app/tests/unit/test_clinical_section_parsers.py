@@ -32,6 +32,15 @@ def test_plain_labeled_parse() -> None:
     assert sections is not None
 
 
+def test_realistic_report_aliases_parse() -> None:
+    sections = _extract(
+        "Anamnesis:\nA\nDrug exposure information:\nT\nLaboratory data:\nL"
+    )
+    assert sections is not None
+    assert sections["drugs"] == "T"
+    assert sections["laboratory_analysis"] == "L"
+
+
 def test_plain_multilingual_titles_parse() -> None:
     sections = _extract("Anamnesi rilevante\nA\nTerapia farmacologica\nT\nLaboratorio\nL")
     assert sections is not None

@@ -14,7 +14,7 @@ class DrugBlock:
 BULLET_RE = re.compile(r"(?m)^[ \t]*(?:[-*•]|\d+[.)])[ \t]+")
 UPPER_TOKEN_RE = re.compile(r"^[A-ZÀ-ÖØ-Þ][\wÀ-ÖØ-öø-ÿ'/-]+")
 METADATA_RE = re.compile(
-    r"\b(?:mg|mcg|g|ui|iu|po|ev|iv|im|sc|bid|tid|die|volta\/die|sospes[oa]|continu[ae]|cronic[ao]|iniziat[oa])\b",
+    r"\b(?:mg|mcg|g|ui|iu|po|ev|iv|im|sc|bid|tid|die|volta\/die|sospes[oa]|continu[ae]|cronic[ao]|iniziat[oa]|started|stopped)\b",
     re.IGNORECASE,
 )
 
@@ -73,10 +73,13 @@ def isolate_drug_blocks(text: str) -> list[DrugBlock]:
                 return blocks
 
     period_split = re.split(r"(?<=\.)\s+(?=[A-ZÀ-ÖØ-Þ])", source.strip())
-    if len(period_split) > 1 and all(_likely_drug_start(part) for part in period_split if part):
+    likely_period_parts = [part for part in period_split if _likely_drug_start(part)]
+    if len(likely_period_parts) >= 2:
         blocks = []
         cursor = 0
         for part in period_split:
+            if not _likely_drug_start(part):
+                continue
             pos = source.find(part, cursor)
             if pos < 0:
                 continue

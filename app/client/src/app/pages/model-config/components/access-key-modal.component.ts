@@ -1,5 +1,13 @@
 import { CommonModule } from '@angular/common';
-import { Component, EventEmitter, Input, OnChanges, Output, SimpleChanges } from '@angular/core';
+import {
+  ChangeDetectorRef,
+  Component,
+  EventEmitter,
+  Input,
+  OnChanges,
+  Output,
+  SimpleChanges,
+} from '@angular/core';
 import { FormsModule } from '@angular/forms';
 
 import { AccessKeyProvider, AccessKeyRecord } from '../../../core/models/types';
@@ -52,6 +60,9 @@ export class AccessKeyModalComponent implements OnChanges {
   newKeyValue = '';
   errorMessage = '';
   visibleRows: Record<number, boolean> = {};
+  private loadSequence = 0;
+
+  constructor(private readonly changeDetectorRef: ChangeDetectorRef) {}
 
   ngOnChanges(changes: SimpleChanges): void {
     if ((changes['isOpen'] || changes['provider']) && this.isOpen) {
@@ -74,14 +85,25 @@ export class AccessKeyModalComponent implements OnChanges {
   }
 
   async loadKeys(): Promise<void> {
+    const loadId = ++this.loadSequence;
     this.isLoading = true;
     this.errorMessage = '';
     try {
-      this.keys = await fetchAccessKeys(this.provider);
+      const keys = await fetchAccessKeys(this.provider);
+      if (loadId === this.loadSequence) {
+        this.keys = keys;
+        this.changeDetectorRef.markForCheck();
+      }
     } catch (error) {
-      this.errorMessage = error instanceof Error ? error.message : 'Unable to load access keys.';
+      if (loadId === this.loadSequence) {
+        this.errorMessage = error instanceof Error ? error.message : 'Unable to load access keys.';
+        this.changeDetectorRef.markForCheck();
+      }
     } finally {
-      this.isLoading = false;
+      if (loadId === this.loadSequence) {
+        this.isLoading = false;
+        this.changeDetectorRef.detectChanges();
+      }
     }
   }
 
@@ -98,7 +120,10 @@ export class AccessKeyModalComponent implements OnChanges {
     this.isSaving = true;
     this.errorMessage = '';
     try {
-      await createAccessKey(this.provider, candidate);
+      const created = await createAccessKey(this.provider, candidate);
+      if (!created.is_active) {
+        await activateAccessKey(created.id, this.provider);
+      }
       this.newKeyValue = '';
       await this.loadKeys();
     } catch (error) {
@@ -119,6 +144,7 @@ export class AccessKeyModalComponent implements OnChanges {
         updated_at: item.id === activated.id ? activated.updated_at : item.updated_at,
         last_used_at: item.id === activated.id ? activated.last_used_at : item.last_used_at,
       }));
+      this.changeDetectorRef.detectChanges();
     } catch (error) {
       this.errorMessage = error instanceof Error ? error.message : 'Unable to activate access key.';
     } finally {
@@ -135,6 +161,7 @@ export class AccessKeyModalComponent implements OnChanges {
       const next = { ...this.visibleRows };
       delete next[keyId];
       this.visibleRows = next;
+      this.changeDetectorRef.detectChanges();
     } catch (error) {
       this.errorMessage = error instanceof Error ? error.message : 'Unable to delete access key.';
     } finally {

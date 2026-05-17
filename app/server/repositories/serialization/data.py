@@ -196,6 +196,10 @@ class _RepositorySerializationService:
         return session_result_data.get_session_detail(self, session_id)
 
     # -----------------------------------------------------------------------------
+    def build_session_text_from_sections(self, sections: dict[str, str]) -> str:
+        return session_result_data.build_session_text_from_sections(self, sections)
+
+    # -----------------------------------------------------------------------------
     def upsert_session_result_payload(
         self, session_id: int, payload: dict[str, Any]
     ) -> bool:
