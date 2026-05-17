@@ -4,6 +4,7 @@ from datetime import date
 
 from domain.clinical.entities import DrugEntry, PatientDrugs
 from domain.clinical.extras import CandidateSelectionResult
+from services.text.normalization import normalize_drug_query_name
 
 
 def _score_drug(entry: DrugEntry, visit_date: date | None) -> int:
@@ -33,7 +34,7 @@ def select_relevant_candidates(
     *,
     visit_date: date | None,
 ) -> CandidateSelectionResult:
-    candidates = [*therapy_drugs.entries, *anamnesis_drugs.entries]
+    candidates = _deduplicate_candidates([*therapy_drugs.entries, *anamnesis_drugs.entries], visit_date)
     scored: list[tuple[DrugEntry, int]] = [
         (entry, _score_drug(entry, visit_date))
         for entry in candidates
@@ -73,4 +74,24 @@ def select_relevant_candidates(
         unresolved=unresolved,
         ordered_analysis_drugs=PatientDrugs(entries=selected_entries),
     )
+
+
+def _deduplicate_candidates(
+    entries: list[DrugEntry],
+    visit_date: date | None,
+) -> list[DrugEntry]:
+    selected: dict[str, DrugEntry] = {}
+    order: list[str] = []
+    for entry in entries:
+        key = normalize_drug_query_name(entry.name)
+        if not key:
+            continue
+        existing = selected.get(key)
+        if existing is None:
+            selected[key] = entry
+            order.append(key)
+            continue
+        if _score_drug(entry, visit_date) > _score_drug(existing, visit_date):
+            selected[key] = entry
+    return [selected[key] for key in order]
 

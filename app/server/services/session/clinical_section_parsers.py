@@ -60,6 +60,8 @@ THERAPY_ALIASES = {
     "terapia farmacologica",
     "terapia in corso",
     "farmacoterapia",
+    "drug exposure",
+    "drug exposure information",
 }
 LAB_ALIASES = {
     "lab analysis",
@@ -72,6 +74,8 @@ LAB_ALIASES = {
     "analisi",
     "esami",
     "esami di laboratorio",
+    "laboratory data",
+    "dati di laboratorio",
 }
 
 

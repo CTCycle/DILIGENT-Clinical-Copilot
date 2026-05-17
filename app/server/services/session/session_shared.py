@@ -109,6 +109,7 @@ class NarrativeBuilder:
             "rucam_title": "## Estimated RUCAM",
             "rucam_item": "- **{drug}**: score {score} ({category}, confidence {confidence})",
             "warnings_title": "## Warnings",
+            "consistency_warning": "- Structured RUCAM classifies {drugs} as excluded despite their inclusion in the active analysis set. Review before clinical use.",
             "report_title": "## Clinical Report",
             "no_report": "No clinical report generated.",
             "none_detected": "None detected",
@@ -130,6 +131,7 @@ class NarrativeBuilder:
             "rucam_title": "## RUCAM Stimato",
             "rucam_item": "- **{drug}**: punteggio {score} ({category}, confidenza {confidence})",
             "warnings_title": "## Avvisi",
+            "consistency_warning": "- Il RUCAM strutturato classifica {drugs} come esclusi nonostante siano inclusi nell'analisi attiva. Verificare prima dell'uso clinico.",
             "report_title": "## Report Clinico",
             "no_report": "Nessun report clinico generato.",
             "none_detected": "Nessuno rilevato",
@@ -151,6 +153,7 @@ class NarrativeBuilder:
             "rucam_title": "## Geschätzter RUCAM",
             "rucam_item": "- **{drug}**: Score {score} ({category}, Vertrauen {confidence})",
             "warnings_title": "## Warnhinweise",
+            "consistency_warning": "- Der strukturierte RUCAM stuft {drugs} als ausgeschlossen ein, obwohl sie in der aktiven Analyse enthalten sind. Vor klinischer Verwendung prüfen.",
             "report_title": "## Klinischer Bericht",
             "no_report": "Kein klinischer Bericht erstellt.",
             "none_detected": "Keine erkannt",
@@ -172,6 +175,7 @@ class NarrativeBuilder:
             "rucam_title": "## RUCAM Estimé",
             "rucam_item": "- **{drug}** : score {score} ({category}, confiance {confidence})",
             "warnings_title": "## Avertissements",
+            "consistency_warning": "- Le RUCAM structuré classe {drugs} comme exclus alors qu'ils figurent dans l'analyse active. Vérifier avant usage clinique.",
             "report_title": "## Rapport Clinique",
             "no_report": "Aucun rapport clinique généré.",
             "none_detected": "Aucun détecté",
@@ -193,6 +197,7 @@ class NarrativeBuilder:
             "rucam_title": "## RUCAM Estimado",
             "rucam_item": "- **{drug}**: puntuación {score} ({category}, confianza {confidence})",
             "warnings_title": "## Advertencias",
+            "consistency_warning": "- El RUCAM estructurado clasifica {drugs} como excluidos aunque están incluidos en el análisis activo. Revisar antes del uso clínico.",
             "report_title": "## Informe Clínico",
             "no_report": "No se generó un informe clínico.",
             "none_detected": "Ninguno detectado",
@@ -339,6 +344,25 @@ class NarrativeBuilder:
             for issue in issues:
                 warnings_section.append(f"- {issue.message}")
             sections.append("\n".join(warnings_section))
+
+        excluded_active_drugs = [
+            assessment.drug_name
+            for assessment in (rucam_assessments or [])
+            if assessment.causality_category == "excluded"
+            and assessment.drug_name in detected_drugs
+        ]
+        if excluded_active_drugs:
+            sections.append(
+                "\n".join(
+                    [
+                        bundle["warnings_title"],
+                        "",
+                        bundle["consistency_warning"].format(
+                            drugs=", ".join(excluded_active_drugs)
+                        ),
+                    ]
+                )
+            )
 
         clinical_report_section = [bundle["report_title"], ""]
         clinical_report_section.append(

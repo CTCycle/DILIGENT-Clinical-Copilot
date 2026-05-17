@@ -13,6 +13,7 @@ from services.session.clinical_input_extractor import ClinicalInputExtractionErr
 from services.runtime.jobs import get_job_manager
 from services.session.factory import build_clinical_session_service
 from services.session.session_service import ClinicalSessionService
+from services.session.session_workflow import start_clinical_job_workflow
 
 
 def _build_service() -> ClinicalSessionService:
@@ -62,3 +63,38 @@ def test_preprocess_unified_input_converts_extraction_error_to_service_validatio
 
     with pytest.raises(ServiceValidationError, match="boom"):
         asyncio.run(service.preprocess_unified_input(request))
+
+
+def test_start_clinical_job_requires_active_cloud_key_before_extraction(monkeypatch) -> None:
+    service = _build_service()
+
+    class FakeExtractor:
+        async def extract(self, *, clinical_input: str) -> ClinicalSectionExtractionResult:
+            raise AssertionError("extractor should not run without a cloud key")
+
+    class FakeAccessKeyService:
+        def list_access_keys(self, provider: str):
+            assert provider == "gemini"
+            return []
+
+    service.clinical_input_extractor = FakeExtractor()  # type: ignore[assignment]
+    monkeypatch.setattr(
+        "services.session.session_workflow.LLMRuntimeConfig.is_cloud_enabled",
+        lambda: True,
+    )
+    monkeypatch.setattr(
+        "services.session.session_workflow.LLMRuntimeConfig.get_llm_provider",
+        lambda: "gemini",
+    )
+    monkeypatch.setattr(
+        "services.session.session_workflow.AccessKeyService",
+        FakeAccessKeyService,
+    )
+    monkeypatch.setattr(service, "apply_persisted_runtime_configuration", lambda: None)
+
+    request = ClinicalSessionRequest(clinical_input="raw input")
+    with pytest.raises(
+        ServiceValidationError,
+        match="Configure an active Gemini access key before running cloud analysis.",
+    ):
+        start_clinical_job_workflow(service, request)

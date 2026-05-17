@@ -7,6 +7,7 @@ NON_DRUG_EXACT_NAMES = {
     "dopo",
     "paziente femmina",
     "paziente maschio",
+    "paziente di",
 }
 NON_DRUG_PREFIXES = (
     "ulteriore ciclo",

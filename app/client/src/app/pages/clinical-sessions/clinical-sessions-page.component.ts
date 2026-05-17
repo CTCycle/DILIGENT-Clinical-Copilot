@@ -36,7 +36,8 @@ export class ClinicalSessionsPageComponent implements OnInit, OnDestroy {
   readonly selected = signal<ClinicalSessionDetail | null>(null);
   readonly loading = signal(false);
   readonly detailLoading = signal(false);
-  readonly error = signal<string | null>(null);
+  readonly listError = signal<string | null>(null);
+  readonly detailError = signal<string | null>(null);
   readonly query = signal('');
   readonly editorText = signal('');
   readonly metadataText = signal('{\n  "documents": [],\n  "images": []\n}');
@@ -59,7 +60,7 @@ export class ClinicalSessionsPageComponent implements OnInit, OnDestroy {
 
   async loadSessions(): Promise<void> {
     this.loading.set(true);
-    this.error.set(null);
+    this.listError.set(null);
     try {
       const payload = await fetchInspectionSessions({
         search: this.query() || undefined,
@@ -71,7 +72,7 @@ export class ClinicalSessionsPageComponent implements OnInit, OnDestroy {
         await this.openSession(payload.items[0].session_id);
       }
     } catch (error) {
-      this.error.set(formatUnknownError(error, 'Failed to load clinical sessions.'));
+      this.listError.set(formatUnknownError(error, 'Failed to load clinical sessions.'));
     } finally {
       this.loading.set(false);
     }
@@ -79,7 +80,7 @@ export class ClinicalSessionsPageComponent implements OnInit, OnDestroy {
 
   async openSession(sessionId: number): Promise<void> {
     this.detailLoading.set(true);
-    this.error.set(null);
+    this.detailError.set(null);
     try {
       const detail = await fetchClinicalSessionDetail(sessionId);
       this.selected.set(detail);
@@ -89,7 +90,7 @@ export class ClinicalSessionsPageComponent implements OnInit, OnDestroy {
       this.revisionInstruction.set('');
       this.activeSection.set('preview');
     } catch (error) {
-      this.error.set(formatUnknownError(error, 'Failed to open session.'));
+      this.detailError.set(formatUnknownError(error, 'Failed to open session.'));
     } finally {
       this.detailLoading.set(false);
     }
