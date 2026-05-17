@@ -5,13 +5,14 @@ import { buildRuntimeSettingsFromConfig } from '../model-config';
 import { fetchModelConfigState } from '../services/model-config-api';
 import { ClinicalFormState, JobStatus, RuntimeSettings } from '../models/types';
 
-export type PageId = 'dili-agent' | 'data-inspection' | 'model-config';
+export type PageId = 'dili-agent' | 'clinical-sessions' | 'data-inspection' | 'model-config';
 export type ThemeMode = 'light' | 'dark';
 
 const DEFAULT_PAGE: PageId = 'dili-agent';
 const DILI_AGENT_PERSISTED_STATE_KEY = 'dili-agent-state-v1';
 const PAGE_PATHS: Record<PageId, string> = {
   'dili-agent': '/',
+  'clinical-sessions': '/clinical-sessions',
   'data-inspection': '/data',
   'model-config': '/model-config',
 };
@@ -27,6 +28,7 @@ export function normalizePathname(pathname: string): string {
 
 export function resolvePageIdFromPath(pathname: string): PageId {
   const normalized = normalizePathname(pathname);
+  if (normalized === PAGE_PATHS['clinical-sessions']) return 'clinical-sessions';
   if (normalized === PAGE_PATHS['data-inspection']) return 'data-inspection';
   if (normalized === PAGE_PATHS['model-config']) return 'model-config';
   return DEFAULT_PAGE;

@@ -1,6 +1,6 @@
 <main class="timetable-page">
   <aside class="timetable-rail" aria-label="Navigation">
-    <a class="rail-button" routerLink="/data" title="Back to data inspection">‹</a>
+    <a class="rail-button" routerLink="/clinical-sessions" title="Back to clinical sessions">‹</a>
     <span class="rail-button is-active" title="Timetable">▦</span>
   </aside>
 
@@ -11,7 +11,7 @@
         <h1>Patient Timetable</h1>
       </div>
       <div class="timetable-actions">
-        <button type="button" class="btn-secondary" routerLink="/data">Back</button>
+        <button type="button" class="btn-secondary" routerLink="/clinical-sessions">Back</button>
         <button type="button" class="btn-primary" (click)="regenerate()" [disabled]="loading()">Regenerate</button>
       </div>
     </header>

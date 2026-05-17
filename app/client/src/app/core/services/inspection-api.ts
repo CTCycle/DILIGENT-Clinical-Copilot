@@ -13,13 +13,15 @@ import {
   InspectionRxNavOverrideRequest,
   InspectionSessionCatalogResponse,
   InspectionSessionQuery,
-  InspectionSessionReportResponse,
   InspectionSessionTimeline,
   InspectionSessionTimelineRequest,
   InspectionUpdateConfigResponse,
   InspectionUpdateJobStatusResponse,
   JobCancelResponse,
   JobStartResponse,
+  ClinicalSessionDetail,
+  ClinicalSessionRevisionRequest,
+  ClinicalSessionUpdateRequest,
 } from "../models/types";
 import { buildQueryString, requestJson } from "./http-api";
 
@@ -42,12 +44,62 @@ export async function fetchInspectionSessions(
   );
 }
 
-export async function fetchInspectionSessionReport(
+export async function fetchClinicalSessionDetail(
   sessionId: number,
-): Promise<InspectionSessionReportResponse> {
-  return requestJson<InspectionSessionReportResponse>(
-    `${API_BASE_URL}/inspection/sessions/${encodeURIComponent(String(sessionId))}/report`,
+): Promise<ClinicalSessionDetail> {
+  return requestJson<ClinicalSessionDetail>(
+    `${API_BASE_URL}/inspection/sessions/${encodeURIComponent(String(sessionId))}`,
     { method: "GET" },
+  );
+}
+
+export async function updateClinicalSession(
+  sessionId: number,
+  payload: ClinicalSessionUpdateRequest,
+): Promise<ClinicalSessionDetail> {
+  return requestJson<ClinicalSessionDetail>(
+    `${API_BASE_URL}/inspection/sessions/${encodeURIComponent(String(sessionId))}`,
+    {
+      method: "PUT",
+      headers: {
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify(payload),
+    },
+  );
+}
+
+export async function startClinicalSessionRevisionJob(
+  sessionId: number,
+  payload: ClinicalSessionRevisionRequest,
+): Promise<JobStartResponse> {
+  return requestJson<JobStartResponse>(
+    `${API_BASE_URL}/inspection/sessions/${encodeURIComponent(String(sessionId))}/revision/jobs`,
+    {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify(payload),
+    },
+  );
+}
+
+export async function fetchClinicalSessionRevisionJobStatus(
+  jobId: string,
+): Promise<InspectionUpdateJobStatusResponse> {
+  return requestJson<InspectionUpdateJobStatusResponse>(
+    `${API_BASE_URL}/inspection/sessions/revision/jobs/${encodeURIComponent(jobId)}`,
+    { method: "GET" },
+  );
+}
+
+export async function cancelClinicalSessionRevisionJob(
+  jobId: string,
+): Promise<JobCancelResponse> {
+  return requestJson<JobCancelResponse>(
+    `${API_BASE_URL}/inspection/sessions/revision/jobs/${encodeURIComponent(jobId)}`,
+    { method: "DELETE" },
   );
 }
 

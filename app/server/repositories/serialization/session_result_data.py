@@ -62,10 +62,10 @@ from services.text.vocabulary import (
 
 # Extracted from the facade module; functions intentionally accept the facade instance.
 
-def save_clinical_session(self, session_data: dict[str, Any]) -> None:
+def save_clinical_session(self, session_data: dict[str, Any]) -> int | None:
     if not session_data:
         logger.warning("Skipping clinical session save; payload is empty")
-        return
+        return None
     self.ensure_session_result_table()
     db_session = self.session_factory()
     try:
@@ -75,6 +75,8 @@ def save_clinical_session(self, session_data: dict[str, Any]) -> None:
             session_timestamp=self.parse_datetime(
                 session_data.get("session_timestamp")
             ),
+            version=self.to_int(session_data.get("version")) or 1,
+            original_session_id=self.to_int(session_data.get("original_session_id")),
             hepatic_pattern=self.normalize_string(
                 session_data.get("hepatic_pattern")
             ),
@@ -88,6 +90,7 @@ def save_clinical_session(self, session_data: dict[str, Any]) -> None:
             session_status=self.normalize_session_status(
                 session_data.get("session_status")
             ),
+            metadata_json=self.serialize_json_payload(session_data.get("metadata")),
         )
         db_session.add(persisted_session)
         db_session.flush()
@@ -97,6 +100,7 @@ def save_clinical_session(self, session_data: dict[str, Any]) -> None:
         self.persist_session_drugs(db_session, session_id, session_data)
         self.persist_session_result_payload(db_session, session_id, session_data)
         db_session.commit()
+        return session_id
     except Exception:
         db_session.rollback()
         raise
@@ -128,7 +132,13 @@ def ensure_session_result_table(self) -> None:
 
     required_columns = {
         Patient.__tablename__: {"image_blob"},
-        ClinicalSession.__tablename__: {"patient_id", "session_status"},
+        ClinicalSession.__tablename__: {
+            "patient_id",
+            "session_status",
+            "version",
+            "original_session_id",
+            "metadata_json",
+        },
         Drug.__tablename__: {"rxnav_last_update"},
     }
     for table_name, columns in required_columns.items():
@@ -305,6 +315,8 @@ def list_sessions(
                 "session_id": int(session_row.id),
                 "patient_name": self.normalize_string(patient_row.name),
                 "session_timestamp": session_row.session_timestamp,
+                "version": int(session_row.version or 1),
+                "original_session_id": self.to_int(session_row.original_session_id),
                 "status": self.normalize_session_status(session_row.session_status),
                 "total_duration": self.to_float(session_row.total_duration),
                 "has_report": int(session_row.id) in report_session_ids,
@@ -321,38 +333,125 @@ def list_sessions(
     finally:
         db_session.close()
 
-def get_session_report(self, session_id: int) -> str | None:
+def get_session_detail(self, session_id: int) -> dict[str, Any] | None:
     self.ensure_session_result_table()
     safe_session_id = int(session_id)
     db_session = self.session_factory()
     try:
-        payload_json = db_session.execute(
-            select(ClinicalSessionResult.payload_json).where(
-                ClinicalSessionResult.session_id == safe_session_id
+        row = db_session.execute(
+            select(ClinicalSession, Patient)
+            .join(Patient, ClinicalSession.patient_id == Patient.id)
+            .where(ClinicalSession.id == safe_session_id)
+        ).first()
+        if row is None:
+            return None
+        session_row, patient_row = row
+        section_rows = db_session.execute(
+            select(ClinicalSessionSection.section_kind, ClinicalSessionSection.content)
+            .where(ClinicalSessionSection.session_id == safe_session_id)
+        ).all()
+        sections = {
+            str(kind): self.normalize_string(content) or ""
+            for kind, content in section_rows
+        }
+        payload = self.get_session_result_payload(safe_session_id) or {}
+        metadata = self.parse_session_result_payload(session_row.metadata_json) or {}
+        session_text = self.normalize_string(
+            payload.get("original_session_text")
+        ) or self.build_session_text_from_sections(sections)
+        return {
+            "session_id": safe_session_id,
+            "patient_name": self.normalize_string(patient_row.name),
+            "visit_date": patient_row.visit_date,
+            "session_timestamp": session_row.session_timestamp,
+            "version": int(session_row.version or 1),
+            "original_session_id": self.to_int(session_row.original_session_id),
+            "status": self.normalize_session_status(session_row.session_status),
+            "text_extraction_model": self.normalize_string(session_row.text_extraction_model),
+            "clinical_model": self.normalize_string(session_row.clinical_model),
+            "metadata": metadata,
+            "sections": sections,
+            "session_text": session_text,
+            "result_payload": payload,
+            "report": self.normalize_string(payload.get("report")) or self.normalize_string(sections.get("final_report")),
+        }
+    finally:
+        db_session.close()
+
+def build_session_text_from_sections(self, sections: dict[str, str]) -> str:
+    chunks: list[str] = []
+    for key, label in (
+        ("anamnesis", "ANAMNESIS"),
+        ("drugs", "THERAPY"),
+        ("laboratory_analysis", "LABORATORY ANALYSIS"),
+    ):
+        value = self.normalize_string(sections.get(key))
+        if value:
+            chunks.append(f"{label}\n{value}")
+    return "\n\n".join(chunks)
+
+def update_session_text_and_metadata(
+    self,
+    session_id: int,
+    *,
+    session_text: str | None,
+    metadata: dict[str, Any] | None,
+) -> dict[str, Any] | None:
+    self.ensure_session_result_table()
+    safe_session_id = int(session_id)
+    db_session = self.session_factory()
+    try:
+        existing = db_session.get(ClinicalSession, safe_session_id)
+        if existing is None:
+            return None
+        if metadata is not None:
+            existing.metadata_json = self.serialize_json_payload(metadata)
+        if session_text is not None:
+            result = db_session.execute(
+                select(ClinicalSessionResult).where(
+                    ClinicalSessionResult.session_id == safe_session_id
+                )
+            ).scalar_one_or_none()
+            payload = (
+                self.parse_session_result_payload(result.payload_json)
+                if result is not None
+                else {}
+            ) or {}
+            payload["original_session_text"] = session_text
+            payload["manual_edit_saved_at"] = datetime.now().isoformat()
+            serialized_payload = self.serialize_json_payload(payload)
+            if serialized_payload is not None:
+                if result is None:
+                    db_session.add(
+                        ClinicalSessionResult(
+                            session_id=safe_session_id,
+                            payload_json=serialized_payload,
+                        )
+                    )
+                else:
+                    result.payload_json = serialized_payload
+        db_session.commit()
+        return self.get_session_detail(safe_session_id)
+    except Exception:
+        db_session.rollback()
+        raise
+    finally:
+        db_session.close()
+
+def get_next_session_version(self, original_session_id: int) -> int:
+    self.ensure_session_result_table()
+    safe_original_id = int(original_session_id)
+    db_session = self.session_factory()
+    try:
+        max_version = db_session.execute(
+            select(func.max(ClinicalSession.version)).where(
+                or_(
+                    ClinicalSession.id == safe_original_id,
+                    ClinicalSession.original_session_id == safe_original_id,
+                )
             )
         ).scalar_one_or_none()
-        if payload_json is not None:
-            normalized_payload = self.normalize_string(payload_json)
-            if normalized_payload is not None:
-                try:
-                    parsed = json.loads(normalized_payload)
-                except json.JSONDecodeError:
-                    parsed = None
-                if isinstance(parsed, dict):
-                    report = self.normalize_string(parsed.get("report"))
-                    if report is not None:
-                        return report
-                elif isinstance(parsed, str):
-                    report = self.normalize_string(parsed)
-                    if report is not None:
-                        return report
-        section_report = db_session.execute(
-            select(ClinicalSessionSection.content).where(
-                ClinicalSessionSection.session_id == safe_session_id,
-                ClinicalSessionSection.section_kind == "final_report",
-            )
-        ).scalar_one_or_none()
-        return self.normalize_string(section_report)
+        return int(max_version or 1) + 1
     finally:
         db_session.close()
 

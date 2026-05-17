@@ -117,6 +117,11 @@ async def process_single_patient_workflow(
     *,
     patient_image_base64: str | None = None,
     section_extraction: ClinicalSectionExtractionResult | None = None,
+    session_version: int = 1,
+    original_session_id: int | None = None,
+    session_metadata: dict[str, Any] | None = None,
+    original_session_text: str | None = None,
+    revision_focus_context: str | None = None,
     progress_callback=None,
     stop_check=None,
 ) -> dict[str, Any]:
@@ -200,6 +205,12 @@ async def process_single_patient_workflow(
         onset_context=onset_context,
         pattern_score=pattern_score,
     )
+    if revision_focus_context:
+        structured_context = (
+            f"{structured_context}\n\n"
+            "Revision focus context:\n"
+            f"{revision_focus_context.strip()}"
+        )
     rag_query = service.build_rag_query(
         payload=payload,
         analysis_drugs=analysis_drugs,
@@ -308,14 +319,25 @@ async def process_single_patient_workflow(
             "cloud_temperature": LLMRuntimeConfig.get_cloud_temperature(),
             "ollama_reasoning": LLMRuntimeConfig.is_ollama_reasoning_enabled(),
         },
+        "revision": {
+            "version": session_version,
+            "original_session_id": original_session_id,
+            "metadata": session_metadata or {},
+            "focus_context": revision_focus_context,
+        },
     }
-    await asyncio.to_thread(
+    if original_session_text is not None:
+        result_payload["original_session_text"] = original_session_text
+    persisted_session_id = await asyncio.to_thread(
         service.serializer.save_clinical_session,
         {
             "patient_name": payload.name,
             "patient_visit_date": payload.visit_date,
             "patient_image_base64": patient_image_base64,
             "session_timestamp": datetime.now(),
+            "version": session_version,
+            "original_session_id": original_session_id,
+            "metadata": session_metadata or {},
             "hepatic_pattern": pattern_score.classification,
             "anamnesis": payload.anamnesis,
             "drugs": payload.drugs,
@@ -334,6 +356,8 @@ async def process_single_patient_workflow(
             "session_result_payload": result_payload,
         },
     )
+    if persisted_session_id is not None:
+        result_payload["session_id"] = persisted_session_id
     return result_payload
 
 

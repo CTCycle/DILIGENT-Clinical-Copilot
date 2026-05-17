@@ -1,6 +1,6 @@
 # DILIGENT Clinical Copilot User Manual
 
-Last updated: 2026-05-03
+Last updated: 2026-05-17
 
 This manual describes practical use of DILIGENT Clinical Copilot for clinical DILI assessment workflows.
 
@@ -55,10 +55,24 @@ Desktop packaged mode is available through Tauri builds. See `assets/docs/RUNTIM
 
 ### Journey D: Audit historical sessions
 
-1. Open Data Inspection sessions view.
+1. Open Clinical Sessions.
 2. Filter/search historical sessions.
-3. Open a session to inspect source inputs, generated outputs, and timestamps.
-4. Use findings for quality review, reproducibility checks, and documentation.
+3. Open a session to inspect the AI-generated preview, detected drugs, and any recorded revision audit.
+4. Manually edit the persisted clinical text when the source material needs correction.
+5. Add session metadata, including document and image references.
+6. Generate or open the patient timeline from the session workspace.
+7. Use findings for quality review, reproducibility checks, and documentation.
+
+### Journey E: Revise a clinical session
+
+1. Open Clinical Sessions and select the session to revise.
+2. Use the editor to save any manual text corrections.
+3. Optionally paste or select the specific text section that should receive model focus.
+4. Add a revision instruction when the model should scrutinize a specific concern in the selected section while still reprocessing the full session text.
+5. Open Revision Mode and override model settings when the second pass should use a different model.
+6. Start the revision job and monitor progress.
+7. Review the newly versioned session result after the revision pipeline completes.
+8. Check the revision audit for parser cross-validation, focused selection, revision instruction, newly identified drugs, missing previous drugs, and the conclusion action.
 
 ## 4. Primary commands (operator workflow)
 
@@ -108,7 +122,8 @@ release\tauri\build_with_tauri.bat
 - Optional web-search augmentation when enabled by configuration.
 - Background job lifecycle with status polling and cancellation.
 - Encrypted-at-rest provider key storage and activation controls.
-- Inspection views for sessions, datasets, and vector-store assets.
+- Clinical Sessions workspace for persisted sessions, metadata, revision, and patient timelines.
+- Inspection views for datasets and vector-store assets.
 - Local-first execution with optional desktop packaging.
 
 ## 7. Troubleshooting quick checks

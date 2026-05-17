@@ -1,7 +1,6 @@
 import { InspectionRagVectorStoreSummary } from '../models/types';
 
 export type InspectionViewId =
-  | 'sessions'
   | 'rxnav'
   | 'livertox'
   | 'rag';
