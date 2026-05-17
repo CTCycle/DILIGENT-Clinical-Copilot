@@ -52,15 +52,6 @@
         </nav>
         <div class="clinical-sessions-filter-controls">
           <select
-            class="clinical-sessions-sort"
-            aria-label="Session date order"
-            [ngModel]="sortOrder()"
-            (ngModelChange)="updateSortOrder($event)"
-          >
-            <option value="newest">Newest</option>
-            <option value="oldest">Oldest</option>
-          </select>
-          <select
             class="clinical-sessions-date-mode"
             aria-label="Date filter mode"
             [ngModel]="dateFilterMode()"
@@ -120,21 +111,10 @@
             <h2>{{ detail.patient_name || 'Unknown patient' }}</h2>
             <p>Session {{ detail.session_id }} · Version {{ detail.version }} · {{ detail.session_timestamp ? (detail.session_timestamp | date:'medium') : 'No timestamp' }}</p>
           </div>
-          <button
-            class="clinical-session-save-btn"
-            type="button"
-            (click)="saveSession()"
-            aria-label="Save session"
-            title="Save session"
-          >
-            <svg viewBox="0 0 24 24" aria-hidden="true">
-              <path d="M5 3h11.2L21 7.8V21H5V3Zm2 2v14h12V8.6L15.4 5H15v5H8V5H7Zm3 0v3h3V5h-3Zm-1 9h8v5H9v-5Zm2 2v1h4v-1h-4Z" />
-            </svg>
-          </button>
         </div>
 
         <nav class="clinical-session-tabs" aria-label="Session sections">
-          <button type="button" [class.is-active]="activeSection() === 'preview'" (click)="setSection('preview')">AI Preview</button>
+          <button type="button" [class.is-active]="activeSection() === 'preview'" (click)="setSection('preview')">Preview</button>
           <button type="button" [class.is-active]="activeSection() === 'editor'" (click)="setSection('editor')">Text Editor</button>
           <button type="button" [class.is-active]="activeSection() === 'metadata'" (click)="setSection('metadata')">Metadata</button>
           <button type="button" [class.is-active]="activeSection() === 'revision'" (click)="setSection('revision')">Revision Mode</button>
@@ -145,7 +125,7 @@
           <section class="clinical-session-preview">
             <div class="clinical-session-preview-main">
               <div class="clinical-session-preview-card">
-                <h3>AI-generated preview</h3>
+                <h3>Preview</h3>
                 <p class="clinical-session-panel-note">Generated from the persisted session result payload.</p>
                 <pre>{{ previewReport(detail) }}</pre>
               </div>
@@ -159,15 +139,26 @@
                       <thead>
                         <tr>
                           <th>Drug</th>
+                          <th>Anamnesis</th>
+                          <th>Therapy</th>
                           <th>LiverTox</th>
                           <th>RxNav</th>
-                          <th>Note</th>
                         </tr>
                       </thead>
                       <tbody>
                         @for (drug of detectedDrugEvidence(); track drug.name) {
                           <tr>
                             <td>{{ drug.name }}</td>
+                            <td>
+                              <span class="clinical-session-source-pill" [class.is-present]="drug.inAnamnesis">
+                                {{ drug.inAnamnesis ? 'Yes' : 'No' }}
+                              </span>
+                            </td>
+                            <td>
+                              <span class="clinical-session-source-pill" [class.is-present]="drug.inTherapy">
+                                {{ drug.inTherapy ? 'Yes' : 'No' }}
+                              </span>
+                            </td>
                             <td>
                               <span class="clinical-session-source-pill" [class.is-present]="drug.liverTox">
                                 {{ drug.liverTox ? 'Yes' : 'No' }}
@@ -178,7 +169,6 @@
                                 {{ drug.rxNav ? 'Yes' : 'No' }}
                               </span>
                             </td>
-                            <td>{{ drug.note }}</td>
                           </tr>
                         }
                       </tbody>
@@ -187,6 +177,40 @@
                 } @else {
                   <p class="clinical-session-panel-note">No detected drug list is available.</p>
                 }
+              </div>
+              <div class="clinical-session-preview-card">
+                <h3>Detected diseases</h3>
+                @if (detectedDiseases().length) {
+                  <ul class="clinical-session-side-list">
+                    @for (disease of detectedDiseases(); track disease) {
+                      <li>{{ disease }}</li>
+                    }
+                  </ul>
+                } @else {
+                  <p class="clinical-session-panel-note">No detected diseases are available.</p>
+                }
+              </div>
+              <div class="clinical-session-preview-card">
+                <h3>Laboratory and pattern</h3>
+                <dl class="clinical-session-audit-list clinical-session-compact-list">
+                  <div>
+                    <dt>Hepatotoxicity pattern</dt>
+                    <dd>{{ hepatotoxicityPattern() }}</dd>
+                  </div>
+                  @if (labSummary().length) {
+                    @for (item of labSummary(); track item.label) {
+                      <div>
+                        <dt>{{ item.label }}</dt>
+                        <dd>{{ item.value }}</dd>
+                      </div>
+                    }
+                  } @else {
+                    <div>
+                      <dt>Laboratory data</dt>
+                      <dd>No laboratory summary available.</dd>
+                    </div>
+                  }
+                </dl>
               </div>
               <div class="clinical-session-preview-card">
                 <h3>Revision audit</h3>
@@ -214,16 +238,55 @@
         }
 
         @if (activeSection() === 'editor') {
-          <div class="clinical-session-editor-actions">
-            <button class="btn btn-secondary" type="button" (click)="useEditorSelectionForRevision()">Revise Selection</button>
+          <div class="clinical-session-editor-toolbar" role="toolbar" aria-label="Text editor toolbar">
+            <div class="clinical-session-toolbar-group">
+              <button type="button" (click)="setEditorFontSize(-1)" [disabled]="editorFontSize() <= 12" aria-label="Decrease font size">A-</button>
+              <span class="clinical-session-editor-font-size">{{ editorFontSize() }}px</span>
+              <button type="button" (click)="setEditorFontSize(1)" [disabled]="editorFontSize() >= 22" aria-label="Increase font size">A+</button>
+            </div>
+            <div class="clinical-session-toolbar-group clinical-session-toolbar-group-format">
+              <select aria-label="Text format" (change)="runEditorCommand('formatBlock', $any($event.target).value)">
+                <option value="p">Format</option>
+                <option value="h1">Heading 1</option>
+                <option value="h2">Heading 2</option>
+                <option value="h3">Heading 3</option>
+                <option value="p">Paragraph</option>
+                <option value="blockquote">Quote</option>
+                <option value="pre">Code block</option>
+              </select>
+            </div>
+            <div class="clinical-session-toolbar-group">
+              <button type="button" (click)="runEditorCommand('undo')" aria-label="Undo">↶</button>
+              <button type="button" (click)="runEditorCommand('redo')" aria-label="Redo">↷</button>
+              <button type="button" (click)="runEditorCommand('bold')" aria-label="Bold"><strong>B</strong></button>
+              <button type="button" (click)="runEditorCommand('italic')" aria-label="Italic"><em>I</em></button>
+              <button type="button" (click)="runEditorCommand('underline')" aria-label="Underline"><u>U</u></button>
+              <button type="button" (click)="runEditorCommand('strikeThrough')" aria-label="Strike"><s>S</s></button>
+              <button type="button" (click)="runEditorCommand('hiliteColor', '#fff59d')" aria-label="Highlight">HL</button>
+              <button type="button" (click)="runEditorCommand('insertUnorderedList')" aria-label="Bullet list">•</button>
+              <button type="button" (click)="runEditorCommand('insertOrderedList')" aria-label="Number list">1.</button>
+              <button type="button" (click)="runEditorCommand('justifyLeft')" aria-label="Align left">≡</button>
+              <button type="button" (click)="runEditorCommand('justifyCenter')" aria-label="Align center">≣</button>
+              <button type="button" (click)="runEditorCommand('justifyRight')" aria-label="Align right">☰</button>
+            </div>
+            <div class="clinical-session-toolbar-group clinical-session-toolbar-group-standalone">
+              <button type="button" (click)="insertLink()" aria-label="Insert link">🔗</button>
+              <button type="button" (click)="clearFormatting()" aria-label="Clear formatting">⌫</button>
+              <button type="button" (click)="removeSelection()" aria-label="Remove selected text">✖</button>
+              <button type="button" class="btn btn-primary" (click)="saveSession()" aria-label="Save report">Save</button>
+            </div>
           </div>
-          <textarea
+          <div
             #sessionTextEditor
-            class="clinical-session-editor"
+            class="clinical-session-editor clinical-session-editor-surface"
             aria-label="Session text editor"
-            [ngModel]="editorText()"
-            (ngModelChange)="updateEditorText($event)"
-          ></textarea>
+            contenteditable="true"
+            spellcheck="true"
+            [style.font-size.px]="editorFontSize()"
+            [innerHTML]="editorText()"
+            (input)="onEditorInput($event)"
+            (keydown)="onEditorKeydown($event)"
+          ></div>
         }
 
         @if (activeSection() === 'metadata') {
