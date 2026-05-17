@@ -1,5 +1,6 @@
-import { Component, HostListener, inject } from '@angular/core';
-import { Router, RouterOutlet } from '@angular/router';
+import { Component, inject } from '@angular/core';
+import { NavigationEnd, Router, RouterOutlet } from '@angular/router';
+import { filter } from 'rxjs';
 
 import {
   AppStateService,
@@ -19,6 +20,14 @@ export class App {
   readonly stateService = inject(AppStateService);
   private readonly router = inject(Router);
 
+  constructor() {
+    this.router.events
+      .pipe(filter((event): event is NavigationEnd => event instanceof NavigationEnd))
+      .subscribe((event) => {
+        this.stateService.setActivePage(resolvePageIdFromPath(event.urlAfterRedirects));
+      });
+  }
+
   navigateToPage(pageId: PageId): void {
     const nextPath = resolvePathFromPage(pageId);
     if (window.location.pathname !== nextPath) {
@@ -27,8 +36,4 @@ export class App {
     this.stateService.setActivePage(pageId);
   }
 
-  @HostListener('window:popstate')
-  onPopState(): void {
-    this.stateService.setActivePage(resolvePageIdFromPath(window.location.pathname));
-  }
 }
