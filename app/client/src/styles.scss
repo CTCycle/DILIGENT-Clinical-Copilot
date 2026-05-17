@@ -5006,7 +5006,16 @@ input[type="date"]::-webkit-calendar-picker-indicator:hover {
 }
 
 .stitch-dili-actions .btn:disabled {
-  opacity: 1;
+  color: #58706a;
+  background: #d8e7e1;
+  border-color: #c4d9d1;
+  box-shadow: none;
+  cursor: not-allowed;
+}
+
+.stitch-dili-actions .stitch-dili-action-hint {
+  text-align: center;
+  color: var(--color-text-secondary);
 }
 
 .stitch-dili-clear-container {
