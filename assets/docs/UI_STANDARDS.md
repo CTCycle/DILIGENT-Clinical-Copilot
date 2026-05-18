@@ -107,8 +107,33 @@ Scope: `DILIGENT/client/src` (Angular + SCSS).
 - Keep visible focus indicators (`--focus-ring` behavior).
 - Use ARIA attributes where interactive semantics are not native.
 - Do not use color alone to indicate status; pair with text/icons.
+- Respect reduced-motion preferences for non-essential transitions and animations.
 
-## 9. Design Principles
+## 9. Component usage rules
+
+- Prefer shared sizing tokens before introducing new values:
+  - `--control-height-sm`, `--control-height-md`, `--control-height-lg`
+  - `--radius-sm` through `--radius-xl`
+  - `--shadow-sm` through `--shadow-lg`
+- Interactive controls should use:
+  - a visible hover state,
+  - a visible `:focus-visible` state,
+  - a distinct disabled state,
+  - and a minimum comfortable hit area aligned with the control-height scale.
+- Page-local color values are acceptable only when they express a page-specific illustration/background treatment. Text, borders, surfaces, and semantic states should prefer shared color tokens.
+- Dense horizontal navigation (tabs, pill filters, compact toolbars) should wrap or scroll instead of clipping at narrow widths.
+
+## 10. Do / Don’t
+
+| Do | Don’t |
+| --- | --- |
+| Reuse spacing, radius, and color tokens. | Add near-duplicate one-off colors or spacing values without a reuse case. |
+| Keep heading hierarchy limited and predictable. | Create new visual hierarchy through arbitrary font sizes alone. |
+| Preserve visible keyboard focus. | Rely on color-only hover states as the only interaction cue. |
+| Let dense controls wrap or scroll on small screens. | Force controls into cramped rows that clip labels. |
+| Keep decorative page backgrounds separate from functional surfaces. | Encode functional meaning only through background hue. |
+
+## 11. Design Principles
 
 - Consistency over one-off styling.
 - Clarity and predictability over decorative complexity.
