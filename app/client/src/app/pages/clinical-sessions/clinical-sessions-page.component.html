@@ -57,7 +57,7 @@
             [ngModel]="dateFilterMode()"
             (ngModelChange)="updateDateFilterMode($event)"
           >
-            <option value="any">Any date</option>
+            <option value="any">Exact date</option>
             <option value="after">After</option>
             <option value="before">Before</option>
             <option value="exact">On date</option>
@@ -125,8 +125,6 @@
           <section class="clinical-session-preview">
             <div class="clinical-session-preview-main">
               <div class="clinical-session-preview-card">
-                <h3>Preview</h3>
-                <p class="clinical-session-panel-note">Generated from the persisted session result payload.</p>
                 <pre>{{ previewReport(detail) }}</pre>
               </div>
             </div>
@@ -239,6 +237,22 @@
 
         @if (activeSection() === 'editor') {
           <div class="clinical-session-editor-toolbar" role="toolbar" aria-label="Text editor toolbar">
+            <div class="clinical-session-toolbar-group clinical-session-view-mode" aria-label="Editor view mode">
+              <button
+                type="button"
+                [class.is-active]="editorViewMode() === 'source'"
+                (click)="setEditorViewMode('source')"
+              >
+                Source
+              </button>
+              <button
+                type="button"
+                [class.is-active]="editorViewMode() === 'rendered'"
+                (click)="setEditorViewMode('rendered')"
+              >
+                Rendered
+              </button>
+            </div>
             <div class="clinical-session-toolbar-group">
               <button type="button" (click)="setEditorFontSize(-1)" [disabled]="editorFontSize() <= 12" aria-label="Decrease font size">A-</button>
               <span class="clinical-session-editor-font-size">{{ editorFontSize() }}px</span>
