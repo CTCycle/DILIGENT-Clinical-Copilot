@@ -4909,9 +4909,9 @@ input[type="date"]::-webkit-calendar-picker-indicator:hover {
 }
 
 .stitch-dili-actions .btn-primary {
-  min-height: 40px;
-  padding-top: 6px;
-  padding-bottom: 6px;
+  min-height: 32px;
+  padding-top: 4px;
+  padding-bottom: 4px;
 }
 
 .stitch-dili-report {
@@ -5169,29 +5169,44 @@ input[type="date"]::-webkit-calendar-picker-indicator:hover {
 
 /* DILI page: enlarge right-bottom texture while keeping it confined */
 .stitch-dili-sidebar {
-  background-image:
-    url("/dili-sidebar-texture-light.png"),
-    linear-gradient(180deg, #f1f8f4 0%, #ecf5f1 100%);
-  background-repeat: no-repeat, no-repeat;
-  background-size: min(320px, 100%) auto, 100% 100%;
-  background-position: right bottom, center;
+  position: relative;
+  overflow: hidden;
+  isolation: isolate;
+  background-image: linear-gradient(180deg, #f1f8f4 0%, #ecf5f1 100%);
+  background-repeat: no-repeat;
+  background-size: 100% 100%;
+  background-position: center;
 }
 
 .stitch-dili-sidebar::after {
-  content: none;
-  display: none;
-  width: 0;
-  height: 0;
-  background: none;
+  content: "";
+  position: absolute;
+  right: -8px;
+  bottom: -6px;
+  z-index: 0;
+  width: 300px;
+  height: 300px;
+  background: url("/dili-sidebar-texture-light.png") right bottom / 320px auto no-repeat;
+  opacity: 0.96;
+  pointer-events: none;
+  -webkit-mask-image: radial-gradient(circle at 100% 100%, #000 36%, rgba(0, 0, 0, 0.72) 54%, transparent 83%);
+  mask-image: radial-gradient(circle at 100% 100%, #000 36%, rgba(0, 0, 0, 0.72) 54%, transparent 83%);
+}
+
+.stitch-dili-sidebar > * {
+  position: relative;
+  z-index: 1;
 }
 
 :root[data-theme="dark"] .stitch-dili-sidebar {
-  background-image:
-    url("/dili-sidebar-texture-dark.png"),
-    linear-gradient(180deg, #10332e 0%, #0d2d29 100%);
-  background-repeat: no-repeat, no-repeat;
-  background-size: min(320px, 100%) auto, 100% 100%;
-  background-position: right bottom, center;
+  background-image: linear-gradient(180deg, #0c2430 0%, #0b2531 100%);
+  background-repeat: no-repeat;
+  background-size: 100% 100%;
+  background-position: center;
+}
+
+:root[data-theme="dark"] .stitch-dili-sidebar::after {
+  background: url("/dili-sidebar-texture-dark.png") right bottom / 320px auto no-repeat;
 }
 
 /* DILI report toolbar actions: stronger emphasis */

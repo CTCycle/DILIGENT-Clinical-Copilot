@@ -1,13 +1,16 @@
 # Runtime Modes
 
-Last updated: 2026-04-24
+Last updated: 2026-05-18
 
 ## 1. Supported Modes
 
 ### Local development (web + API)
 - Backend: FastAPI (`app/server/app.py`)
 - Frontend: Angular app served from `app/client`
-- Default ports from `.env.local.example`:
+- Active local ports from `settings/.env`:
+  - API: `127.0.0.1:7690`
+  - UI: `127.0.0.1:9847`
+- Template ports from `settings/.env.local.example`:
   - API: `127.0.0.1:8000`
   - UI: `127.0.0.1:7861`
 
@@ -41,14 +44,14 @@ What it does:
 ### Manual backend startup (PowerShell)
 
 ```powershell
-runtimes\uv\uv.exe run --python runtimes\python\python.exe python -m uvicorn DILIGENT.app:app --host 127.0.0.1 --port 8000
+runtimes\uv\uv.exe run --python runtimes\python\python.exe python -m uvicorn DILIGENT.app:app --host 127.0.0.1 --port 7690
 ```
 
 ### Manual frontend startup (PowerShell)
 
 ```powershell
 Set-Location DILIGENT\client
-npm run preview -- --host 127.0.0.1 --port 7861 --strictPort
+npm run preview -- --host 127.0.0.1 --port 9847 --strictPort
 ```
 
 ### Desktop build (Tauri)
@@ -71,12 +74,13 @@ Template:
 - `DILIGENT/settings/.env.local.example`
 
 Main keys:
-- `FASTAPI_HOST`, `FASTAPI_PORT`
-- `UI_HOST`, `UI_PORT`
-- `VITE_API_BASE_URL` (expected `/api`)
-- `RELOAD`
-- `OLLAMA_URL`, `OLLAMA_HOST`, `OLLAMA_PORT`
-- `OPTIONAL_DEPENDENCIES`
+- `FASTAPI_HOST=127.0.0.1`
+- `FASTAPI_PORT=7690`
+- `UI_HOST=127.0.0.1`
+- `UI_PORT=9847`
+- `VITE_API_BASE_URL=/api`
+- `RELOAD=false`
+- `OPTIONAL_DEPENDENCIES=true`
 
 Non-secret operational settings:
 - `DILIGENT/settings/configurations.json`

@@ -19,6 +19,7 @@ import {
   InspectionSessionStatus,
   JobStatus,
 } from '../../core/models/types';
+import { MarkdownRendererService } from '../../core/services/markdown-renderer.service';
 import { formatErrorMessage, formatUnknownError } from '../../core/utils';
 
 type DetectedDrugEvidence = {
@@ -40,6 +41,7 @@ export class ClinicalSessionsPageComponent implements OnInit, OnDestroy {
   @ViewChild('sessionTextEditor') private sessionTextEditor?: ElementRef<HTMLDivElement>;
 
   private readonly router = inject(Router);
+  private readonly markdownRenderer = inject(MarkdownRendererService);
   private pollCancelled = false;
 
   readonly sessions = signal<InspectionSessionItem[]>([]);
@@ -72,6 +74,7 @@ export class ClinicalSessionsPageComponent implements OnInit, OnDestroy {
   readonly detailError = signal<string | null>(null);
   readonly query = signal('');
   readonly editorText = signal('');
+  readonly editorViewMode = signal<'source' | 'rendered'>('source');
   readonly editorFontSize = signal(16);
   readonly metadataText = signal('{\n  "documents": [],\n  "images": []\n}');
   readonly revisionSelection = signal('');
@@ -122,6 +125,7 @@ export class ClinicalSessionsPageComponent implements OnInit, OnDestroy {
       const detail = await fetchClinicalSessionDetail(sessionId);
       this.selected.set(detail);
       this.editorText.set(this.toEditorHtml(this.previewReport(detail)));
+      this.editorViewMode.set('source');
       this.metadataText.set(JSON.stringify(detail.metadata || {}, null, 2));
       this.revisionSelection.set('');
       this.revisionInstruction.set('');
@@ -158,6 +162,14 @@ export class ClinicalSessionsPageComponent implements OnInit, OnDestroy {
 
   updateEditorText(value: string): void {
     this.editorText.set(value);
+  }
+
+  setEditorViewMode(mode: 'source' | 'rendered'): void {
+    if (this.editorViewMode() === mode) return;
+    this.editorViewMode.set(mode);
+    const detail = this.selected();
+    const sourceText = detail ? this.previewReport(detail) : this.editorText();
+    this.editorText.set(mode === 'rendered' ? this.markdownRenderer.render(sourceText).html : this.toEditorHtml(sourceText));
   }
 
   setEditorFontSize(delta: number): void {
