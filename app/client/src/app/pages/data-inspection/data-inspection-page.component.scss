@@ -2,14 +2,15 @@
 .inspection-rag-path-editor {
   display: flex;
   align-items: center;
-  gap: 0.5rem;
+  gap: var(--space-sm);
 }
 
 .inspection-rag-path-input {
   min-width: min(28rem, 36vw);
-  padding: 0.55rem 0.7rem;
+  min-height: var(--control-height-md);
+  padding: var(--space-sm) var(--space-md);
   border: 1px solid var(--color-border);
-  border-radius: 0.7rem;
+  border-radius: var(--radius-md);
   background: var(--color-surface-alt);
   color: var(--color-text-primary);
 }
