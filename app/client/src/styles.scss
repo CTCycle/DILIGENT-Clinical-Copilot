@@ -120,6 +120,18 @@
   box-sizing: border-box;
 }
 
+:where(
+    a,
+    button,
+    input,
+    select,
+    textarea,
+    [tabindex]:not([tabindex="-1"])
+  ):focus-visible {
+  outline: var(--focus-ring);
+  outline-offset: var(--focus-ring-offset);
+}
+
 body {
   margin: 0;
   height: 100%;
@@ -135,6 +147,17 @@ html,
 body,
 app-root {
   height: 100%;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    scroll-behavior: auto !important;
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+  }
 }
 
 /* ============================================
@@ -5447,50 +5470,6 @@ input[type="date"]::-webkit-calendar-picker-indicator:hover {
 .model-config-page .model-config-main-column,
 .model-config-page .model-config-summary-panel {
   background: transparent;
-}
-
-:root[data-theme="dark"] .model-config-page .model-config-summary-panel {
-  background:
-    linear-gradient(180deg, rgba(72, 101, 132, 0.92) 0%, rgba(50, 78, 108, 0.9) 100%);
-  border-color: rgba(151, 178, 202, 0.38);
-  box-shadow: 0 18px 42px -28px rgba(2, 6, 23, 0.82);
-  color: #eef6f8;
-}
-
-:root[data-theme="dark"] .model-config-page {
-  background:
-    radial-gradient(110% 90% at -10% -18%, rgba(49, 195, 152, 0.14) 0%, rgba(49, 195, 152, 0) 54%),
-    radial-gradient(96% 78% at 112% 8%, rgba(72, 101, 132, 0.28) 0%, rgba(72, 101, 132, 0) 60%),
-    linear-gradient(150deg, #0a1821 0%, #102432 48%, #142d3d 100%);
-}
-
-:root[data-theme="dark"] .model-config-page .model-config-runtime-row,
-:root[data-theme="dark"] .model-config-page .model-config-local-row,
-:root[data-theme="dark"] .model-config-page .model-config-cloud-row,
-:root[data-theme="dark"] .model-config-page .model-config-extra-row {
-  background: rgba(35, 50, 67, 0.88);
-  border-color: rgba(126, 151, 171, 0.32);
-}
-
-:root[data-theme="dark"] .model-config-page .model-config-summary-panel .modal-section-title,
-:root[data-theme="dark"] .model-config-page .model-config-summary-panel .model-config-summary-subtitle {
-  color: #f4fbfb;
-}
-
-:root[data-theme="dark"] .model-config-page .model-config-summary-list,
-:root[data-theme="dark"] .model-config-page .model-config-summary-table {
-  background: rgba(19, 38, 58, 0.38);
-  border-color: rgba(169, 194, 214, 0.24);
-}
-
-:root[data-theme="dark"] .model-config-page .model-config-summary-list dt,
-:root[data-theme="dark"] .model-config-page .model-config-summary-table th {
-  color: #c8d8df;
-}
-
-:root[data-theme="dark"] .model-config-page .model-config-summary-list dd,
-:root[data-theme="dark"] .model-config-page .model-config-summary-table td {
-  color: #f1f7f8;
 }
 
 /* Model config dark palette repair: keep one coherent slate/teal hierarchy. */
