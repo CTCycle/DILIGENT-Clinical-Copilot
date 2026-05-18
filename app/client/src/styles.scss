@@ -295,7 +295,11 @@ app-root {
 }
 
 .stitch-dili-input-unified {
-  min-height: 474px !important;
+  height: min(72vh, 760px) !important;
+  min-height: 280px !important;
+  max-height: min(72vh, 760px) !important;
+  resize: vertical;
+  transition: height 0.08s ease-out;
 }
 
 .stitch-dili-input-unified::placeholder {
@@ -5172,25 +5176,26 @@ input[type="date"]::-webkit-calendar-picker-indicator:hover {
   position: relative;
   overflow: hidden;
   isolation: isolate;
-  background-image: linear-gradient(180deg, #f1f8f4 0%, #ecf5f1 100%);
+  background-image:
+    linear-gradient(90deg, rgba(241, 248, 244, 0.9) 0%, rgba(236, 245, 241, 0.72) 44%, rgba(236, 245, 241, 0.28) 100%),
+    url("/dili-sidebar-texture-light.png");
   background-repeat: no-repeat;
-  background-size: 100% 100%;
+  background-size: 100% 100%, 100% 100%;
   background-position: center;
 }
 
 .stitch-dili-sidebar::after {
   content: "";
   position: absolute;
-  right: -8px;
-  bottom: -6px;
+  inset: 0;
   z-index: 0;
-  width: 300px;
-  height: 300px;
-  background: url("/dili-sidebar-texture-light.png") right bottom / 320px auto no-repeat;
-  opacity: 0.96;
+  width: auto;
+  height: auto;
+  background: url("/dili-sidebar-texture-light.png") right bottom / cover no-repeat;
+  opacity: 0.72;
   pointer-events: none;
-  -webkit-mask-image: radial-gradient(circle at 100% 100%, #000 36%, rgba(0, 0, 0, 0.72) 54%, transparent 83%);
-  mask-image: radial-gradient(circle at 100% 100%, #000 36%, rgba(0, 0, 0, 0.72) 54%, transparent 83%);
+  -webkit-mask-image: linear-gradient(90deg, transparent 0%, rgba(0, 0, 0, 0.28) 18%, rgba(0, 0, 0, 0.9) 100%);
+  mask-image: linear-gradient(90deg, transparent 0%, rgba(0, 0, 0, 0.28) 18%, rgba(0, 0, 0, 0.9) 100%);
 }
 
 .stitch-dili-sidebar > * {
@@ -5199,14 +5204,19 @@ input[type="date"]::-webkit-calendar-picker-indicator:hover {
 }
 
 :root[data-theme="dark"] .stitch-dili-sidebar {
-  background-image: linear-gradient(180deg, #0c2430 0%, #0b2531 100%);
+  background-image:
+    linear-gradient(90deg, rgba(12, 36, 48, 0.88) 0%, rgba(11, 37, 49, 0.62) 42%, rgba(11, 37, 49, 0.18) 100%),
+    url("/dili-sidebar-texture-dark.png");
   background-repeat: no-repeat;
-  background-size: 100% 100%;
+  background-size: 100% 100%, 100% 100%;
   background-position: center;
 }
 
 :root[data-theme="dark"] .stitch-dili-sidebar::after {
-  background: url("/dili-sidebar-texture-dark.png") right bottom / 320px auto no-repeat;
+  background: url("/dili-sidebar-texture-dark.png") right bottom / cover no-repeat;
+  opacity: 0.82;
+  -webkit-mask-image: linear-gradient(90deg, transparent 0%, rgba(0, 0, 0, 0.46) 14%, #000 100%);
+  mask-image: linear-gradient(90deg, transparent 0%, rgba(0, 0, 0, 0.46) 14%, #000 100%);
 }
 
 /* DILI report toolbar actions: stronger emphasis */

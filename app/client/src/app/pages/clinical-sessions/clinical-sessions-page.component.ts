@@ -2,6 +2,12 @@ import { CommonModule } from '@angular/common';
 import { Component, ElementRef, OnDestroy, OnInit, ViewChild, computed, inject, signal } from '@angular/core';
 import { FormsModule } from '@angular/forms';
 import { Router } from '@angular/router';
+import {
+  LucideBookOpen,
+  LucideBraces,
+  LucideFileText,
+  LucideImage,
+} from '@lucide/angular';
 
 import {
   fetchClinicalSessionDetail,
@@ -33,7 +39,7 @@ type DetectedDrugEvidence = {
 @Component({
   selector: 'app-clinical-sessions-page',
   standalone: true,
-  imports: [CommonModule, FormsModule],
+  imports: [CommonModule, FormsModule, LucideBookOpen, LucideBraces, LucideFileText, LucideImage],
   templateUrl: './clinical-sessions-page.component.html',
   styleUrl: './clinical-sessions-page.component.scss',
 })
@@ -79,7 +85,10 @@ export class ClinicalSessionsPageComponent implements OnInit, OnDestroy {
   readonly metadataText = signal('{\n  "documents": [],\n  "images": []\n}');
   readonly revisionSelection = signal('');
   readonly revisionInstruction = signal('');
-  readonly revisionModelOverrides = signal('{\n  "clinical_model": null,\n  "text_extraction_model": null,\n  "cloud_model": null\n}');
+  readonly revisionModelProvider = signal<'local' | 'cloud'>('local');
+  readonly revisionClinicalModel = signal('');
+  readonly revisionTextParsingModel = signal('');
+  readonly revisionRagSearch = signal(false);
   readonly activeSection = signal<'preview' | 'editor' | 'metadata' | 'revision' | 'timeline'>('preview');
   readonly saveStatus = signal('');
   readonly revisionStatus = signal('');
@@ -126,9 +135,13 @@ export class ClinicalSessionsPageComponent implements OnInit, OnDestroy {
       this.selected.set(detail);
       this.editorText.set(this.toEditorHtml(this.previewReport(detail)));
       this.editorViewMode.set('source');
-      this.metadataText.set(JSON.stringify(detail.metadata || {}, null, 2));
+      this.metadataText.set(JSON.stringify(this.normalizeMetadata(detail.metadata || {}), null, 2));
       this.revisionSelection.set('');
       this.revisionInstruction.set('');
+      this.revisionModelProvider.set(detail.result_payload?.['cloud_model'] ? 'cloud' : 'local');
+      this.revisionClinicalModel.set(detail.clinical_model || '');
+      this.revisionTextParsingModel.set(detail.text_extraction_model || '');
+      this.revisionRagSearch.set(Boolean(detail.metadata?.['use_rag']));
       this.activeSection.set('preview');
       this.detectedDiseases.set(this.previewDetectedDiseases(detail));
       this.labSummary.set(this.previewLaboratorySummary(detail));
@@ -253,12 +266,32 @@ export class ClinicalSessionsPageComponent implements OnInit, OnDestroy {
     this.revisionInstruction.set(value);
   }
 
-  updateRevisionModelOverrides(value: string): void {
-    this.revisionModelOverrides.set(value);
-  }
-
   setSection(section: 'preview' | 'editor' | 'metadata' | 'revision' | 'timeline'): void {
     this.activeSection.set(section);
+  }
+
+  captureRevisionSelection(): void {
+    const selection = globalThis.getSelection()?.toString().trim() || '';
+    if (selection) {
+      this.revisionSelection.set(selection);
+      this.activeSection.set('revision');
+    }
+  }
+
+  updateRevisionModelProvider(value: 'local' | 'cloud'): void {
+    this.revisionModelProvider.set(value);
+  }
+
+  updateRevisionClinicalModel(value: string): void {
+    this.revisionClinicalModel.set(value);
+  }
+
+  updateRevisionTextParsingModel(value: string): void {
+    this.revisionTextParsingModel.set(value);
+  }
+
+  updateRevisionRagSearch(value: boolean): void {
+    this.revisionRagSearch.set(value);
   }
 
   async saveSession(): Promise<void> {
@@ -296,14 +329,7 @@ export class ClinicalSessionsPageComponent implements OnInit, OnDestroy {
   async startRevision(): Promise<void> {
     const detail = this.selected();
     if (!detail) return;
-    let overrides: Record<string, unknown>;
     let metadata: Record<string, unknown>;
-    try {
-      overrides = JSON.parse(this.revisionModelOverrides()) as Record<string, unknown>;
-    } catch {
-      this.revisionStatus.set('[ERROR] Model overrides must be valid JSON.');
-      return;
-    }
     try {
       metadata = JSON.parse(this.metadataText()) as Record<string, unknown>;
     } catch {
@@ -317,8 +343,12 @@ export class ClinicalSessionsPageComponent implements OnInit, OnDestroy {
       const started = await startClinicalSessionRevisionJob(detail.session_id, {
         selected_text: this.revisionSelection().trim() || null,
         revision_instruction: this.revisionInstruction().trim() || null,
-        model_overrides: overrides,
-        metadata: { ...metadata, revision_note: 'Manual revision mode' },
+        model_overrides: this.revisionModelOverrides(),
+        metadata: {
+          ...metadata,
+          use_rag: this.revisionRagSearch(),
+          revision_note: 'Manual revision mode',
+        },
       });
       this.revisionJobStatus.set(started.status);
       void this.pollRevisionJob(started.job_id, Math.max(1000, started.poll_interval * 1000));
@@ -588,6 +618,52 @@ export class ClinicalSessionsPageComponent implements OnInit, OnDestroy {
     } catch {
       return [];
     }
+  }
+
+  onMetadataFilesSelected(kind: 'documents' | 'images', event: Event): void {
+    const input = event.target as HTMLInputElement | null;
+    const files = Array.from(input?.files || []);
+    if (!files.length) return;
+    const additions = files.map((file) => ({
+      file_name: file.name,
+      file_size: file.size,
+      file_type: file.type || 'application/octet-stream',
+      category: kind === 'images' ? 'image' : 'document',
+      last_modified: new Date(file.lastModified).toISOString(),
+    }));
+    const metadata = this.readMetadataDraft();
+    const current = Array.isArray(metadata[kind]) ? metadata[kind] as unknown[] : [];
+    metadata[kind] = [...current, ...additions];
+    this.metadataText.set(JSON.stringify(this.normalizeMetadata(metadata), null, 2));
+    if (input) input.value = '';
+  }
+
+  private normalizeMetadata(metadata: Record<string, unknown>): Record<string, unknown> {
+    return {
+      documents: Array.isArray(metadata['documents']) ? metadata['documents'] : [],
+      images: Array.isArray(metadata['images']) ? metadata['images'] : [],
+      manual_metadata: metadata['manual_metadata'] && typeof metadata['manual_metadata'] === 'object'
+        ? metadata['manual_metadata']
+        : {},
+      ...metadata,
+    };
+  }
+
+  private readMetadataDraft(): Record<string, unknown> {
+    try {
+      return this.normalizeMetadata(JSON.parse(this.metadataText()) as Record<string, unknown>);
+    } catch {
+      return this.normalizeMetadata({});
+    }
+  }
+
+  private revisionModelOverrides(): Record<string, unknown> {
+    return {
+      provider: this.revisionModelProvider(),
+      clinical_model: this.revisionClinicalModel().trim() || null,
+      text_extraction_model: this.revisionTextParsingModel().trim() || null,
+      use_rag: this.revisionRagSearch(),
+    };
   }
 
   private revisedSessionId(result: Record<string, unknown> | null): number | null {

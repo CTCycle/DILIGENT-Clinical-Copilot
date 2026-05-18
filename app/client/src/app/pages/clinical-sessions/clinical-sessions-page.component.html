@@ -125,6 +125,11 @@
           <section class="clinical-session-preview">
             <div class="clinical-session-preview-main">
               <div class="clinical-session-preview-card">
+                <div class="clinical-session-preview-actions">
+                  <button class="btn btn-secondary" type="button" (click)="captureRevisionSelection()">
+                    Include selection in revision
+                  </button>
+                </div>
                 <pre>{{ previewReport(detail) }}</pre>
               </div>
             </div>
@@ -137,8 +142,8 @@
                       <thead>
                         <tr>
                           <th>Drug</th>
-                          <th>Anamnesis</th>
-                          <th>Therapy</th>
+                          <th><span>From</span><span>anamnesis</span></th>
+                          <th><span>From</span><span>therapy</span></th>
                           <th>LiverTox</th>
                           <th>RxNav</th>
                         </tr>
@@ -240,17 +245,23 @@
             <div class="clinical-session-toolbar-group clinical-session-view-mode" aria-label="Editor view mode">
               <button
                 type="button"
+                class="clinical-session-icon-toggle"
                 [class.is-active]="editorViewMode() === 'source'"
                 (click)="setEditorViewMode('source')"
+                title="Source"
+                aria-label="Source view"
               >
-                Source
+                <svg lucideBraces size="16"></svg>
               </button>
               <button
                 type="button"
+                class="clinical-session-icon-toggle"
                 [class.is-active]="editorViewMode() === 'rendered'"
                 (click)="setEditorViewMode('rendered')"
+                title="Rendered"
+                aria-label="Rendered view"
               >
-                Rendered
+                <svg lucideBookOpen size="16"></svg>
               </button>
             </div>
             <div class="clinical-session-toolbar-group">
@@ -305,33 +316,63 @@
 
         @if (activeSection() === 'metadata') {
           <div class="clinical-session-panel">
-            <div class="clinical-session-metadata-summary" aria-label="Session metadata summary">
-              <section>
-                <strong>Documents</strong>
-                @if (metadataEntries('documents').length) {
-                  <ul>
-                    @for (document of metadataEntries('documents'); track document) {
-                      <li>{{ document }}</li>
-                    }
-                  </ul>
-                } @else {
-                  <p>No documents attached.</p>
-                }
-              </section>
-              <section>
-                <strong>Images</strong>
-                @if (metadataEntries('images').length) {
-                  <ul>
-                    @for (image of metadataEntries('images'); track image) {
-                      <li>{{ image }}</li>
-                    }
-                  </ul>
-                } @else {
-                  <p>No images attached.</p>
-                }
-              </section>
+            <div class="clinical-session-metadata-actions" aria-label="Attach session metadata">
+              <div class="clinical-session-metadata-column">
+                <section class="clinical-session-metadata-action-card is-images">
+                  <div class="clinical-session-metadata-card-icon" aria-hidden="true">
+                    <svg lucideImage size="24"></svg>
+                  </div>
+                  <div>
+                    <strong>Clinical image evidence</strong>
+                    <p>Load imaging, photos, and visual source files into this session metadata.</p>
+                  </div>
+                  <label class="btn btn-secondary">
+                    Load images
+                    <input type="file" accept="image/*" multiple (change)="onMetadataFilesSelected('images', $event)" />
+                  </label>
+                </section>
+                <section class="clinical-session-metadata-summary-card">
+                  <strong>Attached images</strong>
+                  @if (metadataEntries('images').length) {
+                    <ul>
+                      @for (image of metadataEntries('images'); track image) {
+                        <li>{{ image }}</li>
+                      }
+                    </ul>
+                  } @else {
+                    <p>No images attached.</p>
+                  }
+                </section>
+              </div>
+              <div class="clinical-session-metadata-column">
+                <section class="clinical-session-metadata-action-card is-documents">
+                  <div class="clinical-session-metadata-card-icon" aria-hidden="true">
+                    <svg lucideFileText size="24"></svg>
+                  </div>
+                  <div>
+                    <strong>Medical document evidence</strong>
+                    <p>Attach PDFs, notes, reports, and source documents used by the review.</p>
+                  </div>
+                  <label class="btn btn-secondary">
+                    Load documents
+                    <input type="file" multiple (change)="onMetadataFilesSelected('documents', $event)" />
+                  </label>
+                </section>
+                <section class="clinical-session-metadata-summary-card">
+                  <strong>Attached documents</strong>
+                  @if (metadataEntries('documents').length) {
+                    <ul>
+                      @for (document of metadataEntries('documents'); track document) {
+                        <li>{{ document }}</li>
+                      }
+                    </ul>
+                  } @else {
+                    <p>No documents attached.</p>
+                  }
+                </section>
+              </div>
             </div>
-            <p class="clinical-session-panel-note">Edit session metadata JSON. Use documents and images arrays for attached evidence.</p>
+            <p class="clinical-session-panel-note">Edit manual session metadata JSON. Use documents and images arrays for attached evidence.</p>
             <textarea
               class="clinical-session-json"
               aria-label="Session metadata JSON"
@@ -343,15 +384,15 @@
 
         @if (activeSection() === 'revision') {
           <div class="clinical-session-panel clinical-session-revision">
-            <label>
-              <span>Focused text selection</span>
-              <textarea
-                class="clinical-session-focus"
-                placeholder="Paste a selected excerpt to focus the revision, or leave empty to revise the full session."
-                [ngModel]="revisionSelection()"
-                (ngModelChange)="updateRevisionSelection($event)"
-              ></textarea>
-            </label>
+            @if (revisionSelection()) {
+              <section class="clinical-session-selected-revision-text" aria-label="Selected text for revision">
+                <div>
+                  <strong>Selected revision excerpt</strong>
+                  <button type="button" class="clinical-session-link-button" (click)="updateRevisionSelection('')">Clear</button>
+                </div>
+                <p>{{ revisionSelection() }}</p>
+              </section>
+            }
             <label>
               <span>Revision instruction</span>
               <textarea
@@ -361,15 +402,46 @@
                 (ngModelChange)="updateRevisionInstruction($event)"
               ></textarea>
             </label>
-            <label>
-              <span>Model overrides JSON</span>
-              <textarea
-                class="clinical-session-overrides"
-                [ngModel]="revisionModelOverrides()"
-                (ngModelChange)="updateRevisionModelOverrides($event)"
-              ></textarea>
-            </label>
-            <button class="btn btn-primary" type="button" (click)="startRevision()">Run Revision Pass</button>
+            <section class="clinical-session-revision-settings" aria-label="Revision model settings">
+              <div class="clinical-session-settings-row">
+                <label>
+                  <span>Model provider</span>
+                  <select [ngModel]="revisionModelProvider()" (ngModelChange)="updateRevisionModelProvider($event)">
+                    <option value="local">Local</option>
+                    <option value="cloud">Cloud</option>
+                  </select>
+                </label>
+                <label>
+                  <span>Clinical model</span>
+                  <input
+                    type="text"
+                    placeholder="Default clinical model"
+                    [ngModel]="revisionClinicalModel()"
+                    (ngModelChange)="updateRevisionClinicalModel($event)"
+                  />
+                </label>
+                <label>
+                  <span>Text parsing model</span>
+                  <input
+                    type="text"
+                    placeholder="Default parser model"
+                    [ngModel]="revisionTextParsingModel()"
+                    (ngModelChange)="updateRevisionTextParsingModel($event)"
+                  />
+                </label>
+              </div>
+              <label class="clinical-session-checkbox-setting">
+                <input
+                  type="checkbox"
+                  [ngModel]="revisionRagSearch()"
+                  (ngModelChange)="updateRevisionRagSearch($event)"
+                />
+                <span>Use RAG search during revision</span>
+              </label>
+            </section>
+            <div class="clinical-session-revision-footer">
+              <button class="btn btn-primary" type="button" (click)="startRevision()">Run Revision Pass</button>
+            </div>
             @if (revisionStatus()) {
               <div class="clinical-session-progress" role="status">
                 <span>{{ revisionStatus() }}</span>
