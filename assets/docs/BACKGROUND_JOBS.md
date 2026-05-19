@@ -1,6 +1,6 @@
 # Background Job Management
 
-Last updated: 2026-05-17
+Last updated: 2026-05-19
 
 DILIGENT uses a centralized thread-based job manager for long-running operations.
 
@@ -33,6 +33,7 @@ Each job tracks:
 ## 4. Active job types and endpoints
 
 - `clinical`
+  - Preflight: `POST /api/clinical/validate-input`
   - Start: `POST /api/clinical/jobs`
   - Poll/cancel: `GET|DELETE /api/clinical/jobs/{job_id}`
 - `ollama_pull`
@@ -75,6 +76,8 @@ Cancellation is cooperative:
 If a runner does not check stop requests, cancellation is delayed.
 
 Current inspection cancellation/progress checkpoints are implemented by the RxNav/RxNorm, LiverTox, and RAG update runners.
+
+Clinical jobs run input preflight before job creation. The completed clinical job result includes database-backed evidence-lock artifacts and gate fields such as `manual_review_required`, `blocking_issues`, `pipeline_artifacts`, and `run_bundle_index`. These artifacts are persisted through the clinical session result payload rather than written as loose files.
 
 ## 7. New job implementation checklist
 

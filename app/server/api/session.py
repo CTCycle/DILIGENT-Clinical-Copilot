@@ -3,6 +3,7 @@ from __future__ import annotations
 from fastapi import APIRouter, Body, status
 
 from domain.clinical.entities import ClinicalSessionRequest
+from domain.clinical.robustness import ClinicalInputPreflightResult
 from domain.jobs import (
     JobCancelResponse,
     JobStartResponse,
@@ -29,6 +30,12 @@ class ClinicalSessionEndpoint:
         validate_clinical_session_request(request_payload)
         return self.service.start_clinical_job(request_payload)
 
+    def validate_clinical_input(
+        self,
+        request_payload: ClinicalSessionRequest = Body(...),
+    ) -> ClinicalInputPreflightResult:
+        return self.service.validate_clinical_input(request_payload)
+
     # -------------------------------------------------------------------------
     def get_clinical_job_status(self, job_id: str) -> JobStatusResponse:
         return self.service.get_clinical_job_status(job_id)
@@ -39,6 +46,13 @@ class ClinicalSessionEndpoint:
 
     # -------------------------------------------------------------------------
     def add_routes(self) -> None:
+        self.router.add_api_route(
+            "/clinical/validate-input",
+            self.validate_clinical_input,
+            methods=["POST"],
+            response_model=ClinicalInputPreflightResult,
+            status_code=status.HTTP_200_OK,
+        )
         self.router.add_api_route(
             "/clinical/jobs",
             self.start_clinical_job,

@@ -149,6 +149,9 @@ class ClinicalSessionRequest(BaseModel):
 
     name: str | None = Field(default=None, max_length=200)
     visit_date: date | dict[str, int] | str | None = None
+    report_mode: Literal["faithful_only", "faithful_plus_interpretation"] = (
+        "faithful_only"
+    )
     clinical_input: str | None = Field(default=None, max_length=100000)
     anamnesis: str | None = Field(default=None, max_length=20000)
     use_rag: bool = False

@@ -13,6 +13,7 @@ from domain.clinical.entities import (
     PatientData,
     PipelineIssue,
 )
+from domain.clinical.robustness import NormalizedDocument
 from configurations.llm_configs import LLMRuntimeConfig
 from services.runtime.jobs import JobManager
 from services.clinical.job_progress import (
@@ -380,6 +381,8 @@ async def execute_clinical_job(
     patient_image_base64: str | None,
     job_id: str,
     section_extraction: ClinicalSectionExtractionResult | None = None,
+    normalized_document: NormalizedDocument | None = None,
+    report_mode: str = "faithful_only",
 ) -> dict[str, Any]:
     service.apply_persisted_runtime_configuration()
     ensure_not_cancelled = partial(
@@ -404,6 +407,8 @@ async def execute_clinical_job(
             payload,
             patient_image_base64=patient_image_base64,
             section_extraction=section_extraction,
+            normalized_document=normalized_document,
+            report_mode=report_mode,
             progress_callback=progress_callback,
             stop_check=ensure_not_cancelled,
         )
@@ -494,6 +499,8 @@ def run_clinical_job(
     patient_image_base64: str | None,
     job_id: str,
     section_extraction: ClinicalSectionExtractionResult | None = None,
+    normalized_document: NormalizedDocument | None = None,
+    report_mode: str = "faithful_only",
 ) -> dict[str, Any]:
     result = asyncio.run(
         execute_clinical_job(
@@ -502,6 +509,8 @@ def run_clinical_job(
             patient_image_base64=patient_image_base64,
             job_id=job_id,
             section_extraction=section_extraction,
+            normalized_document=normalized_document,
+            report_mode=report_mode,
         )
     )
     if not result:
