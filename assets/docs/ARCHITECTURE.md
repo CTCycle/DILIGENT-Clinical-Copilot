@@ -1,6 +1,6 @@
 # DILIGENT Clinical Copilot Architecture
 
-Last updated: 2026-05-17
+Last updated: 2026-05-19
 
 ## 1. System Summary
 
@@ -89,6 +89,7 @@ Root/OpenAPI routes:
 
 Session and clinical:
 - `GET /api/health`
+- `POST /api/clinical/validate-input`
 - `POST /api/clinical/jobs`
 - `GET /api/clinical/jobs/{job_id}`
 - `DELETE /api/clinical/jobs/{job_id}`
@@ -179,6 +180,12 @@ Endpoint -> service -> repository:
   - `app/server/api/session.py`
   - `app/server/services/session/session_service.py`
   - `app/server/repositories/serialization/data.py` + DB repositories
+  - Runs clinical preflight before job creation, normalizes the submitted document, persists evidence-locked pipeline artifacts in `session_result_payload`, and returns artifact/gate summaries through the job result.
+
+- `POST /api/clinical/validate-input`
+  - `app/server/api/session.py`
+  - `app/server/services/session/preflight.py`
+  - Validates UI-supplied patient metadata, selected provider/model readiness, persistence reachability, extraction quality, and timed-drug feasibility without starting a background job.
 
 - `GET /api/inspection/sessions`
   - `app/server/api/data_inspection.py`
@@ -203,6 +210,7 @@ Endpoint -> service -> repository:
   - SQLite file at `app/resources/database.db` when `database.embedded_database=true`
   - PostgreSQL when external DB mode is configured
   - `clinical_sessions` is the single source of truth for session records, versioning, revision parentage, and session metadata. New sessions default to `version=1`; revised sessions store `original_session_id` and incremented `version`.
+  - Evidence-locked DILI artifacts (`normalized_document`, `extraction_artifact`, `fact_graph`, `faithfulness_audit`, generated report metadata, discrepancy report, and `run_bundle_index`) are persisted inside the database-backed session result payload. Durable loose JSON/Markdown assessment files are not part of the runtime contract.
   - Startup does not mutate existing schemas. During development, recreate the database from the current SQLAlchemy models instead of changing existing databases at application startup.
 - Vector persistence:
   - LanceDB collection under `app/resources/sources/vectors`
