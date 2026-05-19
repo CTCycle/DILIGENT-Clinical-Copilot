@@ -24,12 +24,23 @@ from domain.clinical.entities import (
     DrugRucamAssessment,
     PatientData,
     PatientRucamAssessmentBundle,
+    PipelineIssue,
 )
+from domain.clinical.robustness import NormalizedDocument
 from domain.jobs import JobStartResponse
 from services.clinical.candidate_selection import select_relevant_candidates
 from services.clinical.language import ClinicalLanguageDetector
 from services.clinical.match_quality import classify_match_evidence
 from services.session.clinical_input_extractor import ClinicalInputExtractionError
+from services.session.document_normalizer import DocumentNormalizer
+from services.session.robust_pipeline import (
+    audit_report,
+    build_extraction_artifact,
+    build_fact_graph,
+    build_run_bundle_index,
+    render_fact_graph_report,
+    validate_fact_graph,
+)
 from services.session.session_shared import NarrativeBuilder, run_clinical_job
 from services.security.access_keys import AccessKeyService
 from services.text.normalization import normalize_drug_query_name
@@ -118,6 +129,8 @@ async def process_single_patient_workflow(
     *,
     patient_image_base64: str | None = None,
     section_extraction: ClinicalSectionExtractionResult | None = None,
+    normalized_document: NormalizedDocument | None = None,
+    report_mode: str = "faithful_only",
     session_version: int = 1,
     original_session_id: int | None = None,
     session_metadata: dict[str, Any] | None = None,
@@ -139,6 +152,15 @@ async def process_single_patient_workflow(
     validation_bundle = service.build_validation_bundle_for_payload(payload)
     service.ensure_submission_requirements(payload)
     service.run_stop_check(stop_check)
+    if normalized_document is None:
+        normalized_document = DocumentNormalizer().normalize(
+            section_extraction.source_text if section_extraction is not None else ""
+        )
+    extraction_artifact = build_extraction_artifact(
+        normalized_document=normalized_document,
+        section_extraction=section_extraction,
+        payload=payload,
+    )
 
     issues = []
     cleaned_therapy_text = service.drugs_parser.clean_text(payload.drugs or "")
@@ -252,6 +274,37 @@ async def process_single_patient_workflow(
         progress_callback=progress_callback,
         stop_check=stop_check,
     )
+    fact_graph = build_fact_graph(
+        extraction_artifact=extraction_artifact,
+        payload=payload,
+        therapy_drugs=therapy_drugs,
+        anamnesis_drugs=anamnesis_drugs,
+        lab_timeline=lab_timeline,
+        pattern_score=pattern_score,
+        rucam_bundle=rucam_bundle,
+    )
+    fact_graph_validation = validate_fact_graph(fact_graph)
+    generated_report, report_metadata = render_fact_graph_report(
+        fact_graph=fact_graph,
+        patient_name=payload.name,
+        visit_date=payload.visit_date,
+        report_mode=report_mode,
+    )
+    faithfulness_audit = audit_report(
+        extraction_artifact=extraction_artifact,
+        fact_graph_validation=fact_graph_validation,
+        report_metadata=report_metadata,
+    )
+    if faithfulness_audit.blocking_issues:
+        issues.extend(
+            PipelineIssue(
+                severity="error",
+                code=str(issue.get("code", "faithfulness_gate_blocked")),
+                message=str(issue.get("message", "Faithfulness gate blocked finalization."))[:500],
+            )
+            for issue in faithfulness_audit.blocking_issues
+        )
+    final_report = generated_report
 
     patient_label = payload.name or "Unknown patient"
     report_language_key = resolve_supported_language_code(report_language)
@@ -320,6 +373,18 @@ async def process_single_patient_workflow(
             "cloud_temperature": LLMRuntimeConfig.get_cloud_temperature(),
             "ollama_reasoning": LLMRuntimeConfig.is_ollama_reasoning_enabled(),
         },
+        "manual_review_required": faithfulness_audit.manual_review_required,
+        "blocking_issues": faithfulness_audit.blocking_issues,
+        "pipeline_artifacts": {
+            "normalized_document": normalized_document.model_dump(),
+            "extraction_artifact": extraction_artifact.model_dump(),
+            "fact_graph": fact_graph.model_dump(),
+            "fact_graph_validation": fact_graph_validation.model_dump(),
+            "generated_report": generated_report,
+            "report_metadata": report_metadata.model_dump(),
+            "faithfulness_audit": faithfulness_audit.model_dump(),
+            "discrepancy_report": faithfulness_audit.discrepancy_report,
+        },
         "revision": {
             "version": session_version,
             "original_session_id": original_session_id,
@@ -327,6 +392,10 @@ async def process_single_patient_workflow(
             "focus_context": revision_focus_context,
         },
     }
+    result_payload["run_bundle_index"] = build_run_bundle_index(
+        run_id="pending",
+        session_id=None,
+    ).model_dump()
     if original_session_text is not None:
         result_payload["original_session_text"] = original_session_text
     persisted_session_id = await asyncio.to_thread(
@@ -359,6 +428,15 @@ async def process_single_patient_workflow(
     )
     if persisted_session_id is not None:
         result_payload["session_id"] = persisted_session_id
+        result_payload["run_bundle_index"] = build_run_bundle_index(
+            run_id=str(persisted_session_id),
+            session_id=persisted_session_id,
+        ).model_dump()
+        await asyncio.to_thread(
+            service.serializer.upsert_session_result_payload,
+            persisted_session_id,
+            result_payload,
+        )
     return result_payload
 
 
@@ -370,6 +448,11 @@ def start_clinical_job_workflow(
         raise ServiceConflictError("Clinical analysis is already in progress")
 
     service.apply_persisted_runtime_configuration()
+    preflight = service.validate_clinical_input(request_payload)
+    if not preflight.ready:
+        raise ServiceValidationError(
+            [issue.model_dump() for issue in preflight.blocking_issues]
+        )
     if LLMRuntimeConfig.is_cloud_enabled():
         provider = LLMRuntimeConfig.get_llm_provider()
         active_keys = [
@@ -383,6 +466,9 @@ def start_clinical_job_workflow(
             )
 
     try:
+        normalized_document = DocumentNormalizer().normalize(
+            request_payload.clinical_input or ""
+        )
         preprocessed_request, section_extraction = asyncio.run(
             service.preprocess_unified_input(request_payload)
         )
@@ -401,6 +487,8 @@ def start_clinical_job_workflow(
             "payload": patient_payload,
             "patient_image_base64": request_payload.patient_image_base64,
             "section_extraction": section_extraction,
+            "normalized_document": normalized_document,
+            "report_mode": request_payload.report_mode,
         },
     )
     job_status = service.job_manager.get_job_status(job_id)

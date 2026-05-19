@@ -2,15 +2,12 @@ from __future__ import annotations
 
 import asyncio
 import time
-from datetime import datetime
 from typing import Any
 from collections.abc import Callable
 
 from pydantic import ValidationError
 
 from common.exceptions import (
-    ServiceConflictError,
-    ServiceError,
     ServiceNotFoundError,
     ServiceValidationError,
 )
@@ -31,18 +28,14 @@ from domain.clinical.entities import (
     PatientRucamAssessmentBundle,
     PipelineIssue,
 )
+from domain.clinical.robustness import ClinicalInputPreflightResult
 from domain.clinical.validation import ValidationMessageBundle
 from domain.jobs import (
     JobCancelResponse,
     JobStartResponse,
     JobStatusResponse,
 )
-from configurations.startup import server_settings
 from configurations.llm_configs import LLMRuntimeConfig
-from common.utils.languages import (
-    MISSING_VISIT_LABEL_BY_LANGUAGE,
-    resolve_supported_language_code,
-)
 from repositories.serialization.data import DataSerializer
 from repositories.serialization.model_configs import (
     ModelConfigSerializer,
@@ -60,11 +53,7 @@ from services.clinical.job_progress import (
     StageProgressFractionCallback,
 )
 from services.clinical.language import ClinicalLanguageDetector
-from services.clinical.match_quality import classify_match_evidence
 from services.clinical.preparation import ClinicalKnowledgePreparation
-from services.clinical.candidate_selection import (
-    select_relevant_candidates,
-)
 from services.clinical.disease import DiseaseExtractor
 from services.clinical.labs import ClinicalLabExtractor
 from services.clinical.parser import DrugsParser
@@ -83,10 +72,6 @@ from services.session.clinical_input_extractor import (
 )
 from services.llm.model_config import ModelConfigService
 from services.retrieval.query import DILIQueryBuilder
-from services.session.session_shared import (
-    NarrativeBuilder,
-    run_clinical_job,
-)
 from services.session.formatting_mixin import (
     ClinicalSessionFormattingMixin,
 )
@@ -96,6 +81,7 @@ from services.session.session_workflow import (
     process_single_patient_workflow,
     start_clinical_job_workflow,
 )
+from services.session.preflight import validate_clinical_input_preflight
 from services.text.normalization import normalize_drug_query_name
 
 ###############################################################################
@@ -945,6 +931,8 @@ class ClinicalSessionService(ClinicalSessionFormattingMixin):
         *,
         patient_image_base64: str | None = None,
         section_extraction: ClinicalSectionExtractionResult | None = None,
+        normalized_document: Any | None = None,
+        report_mode: str = "faithful_only",
         session_version: int = 1,
         original_session_id: int | None = None,
         session_metadata: dict[str, Any] | None = None,
@@ -958,6 +946,8 @@ class ClinicalSessionService(ClinicalSessionFormattingMixin):
             payload,
             patient_image_base64=patient_image_base64,
             section_extraction=section_extraction,
+            normalized_document=normalized_document,
+            report_mode=report_mode,
             session_version=session_version,
             original_session_id=original_session_id,
             session_metadata=session_metadata,
@@ -971,6 +961,13 @@ class ClinicalSessionService(ClinicalSessionFormattingMixin):
         request_payload: ClinicalSessionRequest,
     ) -> JobStartResponse:
         return start_clinical_job_workflow(self, request_payload)
+
+    def validate_clinical_input(
+        self,
+        request_payload: ClinicalSessionRequest,
+    ) -> ClinicalInputPreflightResult:
+        return validate_clinical_input_preflight(self, request_payload)
+
     def get_clinical_job_status(self, job_id: str) -> JobStatusResponse:
         job_status = self.job_manager.get_job_status(job_id)
         if job_status is None:
