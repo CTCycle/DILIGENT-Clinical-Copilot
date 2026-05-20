@@ -3,6 +3,8 @@ from __future__ import annotations
 from domain.clinical import HepatotoxicityPatternScore
 from services.clinical.language import detect_clinical_language
 from services.clinical.validation import build_validation_bundle
+from services.clinical.hepatox_core import HepatoxConsultation
+from domain.clinical import DrugClinicalAssessment
 from services.session.session_shared import NarrativeBuilder
 from domain.clinical import PatientData
 
@@ -57,4 +59,26 @@ def test_narrative_builder_does_not_force_english_for_italian() -> None:
     )
     assert "# Sintesi Visita Clinica" in report
     assert "## Report Clinico" in report
+
+
+def test_italian_clinician_report_wrappers_do_not_use_english_labels() -> None:
+    consultation = HepatoxConsultation.__new__(HepatoxConsultation)
+    rendered = consultation.render_matched_drug_section(
+        DrugClinicalAssessment(
+            drug_name="Paracetamolo",
+            match_status="matched",
+            matched_livertox_row={"likelihood_score": "A"},
+            evidence_quality="alta",
+            paragraph="Valutazione clinica del farmaco.",
+        ),
+        report_language="it",
+    )
+
+    assert "**Report**" in rendered
+    assert "**Fonte bibliografica**" in rendered
+    assert "**Corrispondenza evidenza**" in rendered
+    assert "Record locale associato" in rendered
+    assert "Evidence match" not in rendered
+    assert "Matched local record" not in rendered
+    assert "Bibliography source" not in rendered
 

@@ -120,6 +120,54 @@ def test_report_metadata_links_claims_to_fact_nodes() -> None:
     assert build_run_bundle_index(run_id="1", session_id=1).storage == "database_session_result_payload"
 
 
+def test_fact_graph_report_localizes_italian_audit_labels() -> None:
+    payload = PatientData(
+        name="Mario Rossi",
+        visit_date=date(2024, 1, 15),
+        anamnesis="Paziente con ittero.",
+        drugs="Paracetamolo 1-0-0-0",
+        laboratory_analysis="ALT 100 U/L.",
+    )
+    extraction = build_extraction_artifact(
+        normalized_document=DocumentNormalizer().normalize(
+            "Paziente con ittero.\nParacetamolo 1-0-0-0\nALT 100 U/L."
+        ),
+        section_extraction=None,
+        payload=payload,
+    )
+    graph = build_fact_graph(
+        extraction_artifact=extraction,
+        payload=payload,
+        therapy_drugs=PatientDrugs(
+            entries=[DrugEntry(name="Paracetamolo", source="therapy")]
+        ),
+        anamnesis_drugs=PatientDrugs(entries=[]),
+        lab_timeline=PatientLabTimeline(
+            entries=[ClinicalLabEntry(marker_name="ALT", value=100.0, unit="U/L")]
+        ),
+        pattern_score=type("Pattern", (), {"classification": "mixed"})(),
+        rucam_bundle=PatientRucamAssessmentBundle(entries=[]),
+    )
+
+    report, metadata = render_fact_graph_report(
+        fact_graph=graph,
+        patient_name=payload.name,
+        visit_date=payload.visit_date,
+        report_mode="faithful_only",
+        report_language="it",
+    )
+
+    assert "## Report Clinico" in report
+    assert "Paziente: Mario Rossi" in report
+    assert "### Esposizione ai Farmaci" in report
+    assert "### Evidenze di Laboratorio" in report
+    assert "### Pattern DILI" in report
+    assert "Drug Exposure" not in report
+    assert "Laboratory Evidence" not in report
+    assert "Clinical Report" not in report
+    assert metadata.claim_references
+
+
 def test_audit_blocks_report_without_claim_references() -> None:
     audit = audit_report(
         extraction_artifact=build_extraction_artifact(
