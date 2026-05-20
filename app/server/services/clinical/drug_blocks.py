@@ -17,11 +17,17 @@ METADATA_RE = re.compile(
     r"\b(?:mg|mcg|g|ui|iu|po|ev|iv|im|sc|bid|tid|die|volta\/die|sospes[oa]|continu[ae]|cronic[ao]|iniziat[oa]|started|stopped)\b",
     re.IGNORECASE,
 )
+CONTINUATION_PREFIX_RE = re.compile(
+    r"^(?:dal|da|dall['’]|se\b|in\s+riserva\b|peso\b|\d+(?:[.,]\d+)?\s*kg\b)",
+    re.IGNORECASE,
+)
 
 
 def _likely_drug_start(value: str) -> bool:
     text = value.strip()
     if not text:
+        return False
+    if CONTINUATION_PREFIX_RE.search(text):
         return False
     if not UPPER_TOKEN_RE.search(text):
         return False
@@ -44,15 +50,42 @@ def isolate_drug_blocks(text: str) -> list[DrugBlock]:
         return blocks or [DrugBlock(text=source.strip(), start=0, end=len(source))]
 
     lines = [line.strip() for line in source.splitlines() if line.strip()]
-    if len(lines) > 1 and all(_likely_drug_start(line) for line in lines):
+    likely_start_count = sum(1 for line in lines if _likely_drug_start(line))
+    if len(lines) > 1 and likely_start_count >= 2:
         blocks: list[DrugBlock] = []
+        current_lines: list[str] = []
+        current_start: int | None = None
+        current_end: int | None = None
         cursor = 0
         for line in lines:
             pos = source.find(line, cursor)
             if pos < 0:
                 continue
-            blocks.append(DrugBlock(text=line, start=pos, end=pos + len(line)))
-            cursor = pos + len(line)
+            line_end = pos + len(line)
+            if _likely_drug_start(line):
+                if current_lines and current_start is not None and current_end is not None:
+                    blocks.append(
+                        DrugBlock(
+                            text="\n".join(current_lines),
+                            start=current_start,
+                            end=current_end,
+                        )
+                    )
+                current_lines = [line]
+                current_start = pos
+                current_end = line_end
+            elif current_lines:
+                current_lines.append(line)
+                current_end = line_end
+            cursor = line_end
+        if current_lines and current_start is not None and current_end is not None:
+            blocks.append(
+                DrugBlock(
+                    text="\n".join(current_lines),
+                    start=current_start,
+                    end=current_end,
+                )
+            )
         if blocks:
             return blocks
 
