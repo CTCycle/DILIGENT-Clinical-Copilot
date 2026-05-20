@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from datetime import date
+from datetime import date, datetime
 
 from domain.clinical.entities import DrugEntry, PatientDrugs
 from domain.clinical.extras import CandidateSelectionResult
@@ -19,13 +19,24 @@ def _score_drug(entry: DrugEntry, visit_date: date | None) -> int:
         score += 1
     if entry.historical_flag:
         score -= 3
-    if (
-        visit_date is not None
-        and entry.therapy_start_date
-        and entry.therapy_start_date > visit_date.isoformat()
-    ):
-        score -= 4
+    therapy_start_date = _parse_therapy_date(entry.therapy_start_date)
+    if visit_date is not None and therapy_start_date is not None and therapy_start_date > visit_date:
+        return min(score - 8, -1)
     return score
+
+
+def _parse_therapy_date(value: str | None) -> date | None:
+    if not value:
+        return None
+    text = value.strip()
+    if not text:
+        return None
+    for date_format in ("%Y-%m-%d", "%d.%m.%Y", "%d/%m/%Y", "%d-%m-%Y"):
+        try:
+            return datetime.strptime(text, date_format).date()
+        except ValueError:
+            continue
+    return None
 
 
 def select_relevant_candidates(
