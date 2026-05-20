@@ -21,6 +21,8 @@ BIBLIOGRAPHY_RE = re.compile(
 
 
 class DocumentNormalizer:
+    MAX_BLOCK_TEXT_CHARS = 5000
+
     def normalize(self, raw_text: str) -> NormalizedDocument:
         clean_text = self._normalize_whitespace(raw_text)
         blocks = self._build_blocks(raw_text)
@@ -105,6 +107,8 @@ class DocumentNormalizer:
         end_line: int,
     ) -> NormalizedDocumentBlock:
         text = "\n".join(lines).strip()
+        if len(text) > DocumentNormalizer.MAX_BLOCK_TEXT_CHARS:
+            text = text[: DocumentNormalizer.MAX_BLOCK_TEXT_CHARS].rstrip()
         block_type = "clinical_content"
         confidence = 0.75
         if BIBLIOGRAPHY_RE.search(text):
@@ -128,4 +132,3 @@ class DocumentNormalizer:
             confidence=confidence,
             source_spans=[span],
         )
-

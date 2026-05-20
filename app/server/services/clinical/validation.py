@@ -39,15 +39,6 @@ def ensure_required_sections(
                 field="anamnesis",
             )
         )
-    if payload.visit_date is None:
-        issues.append(
-            PipelineIssue(
-                severity="error",
-                code="missing_visit_date",
-                message=bundle.missing_visit_date,
-                field="visit_date",
-            )
-        )
     if issues:
         raise ClinicalPipelineValidationError(issues=issues, message=issues[0].message)
 

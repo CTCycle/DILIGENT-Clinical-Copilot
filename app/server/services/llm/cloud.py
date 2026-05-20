@@ -51,6 +51,7 @@ class CloudLLMClient:
         keepalive_connections: int = 10,
         keepalive_max: int = 20,
         default_model: str | None = None,
+        max_retries: int = 2,
     ) -> None:
         self.provider: ProviderName = provider
         self.default_model = default_model
@@ -72,6 +73,7 @@ class CloudLLMClient:
                 api_key=provider_access_key,
                 base_url=self.base_url,
                 timeout=self.timeout_s,
+                max_retries=max(0, int(max_retries)),
             )
         elif provider == "gemini":
             if not provider_access_key:
@@ -106,10 +108,15 @@ class CloudLLMClient:
         try:
             row = access_key_serializer.get_active_key(provider, mark_used=True)
         except Exception as exc:  # noqa: BLE001
-            provider_label = "OpenAI" if provider == "openai" else "Gemini"
-            raise LLMError(
-                f"Failed to load active {provider_label} access key"
-            ) from exc
+            # Some environments expose the key store in read-only mode; in that
+            # case, fall back to a read-only fetch without updating last_used_at.
+            try:
+                row = access_key_serializer.get_active_key(provider, mark_used=False)
+            except Exception as fallback_exc:  # noqa: BLE001
+                provider_label = "OpenAI" if provider == "openai" else "Gemini"
+                raise LLMError(
+                    f"Failed to load active {provider_label} access key"
+                ) from fallback_exc
         if row is None:
             return None
         try:

@@ -18,10 +18,11 @@ from services.session.session_service import ClinicalSessionService
 
 def build_clinical_session_service(job_manager: JobManager) -> ClinicalSessionService:
     timeout_s = server_settings.external_data.default_llm_timeout
+    parser_timeout_s = min(float(timeout_s), 6.0)
     return ClinicalSessionService(
-        drugs_parser=DrugsParser(timeout_s=timeout_s),
-        disease_extractor=DiseaseExtractor(timeout_s=timeout_s),
-        lab_extractor=ClinicalLabExtractor(timeout_s=timeout_s),
+        drugs_parser=DrugsParser(timeout_s=parser_timeout_s),
+        disease_extractor=DiseaseExtractor(timeout_s=parser_timeout_s),
+        lab_extractor=ClinicalLabExtractor(timeout_s=parser_timeout_s),
         pattern_analyzer=HepatotoxicityPatternAnalyzer(),
         rucam_estimator=RucamScoreEstimator(),
         serializer=DataSerializer(),

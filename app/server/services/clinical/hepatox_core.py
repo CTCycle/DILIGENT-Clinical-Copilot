@@ -350,17 +350,17 @@ class HepatoxConsultation:
                 )
             ),
         )
-        default_retry_attempts = 2 if provider == "ollama" else 4
-        self.analysis_retry_attempts = max(
-            1,
-            int(
-                getattr(
-                    server_settings.external_data,
-                    "clinical_llm_retry_attempts",
-                    default_retry_attempts,
-                )
-            ),
+        default_retry_attempts = 1
+        configured_retry_attempts = int(
+            getattr(
+                server_settings.external_data,
+                "clinical_llm_retry_attempts",
+                default_retry_attempts,
+            )
         )
+        # Keep consultation responsive when cloud providers are timing out.
+        # One attempt is enough before falling back to deterministic outputs.
+        self.analysis_retry_attempts = max(1, min(configured_retry_attempts, 1))
 
     # -------------------------------------------------------------------------
     async def run_analysis(

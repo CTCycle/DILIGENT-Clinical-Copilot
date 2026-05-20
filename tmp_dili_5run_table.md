@@ -1,0 +1,7 @@
+| Document | Patient | Visit Date | Job | Outcome | Agreements | Main issues | Manual review |
+|---|---|---|---|---|---|---|---|
+| 235053094.pdf | not found | 2025-02-05 | not_started | comparison_not_possible | n/a | {"detail":[{"severity":"blocking","code":"preflight_validation_failed","message":"Clinical input extraction returned content that is not verbatim from source te | yes |
+| 254543322.pdf | not found | 2025-04-02 | not_started | comparison_not_possible | n/a | {"detail":[{"severity":"blocking","code":"preflight_validation_failed","message":"Clinical input extraction returned content that is not verbatim from source te | yes |
+| 263653953.pdf | not found | 2025-04-30 | completed | partially_faithful_with_major_issues | colest, epatocell, causal | versione, farmaci rilevati | yes |
+| 275173213.pdf | not found | 2025-06-03 | not_started | comparison_not_possible | n/a | {"detail":[{"severity":"blocking","code":"preflight_validation_failed","message":"Clinical input extraction returned content that is not verbatim from source te | yes |
+| 301903638.pdf | not found | 2025-08-22 | not_started | comparison_not_possible | n/a | {"detail":"Clinical input extraction returned content that is not verbatim from source text.","request_id":"f73222cd907c","retryable":false} | yes |

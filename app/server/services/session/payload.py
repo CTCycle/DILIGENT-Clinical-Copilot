@@ -14,6 +14,7 @@ DRUG_BULLET_PREFIX_RE = re.compile(
 )
 DRUG_ALLOWED_SYMBOLS_RE = re.compile(r"[^\w\s.,;:/()\-+%[\]'\"<>=]")
 ANAMNESIS_ALLOWED_SYMBOLS_RE = re.compile(r"[^\w\s.,;:/()\-+%[\]'\"<>=]")
+MAX_DRUGS_TEXT_LENGTH = 20000
 
 
 # HELPERS
@@ -54,7 +55,16 @@ def sanitize_drugs_text(value: str | None) -> str | None:
             lines.append(cleaned)
     if not lines:
         return None
-    return "\n".join(lines)
+    joined = "\n".join(lines)
+    if len(joined) <= MAX_DRUGS_TEXT_LENGTH:
+        return joined
+    # Keep the longest safe prefix at line boundaries to avoid schema failures.
+    clipped = joined[:MAX_DRUGS_TEXT_LENGTH]
+    last_newline = clipped.rfind("\n")
+    if last_newline >= 0:
+        clipped = clipped[:last_newline]
+    clipped = clipped.strip()
+    return clipped or joined[:MAX_DRUGS_TEXT_LENGTH].strip() or None
 
 
 # -----------------------------------------------------------------------------
