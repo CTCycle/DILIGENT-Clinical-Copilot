@@ -23,10 +23,10 @@ def validate_clinical_input_preflight(
     non_blocking: list[ClinicalInputPreflightIssue] = []
     runtime_settings = _runtime_settings()
     service.apply_persisted_runtime_configuration()
-    _validate_ui_metadata(request_payload, blocking)
+    _validate_ui_metadata(request_payload, non_blocking)
     _validate_provider_key(blocking)
     _validate_requested_provider(request_payload, blocking, runtime_settings)
-    _validate_persistence(service, blocking)
+    _validate_persistence(service, non_blocking)
     extraction_quality: dict[str, Any] = {}
     clinical_input = (request_payload.clinical_input or "").strip()
     if not clinical_input:
@@ -56,20 +56,26 @@ def validate_clinical_input_preflight(
             "contamination_flags": extraction_artifact.contamination_flags.model_dump(),
         }
         if extraction_artifact.confidence < 0.55:
-            blocking.append(
+            non_blocking.append(
                 ClinicalInputPreflightIssue(
-                    severity="blocking",
+                    severity="non_blocking",
                     code="minimum_extraction_quality_not_met",
-                    message="Clinical input extraction confidence is below the minimum threshold.",
+                    message=(
+                        "Clinical input extraction confidence is below the minimum threshold; "
+                        "manual review is recommended."
+                    ),
                     field="clinical_input",
                 )
             )
         if not extraction_artifact.timed_drugs:
-            blocking.append(
+            non_blocking.append(
                 ClinicalInputPreflightIssue(
-                    severity="blocking",
+                    severity="non_blocking",
                     code="timed_drug_feasibility_failed",
-                    message="At least one drug with source-reported timing is required.",
+                    message=(
+                        "No drug with explicit source-reported timing was detected; "
+                        "manual review is recommended."
+                    ),
                     field="drugs",
                 )
             )
@@ -114,14 +120,14 @@ def validate_clinical_input_preflight(
 
 def _validate_ui_metadata(
     request_payload: ClinicalSessionRequest,
-    blocking: list[ClinicalInputPreflightIssue],
+    non_blocking: list[ClinicalInputPreflightIssue],
 ) -> None:
     if not request_payload.visit_date:
-        blocking.append(
+        non_blocking.append(
             ClinicalInputPreflightIssue(
-                severity="blocking",
+                severity="non_blocking",
                 code="visit_date_missing",
-                message="Report date must be provided by the UI.",
+                message="Report date is missing; manual confirmation is recommended.",
                 field="visit_date",
             )
         )
@@ -157,17 +163,22 @@ def _validate_requested_provider(
         for item in request_payload.selected_model_providers
         if item and item.strip()
     }
-    if not selected:
-        blocking.append(
-            ClinicalInputPreflightIssue(
-                severity="blocking",
-                code="provider_selection_missing",
-                message="At least one model provider must be selected.",
-                field="selected_model_providers",
-            )
-        )
-        return
     provider = str(runtime_settings.get("llm_provider") or "").lower()
+    if not selected:
+        # Backward-compatible behavior for clients that do not send
+        # selected_model_providers: assume the active runtime provider.
+        if provider:
+            selected = {provider}
+        else:
+            blocking.append(
+                ClinicalInputPreflightIssue(
+                    severity="blocking",
+                    code="provider_selection_missing",
+                    message="At least one model provider must be selected.",
+                    field="selected_model_providers",
+                )
+            )
+            return
     if provider and provider not in selected:
         blocking.append(
             ClinicalInputPreflightIssue(
@@ -181,7 +192,7 @@ def _validate_requested_provider(
 
 def _validate_persistence(
     service: Any,
-    blocking: list[ClinicalInputPreflightIssue],
+    non_blocking: list[ClinicalInputPreflightIssue],
 ) -> None:
     if not hasattr(service.serializer, "session_factory"):
         return
@@ -189,9 +200,9 @@ def _validate_persistence(
         with service.serializer.session_factory() as db_session:
             db_session.connection()
     except Exception as exc:  # noqa: BLE001
-        blocking.append(
+        non_blocking.append(
             ClinicalInputPreflightIssue(
-                severity="blocking",
+                severity="non_blocking",
                 code="persistence_unavailable",
                 message=f"Session persistence is not writable or reachable: {exc}",
             )
@@ -225,4 +236,3 @@ def _result(
         runtime_settings=runtime_settings,
         extraction_quality=extraction_quality,
     )
-

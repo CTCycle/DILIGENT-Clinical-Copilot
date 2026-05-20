@@ -258,7 +258,10 @@ def find_section_markers(text: str) -> list[SectionMarker]:
 
 
 def extract_sections_from_markers(text: str, markers: list[SectionMarker]) -> dict[ClinicalSectionKey, str] | None:
-    extracted: dict[ClinicalSectionKey, str] = _extract_inline_labeled_sections(text)
+    # When explicit section headings are available, prefer contiguous heading-based
+    # slices only. Mixing in inline `Label: value` snippets can stitch together
+    # non-contiguous fragments that then fail strict verbatim validation.
+    extracted: dict[ClinicalSectionKey, str] = {}
     ordered = sorted(markers, key=lambda item: item.marker_start)
     if ordered:
         for index, marker in enumerate(ordered):
@@ -268,7 +271,15 @@ def extract_sections_from_markers(text: str, markers: list[SectionMarker]) -> di
             if not content:
                 continue
             existing = extracted.get(marker.key)
-            extracted[marker.key] = f"{existing}\n\n{content}" if existing else content
+            # Keep one contiguous source span per section key. Concatenating multiple
+            # repeated headings from different pages creates synthetic non-contiguous
+            # text that fails strict verbatim validation.
+            if existing is None:
+                extracted[marker.key] = content
+            elif len(content) > len(existing):
+                extracted[marker.key] = content
+    else:
+        extracted = _extract_inline_labeled_sections(text)
 
     if _has_all_sections(extracted):
         return extracted
@@ -276,6 +287,14 @@ def extract_sections_from_markers(text: str, markers: list[SectionMarker]) -> di
     inferred = _infer_sections_from_cues(text)
     if inferred is None:
         return None
+    # Keep high-quality heading-derived contiguous sections and use inferred
+    # content only to fill keys that are still missing.
+    merged = dict(extracted)
+    for key in ("anamnesis", "drugs", "laboratory_analysis"):
+        if not (merged.get(key) or "").strip():
+            merged[key] = inferred.get(key, "")
+    if _has_all_sections(merged):
+        return merged
     return inferred
 
 
@@ -368,31 +387,39 @@ def _infer_sections_from_cues(text: str) -> dict[ClinicalSectionKey, str] | None
     if _has_all_sections(sections):
         return sections
 
-    line_buckets: dict[ClinicalSectionKey, list[str]] = {
+    # Fallback: infer missing sections from cue-bearing lines, but keep each section
+    # as one contiguous span from the original source to preserve verbatim validity.
+    label_indices: dict[ClinicalSectionKey, list[int]] = {
         "anamnesis": [],
         "drugs": [],
         "laboratory_analysis": [],
     }
-    for line in lines:
+    for idx, line in enumerate(lines):
         stripped = line.strip()
         if not stripped:
             continue
         lab_score, drugs_score, anamnesis_score = _line_scores(stripped)
         if lab_score == drugs_score == anamnesis_score == 0:
-            line_buckets["anamnesis"].append(stripped)
+            label_indices["anamnesis"].append(idx)
             continue
         if lab_score >= drugs_score and lab_score >= anamnesis_score:
-            line_buckets["laboratory_analysis"].append(stripped)
+            label_indices["laboratory_analysis"].append(idx)
         elif drugs_score >= lab_score and drugs_score >= anamnesis_score:
-            line_buckets["drugs"].append(stripped)
+            label_indices["drugs"].append(idx)
         else:
-            line_buckets["anamnesis"].append(stripped)
+            label_indices["anamnesis"].append(idx)
 
     for key in ("anamnesis", "drugs", "laboratory_analysis"):
         if (sections.get(key) or "").strip():
             continue
-        if line_buckets[key]:
-            sections[key] = "\n".join(line_buckets[key]).strip()
+        indices = label_indices[key]
+        if not indices:
+            continue
+        start_idx = min(indices)
+        end_idx = max(indices)
+        contiguous = "\n".join(lines[start_idx : end_idx + 1]).strip()
+        if contiguous:
+            sections[key] = contiguous
 
     if not _has_all_sections(sections):
         return None

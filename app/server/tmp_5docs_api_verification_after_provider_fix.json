@@ -1,0 +1,230 @@
+[
+  {
+    "document": "193203256.pdf",
+    "validate_status": 200,
+    "validate": {
+      "ready": false,
+      "blocking_issues": [
+        {
+          "severity": "blocking",
+          "code": "provider_selection_missing",
+          "message": "At least one model provider must be selected.",
+          "field": "selected_model_providers"
+        }
+      ],
+      "non_blocking_issues": [],
+      "runtime_settings": {
+        "use_cloud_services": true,
+        "llm_provider": "openai",
+        "cloud_model": "gpt-4.1-mini",
+        "text_extraction_provider": "openai",
+        "text_extraction_model": "gpt-4.1-mini",
+        "clinical_provider": "openai",
+        "clinical_model": "gpt-4.1-mini"
+      },
+      "extraction_quality": {
+        "confidence": 0.73,
+        "timed_drug_count": 14,
+        "contamination_flags": {
+          "therapy_contaminated_by_bibliography_or_admin": false,
+          "assessment_contaminated_by_non_clinical_content": false,
+          "labs_embedded_without_dedicated_lab_section": false
+        }
+      }
+    },
+    "start_status": 422,
+    "start": {
+      "detail": [
+        {
+          "field": "selected_model_providers",
+          "message": "At least one model provider must be selected."
+        }
+      ]
+    }
+  },
+  {
+    "document": "194213981.pdf",
+    "validate_status": 200,
+    "validate": {
+      "ready": false,
+      "blocking_issues": [
+        {
+          "severity": "blocking",
+          "code": "provider_selection_missing",
+          "message": "At least one model provider must be selected.",
+          "field": "selected_model_providers"
+        },
+        {
+          "severity": "blocking",
+          "code": "timed_drug_feasibility_failed",
+          "message": "At least one drug with source-reported timing is required.",
+          "field": "drugs"
+        }
+      ],
+      "non_blocking_issues": [],
+      "runtime_settings": {
+        "use_cloud_services": true,
+        "llm_provider": "openai",
+        "cloud_model": "gpt-4.1-mini",
+        "text_extraction_provider": "openai",
+        "text_extraction_model": "gpt-4.1-mini",
+        "clinical_provider": "openai",
+        "clinical_model": "gpt-4.1-mini"
+      },
+      "extraction_quality": {
+        "confidence": 0.73,
+        "timed_drug_count": 0,
+        "contamination_flags": {
+          "therapy_contaminated_by_bibliography_or_admin": false,
+          "assessment_contaminated_by_non_clinical_content": false,
+          "labs_embedded_without_dedicated_lab_section": false
+        }
+      }
+    },
+    "start_status": 422,
+    "start": {
+      "detail": [
+        {
+          "field": "selected_model_providers",
+          "message": "At least one model provider must be selected."
+        }
+      ]
+    }
+  },
+  {
+    "document": "232413080.pdf",
+    "validate_status": 200,
+    "validate": {
+      "ready": false,
+      "blocking_issues": [
+        {
+          "severity": "blocking",
+          "code": "provider_selection_missing",
+          "message": "At least one model provider must be selected.",
+          "field": "selected_model_providers"
+        }
+      ],
+      "non_blocking_issues": [
+        {
+          "severity": "non_blocking",
+          "code": "manual_review_required",
+          "message": "Possible non-clinical contamination was detected.",
+          "field": "clinical_input"
+        }
+      ],
+      "runtime_settings": {
+        "use_cloud_services": true,
+        "llm_provider": "openai",
+        "cloud_model": "gpt-4.1-mini",
+        "text_extraction_provider": "openai",
+        "text_extraction_model": "gpt-4.1-mini",
+        "clinical_provider": "openai",
+        "clinical_model": "gpt-4.1-mini"
+      },
+      "extraction_quality": {
+        "confidence": 0.57,
+        "timed_drug_count": 15,
+        "contamination_flags": {
+          "therapy_contaminated_by_bibliography_or_admin": true,
+          "assessment_contaminated_by_non_clinical_content": false,
+          "labs_embedded_without_dedicated_lab_section": false
+        }
+      }
+    },
+    "start_status": 422,
+    "start": {
+      "detail": [
+        {
+          "field": "selected_model_providers",
+          "message": "At least one model provider must be selected."
+        }
+      ]
+    }
+  },
+  {
+    "document": "234353874.pdf",
+    "validate_status": 200,
+    "validate": {
+      "ready": false,
+      "blocking_issues": [
+        {
+          "severity": "blocking",
+          "code": "provider_selection_missing",
+          "message": "At least one model provider must be selected.",
+          "field": "selected_model_providers"
+        }
+      ],
+      "non_blocking_issues": [],
+      "runtime_settings": {
+        "use_cloud_services": true,
+        "llm_provider": "openai",
+        "cloud_model": "gpt-4.1-mini",
+        "text_extraction_provider": "openai",
+        "text_extraction_model": "gpt-4.1-mini",
+        "clinical_provider": "openai",
+        "clinical_model": "gpt-4.1-mini"
+      },
+      "extraction_quality": {
+        "confidence": 0.74,
+        "timed_drug_count": 9,
+        "contamination_flags": {
+          "therapy_contaminated_by_bibliography_or_admin": false,
+          "assessment_contaminated_by_non_clinical_content": false,
+          "labs_embedded_without_dedicated_lab_section": false
+        }
+      }
+    },
+    "start_status": 422,
+    "start": {
+      "detail": [
+        {
+          "field": "selected_model_providers",
+          "message": "At least one model provider must be selected."
+        }
+      ]
+    }
+  },
+  {
+    "document": "235053094.pdf",
+    "validate_status": 200,
+    "validate": {
+      "ready": false,
+      "blocking_issues": [
+        {
+          "severity": "blocking",
+          "code": "provider_selection_missing",
+          "message": "At least one model provider must be selected.",
+          "field": "selected_model_providers"
+        }
+      ],
+      "non_blocking_issues": [],
+      "runtime_settings": {
+        "use_cloud_services": true,
+        "llm_provider": "openai",
+        "cloud_model": "gpt-4.1-mini",
+        "text_extraction_provider": "openai",
+        "text_extraction_model": "gpt-4.1-mini",
+        "clinical_provider": "openai",
+        "clinical_model": "gpt-4.1-mini"
+      },
+      "extraction_quality": {
+        "confidence": 0.73,
+        "timed_drug_count": 19,
+        "contamination_flags": {
+          "therapy_contaminated_by_bibliography_or_admin": false,
+          "assessment_contaminated_by_non_clinical_content": false,
+          "labs_embedded_without_dedicated_lab_section": false
+        }
+      }
+    },
+    "start_status": 422,
+    "start": {
+      "detail": [
+        {
+          "field": "selected_model_providers",
+          "message": "At least one model provider must be selected."
+        }
+      ]
+    }
+  }
+]

@@ -120,6 +120,7 @@ class DrugsParser:
                     provider=selected_provider,
                     default_model=selected_model,
                     timeout_s=self.timeout_s,
+                    max_retries=0,
                 )
             ),
         )
@@ -272,17 +273,20 @@ class DrugsParser:
         bounded_span = max(0.0, float(progress_span))
         for index, line in enumerate(lines, start=1):
             # Request a deterministic parse for each drug-sized chunk
-            parsed = await self.client.llm_structured_call(
-                model=self.model,
-                system_prompt=single_entry_prompt,
-                user_prompt=(
-                    "Extract the structured representation for the following drug entry:\n"
-                    f"{line}"
+            parsed = await asyncio.wait_for(
+                self.client.llm_structured_call(
+                    model=self.model,
+                    system_prompt=single_entry_prompt,
+                    user_prompt=(
+                        "Extract the structured representation for the following drug entry:\n"
+                        f"{line}"
+                    ),
+                    schema=PatientDrugs,
+                    temperature=self.temperature,
+                    use_json_mode=True,
+                    max_repair_attempts=1,
                 ),
-                schema=PatientDrugs,
-                temperature=self.temperature,
-                use_json_mode=True,
-                max_repair_attempts=2,
+                timeout=max(5.0, float(self.timeout_s)),
             )
             entries.extend(parsed.entries)
             self.emit_progress(
@@ -423,17 +427,20 @@ class DrugsParser:
         llm_failures = 0
         for index, chunk in enumerate(chunks, start=1):
             try:
-                parsed = await self.client.llm_structured_call(
-                    model=self.model,
-                    system_prompt=ANAMNESIS_DRUG_EXTRACTION_PROMPT.strip(),
-                    user_prompt=(
-                        "Extract all drugs mentioned in the following patient anamnesis chunk:\n\n"
-                        f"[Chunk {index}/{len(chunks)}]\n{chunk}"
+                parsed = await asyncio.wait_for(
+                    self.client.llm_structured_call(
+                        model=self.model,
+                        system_prompt=ANAMNESIS_DRUG_EXTRACTION_PROMPT.strip(),
+                        user_prompt=(
+                            "Extract all drugs mentioned in the following patient anamnesis chunk:\n\n"
+                            f"[Chunk {index}/{len(chunks)}]\n{chunk}"
+                        ),
+                        schema=PatientDrugs,
+                        temperature=self.temperature,
+                        use_json_mode=True,
+                        max_repair_attempts=1,
                     ),
-                    schema=PatientDrugs,
-                    temperature=self.temperature,
-                    use_json_mode=True,
-                    max_repair_attempts=2,
+                    timeout=max(5.0, float(self.timeout_s)),
                 )
                 parsed_entries.extend(parsed.entries)
             except Exception:

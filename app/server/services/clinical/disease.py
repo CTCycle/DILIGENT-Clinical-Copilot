@@ -43,7 +43,8 @@ class DiseaseExtractor:
         self.timeout_s = float(timeout_s)
         self.client: Any | None = client
         self.model: str = ""
-        self.extraction_retry_attempts = 2
+        # Prefer fast deterministic fallback over long retry loops.
+        self.extraction_retry_attempts = 1
         self.client_lock = asyncio.Lock()
         self.client_loop_id: int | None = None
         self.forced_provider: str | None = None
@@ -73,6 +74,7 @@ class DiseaseExtractor:
                     provider=selected_provider,
                     default_model=selected_model,
                     timeout_s=self.timeout_s,
+                    max_retries=0,
                 )
             ),
         )
@@ -206,7 +208,7 @@ class DiseaseExtractor:
             if hinted_wait is not None:
                 return hinted_wait
         normalized_attempt = max(int(attempt), 1)
-        return min(8.0, 0.75 * (2 ** (normalized_attempt - 1)))
+        return min(2.0, 0.5 * (2 ** (normalized_attempt - 1)))
 
     # -------------------------------------------------------------------------
     async def extract_diseases_from_anamnesis(
@@ -234,14 +236,17 @@ class DiseaseExtractor:
             parsed: PatientDiseaseContext | None = None
             for attempt in range(1, self.extraction_retry_attempts + 1):
                 try:
-                    parsed = await self.client.llm_structured_call(
-                        model=self.model,
-                        system_prompt=ANAMNESIS_DISEASE_EXTRACTION_PROMPT.strip(),
-                        user_prompt=user_prompt,
-                        schema=PatientDiseaseContext,
-                        temperature=self.temperature,
-                        use_json_mode=True,
-                        max_repair_attempts=2,
+                    parsed = await asyncio.wait_for(
+                        self.client.llm_structured_call(
+                            model=self.model,
+                            system_prompt=ANAMNESIS_DISEASE_EXTRACTION_PROMPT.strip(),
+                            user_prompt=user_prompt,
+                            schema=PatientDiseaseContext,
+                            temperature=self.temperature,
+                            use_json_mode=True,
+                            max_repair_attempts=1,
+                        ),
+                        timeout=max(5.0, float(self.timeout_s)),
                     )
                     break
                 except Exception as exc:

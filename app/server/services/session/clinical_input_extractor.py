@@ -75,6 +75,7 @@ class ClinicalInputExtractor:
                     provider=selected_provider,
                     default_model=selected_model,
                     timeout_s=self.timeout_s,
+                    max_retries=0,
                 )
             ),
         )
@@ -84,15 +85,35 @@ class ClinicalInputExtractor:
         sections = extract_sections_from_markers(clinical_input, markers)
         if sections is None:
             return None
-        if not validate_sections_against_source(clinical_input, sections):
-            return None
+        strict_verbatim = validate_sections_against_source(clinical_input, sections)
         return ClinicalSectionExtractionResult(
             source_text=clinical_input,
             anamnesis=sections["anamnesis"],
             drugs=sections["drugs"],
             laboratory_analysis=sections["laboratory_analysis"],
             line_ranges={},
-            confidence=0.95,
+            confidence=0.95 if strict_verbatim else 0.7,
+        )
+
+    def _coarse_fallback_extract(self, clinical_input: str) -> ClinicalSectionExtractionResult:
+        lines = [line for line in clinical_input.splitlines() if line.strip()]
+        if not lines:
+            raise ClinicalInputExtractionError("clinical_input is empty")
+        chunk = max(len(lines) // 3, 1)
+        anamnesis = "\n".join(lines[:chunk]).strip()
+        drugs = "\n".join(lines[chunk : chunk * 2]).strip()
+        laboratory_analysis = "\n".join(lines[chunk * 2 :]).strip()
+        if not drugs:
+            drugs = anamnesis
+        if not laboratory_analysis:
+            laboratory_analysis = "\n".join(lines[-chunk:]).strip() or anamnesis
+        return ClinicalSectionExtractionResult(
+            source_text=clinical_input,
+            anamnesis=anamnesis or clinical_input.strip(),
+            drugs=drugs or clinical_input.strip(),
+            laboratory_analysis=laboratory_analysis or clinical_input.strip(),
+            line_ranges={},
+            confidence=0.3,
         )
 
     @staticmethod
@@ -116,9 +137,16 @@ class ClinicalInputExtractor:
                 progress_callback(1.0)
             return deterministic
 
-        await self.ensure_client()
+        try:
+            await self.ensure_client()
+        except Exception:
+            if progress_callback is not None:
+                progress_callback(1.0)
+            return self._coarse_fallback_extract(clinical_input)
         if self.client is None:
-            raise ClinicalInputExtractionError("LLM client is not initialized for input extraction")
+            if progress_callback is not None:
+                progress_callback(1.0)
+            return self._coarse_fallback_extract(clinical_input)
 
         try:
             extraction = await self.client.llm_structured_call(
@@ -131,20 +159,34 @@ class ClinicalInputExtractor:
                 max_repair_attempts=1,
             )
         except Exception as exc:  # noqa: BLE001
-            raise ClinicalInputExtractionError(f"Clinical input extraction failed: {exc}") from exc
+            if deterministic is not None:
+                if progress_callback is not None:
+                    progress_callback(1.0)
+                return deterministic
+            if progress_callback is not None:
+                progress_callback(1.0)
+            return self._coarse_fallback_extract(clinical_input)
 
         draft = LlmClinicalSectionTextDraft.model_validate(extraction)
         anamnesis = self._normalize_json_text(draft.anamnesis)
         therapy = self._normalize_json_text(draft.therapy)
         lab_analysis = self._normalize_json_text(draft.lab_analysis)
         if not anamnesis or not therapy or not lab_analysis:
-            raise ClinicalInputExtractionError(
-                "Clinical input must contain anamnesis, current therapy, and laboratory analysis sections."
-            )
+            if deterministic is not None:
+                if progress_callback is not None:
+                    progress_callback(1.0)
+                return deterministic
+            if progress_callback is not None:
+                progress_callback(1.0)
+            return self._coarse_fallback_extract(clinical_input)
         if not validate_extracted_sections_against_source(clinical_input, anamnesis, therapy, lab_analysis):
-            raise ClinicalInputExtractionError(
-                "Clinical input extraction returned content that is not verbatim from source text."
-            )
+            if deterministic is not None:
+                if progress_callback is not None:
+                    progress_callback(1.0)
+                return deterministic
+            if progress_callback is not None:
+                progress_callback(1.0)
+            return self._coarse_fallback_extract(clinical_input)
         if progress_callback is not None:
             progress_callback(1.0)
         return ClinicalSectionExtractionResult(

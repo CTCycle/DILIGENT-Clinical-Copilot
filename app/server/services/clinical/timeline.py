@@ -112,12 +112,14 @@ class PatientTimelineExtractor:
                     initialize_llm_client(
                         purpose="parser",
                         timeout_s=self.timeout_s,
+                        max_retries=0,
                     )
                     if runtime_settings is None
                     else select_llm_provider(
                         provider=provider,
                         timeout_s=self.timeout_s,
                         default_model=model,
+                        max_retries=0,
                     )
                 )
             ),

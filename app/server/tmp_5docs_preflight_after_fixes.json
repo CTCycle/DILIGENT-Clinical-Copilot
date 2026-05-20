@@ -1,0 +1,41 @@
+[
+  {
+    "document": "193203256.pdf",
+    "ready": true,
+    "blocking": [],
+    "non_blocking": [],
+    "confidence": 0.73
+  },
+  {
+    "document": "194213981.pdf",
+    "ready": true,
+    "blocking": [],
+    "non_blocking": [
+      "timed_drug_feasibility_failed"
+    ],
+    "confidence": 0.73
+  },
+  {
+    "document": "232413080.pdf",
+    "ready": true,
+    "blocking": [],
+    "non_blocking": [
+      "manual_review_required"
+    ],
+    "confidence": 0.57
+  },
+  {
+    "document": "234353874.pdf",
+    "ready": true,
+    "blocking": [],
+    "non_blocking": [],
+    "confidence": 0.74
+  },
+  {
+    "document": "235053094.pdf",
+    "ready": true,
+    "blocking": [],
+    "non_blocking": [],
+    "confidence": 0.73
+  }
+]

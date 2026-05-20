@@ -1,0 +1,152 @@
+[
+  {
+    "document": "193203256.pdf",
+    "ok": true,
+    "conf": 0.95
+  },
+  {
+    "document": "194213981.pdf",
+    "ok": false,
+    "err": "Fornire almeno un farmaco con data di inizio, sospensione o altra informazione temporale."
+  },
+  {
+    "document": "232413080.pdf",
+    "ok": false,
+    "err": "Fornire almeno un farmaco con data di inizio, sospensione o altra informazione temporale."
+  },
+  {
+    "document": "234353874.pdf",
+    "ok": false,
+    "err": "Fornire almeno un farmaco con data di inizio, sospensione o altra informazione temporale."
+  },
+  {
+    "document": "235053094.pdf",
+    "ok": false,
+    "err": "[{'type': 'string_too_long', 'loc': ('drugs',), 'msg': 'String should have at most 20000 characters', 'input': 'Liquemin sol iniet [IU] 5000-0-0-5000 s.c.\\ndal 31.01.2025\\nCandesartan Spirig-hc 16 mg cpr [cpr] 2-0-0-0 pe"
+  },
+  {
+    "document": "236063843.pdf",
+    "ok": false,
+    "err": "Fornire almeno un farmaco con data di inizio, sospensione o altra informazione temporale."
+  },
+  {
+    "document": "237723396.pdf",
+    "ok": false,
+    "err": "Fornire almeno un farmaco con data di inizio, sospensione o altra informazione temporale."
+  },
+  {
+    "document": "238493288.pdf",
+    "ok": false,
+    "err": "Fornire almeno un farmaco con data di inizio, sospensione o altra informazione temporale."
+  },
+  {
+    "document": "238503358.pdf",
+    "ok": false,
+    "err": "Fornire almeno un farmaco con data di inizio, sospensione o altra informazione temporale."
+  },
+  {
+    "document": "239543356.pdf",
+    "ok": false,
+    "err": "[{'type': 'string_too_long', 'loc': ('drugs',), 'msg': 'String should have at most 20000 characters', 'input': 'Arixtra 2,5mg/0,5ml sir [mg] 0-0-2.5-0 s.c.\\ndal 11.02.2025 al 18.02.2025\\nClexane 20mg/0,2ml sir [mg] 0-0-2"
+  },
+  {
+    "document": "241033960.pdf",
+    "ok": false,
+    "err": "Fornire almeno un farmaco con data di inizio, sospensione o altra informazione temporale."
+  },
+  {
+    "document": "241053679.pdf",
+    "ok": false,
+    "err": "Fornire almeno un farmaco con data di inizio, sospensione o altra informazione temporale."
+  },
+  {
+    "document": "244623867.pdf",
+    "ok": true,
+    "conf": 0.7
+  },
+  {
+    "document": "248123478.pdf",
+    "ok": false,
+    "err": "Fornire almeno un farmaco con data di inizio, sospensione o altra informazione temporale."
+  },
+  {
+    "document": "250513994.pdf",
+    "ok": false,
+    "err": "Fornire almeno un farmaco con data di inizio, sospensione o altra informazione temporale."
+  },
+  {
+    "document": "252693658.pdf",
+    "ok": false,
+    "err": "Fornire almeno un farmaco con data di inizio, sospensione o altra informazione temporale."
+  },
+  {
+    "document": "252773941.pdf",
+    "ok": true,
+    "conf": 0.7
+  },
+  {
+    "document": "254543322.pdf",
+    "ok": false,
+    "err": "[{'type': 'string_too_long', 'loc': ('drugs',), 'msg': 'String should have at most 20000 characters', 'input': 'Clexane 40mg/0,4ml sir [mg] 0-0-0-40 s.c.\\nCandesartan Sandoz cpr 8 mg 1-0-0-0 per os\\nMovicol polv orale sa"
+  },
+  {
+    "document": "257893139.pdf",
+    "ok": false,
+    "err": "Fornire almeno un farmaco con data di inizio, sospensione o altra informazione temporale."
+  },
+  {
+    "document": "259973446.pdf",
+    "ok": false,
+    "err": "Fornire almeno un farmaco con data di inizio, sospensione o altra informazione temporale."
+  },
+  {
+    "document": "263653953.pdf",
+    "ok": false,
+    "err": "[{'type': 'string_too_long', 'loc': ('drugs',), 'msg': 'String should have at most 20000 characters', 'input': 'Clexane 40 mg/0.4 ml dal 02 al 08.04.2025 e dal 11 al 17.04.2025\\n60 mg/0.6 ml dal 18 al 25.04.2025\\nAtozet "
+  },
+  {
+    "document": "268673683.pdf",
+    "ok": false,
+    "err": "Fornire almeno un farmaco con data di inizio, sospensione o altra informazione temporale."
+  },
+  {
+    "document": "269623505.pdf",
+    "ok": false,
+    "err": "Fornire almeno un farmaco con data di inizio, sospensione o altra informazione temporale."
+  },
+  {
+    "document": "275173213.pdf",
+    "ok": false,
+    "err": "Fornire almeno un farmaco con data di inizio, sospensione o altra informazione temporale."
+  },
+  {
+    "document": "291713623.pdf",
+    "ok": false,
+    "err": "Fornire almeno un farmaco con data di inizio, sospensione o altra informazione temporale."
+  },
+  {
+    "document": "292773527.pdf",
+    "ok": true,
+    "conf": 0.95
+  },
+  {
+    "document": "294183726.pdf",
+    "ok": true,
+    "conf": 0.7
+  },
+  {
+    "document": "297083444.pdf",
+    "ok": false,
+    "err": "Fornire almeno un farmaco con data di inizio, sospensione o altra informazione temporale."
+  },
+  {
+    "document": "297523831.pdf",
+    "ok": false,
+    "err": "Fornire almeno un farmaco con data di inizio, sospensione o altra informazione temporale."
+  },
+  {
+    "document": "300793064.pdf",
+    "ok": false,
+    "err": "Fornire almeno un farmaco con data di inizio, sospensione o altra informazione temporale."
+  }
+]

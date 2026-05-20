@@ -34,11 +34,16 @@ def _set_runtime_signature(
 ###############################################################################
 def _set_retry_attempts(owner: LLMClientRuntimeOwner, provider: str) -> None:
     if hasattr(owner, "extraction_retry_attempts"):
-        setattr(
-            owner,
-            "extraction_retry_attempts",
-            4 if provider in {"openai", "gemini"} else 2,
-        )
+        default_attempts = 4 if provider in {"openai", "gemini"} else 2
+        current = getattr(owner, "extraction_retry_attempts", None)
+        try:
+            current_attempts = int(current)
+        except (TypeError, ValueError):
+            current_attempts = default_attempts
+        if current_attempts <= 0:
+            current_attempts = default_attempts
+        # Preserve stricter caller-defined caps (for example fail-fast extractors).
+        setattr(owner, "extraction_retry_attempts", min(current_attempts, default_attempts))
 
 
 ###############################################################################
