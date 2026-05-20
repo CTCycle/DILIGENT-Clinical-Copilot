@@ -143,6 +143,29 @@ def test_extract_drugs_from_therapy_skips_non_assumed_drug_line() -> None:
     assert [entry.name for entry in parsed.entries] == ["Esomeprazolo"]
 
 
+def test_extract_drugs_from_therapy_keeps_continuation_lines_with_drug_blocks() -> None:
+    parser = DrugsParser(client=object())
+    therapy_text = """
+    ■Amlodipin axapharm cpr 5 mg 0-0-1-0 per os
+    ■Prednison 20 mg cpr [cpr] 2-0-0-0 per os
+     Dal 15.01.2025 40 mg (inizio terapia il 6-7 gennaio, alla dose di 60 mg/die) - Peso della paziente
+    51.60 kg
+    ■Diovan 80 mg cpr [cpr] 0-0-0-0 per os
+     se PAS>o= 100 mmHg
+    ■Domperidon axapharm lingual cpr orodisp 10 mg 0-0-0-0 per os
+     In riserva: se nausea, vomito
+    """
+
+    parsed = asyncio.run(parser.extract_drugs_from_therapy(therapy_text))
+
+    assert [entry.name for entry in parsed.entries] == [
+        "Amlodipin axapharm",
+        "Prednison",
+        "Diovan",
+        "Domperidon axapharm lingual cpr orodisp",
+    ]
+
+
 def test_extract_drugs_from_therapy_empty_input_is_safe() -> None:
     parser = DrugsParser(client=object())
 
