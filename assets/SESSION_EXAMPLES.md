@@ -171,3 +171,59 @@ Follow-up (2026-02-22)
 Microbiologia/virologia:
 - Emocolture negative
 - HBsAg, anti-HCV: negativi
+
+
+
+Anamnesi--------
+Adenocarcinoma polmonare del segmento apico-dorsale del lobo
+superiore sinistro, stadio clinico cT1b-3 cN1 MX, diagnosi 16.03.2023
+Carcinoma duttale in situ (ER-, PR- G3 di tipo comedonico e
+cribriforme) radioterapia adiuvante il 03.04.2012
+Carcinoma lobulare invasivo del seno sinistro stadio pT1c (m), pN0 sn
+0/2 10.12.2018 [ER+, PR, c-erbB-2 score 2] ormonoterapia adiuvante
+con Letrozolo terminata il 14.05.2019 seguita da Tamoxifene dal
+15.05.2019 al 10.10.2020
+Sindrome coronarica acuta tipo STEMI anteriore (06.01.2024) su
+malattia trivasale
+Insufficienza cardiaca con FE ridotta (HFrEF) su base ischemica
+Infezione delle basse vie respiratorie da Influenza A con sospetta
+sovrainfezione batterica
+Asma bronchiale eosinofila, non escludibile BPCO
+Ipertensione arteriosa in trattamento
+Malnutrizione proteico-energetica di grado moderato (Score NRS 4) 
+
+Laboratorio
+ 
+Labor 10.01.2025: ALAT 345 U/L, ALP 1055 U/L, Amilasi P 94 U/L, Lipasi 172 U/L.
+Labor 16.01.2025: ALAT 822 U/L, ASAT 344 U/L, ALP 898 U/L, Amilasi P 119 U/L, Lipasi 215 U/L.
+Labor 13.02.2025: ALAT 591 U/L, ASAT 205 U/L, ALP 666 U/L, Amilasi P 89 U/L, Lipasi 145 U/L.
+Riferitidall'oncologoCurantevalorialteratigiàapartiredal17.12.2024(precedentidinovembrenella
+norma),percuièstatasospesaterapiaantibioticainattoconInvanz®(Ertapenem),chelapaziente
+aveva iniziato i primi giorni di dicembre 2024, senza risoluzione del quadro ma in peggioramento.
+ 
+CT del 07.01.2025 -Fegato: nei limitimorfovolumetrici dellanorma, esentedaalterazioni densitometrichesospette.
+Cisti epatiche stabili. -Colecistieviebiliari: fisiologicamentedistesa,esentedalitiasidievidenzaTC.Nondilatatelevie
+biliari intraepatiche e la via biliare principale. -Pancreas: regolare per volume emorfologia, senza alterazioni densitometriche focali. Non
+dilatato il dotto pancreatico principale.
+
+Terapia
+
+■Amlodipin axapharm cpr 5 mg 0-0-1-0 per os
+■Bilol cpr rivestite 5 mg 1-0-0-0 per os
+■Clopidogrel Spirig HC cpr rivestite 75 mg 1-0-0-0 per os
+■Aspirin Cardio 100 mg cpr [cpr] 1-0-0-0 per os
+■Pantoprazol Helvepharm cpr rivestite 20 mg 1-0-0-0 per os
+■Prednison 20 mg cpr [cpr] 2-0-0-0 per os
+ Dal 15.01.2025 40 mg (inizio terapia il 6-7 gennaio, alla dose di 60 mg/die) - Peso della paziente 
+51.60 kg
+ 
+■Seresta 15 mg cpr [cpr] 0-0-0-0.5 per os
+■Venlafaxin ER Sandoz Ret caps 75 mg 1-0-0-0 per os
+■Forxiga 10 mg cpr [cpr] 1-0-0-0 per os
+■Diovan 80 mg cpr [cpr] 0-0-0-0 per os
+ se PAS>o= 100 mmHg 
+■Domperidon axapharm lingual cpr orodisp 10 mg 0-0-0-0 per os
+ In riserva: se nausea, vomito 
+■Seresta 15 mg cpr [cpr] 0-0-0-0 per os
+ In riserva: se insonnia 
+■ Invanz sol iniet [g] 0-0-0-0 i.
