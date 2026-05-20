@@ -37,6 +37,7 @@ def select_llm_provider(
             keepalive_connections=kwargs.get("keepalive_connections", 10),
             keepalive_max=kwargs.get("keepalive_max", 20),
             default_model=kwargs.get("default_model"),
+            max_retries=kwargs.get("max_retries", 2),
         )
     raise LLMError(f"Unknown or unsupported provider: {provider}")
 

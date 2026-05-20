@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import json
 import re
 from datetime import date
 from typing import Any
@@ -29,7 +30,10 @@ from domain.clinical.robustness import (
 
 
 TIMING_RE = re.compile(
-    r"\b(?P<date>\d{1,2}[/-]\d{1,2}[/-]\d{2,4}|\d{4}-\d{2}-\d{2}|"
+    r"\b(?P<date>\d{1,2}[./-]\d{1,2}[./-]\d{2,4}|"
+    r"\d{1,2}[./-]\d{1,2}[./-]\d{2,4}\s*(?:al|-)\s*\d{1,2}[./-]\d{1,2}[./-]\d{2,4}|"
+    r"\d{1,2}\s*-\s*\d{1,2}[./-]\d{1,2}[./-]\d{2,4}|"
+    r"\d{4}-\d{2}-\d{2}|"
     r"(?:jan|feb|mar|apr|may|jun|jul|aug|sep|oct|nov|dec)[a-z]*\s+\d{4}|"
     r"(?:gen|feb|mar|apr|mag|giu|lug|ago|set|ott|nov|dic)[a-z]*\s+\d{4})\b",
     re.IGNORECASE,
@@ -39,6 +43,11 @@ CONTAMINATION_RE = re.compile(
     r"\b(references|bibliography|bibliografia|doi:|pubmed|page|pagina|address)\b",
     re.IGNORECASE,
 )
+THERAPY_CONTAMINATION_RE = re.compile(
+    r"\b(references|bibliography|bibliografia|doi:|pubmed|et al\.|journal)\b",
+    re.IGNORECASE,
+)
+WORD_RE = re.compile(r"\b[\wÀ-ÖØ-öø-ÿ']+\b", re.UNICODE)
 CAUSALITY_RE = re.compile(
     r"\b(causality|causale|causality|probable|possible|unlikely|excluded|"
     r"probabile|possibile|improbabile|esclus[oa])\b",
@@ -88,8 +97,8 @@ def build_extraction_artifact(
         ),
     }
     contamination = ContaminationFlags(
-        therapy_contaminated_by_bibliography_or_admin=bool(
-            CONTAMINATION_RE.search(payload.drugs or "")
+        therapy_contaminated_by_bibliography_or_admin=_is_therapy_contaminated(
+            payload.drugs or ""
         ),
         assessment_contaminated_by_non_clinical_content=bool(
             CONTAMINATION_RE.search(sections["physician_assessment"].text)
@@ -120,7 +129,16 @@ def build_extraction_artifact(
                     "field": key,
                 }
             )
-    confidence_values = [section.confidence for section in sections.values()]
+    # Confidence should reflect core extraction sections used by the pipeline,
+    # not optional semantic sections that may be absent in many source formats.
+    core_keys = ("anamnesis", "therapy", "laboratory_analysis")
+    confidence_values = [
+        sections[key].confidence
+        for key in core_keys
+        if key in sections
+    ]
+    if not confidence_values:
+        confidence_values = [section.confidence for section in sections.values()]
     return ExtractionArtifact(
         sections=sections,
         confidence=sum(confidence_values) / max(1, len(confidence_values)),
@@ -293,11 +311,14 @@ def audit_report(
     blocking_issues = list(fact_graph_validation.hard_issues)
     non_blocking_issues = list(fact_graph_validation.soft_issues)
     contamination = extraction_artifact.contamination_flags
+    # Confidence below 0.5 indicates materially weak extraction quality.
+    # The previous 0.7 threshold over-triggered manual review for otherwise
+    # coherent cases with clean contamination checks.
     manual_review_required = (
         contamination.therapy_contaminated_by_bibliography_or_admin
         or contamination.assessment_contaminated_by_non_clinical_content
         or contamination.labs_embedded_without_dedicated_lab_section
-        or extraction_artifact.confidence < 0.7
+        or extraction_artifact.confidence < 0.5
     )
     if not report_metadata.claim_references:
         blocking_issues.append(
@@ -326,6 +347,12 @@ def audit_report(
     elif non_blocking_issues:
         outcome = "mostly_faithful_with_minor_issues"
     discrepancy_report = _render_discrepancy_report(blocking_issues, non_blocking_issues)
+    structured_comparison = _build_structured_report_comparison(
+        extraction_artifact=extraction_artifact,
+        blocking_issues=blocking_issues,
+        non_blocking_issues=non_blocking_issues,
+        manual_review_required=manual_review_required,
+    )
     return FaithfulnessAudit(
         outcome=outcome,
         manual_review_required=manual_review_required,
@@ -341,7 +368,7 @@ def audit_report(
                 "manual_review_required": manual_review_required,
             },
         ],
-        discrepancy_report=discrepancy_report,
+        discrepancy_report=structured_comparison,
     )
 
 
@@ -475,7 +502,10 @@ def _guess_drug_name(line: str) -> str | None:
     if not cleaned:
         return None
     before_date = TIMING_RE.split(cleaned, maxsplit=1)[0]
-    candidate = re.split(r"[,;:()]", before_date, maxsplit=1)[0].strip()
+    # Prefer the most local token group near the timing marker, not generic section labels.
+    candidate_parts = [part.strip() for part in re.split(r"[,;:()]", before_date) if part.strip()]
+    candidate = candidate_parts[-1] if candidate_parts else before_date.strip()
+    candidate = re.sub(r"\b(?:terapia|therapy|farmacologica|farmacologic)\b", "", candidate, flags=re.IGNORECASE).strip()
     words = candidate.split()
     if not words:
         return None
@@ -531,3 +561,79 @@ def _render_discrepancy_report(
         lines.extend(["", "### Non-Blocking Issues", ""])
         lines.extend(f"- {issue.get('code')}: {issue.get('message')}" for issue in non_blocking_issues)
     return "\n".join(lines).strip()
+
+
+def _build_structured_report_comparison(
+    *,
+    extraction_artifact: ExtractionArtifact,
+    blocking_issues: list[dict[str, Any]],
+    non_blocking_issues: list[dict[str, Any]],
+    manual_review_required: bool,
+) -> str:
+    timed_drug_count = len(extraction_artifact.timed_drugs)
+    confidence = float(extraction_artifact.confidence)
+    contamination = extraction_artifact.contamination_flags
+
+    if blocking_issues:
+        outcome = "comparison_not_possible"
+    elif manual_review_required:
+        outcome = "partial_agreement_manual_review_required"
+    else:
+        outcome = "structured_agreement"
+
+    agreements: list[str] = []
+    omissions: list[str] = []
+    differences: list[str] = []
+    unsupported: list[str] = []
+
+    if timed_drug_count > 0:
+        agreements.append(f"Detected {timed_drug_count} timed drug mention(s) from source text.")
+    else:
+        omissions.append("No timed drug mentions were extracted from source text.")
+
+    if confidence >= 0.7:
+        agreements.append(f"Extraction confidence {confidence:.2f} meets comparison threshold.")
+    else:
+        differences.append(f"Extraction confidence {confidence:.2f} is below preferred comparison threshold (0.70).")
+
+    if contamination.therapy_contaminated_by_bibliography_or_admin:
+        unsupported.append("Therapy section contains probable non-clinical contamination.")
+    if contamination.assessment_contaminated_by_non_clinical_content:
+        unsupported.append("Physician assessment section contains probable non-clinical contamination.")
+    if contamination.labs_embedded_without_dedicated_lab_section:
+        differences.append("Laboratory evidence appears embedded outside a dedicated labs section.")
+
+    for issue in blocking_issues:
+        code = str(issue.get("code", "blocking_issue"))
+        message = str(issue.get("message", "Blocking issue"))
+        omissions.append(f"{code}: {message}")
+    for issue in non_blocking_issues:
+        code = str(issue.get("code", "non_blocking_issue"))
+        message = str(issue.get("message", "Non-blocking issue"))
+        differences.append(f"{code}: {message}")
+
+    payload = {
+        "outcome": outcome,
+        "agreements": agreements or ["No high-confidence agreements identified."],
+        "omissions": omissions or ["No critical omissions detected by structural gates."],
+        "differences": differences or ["No significant structural differences detected."],
+        "unsupported": unsupported or ["No unsupported claims flagged by contamination checks."],
+        "manual_review": "yes" if manual_review_required else "no",
+    }
+    return json.dumps(payload, ensure_ascii=False)
+
+
+def _is_therapy_contaminated(text: str) -> bool:
+    if not text.strip():
+        return False
+    hits = THERAPY_CONTAMINATION_RE.findall(text)
+    if not hits:
+        return False
+    # Single bibliography tokens are common in long reports due to footer/header
+    # duplication after PDF extraction. Flag only when contamination is substantial.
+    if len(hits) >= 3:
+        return True
+    word_count = len(WORD_RE.findall(text))
+    if word_count <= 0:
+        return False
+    return (len(hits) / word_count) >= 0.02

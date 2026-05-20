@@ -4,6 +4,7 @@ import re
 
 from fastapi import HTTPException, status
 
+from configurations.llm_configs import LLMRuntimeConfig
 from domain.clinical.entities import ClinicalSessionRequest
 
 
@@ -17,12 +18,9 @@ def count_words(text: str) -> int:
 def validate_clinical_session_request(request: ClinicalSessionRequest) -> None:
     details: list[dict[str, str]] = []
 
-    visit_date = str(request.visit_date).strip() if request.visit_date is not None else ""
     clinical_input = (request.clinical_input or "").strip()
     providers = [item.strip() for item in request.selected_model_providers if item and item.strip()]
 
-    if not visit_date:
-        details.append({"field": "visit_date", "message": "Visit date is required."})
     if not clinical_input:
         details.append({"field": "clinical_input", "message": "Clinical input is required."})
     elif count_words(clinical_input) < 60:
@@ -33,12 +31,14 @@ def validate_clinical_session_request(request: ClinicalSessionRequest) -> None:
             }
         )
     if not providers:
-        details.append(
-            {
-                "field": "selected_model_providers",
-                "message": "At least one model provider must be selected.",
-            }
-        )
+        runtime_provider = (LLMRuntimeConfig.get_llm_provider() or "").strip()
+        if not runtime_provider:
+            details.append(
+                {
+                    "field": "selected_model_providers",
+                    "message": "At least one model provider must be selected.",
+                }
+            )
 
     if details:
         raise HTTPException(status_code=status.HTTP_422_UNPROCESSABLE_ENTITY, detail=details)

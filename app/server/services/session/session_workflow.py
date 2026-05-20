@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import asyncio
+import json
 import time
 from datetime import datetime
 from typing import Any
@@ -295,6 +296,17 @@ async def process_single_patient_workflow(
         fact_graph_validation=fact_graph_validation,
         report_metadata=report_metadata,
     )
+    try:
+        report_comparison_payload = json.loads(faithfulness_audit.discrepancy_report)
+    except Exception:
+        report_comparison_payload = {
+            "outcome": "comparison_not_possible",
+            "agreements": ["Unable to parse structured comparison payload."],
+            "omissions": ["Comparison payload is not structured JSON."],
+            "differences": ["Falling back to raw discrepancy report text."],
+            "unsupported": [faithfulness_audit.discrepancy_report or "No details available."],
+            "manual_review": "yes" if faithfulness_audit.manual_review_required else "no",
+        }
     if faithfulness_audit.blocking_issues:
         issues.extend(
             PipelineIssue(
@@ -341,6 +353,7 @@ async def process_single_patient_workflow(
     )
     result_payload = {
         "report": narrative,
+        "final_report": final_report,
         "issues": serialized_issues,
         "pattern_status": pattern_assessment.status,
         "detected_drugs": detected_drugs,
@@ -375,6 +388,7 @@ async def process_single_patient_workflow(
         },
         "manual_review_required": faithfulness_audit.manual_review_required,
         "blocking_issues": faithfulness_audit.blocking_issues,
+        "report_comparison": report_comparison_payload,
         "pipeline_artifacts": {
             "normalized_document": normalized_document.model_dump(),
             "extraction_artifact": extraction_artifact.model_dump(),
@@ -398,45 +412,49 @@ async def process_single_patient_workflow(
     ).model_dump()
     if original_session_text is not None:
         result_payload["original_session_text"] = original_session_text
-    persisted_session_id = await asyncio.to_thread(
-        service.serializer.save_clinical_session,
-        {
-            "patient_name": payload.name,
-            "patient_visit_date": payload.visit_date,
-            "patient_image_base64": patient_image_base64,
-            "session_timestamp": datetime.now(),
-            "version": session_version,
-            "original_session_id": original_session_id,
-            "metadata": session_metadata or {},
-            "hepatic_pattern": pattern_score.classification,
-            "anamnesis": payload.anamnesis,
-            "drugs": payload.drugs,
-            "laboratory_analysis": payload.laboratory_analysis,
-            "section_extraction": (
-                section_extraction.model_dump() if section_extraction is not None else None
-            ),
-            "text_extraction_model": getattr(service.drugs_parser, "model", None),
-            "clinical_model": getattr(clinical_session, "llm_model", None),
-            "total_duration": global_elapsed,
-            "final_report": final_report,
-            "detected_drugs": detected_drugs,
-            "matched_drugs": matched_drugs_payload,
-            "issues": serialized_issues,
-            "session_status": "successful",
-            "session_result_payload": result_payload,
-        },
-    )
-    if persisted_session_id is not None:
-        result_payload["session_id"] = persisted_session_id
-        result_payload["run_bundle_index"] = build_run_bundle_index(
-            run_id=str(persisted_session_id),
-            session_id=persisted_session_id,
-        ).model_dump()
-        await asyncio.to_thread(
-            service.serializer.upsert_session_result_payload,
-            persisted_session_id,
-            result_payload,
+    persisted_session_id = None
+    try:
+        persisted_session_id = await asyncio.to_thread(
+            service.serializer.save_clinical_session,
+            {
+                "patient_name": payload.name,
+                "patient_visit_date": payload.visit_date,
+                "patient_image_base64": patient_image_base64,
+                "session_timestamp": datetime.now(),
+                "version": session_version,
+                "original_session_id": original_session_id,
+                "metadata": session_metadata or {},
+                "hepatic_pattern": pattern_score.classification,
+                "anamnesis": payload.anamnesis,
+                "drugs": payload.drugs,
+                "laboratory_analysis": payload.laboratory_analysis,
+                "section_extraction": (
+                    section_extraction.model_dump() if section_extraction is not None else None
+                ),
+                "text_extraction_model": getattr(service.drugs_parser, "model", None),
+                "clinical_model": getattr(clinical_session, "llm_model", None),
+                "total_duration": global_elapsed,
+                "final_report": final_report,
+                "detected_drugs": detected_drugs,
+                "matched_drugs": matched_drugs_payload,
+                "issues": serialized_issues,
+                "session_status": "successful",
+                "session_result_payload": result_payload,
+            },
         )
+        if persisted_session_id is not None:
+            result_payload["session_id"] = persisted_session_id
+            result_payload["run_bundle_index"] = build_run_bundle_index(
+                run_id=str(persisted_session_id),
+                session_id=persisted_session_id,
+            ).model_dump()
+            await asyncio.to_thread(
+                service.serializer.upsert_session_result_payload,
+                persisted_session_id,
+                result_payload,
+            )
+    except Exception as exc:  # noqa: BLE001
+        logger.warning("Session persistence unavailable; returning in-memory result only: %s", exc)
     return result_payload
 
 

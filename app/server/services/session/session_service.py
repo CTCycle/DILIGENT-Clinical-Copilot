@@ -62,7 +62,6 @@ from services.clinical.rucam import RucamScoreEstimator
 from services.clinical.validation import (
     build_validation_bundle,
     ensure_required_sections,
-    ensure_timed_therapy_drug,
     has_timing_information,
 )
 from services.session.payload import PayloadSanitizationService
@@ -259,10 +258,7 @@ class ClinicalSessionService(ClinicalSessionFormattingMixin):
 
         cleaned_therapy_text = self.drugs_parser.clean_text(payload.drugs or "")
         if not cleaned_therapy_text:
-            ensure_timed_therapy_drug(
-                self.build_fallback_therapy_drugs(payload.drugs),
-                bundle=validation_bundle,
-            )
+            # Keep submission permissive when therapy content cannot provide timing.
             return
 
         lines = [block.text.strip() for block in isolate_drug_blocks(cleaned_therapy_text) if block.text.strip()]
@@ -273,10 +269,9 @@ class ClinicalSessionService(ClinicalSessionFormattingMixin):
         ]
         if any(has_timing_information(entry) for entry in parsed_entries):
             return
-        ensure_timed_therapy_drug(
-            self.build_fallback_therapy_drugs(payload.drugs),
-            bundle=validation_bundle,
-        )
+        # Do not block session start when therapy timing is not explicitly available.
+        # Downstream stages can still assess DILI with uncertainty notes.
+        return
 
     # -------------------------------------------------------------------------
     @staticmethod
@@ -454,8 +449,8 @@ class ClinicalSessionService(ClinicalSessionFormattingMixin):
             end_value=48.0,
         )
         start_time = time.perf_counter()
-        max_attempts = 2
-        backoff_seconds = 1.5
+        max_attempts = 1
+        backoff_seconds = 0.0
         timeout_s = self._resolve_runtime_timeout(
             base_timeout_s=float(self.disease_extractor.timeout_s)
         )
@@ -497,10 +492,28 @@ class ClinicalSessionService(ClinicalSessionFormattingMixin):
                     await asyncio.sleep(backoff_seconds)
                     self.run_stop_check(stop_check)
                     continue
-                raise RuntimeError(
-                    "Disease extraction timed out while waiting for Ollama. "
-                    "Please verify Ollama responsiveness and model readiness."
-                ) from exc
+                logger.warning(
+                    (
+                        "Anamnesis disease extraction timed out after %.4f seconds; "
+                        "continuing without structured disease timeline."
+                    ),
+                    elapsed,
+                )
+                self.append_warning_issue(
+                    issues,
+                    code="anamnesis_disease_extraction_timeout",
+                    message=(
+                        "Disease extraction from anamnesis timed out; "
+                        "the analysis continued without structured disease timeline."
+                    ),
+                    field="anamnesis",
+                )
+                disease_context = PatientDiseaseContext(entries=[])
+                self.emit_progress(
+                    progress_callback, stage="anamnesis_disease_extraction", value=48.0
+                )
+                self.run_stop_check(stop_check)
+                return disease_context
             except Exception as exc:
                 elapsed = time.perf_counter() - start_time
                 logger.warning(
@@ -581,7 +594,40 @@ class ClinicalSessionService(ClinicalSessionFormattingMixin):
                 ),
                 field="anamnesis",
             )
-            lab_timeline = PatientLabTimeline(entries=[])
+            # Deterministic fallback: recover lab markers directly from text
+            # so pattern estimation can still proceed when LLM extraction fails.
+            fallback_entries = []
+            primary_labs_text = self.lab_extractor.clean_text(payload.laboratory_analysis)
+            supplemental_anamnesis_text = self.lab_extractor.clean_text(payload.anamnesis)
+            fallback_entries.extend(
+                self.lab_extractor.extract_entries_from_text(
+                    text=primary_labs_text,
+                    source="laboratory_analysis",
+                    visit_date=payload.visit_date,
+                )
+            )
+            fallback_entries.extend(
+                self.lab_extractor.extract_entries_from_text(
+                    text=supplemental_anamnesis_text,
+                    source="anamnesis",
+                    visit_date=payload.visit_date,
+                )
+            )
+            normalized_entries = []
+            seen_keys: set[tuple[str, str, str, str]] = set()
+            for entry in fallback_entries:
+                prepared = self.lab_extractor.normalize_entry(
+                    entry, visit_date=payload.visit_date
+                )
+                if prepared is None:
+                    continue
+                key = self.lab_extractor.dedupe_key(prepared)
+                if key in seen_keys:
+                    continue
+                seen_keys.add(key)
+                normalized_entries.append(prepared)
+            normalized_entries.sort(key=self.lab_extractor.lab_entry_sort_key)
+            lab_timeline = PatientLabTimeline(entries=normalized_entries)
             onset_context = None
         self.emit_progress(
             progress_callback, stage="anamnesis_lab_extraction", value=52.0
@@ -872,6 +918,46 @@ class ClinicalSessionService(ClinicalSessionFormattingMixin):
                 payload.name or "unknown",
                 exc,
             )
+        if not final_report:
+            drug_names = [
+                (entry.name or "").strip()
+                for entry in analysis_drugs.entries
+                if (entry.name or "").strip()
+            ]
+            unique_drugs: list[str] = []
+            seen_drugs: set[str] = set()
+            for name in drug_names:
+                key = name.casefold()
+                if key in seen_drugs:
+                    continue
+                seen_drugs.add(key)
+                unique_drugs.append(name)
+                if len(unique_drugs) >= 8:
+                    break
+            if report_language.lower().startswith("it"):
+                if unique_drugs:
+                    final_report = (
+                        "Report finale generato in modalità di fallback per indisponibilità del motore clinico. "
+                        f"Farmaci sospetti identificati nel testo: {', '.join(unique_drugs)}. "
+                        "Rivedere manualmente la valutazione clinica e la conclusione specialistica originale."
+                    )
+                else:
+                    final_report = (
+                        "Report finale generato in modalità di fallback per indisponibilità del motore clinico. "
+                        "Non sono stati identificati farmaci sospetti affidabili; è necessaria revisione manuale."
+                    )
+            else:
+                if unique_drugs:
+                    final_report = (
+                        "Final report generated in fallback mode because clinical synthesis was unavailable. "
+                        f"Suspected drugs detected from source text: {', '.join(unique_drugs)}. "
+                        "Manual review against the original specialist assessment is required."
+                    )
+                else:
+                    final_report = (
+                        "Final report generated in fallback mode because clinical synthesis was unavailable. "
+                        "No reliable suspected drugs were detected; manual specialist review is required."
+                    )
         return clinical_session, final_report
 
     # -------------------------------------------------------------------------
