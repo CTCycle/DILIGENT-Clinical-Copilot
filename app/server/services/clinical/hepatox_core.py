@@ -673,16 +673,32 @@ class HepatoxConsultation:
 
     # -------------------------------------------------------------------------
     @staticmethod
-    def render_evidence_quality_lines(entry: DrugClinicalAssessment) -> str:
-        return hepatox_prompts.render_evidence_quality_lines(entry)
+    def render_evidence_quality_lines(
+        entry: DrugClinicalAssessment,
+        *,
+        report_language: str = "en",
+    ) -> str:
+        return hepatox_prompts.render_evidence_quality_lines(
+            entry,
+            report_language=report_language,
+        )
 
     # -------------------------------------------------------------------------
     def sanitize_renderable_body(self, entry: DrugClinicalAssessment) -> str:
         return hepatox_prompts.sanitize_renderable_body(self, entry)
 
     # -------------------------------------------------------------------------
-    def build_fallback_technical_note(self, entry: DrugClinicalAssessment) -> str:
-        return hepatox_prompts.build_fallback_technical_note(self, entry)
+    def build_fallback_technical_note(
+        self,
+        entry: DrugClinicalAssessment,
+        *,
+        report_language: str = "en",
+    ) -> str:
+        return hepatox_prompts.build_fallback_technical_note(
+            self,
+            entry,
+            report_language=report_language,
+        )
 
     # -------------------------------------------------------------------------
     def render_unresolved_mentions_section(
@@ -712,8 +728,16 @@ class HepatoxConsultation:
         return await hepatox_assessment.generate_conclusion(self, clinical_context=clinical_context, multi_drug_report=multi_drug_report, report_language=report_language)
 
     # -------------------------------------------------------------------------
-    def build_excluded_paragraph(self, entry: DrugClinicalAssessment) -> str:
-        return hepatox_prompts.build_excluded_paragraph(self, entry)
+    def build_excluded_paragraph(
+        self,
+        entry: DrugClinicalAssessment,
+        report_language: str = "en",
+    ) -> str:
+        return hepatox_prompts.build_excluded_paragraph(
+            self,
+            entry,
+            report_language,
+        )
 
     # -------------------------------------------------------------------------
     def build_missing_excerpt_paragraph(

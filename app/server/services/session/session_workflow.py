@@ -32,6 +32,7 @@ from domain.jobs import JobStartResponse
 from services.clinical.candidate_selection import select_relevant_candidates
 from services.clinical.language import ClinicalLanguageDetector
 from services.clinical.match_quality import classify_match_evidence
+from services.clinical.report_language import phrase
 from services.session.clinical_input_extractor import ClinicalInputExtractionError
 from services.session.document_normalizer import DocumentNormalizer
 from services.session.robust_pipeline import (
@@ -290,6 +291,7 @@ async def process_single_patient_workflow(
         patient_name=payload.name,
         visit_date=payload.visit_date,
         report_mode=report_mode,
+        report_language=report_language,
     )
     faithfulness_audit = audit_report(
         extraction_artifact=extraction_artifact,
@@ -316,7 +318,8 @@ async def process_single_patient_workflow(
             )
             for issue in faithfulness_audit.blocking_issues
         )
-    final_report = generated_report
+    if not final_report:
+        final_report = phrase("narrative_fallback", report_language)
 
     patient_label = payload.name or "Unknown patient"
     report_language_key = resolve_supported_language_code(report_language)
