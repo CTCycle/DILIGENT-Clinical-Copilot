@@ -983,7 +983,8 @@ async def finalize_patient_report(
             report_language=report_language,
         )
         if conclusion:
-            combined_report = f"{combined_report}\n\n## Global Synthesis and Clinical Recommendations\n\n{conclusion}"
+            heading = report_heading("report_section_summary", report_language)
+            combined_report = f"{combined_report}\n\n## {heading}\n\n{conclusion}"
     return combined_report
 
 def should_render_as_matched_drug(entry: DrugClinicalAssessment) -> bool:

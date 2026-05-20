@@ -5,6 +5,7 @@ import re
 from datetime import date
 from typing import Any
 
+from common.utils.languages import resolve_supported_language_code
 from domain.clinical.entities import (
     ClinicalSectionExtractionResult,
     DrugEntry,
@@ -58,6 +59,41 @@ RECOMMENDATION_RE = re.compile(
     r"consiglia|sospendere|monitorare)\b",
     re.IGNORECASE,
 )
+
+FACT_REPORT_LABELS = {
+    "en": {
+        "title": "Clinical Report",
+        "patient": "Patient",
+        "report_date": "Report date",
+        "not_provided": "Not provided",
+        "drug_exposure": "Drug Exposure",
+        "unknown_drug": "Unknown drug",
+        "timing": "timing",
+        "status": "status",
+        "laboratory_evidence": "Laboratory Evidence",
+        "lab_event": "Lab event",
+        "reported": "reported",
+        "dili_pattern": "DILI Pattern",
+        "causality": "Causality",
+        "recommendations": "Recommendations",
+    },
+    "it": {
+        "title": "Report Clinico",
+        "patient": "Paziente",
+        "report_date": "Data report",
+        "not_provided": "Non fornito",
+        "drug_exposure": "Esposizione ai Farmaci",
+        "unknown_drug": "Farmaco sconosciuto",
+        "timing": "tempistica",
+        "status": "stato",
+        "laboratory_evidence": "Evidenze di Laboratorio",
+        "lab_event": "Evento di laboratorio",
+        "reported": "riportato",
+        "dili_pattern": "Pattern DILI",
+        "causality": "Causalità",
+        "recommendations": "Raccomandazioni",
+    },
+}
 
 
 def build_extraction_artifact(
@@ -252,40 +288,47 @@ def render_fact_graph_report(
     patient_name: str | None,
     visit_date: date | None,
     report_mode: str,
+    report_language: str = "en",
 ) -> tuple[str, ReportMetadata]:
-    lines = ["## Clinical Report", ""]
-    lines.append(f"Patient: {patient_name or 'Not provided'}")
-    lines.append(f"Report date: {visit_date.isoformat() if visit_date else 'Not provided'}")
+    labels = _fact_report_labels(report_language)
+    lines = [f"## {labels['title']}", ""]
+    lines.append(f"{labels['patient']}: {patient_name or labels['not_provided']}")
+    lines.append(
+        f"{labels['report_date']}: "
+        f"{visit_date.isoformat() if visit_date else labels['not_provided']}"
+    )
     claim_refs: dict[str, list[str]] = {}
     drug_nodes = [node for node in fact_graph.nodes if node.family == "drug_exposure"]
     if drug_nodes:
-        lines.extend(["", "### Drug Exposure"])
+        lines.extend(["", f"### {labels['drug_exposure']}"])
         for index, node in enumerate(drug_nodes, start=1):
-            name = node.value.get("name") or node.value.get("drug") or "Unknown drug"
+            name = node.value.get("name") or node.value.get("drug") or labels["unknown_drug"]
             status = node.value.get("status") or node.value.get("suspension_status")
             timing = node.value.get("therapy_start_date") or node.value.get("timing_value")
             claim_id = f"drug_exposure_{index}"
             parts = [str(name)]
             if timing:
-                parts.append(f"timing: {timing}")
+                parts.append(f"{labels['timing']}: {timing}")
             if status is not None:
-                parts.append(f"status: {status}")
+                parts.append(f"{labels['status']}: {status}")
             lines.append(f"- {'; '.join(parts)} [{claim_id}]")
             claim_refs[claim_id] = [node.node_id]
     lab_nodes = [node for node in fact_graph.nodes if node.family == "lab_event"]
     if lab_nodes:
-        lines.extend(["", "### Laboratory Evidence"])
+        lines.extend(["", f"### {labels['laboratory_evidence']}"])
         for index, node in enumerate(lab_nodes, start=1):
             value = node.value
-            label = value.get("marker_name") or value.get("test_name") or value.get("name") or "Lab event"
+            label = value.get("marker_name") or value.get("test_name") or value.get("name") or labels["lab_event"]
             raw_value = value.get("value") or value.get("raw_value") or value.get("result")
             claim_id = f"lab_event_{index}"
-            lines.append(f"- {label}: {raw_value if raw_value is not None else 'reported'} [{claim_id}]")
+            lines.append(
+                f"- {label}: {raw_value if raw_value is not None else labels['reported']} [{claim_id}]"
+            )
             claim_refs[claim_id] = [node.node_id]
     for family, heading in (
-        ("dili_pattern_statement", "DILI Pattern"),
-        ("causality_statement", "Causality"),
-        ("recommendation_statement", "Recommendations"),
+        ("dili_pattern_statement", labels["dili_pattern"]),
+        ("causality_statement", labels["causality"]),
+        ("recommendation_statement", labels["recommendations"]),
     ):
         nodes = [node for node in fact_graph.nodes if node.family == family]
         if not nodes:
@@ -300,6 +343,11 @@ def render_fact_graph_report(
         claim_references=claim_refs,
     )
     return "\n".join(lines).strip(), metadata
+
+
+def _fact_report_labels(report_language: str) -> dict[str, str]:
+    language_key = resolve_supported_language_code(report_language)
+    return FACT_REPORT_LABELS.get(language_key, FACT_REPORT_LABELS["en"])
 
 
 def audit_report(
