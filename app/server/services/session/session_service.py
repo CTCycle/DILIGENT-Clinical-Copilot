@@ -410,10 +410,12 @@ class ClinicalSessionService(ClinicalSessionFormattingMixin):
             elapsed = time.perf_counter() - start_time
             logger.warning(
                 (
-                    "Anamnesis drugs extraction failed after %.4f seconds; "
-                    "continuing without historical drug mentions: %s"
+                    "Anamnesis drugs extraction failed after %.4f seconds "
+                    "(timeout budget %.1fs); continuing without historical "
+                    "drug mentions: %s"
                 ),
                 elapsed,
+                timeout_s,
                 exc,
             )
             self.append_warning_issue(
@@ -482,9 +484,10 @@ class ClinicalSessionService(ClinicalSessionFormattingMixin):
                     logger.warning(
                         (
                             "Anamnesis disease extraction timed out after %.4fs "
-                            "(attempt %d/%d). Retrying in %.1fs."
+                            "(timeout budget %.1fs, attempt %d/%d). Retrying in %.1fs."
                         ),
                         elapsed,
+                        timeout_s,
                         attempt,
                         max_attempts,
                         backoff_seconds,
@@ -494,10 +497,12 @@ class ClinicalSessionService(ClinicalSessionFormattingMixin):
                     continue
                 logger.warning(
                     (
-                        "Anamnesis disease extraction timed out after %.4f seconds; "
-                        "continuing without structured disease timeline."
+                        "Anamnesis disease extraction timed out after %.4f seconds "
+                        "(timeout budget %.1fs); continuing without structured "
+                        "disease timeline."
                     ),
                     elapsed,
+                    timeout_s,
                 )
                 self.append_warning_issue(
                     issues,
@@ -518,10 +523,12 @@ class ClinicalSessionService(ClinicalSessionFormattingMixin):
                 elapsed = time.perf_counter() - start_time
                 logger.warning(
                     (
-                        "Anamnesis disease extraction failed after %.4f seconds; "
-                        "continuing without structured disease timeline: %s"
+                        "Anamnesis disease extraction failed after %.4f seconds "
+                        "(timeout budget %.1fs); continuing without structured "
+                        "disease timeline: %s"
                     ),
                     elapsed,
+                    timeout_s,
                     exc,
                 )
                 self.append_warning_issue(
@@ -579,10 +586,12 @@ class ClinicalSessionService(ClinicalSessionFormattingMixin):
             elapsed = time.perf_counter() - start_time
             logger.warning(
                 (
-                    "Anamnesis lab extraction failed after %.4f seconds; "
-                    "continuing without structured lab timeline: %s"
+                    "Anamnesis lab extraction failed after %.4f seconds "
+                    "(timeout budget %.1fs); continuing with deterministic "
+                    "lab timeline fallback: %s"
                 ),
                 elapsed,
+                timeout_s,
                 exc,
             )
             self.append_warning_issue(
@@ -590,7 +599,7 @@ class ClinicalSessionService(ClinicalSessionFormattingMixin):
                 code="anamnesis_lab_extraction_failed",
                 message=(
                     "Longitudinal lab extraction from anamnesis was unavailable; "
-                    "the analysis continued without timeline enrichment."
+                    "the analysis continued with deterministic lab parsing fallback."
                 ),
                 field="anamnesis",
             )
