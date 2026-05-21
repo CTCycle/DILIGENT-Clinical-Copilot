@@ -1,6 +1,6 @@
 # Background Job Management
 
-Last updated: 2026-05-19
+Last updated: 2026-05-21
 
 DILIGENT uses a centralized thread-based job manager for long-running operations.
 
@@ -20,6 +20,7 @@ Each job tracks:
 - `result` (optional JSON payload)
 - `error` (sanitized user-safe message)
 - `created_at`, `completed_at`
+- `version` (monotonic state version incremented on every state/result/progress mutation)
 - `stop_requested` (cooperative cancellation flag)
 
 ## 3. Execution behavior
@@ -58,6 +59,8 @@ Each job tracks:
 Standard contract:
 1. Start endpoint returns `JobStartResponse` (`job_id`, `status`, `poll_interval`).
 2. Status endpoint returns `JobStatusResponse`.
+   - Clinical status responses are explicitly non-cacheable (`Cache-Control: no-store` headers).
+   - Clients should treat `version` as monotonic and ignore out-of-order older snapshots.
 3. Cancel endpoint returns `JobCancelResponse`.
 4. Inspection update jobs may include phase-aware result fields:
    - `phase`, `step_index`, `step_count`, `progress_message`, `summary`.

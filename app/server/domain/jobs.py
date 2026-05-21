@@ -18,14 +18,19 @@ class JobState:
     error: str | None = None
     created_at: float = field(default_factory=monotonic)
     completed_at: float | None = None
+    version: int = 0
     stop_requested: bool = False
     lock: threading.Lock = field(default_factory=threading.Lock, init=False, repr=False)
 
     def update(self, **kwargs: Any) -> None:
         with self.lock:
+            changed = False
             for key, value in kwargs.items():
                 if hasattr(self, key):
+                    changed = True
                     setattr(self, key, value)
+            if changed:
+                self.version += 1
 
     def snapshot(self) -> dict[str, Any]:
         with self.lock:
@@ -38,6 +43,7 @@ class JobState:
                 "error": self.error,
                 "created_at": self.created_at,
                 "completed_at": self.completed_at,
+                "version": self.version,
             }
 
 
@@ -58,6 +64,9 @@ class JobStatusResponse(BaseModel):
     progress: float
     result: dict[str, Any] | None = None
     error: str | None = None
+    created_at: float | None = None
+    completed_at: float | None = None
+    version: int | None = None
 
 
 ###############################################################################
