@@ -126,6 +126,9 @@ export type JobStatusResponse<TJobResult extends Record<string, unknown> = Clini
   progress: number;
   result: TJobResult | null;
   error: string | null;
+  created_at?: number | null;
+  completed_at?: number | null;
+  version?: number | null;
 };
 
 export type InspectionUpdateJobResult = {

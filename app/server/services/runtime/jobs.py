@@ -159,7 +159,7 @@ class JobManager:
         with state.lock:
             existing = state.result or {}
             merged = {**existing, **patch}
-            state.result = merged
+        state.update(result=merged)
 
     # -------------------------------------------------------------------------
     def run_job(

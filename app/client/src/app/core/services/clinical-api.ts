@@ -25,11 +25,20 @@ export async function startClinicalJob(
 
 export async function fetchClinicalJobStatus(
   jobId: string,
+  requestId: string,
   timeoutSeconds: number = HTTP_TIMEOUT,
 ): Promise<JobStatusResponse> {
+  const query = new URLSearchParams({ _: requestId }).toString();
   return requestJson<JobStatusResponse>(
-    `${API_BASE_URL}/clinical/jobs/${encodeURIComponent(jobId)}`,
-    { method: "GET" },
+    `${API_BASE_URL}/clinical/jobs/${encodeURIComponent(jobId)}?${query}`,
+    {
+      method: "GET",
+      cache: "no-store",
+      headers: {
+        "Cache-Control": "no-cache, no-store, max-age=0",
+        Pragma: "no-cache",
+      },
+    },
     timeoutSeconds,
   );
 }
@@ -65,12 +74,28 @@ export function pollClinicalJobStatus(
   let timeoutId: ReturnType<typeof globalThis.setTimeout> | null = null;
   let stopped = false;
   let consecutivePollErrors = 0;
+  let latestVersion = -1;
 
   const poll = async () => {
     if (stopped) return;
     try {
-      const status = await fetchClinicalJobStatus(jobId, requestTimeoutSeconds);
+      const status = await fetchClinicalJobStatus(
+        jobId,
+        `${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
+        requestTimeoutSeconds,
+      );
       if (stopped) return;
+      const incomingVersion =
+        typeof status.version === "number" && Number.isFinite(status.version)
+          ? status.version
+          : -1;
+      if (incomingVersion >= 0 && incomingVersion < latestVersion) {
+        timeoutId = globalThis.setTimeout(poll, safeIntervalMs);
+        return;
+      }
+      if (incomingVersion >= 0) {
+        latestVersion = incomingVersion;
+      }
       consecutivePollErrors = 0;
       onUpdate(status);
       if (

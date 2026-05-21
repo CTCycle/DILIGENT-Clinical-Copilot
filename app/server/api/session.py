@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from fastapi import APIRouter, Body, status
+from fastapi import APIRouter, Body, Response, status
 
 from domain.clinical.entities import ClinicalSessionRequest
 from domain.clinical.robustness import ClinicalInputPreflightResult
@@ -37,7 +37,14 @@ class ClinicalSessionEndpoint:
         return self.service.validate_clinical_input(request_payload)
 
     # -------------------------------------------------------------------------
-    def get_clinical_job_status(self, job_id: str) -> JobStatusResponse:
+    def get_clinical_job_status(
+        self,
+        job_id: str,
+        response: Response,
+    ) -> JobStatusResponse:
+        response.headers["Cache-Control"] = "no-store, no-cache, max-age=0, must-revalidate"
+        response.headers["Pragma"] = "no-cache"
+        response.headers["Expires"] = "0"
         return self.service.get_clinical_job_status(job_id)
 
     # -------------------------------------------------------------------------
