@@ -10,6 +10,7 @@ from sqlalchemy.orm import sessionmaker
 
 from services.clinical.livertox import LiverToxData
 from repositories.serialization.data import DataSerializer
+from services.updater import livertox_parse
 from repositories.schemas.models import (
     Base,
     ClinicalSession,
@@ -228,7 +229,7 @@ def test_master_list_sanitization_handles_string_dtype_inputs() -> None:
         }
     )
 
-    sanitized = updater.sanitize_livertox_master_list(raw)
+    sanitized = livertox_parse.sanitize_livertox_master_list(updater, raw)
 
     assert sanitized is not None
     assert len(sanitized.index) == 1

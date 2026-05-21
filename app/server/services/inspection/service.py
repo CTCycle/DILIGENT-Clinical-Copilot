@@ -492,6 +492,15 @@ class DataInspectionService:
         return unique
 
     # -------------------------------------------------------------------------
+    @staticmethod
+    def _resolve_override_value(
+        overrides: dict[str, Any],
+        key: str,
+        fallback: Any,
+    ) -> Any:
+        return overrides[key] if key in overrides else fallback
+
+    # -------------------------------------------------------------------------
     def start_revision_job(
         self,
         session_id: int,
@@ -556,20 +565,17 @@ class DataInspectionService:
             key: value for key, value in (model_overrides or {}).items() if value is not None
         }
 
-        def override_value(key: str, fallback: Any) -> Any:
-            return effective_overrides[key] if key in effective_overrides else fallback
-
         try:
             if effective_overrides:
                 config_serializer.save_snapshot(
-                    clinical_model=override_value("clinical_model", previous_snapshot.clinical_model),
-                    text_extraction_model=override_value("text_extraction_model", previous_snapshot.text_extraction_model),
-                    use_cloud_models=override_value("use_cloud_services", previous_snapshot.use_cloud_models),
-                    cloud_provider=override_value("provider", previous_snapshot.cloud_provider),
-                    cloud_model=override_value("cloud_model", previous_snapshot.cloud_model),
-                    ollama_temperature=override_value("ollama_temperature", previous_snapshot.ollama_temperature),
-                    cloud_temperature=override_value("cloud_temperature", previous_snapshot.cloud_temperature),
-                    ollama_reasoning=override_value("ollama_reasoning", previous_snapshot.ollama_reasoning),
+                    clinical_model=self._resolve_override_value(effective_overrides, "clinical_model", previous_snapshot.clinical_model),
+                    text_extraction_model=self._resolve_override_value(effective_overrides, "text_extraction_model", previous_snapshot.text_extraction_model),
+                    use_cloud_models=self._resolve_override_value(effective_overrides, "use_cloud_services", previous_snapshot.use_cloud_models),
+                    cloud_provider=self._resolve_override_value(effective_overrides, "provider", previous_snapshot.cloud_provider),
+                    cloud_model=self._resolve_override_value(effective_overrides, "cloud_model", previous_snapshot.cloud_model),
+                    ollama_temperature=self._resolve_override_value(effective_overrides, "ollama_temperature", previous_snapshot.ollama_temperature),
+                    cloud_temperature=self._resolve_override_value(effective_overrides, "cloud_temperature", previous_snapshot.cloud_temperature),
+                    ollama_reasoning=self._resolve_override_value(effective_overrides, "ollama_reasoning", previous_snapshot.ollama_reasoning),
                 )
             clinical_service.apply_persisted_runtime_configuration()
             request = ClinicalSessionRequest(
@@ -1212,5 +1218,5 @@ class DataInspectionService:
         payload = self.get_job_status(job_id, expected_type=expected_type)
         if payload is None:
             return False
-        return self.jobs.cancel_job(job_id)
+        return self.jobs.cancel_job(job_id) is not None
 

@@ -11,7 +11,7 @@ from collections.abc import Callable
 
 from common.constants import SENSITIVE_ERROR_TOKENS
 from common.utils.logger import logger
-from domain.jobs import JobState
+from services.runtime.state import JobState
 
 from functools import lru_cache
 
@@ -99,22 +99,35 @@ class JobManager:
         return state.snapshot()
 
     # -------------------------------------------------------------------------
-    def cancel_job(self, job_id: str) -> bool:
+    def cancel_job(self, job_id: str) -> dict[str, Any] | None:
         with self.lock:
             state = self.jobs.get(job_id)
         if state is None:
-            return False
+            return None
         if state.status not in ("pending", "running"):
-            return False
+            return None
         if state.status == "pending":
             state.update(
                 stop_requested=True, status="cancelled", completed_at=monotonic()
             )
             logger.info("Cancelled pending job %s", job_id)
-            return True
-        state.update(stop_requested=True, status="cancelled", completed_at=monotonic())
+            return state.snapshot()
+        with state.lock:
+            state.stop_requested = True
+            state.version += 1
+            snapshot = {
+                "job_id": state.job_id,
+                "job_type": state.job_type,
+                "status": state.status,
+                "progress": state.progress,
+                "result": state.result,
+                "error": state.error,
+                "created_at": state.created_at,
+                "completed_at": state.completed_at,
+                "version": state.version,
+            }
         logger.info("Cancellation requested for job %s", job_id)
-        return True
+        return snapshot
 
     # -------------------------------------------------------------------------
     def is_job_running(self, job_type: str | None = None) -> bool:
@@ -151,15 +164,12 @@ class JobManager:
             state.update(progress=min(100.0, max(0.0, progress)))
 
     # -------------------------------------------------------------------------
-    def update_result(self, job_id: str, patch: dict[str, Any]) -> None:
+    def update_result(self, job_id: str, patch: dict[str, Any]) -> dict[str, Any] | None:
         with self.lock:
             state = self.jobs.get(job_id)
         if state is None:
-            return
-        with state.lock:
-            existing = state.result or {}
-            merged = {**existing, **patch}
-        state.update(result=merged)
+            return None
+        return state.merge_result(patch).model_dump()
 
     # -------------------------------------------------------------------------
     def run_job(

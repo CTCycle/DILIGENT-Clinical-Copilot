@@ -7,7 +7,7 @@ from pathlib import Path
 
 import pytest
 
-from services.updater import livertox_core as livertox_module
+from services.updater import livertox_parse as livertox_module
 from services.updater.livertox_core import LiverToxUpdater
 
 
@@ -44,7 +44,7 @@ def test_collect_monographs_deduplicates_duplicate_basenames(tmp_path: Path) -> 
         archive_name=archive_path.name,
         monograph_max_workers=1,
     )
-    records = updater.collect_monographs(str(archive_path))
+    records = livertox_module.collect_monographs(updater, str(archive_path))
 
     nbk_ids = {item["nbk_id"] for item in records}
     assert nbk_ids == {"NBK10001", "NBK10002"}
@@ -91,7 +91,7 @@ def test_collect_monographs_streams_parallel_batches(
         archive_name=archive_path.name,
         monograph_max_workers=3,
     )
-    records = updater.collect_monographs(str(archive_path))
+    records = livertox_module.collect_monographs(updater, str(archive_path))
 
     assert {item["nbk_id"] for item in records} == {"NBK20001", "NBK20002", "NBK20003"}
 
@@ -110,5 +110,7 @@ def test_collect_monographs_honors_cancellation(tmp_path: Path) -> None:
     )
 
     with pytest.raises(RuntimeError, match="cancelled"):
-        updater.collect_monographs(str(archive_path), should_stop=lambda: True)
+        livertox_module.collect_monographs(
+            updater, str(archive_path), should_stop=lambda: True
+        )
 

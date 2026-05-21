@@ -2,7 +2,6 @@ from __future__ import annotations
 
 import asyncio
 from contextlib import nullcontext
-import json
 import os
 import re
 import sys
@@ -11,53 +10,9 @@ from typing import Any
 
 import httpx
 import pandas as pd
-from tqdm import tqdm
 
 from common.utils.logger import logger
-from services.updater import livertox_parse
-
-SUPPORTED_MONOGRAPH_EXTENSIONS = (".html", ".htm", ".xhtml", ".xml", ".nxml", ".pdf")
-NBK_ID_PATTERN = re.compile(r"^NBK\d+$", re.IGNORECASE)
-
-DEFAULT_HTTP_HEADERS = {
-    "User-Agent": (
-        "DILIGENTClinicalCopilot/1.0 (contact=clinical-copilot@pharmagent.local)"
-    )
-}
-
-DOWNLOAD_CHUNK_SIZE = 262_144
-
-
-# -----------------------------------------------------------------------------
-def load_json(path: str) -> dict[str, Any] | None:
-    if not os.path.isfile(path):
-        return None
-    try:
-        with open(path, "r", encoding="utf-8") as handle:
-            return json.load(handle)
-    except (json.JSONDecodeError, OSError):
-        return None
-
-
-# -----------------------------------------------------------------------------
-def save_masterlist_metadata(path: str, payload: dict[str, Any]) -> None:
-    with open(path, "w", encoding="utf-8") as handle:
-        json.dump(payload, handle)
-
-
-# -----------------------------------------------------------------------------
-def metadata_matches(stored: dict[str, Any], remote: dict[str, Any]) -> bool:
-    return stored.get("last_modified") == remote.get("last_modified") and int(
-        stored.get("size", 0)
-    ) == int(remote.get("size", 0))
-
-
-# -----------------------------------------------------------------------------
-def process_monograph_payload(
-    member_name: str,
-    data: bytes,
-) -> dict[str, str] | None:
-    return livertox_parse.process_monograph_member(member_name, data)
+from services.updater import livertox_common, livertox_parse
 
 
 ###############################################################################
@@ -70,28 +25,16 @@ async def download_file(
     *,
     chunk_size: int,
 ) -> None:
-    async with client.stream("GET", url) as response:
-        response.raise_for_status()
-        progress_context = (
-            tqdm(
-                total=total_size,
-                unit="B",
-                unit_scale=True,
-                desc=label,
-                ncols=80,
-            )
-            if sys.stderr is not None and sys.stderr.isatty()
-            else nullcontext()
-        )
-        with (
-            open(destination, "wb") as output,
-            progress_context as progress,
-        ):
-            async for chunk in response.aiter_bytes(chunk_size=chunk_size):
-                if chunk:
-                    output.write(chunk)
-                    if progress is not None:
-                        progress.update(len(chunk))
+    _ = sys
+    _ = nullcontext
+    await livertox_common.download_file(
+        client,
+        url,
+        destination,
+        total_size,
+        label,
+        chunk_size=chunk_size,
+    )
 
 
 ###############################################################################
@@ -114,14 +57,14 @@ async def download_bulk_data(self, dest_path: str) -> dict[str, Any]:
         os.makedirs(dest_dir, exist_ok=True)
         file_path = os.path.join(dest_dir, self.file_name)
 
-        stored_metadata = load_json(self.archive_metadata_path)
+        stored_metadata = livertox_common.load_json(self.archive_metadata_path)
         if self.redownload:
             stored_metadata = None
 
         if (
             stored_metadata
             and os.path.isfile(file_path)
-            and metadata_matches(stored_metadata, metadata)
+            and livertox_common.metadata_matches(stored_metadata, metadata)
         ):
             logger.info("LiverTox archive unchanged; skipping download")
             return {
@@ -141,7 +84,7 @@ async def download_bulk_data(self, dest_path: str) -> dict[str, Any]:
             self.file_name,
             chunk_size=self.chunk_size,
         )
-        save_masterlist_metadata(self.archive_metadata_path, metadata)
+        livertox_common.save_masterlist_metadata(self.archive_metadata_path, metadata)
 
     return {
         "file_path": file_path,
@@ -153,7 +96,7 @@ async def download_bulk_data(self, dest_path: str) -> dict[str, Any]:
 
 def refresh_master_list(self) -> tuple[dict[str, Any], pd.DataFrame]:
     logger.info("Refreshing LiverTox master list")
-    metadata = asyncio.run(self.download_master_list())
+    metadata = asyncio.run(download_master_list(self))
 
     frame = pd.read_excel(
         metadata["file_path"],
@@ -161,7 +104,7 @@ def refresh_master_list(self) -> tuple[dict[str, Any], pd.DataFrame]:
         header=self.header_row,
         skiprows=0,
     )
-    sanitized = self.sanitize_livertox_master_list(frame)
+    sanitized = livertox_parse.sanitize_livertox_master_list(self, frame)
     if sanitized is None:
         sanitized = pd.DataFrame()
     else:
@@ -183,7 +126,7 @@ async def download_master_list(self) -> dict[str, Any]:
     async with httpx.AsyncClient(
         timeout=30.0, headers=self.http_headers, follow_redirects=True
     ) as client:
-        master_url = await self.resolve_master_list_url(client)
+        master_url = await resolve_master_list_url(self, client)
         head = await client.head(master_url)
         head.raise_for_status()
         metadata = {
@@ -191,13 +134,13 @@ async def download_master_list(self) -> dict[str, Any]:
             "last_modified": head.headers.get("Last-Modified"),
             "source_url": str(head.url),
         }
-        stored_metadata = load_json(self.master_list_metadata_path)
+        stored_metadata = livertox_common.load_json(self.master_list_metadata_path)
         if self.redownload:
             stored_metadata = None
         if (
             stored_metadata
             and os.path.isfile(self.master_list_path)
-            and metadata_matches(stored_metadata, metadata)
+            and livertox_common.metadata_matches(stored_metadata, metadata)
         ):
             logger.info("Master list unchanged; skipping download")
             return {
@@ -217,7 +160,7 @@ async def download_master_list(self) -> dict[str, Any]:
             os.path.basename(self.master_list_path),
             chunk_size=self.chunk_size,
         )
-        save_masterlist_metadata(self.master_list_metadata_path, metadata)
+        livertox_common.save_masterlist_metadata(self.master_list_metadata_path, metadata)
 
     return {
         "file_path": self.master_list_path,
@@ -229,14 +172,14 @@ async def download_master_list(self) -> dict[str, Any]:
 
 async def resolve_master_list_url(self, client: httpx.AsyncClient) -> str:
     try:
-        return await self.resolve_master_list_from_bookshelf(client)
+        return await resolve_master_list_from_bookshelf(self, client)
     except Exception as exc:
         logger.warning("Bookshelf Excel lookup failed: %s", exc)
     try:
-        return await self.resolve_master_list_from_bin(client, self.base_url)
+        return await resolve_master_list_from_bin(self, client, self.base_url)
     except Exception as exc:
         logger.warning("Primary FTP lookup failed: %s", exc)
-        fallback_url = await self.resolve_master_list_via_datagov(client)
+        fallback_url = await resolve_master_list_via_datagov(self, client)
         return fallback_url
 
 async def resolve_master_list_from_bookshelf(
@@ -264,14 +207,14 @@ async def resolve_master_list_from_bookshelf(
             candidate = httpx.URL(report_url).join(
                 head_response.headers["Location"]
             )
-            return await self.probe_master_list_candidate(client, str(candidate))
+            return await probe_master_list_candidate(self, client, str(candidate))
         content_type = (head_response.headers.get("Content-Type") or "").lower()
         disposition = (
             head_response.headers.get("Content-Disposition") or ""
         ).lower()
         if "excel" in content_type or ".xlsx" in disposition:
-            return await self.probe_master_list_candidate(
-                client, str(head_response.url)
+            return await probe_master_list_candidate(
+                self, client, str(head_response.url)
             )
 
     get_response = await client.get(report_url, follow_redirects=False)
@@ -279,12 +222,12 @@ async def resolve_master_list_from_bookshelf(
         "Location"
     ):
         candidate = httpx.URL(report_url).join(get_response.headers["Location"])
-        return await self.probe_master_list_candidate(client, str(candidate))
+        return await probe_master_list_candidate(self, client, str(candidate))
 
     content_type = (get_response.headers.get("Content-Type") or "").lower()
     disposition = (get_response.headers.get("Content-Disposition") or "").lower()
     if "excel" in content_type or ".xlsx" in disposition:
-        return await self.probe_master_list_candidate(client, str(get_response.url))
+        return await probe_master_list_candidate(self, client, str(get_response.url))
 
     html_content = get_response.text
     for pattern in (
@@ -295,8 +238,8 @@ async def resolve_master_list_from_bookshelf(
             candidate_url = match.group(1)
             candidate = httpx.URL(report_url).join(candidate_url)
             try:
-                return await self.probe_master_list_candidate(
-                    client, str(candidate)
+                return await probe_master_list_candidate(
+                    self, client, str(candidate)
                 )
             except Exception as exc:  # pragma: no cover - network dependent
                 logger.debug(
@@ -384,7 +327,7 @@ async def resolve_master_list_via_datagov(self, client: httpx.AsyncClient) -> st
         raw_url = str(resource.get("url") or "").strip()
         if not raw_url:
             continue
-        normalized_url = self.normalize_datagov_resource_url(raw_url)
+        normalized_url = normalize_datagov_resource_url(self, raw_url)
         if not normalized_url:
             continue
         lowered = normalized_url.lower()
@@ -415,8 +358,8 @@ async def resolve_master_list_via_datagov(self, client: httpx.AsyncClient) -> st
     last_error: Exception | None = None
     for candidate in direct_candidates:
         try:
-            resolved_direct = await self.probe_master_list_candidate(
-                client, candidate
+            resolved_direct = await probe_master_list_candidate(
+                self, client, candidate
             )
         except Exception as exc:  # pragma: no cover - network dependent
             last_error = exc
@@ -430,8 +373,8 @@ async def resolve_master_list_via_datagov(self, client: httpx.AsyncClient) -> st
     original_base = self.base_url
     for base_candidate in folder_candidates:
         try:
-            resolved = await self.resolve_master_list_from_bin(
-                client, base_candidate
+            resolved = await resolve_master_list_from_bin(
+                self, client, base_candidate
             )
         except Exception as exc:  # pragma: no cover - network dependent
             last_error = exc
@@ -468,9 +411,9 @@ async def probe_master_list_candidate(
         response = await client.head(candidate)
         response.raise_for_status()
     except httpx.HTTPStatusError:  # pragma: no cover - network dependent
-        response = await self.fetch_candidate_with_get(client, candidate)
+        response = await fetch_candidate_with_get(self, client, candidate)
     except httpx.HTTPError:  # pragma: no cover - network dependent
-        response = await self.fetch_candidate_with_get(client, candidate)
+        response = await fetch_candidate_with_get(self, client, candidate)
     content_type = (response.headers.get("Content-Type") or "").lower()
     if ".xlsx" not in candidate.lower() and "excel" not in content_type:
         disposition = (response.headers.get("Content-Disposition") or "").lower()
