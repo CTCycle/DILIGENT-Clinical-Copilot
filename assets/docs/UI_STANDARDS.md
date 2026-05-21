@@ -1,6 +1,6 @@
 # UI Standards
 
-Last updated: 2026-05-17
+Last updated: 2026-05-20
 
 Scope: `DILIGENT/client/src` (Angular + SCSS).
 
@@ -89,6 +89,10 @@ Scope: `DILIGENT/client/src` (Angular + SCSS).
   - Keep terminal states explicit (`completed`, `failed`, `cancelled`).
 - Clinical Sessions:
   - Session detail is the canonical UI source for report preview, parser output, metadata, revision audit, and timeline entry points.
+  - Session lists should stay in bounded scroll containers so the page height remains stable with large session histories.
+  - Preview reports render as formatted HTML, not raw Markdown/plain text.
+  - Drug evidence indicators should prefer persisted pipeline match metadata before falling back to catalog lookups.
+  - Laboratory previews should show all retrieved `lab_timeline` occurrences when available, not only one summary value per marker.
   - Metadata UI should summarize `documents` and `images` from the same persisted metadata JSON instead of storing parallel attachment state.
   - Revision Mode should keep full-session reprocessing as the default while allowing a selected excerpt and free-text revision instruction to focus the second pass.
 
