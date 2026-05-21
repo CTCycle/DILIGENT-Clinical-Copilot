@@ -583,13 +583,15 @@ export class ClinicalSessionsPageComponent implements OnInit, OnDestroy {
 
   private previewDetectedDiseases(detail: ClinicalSessionDetail): string[] {
     const fromPayload = detail.result_payload?.['detected_diseases'];
-    if (Array.isArray(fromPayload)) {
-      const diseases = fromPayload
-        .filter((item): item is string => typeof item === 'string')
-        .map((item) => item.trim())
-        .filter((item) => item.length > 0);
-      if (diseases.length) return diseases;
-    }
+    const fromAnamnesis = detail.result_payload?.['anamnesis_diseases'];
+    const structuredCase = this.recordValue(detail.result_payload?.['structured_case']);
+    const structuredDiseases = structuredCase?.['anamnesis_diseases'];
+    const direct = this.collectDiseaseNames(fromPayload);
+    if (direct.length) return direct;
+    const anamnesis = this.collectDiseaseNames(fromAnamnesis);
+    if (anamnesis.length) return anamnesis;
+    const structured = this.collectDiseaseNames(structuredDiseases);
+    if (structured.length) return structured;
     const report = this.previewReport(detail);
     const lines = report.split(/\r?\n/);
     const diseaseLine = lines.find((line) => /detected diseases?/i.test(line));
@@ -601,6 +603,19 @@ export class ClinicalSessionsPageComponent implements OnInit, OnDestroy {
       .split(',')
       .map((item) => item.replace(/[*-]/g, '').trim())
       .filter((item) => item.length > 0);
+  }
+
+  private collectDiseaseNames(value: unknown): string[] {
+    if (!Array.isArray(value)) return [];
+    const names = value
+      .map((item) => {
+        if (typeof item === 'string') return item.trim();
+        const record = this.recordValue(item);
+        if (!record) return '';
+        return this.stringValue(record['name']) || this.stringValue(record['disease_name']) || '';
+      })
+      .filter((name) => name.length > 0);
+    return [...new Set(names)];
   }
 
   private previewLabTimeline(detail: ClinicalSessionDetail): LabTimelineRow[] {

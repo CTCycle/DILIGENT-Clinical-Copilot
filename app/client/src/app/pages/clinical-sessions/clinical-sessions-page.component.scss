@@ -229,10 +229,11 @@
 
 .clinical-session-tabs {
   display: flex;
+  flex-wrap: wrap;
   gap: var(--space-sm);
   border-bottom: 1px solid var(--color-divider);
   margin-bottom: var(--space-md);
-  overflow-x: auto;
+  overflow: visible;
 }
 
 .clinical-session-tabs button {
@@ -279,6 +280,7 @@
   border-right: 0;
   border-radius: 8px;
   background: transparent;
+  overflow: visible;
 }
 
 .clinical-session-toolbar-group {
@@ -517,34 +519,29 @@
   table-layout: fixed;
   border-collapse: collapse;
   color: #25312f;
-  font-size: 10px;
+  font-size: 12px;
 }
 
 .clinical-session-drug-table th,
 .clinical-session-drug-table td {
   border-bottom: 1px solid #e2ece7;
-  padding: 6px 4px;
+  padding: 6px 3px;
   text-align: left;
   vertical-align: middle;
 }
 
 .clinical-session-drug-table th {
-  color: #65726e;
-  font-size: 10px;
+  color: #25312f;
+  font-size: 12px;
   font-weight: 800;
   letter-spacing: 0;
   text-transform: none;
-  white-space: normal;
+  white-space: nowrap;
   line-height: 1.2;
-  word-break: break-word;
-}
-
-.clinical-session-drug-table th span {
-  display: block;
 }
 
 .clinical-session-drug-table td:first-child {
-  width: 46%;
+  width: 40%;
   font-weight: 750;
   overflow-wrap: anywhere;
   word-break: break-word;
@@ -555,14 +552,14 @@
 .clinical-session-drug-table td:nth-child(2),
 .clinical-session-drug-table th:nth-child(3),
 .clinical-session-drug-table td:nth-child(3) {
-  width: 14%;
+  width: 15%;
 }
 
 .clinical-session-drug-table th:nth-child(4),
 .clinical-session-drug-table td:nth-child(4),
 .clinical-session-drug-table th:nth-child(5),
 .clinical-session-drug-table td:nth-child(5) {
-  width: 13%;
+  width: 15%;
 }
 
 .clinical-session-drug-table th:nth-child(2),
@@ -583,8 +580,8 @@
   min-width: 28px;
   border-radius: 999px;
   background: #f1f5f9;
-  color: #64748b;
-  font-size: 10px;
+  color: #506170;
+  font-size: 11px;
   font-weight: 800;
   line-height: 1;
   padding: 4px 5px;
@@ -637,8 +634,8 @@
 
 .clinical-session-lab-table-wrap {
   margin-top: var(--space-sm);
-  max-height: 280px;
-  overflow: auto;
+  max-height: none;
+  overflow: visible;
 }
 
 .clinical-session-lab-table {
