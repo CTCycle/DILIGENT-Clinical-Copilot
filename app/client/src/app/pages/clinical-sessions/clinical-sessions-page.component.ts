@@ -36,6 +36,20 @@ type DetectedDrugEvidence = {
   inTherapy: boolean;
 };
 
+type LabTimelineRow = {
+  marker: string;
+  value: string;
+  unit: string;
+  upperLimit: string;
+  timing: string;
+  source: string;
+  evidence: string;
+};
+
+type DrugEvidenceDraft = DetectedDrugEvidence & {
+  hasPersistedMatch: boolean;
+};
+
 @Component({
   selector: 'app-clinical-sessions-page',
   standalone: true,
@@ -97,6 +111,7 @@ export class ClinicalSessionsPageComponent implements OnInit, OnDestroy {
   readonly detectedDrugEvidence = signal<DetectedDrugEvidence[]>([]);
   readonly detectedDiseases = signal<string[]>([]);
   readonly labSummary = signal<Array<{ label: string; value: string }>>([]);
+  readonly labTimeline = signal<LabTimelineRow[]>([]);
   readonly hepatotoxicityPattern = signal<string>('N/A');
 
   ngOnInit(): void {
@@ -145,6 +160,7 @@ export class ClinicalSessionsPageComponent implements OnInit, OnDestroy {
       this.activeSection.set('preview');
       this.detectedDiseases.set(this.previewDetectedDiseases(detail));
       this.labSummary.set(this.previewLaboratorySummary(detail));
+      this.labTimeline.set(this.previewLabTimeline(detail));
       this.hepatotoxicityPattern.set(this.previewHepatotoxicityPattern(detail));
       void this.loadDetectedDrugEvidence(detail);
     } catch (error) {
@@ -268,14 +284,6 @@ export class ClinicalSessionsPageComponent implements OnInit, OnDestroy {
 
   setSection(section: 'preview' | 'editor' | 'metadata' | 'revision' | 'timeline'): void {
     this.activeSection.set(section);
-  }
-
-  captureRevisionSelection(): void {
-    const selection = globalThis.getSelection()?.toString().trim() || '';
-    if (selection) {
-      this.revisionSelection.set(selection);
-      this.activeSection.set('revision');
-    }
   }
 
   updateRevisionModelProvider(value: 'local' | 'cloud'): void {
@@ -414,6 +422,10 @@ export class ClinicalSessionsPageComponent implements OnInit, OnDestroy {
     return typeof report === 'string' && report.trim() ? report.trim() : 'No AI report preview is available for this session.';
   }
 
+  previewReportHtml(detail: ClinicalSessionDetail): string {
+    return this.markdownRenderer.render(this.previewReport(detail)).html;
+  }
+
   previewDetectedDrugs(detail: ClinicalSessionDetail): string[] {
     const detected = detail.result_payload?.['detected_drugs'];
     return Array.isArray(detected)
@@ -422,33 +434,117 @@ export class ClinicalSessionsPageComponent implements OnInit, OnDestroy {
   }
 
   private async loadDetectedDrugEvidence(detail: ClinicalSessionDetail): Promise<void> {
-    const drugs = this.previewDetectedDrugs(detail);
-    const sections = this.sectionTextMap(detail);
-    this.detectedDrugEvidence.set(drugs.map((name) => ({
-      name,
-      liverTox: false,
-      rxNav: false,
-      inAnamnesis: this.textContainsDrug(sections.anamnesis, name),
-      inTherapy: this.textContainsDrug(sections.therapy, name),
-    })));
-    if (!drugs.length) return;
+    const rows = this.buildPersistedDrugEvidence(detail);
+    if (this.selected()?.session_id === detail.session_id) {
+      this.detectedDrugEvidence.set(rows.map(({ hasPersistedMatch: _hasPersistedMatch, ...row }) => row));
+    }
+    if (!rows.length) return;
 
-    const rows = await Promise.all(drugs.map(async (name): Promise<DetectedDrugEvidence> => {
+    const needsFallback = rows.filter((row) => !row.hasPersistedMatch || !row.rxNav);
+    if (!needsFallback.length) return;
+
+    const fallbackByName = new Map<string, Partial<DetectedDrugEvidence>>();
+    await Promise.all(needsFallback.map(async (row) => {
       const [rxNav, liverTox] = await Promise.all([
-        this.catalogHasDrug('rxnav', name),
-        this.catalogHasDrug('livertox', name),
+        row.rxNav ? Promise.resolve(true) : this.catalogHasDrug('rxnav', row.name),
+        row.liverTox || row.hasPersistedMatch ? Promise.resolve(row.liverTox) : this.catalogHasDrug('livertox', row.name),
       ]);
-      return {
-        name,
-        rxNav,
-        liverTox,
-        inAnamnesis: this.textContainsDrug(sections.anamnesis, name),
-        inTherapy: this.textContainsDrug(sections.therapy, name),
-      };
+      fallbackByName.set(row.name, { rxNav, liverTox });
     }));
     if (this.selected()?.session_id === detail.session_id) {
-      this.detectedDrugEvidence.set(rows);
+      this.detectedDrugEvidence.set(rows.map(({ hasPersistedMatch: _hasPersistedMatch, ...row }) => ({
+        ...row,
+        rxNav: fallbackByName.get(row.name)?.rxNav ?? row.rxNav,
+        liverTox: fallbackByName.get(row.name)?.liverTox ?? row.liverTox,
+      })));
     }
+  }
+
+  private buildPersistedDrugEvidence(detail: ClinicalSessionDetail): DrugEvidenceDraft[] {
+    const rows = new Map<string, DrugEvidenceDraft>();
+    const sections = this.sectionTextMap(detail);
+    const ensureRow = (name: string): DrugEvidenceDraft => {
+      const normalized = this.normalizeDrugName(name);
+      const key = normalized || name.trim().toLowerCase();
+      const existing = rows.get(key);
+      if (existing) return existing;
+      const next: DrugEvidenceDraft = {
+        name,
+        liverTox: false,
+        rxNav: false,
+        inAnamnesis: this.textContainsDrug(sections.anamnesis, name),
+        inTherapy: this.textContainsDrug(sections.therapy, name),
+        hasPersistedMatch: false,
+      };
+      rows.set(key, next);
+      return next;
+    };
+
+    for (const name of this.previewDetectedDrugs(detail)) {
+      ensureRow(name);
+    }
+
+    const structuredCase = this.recordValue(detail.result_payload?.['structured_case']);
+    const therapyDrugs = this.arrayValue(structuredCase?.['therapy_drugs']);
+    const anamnesisDrugs = [
+      ...this.arrayValue(structuredCase?.['anamnesis_drugs']),
+      ...this.arrayValue(detail.result_payload?.['anamnesis_drugs']),
+    ];
+    for (const item of therapyDrugs) {
+      const name = this.drugNameFromUnknown(item);
+      if (!name) continue;
+      ensureRow(name).inTherapy = true;
+    }
+    for (const item of anamnesisDrugs) {
+      const name = this.drugNameFromUnknown(item);
+      if (!name) continue;
+      ensureRow(name).inAnamnesis = true;
+    }
+
+    for (const item of this.arrayValue(detail.result_payload?.['matched_drugs'])) {
+      const record = this.recordValue(item);
+      if (!record) continue;
+      const name = this.stringValue(record['raw_drug_name'])
+        || this.stringValue(record['drug_name'])
+        || this.stringValue(record['matched_drug_name']);
+      if (!name) continue;
+      const row = ensureRow(name);
+      const matchedName = this.stringValue(record['matched_drug_name']);
+      row.hasPersistedMatch = true;
+      row.name = row.name || matchedName || name;
+      row.liverTox = row.liverTox || this.hasLiverToxEvidence(record);
+      row.rxNav = row.rxNav || this.hasRxNavEvidence(record);
+      row.inTherapy = row.inTherapy || this.originsContain(record, 'therapy') || this.rawMentionsContain(record, sections.therapy);
+      row.inAnamnesis = row.inAnamnesis || this.originsContain(record, 'anamnesis') || this.rawMentionsContain(record, sections.anamnesis);
+    }
+
+    return [...rows.values()];
+  }
+
+  private hasLiverToxEvidence(record: Record<string, unknown>): boolean {
+    if (this.recordValue(record['matched_livertox_row'])) return true;
+    if (this.stringValue(record['nbk_id'])) return true;
+    const status = this.stringValue(record['match_status'])?.toLowerCase();
+    if (status === 'matched_with_excerpt' || status === 'matched_no_excerpt' || status === 'matched') return true;
+    return record['missing_livertox'] === false;
+  }
+
+  private hasRxNavEvidence(record: Record<string, unknown>): boolean {
+    if (this.stringValue(record['rxnorm_rxcui'])) return true;
+    if (this.stringValue(record['rxcui'])) return true;
+    const sources = this.arrayValue(record['sources']);
+    return sources.some((source) => this.stringValue(source)?.toLowerCase() === 'rxnav');
+  }
+
+  private originsContain(record: Record<string, unknown>, origin: 'therapy' | 'anamnesis'): boolean {
+    return this.arrayValue(record['origins']).some((value) => this.stringValue(value)?.toLowerCase().includes(origin));
+  }
+
+  private rawMentionsContain(record: Record<string, unknown>, text: string): boolean {
+    return this.arrayValue(record['raw_mentions']).some((value) => {
+      const mention = this.stringValue(value);
+      return mention ? this.textContainsDrug(text, mention) : false;
+    });
   }
 
   private async catalogHasDrug(source: 'rxnav' | 'livertox', name: string): Promise<boolean> {
@@ -505,6 +601,27 @@ export class ClinicalSessionsPageComponent implements OnInit, OnDestroy {
       .split(',')
       .map((item) => item.replace(/[*-]/g, '').trim())
       .filter((item) => item.length > 0);
+  }
+
+  private previewLabTimeline(detail: ClinicalSessionDetail): LabTimelineRow[] {
+    return this.arrayValue(detail.result_payload?.['lab_timeline'])
+      .map((item) => this.recordValue(item))
+      .filter((item): item is Record<string, unknown> => item !== null)
+      .map((item) => {
+        const value = this.stringValue(item['value']) || this.stringValue(item['value_text']) || 'N/A';
+        const unit = this.stringValue(item['unit']) || '';
+        const upperLimit = this.stringValue(item['upper_limit_normal']) || this.stringValue(item['upper_limit_text']) || 'N/A';
+        const timing = this.stringValue(item['sample_date']) || this.stringValue(item['relative_time']) || 'Unknown';
+        return {
+          marker: this.stringValue(item['marker_name']) || 'Lab',
+          value,
+          unit,
+          upperLimit,
+          timing,
+          source: this.stringValue(item['source']) || 'N/A',
+          evidence: this.stringValue(item['evidence']) || '',
+        };
+      });
   }
 
   private previewLaboratorySummary(detail: ClinicalSessionDetail): Array<{ label: string; value: string }> {
@@ -585,6 +702,32 @@ export class ClinicalSessionsPageComponent implements OnInit, OnDestroy {
         return { label, value: String(payloadEntry[1]).trim() };
       })
       .filter((item): item is { label: string; value: string } => item !== null);
+  }
+
+  private drugNameFromUnknown(value: unknown): string | null {
+    if (typeof value === 'string') return value.trim() || null;
+    const record = this.recordValue(value);
+    if (!record) return null;
+    return this.stringValue(record['name'])
+      || this.stringValue(record['drug_name'])
+      || this.stringValue(record['raw_drug_name'])
+      || this.stringValue(record['matched_drug_name']);
+  }
+
+  private stringValue(value: unknown): string | null {
+    if (typeof value === 'string') return value.trim() || null;
+    if (typeof value === 'number' || typeof value === 'boolean') return String(value);
+    return null;
+  }
+
+  private recordValue(value: unknown): Record<string, unknown> | null {
+    return value && typeof value === 'object' && !Array.isArray(value)
+      ? value as Record<string, unknown>
+      : null;
+  }
+
+  private arrayValue(value: unknown): unknown[] {
+    return Array.isArray(value) ? value : [];
   }
 
   private dateKey(value: string | null): string {

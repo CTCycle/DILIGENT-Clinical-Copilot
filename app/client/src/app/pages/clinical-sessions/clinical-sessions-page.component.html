@@ -72,31 +72,33 @@
           />
         </div>
       </div>
-      @if (loading()) {
-        <p class="clinical-sessions-empty">Loading sessions...</p>
-      } @else if (!filteredSessions().length) {
-        <p class="clinical-sessions-empty">No clinical sessions found.</p>
-      } @else {
-        @for (session of filteredSessions(); track session.session_id) {
-          <button
-            type="button"
-            class="clinical-session-row"
-            [class.is-active]="selected()?.session_id === session.session_id"
-            (click)="openSession(session.session_id)"
-          >
-            <span class="clinical-session-row-main">
-              <strong>{{ session.patient_name || 'Unknown patient' }}</strong>
-              <small>Session {{ session.session_id }} · Version {{ session.version || 1 }}</small>
-            </span>
-            <span class="clinical-session-row-meta">
-              <span>{{ session.session_timestamp ? (session.session_timestamp | date:'medium') : 'No date' }}</span>
-              <span class="clinical-session-status-chip" [class.is-failed]="session.status === 'failed'">
-                {{ statusLabel(session.status) }}
+      <div class="clinical-sessions-results">
+        @if (loading()) {
+          <p class="clinical-sessions-empty">Loading sessions...</p>
+        } @else if (!filteredSessions().length) {
+          <p class="clinical-sessions-empty">No clinical sessions found.</p>
+        } @else {
+          @for (session of filteredSessions(); track session.session_id) {
+            <button
+              type="button"
+              class="clinical-session-row"
+              [class.is-active]="selected()?.session_id === session.session_id"
+              (click)="openSession(session.session_id)"
+            >
+              <span class="clinical-session-row-main">
+                <strong>{{ session.patient_name || 'Unknown patient' }}</strong>
+                <small>Session {{ session.session_id }} · Version {{ session.version || 1 }}</small>
               </span>
-            </span>
-          </button>
+              <span class="clinical-session-row-meta">
+                <span>{{ session.session_timestamp ? (session.session_timestamp | date:'medium') : 'No date' }}</span>
+                <span class="clinical-session-status-chip" [class.is-failed]="session.status === 'failed'">
+                  {{ statusLabel(session.status) }}
+                </span>
+              </span>
+            </button>
+          }
         }
-      }
+      </div>
     </aside>
 
     <section class="clinical-session-workspace">
@@ -125,12 +127,7 @@
           <section class="clinical-session-preview">
             <div class="clinical-session-preview-main">
               <div class="clinical-session-preview-card">
-                <div class="clinical-session-preview-actions">
-                  <button class="btn btn-secondary" type="button" (click)="captureRevisionSelection()">
-                    Include selection in revision
-                  </button>
-                </div>
-                <pre>{{ previewReport(detail) }}</pre>
+                <div class="clinical-session-preview-content" [innerHTML]="previewReportHtml(detail)"></div>
               </div>
             </div>
             <aside class="clinical-session-preview-side">
@@ -200,20 +197,50 @@
                     <dt>Hepatotoxicity pattern</dt>
                     <dd>{{ hepatotoxicityPattern() }}</dd>
                   </div>
-                  @if (labSummary().length) {
+                </dl>
+                @if (labTimeline().length) {
+                  <div class="clinical-session-lab-table-wrap">
+                    <table class="clinical-session-lab-table">
+                      <thead>
+                        <tr>
+                          <th>Time</th>
+                          <th>Marker</th>
+                          <th>Value</th>
+                          <th>ULN</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        @for (item of labTimeline(); track item.marker + item.timing + item.value + $index) {
+                          <tr>
+                            <td>
+                              <strong>{{ item.timing }}</strong>
+                              <span>{{ item.source }}</span>
+                            </td>
+                            <td>{{ item.marker }}</td>
+                            <td>{{ item.value }}{{ item.unit ? ' ' + item.unit : '' }}</td>
+                            <td>{{ item.upperLimit }}</td>
+                          </tr>
+                          @if (item.evidence) {
+                            <tr class="clinical-session-lab-evidence-row">
+                              <td colspan="4">{{ item.evidence }}</td>
+                            </tr>
+                          }
+                        }
+                      </tbody>
+                    </table>
+                  </div>
+                } @else if (labSummary().length) {
+                  <dl class="clinical-session-audit-list clinical-session-compact-list">
                     @for (item of labSummary(); track item.label) {
                       <div>
                         <dt>{{ item.label }}</dt>
                         <dd>{{ item.value }}</dd>
                       </div>
                     }
-                  } @else {
-                    <div>
-                      <dt>Laboratory data</dt>
-                      <dd>No laboratory summary available.</dd>
-                    </div>
-                  }
-                </dl>
+                  </dl>
+                } @else {
+                  <p class="clinical-session-panel-note">No laboratory summary available.</p>
+                }
               </div>
               <div class="clinical-session-preview-card">
                 <h3>Revision audit</h3>

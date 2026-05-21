@@ -76,6 +76,7 @@ def build_single_matched_drug_row_workflow(
         "raw_drug_name": detected_name,
         "matched_drug_name": matched_row.get("drug_name"),
         "nbk_id": matched_row.get("nbk_id"),
+        "rxnorm_rxcui": matched_row.get("rxnorm_rxcui"),
         "match_confidence": match_confidence,
         "match_reason": resolved.get("match_reason"),
         "match_notes": match_notes,

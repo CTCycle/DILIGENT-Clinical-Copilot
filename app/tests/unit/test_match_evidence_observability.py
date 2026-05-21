@@ -27,7 +27,10 @@ def test_matched_drug_payload_exposes_evidence_quality() -> None:
     prepared_inputs = SimpleNamespace(
         resolved_drugs={
             "ondansetron": {
-                "matched_livertox_row": {"drug_name": "5-HT3 Receptor Antagonists"},
+                "row": {
+                    "drug_name": "5-HT3 Receptor Antagonists",
+                    "rxnorm_rxcui": "26225",
+                },
                 "match_confidence": 0.92,
                 "match_reason": "exact_alias",
                 "match_notes": ["matched_record_missing_excerpt"],
@@ -45,6 +48,7 @@ def test_matched_drug_payload_exposes_evidence_quality() -> None:
     )
 
     assert payload[0]["evidence_quality"] == "weak_alias_or_class_match"
+    assert payload[0]["rxnorm_rxcui"] == "26225"
     assert (
         "Drug match is not a direct canonical match." in payload[0]["evidence_warnings"]
     )
