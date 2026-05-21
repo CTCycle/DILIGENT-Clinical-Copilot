@@ -1,185 +1,12 @@
 from __future__ import annotations
 
-import asyncio
-import json
-import os
-import re
 from typing import Any, cast
-from collections.abc import Callable
 
-import httpx
 import pandas as pd
-from tqdm import tqdm
 
-from configurations.startup import server_settings
 from common.utils.logger import logger
 from services.updater import livertox_parse
 
-SUPPORTED_MONOGRAPH_EXTENSIONS = (".html", ".htm", ".xhtml", ".xml", ".nxml", ".pdf")
-NBK_ID_PATTERN = re.compile(r"^NBK\d+$", re.IGNORECASE)
-
-DEFAULT_HTTP_HEADERS = {
-    "User-Agent": (
-        "DILIGENTClinicalCopilot/1.0 (contact=clinical-copilot@pharmagent.local)"
-    )
-}
-
-DOWNLOAD_CHUNK_SIZE = 262_144
-
-
-# -----------------------------------------------------------------------------
-def load_json(path: str) -> dict[str, Any] | None:
-    if not os.path.isfile(path):
-        return None
-    try:
-        with open(path, "r", encoding="utf-8") as handle:
-            return json.load(handle)
-    except (json.JSONDecodeError, OSError):
-        return None
-
-
-# -----------------------------------------------------------------------------
-def save_masterlist_metadata(path: str, payload: dict[str, Any]) -> None:
-    with open(path, "w", encoding="utf-8") as handle:
-        json.dump(payload, handle)
-
-
-# -----------------------------------------------------------------------------
-def metadata_matches(stored: dict[str, Any], remote: dict[str, Any]) -> bool:
-    return stored.get("last_modified") == remote.get("last_modified") and int(
-        stored.get("size", 0)
-    ) == int(remote.get("size", 0))
-
-
-# -----------------------------------------------------------------------------
-def process_monograph_payload(
-    member_name: str,
-    data: bytes,
-) -> dict[str, str] | None:
-    return livertox_parse.process_monograph_member(member_name, data)
-
-
-###############################################################################
-async def download_file(
-    client: httpx.AsyncClient,
-    url: str,
-    destination: str,
-    total_size: int,
-    label: str,
-    *,
-    chunk_size: int,
-) -> None:
-    async with client.stream("GET", url) as response:
-        response.raise_for_status()
-        with (
-            open(destination, "wb") as output,
-            tqdm(
-                total=total_size,
-                unit="B",
-                unit_scale=True,
-                desc=label,
-                ncols=80,
-            ) as progress,
-        ):
-            async for chunk in response.aiter_bytes(chunk_size=chunk_size):
-                if chunk:
-                    output.write(chunk)
-                    progress.update(len(chunk))
-
-
-###############################################################################
-
-# Extracted from the facade module; functions intentionally accept the facade instance.
-
-def update_from_livertox(
-    self,
-    *,
-    progress_callback: Callable[[float, str], None] | None = None,
-    should_stop: Callable[[], bool] | None = None,
-) -> dict[str, Any]:
-    logger.info("Starting LiverTox update")
-    if self.should_cancel(should_stop):
-        raise RuntimeError("LiverTox update cancelled by user request")
-    self.emit_progress(
-        progress_callback,
-        progress=5.0,
-        message="Refreshing LiverTox master list",
-    )
-    master_metadata, master_frame = self.refresh_master_list()
-
-    logger.info("Checking LiverTox archive metadata")
-    if self.should_cancel(should_stop):
-        raise RuntimeError("LiverTox update cancelled by user request")
-    self.emit_progress(
-        progress_callback,
-        progress=20.0,
-        message="Downloading LiverTox archive metadata",
-    )
-    archive_metadata = asyncio.run(self.download_bulk_data(self.sources_path))
-    archive_path = archive_metadata.get("file_path") or os.path.join(
-        self.sources_path, server_settings.external_data.livertox_archive
-    )
-
-    local_info = self.collect_local_archive_info(archive_path)
-    logger.info("Extracting LiverTox monographs from %s", archive_path)
-    self.emit_progress(
-        progress_callback,
-        progress=35.0,
-        message="Extracting LiverTox monographs",
-    )
-    extracted = self.collect_monographs(
-        archive_path,
-        should_stop=should_stop,
-        progress_callback=progress_callback,
-    )
-    if self.should_cancel(should_stop):
-        raise RuntimeError("LiverTox update cancelled by user request")
-    logger.info("Sanitizing %d extracted entries", len(extracted))
-    self.emit_progress(
-        progress_callback,
-        progress=70.0,
-        message="Sanitizing extracted LiverTox entries",
-    )
-    monograph_df = self.sanitize_records(extracted)
-    logger.info("Combining LiverTox datasets")
-    self.emit_progress(
-        progress_callback,
-        progress=80.0,
-        message="Combining master list and monograph excerpts",
-    )
-    unified = self.build_unified_dataset(
-        monograph_df,
-        master_frame,
-        master_metadata,
-    )
-    logger.info("Finalizing sanitized dataset")
-    self.emit_progress(
-        progress_callback,
-        progress=88.0,
-        message="Finalizing LiverTox dataset",
-    )
-    final_dataset = self.finalize_dataset(unified)
-    logger.info("Persisting finalized records to database")
-    if self.should_cancel(should_stop):
-        raise RuntimeError("LiverTox update cancelled by user request")
-    self.emit_progress(
-        progress_callback,
-        progress=95.0,
-        message="Persisting LiverTox records",
-    )
-    self.serializer.save_livertox_records(final_dataset)
-
-    payload = {**master_metadata, **archive_metadata, **local_info}
-    payload["processed_entries"] = len(final_dataset.index)
-    payload["records"] = len(final_dataset.index)
-    logger.info("LiverTox update completed successfully")
-    self.emit_progress(
-        progress_callback,
-        progress=99.0,
-        message="LiverTox update completed",
-    )
-
-    return payload
 
 def build_unified_dataset(
     self,
@@ -252,7 +79,7 @@ def build_unified_dataset(
             if column not in dataset.columns:
                 dataset[column] = pd.NA
         dataset = cast(pd.DataFrame, dataset[final_columns])
-        return self.sanitize_unified_dataset(dataset)
+        return sanitize_unified_dataset(self, dataset)
 
     dataset = cast(pd.DataFrame, master.merge(monograph_df, on="drug_name", how="left"))
     if not monograph_df.empty:
@@ -269,7 +96,7 @@ def build_unified_dataset(
             filler = cast(pd.DataFrame, filler[dataset.columns])
             dataset = cast(pd.DataFrame, pd.concat([dataset, filler], ignore_index=True))
     dataset = cast(pd.DataFrame, dataset[final_columns])
-    return self.sanitize_unified_dataset(dataset)
+    return sanitize_unified_dataset(self, dataset)
 
 def sanitize_unified_dataset(self, frame: pd.DataFrame) -> pd.DataFrame:
     if frame.empty:
@@ -280,7 +107,9 @@ def sanitize_unified_dataset(self, frame: pd.DataFrame) -> pd.DataFrame:
     sanitized = cast(pd.DataFrame, sanitized[sanitized_drug_names != ""])
     numeric_mask = cast(pd.Series, sanitized["drug_name"]).str.fullmatch(r"\d+")
     sanitized = cast(pd.DataFrame, sanitized[~numeric_mask])
-    symbol_mask = cast(pd.Series, sanitized["drug_name"]).apply(self.contains_symbol)
+    symbol_mask = cast(pd.Series, sanitized["drug_name"]).apply(
+        lambda value: livertox_parse.contains_symbol(self, value)
+    )
     sanitized = cast(pd.DataFrame, sanitized[~symbol_mask])
 
     for column in ("ingredient", "brand_name"):
@@ -297,7 +126,7 @@ def sanitize_unified_dataset(self, frame: pd.DataFrame) -> pd.DataFrame:
         ] = pd.NA
         column_values = cast(pd.Series, sanitized[column])
         invalid_mask = column_values.notna() & column_values.apply(
-            self.contains_symbol
+            lambda value: livertox_parse.contains_symbol(self, value)
         )
         invalid_mask = invalid_mask.fillna(False)
         sanitized = cast(pd.DataFrame, sanitized[~invalid_mask])
@@ -313,7 +142,7 @@ def sanitize_unified_dataset(self, frame: pd.DataFrame) -> pd.DataFrame:
 def finalize_dataset(self, frame: pd.DataFrame) -> pd.DataFrame:
     if frame.empty:
         return frame.copy()
-    finalized = self.sanitize_unified_dataset(frame)
+    finalized = sanitize_unified_dataset(self, frame)
     for column in finalized.columns:
         if column == "drug_name":
             continue
@@ -342,7 +171,9 @@ def finalize_dataset(self, frame: pd.DataFrame) -> pd.DataFrame:
     ] = pd.NA
     if "nbk_id" not in finalized.columns:
         finalized["nbk_id"] = pd.NA
-    nbk_series = cast(pd.Series, finalized["nbk_id"]).apply(self.normalize_nbk_id)
+    nbk_series = cast(pd.Series, finalized["nbk_id"]).apply(
+        lambda value: livertox_parse.normalize_nbk_id(self, value)
+    )
     present_nbk_series = cast(pd.Series, nbk_series.dropna())
     counts = cast(pd.Series, present_nbk_series.value_counts())
     unique_counts = cast(pd.Series, counts[counts == 1])

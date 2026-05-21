@@ -11,8 +11,8 @@ Last updated: 2026-05-18
   - API: `127.0.0.1:7690`
   - UI: `127.0.0.1:9847`
 - Template ports from `settings/.env.local.example`:
-  - API: `127.0.0.1:8000`
-  - UI: `127.0.0.1:7861`
+  - API: `127.0.0.1:7690`
+  - UI: `127.0.0.1:9847`
 
 ### Desktop runtime (Tauri)
 - Tauri wrapper (`app/client/src-tauri`) bundles:

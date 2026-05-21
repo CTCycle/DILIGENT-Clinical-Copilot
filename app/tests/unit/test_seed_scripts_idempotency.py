@@ -17,6 +17,7 @@ from repositories.schemas.models import (
     TextNormalizationTerm,
 )
 from repositories.serialization.text_normalization import TextNormalizationVocabularySerializer
+from services.updater import livertox_index
 from services.updater.livertox_core import LiverToxUpdater
 
 
@@ -261,7 +262,7 @@ def test_livertox_duplicate_nbk_is_nulled() -> None:
         ]
     )
 
-    finalized = updater.finalize_dataset(frame)
+    finalized = livertox_index.finalize_dataset(updater, frame)
 
     assert finalized["nbk_id"].isna().all()
 

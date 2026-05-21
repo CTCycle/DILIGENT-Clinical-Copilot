@@ -159,6 +159,7 @@ Inspection:
 - Domain models (`app/server/domain/*`)
   - Pydantic/domain request-response schemas and typed contracts.
   - Clinical extraction schemas used by service orchestration live under `app/server/domain/clinical/`.
+- Runtime job state is internal and lives in `app/server/services/runtime/state.py`; it is not a domain contract and must not be imported by endpoints.
 - Repository layer (`app/server/repositories/*`)
   - SQL persistence, serialization, vector store access.
   - Text-normalization vocabulary persistence and snapshot loading are implemented in `app/server/repositories/serialization/text_normalization.py`.

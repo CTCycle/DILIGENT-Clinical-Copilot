@@ -2,7 +2,6 @@ from __future__ import annotations
 
 import html
 import io
-import json
 import multiprocessing
 import os
 import re
@@ -18,49 +17,14 @@ from concurrent.futures import (
 from typing import Any, cast
 from collections.abc import Callable
 
-import httpx
 import pandas as pd
 from pdfminer.high_level import extract_text as pdfminer_extract_text
 from pypdf import PdfReader
 from tqdm import tqdm
 
 from common.utils.logger import logger
+from services.updater import livertox_common
 from services.text.normalization import normalize_whitespace
-
-SUPPORTED_MONOGRAPH_EXTENSIONS = (".html", ".htm", ".xhtml", ".xml", ".nxml", ".pdf")
-NBK_ID_PATTERN = re.compile(r"^NBK\d+$", re.IGNORECASE)
-
-DEFAULT_HTTP_HEADERS = {
-    "User-Agent": (
-        "DILIGENTClinicalCopilot/1.0 (contact=clinical-copilot@pharmagent.local)"
-    )
-}
-
-DOWNLOAD_CHUNK_SIZE = 262_144
-
-
-# -----------------------------------------------------------------------------
-def load_json(path: str) -> dict[str, Any] | None:
-    if not os.path.isfile(path):
-        return None
-    try:
-        with open(path, "r", encoding="utf-8") as handle:
-            return json.load(handle)
-    except (json.JSONDecodeError, OSError):
-        return None
-
-
-# -----------------------------------------------------------------------------
-def save_masterlist_metadata(path: str, payload: dict[str, Any]) -> None:
-    with open(path, "w", encoding="utf-8") as handle:
-        json.dump(payload, handle)
-
-
-# -----------------------------------------------------------------------------
-def metadata_matches(stored: dict[str, Any], remote: dict[str, Any]) -> bool:
-    return stored.get("last_modified") == remote.get("last_modified") and int(
-        stored.get("size", 0)
-    ) == int(remote.get("size", 0))
 
 
 # -----------------------------------------------------------------------------
@@ -69,34 +33,6 @@ def process_monograph_payload(
     data: bytes,
 ) -> dict[str, str] | None:
     return process_monograph_member(member_name, data)
-
-
-###############################################################################
-async def download_file(
-    client: httpx.AsyncClient,
-    url: str,
-    destination: str,
-    total_size: int,
-    label: str,
-    *,
-    chunk_size: int,
-) -> None:
-    async with client.stream("GET", url) as response:
-        response.raise_for_status()
-        with (
-            open(destination, "wb") as output,
-            tqdm(
-                total=total_size,
-                unit="B",
-                unit_scale=True,
-                desc=label,
-                ncols=80,
-            ) as progress,
-        ):
-            async for chunk in response.aiter_bytes(chunk_size=chunk_size):
-                if chunk:
-                    output.write(chunk)
-                    progress.update(len(chunk))
 
 
 ###############################################################################
@@ -144,7 +80,7 @@ def sanitize_livertox_master_list(self, data: pd.DataFrame) -> pd.DataFrame | No
         "secondary_classification",
     ]
     for column in text_columns:
-        data[column] = self.clean_master_list_column(cast(pd.Series, data[column]))
+        data[column] = clean_master_list_column(self, cast(pd.Series, data[column]))
 
     data = cast(pd.DataFrame, data.dropna(subset=["chapter_title"]))
 
@@ -225,12 +161,13 @@ def collect_monographs(
                 desc="Processing LiverTox files",
                 total=total_payloads,
             ):
-                if self.should_cancel(should_stop):
+                if livertox_common.should_cancel(should_stop):
                     raise RuntimeError("LiverTox update cancelled by user request")
                 extracted = archive.extractfile(member)
                 if extracted is None:
                     processed_count += 1
-                    self.emit_monograph_progress(
+                    emit_monograph_progress(
+                        self,
                         progress_callback=progress_callback,
                         processed_count=processed_count,
                         total_payloads=total_payloads,
@@ -241,18 +178,19 @@ def collect_monographs(
                 finally:
                     extracted.close()
                 if data:
-                    record = self.process_monograph_member(
+                    record = process_monograph_member(
                         member.name, data
                     )
                     if record:
                         collected.append(record)
                 processed_count += 1
-                self.emit_monograph_progress(
+                emit_monograph_progress(
+                    self,
                     progress_callback=progress_callback,
                     processed_count=processed_count,
                     total_payloads=total_payloads,
                 )
-        return self.sort_monograph_records(collected)
+        return sort_monograph_records(self, collected)
 
     ctx = multiprocessing.get_context("spawn")
     max_in_flight = max(1, worker_budget * 2)
@@ -264,12 +202,13 @@ def collect_monographs(
                 desc="Reading LiverTox files",
                 total=total_payloads,
             ):
-                if self.should_cancel(should_stop):
+                if livertox_common.should_cancel(should_stop):
                     raise RuntimeError("LiverTox update cancelled by user request")
                 extracted = archive.extractfile(member)
                 if extracted is None:
                     processed_count += 1
-                    self.emit_monograph_progress(
+                    emit_monograph_progress(
+                        self,
                         progress_callback=progress_callback,
                         processed_count=processed_count,
                         total_payloads=total_payloads,
@@ -281,7 +220,8 @@ def collect_monographs(
                     extracted.close()
                 if not data:
                     processed_count += 1
-                    self.emit_monograph_progress(
+                    emit_monograph_progress(
+                        self,
                         progress_callback=progress_callback,
                         processed_count=processed_count,
                         total_payloads=total_payloads,
@@ -292,7 +232,8 @@ def collect_monographs(
                 )
                 in_flight[future] = member.name
                 if len(in_flight) >= max_in_flight:
-                    processed_count = self.drain_monograph_futures(
+                    processed_count = drain_monograph_futures(
+                        self,
                         in_flight=in_flight,
                         collected=collected,
                         processed_count=processed_count,
@@ -302,9 +243,10 @@ def collect_monographs(
                     )
 
         while in_flight:
-            if self.should_cancel(should_stop):
+            if livertox_common.should_cancel(should_stop):
                 raise RuntimeError("LiverTox update cancelled by user request")
-            processed_count = self.drain_monograph_futures(
+            processed_count = drain_monograph_futures(
+                self,
                 in_flight=in_flight,
                 collected=collected,
                 processed_count=processed_count,
@@ -312,7 +254,7 @@ def collect_monographs(
                 progress_callback=progress_callback,
                 wait_for_one=False,
             )
-    return self.sort_monograph_records(collected)
+    return sort_monograph_records(self, collected)
 
 def emit_monograph_progress(
     self,
@@ -322,7 +264,7 @@ def emit_monograph_progress(
     total_payloads: int,
 ) -> None:
     ratio = min(1.0, max(0.0, processed_count / max(total_payloads, 1)))
-    self.emit_progress(
+    livertox_common.emit_progress(
         progress_callback,
         progress=35.0 + (ratio * 33.0),
         message=f"Processed {processed_count}/{total_payloads} LiverTox files",
@@ -354,7 +296,8 @@ def drain_monograph_futures(
                 exc,
             )
             processed_count += 1
-            self.emit_monograph_progress(
+            emit_monograph_progress(
+                self,
                 progress_callback=progress_callback,
                 processed_count=processed_count,
                 total_payloads=total_payloads,
@@ -363,7 +306,8 @@ def drain_monograph_futures(
         if record:
             collected.append(record)
         processed_count += 1
-        self.emit_monograph_progress(
+        emit_monograph_progress(
+            self,
             progress_callback=progress_callback,
             processed_count=processed_count,
             total_payloads=total_payloads,
@@ -538,7 +482,7 @@ def sanitize_records(self, entries: list[dict[str, Any]]) -> pd.DataFrame:
     numeric_mask = cast(pd.Series, sanitized["drug_name"]).str.fullmatch(r"\d+")
     sanitized = cast(pd.DataFrame, sanitized[~numeric_mask])
     sanitized["excerpt"] = cast(pd.Series, sanitized["excerpt"]).apply(
-        self.sanitize_excerpt
+        lambda value: sanitize_excerpt(self, value)
     )
     sanitized.loc[sanitized["excerpt"] == "", "excerpt"] = pd.NA
     if "synonyms" not in sanitized.columns:
@@ -568,7 +512,7 @@ def normalize_nbk_id(self, value: Any) -> str | None:
     normalized = str(value).strip().upper()
     if not normalized:
         return None
-    if not NBK_ID_PATTERN.fullmatch(normalized):
+    if not livertox_common.NBK_ID_PATTERN.fullmatch(normalized):
         return None
     return normalized
 

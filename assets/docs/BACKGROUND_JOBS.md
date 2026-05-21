@@ -9,6 +9,7 @@ DILIGENT uses a centralized thread-based job manager for long-running operations
 - Manager: `app/server/services/runtime/jobs.py`
 - Shared in-process access point: `get_job_manager()`
 - API models: `app/server/domain/jobs.py`
+- Runtime state: `app/server/services/runtime/state.py`
 
 ## 2. Job state contract
 
@@ -73,7 +74,7 @@ Frontend polling is implemented in `app/client/src/app/core/services/api.ts` and
 
 Cancellation is cooperative:
 - Pending jobs can be set to `cancelled` immediately.
-- Running jobs receive `stop_requested=True`.
+- Running jobs receive `stop_requested=True` and remain `running` until worker execution reaches a terminal transition.
 - Runner code must check `get_job_manager().should_stop(job_id)` or its injected `JobManager` at safe checkpoints.
 
 If a runner does not check stop requests, cancellation is delayed.

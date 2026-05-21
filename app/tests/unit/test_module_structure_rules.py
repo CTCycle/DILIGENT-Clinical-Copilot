@@ -10,6 +10,7 @@ DOMAIN_ROOT = SERVER_ROOT / "domain"
 ALLOWED_DATACLASS_OUTSIDE_DOMAIN = {
     (SERVER_ROOT / "services" / "clinical" / "drug_blocks.py").resolve(),
     (SERVER_ROOT / "services" / "session" / "clinical_section_parsers.py").resolve(),
+    (SERVER_ROOT / "services" / "runtime" / "state.py").resolve(),
 }
 ALLOWED_FASTAPI_IMPORTS_IN_SERVICES = {
     (SERVER_ROOT / "services" / "session" / "session_request_validation.py").resolve(),
@@ -162,8 +163,44 @@ def test_models_live_under_domain() -> None:
                     _format_violation(path, node, "pydantic model outside domain")
                 )
     assert not violations, (
-        "Dataclasses and Pydantic models must be defined under app/server/domain:\n"
+        "Request/response models must be defined under app/server/domain; internal dataclasses outside domain require explicit allowlisting:\n"
         + "\n".join(violations)
+    )
+
+
+def test_livertox_updater_has_no_module_forwarding_wrappers() -> None:
+    path = SERVER_ROOT / "services" / "updater" / "livertox_core.py"
+    tree = ast.parse(path.read_text(encoding="utf-8"), filename=str(path))
+    violations: list[str] = []
+    for node in ast.walk(tree):
+        if not isinstance(node, ast.ClassDef) or node.name != "LiverToxUpdater":
+            continue
+        for item in node.body:
+            if not isinstance(item, (ast.FunctionDef, ast.AsyncFunctionDef)):
+                continue
+            if len(item.body) != 1:
+                continue
+            statement = item.body[0]
+            if not isinstance(statement, ast.Return):
+                continue
+            value = statement.value
+            if isinstance(value, ast.Await):
+                value = value.value
+            if not isinstance(value, ast.Call):
+                continue
+            function = value.func
+            if (
+                isinstance(function, ast.Attribute)
+                and isinstance(function.value, ast.Name)
+                and function.value.id in {
+                    "livertox_download",
+                    "livertox_index",
+                    "livertox_parse",
+                }
+            ):
+                violations.append(_format_violation(path, item, "facade wrapper"))
+    assert not violations, "LiverToxUpdater facade wrappers are forbidden:\n" + "\n".join(
+        violations
     )
 
 
