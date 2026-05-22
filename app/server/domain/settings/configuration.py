@@ -79,7 +79,7 @@ class RagSettings(BaseModel):
     embedding_max_workers: int
 
 
-class ExternalDataSettings(BaseModel):
+class RuntimeSettings(BaseModel):
     model_config = ConfigDict(frozen=True)
     default_llm_timeout: float
     parser_llm_timeout: float
@@ -94,11 +94,6 @@ class ExternalDataSettings(BaseModel):
     max_excerpt_length: int
     rxnav_request_timeout: float
     rxnav_max_concurrency: int
-    brave_request_timeout_s: float
-    brave_search_cache_ttl_s: int
-    brave_rate_limit_per_minute: int
-    brave_fast_max_results: int
-    brave_thorough_max_results: int
 
 
 class IngestionSettings(BaseModel):
@@ -138,7 +133,7 @@ class ServerSettings(BaseModel):
     database: DatabaseSettings
     drugs_matcher: DrugsMatcherSettings
     rag: RagSettings
-    external_data: ExternalDataSettings
+    runtime: RuntimeSettings
     ingestion: IngestionSettings
     session_pipeline: SessionPipelineSettings
     llm_defaults: LLMRuntimeDefaults

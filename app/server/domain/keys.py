@@ -7,11 +7,10 @@ import re
 from pydantic import BaseModel, ConfigDict, Field, field_validator
 
 
-ProviderName = Literal["openai", "gemini", "openrouter", "brave"]
+ProviderName = Literal["openai", "gemini", "openrouter"]
 SUPPORTED_PROVIDERS: frozenset[ProviderName] = frozenset(
-    ("openai", "gemini", "openrouter", "brave")
+    ("openai", "gemini", "openrouter")
 )
-RESEARCH_PROVIDER: ProviderName = "brave"
 CONTROL_CHARACTERS_RE = re.compile(r"[\x00-\x08\x0B\x0C\x0E-\x1F\x7F]")
 MIN_ACCESS_KEY_LENGTH = 16
 

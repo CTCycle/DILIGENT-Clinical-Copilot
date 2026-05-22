@@ -236,7 +236,6 @@ class ClinicalSessionService(ClinicalSessionFormattingMixin):
                 drugs=request_payload.drugs,
                 laboratory_analysis=request_payload.laboratory_analysis,
                 use_rag=request_payload.use_rag,
-                use_web_search=request_payload.use_web_search,
             )
             return PatientData.model_validate(payload_data)
         except ValidationError as exc:
@@ -880,7 +879,6 @@ class ClinicalSessionService(ClinicalSessionFormattingMixin):
                     visit_date=payload.visit_date,
                     report_language=report_language,
                     rag_query=rag_query,
-                    use_web_search=payload.use_web_search,
                     rucam_bundle=rucam_bundle,
                     progress_callback=consultation_progress_callback,
                 ),

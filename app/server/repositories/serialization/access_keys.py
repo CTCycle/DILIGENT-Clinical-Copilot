@@ -12,18 +12,13 @@ from repositories.queries.access_keys import AccessKeyRepositoryQueries
 from repositories.serialization.access_key_encryption import (
     AccessKeyEncryptionMaterialSerializer,
 )
-from repositories.schemas.models import AccessKey, ResearchAccessKey
+from repositories.schemas.models import AccessKey
 from common.security.cryptography import (
     decrypt_with_key_material,
     encrypt_with_key_material,
     fingerprint_plaintext,
 )
-from domain.keys import (
-    ProviderName,
-    RESEARCH_PROVIDER,
-    normalize_access_key,
-    normalize_provider_name,
-)
+from domain.keys import ProviderName, normalize_access_key, normalize_provider_name
 
 
 ###############################################################################
@@ -46,18 +41,14 @@ class AccessKeySerializer:
         )
 
     # -------------------------------------------------------------------------
-    def resolve_table(self, provider: ProviderName) -> type[AccessKey] | type[ResearchAccessKey]:
-        if provider == RESEARCH_PROVIDER:
-            return ResearchAccessKey
+    def resolve_table(self, provider: ProviderName) -> type[AccessKey]:
         return AccessKey
 
     # -------------------------------------------------------------------------
     def resolve_table_from_row(
         self,
-        row: AccessKey | ResearchAccessKey,
-    ) -> type[AccessKey] | type[ResearchAccessKey]:
-        if str(row.provider).strip().lower() == RESEARCH_PROVIDER:
-            return ResearchAccessKey
+        row: AccessKey,
+    ) -> type[AccessKey]:
         return AccessKey
 
     # -------------------------------------------------------------------------
@@ -67,13 +58,13 @@ class AccessKeySerializer:
         key_id: int,
         *,
         provider: str,
-    ) -> AccessKey | ResearchAccessKey | None:
+    ) -> AccessKey | None:
         normalized_provider = self.normalize_provider(provider)
         table = self.resolve_table(normalized_provider)
         return db_session.get(table, key_id)
 
     # -------------------------------------------------------------------------
-    def list_keys(self, provider: str) -> list[AccessKey | ResearchAccessKey]:
+    def list_keys(self, provider: str) -> list[AccessKey]:
         normalized_provider = self.normalize_provider(provider)
         table = self.resolve_table(normalized_provider)
         db_session = self.session_factory()
@@ -88,7 +79,7 @@ class AccessKeySerializer:
     # -------------------------------------------------------------------------
     def create_key(
         self, provider: str, plaintext_key: str
-    ) -> AccessKey | ResearchAccessKey:
+    ) -> AccessKey:
         normalized_provider = self.normalize_provider(provider)
         normalized_key = normalize_access_key(plaintext_key)
         table = self.resolve_table(normalized_provider)
@@ -116,7 +107,7 @@ class AccessKeySerializer:
             db_session.close()
 
     # -------------------------------------------------------------------------
-    def decrypt_key_row(self, row: AccessKey | ResearchAccessKey) -> str:
+    def decrypt_key_row(self, row: AccessKey) -> str:
         version = getattr(row, "encryption_key_version", None)
         if version is None:
             raise RuntimeError(
@@ -137,7 +128,7 @@ class AccessKeySerializer:
         key_id: int,
         *,
         provider: str,
-    ) -> AccessKey | ResearchAccessKey:
+    ) -> AccessKey:
         db_session = self.session_factory()
         now = datetime.now()
         try:
@@ -194,7 +185,7 @@ class AccessKeySerializer:
         provider: str,
         *,
         mark_used: bool = False,
-    ) -> AccessKey | ResearchAccessKey | None:
+    ) -> AccessKey | None:
         normalized_provider = self.normalize_provider(provider)
         table = self.resolve_table(normalized_provider)
         db_session = self.session_factory()

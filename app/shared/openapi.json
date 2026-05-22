@@ -14,8 +14,7 @@
             "enum": [
               "openai",
               "gemini",
-              "openrouter",
-              "brave"
+              "openrouter"
             ],
             "title": "Provider",
             "type": "string"
@@ -87,8 +86,7 @@
             "enum": [
               "openai",
               "gemini",
-              "openrouter",
-              "brave"
+              "openrouter"
             ],
             "title": "Provider",
             "type": "string"
@@ -200,11 +198,6 @@
           "use_rag": {
             "default": false,
             "title": "Use Rag",
-            "type": "boolean"
-          },
-          "use_web_search": {
-            "default": false,
-            "title": "Use Web Search",
             "type": "boolean"
           },
           "visit_date": {
@@ -1390,191 +1383,6 @@
         "title": "RagDocumentListResponse",
         "type": "object"
       },
-      "ResearchCitation": {
-        "properties": {
-          "claim": {
-            "maxLength": 1000,
-            "minLength": 1,
-            "title": "Claim",
-            "type": "string"
-          },
-          "urls": {
-            "items": {
-              "type": "string"
-            },
-            "title": "Urls",
-            "type": "array"
-          }
-        },
-        "required": [
-          "claim"
-        ],
-        "title": "ResearchCitation",
-        "type": "object"
-      },
-      "ResearchRequest": {
-        "additionalProperties": false,
-        "properties": {
-          "allowed_domains": {
-            "anyOf": [
-              {
-                "items": {
-                  "type": "string"
-                },
-                "type": "array"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Allowed Domains"
-          },
-          "blocked_domains": {
-            "anyOf": [
-              {
-                "items": {
-                  "type": "string"
-                },
-                "type": "array"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Blocked Domains"
-          },
-          "mode": {
-            "default": "fast",
-            "enum": [
-              "fast",
-              "thorough"
-            ],
-            "title": "Mode",
-            "type": "string"
-          },
-          "question": {
-            "maxLength": 2000,
-            "minLength": 1,
-            "title": "Question",
-            "type": "string"
-          }
-        },
-        "required": [
-          "question"
-        ],
-        "title": "ResearchRequest",
-        "type": "object"
-      },
-      "ResearchResponse": {
-        "properties": {
-          "answer": {
-            "minLength": 1,
-            "title": "Answer",
-            "type": "string"
-          },
-          "citations": {
-            "items": {
-              "$ref": "#/components/schemas/ResearchCitation"
-            },
-            "title": "Citations",
-            "type": "array"
-          },
-          "message": {
-            "anyOf": [
-              {
-                "maxLength": 500,
-                "type": "string"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Message"
-          },
-          "sources": {
-            "items": {
-              "$ref": "#/components/schemas/ResearchSource"
-            },
-            "title": "Sources",
-            "type": "array"
-          }
-        },
-        "required": [
-          "answer"
-        ],
-        "title": "ResearchResponse",
-        "type": "object"
-      },
-      "ResearchSource": {
-        "properties": {
-          "description": {
-            "anyOf": [
-              {
-                "maxLength": 2000,
-                "type": "string"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Description"
-          },
-          "rank": {
-            "anyOf": [
-              {
-                "minimum": 1.0,
-                "type": "integer"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Rank"
-          },
-          "retrieved_at": {
-            "maxLength": 64,
-            "minLength": 1,
-            "title": "Retrieved At",
-            "type": "string"
-          },
-          "source_domain": {
-            "anyOf": [
-              {
-                "maxLength": 253,
-                "type": "string"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Source Domain"
-          },
-          "title": {
-            "anyOf": [
-              {
-                "maxLength": 500,
-                "type": "string"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Title"
-          },
-          "url": {
-            "maxLength": 2000,
-            "minLength": 1,
-            "title": "Url",
-            "type": "string"
-          }
-        },
-        "required": [
-          "url",
-          "retrieved_at"
-        ],
-        "title": "ResearchSource",
-        "type": "object"
-      },
       "RxNavCatalogItem": {
         "additionalProperties": false,
         "properties": {
@@ -1902,17 +1710,16 @@
         "operationId": "list_access_keys_api_access_keys_get",
         "parameters": [
           {
-            "description": "openai, gemini, openrouter, or brave",
+            "description": "openai, gemini, or openrouter",
             "in": "query",
             "name": "provider",
             "required": true,
             "schema": {
-              "description": "openai, gemini, openrouter, or brave",
+              "description": "openai, gemini, or openrouter",
               "enum": [
                 "openai",
                 "gemini",
-                "openrouter",
-                "brave"
+                "openrouter"
               ],
               "title": "Provider",
               "type": "string"
@@ -2005,17 +1812,16 @@
             }
           },
           {
-            "description": "openai, gemini, openrouter, or brave",
+            "description": "openai, gemini, or openrouter",
             "in": "query",
             "name": "provider",
             "required": true,
             "schema": {
-              "description": "openai, gemini, openrouter, or brave",
+              "description": "openai, gemini, or openrouter",
               "enum": [
                 "openai",
                 "gemini",
-                "openrouter",
-                "brave"
+                "openrouter"
               ],
               "title": "Provider",
               "type": "string"
@@ -2065,17 +1871,16 @@
             }
           },
           {
-            "description": "openai, gemini, openrouter, or brave",
+            "description": "openai, gemini, or openrouter",
             "in": "query",
             "name": "provider",
             "required": true,
             "schema": {
-              "description": "openai, gemini, openrouter, or brave",
+              "description": "openai, gemini, or openrouter",
               "enum": [
                 "openai",
                 "gemini",
-                "openrouter",
-                "brave"
+                "openrouter"
               ],
               "title": "Provider",
               "type": "string"
@@ -3862,47 +3667,6 @@
         "summary": "Start Pull Job",
         "tags": [
           "models"
-        ]
-      }
-    },
-    "/api/research": {
-      "post": {
-        "operationId": "run_research_api_research_post",
-        "requestBody": {
-          "content": {
-            "application/json": {
-              "schema": {
-                "$ref": "#/components/schemas/ResearchRequest"
-              }
-            }
-          },
-          "required": true
-        },
-        "responses": {
-          "200": {
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ResearchResponse"
-                }
-              }
-            },
-            "description": "Successful Response"
-          },
-          "422": {
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/HTTPValidationError"
-                }
-              }
-            },
-            "description": "Validation Error"
-          }
-        },
-        "summary": "Run Research",
-        "tags": [
-          "research"
         ]
       }
     }

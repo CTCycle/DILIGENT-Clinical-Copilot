@@ -619,7 +619,7 @@ class AccessKey(Base):
 
     __table_args__ = (
         CheckConstraint(
-            "provider IN ('openai', 'gemini')",
+            "provider IN ('openai', 'gemini', 'openrouter')",
             name="ck_access_keys_provider",
         ),
         Index("ix_access_keys_provider", "provider"),
@@ -634,47 +634,3 @@ class AccessKey(Base):
 
 
 ###############################################################################
-class ResearchAccessKey(Base):
-    __tablename__ = "research_access_keys"
-
-    id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
-    provider: Mapped[str] = mapped_column(
-        String,
-        nullable=False,
-        server_default=text("'brave'"),
-    )
-    encrypted_value: Mapped[str] = mapped_column(Text, nullable=False)
-    encryption_key_version: Mapped[int] = mapped_column(Integer, nullable=False)
-    fingerprint: Mapped[str] = mapped_column(String, nullable=False)
-    is_active: Mapped[bool] = mapped_column(
-        Boolean,
-        nullable=False,
-        server_default=text("false"),
-    )
-    created_at: Mapped[datetime] = mapped_column(
-        DateTime,
-        nullable=False,
-        server_default=text("CURRENT_TIMESTAMP"),
-    )
-    updated_at: Mapped[datetime] = mapped_column(
-        DateTime,
-        nullable=False,
-        server_default=text("CURRENT_TIMESTAMP"),
-        server_onupdate=text("CURRENT_TIMESTAMP"),
-    )
-    last_used_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
-
-    __table_args__ = (
-        CheckConstraint(
-            "provider = 'brave'",
-            name="ck_research_access_keys_provider",
-        ),
-        Index("ix_research_access_keys_provider", "provider"),
-        Index(
-            "uq_research_access_keys_active_provider",
-            "provider",
-            unique=True,
-            sqlite_where=text("is_active = 1"),
-            postgresql_where=text("is_active = true"),
-        ),
-    )

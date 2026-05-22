@@ -21,7 +21,7 @@ def select_llm_provider(
         return OllamaClient(
             base_url=kwargs.get("base_url"),
             timeout_s=kwargs.get(
-                "timeout_s", server_settings.external_data.default_llm_timeout
+                "timeout_s", server_settings.runtime.default_llm_timeout
             ),
             keepalive_connections=kwargs.get("keepalive_connections", 10),
             keepalive_max=kwargs.get("keepalive_max", 20),
@@ -32,7 +32,7 @@ def select_llm_provider(
             provider=p,  # type: ignore[arg-type]
             base_url=kwargs.get("base_url"),
             timeout_s=kwargs.get(
-                "timeout_s", server_settings.external_data.default_llm_timeout
+                "timeout_s", server_settings.runtime.default_llm_timeout
             ),
             keepalive_connections=kwargs.get("keepalive_connections", 10),
             keepalive_max=kwargs.get("keepalive_max", 20),
@@ -45,7 +45,7 @@ def select_llm_provider(
 def initialize_llm_client(
     *, purpose: RuntimePurpose = "clinical", **kwargs: Any
 ) -> OllamaClient | CloudLLMClient:
-    kwargs.setdefault("timeout_s", server_settings.external_data.default_llm_timeout)
+    kwargs.setdefault("timeout_s", server_settings.runtime.default_llm_timeout)
     provider, default_model = LLMRuntimeConfig.resolve_provider_and_model(purpose)
     if LLMRuntimeConfig.is_cloud_enabled():
         forced_provider = (LLMRuntimeConfig.get_llm_provider() or "").strip().lower()

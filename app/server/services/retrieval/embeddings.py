@@ -132,7 +132,7 @@ class CloudEmbeddingGenerator:
         *,
         provider: ProviderName,
         model: str,
-        timeout_s: float = server_settings.external_data.default_llm_timeout,
+        timeout_s: float = server_settings.runtime.default_llm_timeout,
     ) -> None:
         normalized_provider = (provider or "").strip().lower()
         if normalized_provider not in {"openai", "gemini"}:
@@ -215,7 +215,7 @@ class OllamaEmbeddingGenerator:
         *,
         model: str,
         base_url: str | None = None,
-        timeout_s: float = server_settings.external_data.default_llm_timeout,
+        timeout_s: float = server_settings.runtime.default_llm_timeout,
     ) -> None:
         resolved_model = (model or "").strip()
         if not resolved_model:
@@ -275,7 +275,7 @@ def select_embedding_provider(
     use_cloud_embeddings: bool = False,
     cloud_provider: str | None = None,
     cloud_embedding_model: str | None = None,
-    timeout_s: float = server_settings.external_data.default_llm_timeout,
+    timeout_s: float = server_settings.runtime.default_llm_timeout,
 ) -> CloudEmbeddingGenerator | OllamaEmbeddingGenerator:
     normalized_backend = backend.lower().strip() if backend else "ollama"
     if use_cloud_embeddings:

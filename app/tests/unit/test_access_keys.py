@@ -6,7 +6,6 @@ from sqlalchemy.orm import sessionmaker
 from repositories.schemas.models import (
     AccessKey,
     Base,
-    ResearchAccessKey,
 )
 from repositories.serialization.access_key_encryption import (
     AccessKeyEncryptionMaterialSerializer,
@@ -67,50 +66,29 @@ def test_activation_keeps_only_one_active_key_per_provider() -> None:
 
 
 # -----------------------------------------------------------------------------
-def test_brave_keys_are_stored_in_research_table() -> None:
-    serializer, factory = build_serializer()
-
-    created = serializer.create_key("brave", "brave-secret-value")
-
-    with factory() as db_session:
-        stored = db_session.execute(
-            select(ResearchAccessKey).where(ResearchAccessKey.id == created.id)
-        ).scalar_one()
-
-    assert stored.provider == "brave"
-    assert stored.encrypted_value != "brave-secret"
-    assert stored.fingerprint
-    assert stored.encryption_key_version == 1
-
-
-# -----------------------------------------------------------------------------
-def test_provider_scoped_activate_and_delete_support_brave() -> None:
+def test_provider_scoped_activate_and_delete_for_openrouter() -> None:
     serializer, factory = build_serializer()
 
     openai = serializer.create_key("openai", "openai-key-secret")
-    brave = serializer.create_key("brave", "brave-key-secret")
-
-    # Ids can overlap because keys are stored in different tables.
-    assert openai.id == brave.id
-
-    activated_brave = serializer.activate_key(brave.id, provider="brave")
-    assert activated_brave.provider == "brave"
-    assert activated_brave.is_active is True
+    openrouter = serializer.create_key("openrouter", "openrouter-key-secret")
+    activated_openrouter = serializer.activate_key(openrouter.id, provider="openrouter")
+    assert activated_openrouter.provider == "openrouter"
+    assert activated_openrouter.is_active is True
 
     with factory() as db_session:
         openai_row = db_session.execute(
             select(AccessKey).where(AccessKey.id == openai.id)
         ).scalar_one()
-        brave_row = db_session.execute(
-            select(ResearchAccessKey).where(ResearchAccessKey.id == brave.id)
+        openrouter_row = db_session.execute(
+            select(AccessKey).where(AccessKey.id == openrouter.id)
         ).scalar_one()
 
     assert openai_row.is_active is False
-    assert brave_row.is_active is True
+    assert openrouter_row.is_active is True
 
-    deleted = serializer.delete_key(brave.id, provider="brave")
+    deleted = serializer.delete_key(openrouter.id, provider="openrouter")
     assert deleted is True
-    assert serializer.get_active_key("brave") is None
+    assert serializer.get_active_key("openrouter") is None
 
 
 # -----------------------------------------------------------------------------

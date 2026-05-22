@@ -61,10 +61,6 @@ class PatientData(BaseModel):
         default=False,
         description="Enables retrieval augmented generation during analysis.",
     )
-    use_web_search: bool = Field(
-        default=False,
-        description="Enables Brave Search-backed web evidence retrieval per analyzed drug.",
-    )
 
     # -------------------------------------------------------------------------
     @field_validator("name", "anamnesis", "drugs", "laboratory_analysis", mode="before")
@@ -155,7 +151,6 @@ class ClinicalSessionRequest(BaseModel):
     clinical_input: str | None = Field(default=None, max_length=100000)
     anamnesis: str | None = Field(default=None, max_length=20000)
     use_rag: bool = False
-    use_web_search: bool = False
     drugs: str | None = Field(default=None, max_length=20000)
     laboratory_analysis: str | None = Field(
         default=None, max_length=MAX_LAB_TEXT_LENGTH

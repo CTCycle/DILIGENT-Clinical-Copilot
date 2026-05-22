@@ -40,7 +40,7 @@ from common.utils.types import (
 from domain.settings.configuration import (
     DatabaseSettings,
     DrugsMatcherSettings,
-    ExternalDataSettings,
+    RuntimeSettings,
     FastAPISettings,
     IngestionSettings,
     JobsSettings,
@@ -387,9 +387,9 @@ def _build_rag_settings(
     )
 
 
-def _build_external_data_settings(
+def _build_runtime_settings(
     data: dict[str, Any], *, fallback_timeout: float
-) -> ExternalDataSettings:
+) -> RuntimeSettings:
     unified_llm_timeout = max(
         coerce_float(
             data.get("llm_timeout"),
@@ -404,13 +404,7 @@ def _build_external_data_settings(
     livertox_timeout = max(
         coerce_float(data.get("livertox_llm_timeout"), unified_llm_timeout), 1.0
     )
-    brave_fast_max_results = coerce_positive_int(data.get("brave_fast_max_results"), 5)
-    brave_thorough_max_results = coerce_positive_int(
-        data.get("brave_thorough_max_results"), 10
-    )
-    if brave_thorough_max_results < brave_fast_max_results:
-        brave_thorough_max_results = brave_fast_max_results
-    return ExternalDataSettings(
+    return RuntimeSettings(
         default_llm_timeout=unified_llm_timeout,
         parser_llm_timeout=parser_timeout,
         disease_llm_timeout=disease_timeout,
@@ -436,17 +430,6 @@ def _build_external_data_settings(
         rxnav_max_concurrency=coerce_positive_int(
             data.get("rxnav_max_concurrency"), 16
         ),
-        brave_request_timeout_s=max(
-            coerce_float(data.get("brave_request_timeout_s"), 20.0), 1.0
-        ),
-        brave_search_cache_ttl_s=coerce_positive_int(
-            data.get("brave_search_cache_ttl_s"), 21600
-        ),
-        brave_rate_limit_per_minute=coerce_positive_int(
-            data.get("brave_rate_limit_per_minute"), 30
-        ),
-        brave_fast_max_results=brave_fast_max_results,
-        brave_thorough_max_results=brave_thorough_max_results,
     )
 
 
@@ -498,7 +481,7 @@ def build_settings_payload_from_json(
     database_payload = ensure_mapping(payload.get("database"))
     drugs_matcher_payload = ensure_mapping(payload.get("drugs_matcher"))
     rag_payload = ensure_mapping(payload.get("rag"))
-    external_data_payload = ensure_mapping(payload.get("external_data"))
+    runtime_payload = ensure_mapping(payload.get("runtime"))
     ingestion_payload = ensure_mapping(payload.get("ingestion"))
     session_pipeline_payload = ensure_mapping(payload.get("session_pipeline"))
     return {
@@ -509,8 +492,8 @@ def build_settings_payload_from_json(
             drugs_matcher_payload
         ).model_dump(),
         "rag": _build_rag_settings(rag_payload, llm_defaults).model_dump(),
-        "external_data": _build_external_data_settings(
-            external_data_payload,
+        "runtime": _build_runtime_settings(
+            runtime_payload,
             fallback_timeout=30.0,
         ).model_dump(),
         "ingestion": _build_ingestion_settings(ingestion_payload).model_dump(),

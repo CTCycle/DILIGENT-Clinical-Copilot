@@ -43,7 +43,6 @@ from services.clinical.match_quality import classify_match_evidence
 from services.retrieval.embeddings import SimilaritySearch
 from services.clinical.preparation import HepatoxPreparedInputs
 from services.text.normalization import normalize_drug_query_name
-from services.research.brave import BraveResearchService
 from services.text.vocabulary import get_text_normalization_snapshot
 from services.clinical.report_language import (
     phrase,
@@ -313,7 +312,6 @@ async def run_analysis(
     visit_date: date | None = None,
     report_language: str = "en",
     rag_query: dict[str, str] | None = None,
-    use_web_search: bool = False,
     rucam_bundle: PatientRucamAssessmentBundle | None = None,
     progress_callback: Callable[[str, float], None] | None = None,
 ) -> dict[str, Any] | None:
@@ -336,7 +334,6 @@ async def run_analysis(
         report_language=report_language,
         pattern_prompt=prepared_inputs.pattern_prompt,
         rag_query=rag_query,
-        use_web_search=use_web_search,
         rucam_bundle=rucam_bundle,
         progress_callback=progress_callback,
     )
@@ -351,7 +348,6 @@ async def compile_clinical_assessment(
     report_language: str,
     pattern_prompt: str,
     rag_query: dict[str, str] | None = None,
-    use_web_search: bool = False,
     rucam_bundle: PatientRucamAssessmentBundle | None = None,
     progress_callback: Callable[[str, float], None] | None = None,
 ) -> PatientDrugClinicalReport:
@@ -380,7 +376,6 @@ async def compile_clinical_assessment(
             normalized_context=normalized_context,
             pattern_summary=pattern_summary,
             rag_query=rag_query,
-            use_web_search=use_web_search,
             rucam_by_key=rucam_by_key,
         )
         entries.append(entry)
@@ -466,7 +461,6 @@ async def prepare_drug_assessment(
     normalized_context: str,
     pattern_summary: str,
     rag_query: dict[str, str] | None,
-    use_web_search: bool,
     rucam_by_key: dict[str, DrugRucamAssessment],
 ) -> tuple[DrugClinicalAssessment, tuple[int, Any] | None]:
     raw_name = drug_entry.name or ""
@@ -565,11 +559,6 @@ async def prepare_drug_assessment(
         return entry, None
 
     rag_documents = await self.fetch_rag_documents(rag_query, raw_name)
-    web_evidence = self.web_evidence_disabled_text()
-    if use_web_search:
-        web_evidence = await self.fetch_web_evidence_for_drug(
-            drug_name=drug_entry.name,
-        )
     job = self.request_drug_analysis(
         drug_name=drug_entry.name,
         canonical_name=entry.canonical_name or drug_entry.name,
@@ -589,7 +578,6 @@ async def prepare_drug_assessment(
         visit_date=visit_date,
         pattern_summary=pattern_summary,
         metadata=entry.matched_livertox_row,
-        web_evidence=web_evidence,
         rucam=entry.rucam,
         knowledge_prompt=knowledge_prompt,
         report_language=report_language,
@@ -691,24 +679,6 @@ def record_rag_retrieval_issue(self, *, drug_name: str, error: Exception) -> Non
         self.pipeline_issues = []
     self.pipeline_issues.append(issue)
 
-async def fetch_web_evidence_for_drug(self, *, drug_name: str) -> str:
-    normalized_name = (drug_name or "").strip()
-    if not normalized_name:
-        return "No web evidence available (reason: missing drug name)."
-    try:
-        outcome = await self.research_service.search_sources(
-            question=f"{normalized_name} drug induced liver injury evidence",
-            mode="fast",
-            allowed_domains=None,
-            blocked_domains=None,
-        )
-    except Exception as exc:  # noqa: BLE001
-        return f"No web evidence available (reason: {exc})."
-    return self.research_service.format_clinical_evidence_block(
-        sources=outcome.sources,
-        message=outcome.message,
-    )
-
 def ensure_similarity_search(self) -> bool:
     if self.similarity_search is not None:
         return True
@@ -809,7 +779,6 @@ async def request_drug_analysis(
     visit_date: date | None,
     pattern_summary: str,
     metadata: dict[str, Any] | None,
-    web_evidence: str,
     rucam: DrugRucamAssessment | None,
     knowledge_prompt: str = "No supplemental knowledge prompt available.",
     report_language: str = "en",
@@ -842,7 +811,6 @@ async def request_drug_analysis(
         livertox_status=self.escape_braces(livertox_status),
         excerpt=self.escape_braces(excerpt),
         documents=self.escape_braces(rag_documents),
-        web_evidence=self.escape_braces(web_evidence),
         clinical_context=self.escape_braces(clinical_context),
         visit_date_anchor=self.escape_braces(visit_date_anchor),
         therapy_start_details=self.escape_braces(start_details),

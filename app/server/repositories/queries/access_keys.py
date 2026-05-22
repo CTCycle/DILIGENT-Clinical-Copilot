@@ -4,16 +4,16 @@ from datetime import datetime
 
 from sqlalchemy import Select, Update, select, update
 
-from repositories.schemas.models import AccessKey, ResearchAccessKey
+from repositories.schemas.models import AccessKey
 
-AccessKeyTable = type[AccessKey] | type[ResearchAccessKey]
+AccessKeyTable = type[AccessKey]
 
 
 ###############################################################################
 class AccessKeyRepositoryQueries:
     # -------------------------------------------------------------------------
     @staticmethod
-    def list_for_provider(table: AccessKeyTable, provider: str) -> Select[tuple[AccessKey | ResearchAccessKey]]:
+    def list_for_provider(table: AccessKeyTable, provider: str) -> Select[tuple[AccessKey]]:
         return (
             select(table)
             .where(table.provider == provider)
@@ -33,7 +33,7 @@ class AccessKeyRepositoryQueries:
 
     # -------------------------------------------------------------------------
     @staticmethod
-    def active_for_provider(table: AccessKeyTable, provider: str) -> Select[tuple[AccessKey | ResearchAccessKey]]:
+    def active_for_provider(table: AccessKeyTable, provider: str) -> Select[tuple[AccessKey]]:
         return (
             select(table)
             .where(

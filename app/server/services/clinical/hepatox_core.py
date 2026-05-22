@@ -43,7 +43,6 @@ from services.clinical.match_quality import classify_match_evidence
 from services.retrieval.embeddings import SimilaritySearch
 from services.clinical.preparation import HepatoxPreparedInputs
 from services.text.normalization import normalize_drug_query_name
-from services.research.brave import BraveResearchService
 from services.text.vocabulary import get_text_normalization_snapshot
 from services.clinical.report_language import (
     phrase,
@@ -312,13 +311,12 @@ class HepatoxConsultation:
         drugs: PatientDrugs,
         *,
         patient_name: str | None = None,
-        timeout_s: float = server_settings.external_data.default_llm_timeout,
+        timeout_s: float = server_settings.runtime.default_llm_timeout,
     ) -> None:
         self.drugs = drugs
         self.timeout_s = timeout_s
         self.llm_client = initialize_llm_client(purpose="clinical", timeout_s=timeout_s)
-        self.MAX_EXCERPT_LENGTH = server_settings.external_data.max_excerpt_length
-        self.research_service = BraveResearchService()
+        self.MAX_EXCERPT_LENGTH = server_settings.runtime.max_excerpt_length
         self.patient_name = (patient_name or "").strip() or None
         provider, model_candidate = LLMRuntimeConfig.resolve_provider_and_model(
             "clinical"
@@ -344,7 +342,7 @@ class HepatoxConsultation:
             1,
             int(
                 getattr(
-                    server_settings.external_data,
+                    server_settings.runtime,
                     "clinical_llm_max_concurrency",
                     default_parallel_analyses,
                 )
@@ -353,7 +351,7 @@ class HepatoxConsultation:
         default_retry_attempts = 1
         configured_retry_attempts = int(
             getattr(
-                server_settings.external_data,
+                server_settings.runtime,
                 "clinical_llm_retry_attempts",
                 default_retry_attempts,
             )
@@ -370,11 +368,10 @@ class HepatoxConsultation:
         visit_date: date | None = None,
         report_language: str = "en",
         rag_query: dict[str, str] | None = None,
-        use_web_search: bool = False,
         rucam_bundle: PatientRucamAssessmentBundle | None = None,
         progress_callback: Callable[[str, float], None] | None = None,
     ) -> dict[str, Any] | None:
-        return await hepatox_assessment.run_analysis(self, prepared_inputs=prepared_inputs, visit_date=visit_date, report_language=report_language, rag_query=rag_query, use_web_search=use_web_search, rucam_bundle=rucam_bundle, progress_callback=progress_callback)
+        return await hepatox_assessment.run_analysis(self, prepared_inputs=prepared_inputs, visit_date=visit_date, report_language=report_language, rag_query=rag_query, rucam_bundle=rucam_bundle, progress_callback=progress_callback)
 
     # -------------------------------------------------------------------------
     async def compile_clinical_assessment(
@@ -386,11 +383,10 @@ class HepatoxConsultation:
         report_language: str,
         pattern_prompt: str,
         rag_query: dict[str, str] | None = None,
-        use_web_search: bool = False,
         rucam_bundle: PatientRucamAssessmentBundle | None = None,
         progress_callback: Callable[[str, float], None] | None = None,
     ) -> PatientDrugClinicalReport:
-        return await hepatox_assessment.compile_clinical_assessment(self, resolved_drugs, clinical_context=clinical_context, visit_date=visit_date, report_language=report_language, pattern_prompt=pattern_prompt, rag_query=rag_query, use_web_search=use_web_search, rucam_bundle=rucam_bundle, progress_callback=progress_callback)
+        return await hepatox_assessment.compile_clinical_assessment(self, resolved_drugs, clinical_context=clinical_context, visit_date=visit_date, report_language=report_language, pattern_prompt=pattern_prompt, rag_query=rag_query, rucam_bundle=rucam_bundle, progress_callback=progress_callback)
 
     # -------------------------------------------------------------------------
     @staticmethod
@@ -431,10 +427,9 @@ class HepatoxConsultation:
         normalized_context: str,
         pattern_summary: str,
         rag_query: dict[str, str] | None,
-        use_web_search: bool,
         rucam_by_key: dict[str, DrugRucamAssessment],
     ) -> tuple[DrugClinicalAssessment, tuple[int, Any] | None]:
-        return await hepatox_assessment.prepare_drug_assessment(self, idx=idx, drug_entry=drug_entry, resolved_drugs=resolved_drugs, visit_date=visit_date, report_language=report_language, normalized_context=normalized_context, pattern_summary=pattern_summary, rag_query=rag_query, use_web_search=use_web_search, rucam_by_key=rucam_by_key)
+        return await hepatox_assessment.prepare_drug_assessment(self, idx=idx, drug_entry=drug_entry, resolved_drugs=resolved_drugs, visit_date=visit_date, report_language=report_language, normalized_context=normalized_context, pattern_summary=pattern_summary, rag_query=rag_query, rucam_by_key=rucam_by_key)
 
     # -------------------------------------------------------------------------
     def resolve_livertox_data_for_entry(
@@ -460,15 +455,6 @@ class HepatoxConsultation:
     # -------------------------------------------------------------------------
     def record_rag_retrieval_issue(self, *, drug_name: str, error: Exception) -> None:
         return hepatox_assessment.record_rag_retrieval_issue(self, drug_name=drug_name, error=error)
-
-    # -------------------------------------------------------------------------
-    @staticmethod
-    def web_evidence_disabled_text() -> str:
-        return hepatox_prompts.web_evidence_disabled_text()
-
-    # -------------------------------------------------------------------------
-    async def fetch_web_evidence_for_drug(self, *, drug_name: str) -> str:
-        return await hepatox_assessment.fetch_web_evidence_for_drug(self, drug_name=drug_name)
 
     # -------------------------------------------------------------------------
     def ensure_similarity_search(self) -> bool:
@@ -614,12 +600,11 @@ class HepatoxConsultation:
         visit_date: date | None,
         pattern_summary: str,
         metadata: dict[str, Any] | None,
-        web_evidence: str,
         rucam: DrugRucamAssessment | None,
         knowledge_prompt: str = "No supplemental knowledge prompt available.",
         report_language: str = "en",
     ) -> str:
-        return await hepatox_assessment.request_drug_analysis(self, drug_name=drug_name, canonical_name=canonical_name, origins=origins, extraction_metadata=extraction_metadata, livertox_status=livertox_status, excerpt=excerpt, rag_documents=rag_documents, clinical_context=clinical_context, suspension=suspension, visit_date=visit_date, pattern_summary=pattern_summary, metadata=metadata, web_evidence=web_evidence, rucam=rucam, knowledge_prompt=knowledge_prompt, report_language=report_language)
+        return await hepatox_assessment.request_drug_analysis(self, drug_name=drug_name, canonical_name=canonical_name, origins=origins, extraction_metadata=extraction_metadata, livertox_status=livertox_status, excerpt=excerpt, rag_documents=rag_documents, clinical_context=clinical_context, suspension=suspension, visit_date=visit_date, pattern_summary=pattern_summary, metadata=metadata, rucam=rucam, knowledge_prompt=knowledge_prompt, report_language=report_language)
 
     # -------------------------------------------------------------------------
     @staticmethod

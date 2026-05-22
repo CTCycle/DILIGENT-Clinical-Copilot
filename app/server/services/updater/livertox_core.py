@@ -33,14 +33,14 @@ class LiverToxUpdater:
         self.header_row = 1
         self.base_url = LIVERTOX_BASE_URL
         self.file_name = (
-            archive_name or server_settings.external_data.livertox_archive
+            archive_name or server_settings.runtime.livertox_archive
         ).strip()
         self.monograph_max_workers = max(
             1,
             int(
                 monograph_max_workers
                 if monograph_max_workers is not None
-                else server_settings.external_data.livertox_monograph_max_workers
+                else server_settings.runtime.livertox_monograph_max_workers
             ),
         )
         self.tar_file_path = os.path.join(ARCHIVES_PATH, self.file_name)
@@ -75,7 +75,7 @@ class LiverToxUpdater:
         )
         archive_metadata = asyncio.run(livertox_download.download_bulk_data(self, self.sources_path))
         archive_path = archive_metadata.get("file_path") or os.path.join(
-            self.sources_path, server_settings.external_data.livertox_archive
+            self.sources_path, server_settings.runtime.livertox_archive
         )
         local_info = livertox_download.collect_local_archive_info(self, archive_path)
         livertox_common.emit_progress(

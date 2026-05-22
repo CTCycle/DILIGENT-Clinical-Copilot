@@ -119,7 +119,6 @@ export function buildClinicalPayload(
     selected_model_providers: settings.provider ? [settings.provider] : [],
     patient_image_base64: extractBase64Payload(form.patientImageDataUrl),
     use_rag: form.useRag,
-    use_web_search: form.useWebSearch,
   };
 }
 

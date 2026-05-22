@@ -207,35 +207,35 @@ class DataInspectionService:
     def build_update_config_response(self, target: UpdateTarget) -> dict[str, Any]:
         config = self.load_runtime_config()
         if target == "rxnav":
-            source = config.get("external_data", {})
+            source = config.get("runtime", {})
             defaults = {
                 "rxnav_request_timeout": float(
                     source.get(
                         "rxnav_request_timeout",
-                        server_settings.external_data.rxnav_request_timeout,
+                        server_settings.runtime.rxnav_request_timeout,
                     )
                 ),
                 "rxnav_max_concurrency": int(
                     source.get(
                         "rxnav_max_concurrency",
-                        server_settings.external_data.rxnav_max_concurrency,
+                        server_settings.runtime.rxnav_max_concurrency,
                     )
                 ),
             }
             allowed_fields = list(defaults.keys())
         elif target == "livertox":
-            source = config.get("external_data", {})
+            source = config.get("runtime", {})
             defaults = {
                 "livertox_monograph_max_workers": int(
                     source.get(
                         "livertox_monograph_max_workers",
-                        server_settings.external_data.livertox_monograph_max_workers,
+                        server_settings.runtime.livertox_monograph_max_workers,
                     )
                 ),
                 "livertox_archive": str(
                     source.get(
                         "livertox_archive",
-                        server_settings.external_data.livertox_archive,
+                        server_settings.runtime.livertox_archive,
                     )
                 ),
                 "redownload": False,
@@ -583,7 +583,6 @@ class DataInspectionService:
                 visit_date=session_detail.get("visit_date"),
                 clinical_input=source_text,
                 use_rag=True,
-                use_web_search=True,
             )
             preprocessed_request, section_extraction = asyncio.run(
                 clinical_service.preprocess_unified_input(request)

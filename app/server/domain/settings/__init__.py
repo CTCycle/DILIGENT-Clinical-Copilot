@@ -1,12 +1,12 @@
 from domain.settings.configuration import (
     DatabaseSettings,
     DrugsMatcherSettings,
-    ExternalDataSettings,
     FastAPISettings,
     IngestionSettings,
     JobsSettings,
     LLMRuntimeDefaults,
     RagSettings,
+    RuntimeSettings,
     ServerSettings,
 )
 from domain.settings.runtime import LLMRuntimeState
@@ -14,7 +14,7 @@ from domain.settings.runtime import LLMRuntimeState
 __all__ = [
     "DatabaseSettings",
     "DrugsMatcherSettings",
-    "ExternalDataSettings",
+    "RuntimeSettings",
     "FastAPISettings",
     "IngestionSettings",
     "JobsSettings",

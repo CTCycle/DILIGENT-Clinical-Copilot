@@ -65,8 +65,7 @@ def test_dili_report_state_restores_after_refresh(page: Page, base_url: str):
                     visitDate: "2026-04-20",
                     patientImageDataUrl: null,
                     clinicalInput: "Persisted clinical input",
-                    useRag: false,
-                    useWebSearch: false
+                    useRag: false
                 },
                 message: "Persisted clinical report body",
                 jobStatus: "completed",

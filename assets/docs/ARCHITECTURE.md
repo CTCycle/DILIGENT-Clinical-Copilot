@@ -111,7 +111,6 @@ Access keys:
 - `DELETE /api/access-keys/{key_id}`
 
 Research:
-- `POST /api/research`
 
 Inspection:
 - `GET /api/inspection/sessions`

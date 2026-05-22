@@ -9,7 +9,6 @@ describe('buildClinicalPayload', () => {
       patientImageDataUrl: null,
       clinicalInput: 'test input',
       useRag: false,
-      useWebSearch: false,
     };
     const settings: RuntimeSettings = {
       useCloudServices: true,

@@ -248,9 +248,6 @@ LIVERTOX_CLINICAL_USER_PROMPT = """
 # Optional text from retrieved documents
 {documents}
 
-# Optional Web Search Evidence (untrusted)
-{web_evidence}
-
 # Patient Clinical Context
 {clinical_context}
 
