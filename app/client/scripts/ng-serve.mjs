@@ -3,7 +3,7 @@ import { spawn } from 'node:child_process';
 import path from 'node:path';
 
 const projectRoot = process.cwd();
-const envPath = path.resolve(projectRoot, '../../../settings/.env');
+const envPath = path.resolve(projectRoot, '../../settings/.env');
 
 const defaults = {
   FASTAPI_HOST: '127.0.0.1',

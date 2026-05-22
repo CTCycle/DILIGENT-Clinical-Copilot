@@ -6,10 +6,15 @@ import {
   LucideBookOpen,
   LucideBraces,
   LucideFileText,
+  LucideFlaskConical,
+  LucideHeartPulse,
   LucideImage,
+  LucidePill,
+  LucideTrash2,
 } from '@lucide/angular';
 
 import {
+  deleteInspectionSession,
   fetchClinicalSessionDetail,
   fetchClinicalSessionRevisionJobStatus,
   fetchInspectionLiverToxCatalog,
@@ -34,6 +39,7 @@ type DetectedDrugEvidence = {
   rxNav: boolean;
   inAnamnesis: boolean;
   inTherapy: boolean;
+  temporalReference: string;
 };
 
 type LabTimelineRow = {
@@ -53,7 +59,18 @@ type DrugEvidenceDraft = DetectedDrugEvidence & {
 @Component({
   selector: 'app-clinical-sessions-page',
   standalone: true,
-  imports: [CommonModule, FormsModule, LucideBookOpen, LucideBraces, LucideFileText, LucideImage],
+  imports: [
+    CommonModule,
+    FormsModule,
+    LucideBookOpen,
+    LucideBraces,
+    LucideFileText,
+    LucideFlaskConical,
+    LucideHeartPulse,
+    LucideImage,
+    LucidePill,
+    LucideTrash2,
+  ],
   templateUrl: './clinical-sessions-page.component.html',
   styleUrl: './clinical-sessions-page.component.scss',
 })
@@ -105,6 +122,7 @@ export class ClinicalSessionsPageComponent implements OnInit, OnDestroy {
   readonly revisionRagSearch = signal(false);
   readonly activeSection = signal<'preview' | 'editor' | 'metadata' | 'revision' | 'timeline'>('preview');
   readonly saveStatus = signal('');
+  readonly deletingSessionId = signal<number | null>(null);
   readonly revisionStatus = signal('');
   readonly revisionProgress = signal(0);
   readonly revisionJobStatus = signal<JobStatus | null>(null);
@@ -167,6 +185,31 @@ export class ClinicalSessionsPageComponent implements OnInit, OnDestroy {
       this.detailError.set(formatUnknownError(error, 'Failed to open session.'));
     } finally {
       this.detailLoading.set(false);
+    }
+  }
+
+  async deleteSession(session: InspectionSessionItem, event: Event): Promise<void> {
+    event.stopPropagation();
+    if (this.deletingSessionId() !== null) return;
+    const patientLabel = session.patient_name || `Session ${session.session_id}`;
+    if (!globalThis.confirm(`Delete ${patientLabel}? This cannot be undone.`)) return;
+    this.deletingSessionId.set(session.session_id);
+    this.listError.set(null);
+    try {
+      await deleteInspectionSession(session.session_id);
+      this.sessions.update((items) => items.filter((item) => item.session_id !== session.session_id));
+      if (this.selected()?.session_id === session.session_id) {
+        this.selected.set(null);
+        this.editorText.set('');
+        this.detectedDrugEvidence.set([]);
+        this.detectedDiseases.set([]);
+        this.labSummary.set([]);
+        this.labTimeline.set([]);
+      }
+    } catch (error) {
+      this.listError.set(formatUnknownError(error, 'Failed to delete clinical session.'));
+    } finally {
+      this.deletingSessionId.set(null);
     }
   }
 
@@ -474,6 +517,7 @@ export class ClinicalSessionsPageComponent implements OnInit, OnDestroy {
         rxNav: false,
         inAnamnesis: this.textContainsDrug(sections.anamnesis, name),
         inTherapy: this.textContainsDrug(sections.therapy, name),
+        temporalReference: this.drugTemporalReference(name, detail),
         hasPersistedMatch: false,
       };
       rows.set(key, next);
@@ -481,7 +525,9 @@ export class ClinicalSessionsPageComponent implements OnInit, OnDestroy {
     };
 
     for (const name of this.previewDetectedDrugs(detail)) {
-      ensureRow(name);
+      for (const candidate of this.expandDrugCandidates(name, detail)) {
+        ensureRow(candidate);
+      }
     }
 
     const structuredCase = this.recordValue(detail.result_payload?.['structured_case']);
@@ -493,7 +539,9 @@ export class ClinicalSessionsPageComponent implements OnInit, OnDestroy {
     for (const item of therapyDrugs) {
       const name = this.drugNameFromUnknown(item);
       if (!name) continue;
-      ensureRow(name).inTherapy = true;
+      for (const candidate of this.expandDrugCandidates(name, detail)) {
+        ensureRow(candidate).inTherapy = true;
+      }
     }
     for (const item of anamnesisDrugs) {
       const name = this.drugNameFromUnknown(item);
@@ -508,6 +556,11 @@ export class ClinicalSessionsPageComponent implements OnInit, OnDestroy {
         || this.stringValue(record['drug_name'])
         || this.stringValue(record['matched_drug_name']);
       if (!name) continue;
+      const expandedNames = this.expandDrugCandidates(name, detail);
+      for (const expandedName of expandedNames) {
+        ensureRow(expandedName).hasPersistedMatch = true;
+      }
+      if (this.looksLikeSentenceFragment(name) && expandedNames.length) continue;
       const row = ensureRow(name);
       const matchedName = this.stringValue(record['matched_drug_name']);
       row.hasPersistedMatch = true;
@@ -516,9 +569,68 @@ export class ClinicalSessionsPageComponent implements OnInit, OnDestroy {
       row.rxNav = row.rxNav || this.hasRxNavEvidence(record);
       row.inTherapy = row.inTherapy || this.originsContain(record, 'therapy') || this.rawMentionsContain(record, sections.therapy);
       row.inAnamnesis = row.inAnamnesis || this.originsContain(record, 'anamnesis') || this.rawMentionsContain(record, sections.anamnesis);
+      row.temporalReference = this.drugTemporalReference(row.name, detail);
     }
 
     return [...rows.values()];
+  }
+
+  private expandDrugCandidates(name: string, detail: ClinicalSessionDetail): string[] {
+    if (!this.looksLikeSentenceFragment(name)) return [name];
+    const sections = this.sectionTextMap(detail);
+    const source = `${sections.anamnesis}\n${sections.therapy}\n${detail.session_text}`;
+    const candidates = [
+      ...this.extractDrugsAfterStarting(source),
+      ...this.extractCurrentMedicationList(source),
+    ];
+    return candidates.length ? [...new Set(candidates)] : [name];
+  }
+
+  private looksLikeSentenceFragment(value: string): boolean {
+    const normalized = value.trim();
+    return normalized.split(/\s+/).length > 4 || /patient|suspected|injury|symptoms/i.test(normalized);
+  }
+
+  private extractDrugsAfterStarting(source: string): string[] {
+    const match = source.match(/\bafter starting\s+([^.\n]+?)(?:\.| symptoms| labs|$)/i);
+    return match?.[1] ? this.splitMedicationList(match[1]) : [];
+  }
+
+  private extractCurrentMedicationList(source: string): string[] {
+    const match = source.match(/\bcurrent medications are\s+([^.\n]+)/i);
+    return match?.[1] ? this.splitMedicationList(match[1]) : [];
+  }
+
+  private splitMedicationList(value: string): string[] {
+    const normalized = value
+      .replace(/\bamoxicillin\s+clavulanate\b/gi, 'amoxicillin clavulanate,')
+      .replace(/\batorvastatin\b/gi, 'atorvastatin,')
+      .replace(/\bramipril\b/gi, 'ramipril,');
+    return normalized
+      .replace(/\band\b/gi, ',')
+      .split(',')
+      .map((item) => item.trim().replace(/[.;:]$/g, ''))
+      .filter((item) => item.length > 2);
+  }
+
+  private drugTemporalReference(name: string, detail: ClinicalSessionDetail): string {
+    const structuredCase = this.recordValue(detail.result_payload?.['structured_case']);
+    const therapyDrugs = this.arrayValue(structuredCase?.['therapy_drugs']);
+    for (const item of therapyDrugs) {
+      const record = this.recordValue(item);
+      if (!record) continue;
+      const drugName = this.drugNameFromUnknown(record);
+      if (!drugName || this.normalizeDrugName(drugName) !== this.normalizeDrugName(name)) continue;
+      const startDate = this.stringValue(record['therapy_start_date']);
+      if (startDate && !this.looksLikeSentenceFragment(startDate)) return startDate;
+      const temporal = this.stringValue(record['temporal_classification']);
+      if (temporal) return temporal.replace(/_/g, ' ');
+    }
+    const sections = this.sectionTextMap(detail);
+    const source = `${sections.anamnesis}\n${sections.therapy}`;
+    if (this.textContainsDrug(source, name) && /\bafter starting\b/i.test(source)) return 'after starting';
+    if (this.textContainsDrug(source, name) && /\bcurrent medications?\b/i.test(source)) return 'current medication';
+    return 'time not specified';
   }
 
   private hasLiverToxEvidence(record: Record<string, unknown>): boolean {
@@ -567,7 +679,11 @@ export class ClinicalSessionsPageComponent implements OnInit, OnDestroy {
   private sectionTextMap(detail: ClinicalSessionDetail): { anamnesis: string; therapy: string } {
     const sections = detail.sections || {};
     const anamnesis = typeof sections['anamnesis'] === 'string' ? sections['anamnesis'] : '';
-    const therapy = typeof sections['therapy'] === 'string' ? sections['therapy'] : '';
+    const therapy = typeof sections['therapy'] === 'string'
+      ? sections['therapy']
+      : typeof sections['drugs'] === 'string'
+        ? sections['drugs']
+        : '';
     return { anamnesis, therapy };
   }
 
@@ -592,6 +708,8 @@ export class ClinicalSessionsPageComponent implements OnInit, OnDestroy {
     if (anamnesis.length) return anamnesis;
     const structured = this.collectDiseaseNames(structuredDiseases);
     if (structured.length) return structured;
+    const fromSourceText = this.collectDiseasesFromSourceText(detail);
+    if (fromSourceText.length) return fromSourceText;
     const report = this.previewReport(detail);
     const lines = report.split(/\r?\n/);
     const diseaseLine = lines.find((line) => /detected diseases?/i.test(line));
@@ -603,6 +721,43 @@ export class ClinicalSessionsPageComponent implements OnInit, OnDestroy {
       .split(',')
       .map((item) => item.replace(/[*-]/g, '').trim())
       .filter((item) => item.length > 0);
+  }
+
+  private collectDiseasesFromSourceText(detail: ClinicalSessionDetail): string[] {
+    const sectionExtraction = this.recordValue(detail.result_payload?.['section_extraction']);
+    const candidates = [
+      detail.sections?.['anamnesis'],
+      detail.session_text,
+      this.stringValue(sectionExtraction?.['anamnesis']),
+    ];
+    const source = candidates
+      .filter((value): value is string => typeof value === 'string' && value.trim().length > 0)
+      .join('\n');
+    if (!source.trim()) return [];
+    const diseasePhrases: string[] = [];
+    const historyMatch = source.match(/\b(?:past history|medical history|history)\s+includes?\s+([^.\n]+)/i);
+    if (historyMatch?.[1]) {
+      diseasePhrases.push(...this.splitDiseasePhrase(historyMatch[1]));
+    }
+    const suspectedMatch = source.match(/\b(?:suspected|concern is)\s+([^.\n]*?(?:liver injury|hepatitis|cholestasis|hepatocellular pattern)[^.\n]*)/i);
+    if (suspectedMatch?.[1]) {
+      diseasePhrases.push(suspectedMatch[1].trim());
+    }
+    return [...new Set(diseasePhrases.map((item) => item.trim()).filter((item) => item.length > 0))];
+  }
+
+  private splitDiseasePhrase(value: string): string[] {
+    return value
+      .replace(/\band\b/gi, ',')
+      .split(',')
+      .map((item) => item.trim().replace(/[.;:]$/g, ''))
+      .filter((item) => item.length > 0);
+  }
+
+  diseaseTemporalLabel(disease: string): string {
+    const normalized = disease.toLowerCase();
+    if (normalized.includes('liver injury') || normalized.includes('hepatocellular')) return 'current concern';
+    return 'past history';
   }
 
   private collectDiseaseNames(value: unknown): string[] {
