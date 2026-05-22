@@ -14,10 +14,10 @@ def _env() -> EnvironmentSnapshot:
     )
 
 
-def test_external_data_timeouts_respect_values_and_minimums() -> None:
+def test_runtime_timeouts_respect_values_and_minimums() -> None:
     payload = build_settings_payload_from_json(
         {
-            "external_data": {
+            "runtime": {
                 "default_llm_timeout": 120.0,
                 "parser_llm_timeout": 45.0,
                 "disease_llm_timeout": 55.0,
@@ -28,7 +28,7 @@ def test_external_data_timeouts_respect_values_and_minimums() -> None:
         },
         _env(),
     )
-    settings = payload["external_data"]
+    settings = payload["runtime"]
 
     assert settings["default_llm_timeout"] == 120.0
     assert settings["parser_llm_timeout"] == 120.0
@@ -38,10 +38,10 @@ def test_external_data_timeouts_respect_values_and_minimums() -> None:
     assert settings["ollama_server_start_timeout"] == 22.0
 
 
-def test_external_data_timeouts_floor_to_positive_values() -> None:
+def test_runtime_timeouts_floor_to_positive_values() -> None:
     payload = build_settings_payload_from_json(
         {
-            "external_data": {
+            "runtime": {
                 "default_llm_timeout": -100.0,
                 "parser_llm_timeout": 0.0,
                 "disease_llm_timeout": -1.0,
@@ -52,7 +52,7 @@ def test_external_data_timeouts_floor_to_positive_values() -> None:
         },
         _env(),
     )
-    settings = payload["external_data"]
+    settings = payload["runtime"]
 
     assert settings["default_llm_timeout"] == 1.0
     assert settings["parser_llm_timeout"] == 1.0

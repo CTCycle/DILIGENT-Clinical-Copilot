@@ -6,7 +6,7 @@ from domain.keys import (
     normalize_provider_name,
 )
 from repositories.serialization.access_keys import AccessKeySerializer
-from repositories.schemas.models import AccessKey, ResearchAccessKey
+from repositories.schemas.models import AccessKey
 
 ###############################################################################
 class AccessKeyService:
@@ -15,7 +15,7 @@ class AccessKeyService:
 
     # -------------------------------------------------------------------------
     @staticmethod
-    def to_response(row: AccessKey | ResearchAccessKey) -> AccessKeyResponse:
+    def to_response(row: AccessKey) -> AccessKeyResponse:
         return AccessKeyResponse(
             id=int(row.id),
             provider=normalize_provider_name(str(row.provider)),

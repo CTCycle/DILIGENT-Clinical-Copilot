@@ -45,7 +45,7 @@ def test_clinical_session_factory_uses_configured_parser_timeouts(
     monkeypatch: Any,
 ) -> None:
     settings = SimpleNamespace(
-        external_data=SimpleNamespace(
+        runtime=SimpleNamespace(
             parser_llm_timeout=120.0,
             disease_llm_timeout=150.0,
         )

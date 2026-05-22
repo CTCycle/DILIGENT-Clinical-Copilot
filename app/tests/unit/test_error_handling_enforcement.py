@@ -20,8 +20,6 @@ from api.error_handling import (
 )
 from services.llm.ollama_client import OllamaError
 from services.runtime.jobs import JobManager
-from services.research import brave as brave_module
-from services.research.brave import BraveResearchService
 
 EXCLUDED_DIRS = {
     "__pycache__",
@@ -235,69 +233,6 @@ def test_ollama_endpoint_sanitizes_provider_error(monkeypatch) -> None:
     )
 
 
-# -----------------------------------------------------------------------------
-def test_brave_retry_retries_transient_status(monkeypatch) -> None:
-    service = BraveResearchService()
-    service.retry_limit = 2
-
-    class FakeResponse:
-        def __init__(self, status_code: int, payload: dict[str, Any]) -> None:
-            self.status_code = status_code
-            self.payload = payload
-
-        def raise_for_status(self) -> None:
-            if self.status_code >= 400:
-                request = httpx.Request("POST", "https://unit.test")
-                response = httpx.Response(
-                    status_code=self.status_code,
-                    request=request,
-                )
-                raise httpx.HTTPStatusError(
-                    "status error",
-                    request=request,
-                    response=response,
-                )
-
-        def json(self) -> dict[str, Any]:
-            return self.payload
-
-    class FakeAsyncClient:
-        call_count = 0
-
-        def __init__(self, *args: Any, **kwargs: Any) -> None:
-            pass
-
-        async def __aenter__(self):
-            return self
-
-        async def __aexit__(self, exc_type, exc, tb) -> None:
-            return None
-
-        async def get(self, url: str, params: dict[str, Any], headers: dict[str, str]):
-            FakeAsyncClient.call_count += 1
-            if FakeAsyncClient.call_count == 1:
-                return FakeResponse(503, {"detail": "unavailable"})
-            return FakeResponse(200, {"web": {"results": []}})
-
-    delays: list[float] = []
-
-    async def fake_sleep(delay: float) -> None:
-        delays.append(delay)
-
-    monkeypatch.setattr(brave_module.httpx, "AsyncClient", FakeAsyncClient)
-    monkeypatch.setattr(brave_module.asyncio, "sleep", fake_sleep)
-    monkeypatch.setattr(service, "consume_rate_slot", lambda: None)
-
-    payload = asyncio.run(
-        service.get_json_with_retry(
-            api_key="brave-key",
-            params={"q": "acetaminophen"},
-        )
-    )
-
-    assert payload == {"web": {"results": []}}
-    assert FakeAsyncClient.call_count == 2
-    assert len(delays) == 1
 
 
 

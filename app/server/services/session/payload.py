@@ -167,7 +167,6 @@ def sanitize_dili_payload(
     drugs: str | None,
     laboratory_analysis: str | None,
     use_rag: bool,
-    use_web_search: bool = False,
 ) -> dict[str, Any]:
     normalized_visit_date = normalize_visit_date(visit_date)
 
@@ -186,7 +185,6 @@ def sanitize_dili_payload(
         "drugs": sanitize_drugs_text(drugs),
         "laboratory_analysis": sanitize_laboratory_text(laboratory_analysis),
         "use_rag": bool(use_rag),
-        "use_web_search": bool(use_web_search),
     }
 
 
@@ -202,7 +200,6 @@ class PayloadSanitizationService:
         drugs: str | None,
         laboratory_analysis: str | None,
         use_rag: bool,
-        use_web_search: bool = False,
     ) -> dict[str, Any]:
         return sanitize_dili_payload(
             patient_name=patient_name,
@@ -211,5 +208,4 @@ class PayloadSanitizationService:
             drugs=drugs,
             laboratory_analysis=laboratory_analysis,
             use_rag=use_rag,
-            use_web_search=use_web_search,
         )

@@ -25,7 +25,7 @@ class AccessKeyEndpoint:
         self,
         provider: ProviderName = Query(
             ...,
-            description="openai, gemini, openrouter, or brave",
+            description="openai, gemini, or openrouter",
         ),
     ) -> list[AccessKeyResponse]:
         try:
@@ -65,7 +65,7 @@ class AccessKeyEndpoint:
         key_id: int = Path(..., ge=1),
         provider: ProviderName = Query(
             ...,
-            description="openai, gemini, openrouter, or brave",
+            description="openai, gemini, or openrouter",
         ),
     ) -> AccessKeyResponse:
         try:
@@ -88,7 +88,7 @@ class AccessKeyEndpoint:
         key_id: int = Path(..., ge=1),
         provider: ProviderName = Query(
             ...,
-            description="openai, gemini, openrouter, or brave",
+            description="openai, gemini, or openrouter",
         ),
     ) -> AccessKeyDeleteResponse:
         deleted = self.service.delete_access_key(key_id, provider=provider)
