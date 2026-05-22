@@ -2,7 +2,6 @@ import { CommonModule } from '@angular/common';
 import { Component, OnInit, computed, inject, signal } from '@angular/core';
 import { FormsModule } from '@angular/forms';
 
-import { ProviderAccessCardComponent } from '../../components/provider-access-card/provider-access-card.component';
 import {
   StatusMessageComponent,
   resolveStatusTone,
@@ -73,7 +72,6 @@ function resolveProviderLabel(provider: string): string {
   imports: [
     CommonModule,
     FormsModule,
-    ProviderAccessCardComponent,
     StatusMessageComponent,
     AccessKeyModalComponent,
     ModelRoleActionButtonComponent,
@@ -115,6 +113,8 @@ export class ModelConfigPageComponent implements OnInit {
     () => this.localModels().filter((model) => model.available_in_ollama).length,
   );
 
+  readonly visibleLocalModels = computed(() => this.filteredLocalModels().slice(0, 5));
+
   readonly draftProvider = computed(() =>
     resolveProvider(this.draftConfig().provider, this.cloudChoices()),
   );
@@ -132,6 +132,8 @@ export class ModelConfigPageComponent implements OnInit {
   );
 
   readonly statusTone = computed(() => resolveStatusTone(this.statusMessage()));
+
+  readonly ragPipelineEnabled = computed(() => this.appState.state().diliAgent.form.useRag);
 
   readonly cloudProviderOptions = computed<CloudProvider[]>(() => {
     const values = Object.keys(this.cloudChoices());
@@ -236,6 +238,15 @@ export class ModelConfigPageComponent implements OnInit {
     this.activeFilters.update((current) => ({ ...current, [key]: !current[key] }));
   }
 
+  clearFilters(): void {
+    this.activeFilters.set({
+      installed: false,
+      reasoning: false,
+      small: false,
+      extraction: false,
+    });
+  }
+
   setModelSearchQuery(value: string): void {
     this.modelSearchQuery.set(value);
   }
@@ -253,6 +264,16 @@ export class ModelConfigPageComponent implements OnInit {
     if (!value) {
       void this.loadModelConfig(false, true);
     }
+  }
+
+  handleRagPipelineChange(enabled: boolean): void {
+    const currentForm = this.appState.state().diliAgent.form;
+    this.appState.updateDiliAgent({
+      form: {
+        ...currentForm,
+        useRag: enabled,
+      },
+    });
   }
 
   handleProviderChange(provider: CloudProvider): void {

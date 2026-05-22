@@ -5076,6 +5076,44 @@ input[type="date"]::-webkit-calendar-picker-indicator:hover {
   color: #d8edf2;
 }
 
+/* Preview A model configuration dark-theme overrides */
+:root[data-theme="dark"] .model-config-page .model-config-runtime-card,
+:root[data-theme="dark"] .model-config-page .model-config-rag-card,
+:root[data-theme="dark"] .model-config-page .model-config-catalog-panel,
+:root[data-theme="dark"] .model-config-page .model-config-cloud-options {
+  background: #10221d;
+  border-color: #284d42;
+}
+
+:root[data-theme="dark"] .model-config-page .model-config-summary-panel {
+  background: #172d3b;
+  border-color: #39576a;
+}
+
+:root[data-theme="dark"] .model-config-page .model-config-runtime-option {
+  background: #142922 !important;
+  border-color: #40695c !important;
+  box-shadow: none !important;
+  color: #e8f8f3 !important;
+}
+
+:root[data-theme="dark"] .model-config-page .model-config-runtime-option.is-active {
+  background: #193e33 !important;
+  border-color: #67ddb0 !important;
+  box-shadow: inset 0 0 0 1px rgba(103, 221, 176, 0.22) !important;
+}
+
+:root[data-theme="dark"] .model-config-page .model-config-runtime-option strong,
+:root[data-theme="dark"] .model-config-page .model-config-runtime-option small,
+:root[data-theme="dark"] .model-config-page .model-config-option-icon {
+  color: #e8f8f3 !important;
+  opacity: 1;
+}
+
+:root[data-theme="dark"] .model-config-page .model-config-runtime-option small {
+  color: #a8c6bc !important;
+}
+
 .stitch-dili-report-shell {
   background: #f4f8f6;
   border-top: 1px solid #d8e6df;
@@ -5820,4 +5858,93 @@ input[type="date"]::-webkit-calendar-picker-indicator:hover {
   min-height: 62px;
   border-radius: 10px;
   background: linear-gradient(90deg, #07825f 0%, #45be91 100%);
+}
+
+/* Final Preview A overrides for the redesigned model configuration page. */
+.model-config-page .model-config-preview-a-layout .model-config-summary-panel {
+  padding: 20px;
+  min-height: 0;
+  margin-top: 176px;
+}
+
+.model-config-page .model-config-preview-a-layout .model-config-summary-actions .btn-primary {
+  min-height: 42px;
+  border-radius: 5px;
+  background: linear-gradient(90deg, #087d59, #049063);
+}
+
+.model-config-page .model-config-preview-a-layout .model-config-summary-actions .btn-primary:disabled {
+  opacity: 1;
+}
+
+.model-config-page .model-config-preview-a-layout .model-config-runtime-options {
+  max-width: none;
+}
+
+.model-config-page .model-config-preview-a-layout .model-config-runtime-option {
+  display: grid;
+  grid-template-columns: 32px minmax(0, 1fr) 18px;
+  min-height: 82px;
+  align-items: center;
+  padding: 16px;
+  border-radius: 6px;
+}
+
+.model-config-page .model-config-preview-a-layout .model-config-runtime-option > span {
+  display: block;
+}
+
+.model-config-page .model-config-preview-a-layout .model-config-filter-pills {
+  display: flex;
+  flex-wrap: nowrap;
+  gap: 8px;
+  justify-content: flex-start;
+  width: auto;
+}
+
+.model-config-page .model-config-preview-a-layout .model-config-filter-pill {
+  min-height: 34px;
+  padding: 0 12px;
+  border-radius: 5px;
+  font-size: 12px;
+  line-height: 1;
+  text-align: center;
+  white-space: nowrap;
+}
+
+:root[data-theme="dark"] .model-config-page .model-config-preview-a-layout .model-config-runtime-card,
+:root[data-theme="dark"] .model-config-page .model-config-preview-a-layout .model-config-rag-card,
+:root[data-theme="dark"] .model-config-page .model-config-preview-a-layout .model-config-catalog-panel,
+:root[data-theme="dark"] .model-config-page .model-config-preview-a-layout .model-config-cloud-options {
+  background: #10221d;
+  border-color: #284d42;
+}
+
+:root[data-theme="dark"] .model-config-page .model-config-preview-a-layout .model-config-summary-panel {
+  background: #172d3b;
+  border-color: #39576a;
+}
+
+:root[data-theme="dark"] .model-config-page .model-config-preview-a-layout .model-config-runtime-option {
+  background: #142922 !important;
+  border-color: #40695c !important;
+  box-shadow: none !important;
+  color: #e8f8f3 !important;
+}
+
+:root[data-theme="dark"] .model-config-page .model-config-preview-a-layout .model-config-runtime-option.is-active {
+  background: #193e33 !important;
+  border-color: #67ddb0 !important;
+  box-shadow: inset 0 0 0 1px rgba(103, 221, 176, 0.22) !important;
+}
+
+:root[data-theme="dark"] .model-config-page .model-config-preview-a-layout .model-config-runtime-option strong,
+:root[data-theme="dark"] .model-config-page .model-config-preview-a-layout .model-config-runtime-option small,
+:root[data-theme="dark"] .model-config-page .model-config-preview-a-layout .model-config-option-icon {
+  color: #e8f8f3 !important;
+  opacity: 1;
+}
+
+:root[data-theme="dark"] .model-config-page .model-config-preview-a-layout .model-config-runtime-option small {
+  color: #a8c6bc !important;
 }
