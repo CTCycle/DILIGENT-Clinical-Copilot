@@ -72,7 +72,7 @@
   --container-max: 1536px;
   --drawer-width: 360px;
   --report-max-height: 480px;
-  --app-top-nav-height: 74px;
+  --app-top-nav-height: 59px;
 
   /* Background */
   --app-background:
@@ -357,6 +357,8 @@ app-root {
   box-shadow: none;
   padding: 0;
   min-height: 100%;
+  display: flex;
+  flex-direction: column;
 }
 
 @media (min-width: 1100px) {
@@ -435,6 +437,8 @@ app-root {
   display: flex;
   flex-direction: column;
   gap: var(--space-sm);
+  margin-top: auto;
+  padding-top: var(--space-xl);
 }
 
 .stitch-dili-clear {
@@ -2029,8 +2033,8 @@ input[type="date"]::-webkit-calendar-picker-indicator:hover {
 
 .app-header-logo {
   display: inline-flex;
-  width: 56px;
-  height: 56px;
+  width: 44px;
+  height: 44px;
   max-width: 100%;
   color: var(--color-text-primary);
   flex: 0 0 auto;
@@ -5199,12 +5203,8 @@ input[type="date"]::-webkit-calendar-picker-indicator:hover {
   position: relative;
   overflow: hidden;
   isolation: isolate;
-  background-image:
-    linear-gradient(90deg, rgba(241, 248, 244, 0.9) 0%, rgba(236, 245, 241, 0.72) 44%, rgba(236, 245, 241, 0.28) 100%),
-    url("/dili-sidebar-texture-light.png");
-  background-repeat: no-repeat;
-  background-size: 100% 100%, 100% 100%;
-  background-position: center;
+  background:
+    linear-gradient(90deg, rgba(241, 248, 244, 0.9) 0%, rgba(236, 245, 241, 0.72) 44%, rgba(236, 245, 241, 0.28) 100%);
 }
 
 .stitch-dili-sidebar::after {
@@ -5227,16 +5227,14 @@ input[type="date"]::-webkit-calendar-picker-indicator:hover {
 }
 
 :root[data-theme="dark"] .stitch-dili-sidebar {
-  background-image:
-    linear-gradient(90deg, rgba(12, 36, 48, 0.88) 0%, rgba(11, 37, 49, 0.62) 42%, rgba(11, 37, 49, 0.18) 100%),
-    url("/dili-sidebar-texture-dark.png");
-  background-repeat: no-repeat;
-  background-size: 100% 100%, 100% 100%;
-  background-position: center;
+  background:
+    linear-gradient(90deg, rgba(12, 36, 48, 0.88) 0%, rgba(11, 37, 49, 0.62) 42%, rgba(11, 37, 49, 0.18) 100%);
 }
 
 :root[data-theme="dark"] .stitch-dili-sidebar::after {
   background: url("/dili-sidebar-texture-dark.png") right bottom / cover no-repeat;
+  width: auto;
+  height: auto;
   opacity: 0.82;
   -webkit-mask-image: linear-gradient(90deg, transparent 0%, rgba(0, 0, 0, 0.46) 14%, #000 100%);
   mask-image: linear-gradient(90deg, transparent 0%, rgba(0, 0, 0, 0.46) 14%, #000 100%);

@@ -79,23 +79,36 @@
           <p class="clinical-sessions-empty">No clinical sessions found.</p>
         } @else {
           @for (session of filteredSessions(); track session.session_id) {
-            <button
-              type="button"
-              class="clinical-session-row"
-              [class.is-active]="selected()?.session_id === session.session_id"
-              (click)="openSession(session.session_id)"
-            >
-              <span class="clinical-session-row-main">
-                <strong>{{ session.patient_name || 'Unknown patient' }}</strong>
-                <small>Session {{ session.session_id }} · Version {{ session.version || 1 }}</small>
-              </span>
-              <span class="clinical-session-row-meta">
-                <span>{{ session.session_timestamp ? (session.session_timestamp | date:'medium') : 'No date' }}</span>
-                <span class="clinical-session-status-chip" [class.is-failed]="session.status === 'failed'">
-                  {{ statusLabel(session.status) }}
+            <div class="clinical-session-row-shell" [class.is-active]="selected()?.session_id === session.session_id">
+              <button
+                type="button"
+                class="clinical-session-row"
+                (click)="openSession(session.session_id)"
+              >
+                <span class="clinical-session-row-main">
+                  <strong>{{ session.patient_name || 'Unknown patient' }}</strong>
+                  <small>Session {{ session.session_id }} · Version {{ session.version || 1 }}</small>
                 </span>
-              </span>
-            </button>
+                <span class="clinical-session-row-meta">
+                  <span>{{ session.session_timestamp ? (session.session_timestamp | date:'medium') : 'No date' }}</span>
+                  <span class="clinical-session-status-chip" [class.is-failed]="session.status === 'failed'">
+                    {{ statusLabel(session.status) }}
+                  </span>
+                </span>
+              </button>
+              <div class="clinical-session-row-actions">
+                <button
+                  type="button"
+                  class="clinical-session-delete"
+                  title="Delete session"
+                  aria-label="Delete session"
+                  [disabled]="deletingSessionId() === session.session_id"
+                  (click)="deleteSession(session, $event)"
+                >
+                  <svg lucideTrash2 size="14"></svg>
+                </button>
+              </div>
+            </div>
           }
         }
       </div>
@@ -132,58 +145,67 @@
             </div>
             <aside class="clinical-session-preview-side">
               <div class="clinical-session-preview-card">
-                <h3>Detected drugs</h3>
+                <h3 class="clinical-session-card-title">
+                  <span class="clinical-session-card-icon" aria-hidden="true">
+                    <svg lucidePill size="15"></svg>
+                  </span>
+                  Detected drugs
+                </h3>
                 @if (detectedDrugEvidence().length) {
-                  <div class="clinical-session-drug-table-wrap">
-                    <table class="clinical-session-drug-table">
-                      <thead>
+                  <table class="clinical-session-drug-evidence-table">
+                    <thead>
+                      <tr>
+                        <th>Drug</th>
+                        <th>Extracted from</th>
+                        <th>Bibliography</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      @for (drug of detectedDrugEvidence(); track drug.name) {
                         <tr>
-                          <th>Drug</th>
-                          <th>Anamnesis</th>
-                          <th>Therapy</th>
-                          <th>LiverTox</th>
-                          <th>RxNav</th>
+                          <td>
+                            <strong>{{ drug.name }}</strong>
+                            <small>{{ drug.temporalReference }}</small>
+                          </td>
+                          <td>
+                            @if (drug.inAnamnesis || drug.inTherapy) {
+                              @if (drug.inAnamnesis) {
+                                <span class="clinical-session-table-value">Anamnesis</span>
+                              }
+                              @if (drug.inTherapy) {
+                                <span class="clinical-session-table-value">Therapy</span>
+                              }
+                            } @else {
+                              <span class="clinical-session-table-value is-muted">None</span>
+                            }
+                          </td>
+                          <td>
+                            <span class="clinical-session-table-value" [class.is-muted]="!drug.liverTox">
+                              {{ drug.liverTox ? 'LiverTox' : 'None' }}
+                            </span>
+                          </td>
                         </tr>
-                      </thead>
-                      <tbody>
-                        @for (drug of detectedDrugEvidence(); track drug.name) {
-                          <tr>
-                            <td>{{ drug.name }}</td>
-                            <td>
-                              <span class="clinical-session-source-pill" [class.is-present]="drug.inAnamnesis">
-                                {{ drug.inAnamnesis ? 'Yes' : 'No' }}
-                              </span>
-                            </td>
-                            <td>
-                              <span class="clinical-session-source-pill" [class.is-present]="drug.inTherapy">
-                                {{ drug.inTherapy ? 'Yes' : 'No' }}
-                              </span>
-                            </td>
-                            <td>
-                              <span class="clinical-session-source-pill" [class.is-present]="drug.liverTox">
-                                {{ drug.liverTox ? 'Yes' : 'No' }}
-                              </span>
-                            </td>
-                            <td>
-                              <span class="clinical-session-source-pill" [class.is-present]="drug.rxNav">
-                                {{ drug.rxNav ? 'Yes' : 'No' }}
-                              </span>
-                            </td>
-                          </tr>
-                        }
-                      </tbody>
-                    </table>
-                  </div>
+                      }
+                    </tbody>
+                  </table>
                 } @else {
                   <p class="clinical-session-panel-note">No detected drug list is available.</p>
                 }
               </div>
               <div class="clinical-session-preview-card">
-                <h3>Detected diseases</h3>
+                <h3 class="clinical-session-card-title">
+                  <span class="clinical-session-card-icon" aria-hidden="true">
+                    <svg lucideHeartPulse size="15"></svg>
+                  </span>
+                  Detected diseases
+                </h3>
                 @if (detectedDiseases().length) {
                   <ul class="clinical-session-side-list">
                     @for (disease of detectedDiseases(); track disease) {
-                      <li>{{ disease }}</li>
+                      <li>
+                        <span>{{ disease }}</span>
+                        <small>{{ diseaseTemporalLabel(disease) }}</small>
+                      </li>
                     }
                   </ul>
                 } @else {
@@ -191,7 +213,12 @@
                 }
               </div>
               <div class="clinical-session-preview-card">
-                <h3>Laboratory and pattern</h3>
+                <h3 class="clinical-session-card-title">
+                  <span class="clinical-session-card-icon" aria-hidden="true">
+                    <svg lucideFlaskConical size="15"></svg>
+                  </span>
+                  Laboratory and pattern
+                </h3>
                 <dl class="clinical-session-audit-list clinical-session-compact-list">
                   <div>
                     <dt>Hepatotoxicity pattern</dt>
@@ -213,18 +240,13 @@
                         @for (item of labTimeline(); track item.marker + item.timing + item.value + $index) {
                           <tr>
                             <td>
-                              <strong>{{ item.timing }}</strong>
+                              <strong>{{ item.timing === 'Unknown' ? 'Not dated' : item.timing }}</strong>
                               <span>{{ item.source }}</span>
                             </td>
                             <td>{{ item.marker }}</td>
                             <td>{{ item.value }}{{ item.unit ? ' ' + item.unit : '' }}</td>
                             <td>{{ item.upperLimit }}</td>
                           </tr>
-                          @if (item.evidence) {
-                            <tr class="clinical-session-lab-evidence-row">
-                              <td colspan="4">{{ item.evidence }}</td>
-                            </tr>
-                          }
                         }
                       </tbody>
                     </table>
@@ -240,27 +262,6 @@
                   </dl>
                 } @else {
                   <p class="clinical-session-panel-note">No laboratory summary available.</p>
-                }
-              </div>
-              <div class="clinical-session-preview-card">
-                <h3>Revision audit</h3>
-                @if (previewRevisionAudit(detail); as audit) {
-                  <dl class="clinical-session-audit-list">
-                    <div>
-                      <dt>Source</dt>
-                      <dd>{{ audit['source_session_id'] || 'N/A' }}</dd>
-                    </div>
-                    <div>
-                      <dt>New drugs</dt>
-                      <dd>{{ audit['newly_identified_drugs'] || 'None' }}</dd>
-                    </div>
-                    <div>
-                      <dt>Conclusion</dt>
-                      <dd>{{ audit['conclusion_action'] || 'N/A' }}</dd>
-                    </div>
-                  </dl>
-                } @else {
-                  <p class="clinical-session-panel-note">No revision audit has been recorded yet.</p>
                 }
               </div>
             </aside>
