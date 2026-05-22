@@ -47,7 +47,7 @@ class CloudLLMClient:
         *,
         provider: ProviderName = "openai",
         base_url: str | None = None,
-        timeout_s: float = server_settings.external_data.default_llm_timeout,
+        timeout_s: float = server_settings.runtime.default_llm_timeout,
         keepalive_connections: int = 10,
         keepalive_max: int = 20,
         default_model: str | None = None,

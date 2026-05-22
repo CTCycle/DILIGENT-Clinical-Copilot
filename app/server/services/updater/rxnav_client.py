@@ -43,7 +43,7 @@ class RxNavClient:
         max_concurrency: int | None = None,
     ) -> None:
         self.enabled = True
-        external_settings = server_settings.external_data
+        external_settings = server_settings.runtime
         configured_timeout = (
             float(request_timeout)
             if request_timeout is not None

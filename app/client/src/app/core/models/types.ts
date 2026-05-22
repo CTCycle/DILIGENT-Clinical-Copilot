@@ -43,7 +43,7 @@ export type ModelConfigUpdateRequest = {
   ollama_reasoning?: boolean;
 };
 
-export type AccessKeyProvider = "openai" | "gemini" | "brave";
+export type AccessKeyProvider = "openai" | "gemini" | "openrouter";
 
 export type AccessKeyRecord = {
   id: number;
@@ -61,7 +61,6 @@ export type ClinicalFormState = {
   patientImageDataUrl: string | null;
   clinicalInput: string;
   useRag: boolean;
-  useWebSearch: boolean;
 };
 
 export type ClinicalRequestPayload = {
@@ -71,7 +70,6 @@ export type ClinicalRequestPayload = {
   selected_model_providers: string[];
   patient_image_base64?: string | null;
   use_rag: boolean;
-  use_web_search: boolean;
 };
 
 export type ApiResult = {

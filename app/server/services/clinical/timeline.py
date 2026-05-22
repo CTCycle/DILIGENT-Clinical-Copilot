@@ -32,7 +32,7 @@ class PatientTimelineExtractor:
         *,
         client: Any | None = None,
         temperature: float = 0.0,
-        timeout_s: float = server_settings.external_data.default_llm_timeout,
+        timeout_s: float = server_settings.runtime.default_llm_timeout,
     ) -> None:
         self.temperature = float(temperature)
         self.timeout_s = float(timeout_s)

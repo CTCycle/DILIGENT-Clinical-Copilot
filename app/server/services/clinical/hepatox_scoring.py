@@ -43,7 +43,6 @@ from services.clinical.match_quality import classify_match_evidence
 from services.retrieval.embeddings import SimilaritySearch
 from services.clinical.preparation import HepatoxPreparedInputs
 from services.text.normalization import normalize_drug_query_name
-from services.research.brave import BraveResearchService
 from services.text.vocabulary import get_text_normalization_snapshot
 from services.clinical.report_language import (
     phrase,

@@ -17,8 +17,8 @@ from services.session.session_service import ClinicalSessionService
 
 
 def build_clinical_session_service(job_manager: JobManager) -> ClinicalSessionService:
-    parser_timeout_s = float(server_settings.external_data.parser_llm_timeout)
-    disease_timeout_s = float(server_settings.external_data.disease_llm_timeout)
+    parser_timeout_s = float(server_settings.runtime.parser_llm_timeout)
+    disease_timeout_s = float(server_settings.runtime.disease_llm_timeout)
     return ClinicalSessionService(
         drugs_parser=DrugsParser(timeout_s=parser_timeout_s),
         disease_extractor=DiseaseExtractor(timeout_s=disease_timeout_s),

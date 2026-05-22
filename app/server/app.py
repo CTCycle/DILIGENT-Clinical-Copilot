@@ -21,7 +21,6 @@ from api.health import router as health_router
 from api.model_config import router as model_config_router
 from api.session import router as session_router
 from api.ollama import router as ollama_router
-from api.research import router as research_router
 from api.root import RootEndpoint
 from api.error_handling import register_error_handling
 from repositories.database.initializer import initialize_database
@@ -58,7 +57,6 @@ def create_app() -> FastAPI:
         ollama_router,
         model_config_router,
         access_keys_router,
-        research_router,
     ):
         fastapi_app.include_router(router, prefix="/api")
 

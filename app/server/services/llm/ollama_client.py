@@ -167,7 +167,7 @@ class OllamaClient:
     def __init__(
         self,
         base_url: str | None = None,
-        timeout_s: float = server_settings.external_data.default_llm_timeout,
+        timeout_s: float = server_settings.runtime.default_llm_timeout,
         keepalive_connections: int = 10,
         keepalive_max: int = 20,
         default_model: str | None = None,
@@ -572,7 +572,7 @@ class OllamaClient:
     async def start_server(
         self,
         *,
-        wait_timeout_s: float = server_settings.external_data.ollama_server_start_timeout,
+        wait_timeout_s: float = server_settings.runtime.ollama_server_start_timeout,
         poll_interval_s: float = server_settings.jobs.polling_interval,
     ) -> Literal["started", "already_running"]:
         return await ollama_chat.start_server(self, wait_timeout_s=wait_timeout_s, poll_interval_s=poll_interval_s)

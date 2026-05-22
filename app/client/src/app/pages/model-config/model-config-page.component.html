@@ -255,16 +255,7 @@
           Extra Parameters
         </h2>
         <div class="model-config-extra-columns">
-          <div class="model-config-extra-left">
-            <app-provider-access-card
-              variant="compact"
-              [label]="getProviderLabel('brave')"
-              hint="Brave Search API key"
-              [disabled]="isSaving() || isLoading()"
-              manageKeyAriaLabel="Manage Brave Search access keys"
-              (manageKeys)="openKeys('brave')"
-            ></app-provider-access-card>
-          </div>
+          <div class="model-config-extra-left"></div>
           <div class="model-config-extra-right">
             <div class="field">
               <label class="field-label" for="global-temperature-input">Temperature</label>

@@ -44,7 +44,7 @@ class ClinicalInputExtractor:
         self,
         *,
         client: Any | None = None,
-        timeout_s: float = server_settings.external_data.default_llm_timeout,
+        timeout_s: float = server_settings.runtime.default_llm_timeout,
     ) -> None:
         self.timeout_s = float(timeout_s)
         self.client: Any | None = client
