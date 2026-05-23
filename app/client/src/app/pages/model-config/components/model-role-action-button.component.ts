@@ -17,6 +17,9 @@ import { ModelRole } from '../model-config.types';
       [attr.title]="title"
     >
       <span>{{ visibleLabel }}</span>
+      <svg viewBox="0 0 24 24" aria-hidden="true">
+        <path d="m7 10 5 5 5-5" />
+      </svg>
     </button>
   `,
 })
