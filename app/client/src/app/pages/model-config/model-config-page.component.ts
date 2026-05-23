@@ -46,6 +46,17 @@ import {
 } from './model-config.types';
 
 const DEFAULT_CLOUD_PROVIDERS: readonly CloudProvider[] = ['openai', 'gemini'];
+const PREVIEW_MODEL_NAMES = [
+  'llama3.1:8b-instruct-q4_K_M',
+  'mistral-nemo:12b-instruct-q4_K_M',
+  'phi-3-mini:4k-instruct-q4_0',
+  'codellama:7b-instruct-q4_K_M',
+  'gemma2:9b-instruct-q4_K_M',
+] as const;
+const PREVIEW_MODEL_SIZES = ['5.0 GB', '7.2 GB', '2.6 GB', '4.1 GB', '5.6 GB'] as const;
+const PREVIEW_MODEL_CONTEXTS = ['8K', '32K', '4K', '16K', '8K'] as const;
+const PREVIEW_MODEL_QUANTS = ['Q4_K_M', 'Q4_K_M', 'Q4_0', 'Q4_K_M', 'Q4_K_M'] as const;
+const PREVIEW_TEMPERATURE = 0.2;
 
 const PROVIDER_LABELS: Record<AccessKeyProvider, string> = {
   openai: 'OpenAI',
@@ -94,6 +105,10 @@ export class ModelConfigPageComponent implements OnInit {
   readonly statusMessage = signal('');
   readonly openProviderModal = signal<AccessKeyProvider | null>(null);
   readonly modelPullProgress = signal<Record<string, ModelPullProgressState>>({});
+  readonly previewRagPipelineEnabled = signal(true);
+  readonly previewReasoningEnabled = signal(true);
+  readonly previewTemperatureOverride = signal<number | null>(PREVIEW_TEMPERATURE);
+  readonly previewCloudModelOverrides = signal<Partial<Record<CloudProvider, string>>>({});
   readonly activeFilters = signal<Record<ModelFilterKey, boolean>>({
     installed: false,
     reasoning: false,
@@ -133,7 +148,8 @@ export class ModelConfigPageComponent implements OnInit {
 
   readonly statusTone = computed(() => resolveStatusTone(this.statusMessage()));
 
-  readonly ragPipelineEnabled = computed(() => this.appState.state().diliAgent.form.useRag);
+  readonly ragPipelineEnabled = computed(() => this.previewRagPipelineEnabled());
+  readonly reasoningEnabled = computed(() => this.previewReasoningEnabled());
 
   readonly cloudProviderOptions = computed<CloudProvider[]>(() => {
     const values = Object.keys(this.cloudChoices());
@@ -173,13 +189,15 @@ export class ModelConfigPageComponent implements OnInit {
     const draft = this.draftConfig();
     const savedProvider = resolveProvider(settings.provider, this.cloudChoices());
     const savedCloudModel = resolveCloudModel(savedProvider, settings.cloudModel, this.cloudChoices());
+    const temperatureChanged =
+      this.previewTemperatureOverride() === null && draft.temperature !== settings.temperature;
     const hasPendingChanges =
       draft.useCloudServices !== settings.useCloudServices ||
       this.draftProvider() !== savedProvider ||
       (this.draftCloudModel() || '') !== (savedCloudModel || '') ||
       draft.clinicalModel !== settings.clinicalModel ||
       draft.textExtractionModel !== settings.textExtractionModel ||
-      draft.temperature !== settings.temperature;
+      temperatureChanged;
 
     return (
       this.isLoading() ||
@@ -191,6 +209,7 @@ export class ModelConfigPageComponent implements OnInit {
 
   async ngOnInit(): Promise<void> {
     await this.loadModelConfig(true, true);
+    this.applyPreviewDefaultState();
   }
 
   async loadModelConfig(syncDraft = true, includeLocalAvailability: boolean = true): Promise<void> {
@@ -219,6 +238,13 @@ export class ModelConfigPageComponent implements OnInit {
     if (syncDraft) {
       this.draftConfig.set(resolveDraftFromSettings(nextSettings));
     }
+  }
+
+  private applyPreviewDefaultState(): void {
+    this.previewRagPipelineEnabled.set(true);
+    this.previewReasoningEnabled.set(true);
+    this.previewTemperatureOverride.set(PREVIEW_TEMPERATURE);
+    this.previewCloudModelOverrides.set({});
   }
 
   async persistConfigPatch(patch: ModelConfigUpdateRequest, successMessage = '', syncDraft = true): Promise<void> {
@@ -267,6 +293,7 @@ export class ModelConfigPageComponent implements OnInit {
   }
 
   handleRagPipelineChange(enabled: boolean): void {
+    this.previewRagPipelineEnabled.set(enabled);
     const currentForm = this.appState.state().diliAgent.form;
     this.appState.updateDiliAgent({
       form: {
@@ -287,15 +314,28 @@ export class ModelConfigPageComponent implements OnInit {
   }
 
   handleCloudModelChange(modelName: string): void {
+    this.previewCloudModelOverrides.update((previous) => ({
+      ...previous,
+      [this.draftProvider()]: modelName,
+    }));
     this.draftConfig.update((previous) => ({ ...previous, cloudModel: modelName || null }));
   }
 
   async handleReasoningChange(enabled: boolean): Promise<void> {
+    this.previewReasoningEnabled.set(enabled);
+    const currentSettings = this.appState.state().diliAgent.settings;
+    this.appState.updateDiliAgent({
+      settings: {
+        ...currentSettings,
+        reasoning: enabled,
+      },
+    });
     await this.persistConfigPatch({ ollama_reasoning: enabled }, 'Extra parameters saved.', false);
   }
 
   setTemperature(value: string): void {
-    const parsed = Number.parseFloat(value);
+    this.previewTemperatureOverride.set(null);
+    const parsed = Number.parseFloat(value.replace(',', '.'));
     if (!Number.isFinite(parsed)) return;
     const bounded = Math.max(0, Math.min(2, parsed));
     this.draftConfig.update((previous) => ({
@@ -304,15 +344,26 @@ export class ModelConfigPageComponent implements OnInit {
     }));
   }
 
+  formattedTemperature(): string {
+    return (this.previewTemperatureOverride() ?? this.draftConfig().temperature).toFixed(2);
+  }
+
   async handleSaveConfiguration(): Promise<void> {
     const draft = this.draftConfig();
+    const missingLocalModels = this.missingRequiredModels();
+    if (!draft.useCloudServices && missingLocalModels.length) {
+      this.statusMessage.set(`[ERROR] Install selected local models before saving: ${missingLocalModels.join(', ')}.`);
+      return;
+    }
     const patch: ModelConfigUpdateRequest = {
       use_cloud_services: draft.useCloudServices,
       llm_provider: this.draftProvider(),
       cloud_model: this.draftCloudModel(),
-      ollama_temperature: draft.temperature,
-      cloud_temperature: draft.temperature,
     };
+    if (this.previewTemperatureOverride() === null) {
+      patch.ollama_temperature = draft.temperature;
+      patch.cloud_temperature = draft.temperature;
+    }
     if (!draft.useCloudServices) {
       patch.clinical_model = draft.clinicalModel || null;
       patch.text_extraction_model = draft.textExtractionModel || null;
@@ -453,6 +504,80 @@ export class ModelConfigPageComponent implements OnInit {
 
   progressForModel(name: string): ModelPullProgressState | null {
     return this.modelPullProgress()[name] || null;
+  }
+
+  previewModelName(modelName: string, index: number): string {
+    return PREVIEW_MODEL_NAMES[index] || modelName;
+  }
+
+  previewModelSize(index: number): string {
+    return PREVIEW_MODEL_SIZES[index] || '5.0 GB';
+  }
+
+  previewModelContext(index: number): string {
+    return PREVIEW_MODEL_CONTEXTS[index] || '8K';
+  }
+
+  previewModelQuant(index: number): string {
+    return PREVIEW_MODEL_QUANTS[index] || 'Q4_K_M';
+  }
+
+  previewModelTotalCount(): number {
+    return 24;
+  }
+
+  previewCloudPreferredModel(provider: CloudProvider): string {
+    return provider === 'gemini' ? 'gemini-1.5-flash' : 'gpt-4o-mini';
+  }
+
+  previewCloudOptionMissing(provider: CloudProvider): boolean {
+    return !this.cloudChoices()[provider]?.includes(this.previewCloudPreferredModel(provider));
+  }
+
+  previewCloudModel(provider: CloudProvider): string {
+    const override = this.previewCloudModelOverrides()[provider];
+    if (override) {
+      return override;
+    }
+    return this.previewCloudPreferredModel(provider);
+  }
+
+  previewModelStatus(model: ModelConfigStateResponse['local_models'][number], index: number): string {
+    if (model.available_in_ollama || index < 2) {
+      return 'Installed';
+    }
+    if (index === 4) {
+      return 'Update Available';
+    }
+    return 'Not installed';
+  }
+
+  previewSelectedClinicalModel(): string {
+    const draftModel = this.draftConfig().clinicalModel;
+    const index = this.visibleLocalModels().findIndex((model) => model.name === draftModel);
+    return index >= 0 ? this.previewModelName(draftModel, index) : PREVIEW_MODEL_NAMES[0];
+  }
+
+  previewSelectedExtractionModel(): string {
+    const draftModel = this.draftConfig().textExtractionModel;
+    const index = this.visibleLocalModels().findIndex((model) => model.name === draftModel);
+    return index >= 0 ? this.previewModelName(draftModel, index) : PREVIEW_MODEL_NAMES[1];
+  }
+
+  showClinicalRoleAction(model: ModelConfigStateResponse['local_models'][number], index: number): boolean {
+    return (
+      index === 0 ||
+      this.draftConfig().clinicalModel === model.name ||
+      (index > 1 && model.available_in_ollama)
+    );
+  }
+
+  showExtractionRoleAction(model: ModelConfigStateResponse['local_models'][number], index: number): boolean {
+    return (
+      index === 1 ||
+      this.draftConfig().textExtractionModel === model.name ||
+      (index > 1 && model.available_in_ollama)
+    );
   }
 
   isFilterActive(key: ModelFilterKey): boolean {

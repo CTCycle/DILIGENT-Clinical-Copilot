@@ -5655,9 +5655,14 @@ input[type="date"]::-webkit-calendar-picker-indicator:hover {
 
 .model-config-page .model-config-header-compact h1 {
   margin: 0 0 6px;
-  font-size: 30px;
+  font-size: 28px;
   line-height: 1.15;
   color: #20283a;
+}
+
+.model-config-page .model-config-header-compact .lede {
+  font-size: 13px;
+  line-height: 1.45;
 }
 
 .model-config-page .model-config-layout {
@@ -5861,16 +5866,60 @@ input[type="date"]::-webkit-calendar-picker-indicator:hover {
 }
 
 /* Final Preview A overrides for the redesigned model configuration page. */
+.model-config-page {
+  max-width: none;
+  margin-right: 0;
+  margin-left: 0;
+  min-height: calc(100vh - var(--app-top-nav-height, 0px));
+  background:
+    radial-gradient(72% 58% at 92% 24%, rgba(196, 235, 221, 0.28), rgba(196, 235, 221, 0) 58%),
+    linear-gradient(180deg, #fbfdfc 0%, #f7fbf9 100%);
+}
+
+.model-config-page .model-config-hero,
+.model-config-page .model-config-preview-a-layout {
+  width: min(100%, 1040px);
+  margin-right: auto;
+  margin-left: auto;
+}
+
+.model-config-page .model-config-preview-a-layout {
+  grid-template-columns: minmax(0, 1fr) 280px;
+  gap: 20px;
+  align-items: stretch;
+}
+
+.model-config-page .model-config-preview-a-layout .model-config-control-rail {
+  grid-template-columns: minmax(0, 1fr) 250px;
+  gap: 20px;
+}
+
 .model-config-page .model-config-preview-a-layout .model-config-summary-panel {
+  align-self: stretch;
+  display: flex;
+  flex-direction: column;
   padding: 20px;
   min-height: 0;
-  margin-top: 176px;
+  margin-top: 143px;
+}
+
+.model-config-page .model-config-preview-a-layout .model-config-summary-actions {
+  gap: 8px;
+  margin-top: auto;
+}
+
+.model-config-page .model-config-preview-a-layout .model-config-saved-note {
+  color: #6d7f79;
+  font-size: 10.5px;
+  line-height: 1.35;
 }
 
 .model-config-page .model-config-preview-a-layout .model-config-summary-actions .btn-primary {
-  min-height: 42px;
+  height: 40px;
+  min-height: 40px;
   border-radius: 5px;
   background: linear-gradient(90deg, #087d59, #049063);
+  font-size: 12.5px;
 }
 
 .model-config-page .model-config-preview-a-layout .model-config-summary-actions .btn-primary:disabled {
@@ -5884,10 +5933,37 @@ input[type="date"]::-webkit-calendar-picker-indicator:hover {
 .model-config-page .model-config-preview-a-layout .model-config-runtime-option {
   display: grid;
   grid-template-columns: 32px minmax(0, 1fr) 18px;
-  min-height: 82px;
+  min-height: 60px;
   align-items: center;
-  padding: 16px;
+  padding: 12px;
   border-radius: 6px;
+}
+
+.model-config-page .model-config-preview-a-layout .model-config-runtime-option:hover,
+.model-config-page .model-config-preview-a-layout .model-config-rag-card:hover {
+  border-color: #9fcbbd;
+  background: color-mix(in srgb, #e4f5ee 22%, #ffffff);
+}
+
+.model-config-page .model-config-preview-a-layout .model-config-runtime-option:focus-within,
+.model-config-page .model-config-preview-a-layout .model-config-rag-card:focus-within,
+.model-config-page .model-config-preview-a-layout .model-config-switch-row:focus-within {
+  outline: 2px solid color-mix(in srgb, #087d59 54%, transparent);
+  outline-offset: 3px;
+}
+
+.model-config-page .model-config-preview-a-layout .model-config-runtime-card {
+  padding: 14px;
+}
+
+.model-config-page .model-config-preview-a-layout .model-config-runtime-options {
+  gap: 14px;
+  margin-top: 11px;
+}
+
+.model-config-page .model-config-preview-a-layout .model-config-rag-card {
+  min-height: 114px;
+  padding: 14px;
 }
 
 .model-config-page .model-config-preview-a-layout .model-config-runtime-option > span {
@@ -5900,9 +5976,14 @@ input[type="date"]::-webkit-calendar-picker-indicator:hover {
   gap: 8px;
   justify-content: flex-start;
   width: auto;
+  margin-bottom: 16px;
 }
 
 .model-config-page .model-config-preview-a-layout .model-config-filter-pill {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 5px;
   min-height: 34px;
   padding: 0 12px;
   border-radius: 5px;
@@ -5910,32 +5991,311 @@ input[type="date"]::-webkit-calendar-picker-indicator:hover {
   line-height: 1;
   text-align: center;
   white-space: nowrap;
+  transition: border-color 0.18s ease, background 0.18s ease, color 0.18s ease;
+}
+
+.model-config-page .model-config-preview-a-layout .model-config-filter-pill:hover {
+  border-color: rgba(159, 203, 189, 0.76);
+  background: color-mix(in srgb, #e4f5ee 38%, #f7fbf9);
+}
+
+.model-config-page .model-config-preview-a-layout .model-config-filter-pill.is-active:hover {
+  background: #076f50;
+}
+
+.model-config-page .model-config-preview-a-layout .model-config-tag-select {
+  display: inline-flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  padding-right: 11px;
+}
+
+.model-config-page .model-config-preview-a-layout .model-config-tag-select svg,
+.model-config-page .model-config-preview-a-layout .model-config-filter-pill svg {
+  flex: none;
+  width: 13px;
+  height: 13px;
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 2.2;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+
+.model-config-page .model-config-preview-a-layout .model-config-filter-pill svg {
+  width: 12px;
+  height: 12px;
+}
+
+.model-config-page .model-config-preview-a-layout .model-config-cloud-row {
+  display: grid;
+  grid-template-columns: minmax(220px, 1fr) 150px 140px;
+  gap: 12px;
+  min-height: 64px;
+  margin: 0;
+  border: 0;
+  border-top: 1px solid rgba(155, 196, 183, 0.45);
+  border-radius: 0;
+  background: transparent;
+  box-shadow: none;
+  padding: 10px 0;
+}
+
+.model-config-page .model-config-preview-a-layout .model-config-cloud-row:first-of-type {
+  margin-top: 10px;
+}
+
+.model-config-page .model-config-preview-a-layout .model-config-cloud-row label {
+  margin: 0;
+}
+
+.model-config-page .model-config-preview-a-layout .model-config-provider-mark {
+  flex: none;
+}
+
+.model-config-page .model-config-preview-a-layout .model-config-provider-mark.is-openai {
+  color: #14231f;
+}
+
+.model-config-page .model-config-preview-a-layout .model-config-table th,
+.model-config-page .model-config-preview-a-layout .model-config-table td {
+  padding-top: 9px;
+  padding-bottom: 9px;
+}
+
+.model-config-page .model-config-preview-a-layout .model-config-table td:nth-child(n + 2) {
+  white-space: nowrap;
+}
+
+.model-config-page .model-config-preview-a-layout .model-config-table th:first-child,
+.model-config-page .model-config-preview-a-layout .model-config-table td:first-child {
+  width: 39%;
+}
+
+.model-config-page .model-config-preview-a-layout .model-config-table th:nth-child(2),
+.model-config-page .model-config-preview-a-layout .model-config-table td:nth-child(2),
+.model-config-page .model-config-preview-a-layout .model-config-table th:nth-child(3),
+.model-config-page .model-config-preview-a-layout .model-config-table td:nth-child(3),
+.model-config-page .model-config-preview-a-layout .model-config-table th:nth-child(4),
+.model-config-page .model-config-preview-a-layout .model-config-table td:nth-child(4) {
+  width: 8%;
+}
+
+.model-config-page .model-config-preview-a-layout .model-config-table th:nth-child(5),
+.model-config-page .model-config-preview-a-layout .model-config-table td:nth-child(5) {
+  width: 14%;
+}
+
+.model-config-page .model-config-preview-a-layout .model-config-table th:nth-child(6),
+.model-config-page .model-config-preview-a-layout .model-config-table td:nth-child(6) {
+  width: 15%;
+}
+
+.model-config-page .model-config-preview-a-layout .model-config-model-cell strong {
+  font-size: 11px;
+  font-weight: 620;
+}
+
+.model-config-page .model-config-preview-a-layout .model-config-model-cell small {
+  background: #c9eadf;
+  padding: 1px 7px;
+}
+
+.model-config-page .model-config-preview-a-layout .model-config-status-pill {
+  gap: 5px;
+  font-size: 10.5px;
+}
+
+.model-config-page .model-config-preview-a-layout .model-config-status-pill::before {
+  width: 6px;
+  height: 6px;
+}
+
+.model-config-page .model-config-preview-a-layout .model-config-action-btn,
+.model-config-page .model-config-preview-a-layout .model-config-role-action {
+  width: auto;
+  height: 32px;
+  min-height: 32px;
+  padding-right: 8px;
+  padding-left: 8px;
+  font-size: 10.5px;
+  white-space: nowrap;
+  transition: border-color 0.18s ease, background 0.18s ease, color 0.18s ease;
+}
+
+.model-config-page .model-config-preview-a-layout .model-config-action-btn:hover,
+.model-config-page .model-config-preview-a-layout .model-config-role-action:hover,
+.model-config-page .model-config-preview-a-layout .model-config-test-btn:hover {
+  border-color: #087d59;
+  background: color-mix(in srgb, #e4f5ee 44%, #ffffff);
+}
+
+.model-config-page .model-config-preview-a-layout .model-config-role-action {
+  width: 104px;
+  min-width: 78px;
+  max-width: 104px;
+  white-space: normal;
+}
+
+.model-config-page .model-config-preview-a-layout .model-config-role-action span {
+  overflow: visible;
+  text-overflow: clip;
+}
+
+.model-config-page .model-config-preview-a-layout .model-config-table-footer {
+  margin-top: 14px;
+}
+
+.model-config-page .model-config-preview-a-layout .model-config-pagination {
+  gap: 5px;
+}
+
+.model-config-page .model-config-preview-a-layout .model-config-pagination button {
+  width: 27px;
+  height: 27px;
+  font-size: 11px;
+  transition: border-color 0.18s ease, background 0.18s ease, color 0.18s ease;
+}
+
+.model-config-page .model-config-preview-a-layout .model-config-pagination button:hover {
+  border-color: #9fcbbd;
+  background: color-mix(in srgb, #e4f5ee 34%, #ffffff);
+}
+
+.model-config-page .model-config-preview-a-layout .model-config-summary-list > div {
+  display: block;
+  padding: 15px 0;
+}
+
+.model-config-page .model-config-preview-a-layout .model-config-summary-list dt {
+  display: block;
+  margin: 0 0 9px;
+  font-weight: 720;
+}
+
+.model-config-page .model-config-preview-a-layout .model-config-summary-list dd {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 6px;
+  margin: 0;
+  font-weight: 620;
+  text-align: left;
+}
+
+.model-config-page .model-config-preview-a-layout .model-config-summary-list dd:has(.model-config-summary-icon) {
+  display: grid;
+  grid-template-columns: 28px minmax(0, 1fr);
+}
+
+.model-config-page .model-config-preview-a-layout .model-config-temperature-row {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 66px;
+  align-items: center;
+  gap: 10px;
+}
+
+.model-config-page .model-config-preview-a-layout .model-config-temperature-row .field-label {
+  margin: 0;
+}
+
+.model-config-page .model-config-preview-a-layout .model-config-temperature-input {
+  width: 66px;
+  justify-self: end;
+  height: 34px;
+  min-height: 34px;
+  text-align: center;
+}
+
+.model-config-page .model-config-preview-a-layout .model-config-search input,
+.model-config-page .model-config-preview-a-layout .model-config-tag-select,
+.model-config-page .model-config-preview-a-layout .model-config-cloud-row select,
+.model-config-page .model-config-preview-a-layout .model-config-temperature-input {
+  border-color: #bed8cf;
+  background: rgba(255, 255, 255, 0.84);
+  transition: border-color 0.18s ease, box-shadow 0.18s ease, background 0.18s ease;
+}
+
+.model-config-page .model-config-preview-a-layout .model-config-search input:hover,
+.model-config-page .model-config-preview-a-layout .model-config-tag-select:hover,
+.model-config-page .model-config-preview-a-layout .model-config-cloud-row select:hover,
+.model-config-page .model-config-preview-a-layout .model-config-temperature-input:hover {
+  border-color: #9fcbbd;
+  background: #ffffff;
+}
+
+.model-config-page .model-config-preview-a-layout .model-config-search input:focus-visible,
+.model-config-page .model-config-preview-a-layout .model-config-tag-select:focus-visible,
+.model-config-page .model-config-preview-a-layout .model-config-cloud-row select:focus-visible,
+.model-config-page .model-config-preview-a-layout .model-config-temperature-input:focus-visible,
+.model-config-page .model-config-preview-a-layout .model-config-filter-pill:focus-visible,
+.model-config-page .model-config-preview-a-layout .model-config-action-btn:focus-visible,
+.model-config-page .model-config-preview-a-layout .model-config-role-action:focus-visible,
+.model-config-page .model-config-preview-a-layout .model-config-test-btn:focus-visible,
+.model-config-page .model-config-preview-a-layout .model-config-save-btn:focus-visible,
+.model-config-page .model-config-preview-a-layout .model-config-pagination button:focus-visible {
+  outline: 2px solid color-mix(in srgb, #087d59 58%, transparent);
+  outline-offset: 2px;
+  box-shadow: 0 0 0 4px color-mix(in srgb, #087d59 14%, transparent);
+}
+
+.model-config-page .model-config-preview-a-layout .model-config-test-btn {
+  width: 140px;
+  padding-right: 10px;
+  padding-left: 10px;
+  font-size: 11px;
+  white-space: nowrap;
+  transition: border-color 0.18s ease, background 0.18s ease, color 0.18s ease;
+}
+
+.model-config-page .model-config-preview-a-layout .model-config-save-btn:hover:not(:disabled) {
+  filter: saturate(1.04) brightness(1.02);
+  box-shadow: 0 12px 24px -18px rgba(3, 108, 85, 0.72);
+}
+
+.model-config-page .model-config-preview-a-layout .model-config-switch-row {
+  grid-template-columns: 46px minmax(0, 1fr) auto;
+  gap: 9px;
+}
+
+.model-config-page .model-config-preview-a-layout .model-config-switch-row em {
+  color: #087d59;
+  font-size: 11px;
+  font-style: normal;
+  font-weight: 760;
 }
 
 :root[data-theme="dark"] .model-config-page .model-config-preview-a-layout .model-config-runtime-card,
 :root[data-theme="dark"] .model-config-page .model-config-preview-a-layout .model-config-rag-card,
 :root[data-theme="dark"] .model-config-page .model-config-preview-a-layout .model-config-catalog-panel,
 :root[data-theme="dark"] .model-config-page .model-config-preview-a-layout .model-config-cloud-options {
-  background: #10221d;
-  border-color: #284d42;
+  background: linear-gradient(180deg, rgba(18, 45, 39, 0.98), rgba(12, 31, 27, 0.98));
+  border-color: #2f5d51;
 }
 
 :root[data-theme="dark"] .model-config-page .model-config-preview-a-layout .model-config-summary-panel {
-  background: #172d3b;
-  border-color: #39576a;
+  background: linear-gradient(180deg, rgba(18, 45, 39, 0.98), rgba(12, 31, 27, 0.98));
+  border-color: #2f5d51;
 }
 
 :root[data-theme="dark"] .model-config-page .model-config-preview-a-layout .model-config-runtime-option {
-  background: #142922 !important;
-  border-color: #40695c !important;
+  background: #10251f !important;
+  border-color: #345f52 !important;
   box-shadow: none !important;
   color: #e8f8f3 !important;
 }
 
 :root[data-theme="dark"] .model-config-page .model-config-preview-a-layout .model-config-runtime-option.is-active {
-  background: #193e33 !important;
-  border-color: #67ddb0 !important;
-  box-shadow: inset 0 0 0 1px rgba(103, 221, 176, 0.22) !important;
+  background: #16392f !important;
+  border-color: #58e0ad !important;
+  box-shadow: inset 0 0 0 1px rgba(88, 224, 173, 0.24) !important;
+}
+
+:root[data-theme="dark"] .model-config-page .model-config-preview-a-layout .model-config-runtime-option:hover,
+:root[data-theme="dark"] .model-config-page .model-config-preview-a-layout .model-config-rag-card:hover {
+  background: #16342c !important;
+  border-color: #4fa98c !important;
 }
 
 :root[data-theme="dark"] .model-config-page .model-config-preview-a-layout .model-config-runtime-option strong,
@@ -5947,4 +6307,125 @@ input[type="date"]::-webkit-calendar-picker-indicator:hover {
 
 :root[data-theme="dark"] .model-config-page .model-config-preview-a-layout .model-config-runtime-option small {
   color: #a8c6bc !important;
+}
+
+:root[data-theme="dark"] .model-config-page .model-config-preview-a-layout .model-config-cloud-row {
+  border-top-color: rgba(82, 134, 118, 0.36);
+  background: transparent !important;
+  box-shadow: none !important;
+}
+
+:root[data-theme="dark"] .model-config-page .model-config-preview-a-layout .model-config-cloud-row select,
+:root[data-theme="dark"] .model-config-page .model-config-preview-a-layout .model-config-temperature-input,
+:root[data-theme="dark"] .model-config-page .model-config-preview-a-layout .model-config-search input,
+:root[data-theme="dark"] .model-config-page .model-config-preview-a-layout .model-config-tag-select {
+  background: #0b1f1a;
+  border-color: #345f52;
+  color: #eefbf6;
+}
+
+:root[data-theme="dark"] .model-config-page .model-config-preview-a-layout .model-config-filter-pill.is-active {
+  background: #0b8f68;
+  border-color: #36d8a2;
+  color: #ffffff;
+}
+
+:root[data-theme="dark"] .model-config-page .model-config-preview-a-layout .model-config-filter-pill:hover,
+:root[data-theme="dark"] .model-config-page .model-config-preview-a-layout .model-config-action-btn:hover,
+:root[data-theme="dark"] .model-config-page .model-config-preview-a-layout .model-config-role-action:hover,
+:root[data-theme="dark"] .model-config-page .model-config-preview-a-layout .model-config-test-btn:hover {
+  background: #12362e;
+  border-color: #58e0ad;
+}
+
+:root[data-theme="dark"] .model-config-page .model-config-preview-a-layout .model-config-summary-badge,
+:root[data-theme="dark"] .model-config-page .model-config-preview-a-layout .model-config-model-cell small {
+  background: rgba(115, 232, 184, 0.17);
+  color: #c8f7e4;
+}
+
+:root[data-theme="dark"] .model-config-page .model-config-preview-a-layout .model-config-table-shell {
+  border-color: #2f5d51;
+}
+
+:root[data-theme="dark"] .model-config-page .model-config-preview-a-layout .model-config-table th,
+:root[data-theme="dark"] .model-config-page .model-config-preview-a-layout .model-config-table td,
+:root[data-theme="dark"] .model-config-page .model-config-preview-a-layout .model-config-summary-list > div,
+:root[data-theme="dark"] .model-config-page .model-config-preview-a-layout .model-config-parameters,
+:root[data-theme="dark"] .model-config-page .model-config-preview-a-layout .model-config-summary-actions {
+  border-color: rgba(82, 134, 118, 0.36);
+}
+
+:root[data-theme="dark"] .model-config-page .model-config-preview-a-layout .model-config-summary-list > div,
+:root[data-theme="dark"] .model-config-page .model-config-preview-a-layout .model-config-summary-list,
+:root[data-theme="dark"] .model-config-page .model-config-preview-a-layout .model-config-parameters,
+:root[data-theme="dark"] .model-config-page .model-config-preview-a-layout .model-config-summary-actions,
+:root[data-theme="dark"] .model-config-page .model-config-preview-a-layout .model-config-empty-note {
+  background: transparent;
+}
+
+:root[data-theme="dark"] .model-config-page .model-config-preview-a-layout .model-config-provider-mark.is-openai {
+  color: #eefbf6;
+}
+
+:root[data-theme="dark"] .model-config-page .model-config-preview-a-layout .model-config-switch-row em {
+  color: #58e0ad;
+}
+
+:root[data-theme="dark"] .model-config-page .model-config-preview-a-layout .model-config-saved-note {
+  color: #a9c8bd;
+}
+
+:root[data-theme="dark"] .model-config-page {
+  background:
+    radial-gradient(72% 58% at 92% 24%, rgba(33, 108, 86, 0.22), rgba(33, 108, 86, 0) 58%),
+    linear-gradient(180deg, #071916 0%, #0a1f1c 100%);
+}
+
+@media (max-width: 940px) {
+  .model-config-page .model-config-preview-a-layout,
+  .model-config-page .model-config-preview-a-layout .model-config-control-rail {
+    grid-template-columns: 1fr;
+  }
+
+  .model-config-page .model-config-preview-a-layout .model-config-summary-panel {
+    margin-top: 0;
+  }
+}
+
+@media (max-width: 760px) {
+  .model-config-page .model-config-preview-a-layout .model-config-runtime-options,
+  .model-config-page .model-config-preview-a-layout .model-config-toolbar,
+  .model-config-page .model-config-preview-a-layout .model-config-cloud-row {
+    grid-template-columns: 1fr;
+  }
+
+  .model-config-page .model-config-preview-a-layout .model-config-filter-pills {
+    flex-wrap: wrap;
+    width: 100%;
+  }
+
+  .model-config-page .model-config-preview-a-layout .model-config-cloud-row {
+    gap: 10px;
+  }
+
+  .model-config-page .model-config-preview-a-layout .model-config-cloud-row label,
+  .model-config-page .model-config-preview-a-layout .model-config-cloud-row select,
+  .model-config-page .model-config-preview-a-layout .model-config-test-btn {
+    width: 100%;
+  }
+
+  .model-config-page .model-config-preview-a-layout .model-config-table-shell {
+    max-width: 100%;
+    overflow-x: auto;
+  }
+
+  .model-config-page .model-config-preview-a-layout .model-config-table {
+    min-width: 840px;
+  }
+
+  .model-config-page .model-config-preview-a-layout .model-config-table-footer {
+    align-items: flex-start;
+    flex-direction: column;
+  }
 }
