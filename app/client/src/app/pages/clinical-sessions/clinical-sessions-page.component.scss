@@ -64,7 +64,7 @@
 }
 
 .clinical-sessions-filter-nav button {
-  min-height: var(--control-height-sm);
+  min-height: calc(var(--control-height-sm) * 0.9);
   flex: 1 1 0;
   border: 0;
   border-bottom: 2px solid transparent;
@@ -73,7 +73,7 @@
   cursor: pointer;
   font-size: var(--font-sm);
   font-weight: 800;
-  padding: var(--space-sm);
+  padding: calc(var(--space-sm) * 0.8) var(--space-sm);
 }
 
 .clinical-sessions-filter-nav button.is-active {
@@ -316,11 +316,8 @@
   gap: var(--space-sm);
   flex-wrap: wrap;
   margin-bottom: var(--space-md);
-  padding: var(--space-sm) 0;
-  border: 1px solid #d4e4dd;
-  border-left: 0;
-  border-right: 0;
-  border-radius: 8px;
+  padding: 0 0 var(--space-sm);
+  border-bottom: 1px solid #d4e4dd;
   background: transparent;
   overflow: visible;
 }
@@ -757,7 +754,7 @@
 
 .clinical-session-metadata-column {
   display: grid;
-  gap: var(--space-lg);
+  gap: 0;
   min-width: 0;
 }
 
@@ -769,7 +766,7 @@
   min-width: 0;
   border: 1px solid #dbe7e2;
   border-left: 5px solid #0f9f78;
-  border-radius: var(--radius-md);
+  border-radius: var(--radius-md) var(--radius-md) 0 0;
   background: linear-gradient(135deg, #ffffff 0%, #f2fbf7 100%);
   padding: var(--space-lg);
   box-shadow: 0 16px 30px -30px rgba(18, 67, 54, 0.5);
@@ -817,9 +814,12 @@
 .clinical-session-metadata-summary section,
 .clinical-session-metadata-summary-card {
   border: 1px solid #dbe7e2;
-  border-radius: var(--radius-md);
+  border-top: 0;
+  border-radius: 0 0 var(--radius-md) var(--radius-md);
   background: #fff;
   padding: var(--space-lg);
+  max-height: 220px;
+  overflow: auto;
 }
 
 .clinical-session-metadata-summary strong,
@@ -836,6 +836,27 @@
   margin: 0;
   padding: 0;
   list-style: none;
+}
+
+.clinical-session-json-template {
+  border: 1px dashed #b8d2c8;
+  border-radius: var(--radius-sm);
+  background: #f7fbf9;
+  padding: var(--space-sm) var(--space-md);
+}
+
+.clinical-session-json-template summary {
+  cursor: pointer;
+  color: #2b4a41;
+  font-size: var(--font-sm);
+  font-weight: 700;
+}
+
+.clinical-session-json-template pre {
+  margin: var(--space-sm) 0 0;
+  color: #44534f;
+  font: 12px/1.45 ui-monospace, SFMono-Regular, Consolas, monospace;
+  white-space: pre-wrap;
 }
 
 .clinical-session-metadata-summary li,

@@ -2,7 +2,7 @@
   <header class="clinical-sessions-header">
     <div>
       <h1>Clinical Sessions</h1>
-      <p class="lede">Browse, edit, annotate, revise, and build patient timelines from persisted sessions.</p>
+      <p class="lede">Browse, edit, annotate, and revise persisted clinical sessions while building clearer patient timelines across each versioned review.</p>
     </div>
   </header>
 
@@ -57,7 +57,7 @@
             [ngModel]="dateFilterMode()"
             (ngModelChange)="updateDateFilterMode($event)"
           >
-            <option value="any">Exact date</option>
+            <option value="any">Any date</option>
             <option value="after">After</option>
             <option value="before">Before</option>
             <option value="exact">On date</option>
@@ -240,7 +240,9 @@
                         @for (item of labTimeline(); track item.marker + item.timing + item.value + $index) {
                           <tr>
                             <td>
-                              <strong>{{ item.timing === 'Unknown' ? 'Not dated' : item.timing }}</strong>
+                              <strong [title]="item.timing === 'Unknown' ? 'Source timeline has no date field for this row.' : item.timing">
+                                {{ item.timing === 'Unknown' ? 'Not dated' : item.timing }}
+                              </strong>
                               <span>{{ item.source }}</span>
                             </td>
                             <td>{{ item.marker }}</td>
@@ -400,7 +402,20 @@
                 </section>
               </div>
             </div>
-            <p class="clinical-session-panel-note">Edit manual session metadata JSON. Use documents and images arrays for attached evidence.</p>
+            <p class="clinical-session-panel-note">Add custom metadata in JSON format. Use `documents`, `images`, and `manual_metadata` for attached evidence.</p>
+            <details class="clinical-session-json-template">
+              <summary>JSON template</summary>
+              <pre>&#123;
+  "documents": [],
+  "images": [],
+  "manual_metadata": &#123;
+    "source_system": "",
+    "reviewer": "",
+    "tags": [],
+    "notes": ""
+  &#125;
+&#125;</pre>
+            </details>
             <textarea
               class="clinical-session-json"
               aria-label="Session metadata JSON"

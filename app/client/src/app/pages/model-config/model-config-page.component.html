@@ -33,8 +33,8 @@
                   <path d="M9.75 9.25h4.5M9.75 12h4.5M9.75 14.75h2.75" />
                 </svg>
                 <span>
-                  <strong>Local Models</strong>
-                  <small>(Ollama)</small>
+                  <strong>Local</strong>
+                  <small>Ollama</small>
                 </span>
                 <i class="model-config-radio-dot" aria-hidden="true"></i>
               </label>
@@ -52,8 +52,8 @@
                   <path d="M7.25 17.75h9.4a3.85 3.85 0 0 0 .68-7.64 5.56 5.56 0 0 0-10.76 1.54 3.08 3.08 0 0 0 .68 6.1Z" />
                 </svg>
                 <span>
-                  <strong>Cloud Models</strong>
-                  <small>(OpenAI / Gemini)</small>
+                  <strong>Cloud</strong>
+                  <small>OpenAI / Gemini</small>
                 </span>
                 <i class="model-config-radio-dot" aria-hidden="true"></i>
               </label>
@@ -84,11 +84,36 @@
               <span>Use indexed clinical evidence during analysis</span>
             </span>
           </label>
+
+          <label class="model-config-rag-card model-config-reasoning-top-card" [class.is-active]="reasoningEnabled()">
+            <input
+              type="checkbox"
+              aria-label="Enable SDL/Reasoning"
+              [ngModel]="reasoningEnabled()"
+              (ngModelChange)="handleReasoningChange($event)"
+              [disabled]="isSaving() || isLoading()"
+            />
+            <span class="model-config-rag-card-top">
+              <span class="model-config-section-kicker">
+                <strong>Reasoning</strong>
+              </span>
+              <span class="model-config-rag-state">{{ reasoningEnabled() ? 'On' : 'Off' }}</span>
+              <span class="model-config-toggle" aria-hidden="true"><i></i></span>
+            </span>
+            <span class="model-config-rag-body">
+              <svg class="model-config-rag-icon" viewBox="0 0 24 24" aria-hidden="true">
+                <path d="M8 4h8a2 2 0 0 1 2 2v8l-4 4H8a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2Z" />
+                <path d="M14 14h4" />
+                <path d="M9 9h6M9 12h6" />
+              </svg>
+              <span>Improve accuracy for complex clinical reasoning.</span>
+            </span>
+          </label>
         </section>
 
         <section class="model-config-catalog-panel" [class.is-disabled]="isSaving() || isLoading()" [attr.aria-disabled]="isSaving() || isLoading()">
           <div class="model-config-panel-heading">
-            <h2>Local Model Catalog</h2>
+            <h2>{{ draftConfig().useCloudServices ? 'Cloud Model Catalog' : 'Local Model Catalog' }}</h2>
           </div>
 
           <div class="model-config-toolbar">
@@ -103,12 +128,13 @@
                 <path d="m21 21-4.35-4.35M10.5 18a7.5 7.5 0 1 1 0-15 7.5 7.5 0 0 1 0 15Z" />
               </svg>
             </div>
-            <button class="model-config-tag-select" type="button">
-              <span>All Tags</span>
+            <button class="model-config-tag-select" type="button" [disabled]="draftConfig().useCloudServices">
+              <span>{{ draftConfig().useCloudServices ? getProviderLabel(draftProvider()) : 'All Tags' }}</span>
               <svg viewBox="0 0 24 24" aria-hidden="true"><path d="m6 9 6 6 6-6" /></svg>
             </button>
           </div>
 
+          @if (!draftConfig().useCloudServices) {
           <div class="model-config-filter-pills" aria-label="Model filters">
             <button
               type="button"
@@ -155,8 +181,11 @@
               <svg viewBox="0 0 24 24" aria-hidden="true"><path d="m6 9 6 6 6-6" /></svg>
             </button>
           </div>
+          } @else {
+          <p class="model-config-cloud-filter-note">Tag filters are available only for local catalog metadata.</p>
+          }
 
-          <div class="model-config-table-shell">
+          <div class="model-config-table-shell" (scroll)="onModelCatalogScroll($event)">
             <table class="model-config-table">
               <thead>
                 <tr>
@@ -169,11 +198,12 @@
                 </tr>
               </thead>
               <tbody>
-                @if (noLocalModelMessage()) {
+                @if (catalogEmptyMessage()) {
                   <tr>
-                    <td colspan="6" class="model-config-empty-note">{{ noLocalModelMessage() }}</td>
+                    <td colspan="6" class="model-config-empty-note">{{ catalogEmptyMessage() }}</td>
                   </tr>
                 }
+                @if (!draftConfig().useCloudServices) {
                 @for (model of visibleLocalModels(); track model.name; let index = $index) {
                   <tr [class.is-selected]="draftConfig().clinicalModel === model.name || draftConfig().textExtractionModel === model.name">
                     <td>
@@ -184,60 +214,51 @@
                           <path d="M10.25 9.75h3.5M10.25 12h3.5M10.25 14.25h2" />
                         </svg>
                         <span>
-                          <strong>{{ previewModelName(model.name, index) }}</strong>
-                          @if (index === 0) {
-                            <small>Recommended</small>
-                          }
+                          <strong>{{ model.name }}</strong>
                         </span>
                       </div>
                     </td>
-                    <td>{{ previewModelSize(index) }}</td>
-                    <td>{{ previewModelContext(index) }}</td>
-                    <td>{{ previewModelQuant(index) }}</td>
+                    <td>{{ modelSizeLabel(model.name) }}</td>
+                    <td>{{ modelContextLabel(model.name) }}</td>
+                    <td>{{ modelQuantLabel(model.name) }}</td>
                     <td>
                       <span
                         class="model-config-status-pill"
-                        [class.is-installed]="previewModelStatus(model, index) === 'Installed'"
-                        [class.is-update]="previewModelStatus(model, index) === 'Update Available'"
-                        [class.is-missing]="previewModelStatus(model, index) === 'Not installed'"
+                        [class.is-installed]="modelStatus(model) === 'Installed'"
+                        [class.is-missing]="modelStatus(model) === 'Not installed'"
                       >
-                        {{ previewModelStatus(model, index) }}
+                        {{ modelStatus(model) }}
                       </span>
                     </td>
                     <td>
                       <div class="model-config-actions">
-                        @if (previewModelStatus(model, index) !== 'Installed') {
+                        @if (modelStatus(model) !== 'Installed') {
                           <button
                             class="model-config-action-btn"
-                            [class.is-update]="previewModelStatus(model, index) === 'Update Available'"
                             type="button"
+                            [attr.aria-label]="'Install ' + model.name"
+                            [attr.title]="'Install model'"
                             (click)="pullModelByName(model.name)"
                             [disabled]="isSaving() || isLoading() || appState.state().diliAgent.isPulling"
                           >
-                            {{ progressForModel(model.name) ? 'Installing...' : previewModelStatus(model, index) === 'Update Available' ? 'Update' : 'Install' }}
-                            @if (previewModelStatus(model, index) !== 'Installed') {
-                              <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 4v11M7.5 10.5 12 15l4.5-4.5M5 19h14" /></svg>
-                            }
+                            <span class="model-config-action-label">{{ progressForModel(model.name) ? 'Installing...' : 'Install' }}</span>
+                            <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 4v11M7.5 10.5 12 15l4.5-4.5M5 19h14" /></svg>
                           </button>
                         }
-                        @if (showClinicalRoleAction(model, index)) {
-                          <app-model-role-action-button
-                            role="clinical"
-                            [modelName]="model.name"
-                            [selected]="draftConfig().clinicalModel === model.name"
-                            [disabled]="isSaving() || isLoading()"
-                            (roleSelected)="handleRoleSelection($event, model.name)"
-                          />
-                        }
-                        @if (showExtractionRoleAction(model, index)) {
-                          <app-model-role-action-button
-                            role="text_extraction"
-                            [modelName]="model.name"
-                            [selected]="draftConfig().textExtractionModel === model.name"
-                            [disabled]="isSaving() || isLoading()"
-                            (roleSelected)="handleRoleSelection($event, model.name)"
-                          />
-                        }
+                        <app-model-role-action-button
+                          role="clinical"
+                          [modelName]="model.name"
+                          [selected]="draftConfig().clinicalModel === model.name"
+                          [disabled]="isSaving() || isLoading() || !isModelRoleSelectable(model)"
+                          (roleSelected)="handleRoleSelection($event, model.name)"
+                        />
+                        <app-model-role-action-button
+                          role="text_extraction"
+                          [modelName]="model.name"
+                          [selected]="draftConfig().textExtractionModel === model.name"
+                          [disabled]="isSaving() || isLoading() || !isModelRoleSelectable(model)"
+                          (roleSelected)="handleRoleSelection($event, model.name)"
+                        />
                       </div>
                     </td>
                   </tr>
@@ -254,21 +275,50 @@
                     </tr>
                   }
                 }
+                } @else {
+                @for (modelName of visibleCloudModels(); track modelName) {
+                  <tr [class.is-selected]="draftCloudModel() === modelName">
+                    <td>
+                      <div class="model-config-model-cell">
+                        <svg class="model-config-model-icon" viewBox="0 0 24 24" aria-hidden="true">
+                          <path d="M7.25 17.75h9.4a3.85 3.85 0 0 0 .68-7.64 5.56 5.56 0 0 0-10.76 1.54 3.08 3.08 0 0 0 .68 6.1Z" />
+                        </svg>
+                        <span><strong>{{ modelName }}</strong></span>
+                      </div>
+                    </td>
+                    <td>Cloud</td>
+                    <td>Provider default</td>
+                    <td>N/A</td>
+                    <td><span class="model-config-status-pill is-installed">Available</span></td>
+                    <td>
+                      <div class="model-config-actions model-config-actions-end">
+                        <button
+                          class="model-config-action-btn"
+                          type="button"
+                          [attr.aria-label]="'Use ' + modelName"
+                          [attr.title]="'Use model'"
+                          (click)="handleProviderModelChange(draftProvider(), modelName)"
+                          [disabled]="isSaving() || isLoading()"
+                        >
+                          <span class="model-config-action-label">Use model</span>
+                          <svg viewBox="0 0 24 24" aria-hidden="true"><path d="m8.4 12.2 2.35 2.35 4.85-5.1" /></svg>
+                        </button>
+                      </div>
+                    </td>
+                  </tr>
+                }
+                }
               </tbody>
             </table>
           </div>
 
           <div class="model-config-table-footer">
-            <span>Showing 1-{{ visibleLocalModels().length }} of {{ previewModelTotalCount() }} models</span>
-            <div class="model-config-pagination" aria-hidden="true">
-              <button type="button">‹</button>
-              <button type="button" class="is-active">1</button>
-              <button type="button">2</button>
-              <button type="button">3</button>
-              <button type="button">4</button>
-              <button type="button">5</button>
-              <button type="button">›</button>
-            </div>
+            <span>Showing {{ visibleModelRangeStart() }}-{{ visibleModelRangeEnd() }} of {{ filteredModelCount() }} models</span>
+            @if (canRevealMoreModels()) {
+              <span class="model-config-scroll-hint">Scroll inside the catalog to load more</span>
+            } @else if (filteredModelCount()) {
+              <span class="model-config-scroll-hint">All matching models loaded</span>
+            }
           </div>
         </section>
 
@@ -279,17 +329,9 @@
               <div class="model-config-provider-name">
                 <span class="model-config-provider-mark" [class.is-openai]="provider === 'openai'" [class.is-gemini]="provider === 'gemini'">
                   @if (provider === 'openai') {
-                    <svg viewBox="0 0 24 24" aria-hidden="true">
-                      <circle cx="12" cy="12" r="8.2" />
-                      <path d="M12 3.8c2.7 1.7 4.2 4 4.2 6.8 0 1.1-.3 2.3-.8 3.3" />
-                      <path d="M20 9.6c-2.8-1.4-5.6-1.6-8-.2-1 .6-1.8 1.4-2.4 2.4" />
-                      <path d="M18.8 17.2c-3.2.1-5.8-.9-7.2-3.3-.6-1-.8-2.1-.7-3.2" />
-                      <path d="M12 20.2c-2.7-1.7-4.2-4-4.2-6.8 0-1.1.3-2.3.8-3.3" />
-                      <path d="M4 14.4c2.8 1.4 5.6 1.6 8 .2 1-.6 1.8-1.4 2.4-2.4" />
-                      <path d="M5.2 6.8c3.2-.1 5.8.9 7.2 3.3.6 1 .8 2.1.7 3.2" />
-                    </svg>
+                    <img src="logos/openai-mark.svg" alt="OpenAI logo" />
                   } @else {
-                    <span aria-hidden="true">G</span>
+                    <img src="logos/google-g.svg" alt="Google logo" />
                   }
                 </span>
                 <span>
@@ -300,13 +342,10 @@
               <label>
                 <span>Model</span>
                 <select
-                  [ngModel]="previewCloudModel(provider)"
-                  (ngModelChange)="handleProviderChange(provider); handleCloudModelChange($event)"
+                  [ngModel]="cloudModelForProvider(provider)"
+                  (ngModelChange)="handleProviderModelChange(provider, $event)"
                   [disabled]="isSaving() || isLoading() || !(cloudChoices()[provider] || []).length"
                 >
-                  @if (previewCloudOptionMissing(provider)) {
-                    <option [value]="previewCloudPreferredModel(provider)" disabled>{{ previewCloudPreferredModel(provider) }}</option>
-                  }
                   @for (modelName of cloudChoices()[provider] || []; track modelName) {
                     <option [value]="modelName">{{ modelName }}</option>
                   }
@@ -340,11 +379,11 @@
           </div>
           <div>
             <dt>Primary Model (Clinical)</dt>
-            <dd>{{ previewSelectedClinicalModel() }}</dd>
+            <dd>{{ selectedClinicalModel() }}</dd>
           </div>
           <div>
             <dt>Extraction Model</dt>
-            <dd>{{ previewSelectedExtractionModel() }}</dd>
+            <dd>{{ selectedExtractionModel() }}</dd>
           </div>
           @if (draftConfig().useCloudServices) {
             <div>
@@ -375,21 +414,11 @@
               class="model-config-temperature-input"
             />
           </div>
-          <label class="model-config-switch-row">
-            <input
-              type="checkbox"
-              aria-label="Enable SDL/Reasoning"
-              [ngModel]="reasoningEnabled()"
-              (ngModelChange)="handleReasoningChange($event)"
-              [disabled]="isSaving() || isLoading()"
-            />
-            <span class="model-config-toggle" aria-hidden="true"><i></i></span>
-            <span>
-              <strong>Reasoning / Chain-of-Thought</strong>
-              <small>Improve accuracy for complex clinical reasoning.</small>
-            </span>
-            <em>{{ reasoningEnabled() ? 'On' : 'Off' }}</em>
-          </label>
+        </section>
+
+        <section class="model-config-description-panel">
+          <h3>Model Details</h3>
+          <p>{{ selectedModelDescription() }}</p>
         </section>
 
         <div class="model-config-summary-actions">
@@ -397,7 +426,7 @@
             <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5 4.75h12.25L19.25 7v12.25H4.75V4.75H5Z" /><path d="M8 4.75v5h7v-5M8 15h8" /></svg>
             {{ isSaving() ? 'Saving...' : 'Save Configuration' }}
           </button>
-          <small class="model-config-saved-note">Last saved: May 14, 2025 10:32 AM</small>
+          <small class="model-config-saved-note">Last saved: {{ lastSavedLabel() }}</small>
         </div>
       </aside>
     </div>

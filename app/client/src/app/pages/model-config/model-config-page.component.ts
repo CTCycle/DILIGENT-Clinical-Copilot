@@ -46,17 +46,8 @@ import {
 } from './model-config.types';
 
 const DEFAULT_CLOUD_PROVIDERS: readonly CloudProvider[] = ['openai', 'gemini'];
-const PREVIEW_MODEL_NAMES = [
-  'llama3.1:8b-instruct-q4_K_M',
-  'mistral-nemo:12b-instruct-q4_K_M',
-  'phi-3-mini:4k-instruct-q4_0',
-  'codellama:7b-instruct-q4_K_M',
-  'gemma2:9b-instruct-q4_K_M',
-] as const;
-const PREVIEW_MODEL_SIZES = ['5.0 GB', '7.2 GB', '2.6 GB', '4.1 GB', '5.6 GB'] as const;
-const PREVIEW_MODEL_CONTEXTS = ['8K', '32K', '4K', '16K', '8K'] as const;
-const PREVIEW_MODEL_QUANTS = ['Q4_K_M', 'Q4_K_M', 'Q4_0', 'Q4_K_M', 'Q4_K_M'] as const;
 const PREVIEW_TEMPERATURE = 0.2;
+const MODEL_BATCH_SIZE = 12;
 
 const PROVIDER_LABELS: Record<AccessKeyProvider, string> = {
   openai: 'OpenAI',
@@ -102,6 +93,7 @@ export class ModelConfigPageComponent implements OnInit {
   readonly localModels = signal<ModelConfigStateResponse['local_models']>([]);
   readonly cloudChoices = signal(CLOUD_MODEL_CHOICES);
   readonly modelSearchQuery = signal('');
+  readonly visibleModelLimit = signal(MODEL_BATCH_SIZE);
   readonly statusMessage = signal('');
   readonly openProviderModal = signal<AccessKeyProvider | null>(null);
   readonly modelPullProgress = signal<Record<string, ModelPullProgressState>>({});
@@ -116,6 +108,7 @@ export class ModelConfigPageComponent implements OnInit {
     extraction: false,
   });
   readonly draftConfig = signal<DraftRuntimeConfig>(resolveDraftFromSettings(this.appState.state().diliAgent.settings));
+  readonly lastUpdatedAt = signal<string | null>(null);
 
   readonly filteredLocalModels = computed(() => {
     const query = this.modelSearchQuery().trim().toLowerCase();
@@ -128,7 +121,38 @@ export class ModelConfigPageComponent implements OnInit {
     () => this.localModels().filter((model) => model.available_in_ollama).length,
   );
 
-  readonly visibleLocalModels = computed(() => this.filteredLocalModels().slice(0, 5));
+  readonly visibleLocalModels = computed(() => {
+    return this.filteredLocalModels().slice(0, this.visibleModelLimit());
+  });
+
+  readonly filteredCloudModels = computed(() => {
+    const query = this.modelSearchQuery().trim().toLowerCase();
+    const models = this.cloudChoices()[this.draftProvider()] || [];
+    if (!query) return models;
+    return models.filter((name) => name.toLowerCase().includes(query));
+  });
+
+  readonly visibleCloudModels = computed(() => {
+    return this.filteredCloudModels().slice(0, this.visibleModelLimit());
+  });
+
+  readonly canRevealMoreModels = computed(() =>
+    this.draftConfig().useCloudServices
+      ? this.visibleCloudModels().length < this.filteredCloudModels().length
+      : this.visibleLocalModels().length < this.filteredLocalModels().length,
+  );
+
+  readonly visibleModelRangeStart = computed(() =>
+    this.filteredModelCount() ? 1 : 0,
+  );
+
+  readonly visibleModelRangeEnd = computed(() =>
+    this.draftConfig().useCloudServices ? this.visibleCloudModels().length : this.visibleLocalModels().length,
+  );
+
+  readonly filteredModelCount = computed(() =>
+    this.draftConfig().useCloudServices ? this.filteredCloudModels().length : this.filteredLocalModels().length,
+  );
 
   readonly draftProvider = computed(() =>
     resolveProvider(this.draftConfig().provider, this.cloudChoices()),
@@ -150,6 +174,31 @@ export class ModelConfigPageComponent implements OnInit {
 
   readonly ragPipelineEnabled = computed(() => this.previewRagPipelineEnabled());
   readonly reasoningEnabled = computed(() => this.previewReasoningEnabled());
+
+  readonly lastSavedLabel = computed(() => {
+    const updatedAt = this.lastUpdatedAt();
+    if (!updatedAt) {
+      return 'Not saved in this session';
+    }
+    const parsed = new Date(updatedAt);
+    if (Number.isNaN(parsed.getTime())) {
+      return updatedAt;
+    }
+    return parsed.toLocaleString();
+  });
+
+  readonly selectedModelDescription = computed(() => {
+    const draft = this.draftConfig();
+    const selectedNames = [draft.clinicalModel, draft.textExtractionModel].filter((name) => !!name);
+    const modelMap = new Map(this.localModels().map((model) => [model.name, model.description || '']));
+    for (const modelName of selectedNames) {
+      const description = modelMap.get(modelName);
+      if (description?.trim()) {
+        return description.trim();
+      }
+    }
+    return 'Select an installed model to show catalog details here.';
+  });
 
   readonly cloudProviderOptions = computed<CloudProvider[]>(() => {
     const values = Object.keys(this.cloudChoices());
@@ -174,8 +223,15 @@ export class ModelConfigPageComponent implements OnInit {
     return Array.from(missing);
   });
 
-  readonly noLocalModelMessage = computed(() => {
+  readonly catalogEmptyMessage = computed(() => {
     if (this.isLoading()) return 'Loading local model catalog...';
+    if (this.draftConfig().useCloudServices) {
+      if (!this.filteredCloudModels().length) {
+        const q = this.modelSearchQuery().trim();
+        return q ? `No cloud models match "${q}".` : 'No cloud models are available for this provider.';
+      }
+      return '';
+    }
     if (!this.localModels().length) return 'No local model catalog entries available.';
     if (!this.filteredLocalModels().length) {
       const q = this.modelSearchQuery().trim();
@@ -228,12 +284,17 @@ export class ModelConfigPageComponent implements OnInit {
 
   private applyConfigToState(payload: ModelConfigStateResponse, syncDraft: boolean): void {
     this.localModels.set(payload.local_models || []);
+    this.lastUpdatedAt.set(payload.updated_at);
     const choices = resolveCloudChoices(payload.cloud_model_choices);
     this.cloudChoices.set(choices);
 
     const current = this.appState.state().diliAgent.settings;
     const nextSettings: RuntimeSettings = buildRuntimeSettingsFromConfig(payload, current);
     this.appState.updateDiliAgent({ settings: nextSettings });
+    this.previewCloudModelOverrides.update((previous) => ({
+      ...previous,
+      [nextSettings.provider]: nextSettings.cloudModel || undefined,
+    }));
 
     if (syncDraft) {
       this.draftConfig.set(resolveDraftFromSettings(nextSettings));
@@ -244,7 +305,6 @@ export class ModelConfigPageComponent implements OnInit {
     this.previewRagPipelineEnabled.set(true);
     this.previewReasoningEnabled.set(true);
     this.previewTemperatureOverride.set(PREVIEW_TEMPERATURE);
-    this.previewCloudModelOverrides.set({});
   }
 
   async persistConfigPatch(patch: ModelConfigUpdateRequest, successMessage = '', syncDraft = true): Promise<void> {
@@ -262,6 +322,7 @@ export class ModelConfigPageComponent implements OnInit {
 
   toggleFilter(key: ModelFilterKey): void {
     this.activeFilters.update((current) => ({ ...current, [key]: !current[key] }));
+    this.resetVisibleModelLimit();
   }
 
   clearFilters(): void {
@@ -271,10 +332,31 @@ export class ModelConfigPageComponent implements OnInit {
       small: false,
       extraction: false,
     });
+    this.resetVisibleModelLimit();
   }
 
   setModelSearchQuery(value: string): void {
     this.modelSearchQuery.set(value);
+    this.resetVisibleModelLimit();
+  }
+
+  onModelCatalogScroll(event: Event): void {
+    const shell = event.target instanceof HTMLElement ? event.target : null;
+    if (!shell || !this.canRevealMoreModels()) return;
+    const remainingScroll = shell.scrollHeight - shell.scrollTop - shell.clientHeight;
+    if (remainingScroll <= 96) {
+      this.revealMoreModels();
+    }
+  }
+
+  private resetVisibleModelLimit(): void {
+    this.visibleModelLimit.set(MODEL_BATCH_SIZE);
+  }
+
+  private revealMoreModels(): void {
+    this.visibleModelLimit.update((current) =>
+      Math.min(current + MODEL_BATCH_SIZE, this.filteredModelCount()),
+    );
   }
 
   handleRoleSelection(role: ModelRole, modelName: string): void {
@@ -506,78 +588,54 @@ export class ModelConfigPageComponent implements OnInit {
     return this.modelPullProgress()[name] || null;
   }
 
-  previewModelName(modelName: string, index: number): string {
-    return PREVIEW_MODEL_NAMES[index] || modelName;
+  modelSizeLabel(modelName: string): string {
+    const match = modelName.match(/:(\d+(?:\.\d+)?)([mb])(?:$|[-_])/i);
+    if (!match) {
+      return 'Unknown';
+    }
+    return `${match[1]}${match[2].toUpperCase()}`;
   }
 
-  previewModelSize(index: number): string {
-    return PREVIEW_MODEL_SIZES[index] || '5.0 GB';
+  modelContextLabel(modelName: string): string {
+    const match = modelName.match(/(\d+)k/i);
+    return match ? `${match[1]}K` : 'Default';
   }
 
-  previewModelContext(index: number): string {
-    return PREVIEW_MODEL_CONTEXTS[index] || '8K';
+  modelQuantLabel(modelName: string): string {
+    const match = modelName.match(/q\d(?:_[a-z0-9]+)*/i);
+    return match ? match[0].toUpperCase() : 'Default';
   }
 
-  previewModelQuant(index: number): string {
-    return PREVIEW_MODEL_QUANTS[index] || 'Q4_K_M';
+  modelStatus(model: ModelConfigStateResponse['local_models'][number]): string {
+    return model.available_in_ollama ? 'Installed' : 'Not installed';
   }
 
-  previewModelTotalCount(): number {
-    return 24;
-  }
-
-  previewCloudPreferredModel(provider: CloudProvider): string {
-    return provider === 'gemini' ? 'gemini-1.5-flash' : 'gpt-4o-mini';
-  }
-
-  previewCloudOptionMissing(provider: CloudProvider): boolean {
-    return !this.cloudChoices()[provider]?.includes(this.previewCloudPreferredModel(provider));
-  }
-
-  previewCloudModel(provider: CloudProvider): string {
+  cloudModelForProvider(provider: CloudProvider): string | null {
     const override = this.previewCloudModelOverrides()[provider];
     if (override) {
       return override;
     }
-    return this.previewCloudPreferredModel(provider);
-  }
-
-  previewModelStatus(model: ModelConfigStateResponse['local_models'][number], index: number): string {
-    if (model.available_in_ollama || index < 2) {
-      return 'Installed';
+    if (this.draftProvider() === provider) {
+      return this.draftCloudModel();
     }
-    if (index === 4) {
-      return 'Update Available';
-    }
-    return 'Not installed';
+    return resolveCloudModel(provider, null, this.cloudChoices());
   }
 
-  previewSelectedClinicalModel(): string {
-    const draftModel = this.draftConfig().clinicalModel;
-    const index = this.visibleLocalModels().findIndex((model) => model.name === draftModel);
-    return index >= 0 ? this.previewModelName(draftModel, index) : PREVIEW_MODEL_NAMES[0];
+  selectedClinicalModel(): string {
+    return this.draftConfig().clinicalModel || 'Not set';
   }
 
-  previewSelectedExtractionModel(): string {
-    const draftModel = this.draftConfig().textExtractionModel;
-    const index = this.visibleLocalModels().findIndex((model) => model.name === draftModel);
-    return index >= 0 ? this.previewModelName(draftModel, index) : PREVIEW_MODEL_NAMES[1];
+  selectedExtractionModel(): string {
+    return this.draftConfig().textExtractionModel || 'Not set';
   }
 
-  showClinicalRoleAction(model: ModelConfigStateResponse['local_models'][number], index: number): boolean {
-    return (
-      index === 0 ||
-      this.draftConfig().clinicalModel === model.name ||
-      (index > 1 && model.available_in_ollama)
-    );
+  handleProviderModelChange(provider: CloudProvider, modelName: string): void {
+    this.handleProviderChange(provider);
+    this.handleCloudModelChange(modelName);
   }
 
-  showExtractionRoleAction(model: ModelConfigStateResponse['local_models'][number], index: number): boolean {
-    return (
-      index === 1 ||
-      this.draftConfig().textExtractionModel === model.name ||
-      (index > 1 && model.available_in_ollama)
-    );
+  isModelRoleSelectable(model: ModelConfigStateResponse['local_models'][number]): boolean {
+    return model.available_in_ollama;
   }
 
   isFilterActive(key: ModelFilterKey): boolean {
