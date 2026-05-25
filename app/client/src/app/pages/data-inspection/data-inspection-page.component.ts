@@ -54,6 +54,16 @@ const INSPECTION_VIEWS: InspectionViewOption[] = [
   { id: 'rag', label: 'RAG' },
 ];
 
+function normalizeFolderSeparators(value: string): string {
+  return value.replace(/\\/g, '/');
+}
+
+function folderBasename(value: string): string {
+  const normalized = normalizeFolderSeparators(value).replace(/\/+$/g, '');
+  const segments = normalized.split('/');
+  return segments.at(-1)?.trim() || '';
+}
+
 @Component({
   selector: 'app-data-inspection-page',
   standalone: true,
@@ -123,11 +133,6 @@ export class DataInspectionPageComponent implements OnInit, OnDestroy {
   readonly ragSearchInput = this.ragCatalog.searchInput;
   readonly ragVectorStore = signal<InspectionRagVectorStoreSummary | null>(null);
   readonly ragSelectedFolderPath = signal('');
-  readonly ragFolderPathInput = signal('');
-  readonly supportsNativeFolderSelection =
-    typeof globalThis !== 'undefined' &&
-    '__TAURI_INTERNALS__' in globalThis;
-
   private readonly aliasDetail = new InspectionDetailResource<InspectionDrugAliasesResponse>();
   readonly aliasData = this.aliasDetail.data;
   readonly aliasLoading = this.aliasDetail.loading;
@@ -229,7 +234,6 @@ export class DataInspectionPageComponent implements OnInit, OnDestroy {
       if (!this.ragSelectedFolderPath().trim()) {
         const resolvedPath = resolveRagDocumentsPath(vectorStore);
         this.ragSelectedFolderPath.set(resolvedPath);
-        this.ragFolderPathInput.set(resolvedPath);
       }
     } catch (error) {
       this.ragVectorStore.set(null);
@@ -346,21 +350,13 @@ export class DataInspectionPageComponent implements OnInit, OnDestroy {
   }
 
   openRagFolderPicker(): void {
-    this.ragFolderInput?.nativeElement.click();
-  }
-
-  updateRagFolderPath(value: string): void {
-    this.ragFolderPathInput.set(value);
-  }
-
-  applyRagFolderPath(): void {
-    const normalized = this.ragFolderPathInput().trim();
-    if (!normalized) {
-      this.ragError.set('Enter an absolute RAG folder path before using it.');
+    const input = this.ragFolderInput?.nativeElement;
+    if (!input) {
+      this.ragError.set('Folder picker is unavailable in this browser runtime.');
       return;
     }
-    this.ragSelectedFolderPath.set(normalized);
-    this.ragError.set(null);
+    input.value = '';
+    input.click();
   }
 
   handleRagFolderSelection(event: Event): void {
@@ -374,12 +370,17 @@ export class DataInspectionPageComponent implements OnInit, OnDestroy {
     const absoluteCandidate = this.resolveAbsoluteFolderPath(firstFile, webkitPath, rootFolder);
     if (absoluteCandidate) {
       this.ragSelectedFolderPath.set(absoluteCandidate);
-      this.ragFolderPathInput.set(absoluteCandidate);
+      this.ragError.set(null);
+      return;
+    }
+    const currentPath = this.displayedRagFolderPath.trim();
+    if (rootFolder && folderBasename(currentPath).toLowerCase() === rootFolder.toLowerCase()) {
+      this.ragSelectedFolderPath.set(currentPath);
       this.ragError.set(null);
       return;
     }
     this.ragError.set(
-      'Unable to resolve an absolute folder path from this browser selection. Paste an absolute path in JSON overrides.',
+      'This browser did not expose an absolute folder path from folder selection.',
     );
   }
 
@@ -392,8 +393,8 @@ export class DataInspectionPageComponent implements OnInit, OnDestroy {
     if (!filePath || !webkitRelativePath || !rootFolder) {
       return '';
     }
-    const normalizedFilePath = filePath.replace(/\\/g, '/');
-    const normalizedRelative = webkitRelativePath.replace(/\\/g, '/');
+    const normalizedFilePath = normalizeFolderSeparators(filePath);
+    const normalizedRelative = normalizeFolderSeparators(webkitRelativePath);
     if (!normalizedFilePath.toLowerCase().endsWith(normalizedRelative.toLowerCase())) {
       return '';
     }
