@@ -1,7 +1,7 @@
 <main class="timetable-page">
   <aside class="timetable-rail" aria-label="Navigation">
-    <a class="rail-button" routerLink="/clinical-sessions" title="Back to clinical sessions">‹</a>
-    <span class="rail-button is-active" title="Timetable">▦</span>
+    <a class="rail-button" routerLink="/clinical-sessions" title="Back to clinical sessions" aria-label="Back to clinical sessions">‹</a>
+    <span class="rail-button is-active" title="Timetable" aria-label="Current page: timetable">▦</span>
   </aside>
 
   <section class="timetable-shell">
@@ -17,11 +17,11 @@
     </header>
 
     <section class="timetable-toolbar" aria-label="Timetable controls">
-      <button type="button">Jan 2024 - May 2025</button>
+      <span class="toolbar-group">Range <strong>Jan 2024 - May 2025</strong></span>
       <span class="toolbar-group">Zoom <strong>6m</strong></span>
       <span class="toolbar-group">Display <strong>All event types</strong></span>
       <span class="toolbar-group">Group by <strong>None</strong></span>
-      <button type="button">Today</button>
+      <span class="toolbar-group">Anchor <strong>Today</strong></span>
     </section>
 
     @if (loading()) {
@@ -41,7 +41,7 @@
           <div class="lane-track">
             @for (item of renderedEvents(); track item.event.event_id) {
               @if (item.lane === 'clinical') {
-                <button type="button" class="event-chip" [class.is-selected]="selectedEventId() === item.event.event_id" [style.left.%]="item.left" [style.--event-color]="item.color" (click)="selectEvent(item.event)">
+                <button type="button" class="event-chip" [attr.aria-pressed]="selectedEventId() === item.event.event_id" [class.is-selected]="selectedEventId() === item.event.event_id" [style.left.%]="item.left" [style.--event-color]="item.color" (click)="selectEvent(item.event)">
                   {{ item.event.title }}
                 </button>
               }
@@ -52,7 +52,7 @@
           <div class="lane-track">
             @for (item of renderedEvents(); track item.event.event_id) {
               @if (item.lane === 'therapy') {
-                <button type="button" class="event-bar" [class.is-selected]="selectedEventId() === item.event.event_id" [style.left.%]="item.left" [style.width.%]="item.width" [style.--event-color]="item.color" (click)="selectEvent(item.event)">
+                <button type="button" class="event-bar" [attr.aria-pressed]="selectedEventId() === item.event.event_id" [class.is-selected]="selectedEventId() === item.event.event_id" [style.left.%]="item.left" [style.width.%]="item.width" [style.--event-color]="item.color" (click)="selectEvent(item.event)">
                   {{ item.event.title }}
                 </button>
               }
@@ -63,7 +63,7 @@
           <div class="lane-track">
             @for (item of renderedEvents(); track item.event.event_id) {
               @if (item.lane === 'labs') {
-                <button type="button" class="event-pin" [class.is-selected]="selectedEventId() === item.event.event_id" [style.left.%]="item.left" [style.--event-color]="item.color" (click)="selectEvent(item.event)">
+                <button type="button" class="event-pin" [attr.aria-pressed]="selectedEventId() === item.event.event_id" [class.is-selected]="selectedEventId() === item.event.event_id" [style.left.%]="item.left" [style.--event-color]="item.color" (click)="selectEvent(item.event)">
                   {{ item.event.title }}
                 </button>
               }
@@ -74,7 +74,7 @@
           <div class="lane-track">
             @for (item of renderedEvents(); track item.event.event_id) {
               @if (item.lane === 'uncertainty') {
-                <button type="button" class="event-uncertain" [class.is-selected]="selectedEventId() === item.event.event_id" [style.left.%]="item.left" (click)="selectEvent(item.event)">
+                <button type="button" class="event-uncertain" [attr.aria-pressed]="selectedEventId() === item.event.event_id" [class.is-selected]="selectedEventId() === item.event.event_id" [style.left.%]="item.left" (click)="selectEvent(item.event)">
                   {{ item.event.title }}
                 </button>
               }

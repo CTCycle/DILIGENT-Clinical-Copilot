@@ -1941,6 +1941,22 @@ app-root {
   }
 }
 
+@media (max-width: 720px) {
+  .stitch-dili-report-shell .report-toolbar {
+    justify-content: flex-start;
+    gap: var(--space-xs);
+  }
+
+  .stitch-dili-report-shell .report-toolbar-label {
+    flex: 1 0 100%;
+    margin: 0 0 var(--space-2xs) 0;
+  }
+
+  .stitch-dili-report-shell .toolbar-btn {
+    white-space: nowrap;
+  }
+}
+
 /* ============================================
    Accessibility & Focus States
    ============================================ */
@@ -5878,20 +5894,24 @@ input[type="date"]::-webkit-calendar-picker-indicator:hover {
 
 .model-config-page .model-config-hero,
 .model-config-page .model-config-preview-a-layout {
-  width: min(100%, 1040px);
+  width: min(100%, 1280px);
   margin-right: auto;
   margin-left: auto;
 }
 
 .model-config-page .model-config-preview-a-layout {
-  grid-template-columns: minmax(0, 1fr) 280px;
-  gap: 20px;
+  grid-template-columns: minmax(0, 1fr) 286px;
+  gap: 16px;
   align-items: stretch;
 }
 
 .model-config-page .model-config-preview-a-layout .model-config-control-rail {
-  grid-template-columns: minmax(0, 1fr) 250px;
-  gap: 20px;
+  grid-template-columns: minmax(0, 2fr) repeat(2, minmax(0, 1fr));
+  gap: 14px;
+}
+
+.model-config-page .model-config-preview-a-layout .model-config-runtime-card {
+  grid-column: auto;
 }
 
 .model-config-page .model-config-preview-a-layout .model-config-summary-panel {
@@ -5900,7 +5920,7 @@ input[type="date"]::-webkit-calendar-picker-indicator:hover {
   flex-direction: column;
   padding: 20px;
   min-height: 0;
-  margin-top: 143px;
+  margin-top: 0;
 }
 
 .model-config-page .model-config-preview-a-layout .model-config-summary-actions {
@@ -5932,10 +5952,10 @@ input[type="date"]::-webkit-calendar-picker-indicator:hover {
 
 .model-config-page .model-config-preview-a-layout .model-config-runtime-option {
   display: grid;
-  grid-template-columns: 32px minmax(0, 1fr) 18px;
-  min-height: 60px;
+  grid-template-columns: 24px minmax(0, 1fr) 16px;
+  min-height: 40px;
   align-items: center;
-  padding: 12px;
+  padding: 7px 9px;
   border-radius: 6px;
 }
 
@@ -5946,24 +5966,23 @@ input[type="date"]::-webkit-calendar-picker-indicator:hover {
 }
 
 .model-config-page .model-config-preview-a-layout .model-config-runtime-option:focus-within,
-.model-config-page .model-config-preview-a-layout .model-config-rag-card:focus-within,
-.model-config-page .model-config-preview-a-layout .model-config-switch-row:focus-within {
+.model-config-page .model-config-preview-a-layout .model-config-rag-card:focus-within {
   outline: 2px solid color-mix(in srgb, #087d59 54%, transparent);
   outline-offset: 3px;
 }
 
 .model-config-page .model-config-preview-a-layout .model-config-runtime-card {
-  padding: 14px;
+  padding: 10px 12px;
 }
 
 .model-config-page .model-config-preview-a-layout .model-config-runtime-options {
-  gap: 14px;
-  margin-top: 11px;
+  gap: 9px;
+  margin-top: 8px;
 }
 
 .model-config-page .model-config-preview-a-layout .model-config-rag-card {
-  min-height: 114px;
-  padding: 14px;
+  min-height: 86px;
+  padding: 10px 12px;
 }
 
 .model-config-page .model-config-preview-a-layout .model-config-runtime-option > span {
@@ -6058,10 +6077,26 @@ input[type="date"]::-webkit-calendar-picker-indicator:hover {
   color: #14231f;
 }
 
+:root[data-theme="dark"] .model-config-page .model-config-preview-a-layout .model-config-provider-mark.is-openai img {
+  filter: invert(1) brightness(1.65);
+}
+
 .model-config-page .model-config-preview-a-layout .model-config-table th,
 .model-config-page .model-config-preview-a-layout .model-config-table td {
   padding-top: 9px;
   padding-bottom: 9px;
+}
+
+.model-config-page .model-config-preview-a-layout .model-config-table-shell {
+  max-height: 430px;
+  overflow: auto;
+  overscroll-behavior: contain;
+}
+
+.model-config-page .model-config-preview-a-layout .model-config-table th {
+  position: sticky;
+  top: 0;
+  z-index: 1;
 }
 
 .model-config-page .model-config-preview-a-layout .model-config-table td:nth-child(n + 2) {
@@ -6070,7 +6105,7 @@ input[type="date"]::-webkit-calendar-picker-indicator:hover {
 
 .model-config-page .model-config-preview-a-layout .model-config-table th:first-child,
 .model-config-page .model-config-preview-a-layout .model-config-table td:first-child {
-  width: 39%;
+  width: 30%;
 }
 
 .model-config-page .model-config-preview-a-layout .model-config-table th:nth-child(2),
@@ -6089,17 +6124,12 @@ input[type="date"]::-webkit-calendar-picker-indicator:hover {
 
 .model-config-page .model-config-preview-a-layout .model-config-table th:nth-child(6),
 .model-config-page .model-config-preview-a-layout .model-config-table td:nth-child(6) {
-  width: 15%;
+  width: 19%;
 }
 
 .model-config-page .model-config-preview-a-layout .model-config-model-cell strong {
   font-size: 11px;
   font-weight: 620;
-}
-
-.model-config-page .model-config-preview-a-layout .model-config-model-cell small {
-  background: #c9eadf;
-  padding: 1px 7px;
 }
 
 .model-config-page .model-config-preview-a-layout .model-config-status-pill {
@@ -6114,14 +6144,31 @@ input[type="date"]::-webkit-calendar-picker-indicator:hover {
 
 .model-config-page .model-config-preview-a-layout .model-config-action-btn,
 .model-config-page .model-config-preview-a-layout .model-config-role-action {
-  width: auto;
-  height: 32px;
-  min-height: 32px;
-  padding-right: 8px;
-  padding-left: 8px;
+  width: 30px;
+  min-width: 30px;
+  max-width: 30px;
+  height: 30px;
+  min-height: 30px;
+  padding-right: 0;
+  padding-left: 0;
   font-size: 10.5px;
   white-space: nowrap;
   transition: border-color 0.18s ease, background 0.18s ease, color 0.18s ease;
+}
+
+.model-config-page .model-config-preview-a-layout .model-config-actions {
+  display: inline-flex;
+  flex-wrap: nowrap;
+  gap: 6px;
+}
+
+.model-config-page .model-config-preview-a-layout .model-config-action-label {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip: rect(0 0 0 0);
+  white-space: nowrap;
 }
 
 .model-config-page .model-config-preview-a-layout .model-config-action-btn:hover,
@@ -6132,35 +6179,23 @@ input[type="date"]::-webkit-calendar-picker-indicator:hover {
 }
 
 .model-config-page .model-config-preview-a-layout .model-config-role-action {
-  width: 104px;
-  min-width: 78px;
-  max-width: 104px;
-  white-space: normal;
+  width: 30px;
+  min-width: 30px;
+  max-width: 30px;
+  white-space: nowrap;
 }
 
 .model-config-page .model-config-preview-a-layout .model-config-role-action span {
-  overflow: visible;
-  text-overflow: clip;
+  display: none;
 }
 
 .model-config-page .model-config-preview-a-layout .model-config-table-footer {
   margin-top: 14px;
 }
 
-.model-config-page .model-config-preview-a-layout .model-config-pagination {
-  gap: 5px;
-}
-
-.model-config-page .model-config-preview-a-layout .model-config-pagination button {
-  width: 27px;
-  height: 27px;
-  font-size: 11px;
-  transition: border-color 0.18s ease, background 0.18s ease, color 0.18s ease;
-}
-
-.model-config-page .model-config-preview-a-layout .model-config-pagination button:hover {
-  border-color: #9fcbbd;
-  background: color-mix(in srgb, #e4f5ee 34%, #ffffff);
+.model-config-page .model-config-preview-a-layout .model-config-scroll-hint {
+  color: #087d59;
+  font-weight: 700;
 }
 
 .model-config-page .model-config-preview-a-layout .model-config-summary-list > div {
@@ -6208,6 +6243,27 @@ input[type="date"]::-webkit-calendar-picker-indicator:hover {
   text-align: center;
 }
 
+.model-config-page .model-config-preview-a-layout .model-config-description-panel {
+  display: block;
+  border-top: 1px solid color-mix(in srgb, #9fcbbd 36%, transparent);
+  padding: 15px 0;
+}
+
+.model-config-page .model-config-preview-a-layout .model-config-description-panel h3 {
+  margin: 0 0 8px;
+  color: inherit;
+  font-family: "Manrope", "Inter", sans-serif;
+  font-size: 12px;
+  font-weight: 760;
+}
+
+.model-config-page .model-config-preview-a-layout .model-config-description-panel p {
+  margin: 0;
+  color: #a9c8bd;
+  font-size: 11px;
+  line-height: 1.45;
+}
+
 .model-config-page .model-config-preview-a-layout .model-config-search input,
 .model-config-page .model-config-preview-a-layout .model-config-tag-select,
 .model-config-page .model-config-preview-a-layout .model-config-cloud-row select,
@@ -6233,8 +6289,7 @@ input[type="date"]::-webkit-calendar-picker-indicator:hover {
 .model-config-page .model-config-preview-a-layout .model-config-action-btn:focus-visible,
 .model-config-page .model-config-preview-a-layout .model-config-role-action:focus-visible,
 .model-config-page .model-config-preview-a-layout .model-config-test-btn:focus-visible,
-.model-config-page .model-config-preview-a-layout .model-config-save-btn:focus-visible,
-.model-config-page .model-config-preview-a-layout .model-config-pagination button:focus-visible {
+.model-config-page .model-config-preview-a-layout .model-config-save-btn:focus-visible {
   outline: 2px solid color-mix(in srgb, #087d59 58%, transparent);
   outline-offset: 2px;
   box-shadow: 0 0 0 4px color-mix(in srgb, #087d59 14%, transparent);
@@ -6382,9 +6437,18 @@ input[type="date"]::-webkit-calendar-picker-indicator:hover {
     linear-gradient(180deg, #071916 0%, #0a1f1c 100%);
 }
 
-@media (max-width: 940px) {
-  .model-config-page .model-config-preview-a-layout,
+@media (max-width: 1100px) {
   .model-config-page .model-config-preview-a-layout .model-config-control-rail {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .model-config-page .model-config-preview-a-layout .model-config-runtime-card {
+    grid-column: 1 / -1;
+  }
+}
+
+@media (max-width: 940px) {
+  .model-config-page .model-config-preview-a-layout {
     grid-template-columns: 1fr;
   }
 
@@ -6396,7 +6460,8 @@ input[type="date"]::-webkit-calendar-picker-indicator:hover {
 @media (max-width: 760px) {
   .model-config-page .model-config-preview-a-layout .model-config-runtime-options,
   .model-config-page .model-config-preview-a-layout .model-config-toolbar,
-  .model-config-page .model-config-preview-a-layout .model-config-cloud-row {
+  .model-config-page .model-config-preview-a-layout .model-config-cloud-row,
+  .model-config-page .model-config-preview-a-layout .model-config-control-rail {
     grid-template-columns: 1fr;
   }
 

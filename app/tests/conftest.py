@@ -7,11 +7,28 @@ from __future__ import annotations
 
 import asyncio
 import os
+from pathlib import Path
 import threading
 from collections.abc import Coroutine
 from typing import Any
 
 import pytest
+
+
+def _configure_playwright_node_runtime() -> None:
+    """
+    Ensure pytest-playwright uses the bundled Node runtime instead of ambient PATH.
+    This avoids host-specific Node resolution issues during driver startup.
+    """
+    if os.getenv("PLAYWRIGHT_NODEJS_PATH"):
+        return
+    repo_root = Path(__file__).resolve().parents[2]
+    bundled_node = repo_root / "runtimes" / "nodejs" / "node.exe"
+    if bundled_node.is_file():
+        os.environ["PLAYWRIGHT_NODEJS_PATH"] = str(bundled_node)
+
+
+_configure_playwright_node_runtime()
 
 
 class CoroutineThreadRunner:
