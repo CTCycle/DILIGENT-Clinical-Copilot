@@ -21,7 +21,11 @@ from common.utils.logger import logger
 
 class SQLiteRepository:
     def __init__(self, settings: DatabaseSettings) -> None:
-        self.db_path: str | None = os.path.join(RESOURCES_PATH, DATABASE_FILENAME)
+        override_path = os.getenv("DILIGENT_SQLITE_PATH", "").strip()
+        if override_path:
+            self.db_path = os.path.abspath(override_path)
+        else:
+            self.db_path = os.path.join(RESOURCES_PATH, DATABASE_FILENAME)
         should_initialize_schema = bool(
             self.db_path and not os.path.exists(self.db_path)
         )

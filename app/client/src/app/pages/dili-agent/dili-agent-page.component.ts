@@ -59,7 +59,7 @@ export class DiliAgentPageComponent implements OnDestroy {
   readonly isCancelling = signal(false);
   readonly isRunActionLocked = signal(false);
   readonly todayIso = todayIso;
-  readonly finalReportMarkdown = computed(() => this.stateService.state().diliAgent.message ?? '');
+  readonly finalReportMarkdown = computed(() => this.stateService.state().diliAgent.message || this.reportBody);
   readonly renderedReport = computed(() => this.markdownRenderer.render(this.finalReportMarkdown()));
   readonly clinicalInputTemplate = CLINICAL_SECTION_TEMPLATE;
 
@@ -100,18 +100,35 @@ export class DiliAgentPageComponent implements OnDestroy {
 
   handleFormChange<K extends keyof typeof this.vm.form>(key: K, value: (typeof this.vm.form)[K]): void {
     const currentMessage = this.vm.message ?? '';
+    const shouldClearStaleOutput =
+      !this.vm.isRunning &&
+      !this.vm.isStarting &&
+      Boolean(currentMessage || this.vm.exportUrl || this.vm.jobId || this.vm.jobStatus);
     const shouldClearValidationMessage =
       !this.vm.isRunning &&
       !this.vm.isStarting &&
       currentMessage.startsWith('[ERROR]') &&
       currentMessage !== '[ERROR] Clinical analysis failed.';
 
+    if (shouldClearStaleOutput && this.vm.exportUrl) {
+      this.revokeObjectUrl();
+    }
     this.stateService.updateDiliAgent({
       form: {
         ...this.vm.form,
         [key]: value,
       },
-      ...(shouldClearValidationMessage ? { message: '' } : {}),
+      ...(shouldClearStaleOutput || shouldClearValidationMessage
+        ? {
+            message: '',
+            exportUrl: null,
+            jobId: null,
+            jobProgress: 0,
+            jobStatus: null,
+            jobStage: null,
+            jobStageMessage: null,
+          }
+        : {}),
     });
   }
 

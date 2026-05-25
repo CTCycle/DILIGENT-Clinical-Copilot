@@ -108,6 +108,26 @@ setup_and_maintenance.bat
 
 Use this script for offline maintenance operations (for example DB initialization and cleanup tasks).
 
+### 6.1 Regression Validation Shortcuts
+
+From repository root:
+
+```cmd
+app\tests\run_tests.bat modelconfig
+app\tests\run_tests.bat modelconfigfull
+```
+
+- `modelconfig`: validated regression slice (model-config unit + focused model-config/app-flow e2e checks, including conflict-feedback handling)
+- `modelconfigfull`: model-config unit + full `test_app_flow.py` + `test_model_config_api.py`
+  - If `uv --with pytest-playwright` cannot access package indexes on first use, run the PowerShell runner directly after cache warmup.
+
+Equivalent PowerShell runners:
+
+```powershell
+.\app\tests\run_model_config_regression.ps1
+.\app\tests\run_model_config_full_regression.ps1
+```
+
 ## 7. Database and Ollama Requirements
 - Database schemas are not upgraded in place across this cleanup; recreate the schema (or local SQLite DB file) when upgrading.
 - Runtime startup does not perform SQLite schema salvage/deletion.

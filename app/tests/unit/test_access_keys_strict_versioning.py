@@ -14,6 +14,8 @@ from repositories.serialization.access_key_encryption import (
 )
 from repositories.serialization.access_keys import AccessKeySerializer
 
+VALID_TEST_KEY = "openai-secret-value"
+
 
 # -----------------------------------------------------------------------------
 def build_serializer() -> tuple[AccessKeySerializer, sessionmaker]:
@@ -30,7 +32,7 @@ def build_serializer() -> tuple[AccessKeySerializer, sessionmaker]:
 # -----------------------------------------------------------------------------
 def test_decryption_fails_when_encryption_key_version_is_missing() -> None:
     serializer, factory = build_serializer()
-    row = serializer.create_key("openai", "openai-secret")
+    row = serializer.create_key("openai", VALID_TEST_KEY)
     with factory() as db_session:
         loaded = db_session.get(AccessKey, row.id)
         assert loaded is not None
@@ -52,7 +54,7 @@ def test_decryption_fails_when_encryption_key_version_is_missing() -> None:
 # -----------------------------------------------------------------------------
 def test_decryption_fails_when_referenced_version_does_not_exist() -> None:
     serializer, factory = build_serializer()
-    row = serializer.create_key("openai", "openai-secret")
+    row = serializer.create_key("openai", VALID_TEST_KEY)
 
     with factory() as db_session:
         loaded = db_session.get(AccessKey, row.id)
@@ -80,7 +82,7 @@ def test_code_never_reads_access_key_encryption_key_env_var() -> None:
 # -----------------------------------------------------------------------------
 def test_unavailable_key_material_version_fails_loudly() -> None:
     serializer, _ = build_serializer()
-    serializer.create_key("openai", "openai-secret")
+    serializer.create_key("openai", VALID_TEST_KEY)
 
     stale_row = AccessKey(
         provider="openai",

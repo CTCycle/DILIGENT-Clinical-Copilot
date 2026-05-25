@@ -1,12 +1,14 @@
 from __future__ import annotations
 
 from datetime import date
+from types import SimpleNamespace
 from typing import Any
 
 from configurations.startup import server_settings
 from domain.clinical import ClinicalSessionRequest
 from api import ollama as ollama_routes
 from api import session as session_routes
+from services.session import session_workflow
 from services.clinical import job_progress as clinical_job_progress
 
 
@@ -58,6 +60,23 @@ def test_start_clinical_job_uses_centralized_poll_interval(monkeypatch) -> None:
     job_manager_stub = JobManagerStub()
     endpoint = get_route_owner(session_routes.router, "/clinical/jobs")
     monkeypatch.setattr(endpoint.service, "job_manager", job_manager_stub)
+    monkeypatch.setattr(
+        endpoint.service,
+        "validate_clinical_input",
+        lambda _: SimpleNamespace(ready=True, blocking_issues=[]),
+    )
+    monkeypatch.setattr(
+        session_workflow.LLMRuntimeConfig,
+        "is_cloud_enabled",
+        staticmethod(lambda: False),
+    )
+
+    async def preprocess_unified_input(request_payload: ClinicalSessionRequest) -> tuple[ClinicalSessionRequest, object]:
+        return request_payload, object()
+
+    monkeypatch.setattr(endpoint.service, "preprocess_unified_input", preprocess_unified_input)
+    monkeypatch.setattr(endpoint.service, "build_patient_payload", lambda request_payload: object())
+    monkeypatch.setattr(endpoint.service, "ensure_submission_requirements", lambda _: None)
 
     response = endpoint.service.start_clinical_job(
         ClinicalSessionRequest(
@@ -67,6 +86,7 @@ def test_start_clinical_job_uses_centralized_poll_interval(monkeypatch) -> None:
                 "Lab analysis: ALT 300 U/L"
             ),
             visit_date=date(2026, 4, 24),
+            selected_model_providers=["openai"],
         )
     )
 

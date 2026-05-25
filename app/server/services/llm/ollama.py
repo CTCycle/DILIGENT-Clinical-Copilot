@@ -303,7 +303,8 @@ class OllamaService:
         job_status = self.job_manager.get_job_status(job_id)
         if job_status is None:
             raise ServiceNotFoundError("Job not found.")
-        success = self.job_manager.cancel_job(job_id)
+        cancelled_snapshot = self.job_manager.cancel_job(job_id)
+        success = cancelled_snapshot is not None
         if success:
             logger.info("Model pull stop requested for job %s", job_id)
         return JobCancelResponse(

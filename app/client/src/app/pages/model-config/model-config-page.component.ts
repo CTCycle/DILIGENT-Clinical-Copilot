@@ -46,7 +46,6 @@ import {
 } from './model-config.types';
 
 const DEFAULT_CLOUD_PROVIDERS: readonly CloudProvider[] = ['openai', 'gemini'];
-const PREVIEW_TEMPERATURE = 0.2;
 const MODEL_BATCH_SIZE = 12;
 
 const PROVIDER_LABELS: Record<AccessKeyProvider, string> = {
@@ -99,7 +98,7 @@ export class ModelConfigPageComponent implements OnInit {
   readonly modelPullProgress = signal<Record<string, ModelPullProgressState>>({});
   readonly previewRagPipelineEnabled = signal(true);
   readonly previewReasoningEnabled = signal(true);
-  readonly previewTemperatureOverride = signal<number | null>(PREVIEW_TEMPERATURE);
+  readonly previewTemperatureOverride = signal<number | null>(null);
   readonly previewCloudModelOverrides = signal<Partial<Record<CloudProvider, string>>>({});
   readonly activeFilters = signal<Record<ModelFilterKey, boolean>>({
     installed: false,
@@ -302,9 +301,10 @@ export class ModelConfigPageComponent implements OnInit {
   }
 
   private applyPreviewDefaultState(): void {
-    this.previewRagPipelineEnabled.set(true);
-    this.previewReasoningEnabled.set(true);
-    this.previewTemperatureOverride.set(PREVIEW_TEMPERATURE);
+    const state = this.appState.state().diliAgent;
+    this.previewRagPipelineEnabled.set(state.form.useRag);
+    this.previewReasoningEnabled.set(state.settings.reasoning);
+    this.previewTemperatureOverride.set(null);
   }
 
   async persistConfigPatch(patch: ModelConfigUpdateRequest, successMessage = '', syncDraft = true): Promise<void> {

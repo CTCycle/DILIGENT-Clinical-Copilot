@@ -82,8 +82,10 @@ echo 3. End-to-end tests
 echo 4. Regression tests
 echo 5. Stress tests
 echo 6. All tests
+echo 7. Model-config regression slice
+echo 8. Model-config full pass
 echo.
-set /p SUITE="Select an option (1-6): "
+set /p SUITE="Select an option (1-8): "
 
 if "%SUITE%"=="1" set "SUITE=unit"
 if "%SUITE%"=="2" set "SUITE=integration"
@@ -91,6 +93,8 @@ if "%SUITE%"=="3" set "SUITE=e2e"
 if "%SUITE%"=="4" set "SUITE=regression"
 if "%SUITE%"=="5" set "SUITE=stress"
 if "%SUITE%"=="6" set "SUITE=all"
+if "%SUITE%"=="7" set "SUITE=modelconfig"
+if "%SUITE%"=="8" set "SUITE=modelconfigfull"
 
 :suite_selected
 set "PYTEST_TARGET=%TESTS_DIR%\unit"
@@ -102,6 +106,7 @@ if /i "%SUITE%"=="unit" goto :suite_done
 if /i "%SUITE%"=="integration" (
   set "PYTEST_TARGET=%TESTS_DIR%\e2e"
   set "NEED_BACKEND=1"
+  set "NEED_FRONTEND=1"
   goto :suite_done
 )
 if /i "%SUITE%"=="e2e" (
@@ -126,6 +131,20 @@ if /i "%SUITE%"=="all" (
   set "NEED_FRONTEND=1"
   goto :suite_done
 )
+if /i "%SUITE%"=="modelconfig" (
+  set "UV_CACHE_DIR=%PROJECT_ROOT%\.uv-cache"
+  "C:\Program Files\PowerShell\7\pwsh.exe" -NoProfile -ExecutionPolicy Bypass -File "%TESTS_DIR%\run_model_config_regression.ps1"
+  set "UV_CACHE_DIR="
+  if errorlevel 1 exit /b 1
+  exit /b 0
+)
+if /i "%SUITE%"=="modelconfigfull" (
+  set "UV_CACHE_DIR=%PROJECT_ROOT%\.uv-cache"
+  "C:\Program Files\PowerShell\7\pwsh.exe" -NoProfile -ExecutionPolicy Bypass -File "%TESTS_DIR%\run_model_config_full_regression.ps1"
+  set "UV_CACHE_DIR="
+  if errorlevel 1 exit /b 1
+  exit /b 0
+)
 
 echo [ERROR] Unknown suite: %SUITE%
 exit /b 1
@@ -149,6 +168,21 @@ if "%NEED_BACKEND%"=="1" (
   )
 )
 
+if "%NEED_BACKEND%"=="1" (
+  set "BACKEND_READY=0"
+  for /l %%I in (1,1,90) do (
+    if "!BACKEND_READY!"=="0" (
+      curl -s --max-time 2 "%APP_TEST_BACKEND_URL%/docs" >nul 2>&1
+      if not errorlevel 1 (
+        set "BACKEND_READY=1"
+      ) else (
+        ping -n 2 127.0.0.1 >nul
+      )
+    )
+  )
+  if not "!BACKEND_READY!"=="1" set "TEST_RESULT=1" & goto cleanup
+)
+
 if "%NEED_FRONTEND%"=="1" (
   if not exist "%CLIENT_DIR%\node_modules" (
     echo [INFO] Installing frontend dependencies...
@@ -160,21 +194,6 @@ if "%NEED_FRONTEND%"=="1" (
   set "STARTED_FRONTEND=1"
 )
 
-if "%NEED_BACKEND%"=="1" (
-  set "BACKEND_READY=0"
-  for /l %%I in (1,1,90) do (
-    if "!BACKEND_READY!"=="0" (
-      curl -s --max-time 2 "%APP_TEST_BACKEND_URL%/docs" >nul 2>&1
-      if not errorlevel 1 (
-        set "BACKEND_READY=1"
-      ) else (
-        timeout /t 1 /nobreak >nul
-      )
-    )
-  )
-  if not "!BACKEND_READY!"=="1" set "TEST_RESULT=1" & goto cleanup
-)
-
 if "%NEED_FRONTEND%"=="1" (
   set "FRONTEND_READY=0"
   for /l %%I in (1,1,90) do (
@@ -183,7 +202,7 @@ if "%NEED_FRONTEND%"=="1" (
       if not errorlevel 1 (
         set "FRONTEND_READY=1"
       ) else (
-        timeout /t 1 /nobreak >nul
+        ping -n 2 127.0.0.1 >nul
       )
     )
   )
@@ -191,7 +210,7 @@ if "%NEED_FRONTEND%"=="1" (
 )
 
 echo [STEP] Running pytest...
-"%PYTHON_CMD%" -m pytest "%PYTEST_TARGET%" -v --tb=short %EXTRA_PYTEST_ARGS% %*
+"%PYTHON_CMD%" -m pytest "%PYTEST_TARGET%" -v --tb=short %EXTRA_PYTEST_ARGS%
 if errorlevel 1 set "TEST_RESULT=1"
 
 :cleanup
