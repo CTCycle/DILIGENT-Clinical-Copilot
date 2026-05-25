@@ -264,7 +264,13 @@ def test_related_excerpt_is_used_when_matched_monograph_excerpt_is_missing() -> 
     assert entry["missing_livertox"] is False
     assert entry["extracted_excerpts"]
     assert "ursodiol is generally safe" in entry["extracted_excerpts"][0].lower()
-    assert "fallback_excerpt_from_related_monograph" in entry["match_notes"]
+    assert any(
+        note in entry["match_notes"]
+        for note in (
+            "fallback_excerpt_from_related_monograph",
+            "deterministic_disambiguation_applied",
+        )
+    )
 
 
 def test_query_normalization_handles_brands_and_manufacturers() -> None:

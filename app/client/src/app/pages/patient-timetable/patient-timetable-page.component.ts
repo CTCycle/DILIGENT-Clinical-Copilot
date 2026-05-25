@@ -3,6 +3,7 @@ import { Component, OnInit, computed, inject, signal } from '@angular/core';
 import { ActivatedRoute, RouterLink } from '@angular/router';
 
 import {
+  fetchInspectionSessionTimeline,
   generateInspectionSessionTimeline,
 } from '../../core/services/inspection-api';
 import {
@@ -94,15 +95,16 @@ export class PatientTimetablePageComponent implements OnInit {
     this.loading.set(true);
     this.error.set(null);
     try {
-      // Single-call path: backend returns cached timeline when present,
-      // otherwise attempts generation, avoiding an expected GET 404 first.
-      const payload: InspectionSessionTimeline =
-        await generateInspectionSessionTimeline(sessionId);
+      const payload = await fetchInspectionSessionTimeline(sessionId);
       this.timeline.set(payload);
       this.selectedEventId.set(payload.events[0]?.event_id ?? null);
     } catch (error) {
       this.timeline.set(null);
-      this.error.set(error instanceof Error ? error.message : 'Failed to load timetable.');
+      if (this.isNotFoundError(error)) {
+        this.error.set('[ERROR] No timetable is available yet. Select Regenerate to create one.');
+      } else {
+        this.error.set(error instanceof Error ? error.message : 'Failed to load timetable.');
+      }
     } finally {
       this.loading.set(false);
     }
@@ -156,5 +158,9 @@ export class PatientTimetablePageComponent implements OnInit {
       return 'labs';
     }
     return 'clinical';
+  }
+
+  private isNotFoundError(error: unknown): boolean {
+    return error instanceof Error && error.message.includes('not found');
   }
 }

@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from collections.abc import Iterable
+from time import monotonic
 from typing import Any, cast
 from typing import Protocol
 
@@ -39,6 +40,8 @@ class ModelConfigSnapshotStore(Protocol):
 
 ###############################################################################
 class ModelConfigService:
+    _OLLAMA_WARNING_COOLDOWN_SECONDS = 120.0
+
     def __init__(self, serializer: ModelConfigSnapshotStore | None = None) -> None:
         self.serializer = serializer or ModelConfigSerializer()
         self.local_model_catalog = cast(
@@ -50,6 +53,8 @@ class ModelConfigService:
             ),
         )
         self.local_model_names = {name for name, _, _ in self.local_model_catalog}
+        self._last_ollama_warning_message: str | None = None
+        self._last_ollama_warning_at = 0.0
 
     # -------------------------------------------------------------------------
     async def get_state(
@@ -331,7 +336,7 @@ class ModelConfigService:
             async with OllamaClient() as client:
                 models = await client.list_models()
         except OllamaError as exc:
-            logger.warning("Unable to list local Ollama models: %s", exc)
+            self._log_ollama_availability_warning(exc)
             return set()
         except Exception:
             logger.exception("Unexpected error while listing local Ollama models")
@@ -341,6 +346,21 @@ class ModelConfigService:
             for model in models
             if isinstance(model, str) and model.strip()
         }
+
+    # -------------------------------------------------------------------------
+    def _log_ollama_availability_warning(self, exc: OllamaError) -> None:
+        message = str(exc)
+        now = monotonic()
+        is_duplicate = message == self._last_ollama_warning_message
+        within_cooldown = (
+            now - self._last_ollama_warning_at
+            < self._OLLAMA_WARNING_COOLDOWN_SECONDS
+        )
+        if is_duplicate and within_cooldown:
+            return
+        logger.warning("Unable to list local Ollama models: %s", exc)
+        self._last_ollama_warning_message = message
+        self._last_ollama_warning_at = now
 
     # -------------------------------------------------------------------------
     async def list_local_model_cards(

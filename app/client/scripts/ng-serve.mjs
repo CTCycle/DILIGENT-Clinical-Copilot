@@ -41,21 +41,38 @@ const apiHost = env.FASTAPI_HOST || defaults.FASTAPI_HOST;
 const apiPort = env.FASTAPI_PORT || defaults.FASTAPI_PORT;
 
 const proxyConfigPath = path.resolve(projectRoot, 'proxy.conf.json');
-writeFileSync(
-  proxyConfigPath,
-  JSON.stringify(
-    {
-      '/api': {
-        target: `http://${apiHost}:${apiPort}`,
-        secure: false,
-        changeOrigin: true,
-      },
+const proxyConfigContent = `${JSON.stringify(
+  {
+    '/api': {
+      target: `http://${apiHost}:${apiPort}`,
+      secure: false,
+      changeOrigin: true,
     },
-    null,
-    2,
-  ),
-  'utf8',
-);
+  },
+  null,
+  2,
+)}\n`;
+
+let existingProxyConfig = '';
+try {
+  existingProxyConfig = readFileSync(proxyConfigPath, 'utf8');
+} catch {
+  existingProxyConfig = '';
+}
+
+if (existingProxyConfig !== proxyConfigContent) {
+  try {
+    writeFileSync(proxyConfigPath, proxyConfigContent, 'utf8');
+  } catch (error) {
+    // Under some Windows launch paths proxy.conf.json can be transiently locked.
+    // Continue when the existing file already points to the desired backend target.
+    const latestProxyConfig = readFileSync(proxyConfigPath, 'utf8');
+    const expectedTargetSnippet = `"target": "http://${apiHost}:${apiPort}"`;
+    if (!latestProxyConfig.includes(expectedTargetSnippet)) {
+      throw error;
+    }
+  }
+}
 
 const isWindows = process.platform === 'win32';
 const child = spawn(

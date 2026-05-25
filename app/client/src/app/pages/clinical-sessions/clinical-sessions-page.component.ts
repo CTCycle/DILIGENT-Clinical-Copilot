@@ -150,9 +150,7 @@ export class ClinicalSessionsPageComponent implements OnInit, OnDestroy {
         limit: 100,
       });
       this.sessions.set(payload.items);
-      if (!this.selected() && payload.items[0]) {
-        await this.openSession(payload.items[0].session_id);
-      }
+      await this.ensureSelectedSessionVisible();
     } catch (error) {
       this.listError.set(formatUnknownError(error, 'Failed to load clinical sessions.'));
     } finally {
@@ -199,12 +197,8 @@ export class ClinicalSessionsPageComponent implements OnInit, OnDestroy {
       await deleteInspectionSession(session.session_id);
       this.sessions.update((items) => items.filter((item) => item.session_id !== session.session_id));
       if (this.selected()?.session_id === session.session_id) {
-        this.selected.set(null);
-        this.editorText.set('');
-        this.detectedDrugEvidence.set([]);
-        this.detectedDiseases.set([]);
-        this.labSummary.set([]);
-        this.labTimeline.set([]);
+        this.clearSelectedSession();
+        await this.ensureSelectedSessionVisible();
       }
     } catch (error) {
       this.listError.set(formatUnknownError(error, 'Failed to delete clinical session.'));
@@ -219,6 +213,7 @@ export class ClinicalSessionsPageComponent implements OnInit, OnDestroy {
 
   updateStatusFilter(value: 'all' | InspectionSessionStatus): void {
     this.statusFilter.set(value);
+    void this.ensureSelectedSessionVisible();
   }
 
   updateDateFilterMode(value: 'any' | 'after' | 'before' | 'exact'): void {
@@ -226,10 +221,40 @@ export class ClinicalSessionsPageComponent implements OnInit, OnDestroy {
     if (value === 'any') {
       this.dateFilter.set('');
     }
+    void this.ensureSelectedSessionVisible();
   }
 
   updateDateFilter(value: string): void {
     this.dateFilter.set(value);
+    void this.ensureSelectedSessionVisible();
+  }
+
+  private async ensureSelectedSessionVisible(): Promise<void> {
+    const visibleSessions = this.filteredSessions();
+    const selectedId = this.selected()?.session_id;
+    if (selectedId && visibleSessions.some((session) => session.session_id === selectedId)) {
+      return;
+    }
+    const nextSession = visibleSessions[0];
+    if (nextSession) {
+      await this.openSession(nextSession.session_id);
+      return;
+    }
+    this.clearSelectedSession();
+  }
+
+  private clearSelectedSession(): void {
+    this.selected.set(null);
+    this.editorText.set('');
+    this.metadataText.set('{\n  "documents": [],\n  "images": []\n}');
+    this.revisionSelection.set('');
+    this.revisionInstruction.set('');
+    this.detectedDrugEvidence.set([]);
+    this.detectedDiseases.set([]);
+    this.labSummary.set([]);
+    this.labTimeline.set([]);
+    this.hepatotoxicityPattern.set('N/A');
+    this.detailError.set(null);
   }
 
   updateEditorText(value: string): void {

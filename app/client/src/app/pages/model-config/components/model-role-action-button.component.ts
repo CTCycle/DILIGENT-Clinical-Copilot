@@ -16,9 +16,13 @@ import { ModelRole } from '../model-config.types';
       [attr.aria-label]="ariaLabel"
       [attr.title]="title"
     >
-      <span>{{ visibleLabel }}</span>
       <svg viewBox="0 0 24 24" aria-hidden="true">
-        <path d="m7 10 5 5 5-5" />
+        @if (role === 'clinical') {
+          <path d="M12 21s-6.7-3.5-6.7-9.3A3.7 3.7 0 0 1 9 8a3.9 3.9 0 0 1 3 1.5A3.9 3.9 0 0 1 15 8a3.7 3.7 0 0 1 3.7 3.7C18.7 17.5 12 21 12 21Z" />
+        } @else {
+          <path d="m8 12 2.5 2.5L16 9" />
+          <rect x="4" y="4" width="16" height="16" rx="3" />
+        }
       </svg>
     </button>
   `,
@@ -44,10 +48,7 @@ export class ModelRoleActionButtonComponent {
   }
 
   get visibleLabel(): string {
-    if (this.selected) {
-      return this.role === 'clinical' ? 'Clinical' : 'Extraction';
-    }
-    return this.role === 'clinical' ? 'Use for Clinical' : 'Use for Text Extraction';
+    return this.role === 'clinical' ? 'Clinical' : 'Extraction';
   }
 
   get ariaLabel(): string {

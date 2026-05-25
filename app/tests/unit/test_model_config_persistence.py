@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import asyncio
 from datetime import datetime
 from typing import Any
 
@@ -8,6 +9,8 @@ from domain.model_configs import ModelConfigSnapshot
 from services.llm.model_config import ModelConfigService
 from services.runtime.jobs import get_job_manager
 from services.session.factory import build_clinical_session_service
+import services.llm.model_config as model_config_module
+from services.llm.ollama_client import OllamaError
 
 
 class InMemorySerializer:
@@ -31,7 +34,7 @@ def test_model_config_roundtrip_preserves_cloud_selection() -> None:
             text_extraction_model="qwen3:1.7b",
             use_cloud_models=True,
             cloud_provider="openai",
-            cloud_model="gpt-5.4-mini",
+            cloud_model="gpt-4.1-mini",
             ollama_temperature=0.7,
             cloud_temperature=0.7,
             updated_at=datetime.now(),
@@ -42,7 +45,7 @@ def test_model_config_roundtrip_preserves_cloud_selection() -> None:
     service.serializer.save_snapshot(
         use_cloud_models=True,
         cloud_provider="openai",
-        cloud_model="gpt-5.4-mini",
+        cloud_model="gpt-4.1-mini",
         clinical_model="gpt-oss:20b",
         text_extraction_model="qwen3:1.7b",
     )
@@ -50,7 +53,7 @@ def test_model_config_roundtrip_preserves_cloud_selection() -> None:
 
     assert snapshot.use_cloud_models is True
     assert snapshot.cloud_provider == "openai"
-    assert snapshot.cloud_model == "gpt-5.4-mini"
+    assert snapshot.cloud_model == "gpt-4.1-mini"
     assert snapshot.clinical_model == "gpt-oss:20b"
     assert snapshot.text_extraction_model == "qwen3:1.7b"
 
@@ -63,4 +66,47 @@ def test_clinical_service_reads_runtime_from_persisted_config() -> None:
     )
     assert parser_provider
     assert parser_model
+
+
+def test_model_config_service_throttles_repeated_ollama_warnings(monkeypatch) -> None:
+    serializer = InMemorySerializer(
+        ModelConfigSnapshot(
+            clinical_model="gpt-oss:20b",
+            text_extraction_model="qwen3:14b",
+            use_cloud_models=False,
+            cloud_provider="openai",
+            cloud_model="gpt-4.1-mini",
+            ollama_temperature=0.7,
+            cloud_temperature=0.7,
+            updated_at=datetime.now(),
+        )
+    )
+    service = ModelConfigService(serializer=serializer)
+
+    class FailingOllamaClient:
+        async def __aenter__(self):
+            return self
+
+        async def __aexit__(self, exc_type, exc, tb):
+            return False
+
+        async def list_models(self):
+            raise OllamaError("Failed to list Ollama models: All connection attempts failed")
+
+    warnings: list[str] = []
+    times = iter([10.0, 20.0, 135.0])
+
+    monkeypatch.setattr(model_config_module, "OllamaClient", FailingOllamaClient)
+    monkeypatch.setattr(model_config_module, "monotonic", lambda: next(times))
+    monkeypatch.setattr(
+        model_config_module.logger,
+        "warning",
+        lambda message, exc: warnings.append(f"{message}::{exc}"),
+    )
+
+    asyncio.run(service.list_available_ollama_models())
+    asyncio.run(service.list_available_ollama_models())
+    asyncio.run(service.list_available_ollama_models())
+
+    assert len(warnings) == 2
 

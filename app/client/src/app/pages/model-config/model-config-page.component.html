@@ -352,7 +352,7 @@
                 </select>
               </label>
               <button type="button" class="model-config-test-btn" (click)="openKeys(provider)" [disabled]="isSaving() || isLoading()">
-                Test Connection
+                Manage keys
                 <svg viewBox="0 0 24 24" aria-hidden="true">
                   <circle cx="12" cy="12" r="8.25" />
                   <path d="m8.4 12.2 2.35 2.35 4.85-5.1" />
@@ -395,7 +395,7 @@
             <dt>RAG Pipeline</dt>
             <dd>
               <span class="model-config-summary-badge">{{ ragPipelineEnabled() ? 'Enabled' : 'Disabled' }}</span>
-              <small>Using indexed clinical evidence</small>
+              <small>{{ ragPipelineEnabled() ? 'Using indexed clinical evidence' : 'Indexed clinical evidence disabled' }}</small>
             </dd>
           </div>
         </dl>

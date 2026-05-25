@@ -869,6 +869,12 @@
   overflow-wrap: anywhere;
 }
 
+.clinical-session-metadata-save {
+  display: flex;
+  justify-content: flex-end;
+  margin-top: var(--space-md);
+}
+
 .clinical-session-revision label {
   display: grid;
   gap: var(--space-sm);

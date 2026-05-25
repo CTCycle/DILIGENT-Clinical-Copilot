@@ -1076,7 +1076,8 @@ class ClinicalSessionService(ClinicalSessionFormattingMixin):
             raise ServiceNotFoundError(
                 "Job not found.",
             )
-        success = self.job_manager.cancel_job(job_id)
+        cancelled_snapshot = self.job_manager.cancel_job(job_id)
+        success = cancelled_snapshot is not None
         if success:
             logger.info("Clinical analysis stop requested for job %s", job_id)
         return JobCancelResponse(
