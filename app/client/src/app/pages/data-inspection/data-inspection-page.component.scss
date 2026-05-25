@@ -2,26 +2,27 @@
 .inspection-rag-path-editor {
   display: flex;
   align-items: center;
-  gap: var(--space-sm);
+  width: auto;
 }
 
-.inspection-rag-path-input {
-  min-width: min(28rem, 36vw);
-  min-height: var(--control-height-md);
-  padding: var(--space-sm) var(--space-md);
-  border: 1px solid var(--color-border);
-  border-radius: var(--radius-md);
-  background: var(--color-surface-alt);
-  color: var(--color-text-primary);
+.inspection-rag-picker-btn {
+  width: 2.25rem;
+  min-width: 2.25rem;
+  height: 2.25rem;
+  min-height: 2.25rem;
+  padding: 0;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.inspection-rag-picker-btn .inspection-icon {
+  width: 1rem;
+  height: 1rem;
 }
 
 @media (max-width: 900px) {
   .inspection-rag-path-editor {
-    width: 100%;
-  }
-
-  .inspection-rag-path-input {
-    min-width: 0;
-    flex: 1;
+    width: auto;
   }
 }

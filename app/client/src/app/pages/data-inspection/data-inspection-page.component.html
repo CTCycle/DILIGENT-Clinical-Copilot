@@ -172,48 +172,28 @@
               (searchChange)="updateRagSearch($event)"
               (updateClick)="openUpdateModal('rag')"
             >
-              @if (supportsNativeFolderSelection) {
-                <ng-container inspectionToolbarBeforeActions>
-                  <button
-                    class="btn btn-secondary inspection-mini-btn"
-                    type="button"
-                    (click)="openRagFolderPicker()"
-                    aria-label="Select RAG folder"
-                    title="Select RAG folder"
-                  >
-                    <svg class="inspection-icon" viewBox="0 0 24 24" aria-hidden="true">
-                      <path fill="currentColor" d="M10 4a2 2 0 0 1 1.41.59L13 6h7a2 2 0 0 1 2 2v1H2V6a2 2 0 0 1 2-2h6Zm12 7v7a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2v-7h20Zm-6.2 2.22a1 1 0 0 0-1.42 0L13 14.59V13a1 1 0 0 0-2 0v1.59l-1.38-1.37a1 1 0 1 0-1.42 1.41l3.08 3.09a1 1 0 0 0 1.42 0l3.1-3.09a1 1 0 0 0 0-1.41Z"/>
-                    </svg>
-                  </button>
-                  <input
-                    #ragFolderInput
-                    type="file"
-                    class="inspection-folder-input"
-                    webkitdirectory
-                    directory
-                    aria-label="RAG documents folder picker"
-                    (change)="handleRagFolderSelection($event)"
-                  />
-                </ng-container>
-              } @else {
-                <div inspectionToolbarBeforeActions class="inspection-rag-path-editor">
-                  <input
-                    class="inspection-rag-path-input"
-                    type="text"
-                    [ngModel]="ragFolderPathInput()"
-                    (ngModelChange)="updateRagFolderPath($event)"
-                    placeholder="Enter absolute RAG folder path"
-                    aria-label="RAG documents folder path"
-                  />
-                  <button
-                    class="btn btn-secondary inspection-mini-btn"
-                    type="button"
-                    (click)="applyRagFolderPath()"
-                  >
-                    Use Path
-                  </button>
-                </div>
-              }
+              <div inspectionToolbarBeforeActions class="inspection-rag-path-editor">
+                <button
+                  class="btn btn-secondary inspection-mini-btn inspection-rag-picker-btn"
+                  type="button"
+                  (click)="openRagFolderPicker()"
+                  aria-label="Select RAG folder"
+                  title="Select RAG folder"
+                >
+                  <svg class="inspection-icon" viewBox="0 0 24 24" aria-hidden="true">
+                    <path fill="currentColor" d="M10 4a2 2 0 0 1 1.41.59L13 6h7a2 2 0 0 1 2 2v1H2V6a2 2 0 0 1 2-2h6Zm12 7v7a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2v-7h20Zm-6.2 2.22a1 1 0 0 0-1.42 0L13 14.59V13a1 1 0 0 0-2 0v1.59l-1.38-1.37a1 1 0 1 0-1.42 1.41l3.08 3.09a1 1 0 0 0 1.42 0l3.1-3.09a1 1 0 0 0 0-1.41Z"/>
+                  </svg>
+                </button>
+                <input
+                  #ragFolderInput
+                  type="file"
+                  class="inspection-folder-input"
+                  webkitdirectory
+                  directory
+                  aria-label="RAG documents folder picker"
+                  (change)="handleRagFolderSelection($event)"
+                />
+              </div>
             </app-inspection-catalog-toolbar>
 
             <div class="inspection-scroll-frame inspection-scroll-frame-compact inspection-rag-second-view">
