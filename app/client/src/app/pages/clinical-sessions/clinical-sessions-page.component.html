@@ -360,18 +360,19 @@
                     Load images
                     <input type="file" accept="image/*" multiple (change)="onMetadataFilesSelected('images', $event)" />
                   </label>
-                </section>
-                <section class="clinical-session-metadata-summary-card">
-                  <strong>Attached images</strong>
-                  @if (metadataEntries('images').length) {
-                    <ul>
-                      @for (image of metadataEntries('images'); track image) {
-                        <li>{{ image }}</li>
-                      }
-                    </ul>
-                  } @else {
-                    <p>No images attached.</p>
-                  }
+                  <hr class="clinical-session-metadata-divider" />
+                  <section class="clinical-session-metadata-summary-card">
+                    <strong>Attached images</strong>
+                    @if (metadataEntries('images').length) {
+                      <ul>
+                        @for (image of metadataEntries('images'); track image) {
+                          <li>{{ image }}</li>
+                        }
+                      </ul>
+                    } @else {
+                      <p>No images attached.</p>
+                    }
+                  </section>
                 </section>
               </div>
               <div class="clinical-session-metadata-column">
@@ -387,18 +388,19 @@
                     Load documents
                     <input type="file" multiple (change)="onMetadataFilesSelected('documents', $event)" />
                   </label>
-                </section>
-                <section class="clinical-session-metadata-summary-card">
-                  <strong>Attached documents</strong>
-                  @if (metadataEntries('documents').length) {
-                    <ul>
-                      @for (document of metadataEntries('documents'); track document) {
-                        <li>{{ document }}</li>
-                      }
-                    </ul>
-                  } @else {
-                    <p>No documents attached.</p>
-                  }
+                  <hr class="clinical-session-metadata-divider" />
+                  <section class="clinical-session-metadata-summary-card">
+                    <strong>Attached documents</strong>
+                    @if (metadataEntries('documents').length) {
+                      <ul>
+                        @for (document of metadataEntries('documents'); track document) {
+                          <li>{{ document }}</li>
+                        }
+                      </ul>
+                    } @else {
+                      <p>No documents attached.</p>
+                    }
+                  </section>
                 </section>
               </div>
             </div>
@@ -422,8 +424,8 @@
               [ngModel]="metadataText()"
               (ngModelChange)="updateMetadataText($event)"
             ></textarea>
-            <div class="clinical-session-metadata-save">
-              <button type="button" class="btn btn-primary" (click)="saveSession()">Save metadata</button>
+            <div class="clinical-session-metadata-editor-footer">
+              <button type="button" class="btn btn-primary clinical-session-json-save" (click)="saveSession()">Save metadata</button>
             </div>
           </div>
         }

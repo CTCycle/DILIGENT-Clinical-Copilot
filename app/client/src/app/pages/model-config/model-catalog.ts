@@ -8,10 +8,11 @@ export type ModelFilterOption = {
 };
 
 export const MODEL_FILTERS: readonly ModelFilterOption[] = [
-  { key: 'installed', label: 'Installed' },
-  { key: 'reasoning', label: 'Reasoning' },
-  { key: 'small', label: 'Small models' },
-  { key: 'extraction', label: 'Extraction' },
+  { key: 'installed', label: 'Installed in Ollama' },
+  { key: 'missing', label: 'Not installed' },
+  { key: 'small', label: 'Up to 8B' },
+  { key: 'large', label: 'Above 8B' },
+  { key: 'quantized', label: 'Quantized (Q*)' },
 ];
 
 export function parseModelSizeInBillions(name: string): number | null {
@@ -26,29 +27,18 @@ export function parseModelSizeInBillions(name: string): number | null {
   return match[2].toLowerCase() === 'm' ? value / 1000 : value;
 }
 
-export function isReasoningModel(model: LocalModelCard): boolean {
-  const value = `${model.name} ${model.family} ${model.description}`.toLowerCase();
-  return value.includes('reasoning');
-}
-
 export function isSmallModel(model: LocalModelCard): boolean {
   const size = parseModelSizeInBillions(model.name);
-  return size !== null && size <= 4;
+  return size !== null && size <= 8;
 }
 
-export function isExtractionModel(model: LocalModelCard): boolean {
-  const value = `${model.name} ${model.family} ${model.description}`.toLowerCase();
-  const extractionKeywords = [
-    'extract',
-    'parsing',
-    'parser',
-    'structured',
-    'compact',
-    'lightweight',
-    'low-latency',
-    'smollm',
-  ];
-  return extractionKeywords.some((keyword) => value.includes(keyword)) || isSmallModel(model);
+export function isLargeModel(model: LocalModelCard): boolean {
+  const size = parseModelSizeInBillions(model.name);
+  return size !== null && size > 8;
+}
+
+export function isQuantizedModel(model: LocalModelCard): boolean {
+  return /(?:^|[-_:])q\d/i.test(model.name);
 }
 
 export function modelMatchesFilters(
@@ -59,9 +49,10 @@ export function modelMatchesFilters(
   const haystack = `${model.name} ${model.family} ${model.description}`.toLowerCase();
   if (query && !haystack.includes(query)) return false;
   if (filters.installed && !model.available_in_ollama) return false;
-  if (filters.reasoning && !isReasoningModel(model)) return false;
+  if (filters.missing && model.available_in_ollama) return false;
   if (filters.small && !isSmallModel(model)) return false;
-  if (filters.extraction && !isExtractionModel(model)) return false;
+  if (filters.large && !isLargeModel(model)) return false;
+  if (filters.quantized && !isQuantizedModel(model)) return false;
   return true;
 }
 
