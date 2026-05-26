@@ -196,31 +196,6 @@
               </div>
             </app-inspection-catalog-toolbar>
 
-            <div class="inspection-scroll-frame inspection-scroll-frame-compact inspection-rag-second-view">
-              <table class="inspection-table inspection-table-dense inspection-rag-summary-table">
-                <thead>
-                  <tr>
-                    <th class="inspection-rag-path-column">Folder path</th>
-                    <th>Collection</th>
-                    <th>Embeddings</th>
-                    <th>Documents</th>
-                    <th>Dimension</th>
-                    <th>Index ready</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  <tr>
-                    <td class="inspection-rag-path-cell" [title]="displayedRagFolderPath">{{ displayedRagFolderPath }}</td>
-                    <td>{{ ragVectorStore()?.collection_name || 'N/A' }}</td>
-                    <td>{{ ragVectorStore()?.embedding_count ?? 0 }}</td>
-                    <td>{{ ragVectorStore()?.distinct_document_count ?? 0 }}</td>
-                    <td>{{ ragVectorStore()?.embedding_dimension ?? 'N/A' }}</td>
-                    <td>{{ ragVectorStore()?.index_ready ? 'Yes' : 'No' }}</td>
-                  </tr>
-                </tbody>
-              </table>
-            </div>
-
             <div class="inspection-scroll-frame inspection-scroll-frame-compact" (scroll)="onRagScroll($event)">
               <table class="inspection-table inspection-table-dense">
                 <thead>

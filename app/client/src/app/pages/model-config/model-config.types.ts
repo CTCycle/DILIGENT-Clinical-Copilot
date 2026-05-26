@@ -1,6 +1,6 @@
 import { CloudProvider, JobStatus } from '../../core/models/types';
 
-export type ModelFilterKey = 'installed' | 'reasoning' | 'small' | 'extraction';
+export type ModelFilterKey = 'installed' | 'missing' | 'small' | 'large' | 'quantized';
 
 export type ModelRole = 'clinical' | 'text_extraction';
 
