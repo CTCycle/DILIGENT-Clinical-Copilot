@@ -111,9 +111,9 @@
   --shadow-lg: 0 22px 48px -28px rgba(2, 6, 23, 0.74);
   --shadow-brand: 0 12px 30px -20px rgba(22, 163, 74, 0.6);
   --app-background:
-    radial-gradient(128% 96% at -6% -10%, rgba(34, 197, 94, 0.32) 0%, rgba(34, 197, 94, 0.11) 34%, rgba(34, 197, 94, 0) 66%),
-    radial-gradient(118% 92% at 106% 4%, rgba(20, 148, 95, 0.3) 0%, rgba(20, 148, 95, 0.11) 38%, rgba(20, 148, 95, 0) 68%),
-    linear-gradient(170deg, #06130e 0%, #0c2219 52%, #13352b 100%);
+    radial-gradient(118% 90% at -8% -12%, rgba(55, 132, 234, 0.2) 0%, rgba(55, 132, 234, 0.08) 36%, rgba(55, 132, 234, 0) 68%),
+    radial-gradient(112% 86% at 108% 0%, rgba(45, 184, 230, 0.18) 0%, rgba(45, 184, 230, 0.07) 34%, rgba(45, 184, 230, 0) 66%),
+    linear-gradient(170deg, #061427 0%, #0a1d36 52%, #102744 100%);
 }
 
 * {
@@ -5050,6 +5050,7 @@ input[type="date"]::-webkit-calendar-picker-indicator:hover {
 .stitch-dili-actions .btn-primary {
   background: linear-gradient(90deg, #0d7f5f 0%, #37b58c 100%);
   box-shadow: 0 12px 24px -18px rgba(23, 131, 99, 0.85);
+  opacity: 1;
 }
 
 .stitch-dili-actions .btn:disabled {
@@ -5906,7 +5907,7 @@ input[type="date"]::-webkit-calendar-picker-indicator:hover {
 }
 
 .model-config-page .model-config-preview-a-layout .model-config-control-rail {
-  grid-template-columns: minmax(0, 2fr) repeat(2, minmax(0, 1fr));
+  grid-template-columns: minmax(0, 2.35fr) repeat(2, minmax(0, 1fr));
   gap: 14px;
 }
 
@@ -6238,8 +6239,8 @@ input[type="date"]::-webkit-calendar-picker-indicator:hover {
 .model-config-page .model-config-preview-a-layout .model-config-temperature-input {
   width: 66px;
   justify-self: end;
-  height: 34px;
-  min-height: 34px;
+  height: 30px;
+  min-height: 30px;
   text-align: center;
 }
 
@@ -6493,4 +6494,52 @@ input[type="date"]::-webkit-calendar-picker-indicator:hover {
     align-items: flex-start;
     flex-direction: column;
   }
+}
+
+/* Model Config dark palette normalization (blue family) */
+:root[data-theme="dark"] .model-config-page {
+  background:
+    radial-gradient(92% 72% at 88% 16%, rgba(58, 116, 206, 0.22), rgba(58, 116, 206, 0) 58%),
+    linear-gradient(180deg, #051428 0%, #081c36 100%);
+}
+
+:root[data-theme="dark"] .model-config-page .model-config-preview-a-layout
+  :is(.model-config-runtime-card, .model-config-rag-card, .model-config-catalog-panel, .model-config-cloud-options, .model-config-summary-panel) {
+  background: linear-gradient(180deg, rgba(14, 30, 55, 0.98), rgba(10, 23, 45, 0.98));
+  border-color: #2b456f;
+}
+
+:root[data-theme="dark"] .model-config-page .model-config-preview-a-layout .model-config-runtime-option {
+  background: #112543 !important;
+  border-color: #3a5b8a !important;
+}
+
+:root[data-theme="dark"] .model-config-page .model-config-preview-a-layout .model-config-runtime-option.is-active {
+  background: #183760 !important;
+  border-color: #5fc8ef !important;
+  box-shadow: inset 0 0 0 1px rgba(95, 200, 239, 0.28) !important;
+}
+
+:root[data-theme="dark"] .model-config-page .model-config-preview-a-layout
+  :is(.model-config-search input, .model-config-tag-select, .model-config-cloud-row select, .model-config-temperature-input, .model-config-filter-pill, .model-config-table th) {
+  background: #0f213f;
+  border-color: #35527e;
+  color: #dfe9fb;
+}
+
+:root[data-theme="dark"] .model-config-page .model-config-preview-a-layout .model-config-filter-pill.is-active {
+  background: #1f73b8;
+  border-color: #5fc8ef;
+  color: #ffffff;
+}
+
+:root[data-theme="dark"] .model-config-page .model-config-preview-a-layout
+  :is(.model-config-action-btn, .model-config-role-action, .model-config-test-btn) {
+  background: #132846;
+  border-color: #3f6599;
+  color: #7fcefb;
+}
+
+:root[data-theme="dark"] .model-config-page .model-config-preview-a-layout .model-config-save-btn {
+  background: linear-gradient(90deg, #1e66b2, #2799d1);
 }

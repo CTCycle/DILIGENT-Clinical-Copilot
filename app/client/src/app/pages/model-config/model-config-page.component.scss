@@ -17,18 +17,18 @@
 }
 
 :host-context([data-theme="dark"]) {
-  --mc-bg: #071613;
-  --mc-page: #091816;
-  --mc-surface: #0f2420;
-  --mc-surface-soft: #132d27;
-  --mc-border: #254b40;
-  --mc-border-strong: #3c7d68;
-  --mc-text: #f0faf6;
-  --mc-muted: #a9c8bd;
-  --mc-faint: #7fa296;
-  --mc-brand: #58e0ad;
-  --mc-brand-2: #22b884;
-  --mc-brand-soft: rgba(56, 196, 143, 0.16);
+  --mc-bg: #071326;
+  --mc-page: #081a2f;
+  --mc-surface: #0f1d35;
+  --mc-surface-soft: #12243f;
+  --mc-border: #2a3f63;
+  --mc-border-strong: #3f6ea5;
+  --mc-text: #e2e8f0;
+  --mc-muted: #a9b7cc;
+  --mc-faint: #7f92ad;
+  --mc-brand: #59d7c0;
+  --mc-brand-2: #2db8e6;
+  --mc-brand-soft: rgba(45, 184, 230, 0.14);
   --mc-shadow: 0 24px 58px -42px rgba(0, 0, 0, 0.88);
 }
 
@@ -51,8 +51,8 @@
 }
 
 .model-config-hero {
-  width: min(100%, 1280px);
-  margin-inline: auto;
+  width: 100%;
+  margin-inline: 0;
   padding: 0 0 4px;
 }
 
@@ -74,11 +74,11 @@
 
 .model-config-preview-a-layout {
   display: grid;
-  grid-template-columns: minmax(0, 1fr) 286px;
+  grid-template-columns: minmax(0, 1fr) 344px;
   gap: 16px;
   align-items: stretch;
-  width: min(100%, 1280px);
-  margin-inline: auto;
+  width: 100%;
+  margin-inline: 0;
 }
 
 .model-config-workspace {
@@ -90,7 +90,7 @@
 
 .model-config-control-rail {
   display: grid;
-  grid-template-columns: minmax(0, 2fr) repeat(2, minmax(0, 1fr));
+  grid-template-columns: minmax(0, 2.35fr) repeat(2, minmax(0, 1fr));
   gap: 14px;
   align-items: stretch;
 }
@@ -445,9 +445,12 @@
 }
 
 .model-config-table-shell {
-  overflow: auto;
+  overflow-x: auto;
+  overflow-y: auto;
+  height: 430px;
   max-height: 430px;
   overscroll-behavior: contain;
+  scrollbar-gutter: stable;
   border: 1px solid color-mix(in srgb, var(--mc-border) 72%, transparent);
   border-radius: 7px;
 }
@@ -527,7 +530,7 @@
   display: block;
   overflow: hidden;
   color: var(--mc-text);
-  font-size: 11px;
+  font-size: 12px;
   font-weight: 620;
   line-height: 1.35;
   text-overflow: ellipsis;
@@ -622,6 +625,10 @@
 
 .model-config-action-btn.is-update {
   color: #0f6fba;
+}
+
+.model-config-action-btn.is-disabled {
+  opacity: 0.55;
 }
 
 .model-config-action-btn svg,
@@ -747,20 +754,20 @@
 :host-context([data-theme="dark"]) .model-config-cloud-options,
 :host-context([data-theme="dark"]) .model-config-summary-panel {
   background:
-    linear-gradient(180deg, rgba(18, 45, 39, 0.98), rgba(12, 31, 27, 0.98));
-  border-color: #2f5d51;
+    linear-gradient(180deg, rgba(16, 29, 54, 0.98), rgba(11, 23, 43, 0.98));
+  border-color: #2a3f63;
 }
 
 :host-context([data-theme="dark"]) .model-config-runtime-option {
-  background: #10251f !important;
-  border-color: #345f52 !important;
+  background: #12233f !important;
+  border-color: #3f587e !important;
   box-shadow: none !important;
 }
 
 :host-context([data-theme="dark"]) .model-config-runtime-option.is-active {
-  background: #16392f !important;
-  border-color: #58e0ad !important;
-  box-shadow: inset 0 0 0 1px rgba(88, 224, 173, 0.24) !important;
+  background: #163154 !important;
+  border-color: #59d7c0 !important;
+  box-shadow: inset 0 0 0 1px rgba(89, 215, 192, 0.24) !important;
 }
 
 :host-context([data-theme="dark"]) .model-config-runtime-option strong,
@@ -780,26 +787,26 @@
 :host-context([data-theme="dark"]) .model-config-tag-select,
 :host-context([data-theme="dark"]) .model-config-cloud-row select,
 :host-context([data-theme="dark"]) .model-config-temperature-input {
-  background: #0b1f1a;
-  border-color: #345f52;
-  color: #eefbf6;
+  background: #0f1f39;
+  border-color: #3a547a;
+  color: #e2e8f0;
 }
 
 :host-context([data-theme="dark"]) .model-config-filter-pill.is-active {
-  background: #0b8f68;
-  border-color: #36d8a2;
+  background: #1b8fbe;
+  border-color: #59d7c0;
   color: #ffffff;
 }
 
 :host-context([data-theme="dark"]) .model-config-action-btn,
 :host-context([data-theme="dark"]) ::ng-deep .model-config-role-action {
-  background: #0c211c;
-  border-color: #3d7c68;
-  color: #68d9ae;
+  background: #132846;
+  border-color: #3f6ea5;
+  color: #77d8f2;
 }
 
 :host-context([data-theme="dark"]) .model-config-table-shell {
-  border-color: #2f5d51;
+  border-color: #2a3f63;
 }
 
 :host-context([data-theme="dark"]) .model-config-table th,
@@ -842,7 +849,7 @@
 }
 
 :host-context([data-theme="dark"]) .model-config-toggle {
-  background: #31534a;
+  background: #334a6f;
 }
 
 :host-context([data-theme="dark"]) .model-config-toggle i {
@@ -933,8 +940,8 @@
 
 :host-context([data-theme="dark"]) ::ng-deep .model-config-page {
   background:
-    radial-gradient(72% 58% at 92% 24%, rgba(33, 108, 86, 0.22), rgba(33, 108, 86, 0) 58%),
-    linear-gradient(180deg, #071916 0%, #0a1f1c 100%);
+    radial-gradient(72% 58% at 92% 24%, rgba(69, 106, 164, 0.2), rgba(69, 106, 164, 0) 58%),
+    linear-gradient(180deg, #061427 0%, #0a1c34 100%);
 }
 
 .model-config-summary-list dd:has(.model-config-summary-icon) {
@@ -990,7 +997,7 @@
   display: grid;
   grid-template-columns: minmax(0, 1fr) 66px;
   align-items: center;
-  gap: 10px;
+  gap: 8px;
 }
 
 .model-config-temperature-row .field-label {
@@ -1000,9 +1007,10 @@
 .model-config-temperature-input {
   width: 66px;
   justify-self: end;
-  padding: 0 10px;
-  height: 34px;
-  min-height: 34px;
+  padding: 0 9px;
+  height: 28px;
+  min-height: 28px;
+  max-height: 28px;
   text-align: center;
 }
 

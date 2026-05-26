@@ -139,7 +139,7 @@
             <button
               type="button"
               class="model-config-filter-pill"
-              [class.is-active]="!isFilterActive('installed') && !isFilterActive('reasoning') && !isFilterActive('small') && !isFilterActive('extraction')"
+              [class.is-active]="!isFilterActive('installed') && !isFilterActive('missing') && !isFilterActive('small') && !isFilterActive('large') && !isFilterActive('quantized')"
               (click)="clearFilters()"
             >
               All
@@ -147,18 +147,18 @@
             <button
               type="button"
               class="model-config-filter-pill"
-              [class.is-active]="isFilterActive('extraction')"
-              (click)="toggleFilter('extraction')"
+              [class.is-active]="isFilterActive('installed')"
+              (click)="toggleFilter('installed')"
             >
-              Text Extraction
+              Installed in Ollama
             </button>
             <button
               type="button"
               class="model-config-filter-pill"
-              [class.is-active]="isFilterActive('reasoning')"
-              (click)="toggleFilter('reasoning')"
+              [class.is-active]="isFilterActive('missing')"
+              (click)="toggleFilter('missing')"
             >
-              Clinical QA
+              Not installed
             </button>
             <button
               type="button"
@@ -166,19 +166,23 @@
               [class.is-active]="isFilterActive('small')"
               (click)="toggleFilter('small')"
             >
-              Summarization
+              Up to 8B
             </button>
             <button
               type="button"
               class="model-config-filter-pill"
-              [class.is-active]="isFilterActive('installed')"
-              (click)="toggleFilter('installed')"
+              [class.is-active]="isFilterActive('large')"
+              (click)="toggleFilter('large')"
             >
-              Privacy-Focused
+              Above 8B
             </button>
-            <button type="button" class="model-config-filter-pill">
-              <span>More</span>
-              <svg viewBox="0 0 24 24" aria-hidden="true"><path d="m6 9 6 6 6-6" /></svg>
+            <button
+              type="button"
+              class="model-config-filter-pill"
+              [class.is-active]="isFilterActive('quantized')"
+              (click)="toggleFilter('quantized')"
+            >
+              Quantized (Q*)
             </button>
           </div>
           } @else {
@@ -232,19 +236,18 @@
                     </td>
                     <td>
                       <div class="model-config-actions">
-                        @if (modelStatus(model) !== 'Installed') {
-                          <button
-                            class="model-config-action-btn"
-                            type="button"
-                            [attr.aria-label]="'Install ' + model.name"
-                            [attr.title]="'Install model'"
-                            (click)="pullModelByName(model.name)"
-                            [disabled]="isSaving() || isLoading() || appState.state().diliAgent.isPulling"
-                          >
-                            <span class="model-config-action-label">{{ progressForModel(model.name) ? 'Installing...' : 'Install' }}</span>
-                            <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 4v11M7.5 10.5 12 15l4.5-4.5M5 19h14" /></svg>
-                          </button>
-                        }
+                        <button
+                          class="model-config-action-btn"
+                          [class.is-disabled]="modelStatus(model) === 'Installed'"
+                          type="button"
+                          [attr.aria-label]="'Install ' + model.name"
+                          [attr.title]="modelStatus(model) === 'Installed' ? 'Already installed' : 'Install model'"
+                          (click)="pullModelByName(model.name)"
+                          [disabled]="isSaving() || isLoading() || appState.state().diliAgent.isPulling || modelStatus(model) === 'Installed'"
+                        >
+                          <span class="model-config-action-label">{{ progressForModel(model.name) ? 'Installing...' : 'Install' }}</span>
+                          <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 4v11M7.5 10.5 12 15l4.5-4.5M5 19h14" /></svg>
+                        </button>
                         <app-model-role-action-button
                           role="clinical"
                           [modelName]="model.name"
@@ -292,17 +295,20 @@
                     <td><span class="model-config-status-pill is-installed">Available</span></td>
                     <td>
                       <div class="model-config-actions model-config-actions-end">
-                        <button
-                          class="model-config-action-btn"
-                          type="button"
-                          [attr.aria-label]="'Use ' + modelName"
-                          [attr.title]="'Use model'"
-                          (click)="handleProviderModelChange(draftProvider(), modelName)"
+                        <app-model-role-action-button
+                          role="clinical"
+                          [modelName]="modelName"
+                          [selected]="draftConfig().clinicalModel === modelName"
                           [disabled]="isSaving() || isLoading()"
-                        >
-                          <span class="model-config-action-label">Use model</span>
-                          <svg viewBox="0 0 24 24" aria-hidden="true"><path d="m8.4 12.2 2.35 2.35 4.85-5.1" /></svg>
-                        </button>
+                          (roleSelected)="handleRoleSelection($event, modelName)"
+                        />
+                        <app-model-role-action-button
+                          role="text_extraction"
+                          [modelName]="modelName"
+                          [selected]="draftConfig().textExtractionModel === modelName"
+                          [disabled]="isSaving() || isLoading()"
+                          (roleSelected)="handleRoleSelection($event, modelName)"
+                        />
                       </div>
                     </td>
                   </tr>
@@ -314,11 +320,6 @@
 
           <div class="model-config-table-footer">
             <span>Showing {{ visibleModelRangeStart() }}-{{ visibleModelRangeEnd() }} of {{ filteredModelCount() }} models</span>
-            @if (canRevealMoreModels()) {
-              <span class="model-config-scroll-hint">Scroll inside the catalog to load more</span>
-            } @else if (filteredModelCount()) {
-              <span class="model-config-scroll-hint">All matching models loaded</span>
-            }
           </div>
         </section>
 
@@ -329,7 +330,7 @@
               <div class="model-config-provider-name">
                 <span class="model-config-provider-mark" [class.is-openai]="provider === 'openai'" [class.is-gemini]="provider === 'gemini'">
                   @if (provider === 'openai') {
-                    <img src="logos/openai-mark.svg" alt="OpenAI logo" />
+                    <img src="https://openai.com/favicon.ico" alt="OpenAI logo" />
                   } @else {
                     <img src="logos/google-g.svg" alt="Google logo" />
                   }

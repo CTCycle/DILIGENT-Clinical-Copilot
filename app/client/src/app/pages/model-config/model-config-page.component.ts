@@ -102,9 +102,10 @@ export class ModelConfigPageComponent implements OnInit {
   readonly previewCloudModelOverrides = signal<Partial<Record<CloudProvider, string>>>({});
   readonly activeFilters = signal<Record<ModelFilterKey, boolean>>({
     installed: false,
-    reasoning: false,
+    missing: false,
     small: false,
-    extraction: false,
+    large: false,
+    quantized: false,
   });
   readonly draftConfig = signal<DraftRuntimeConfig>(resolveDraftFromSettings(this.appState.state().diliAgent.settings));
   readonly lastUpdatedAt = signal<string | null>(null);
@@ -328,9 +329,10 @@ export class ModelConfigPageComponent implements OnInit {
   clearFilters(): void {
     this.activeFilters.set({
       installed: false,
-      reasoning: false,
+      missing: false,
       small: false,
-      extraction: false,
+      large: false,
+      quantized: false,
     });
     this.resetVisibleModelLimit();
   }
