@@ -14,11 +14,11 @@ class DrugBlock:
 BULLET_RE = re.compile(r"(?m)^[ \t]*(?:[-*•]|\d+[.)])[ \t]+")
 UPPER_TOKEN_RE = re.compile(r"^[A-ZÀ-ÖØ-Þ][\wÀ-ÖØ-öø-ÿ'/-]+")
 METADATA_RE = re.compile(
-    r"\b(?:mg|mcg|g|ui|iu|po|ev|iv|im|sc|bid|tid|die|volta\/die|sospes[oa]|continu[ae]|cronic[ao]|iniziat[oa]|started|stopped)\b",
+    r"(?<![A-Za-zÀ-ÖØ-öø-ÿ])(?:mg|mcg|g|ml|ui|iu|po|ev|iv|im|sc|bid|tid|die|volta\/die|sospes[oa]|continu[ae]|cronic[ao]|iniziat[oa]|started|stopped)\b",
     re.IGNORECASE,
 )
 CONTINUATION_PREFIX_RE = re.compile(
-    r"^(?:dal|da|dall['’]|se\b|in\s+riserva\b|peso\b|\d+(?:[.,]\d+)?\s*kg\b)",
+    r"^(?:dal\b|da\b|dall['’]|se\b|in\s+riserva\b|peso\b|\d+(?:[.,]\d+)?\s*kg\b)",
     re.IGNORECASE,
 )
 

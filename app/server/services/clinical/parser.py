@@ -188,15 +188,62 @@ class DrugsParser:
         if not cleaned:
             return PatientDrugs(entries=[])
         self.emit_progress(progress_callback, 0.0)
-        structured = await self.llm_extract_drugs_from_section(
+        combined = await self.extract_drugs_from_therapy_hybrid(
             cleaned,
-            source="therapy",
-            historical_flag=False,
             progress_callback=progress_callback,
         )
-        combined = self.deduplicate_drug_entries(structured.entries)
         self.emit_progress(progress_callback, 1.0)
         return PatientDrugs(entries=combined)
+
+    async def extract_drugs_from_therapy_hybrid(
+        self,
+        cleaned: str,
+        *,
+        progress_callback: Callable[[float], None] | None = None,
+    ) -> list[DrugEntry]:
+        lines = [
+            block.text.strip()
+            for block in isolate_drug_blocks(cleaned)
+            if block.text.strip() and not self.is_non_therapy_line(block.text.strip())
+        ]
+        parsed, fallback = self.rule_based_parse(lines)
+        deterministic_entries = [entry for _, entry in parsed]
+        if not fallback:
+            self.emit_progress(progress_callback, 1.0)
+            return self.deduplicate_drug_entries(deterministic_entries)
+
+        if self.client is None or not hasattr(self.client, "llm_structured_call"):
+            self.emit_progress(progress_callback, 1.0)
+            return self.deduplicate_drug_entries(deterministic_entries)
+
+        fallback_lines = [line for _, line in fallback]
+        try:
+            structured = await self.llm_extract_drugs(
+                fallback_lines,
+                progress_callback=progress_callback,
+                progress_start=0.2,
+                progress_span=0.8,
+            )
+        except Exception as exc:  # noqa: BLE001
+            logger.warning(
+                "Therapy LLM extraction failed for %s unresolved fragments; using deterministic entries only: %s",
+                len(fallback_lines),
+                exc,
+            )
+            structured = PatientDrugs(entries=[])
+
+        llm_entries: list[DrugEntry] = []
+        for index, entry in enumerate(structured.entries):
+            raw_line = fallback_lines[index] if index < len(fallback_lines) else ""
+            post_processed = self.post_process_llm_entry(
+                entry,
+                raw_line=raw_line,
+                source="therapy",
+                historical_flag=False,
+            )
+            if post_processed is not None:
+                llm_entries.append(post_processed)
+        return self.deduplicate_drug_entries([*deterministic_entries, *llm_entries])
 
     # -------------------------------------------------------------------------
     async def llm_extract_drugs(
@@ -325,15 +372,19 @@ class DrugsParser:
             for block in isolate_drug_blocks(text)
             if block.text.strip() and not self.is_non_therapy_line(block.text.strip())
         ]
+        parsed, fallback = self.rule_based_parse(lines)
+        normalized = [entry for _, entry in parsed]
+        if not fallback:
+            return PatientDrugs(entries=normalized)
+        fallback_lines = [line for _, line in fallback]
         structured = await self.llm_extract_drugs(
-            lines,
+            fallback_lines,
             progress_callback=progress_callback,
-            progress_start=0.0,
-            progress_span=1.0,
+            progress_start=0.2,
+            progress_span=0.8,
         )
-        normalized: list[DrugEntry] = []
         for index, entry in enumerate(structured.entries):
-            raw_line = lines[index] if index < len(lines) else ""
+            raw_line = fallback_lines[index] if index < len(fallback_lines) else ""
             post_processed = self.post_process_llm_entry(
                 entry,
                 raw_line=raw_line,
