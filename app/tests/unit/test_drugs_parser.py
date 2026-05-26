@@ -1,9 +1,16 @@
 from __future__ import annotations
 
 import asyncio
+from typing import Any
 
 from domain.clinical import DrugEntry
 from services.clinical.parser import DrugsParser
+
+
+class FailingStructuredClient:
+    async def llm_structured_call(self, **kwargs: Any):
+        _ = kwargs
+        raise AssertionError("LLM should not be called for deterministic therapy lines")
 
 
 def test_extract_drugs_from_therapy_parses_schedule_route_and_dates() -> None:
@@ -163,6 +170,65 @@ def test_extract_drugs_from_therapy_keeps_continuation_lines_with_drug_blocks() 
         "Prednison",
         "Diovan",
         "Domperidon axapharm lingual cpr orodisp",
+    ]
+
+
+def test_extract_drugs_from_therapy_uses_rules_before_llm_for_structured_blocks() -> None:
+    parser = DrugsParser(client=FailingStructuredClient())
+    therapy_text = """
+    ■Fortecortin 4 mg cpr
+    [cpr]
+    1-0-0-0
+    15.03 - 20.03
+
+    ■De-Ursil 150 mg caps
+    [caps]
+    1-0-1-0
+    per os
+    dal 21.03
+
+    ■Pantozol 40 mg cpr
+    [cpr]
+    1-0-0-0
+    per os
+    dal 06.02
+    """
+
+    parsed = asyncio.run(parser.extract_drugs_from_therapy(therapy_text))
+
+    assert [entry.name for entry in parsed.entries] == [
+        "Fortecortin",
+        "De-Ursil",
+        "Pantozol",
+    ]
+
+
+def test_extract_drugs_from_therapy_splits_reserve_drugs_without_bullets() -> None:
+    parser = DrugsParser(client=FailingStructuredClient())
+    therapy_text = """
+    Imodium lingual 2 mg cpr orodisp
+    [cpr]
+    0-0-0-0
+    per os
+    In riserva:
+
+    Dafalgan 1 g cpr
+    [cpr]
+    0-0-0-0
+    In riserva:
+
+    Rivotril 2,5mg/ml gtt orali 10 ml
+    [mg]
+    0-0-0-0
+    In riserva:
+    """
+
+    parsed = asyncio.run(parser.extract_drugs_from_therapy(therapy_text))
+
+    assert [entry.name for entry in parsed.entries] == [
+        "Imodium lingual",
+        "Dafalgan",
+        "Rivotril",
     ]
 
 
