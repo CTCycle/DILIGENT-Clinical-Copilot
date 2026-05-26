@@ -142,10 +142,20 @@ class DiseaseExtractor:
         if name is None:
             return None
         occurrence_time = self.sanitize_text(entry.occurrence_time, max_words=10)
+        timeline = self.sanitize_text(entry.timeline, max_words=16)
+        severity = self.sanitize_text(entry.severity, max_words=8)
+        diagnosis_status = self.sanitize_text(entry.diagnosis_status, max_words=10)
+        symptoms = self.sanitize_text(entry.symptoms, max_words=30)
+        clinical_context = self.sanitize_text(entry.clinical_context, max_words=30)
         evidence = self.sanitize_text(entry.evidence, max_words=30)
         return DiseaseContextEntry(
             name=name,
             occurrence_time=occurrence_time,
+            timeline=timeline,
+            severity=severity,
+            diagnosis_status=diagnosis_status,
+            symptoms=symptoms,
+            clinical_context=clinical_context,
             chronic=entry.chronic,
             hepatic_related=entry.hepatic_related,
             evidence=evidence,
@@ -155,6 +165,16 @@ class DiseaseExtractor:
     def entry_score(self, entry: DiseaseContextEntry) -> int:
         score = 1
         if entry.occurrence_time:
+            score += 1
+        if entry.timeline:
+            score += 1
+        if entry.severity:
+            score += 1
+        if entry.diagnosis_status:
+            score += 1
+        if entry.symptoms:
+            score += 1
+        if entry.clinical_context:
             score += 1
         if entry.chronic is not None:
             score += 1

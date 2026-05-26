@@ -243,6 +243,7 @@ class ClinicalSectionExtractionResult(BaseModel):
         le=1.0,
         description="Overall confidence in section assignment quality.",
     )
+    metadata: dict[str, Any] = Field(default_factory=dict)
 
     @model_validator(mode="after")
     def validate_section_texts(self) -> "ClinicalSectionExtractionResult":
@@ -367,11 +368,26 @@ class PatientDrugs(BaseModel):
 class DiseaseContextEntry(BaseModel):
     name: str = Field(..., min_length=1, max_length=200)
     occurrence_time: str | None = Field(default=None, max_length=120)
+    timeline: str | None = Field(default=None, max_length=200)
+    severity: str | None = Field(default=None, max_length=120)
+    diagnosis_status: str | None = Field(default=None, max_length=120)
+    symptoms: str | None = Field(default=None, max_length=500)
+    clinical_context: str | None = Field(default=None, max_length=500)
     chronic: bool | None = Field(default=None)
     hepatic_related: bool | None = Field(default=None)
     evidence: str | None = Field(default=None, max_length=500)
 
-    @field_validator("name", "occurrence_time", "evidence", mode="before")
+    @field_validator(
+        "name",
+        "occurrence_time",
+        "timeline",
+        "severity",
+        "diagnosis_status",
+        "symptoms",
+        "clinical_context",
+        "evidence",
+        mode="before",
+    )
     @classmethod
     def strip_text_fields(cls, value: str | None) -> str | None:
         if value is None:

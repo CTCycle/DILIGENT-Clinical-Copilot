@@ -4,7 +4,7 @@ import asyncio
 import json
 import time
 from datetime import datetime
-from typing import Any
+from typing import Any, cast
 
 from common.exceptions import (
     ServiceConflictError,
@@ -24,6 +24,7 @@ from domain.clinical.entities import (
     ClinicalSessionRequest,
     DrugRucamAssessment,
     PatientData,
+    PatientDrugs,
     PatientRucamAssessmentBundle,
     PipelineIssue,
 )
@@ -35,6 +36,7 @@ from services.clinical.match_quality import classify_match_evidence
 from services.clinical.report_language import phrase
 from services.session.clinical_input_extractor import ClinicalInputExtractionError
 from services.session.document_normalizer import DocumentNormalizer
+from services.session.preflight import check_parser_batch_capacity
 from services.session.robust_pipeline import (
     audit_report,
     build_extraction_artifact,
@@ -46,6 +48,118 @@ from services.session.robust_pipeline import (
 from services.session.session_shared import NarrativeBuilder, run_clinical_job
 from services.security.access_keys import AccessKeyService
 from services.text.normalization import normalize_drug_query_name
+
+_CLOUD_PROVIDERS = {"openai", "gemini", "openrouter"}
+
+
+async def _extract_drugs_from_section(
+    service: Any,
+    *,
+    text: str,
+    source: str,
+    issues: list[PipelineIssue],
+) -> Any:
+    if hasattr(service, "_resolve_runtime_timeout"):
+        parser_timeout_s = service._resolve_runtime_timeout(
+            base_timeout_s=float(getattr(service.drugs_parser, "timeout_s", 1.0))
+        )
+    else:
+        parser_timeout_s = float(getattr(service.drugs_parser, "timeout_s", 30.0))
+    try:
+        if source == "anamnesis":
+            if not hasattr(service.drugs_parser, "extract_drugs_from_anamnesis") and hasattr(
+                service, "extract_anamnesis_drugs"
+            ):
+                return await service.extract_anamnesis_drugs(
+                    anamnesis_text=text,
+                    issues=issues,
+                    progress_callback=None,
+                    stop_check=None,
+                )
+            return await asyncio.wait_for(
+                service.drugs_parser.extract_drugs_from_anamnesis(
+                    text,
+                    already_cleaned=True,
+                ),
+                timeout=parser_timeout_s,
+            )
+        if not hasattr(service.drugs_parser, "extract_drugs_from_therapy") and hasattr(
+            service, "extract_therapy_drugs"
+        ):
+            return await service.extract_therapy_drugs(
+                cleaned_therapy_text=text,
+                issues=issues,
+                progress_callback=None,
+                stop_check=None,
+            )
+        return await asyncio.wait_for(
+            service.drugs_parser.extract_drugs_from_therapy(
+                text,
+                already_cleaned=True,
+            ),
+            timeout=parser_timeout_s,
+        )
+    except Exception as exc:
+        _append_warning_issue(
+            service,
+            issues,
+            code=f"{source}_extraction_failed",
+            message=(
+                f"Drug extraction from {source} failed; continuing without "
+                f"{source} drug entries."
+            ),
+            field=source,
+        )
+        logger.warning("Drug extraction failed for section '%s': %s", source, exc)
+        return PatientDrugs(entries=[])
+
+
+def _append_warning_issue(
+    service: Any,
+    issues: list[PipelineIssue],
+    *,
+    code: str,
+    message: str,
+    field: str | None = None,
+) -> None:
+    if hasattr(service, "append_warning_issue"):
+        service.append_warning_issue(
+            issues,
+            code=code,
+            message=message,
+            field=field,
+        )
+        return
+    issues.append(
+        PipelineIssue(
+            severity="warning",
+            code=code,
+            message=message,
+            field=field,
+        )
+    )
+
+
+def _has_temporal_information(service: Any, entry: Any) -> bool:
+    parser = getattr(service, "drugs_parser", None)
+    checker = getattr(parser, "drug_entry_has_temporal_information", None)
+    if callable(checker):
+        return bool(checker(entry))
+    return True
+
+
+def _resolve_rucam_source(entries: list[DrugRucamAssessment]) -> str:
+    if not entries:
+        return "not_calculated_insufficient_data"
+    if any(
+        entry.calculation_method == "source_reported"
+        and (entry.score_source or "") == "laboratory_history"
+        for entry in entries
+    ):
+        return "provided"
+    if any(entry.total_score is not None for entry in entries):
+        return "calculated"
+    return "not_calculated_insufficient_data"
 
 
 def build_single_matched_drug_row_workflow(
@@ -167,19 +281,57 @@ async def process_single_patient_workflow(
 
     issues = []
     cleaned_therapy_text = service.drugs_parser.clean_text(payload.drugs or "")
-    therapy_drugs = await service.extract_therapy_drugs(
-        cleaned_therapy_text=cleaned_therapy_text,
-        issues=issues,
-        progress_callback=progress_callback,
-        stop_check=stop_check,
-    )
+    cleaned_anamnesis_text = service.drugs_parser.clean_text(payload.anamnesis or "")
+    service.emit_progress(progress_callback, stage="therapy_extraction", value=22.0)
+    service.emit_progress(progress_callback, stage="anamnesis_extraction", value=30.0)
+    preflight = await check_parser_batch_capacity(task_count=2)
+    if preflight.concurrency_allowed:
+        anamnesis_drugs, therapy_drugs = await asyncio.gather(
+            _extract_drugs_from_section(
+                service,
+                text=cleaned_anamnesis_text,
+                source="anamnesis",
+                issues=issues,
+            ),
+            _extract_drugs_from_section(
+                service,
+                text=cleaned_therapy_text,
+                source="therapy",
+                issues=issues,
+            ),
+        )
+    else:
+        logger.info(
+            "Parser batch preflight denied concurrency for provider=%s model=%s: %s",
+            preflight.provider,
+            preflight.model,
+            preflight.reason,
+        )
+        _append_warning_issue(
+            service,
+            issues,
+            code="parser_batch_preflight_sequential_fallback",
+            message=(
+                "Parser batch preflight denied concurrent extraction; "
+                "using sequential extraction for local runtime safety."
+            ),
+            field="clinical_input",
+        )
+        anamnesis_drugs = await _extract_drugs_from_section(
+            service,
+            text=cleaned_anamnesis_text,
+            source="anamnesis",
+            issues=issues,
+        )
+        therapy_drugs = await _extract_drugs_from_section(
+            service,
+            text=cleaned_therapy_text,
+            source="therapy",
+            issues=issues,
+        )
+    service.emit_progress(progress_callback, stage="therapy_extraction", value=30.0)
+    service.emit_progress(progress_callback, stage="anamnesis_extraction", value=42.0)
     anamnesis_text = payload.anamnesis or ""
-    anamnesis_drugs = await service.extract_anamnesis_drugs(
-        anamnesis_text=anamnesis_text,
-        issues=issues,
-        progress_callback=progress_callback,
-        stop_check=stop_check,
-    )
     disease_context = await service.extract_disease_context(
         anamnesis_text=anamnesis_text,
         issues=issues,
@@ -200,6 +352,52 @@ async def process_single_patient_workflow(
         stop_check=stop_check,
     )
     pattern_score = pattern_assessment.score
+    pattern_source = "calculated"
+    explicit_hepatic_pattern = None
+    lab_extractor = getattr(service, "lab_extractor", None)
+    if (
+        lab_extractor is not None
+        and hasattr(lab_extractor, "extract_explicit_hepatic_pattern")
+        and payload.laboratory_analysis
+    ):
+        try:
+            explicit_hepatic_pattern = lab_extractor.extract_explicit_hepatic_pattern(
+                payload.laboratory_analysis
+            )
+        except Exception:
+            explicit_hepatic_pattern = None
+    if explicit_hepatic_pattern:
+        pattern_score.classification = explicit_hepatic_pattern
+        pattern_source = "provided"
+    filtered_anamnesis_entries = [
+        entry
+        for entry in anamnesis_drugs.entries
+        if _has_temporal_information(service, entry)
+    ]
+    filtered_therapy_entries = [
+        entry
+        for entry in therapy_drugs.entries
+        if _has_temporal_information(service, entry)
+    ]
+    filtered_out_count = (
+        len(anamnesis_drugs.entries)
+        + len(therapy_drugs.entries)
+        - len(filtered_anamnesis_entries)
+        - len(filtered_therapy_entries)
+    )
+    anamnesis_drugs = PatientDrugs(entries=filtered_anamnesis_entries)
+    therapy_drugs = PatientDrugs(entries=filtered_therapy_entries)
+    if filtered_out_count > 0:
+        _append_warning_issue(
+            service,
+            issues,
+            code="drugs_missing_temporal_information_filtered",
+            message=(
+                f"{filtered_out_count} extracted drug entries were excluded because "
+                "temporal information was missing."
+            ),
+            field="drugs",
+        )
     all_detected_drugs = type(therapy_drugs)(
         entries=[*therapy_drugs.entries, *anamnesis_drugs.entries]
     )
@@ -372,6 +570,19 @@ async def process_single_patient_workflow(
         "relevant_drugs": candidate_selection.relevant,
         "excluded_drugs": candidate_selection.excluded,
         "unresolved_drugs": candidate_selection.unresolved,
+        "extraction_metadata": {
+            "drug_filtering": {
+                "filtered_out_count": filtered_out_count,
+                "reason": "missing_temporal_information",
+            },
+            "hepatic_pattern": {
+                "value": pattern_score.classification,
+                "source": pattern_source,
+            },
+            "rucam": {
+                "source": _resolve_rucam_source(rucam_bundle.entries),
+            },
+        },
         "structured_case": {
             "therapy_drugs": [entry.model_dump() for entry in therapy_drugs.entries],
             "anamnesis_drugs": [entry.model_dump() for entry in anamnesis_drugs.entries],
@@ -476,10 +687,14 @@ def start_clinical_job_workflow(
             [issue.model_dump() for issue in preflight.blocking_issues]
         )
     if LLMRuntimeConfig.is_cloud_enabled():
-        provider = LLMRuntimeConfig.get_llm_provider()
+        provider = LLMRuntimeConfig.get_llm_provider().strip().lower()
+        if provider not in _CLOUD_PROVIDERS:
+            raise ServiceValidationError(
+                f"Unsupported cloud provider '{provider}' for access-key validation."
+            )
         active_keys = [
             item
-            for item in AccessKeyService().list_access_keys(provider)
+            for item in AccessKeyService().list_access_keys(cast(Any, provider))
             if item.is_active
         ]
         if not active_keys:
