@@ -17,10 +17,12 @@ CANONICAL_TO_CLINICAL_KEY: Mapping[str, ClinicalSectionKey] = {
 }
 MIN_TYPO_TOKEN_LEN = 7
 MIN_TYPO_SIMILARITY = 0.88
+MIN_TYPO_SHARED_PREFIX_LEN = 4
 HEADING_PREFIX_RE = re.compile(r"^(?:#{1,6}\s*|\d+\s*[.):\-]\s*|[-*+]\s*|(?:[ivxlcdm]+)\s*[.):\-]\s*)", re.IGNORECASE)
 HEADING_SUFFIX_RE = re.compile(r"[\s:;.,\-_/|]+$")
 NON_ALNUM_RE = re.compile(r"[^0-9a-zA-ZÀ-ÖØ-öø-ÿ ]+")
 WS_RE = re.compile(r"\s+")
+MARKDOWN_HEADING_RE = re.compile(r"^\s*#{1,6}\s+\S")
 
 SECTION_HEADING_PROFILES: dict[str, dict[str, set[str]]] = {
     "anamnesis": {
@@ -131,6 +133,12 @@ class ClinicalRawSection:
     verbatim_coherent: bool
 
 
+@dataclass(frozen=True)
+class HeadingScanResult:
+    section_headings: list[SectionHeadingMatch]
+    boundary_line_starts: set[int]
+
+
 def normalize_heading_text(value: str) -> str:
     text = unicodedata.normalize("NFKC", value or "")
     text = text.strip()
@@ -175,6 +183,36 @@ def _token_similarity(left: str, right: str) -> float:
     return SequenceMatcher(None, left, right).ratio()
 
 
+def _looks_like_typo(candidate: str, token: str) -> bool:
+    prefix_len = min(MIN_TYPO_SHARED_PREFIX_LEN, len(candidate), len(token))
+    return (
+        candidate[:prefix_len] == token[:prefix_len]
+        and _token_similarity(candidate, token) >= MIN_TYPO_SIMILARITY
+    )
+
+
+def _phrase_matches_with_typo(tokens: set[str], phrase: str) -> bool:
+    phrase_tokens = tuple(token for token in phrase.split(" ") if token)
+    if not phrase_tokens:
+        return False
+
+    found_typo = False
+    for phrase_token in phrase_tokens:
+        if phrase_token in tokens:
+            continue
+        if len(phrase_token) < MIN_TYPO_TOKEN_LEN:
+            return False
+        if not any(
+            len(candidate) >= MIN_TYPO_TOKEN_LEN
+            and candidate != phrase_token
+            and _looks_like_typo(candidate, phrase_token)
+            for candidate in tokens
+        ):
+            return False
+        found_typo = True
+    return found_typo
+
+
 def _classify_against_profile(
     normalized_heading: str,
     profile: dict[str, set[str]],
@@ -191,14 +229,8 @@ def _classify_against_profile(
         if phrase_tokens and phrase_tokens.issubset(tokens):
             return (0.9, "token_containment")
     for phrase in required:
-        for token in phrase.split(" "):
-            if len(token) < MIN_TYPO_TOKEN_LEN:
-                continue
-            if any(
-                len(candidate) >= MIN_TYPO_TOKEN_LEN and _token_similarity(candidate, token) >= MIN_TYPO_SIMILARITY
-                for candidate in tokens
-            ):
-                return (0.88, "typo_tolerant")
+        if _phrase_matches_with_typo(tokens, phrase):
+            return (0.88, "typo_tolerant")
     return None
 
 
@@ -232,17 +264,41 @@ def classify_dili_heading(raw_heading: str, *, line_start: int, line_end: int) -
     return candidates[0]
 
 
-def find_dili_section_headings(raw_text: str) -> list[SectionHeadingMatch]:
+def is_markdown_heading_line(line: str) -> bool:
+    return bool(MARKDOWN_HEADING_RE.match(line or ""))
+
+
+def scan_dili_section_headings(raw_text: str) -> HeadingScanResult:
     matches: list[SectionHeadingMatch] = []
+    markdown_matches: list[SectionHeadingMatch] = []
+    markdown_boundary_lines: set[int] = set()
     offset = 0
     for line_number, raw_line in enumerate(raw_text.splitlines(keepends=True), start=1):
         line = raw_line.rstrip("\r\n")
-        if is_structural_heading_line(line):
+        is_markdown_heading = is_markdown_heading_line(line)
+        if is_markdown_heading:
+            markdown_boundary_lines.add(line_number)
+        if is_markdown_heading or is_structural_heading_line(line):
             match = classify_dili_heading(line, line_start=line_number, line_end=line_number)
             if match is not None:
                 matches.append(match)
+                if is_markdown_heading:
+                    markdown_matches.append(match)
         offset += len(raw_line)
-    return matches
+    markdown_keys = {match.canonical_key for match in markdown_matches}
+    if all(key in markdown_keys for key in REQUIRED_DILI_SECTION_KEYS):
+        return HeadingScanResult(
+            section_headings=markdown_matches,
+            boundary_line_starts=markdown_boundary_lines,
+        )
+    return HeadingScanResult(
+        section_headings=matches,
+        boundary_line_starts={match.line_start for match in matches},
+    )
+
+
+def find_dili_section_headings(raw_text: str) -> list[SectionHeadingMatch]:
+    return scan_dili_section_headings(raw_text).section_headings
 
 
 def resolve_heading_collisions(matches: Sequence[SectionHeadingMatch]) -> list[SectionHeadingMatch]:
@@ -272,7 +328,8 @@ def _line_char_offsets(raw_text: str) -> list[tuple[int, int]]:
 
 
 def extract_required_dili_sections(raw_text: str) -> dict[str, ClinicalRawSection]:
-    headings = resolve_heading_collisions(find_dili_section_headings(raw_text))
+    scan_result = scan_dili_section_headings(raw_text)
+    headings = resolve_heading_collisions(scan_result.section_headings)
     offsets = _line_char_offsets(raw_text)
     sections: dict[str, ClinicalRawSection] = {}
 
@@ -281,8 +338,12 @@ def extract_required_dili_sections(raw_text: str) -> dict[str, ClinicalRawSectio
             continue
         heading_line_start, heading_line_end = offsets[heading.line_start - 1]
         body_start = heading_line_end
-        if index + 1 < len(headings):
-            next_heading_line_start, _ = offsets[headings[index + 1].line_start - 1]
+        boundary_line = _next_boundary_line_start(
+            heading.line_start,
+            scan_result.boundary_line_starts,
+        )
+        if boundary_line is not None and boundary_line - 1 < len(offsets):
+            next_heading_line_start, _ = offsets[boundary_line - 1]
             body_end = next_heading_line_start
         else:
             body_end = len(raw_text)
@@ -318,6 +379,13 @@ def extract_required_dili_sections(raw_text: str) -> dict[str, ClinicalRawSectio
             verbatim_coherent=coherent,
         )
     return sections
+
+
+def _next_boundary_line_start(current_line_start: int, boundary_line_starts: set[int]) -> int | None:
+    for line_start in sorted(boundary_line_starts):
+        if line_start > current_line_start:
+            return line_start
+    return None
 
 
 def verify_verbatim_section_coherence(raw_text: str, section: ClinicalRawSection) -> bool:
