@@ -114,6 +114,8 @@ class JobManager:
             return state.snapshot()
         with state.lock:
             state.stop_requested = True
+            state.status = "cancelled"
+            state.completed_at = monotonic()
             state.version += 1
             snapshot = {
                 "job_id": state.job_id,
@@ -133,6 +135,8 @@ class JobManager:
     def is_job_running(self, job_type: str | None = None) -> bool:
         with self.lock:
             for state in self.jobs.values():
+                if state.stop_requested:
+                    continue
                 if state.status in ("pending", "running"):
                     if job_type is None or state.job_type == job_type:
                         return True

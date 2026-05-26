@@ -24,6 +24,27 @@ def test_source_reported_rucam_score_is_used_directly() -> None:
     assert item.data_sufficient is True
 
 
+def test_laboratory_history_rucam_score_has_priority() -> None:
+    estimator = RucamScoreEstimator()
+    payload, analysis, timeline = _base_inputs()
+    payload.laboratory_analysis = "RUCAM score: 6"
+    bundle = estimator.estimate(
+        payload=payload,
+        analysis_drugs=analysis,
+        anamnesis_drugs=PatientDrugs(entries=[]),
+        disease_context=PatientDiseaseContext(entries=[]),
+        lab_timeline=timeline,
+        onset_context=LiverInjuryOnsetContext(onset_date='2025-01-10', onset_basis='first_abnormal_lab'),
+        pattern_score=HepatotoxicityPatternScore(classification='hepatocellular'),
+        resolved_drugs={'drug a': {'extracted_excerpts': ['LiverTox monograph: RUCAM score 8 in representative case.']}},
+        report_language='en',
+    )
+    item = bundle.entries[0]
+    assert item.total_score == 6
+    assert item.calculation_method == 'source_reported'
+    assert item.score_source == 'laboratory_history'
+
+
 def test_livertox_likelihood_score_is_not_treated_as_rucam() -> None:
     estimator = RucamScoreEstimator()
     payload, analysis, timeline = _base_inputs()

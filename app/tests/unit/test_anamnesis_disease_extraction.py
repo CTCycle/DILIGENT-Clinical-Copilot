@@ -70,6 +70,11 @@ def test_extract_diseases_from_anamnesis_deduplicates_and_keeps_rich_entry() -> 
                     DiseaseContextEntry(
                         name="steatosi epatica",
                         occurrence_time="2021",
+                        timeline="diagnosed in 2021, persistent thereafter",
+                        severity="moderate",
+                        diagnosis_status="confirmed",
+                        symptoms="fatigue",
+                        clinical_context="chronic liver disease follow-up",
                         chronic=True,
                         hepatic_related=True,
                         evidence="Steatosi epatica cronica documentata dal 2021.",
@@ -93,6 +98,11 @@ def test_extract_diseases_from_anamnesis_deduplicates_and_keeps_rich_entry() -> 
     steatosis = parsed.entries[0]
     assert steatosis.name.lower() == "steatosi epatica"
     assert steatosis.occurrence_time == "2021"
+    assert steatosis.timeline is not None
+    assert steatosis.severity == "moderate"
+    assert steatosis.diagnosis_status == "confirmed"
+    assert steatosis.symptoms == "fatigue"
+    assert steatosis.clinical_context == "chronic liver disease follow-up"
     assert steatosis.chronic is True
     assert steatosis.hepatic_related is True
 

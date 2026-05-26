@@ -117,6 +117,7 @@ Feature toggles/settings:
 - Desktop build is Windows-focused in current release scripts/output layout.
 - Long-running operations rely on backend job polling lifecycle; frontend must poll for completion.
 - Some features require reachable external dependencies (for example Ollama).
+- When parser models run on local providers (for example Ollama), parser batch preflight is executed before concurrent extraction; if runtime/model status cannot be safely validated, the workflow automatically falls back to sequential parser execution.
 
 ## 7. Deployment and Packaging Notes
 

@@ -1,21 +1,18 @@
 from __future__ import annotations
 
 import asyncio
-import re
 from collections.abc import Callable
 from typing import Any
 
 from configurations.llm_configs import LLMRuntimeConfig
 from configurations.startup import server_settings
-from domain.clinical.extraction import LlmClinicalSectionTextDraft
 from domain.clinical.entities import ClinicalSectionExtractionResult
 from services.llm.client_runtime import ensure_runtime_client
-from services.llm.prompts import CLINICAL_SECTION_EXTRACTION_PROMPT
 from services.llm.provider_factory import select_llm_provider
 from services.session.clinical_section_parsers import (
-    extract_sections_from_markers,
-    find_section_markers,
-    validate_sections_against_source,
+    extract_required_dili_sections,
+    missing_required_section_names,
+    verify_verbatim_section_coherence,
 )
 
 
@@ -29,14 +26,7 @@ def validate_extracted_sections_against_source(
     therapy: str,
     lab_analysis: str,
 ) -> bool:
-    return validate_sections_against_source(
-        source_text,
-        {
-            "anamnesis": anamnesis,
-            "drugs": therapy,
-            "laboratory_analysis": lab_analysis,
-        },
-    )
+    return all(section and section in source_text for section in (anamnesis, therapy, lab_analysis))
 
 
 class ClinicalInputExtractor:
@@ -80,28 +70,58 @@ class ClinicalInputExtractor:
             ),
         )
 
-    def _deterministic_extract(self, clinical_input: str) -> ClinicalSectionExtractionResult | None:
-        markers = find_section_markers(clinical_input)
-        sections = extract_sections_from_markers(clinical_input, markers)
-        if sections is None:
-            return None
-        strict_verbatim = validate_sections_against_source(clinical_input, sections)
+    def _deterministic_extract(self, clinical_input: str) -> ClinicalSectionExtractionResult:
+        sections = extract_required_dili_sections(clinical_input)
+        missing = missing_required_section_names(sections)
+        if missing:
+            raise ClinicalInputExtractionError(
+                f"Missing required titled sections: {', '.join(missing)}"
+            )
+        for key, section in sections.items():
+            if not section.text.strip():
+                raise ClinicalInputExtractionError(f"Section '{key}' is empty.")
+            if not verify_verbatim_section_coherence(clinical_input, section):
+                raise ClinicalInputExtractionError(
+                    f"Section '{key}' does not match a coherent verbatim span."
+                )
+        therapy = sections["therapy"]
+        labs = sections["laboratory_history"]
+        anamnesis = sections["anamnesis"]
+        strict_verbatim = validate_extracted_sections_against_source(
+            clinical_input,
+            anamnesis=anamnesis.text,
+            therapy=therapy.text,
+            lab_analysis=labs.text,
+        )
+        if not strict_verbatim:
+            raise ClinicalInputExtractionError("Deterministic section extraction failed source grounding.")
         return ClinicalSectionExtractionResult(
             source_text=clinical_input,
-            anamnesis=sections["anamnesis"],
-            drugs=sections["drugs"],
-            laboratory_analysis=sections["laboratory_analysis"],
+            anamnesis=anamnesis.text,
+            drugs=therapy.text,
+            laboratory_analysis=labs.text,
             line_ranges={},
             confidence=0.95 if strict_verbatim else 0.7,
+            metadata={
+                "sections": {
+                    key: {
+                        "canonical_key": value.canonical_key,
+                        "raw_heading": value.raw_heading,
+                        "normalized_heading": value.normalized_heading,
+                        "match_strategy": value.match_strategy,
+                        "score": value.confidence_score,
+                        "line_span": [value.line_start, value.line_end],
+                        "char_span": [value.body_start, value.body_end],
+                        "verbatim_coherent": value.verbatim_coherent,
+                    }
+                    for key, value in sections.items()
+                }
+            },
         )
 
     @staticmethod
     def _raise_extraction_failed(reason: str) -> None:
         raise ClinicalInputExtractionError(f"Unable to extract clinical sections: {reason}")
-
-    @staticmethod
-    def _normalize_json_text(text: str) -> str:
-        return re.sub(r"\s+", " ", text).strip()
 
     async def extract(
         self,
@@ -114,57 +134,20 @@ class ClinicalInputExtractor:
         if progress_callback is not None:
             progress_callback(0.0)
 
-        deterministic = self._deterministic_extract(clinical_input)
-        if deterministic is not None:
-            if progress_callback is not None:
-                progress_callback(1.0)
-            return deterministic
-
+        deterministic: ClinicalSectionExtractionResult | None = None
         try:
-            await self.ensure_client()
-        except Exception as exc:  # noqa: BLE001
+            deterministic = self._deterministic_extract(clinical_input)
+        except ValueError as exc:
             if progress_callback is not None:
                 progress_callback(1.0)
-            self._raise_extraction_failed(str(exc) or "LLM client unavailable")
-        if self.client is None:
+            self._raise_extraction_failed(str(exc))
+        except ClinicalInputExtractionError:
             if progress_callback is not None:
                 progress_callback(1.0)
-            self._raise_extraction_failed("LLM client unavailable")
-
-        try:
-            extraction = await self.client.llm_structured_call(
-                model=self.model,
-                system_prompt=CLINICAL_SECTION_EXTRACTION_PROMPT,
-                user_prompt=clinical_input,
-                schema=LlmClinicalSectionTextDraft,
-                temperature=0.0,
-                use_json_mode=True,
-                max_repair_attempts=1,
-            )
-        except Exception as exc:  # noqa: BLE001
-            if progress_callback is not None:
-                progress_callback(1.0)
-            self._raise_extraction_failed(str(exc) or "LLM extraction failed")
-
-        draft = LlmClinicalSectionTextDraft.model_validate(extraction)
-        anamnesis = self._normalize_json_text(draft.anamnesis)
-        therapy = self._normalize_json_text(draft.therapy)
-        lab_analysis = self._normalize_json_text(draft.lab_analysis)
-        if not anamnesis or not therapy or not lab_analysis:
-            if progress_callback is not None:
-                progress_callback(1.0)
-            self._raise_extraction_failed("extracted section text is incomplete")
-        if not validate_extracted_sections_against_source(clinical_input, anamnesis, therapy, lab_analysis):
-            if progress_callback is not None:
-                progress_callback(1.0)
-            self._raise_extraction_failed("extracted section text is not source-grounded")
+            raise
         if progress_callback is not None:
             progress_callback(1.0)
-        return ClinicalSectionExtractionResult(
-            source_text=clinical_input,
-            anamnesis=anamnesis,
-            drugs=therapy,
-            laboratory_analysis=lab_analysis,
-            line_ranges={},
-            confidence=0.5,
-        )
+        if deterministic is None:
+            self._raise_extraction_failed("deterministic extraction returned no result")
+        assert deterministic is not None
+        return deterministic

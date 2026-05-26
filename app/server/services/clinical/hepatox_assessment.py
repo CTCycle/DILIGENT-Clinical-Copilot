@@ -484,6 +484,8 @@ async def prepare_drug_assessment(
     if not origins and drug_entry.source in {"therapy", "anamnesis"}:
         origins = [drug_entry.source]
     extraction_metadata = livertox_data.get("extraction_metadata", [])
+    if not isinstance(extraction_metadata, list):
+        extraction_metadata = []
     knowledge_prompt = str(livertox_data.get("knowledge_prompt") or "").strip()
     missing_livertox = bool(livertox_data.get("missing_livertox"))
     ambiguous_match = bool(livertox_data.get("ambiguous_match"))
@@ -522,6 +524,25 @@ async def prepare_drug_assessment(
     suspension = self.evaluate_suspension(drug_entry, visit_date)
     matched_lvt_row = matched_row if isinstance(matched_row, dict) else None
     rucam = rucam_by_key.get(normalized_drug_key)
+    source_context_summary = summarize_drug_source_context(drug_entry)
+    temporal_plausibility = assess_temporal_plausibility(
+        drug_entry,
+        None,
+    )
+    pattern_compatibility = assess_pattern_compatibility(
+        drug_entry,
+        pattern_summary,
+        self.select_excerpt(excerpts_list),
+    )
+    extraction_metadata = [
+        *extraction_metadata,
+        {
+            "source_context": source_context_summary,
+            "temporal_plausibility": temporal_plausibility,
+            "pattern_compatibility": pattern_compatibility,
+            "historical_flag": bool(getattr(drug_entry, "historical_flag", False)),
+        },
+    ]
     entry = DrugClinicalAssessment(
         drug_name=drug_entry.name,
         canonical_name=canonical_name,
@@ -937,7 +958,12 @@ async def finalize_patient_report(
     )
     sections: list[str] = []
     if matched_sections:
-        sections.append("\n\n---\n\n".join(matched_sections))
+        sections.append(
+            self.render_drug_assessment_section(
+                matched_entries,
+                report_language,
+            )
+        )
     if unresolved_section:
         sections.append(unresolved_section)
     if not sections:
@@ -1027,3 +1053,39 @@ def bibliography_source_label(self) -> str:
     return get_text_normalization_snapshot().knowledge_source_references.get(
         "livertox", "LiverTox"
     )
+
+
+def summarize_drug_source_context(entry: DrugEntry) -> str:
+    source = (entry.source or "unknown").strip() if isinstance(entry.source, str) else "unknown"
+    if source == "therapy":
+        return "Current/past therapy section entry."
+    if source == "anamnesis":
+        return "Historical anamnesis section entry."
+    return "Source section unavailable."
+
+
+def assess_temporal_plausibility(
+    entry: DrugEntry,
+    lab_timeline: PatientLabTimeline | None,
+) -> str:
+    _ = lab_timeline
+    if entry.therapy_start_date and (entry.suspension_status is not None or entry.suspension_date):
+        return "Temporal sequence available for plausibility assessment."
+    if entry.therapy_start_date:
+        return "Therapy start is available; temporal assessment is partially supported."
+    return "Temporal evidence is limited."
+
+
+def assess_pattern_compatibility(
+    entry: DrugEntry,
+    hepatic_pattern: str | None,
+    livertox_excerpt: str | None,
+) -> str:
+    _ = entry
+    pattern_value = (hepatic_pattern or "").strip().lower()
+    excerpt_text = (livertox_excerpt or "").strip()
+    if not pattern_value:
+        return "Hepatic pattern unavailable for compatibility assessment."
+    if not excerpt_text:
+        return f"Pattern '{pattern_value}' available; LiverTox excerpt unavailable."
+    return f"Pattern '{pattern_value}' can be compared against LiverTox evidence."

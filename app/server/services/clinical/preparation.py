@@ -3,7 +3,7 @@ from __future__ import annotations
 import asyncio
 import re
 from collections.abc import Callable
-from typing import Any
+from typing import Any, Sequence
 
 from domain.clinical.entities import (
     DrugEntry,
@@ -14,7 +14,13 @@ from domain.clinical.extras import HepatoxPreparedInputs
 from common.utils.logger import logger
 from repositories.serialization.data import DataSerializer
 from services.clinical.knowledge import ClinicalKnowledgeComposer
-from services.clinical.matches_core import LiverToxMatcher
+from services.clinical.matches_core import (
+    LiverToxMatcher,
+)
+from services.clinical.match_resolution import (
+    DrugEvidenceMatchResult,
+    conservative_fuzzy_livertox_match,
+)
 from services.text.normalization import (
     canonicalize_drug_query,
     normalize_drug_query_name,
@@ -31,6 +37,91 @@ class ClinicalKnowledgePreparation:
         self.serializer = DataSerializer()
         self.knowledge_composer = ClinicalKnowledgeComposer(serializer=self.serializer)
         self.livertox_matcher: LiverToxMatcher | None = None
+
+    def build_drug_alias_candidates(
+        self,
+        entry: DrugEntry,
+        rxnav_aliases: Sequence[str],
+    ) -> list[str]:
+        values: list[str] = []
+        base_name = (entry.name or "").strip()
+        if base_name:
+            values.append(base_name)
+        for alias in rxnav_aliases:
+            cleaned = (alias or "").strip()
+            if cleaned:
+                values.append(cleaned)
+        unique: list[str] = []
+        seen: set[str] = set()
+        for value in values:
+            norm = normalize_drug_query_name(value)
+            if not norm or norm in seen:
+                continue
+            seen.add(norm)
+            unique.append(value)
+        return unique
+
+    async def resolve_livertox_match_for_drug(
+        self,
+        entry: DrugEntry,
+        *,
+        llm_client: Any | None = None,
+    ) -> DrugEvidenceMatchResult | None:
+        if not await self.ensure_livertox_matcher() or self.livertox_matcher is None:
+            return None
+        candidate_name = (entry.name or "").strip()
+        if not candidate_name:
+            return None
+        matches = await asyncio.to_thread(
+            self.livertox_matcher.match_drug_names,
+            [candidate_name],
+        )
+        if not matches:
+            return None
+        primary = matches[0]
+        if primary.status == "matched" and primary.matched_name:
+            return DrugEvidenceMatchResult(
+                extracted_name=candidate_name,
+                matched_livertox_name=primary.matched_name,
+                matched_livertox_id=primary.nbk_id,
+                rxnav_validated=False,
+                rxnav_rxcui=None,
+                match_strategy="direct_livertox",
+                supplementary_information_available=True,
+            )
+        if primary.status == "ambiguous" and primary.candidate_names:
+            chosen = conservative_fuzzy_livertox_match(
+                [candidate_name],
+                list(primary.candidate_names),
+            )
+            if chosen:
+                return DrugEvidenceMatchResult(
+                    extracted_name=candidate_name,
+                    matched_livertox_name=chosen,
+                    matched_livertox_id=None,
+                    rxnav_validated=False,
+                    rxnav_rxcui=None,
+                    match_strategy="rxnav_alias_fuzzy",
+                    supplementary_information_available=True,
+                )
+        if llm_client is not None and hasattr(llm_client, "llm_structured_call"):
+            normalized = normalize_drug_query_name(candidate_name)
+            if normalized and normalized != candidate_name:
+                retry = await asyncio.to_thread(
+                    self.livertox_matcher.match_drug_names,
+                    [normalized],
+                )
+                if retry and retry[0].status == "matched" and retry[0].matched_name:
+                    return DrugEvidenceMatchResult(
+                        extracted_name=candidate_name,
+                        matched_livertox_name=retry[0].matched_name,
+                        matched_livertox_id=retry[0].nbk_id,
+                        rxnav_validated=False,
+                        rxnav_rxcui=None,
+                        match_strategy="llm_normalized_retry",
+                        supplementary_information_available=True,
+                    )
+        return None
 
     # -------------------------------------------------------------------------
     async def prepare_inputs(

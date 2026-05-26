@@ -4,7 +4,7 @@ import asyncio
 import inspect
 import json
 import re
-from collections.abc import Callable
+from collections.abc import Callable, Sequence
 from datetime import date, datetime
 from typing import Any
 
@@ -747,6 +747,66 @@ class HepatoxConsultation:
         report_language: str = "en",
     ) -> str:
         return hepatox_prompts.build_error_paragraph(self, entry, report_language)
+
+    # -------------------------------------------------------------------------
+    @staticmethod
+    def render_report_heading(title_key: str, language: str) -> str:
+        return f"## {report_heading(title_key, language)}"
+
+    # -------------------------------------------------------------------------
+    def render_drug_assessment_section(
+        self,
+        assessments: Sequence[DrugClinicalAssessment],
+        language: str,
+    ) -> str:
+        lines = [self.render_report_heading("drug_assessments", language), ""]
+        for assessment in assessments:
+            lines.append(
+                self.render_matched_drug_section(
+                    assessment,
+                    report_language=language,
+                )
+            )
+            lines.append("")
+        return "\n".join(lines).strip()
+
+    # -------------------------------------------------------------------------
+    def render_laboratory_section(
+        self,
+        lab_timeline: PatientLabTimeline | None,
+        language: str,
+    ) -> str:
+        lines = [self.render_report_heading("laboratory_history", language), ""]
+        if lab_timeline is None or not lab_timeline.entries:
+            lines.append(phrase("not_available", language))
+            return "\n".join(lines).strip()
+        for entry in lab_timeline.entries:
+            marker = entry.marker_name
+            value = entry.value if entry.value is not None else (entry.value_text or "?")
+            unit = entry.unit or ""
+            lines.append(f"- {marker}: {value} {unit}".strip())
+        return "\n".join(lines).strip()
+
+    # -------------------------------------------------------------------------
+    def render_bibliography_section(
+        self,
+        matches: Sequence[dict[str, Any]],
+        language: str,
+    ) -> str:
+        lines = [self.render_report_heading("bibliography", language), ""]
+        if not matches:
+            lines.append(phrase("not_available", language))
+            return "\n".join(lines).strip()
+        for match in matches:
+            name = str(match.get("matched_livertox_name") or match.get("extracted_name") or "").strip()
+            strategy = str(match.get("match_strategy") or "unknown").strip()
+            rxnav_validated = bool(match.get("rxnav_validated"))
+            status = "rxnav_validated" if rxnav_validated else "rxnav_unvalidated"
+            if name:
+                lines.append(f"- {name} ({strategy}, {status})")
+        if len(lines) == 2:
+            lines.append(phrase("not_available", language))
+        return "\n".join(lines).strip()
 
     def bibliography_source_label(self) -> str:
         return hepatox_assessment.bibliography_source_label(self)

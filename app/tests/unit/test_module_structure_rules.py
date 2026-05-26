@@ -9,7 +9,9 @@ SERVER_ROOT = APP_ROOT / "server"
 DOMAIN_ROOT = SERVER_ROOT / "domain"
 ALLOWED_DATACLASS_OUTSIDE_DOMAIN = {
     (SERVER_ROOT / "services" / "clinical" / "drug_blocks.py").resolve(),
+    (SERVER_ROOT / "services" / "clinical" / "match_resolution.py").resolve(),
     (SERVER_ROOT / "services" / "session" / "clinical_section_parsers.py").resolve(),
+    (SERVER_ROOT / "services" / "session" / "preflight.py").resolve(),
     (SERVER_ROOT / "services" / "runtime" / "state.py").resolve(),
 }
 ALLOWED_FASTAPI_IMPORTS_IN_SERVICES = {

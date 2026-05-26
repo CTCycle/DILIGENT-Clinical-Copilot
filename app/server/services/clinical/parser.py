@@ -154,6 +154,13 @@ class DrugsParser:
         return "\n".join(lines)
 
     # -------------------------------------------------------------------------
+    def conservative_prepare_drug_section_text(self, text: str | None) -> str:
+        prepared = self.clean_text(text)
+        if not prepared:
+            return ""
+        return "\n".join(line.rstrip() for line in prepared.split("\n") if line.rstrip())
+
+    # -------------------------------------------------------------------------
     def parse_drug_list(self, text: str | None) -> PatientDrugs:
         cleaned_text = self.clean_text(text)
         try:
@@ -173,76 +180,21 @@ class DrugsParser:
         already_cleaned: bool = False,
         progress_callback: Callable[[float], None] | None = None,
     ) -> PatientDrugs:
-        cleaned = (text or "") if already_cleaned else self.clean_text(text)
+        cleaned = (
+            (text or "")
+            if already_cleaned
+            else self.conservative_prepare_drug_section_text(text)
+        )
         if not cleaned:
             return PatientDrugs(entries=[])
-        blocks = [
-            block.text.strip()
-            for block in isolate_drug_blocks(cleaned)
-            if block.text.strip() and not self.is_non_therapy_line(block.text.strip())
-        ]
-        total_chunks = max(len(blocks), 1)
-        processed_chunks = 0
         self.emit_progress(progress_callback, 0.0)
-        parsed_chunks, fallback_chunks = self.rule_based_parse(blocks)
-        ordered_entries: list[DrugEntry | None] = [None] * len(blocks)
-        for index, entry in parsed_chunks:
-            normalized = self.normalize_entry(
-                entry,
-                source="therapy",
-                historical_flag=False,
-            )
-            ordered_entries[index] = normalized
-            processed_chunks += 1
-            self.emit_progress(progress_callback, processed_chunks / total_chunks)
-
-        if fallback_chunks:
-            await self.ensure_client()
-            if self.client is None:
-                raise RuntimeError(self.LLM_CLIENT_NOT_INITIALIZED_ERROR)
-            try:
-                fallback_start = processed_chunks / total_chunks
-                fallback_span = len(fallback_chunks) / total_chunks
-
-                # Ask the LLM for structured entries only for lines with true rule failures.
-                structured = await self.llm_extract_drugs(
-                    [line for _, line in fallback_chunks],
-                    progress_callback=progress_callback,
-                    progress_start=fallback_start,
-                    progress_span=fallback_span,
-                )
-            except Exception as exc:  # pragma: no cover - passthrough for visibility
-                # Preserve already parsed deterministic entries when fallback LLM
-                # extraction is unavailable for a subset of lines.
-                logger.warning(
-                    "LLM fallback extraction unavailable; keeping deterministic therapy entries only: %s",
-                    exc,
-                )
-                self.emit_progress(progress_callback, 1.0)
-                return PatientDrugs(
-                    entries=[entry for entry in ordered_entries if entry is not None]
-                )
-
-            llm_entries = list(structured.entries)
-            for offset, (target_index, raw_line) in enumerate(fallback_chunks):
-                llm_entry = llm_entries[offset] if offset < len(llm_entries) else None
-                normalized = self.post_process_llm_entry(
-                    llm_entry,
-                    raw_line=raw_line,
-                    source="therapy",
-                    historical_flag=False,
-                )
-                ordered_entries[target_index] = normalized
-                processed_chunks += 1
-            for entry in llm_entries[len(fallback_chunks) :]:
-                normalized = self.normalize_entry(
-                    entry,
-                    source="therapy",
-                    historical_flag=False,
-                )
-                ordered_entries.append(normalized)
-
-        combined = [entry for entry in ordered_entries if entry is not None]
+        structured = await self.llm_extract_drugs_from_section(
+            cleaned,
+            source="therapy",
+            historical_flag=False,
+            progress_callback=progress_callback,
+        )
+        combined = self.deduplicate_drug_entries(structured.entries)
         self.emit_progress(progress_callback, 1.0)
         return PatientDrugs(entries=combined)
 
@@ -295,6 +247,102 @@ class DrugsParser:
             )
 
         return PatientDrugs(entries=entries)
+
+    async def llm_extract_drugs_from_section(
+        self,
+        text: str,
+        *,
+        source: Literal["anamnesis", "therapy"],
+        historical_flag: bool,
+        progress_callback: Callable[[float], None] | None = None,
+    ) -> PatientDrugs:
+        await self.ensure_client()
+        if self.client is None:
+            raise RuntimeError(self.LLM_CLIENT_NOT_INITIALIZED_ERROR)
+        if not text.strip():
+            return PatientDrugs(entries=[])
+        if not hasattr(self.client, "llm_structured_call"):
+            logger.warning(
+                "LLM structured call unavailable; falling back to deterministic parsing for %s section.",
+                source,
+            )
+            entries: list[DrugEntry]
+            if source == "anamnesis":
+                entries = self.extract_drugs_from_anamnesis_rule_based(text)
+            else:
+                lines = [
+                    block.text.strip()
+                    for block in isolate_drug_blocks(text)
+                    if block.text.strip() and not self.is_non_therapy_line(block.text.strip())
+                ]
+                entries = []
+                for line in lines:
+                    candidate = self.parse_line(line)
+                    normalized_entry = self.normalize_entry(
+                        candidate,
+                        source=source,
+                        historical_flag=historical_flag,
+                    )
+                    if normalized_entry is not None:
+                        entries.append(normalized_entry)
+            self.emit_progress(progress_callback, 1.0)
+            return PatientDrugs(entries=entries)
+
+        if source == "anamnesis":
+            chunks = self.chunk_anamnesis_text(text)
+            parsed_entries: list[DrugEntry] = []
+            for index, chunk in enumerate(chunks, start=1):
+                parsed = await asyncio.wait_for(
+                    self.client.llm_structured_call(
+                        model=self.model,
+                        system_prompt=ANAMNESIS_DRUG_EXTRACTION_PROMPT.strip(),
+                        user_prompt=(
+                            "Extract all drugs mentioned in the following patient anamnesis chunk:\n\n"
+                            f"[Chunk {index}/{len(chunks)}]\n{chunk}"
+                        ),
+                        schema=PatientDrugs,
+                        temperature=self.temperature,
+                        use_json_mode=True,
+                        max_repair_attempts=1,
+                    ),
+                    timeout=max(5.0, float(self.timeout_s)),
+                )
+                parsed_entries.extend(parsed.entries)
+                self.emit_progress(progress_callback, index / max(len(chunks), 1))
+            normalized_candidates: list[DrugEntry | None] = [
+                self.normalize_entry(
+                    entry,
+                    source=source,
+                    historical_flag=historical_flag,
+                )
+                for entry in parsed_entries
+            ]
+            normalized = [entry for entry in normalized_candidates if entry is not None]
+            return PatientDrugs(entries=normalized)
+
+        lines = [
+            block.text.strip()
+            for block in isolate_drug_blocks(text)
+            if block.text.strip() and not self.is_non_therapy_line(block.text.strip())
+        ]
+        structured = await self.llm_extract_drugs(
+            lines,
+            progress_callback=progress_callback,
+            progress_start=0.0,
+            progress_span=1.0,
+        )
+        normalized: list[DrugEntry] = []
+        for index, entry in enumerate(structured.entries):
+            raw_line = lines[index] if index < len(lines) else ""
+            post_processed = self.post_process_llm_entry(
+                entry,
+                raw_line=raw_line,
+                source=source,
+                historical_flag=historical_flag,
+            )
+            if post_processed is not None:
+                normalized.append(post_processed)
+        return PatientDrugs(entries=normalized)
 
     def chunk_anamnesis_text(self, text: str) -> list[str]:
         normalized = self.clean_text(text)
@@ -361,21 +409,22 @@ class DrugsParser:
 
     # -------------------------------------------------------------------------
     def deduplicate_drug_entries(self, entries: list[DrugEntry]) -> list[DrugEntry]:
-        selected: dict[str, DrugEntry] = {}
-        order: list[str] = []
+        selected: dict[tuple[str, str | None], DrugEntry] = {}
+        order: list[tuple[str, str | None]] = []
         for entry in entries:
             normalized_name = normalize_token(entry.name)
             if not normalized_name:
                 continue
-            existing = selected.get(normalized_name)
+            key = (normalized_name, entry.source)
+            existing = selected.get(key)
             if existing is None:
-                selected[normalized_name] = entry
-                order.append(normalized_name)
+                selected[key] = entry
+                order.append(key)
                 continue
             if self.entry_information_score(entry) > self.entry_information_score(
                 existing
             ):
-                selected[normalized_name] = entry
+                selected[key] = entry
         return [selected[key] for key in order if key in selected]
 
     # -------------------------------------------------------------------------
@@ -414,67 +463,36 @@ class DrugsParser:
         if not anamnesis or not anamnesis.strip():
             return PatientDrugs(entries=[])
 
-        await self.ensure_client()
-        if self.client is None:
-            raise RuntimeError(self.LLM_CLIENT_NOT_INITIALIZED_ERROR)
-
         cleaned_anamnesis = (
-            (anamnesis or "") if already_cleaned else self.clean_text(anamnesis)
+            (anamnesis or "")
+            if already_cleaned
+            else self.conservative_prepare_drug_section_text(anamnesis)
         )
-        chunks = self.chunk_anamnesis_text(cleaned_anamnesis)
         self.emit_progress(progress_callback, 0.0)
-        parsed_entries: list[DrugEntry] = []
-        llm_failures = 0
-        for index, chunk in enumerate(chunks, start=1):
-            try:
-                parsed = await asyncio.wait_for(
-                    self.client.llm_structured_call(
-                        model=self.model,
-                        system_prompt=ANAMNESIS_DRUG_EXTRACTION_PROMPT.strip(),
-                        user_prompt=(
-                            "Extract all drugs mentioned in the following patient anamnesis chunk:\n\n"
-                            f"[Chunk {index}/{len(chunks)}]\n{chunk}"
-                        ),
-                        schema=PatientDrugs,
-                        temperature=self.temperature,
-                        use_json_mode=True,
-                        max_repair_attempts=1,
-                    ),
-                    timeout=max(5.0, float(self.timeout_s)),
-                )
-                parsed_entries.extend(parsed.entries)
-            except Exception:
-                llm_failures += 1
-                logger.warning(
-                    "Anamnesis LLM extraction failed for chunk %s/%s; continuing with rule-based fallback.",
-                    index,
-                    len(chunks),
-                )
-            self.emit_progress(
-                progress_callback,
-                (index / max(len(chunks), 1)) * 0.85,
-            )
-
-        entries: list[DrugEntry] = []
-        for entry in parsed_entries:
-            normalized = self.normalize_entry(
-                entry,
+        raw_llm_entries = 0
+        try:
+            structured = await self.llm_extract_drugs_from_section(
+                cleaned_anamnesis,
                 source="anamnesis",
                 historical_flag=True,
+                progress_callback=progress_callback,
             )
-            if normalized is not None:
-                entries.append(normalized)
-        fallback_entries = self.extract_drugs_from_anamnesis_rule_based(
-            cleaned_anamnesis
-        )
-        self.emit_progress(progress_callback, 0.95)
-        merged_entries = self.deduplicate_drug_entries([*entries, *fallback_entries])
+            raw_llm_entries = len(structured.entries)
+            merged_entries = self.deduplicate_drug_entries(structured.entries)
+        except Exception as exc:  # noqa: BLE001
+            logger.warning(
+                "Anamnesis LLM extraction failed; using deterministic fallback: %s",
+                exc,
+            )
+            merged_entries = []
+        if not merged_entries:
+            merged_entries = self.extract_drugs_from_anamnesis_rule_based(
+                cleaned_anamnesis
+            )
         logger.info(
-            "Anamnesis extraction produced %s normalized drugs (%s raw LLM entries, %s fallback candidates, %s LLM chunk failures)",
+            "Anamnesis extraction produced %s normalized drugs (%s raw LLM entries)",
             len(merged_entries),
-            len(parsed_entries),
-            len(fallback_entries),
-            llm_failures,
+            raw_llm_entries,
         )
         self.emit_progress(progress_callback, 1.0)
         return PatientDrugs(entries=merged_entries)
@@ -848,6 +866,18 @@ class DrugsParser:
         if schedule_present or start_present or suspension_present:
             return "temporal_known"
         return "temporal_uncertain"
+
+    def drug_entry_has_temporal_information(self, entry: DrugEntry) -> bool:
+        if entry.temporal_classification == "temporal_known":
+            return True
+        return bool(
+            entry.administration_pattern
+            or entry.daytime_administration
+            or entry.therapy_start_date
+            or entry.therapy_start_status is not None
+            or entry.suspension_date
+            or entry.suspension_status is not None
+        )
 
     # -------------------------------------------------------------------------
     def normalize_entry(

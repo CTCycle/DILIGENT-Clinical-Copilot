@@ -13,7 +13,7 @@ def _fill_required_dili_fields(page: Page) -> None:
         "## Anamnesis\n"
         + " ".join(["Patient reports persistent fatigue nausea and abdominal discomfort."] * 12)
         + "\n\n## Therapy\nAmoxicillin 500 mg BID, started on 2026-04-13, stopped on 2026-04-20.\n\n"
-        + "## Laboratory Analysis\nALT 210 U/L; AST 180 U/L; ALP 130 U/L."
+        + "## Laboratory history\nALT 210 U/L; AST 180 U/L; ALP 130 U/L."
     )
     page.get_by_label("Patient Name").fill("Marco Rossi")
     page.get_by_label("Visit Date").fill("2026-04-20")
@@ -29,7 +29,25 @@ def _build_clinical_job_payload() -> dict:
                 ["Patient reports persistent fatigue nausea and abdominal discomfort."] * 12
             )
             + "\n\n## Therapy\nAmoxicillin 500 mg BID, started on 2026-04-13, stopped on 2026-04-20.\n\n"
-            + "## Laboratory Analysis\nALT 210 U/L; AST 180 U/L; ALP 130 U/L."
+            + "## Laboratory history\nALT 210 U/L; AST 180 U/L; ALP 130 U/L."
+        ),
+        "selected_model_providers": ["openai"],
+        "patient_image_base64": None,
+        "use_rag": False,
+    }
+
+
+def _build_variant_heading_payload() -> dict:
+    return {
+        "name": "Marco Rossi",
+        "visit_date": {"day": 20, "month": 4, "year": 2026},
+        "clinical_input": (
+            "## Clinical history\n"
+            + " ".join(
+                ["Patient reports persistent fatigue nausea and abdominal discomfort."] * 12
+            )
+            + "\n\n## Current medications\nAmoxicillin 500 mg BID, started on 2026-04-13, stopped on 2026-04-20.\n\n"
+            + "## Laboratory tests\nALT 210 U/L; AST 180 U/L; ALP 130 U/L."
         ),
         "selected_model_providers": ["openai"],
         "patient_image_base64": None,
@@ -350,6 +368,53 @@ def test_dili_run_burst_click_submits_single_job(
     page.wait_for_timeout(1200)
     page.unroute("**/api/clinical/jobs/burst-test**")
     page.unroute("**/api/clinical/jobs", count_submissions)
+
+    assert submission_count == 1
+
+
+def test_dili_submit_accepts_variant_section_headings(page: Page, base_url: str) -> None:
+    page.goto(base_url)
+    payload = _build_variant_heading_payload()
+    page.get_by_label("Patient Name").fill(payload["name"])
+    page.get_by_label("Visit Date").fill("2026-04-20")
+    page.get_by_label("Clinical Input").fill(payload["clinical_input"])
+
+    run_button = page.get_by_role("button", name="Run DILI analysis")
+    expect(run_button).to_be_enabled(timeout=10000)
+    submission_count = 0
+
+    def submit_variant(route: Route) -> None:
+        nonlocal submission_count
+        if route.request.method == "POST":
+            submission_count += 1
+            route.fulfill(
+                status=202,
+                content_type="application/json",
+                body=(
+                    '{"job_id":"variant-headings","job_type":"clinical","status":"running",'
+                    '"message":"Clinical analysis started","poll_interval":0.2}'
+                ),
+            )
+            return
+        route.continue_()
+
+    page.route("**/api/clinical/jobs", submit_variant)
+    page.route(
+        "**/api/clinical/jobs/variant-headings**",
+        lambda route: route.fulfill(
+            status=200,
+            content_type="application/json",
+            body=(
+                '{"job_id":"variant-headings","job_type":"clinical","status":"completed",'
+                '"progress":1,"result":{"report":"Variant heading test completed."},'
+                '"error":null,"created_at":1,"completed_at":2,"version":1}'
+            ),
+        ),
+    )
+    run_button.click()
+    page.wait_for_timeout(1200)
+    page.unroute("**/api/clinical/jobs/variant-headings**")
+    page.unroute("**/api/clinical/jobs", submit_variant)
 
     assert submission_count == 1
 

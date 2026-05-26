@@ -82,6 +82,7 @@ If a runner does not check stop requests, cancellation is delayed.
 Current inspection cancellation/progress checkpoints are implemented by the RxNav/RxNorm, LiverTox, and RAG update runners.
 
 Clinical jobs run input preflight before job creation. The completed clinical job result includes database-backed evidence-lock artifacts and gate fields such as `manual_review_required`, `blocking_issues`, `pipeline_artifacts`, and `run_bundle_index`. These artifacts are persisted through the clinical session result payload rather than written as loose files.
+For DILI sessions, background processing performs deterministic section validation before clinical extraction and may parallelize parser-model extraction tasks only when parser batch preflight marks concurrency as safe; otherwise it falls back to sequential execution.
 
 ## 7. New job implementation checklist
 

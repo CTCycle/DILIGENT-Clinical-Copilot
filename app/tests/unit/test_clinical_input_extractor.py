@@ -11,7 +11,7 @@ from services.session.clinical_input_extractor import (
 
 
 def test_deterministic_success_does_not_call_fallback() -> None:
-    text = "# Anamnesis\nA\n# Therapy\nT\n# Lab analysis\nL"
+    text = "# Anamnesis\nA\n# Therapy\nT\n# Laboratory history\nL"
 
     class FakeClient:
         async def llm_structured_call(self, **_: object) -> object:
@@ -24,7 +24,7 @@ def test_deterministic_success_does_not_call_fallback() -> None:
     assert result.laboratory_analysis == "L"
 
 
-def test_deterministic_failure_calls_fallback() -> None:
+def test_deterministic_failure_raises_without_fallback() -> None:
     text = "no explicit sections"
     called = {"value": False}
 
@@ -36,23 +36,14 @@ def test_deterministic_failure_calls_fallback() -> None:
     extractor = ClinicalInputExtractor(client=FakeClient())
     with pytest.raises(ClinicalInputExtractionError):
         asyncio.run(extractor.extract(clinical_input=text))
-    assert called["value"] is True
+    assert called["value"] is False
 
 
-def test_fallback_verbatim_is_accepted() -> None:
+def test_untitled_prose_is_rejected() -> None:
     text = "Anamnesis text. Therapy text. Lab text."
-
-    class FakeClient:
-        async def llm_structured_call(self, **_: object) -> object:
-            return {
-                "anamnesis": "Anamnesis text.",
-                "therapy": "Therapy text.",
-                "lab_analysis": "Lab text.",
-            }
-
-    extractor = ClinicalInputExtractor(client=FakeClient())
-    result = asyncio.run(extractor.extract(clinical_input=text))
-    assert result.anamnesis == "Anamnesis text."
+    extractor = ClinicalInputExtractor()
+    with pytest.raises(ClinicalInputExtractionError):
+        asyncio.run(extractor.extract(clinical_input=text))
 
 
 def test_fallback_summarized_is_rejected() -> None:

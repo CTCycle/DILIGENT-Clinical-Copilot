@@ -47,6 +47,49 @@ RucamCausalityCategory = Literal[
 
 
 class RucamScoreEstimator:
+    def resolve_provided_rucam_score(
+        self,
+        laboratory_history_text: str,
+    ) -> RucamSourceReportedScore | None:
+        if not laboratory_history_text:
+            return None
+        match = RUCAM_SCORE_RE.search(laboratory_history_text)
+        if not match:
+            return None
+        score = max(-10, min(14, int(match.group(1))))
+        lowered = laboratory_history_text.lower()
+        category = None
+        for candidate in ("highly probable", "probable", "possible", "unlikely", "excluded"):
+            if candidate in lowered:
+                category = candidate
+                break
+        return RucamSourceReportedScore(
+            score=score,
+            causality_category=category,
+            source_name="laboratory_history",
+            evidence=match.group(0),
+        )
+
+    def has_sufficient_rucam_inputs(
+        self,
+        *,
+        injury_type: str,
+        anchor: RucamAnchor,
+        drug: DrugEntry,
+        lab_timeline: PatientLabTimeline,
+        payload: PatientData,
+        disease_context: PatientDiseaseContext,
+    ) -> bool:
+        sufficiency = self.evaluate_data_sufficiency(
+            injury_type=injury_type,
+            anchor=anchor,
+            drug=drug,
+            lab_timeline=lab_timeline,
+            payload=payload,
+            disease_context=disease_context,
+        )
+        return sufficiency.sufficient
+
     def estimate(self, *, payload: PatientData, analysis_drugs: PatientDrugs, anamnesis_drugs: PatientDrugs, disease_context: PatientDiseaseContext, lab_timeline: PatientLabTimeline, onset_context: LiverInjuryOnsetContext | None, pattern_score: HepatotoxicityPatternScore, resolved_drugs: dict[str, dict[str, Any]] | None = None, report_language: str = "en") -> PatientRucamAssessmentBundle:
         resolved_mapping = resolved_drugs or {}
         all_drugs = [*analysis_drugs.entries, *anamnesis_drugs.entries]
@@ -185,6 +228,15 @@ class RucamScoreEstimator:
         return DrugRucamAssessment(drug_name=drug.name, injury_type_for_rucam=cast(RucamInjuryType, injury_type), total_score=source.score, causality_category=cast(RucamCausalityCategory, category), confidence="moderate", estimated=False, components=[RucamComponentAssessment(component_key="source_reported", label="Source-reported RUCAM", score=source.score, status="scored", evidence=source.evidence, rationale=phrase("rucam_source_reported", report_language))], limitations=[], summary=phrase("rucam_source_reported", report_language), calculation_method="source_reported", score_source=source.source_name, data_sufficient=True)
 
     def estimate_for_drug(self, *, payload: PatientData, drug: DrugEntry, all_drugs: list[DrugEntry], disease_context: PatientDiseaseContext, lab_timeline: PatientLabTimeline, onset_context: LiverInjuryOnsetContext | None, injury_type: str, anchor: RucamAnchor, resolved_item: dict[str, Any], report_language: str = "en") -> DrugRucamAssessment:
+        provided_from_labs = self.resolve_provided_rucam_score(payload.laboratory_analysis or "")
+        if provided_from_labs is not None:
+            return self.build_source_reported_assessment(
+                drug=drug,
+                injury_type=injury_type,
+                source=provided_from_labs,
+                report_language=report_language,
+            )
+
         source_reported = self.extract_source_reported_rucam(resolved_item)
         if source_reported is not None:
             return self.build_source_reported_assessment(drug=drug, injury_type=injury_type, source=source_reported, report_language=report_language)

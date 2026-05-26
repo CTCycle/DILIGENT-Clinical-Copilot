@@ -1,7 +1,9 @@
 from __future__ import annotations
 
 import asyncio
-from typing import Any
+from dataclasses import dataclass
+from inspect import isawaitable
+from typing import Any, cast
 
 from common.exceptions import ServiceValidationError
 from configurations.llm_configs import LLMRuntimeConfig
@@ -11,8 +13,130 @@ from domain.clinical.robustness import (
     ClinicalInputPreflightResult,
 )
 from services.security.access_keys import AccessKeyService
+from services.llm.provider_factory import select_llm_provider
 from services.session.document_normalizer import DocumentNormalizer
 from services.session.robust_pipeline import build_extraction_artifact
+
+
+@dataclass(frozen=True)
+class LocalModelBatchPreflightResult:
+    concurrency_allowed: bool
+    provider: str
+    model: str | None
+    reason: str | None = None
+
+
+async def check_parser_batch_capacity(
+    task_count: int,
+    model: str | None = None,
+) -> LocalModelBatchPreflightResult:
+    provider, resolved_model = LLMRuntimeConfig.resolve_provider_and_model("parser")
+    normalized_provider = (provider or "").strip().lower()
+    selected_model = (model or resolved_model or "").strip() or None
+
+    if task_count <= 1:
+        return LocalModelBatchPreflightResult(
+            concurrency_allowed=True,
+            provider=normalized_provider,
+            model=selected_model,
+            reason=None,
+        )
+
+    if normalized_provider != "ollama":
+        return LocalModelBatchPreflightResult(
+            concurrency_allowed=True,
+            provider=normalized_provider,
+            model=selected_model,
+            reason=None,
+        )
+
+    if not selected_model:
+        return LocalModelBatchPreflightResult(
+            concurrency_allowed=False,
+            provider=normalized_provider,
+            model=selected_model,
+            reason="Parser model is not configured for local runtime.",
+        )
+
+    client: Any = select_llm_provider(
+        provider=normalized_provider,
+        default_model=selected_model,
+        max_retries=0,
+    )
+    try:
+        is_server_online = getattr(client, "is_server_online", None)
+        if not callable(is_server_online):
+            return LocalModelBatchPreflightResult(
+                concurrency_allowed=False,
+                provider=normalized_provider,
+                model=selected_model,
+                reason="Local runtime status endpoint is unavailable.",
+            )
+        is_online = await cast(Any, is_server_online())
+        if not is_online:
+            return LocalModelBatchPreflightResult(
+                concurrency_allowed=False,
+                provider=normalized_provider,
+                model=selected_model,
+                reason="Local runtime is unreachable.",
+            )
+        list_models = getattr(client, "list_models", None)
+        if not callable(list_models):
+            return LocalModelBatchPreflightResult(
+                concurrency_allowed=False,
+                provider=normalized_provider,
+                model=selected_model,
+                reason="Local runtime model listing is unavailable.",
+            )
+        available_models = await cast(Any, list_models())
+        normalized_models = {(item or "").strip() for item in available_models}
+        if selected_model not in normalized_models:
+            return LocalModelBatchPreflightResult(
+                concurrency_allowed=False,
+                provider=normalized_provider,
+                model=selected_model,
+                reason="Configured parser model is not available locally.",
+            )
+        get_cached_residency_plan = getattr(client, "get_cached_residency_plan", None)
+        if callable(get_cached_residency_plan):
+            try:
+                await cast(Any, get_cached_residency_plan(force_refresh=True))
+            except Exception:
+                return LocalModelBatchPreflightResult(
+                    concurrency_allowed=False,
+                    provider=normalized_provider,
+                    model=selected_model,
+                    reason="Local runtime status cannot be inspected safely.",
+                )
+        else:
+            return LocalModelBatchPreflightResult(
+                concurrency_allowed=False,
+                provider=normalized_provider,
+                model=selected_model,
+                reason="Local runtime status API is unavailable.",
+            )
+        return LocalModelBatchPreflightResult(
+            concurrency_allowed=True,
+            provider=normalized_provider,
+            model=selected_model,
+            reason=None,
+        )
+    except Exception as exc:  # noqa: BLE001
+        return LocalModelBatchPreflightResult(
+            concurrency_allowed=False,
+            provider=normalized_provider,
+            model=selected_model,
+            reason=str(exc),
+        )
+    finally:
+        close = getattr(client, "close", None)
+        if callable(close):
+            try:
+                close_result = close()
+                if isawaitable(close_result):
+                    await cast(Any, close_result)
+            except Exception:
+                pass
 
 
 def validate_clinical_input_preflight(
@@ -136,10 +260,12 @@ def _validate_ui_metadata(
 def _validate_provider_key(blocking: list[ClinicalInputPreflightIssue]) -> None:
     if not LLMRuntimeConfig.is_cloud_enabled():
         return
-    provider = LLMRuntimeConfig.get_llm_provider()
+    provider = LLMRuntimeConfig.get_llm_provider().strip().lower()
+    if provider not in _CLOUD_PROVIDERS:
+        return
     active_keys = [
         item
-        for item in AccessKeyService().list_access_keys(provider)
+        for item in AccessKeyService().list_access_keys(cast(Any, provider))
         if item.is_active
     ]
     if not active_keys:
@@ -236,3 +362,4 @@ def _result(
         runtime_settings=runtime_settings,
         extraction_quality=extraction_quality,
     )
+_CLOUD_PROVIDERS = {"openai", "gemini", "openrouter"}

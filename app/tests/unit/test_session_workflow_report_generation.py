@@ -43,6 +43,11 @@ class FakeClinicalService:
         self.drugs_parser = FakeDrugsParser()
         self.pattern_analyzer = FakePatternAnalyzer()
         self.serializer = FakeSerializer()
+        self.lab_extractor = SimpleNamespace(
+            extract_explicit_hepatic_pattern=lambda text: (
+                "cholestatic" if "Hepatic pattern: cholestatic" in (text or "") else None
+            )
+        )
 
     def run_stop_check(self, stop_check: Any) -> None:
         if stop_check is not None:
@@ -153,7 +158,7 @@ def test_workflow_keeps_narrative_report_and_stores_audit_report() -> None:
         visit_date=date(2025, 5, 20),
         anamnesis="Paziente con ittero.",
         drugs="Paracetamolo 1-0-0-0",
-        laboratory_analysis="ALT 100 U/L, ALP 120 U/L.",
+        laboratory_analysis="Hepatic pattern: cholestatic. ALT 100 U/L, ALP 120 U/L.",
     )
 
     result = asyncio.run(
@@ -175,3 +180,6 @@ def test_workflow_keeps_narrative_report_and_stores_audit_report() -> None:
     assert "## Report Clinico" in result["pipeline_artifacts"]["generated_report"]
     assert "### Esposizione ai Farmaci" in result["pipeline_artifacts"]["generated_report"]
     assert result["pipeline_artifacts"]["generated_report"] != result["final_report"]
+    assert result["extraction_metadata"]["hepatic_pattern"]["source"] == "provided"
+    assert result["extraction_metadata"]["hepatic_pattern"]["value"] == "cholestatic"
+    assert result["extraction_metadata"]["rucam"]["source"] == "not_calculated_insufficient_data"

@@ -1,453 +1,360 @@
 from __future__ import annotations
 
+from collections.abc import Mapping, Sequence
 from dataclasses import dataclass
+from difflib import SequenceMatcher
 import re
 import unicodedata
+from typing import Literal
 
 from domain.clinical.sections import ClinicalSectionKey
 
-
-NORMALIZE_RE = re.compile(r"[^A-Za-zÀ-ÖØ-öø-ÿ0-9 ]+")
+REQUIRED_DILI_SECTION_KEYS = ("anamnesis", "therapy", "laboratory_history")
+CANONICAL_TO_CLINICAL_KEY: Mapping[str, ClinicalSectionKey] = {
+    "anamnesis": "anamnesis",
+    "therapy": "drugs",
+    "laboratory_history": "laboratory_analysis",
+}
+MIN_TYPO_TOKEN_LEN = 7
+MIN_TYPO_SIMILARITY = 0.88
+HEADING_PREFIX_RE = re.compile(r"^(?:#{1,6}\s*|\d+\s*[.):\-]\s*|[-*+]\s*|(?:[ivxlcdm]+)\s*[.):\-]\s*)", re.IGNORECASE)
+HEADING_SUFFIX_RE = re.compile(r"[\s:;.,\-_/|]+$")
+NON_ALNUM_RE = re.compile(r"[^0-9a-zA-ZÀ-ÖØ-öø-ÿ ]+")
 WS_RE = re.compile(r"\s+")
-EMPHASIS_EDGE_RE = re.compile(r"^[*_`~\s]+|[*_`~\s]+$")
-ROMAN_NUMERAL_RE = re.compile(r"^(?:[ivxlcdm]+)$", re.IGNORECASE)
-LAB_CUE_RE = re.compile(
-    r"\b(?:alat|asat|alt|ast|alp|ggt|bilirub|egfr|clcr|creat|cr\b|u/l|umol|mg/dl|labor)\b",
-    re.IGNORECASE,
-)
-DRUG_CUE_RE = re.compile(
-    r"\b(?:per os|s\.?c\.?|i\.?v\.?|sospes[oa]|terapia|farmac|medic|dose|dosaggio|dal\s+\d{1,2}[./-]\d{1,2})\b",
-    re.IGNORECASE,
-)
-DRUG_SCHEDULE_RE = re.compile(r"\b\d+(?:[.,]\d+)?-\d+(?:[.,]\d+)?-\d+(?:[.,]\d+)?-\d+(?:[.,]\d+)?\b")
-ANAMNESIS_CUE_RE = re.compile(
-    r"\b(?:paziente|anamnes|storia clinica|noto per|ricoverat|comorbid|diagnosi)\b",
-    re.IGNORECASE,
-)
-MIN_FUZZY_SIMILARITY = 0.82
-MAX_FUZZY_EDIT_DISTANCE_SHORT = 1
-MAX_FUZZY_EDIT_DISTANCE_LONG = 2
-HSEP_HEADING_RE = re.compile(
-    r"(?m)^[ \t]*---[ \t]*\r?\n[ \t]*(?P<title>[^\r\n]{1,100}?)[ \t]*\r?\n[ \t]*---[ \t]*$"
-)
-MARKER_PATTERNS: tuple[re.Pattern[str], ...] = (
-    re.compile(r"(?m)^[ \t]*#{1,6}[ \t]+(?P<title>[^\r\n]{1,100})$"),
-    re.compile(r"(?m)^[ \t]*\d+[ \t]*[.):][ \t]*(?P<title>[^\r\n]{1,100})$"),
-    re.compile(r"(?m)^[ \t]*(?:I|II|III|IV|V|VI|VII|VIII|IX|X)[ \t]*[.):][ \t]*(?P<title>[^\r\n]{1,100})$", re.IGNORECASE),
-    re.compile(r"(?m)^[ \t]*(?P<title>[A-Za-zÀ-ÖØ-öø-ÿ][^\r\n:]{0,98})[ \t]*:[ \t]*$"),
-    HSEP_HEADING_RE,
-)
 
-ANAMNESIS_ALIASES = {
-    "anamnesis",
-    "anamnesi",
-    "anamnesi rilevante",
-    "history",
-    "clinical history",
-    "medical history",
-    "storia clinica",
-}
-THERAPY_ALIASES = {
-    "therapy",
-    "therapies",
-    "current therapy",
-    "drugs",
-    "current drugs",
-    "current medications",
-    "medications",
-    "farmaci",
-    "terapia",
-    "terapia farmacologica",
-    "terapia in corso",
-    "farmacoterapia",
-    "drug exposure",
-    "drug exposure information",
-}
-LAB_ALIASES = {
-    "lab analysis",
-    "laboratory analysis",
-    "laboratory",
-    "labs",
-    "lab",
-    "laboratorio",
-    "analisi di laboratorio",
-    "analisi",
-    "esami",
-    "esami di laboratorio",
-    "laboratory data",
-    "dati di laboratorio",
+SECTION_HEADING_PROFILES: dict[str, dict[str, set[str]]] = {
+    "anamnesis": {
+        "required_any": {
+            "anamnesis",
+            "anamnesi",
+            "history",
+            "clinical history",
+            "medical history",
+            "patient history",
+            "case history",
+            "storia clinica",
+            "storia anamnestica",
+            "anamnesi patologica",
+        },
+        "supporting": {
+            "precedenti",
+            "sintomi",
+            "diagnosi",
+            "clinical conditions",
+            "patient background",
+        },
+    },
+    "therapy": {
+        "required_any": {
+            "therapy",
+            "therapies",
+            "treatment",
+            "treatments",
+            "medication",
+            "medications",
+            "drug therapy",
+            "current therapy",
+            "current medications",
+            "terapia",
+            "terapie",
+            "trattamento",
+            "farmaci",
+            "terapia farmacologica",
+            "terapie in corso",
+        },
+        "supporting": {
+            "dose",
+            "dosage",
+            "route",
+            "suspension",
+            "somministrazione",
+            "posologia",
+            "sospensione",
+        },
+    },
+    "laboratory_history": {
+        "required_any": {
+            "laboratory history",
+            "laboratory",
+            "labs",
+            "lab history",
+            "laboratory tests",
+            "blood tests",
+            "biochemistry",
+            "liver tests",
+            "esami di laboratorio",
+            "laboratorio",
+            "storia laboratoristica",
+            "esami ematochimici",
+            "biochimica",
+        },
+        "supporting": {
+            "alt",
+            "alp",
+            "ast",
+            "ggt",
+            "bilirubin",
+            "bilirubina",
+            "inr",
+            "uln",
+            "limite superiore",
+        },
+    },
 }
 
 
 @dataclass(frozen=True)
-class SectionMarker:
-    key: ClinicalSectionKey
-    title: str
-    marker_start: int
-    marker_end: int
+class SectionHeadingMatch:
+    canonical_key: str
+    raw_heading: str
+    normalized_heading: str
+    score: float
+    strategy: Literal["exact", "phrase", "token_containment", "typo_tolerant"]
+    line_start: int
+    line_end: int
+    body_start: int | None = None
+    body_end: int | None = None
 
 
-def normalize_section_title(title: str) -> str | None:
-    raw = (title or "").strip()
-    if not raw:
-        return None
-    raw = EMPHASIS_EDGE_RE.sub("", raw)
-    normalized = NORMALIZE_RE.sub(" ", raw)
-    normalized = WS_RE.sub(" ", normalized).strip().lower()
+@dataclass(frozen=True)
+class ClinicalRawSection:
+    canonical_key: str
+    raw_heading: str
+    normalized_heading: str
+    match_strategy: Literal["exact", "phrase", "token_containment", "typo_tolerant"]
+    confidence_score: float
+    line_start: int
+    line_end: int
+    body_start: int
+    body_end: int
+    text: str
+    verbatim_coherent: bool
+
+
+def normalize_heading_text(value: str) -> str:
+    text = unicodedata.normalize("NFKC", value or "")
+    text = text.strip()
+    text = HEADING_PREFIX_RE.sub("", text)
+    text = HEADING_SUFFIX_RE.sub("", text)
+    text = NON_ALNUM_RE.sub(" ", text)
+    text = WS_RE.sub(" ", text).strip()
+    return text.casefold()
+
+
+def tokenize_heading(value: str) -> tuple[str, ...]:
+    normalized = normalize_heading_text(value)
     if not normalized:
-        return None
-    return normalized
+        return ()
+    return tuple(token for token in normalized.split(" ") if token)
 
 
-def _title_alias_match(normalized: str, aliases: set[str]) -> bool:
-    if normalized in aliases:
-        return True
-    word_count = len(normalized.split(" "))
-    strict_single_word_aliases = {"terapia", "therapy"}
-    for alias in aliases:
-        alias_word_count = len(alias.split(" "))
-        if alias_word_count >= 2 or alias not in strict_single_word_aliases:
-            if normalized.startswith(f"{alias} "):
-                return True
-            if normalized.endswith(f" {alias}"):
-                return True
-            if word_count <= 6 and f" {alias} " in normalized:
-                return True
-        if _is_near_title_match(normalized, alias):
-            return True
-    return False
-
-
-def _is_near_title_match(candidate: str, alias: str) -> bool:
-    if not candidate or not alias:
+def is_structural_heading_line(line: str) -> bool:
+    stripped = (line or "").strip()
+    if not stripped:
         return False
-    if candidate == alias:
-        return True
-    edit_distance = _levenshtein_distance(candidate, alias)
-    max_distance = (
-        MAX_FUZZY_EDIT_DISTANCE_SHORT
-        if max(len(candidate), len(alias)) <= 12
-        else MAX_FUZZY_EDIT_DISTANCE_LONG
+    if len(stripped) > 120:
+        return False
+    if stripped.endswith((".", "!", "?")):
+        return False
+    if "  " in stripped:
+        stripped = WS_RE.sub(" ", stripped)
+    normalized = normalize_heading_text(stripped)
+    if not normalized:
+        return False
+    if len(normalized.split(" ")) > 8:
+        return False
+    return bool(
+        re.match(
+            r"^(?:#{1,6}\s+[A-Za-zÀ-ÖØ-öø-ÿ0-9]+(?:\s+[A-Za-zÀ-ÖØ-öø-ÿ0-9]+){0,7}\s*:?\s*|[A-Za-zÀ-ÖØ-öø-ÿ0-9]+(?:\s+[A-Za-zÀ-ÖØ-öø-ÿ0-9]+){0,7}\s*:?\s*)$",
+            stripped,
+        )
     )
-    if edit_distance <= max_distance:
-        return True
-    similarity = _normalized_similarity(candidate, alias)
-    if similarity >= MIN_FUZZY_SIMILARITY:
-        return True
-
-    # Token-level fallback for small differences in multi-word headings.
-    cand_tokens = candidate.split(" ")
-    alias_tokens = alias.split(" ")
-    if len(cand_tokens) != len(alias_tokens):
-        return False
-    for cand_token, alias_token in zip(cand_tokens, alias_tokens, strict=False):
-        token_distance = _levenshtein_distance(cand_token, alias_token)
-        if token_distance > 1 and _normalized_similarity(cand_token, alias_token) < 0.8:
-            return False
-    return True
 
 
-def _normalized_similarity(left: str, right: str) -> float:
-    max_len = max(len(left), len(right))
-    if max_len == 0:
-        return 1.0
-    distance = _levenshtein_distance(left, right)
-    return 1.0 - (distance / max_len)
+def _token_similarity(left: str, right: str) -> float:
+    return SequenceMatcher(None, left, right).ratio()
 
 
-def _levenshtein_distance(left: str, right: str) -> int:
-    if left == right:
-        return 0
-    if not left:
-        return len(right)
-    if not right:
-        return len(left)
-    if len(left) < len(right):
-        left, right = right, left
-
-    previous_row = list(range(len(right) + 1))
-    for i, left_char in enumerate(left, start=1):
-        current_row = [i]
-        for j, right_char in enumerate(right, start=1):
-            insertions = previous_row[j] + 1
-            deletions = current_row[j - 1] + 1
-            substitutions = previous_row[j - 1] + (left_char != right_char)
-            current_row.append(min(insertions, deletions, substitutions))
-        previous_row = current_row
-    return previous_row[-1]
-
-
-def _map_title_to_key(title: str) -> ClinicalSectionKey | None:
-    normalized = normalize_section_title(title)
-    if normalized is None:
-        return None
-    if _title_alias_match(normalized, ANAMNESIS_ALIASES):
-        return "anamnesis"
-    if _title_alias_match(normalized, THERAPY_ALIASES):
-        return "drugs"
-    if _title_alias_match(normalized, LAB_ALIASES):
-        return "laboratory_analysis"
+def _classify_against_profile(
+    normalized_heading: str,
+    profile: dict[str, set[str]],
+) -> tuple[float, Literal["exact", "phrase", "token_containment", "typo_tolerant"]] | None:
+    required = profile["required_any"]
+    tokens = set(tokenize_heading(normalized_heading))
+    if normalized_heading in required:
+        return (1.0, "exact")
+    for phrase in required:
+        if phrase in normalized_heading:
+            return (0.95, "phrase")
+    for phrase in required:
+        phrase_tokens = set(phrase.split(" "))
+        if phrase_tokens and phrase_tokens.issubset(tokens):
+            return (0.9, "token_containment")
+    for phrase in required:
+        for token in phrase.split(" "):
+            if len(token) < MIN_TYPO_TOKEN_LEN:
+                continue
+            if any(
+                len(candidate) >= MIN_TYPO_TOKEN_LEN and _token_similarity(candidate, token) >= MIN_TYPO_SIMILARITY
+                for candidate in tokens
+            ):
+                return (0.88, "typo_tolerant")
     return None
 
 
-def _is_probable_heading_line(raw_line: str) -> bool:
-    stripped = raw_line.strip()
-    if not stripped:
-        return False
-    if stripped.endswith((".", ";", "!", "?")):
-        return False
-    normalized = normalize_section_title(stripped)
-    if normalized is None:
-        return False
-    words = normalized.split(" ")
-    if len(words) > 12:
-        return False
-    if any(ROMAN_NUMERAL_RE.match(word) for word in words):
-        return False
-    # Allow numeric artifacts (e.g., patient IDs) only when the line still maps to
-    # a known section title alias.
-    if any(char.isdigit() for char in normalized) and _map_title_to_key(stripped) is None:
-        return False
-    return True
+def classify_dili_heading(raw_heading: str, *, line_start: int, line_end: int) -> SectionHeadingMatch | None:
+    normalized = normalize_heading_text(raw_heading)
+    if not normalized:
+        return None
 
-
-def find_section_markers(text: str) -> list[SectionMarker]:
-    markers: list[SectionMarker] = []
-    for pattern in MARKER_PATTERNS:
-        for match in pattern.finditer(text):
-            title = (match.group("title") or "").strip()
-            key = _map_title_to_key(title)
-            if key is None:
-                continue
-            markers.append(
-                SectionMarker(
-                    key=key,
-                    title=title,
-                    marker_start=match.start(),
-                    marker_end=match.end(),
-                )
+    candidates: list[SectionHeadingMatch] = []
+    for canonical_key, profile in SECTION_HEADING_PROFILES.items():
+        match = _classify_against_profile(normalized, profile)
+        if match is None:
+            continue
+        score, strategy = match
+        candidates.append(
+            SectionHeadingMatch(
+                canonical_key=canonical_key,
+                raw_heading=raw_heading.strip(),
+                normalized_heading=normalized,
+                score=score,
+                strategy=strategy,
+                line_start=line_start,
+                line_end=line_end,
             )
-    # Also support standalone heading lines without markdown/colon markers,
-    # e.g. "Anamnesis" followed by section content on next lines.
+        )
+    if not candidates:
+        return None
+    candidates.sort(key=lambda item: item.score, reverse=True)
+    if len(candidates) >= 2 and abs(candidates[0].score - candidates[1].score) <= 0.02:
+        return None
+    return candidates[0]
+
+
+def find_dili_section_headings(raw_text: str) -> list[SectionHeadingMatch]:
+    matches: list[SectionHeadingMatch] = []
     offset = 0
-    for raw_line in text.splitlines(keepends=True):
-        line = raw_line.strip()
-        if ":" in line and not line.endswith(":"):
-            offset += len(raw_line)
-            continue
-        line_key = _map_title_to_key(line)
-        if (
-            line_key is not None
-            and _is_probable_heading_line(raw_line)
-        ):
-            marker_start = offset + raw_line.find(line)
-            marker_end = marker_start + len(line)
-            markers.append(
-                SectionMarker(
-                    key=line_key,
-                    title=line,
-                    marker_start=marker_start,
-                    marker_end=marker_end,
-                )
-            )
+    for line_number, raw_line in enumerate(raw_text.splitlines(keepends=True), start=1):
+        line = raw_line.rstrip("\r\n")
+        if is_structural_heading_line(line):
+            match = classify_dili_heading(line, line_start=line_number, line_end=line_number)
+            if match is not None:
+                matches.append(match)
         offset += len(raw_line)
-    unique: dict[tuple[int, int, ClinicalSectionKey], SectionMarker] = {}
-    for marker in markers:
-        unique[(marker.marker_start, marker.marker_end, marker.key)] = marker
-    return sorted(unique.values(), key=lambda marker: marker.marker_start)
+    return matches
 
 
-def extract_sections_from_markers(text: str, markers: list[SectionMarker]) -> dict[ClinicalSectionKey, str] | None:
-    # When explicit section headings are available, prefer contiguous heading-based
-    # slices only. Mixing in inline `Label: value` snippets can stitch together
-    # non-contiguous fragments that then fail strict verbatim validation.
-    extracted: dict[ClinicalSectionKey, str] = {}
-    ordered = sorted(markers, key=lambda item: item.marker_start)
-    if ordered:
-        for index, marker in enumerate(ordered):
-            body_start = marker.marker_end
-            body_end = ordered[index + 1].marker_start if index + 1 < len(ordered) else len(text)
-            content = text[body_start:body_end].strip()
-            if not content:
-                continue
-            existing = extracted.get(marker.key)
-            # Keep one contiguous source span per section key. Concatenating multiple
-            # repeated headings from different pages creates synthetic non-contiguous
-            # text that fails strict verbatim validation.
-            if existing is None:
-                extracted[marker.key] = content
-            elif len(content) > len(existing):
-                extracted[marker.key] = content
-    else:
-        extracted = _extract_inline_labeled_sections(text)
-
-    if _has_all_sections(extracted):
-        return extracted
-
-    inferred = _infer_sections_from_cues(text)
-    if inferred is None:
-        return None
-    # Keep high-quality heading-derived contiguous sections and use inferred
-    # content only to fill keys that are still missing.
-    merged = dict(extracted)
-    for key in ("anamnesis", "drugs", "laboratory_analysis"):
-        if not (merged.get(key) or "").strip():
-            merged[key] = inferred.get(key, "")
-    if _has_all_sections(merged):
-        return merged
-    return inferred
-
-
-def _has_all_sections(sections: dict[ClinicalSectionKey, str]) -> bool:
-    return bool(
-        (sections.get("anamnesis") or "").strip()
-        and (sections.get("drugs") or "").strip()
-        and (sections.get("laboratory_analysis") or "").strip()
-    )
-
-
-def _extract_inline_labeled_sections(text: str) -> dict[ClinicalSectionKey, str]:
-    extracted: dict[ClinicalSectionKey, str] = {}
-    for raw_line in text.splitlines():
-        line = raw_line.strip()
-        if ":" not in line:
+def resolve_heading_collisions(matches: Sequence[SectionHeadingMatch]) -> list[SectionHeadingMatch]:
+    by_line: dict[int, list[SectionHeadingMatch]] = {}
+    for match in matches:
+        by_line.setdefault(match.line_start, []).append(match)
+    resolved: list[SectionHeadingMatch] = []
+    for _, line_matches in sorted(by_line.items()):
+        line_matches.sort(key=lambda item: item.score, reverse=True)
+        top = line_matches[0]
+        if len(line_matches) > 1 and abs(top.score - line_matches[1].score) <= 0.02:
             continue
-        heading_part, body_part = line.split(":", 1)
-        key = _map_title_to_key(heading_part.strip())
-        body = body_part.strip()
-        if key is None or not body:
+        resolved.append(top)
+    return resolved
+
+
+def _line_char_offsets(raw_text: str) -> list[tuple[int, int]]:
+    offsets: list[tuple[int, int]] = []
+    cursor = 0
+    for line in raw_text.splitlines(keepends=True):
+        start = cursor
+        cursor += len(line)
+        offsets.append((start, cursor))
+    if not offsets:
+        offsets.append((0, 0))
+    return offsets
+
+
+def extract_required_dili_sections(raw_text: str) -> dict[str, ClinicalRawSection]:
+    headings = resolve_heading_collisions(find_dili_section_headings(raw_text))
+    offsets = _line_char_offsets(raw_text)
+    sections: dict[str, ClinicalRawSection] = {}
+
+    for index, heading in enumerate(headings):
+        if heading.line_start - 1 >= len(offsets):
             continue
-        existing = extracted.get(key)
-        extracted[key] = f"{existing}\n\n{body}" if existing else body
-    return extracted
-
-
-def _line_scores(line: str) -> tuple[int, int, int]:
-    lab = 0
-    drugs = 0
-    anamnesis = 0
-    lowered = line.strip().lower()
-    if not lowered:
-        return (lab, drugs, anamnesis)
-    if LAB_CUE_RE.search(lowered):
-        lab += 3
-    if DRUG_CUE_RE.search(lowered):
-        drugs += 3
-    if DRUG_SCHEDULE_RE.search(lowered):
-        drugs += 3
-    if ANAMNESIS_CUE_RE.search(lowered):
-        anamnesis += 2
-    if ":" in lowered and any(token in lowered for token in ("alat", "asat", "alt", "ast", "alp", "ggt")):
-        lab += 2
-    return (lab, drugs, anamnesis)
-
-
-def _infer_sections_from_cues(text: str) -> dict[ClinicalSectionKey, str] | None:
-    lines = [line.rstrip() for line in text.splitlines()]
-    if not lines:
-        return None
-
-    blocks: list[list[str]] = []
-    current: list[str] = []
-    for line in lines:
-        if line.strip():
-            current.append(line)
-            continue
-        if current:
-            blocks.append(current)
-            current = []
-    if current:
-        blocks.append(current)
-    if not blocks:
-        return None
-
-    sections: dict[ClinicalSectionKey, str] = {}
-    for block in blocks:
-        block_text = "\n".join(block).strip()
-        if not block_text:
-            continue
-        lab_score = drugs_score = anamnesis_score = 0
-        for line in block:
-            l_score, d_score, a_score = _line_scores(line)
-            lab_score += l_score
-            drugs_score += d_score
-            anamnesis_score += a_score
-        best_score = max(lab_score, drugs_score, anamnesis_score)
-        if best_score <= 0:
-            key: ClinicalSectionKey = "anamnesis"
-        elif best_score == lab_score:
-            key = "laboratory_analysis"
-        elif best_score == drugs_score:
-            key = "drugs"
+        heading_line_start, heading_line_end = offsets[heading.line_start - 1]
+        body_start = heading_line_end
+        if index + 1 < len(headings):
+            next_heading_line_start, _ = offsets[headings[index + 1].line_start - 1]
+            body_end = next_heading_line_start
         else:
-            key = "anamnesis"
-        existing = sections.get(key)
-        sections[key] = f"{existing}\n\n{block_text}" if existing else block_text
-
-    if _has_all_sections(sections):
-        return sections
-
-    # Fallback: infer missing sections from cue-bearing lines, but keep each section
-    # as one contiguous span from the original source to preserve verbatim validity.
-    label_indices: dict[ClinicalSectionKey, list[int]] = {
-        "anamnesis": [],
-        "drugs": [],
-        "laboratory_analysis": [],
-    }
-    for idx, line in enumerate(lines):
-        stripped = line.strip()
-        if not stripped:
+            body_end = len(raw_text)
+        content = raw_text[body_start:body_end].strip("\r\n")
+        if not content:
             continue
-        lab_score, drugs_score, anamnesis_score = _line_scores(stripped)
-        if lab_score == drugs_score == anamnesis_score == 0:
-            label_indices["anamnesis"].append(idx)
-            continue
-        if lab_score >= drugs_score and lab_score >= anamnesis_score:
-            label_indices["laboratory_analysis"].append(idx)
-        elif drugs_score >= lab_score and drugs_score >= anamnesis_score:
-            label_indices["drugs"].append(idx)
-        else:
-            label_indices["anamnesis"].append(idx)
-
-    for key in ("anamnesis", "drugs", "laboratory_analysis"):
-        if (sections.get(key) or "").strip():
-            continue
-        indices = label_indices[key]
-        if not indices:
-            continue
-        start_idx = min(indices)
-        end_idx = max(indices)
-        contiguous = "\n".join(lines[start_idx : end_idx + 1]).strip()
-        if contiguous:
-            sections[key] = contiguous
-
-    if not _has_all_sections(sections):
-        return None
+        coherent = verify_verbatim_section_coherence(raw_text, ClinicalRawSection(
+            canonical_key=heading.canonical_key,
+            raw_heading=heading.raw_heading,
+            normalized_heading=heading.normalized_heading,
+            match_strategy=heading.strategy,
+            confidence_score=heading.score,
+            line_start=heading.line_start,
+            line_end=heading.line_end,
+            body_start=body_start,
+            body_end=body_end,
+            text=content,
+            verbatim_coherent=True,
+        ))
+        if heading.canonical_key in sections:
+            raise ValueError(f"Duplicate section heading for '{heading.canonical_key}'.")
+        sections[heading.canonical_key] = ClinicalRawSection(
+            canonical_key=heading.canonical_key,
+            raw_heading=heading.raw_heading,
+            normalized_heading=heading.normalized_heading,
+            match_strategy=heading.strategy,
+            confidence_score=heading.score,
+            line_start=heading.line_start,
+            line_end=heading.line_end,
+            body_start=body_start,
+            body_end=body_end,
+            text=content,
+            verbatim_coherent=coherent,
+        )
     return sections
 
 
+def verify_verbatim_section_coherence(raw_text: str, section: ClinicalRawSection) -> bool:
+    if section.body_start < 0 or section.body_end < section.body_start:
+        return False
+    if section.body_end > len(raw_text):
+        return False
+    span_text = raw_text[section.body_start:section.body_end].strip("\r\n")
+    return span_text == section.text
+
+
+def missing_required_section_names(sections: Mapping[str, ClinicalRawSection]) -> list[str]:
+    return [key for key in REQUIRED_DILI_SECTION_KEYS if key not in sections or not sections[key].text.strip()]
+
+
+# Compatibility wrappers for current callers/tests.
+def find_section_markers(text: str) -> list[SectionHeadingMatch]:
+    return find_dili_section_headings(text)
+
+
+def extract_sections_from_markers(text: str, _markers: list[SectionHeadingMatch]) -> dict[ClinicalSectionKey, str] | None:
+    try:
+        sections = extract_required_dili_sections(text)
+    except ValueError:
+        return None
+    if missing_required_section_names(sections):
+        return None
+    return {
+        "anamnesis": sections["anamnesis"].text,
+        "drugs": sections["therapy"].text,
+        "laboratory_analysis": sections["laboratory_history"].text,
+    }
+
+
 def validate_sections_against_source(text: str, sections: dict[ClinicalSectionKey, str]) -> bool:
-    normalized_source = WS_RE.sub(" ", text).strip()
-    canonical_source = _canonicalize_text(normalized_source)
     for key in ("anamnesis", "drugs", "laboratory_analysis"):
         value = (sections.get(key) or "").strip()
-        if not value:
-            return False
-        if value in text:
-            continue
-        normalized_value = WS_RE.sub(" ", value).strip()
-        if not normalized_value:
-            return False
-        if normalized_value in normalized_source:
-            continue
-        canonical_value = _canonicalize_text(normalized_value)
-        if not canonical_value or canonical_value not in canonical_source:
+        if not value or value not in text:
             return False
     return True
-
-
-def _canonicalize_text(value: str) -> str:
-    normalized = unicodedata.normalize("NFKD", value).encode("ascii", "ignore").decode("ascii")
-    normalized = re.sub(r"[^a-zA-Z0-9\s]+", " ", normalized)
-    normalized = WS_RE.sub(" ", normalized).strip().lower()
-    return re.sub(r"(?<=\d)\s+(?=\d)", "", normalized)

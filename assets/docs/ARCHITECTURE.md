@@ -180,7 +180,7 @@ Endpoint -> service -> repository:
   - `app/server/api/session.py`
   - `app/server/services/session/session_service.py`
   - `app/server/repositories/serialization/data.py` + DB repositories
-  - Runs clinical preflight before job creation, normalizes the submitted document, persists evidence-locked pipeline artifacts in `session_result_payload`, and returns artifact/gate summaries through the job result.
+  - Runs clinical preflight before job creation, normalizes the submitted document, applies deterministic section-first extraction (adaptive heading classification for anamnesis/therapy/laboratory history) before clinical LLM extraction, persists evidence-locked pipeline artifacts in `session_result_payload`, and returns artifact/gate summaries through the job result.
 
 - `POST /api/clinical/validate-input`
   - `app/server/api/session.py`

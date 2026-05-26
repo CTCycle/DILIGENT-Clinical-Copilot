@@ -104,9 +104,18 @@ release\tauri\build_with_tauri.bat
 ## 5. Usage patterns and best practices
 
 - Clinical input textbox accepts plain text only.
-- Recommended section headings are `Anamnesis`, `Drugs`, and `Lab analysis`.
+- Preferred template:
+  - `## Anamnesis`
+  - `## Therapy`
+  - `## Laboratory history`
+- Accepted deterministic heading variants:
+  - Anamnesis: `Clinical history`, `Medical history`, `Patient history`, `Storia clinica`
+  - Therapy: `Current medications`, `Drug therapy`, `Terapia farmacologica`, `Farmaci`
+  - Laboratory history: `Laboratory tests`, `Blood tests`, `Esami di laboratorio`, `Esami ematochimici`
+- Sections must be clearly separated and titled.
+- The backend does not infer missing sections from paragraph prose.
+- Exact preferred headings are recommended but not mandatory.
 - Numbered headings and Markdown headings are supported.
-- Additional heading aliases are supported through seeded section-title vocabulary.
 - Enter complete medication timing details before running analysis.
 - Provide structured, clinically specific lab context to improve pattern derivation.
 - Treat missing-core-field warnings as blockers and resolve before re-running.

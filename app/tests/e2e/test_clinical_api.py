@@ -44,6 +44,13 @@ def wait_for_job_completion(api_context: APIRequestContext, job_id: str) -> dict
 
 @pytest.fixture(autouse=True)
 def reset_runtime_to_local(api_context: APIRequestContext) -> None:
+    latest_job = api_context.get("/api/clinical/jobs/latest")
+    if latest_job.status == 200:
+        payload = latest_job.json()
+        job_id = payload.get("job_id")
+        status = payload.get("status")
+        if job_id and status in {"pending", "running"}:
+            api_context.delete(f"/api/clinical/jobs/{job_id}")
     response = api_context.put(
         "/api/model-config",
         data={"use_cloud_services": False, "cloud_model": "gpt-4.1-mini"},
