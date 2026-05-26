@@ -63,6 +63,11 @@ Instructions:
 - For each condition, return:
   - `name`: disease/condition name as written (normalized spacing only).
   - `occurrence_time`: time clue if available (date, year, relative timing).
+  - `timeline`: optional timeline detail if distinct from `occurrence_time`.
+  - `severity`: optional severity qualifier when explicitly stated.
+  - `diagnosis_status`: optional status qualifier (confirmed/suspected/resolved) when explicit.
+  - `symptoms`: optional symptom context linked to the condition when explicit.
+  - `clinical_context`: optional concise clinical context for the condition when explicit.
   - `chronic`: true if clearly chronic/longstanding, false if clearly acute/transient, null if unclear.
   - `hepatic_related`: true when the condition is hepatic/liver-related, false when clearly non-hepatic, null if unclear.
   - `evidence`: short snippet from the anamnesis supporting extraction.

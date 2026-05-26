@@ -42,6 +42,14 @@ MARKER_ALIASES: dict[str, tuple[str, ...]] = {
     "INR": ("inr",),
     "ALB": ("albumin", "alb"),
 }
+HEPATIC_PATTERN_RE = re.compile(
+    r"\b(?:hepatic\s+pattern|injury\s+pattern|pattern)\s*[:=]?\s*(hepatocellular|cholestatic|mixed|indeterminate)\b",
+    re.IGNORECASE,
+)
+RUCAM_SCORE_TEXT_RE = re.compile(
+    r"\brucam\b\s*(?:score)?\s*[:=]?\s*(-?\d{1,2})\b",
+    re.IGNORECASE,
+)
 
 
 def normalize_lab_marker(marker_name: str, aliases: dict[str, str]) -> str:
@@ -119,6 +127,76 @@ class ClinicalLabExtractor:
         normalized = normalized.replace("\r\n", "\n").replace("\r", "\n")
         lines = [line.strip() for line in normalized.split("\n") if line.strip()]
         return "\n".join(lines)
+
+    # -------------------------------------------------------------------------
+    def extract_explicit_hepatic_pattern(self, text: str) -> str | None:
+        if not text:
+            return None
+        match = HEPATIC_PATTERN_RE.search(text)
+        if match is None:
+            return None
+        value = match.group(1).strip().lower()
+        if value in {"hepatocellular", "cholestatic", "mixed", "indeterminate"}:
+            return value
+        return None
+
+    # -------------------------------------------------------------------------
+    def extract_explicit_rucam_score(self, text: str) -> int | None:
+        if not text:
+            return None
+        match = RUCAM_SCORE_TEXT_RE.search(text)
+        if match is None:
+            return None
+        try:
+            return int(match.group(1))
+        except ValueError:
+            return None
+
+    # -------------------------------------------------------------------------
+    def calculate_hepatic_pattern_from_lab_timeline(
+        self,
+        timeline: PatientLabTimeline,
+    ) -> str | None:
+        alt_entries = [
+            entry for entry in timeline.entries
+            if entry.marker_name == "ALT"
+            and entry.value is not None
+            and entry.upper_limit_normal is not None
+            and entry.upper_limit_normal > 0
+        ]
+        alp_entries = [
+            entry for entry in timeline.entries
+            if entry.marker_name == "ALP"
+            and entry.value is not None
+            and entry.upper_limit_normal is not None
+            and entry.upper_limit_normal > 0
+        ]
+        if not alt_entries or not alp_entries:
+            return None
+        peak_alt = max(
+            (
+                float(entry.value) / float(entry.upper_limit_normal)
+                for entry in alt_entries
+                if entry.value is not None and entry.upper_limit_normal is not None
+            ),
+            default=0.0,
+        )
+        peak_alp = max(
+            (
+                float(entry.value) / float(entry.upper_limit_normal)
+                for entry in alp_entries
+                if entry.value is not None and entry.upper_limit_normal is not None
+            ),
+            default=0.0,
+        )
+        if peak_alp <= 0:
+            return None
+        r_ratio = peak_alt / peak_alp
+        if r_ratio >= 5.0:
+            return "hepatocellular"
+        if r_ratio <= 2.0:
+            return "cholestatic"
+        return "mixed"
 
     # -------------------------------------------------------------------------
     def chunk_text(self, text: str) -> list[str]:
@@ -504,11 +582,6 @@ class ClinicalLabExtractor:
             if already_cleaned
             else self.clean_text(payload.laboratory_analysis)
         )
-        supplemental_anamnesis_text = (
-            (payload.anamnesis or "")
-            if already_cleaned
-            else self.clean_text(payload.anamnesis)
-        )
         deterministic_entries: list[ClinicalLabEntry] = []
         timeline_entries: list[ClinicalLabEntry] = []
         onset_context: LiverInjuryOnsetContext | None = None
@@ -521,18 +594,9 @@ class ClinicalLabExtractor:
                 visit_date=payload.visit_date,
             )
         )
-        deterministic_entries.extend(
-            self.extract_entries_from_text(
-                text=supplemental_anamnesis_text,
-                source="anamnesis",
-                visit_date=payload.visit_date,
-            )
-        )
         self.emit_progress(progress_callback, 0.2)
 
-        merged_source_text = "\n\n".join(
-            block for block in (primary_labs_text, supplemental_anamnesis_text) if block
-        )
+        merged_source_text = primary_labs_text
         if merged_source_text:
             try:
                 await self.ensure_client()

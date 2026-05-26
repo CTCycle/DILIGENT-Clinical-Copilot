@@ -35,7 +35,7 @@ def test_clinical_cancel_response_converts_job_snapshot_to_success_bool() -> Non
     assert response.job_id == "job-123"
 
 
-def test_running_cancel_preserves_running_status_until_worker_exits() -> None:
+def test_running_cancel_transitions_to_cancelled_immediately() -> None:
     manager = JobManager()
     started = threading.Event()
     release = threading.Event()
@@ -49,8 +49,8 @@ def test_running_cancel_preserves_running_status_until_worker_exits() -> None:
     assert started.wait(timeout=1)
     snapshot = manager.cancel_job(job_id)
     assert snapshot is not None
-    assert snapshot["status"] == "running"
-    assert manager.is_job_running("runtime_test") is True
+    assert snapshot["status"] == "cancelled"
+    assert manager.is_job_running("runtime_test") is False
     release.set()
     for _ in range(20):
         terminal = manager.get_job_status(job_id)
@@ -61,7 +61,7 @@ def test_running_cancel_preserves_running_status_until_worker_exits() -> None:
     assert terminal["status"] == "cancelled"
 
 
-def test_running_cancel_blocks_duplicate_job_until_terminal() -> None:
+def test_running_cancel_allows_duplicate_job_submission_immediately() -> None:
     manager = JobManager()
     started = threading.Event()
     release = threading.Event()
@@ -74,7 +74,7 @@ def test_running_cancel_blocks_duplicate_job_until_terminal() -> None:
     job_id = manager.start_job("runtime_test", runner)
     assert started.wait(timeout=1)
     manager.cancel_job(job_id)
-    assert manager.is_job_running("runtime_test") is True
+    assert manager.is_job_running("runtime_test") is False
     release.set()
 
 

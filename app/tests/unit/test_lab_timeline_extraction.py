@@ -60,7 +60,10 @@ def test_extracts_dated_alt_alp_and_bilirubin() -> None:
             ]
         )
     )
-    payload = PatientData(anamnesis="ALT, ALP and bilirubin elevated.", drugs="Drug A")
+    payload = PatientData(
+        laboratory_analysis="ALT, ALP and bilirubin elevated.",
+        drugs="Drug A",
+    )
 
     timeline, _ = asyncio.run(extractor.extract_from_payload(payload))
 
@@ -89,7 +92,7 @@ def test_uses_ast_when_alt_absent() -> None:
             ]
         )
     )
-    payload = PatientData(anamnesis="AST 200 U/L.", drugs="Drug A")
+    payload = PatientData(laboratory_analysis="AST 200 U/L.", drugs="Drug A")
 
     timeline, _ = asyncio.run(extractor.extract_from_payload(payload))
 
@@ -133,7 +136,8 @@ def test_preserves_relative_timing_without_absolute_dates() -> None:
         )
     )
     payload = PatientData(
-        anamnesis="ALT peak two weeks after therapy start.", drugs="Drug A"
+        laboratory_analysis="ALT peak two weeks after therapy start.",
+        drugs="Drug A",
     )
 
     timeline, _ = asyncio.run(extractor.extract_from_payload(payload))
@@ -169,7 +173,10 @@ def test_deduplicates_near_identical_entries() -> None:
             ]
         )
     )
-    payload = PatientData(anamnesis="Duplicate ALT mentions.", drugs="Drug A")
+    payload = PatientData(
+        laboratory_analysis="Duplicate ALT mentions.",
+        drugs="Drug A",
+    )
 
     timeline, _ = asyncio.run(extractor.extract_from_payload(payload))
 
@@ -185,11 +192,31 @@ def test_extracts_onset_clue_context() -> None:
     extractor = ClinicalLabExtractor(
         client=FakeLabClient([LabExtractionPayload(entries=[], onset_context=onset)])
     )
-    payload = PatientData(anamnesis="Jaundice started on 11 Jan 2025.", drugs="Drug A")
+    payload = PatientData(
+        laboratory_analysis="Jaundice started on 11 Jan 2025.",
+        drugs="Drug A",
+    )
 
     _, onset_context = asyncio.run(extractor.extract_from_payload(payload))
 
     assert onset_context is not None
     assert onset_context.onset_date == "2025-01-11"
     assert onset_context.onset_basis == "first_symptom"
+
+
+def test_extracts_explicit_pattern_and_rucam_score() -> None:
+    extractor = ClinicalLabExtractor(client=FakeLabClient([]))
+    text = "Hepatic pattern: mixed. RUCAM score: 7."
+    assert extractor.extract_explicit_hepatic_pattern(text) == "mixed"
+    assert extractor.extract_explicit_rucam_score(text) == 7
+
+
+def test_calculates_pattern_from_alt_alp_with_uln() -> None:
+    extractor = ClinicalLabExtractor(client=FakeLabClient([]))
+    timeline = PatientData(
+        laboratory_analysis="ALT 300 U/L (ULN 40), ALP 120 U/L (ULN 120)",
+        drugs="Drug A",
+    )
+    parsed, _ = asyncio.run(extractor.extract_from_payload(timeline))
+    assert extractor.calculate_hepatic_pattern_from_lab_timeline(parsed) == "hepatocellular"
 
