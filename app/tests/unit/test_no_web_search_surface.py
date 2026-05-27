@@ -9,5 +9,5 @@ def test_no_research_route_registered() -> None:
     assert all(not route.path.startswith("/api/research") for route in app.routes)
 
 
-def test_no_brave_access_key_provider() -> None:
-    assert "brave" not in SUPPORTED_PROVIDERS
+def test_brave_access_key_provider_supported() -> None:
+    assert "brave" in SUPPORTED_PROVIDERS

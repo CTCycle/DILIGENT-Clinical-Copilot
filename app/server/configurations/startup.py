@@ -79,17 +79,6 @@ def tauri_mode_enabled() -> bool:
     return value in TRUTHY_ENV_VALUES
 
 
-class _ServerSettingsProxy:
-    def __getattr__(self, item: str) -> Any:
-        return getattr(get_server_settings(), item)
-
-    def __repr__(self) -> str:
-        return repr(get_server_settings())
-
-
-server_settings = _ServerSettingsProxy()
-
-
 def initialize_settings() -> None:
     get_server_settings()
 
@@ -106,7 +95,6 @@ __all__ = [
     "reload_settings_for_tests",
     "reset_app_settings_cache",
     "reset_environment_bootstrap_for_tests",
-    "server_settings",
     "tauri_mode_enabled",
 ]
 

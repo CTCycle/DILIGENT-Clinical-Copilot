@@ -1,4 +1,5 @@
 from __future__ import annotations
+# ruff: noqa: E402
 
 import re
 from collections import OrderedDict
@@ -6,7 +7,7 @@ from typing import Any, Generic, Iterable, TypeVar
 
 import pandas as pd
 
-from configurations.startup import server_settings
+from configurations.startup import get_server_settings
 from domain.clinical.matching import (
     AliasCacheEntry,
     LiverToxMatch,
@@ -63,26 +64,26 @@ from services.clinical import matches_causality, matches_drug, matches_serializa
 
 
 class DrugsLookup:
-    DIRECT_CONFIDENCE = server_settings.drugs_matcher.direct_confidence
-    MASTER_CONFIDENCE = server_settings.drugs_matcher.master_confidence
-    SYNONYM_CONFIDENCE = server_settings.drugs_matcher.synonym_confidence
-    MIN_CONFIDENCE = server_settings.drugs_matcher.min_confidence
-    NORMALIZATION_CACHE_LIMIT = server_settings.drugs_matcher.normalization_cache_limit
-    MATCH_CACHE_LIMIT = server_settings.drugs_matcher.match_cache_limit
-    ALIAS_CACHE_LIMIT = server_settings.drugs_matcher.alias_cache_limit
-    TOKEN_MIN_LENGTH = server_settings.drugs_matcher.token_min_length
+    DIRECT_CONFIDENCE = get_server_settings().drugs_matcher.direct_confidence
+    MASTER_CONFIDENCE = get_server_settings().drugs_matcher.master_confidence
+    SYNONYM_CONFIDENCE = get_server_settings().drugs_matcher.synonym_confidence
+    MIN_CONFIDENCE = get_server_settings().drugs_matcher.min_confidence
+    NORMALIZATION_CACHE_LIMIT = get_server_settings().drugs_matcher.normalization_cache_limit
+    MATCH_CACHE_LIMIT = get_server_settings().drugs_matcher.match_cache_limit
+    ALIAS_CACHE_LIMIT = get_server_settings().drugs_matcher.alias_cache_limit
+    TOKEN_MIN_LENGTH = get_server_settings().drugs_matcher.token_min_length
     CATALOG_EXCLUDED_TERM_SUFFIXES = _catalog_excluded_term_suffixes()
-    CATALOG_INDEX_LIMIT = server_settings.drugs_matcher.catalog_index_limit
-    SPELLING_CONFIDENCE = server_settings.drugs_matcher.spelling_confidence
-    SPELLING_MIN_QUERY_LENGTH = server_settings.drugs_matcher.spelling_min_query_length
+    CATALOG_INDEX_LIMIT = get_server_settings().drugs_matcher.catalog_index_limit
+    SPELLING_CONFIDENCE = get_server_settings().drugs_matcher.spelling_confidence
+    SPELLING_MIN_QUERY_LENGTH = get_server_settings().drugs_matcher.spelling_min_query_length
     SPELLING_SHORT_NAME_LENGTH = (
-        server_settings.drugs_matcher.spelling_short_name_length
+        get_server_settings().drugs_matcher.spelling_short_name_length
     )
     SPELLING_SHORT_MAX_DISTANCE = (
-        server_settings.drugs_matcher.spelling_short_max_distance
+        get_server_settings().drugs_matcher.spelling_short_max_distance
     )
     SPELLING_LONG_MAX_DISTANCE = (
-        server_settings.drugs_matcher.spelling_long_max_distance
+        get_server_settings().drugs_matcher.spelling_long_max_distance
     )
     REGIMEN_SPLIT_RE = re.compile(r"(?:\s*\+\s*|\s*/\s*|\s+\bplus\b\s+)", re.IGNORECASE)
     BRAND_COMBO_PREFERENCES: dict[str, str] = {}

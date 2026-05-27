@@ -9,7 +9,7 @@ from sqlalchemy.orm import sessionmaker
 from sqlalchemy.sql.elements import TextClause
 
 from common.utils.logger import logger
-from configurations.startup import server_settings
+from configurations.startup import get_server_settings
 from domain.settings.configuration import DatabaseSettings
 from repositories.database.postgres import PostgresRepository
 from repositories.database.sqlite import SQLiteRepository
@@ -209,7 +209,7 @@ def run_database_initialization(
     seed_catalogs: bool = True,
     force_reseed_catalogs: bool = False,
 ) -> None:
-    settings = server_settings.database
+    settings = get_server_settings().database
     init_kwargs = {
         "drop_existing": drop_existing,
         "seed_catalogs": seed_catalogs,

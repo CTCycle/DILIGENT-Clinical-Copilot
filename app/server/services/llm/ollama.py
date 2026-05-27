@@ -13,7 +13,7 @@ from common.exceptions import (
     ServiceValidationError,
 )
 from common.utils.logger import logger
-from configurations.startup import server_settings
+from configurations.startup import get_server_settings
 from domain.jobs import (
     JobCancelResponse,
     JobStartResponse,
@@ -288,7 +288,7 @@ class OllamaService:
             job_type=job_status["job_type"],
             status=job_status["status"],
             message="Model pull job started",
-            poll_interval=server_settings.jobs.polling_interval,
+            poll_interval=get_server_settings().jobs.polling_interval,
         )
 
     # -------------------------------------------------------------------------

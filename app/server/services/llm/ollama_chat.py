@@ -24,7 +24,7 @@ from langchain_ollama import ChatOllama, OllamaEmbeddings
 from common.utils.logger import logger
 from common.utils.types import extract_positive_int
 from configurations.llm_configs import LLMRuntimeConfig
-from configurations.startup import server_settings
+from configurations.startup import get_server_settings
 
 ProviderName = Literal["openai", "gemini"]
 RuntimePurpose = Literal["clinical", "parser"]
@@ -604,8 +604,8 @@ async def is_server_online(self) -> bool:
 async def start_server(
     self,
     *,
-    wait_timeout_s: float = server_settings.runtime.ollama_server_start_timeout,
-    poll_interval_s: float = server_settings.jobs.polling_interval,
+    wait_timeout_s: float = get_server_settings().runtime.ollama_server_start_timeout,
+    poll_interval_s: float = get_server_settings().jobs.polling_interval,
 ) -> Literal["started", "already_running"]:
     if await self.is_server_online():
         return "already_running"
