@@ -1,10 +1,11 @@
 from __future__ import annotations
 
 import pytest
-from fastapi import HTTPException
-
 from domain.clinical.entities import ClinicalSessionRequest
-from services.session.session_request_validation import validate_clinical_session_request
+from fastapi import HTTPException
+from services.session.session_request_validation import (
+    validate_clinical_session_request,
+)
 
 
 def _words(count: int) -> str:

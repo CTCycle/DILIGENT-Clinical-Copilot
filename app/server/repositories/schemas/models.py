@@ -495,21 +495,27 @@ class RuntimeSetting(Base):
 
 
 ###############################################################################
-class TextNormalizationTerm(Base):
-    __tablename__ = "text_normalization_terms"
+class ReferenceCatalogEntry(Base):
+    __tablename__ = "reference_catalog_entries"
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
+    manifest: Mapped[str] = mapped_column(String, nullable=False)
+    manifest_version: Mapped[int] = mapped_column(Integer, nullable=False)
+    domain: Mapped[str] = mapped_column(String, nullable=False)
     category: Mapped[str] = mapped_column(String, nullable=False)
-    term: Mapped[str] = mapped_column(Text, nullable=False)
-    term_norm: Mapped[str] = mapped_column(String, nullable=False)
-    replacement: Mapped[str | None] = mapped_column(Text, nullable=True)
-    source: Mapped[str] = mapped_column(String, nullable=False)
-    encounter_count: Mapped[int] = mapped_column(
-        Integer,
+    key: Mapped[str] = mapped_column(String, nullable=False)
+    locale: Mapped[str] = mapped_column(String, nullable=False, server_default=text("'und'"))
+    value: Mapped[str] = mapped_column(Text, nullable=False)
+    normalized_value: Mapped[str] = mapped_column(String, nullable=False)
+    priority: Mapped[int] = mapped_column(Integer, nullable=False, server_default=text("100"))
+    match_mode: Mapped[str] = mapped_column(String, nullable=False, server_default=text("'token'"))
+    case_sensitive: Mapped[bool] = mapped_column(
+        Boolean,
         nullable=False,
-        server_default=text("0"),
+        server_default=text("false"),
     )
-    is_active: Mapped[bool] = mapped_column(
+    metadata_json: Mapped[str | None] = mapped_column(Text, nullable=True)
+    active: Mapped[bool] = mapped_column(
         Boolean,
         nullable=False,
         server_default=text("true"),
@@ -528,12 +534,47 @@ class TextNormalizationTerm(Base):
 
     __table_args__ = (
         UniqueConstraint(
+            "manifest",
+            "domain",
             "category",
-            "term_norm",
-            name="uq_text_normalization_terms_category_term_norm",
+            "key",
+            "locale",
+            "normalized_value",
+            name="uq_reference_catalog_entries_identity",
         ),
-        Index("ix_text_normalization_terms_category_active", "category", "is_active"),
-        Index("ix_text_normalization_terms_term_norm", "term_norm"),
+        Index("ix_reference_catalog_entries_manifest", "manifest"),
+        Index("ix_reference_catalog_entries_lookup", "domain", "category", "key", "locale"),
+        Index("ix_reference_catalog_entries_active", "active"),
+    )
+
+
+###############################################################################
+class ReferenceCatalogSeedRun(Base):
+    __tablename__ = "reference_catalog_seed_runs"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
+    manifest: Mapped[str] = mapped_column(String, nullable=False)
+    manifest_version: Mapped[int] = mapped_column(Integer, nullable=False)
+    manifest_hash: Mapped[str] = mapped_column(String, nullable=False)
+    source_path: Mapped[str] = mapped_column(Text, nullable=False)
+    status: Mapped[str] = mapped_column(String, nullable=False)
+    seeded_at: Mapped[datetime] = mapped_column(
+        DateTime,
+        nullable=False,
+        server_default=text("CURRENT_TIMESTAMP"),
+    )
+    entry_count: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    error_message: Mapped[str | None] = mapped_column(Text, nullable=True)
+
+    __table_args__ = (
+        UniqueConstraint(
+            "manifest",
+            "manifest_hash",
+            "status",
+            name="uq_reference_catalog_seed_runs_manifest_hash_status",
+        ),
+        Index("ix_reference_catalog_seed_runs_manifest", "manifest"),
+        Index("ix_reference_catalog_seed_runs_status", "status"),
     )
 
 

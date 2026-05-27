@@ -13,12 +13,12 @@ from pypdf import PdfReader
 from sqlalchemy.engine import Engine
 from sqlalchemy.orm import Session, sessionmaker
 
-from domain.documents import Document
 from common.constants import (
     DOCUMENT_SUPPORTED_EXTENSIONS,
     TEXT_FILE_FALLBACK_ENCODINGS,
 )
 from common.utils.logger import logger
+from domain.documents import Document
 from repositories.database.session import (
     resolve_engine,
     resolve_session_factory,
@@ -29,10 +29,13 @@ from repositories.schemas.models import (
     LiverToxMonograph,
     Patient,
 )
+from repositories.serialization import (
+    evidence_aliases,
+    evidence_data,
+    fda_data,
+    session_result_data,
+)
 
-
-from repositories.serialization import evidence_data, fda_data, session_result_data
-from repositories.serialization import evidence_aliases
 
 class _RepositorySerializationService:
     def __init__(

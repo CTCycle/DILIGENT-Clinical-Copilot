@@ -12,8 +12,10 @@ from repositories.database.utils import (
     normalize_postgres_engine,
     validate_postgres_database_name,
 )
+from repositories.serialization.catalogs import ReferenceCatalogSerializer
 
 
+###############################################################################
 class PostgresRepository:
     def __init__(self, settings: DatabaseSettings) -> None:
         if not settings.host:
@@ -46,4 +48,5 @@ class PostgresRepository:
             pool_pre_ping=True,
         )
         self.session_factory = sessionmaker(bind=self.engine, future=True)
+        self.catalogs = ReferenceCatalogSerializer(session_factory=self.session_factory)
 

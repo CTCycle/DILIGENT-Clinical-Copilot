@@ -1,13 +1,14 @@
 from __future__ import annotations
 
+import re
+import unicodedata
 from collections.abc import Mapping, Sequence
 from dataclasses import dataclass
 from difflib import SequenceMatcher
-import re
-import unicodedata
 from typing import Literal
 
 from domain.clinical.sections import ClinicalSectionKey
+from services.catalogs.runtime import get_reference_catalog_snapshot
 
 REQUIRED_DILI_SECTION_KEYS = ("anamnesis", "therapy", "laboratory_history")
 CANONICAL_TO_CLINICAL_KEY: Mapping[str, ClinicalSectionKey] = {
@@ -24,85 +25,43 @@ NON_ALNUM_RE = re.compile(r"[^0-9a-zA-ZÀ-ÖØ-öø-ÿ ]+")
 WS_RE = re.compile(r"\s+")
 MARKDOWN_HEADING_RE = re.compile(r"^\s*#{1,6}\s+\S")
 
-SECTION_HEADING_PROFILES: dict[str, dict[str, set[str]]] = {
-    "anamnesis": {
-        "required_any": {
-            "anamnesis",
-            "anamnesi",
-            "history",
-            "clinical history",
-            "medical history",
-            "patient history",
-            "case history",
-            "storia clinica",
-            "storia anamnestica",
-            "anamnesi patologica",
-        },
-        "supporting": {
-            "precedenti",
-            "sintomi",
-            "diagnosi",
-            "clinical conditions",
-            "patient background",
-        },
-    },
-    "therapy": {
-        "required_any": {
-            "therapy",
-            "therapies",
-            "treatment",
-            "treatments",
-            "medication",
-            "medications",
-            "drug therapy",
-            "current therapy",
-            "current medications",
-            "terapia",
-            "terapie",
-            "trattamento",
-            "farmaci",
-            "terapia farmacologica",
-            "terapie in corso",
-        },
-        "supporting": {
-            "dose",
-            "dosage",
-            "route",
-            "suspension",
-            "somministrazione",
-            "posologia",
-            "sospensione",
-        },
-    },
-    "laboratory_history": {
-        "required_any": {
-            "laboratory history",
-            "laboratory",
-            "labs",
-            "lab history",
-            "laboratory tests",
-            "blood tests",
-            "biochemistry",
-            "liver tests",
-            "esami di laboratorio",
-            "laboratorio",
-            "storia laboratoristica",
-            "esami ematochimici",
-            "biochimica",
-        },
-        "supporting": {
-            "alt",
-            "alp",
-            "ast",
-            "ggt",
-            "bilirubin",
-            "bilirubina",
-            "inr",
-            "uln",
-            "limite superiore",
-        },
-    },
-}
+def _section_profiles_from_catalog() -> dict[str, dict[str, set[str]]]:
+    snapshot = get_reference_catalog_snapshot()
+    profiles: dict[str, dict[str, set[str]]] = {
+        "anamnesis": {"required_any": set(), "supporting": set()},
+        "therapy": {"required_any": set(), "supporting": set()},
+        "laboratory_history": {"required_any": set(), "supporting": set()},
+    }
+    category_map: dict[str, tuple[str, str]] = {
+        "anamnesis_required": ("anamnesis", "required_any"),
+        "anamnesis_supporting": ("anamnesis", "supporting"),
+        "therapy_required": ("therapy", "required_any"),
+        "therapy_supporting": ("therapy", "supporting"),
+        "laboratory_history_required": ("laboratory_history", "required_any"),
+        "laboratory_history_supporting": ("laboratory_history", "supporting"),
+    }
+    for category, (canonical_key, bucket) in category_map.items():
+        values = snapshot.values("clinical_extraction", "section_heading_patterns", key=category)
+        profiles[canonical_key][bucket].update(
+            normalize_heading_text(value) for value in values if normalize_heading_text(value)
+        )
+
+    mapped: dict[str, str] = {
+        "anamnesis": "anamnesis",
+        "drugs": "therapy",
+        "laboratory_analysis": "laboratory_history",
+    }
+    for backend_key, canonical_key in mapped.items():
+        aliases = snapshot.values(
+            "clinical_extraction",
+            "section_aliases",
+            key=backend_key,
+        )
+        if aliases:
+            profiles[canonical_key]["required_any"].update(
+                normalize_heading_text(alias) for alias in aliases if normalize_heading_text(alias)
+            )
+    return profiles
 
 
 @dataclass(frozen=True)
@@ -240,7 +199,8 @@ def classify_dili_heading(raw_heading: str, *, line_start: int, line_end: int) -
         return None
 
     candidates: list[SectionHeadingMatch] = []
-    for canonical_key, profile in SECTION_HEADING_PROFILES.items():
+    profiles = _section_profiles_from_catalog()
+    for canonical_key, profile in profiles.items():
         match = _classify_against_profile(normalized, profile)
         if match is None:
             continue

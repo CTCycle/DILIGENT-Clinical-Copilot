@@ -6,21 +6,21 @@ from datetime import datetime
 from functools import partial
 from typing import Any
 
+from configurations.llm_configs import LLMRuntimeConfig
 from domain.clinical.entities import (
-    ClinicalSectionExtractionResult,
     ClinicalPipelineValidationError,
+    ClinicalSectionExtractionResult,
     DrugRucamAssessment,
     PatientData,
     PipelineIssue,
 )
 from domain.clinical.robustness import NormalizedDocument
-from configurations.llm_configs import LLMRuntimeConfig
-from services.runtime.jobs import JobManager
 from services.clinical.job_progress import (
     CLINICAL_PROGRESS_MESSAGES,
     ClinicalJobCancelled,
 )
 from services.clinical.language import ClinicalLanguageDetector
+from services.runtime.jobs import JobManager
 
 NOT_AVAILABLE = "Not available"
 PATIENT_LINE_TEMPLATE = "- **Patient:** {value}"

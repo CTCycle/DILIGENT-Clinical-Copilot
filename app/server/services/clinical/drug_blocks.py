@@ -1,7 +1,10 @@
 from __future__ import annotations
 
-from dataclasses import dataclass
 import re
+from dataclasses import dataclass
+from functools import lru_cache
+
+from services.catalogs.runtime import get_reference_catalog_snapshot
 
 
 @dataclass(frozen=True)
@@ -13,25 +16,64 @@ class DrugBlock:
 
 BULLET_RE = re.compile(r"(?m)^[ \t]*(?:[-*•]|\d+[.)])[ \t]+")
 UPPER_TOKEN_RE = re.compile(r"^[A-ZÀ-ÖØ-Þ][\wÀ-ÖØ-öø-ÿ'/-]+")
-METADATA_RE = re.compile(
-    r"(?<![A-Za-zÀ-ÖØ-öø-ÿ])(?:mg|mcg|g|ml|ui|iu|po|ev|iv|im|sc|bid|tid|die|volta\/die|sospes[oa]|continu[ae]|cronic[ao]|iniziat[oa]|started|stopped)\b",
-    re.IGNORECASE,
-)
-CONTINUATION_PREFIX_RE = re.compile(
-    r"^(?:dal\b|da\b|dall['’]|se\b|in\s+riserva\b|peso\b|\d+(?:[.,]\d+)?\s*kg\b)",
-    re.IGNORECASE,
-)
+
+
+@lru_cache(maxsize=1)
+def _metadata_re() -> re.Pattern[str]:
+    snapshot = get_reference_catalog_snapshot()
+    terms = list(snapshot.values("clinical_extraction", "drug_metadata_labels"))
+    terms.extend(snapshot.values("clinical_extraction", "drug_dosage_units"))
+    terms.extend(snapshot.values("clinical_extraction", "drug_frequency_terms"))
+    terms.extend(snapshot.values("clinical_extraction", "drug_route_terms"))
+    escaped = [re.escape(term) for term in terms if term.strip()]
+    if not escaped:
+        return re.compile(r"$^")
+    return re.compile(
+        r"(?<![A-Za-zÀ-ÖØ-öø-ÿ])(?:" + "|".join(escaped) + r")\b",
+        re.IGNORECASE,
+    )
+
+
+@lru_cache(maxsize=1)
+def _continuation_prefix_re() -> re.Pattern[str]:
+    snapshot = get_reference_catalog_snapshot()
+    terms = list(snapshot.values("clinical_extraction", "drug_continuation_markers"))
+    escaped = [re.escape(term) + r"\b" for term in terms if term.strip()]
+    prefix_body = "|".join(escaped) if escaped else r"$^"
+    return re.compile(
+        r"^(?:" + prefix_body + r"|peso\b|\d+(?:[.,]\d+)?\s*kg\b)",
+        re.IGNORECASE,
+    )
+
+
+@lru_cache(maxsize=1)
+def _regimen_split_re() -> re.Pattern[str]:
+    snapshot = get_reference_catalog_snapshot()
+    separators = [
+        value.strip().lower()
+        for value in snapshot.values("clinical_extraction", "drug_regimen_separators")
+        if value
+    ]
+    separator_map = {
+        "semicolon": r";",
+        "plus": r"\+|\s+plus\s+",
+        "slash": r"/",
+    }
+    escaped = [separator_map[value] for value in separators if value in separator_map]
+    if not escaped:
+        return re.compile(r"$^")
+    return re.compile(r"(?:%s)" % "|".join(escaped), re.IGNORECASE)
 
 
 def _likely_drug_start(value: str) -> bool:
     text = value.strip()
     if not text:
         return False
-    if CONTINUATION_PREFIX_RE.search(text):
+    if _continuation_prefix_re().search(text):
         return False
     if not UPPER_TOKEN_RE.search(text):
         return False
-    return bool(METADATA_RE.search(text))
+    return bool(_metadata_re().search(text))
 
 
 def isolate_drug_blocks(text: str) -> list[DrugBlock]:
@@ -89,8 +131,9 @@ def isolate_drug_blocks(text: str) -> list[DrugBlock]:
         if blocks:
             return blocks
 
-    if ";" in source:
-        parts = [part.strip() for part in source.split(";")]
+    regimen_split = _regimen_split_re()
+    if regimen_split.pattern != r"$^":
+        parts = [part.strip() for part in regimen_split.split(source)]
         if len(parts) > 1 and all(_likely_drug_start(part) for part in parts if part):
             blocks: list[DrugBlock] = []
             cursor = 0

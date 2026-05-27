@@ -5,12 +5,6 @@ from types import SimpleNamespace
 from typing import Any
 
 import pandas as pd
-from sqlalchemy import create_engine, select
-from sqlalchemy.orm import sessionmaker
-
-from services.clinical.livertox import LiverToxData
-from repositories.serialization.data import DataSerializer
-from services.updater import livertox_parse
 from repositories.schemas.models import (
     Base,
     ClinicalSession,
@@ -18,7 +12,12 @@ from repositories.schemas.models import (
     ClinicalSessionResult,
     Patient,
 )
+from repositories.serialization.data import DataSerializer
+from services.clinical.livertox import LiverToxData
+from services.updater import livertox_parse
 from services.updater.livertox_core import LiverToxUpdater
+from sqlalchemy import create_engine, select
+from sqlalchemy.orm import sessionmaker
 
 
 ###############################################################################

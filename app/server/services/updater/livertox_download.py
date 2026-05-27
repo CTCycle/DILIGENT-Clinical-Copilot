@@ -1,10 +1,10 @@
 from __future__ import annotations
 
 import asyncio
-from contextlib import nullcontext
 import os
 import re
 import sys
+from contextlib import nullcontext
 from datetime import UTC, datetime
 from typing import Any
 

@@ -4,13 +4,13 @@ import asyncio
 from datetime import datetime
 from typing import Any
 
+import services.llm.model_config as model_config_module
 from configurations.llm_configs import LLMRuntimeConfig
 from domain.model_configs import ModelConfigSnapshot
 from services.llm.model_config import ModelConfigService
+from services.llm.ollama_client import OllamaError
 from services.runtime.jobs import get_job_manager
 from services.session.factory import build_clinical_session_service
-import services.llm.model_config as model_config_module
-from services.llm.ollama_client import OllamaError
 
 
 class InMemorySerializer:

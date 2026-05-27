@@ -1,17 +1,16 @@
 from __future__ import annotations
 
-from sqlalchemy import create_engine, select
-from sqlalchemy.orm import sessionmaker
-
 from repositories.schemas.models import (
     Base,
     ClinicalSession,
     Drug,
     DrugAlias,
     Patient,
-    TextNormalizationTerm,
+    ReferenceCatalogEntry,
 )
 from repositories.serialization.data import DataSerializer
+from sqlalchemy import create_engine, select
+from sqlalchemy.orm import sessionmaker
 
 
 def test_session_learning_promotes_only_direct_high_confidence_aliases() -> None:
@@ -77,8 +76,8 @@ def test_session_learning_promotes_only_direct_high_confidence_aliases() -> None
             )
         ).all()
         terms = db_session.execute(
-            select(TextNormalizationTerm.category, TextNormalizationTerm.term).where(
-                TextNormalizationTerm.source == "session"
+            select(ReferenceCatalogEntry.category, ReferenceCatalogEntry.value).where(
+                ReferenceCatalogEntry.manifest == "runtime_observations"
             )
         ).all()
     finally:

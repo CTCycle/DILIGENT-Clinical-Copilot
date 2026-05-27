@@ -8,6 +8,7 @@ from sqlalchemy.exc import SQLAlchemyError
 from sqlalchemy.orm import sessionmaker
 from sqlalchemy.sql.elements import TextClause
 
+from common.utils.logger import logger
 from configurations.startup import server_settings
 from domain.settings.configuration import DatabaseSettings
 from repositories.database.postgres import PostgresRepository
@@ -16,14 +17,15 @@ from repositories.database.utils import (
     normalize_postgres_engine,
     validate_postgres_database_name,
 )
+from repositories.schemas.models import Base
 from repositories.serialization.access_key_encryption import (
     AccessKeyEncryptionMaterialSerializer,
 )
-from repositories.serialization.text_normalization import (
-    TextNormalizationVocabularySerializer,
+from repositories.serialization.catalogs import (
+    ReferenceCatalogSerializer,
 )
-from repositories.schemas.models import Base
-from common.utils.logger import logger
+from services.catalogs.runtime import reload_reference_catalog_snapshot
+from services.catalogs.seeder import ReferenceCatalogSeeder
 
 
 # -----------------------------------------------------------------------------
@@ -85,13 +87,52 @@ def build_postgres_create_database_sql(
 
 
 # -----------------------------------------------------------------------------
-def initialize_sqlite_database(settings: DatabaseSettings) -> None:
+def initialize_sqlite_database(
+    settings: DatabaseSettings,
+    *,
+    drop_existing: bool = False,
+    seed_catalogs: bool = True,
+    force_reseed_catalogs: bool = False,
+) -> None:
     repository = SQLiteRepository(settings)
+    if drop_existing:
+        Base.metadata.drop_all(repository.engine)
+    Base.metadata.create_all(repository.engine)
+    AccessKeyEncryptionMaterialSerializer(
+        engine=repository.engine,
+        session_factory=sessionmaker(
+            bind=repository.engine,
+            future=True,
+            expire_on_commit=False,
+        ),
+    ).ensure_seeded("provider_access_keys")
+    if seed_catalogs:
+        session_factory = getattr(
+            repository,
+            "session_factory",
+            sessionmaker(bind=repository.engine, future=True),
+        )
+        result = ReferenceCatalogSeeder(
+            ReferenceCatalogSerializer(session_factory=session_factory)
+        ).seed_missing_or_changed_manifests(force=force_reseed_catalogs)
+        logger.info(
+            "Catalog seeding completed for SQLite: seen=%s seeded=%s entries=%s",
+            result.manifests_seen,
+            result.manifests_seeded,
+            result.entries_written,
+        )
+        reload_reference_catalog_snapshot()
     logger.info("Initialized SQLite database schema at %s", repository.db_path)
 
 
 # -----------------------------------------------------------------------------
-def ensure_postgres_database(settings: DatabaseSettings) -> str:
+def ensure_postgres_database(
+    settings: DatabaseSettings,
+    *,
+    drop_existing: bool = False,
+    seed_catalogs: bool = True,
+    force_reseed_catalogs: bool = False,
+) -> str:
     if not settings.host:
         raise ValueError("Database host is required for PostgreSQL initialization.")
     if not settings.username:
@@ -129,6 +170,8 @@ def ensure_postgres_database(settings: DatabaseSettings) -> str:
 
     normalized_settings = clone_settings_with_database(settings, target_database)
     repository = PostgresRepository(normalized_settings)
+    if drop_existing:
+        Base.metadata.drop_all(repository.engine)
     Base.metadata.create_all(repository.engine)
     material_serializer = AccessKeyEncryptionMaterialSerializer(
         engine=repository.engine,
@@ -139,25 +182,49 @@ def ensure_postgres_database(settings: DatabaseSettings) -> str:
         ),
     )
     material_serializer.ensure_seeded("provider_access_keys")
-    TextNormalizationVocabularySerializer(
-        engine=repository.engine,
-        session_factory=sessionmaker(
-            bind=repository.engine,
-            future=True,
-            expire_on_commit=False,
-        ),
-    ).ensure_seeded()
+    if seed_catalogs:
+        session_factory = getattr(repository, "session_factory", None)
+        if session_factory is not None:
+            result = ReferenceCatalogSeeder(
+                ReferenceCatalogSerializer(session_factory=session_factory)
+            ).seed_missing_or_changed_manifests(force=force_reseed_catalogs)
+        else:
+            result = None
+        if result is not None:
+            logger.info(
+                "Catalog seeding completed for PostgreSQL: seen=%s seeded=%s entries=%s",
+                result.manifests_seen,
+                result.manifests_seeded,
+                result.entries_written,
+            )
+            reload_reference_catalog_snapshot()
     logger.info("Ensured PostgreSQL tables exist in %s", target_database)
 
     return target_database
 
 
 # -----------------------------------------------------------------------------
-def run_database_initialization() -> None:
+def run_database_initialization(
+    *,
+    drop_existing: bool = False,
+    seed_catalogs: bool = True,
+    force_reseed_catalogs: bool = False,
+) -> None:
     settings = server_settings.database
+    init_kwargs = {
+        "drop_existing": drop_existing,
+        "seed_catalogs": seed_catalogs,
+        "force_reseed_catalogs": force_reseed_catalogs,
+    }
+    use_default_init_kwargs = (
+        not drop_existing and seed_catalogs and not force_reseed_catalogs
+    )
     if settings.embedded_database:
         logger.info("Running SQLite initialization path.")
-        initialize_sqlite_database(settings)
+        if use_default_init_kwargs:
+            initialize_sqlite_database(settings)
+        else:
+            initialize_sqlite_database(settings, **init_kwargs)
         return
 
     logger.info("Running PostgreSQL initialization path (manual trigger expected).")
@@ -169,13 +236,24 @@ def run_database_initialization() -> None:
     }:
         raise ValueError(f"Unsupported database engine: {settings.engine}")
 
-    ensure_postgres_database(settings)
+    if use_default_init_kwargs:
+        ensure_postgres_database(settings)
+    else:
+        ensure_postgres_database(settings, **init_kwargs)
 
 
 # -----------------------------------------------------------------------------
-def initialize_database() -> None:
+def initialize_database(
+    drop_existing: bool = False,
+    seed_catalogs: bool = True,
+    force_reseed_catalogs: bool = False,
+) -> None:
     try:
-        run_database_initialization()
+        run_database_initialization(
+            drop_existing=drop_existing,
+            seed_catalogs=seed_catalogs,
+            force_reseed_catalogs=force_reseed_catalogs,
+        )
     except (SQLAlchemyError, ValueError) as exc:
         logger.error("Database initialization failed: %s", exc)
         raise SystemExit(1) from exc

@@ -72,6 +72,11 @@ export type ClinicalRequestPayload = {
   use_rag: boolean;
 };
 
+export type ClinicalSectionTemplateResponse = {
+  headings: Record<string, string[]>;
+  template: string;
+};
+
 export type ApiResult = {
   message: string;
   json: unknown;

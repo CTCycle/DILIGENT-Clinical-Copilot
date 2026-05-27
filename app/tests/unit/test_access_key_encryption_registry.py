@@ -1,8 +1,9 @@
 from __future__ import annotations
 
-from sqlalchemy import create_engine, func, select
-from sqlalchemy.orm import sessionmaker
-
+from common.security.cryptography import (
+    decrypt_with_key_material,
+    encrypt_with_key_material,
+)
 from repositories.schemas.models import (
     AccessKeyEncryptionMaterial,
     Base,
@@ -10,10 +11,8 @@ from repositories.schemas.models import (
 from repositories.serialization.access_key_encryption import (
     AccessKeyEncryptionMaterialSerializer,
 )
-from common.security.cryptography import (
-    decrypt_with_key_material,
-    encrypt_with_key_material,
-)
+from sqlalchemy import create_engine, func, select
+from sqlalchemy.orm import sessionmaker
 
 
 # -----------------------------------------------------------------------------

@@ -2,8 +2,8 @@ from __future__ import annotations
 
 import asyncio
 import re
-from typing import Any, NoReturn
 from collections.abc import Callable
+from typing import Any, NoReturn
 
 from common.exceptions import (
     ServiceConflictError,
@@ -20,13 +20,13 @@ from domain.jobs import (
     JobStatusResponse,
 )
 from domain.models import ModelListResponse
-from services.runtime.jobs import (
-    JobManager,
-)
 from services.llm.ollama_client import (
     OllamaClient,
     OllamaError,
     OllamaTimeout,
+)
+from services.runtime.jobs import (
+    JobManager,
 )
 
 SAFE_OLLAMA_MODEL_RE = re.compile(r"^[A-Za-z0-9][A-Za-z0-9._:/+\-]{0,199}$")

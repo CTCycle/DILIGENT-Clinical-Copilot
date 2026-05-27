@@ -1,7 +1,9 @@
 from __future__ import annotations
 
 import re
+from functools import lru_cache
 
+from services.catalogs.runtime import get_reference_catalog_snapshot
 
 SUPPORTED_REPORT_LANGUAGES: tuple[str, ...] = ("en", "it", "de", "fr", "es")
 TOKEN_PATTERN = re.compile(r"[A-Za-zÀ-ÖØ-öø-ÿ]+")
@@ -13,128 +15,82 @@ MISSING_VISIT_LABEL_BY_LANGUAGE: dict[str, str] = {
     "es": "No proporcionada",
 }
 
-LANGUAGE_HINTS: dict[str, set[str]] = {
-    "en": {
-        "patient",
-        "anamnesis",
-        "drug",
-        "drugs",
-        "visit",
-        "bilirubin",
-        "jaundice",
-        "liver",
-        "history",
-        "therapy",
-        "suspended",
-        "alkaline",
-        "phosphatase",
-        "elevated",
-        "improved",
-        "worsening",
-    },
-    "it": {
-        "paziente",
-        "anamnesi",
-        "farmaco",
-        "farmaci",
-        "visita",
-        "bilirubina",
-        "ittero",
-        "fegato",
-        "terapia",
-        "sospeso",
-        "sospensione",
-        "epatotossicita",
-        "epatotossicità",
-        "miglioramento",
-        "peggioramento",
-        "transaminasi",
-    },
-    "de": {
-        "patient",
-        "anamnese",
-        "arzneimittel",
-        "medikament",
-        "medikamente",
-        "besuch",
-        "bilirubin",
-        "ikterus",
-        "leber",
-        "therapie",
-        "abgesetzt",
-        "erhoht",
-        "erhöht",
-        "verschlechterung",
-        "besserung",
-        "transaminasen",
-    },
-    "fr": {
-        "patient",
-        "anamnese",
-        "anamnesis",
-        "médicament",
-        "médicaments",
-        "medicament",
-        "medicaments",
-        "visite",
-        "bilirubine",
-        "ictère",
-        "ictere",
-        "foie",
-        "thérapie",
-        "therapie",
-        "arrêt",
-        "arret",
-        "aggravation",
-        "amélioration",
-        "amelioration",
-    },
-    "es": {
-        "paciente",
-        "anamnesis",
-        "fármaco",
-        "fármacos",
-        "farmaco",
-        "farmacos",
-        "medicamento",
-        "medicamentos",
-        "visita",
-        "bilirrubina",
-        "ictericia",
-        "hígado",
-        "higado",
-        "terapia",
-        "suspendido",
-        "empeoramiento",
-        "mejoria",
-        "mejoría",
-        "transaminasas",
-    },
-}
+LANGUAGE_HINTS: dict[str, set[str]] = {}
+LANGUAGE_FUNCTION_HINTS: dict[str, set[str]] = {}
+LANGUAGE_PHRASE_HINTS: dict[str, tuple[str, ...]] = {}
+LANGUAGE_DIACRITIC_HINTS: dict[str, set[str]] = {}
 
-LANGUAGE_FUNCTION_HINTS: dict[str, set[str]] = {
-    "en": {"the", "and", "with", "without", "after", "before", "during", "from"},
-    "it": {"il", "la", "con", "senza", "dopo", "prima", "durante", "dal", "della"},
-    "de": {"der", "die", "das", "mit", "ohne", "nach", "vor", "wahrend", "während"},
-    "fr": {"le", "la", "les", "avec", "sans", "apres", "après", "avant", "pendant"},
-    "es": {"el", "la", "los", "las", "con", "sin", "despues", "después", "antes"},
-}
 
-LANGUAGE_PHRASE_HINTS: dict[str, tuple[str, ...]] = {
-    "en": ("liver injury", "drug induced", "alkaline phosphatase"),
-    "it": ("danno epatico", "epatotossicita", "fosfatasi alcalina"),
-    "de": ("leberschaden", "arzneimittel induziert", "alkalische phosphatase"),
-    "fr": ("atteinte hepatique", "lésion hépatique", "phosphatase alcaline"),
-    "es": ("lesion hepatica", "lesión hepática", "fosfatasa alcalina"),
-}
+@lru_cache(maxsize=1)
+def _catalog_language_hints() -> dict[str, set[str]]:
+    snapshot = get_reference_catalog_snapshot()
+    result: dict[str, set[str]] = {}
+    for lang in SUPPORTED_REPORT_LANGUAGES:
+        values = snapshot.values("language_detection", "language_hints", key=lang)
+        if values:
+            result[lang] = {value.casefold() for value in values if value.strip()}
+    return result
 
-LANGUAGE_DIACRITIC_HINTS: dict[str, set[str]] = {
-    "en": set(),
-    "it": {"à", "è", "é", "ì", "ò", "ù"},
-    "de": {"ä", "ö", "ü", "ß"},
-    "fr": {"à", "â", "ç", "é", "è", "ê", "ë", "î", "ï", "ô", "ù", "û", "ü", "œ"},
-    "es": {"á", "é", "í", "ó", "ú", "ü", "ñ"},
-}
+
+@lru_cache(maxsize=1)
+def _catalog_phrase_hints() -> dict[str, tuple[str, ...]]:
+    snapshot = get_reference_catalog_snapshot()
+    result: dict[str, tuple[str, ...]] = {}
+    for lang in SUPPORTED_REPORT_LANGUAGES:
+        values = snapshot.values(
+            "language_detection",
+            "report_language_phrase_markers",
+            key=lang,
+        )
+        if values:
+            result[lang] = tuple(value.casefold() for value in values if value.strip())
+    return result
+
+
+@lru_cache(maxsize=1)
+def _catalog_function_hints() -> dict[str, set[str]]:
+    snapshot = get_reference_catalog_snapshot()
+    result: dict[str, set[str]] = {}
+    for lang in SUPPORTED_REPORT_LANGUAGES:
+        values = snapshot.values(
+            "language_detection",
+            "clinical_language_scoring_terms",
+            key=lang,
+        )
+        if values:
+            result[lang] = {value.casefold() for value in values if value.strip()}
+    return result
+
+
+@lru_cache(maxsize=1)
+def _catalog_diacritic_hints() -> dict[str, set[str]]:
+    snapshot = get_reference_catalog_snapshot()
+    result: dict[str, set[str]] = {lang: set() for lang in SUPPORTED_REPORT_LANGUAGES}
+    for lang in SUPPORTED_REPORT_LANGUAGES:
+        values = snapshot.values(
+            "language_detection",
+            "diacritic_detection_terms",
+            key=lang,
+        )
+        if values:
+            result[lang] = {value for value in values if value.strip()}
+    return result
+
+
+def get_language_hints() -> dict[str, set[str]]:
+    return _catalog_language_hints()
+
+
+def get_language_phrase_hints() -> dict[str, tuple[str, ...]]:
+    return _catalog_phrase_hints()
+
+
+def get_language_function_hints() -> dict[str, set[str]]:
+    return _catalog_function_hints()
+
+
+def get_language_diacritic_hints() -> dict[str, set[str]]:
+    return _catalog_diacritic_hints()
 
 VALIDATION_MESSAGE_BUNDLES: dict[str, dict[str, str]] = {
     "en": {

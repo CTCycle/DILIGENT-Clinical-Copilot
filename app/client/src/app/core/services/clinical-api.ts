@@ -1,5 +1,6 @@
 import { API_BASE_URL } from "../constants";
 import {
+  ClinicalSectionTemplateResponse,
   ClinicalRequestPayload,
   JobCancelResponse,
   JobStartResponse,
@@ -40,6 +41,13 @@ export async function fetchClinicalJobStatus(
       },
     },
     timeoutSeconds,
+  );
+}
+
+export async function fetchClinicalSectionTemplate(): Promise<ClinicalSectionTemplateResponse> {
+  return requestJson<ClinicalSectionTemplateResponse>(
+    `${API_BASE_URL}/clinical/section-template`,
+    { method: "GET" },
   );
 }
 

@@ -4,22 +4,20 @@ import asyncio
 from datetime import date
 
 import pytest
-
-from services.llm.prompts import LIVERTOX_CLINICAL_USER_PROMPT
 from domain.clinical import (
     ClinicalLabEntry,
-    ClinicalPipelineValidationError,
     DrugClinicalAssessment,
     DrugEntry,
     DrugRucamAssessment,
-    RucamComponentAssessment,
     DrugSuspensionContext,
     PatientLabTimeline,
+    RucamComponentAssessment,
 )
 from services.clinical.hepatox_core import (
     HepatotoxicityPatternAnalyzer,
     HepatoxConsultation,
 )
+from services.llm.prompts import LIVERTOX_CLINICAL_USER_PROMPT
 
 
 ###############################################################################

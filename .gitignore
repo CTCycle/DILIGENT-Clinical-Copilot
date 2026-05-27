@@ -12,6 +12,7 @@ app/client/src-tauri/target/
 app/client/src-tauri/gen/
 release/windows/
 runtimes/**
+QA/**
 
 # Python
 *.py[cod]

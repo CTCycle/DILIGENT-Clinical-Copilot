@@ -41,7 +41,6 @@
     "embedding_max_workers": 4
   },
   "runtime": {
-    "llm_timeout": 3600.0,
     "default_llm_timeout": 3600.0,
     "livertox_llm_timeout": 3600.0,
     "ollama_server_start_timeout": 15.0,
@@ -82,7 +81,6 @@
     "match_cache_limit": 5000,
     "alias_cache_limit": 2000,
     "token_min_length": 4,
-    "catalog_excluded_term_suffixes": ["PCK"],
     "catalog_index_limit": 75000,
     "spelling_confidence": 0.94,
     "spelling_min_query_length": 6,

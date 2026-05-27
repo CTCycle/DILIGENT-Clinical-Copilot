@@ -1,6 +1,6 @@
 # DILIGENT Clinical Copilot Architecture
 
-Last updated: 2026-05-19
+Last updated: 2026-05-27
 
 ## 1. System Summary
 
@@ -136,10 +136,10 @@ Inspection:
 - `POST /api/inspection/livertox/jobs`
 - `GET /api/inspection/livertox/jobs/{job_id}`
 - `DELETE /api/inspection/livertox/jobs/{job_id}`
-- `GET /api/inspection/text-normalization`
-- `GET /api/inspection/text-normalization/{category}`
-- `PUT /api/inspection/text-normalization/{category}`
-- `DELETE /api/inspection/text-normalization/{category}/{term}`
+- `GET /api/inspection/reference-catalogs/runtime-observations`
+- `GET /api/inspection/reference-catalogs/runtime-observations/{category}`
+- `PUT /api/inspection/reference-catalogs/runtime-observations/{category}`
+- `DELETE /api/inspection/reference-catalogs/runtime-observations/{category}/{term}`
 - `GET /api/inspection/rag/update-config`
 - `GET /api/inspection/rag/documents`
 - `GET /api/inspection/rag/vector-store`
@@ -161,7 +161,7 @@ Inspection:
 - Runtime job state is internal and lives in `app/server/services/runtime/state.py`; it is not a domain contract and must not be imported by endpoints.
 - Repository layer (`app/server/repositories/*`)
   - SQL persistence, serialization, vector store access.
-  - Text-normalization vocabulary persistence and snapshot loading are implemented in `app/server/repositories/serialization/text_normalization.py`.
+  - Reference catalog persistence/seeding is implemented through `reference_catalog_entries` and `reference_catalog_seed_runs` via `app/server/repositories/serialization/catalogs.py`.
 - Config/common layers (`app/server/configurations/*`, `app/server/common/*`)
   - Runtime settings, constants, environment/bootstrap, logging.
   - Shared security helpers, including provider-key cryptography, live under `app/server/common/security/cryptography.py`.
@@ -211,7 +211,9 @@ Endpoint -> service -> repository:
   - PostgreSQL when external DB mode is configured
   - `clinical_sessions` is the single source of truth for session records, versioning, revision parentage, and session metadata. New sessions default to `version=1`; revised sessions store `original_session_id` and incremented `version`.
   - Evidence-locked DILI artifacts (`normalized_document`, `extraction_artifact`, `fact_graph`, `faithfulness_audit`, generated report metadata, discrepancy report, and `run_bundle_index`) are persisted inside the database-backed session result payload. Durable loose JSON/Markdown assessment files are not part of the runtime contract.
-  - Startup does not mutate existing schemas. During development, recreate the database from the current SQLAlchemy models instead of changing existing databases at application startup.
+  - Reference catalogs are canonicalized from JSON manifests in `app/resources/catalogs/*.json` and seeded into DB tables.
+  - Startup performs hash-based seed checks and only reseeds manifests that are missing/changed.
+  - Full reseed/reset is explicit via `app/scripts/initialize_database.py --drop-existing --seed-catalogs --force-reseed-catalogs`.
 - Vector persistence:
   - LanceDB collection under `app/resources/sources/vectors`
   - RAG retrieval uses vector search plus LanceDB full-text search with metadata-aware fusion and local cross-encoder reranking.

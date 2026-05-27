@@ -9,7 +9,6 @@ from domain.clinical.robustness import (
     SpanMapping,
 )
 
-
 ADMIN_RE = re.compile(
     r"\b(patient|paziente|date|data|page|pagina|address|telefono|phone|email|id)\b",
     re.IGNORECASE,

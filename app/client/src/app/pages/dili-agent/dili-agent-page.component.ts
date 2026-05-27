@@ -3,7 +3,6 @@ import { Component, ElementRef, HostListener, OnDestroy, ViewChild, computed, ef
 import { FormsModule } from '@angular/forms';
 
 import { DEFAULT_FORM_STATE, REPORT_EXPORT_FILENAME } from '../../core/constants';
-import { CLINICAL_SECTION_TEMPLATE } from '../../core/clinical-section-template';
 import { AppStateService } from '../../core/state/app-state.service';
 import {
   buildClinicalPayload,
@@ -17,6 +16,7 @@ import {
   JobStatusResponse,
 } from '../../core/models/types';
 import {
+  fetchClinicalSectionTemplate,
   cancelClinicalJob,
   pollClinicalJobStatus,
   resolvePollIntervalMs,
@@ -61,7 +61,7 @@ export class DiliAgentPageComponent implements OnDestroy {
   readonly todayIso = todayIso;
   readonly finalReportMarkdown = computed(() => this.stateService.state().diliAgent.message || this.reportBody);
   readonly renderedReport = computed(() => this.markdownRenderer.render(this.finalReportMarkdown()));
-  readonly clinicalInputTemplate = CLINICAL_SECTION_TEMPLATE;
+  readonly clinicalInputTemplate = signal('');
 
   private poller: { stop: () => void } | null = null;
   private runActionLockTimer: ReturnType<typeof globalThis.setTimeout> | null = null;
@@ -69,6 +69,7 @@ export class DiliAgentPageComponent implements OnDestroy {
   private runControlDebounced = false;
 
   constructor() {
+    void this.loadClinicalSectionTemplate();
     effect(() => {
       const state = this.vm;
       if (
@@ -130,6 +131,18 @@ export class DiliAgentPageComponent implements OnDestroy {
           }
         : {}),
     });
+  }
+
+  private async loadClinicalSectionTemplate(): Promise<void> {
+    try {
+      const response = await fetchClinicalSectionTemplate();
+      if (response.template?.trim()) {
+        this.clinicalInputTemplate.set(response.template.trim());
+        return;
+      }
+    } catch {
+      this.clinicalInputTemplate.set('');
+    }
   }
 
   handleVisitDateChange(value: string): void {

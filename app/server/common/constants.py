@@ -85,9 +85,10 @@ TABLE_LIVERTOX_MONOGRAPHS = "livertox_monographs"
 TABLE_MODEL_SELECTIONS = "model_selections"
 TABLE_RUNTIME_SETTINGS = "runtime_settings"
 TABLE_ACCESS_KEYS = "access_keys"
+TABLE_REFERENCE_CATALOG_ENTRIES = "reference_catalog_entries"
+TABLE_REFERENCE_CATALOG_SEED_RUNS = "reference_catalog_seed_runs"
 
 DEFAULT_DRUG_MATCH_TOKEN_MIN_LENGTH = 4
-DEFAULT_DRUG_MATCH_CATALOG_EXCLUDED_TERM_SUFFIXES = ("PCK",)
 DEFAULT_DRUG_MATCH_CATALOG_INDEX_LIMIT = 75000
 DEFAULT_DRUG_MATCH_SPELLING_CONFIDENCE = 0.94
 DEFAULT_DRUG_MATCH_SPELLING_MIN_QUERY_LENGTH = 6
@@ -153,37 +154,6 @@ DOCUMENT_SUPPORTED_EXTENSIONS = {".pdf", ".txt", ".xml", ".docx", ".doc"}
 TEXT_FILE_FALLBACK_ENCODINGS = ("utf-8", "utf-16", "latin-1", "iso-8859-1")
 DRUG_NAME_ALLOWED_PATTERN = r"[A-Za-z0-9\s\-/(),'+\.]+"
 DEFAULT_EMBEDDING_BATCH_SIZE = 64
-HEPATIC_KEYWORDS = {
-    "liver",
-    "hepatic",
-    "hepatotoxic",
-    "hepatitis",
-    "cholestatic",
-    "bilirubin",
-    "transaminase",
-    "alt",
-    "ast",
-    "alp",
-    "drug induced liver injury",
-    "dili",
-}
-
-HEPATOTOXIC_MEDDRA_TERMS = {
-    "hepatotoxicity",
-    "drug induced liver injury",
-    "drug-induced liver injury",
-    "liver injury",
-    "hepatic failure",
-    "acute hepatic failure",
-    "hepatitis cholestatic",
-    "cholestasis",
-    "liver disorder",
-    "liver function test increased",
-    "alanine aminotransferase increased",
-    "aspartate aminotransferase increased",
-    "alkaline phosphatase increased",
-    "blood bilirubin increased",
-}
 
 # [DILI DEFAULTS]
 ###############################################################################
@@ -194,14 +164,4 @@ R_SCORE_HEPATOCELLULAR_THRESHOLD = 5.0
 R_SCORE_CHOLESTATIC_THRESHOLD = 2.0
 TRUTHY_ENV_VALUES = {"1", "true", "yes", "on"}
 FALSY_ENV_VALUES = {"0", "false", "no", "off"}
-SENSITIVE_ERROR_TOKENS: tuple[str, ...] = (
-    "traceback",
-    "stack",
-    "token",
-    "secret",
-    "password",
-    "authorization",
-    "api key",
-    "access key",
-)
 

@@ -7,30 +7,25 @@ from typing import Any, Generic, Iterable, TypeVar
 import pandas as pd
 
 from configurations.startup import server_settings
-from common.utils.logger import logger
 from domain.clinical.matching import (
     AliasCacheEntry,
     LiverToxMatch,
     MonographRecord,
 )
-from services.text.normalization import (
-    canonicalize_drug_query,
-    coerce_text,
-    normalize_drug_query_name,
-    normalize_whitespace,
-)
-from services.text.vocabulary import get_text_normalization_snapshot
+from services.catalogs.runtime import get_reference_catalog_snapshot
 from services.clinical.livertox import LiverToxData
-from services.text.synonyms import (
-    extract_synonym_strings,
-    parse_synonym_list,
-    split_synonym_variants,
-)
-
 
 KT = TypeVar("KT")
 VT = TypeVar("VT")
 CACHE_MISS = object()
+
+def _catalog_excluded_term_suffixes() -> tuple[str, ...]:
+    values = get_reference_catalog_snapshot().values(
+        "drug_matching",
+        "rxnav_excluded_term_suffixes",
+        key="default",
+    )
+    return tuple(value.strip().upper() for value in values if value.strip())
 
 
 ###############################################################################
@@ -64,7 +59,8 @@ class BoundedCache(Generic[KT, VT]):
         self.store.clear()
 
 
-from services.clinical import matches_drug, matches_causality, matches_serialization
+from services.clinical import matches_causality, matches_drug, matches_serialization
+
 
 class DrugsLookup:
     DIRECT_CONFIDENCE = server_settings.drugs_matcher.direct_confidence
@@ -75,9 +71,7 @@ class DrugsLookup:
     MATCH_CACHE_LIMIT = server_settings.drugs_matcher.match_cache_limit
     ALIAS_CACHE_LIMIT = server_settings.drugs_matcher.alias_cache_limit
     TOKEN_MIN_LENGTH = server_settings.drugs_matcher.token_min_length
-    CATALOG_EXCLUDED_TERM_SUFFIXES = (
-        server_settings.drugs_matcher.catalog_excluded_term_suffixes
-    )
+    CATALOG_EXCLUDED_TERM_SUFFIXES = _catalog_excluded_term_suffixes()
     CATALOG_INDEX_LIMIT = server_settings.drugs_matcher.catalog_index_limit
     SPELLING_CONFIDENCE = server_settings.drugs_matcher.spelling_confidence
     SPELLING_MIN_QUERY_LENGTH = server_settings.drugs_matcher.spelling_min_query_length

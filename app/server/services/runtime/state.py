@@ -1,10 +1,10 @@
 from __future__ import annotations
 
-from dataclasses import dataclass, field
 import threading
+from collections.abc import Mapping
+from dataclasses import dataclass, field
 from time import monotonic
 from typing import Any
-from collections.abc import Mapping
 
 from domain.jobs import JobStatusResponse
 

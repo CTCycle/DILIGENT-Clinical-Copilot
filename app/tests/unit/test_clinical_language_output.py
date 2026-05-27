@@ -1,12 +1,14 @@
 from __future__ import annotations
 
-from domain.clinical import HepatotoxicityPatternScore
+from domain.clinical import (
+    DrugClinicalAssessment,
+    HepatotoxicityPatternScore,
+    PatientData,
+)
+from services.clinical.hepatox_core import HepatoxConsultation
 from services.clinical.language import detect_clinical_language
 from services.clinical.validation import build_validation_bundle
-from services.clinical.hepatox_core import HepatoxConsultation
-from domain.clinical import DrugClinicalAssessment
 from services.session.session_shared import NarrativeBuilder
-from domain.clinical import PatientData
 
 
 def test_italian_input_yields_italian_language_detection_and_messages() -> None:
