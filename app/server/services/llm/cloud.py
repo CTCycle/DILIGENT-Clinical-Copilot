@@ -12,14 +12,14 @@ from openai import APIConnectionError, APITimeoutError, AsyncOpenAI, OpenAIError
 
 from common.constants import GEMINI_API_BASE, OPENAI_API_BASE
 from common.utils.logger import logger
-from configurations.startup import server_settings
 from configurations.llm_configs import LLMRuntimeConfig
+from configurations.startup import server_settings
+from repositories.serialization.access_keys import AccessKeySerializer
 from services.llm.structured import (
     StructuredOutputParser,
-    parse_json_dict,
     T,
+    parse_json_dict,
 )
-from repositories.serialization.access_keys import AccessKeySerializer
 
 ProviderName = Literal["openai", "gemini"]
 
@@ -107,7 +107,7 @@ class CloudLLMClient:
         access_key_serializer = AccessKeySerializer()
         try:
             row = access_key_serializer.get_active_key(provider, mark_used=True)
-        except Exception as exc:  # noqa: BLE001
+        except Exception:  # noqa: BLE001
             # Some environments expose the key store in read-only mode; in that
             # case, fall back to a read-only fetch without updating last_used_at.
             try:

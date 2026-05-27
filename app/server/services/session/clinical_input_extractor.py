@@ -6,8 +6,10 @@ from typing import Any
 
 from configurations.llm_configs import LLMRuntimeConfig
 from configurations.startup import server_settings
-from domain.clinical.entities import ClinicalSectionExtractionResult
-from domain.clinical.entities import ClinicalSectionLineRange
+from domain.clinical.entities import (
+    ClinicalSectionExtractionResult,
+    ClinicalSectionLineRange,
+)
 from services.llm.client_runtime import ensure_runtime_client
 from services.llm.provider_factory import select_llm_provider
 from services.session.clinical_section_parsers import (

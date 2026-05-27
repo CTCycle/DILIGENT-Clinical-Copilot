@@ -2,8 +2,7 @@ from __future__ import annotations
 
 from collections.abc import Iterable
 from time import monotonic
-from typing import Any, cast
-from typing import Protocol
+from typing import Any, Protocol, cast
 
 from common.constants import CLOUD_MODEL_CHOICES
 from common.exceptions import ServiceValidationError
@@ -20,6 +19,7 @@ from repositories.serialization.model_configs import (
     ModelConfigSerializer,
 )
 from services.llm.ollama_client import OllamaClient, OllamaError
+
 
 ###############################################################################
 class ModelConfigSnapshotStore(Protocol):

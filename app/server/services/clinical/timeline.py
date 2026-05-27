@@ -2,11 +2,11 @@ from __future__ import annotations
 
 import asyncio
 import re
-from datetime import datetime, UTC
+from datetime import UTC, datetime
 from typing import Any
 
-from common.utils.logger import logger
 from common.constants import CLOUD_MODEL_CHOICES
+from common.utils.logger import logger
 from configurations.llm_configs import LLMRuntimeConfig
 from configurations.startup import server_settings
 from domain.patient_timeline import (
@@ -14,13 +14,12 @@ from domain.patient_timeline import (
     PatientTimelineEvent,
     PatientTimelineExtraction,
 )
-from services.llm.prompts import PATIENT_TIMELINE_EXTRACTION_PROMPT
 from services.llm.client_runtime import ensure_runtime_client
+from services.llm.prompts import PATIENT_TIMELINE_EXTRACTION_PROMPT
 from services.llm.provider_factory import (
     initialize_llm_client,
     select_llm_provider,
 )
-
 
 DATE_PREFIX_RE = re.compile(r"^\d{4}-\d{2}-\d{2}$")
 DATE_SHORT_RE = re.compile(r"^\d{4}-\d{2}$")

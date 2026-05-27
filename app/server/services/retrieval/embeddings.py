@@ -6,20 +6,20 @@ from collections.abc import Coroutine
 from typing import Any, Literal, Protocol, cast
 
 import httpx
+import torch
 from langchain_google_genai import GoogleGenerativeAIEmbeddings
 from langchain_ollama import OllamaEmbeddings
 from langchain_openai import OpenAIEmbeddings
 from pydantic import SecretStr
 from transformers import AutoModelForSequenceClassification, AutoTokenizer
-import torch
 
-from configurations.startup import server_settings
 from common.constants import CLOUD_MODEL_CHOICES, VECTOR_DB_PATH
 from common.utils.logger import logger
+from configurations.startup import server_settings
 from repositories.serialization.access_keys import AccessKeySerializer
+from repositories.vectors import LanceVectorDatabase
 from services.llm.cloud import LLMError, LLMTimeout
 from services.llm.ollama_client import OllamaError, OllamaTimeout
-from repositories.vectors import LanceVectorDatabase
 
 ProviderName = Literal["openai", "gemini"]
 EmbeddingBackend = Literal["ollama", "cloud"]

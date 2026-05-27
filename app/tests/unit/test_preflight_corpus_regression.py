@@ -5,13 +5,12 @@ import json
 from pathlib import Path
 
 import pytest
-
 from configurations.llm_configs import LLMRuntimeConfig
 from domain.clinical.entities import ClinicalSessionRequest
 from domain.clinical.robustness import FactGraph, ReportMetadata
 from services.runtime.jobs import get_job_manager
-from services.session.document_normalizer import DocumentNormalizer
 from services.session import preflight as preflight_module
+from services.session.document_normalizer import DocumentNormalizer
 from services.session.factory import build_clinical_session_service
 from services.session.robust_pipeline import (
     audit_report,

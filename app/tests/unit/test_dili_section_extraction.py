@@ -1,8 +1,10 @@
 from __future__ import annotations
 
 import pytest
-
-from services.session.clinical_section_parsers import extract_required_dili_sections, missing_required_section_names
+from services.session.clinical_section_parsers import (
+    extract_required_dili_sections,
+    missing_required_section_names,
+)
 
 
 def test_extract_preferred_markdown_headings() -> None:

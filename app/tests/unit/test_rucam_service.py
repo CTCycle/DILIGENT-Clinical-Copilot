@@ -1,6 +1,15 @@
 from __future__ import annotations
 
-from domain.clinical import ClinicalLabEntry, DrugEntry, HepatotoxicityPatternScore, LiverInjuryOnsetContext, PatientData, PatientDiseaseContext, PatientDrugs, PatientLabTimeline
+from domain.clinical import (
+    ClinicalLabEntry,
+    DrugEntry,
+    HepatotoxicityPatternScore,
+    LiverInjuryOnsetContext,
+    PatientData,
+    PatientDiseaseContext,
+    PatientDrugs,
+    PatientLabTimeline,
+)
 from services.clinical.rucam import RucamScoreEstimator
 
 

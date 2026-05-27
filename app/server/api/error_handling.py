@@ -8,9 +8,9 @@ import httpx
 from fastapi import FastAPI, Request, status
 from fastapi.exceptions import RequestValidationError
 from fastapi.responses import JSONResponse
-from starlette.types import ExceptionHandler
 from starlette.middleware.base import BaseHTTPMiddleware, RequestResponseEndpoint
 from starlette.responses import Response
+from starlette.types import ExceptionHandler
 
 from common.constants import (
     DEPENDENCY_FAILURE_MESSAGE,
@@ -19,9 +19,9 @@ from common.constants import (
     REQUEST_ID_HEADER,
     TIMEOUT_FAILURE_MESSAGE,
 )
+from common.exceptions import ServiceError
 from common.utils.logger import logger
 from domain.errors import ApiErrorResponse
-from common.exceptions import ServiceError
 
 
 ###############################################################################

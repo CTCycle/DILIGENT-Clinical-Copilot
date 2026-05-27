@@ -2,14 +2,19 @@ from __future__ import annotations
 
 import asyncio
 import os
-from typing import Any
 from collections.abc import Callable
+from typing import Any
 
+from common.constants import ARCHIVES_PATH, LIVERTOX_BASE_URL
 from configurations.startup import server_settings
-from common.constants import LIVERTOX_BASE_URL, ARCHIVES_PATH
-from services.updater.sanitizer import LiverToxExcerptSanitizer
-from services.updater import livertox_common, livertox_download, livertox_index, livertox_parse
 from repositories.serialization.data import DataSerializer
+from services.updater import (
+    livertox_common,
+    livertox_download,
+    livertox_index,
+    livertox_parse,
+)
+from services.updater.sanitizer import LiverToxExcerptSanitizer
 
 
 class LiverToxUpdater:

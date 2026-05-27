@@ -7,19 +7,18 @@ from collections.abc import Callable
 from typing import Any
 
 from common.utils.logger import logger
-from configurations.startup import server_settings
 from configurations.llm_configs import LLMRuntimeConfig
+from configurations.startup import server_settings
 from domain.clinical.entities import (
     DiseaseContextEntry,
     PatientDiseaseContext,
 )
+from services.llm.client_runtime import ensure_runtime_client
 from services.llm.prompts import (
     ANAMNESIS_DISEASE_EXTRACTION_PROMPT,
 )
-from services.llm.client_runtime import ensure_runtime_client
 from services.llm.provider_factory import select_llm_provider
 from services.text.normalization import normalize_token
-
 
 ###############################################################################
 RATE_LIMIT_WAIT_HINT_RE = re.compile(

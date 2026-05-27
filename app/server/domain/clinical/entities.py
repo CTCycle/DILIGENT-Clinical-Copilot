@@ -1,8 +1,8 @@
 from __future__ import annotations
 
+import re
 from collections.abc import Mapping
 from datetime import date, datetime
-import re
 from typing import Any, Literal
 
 from pydantic import (
@@ -12,6 +12,7 @@ from pydantic import (
     field_validator,
     model_validator,
 )
+
 from domain.clinical.sections import ClinicalSectionKey
 
 Comparator = Literal["<=", "<", ">=", ">"]
@@ -197,6 +198,11 @@ class ClinicalSessionRequest(BaseModel):
             if cleaned:
                 normalized.append(cleaned)
         return normalized
+
+
+class ClinicalSectionTemplateResponse(BaseModel):
+    headings: dict[str, list[str]] = Field(default_factory=dict)
+    template: str = Field(..., min_length=1)
 
 
 class ClinicalSectionLineRange(BaseModel):

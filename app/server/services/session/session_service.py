@@ -2,8 +2,8 @@ from __future__ import annotations
 
 import asyncio
 import time
-from typing import Any
 from collections.abc import Callable
+from typing import Any
 
 from pydantic import ValidationError
 
@@ -11,23 +11,23 @@ from common.exceptions import (
     ServiceNotFoundError,
     ServiceValidationError,
 )
-from domain.clinical.extras import HepatoxPreparedInputs
-from services.llm.cloud import LLMError
-
+from common.utils.logger import logger
+from configurations.llm_configs import LLMRuntimeConfig
 from domain.clinical.entities import (
-    ClinicalSectionExtractionResult,
     ClinicalPipelineValidationError,
+    ClinicalSectionExtractionResult,
     ClinicalSessionRequest,
     DrugRucamAssessment,
     HepatotoxicityPatternAssessment,
     LiverInjuryOnsetContext,
-    PatientLabTimeline,
     PatientData,
     PatientDiseaseContext,
     PatientDrugs,
+    PatientLabTimeline,
     PatientRucamAssessmentBundle,
     PipelineIssue,
 )
+from domain.clinical.extras import HepatoxPreparedInputs
 from domain.clinical.robustness import ClinicalInputPreflightResult
 from domain.clinical.validation import ValidationMessageBundle
 from domain.jobs import (
@@ -35,15 +35,12 @@ from domain.jobs import (
     JobStartResponse,
     JobStatusResponse,
 )
-from configurations.llm_configs import LLMRuntimeConfig
 from repositories.serialization.data import DataSerializer
 from repositories.serialization.model_configs import (
     ModelConfigSerializer,
 )
-from services.runtime.jobs import (
-    JobManager,
-)
-from common.utils.logger import logger
+from services.clinical.disease import DiseaseExtractor
+from services.clinical.drug_blocks import isolate_drug_blocks
 from services.clinical.hepatox_core import (
     HepatotoxicityPatternAnalyzer,
     HepatoxConsultation,
@@ -52,36 +49,39 @@ from services.clinical.job_progress import (
     ClinicalConsultationProgressCallback,
     StageProgressFractionCallback,
 )
-from services.clinical.language import ClinicalLanguageDetector
-from services.clinical.preparation import ClinicalKnowledgePreparation
-from services.clinical.disease import DiseaseExtractor
 from services.clinical.labs import ClinicalLabExtractor
+from services.clinical.language import ClinicalLanguageDetector
 from services.clinical.parser import DrugsParser
-from services.clinical.drug_blocks import isolate_drug_blocks
+from services.clinical.preparation import ClinicalKnowledgePreparation
 from services.clinical.rucam import RucamScoreEstimator
 from services.clinical.validation import (
     build_validation_bundle,
     ensure_required_sections,
     has_timing_information,
 )
-from services.session.payload import PayloadSanitizationService
+from services.llm.cloud import LLMError
+from services.llm.model_config import ModelConfigService
+from services.retrieval.query import DILIQueryBuilder
+from services.runtime.jobs import (
+    JobManager,
+)
 from services.session.clinical_input_extractor import (
     ClinicalInputExtractionError,
     ClinicalInputExtractor,
 )
-from services.llm.model_config import ModelConfigService
-from services.retrieval.query import DILIQueryBuilder
 from services.session.formatting_mixin import (
     ClinicalSessionFormattingMixin,
 )
+from services.session.payload import PayloadSanitizationService
+from services.session.preflight import validate_clinical_input_preflight
 from services.session.session_workflow import (
     build_matched_drugs_payload_workflow,
     build_single_matched_drug_row_workflow,
     process_single_patient_workflow,
     start_clinical_job_workflow,
 )
-from services.session.preflight import validate_clinical_input_preflight
 from services.text.normalization import normalize_drug_query_name
+
 
 ###############################################################################
 class ClinicalSessionService(ClinicalSessionFormattingMixin):
@@ -477,7 +477,7 @@ class ClinicalSessionService(ClinicalSessionFormattingMixin):
                 )
                 self.run_stop_check(stop_check)
                 return disease_context
-            except TimeoutError as exc:
+            except TimeoutError:
                 elapsed = time.perf_counter() - start_time
                 if attempt < max_attempts:
                     logger.warning(

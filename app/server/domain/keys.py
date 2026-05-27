@@ -1,11 +1,10 @@
 from __future__ import annotations
 
+import re
 from datetime import datetime
 from typing import Literal, cast
-import re
 
 from pydantic import BaseModel, ConfigDict, Field, field_validator
-
 
 ProviderName = Literal["openai", "gemini", "openrouter"]
 SUPPORTED_PROVIDERS: frozenset[ProviderName] = frozenset(

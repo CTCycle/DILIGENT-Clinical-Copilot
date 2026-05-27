@@ -7,35 +7,35 @@ from collections.abc import Callable
 from datetime import date
 from typing import Any, Literal, cast
 
-from services.llm.prompts import (
-    ANAMNESIS_DRUG_EXTRACTION_PROMPT,
-    DRUG_EXTRACTION_PROMPT,
+from common.utils.logger import logger
+from common.utils.patterns import (
+    FORM_DESCRIPTORS,
+    FORM_TOKENS,
+    UNIT_TOKENS,
 )
-from services.llm.client_runtime import ensure_runtime_client
-from services.llm.provider_factory import select_llm_provider
+from configurations.llm_configs import LLMRuntimeConfig
+from configurations.startup import server_settings
 from domain.clinical.entities import (
     DrugEntry,
     PatientDrugs,
 )
-from configurations.startup import server_settings
-from configurations.llm_configs import LLMRuntimeConfig
-from services.text.normalization import normalize_token
+from services.catalogs.runtime import get_reference_catalog_snapshot
 from services.clinical.drug_blocks import isolate_drug_blocks
 from services.clinical.parser_extraction import (
     BRACKET_TRAIL_RE,
     BULLET_RE,
     DATE_LIKE_SCHEDULE_RE,
-    DOSE_CUE_RE,
-    DOSAGE_TEMPORAL_SPLIT_RE,
-    NAME_TEMPORAL_SPLIT_RE,
-    ROUTE_PATTERNS,
     SCHEDULE_RE,
     START_DATE_RE,
-    START_EVENT_RE,
     SUSPENSION_DATE_RE,
-    SUSPENSION_EVENT_RE,
     SUSPENSION_RE,
-    TRAILING_ROUTE_TOKEN_RE,
+    build_dosage_temporal_split_re,
+    build_dose_cue_re,
+    build_name_temporal_split_re,
+    build_route_patterns,
+    build_start_event_re,
+    build_suspension_event_re,
+    build_trailing_route_token_re,
 )
 from services.clinical.parser_prompting import ANAMNESIS_CHUNK_MAX_CHARS
 from services.clinical.parser_validation import (
@@ -45,13 +45,14 @@ from services.clinical.parser_validation import (
     NON_THERAPY_LINE_PREFIXES,
     WEEKDAY_TOKENS,
 )
-from common.utils.logger import logger
-from services.text.vocabulary import get_text_normalization_snapshot
-from common.utils.patterns import (
-    FORM_DESCRIPTORS,
-    FORM_TOKENS,
-    UNIT_TOKENS,
+from services.llm.client_runtime import ensure_runtime_client
+from services.llm.prompts import (
+    ANAMNESIS_DRUG_EXTRACTION_PROMPT,
+    DRUG_EXTRACTION_PROMPT,
 )
+from services.llm.provider_factory import select_llm_provider
+from services.text.normalization import normalize_token
+from services.text.vocabulary import get_text_normalization_snapshot
 
 
 ###############################################################################
@@ -66,27 +67,21 @@ class DrugsParser:
     SUSPENSION_RE = SUSPENSION_RE
     SUSPENSION_DATE_RE = SUSPENSION_DATE_RE
     START_DATE_RE = START_DATE_RE
-    ROUTE_PATTERNS = ROUTE_PATTERNS
-    DOSE_CUE_RE = DOSE_CUE_RE
-    DOSAGE_TEMPORAL_SPLIT_RE = DOSAGE_TEMPORAL_SPLIT_RE
-    NAME_TEMPORAL_SPLIT_RE = NAME_TEMPORAL_SPLIT_RE
-    TRAILING_ROUTE_TOKEN_RE = TRAILING_ROUTE_TOKEN_RE
-    START_EVENT_RE = START_EVENT_RE
-    SUSPENSION_EVENT_RE = SUSPENSION_EVENT_RE
+    ROUTE_PATTERNS: tuple[tuple[str, re.Pattern[str]], ...] = ()
+    DOSE_CUE_RE = re.compile(r"$^")
+    DOSAGE_TEMPORAL_SPLIT_RE = re.compile(r"$^")
+    NAME_TEMPORAL_SPLIT_RE = re.compile(r"$^")
+    TRAILING_ROUTE_TOKEN_RE = re.compile(r"$^")
+    START_EVENT_RE = re.compile(r"$^")
+    SUSPENSION_EVENT_RE = re.compile(r"$^")
     ANAMNESIS_CHUNK_MAX_CHARS = ANAMNESIS_CHUNK_MAX_CHARS
     NON_DRUG_EXACT_NAMES = NON_DRUG_EXACT_NAMES
     NON_DRUG_PREFIXES = NON_DRUG_PREFIXES
     NON_DRUG_CONTAINS = NON_DRUG_CONTAINS
     WEEKDAY_TOKENS = WEEKDAY_TOKENS
     NON_THERAPY_LINE_PREFIXES = NON_THERAPY_LINE_PREFIXES
-    LAB_MEASUREMENT_NAME_RE = re.compile(
-        r"\b(?:u/l|ui/l|mg/dl|g/l|mmol/l|micromol|µmol|x10\^?\d+|uln)\b",
-        re.IGNORECASE,
-    )
-    LAB_MARKER_NAME_RE = re.compile(
-        r"\b(?:alt|alat|ast|asat|alp|ggt|bilirubin|bilirubina|inr)\b",
-        re.IGNORECASE,
-    )
+    LAB_MEASUREMENT_NAME_RE = re.compile(r"\b(?:u/l|ui/l|mg/dl|uln)\b", re.IGNORECASE)
+    LAB_MARKER_NAME_RE = re.compile(r"\b(?:alt|ast|alp|bilirubin|inr)\b", re.IGNORECASE)
 
     def __init__(
         self,
@@ -109,6 +104,60 @@ class DrugsParser:
         else:
             self.client_provider = "injected"
             self.runtime_revision = LLMRuntimeConfig.get_revision()
+        self._embedded_aliases = self._load_embedded_aliases()
+        self._non_drug_tokens = self._load_non_drug_tokens()
+        self.ROUTE_PATTERNS = build_route_patterns()
+        self.DOSE_CUE_RE = build_dose_cue_re()
+        self.DOSAGE_TEMPORAL_SPLIT_RE = build_dosage_temporal_split_re()
+        self.NAME_TEMPORAL_SPLIT_RE = build_name_temporal_split_re()
+        self.TRAILING_ROUTE_TOKEN_RE = build_trailing_route_token_re()
+        self.START_EVENT_RE = build_start_event_re()
+        self.SUSPENSION_EVENT_RE = build_suspension_event_re()
+        self._lab_measurement_name_re = self._build_lab_measurement_pattern()
+        self._lab_marker_name_re = self._build_lab_marker_pattern()
+
+    # -------------------------------------------------------------------------
+    def _load_embedded_aliases(self) -> tuple[tuple[str, str], ...]:
+        snapshot = get_reference_catalog_snapshot()
+        entries = snapshot.entries("drug_matching", "catalog_fallback_aliases")
+        aliases: list[tuple[str, str]] = []
+        for entry in entries:
+            normalized_alias = self.normalize_filter_key(entry.value)
+            replacement = entry.key.strip()
+            if normalized_alias and replacement:
+                aliases.append((normalized_alias, replacement))
+        return tuple(aliases)
+
+    # -------------------------------------------------------------------------
+    def _load_non_drug_tokens(self) -> frozenset[str]:
+        snapshot = get_reference_catalog_snapshot()
+        return frozenset(
+            self.normalize_filter_key(value)
+            for value in snapshot.values(
+                "clinical_extraction",
+                "drug_non_name_tokens",
+            )
+            if value
+        )
+
+    # -------------------------------------------------------------------------
+    def _build_lab_measurement_pattern(self) -> re.Pattern[str]:
+        snapshot = get_reference_catalog_snapshot()
+        values = list(snapshot.values("clinical_extraction", "lab_measurement_indicators"))
+        values.extend(snapshot.values("clinical_extraction", "laboratory_uln_labels"))
+        escaped = [re.escape(value) for value in values if value]
+        if not escaped:
+            return self.LAB_MEASUREMENT_NAME_RE
+        return re.compile(r"\b(?:" + "|".join(escaped) + r")\b", re.IGNORECASE)
+
+    # -------------------------------------------------------------------------
+    def _build_lab_marker_pattern(self) -> re.Pattern[str]:
+        snapshot = get_reference_catalog_snapshot()
+        values = list(snapshot.values("clinical_extraction", "lab_marker_indicators"))
+        escaped = [re.escape(value) for value in values if value]
+        if not escaped:
+            return self.LAB_MARKER_NAME_RE
+        return re.compile(r"\b(?:" + "|".join(escaped) + r")\b", re.IGNORECASE)
 
     # -------------------------------------------------------------------------
     async def ensure_client(self) -> None:
@@ -866,14 +915,7 @@ class DrugsParser:
         if not value:
             return value
         normalized = self.normalize_filter_key(value)
-        embedded_aliases = (
-            ("co amoxicillina", "Co-Amoxicillina"),
-            ("co amoxi", "Co-Amoxicillina"),
-            ("valaciclovir", "Valaciclovir"),
-            ("valacyclovir", "Valaciclovir"),
-            ("bactrim", "Bactrim"),
-        )
-        for alias, replacement in embedded_aliases:
+        for alias, replacement in self._embedded_aliases:
             if alias in normalized:
                 return replacement
         return value
@@ -911,36 +953,6 @@ class DrugsParser:
         )
         weekday_tokens = set(self.WEEKDAY_TOKENS) | set(snapshot.drug_weekday_words)
         duration_words = set(snapshot.drug_duration_words)
-        non_drug_tokens = {
-            "il",
-            "dal",
-            "dalla",
-            "dalle",
-            "kg",
-            "mg",
-            "ml",
-            "ui",
-            "per",
-            "os",
-            "iv",
-            "sc",
-            "die",
-            "giorno",
-            "giorni",
-            "settimana",
-            "settimane",
-            "mese",
-            "mesi",
-            "terapia",
-            "terapie",
-            "farmacoterapia",
-            "eseguite",
-            "eseguita",
-            "iniziato",
-            "iniziata",
-            "sospeso",
-            "sospesa",
-        }
         if not normalized:
             return True
         if normalized in non_drug_exact:
@@ -956,16 +968,16 @@ class DrugsParser:
             return True
         if tokens and all(token in weekday_tokens for token in tokens):
             return True
-        if tokens and all(token in non_drug_tokens for token in tokens):
+        if tokens and all(token in self._non_drug_tokens for token in tokens):
             return True
         if len(tokens) <= 3 and tokens[:2] == ["terapie", "eseguite"]:
             return True
         if any(char.isdigit() for char in normalized):
             # Guardrail: numeric-heavy fragments that look like lab measurements
             # are frequently LLM extraction artefacts, not medication names.
-            if self.LAB_MEASUREMENT_NAME_RE.search(normalized) is not None:
+            if self._lab_measurement_name_re.search(normalized) is not None:
                 return True
-            if self.LAB_MARKER_NAME_RE.search(normalized) is not None:
+            if self._lab_marker_name_re.search(normalized) is not None:
                 return True
         return False
 

@@ -7,6 +7,7 @@ import os
 import re
 import tarfile
 import unicodedata
+from collections.abc import Callable
 from concurrent.futures import (
     ALL_COMPLETED,
     FIRST_COMPLETED,
@@ -15,7 +16,6 @@ from concurrent.futures import (
     wait,
 )
 from typing import Any, cast
-from collections.abc import Callable
 
 import pandas as pd
 from pdfminer.high_level import extract_text as pdfminer_extract_text
@@ -23,8 +23,8 @@ from pypdf import PdfReader
 from tqdm import tqdm
 
 from common.utils.logger import logger
-from services.updater import livertox_common
 from services.text.normalization import normalize_whitespace
+from services.updater import livertox_common
 
 
 # -----------------------------------------------------------------------------

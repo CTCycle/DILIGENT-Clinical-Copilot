@@ -13,12 +13,11 @@ from typing import Any
 import httpx
 import pandas as pd
 
-from common.utils.logger import logger
 from common.constants import RXNAV_CURATED_ALIASES_PATH
+from common.utils.logger import logger
 from repositories.serialization.data import DataSerializer
 from services.text.normalization import normalize_drug_name
 from services.text.vocabulary import get_text_normalization_snapshot
-
 from services.updater.rxnav_client import (
     RxNavClient,
     run_with_semaphore,

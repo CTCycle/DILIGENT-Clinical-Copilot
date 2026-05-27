@@ -3,14 +3,13 @@ from __future__ import annotations
 import asyncio
 
 import pytest
-
 from common.exceptions import ServiceValidationError
 from domain.clinical.entities import (
     ClinicalSectionExtractionResult,
     ClinicalSessionRequest,
 )
-from services.session.clinical_input_extractor import ClinicalInputExtractionError
 from services.runtime.jobs import get_job_manager
+from services.session.clinical_input_extractor import ClinicalInputExtractionError
 from services.session.factory import build_clinical_session_service
 from services.session.session_service import ClinicalSessionService
 from services.session.session_workflow import start_clinical_job_workflow

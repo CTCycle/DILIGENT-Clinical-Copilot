@@ -2,25 +2,22 @@ from __future__ import annotations
 
 import asyncio
 import inspect
-import json
 import re
 from collections.abc import Callable, Sequence
-from datetime import date, datetime
+from datetime import date
 from typing import Any
 
-from services.llm.prompts import (
-    LIVERTOX_CONCLUSION_SYSTEM_PROMPT,
-    LIVERTOX_CONCLUSION_USER_PROMPT,
-    LIVERTOX_CLINICAL_SYSTEM_PROMPT,
-    LIVERTOX_CLINICAL_USER_PROMPT,
-    LIVERTOX_REPORT_EXAMPLE_TEMPLATE,
+from common.constants import (
+    DEFAULT_DILI_CLASSIFICATION,
+    R_SCORE_CHOLESTATIC_THRESHOLD,
+    R_SCORE_HEPATOCELLULAR_THRESHOLD,
 )
-from services.llm.provider_factory import initialize_llm_client
+from configurations.llm_configs import LLMRuntimeConfig
+from configurations.startup import server_settings
 from domain.clinical.entities import (
     ClinicalLabEntry,
-    ClinicalPipelineValidationError,
-    DrugEntry,
     DrugClinicalAssessment,
+    DrugEntry,
     DrugRucamAssessment,
     DrugSuspensionContext,
     HepatotoxicityPatternAssessment,
@@ -31,25 +28,13 @@ from domain.clinical.entities import (
     PatientRucamAssessmentBundle,
     PipelineIssue,
 )
-from configurations.startup import server_settings
-from configurations.llm_configs import LLMRuntimeConfig
-from common.constants import (
-    DEFAULT_DILI_CLASSIFICATION,
-    R_SCORE_CHOLESTATIC_THRESHOLD,
-    R_SCORE_HEPATOCELLULAR_THRESHOLD,
-)
-from common.utils.logger import logger
-from services.clinical.match_quality import classify_match_evidence
-from services.retrieval.embeddings import SimilaritySearch
 from services.clinical.preparation import HepatoxPreparedInputs
-from services.text.normalization import normalize_drug_query_name
-from services.text.vocabulary import get_text_normalization_snapshot
 from services.clinical.report_language import (
     phrase,
     report_heading,
-    rucam_summary_text,
 )
-
+from services.llm.provider_factory import initialize_llm_client
+from services.retrieval.embeddings import SimilaritySearch
 
 ###############################################################################
 NOT_AVAILABLE_TEXT = "Not available"
@@ -308,8 +293,13 @@ class HepatotoxicityPatternAnalyzer:
 
 
 ###############################################################################
-from services.clinical import hepatox_assessment, hepatox_prompts, hepatox_scoring
-from services.clinical import hepatox_timeline
+from services.clinical import (
+    hepatox_assessment,
+    hepatox_prompts,
+    hepatox_scoring,
+    hepatox_timeline,
+)
+
 
 class HepatoxConsultation:
     def __init__(

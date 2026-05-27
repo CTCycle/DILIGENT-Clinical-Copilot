@@ -1,8 +1,8 @@
 from __future__ import annotations
 
-import json
 import asyncio
-from datetime import date, datetime, UTC
+import json
+from datetime import UTC, date, datetime
 from functools import partial
 from pathlib import Path
 from threading import Lock
@@ -16,39 +16,47 @@ from common.constants import (
 )
 from common.utils.logger import logger
 from configurations.startup import server_settings
-from domain.inspection import InspectionJobPhase
 from domain.clinical.entities import ClinicalSessionRequest
+from domain.inspection import InspectionJobPhase
 from domain.patient_timeline import PatientTimeline
 from repositories.serialization.data import (
     DataSerializer,
     DocumentSerializer,
 )
+from repositories.serialization.model_configs import ModelConfigSerializer
 from repositories.vectors import LanceVectorDatabase
 from services.clinical.timeline import PatientTimelineExtractor
-from services.runtime.jobs import JobManager
-from services.session.factory import build_clinical_session_service
-from repositories.serialization.model_configs import ModelConfigSerializer
 from services.inspection.normalization import (
     extract_lab_marker as extract_lab_marker_value,
+)
+from services.inspection.normalization import (
     first_iso_date as first_iso_date_value,
+)
+from services.inspection.normalization import (
     normalize_text as normalize_text_value,
 )
 from services.inspection.timeline import (
     build_fallback_timeline as build_fallback_timeline_value,
+)
+from services.inspection.timeline import (
     generate_session_timeline as generate_session_timeline_value,
+)
+from services.inspection.timeline import (
     get_session_timeline as get_session_timeline_value,
+)
+from services.runtime.jobs import JobManager
+from services.session.factory import build_clinical_session_service
+from services.text.normalization import normalize_drug_query_name
+from services.text.vocabulary import (
+    deactivate_text_normalization_term_payload,
+    invalidate_text_normalization_snapshot,
+    list_text_normalization_term_payloads,
+    upsert_text_normalization_term_payload,
 )
 from services.updater.embeddings import RagEmbeddingUpdater
 from services.updater.livertox_core import LiverToxUpdater
 from services.updater.rxnav_builder import RxNavDrugCatalogBuilder
 from services.updater.rxnav_client import RxNavClient
-from repositories.serialization.text_normalization import (
-    TextNormalizationVocabularySerializer,
-)
-from services.text.vocabulary import (
-    invalidate_text_normalization_snapshot,
-)
-from services.text.normalization import normalize_drug_query_name
 
 PhaseStep = tuple[InspectionJobPhase, int, int, str]
 UpdateTarget = Literal["rxnav", "livertox", "rag"]
@@ -112,15 +120,10 @@ class DataInspectionService:
         serializer: DataSerializer | None = None,
         timeline_extractor: PatientTimelineExtractor | None = None,
         jobs: JobManager,
-        text_vocabulary_serializer: TextNormalizationVocabularySerializer | None = None,
     ) -> None:
         self.serializer = serializer or DataSerializer()
         self.timeline_extractor = timeline_extractor or PatientTimelineExtractor()
         self.jobs = jobs
-        self.text_vocabulary_serializer = text_vocabulary_serializer or TextNormalizationVocabularySerializer(
-            engine=self.serializer.engine,
-            session_factory=self.serializer.session_factory,
-        )
         self.timeline_generation_lock = Lock()
         self.timeline_generation_inflight: set[int] = set()
         self.timeline_generation_cooldown_until: dict[int, float] = {}
@@ -170,12 +173,12 @@ class DataInspectionService:
         rag_cfg = config.get("rag", {}) if isinstance(config, dict) else {}
         return str(rag_cfg.get("documents_path", DOCS_PATH))
 
-    def list_text_normalization_terms(
+    def list_reference_catalog_runtime_observations(
         self, category: str | None = None
     ) -> list[dict[str, Any]]:
-        return self.text_vocabulary_serializer.list_term_payloads(category=category)
+        return list_text_normalization_term_payloads(category=category)
 
-    def upsert_text_normalization_term(
+    def upsert_reference_catalog_runtime_observation(
         self,
         *,
         category: str,
@@ -184,7 +187,7 @@ class DataInspectionService:
         source: str,
         is_active: bool,
     ) -> dict[str, Any]:
-        payload = self.text_vocabulary_serializer.upsert_term_payload(
+        payload = upsert_text_normalization_term_payload(
             category=category,
             term=term,
             replacement=replacement,
@@ -194,8 +197,10 @@ class DataInspectionService:
         invalidate_text_normalization_snapshot()
         return payload
 
-    def deactivate_text_normalization_term(self, *, category: str, term: str) -> bool:
-        updated = self.text_vocabulary_serializer.deactivate_term(
+    def deactivate_reference_catalog_runtime_observation(
+        self, *, category: str, term: str
+    ) -> bool:
+        updated = deactivate_text_normalization_term_payload(
             category=category,
             term=term,
         )

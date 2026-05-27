@@ -2,11 +2,10 @@ from __future__ import annotations
 
 from pathlib import Path
 
-from sqlalchemy import create_engine, func, inspect, select
-
 from domain.settings.configuration import DatabaseSettings
 from repositories.database.sqlite import SQLiteRepository
-from repositories.schemas.models import Base, TextNormalizationTerm
+from repositories.schemas.models import Base, ReferenceCatalogEntry
+from sqlalchemy import create_engine, func, inspect, select
 
 
 def _build_settings() -> DatabaseSettings:
@@ -48,7 +47,7 @@ def test_sqlite_repository_initializes_schema_when_db_file_missing(
     assert inspector.has_table("model_selections")
 
 
-def test_sqlite_repository_seeds_when_existing_db_has_schema(
+def test_sqlite_repository_does_not_seed_catalogs_during_construction(
     monkeypatch, tmp_path: Path
 ) -> None:  # type: ignore[no-untyped-def]
     db_path = tmp_path / "existing.db"
@@ -70,11 +69,11 @@ def test_sqlite_repository_seeds_when_existing_db_has_schema(
 
     assert inspector.has_table("access_keys")
     assert inspector.has_table("model_selections")
-    assert inspector.has_table("text_normalization_terms")
+    assert inspector.has_table("reference_catalog_entries")
     with repository.session_factory() as db_session:
-        normalization_terms = db_session.execute(
-            select(func.count()).select_from(TextNormalizationTerm)
+        catalog_entries = db_session.execute(
+            select(func.count()).select_from(ReferenceCatalogEntry)
         ).scalar_one()
-    assert int(normalization_terms) > 0
+    assert int(catalog_entries) == 0
 
 

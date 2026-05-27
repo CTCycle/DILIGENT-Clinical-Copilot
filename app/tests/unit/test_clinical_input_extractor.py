@@ -3,7 +3,6 @@ from __future__ import annotations
 import asyncio
 
 import pytest
-
 from services.session.clinical_input_extractor import (
     ClinicalInputExtractionError,
     ClinicalInputExtractor,

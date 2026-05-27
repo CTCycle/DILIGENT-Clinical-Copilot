@@ -1,0 +1,28 @@
+{
+  "manifest": "security_text_filters",
+  "version": 1,
+  "description": "Deterministic sensitive token filters for safe error messaging.",
+  "entries": [
+    {
+      "domain": "security_text_filters",
+      "category": "sensitive_error_tokens",
+      "key": "default",
+      "locale": "und",
+      "priority": 100,
+      "values": [
+        "traceback",
+        "stack",
+        "token",
+        "secret",
+        "password",
+        "authorization",
+        "api key",
+        "access key"
+      ],
+      "metadata": {
+        "case_sensitive": false,
+        "match_mode": "token"
+      }
+    }
+  ]
+}

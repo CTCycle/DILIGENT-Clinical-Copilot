@@ -2,8 +2,7 @@ from __future__ import annotations
 
 from typing import Annotated
 
-from fastapi import APIRouter, Body, status
-from fastapi import Query
+from fastapi import APIRouter, Body, Query, status
 
 from domain.model_configs import (
     ModelConfigStateResponse,

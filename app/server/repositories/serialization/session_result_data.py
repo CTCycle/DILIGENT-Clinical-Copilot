@@ -2,39 +2,16 @@ from __future__ import annotations
 
 import base64
 import binascii
-import hashlib
 import json
-import os
 import re
-import zipfile
 from datetime import date, datetime, timedelta
-from typing import Any, Iterator, cast
-from xml.etree import ElementTree
+from typing import Any
 
 import pandas as pd
-from pypdf import PdfReader
-from sqlalchemy.engine import Engine
-from sqlalchemy import and_, delete, exists, func, inspect, or_, select, update
-from sqlalchemy.orm import Session, selectinload, sessionmaker
+from sqlalchemy import and_, delete, exists, func, inspect, or_, select
+from sqlalchemy.orm import Session
 
-from configurations.startup import server_settings
-from domain.documents import Document
-from common.constants import (
-    DRUG_NAME_ALLOWED_PATTERN,
-    DOCUMENT_SUPPORTED_EXTENSIONS,
-    LIVERTOX_COLUMNS,
-    LIVERTOX_MASTER_COLUMNS,
-    LIVERTOX_OPTIONAL_COLUMNS,
-    LIVERTOX_REQUIRED_COLUMNS,
-    RXNORM_CATALOG_COLUMNS,
-    TEXT_FILE_FALLBACK_ENCODINGS,
-)
 from common.utils.logger import logger
-from repositories.database.session import (
-    resolve_engine,
-    resolve_session_factory,
-)
-from repositories.queries.drugs import DrugRepositoryQueries
 from repositories.schemas.models import (
     ClinicalSession,
     ClinicalSessionDrug,
@@ -48,14 +25,8 @@ from repositories.schemas.models import (
     LiverToxMonograph,
     Patient,
 )
-from repositories.serialization.text_normalization import (
-    TextNormalizationVocabularySerializer,
-)
-from services.text.normalization import coerce_text, normalize_drug_name
-from services.text.synonyms import (
-    parse_synonym_list,
-    split_synonym_variants,
-)
+from repositories.serialization.catalogs import ReferenceCatalogSerializer
+from services.text.normalization import normalize_drug_name
 from services.text.vocabulary import (
     invalidate_text_normalization_snapshot,
 )
@@ -112,6 +83,9 @@ def ensure_session_result_table(self) -> None:
     required_tables = (
         Patient.__tablename__,
         ClinicalSession.__tablename__,
+        ClinicalSessionSection.__tablename__,
+        ClinicalSessionLab.__tablename__,
+        ClinicalSessionDrug.__tablename__,
         ClinicalSessionResult.__tablename__,
         Drug.__tablename__,
         LiverToxMonograph.__tablename__,
@@ -830,10 +804,6 @@ def persist_session_drugs(
                     records.append({"raw_drug_name": item})
     seen: set[str] = set()
     vocabulary_changed = False
-    vocabulary_serializer = TextNormalizationVocabularySerializer(
-        engine=self.engine,
-        session_factory=self.session_factory,
-    )
     for item in records:
         raw_drug_name = self.normalize_string(
             item.get("raw_drug_name") or item.get("name")
@@ -883,13 +853,13 @@ def persist_session_drugs(
                 if resolved_drug_id is None
                 else "observed_unpromoted_query"
             )
-            vocabulary_serializer.upsert_term(
-                db_session,
-                category=observation_category,
+            catalogs = ReferenceCatalogSerializer(self.session_factory)
+            catalogs.upsert_runtime_observation(
                 term=raw_drug_name,
-                replacement=None,
+                category=observation_category,
                 source="session",
-                increment=True,
+                is_active=True,
+                db_session=db_session,
             )
             vocabulary_changed = True
         notes = item.get("match_notes")

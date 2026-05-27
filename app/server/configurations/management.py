@@ -12,7 +12,6 @@ from common.constants import (
     CLINICAL_MODEL_CHOICES,
     CLOUD_MODEL_CHOICES,
     CONFIGURATIONS_FILE,
-    DEFAULT_DRUG_MATCH_CATALOG_EXCLUDED_TERM_SUFFIXES,
     DEFAULT_DRUG_MATCH_CATALOG_INDEX_LIMIT,
     DEFAULT_DRUG_MATCH_SPELLING_CONFIDENCE,
     DEFAULT_DRUG_MATCH_SPELLING_LONG_MAX_DISTANCE,
@@ -40,14 +39,14 @@ from common.utils.types import (
 from domain.settings.configuration import (
     DatabaseSettings,
     DrugsMatcherSettings,
-    RuntimeSettings,
     FastAPISettings,
     IngestionSettings,
     JobsSettings,
     LLMRuntimeDefaults,
     RagSettings,
-    SessionPipelineSettings,
+    RuntimeSettings,
     ServerSettings,
+    SessionPipelineSettings,
 )
 
 
@@ -242,9 +241,7 @@ def _build_jobs_settings(data: dict[str, Any]) -> JobsSettings:
 
 
 def _build_database_settings(payload: dict[str, Any]) -> DatabaseSettings:
-    embedded = coerce_bool(
-        payload.get("embedded_database", payload.get("embedded")), True
-    )
+    embedded = coerce_bool(payload.get("embedded_database"), True)
     insert_batch_size = coerce_int(payload.get("insert_batch_size"), 1000, minimum=1)
     commit_interval = coerce_int(payload.get("insert_commit_interval"), 5, minimum=1)
     select_page_size = coerce_int(payload.get("select_page_size"), 2000, minimum=100)
@@ -283,20 +280,6 @@ def _build_database_settings(payload: dict[str, Any]) -> DatabaseSettings:
 
 
 def _build_drugs_matcher_settings(data: dict[str, Any]) -> DrugsMatcherSettings:
-    suffixes_value = data.get(
-        "catalog_excluded_term_suffixes",
-        DEFAULT_DRUG_MATCH_CATALOG_EXCLUDED_TERM_SUFFIXES,
-    )
-    suffix_candidates = (
-        list(suffixes_value)
-        if isinstance(suffixes_value, (list, tuple, set))
-        else [suffixes_value]
-    )
-    suffixes = tuple(
-        text
-        for text in (coerce_str(entry, "").upper() for entry in suffix_candidates)
-        if text
-    )
     return DrugsMatcherSettings(
         direct_confidence=coerce_float(data.get("direct_confidence"), 1.0),
         master_confidence=coerce_float(data.get("master_confidence"), 0.92),
@@ -310,9 +293,6 @@ def _build_drugs_matcher_settings(data: dict[str, Any]) -> DrugsMatcherSettings:
         token_min_length=coerce_positive_int(
             data.get("token_min_length"),
             DEFAULT_DRUG_MATCH_TOKEN_MIN_LENGTH,
-        ),
-        catalog_excluded_term_suffixes=(
-            suffixes or DEFAULT_DRUG_MATCH_CATALOG_EXCLUDED_TERM_SUFFIXES
         ),
         catalog_index_limit=coerce_positive_int(
             data.get("catalog_index_limit"),
@@ -391,10 +371,7 @@ def _build_runtime_settings(
     data: dict[str, Any], *, fallback_timeout: float
 ) -> RuntimeSettings:
     unified_llm_timeout = max(
-        coerce_float(
-            data.get("llm_timeout"),
-            coerce_float(data.get("default_llm_timeout"), fallback_timeout),
-        ),
+        coerce_float(data.get("default_llm_timeout"), fallback_timeout),
         1.0,
     )
     # Parser and clinical flows share one timeout budget by policy.

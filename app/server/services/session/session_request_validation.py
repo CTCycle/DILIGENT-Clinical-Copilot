@@ -6,7 +6,6 @@ from fastapi import HTTPException, status
 
 from domain.clinical.entities import ClinicalSessionRequest
 
-
 WORD_PATTERN = re.compile(r"\b[\wÀ-ÖØ-öø-ÿ']+\b", re.UNICODE)
 
 
