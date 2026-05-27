@@ -854,6 +854,20 @@ class DrugsParser:
         return normalized
 
     # -------------------------------------------------------------------------
+    def extract_embedded_drug_name(self, value: str) -> str:
+        if not value:
+            return value
+        normalized = self.normalize_filter_key(value)
+        embedded_aliases = (
+            ("co amoxicillina", "Co-Amoxicillina"),
+            ("co amoxi", "Co-Amoxicillina"),
+        )
+        for alias, replacement in embedded_aliases:
+            if alias in normalized:
+                return replacement
+        return value
+
+    # -------------------------------------------------------------------------
     def sanitize_text_field(self, value: str | None) -> str | None:
         if value is None:
             return None
@@ -943,6 +957,7 @@ class DrugsParser:
         name = self.sanitize_name(entry.name)
         if name is None:
             return None
+        name = self.extract_embedded_drug_name(name)
         if self.is_non_drug_fragment_name(name):
             return None
         normalized = entry.model_copy(deep=True)
