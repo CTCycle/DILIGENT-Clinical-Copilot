@@ -8,8 +8,8 @@ from common.utils.logger import logger
 from configurations.startup import server_settings
 from domain.inspection import (
     CatalogListFilters,
-    DeleteEntityResponse,
     DateFilterMode,
+    DeleteEntityResponse,
     DrugAliasesResponse,
     InspectionLiverToxOverrideRequest,
     InspectionRagOverrideRequest,
@@ -19,15 +19,15 @@ from domain.inspection import (
     LiverToxCatalogResponse,
     LiverToxExcerptResponse,
     RagDocumentListResponse,
+    ReferenceCatalogRuntimeObservationResponse,
+    ReferenceCatalogRuntimeObservationUpsertRequest,
     RxNavCatalogResponse,
     SessionCatalogResponse,
     SessionDetailResponse,
-    SessionRevisionRequest,
     SessionListFilters,
+    SessionRevisionRequest,
     SessionStatus,
     SessionUpdateRequest,
-    TextNormalizationTermResponse,
-    TextNormalizationTermUpsertRequest,
 )
 from domain.jobs import (
     JobCancelResponse,
@@ -40,7 +40,6 @@ from domain.patient_timeline import (
 )
 from services.inspection.service import DataInspectionService
 from services.runtime.jobs import get_job_manager
-
 
 router = APIRouter(prefix="/inspection", tags=["inspection"])
 
@@ -482,28 +481,34 @@ class DataInspectionEndpoint:
     def cancel_rag_update_job(self, job_id: str) -> JobCancelResponse:
         return self.cancel_update_job(job_id=job_id, job_type=self.service.RAG_JOB_TYPE)
 
-    def list_text_normalization(self) -> list[TextNormalizationTermResponse]:
+    def list_reference_catalog_runtime_observations(
+        self,
+    ) -> list[ReferenceCatalogRuntimeObservationResponse]:
         return [
-            TextNormalizationTermResponse(**row)
-            for row in self.service.list_text_normalization_terms()
+            ReferenceCatalogRuntimeObservationResponse(**row)
+            for row in self.service.list_reference_catalog_runtime_observations()
         ]
 
-    def list_text_normalization_category(
+    def list_reference_catalog_runtime_observations_by_category(
         self, category: str
-    ) -> list[TextNormalizationTermResponse]:
+    ) -> list[ReferenceCatalogRuntimeObservationResponse]:
         return [
-            TextNormalizationTermResponse(**row)
-            for row in self.service.list_text_normalization_terms(category=category)
+            ReferenceCatalogRuntimeObservationResponse(**row)
+            for row in self.service.list_reference_catalog_runtime_observations(
+                category=category
+            )
         ]
 
-    def upsert_text_normalization_category(
+    def upsert_reference_catalog_runtime_observation(
         self,
         category: str,
-        request: TextNormalizationTermUpsertRequest | None = Body(default=None),
-    ) -> TextNormalizationTermResponse:
-        request = request or TextNormalizationTermUpsertRequest(term="")
-        return TextNormalizationTermResponse(
-            **self.service.upsert_text_normalization_term(
+        request: ReferenceCatalogRuntimeObservationUpsertRequest | None = Body(
+            default=None
+        ),
+    ) -> ReferenceCatalogRuntimeObservationResponse:
+        request = request or ReferenceCatalogRuntimeObservationUpsertRequest(term="")
+        return ReferenceCatalogRuntimeObservationResponse(
+            **self.service.upsert_reference_catalog_runtime_observation(
                 category=category,
                 term=request.term,
                 replacement=request.replacement,
@@ -512,10 +517,10 @@ class DataInspectionEndpoint:
             )
         )
 
-    def delete_text_normalization_category_term(
+    def delete_reference_catalog_runtime_observation(
         self, category: str, term: str
     ) -> DeleteEntityResponse:
-        deleted = self.service.deactivate_text_normalization_term(
+        deleted = self.service.deactivate_reference_catalog_runtime_observation(
             category=category, term=term
         )
         return DeleteEntityResponse(deleted=deleted)
@@ -686,29 +691,29 @@ class DataInspectionEndpoint:
             status_code=status.HTTP_200_OK,
         )
         self.router.add_api_route(
-            "/text-normalization",
-            self.list_text_normalization,
+            "/reference-catalogs/runtime-observations",
+            self.list_reference_catalog_runtime_observations,
             methods=["GET"],
-            response_model=list[TextNormalizationTermResponse],
+            response_model=list[ReferenceCatalogRuntimeObservationResponse],
             status_code=status.HTTP_200_OK,
         )
         self.router.add_api_route(
-            "/text-normalization/{category}",
-            self.list_text_normalization_category,
+            "/reference-catalogs/runtime-observations/{category}",
+            self.list_reference_catalog_runtime_observations_by_category,
             methods=["GET"],
-            response_model=list[TextNormalizationTermResponse],
+            response_model=list[ReferenceCatalogRuntimeObservationResponse],
             status_code=status.HTTP_200_OK,
         )
         self.router.add_api_route(
-            "/text-normalization/{category}",
-            self.upsert_text_normalization_category,
+            "/reference-catalogs/runtime-observations/{category}",
+            self.upsert_reference_catalog_runtime_observation,
             methods=["PUT"],
-            response_model=TextNormalizationTermResponse,
+            response_model=ReferenceCatalogRuntimeObservationResponse,
             status_code=status.HTTP_200_OK,
         )
         self.router.add_api_route(
-            "/text-normalization/{category}/{term}",
-            self.delete_text_normalization_category_term,
+            "/reference-catalogs/runtime-observations/{category}/{term}",
+            self.delete_reference_catalog_runtime_observation,
             methods=["DELETE"],
             response_model=DeleteEntityResponse,
             status_code=status.HTTP_200_OK,

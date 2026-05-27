@@ -1,0 +1,435 @@
+{
+  "manifest": "language_detection",
+  "version": 1,
+  "description": "Deterministic text reference data used by language detection and scoring.",
+  "entries": [
+    {
+      "domain": "language_detection",
+      "category": "language_hints",
+      "key": "en",
+      "locale": "und",
+      "priority": 100,
+      "values": [
+        "patient",
+        "anamnesis",
+        "drug",
+        "drugs",
+        "visit",
+        "bilirubin",
+        "jaundice",
+        "liver",
+        "history",
+        "therapy",
+        "suspended",
+        "alkaline",
+        "phosphatase",
+        "elevated",
+        "improved",
+        "worsening"
+      ],
+      "metadata": {
+        "case_sensitive": false,
+        "match_mode": "token"
+      }
+    },
+    {
+      "domain": "language_detection",
+      "category": "language_hints",
+      "key": "it",
+      "locale": "und",
+      "priority": 100,
+      "values": [
+        "paziente",
+        "anamnesi",
+        "farmaco",
+        "farmaci",
+        "visita",
+        "bilirubina",
+        "ittero",
+        "fegato",
+        "terapia",
+        "sospeso",
+        "sospensione",
+        "epatotossicita",
+        "miglioramento",
+        "peggioramento",
+        "transaminasi",
+        "esami"
+      ],
+      "metadata": {
+        "case_sensitive": false,
+        "match_mode": "token"
+      }
+    },
+    {
+      "domain": "language_detection",
+      "category": "language_hints",
+      "key": "de",
+      "locale": "und",
+      "priority": 100,
+      "values": [
+        "patient",
+        "anamnese",
+        "arzneimittel",
+        "medikament",
+        "medikamente",
+        "besuch",
+        "bilirubin",
+        "ikterus",
+        "leber",
+        "therapie",
+        "abgesetzt",
+        "erhoht",
+        "verschlechterung",
+        "besserung",
+        "transaminasen"
+      ],
+      "metadata": {
+        "case_sensitive": false,
+        "match_mode": "token"
+      }
+    },
+    {
+      "domain": "language_detection",
+      "category": "language_hints",
+      "key": "fr",
+      "locale": "und",
+      "priority": 100,
+      "values": [
+        "patient",
+        "anamnese",
+        "anamnesis",
+        "medicament",
+        "medicaments",
+        "visite",
+        "bilirubine",
+        "ictere",
+        "foie",
+        "therapie",
+        "arret",
+        "aggravation",
+        "amelioration"
+      ],
+      "metadata": {
+        "case_sensitive": false,
+        "match_mode": "token"
+      }
+    },
+    {
+      "domain": "language_detection",
+      "category": "language_hints",
+      "key": "es",
+      "locale": "und",
+      "priority": 100,
+      "values": [
+        "paciente",
+        "anamnesis",
+        "farmaco",
+        "farmacos",
+        "medicamento",
+        "medicamentos",
+        "visita",
+        "bilirrubina",
+        "ictericia",
+        "higado",
+        "terapia",
+        "suspendido",
+        "empeoramiento",
+        "mejoria",
+        "transaminasas"
+      ],
+      "metadata": {
+        "case_sensitive": false,
+        "match_mode": "token"
+      }
+    },
+    {
+      "domain": "language_detection",
+      "category": "validation_language_markers",
+      "key": "en",
+      "locale": "und",
+      "priority": 100,
+      "values": [
+        "medical history",
+        "laboratory analysis"
+      ],
+      "metadata": {
+        "case_sensitive": false,
+        "match_mode": "phrase"
+      }
+    },
+    {
+      "domain": "language_detection",
+      "category": "report_language_phrase_markers",
+      "key": "en",
+      "locale": "und",
+      "priority": 100,
+      "values": [
+        "liver injury",
+        "drug induced",
+        "alkaline phosphatase"
+      ],
+      "metadata": {
+        "case_sensitive": false,
+        "match_mode": "phrase"
+      }
+    },
+    {
+      "domain": "language_detection",
+      "category": "report_language_phrase_markers",
+      "key": "it",
+      "locale": "und",
+      "priority": 100,
+      "values": [
+        "danno epatico",
+        "epatotossicita",
+        "fosfatasi alcalina"
+      ],
+      "metadata": {
+        "case_sensitive": false,
+        "match_mode": "phrase"
+      }
+    },
+    {
+      "domain": "language_detection",
+      "category": "report_language_phrase_markers",
+      "key": "de",
+      "locale": "und",
+      "priority": 100,
+      "values": [
+        "leberschaden",
+        "arzneimittel induziert",
+        "alkalische phosphatase"
+      ],
+      "metadata": {
+        "case_sensitive": false,
+        "match_mode": "phrase"
+      }
+    },
+    {
+      "domain": "language_detection",
+      "category": "report_language_phrase_markers",
+      "key": "fr",
+      "locale": "und",
+      "priority": 100,
+      "values": [
+        "atteinte hepatique",
+        "lesion hepatique",
+        "phosphatase alcaline"
+      ],
+      "metadata": {
+        "case_sensitive": false,
+        "match_mode": "phrase"
+      }
+    },
+    {
+      "domain": "language_detection",
+      "category": "report_language_phrase_markers",
+      "key": "es",
+      "locale": "und",
+      "priority": 100,
+      "values": [
+        "lesion hepatica",
+        "fosfatasa alcalina"
+      ],
+      "metadata": {
+        "case_sensitive": false,
+        "match_mode": "phrase"
+      }
+    },
+    {
+      "domain": "language_detection",
+      "category": "clinical_language_scoring_terms",
+      "key": "default",
+      "locale": "und",
+      "priority": 100,
+      "values": [
+        "anamnesis",
+        "therapy",
+        "bilirubin"
+      ],
+      "metadata": {
+        "case_sensitive": false,
+        "match_mode": "token"
+      }
+    },
+    {
+      "domain": "language_detection",
+      "category": "clinical_language_scoring_terms",
+      "key": "en",
+      "locale": "und",
+      "priority": 100,
+      "values": [
+        "the",
+        "and",
+        "with",
+        "for",
+        "patient",
+        "drug",
+        "liver"
+      ],
+      "metadata": {
+        "case_sensitive": false,
+        "match_mode": "token"
+      }
+    },
+    {
+      "domain": "language_detection",
+      "category": "clinical_language_scoring_terms",
+      "key": "it",
+      "locale": "und",
+      "priority": 100,
+      "values": [
+        "il",
+        "la",
+        "del",
+        "della",
+        "con",
+        "per",
+        "farmaco",
+        "paziente"
+      ],
+      "metadata": {
+        "case_sensitive": false,
+        "match_mode": "token"
+      }
+    },
+    {
+      "domain": "language_detection",
+      "category": "clinical_language_scoring_terms",
+      "key": "de",
+      "locale": "und",
+      "priority": 100,
+      "values": [
+        "der",
+        "die",
+        "das",
+        "und",
+        "mit",
+        "für",
+        "patient",
+        "arznei"
+      ],
+      "metadata": {
+        "case_sensitive": false,
+        "match_mode": "token"
+      }
+    },
+    {
+      "domain": "language_detection",
+      "category": "clinical_language_scoring_terms",
+      "key": "fr",
+      "locale": "und",
+      "priority": 100,
+      "values": [
+        "le",
+        "la",
+        "les",
+        "des",
+        "avec",
+        "pour",
+        "patient",
+        "médicament"
+      ],
+      "metadata": {
+        "case_sensitive": false,
+        "match_mode": "token"
+      }
+    },
+    {
+      "domain": "language_detection",
+      "category": "clinical_language_scoring_terms",
+      "key": "es",
+      "locale": "und",
+      "priority": 100,
+      "values": [
+        "el",
+        "la",
+        "los",
+        "las",
+        "con",
+        "para",
+        "paciente",
+        "fármaco"
+      ],
+      "metadata": {
+        "case_sensitive": false,
+        "match_mode": "token"
+      }
+    },
+    {
+      "domain": "language_detection",
+      "category": "diacritic_detection_terms",
+      "key": "it",
+      "locale": "und",
+      "priority": 100,
+      "values": [
+        "à",
+        "è",
+        "ì",
+        "ò",
+        "ù"
+      ],
+      "metadata": {
+        "case_sensitive": true,
+        "match_mode": "token"
+      }
+    },
+    {
+      "domain": "language_detection",
+      "category": "diacritic_detection_terms",
+      "key": "de",
+      "locale": "und",
+      "priority": 100,
+      "values": [
+        "ä",
+        "ö",
+        "ü",
+        "ß"
+      ],
+      "metadata": {
+        "case_sensitive": true,
+        "match_mode": "token"
+      }
+    },
+    {
+      "domain": "language_detection",
+      "category": "diacritic_detection_terms",
+      "key": "fr",
+      "locale": "und",
+      "priority": 100,
+      "values": [
+        "à",
+        "ç",
+        "é",
+        "î",
+        "ô",
+        "ù",
+        "œ"
+      ],
+      "metadata": {
+        "case_sensitive": true,
+        "match_mode": "token"
+      }
+    },
+    {
+      "domain": "language_detection",
+      "category": "diacritic_detection_terms",
+      "key": "es",
+      "locale": "und",
+      "priority": 100,
+      "values": [
+        "á",
+        "é",
+        "í",
+        "ó",
+        "ú",
+        "ñ"
+      ],
+      "metadata": {
+        "case_sensitive": true,
+        "match_mode": "token"
+      }
+    }
+  ]
+}

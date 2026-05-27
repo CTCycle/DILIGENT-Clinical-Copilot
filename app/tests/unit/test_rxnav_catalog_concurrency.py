@@ -5,7 +5,6 @@ from pathlib import Path
 from typing import Any
 
 import httpx
-
 from services.updater.rxnav_builder import RxNavDrugCatalogBuilder
 
 

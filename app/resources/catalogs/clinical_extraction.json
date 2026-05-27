@@ -1,0 +1,874 @@
+{
+  "manifest": "clinical_extraction",
+  "version": 1,
+  "description": "Deterministic text reference data used by clinical extraction services.",
+  "entries": [
+    {
+      "domain": "clinical_extraction",
+      "category": "clinical_sections",
+      "key": "default",
+      "locale": "und",
+      "priority": 100,
+      "values": [
+        "anamnesis",
+        "drugs",
+        "laboratory_analysis"
+      ],
+      "metadata": {
+        "case_sensitive": false,
+        "match_mode": "token"
+      }
+    },
+    {
+      "domain": "clinical_extraction",
+      "category": "section_aliases",
+      "key": "anamnesis",
+      "locale": "und",
+      "priority": 100,
+      "values": [
+        "anamnesis",
+        "medical history",
+        "anamnesi"
+      ],
+      "metadata": {
+        "case_sensitive": false,
+        "match_mode": "phrase"
+      }
+    },
+    {
+      "domain": "clinical_extraction",
+      "category": "section_aliases",
+      "key": "drugs",
+      "locale": "und",
+      "priority": 100,
+      "values": [
+        "drugs",
+        "therapy",
+        "farmaci",
+        "terapia"
+      ],
+      "metadata": {
+        "case_sensitive": false,
+        "match_mode": "phrase"
+      }
+    },
+    {
+      "domain": "clinical_extraction",
+      "category": "section_aliases",
+      "key": "laboratory_analysis",
+      "locale": "und",
+      "priority": 100,
+      "values": [
+        "laboratory analysis",
+        "lab results",
+        "esami di laboratorio"
+      ],
+      "metadata": {
+        "case_sensitive": false,
+        "match_mode": "phrase"
+      }
+    },
+    {
+      "domain": "clinical_extraction",
+      "category": "drug_dosage_units",
+      "key": "mass_units",
+      "locale": "und",
+      "priority": 100,
+      "values": [
+        "mg",
+        "mcg",
+        "g",
+        "ml",
+        "iu"
+      ],
+      "metadata": {
+        "case_sensitive": false,
+        "match_mode": "token"
+      }
+    },
+    {
+      "domain": "clinical_extraction",
+      "category": "drug_route_terms",
+      "key": "oral",
+      "locale": "und",
+      "priority": 100,
+      "values": [
+        "p.o.",
+        "po",
+        "per os",
+        "oral",
+        "orale"
+      ],
+      "metadata": {
+        "case_sensitive": false,
+        "match_mode": "phrase"
+      }
+    },
+    {
+      "domain": "clinical_extraction",
+      "category": "drug_route_terms",
+      "key": "iv",
+      "locale": "und",
+      "priority": 100,
+      "values": [
+        "i.v.",
+        "iv",
+        "e.v.",
+        "ev",
+        "endovenosa",
+        "intravenous",
+        "intravenosa"
+      ],
+      "metadata": {
+        "case_sensitive": false,
+        "match_mode": "phrase"
+      }
+    },
+    {
+      "domain": "clinical_extraction",
+      "category": "drug_route_terms",
+      "key": "im",
+      "locale": "und",
+      "priority": 100,
+      "values": [
+        "i.m.",
+        "im",
+        "intramuscolare",
+        "intramuscular"
+      ],
+      "metadata": {
+        "case_sensitive": false,
+        "match_mode": "phrase"
+      }
+    },
+    {
+      "domain": "clinical_extraction",
+      "category": "drug_route_terms",
+      "key": "sc",
+      "locale": "und",
+      "priority": 100,
+      "values": [
+        "s.c.",
+        "sc",
+        "sottocutanea",
+        "subcutaneous",
+        "subcutanea"
+      ],
+      "metadata": {
+        "case_sensitive": false,
+        "match_mode": "phrase"
+      }
+    },
+    {
+      "domain": "clinical_extraction",
+      "category": "drug_frequency_terms",
+      "key": "default",
+      "locale": "und",
+      "priority": 100,
+      "values": [
+        "daily",
+        "bid",
+        "tid",
+        "qhs",
+        "die",
+        "volta/die"
+      ],
+      "metadata": {
+        "case_sensitive": false,
+        "match_mode": "token"
+      }
+    },
+    {
+      "domain": "clinical_extraction",
+      "category": "drug_line_prefixes",
+      "key": "non_therapy",
+      "locale": "und",
+      "priority": 100,
+      "values": [
+        "farmaci non assunti",
+        "farmaci non in uso",
+        "not taking"
+      ],
+      "metadata": {
+        "case_sensitive": false,
+        "match_mode": "phrase"
+      }
+    },
+    {
+      "domain": "clinical_extraction",
+      "category": "drug_continuation_markers",
+      "key": "default",
+      "locale": "und",
+      "priority": 100,
+      "values": [
+        "dal",
+        "da",
+        "in riserva",
+        "se"
+      ],
+      "metadata": {
+        "case_sensitive": false,
+        "match_mode": "token"
+      }
+    },
+    {
+      "domain": "clinical_extraction",
+      "category": "drug_metadata_labels",
+      "key": "default",
+      "locale": "und",
+      "priority": 100,
+      "values": [
+        "sospeso",
+        "continua",
+        "cronica",
+        "iniziato",
+        "started",
+        "stopped"
+      ],
+      "metadata": {
+        "case_sensitive": false,
+        "match_mode": "token"
+      }
+    },
+    {
+      "domain": "clinical_extraction",
+      "category": "drug_timing_terms",
+      "key": "default",
+      "locale": "und",
+      "priority": 100,
+      "values": [
+        "iniziato",
+        "iniziata",
+        "iniziate",
+        "iniziati",
+        "avviato",
+        "avviata",
+        "avviate",
+        "avviati",
+        "started",
+        "starting",
+        "began",
+        "begin",
+        "sospeso",
+        "sospesa",
+        "sospese",
+        "sospesi",
+        "interrotto",
+        "interrotta",
+        "interrotte",
+        "interrotti",
+        "suspended",
+        "suspend",
+        "stopped",
+        "discontinued",
+        "alla comparsa",
+        "dal",
+        "dalla",
+        "dalle",
+        "dall'",
+        "da",
+        "since",
+        "from",
+        "on"
+      ],
+      "metadata": {
+        "case_sensitive": false,
+        "match_mode": "phrase"
+      }
+    },
+    {
+      "domain": "clinical_extraction",
+      "category": "drug_timing_context_terms",
+      "key": "default",
+      "locale": "und",
+      "priority": 100,
+      "values": [
+        "ultima somministrazione",
+        "linea precedente"
+      ],
+      "metadata": {
+        "case_sensitive": false,
+        "match_mode": "phrase"
+      }
+    },
+    {
+      "domain": "clinical_extraction",
+      "category": "drug_start_terms",
+      "key": "default",
+      "locale": "und",
+      "priority": 100,
+      "values": [
+        "inizio",
+        "iniziato",
+        "iniziata",
+        "iniziate",
+        "iniziati",
+        "avviato",
+        "avviata",
+        "avviate",
+        "avviati",
+        "ripreso",
+        "ripresa",
+        "riprese",
+        "ripresi",
+        "riprendere",
+        "assunzione",
+        "assunzioni",
+        "in terapia",
+        "in trattamento",
+        "terapia",
+        "trattamento",
+        "started",
+        "starting",
+        "initiated",
+        "initiation",
+        "began",
+        "begin",
+        "resumed",
+        "resume",
+        "taking"
+      ],
+      "metadata": {
+        "case_sensitive": false,
+        "match_mode": "phrase"
+      }
+    },
+    {
+      "domain": "clinical_extraction",
+      "category": "drug_suspension_terms",
+      "key": "default",
+      "locale": "und",
+      "priority": 100,
+      "values": [
+        "sospeso",
+        "sospesa",
+        "sospese",
+        "sospesi",
+        "interrotto",
+        "interrotta",
+        "interrotte",
+        "interrotti",
+        "suspended",
+        "suspend",
+        "stopped",
+        "discontinued"
+      ],
+      "metadata": {
+        "case_sensitive": false,
+        "match_mode": "phrase"
+      }
+    },
+    {
+      "domain": "clinical_extraction",
+      "category": "drug_non_name_tokens",
+      "key": "default",
+      "locale": "und",
+      "priority": 100,
+      "values": [
+        "il",
+        "dal",
+        "dalla",
+        "dalle",
+        "kg",
+        "mg",
+        "ml",
+        "ui",
+        "per",
+        "os",
+        "iv",
+        "sc",
+        "die",
+        "giorno",
+        "giorni",
+        "settimana",
+        "settimane",
+        "mese",
+        "mesi",
+        "terapia",
+        "terapie",
+        "farmacoterapia",
+        "eseguite",
+        "eseguita",
+        "iniziato",
+        "iniziata",
+        "sospeso",
+        "sospesa"
+      ],
+      "metadata": {
+        "case_sensitive": false,
+        "match_mode": "token"
+      }
+    },
+    {
+      "domain": "clinical_extraction",
+      "category": "laboratory_markers",
+      "key": "ALT",
+      "locale": "und",
+      "priority": 100,
+      "values": [
+        "alt",
+        "alat",
+        "gpt"
+      ],
+      "metadata": {
+        "case_sensitive": false,
+        "match_mode": "token"
+      }
+    },
+    {
+      "domain": "clinical_extraction",
+      "category": "laboratory_markers",
+      "key": "AST",
+      "locale": "und",
+      "priority": 100,
+      "values": [
+        "ast",
+        "asat",
+        "got"
+      ],
+      "metadata": {
+        "case_sensitive": false,
+        "match_mode": "token"
+      }
+    },
+    {
+      "domain": "clinical_extraction",
+      "category": "laboratory_markers",
+      "key": "ALP",
+      "locale": "und",
+      "priority": 100,
+      "values": [
+        "alp",
+        "alkp",
+        "alkaline phosphatase"
+      ],
+      "metadata": {
+        "case_sensitive": false,
+        "match_mode": "token"
+      }
+    },
+    {
+      "domain": "clinical_extraction",
+      "category": "laboratory_markers",
+      "key": "TBIL",
+      "locale": "und",
+      "priority": 100,
+      "values": [
+        "tbil",
+        "total bilirubin",
+        "bilirubin total",
+        "bilirubin"
+      ],
+      "metadata": {
+        "case_sensitive": false,
+        "match_mode": "phrase"
+      }
+    },
+    {
+      "domain": "clinical_extraction",
+      "category": "laboratory_markers",
+      "key": "DBIL",
+      "locale": "und",
+      "priority": 100,
+      "values": [
+        "dbil",
+        "direct bilirubin",
+        "bilirubin direct"
+      ],
+      "metadata": {
+        "case_sensitive": false,
+        "match_mode": "phrase"
+      }
+    },
+    {
+      "domain": "clinical_extraction",
+      "category": "laboratory_markers",
+      "key": "GGT",
+      "locale": "und",
+      "priority": 100,
+      "values": [
+        "ggt",
+        "gamma gt",
+        "gamma-glutamyl transferase"
+      ],
+      "metadata": {
+        "case_sensitive": false,
+        "match_mode": "phrase"
+      }
+    },
+    {
+      "domain": "clinical_extraction",
+      "category": "laboratory_markers",
+      "key": "INR",
+      "locale": "und",
+      "priority": 100,
+      "values": [
+        "inr"
+      ],
+      "metadata": {
+        "case_sensitive": false,
+        "match_mode": "token"
+      }
+    },
+    {
+      "domain": "clinical_extraction",
+      "category": "laboratory_markers",
+      "key": "ALB",
+      "locale": "und",
+      "priority": 100,
+      "values": [
+        "albumin",
+        "alb",
+        "albumina"
+      ],
+      "metadata": {
+        "case_sensitive": false,
+        "match_mode": "token"
+      }
+    },
+    {
+      "domain": "clinical_extraction",
+      "category": "laboratory_units",
+      "key": "default",
+      "locale": "und",
+      "priority": 100,
+      "values": [
+        "u/l",
+        "mg/dl",
+        "umol/l"
+      ],
+      "metadata": {
+        "case_sensitive": false,
+        "match_mode": "token"
+      }
+    },
+    {
+      "domain": "clinical_extraction",
+      "category": "laboratory_uln_labels",
+      "key": "default",
+      "locale": "und",
+      "priority": 100,
+      "values": [
+        "uln",
+        "upper limit of normal"
+      ],
+      "metadata": {
+        "case_sensitive": false,
+        "match_mode": "phrase"
+      }
+    },
+    {
+      "domain": "clinical_extraction",
+      "category": "lab_measurement_indicators",
+      "key": "default",
+      "locale": "und",
+      "priority": 100,
+      "values": [
+        "u/l",
+        "ui/l",
+        "mg/dl",
+        "g/l",
+        "mmol/l",
+        "micromol",
+        "µmol",
+        "x10"
+      ],
+      "metadata": {
+        "case_sensitive": false,
+        "match_mode": "token"
+      }
+    },
+    {
+      "domain": "clinical_extraction",
+      "category": "lab_marker_indicators",
+      "key": "default",
+      "locale": "und",
+      "priority": 100,
+      "values": [
+        "alt",
+        "alat",
+        "ast",
+        "asat",
+        "alp",
+        "ggt",
+        "bilirubin",
+        "bilirubina",
+        "inr"
+      ],
+      "metadata": {
+        "case_sensitive": false,
+        "match_mode": "token"
+      }
+    },
+    {
+      "domain": "clinical_extraction",
+      "category": "clinical_timeline_markers",
+      "key": "default",
+      "locale": "und",
+      "priority": 100,
+      "values": [
+        "before",
+        "after",
+        "day",
+        "week",
+        "month"
+      ],
+      "metadata": {
+        "case_sensitive": false,
+        "match_mode": "token"
+      }
+    },
+    {
+      "domain": "clinical_extraction",
+      "category": "section_heading_patterns",
+      "key": "anamnesis_required",
+      "locale": "und",
+      "priority": 100,
+      "values": [
+        "anamnesis",
+        "anamnesi",
+        "history",
+        "clinical history",
+        "medical history",
+        "patient history",
+        "case history",
+        "storia clinica",
+        "storia anamnestica",
+        "anamnesi patologica"
+      ],
+      "metadata": {
+        "case_sensitive": false,
+        "match_mode": "phrase"
+      }
+    },
+    {
+      "domain": "clinical_extraction",
+      "category": "section_heading_patterns",
+      "key": "anamnesis_supporting",
+      "locale": "und",
+      "priority": 100,
+      "values": [
+        "precedenti",
+        "sintomi",
+        "diagnosi",
+        "clinical conditions",
+        "patient background"
+      ],
+      "metadata": {
+        "case_sensitive": false,
+        "match_mode": "phrase"
+      }
+    },
+    {
+      "domain": "clinical_extraction",
+      "category": "section_heading_patterns",
+      "key": "therapy_required",
+      "locale": "und",
+      "priority": 100,
+      "values": [
+        "therapy",
+        "therapies",
+        "treatment",
+        "treatments",
+        "medication",
+        "medications",
+        "drug therapy",
+        "current therapy",
+        "current medications",
+        "terapia",
+        "terapie",
+        "trattamento",
+        "farmaci",
+        "terapia farmacologica",
+        "terapie in corso"
+      ],
+      "metadata": {
+        "case_sensitive": false,
+        "match_mode": "phrase"
+      }
+    },
+    {
+      "domain": "clinical_extraction",
+      "category": "section_heading_patterns",
+      "key": "therapy_supporting",
+      "locale": "und",
+      "priority": 100,
+      "values": [
+        "dose",
+        "dosage",
+        "route",
+        "suspension",
+        "somministrazione",
+        "posologia",
+        "sospensione"
+      ],
+      "metadata": {
+        "case_sensitive": false,
+        "match_mode": "phrase"
+      }
+    },
+    {
+      "domain": "clinical_extraction",
+      "category": "section_heading_patterns",
+      "key": "laboratory_history_required",
+      "locale": "und",
+      "priority": 100,
+      "values": [
+        "laboratory history",
+        "laboratory",
+        "labs",
+        "lab history",
+        "laboratory tests",
+        "blood tests",
+        "biochemistry",
+        "liver tests",
+        "esami di laboratorio",
+        "laboratorio",
+        "storia laboratoristica",
+        "esami ematochimici",
+        "biochimica"
+      ],
+      "metadata": {
+        "case_sensitive": false,
+        "match_mode": "phrase"
+      }
+    },
+    {
+      "domain": "clinical_extraction",
+      "category": "section_heading_patterns",
+      "key": "laboratory_history_supporting",
+      "locale": "und",
+      "priority": 100,
+      "values": [
+        "alt",
+        "alp",
+        "ast",
+        "ggt",
+        "bilirubin",
+        "bilirubina",
+        "inr",
+        "uln",
+        "limite superiore"
+      ],
+      "metadata": {
+        "case_sensitive": false,
+        "match_mode": "phrase"
+      }
+    },
+    {
+      "domain": "clinical_extraction",
+      "category": "drug_non_name_exact",
+      "key": "default",
+      "locale": "und",
+      "priority": 100,
+      "values": [
+        "in riserva",
+        "al bisogno",
+        "se necessario",
+        "dopo",
+        "dal",
+        "entrambi e il",
+        "paziente femmina",
+        "paziente maschio",
+        "paziente di",
+        "rialzo a"
+      ],
+      "metadata": {
+        "case_sensitive": false,
+        "match_mode": "token"
+      }
+    },
+    {
+      "domain": "clinical_extraction",
+      "category": "drug_non_name_prefixes",
+      "key": "default",
+      "locale": "und",
+      "priority": 100,
+      "values": [
+        "ulteriore ciclo",
+        "eventuale inizio"
+      ],
+      "metadata": {
+        "case_sensitive": false,
+        "match_mode": "phrase"
+      }
+    },
+    {
+      "domain": "clinical_extraction",
+      "category": "drug_non_name_contains",
+      "key": "default",
+      "locale": "und",
+      "priority": 100,
+      "values": [
+        "originariamente previsto"
+      ],
+      "metadata": {
+        "case_sensitive": false,
+        "match_mode": "phrase"
+      }
+    },
+    {
+      "domain": "clinical_extraction",
+      "category": "weekday_terms",
+      "key": "default",
+      "locale": "und",
+      "priority": 100,
+      "values": [
+        "il",
+        "la",
+        "lunedi",
+        "martedi",
+        "mercoledi",
+        "giovedi",
+        "venerdi",
+        "sabato",
+        "domenica",
+        "monday",
+        "tuesday",
+        "wednesday",
+        "thursday",
+        "friday",
+        "saturday",
+        "sunday"
+      ],
+      "metadata": {
+        "case_sensitive": false,
+        "match_mode": "token"
+      }
+    },
+    {
+      "domain": "clinical_extraction",
+      "category": "drug_block_labels",
+      "key": "default",
+      "locale": "und",
+      "priority": 100,
+      "values": [
+        "therapy",
+        "treatment",
+        "medication list",
+        "farmaci",
+        "terapia"
+      ],
+      "metadata": {
+        "case_sensitive": false,
+        "match_mode": "phrase"
+      }
+    },
+    {
+      "domain": "clinical_extraction",
+      "category": "drug_regimen_separators",
+      "key": "default",
+      "locale": "und",
+      "priority": 100,
+      "values": [
+        "semicolon",
+        "plus",
+        "slash"
+      ],
+      "metadata": {
+        "case_sensitive": false,
+        "match_mode": "phrase"
+      }
+    }
+  ]
+}

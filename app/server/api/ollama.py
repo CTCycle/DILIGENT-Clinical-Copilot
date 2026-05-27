@@ -8,9 +8,9 @@ from domain.jobs import (
     JobStatusResponse,
 )
 from domain.models import ModelListResponse
+from services.llm.ollama import OllamaService
 from services.llm.ollama_client import OllamaClient
 from services.runtime.jobs import get_job_manager
-from services.llm.ollama import OllamaService
 
 router = APIRouter(prefix="/models", tags=["models"])
 

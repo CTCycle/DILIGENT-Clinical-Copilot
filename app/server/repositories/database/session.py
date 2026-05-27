@@ -9,6 +9,7 @@ from configurations.startup import server_settings
 from repositories.database.postgres import PostgresRepository
 from repositories.database.sqlite import SQLiteRepository
 
+
 @lru_cache(maxsize=1)
 def get_default_repository():
     settings = server_settings.database

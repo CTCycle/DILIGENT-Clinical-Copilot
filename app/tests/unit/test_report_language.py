@@ -1,7 +1,6 @@
 from __future__ import annotations
 
 import pytest
-
 from domain.clinical.entities import DrugRucamAssessment
 from services.clinical.report_language import (
     SUPPORTED_REPORT_LANGUAGE_CODES,

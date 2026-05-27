@@ -1,14 +1,14 @@
 from __future__ import annotations
 
 import json
-from concurrent.futures import ThreadPoolExecutor, as_completed
 from collections.abc import Callable
+from concurrent.futures import ThreadPoolExecutor, as_completed
 from typing import Any
 
-from configurations.startup import server_settings
-from domain.documents import Document
 from common.constants import DEFAULT_EMBEDDING_BATCH_SIZE
 from common.utils.logger import logger
+from configurations.startup import server_settings
+from domain.documents import Document
 from repositories.serialization.data import DocumentChunker, DocumentSerializer
 from repositories.vectors import LanceVectorDatabase
 from services.retrieval.embeddings import EmbeddingGenerator

@@ -1,8 +1,11 @@
 from __future__ import annotations
 
-from domain.clinical.entities import DrugRucamAssessment
+from domain.clinical.entities import (
+    ClinicalLabEntry,
+    DrugRucamAssessment,
+    PatientLabTimeline,
+)
 from services.clinical.hepatox_core import HepatoxConsultation
-from domain.clinical.entities import ClinicalLabEntry, PatientLabTimeline
 from services.clinical.report_language import phrase, report_heading, rucam_summary_text
 
 

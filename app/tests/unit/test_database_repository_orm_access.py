@@ -2,11 +2,10 @@ from __future__ import annotations
 
 from pathlib import Path
 
-from sqlalchemy import select
-
 from domain.settings.configuration import DatabaseSettings
 from repositories.database.sqlite import SQLiteRepository
 from repositories.schemas.models import ModelSelection
+from sqlalchemy import select
 
 
 def _build_settings() -> DatabaseSettings:

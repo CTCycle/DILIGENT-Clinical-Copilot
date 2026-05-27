@@ -2,13 +2,12 @@ from __future__ import annotations
 
 from pathlib import Path
 
-from sqlalchemy import create_engine, func, select
-from sqlalchemy.orm import sessionmaker
-
 from domain.settings.configuration import DatabaseSettings
 from repositories.database import initializer
 from repositories.database.sqlite import SQLiteRepository
 from repositories.schemas.models import AccessKeyEncryptionMaterial
+from sqlalchemy import create_engine, func, select
+from sqlalchemy.orm import sessionmaker
 
 
 # -----------------------------------------------------------------------------
@@ -122,6 +121,7 @@ def test_postgresql_initialization_path_seeds_after_schema_creation(
     class FakePostgresRepository:
         def __init__(self, _settings) -> None:
             self.engine = engine
+            self.session_factory = sessionmaker(bind=engine, future=True)
 
     def fake_create_all(_engine):
         order.append("create_all")
@@ -134,12 +134,23 @@ def test_postgresql_initialization_path_seeds_after_schema_creation(
             assert purpose == "provider_access_keys"
             order.append("seeded")
 
-    class FakeTextNormalizationSerializer:
+    class FakeCatalogSerializer:
         def __init__(self, **_kwargs) -> None:
             pass
 
-        def ensure_seeded(self):
-            order.append("text_seeded")
+    class FakeCatalogSeedResult:
+        manifests_seen = 1
+        manifests_seeded = 1
+        entries_written = 1
+
+    class FakeCatalogSeeder:
+        def __init__(self, _serializer) -> None:
+            pass
+
+        def seed_missing_or_changed_manifests(self, *, force: bool = False):
+            assert force is False
+            order.append("catalog_seeded")
+            return FakeCatalogSeedResult()
 
     monkeypatch.setattr(
         initializer.sqlalchemy, "create_engine", lambda *a, **k: FakeAdminEngine()
@@ -149,16 +160,17 @@ def test_postgresql_initialization_path_seeds_after_schema_creation(
     monkeypatch.setattr(
         initializer, "AccessKeyEncryptionMaterialSerializer", FakeMaterialSerializer
     )
+    monkeypatch.setattr(initializer, "ReferenceCatalogSerializer", FakeCatalogSerializer)
     monkeypatch.setattr(
         initializer,
-        "TextNormalizationVocabularySerializer",
-        FakeTextNormalizationSerializer,
+        "ReferenceCatalogSeeder",
+        FakeCatalogSeeder,
     )
 
     db_name = initializer.ensure_postgres_database(settings)
 
     assert db_name == "diligent"
-    assert order == ["create_all", "seeded", "text_seeded"]
+    assert order == ["create_all", "seeded", "catalog_seeded"]
 
 
 # -----------------------------------------------------------------------------

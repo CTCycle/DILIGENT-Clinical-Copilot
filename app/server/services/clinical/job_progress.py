@@ -4,7 +4,6 @@ from collections.abc import Callable
 
 from services.runtime.jobs import get_job_manager
 
-
 CLINICAL_PROGRESS_MESSAGES: dict[str, str] = {
     "session_initialization": "Step 1/12 - Initializing session context and validating clinical inputs",
     "therapy_extraction": "Step 2/12 - Parsing THERAPY section to extract active treatment lines",

@@ -3,7 +3,6 @@ from __future__ import annotations
 from datetime import date
 
 import pytest
-
 from domain.clinical import (
     ClinicalLabEntry,
     ClinicalPipelineValidationError,
@@ -61,11 +60,10 @@ def test_drug_schedule_counts_as_timing_information() -> None:
 
 def test_insufficient_pattern_labs_raise_blocker() -> None:
     analyzer = HepatotoxicityPatternAnalyzer()
-    with pytest.raises(ClinicalPipelineValidationError) as exc_info:
-        analyzer.assess_payload(PatientLabTimeline(entries=[]))
-    assert any(
-        issue.code == "missing_hepatotoxicity_inputs" for issue in exc_info.value.issues
-    )
+    assessment = analyzer.assess_payload(PatientLabTimeline(entries=[]))
+    assert assessment.status == "undetermined_due_to_missing_labs"
+    assert assessment.score.classification == "indeterminate"
+    assert any(issue.code == "missing_hepatotoxicity_inputs" for issue in assessment.issues)
 
 
 def test_non_critical_missing_data_does_not_block() -> None:

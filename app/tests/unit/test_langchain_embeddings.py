@@ -3,7 +3,6 @@ from __future__ import annotations
 import asyncio
 
 from pytest import MonkeyPatch
-
 from services.retrieval import embeddings as embeddings_module
 
 

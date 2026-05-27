@@ -34,6 +34,7 @@ from services.clinical.candidate_selection import select_relevant_candidates
 from services.clinical.language import ClinicalLanguageDetector
 from services.clinical.match_quality import classify_match_evidence
 from services.clinical.report_language import phrase
+from services.security.access_keys import AccessKeyService
 from services.session.clinical_input_extractor import ClinicalInputExtractionError
 from services.session.document_normalizer import DocumentNormalizer
 from services.session.preflight import check_parser_batch_capacity
@@ -46,7 +47,6 @@ from services.session.robust_pipeline import (
     validate_fact_graph,
 )
 from services.session.session_shared import NarrativeBuilder, run_clinical_job
-from services.security.access_keys import AccessKeyService
 from services.text.normalization import normalize_drug_query_name
 
 _CLOUD_PROVIDERS = {"openai", "gemini", "openrouter"}

@@ -1,8 +1,5 @@
 from __future__ import annotations
 
-from sqlalchemy import create_engine, select
-from sqlalchemy.orm import sessionmaker
-
 from repositories.schemas.models import (
     AccessKey,
     Base,
@@ -11,6 +8,8 @@ from repositories.serialization.access_key_encryption import (
     AccessKeyEncryptionMaterialSerializer,
 )
 from repositories.serialization.access_keys import AccessKeySerializer
+from sqlalchemy import create_engine, select
+from sqlalchemy.orm import sessionmaker
 
 
 # -----------------------------------------------------------------------------

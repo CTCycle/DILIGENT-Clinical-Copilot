@@ -5,6 +5,7 @@ from types import SimpleNamespace
 from typing import Any, cast
 
 import pandas as pd
+
 from services.text.normalization import coerce_text
 
 

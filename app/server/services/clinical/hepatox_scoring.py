@@ -1,55 +1,21 @@
 from __future__ import annotations
 
-import asyncio
-import inspect
-import json
 import re
-from collections.abc import Callable
-from datetime import date, datetime
-from typing import Any
 
-from services.llm.prompts import (
-    LIVERTOX_CONCLUSION_SYSTEM_PROMPT,
-    LIVERTOX_CONCLUSION_USER_PROMPT,
-    LIVERTOX_CLINICAL_SYSTEM_PROMPT,
-    LIVERTOX_CLINICAL_USER_PROMPT,
-    LIVERTOX_REPORT_EXAMPLE_TEMPLATE,
-)
-from services.llm.provider_factory import initialize_llm_client
-from domain.clinical.entities import (
-    ClinicalLabEntry,
-    ClinicalPipelineValidationError,
-    DrugEntry,
-    DrugClinicalAssessment,
-    DrugRucamAssessment,
-    DrugSuspensionContext,
-    HepatotoxicityPatternAssessment,
-    HepatotoxicityPatternScore,
-    PatientDrugClinicalReport,
-    PatientDrugs,
-    PatientLabTimeline,
-    PatientRucamAssessmentBundle,
-    PipelineIssue,
-)
-from configurations.startup import server_settings
-from configurations.llm_configs import LLMRuntimeConfig
 from common.constants import (
     DEFAULT_DILI_CLASSIFICATION,
     R_SCORE_CHOLESTATIC_THRESHOLD,
     R_SCORE_HEPATOCELLULAR_THRESHOLD,
 )
-from common.utils.logger import logger
-from services.clinical.match_quality import classify_match_evidence
-from services.retrieval.embeddings import SimilaritySearch
-from services.clinical.preparation import HepatoxPreparedInputs
-from services.text.normalization import normalize_drug_query_name
-from services.text.vocabulary import get_text_normalization_snapshot
-from services.clinical.report_language import (
-    phrase,
-    report_heading,
-    rucam_summary_text,
+from domain.clinical.entities import (
+    ClinicalLabEntry,
+    DrugRucamAssessment,
+    HepatotoxicityPatternAssessment,
+    HepatotoxicityPatternScore,
+    PatientLabTimeline,
+    PipelineIssue,
 )
-
+from services.catalogs.runtime import get_reference_catalog_snapshot
 
 ###############################################################################
 NOT_AVAILABLE_TEXT = "Not available"
@@ -335,16 +301,27 @@ def is_materially_in_report_language(text: str, report_language: str) -> bool:
     if language_key == "en":
         return True
     token_pattern = re.compile(r"[A-Za-zÀ-ÖØ-öø-ÿ]+")
-    language_markers: dict[str, set[str]] = {
-        "it": {"il", "la", "del", "della", "con", "per", "farmaco", "paziente"},
-        "de": {"der", "die", "das", "und", "mit", "für", "patient", "arznei"},
-        "fr": {"le", "la", "les", "des", "avec", "pour", "patient", "médicament"},
-        "es": {"el", "la", "los", "las", "con", "para", "paciente", "fármaco"},
-    }
-    target_markers = language_markers.get(language_key)
+    snapshot = get_reference_catalog_snapshot()
+    target_markers = set(
+        token.casefold()
+        for token in snapshot.values(
+            "language_detection",
+            "clinical_language_scoring_terms",
+            key=language_key,
+        )
+    )
     if not target_markers:
         return True
-    english_markers = {"the", "and", "with", "for", "patient", "drug", "liver"}
+    english_markers = set(
+        token.casefold()
+        for token in snapshot.values(
+            "language_detection",
+            "clinical_language_scoring_terms",
+            key="en",
+        )
+    )
+    if not english_markers:
+        return True
     target_hits = 0
     english_hits = 0
     for match in token_pattern.finditer(normalized):

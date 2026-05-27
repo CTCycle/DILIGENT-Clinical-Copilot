@@ -5,13 +5,11 @@ from types import SimpleNamespace
 from typing import Any
 
 from domain.clinical import PatientData
-from services.clinical.labs import ClinicalLabExtractor
-from services.clinical.labs import LabExtractionPayload
+from services.clinical.labs import ClinicalLabExtractor, LabExtractionPayload
 from services.clinical.parser import DrugsParser
 from services.runtime.jobs import JobManager
 from services.session import factory
 from services.session.session_service import ClinicalSessionService
-
 
 ITALIAN_LAB_TEXT = """
 Labor 10.01.2025: ALAT 345 U/L, ALP 1055 U/L, Amilasi P 94 U/L, Lipasi 172 U/L.

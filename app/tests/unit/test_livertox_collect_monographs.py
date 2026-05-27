@@ -6,7 +6,6 @@ from concurrent.futures import ThreadPoolExecutor
 from pathlib import Path
 
 import pytest
-
 from services.updater import livertox_parse as livertox_module
 from services.updater.livertox_core import LiverToxUpdater
 

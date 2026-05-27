@@ -8,20 +8,20 @@ from datetime import date, datetime
 from typing import Any, Literal
 
 from common.utils.logger import logger
-from configurations.startup import server_settings
 from configurations.llm_configs import LLMRuntimeConfig
-from domain.clinical.extras import LabExtractionPayload
+from configurations.startup import server_settings
 from domain.clinical.entities import (
     ClinicalLabEntry,
     LiverInjuryOnsetContext,
     PatientData,
     PatientLabTimeline,
 )
-from services.llm.prompts import CLINICAL_LAB_EXTRACTION_PROMPT
+from domain.clinical.extras import LabExtractionPayload
+from services.catalogs.runtime import get_reference_catalog_snapshot
 from services.llm.client_runtime import ensure_runtime_client
+from services.llm.prompts import CLINICAL_LAB_EXTRACTION_PROMPT
 from services.llm.provider_factory import select_llm_provider
 from services.text.vocabulary import get_text_normalization_snapshot
-
 
 ###############################################################################
 RATE_LIMIT_WAIT_HINT_RE = re.compile(
@@ -32,16 +32,27 @@ NUMERIC_RE = re.compile(r"[-+]?\d+(?:[.,]\d+)?")
 DATE_RE = re.compile(
     r"\b(?:\d{4}[-/.]\d{1,2}[-/.]\d{1,2}|\d{1,2}[-/.]\d{1,2}[-/.]\d{4})\b"
 )
-MARKER_ALIASES: dict[str, tuple[str, ...]] = {
-    "ALT": ("alt", "alat", "gpt"),
-    "AST": ("ast", "asat", "got"),
-    "ALP": ("alp", "alkp", "alkaline phosphatase"),
-    "TBIL": ("tbil", "total bilirubin", "bilirubin total", "bilirubin"),
-    "DBIL": ("dbil", "direct bilirubin", "bilirubin direct"),
-    "GGT": ("ggt", "gamma gt", "gamma-glutamyl transferase"),
-    "INR": ("inr",),
-    "ALB": ("albumin", "alb"),
-}
+def _load_marker_aliases() -> dict[str, tuple[str, ...]]:
+    snapshot = get_reference_catalog_snapshot()
+    entries = snapshot.entries("clinical_extraction", "laboratory_markers")
+    by_key: dict[str, list[str]] = {}
+    for entry in entries:
+        by_key.setdefault(entry.key.upper(), []).append(entry.value.casefold())
+    if by_key:
+        return {key: tuple(dict.fromkeys(values)) for key, values in by_key.items()}
+    return {
+        "ALT": ("alt", "alat", "gpt"),
+        "AST": ("ast", "asat", "got"),
+        "ALP": ("alp", "alkp", "alkaline phosphatase"),
+        "TBIL": ("tbil", "total bilirubin", "bilirubin total", "bilirubin"),
+        "DBIL": ("dbil", "direct bilirubin", "bilirubin direct"),
+        "GGT": ("ggt", "gamma gt", "gamma-glutamyl transferase"),
+        "INR": ("inr",),
+        "ALB": ("albumin", "alb"),
+    }
+
+
+MARKER_ALIASES: dict[str, tuple[str, ...]] = _load_marker_aliases()
 HEPATIC_PATTERN_RE = re.compile(
     r"\b(?:hepatic\s+pattern|injury\s+pattern|pattern)\s*[:=]?\s*(hepatocellular|cholestatic|mixed|indeterminate)\b",
     re.IGNORECASE,
@@ -493,7 +504,11 @@ class ClinicalLabExtractor:
         lowered = (text or "").casefold()
         if not lowered:
             return False
-        marker_tokens = (
+        snapshot = get_reference_catalog_snapshot()
+        marker_tokens = tuple(
+            value.casefold()
+            for value in snapshot.values("clinical_extraction", "laboratory_markers")
+        ) or (
             "alat",
             "alt",
             "asat",
@@ -506,7 +521,10 @@ class ClinicalLabExtractor:
             "albumina",
             "albumin",
         )
-        unit_tokens = ("u/l", "ui/l", "micromol", "µmol", "mg/dl", "g/l")
+        unit_tokens = tuple(
+            value.casefold()
+            for value in snapshot.values("clinical_extraction", "laboratory_units")
+        ) or ("u/l", "ui/l", "micromol", "µmol", "mg/dl", "g/l")
         has_marker = any(token in lowered for token in marker_tokens)
         has_unit = any(token in lowered for token in unit_tokens)
         has_number = NUMERIC_RE.search(lowered) is not None

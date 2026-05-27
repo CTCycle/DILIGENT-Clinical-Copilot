@@ -1,7 +1,8 @@
 from __future__ import annotations
 
-from app import app
 from domain.keys import SUPPORTED_PROVIDERS
+
+from app import app
 
 
 def test_no_research_route_registered() -> None:

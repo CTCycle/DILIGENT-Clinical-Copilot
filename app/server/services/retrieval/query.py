@@ -2,13 +2,13 @@ from __future__ import annotations
 
 from collections import defaultdict
 
-from services.llm.prompts import DILI_RAG_QUERY_PROMPT
-from domain.clinical.entities import PatientDrugs
 from common.constants import (
     DEFAULT_DILI_CLASSIFICATION,
     NO_CLINICAL_CONTEXT_FALLBACK,
     UNKNOWN_R_SCORE_TOKEN,
 )
+from domain.clinical.entities import PatientDrugs
+from services.llm.prompts import DILI_RAG_QUERY_PROMPT
 
 
 ###############################################################################

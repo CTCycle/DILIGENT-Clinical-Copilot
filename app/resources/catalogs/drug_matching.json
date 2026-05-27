@@ -1,0 +1,169 @@
+{
+  "manifest": "drug_matching",
+  "version": 1,
+  "description": "Deterministic text reference data used by drug matching services.",
+  "entries": [
+    {
+      "domain": "drug_matching",
+      "category": "rxnav_excluded_term_suffixes",
+      "key": "default",
+      "locale": "und",
+      "priority": 100,
+      "values": [
+        "pck"
+      ],
+      "metadata": {
+        "case_sensitive": false,
+        "match_mode": "suffix"
+      }
+    },
+    {
+      "domain": "drug_matching",
+      "category": "brand_indicator_terms",
+      "key": "default",
+      "locale": "und",
+      "priority": 100,
+      "values": [
+        "brand",
+        "trade"
+      ],
+      "metadata": {
+        "case_sensitive": false,
+        "match_mode": "token"
+      }
+    },
+    {
+      "domain": "drug_matching",
+      "category": "company_suffix_terms",
+      "key": "default",
+      "locale": "und",
+      "priority": 100,
+      "values": [
+        "inc",
+        "ltd",
+        "gmbh",
+        "spa",
+        "desitin",
+        "axapharm",
+        "streuli"
+      ],
+      "metadata": {
+        "case_sensitive": false,
+        "match_mode": "token"
+      }
+    },
+    {
+      "domain": "drug_matching",
+      "category": "catalog_fallback_aliases",
+      "key": "Co-Amoxicillina",
+      "locale": "und",
+      "priority": 100,
+      "values": [
+        "co amoxicillina",
+        "co amoxi",
+        "coamoxi"
+      ],
+      "metadata": {
+        "case_sensitive": false,
+        "match_mode": "phrase"
+      }
+    },
+    {
+      "domain": "drug_matching",
+      "category": "catalog_fallback_aliases",
+      "key": "Valaciclovir",
+      "locale": "und",
+      "priority": 100,
+      "values": [
+        "valaciclovir",
+        "valacyclovir"
+      ],
+      "metadata": {
+        "case_sensitive": false,
+        "match_mode": "phrase"
+      }
+    },
+    {
+      "domain": "drug_matching",
+      "category": "catalog_fallback_aliases",
+      "key": "Bactrim",
+      "locale": "und",
+      "priority": 100,
+      "values": [
+        "bactrim"
+      ],
+      "metadata": {
+        "case_sensitive": false,
+        "match_mode": "phrase"
+      }
+    },
+    {
+      "domain": "drug_matching",
+      "category": "knowledge_source_references",
+      "key": "default",
+      "locale": "und",
+      "priority": 100,
+      "values": [
+        "livertox",
+        "rxnav"
+      ],
+      "metadata": {
+        "case_sensitive": false,
+        "match_mode": "token"
+      }
+    },
+    {
+      "domain": "drug_matching",
+      "category": "matching_stopwords",
+      "key": "default",
+      "locale": "und",
+      "priority": 100,
+      "values": [
+        "tablet",
+        "tablets",
+        "capsule",
+        "solution",
+        "injectable",
+        "cpr",
+        "gtt",
+        "estratto",
+        "secco",
+        "lingual"
+      ],
+      "metadata": {
+        "case_sensitive": false,
+        "match_mode": "token"
+      }
+    },
+    {
+      "domain": "drug_matching",
+      "category": "token_blacklist_terms",
+      "key": "default",
+      "locale": "und",
+      "priority": 100,
+      "values": [
+        "therapy",
+        "treatment"
+      ],
+      "metadata": {
+        "case_sensitive": false,
+        "match_mode": "token"
+      }
+    },
+    {
+      "domain": "drug_matching",
+      "category": "combination_preference_terms",
+      "key": "default",
+      "locale": "und",
+      "priority": 100,
+      "values": [
+        "trimethoprim sulfamethoxazole",
+        "amoxicillin clavulanate"
+      ],
+      "metadata": {
+        "case_sensitive": false,
+        "match_mode": "phrase"
+      }
+    }
+  ]
+}

@@ -1,24 +1,25 @@
 from __future__ import annotations
 
 from datetime import datetime
+
 from sqlalchemy.engine import Engine
 from sqlalchemy.orm import Session, sessionmaker
 
-from repositories.database.session import (
-    resolve_engine,
-    resolve_session_factory,
-)
-from repositories.queries.access_keys import AccessKeyRepositoryQueries
-from repositories.serialization.access_key_encryption import (
-    AccessKeyEncryptionMaterialSerializer,
-)
-from repositories.schemas.models import AccessKey
 from common.security.cryptography import (
     decrypt_with_key_material,
     encrypt_with_key_material,
     fingerprint_plaintext,
 )
 from domain.keys import ProviderName, normalize_access_key, normalize_provider_name
+from repositories.database.session import (
+    resolve_engine,
+    resolve_session_factory,
+)
+from repositories.queries.access_keys import AccessKeyRepositoryQueries
+from repositories.schemas.models import AccessKey
+from repositories.serialization.access_key_encryption import (
+    AccessKeyEncryptionMaterialSerializer,
+)
 
 
 ###############################################################################

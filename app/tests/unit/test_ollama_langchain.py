@@ -4,9 +4,8 @@ import asyncio
 from dataclasses import dataclass
 from typing import Any
 
-from pydantic import BaseModel
-
 import services.llm.ollama_client as providers_module
+from pydantic import BaseModel
 from services.llm.structured import StructuredOutputParser
 
 

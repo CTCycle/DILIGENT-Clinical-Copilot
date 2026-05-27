@@ -7,18 +7,18 @@ from typing import Any
 
 from common.constants import CONFIGURATIONS_FILE
 from common.utils.languages import (
-    LANGUAGE_DIACRITIC_HINTS,
-    LANGUAGE_FUNCTION_HINTS,
-    LANGUAGE_HINTS,
-    LANGUAGE_PHRASE_HINTS,
     SUPPORTED_REPORT_LANGUAGES,
     TOKEN_PATTERN,
+    get_language_diacritic_hints,
+    get_language_function_hints,
+    get_language_hints,
+    get_language_phrase_hints,
     resolve_supported_language_code,
 )
 from domain.clinical.entities import PatientData
 from domain.clinical.language import LanguageDetectionResult
 
-
+###############################################################################
 class ClinicalLanguageDetector:
     DEFAULT_THRESHOLDS: dict[str, float] = {
         "min_best_score": 2.0,
@@ -43,11 +43,15 @@ class ClinicalLanguageDetector:
         lowered_text = text.casefold()
         length_norm = 1.0 + math.log10(max(10, len(tokens)))
 
+        runtime_language_hints = get_language_hints()
+        runtime_phrase_hints = get_language_phrase_hints()
+        runtime_function_hints = get_language_function_hints()
+        runtime_diacritic_hints = get_language_diacritic_hints()
         for lang_code in SUPPORTED_REPORT_LANGUAGES:
-            hints = LANGUAGE_HINTS.get(lang_code, set())
-            function_hints = LANGUAGE_FUNCTION_HINTS.get(lang_code, set())
-            phrase_hints = LANGUAGE_PHRASE_HINTS.get(lang_code, ())
-            diacritic_hints = LANGUAGE_DIACRITIC_HINTS.get(lang_code, set())
+            hints = runtime_language_hints.get(lang_code, set())
+            function_hints = runtime_function_hints.get(lang_code, set())
+            phrase_hints = runtime_phrase_hints.get(lang_code, ())
+            diacritic_hints = runtime_diacritic_hints.get(lang_code, set())
 
             exact_hint_hits = sum(1 for token in tokens if token in hints)
             unique_hint_hits = sum(1 for token in unique_tokens if token in hints)

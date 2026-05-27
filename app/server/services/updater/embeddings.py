@@ -1,11 +1,11 @@
 from __future__ import annotations
 
-from pathlib import Path
 from collections.abc import Callable
+from pathlib import Path
 
-from configurations.startup import server_settings
 from common.constants import DOCS_PATH, VECTOR_DB_PATH
 from common.utils.logger import logger
+from configurations.startup import server_settings
 from repositories.serialization.vectors import VectorSerializer
 from repositories.vectors import LanceVectorDatabase
 

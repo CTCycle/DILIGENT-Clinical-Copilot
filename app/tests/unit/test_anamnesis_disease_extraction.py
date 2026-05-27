@@ -5,17 +5,17 @@ from datetime import date
 from typing import Any
 
 from domain.clinical import (
-    LiverInjuryOnsetContext,
     DiseaseContextEntry,
     DrugEntry,
     HepatotoxicityPatternScore,
-    PatientLabTimeline,
+    LiverInjuryOnsetContext,
     PatientData,
     PatientDiseaseContext,
     PatientDrugs,
+    PatientLabTimeline,
 )
-from services.session.session_service import ClinicalSessionService
 from services.clinical.disease import DiseaseExtractor
+from services.session.session_service import ClinicalSessionService
 
 
 class FakeDiseaseClient:

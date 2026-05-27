@@ -1,0 +1,135 @@
+{
+  "manifest": "dili_assessment",
+  "version": 1,
+  "description": "Deterministic text reference data used by DILI and RUCAM assessment services.",
+  "entries": [
+    {
+      "domain": "dili_assessment",
+      "category": "hepatic_keywords",
+      "key": "default",
+      "locale": "und",
+      "priority": 100,
+      "values": [
+        "liver",
+        "hepatic",
+        "hepatotoxic",
+        "dili",
+        "bilirubin",
+        "alt",
+        "ast",
+        "alp"
+      ],
+      "metadata": {
+        "case_sensitive": false,
+        "match_mode": "token"
+      }
+    },
+    {
+      "domain": "dili_assessment",
+      "category": "hepatotoxic_meddra_terms",
+      "key": "default",
+      "locale": "und",
+      "priority": 100,
+      "values": [
+        "hepatotoxicity",
+        "drug induced liver injury",
+        "hepatic failure"
+      ],
+      "metadata": {
+        "case_sensitive": false,
+        "match_mode": "phrase"
+      }
+    },
+    {
+      "domain": "dili_assessment",
+      "category": "rucam_alcohol_terms",
+      "key": "default",
+      "locale": "und",
+      "priority": 100,
+      "values": [
+        "alcohol",
+        "ethanol"
+      ],
+      "metadata": {
+        "case_sensitive": false,
+        "match_mode": "token"
+      }
+    },
+    {
+      "domain": "dili_assessment",
+      "category": "rucam_pregnancy_terms",
+      "key": "default",
+      "locale": "und",
+      "priority": 100,
+      "values": [
+        "pregnancy",
+        "pregnant"
+      ],
+      "metadata": {
+        "case_sensitive": false,
+        "match_mode": "token"
+      }
+    },
+    {
+      "domain": "dili_assessment",
+      "category": "rucam_competing_etiology_terms",
+      "key": "default",
+      "locale": "und",
+      "priority": 100,
+      "values": [
+        "viral hepatitis",
+        "autoimmune hepatitis"
+      ],
+      "metadata": {
+        "case_sensitive": false,
+        "match_mode": "phrase"
+      }
+    },
+    {
+      "domain": "dili_assessment",
+      "category": "rucam_exclusion_terms",
+      "key": "default",
+      "locale": "und",
+      "priority": 100,
+      "values": [
+        "no evidence",
+        "excluded"
+      ],
+      "metadata": {
+        "case_sensitive": false,
+        "match_mode": "phrase"
+      }
+    },
+    {
+      "domain": "dili_assessment",
+      "category": "r_score_text_tokens",
+      "key": "default",
+      "locale": "und",
+      "priority": 100,
+      "values": [
+        "r score",
+        "r="
+      ],
+      "metadata": {
+        "case_sensitive": false,
+        "match_mode": "phrase"
+      }
+    },
+    {
+      "domain": "dili_assessment",
+      "category": "dili_classification_terms",
+      "key": "default",
+      "locale": "und",
+      "priority": 100,
+      "values": [
+        "indeterminate",
+        "probable",
+        "highly probable"
+      ],
+      "metadata": {
+        "case_sensitive": false,
+        "match_mode": "token"
+      }
+    }
+  ]
+}

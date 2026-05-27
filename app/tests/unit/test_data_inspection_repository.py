@@ -3,8 +3,6 @@ from __future__ import annotations
 import time
 from datetime import date, datetime
 from typing import Any
-from sqlalchemy import create_engine, select
-from sqlalchemy.orm import sessionmaker
 
 from domain.patient_timeline import (
     PatientTimeline,
@@ -24,6 +22,8 @@ from repositories.schemas.models import (
 from repositories.serialization.data import DataSerializer
 from services.inspection import DataInspectionService
 from services.runtime.jobs import JobManager
+from sqlalchemy import create_engine, select
+from sqlalchemy.orm import sessionmaker
 
 
 # -----------------------------------------------------------------------------

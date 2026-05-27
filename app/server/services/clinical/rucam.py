@@ -22,12 +22,32 @@ from domain.clinical.rucam import (
     RucamDataSufficiency,
     RucamSourceReportedScore,
 )
+from services.catalogs.runtime import get_reference_catalog_snapshot
 from services.clinical.report_language import phrase, resolve_report_language
 from services.text.normalization import normalize_drug_query_name
 
-ALCOHOL_RE = re.compile(r"\b(alcohol|ethanol|wine|beer|abuse)\b", re.IGNORECASE)
-PREGNANCY_RE = re.compile(r"\b(pregnan|gestation|gravida)\b", re.IGNORECASE)
-EXCLUSION_RE = re.compile(r"(viral|hepatitis|serolog|autoimmune|imaging|ultrasound|mr[ci]|ct)\s+(negative|excluded|normal|without)", re.IGNORECASE)
+
+def _compile_terms_regex(category: str) -> re.Pattern[str]:
+    values = get_reference_catalog_snapshot().values(
+        "dili_assessment",
+        category,
+        key="default",
+    )
+    terms = [re.escape(value.strip()) for value in values if value.strip()]
+    if terms:
+        return re.compile(r"\b(" + "|".join(terms) + r")\b", re.IGNORECASE)
+    return re.compile(r"$^")
+
+
+ALCOHOL_RE = _compile_terms_regex(
+    "rucam_alcohol_terms",
+)
+PREGNANCY_RE = _compile_terms_regex(
+    "rucam_pregnancy_terms",
+)
+EXCLUSION_RE = _compile_terms_regex(
+    "rucam_exclusion_terms",
+)
 RUCAM_SCORE_RE = re.compile(r"\brucam\b\s*(?:score)?\s*[:=]?\s*(-?\d{1,2})", re.IGNORECASE)
 
 RucamInjuryType = Literal[

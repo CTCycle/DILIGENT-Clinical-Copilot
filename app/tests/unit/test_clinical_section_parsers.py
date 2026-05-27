@@ -1,7 +1,6 @@
 from __future__ import annotations
 
 import pytest
-
 from services.session.clinical_section_parsers import (
     extract_sections_from_markers,
     find_section_markers,
@@ -34,7 +33,9 @@ def test_untitled_prose_fails() -> None:
 
 def test_duplicate_competing_headings_fail() -> None:
     with pytest.raises(ValueError):
-        from services.session.clinical_section_parsers import extract_required_dili_sections
+        from services.session.clinical_section_parsers import (
+            extract_required_dili_sections,
+        )
 
         extract_required_dili_sections(
             "Therapy:\nT1\nCurrent medications:\nT2\nAnamnesis:\nA\nLaboratory history:\nL"

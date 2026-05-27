@@ -7,13 +7,16 @@ from typing import Any, cast
 
 from common.exceptions import ServiceValidationError
 from configurations.llm_configs import LLMRuntimeConfig
-from domain.clinical.entities import ClinicalPipelineValidationError, ClinicalSessionRequest
+from domain.clinical.entities import (
+    ClinicalPipelineValidationError,
+    ClinicalSessionRequest,
+)
 from domain.clinical.robustness import (
     ClinicalInputPreflightIssue,
     ClinicalInputPreflightResult,
 )
-from services.security.access_keys import AccessKeyService
 from services.llm.provider_factory import select_llm_provider
+from services.security.access_keys import AccessKeyService
 from services.session.document_normalizer import DocumentNormalizer
 from services.session.robust_pipeline import build_extraction_artifact
 

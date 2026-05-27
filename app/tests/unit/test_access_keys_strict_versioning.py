@@ -2,9 +2,6 @@ from __future__ import annotations
 
 from pathlib import Path
 
-from sqlalchemy import create_engine
-from sqlalchemy.orm import sessionmaker
-
 from repositories.schemas.models import (
     AccessKey,
     Base,
@@ -13,6 +10,8 @@ from repositories.serialization.access_key_encryption import (
     AccessKeyEncryptionMaterialSerializer,
 )
 from repositories.serialization.access_keys import AccessKeySerializer
+from sqlalchemy import create_engine
+from sqlalchemy.orm import sessionmaker
 
 VALID_TEST_KEY = "openai-secret-value"
 

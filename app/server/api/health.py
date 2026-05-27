@@ -4,7 +4,6 @@ from fastapi import APIRouter, status
 
 from domain.health import HealthResponse
 
-
 router = APIRouter(tags=["health"])
 
 

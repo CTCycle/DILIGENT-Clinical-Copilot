@@ -3,9 +3,8 @@ from __future__ import annotations
 import html
 import re
 import unicodedata
+from datetime import date, datetime
 from typing import Any
-from datetime import datetime, date
-
 
 HTML_TAG_RE = re.compile(r"<[^>]+>")
 MULTISPACE_RE = re.compile(r"[ \t]+")

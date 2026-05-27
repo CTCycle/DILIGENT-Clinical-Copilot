@@ -19,28 +19,6 @@ _STRENGTH_FRAGMENT_RE = re.compile(
     re.IGNORECASE,
 )
 _PARENTHETICAL_RE = re.compile(r"\([^)]*\)")
-_STATIC_QUERY_ALIASES = {
-    "bactrim": "trimethoprim sulfamethoxazole",
-    "bactrim forte": "trimethoprim sulfamethoxazole",
-    "buscopan": "scopolamine",
-    "co amoxi": "amoxicillin clavulanate",
-    "co amoxicillina": "amoxicillin clavulanate",
-    "co amoxiclav": "amoxicillin clavulanate",
-    "dafalgan": "acetaminophen",
-    "imodium": "loperamide",
-    "imodium lingual": "loperamide",
-    "paspertin": "metoclopramide",
-    "rivotril": "clonazepam",
-}
-_STATIC_QUERY_SUBSTRING_ALIASES = {
-    "co amoxicillina": "amoxicillin clavulanate",
-    "co amoxi": "amoxicillin clavulanate",
-}
-_NOISY_QUERY_PHRASES = {
-    "dal",
-    "entrambi e il",
-    "rialzo a",
-}
 
 
 # ---------------------------------------------------------------------------
@@ -98,14 +76,12 @@ def canonicalize_drug_query(value: str | None) -> str:
     canonical = normalize_whitespace(" ".join(kept_tokens))
     return resolve_known_query_alias(canonical)
 
-
 # ---------------------------------------------------------------------------
 def normalize_drug_query_name(value: str | None) -> str:
     canonical = canonicalize_drug_query(value)
     if not canonical:
         return ""
     return normalize_drug_name(canonical)
-
 
 # -----------------------------------------------------------------------------
 def coerce_text(value: Any) -> str | None:
@@ -122,13 +98,11 @@ def coerce_text(value: Any) -> str | None:
     text = str(value).strip()
     return text or None
 
-
 # -----------------------------------------------------------------------------
 def normalize_whitespace(value: str) -> str:
     if not value:
         return ""
     return re.sub(r"\s+", " ", value).strip()
-
 
 # -----------------------------------------------------------------------------
 def normalize_drug_name(value: str) -> str:
@@ -147,7 +121,6 @@ def normalize_token(token: str) -> str:
     if not token:
         return ""
     return re.sub(r"[.,;:]+$", "", token.lower())
-
 
 # -----------------------------------------------------------------------------
 def strip_manufacturer_suffix_tokens(tokens: list[str]) -> list[str]:
@@ -168,7 +141,6 @@ def strip_manufacturer_suffix_tokens(tokens: list[str]) -> list[str]:
         break
     return trimmed
 
-
 # -----------------------------------------------------------------------------
 def strip_trailing_temporal_tokens(tokens: list[str]) -> list[str]:
     if not tokens:
@@ -188,18 +160,15 @@ def resolve_known_query_alias(value: str) -> str:
     normalized = normalize_drug_name(value)
     if not normalized:
         return ""
-    if normalized in _NOISY_QUERY_PHRASES:
+    snapshot = get_text_normalization_snapshot()
+    if normalized in snapshot.noisy_phrases:
         return ""
-    alias = get_text_normalization_snapshot().query_aliases.get(normalized)
+    alias = snapshot.query_aliases.get(normalized)
     if alias is not None:
         return alias
-    static_alias = _STATIC_QUERY_ALIASES.get(normalized)
-    if static_alias is not None:
-        return static_alias
-    for phrase, alias_value in _STATIC_QUERY_SUBSTRING_ALIASES.items():
-        if phrase in normalized:
-            return alias_value
-
+    for candidate, replacement in snapshot.query_aliases.items():
+        if candidate and " " in candidate and candidate in normalized:
+            return replacement
     return normalized
 
 

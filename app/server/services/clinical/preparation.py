@@ -5,21 +5,21 @@ import re
 from collections.abc import Callable
 from typing import Any, Sequence
 
+from common.utils.logger import logger
 from domain.clinical.entities import (
     DrugEntry,
     HepatotoxicityPatternScore,
     PatientDrugs,
 )
 from domain.clinical.extras import HepatoxPreparedInputs
-from common.utils.logger import logger
 from repositories.serialization.data import DataSerializer
 from services.clinical.knowledge import ClinicalKnowledgeComposer
-from services.clinical.matches_core import (
-    LiverToxMatcher,
-)
 from services.clinical.match_resolution import (
     DrugEvidenceMatchResult,
     conservative_fuzzy_livertox_match,
+)
+from services.clinical.matches_core import (
+    LiverToxMatcher,
 )
 from services.text.normalization import (
     canonicalize_drug_query,

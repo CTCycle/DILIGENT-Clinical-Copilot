@@ -4,16 +4,14 @@ import asyncio
 import inspect
 import threading
 import uuid
+from collections.abc import Callable
+from functools import lru_cache
 from time import monotonic
 from typing import Any
 
-from collections.abc import Callable
-
-from common.constants import SENSITIVE_ERROR_TOKENS
+from common.utils.error_filters import get_sensitive_error_tokens
 from common.utils.logger import logger
 from services.runtime.state import JobState
-
-from functools import lru_cache
 
 
 ###############################################################################
@@ -27,7 +25,7 @@ class JobErrorSanitizer:
         if len(candidate) > 180:
             return False
         lowered = candidate.casefold()
-        return not any(token in lowered for token in SENSITIVE_ERROR_TOKENS)
+        return not any(token in lowered for token in get_sensitive_error_tokens())
 
     # -------------------------------------------------------------------------
     @classmethod

@@ -6,7 +6,17 @@ from datetime import date
 from typing import Any
 
 from api import session as session_module
-from domain.clinical import ClinicalLabEntry, DrugEntry, DrugRucamAssessment, LiverInjuryOnsetContext, PatientData, PatientDiseaseContext, PatientDrugs, PatientLabTimeline, PatientRucamAssessmentBundle
+from domain.clinical import (
+    ClinicalLabEntry,
+    DrugEntry,
+    DrugRucamAssessment,
+    LiverInjuryOnsetContext,
+    PatientData,
+    PatientDiseaseContext,
+    PatientDrugs,
+    PatientLabTimeline,
+    PatientRucamAssessmentBundle,
+)
 from services.clinical.preparation import HepatoxPreparedInputs
 
 

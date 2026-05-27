@@ -3,25 +3,24 @@ from __future__ import annotations
 from typing import Any
 
 import pytest
-from pydantic import ValidationError
-from fastapi import FastAPI
-from fastapi.testclient import TestClient
-from sqlalchemy import create_engine
-
 from api import data_inspection
 from domain.inspection import (
+    MAX_SEARCH_LENGTH,
     CatalogListFilters,
     InspectionLiverToxOverrideRequest,
     InspectionRagOverrideRequest,
     InspectionRxNavOverrideRequest,
-    MAX_SEARCH_LENGTH,
     SessionListFilters,
 )
-from services.inspection import DataInspectionService
+from fastapi import FastAPI
+from fastapi.testclient import TestClient
+from pydantic import ValidationError
+from repositories.schemas.models import Base
 from repositories.serialization.data import (
     _RepositorySerializationService,
 )
-from repositories.schemas.models import Base
+from services.inspection import DataInspectionService
+from sqlalchemy import create_engine
 
 
 def get_route_owner(router: Any, route_path: str) -> Any:
@@ -138,4 +137,43 @@ def test_livertox_update_config_exposes_only_supported_overrides() -> None:
     assert payload["target"] == "livertox"
     assert "redownload" in payload["allowed_fields"]
     assert "redownload" in payload["defaults"]
+
+
+# -----------------------------------------------------------------------------
+def test_reference_catalog_runtime_observation_routes_are_registered() -> None:
+    app = FastAPI()
+    app.include_router(data_inspection.router)
+    routes: set[tuple[str, str]] = set()
+    for route in app.routes:
+        path = getattr(route, "path", "")
+        if not path.startswith("/inspection/"):
+            continue
+        for method in getattr(route, "methods", set()) or set():
+            routes.add((method, path))
+    assert ("GET", "/inspection/reference-catalogs/runtime-observations") in routes
+    assert (
+        "GET",
+        "/inspection/reference-catalogs/runtime-observations/{category}",
+    ) in routes
+    assert (
+        "PUT",
+        "/inspection/reference-catalogs/runtime-observations/{category}",
+    ) in routes
+    assert (
+        "DELETE",
+        "/inspection/reference-catalogs/runtime-observations/{category}/{term}",
+    ) in routes
+
+
+# -----------------------------------------------------------------------------
+def test_legacy_text_normalization_routes_are_removed() -> None:
+    app = FastAPI()
+    app.include_router(data_inspection.router)
+    legacy_paths = {
+        "/inspection/text-normalization",
+        "/inspection/text-normalization/{category}",
+        "/inspection/text-normalization/{category}/{term}",
+    }
+    current_paths = {getattr(route, "path", "") for route in app.routes}
+    assert legacy_paths.isdisjoint(current_paths)
 

@@ -4,7 +4,6 @@ from typing import Any, Literal
 
 from pydantic import BaseModel, ConfigDict, Field
 
-
 SpanKind = Literal["raw", "clean"]
 DocumentBlockType = Literal["clinical_content", "administrative", "bibliography"]
 FactNodeFamily = Literal[

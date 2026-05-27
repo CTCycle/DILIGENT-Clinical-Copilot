@@ -1,13 +1,13 @@
 from __future__ import annotations
 
 from domain.clinical.entities import (
-    Comparator,
     CONTROL_CHARACTERS_RE,
     MAX_LAB_TEXT_LENGTH,
     ClinicalLabEntry,
     ClinicalPipelineValidationError,
     ClinicalSectionLineRange,
     ClinicalSessionRequest,
+    Comparator,
     DiseaseContextEntry,
     DrugClinicalAssessment,
     DrugEntry,

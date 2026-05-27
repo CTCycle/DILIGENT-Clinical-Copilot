@@ -12,7 +12,6 @@ from configurations.startup import (
     reload_settings_for_tests,
 )
 
-
 __all__ = [
     "ConfigurationManager",
     "ensure_environment_loaded",

@@ -245,7 +245,9 @@ if not exist "%server_dir%\pyproject.toml" (
 )
 
 pushd "%server_dir%" >nul
-"%uv_exe%" run --project "%server_dir%" --python "%python_exe%" python "%init_db_script%"
+echo Recreating database schema
+echo Seeding reference catalogs from app/resources/catalogs
+"%uv_exe%" run --project "%server_dir%" --python "%python_exe%" python "%init_db_script%" --drop-existing --seed-catalogs --force-reseed-catalogs
 set "run_ec=%ERRORLEVEL%"
 popd >nul
 if "%run_ec%"=="0" (

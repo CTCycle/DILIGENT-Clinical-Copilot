@@ -5,7 +5,6 @@ from dataclasses import dataclass
 from typing import Any
 
 from pydantic import BaseModel
-
 from services.llm import cloud as cloud_module
 
 

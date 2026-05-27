@@ -16,7 +16,7 @@
             id="clinical-input"
             aria-label="Clinical Input"
             class="stitch-dili-input-unified"
-            [placeholder]="clinicalInputTemplate"
+            [placeholder]="clinicalInputTemplate()"
             [ngModel]="vm.form.clinicalInput"
             (ngModelChange)="handleFormChange('clinicalInput', $event)"
           ></textarea>

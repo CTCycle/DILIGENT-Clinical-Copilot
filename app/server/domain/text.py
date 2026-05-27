@@ -16,6 +16,7 @@ class TextNormalizationSnapshot:
     rxnav_name_stopwords: frozenset[str]
     trailing_temporal_tokens: frozenset[str]
     query_aliases: dict[str, str]
+    noisy_phrases: frozenset[str]
     drug_non_mentions: frozenset[str]
     drug_duration_words: frozenset[str]
     drug_weekday_words: frozenset[str]
@@ -42,6 +43,7 @@ def empty_text_normalization_snapshot() -> TextNormalizationSnapshot:
         rxnav_name_stopwords=frozenset(),
         trailing_temporal_tokens=frozenset(),
         query_aliases={},
+        noisy_phrases=frozenset(),
         drug_non_mentions=frozenset(),
         drug_duration_words=frozenset(),
         drug_weekday_words=frozenset(),

@@ -1,12 +1,11 @@
 from __future__ import annotations
 
+import re
 from datetime import date as DateValue
 from datetime import datetime
-import re
 from typing import Any, Literal
 
 from pydantic import BaseModel, ConfigDict, Field, field_validator
-
 
 SessionStatus = Literal["successful", "failed"]
 DateFilterMode = Literal["before", "after", "exact"]
@@ -315,7 +314,7 @@ class RagUpdateJobSummary(BaseModel):
     backend: str = "local"
 
 
-class TextNormalizationTermResponse(BaseModel):
+class ReferenceCatalogRuntimeObservationResponse(BaseModel):
     model_config = ConfigDict(extra="forbid")
     id: int
     category: str
@@ -326,7 +325,7 @@ class TextNormalizationTermResponse(BaseModel):
     is_active: bool
 
 
-class TextNormalizationTermUpsertRequest(BaseModel):
+class ReferenceCatalogRuntimeObservationUpsertRequest(BaseModel):
     model_config = ConfigDict(extra="forbid")
     term: str
     replacement: str | None = None

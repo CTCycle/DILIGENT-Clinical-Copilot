@@ -5,8 +5,14 @@ from contextlib import asynccontextmanager
 
 from fastapi import FastAPI
 
-from configurations.startup import initialize_settings
-from configurations.startup import tauri_mode_enabled
+from api.access_keys import router as access_keys_router
+from api.data_inspection import router as data_inspection_router
+from api.error_handling import register_error_handling
+from api.health import router as health_router
+from api.model_config import router as model_config_router
+from api.ollama import router as ollama_router
+from api.root import RootEndpoint
+from api.session import router as session_router
 from common.constants import (
     FASTAPI_DESCRIPTION,
     FASTAPI_DOCS_URL,
@@ -15,14 +21,7 @@ from common.constants import (
     FASTAPI_TITLE,
     FASTAPI_VERSION,
 )
-from api.access_keys import router as access_keys_router
-from api.data_inspection import router as data_inspection_router
-from api.health import router as health_router
-from api.model_config import router as model_config_router
-from api.session import router as session_router
-from api.ollama import router as ollama_router
-from api.root import RootEndpoint
-from api.error_handling import register_error_handling
+from configurations.startup import initialize_settings, tauri_mode_enabled
 from repositories.database.initializer import initialize_database
 from services.llm.model_config import ModelConfigService
 
@@ -30,7 +29,11 @@ from services.llm.model_config import ModelConfigService
 ###############################################################################
 @asynccontextmanager
 async def app_lifespan(_app: FastAPI) -> AsyncIterator[None]:
-    initialize_database()
+    initialize_database(
+        drop_existing=False,
+        seed_catalogs=True,
+        force_reseed_catalogs=False,
+    )
     ModelConfigService().ensure_defaults()
     yield
 

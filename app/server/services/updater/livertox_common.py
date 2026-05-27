@@ -3,12 +3,11 @@ from __future__ import annotations
 import json
 import os
 import re
-from typing import Any
 from collections.abc import Callable
+from typing import Any
 
 import httpx
 from tqdm import tqdm
-
 
 SUPPORTED_MONOGRAPH_EXTENSIONS = (".html", ".htm", ".xhtml", ".xml", ".nxml", ".pdf")
 NBK_ID_PATTERN = re.compile(r"^NBK\d+$", re.IGNORECASE)

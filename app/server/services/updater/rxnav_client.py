@@ -9,8 +9,8 @@ from typing import Any
 
 import httpx
 
-from configurations.startup import server_settings
 from common.utils.logger import logger
+from configurations.startup import server_settings
 from domain.rxnav import RxNormCandidate
 from services.text.vocabulary import get_text_normalization_snapshot
 

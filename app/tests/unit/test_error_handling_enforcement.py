@@ -1,16 +1,10 @@
 from __future__ import annotations
 
 import ast
-import asyncio
 import pathlib
 import time
 from typing import Any
 
-import httpx
-from fastapi import FastAPI
-from fastapi.testclient import TestClient
-
-import app as server_app_module
 from api import access_keys as access_keys_api
 from api import data_inspection as data_inspection_api
 from api import ollama as ollama_api
@@ -18,8 +12,12 @@ from api.error_handling import (
     REQUEST_ID_HEADER,
     register_error_handling,
 )
+from fastapi import FastAPI
+from fastapi.testclient import TestClient
 from services.llm.ollama_client import OllamaError
 from services.runtime.jobs import JobManager
+
+import app as server_app_module
 
 EXCLUDED_DIRS = {
     "__pycache__",

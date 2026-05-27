@@ -4,21 +4,20 @@ from typing import Any
 
 import pandas as pd
 import pytest
-from sqlalchemy import create_engine, select
-from sqlalchemy.orm import sessionmaker
-
-from repositories.serialization.data import DataSerializer
 from repositories.schemas.models import (
     Base,
     Drug,
     DrugAlias,
     DrugRxnormCode,
     LiverToxMonograph,
-    TextNormalizationTerm,
+    ReferenceCatalogEntry,
 )
-from repositories.serialization.text_normalization import TextNormalizationVocabularySerializer
+from repositories.serialization.data import DataSerializer
+from services.text.vocabulary import record_text_normalization_observation
 from services.updater import livertox_index
 from services.updater.livertox_core import LiverToxUpdater
+from sqlalchemy import create_engine, func, select
+from sqlalchemy.orm import sessionmaker
 
 
 # -----------------------------------------------------------------------------
@@ -339,41 +338,36 @@ def test_ensure_drug_conflict_raises() -> None:
         assert len(rows) == 2
 
 
-def test_text_normalization_seed_includes_section_title_alias_categories() -> None:
+def test_text_normalization_runtime_observation_writes_only_runtime_manifest() -> None:
     _, engine = build_serializer()
     factory = sessionmaker(bind=engine, future=True)
-    vocabulary = TextNormalizationVocabularySerializer(engine=engine, session_factory=factory)
-    vocabulary.ensure_seeded()
+    from services.text import vocabulary as vocabulary_module
 
-    categories = [
-        "section_title_alias_anamnesis",
-        "section_title_alias_drugs",
-        "section_title_alias_laboratory_analysis",
-    ]
+    vocabulary_module.get_default_repository = lambda: type(  # type: ignore[method-assign]
+        "Repo",
+        (),
+        {"engine": engine, "session_factory": factory},
+    )()
+    record_text_normalization_observation(
+        "Bactrim",
+        category="observed_unresolved_query",
+    )
 
     with factory() as db_session:
-        rows = (
+        entry_count = db_session.execute(
+            select(func.count()).select_from(ReferenceCatalogEntry)
+        ).scalar_one()
+        runtime_observations = (
             db_session.execute(
-                select(TextNormalizationTerm).where(
-                    TextNormalizationTerm.category.in_(categories),
-                    TextNormalizationTerm.is_active.is_(True),
+                select(ReferenceCatalogEntry).where(
+                    ReferenceCatalogEntry.manifest == "runtime_observations",
+                    ReferenceCatalogEntry.domain == "text_normalization",
                 )
             )
             .scalars()
             .all()
         )
 
-    assert rows
-    by_category = {category: [row for row in rows if row.category == category] for category in categories}
-    for category in categories:
-        assert by_category[category]
-        assert all(row.replacement is None for row in by_category[category])
-
-    all_terms = {row.term_norm for row in rows}
-    assert "anamnesis" in all_terms
-    assert "drugs" in all_terms
-    assert "lab analysis" in all_terms
-    assert "anamnesi" in all_terms
-    assert "farmaci" in all_terms
-    assert "analisi di laboratorio" in all_terms
+    assert int(entry_count) == 1
+    assert len(runtime_observations) == 1
 

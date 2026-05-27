@@ -2,31 +2,25 @@ from __future__ import annotations
 
 import re
 from collections import OrderedDict
-from typing import Any, Generic, Iterable, TypeVar
+from typing import Any, Generic, TypeVar
 
-import pandas as pd
-
-from configurations.startup import server_settings
-from common.utils.logger import logger
 from domain.clinical.matching import (
     AliasCacheEntry,
-    LiverToxMatch,
     MonographRecord,
 )
+from services.clinical.livertox import LiverToxData
 from services.text.normalization import (
     canonicalize_drug_query,
     coerce_text,
     normalize_drug_query_name,
     normalize_whitespace,
 )
-from services.text.vocabulary import get_text_normalization_snapshot
-from services.clinical.livertox import LiverToxData
 from services.text.synonyms import (
     extract_synonym_strings,
     parse_synonym_list,
     split_synonym_variants,
 )
-
+from services.text.vocabulary import get_text_normalization_snapshot
 
 KT = TypeVar("KT")
 VT = TypeVar("VT")

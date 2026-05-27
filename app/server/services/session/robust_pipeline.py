@@ -29,7 +29,6 @@ from domain.clinical.robustness import (
     TimedDrugMention,
 )
 
-
 TIMING_RE = re.compile(
     r"\b(?P<date>\d{1,2}[./-]\d{1,2}[./-]\d{2,4}|"
     r"\d{1,2}[./-]\d{1,2}[./-]\d{2,4}\s*(?:al|-)\s*\d{1,2}[./-]\d{1,2}[./-]\d{2,4}|"

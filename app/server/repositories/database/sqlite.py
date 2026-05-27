@@ -7,25 +7,20 @@ from sqlalchemy import event
 from sqlalchemy.engine import Engine
 from sqlalchemy.orm import sessionmaker
 
+from common.constants import DATABASE_FILENAME, RESOURCES_PATH
+from common.utils.logger import logger
 from domain.settings.configuration import DatabaseSettings
+from repositories.schemas.models import Base
 from repositories.serialization.access_key_encryption import (
     AccessKeyEncryptionMaterialSerializer,
 )
-from repositories.serialization.text_normalization import (
-    TextNormalizationVocabularySerializer,
-)
-from repositories.schemas.models import Base
-from common.constants import DATABASE_FILENAME, RESOURCES_PATH
-from common.utils.logger import logger
+from repositories.serialization.catalogs import ReferenceCatalogSerializer
 
 
+###############################################################################
 class SQLiteRepository:
     def __init__(self, settings: DatabaseSettings) -> None:
-        override_path = os.getenv("DILIGENT_SQLITE_PATH", "").strip()
-        if override_path:
-            self.db_path = os.path.abspath(override_path)
-        else:
-            self.db_path = os.path.join(RESOURCES_PATH, DATABASE_FILENAME)
+        self.db_path = os.path.join(RESOURCES_PATH, DATABASE_FILENAME)
         should_initialize_schema = bool(
             self.db_path and not os.path.exists(self.db_path)
         )
@@ -51,12 +46,10 @@ class SQLiteRepository:
                 "SQLite DB file was missing; created and initialized schema at %s",
                 self.db_path,
             )
-        TextNormalizationVocabularySerializer(
-            engine=self.engine,
-            session_factory=seed_session_factory,
-        ).ensure_seeded()
         self.session_factory = sessionmaker(bind=self.engine, future=True)
+        self.catalogs = ReferenceCatalogSerializer(session_factory=self.session_factory)
 
+    # -------------------------------------------------------------------------
     @staticmethod
     def _enable_foreign_keys(dbapi_connection, _connection_record) -> None:
         cursor = dbapi_connection.cursor()
