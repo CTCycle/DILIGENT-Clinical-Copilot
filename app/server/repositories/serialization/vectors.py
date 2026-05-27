@@ -3,15 +3,19 @@ from __future__ import annotations
 import json
 from collections.abc import Callable
 from concurrent.futures import ThreadPoolExecutor, as_completed
+from datetime import UTC, datetime
 from typing import Any
 
 from common.constants import DEFAULT_EMBEDDING_BATCH_SIZE
 from common.utils.logger import logger
 from configurations.startup import get_server_settings
 from domain.documents import Document
-from repositories.serialization.data import DocumentChunker, DocumentSerializer
+from repositories.serialization.data import DocumentSerializer
 from repositories.vectors import LanceVectorDatabase
+from services.retrieval.chunking import SmartDocumentChunker
+from services.retrieval.embedding_model import EmbeddingModelSpec
 from services.retrieval.embeddings import EmbeddingGenerator
+from services.retrieval.seed_terms import load_seed_term_catalog
 
 
 ###############################################################################
@@ -38,7 +42,12 @@ class VectorSerializer:
         self.vector_database = vector_database
         self.documents_path = documents_path
         self.document_serializer = DocumentSerializer(documents_path)
-        self.chunker = DocumentChunker(chunk_size, chunk_overlap)
+        self.chunker = SmartDocumentChunker(
+            target_chars=chunk_size,
+            max_chars=max(chunk_size, chunk_size + chunk_overlap),
+            overlap_chars=chunk_overlap,
+            seed_catalog=load_seed_term_catalog(),
+        )
         self.embedding_generator = EmbeddingGenerator(
             backend=embedding_backend,
             ollama_base_url=ollama_base_url,
@@ -60,6 +69,7 @@ class VectorSerializer:
         )
         self.embedding_workers = max(int(resolved_workers), 1)
         self.progress_callback = progress_callback
+        self.model_spec = self.embedding_generator.resolve_active_embedding_model_spec()
 
     # -------------------------------------------------------------------------
     def serialize(self) -> dict[str, Any]:
@@ -87,7 +97,7 @@ class VectorSerializer:
             24.0,
             f"Loaded {len(documents)} source document parts; chunking content",
         )
-        chunks = self.chunker.chunk_documents(documents)
+        chunks = self.chunk_documents(documents)
         if not chunks:
             logger.warning("Document chunking resulted in zero chunks")
             return {
@@ -189,14 +199,40 @@ class VectorSerializer:
             for chunk in batch_chunks
             if chunk.metadata.get("document_id")
         }
-        records = self.build_records(batch_chunks, embeddings)
+        records = self.build_records(batch_chunks, embeddings, self.model_spec)
         return records, document_ids
+
+    # -------------------------------------------------------------------------
+    def chunk_documents(self, documents: list[Document]) -> list[Document]:
+        chunks: list[Document] = []
+        for doc in documents:
+            file_name = str(doc.metadata.get("file_name") or "")
+            source = str(doc.metadata.get("source") or "")
+            relative_path = source
+            if file_name and source.endswith(file_name):
+                relative_path = source[: -len(file_name)].rstrip("\\/")
+                if relative_path:
+                    relative_path = f"{relative_path}/{file_name}".replace("\\", "/")
+            smart_chunks = self.chunker.chunk_document(
+                text=doc.page_content,
+                file_name=file_name,
+                relative_path=relative_path or file_name,
+                content_type=str(doc.metadata.get("content_type") or ""),
+                page_texts=[doc.page_content],
+            )
+            for chunk in smart_chunks:
+                metadata = dict(doc.metadata)
+                metadata.update(chunk.metadata)
+                metadata["chunk_index"] = chunk.chunk_index
+                chunks.append(Document(page_content=chunk.text, metadata=metadata))
+        return chunks
 
     # -------------------------------------------------------------------------
     def build_records(
         self,
         chunks: list[Document],
         embeddings: list[list[float]],
+        model_spec: EmbeddingModelSpec,
     ) -> list[dict[str, Any]]:
         records: list[dict[str, Any]] = []
         for chunk, embedding in zip(chunks, embeddings):
@@ -222,6 +258,22 @@ class VectorSerializer:
                     "heading_path": metadata.get("heading_path", ""),
                     "content_type": metadata.get("content_type", ""),
                     "metadata": json.dumps(metadata, ensure_ascii=False),
+                    "chunk_uid": metadata.get("chunk_uid", ""),
+                    "chunk_index": metadata.get("chunk_index", ""),
+                    "page_reference": metadata.get("page_reference", ""),
+                    "line_start": metadata.get("line_start"),
+                    "line_end": metadata.get("line_end"),
+                    "seed_matched_keywords": json.dumps(metadata.get("seed_matched_keywords", []), ensure_ascii=False),
+                    "seed_matched_stopwords": json.dumps(metadata.get("seed_matched_stopwords", []), ensure_ascii=False),
+                    "seed_matched_terms": json.dumps(metadata.get("seed_matched_terms", []), ensure_ascii=False),
+                    "seed_matched_term_groups": json.dumps(metadata.get("seed_matched_term_groups", {}), ensure_ascii=False),
+                    "seed_matched_term_counts": json.dumps(metadata.get("seed_matched_term_counts", {}), ensure_ascii=False),
+                    "vector_model_provider": model_spec.provider,
+                    "vector_model_name": model_spec.model_name,
+                    "vector_model_dimension": model_spec.dimension,
+                    "vector_model_mode": model_spec.mode,
+                    "vector_model_signature": model_spec.signature,
+                    "vectorized_at": datetime.now(UTC).isoformat(),
                 }
             )
         return records
