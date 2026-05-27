@@ -205,11 +205,12 @@
                     <th>Size</th>
                     <th>Last modified</th>
                     <th>Supported</th>
+                    <th>Vector model</th>
                   </tr>
                 </thead>
                 <tbody>
                   @if (ragDocuments().length > 0) {
-                    <tr class="inspection-virtual-spacer-row"><td colspan="5" [style.height.px]="ragTopPaddingPx()"></td></tr>
+                    <tr class="inspection-virtual-spacer-row"><td colspan="6" [style.height.px]="ragTopPaddingPx()"></td></tr>
                   }
                   @for (row of ragVisibleItems(); track row.path) {
                     <tr>
@@ -218,13 +219,14 @@
                       <td>{{ row.file_size }}</td>
                       <td>{{ formatDateTime(row.last_modified) }}</td>
                       <td>{{ row.supported_for_ingestion ? 'Yes' : 'No' }}</td>
+                      <td>{{ row.vector_model || 'Not vectorized' }}</td>
                     </tr>
                   }
                   @if (ragDocuments().length > 0) {
-                    <tr class="inspection-virtual-spacer-row"><td colspan="5" [style.height.px]="ragBottomPaddingPx()"></td></tr>
+                    <tr class="inspection-virtual-spacer-row"><td colspan="6" [style.height.px]="ragBottomPaddingPx()"></td></tr>
                   }
                   @if (!ragLoading() && ragDocuments().length === 0) {
-                    <tr><td colspan="5" class="inspection-empty-row">No RAG documents found.</td></tr>
+                    <tr><td colspan="6" class="inspection-empty-row">No RAG documents found.</td></tr>
                   }
                 </tbody>
               </table>

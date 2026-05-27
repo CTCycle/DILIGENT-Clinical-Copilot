@@ -38,6 +38,9 @@ from services.security.access_keys import AccessKeyService
 from services.session.clinical_input_extractor import ClinicalInputExtractionError
 from services.session.document_normalizer import DocumentNormalizer
 from services.session.preflight import check_parser_batch_capacity
+from services.session.text_section_parser import (
+    build_section_extraction_from_initial_text,
+)
 from services.session.robust_pipeline import (
     audit_report,
     build_extraction_artifact,
@@ -50,6 +53,33 @@ from services.session.session_shared import NarrativeBuilder, run_clinical_job
 from services.text.normalization import normalize_drug_query_name
 
 _CLOUD_PROVIDERS = {"openai", "gemini"}
+_PROGRESS_SEQUENCE: list[tuple[str, float]] = [
+    ("preflight.validated", 2.0),
+    ("sections.loaded", 6.0),
+    ("assessment.bundle", 10.0),
+    ("therapy.extracting", 16.0),
+    ("anamnesis.extracting", 23.0),
+    ("drugs.resolving", 30.0),
+    ("diseases.extracting", 38.0),
+    ("labs.extracting", 46.0),
+    ("pattern.assessing", 54.0),
+    ("candidates.selecting", 61.0),
+    ("rucam.initial", 68.0),
+    ("retrieval.query", 75.0),
+    ("retrieval.evidence", 82.0),
+    ("rucam.refined", 88.0),
+    ("report.generating", 94.0),
+    ("session.saving", 99.0),
+]
+
+
+def _emit_progress(progress_callback, stage: str, progress: float, detail: str | None = None) -> None:
+    if progress_callback is None:
+        return
+    try:
+        progress_callback(stage, progress, detail)
+    except TypeError:
+        progress_callback(stage, progress)
 
 
 async def _extract_drugs_from_section(
@@ -263,7 +293,7 @@ async def process_single_patient_workflow(
     )
 
     global_start_time = time.perf_counter()
-    service.emit_progress(progress_callback, stage="session_initialization", value=5.0)
+    _emit_progress(progress_callback, "clinical", _PROGRESS_SEQUENCE[1][1], _PROGRESS_SEQUENCE[1][0])
     language_result = ClinicalLanguageDetector.detect(payload)
     report_language = language_result.report_language
     validation_bundle = service.build_validation_bundle_for_payload(payload)
@@ -280,10 +310,11 @@ async def process_single_patient_workflow(
     )
 
     issues = []
+    _emit_progress(progress_callback, "clinical", _PROGRESS_SEQUENCE[2][1], _PROGRESS_SEQUENCE[2][0])
     cleaned_therapy_text = service.drugs_parser.clean_text(payload.drugs or "")
     cleaned_anamnesis_text = service.drugs_parser.clean_text(payload.anamnesis or "")
-    service.emit_progress(progress_callback, stage="therapy_extraction", value=22.0)
-    service.emit_progress(progress_callback, stage="anamnesis_extraction", value=30.0)
+    _emit_progress(progress_callback, "clinical", _PROGRESS_SEQUENCE[3][1], _PROGRESS_SEQUENCE[3][0])
+    _emit_progress(progress_callback, "clinical", _PROGRESS_SEQUENCE[4][1], _PROGRESS_SEQUENCE[4][0])
     preflight = await check_parser_batch_capacity(task_count=2)
     if preflight.concurrency_allowed:
         anamnesis_drugs, therapy_drugs = await asyncio.gather(
@@ -329,26 +360,28 @@ async def process_single_patient_workflow(
             source="therapy",
             issues=issues,
         )
-    service.emit_progress(progress_callback, stage="therapy_extraction", value=30.0)
-    service.emit_progress(progress_callback, stage="anamnesis_extraction", value=42.0)
+    _emit_progress(progress_callback, "clinical", _PROGRESS_SEQUENCE[5][1], _PROGRESS_SEQUENCE[5][0])
     anamnesis_text = payload.anamnesis or ""
+    _emit_progress(progress_callback, "clinical", _PROGRESS_SEQUENCE[6][1], _PROGRESS_SEQUENCE[6][0])
     disease_context = await service.extract_disease_context(
         anamnesis_text=anamnesis_text,
         issues=issues,
-        progress_callback=progress_callback,
+        progress_callback=None,
         stop_check=stop_check,
     )
+    _emit_progress(progress_callback, "clinical", _PROGRESS_SEQUENCE[7][1], _PROGRESS_SEQUENCE[7][0])
     lab_timeline, onset_context = await service.extract_lab_timeline(
         payload=payload,
         issues=issues,
-        progress_callback=progress_callback,
+        progress_callback=None,
         stop_check=stop_check,
     )
+    _emit_progress(progress_callback, "clinical", _PROGRESS_SEQUENCE[8][1], _PROGRESS_SEQUENCE[8][0])
     pattern_assessment = service.assess_pattern(
         lab_timeline=lab_timeline,
         validation_bundle=validation_bundle,
         issues=issues,
-        progress_callback=progress_callback,
+        progress_callback=None,
         stop_check=stop_check,
     )
     pattern_score = pattern_assessment.score
@@ -393,7 +426,9 @@ async def process_single_patient_workflow(
         anamnesis_drugs=anamnesis_drugs,
         visit_date=payload.visit_date,
     )
+    _emit_progress(progress_callback, "clinical", _PROGRESS_SEQUENCE[9][1], _PROGRESS_SEQUENCE[9][0])
     analysis_drugs = candidate_selection.ordered_analysis_drugs
+    _emit_progress(progress_callback, "clinical", _PROGRESS_SEQUENCE[10][1], _PROGRESS_SEQUENCE[10][0])
     rucam_bundle = service.estimate_rucam(
         payload=payload,
         analysis_drugs=analysis_drugs,
@@ -404,7 +439,7 @@ async def process_single_patient_workflow(
         pattern_score=pattern_score,
         report_language=report_language,
         issues=issues,
-        progress_callback=progress_callback,
+        progress_callback=None,
         stop_check=stop_check,
     )
     structured_context = service.build_structured_clinical_context(
@@ -422,22 +457,25 @@ async def process_single_patient_workflow(
             "Revision focus context:\n"
             f"{revision_focus_context.strip()}"
         )
+    _emit_progress(progress_callback, "clinical", _PROGRESS_SEQUENCE[11][1], _PROGRESS_SEQUENCE[11][0])
     rag_query = service.build_rag_query(
         payload=payload,
         analysis_drugs=analysis_drugs,
         structured_context=structured_context,
         pattern_score=pattern_score,
-        progress_callback=progress_callback,
+        progress_callback=None,
         stop_check=stop_check,
     )
+    _emit_progress(progress_callback, "clinical", _PROGRESS_SEQUENCE[12][1], _PROGRESS_SEQUENCE[12][0])
     prepared_inputs = await service.run_livertox_lookup(
         all_detected_drugs=all_detected_drugs,
         structured_context=structured_context,
         pattern_score=pattern_score,
         issues=issues,
-        progress_callback=progress_callback,
+        progress_callback=None,
         stop_check=stop_check,
     )
+    _emit_progress(progress_callback, "clinical", _PROGRESS_SEQUENCE[13][1], _PROGRESS_SEQUENCE[13][0])
     rucam_bundle = service.reestimate_rucam_with_livertox(
         payload=payload,
         analysis_drugs=analysis_drugs,
@@ -451,6 +489,7 @@ async def process_single_patient_workflow(
         rucam_bundle=rucam_bundle,
         issues=issues,
     )
+    _emit_progress(progress_callback, "clinical", _PROGRESS_SEQUENCE[14][1], _PROGRESS_SEQUENCE[14][0])
     clinical_session, final_report = await service.run_consultation(
         payload=payload,
         analysis_drugs=analysis_drugs,
@@ -459,7 +498,7 @@ async def process_single_patient_workflow(
         rag_query=rag_query,
         rucam_bundle=rucam_bundle,
         issues=issues,
-        progress_callback=progress_callback,
+        progress_callback=None,
         stop_check=stop_check,
     )
     fact_graph = build_fact_graph(
@@ -615,6 +654,7 @@ async def process_single_patient_workflow(
     ).model_dump()
     if original_session_text is not None:
         result_payload["original_session_text"] = original_session_text
+    _emit_progress(progress_callback, "clinical", _PROGRESS_SEQUENCE[15][1], _PROGRESS_SEQUENCE[15][0])
     persisted_session_id = None
     try:
         persisted_session_id = await asyncio.to_thread(
@@ -694,12 +734,24 @@ def start_clinical_job_workflow(
         normalized_document = DocumentNormalizer().normalize(
             request_payload.clinical_input or ""
         )
-        preprocessed_request, section_extraction = asyncio.run(
-            service.preprocess_unified_input(request_payload)
+        parse_result = service.validate_assessment_prerequisites_without_llm(
+            request_payload
+        )
+        section_extraction = build_section_extraction_from_initial_text(
+            parse_result,
+            request_payload.clinical_input or "",
         )
     except ClinicalInputExtractionError as exc:
         raise ServiceValidationError(str(exc)) from exc
-    patient_payload = service.build_patient_payload(preprocessed_request)
+    patient_payload = service.build_patient_payload(
+        request_payload.model_copy(
+            update={
+                "anamnesis": section_extraction.anamnesis,
+                "drugs": section_extraction.drugs,
+                "laboratory_analysis": section_extraction.laboratory_analysis,
+            }
+        )
+    )
     try:
         service.ensure_submission_requirements(patient_payload)
     except ClinicalPipelineValidationError as exc:

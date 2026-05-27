@@ -346,6 +346,7 @@ export type InspectionRagDocumentRow = {
   file_size: number;
   last_modified: string;
   supported_for_ingestion: boolean;
+  vector_model?: string | null;
 };
 
 export type InspectionRagDocumentsResponse = {

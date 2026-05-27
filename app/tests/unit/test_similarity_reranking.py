@@ -48,6 +48,10 @@ class VectorDatabaseStub:
     def get_table(self) -> SearchTableStub:
         return self.table
 
+    def assert_query_model_matches_index(self, active_signature: str) -> None:
+        _ = active_signature
+        return None
+
 
 ###############################################################################
 class EmbeddingGeneratorStub:
@@ -57,6 +61,13 @@ class EmbeddingGeneratorStub:
     # -------------------------------------------------------------------------
     def embed_texts(self, texts: list[str]) -> list[list[float]]:
         return [self.vectors[text] for text in texts]
+
+    def resolve_active_embedding_model_spec(self) -> Any:
+        return type(
+            "Spec",
+            (),
+            {"provider": "ollama", "model_name": "test", "dimension": 2, "mode": "local", "signature": "sig"},
+        )()
 
 
 ###############################################################################

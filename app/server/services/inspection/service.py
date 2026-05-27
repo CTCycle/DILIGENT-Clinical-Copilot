@@ -727,6 +727,29 @@ class DataInspectionService:
         limit: int,
     ) -> dict[str, Any]:
         serializer = DocumentSerializer(self.get_effective_rag_documents_path())
+        vector_model_by_file: dict[str, str] = {}
+        try:
+            settings = get_server_settings()
+            vector_db = LanceVectorDatabase(
+                database_path=VECTOR_DB_PATH,
+                collection_name=settings.rag.vector_collection_name,
+                metric=settings.rag.vector_index_metric,
+                index_type=settings.rag.vector_index_type,
+                stream_batch_size=settings.rag.vector_stream_batch_size,
+            )
+            if vector_db.has_collection():
+                for row in vector_db.load_embeddings():
+                    file_name = str(row.get("file_name") or "")
+                    provider = str(row.get("vector_model_provider") or "").strip()
+                    model_name = str(row.get("vector_model_name") or "").strip()
+                    if not file_name:
+                        continue
+                    if provider and model_name:
+                        vector_model_by_file[file_name] = f"{provider}:{model_name}"
+                    elif model_name:
+                        vector_model_by_file[file_name] = model_name
+        except Exception:
+            vector_model_by_file = {}
         items: list[dict[str, Any]] = []
         supported_ext = {entry.lower() for entry in DOCUMENT_SUPPORTED_EXTENSIONS}
         for path in serializer.collect_document_paths():
@@ -747,6 +770,7 @@ class DataInspectionService:
                     "file_size": size,
                     "last_modified": modified,
                     "supported_for_ingestion": suffix in supported_ext,
+                    "vector_model": vector_model_by_file.get(file_path.name),
                 }
             )
         items.sort(key=lambda item: str(item["path"]).casefold())

@@ -398,7 +398,11 @@ async def execute_clinical_job(
 
     ensure_not_cancelled()
 
-    report_progress(stage="session_initialization", progress=5.0)
+    report_progress(
+        stage="clinical",
+        progress=2.0,
+        detail="preflight.validated",
+    )
     progress_callback = report_progress
     job_started_at = time.perf_counter()
 
@@ -475,13 +479,16 @@ def ensure_clinical_job_not_cancelled(*, job_manager: JobManager, job_id: str) -
 def report_clinical_job_progress(
     stage: str,
     progress: float,
+    detail: str | None = None,
     *,
     job_manager: JobManager,
     job_id: str,
 ) -> None:
     ensure_clinical_job_not_cancelled(job_manager=job_manager, job_id=job_id)
     bounded = min(100.0, max(0.0, float(progress)))
-    message = CLINICAL_PROGRESS_MESSAGES.get(stage, stage.replace("_", " ").strip())
+    message = CLINICAL_PROGRESS_MESSAGES.get(
+        detail or stage, stage.replace("_", " ").strip()
+    )
     job_manager.update_progress(job_id, bounded)
     job_manager.update_result(
         job_id,
