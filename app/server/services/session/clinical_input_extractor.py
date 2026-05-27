@@ -7,6 +7,7 @@ from typing import Any
 from configurations.llm_configs import LLMRuntimeConfig
 from configurations.startup import server_settings
 from domain.clinical.entities import ClinicalSectionExtractionResult
+from domain.clinical.entities import ClinicalSectionLineRange
 from services.llm.client_runtime import ensure_runtime_client
 from services.llm.provider_factory import select_llm_provider
 from services.session.clinical_section_parsers import (
@@ -100,7 +101,26 @@ class ClinicalInputExtractor:
             anamnesis=anamnesis.text,
             drugs=therapy.text,
             laboratory_analysis=labs.text,
-            line_ranges={},
+            line_ranges={
+                "anamnesis": [
+                    ClinicalSectionLineRange(
+                        start_line=anamnesis.line_start,
+                        end_line=anamnesis.line_end,
+                    )
+                ],
+                "drugs": [
+                    ClinicalSectionLineRange(
+                        start_line=therapy.line_start,
+                        end_line=therapy.line_end,
+                    )
+                ],
+                "laboratory_analysis": [
+                    ClinicalSectionLineRange(
+                        start_line=labs.line_start,
+                        end_line=labs.line_end,
+                    )
+                ],
+            },
             confidence=0.95 if strict_verbatim else 0.7,
             metadata={
                 "sections": {

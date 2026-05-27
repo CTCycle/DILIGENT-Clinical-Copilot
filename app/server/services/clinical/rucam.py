@@ -208,12 +208,8 @@ class RucamScoreEstimator:
             reasons.append("injury pattern indeterminate")
         if not anchor.is_score_eligible:
             reasons.append("onset anchor not score-eligible")
-        if not (drug.therapy_start_date or drug.therapy_start_status):
-            reasons.append("drug start timing unavailable")
-        if not (drug.suspension_status is True or drug.suspension_status is False):
-            reasons.append("withdrawal status unavailable")
-        if len(lab_timeline.entries) < 2:
-            reasons.append("insufficient follow-up labs")
+        if len(lab_timeline.entries) < 1:
+            reasons.append("no laboratory timeline entries")
         has_alt = bool((payload.anamnesis or "").strip()) and (len(EXCLUSION_RE.findall(payload.anamnesis or "")) > 0 or len(disease_context.entries) > 0)
         if not has_alt:
             reasons.append("alternative-cause assessment evidence unavailable")
@@ -257,8 +253,33 @@ class RucamScoreEstimator:
 
         total = int(sum(component.score for component in components if component.status == "scored"))
         category = self.resolve_causality_bucket(total)
+        limitations: list[str] = []
+        if drug.therapy_start_date is None and drug.therapy_start_status is None:
+            limitations.append("drug start timing unavailable")
+        if drug.suspension_status is None and not drug.suspension_date:
+            limitations.append("withdrawal status unavailable")
+        if len(lab_timeline.entries) < 2:
+            limitations.append("insufficient follow-up labs")
+        if any(component.status == "not_assessable" for component in components):
+            limitations.append("one or more RUCAM components are not assessable")
+        confidence: Literal["low", "moderate", "high"] = (
+            "low" if limitations else "moderate"
+        )
         summary = phrase("rucam_structured_score", report_language, score=total, category=category)
-        return DrugRucamAssessment(drug_name=drug.name, injury_type_for_rucam=cast(RucamInjuryType, injury_type), total_score=total, causality_category=cast(RucamCausalityCategory, category), confidence="moderate", estimated=True, components=components, limitations=[], summary=summary, calculation_method="structured_rucam", score_source=None, data_sufficient=True)
+        return DrugRucamAssessment(
+            drug_name=drug.name,
+            injury_type_for_rucam=cast(RucamInjuryType, injury_type),
+            total_score=total,
+            causality_category=cast(RucamCausalityCategory, category),
+            confidence=confidence,
+            estimated=True,
+            components=components,
+            limitations=limitations,
+            summary=summary,
+            calculation_method="structured_rucam",
+            score_source=None,
+            data_sufficient=not limitations,
+        )
 
     def score_time_to_onset(self, *, payload: PatientData, drug: DrugEntry, onset_context: LiverInjuryOnsetContext | None, anchor: RucamAnchor, injury_type: str) -> tuple[RucamComponentAssessment, date | None]:
         _ = injury_type

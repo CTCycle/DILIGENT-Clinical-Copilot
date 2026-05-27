@@ -369,32 +369,19 @@ async def process_single_patient_workflow(
     if explicit_hepatic_pattern:
         pattern_score.classification = explicit_hepatic_pattern
         pattern_source = "provided"
-    filtered_anamnesis_entries = [
-        entry
-        for entry in anamnesis_drugs.entries
-        if _has_temporal_information(service, entry)
-    ]
-    filtered_therapy_entries = [
-        entry
-        for entry in therapy_drugs.entries
-        if _has_temporal_information(service, entry)
-    ]
-    filtered_out_count = (
-        len(anamnesis_drugs.entries)
-        + len(therapy_drugs.entries)
-        - len(filtered_anamnesis_entries)
-        - len(filtered_therapy_entries)
+    temporal_uncertain_count = sum(
+        1 for entry in [*anamnesis_drugs.entries, *therapy_drugs.entries]
+        if not _has_temporal_information(service, entry)
     )
-    anamnesis_drugs = PatientDrugs(entries=filtered_anamnesis_entries)
-    therapy_drugs = PatientDrugs(entries=filtered_therapy_entries)
-    if filtered_out_count > 0:
+    filtered_out_count = 0
+    if temporal_uncertain_count > 0:
         _append_warning_issue(
             service,
             issues,
-            code="drugs_missing_temporal_information_filtered",
+            code="drugs_missing_temporal_information_present",
             message=(
-                f"{filtered_out_count} extracted drug entries were excluded because "
-                "temporal information was missing."
+                f"{temporal_uncertain_count} extracted drug entries have uncertain "
+                "temporal information and are reported with reduced causal confidence."
             ),
             field="drugs",
         )
@@ -573,7 +560,8 @@ async def process_single_patient_workflow(
         "extraction_metadata": {
             "drug_filtering": {
                 "filtered_out_count": filtered_out_count,
-                "reason": "missing_temporal_information",
+                "temporal_uncertain_count": temporal_uncertain_count,
+                "reason": "temporal_uncertainty_retained_with_low_confidence",
             },
             "hepatic_pattern": {
                 "value": pattern_score.classification,
