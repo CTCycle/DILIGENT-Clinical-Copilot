@@ -73,13 +73,13 @@ class SessionDetailResponse(BaseModel):
     result_payload: dict[str, Any] = Field(default_factory=dict)
     report: str | None = None
 
-
+###############################################################################
 class SessionUpdateRequest(BaseModel):
     model_config = ConfigDict(extra="forbid")
     session_text: str | None = Field(default=None, max_length=100000)
     metadata: dict[str, Any] | None = None
 
-
+###############################################################################
 class SessionRevisionRequest(BaseModel):
     model_config = ConfigDict(extra="forbid")
     selected_text: str | None = Field(default=None, max_length=100000)
@@ -291,7 +291,7 @@ class RagDocumentListResponse(BaseModel):
     offset: int = 0
     limit: int = 0
 
-
+###############################################################################
 class LanceVectorStoreSummaryResponse(BaseModel):
     model_config = ConfigDict(extra="forbid")
     source_documents_path: str
@@ -313,7 +313,7 @@ class RagUpdateJobSummary(BaseModel):
     chunks: int = 0
     backend: str = "local"
 
-
+###############################################################################
 class ReferenceCatalogRuntimeObservationResponse(BaseModel):
     model_config = ConfigDict(extra="forbid")
     id: int
@@ -324,7 +324,7 @@ class ReferenceCatalogRuntimeObservationResponse(BaseModel):
     encounter_count: int
     is_active: bool
 
-
+###############################################################################
 class ReferenceCatalogRuntimeObservationUpsertRequest(BaseModel):
     model_config = ConfigDict(extra="forbid")
     term: str

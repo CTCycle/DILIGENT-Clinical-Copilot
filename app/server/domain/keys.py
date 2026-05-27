@@ -13,14 +13,14 @@ SUPPORTED_PROVIDERS: frozenset[ProviderName] = frozenset(
 CONTROL_CHARACTERS_RE = re.compile(r"[\x00-\x08\x0B\x0C\x0E-\x1F\x7F]")
 MIN_ACCESS_KEY_LENGTH = 16
 
-
+###############################################################################
 def normalize_provider_name(provider: str) -> ProviderName:
     normalized = str(provider or "").strip().lower()
     if normalized not in SUPPORTED_PROVIDERS:
         raise ValueError("Unsupported provider")
     return cast(ProviderName, normalized)
 
-
+###############################################################################
 def normalize_access_key(value: str | None) -> str:
     if value is None:
         raise ValueError("access_key must not be null")
