@@ -15,7 +15,7 @@ from common.constants import (
     RXNORM_CATALOG_COLUMNS,
 )
 from common.utils.logger import logger
-from configurations.startup import server_settings
+from configurations.startup import get_server_settings
 from repositories.schemas.models import (
     ClinicalSessionDrug,
     Drug,
@@ -363,7 +363,7 @@ def stream_drugs_catalog(
     self, page_size: int | None = None
 ) -> Iterator[pd.DataFrame]:
     chunk_size = (
-        server_settings.database.select_page_size
+        get_server_settings().database.select_page_size
         if page_size is None
         else max(int(page_size), 1)
     )
@@ -703,7 +703,7 @@ def resolve_drug_id_from_match_cache(
         .where(
             KbMatchCache.normalized_drug_key == normalized_drug_key,
             KbMatchCache.invalidated_at.is_(None),
-            KbMatchCache.confidence >= server_settings.drugs_matcher.min_confidence,
+            KbMatchCache.confidence >= get_server_settings().drugs_matcher.min_confidence,
         )
         .order_by(KbMatchCache.updated_at.desc(), KbMatchCache.id.desc())
         .limit(1)
@@ -753,7 +753,7 @@ def upsert_high_confidence_kb_match_cache(
     if (
         drug_id is None
         or confidence is None
-        or confidence < server_settings.drugs_matcher.min_confidence
+        or confidence < get_server_settings().drugs_matcher.min_confidence
         or ambiguous
         or source not in {"rxnav", "livertox", "rag"}
     ):

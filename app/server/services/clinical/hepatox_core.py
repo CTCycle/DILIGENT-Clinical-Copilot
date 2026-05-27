@@ -1,4 +1,5 @@
 from __future__ import annotations
+# ruff: noqa: E402
 
 import asyncio
 import inspect
@@ -13,7 +14,7 @@ from common.constants import (
     R_SCORE_HEPATOCELLULAR_THRESHOLD,
 )
 from configurations.llm_configs import LLMRuntimeConfig
-from configurations.startup import server_settings
+from configurations.startup import get_server_settings
 from domain.clinical.entities import (
     ClinicalLabEntry,
     DrugClinicalAssessment,
@@ -307,12 +308,12 @@ class HepatoxConsultation:
         drugs: PatientDrugs,
         *,
         patient_name: str | None = None,
-        timeout_s: float = server_settings.runtime.default_llm_timeout,
+        timeout_s: float = get_server_settings().runtime.default_llm_timeout,
     ) -> None:
         self.drugs = drugs
         self.timeout_s = timeout_s
         self.llm_client = initialize_llm_client(purpose="clinical", timeout_s=timeout_s)
-        self.MAX_EXCERPT_LENGTH = server_settings.runtime.max_excerpt_length
+        self.MAX_EXCERPT_LENGTH = get_server_settings().runtime.max_excerpt_length
         self.patient_name = (patient_name or "").strip() or None
         provider, model_candidate = LLMRuntimeConfig.resolve_provider_and_model(
             "clinical"
@@ -327,10 +328,10 @@ class HepatoxConsultation:
         )
         self.temperature = LLMRuntimeConfig.get_ollama_temperature()
         self.similarity_search: SimilaritySearch | None = None
-        self.rag_use_reranking = bool(server_settings.rag.use_reranking)
-        self.rag_top_n = max(int(server_settings.rag.rerank_top_n), 1)
+        self.rag_use_reranking = bool(get_server_settings().rag.use_reranking)
+        self.rag_top_n = max(int(get_server_settings().rag.rerank_top_n), 1)
         self.rag_candidate_k = max(
-            int(server_settings.rag.rerank_candidate_k), self.rag_top_n
+            int(get_server_settings().rag.rerank_candidate_k), self.rag_top_n
         )
         self.pipeline_issues: list[PipelineIssue] = []
         default_parallel_analyses = 3 if provider == "ollama" else 1
@@ -338,7 +339,7 @@ class HepatoxConsultation:
             1,
             int(
                 getattr(
-                    server_settings.runtime,
+                    get_server_settings().runtime,
                     "clinical_llm_max_concurrency",
                     default_parallel_analyses,
                 )
@@ -347,7 +348,7 @@ class HepatoxConsultation:
         default_retry_attempts = 1
         configured_retry_attempts = int(
             getattr(
-                server_settings.runtime,
+                get_server_settings().runtime,
                 "clinical_llm_retry_attempts",
                 default_retry_attempts,
             )

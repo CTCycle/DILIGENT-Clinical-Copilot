@@ -5,7 +5,6 @@ from datetime import date
 from fastapi import APIRouter, Body, HTTPException, Query, status
 
 from common.utils.logger import logger
-from configurations.startup import server_settings
 from domain.inspection import (
     CatalogListFilters,
     DateFilterMode,
@@ -67,7 +66,7 @@ class DataInspectionEndpoint:
             job_type=str(payload["job_type"]),
             status=str(payload["status"]),
             message=message,
-            poll_interval=server_settings.jobs.polling_interval,
+            poll_interval=float(payload.get("poll_interval") or 1.0),
         )
 
     # -------------------------------------------------------------------------

@@ -3,7 +3,7 @@ from __future__ import annotations
 from typing import Any, Literal
 
 from configurations.llm_configs import LLMRuntimeConfig
-from configurations.startup import server_settings
+from configurations.startup import get_server_settings
 from services.llm.cloud import CloudLLMClient, LLMError
 from services.llm.ollama_client import OllamaClient
 
@@ -18,22 +18,21 @@ def select_llm_provider(
     """Factory returning an LLM client with a unified interface."""
     p = provider.strip().lower()
     if p == "ollama":
+        runtime_timeout = get_server_settings().runtime.default_llm_timeout
         return OllamaClient(
             base_url=kwargs.get("base_url"),
-            timeout_s=kwargs.get(
-                "timeout_s", server_settings.runtime.default_llm_timeout
-            ),
+            timeout_s=kwargs.get("timeout_s", runtime_timeout),
             keepalive_connections=kwargs.get("keepalive_connections", 10),
             keepalive_max=kwargs.get("keepalive_max", 20),
             default_model=kwargs.get("default_model"),
         )
     if p in ("openai", "gemini"):
+        runtime_timeout = get_server_settings().runtime.default_llm_timeout
+        cloud_provider: ProviderName = "openai" if p == "openai" else "gemini"
         return CloudLLMClient(
-            provider=p,  # type: ignore[arg-type]
+            provider=cloud_provider,
             base_url=kwargs.get("base_url"),
-            timeout_s=kwargs.get(
-                "timeout_s", server_settings.runtime.default_llm_timeout
-            ),
+            timeout_s=kwargs.get("timeout_s", runtime_timeout),
             keepalive_connections=kwargs.get("keepalive_connections", 10),
             keepalive_max=kwargs.get("keepalive_max", 20),
             default_model=kwargs.get("default_model"),
@@ -45,7 +44,7 @@ def select_llm_provider(
 def initialize_llm_client(
     *, purpose: RuntimePurpose = "clinical", **kwargs: Any
 ) -> OllamaClient | CloudLLMClient:
-    kwargs.setdefault("timeout_s", server_settings.runtime.default_llm_timeout)
+    kwargs.setdefault("timeout_s", get_server_settings().runtime.default_llm_timeout)
     provider, default_model = LLMRuntimeConfig.resolve_provider_and_model(purpose)
     if LLMRuntimeConfig.is_cloud_enabled():
         forced_provider = (LLMRuntimeConfig.get_llm_provider() or "").strip().lower()

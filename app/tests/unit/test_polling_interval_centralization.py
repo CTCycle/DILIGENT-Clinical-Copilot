@@ -6,7 +6,7 @@ from typing import Any
 
 from api import ollama as ollama_routes
 from api import session as session_routes
-from configurations.startup import server_settings
+from configurations.startup import get_server_settings
 from domain.clinical import ClinicalSessionRequest
 from services.clinical import job_progress as clinical_job_progress
 from services.session import session_workflow
@@ -90,7 +90,7 @@ def test_start_clinical_job_uses_centralized_poll_interval(monkeypatch) -> None:
         )
     )
 
-    assert response.poll_interval == server_settings.jobs.polling_interval
+    assert response.poll_interval == get_server_settings().jobs.polling_interval
 
 
 # -----------------------------------------------------------------------------
@@ -104,7 +104,7 @@ def test_start_pull_job_uses_centralized_poll_interval(monkeypatch) -> None:
         stream=False,
     )
 
-    assert response.poll_interval == server_settings.jobs.polling_interval
+    assert response.poll_interval == get_server_settings().jobs.polling_interval
 
 
 # -----------------------------------------------------------------------------

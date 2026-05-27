@@ -5,7 +5,7 @@ from collections.abc import Callable
 from typing import Any
 
 from configurations.llm_configs import LLMRuntimeConfig
-from configurations.startup import server_settings
+from configurations.startup import get_server_settings
 from domain.clinical.entities import (
     ClinicalSectionExtractionResult,
     ClinicalSectionLineRange,
@@ -37,7 +37,7 @@ class ClinicalInputExtractor:
         self,
         *,
         client: Any | None = None,
-        timeout_s: float = server_settings.runtime.default_llm_timeout,
+        timeout_s: float = get_server_settings().runtime.default_llm_timeout,
     ) -> None:
         self.timeout_s = float(timeout_s)
         self.client: Any | None = client
