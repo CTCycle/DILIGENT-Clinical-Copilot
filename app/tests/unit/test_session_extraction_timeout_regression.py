@@ -55,7 +55,7 @@ def test_clinical_session_factory_uses_configured_parser_timeouts(
             disease_llm_timeout=150.0,
         )
     )
-    monkeypatch.setattr(factory, "server_settings", settings)
+    monkeypatch.setattr(factory, "get_server_settings", lambda: settings)
 
     service = factory.build_clinical_session_service(JobManager())
 

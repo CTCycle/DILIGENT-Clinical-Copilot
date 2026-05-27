@@ -7,7 +7,7 @@ from typing import Any
 
 from common.constants import DEFAULT_EMBEDDING_BATCH_SIZE
 from common.utils.logger import logger
-from configurations.startup import server_settings
+from configurations.startup import get_server_settings
 from domain.documents import Document
 from repositories.serialization.data import DocumentChunker, DocumentSerializer
 from repositories.vectors import LanceVectorDatabase
@@ -54,7 +54,7 @@ class VectorSerializer:
         )
         self.embedding_batch_size = max(int(resolved_batch_size), 1)
         resolved_workers = (
-            server_settings.rag.embedding_max_workers
+            get_server_settings().rag.embedding_max_workers
             if embedding_workers is None
             else embedding_workers
         )

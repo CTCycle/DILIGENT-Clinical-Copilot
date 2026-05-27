@@ -10,7 +10,7 @@ from typing import Any
 import httpx
 
 from common.utils.logger import logger
-from configurations.startup import server_settings
+from configurations.startup import get_server_settings
 from domain.rxnav import RxNormCandidate
 from services.text.vocabulary import get_text_normalization_snapshot
 
@@ -43,7 +43,7 @@ class RxNavClient:
         max_concurrency: int | None = None,
     ) -> None:
         self.enabled = True
-        external_settings = server_settings.runtime
+        external_settings = get_server_settings().runtime
         configured_timeout = (
             float(request_timeout)
             if request_timeout is not None

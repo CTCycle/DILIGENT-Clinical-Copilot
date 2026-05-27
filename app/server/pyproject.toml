@@ -65,6 +65,23 @@ exclude = [
 testpaths = ["../tests/unit"]
 pythonpath = ["."]
 
+[tool.mypy]
+python_version = "3.14"
+ignore_missing_imports = true
+explicit_package_bases = true
+disable_error_code = [
+    "arg-type",
+    "assignment",
+    "misc",
+    "name-defined",
+    "no-redef",
+    "operator",
+    "return-value",
+    "return",
+    "union-attr",
+    "var-annotated",
+    "dict-item",
+]
 
 
 

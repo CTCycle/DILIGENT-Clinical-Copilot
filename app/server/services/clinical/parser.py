@@ -14,7 +14,7 @@ from common.utils.patterns import (
     UNIT_TOKENS,
 )
 from configurations.llm_configs import LLMRuntimeConfig
-from configurations.startup import server_settings
+from configurations.startup import get_server_settings
 from domain.clinical.entities import (
     DrugEntry,
     PatientDrugs,
@@ -88,7 +88,7 @@ class DrugsParser:
         *,
         client: Any | None = None,
         temperature: float = 0.0,
-        timeout_s: float = server_settings.runtime.default_llm_timeout,
+        timeout_s: float = get_server_settings().runtime.default_llm_timeout,
     ) -> None:
         self.temperature = float(temperature)
         self.timeout_s = float(timeout_s)
