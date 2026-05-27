@@ -9,20 +9,20 @@ from configurations.startup import server_settings
 from repositories.database.postgres import PostgresRepository
 from repositories.database.sqlite import SQLiteRepository
 
-
+###############################################################################
 @lru_cache(maxsize=1)
 def get_default_repository():
     settings = server_settings.database
     repository_cls = SQLiteRepository if settings.embedded_database else PostgresRepository
     return repository_cls(settings)
 
-
+###############################################################################
 def resolve_engine(engine: Engine | None = None) -> Engine:
     if engine is not None:
         return engine
     return get_default_repository().engine
 
-
+###############################################################################
 def resolve_session_factory(
     *,
     engine: Engine | None = None,
