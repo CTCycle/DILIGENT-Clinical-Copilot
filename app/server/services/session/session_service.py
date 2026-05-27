@@ -74,6 +74,10 @@ from services.session.formatting_mixin import (
 )
 from services.session.payload import PayloadSanitizationService
 from services.session.preflight import validate_clinical_input_preflight
+from services.session.text_section_parser import (
+    InitialTextSectionParseResult,
+    parse_initial_text_sections,
+)
 from services.session.session_workflow import (
     build_matched_drugs_payload_workflow,
     build_single_matched_drug_row_workflow,
@@ -124,14 +128,18 @@ class ClinicalSessionService(ClinicalSessionFormattingMixin):
     # -------------------------------------------------------------------------
     @staticmethod
     def emit_progress(
-        progress_callback: Callable[[str, float], None] | None,
+        progress_callback: Callable[..., None] | None,
         *,
         stage: str,
         value: float,
+        detail: str | None = None,
     ) -> None:
         if progress_callback is None:
             return
-        progress_callback(stage, value)
+        try:
+            progress_callback(stage, value, detail)
+        except TypeError:
+            progress_callback(stage, value)
 
     # -------------------------------------------------------------------------
     @staticmethod
@@ -222,6 +230,47 @@ class ClinicalSessionService(ClinicalSessionFormattingMixin):
             ),
             extraction,
         )
+
+    # -------------------------------------------------------------------------
+    def validate_assessment_prerequisites_without_llm(
+        self, request_payload: ClinicalSessionRequest
+    ) -> InitialTextSectionParseResult:
+        clinical_input = (request_payload.clinical_input or "").strip()
+        if not clinical_input:
+            raise ServiceValidationError("Clinical input is required.")
+        if not request_payload.visit_date:
+            raise ServiceValidationError("Visit date is required.")
+
+        livertox_rows, _ = self.serializer.list_livertox_catalog(
+            search=None, offset=0, limit=1
+        )
+        if not livertox_rows:
+            raise ServiceValidationError(
+                "LiverTox catalog is empty. Rebuild LiverTox data before clinical analysis."
+            )
+        rxnav_rows, _ = self.serializer.list_rxnav_catalog(
+            search=None, offset=0, limit=1
+        )
+        if not rxnav_rows:
+            raise ServiceValidationError(
+                "RxNav catalog is empty. Rebuild RxNav data before clinical analysis."
+            )
+
+        parse_result = parse_initial_text_sections(clinical_input)
+        if parse_result.missing_required_sections or parse_result.malformed_sections:
+            details: list[str] = []
+            if parse_result.missing_required_sections:
+                details.append(
+                    "missing sections: " + ", ".join(parse_result.missing_required_sections)
+                )
+            if parse_result.malformed_sections:
+                details.append(
+                    "malformed sections: " + ", ".join(parse_result.malformed_sections)
+                )
+            raise ServiceValidationError(
+                "Clinical input sections are invalid (" + "; ".join(details) + ")."
+            )
+        return parse_result
 
     # -------------------------------------------------------------------------
     def build_patient_payload(

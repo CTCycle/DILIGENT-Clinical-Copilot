@@ -19,6 +19,7 @@ from services.llm.provider_factory import select_llm_provider
 from services.security.access_keys import AccessKeyService
 from services.session.document_normalizer import DocumentNormalizer
 from services.session.robust_pipeline import build_extraction_artifact
+from services.session.text_section_parser import parse_initial_text_sections
 
 
 @dataclass(frozen=True)
@@ -150,7 +151,7 @@ def validate_clinical_input_preflight(
     non_blocking: list[ClinicalInputPreflightIssue] = []
     runtime_settings = _runtime_settings()
     service.apply_persisted_runtime_configuration()
-    _validate_ui_metadata(request_payload, non_blocking)
+    _validate_ui_metadata(request_payload, blocking)
     _validate_provider_key(blocking)
     _validate_requested_provider(request_payload, blocking, runtime_settings)
     _validate_persistence(service, non_blocking)
@@ -166,6 +167,55 @@ def validate_clinical_input_preflight(
             )
         )
         return _result(blocking, non_blocking, runtime_settings, extraction_quality)
+    livertox_rows, _ = service.serializer.list_livertox_catalog(
+        search=None,
+        offset=0,
+        limit=1,
+    )
+    if not livertox_rows:
+        blocking.append(
+            ClinicalInputPreflightIssue(
+                severity="blocking",
+                code="livertox_catalog_empty",
+                message="LiverTox catalog is empty. Rebuild LiverTox data.",
+                field="knowledge_base",
+            )
+        )
+    rxnav_rows, _ = service.serializer.list_rxnav_catalog(
+        search=None,
+        offset=0,
+        limit=1,
+    )
+    if not rxnav_rows:
+        blocking.append(
+            ClinicalInputPreflightIssue(
+                severity="blocking",
+                code="rxnav_catalog_empty",
+                message="RxNav catalog is empty. Rebuild RxNav data.",
+                field="knowledge_base",
+            )
+        )
+    parse_result = parse_initial_text_sections(clinical_input)
+    if parse_result.missing_required_sections:
+        blocking.append(
+            ClinicalInputPreflightIssue(
+                severity="blocking",
+                code="required_sections_missing",
+                message="Missing required sections: "
+                + ", ".join(parse_result.missing_required_sections),
+                field="clinical_input",
+            )
+        )
+    if parse_result.malformed_sections:
+        blocking.append(
+            ClinicalInputPreflightIssue(
+                severity="blocking",
+                code="required_sections_malformed",
+                message="Malformed required sections: "
+                + ", ".join(parse_result.malformed_sections),
+                field="clinical_input",
+            )
+        )
     normalized_document = DocumentNormalizer().normalize(clinical_input)
     try:
         preprocessed_request, section_extraction = asyncio.run(
@@ -247,14 +297,14 @@ def validate_clinical_input_preflight(
 
 def _validate_ui_metadata(
     request_payload: ClinicalSessionRequest,
-    non_blocking: list[ClinicalInputPreflightIssue],
+    blocking: list[ClinicalInputPreflightIssue],
 ) -> None:
     if not request_payload.visit_date:
-        non_blocking.append(
+        blocking.append(
             ClinicalInputPreflightIssue(
-                severity="non_blocking",
+                severity="blocking",
                 code="visit_date_missing",
-                message="Report date is missing; manual confirmation is recommended.",
+                message="Visit date is required.",
                 field="visit_date",
             )
         )

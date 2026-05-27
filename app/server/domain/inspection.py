@@ -281,6 +281,7 @@ class RagDocumentListItem(BaseModel):
     file_size: int
     last_modified: str
     supported_for_ingestion: bool
+    vector_model: str | None = None
 
 
 ###############################################################################

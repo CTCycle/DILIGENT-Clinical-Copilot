@@ -35,6 +35,7 @@ from repositories.serialization import (
     fda_data,
     session_result_data,
 )
+from services.retrieval.chunking import SmartDocumentChunker
 
 
 class _RepositorySerializationService:
@@ -901,19 +902,33 @@ class DocumentChunker:
     def chunk_documents(self, documents: list[Document]) -> list[Document]:
         if not documents:
             return []
+        smart_chunker = SmartDocumentChunker(
+            target_chars=self.chunk_size,
+            max_chars=max(self.chunk_size, self.chunk_size + self.chunk_overlap),
+            overlap_chars=self.chunk_overlap,
+        )
         chunks: list[Document] = []
         for document in documents:
             metadata = dict(document.metadata)
-            for chunk_text, start_index, section_title, heading_path in self.split_text(
-                document.page_content
-            ):
+            source = str(metadata.get("source") or "")
+            file_name = str(metadata.get("file_name") or "")
+            relative_path = file_name
+            if source and file_name and source.endswith(file_name):
+                relative_path = source.replace("\\", "/")
+            smart_chunks = smart_chunker.chunk_document(
+                text=document.page_content,
+                file_name=file_name or "document",
+                relative_path=relative_path or "document",
+                content_type=str(metadata.get("content_type") or ""),
+                page_texts=[document.page_content],
+            )
+            for chunk in smart_chunks:
                 chunk_metadata = dict(metadata)
-                chunk_metadata["start_index"] = start_index
-                chunk_metadata["section_title"] = section_title
-                chunk_metadata["heading_path"] = heading_path
-                chunks.append(
-                    Document(page_content=chunk_text, metadata=chunk_metadata)
-                )
+                chunk_metadata.update(chunk.metadata)
+                chunk_metadata["start_index"] = int(chunk.metadata.get("char_start", 0) or 0)
+                chunk_metadata["section_title"] = chunk.metadata.get("section_heading")
+                chunk_metadata["heading_path"] = chunk.metadata.get("section_heading")
+                chunks.append(Document(page_content=chunk.text, metadata=chunk_metadata))
         for index, chunk in enumerate(chunks):
             chunk.metadata["chunk_index"] = index
         return chunks

@@ -25,6 +25,22 @@ VECTOR_TABLE_SCHEMA = pa.schema(
         pa.field("heading_path", pa.string()),
         pa.field("content_type", pa.string()),
         pa.field("metadata", pa.string()),
+        pa.field("chunk_uid", pa.string()),
+        pa.field("chunk_index", pa.string()),
+        pa.field("page_reference", pa.string()),
+        pa.field("line_start", pa.int32()),
+        pa.field("line_end", pa.int32()),
+        pa.field("seed_matched_keywords", pa.string()),
+        pa.field("seed_matched_stopwords", pa.string()),
+        pa.field("seed_matched_terms", pa.string()),
+        pa.field("seed_matched_term_groups", pa.string()),
+        pa.field("seed_matched_term_counts", pa.string()),
+        pa.field("vector_model_provider", pa.string()),
+        pa.field("vector_model_name", pa.string()),
+        pa.field("vector_model_dimension", pa.int32()),
+        pa.field("vector_model_mode", pa.string()),
+        pa.field("vector_model_signature", pa.string()),
+        pa.field("vectorized_at", pa.string()),
     ]
 )
 
@@ -419,6 +435,28 @@ class LanceVectorDatabase:
         if limit is not None:
             data = data.slice(0, limit)
         return data.to_pylist()
+
+    # -------------------------------------------------------------------------
+    def get_vector_model_signatures(self) -> set[str]:
+        if not self.has_collection():
+            return set()
+        records = self.load_embeddings()
+        signatures: set[str] = set()
+        for row in records:
+            value = row.get("vector_model_signature")
+            if isinstance(value, str) and value.strip():
+                signatures.add(value.strip())
+        return signatures
+
+    # -------------------------------------------------------------------------
+    def assert_query_model_matches_index(self, active_signature: str) -> None:
+        signatures = self.get_vector_model_signatures()
+        if not signatures:
+            return
+        if active_signature not in signatures:
+            raise ValueError(
+                "Embedding model mismatch detected. Rebuild the RAG vector store with the active embedding model."
+            )
 
     # -------------------------------------------------------------------------
     def count_embeddings(self) -> int:

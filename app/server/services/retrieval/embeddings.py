@@ -20,9 +20,18 @@ from repositories.serialization.access_keys import AccessKeySerializer
 from repositories.vectors import LanceVectorDatabase
 from services.llm.cloud import LLMError, LLMTimeout
 from services.llm.ollama_client import OllamaError, OllamaTimeout
+from services.retrieval.embedding_model import (
+    EmbeddingModelSpec,
+    build_embedding_model_signature,
+)
 
 ProviderName = Literal["openai", "gemini"]
 EmbeddingBackend = Literal["ollama", "cloud"]
+
+
+###############################################################################
+class EmbeddingModelMismatchError(RuntimeError):
+    pass
 
 
 ###############################################################################
@@ -343,6 +352,30 @@ class EmbeddingGenerator:
         embeddings = self.run_async(self.provider.embed_texts(sanitized))
         return [[float(value) for value in vector] for vector in embeddings]
 
+    def resolve_active_embedding_model_spec(self) -> EmbeddingModelSpec:
+        provider = "cloud" if self.backend == "cloud" else "ollama"
+        if self.backend == "cloud":
+            model_name = str(getattr(self.provider, "model", "") or "")
+            mode = str(getattr(self.provider, "provider", "cloud"))
+        else:
+            model_name = str(getattr(self.provider, "model", "") or "")
+            mode = "local"
+        sample = self.embed_texts(["embedding-dimension-probe"])
+        dimension = len(sample[0]) if sample else 0
+        signature = build_embedding_model_signature(
+            provider=provider,
+            model_name=model_name,
+            dimension=dimension,
+            mode=mode,
+        )
+        return EmbeddingModelSpec(
+            provider=provider,
+            model_name=model_name,
+            dimension=dimension,
+            mode=mode,
+            signature=signature,
+        )
+
     # -------------------------------------------------------------------------
     @staticmethod
     def run_async(
@@ -406,6 +439,13 @@ class SimilaritySearch:
         if not normalized:
             return []
         limit = self.default_top_k if top_k is None else max(int(top_k), 1)
+        model_spec = self.embedding_generator.resolve_active_embedding_model_spec()
+        try:
+            self.vector_database.assert_query_model_matches_index(model_spec.signature)
+        except Exception as exc:  # noqa: BLE001
+            raise EmbeddingModelMismatchError(
+                "Active embedding model does not match indexed vectors. Rebuild the RAG vector store."
+            ) from exc
         embeddings = self.embedding_generator.embed_texts([normalized])
         if not embeddings:
             return []
@@ -687,6 +727,7 @@ class SimilaritySearch:
         return float("-inf")
 
 __all__ = [
+    "EmbeddingModelMismatchError",
     "CloudEmbeddingGenerator",
     "OllamaEmbeddingGenerator",
     "select_embedding_provider",

@@ -38,7 +38,10 @@ from services.llm.prompts import (
     LIVERTOX_CONCLUSION_USER_PROMPT,
     LIVERTOX_REPORT_EXAMPLE_TEMPLATE,
 )
-from services.retrieval.embeddings import SimilaritySearch
+from services.retrieval.embeddings import (
+    EmbeddingModelMismatchError,
+    SimilaritySearch,
+)
 from services.text.normalization import normalize_drug_query_name
 from services.text.vocabulary import get_text_normalization_snapshot
 
@@ -673,6 +676,8 @@ async def fetch_rag_documents(
             self.search_supporting_documents,
             drug_rag_query,
         )
+    except EmbeddingModelMismatchError:
+        raise
     except Exception as exc:  # noqa: BLE001
         logger.warning(
             "RAG retrieval unavailable for drug '%s'; continuing without supporting documents: %s",

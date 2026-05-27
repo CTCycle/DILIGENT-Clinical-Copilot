@@ -157,10 +157,17 @@ class DataInspectionUpdateJobRunner:
         self.report_phase_by_target(job_id, "rag", 96, "Finalizing update")
         self.report_phase_by_target(job_id, "rag", 100, "Completed")
         backend = "cloud" if bool(override_values.get("use_cloud_embeddings")) else "local"
+        model_spec = getattr(getattr(updater, "serializer", None), "model_spec", None)
+        vector_model = None
+        if model_spec is not None:
+            provider = str(getattr(model_spec, "provider", "") or "").strip()
+            model_name = str(getattr(model_spec, "model_name", "") or "").strip()
+            vector_model = f"{provider}:{model_name}" if provider and model_name else model_name or None
         return {
             "summary": {
                 **result,
                 "backend": backend,
+                "vector_model": vector_model,
                 "documents": documents_count,
                 "chunks": chunks_count,
                 "supported_files": supported_files,
