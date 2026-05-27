@@ -5,9 +5,12 @@ NON_DRUG_EXACT_NAMES = {
     "al bisogno",
     "se necessario",
     "dopo",
+    "dal",
+    "entrambi e il",
     "paziente femmina",
     "paziente maschio",
     "paziente di",
+    "rialzo a",
 }
 NON_DRUG_PREFIXES = (
     "ulteriore ciclo",

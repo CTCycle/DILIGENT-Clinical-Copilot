@@ -336,6 +336,18 @@ def test_query_normalization_high_value_aliases_are_deterministic() -> None:
         normalize_drug_query_name("amoxicillin/clavulanate")
         == "amoxicillin clavulanate"
     )
+    assert normalize_drug_query_name("Paspertin") == "metoclopramide"
+    assert normalize_drug_query_name("Buscopan") == "scopolamine"
+    assert normalize_drug_query_name("Imodium lingual") == "loperamide"
+    assert normalize_drug_query_name("Dafalgan") == "acetaminophen"
+    assert normalize_drug_query_name("Rivotril") == "clonazepam"
+    assert (
+        normalize_drug_query_name("nozione di terapia antibiotica con co amoxicillina")
+        == "amoxicillin clavulanate"
+    )
+    assert normalize_drug_query_name("dal") == ""
+    assert normalize_drug_query_name("entrambi e il") == ""
+    assert normalize_drug_query_name("rialzo a") == ""
 
 
 def test_matcher_prefers_combo_for_bactrim_brand_disambiguation() -> None:

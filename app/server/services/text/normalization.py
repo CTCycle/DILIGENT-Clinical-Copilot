@@ -20,10 +20,26 @@ _STRENGTH_FRAGMENT_RE = re.compile(
 )
 _PARENTHETICAL_RE = re.compile(r"\([^)]*\)")
 _STATIC_QUERY_ALIASES = {
-    "bactrim": "sulfamethoxazole trimethoprim",
-    "bactrim forte": "sulfamethoxazole trimethoprim",
+    "bactrim": "trimethoprim sulfamethoxazole",
+    "bactrim forte": "trimethoprim sulfamethoxazole",
+    "buscopan": "scopolamine",
+    "co amoxi": "amoxicillin clavulanate",
     "co amoxicillina": "amoxicillin clavulanate",
     "co amoxiclav": "amoxicillin clavulanate",
+    "dafalgan": "acetaminophen",
+    "imodium": "loperamide",
+    "imodium lingual": "loperamide",
+    "paspertin": "metoclopramide",
+    "rivotril": "clonazepam",
+}
+_STATIC_QUERY_SUBSTRING_ALIASES = {
+    "co amoxicillina": "amoxicillin clavulanate",
+    "co amoxi": "amoxicillin clavulanate",
+}
+_NOISY_QUERY_PHRASES = {
+    "dal",
+    "entrambi e il",
+    "rialzo a",
 }
 
 
@@ -172,12 +188,17 @@ def resolve_known_query_alias(value: str) -> str:
     normalized = normalize_drug_name(value)
     if not normalized:
         return ""
+    if normalized in _NOISY_QUERY_PHRASES:
+        return ""
     alias = get_text_normalization_snapshot().query_aliases.get(normalized)
     if alias is not None:
         return alias
     static_alias = _STATIC_QUERY_ALIASES.get(normalized)
     if static_alias is not None:
         return static_alias
+    for phrase, alias_value in _STATIC_QUERY_SUBSTRING_ALIASES.items():
+        if phrase in normalized:
+            return alias_value
 
     return normalized
 

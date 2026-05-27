@@ -106,6 +106,10 @@ def test_extract_drugs_from_anamnesis_filters_non_drug_fragments() -> None:
                     DrugEntry(name="il lunedi"),
                     DrugEntry(name="Paziente femmina"),
                     DrugEntry(name="Dopo"),
+                    DrugEntry(name="Dal"),
+                    DrugEntry(name="entrambi e il"),
+                    DrugEntry(name="Nozione di terapia antibiotica con Co-Amoxicillina"),
+                    DrugEntry(name="rialzo a"),
                     DrugEntry(name="ulteriore ciclo (originariamente previsto il"),
                 ]
             )
@@ -117,7 +121,11 @@ def test_extract_drugs_from_anamnesis_filters_non_drug_fragments() -> None:
         parser.extract_drugs_from_anamnesis("History includes oncology treatment.")
     )
 
-    assert [entry.name for entry in parsed.entries] == ["Pemetrexed", "Benziodiazepine"]
+    assert [entry.name for entry in parsed.entries] == [
+        "Pemetrexed",
+        "Benziodiazepine",
+        "Co-Amoxicillina",
+    ]
 
 
 def test_extract_drugs_from_anamnesis_llm_failure_uses_rule_fallback() -> None:

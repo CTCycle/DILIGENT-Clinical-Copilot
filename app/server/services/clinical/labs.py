@@ -60,6 +60,8 @@ def normalize_lab_marker(marker_name: str, aliases: dict[str, str]) -> str:
 ###############################################################################
 class ClinicalLabExtractor:
     CHUNK_MAX_CHARS = 2600
+    LOCAL_LLM_CHUNK_TIMEOUT_CAP_S = 45.0
+    CLOUD_LLM_CHUNK_TIMEOUT_CAP_S = 30.0
 
     def __init__(
         self,
@@ -533,6 +535,12 @@ class ClinicalLabExtractor:
         parsed: LabExtractionPayload | None = None
         if self.client is None:
             raise RuntimeError("LLM client is not initialized for lab extraction")
+        chunk_timeout_s = min(
+            max(5.0, float(self.timeout_s)),
+            self.CLOUD_LLM_CHUNK_TIMEOUT_CAP_S
+            if LLMRuntimeConfig.is_cloud_enabled()
+            else self.LOCAL_LLM_CHUNK_TIMEOUT_CAP_S,
+        )
         for attempt in range(1, self.extraction_retry_attempts + 1):
             try:
                 parsed = await asyncio.wait_for(
@@ -545,7 +553,7 @@ class ClinicalLabExtractor:
                         use_json_mode=True,
                         max_repair_attempts=1,
                     ),
-                    timeout=max(5.0, float(self.timeout_s)),
+                    timeout=chunk_timeout_s,
                 )
                 break
             except Exception as exc:

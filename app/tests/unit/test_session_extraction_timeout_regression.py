@@ -41,6 +41,13 @@ class FailingLabClient:
         raise RuntimeError("simulated lab extraction failure")
 
 
+class SlowLabClient:
+    async def llm_structured_call(self, **kwargs: Any) -> LabExtractionPayload:
+        _ = kwargs
+        await asyncio.sleep(1.0)
+        return LabExtractionPayload(entries=[], onset_context=None)
+
+
 def test_clinical_session_factory_uses_configured_parser_timeouts(
     monkeypatch: Any,
 ) -> None:
@@ -88,6 +95,24 @@ def test_italian_laboratory_text_uses_deterministic_fallback() -> None:
     assert ("ALP", "2025-01-10", 1055.0) in observed
     assert ("AST", "2025-01-16", 344.0) in observed
     assert ("ALT", "2025-02-13", 591.0) in observed
+
+
+def test_lab_llm_chunk_timeout_uses_deterministic_fallback(monkeypatch: Any) -> None:
+    extractor = ClinicalLabExtractor(client=SlowLabClient(), timeout_s=3600.0)
+    monkeypatch.setattr(extractor, "LOCAL_LLM_CHUNK_TIMEOUT_CAP_S", 0.01)
+    payload = PatientData(
+        anamnesis="",
+        drugs="Invanz sol iniet",
+        laboratory_analysis="Labor 10.01.2025: ALAT 345 U/L, ALP 1055 U/L.",
+    )
+
+    timeline, _ = asyncio.run(extractor.extract_from_payload(payload))
+
+    observed = {
+        (entry.marker_name, entry.sample_date, entry.value) for entry in timeline.entries
+    }
+    assert ("ALT", "2025-01-10", 345.0) in observed
+    assert ("ALP", "2025-01-10", 1055.0) in observed
 
 
 def test_runtime_timeout_resolution_does_not_apply_six_second_parser_cap() -> None:
