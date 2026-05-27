@@ -10,7 +10,12 @@ from common.security.cryptography import (
     encrypt_with_key_material,
     fingerprint_plaintext,
 )
-from domain.keys import ProviderName, normalize_access_key, normalize_provider_name
+from domain.keys import (
+    AccessKeyRecord,
+    ProviderName,
+    normalize_access_key,
+    normalize_provider_name,
+)
 from repositories.database.session import (
     resolve_engine,
     resolve_session_factory,
@@ -65,7 +70,26 @@ class AccessKeySerializer:
         return db_session.get(table, key_id)
 
     # -------------------------------------------------------------------------
-    def list_keys(self, provider: str) -> list[AccessKey]:
+    def _to_record(self, key: AccessKey) -> AccessKeyRecord:
+        return AccessKeyRecord(
+            id=int(key.id),
+            provider=normalize_provider_name(str(key.provider)),
+            created_at=key.created_at,
+            updated_at=key.updated_at,
+            is_active=bool(key.is_active),
+            key_fingerprint=str(key.fingerprint),
+            last_used_at=key.last_used_at,
+        )
+
+    # -------------------------------------------------------------------------
+    def list_keys(self, provider: str | None = None) -> list[AccessKeyRecord]:
+        if provider is None:
+            providers = ("openai", "gemini", "brave")
+            items: list[AccessKeyRecord] = []
+            for provider_name in providers:
+                items.extend(self.list_keys(provider_name))
+            items.sort(key=lambda item: item.id)
+            return items
         normalized_provider = self.normalize_provider(provider)
         table = self.resolve_table(normalized_provider)
         db_session = self.session_factory()
@@ -73,7 +97,8 @@ class AccessKeySerializer:
             stmt = AccessKeyRepositoryQueries.list_for_provider(
                 table, normalized_provider
             )
-            return db_session.execute(stmt).scalars().all()
+            rows = db_session.execute(stmt).scalars().all()
+            return [self._to_record(row) for row in rows]
         finally:
             db_session.close()
 
@@ -208,6 +233,13 @@ class AccessKeySerializer:
             raise
         finally:
             db_session.close()
+
+    # -------------------------------------------------------------------------
+    def get_active_key_value(self, provider: ProviderName) -> str | None:
+        row = self.get_active_key(provider, mark_used=True)
+        if row is None:
+            return None
+        return self.decrypt_key_row(row)
 
     # -------------------------------------------------------------------------
     @staticmethod

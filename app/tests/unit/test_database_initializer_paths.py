@@ -47,7 +47,7 @@ def test_run_database_initialization_uses_sqlite_path_when_embedded(
     settings = _sqlite_settings()
 
     monkeypatch.setattr(
-        initializer, "server_settings", type("S", (), {"database": settings})()
+        initializer, "get_server_settings", lambda: type("S", (), {"database": settings})()
     )
     monkeypatch.setattr(
         initializer,
@@ -72,7 +72,7 @@ def test_run_database_initialization_uses_postgres_path_when_external(
     settings = _postgres_settings()
 
     monkeypatch.setattr(
-        initializer, "server_settings", type("S", (), {"database": settings})()
+        initializer, "get_server_settings", lambda: type("S", (), {"database": settings})()
     )
     monkeypatch.setattr(
         initializer,

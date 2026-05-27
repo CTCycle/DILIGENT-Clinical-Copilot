@@ -3,9 +3,10 @@ from __future__ import annotations
 import time
 from typing import Any
 
-from services.inspection import service as inspection_service_module
+from services.inspection import update_jobs as update_jobs_module
 from services.inspection.service import DataInspectionService
 from services.runtime.jobs import JobManager
+from repositories.serialization.data import DataSerializer
 
 
 def test_rag_job_surfaces_incremental_serializer_progress(monkeypatch) -> None:
@@ -27,10 +28,9 @@ def test_rag_job_surfaces_incremental_serializer_progress(monkeypatch) -> None:
                 "loaded_documents": 2,
             }
 
-    service = object.__new__(DataInspectionService)
-    service.jobs = JobManager()
+    service = DataInspectionService(serializer=DataSerializer(), jobs=JobManager())
     monkeypatch.setattr(
-        inspection_service_module,
+        update_jobs_module,
         "RagEmbeddingUpdater",
         FakeRagEmbeddingUpdater,
     )
