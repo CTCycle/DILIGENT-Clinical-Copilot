@@ -15,7 +15,7 @@ from transformers import AutoModelForSequenceClassification, AutoTokenizer
 
 from common.constants import CLOUD_MODEL_CHOICES, VECTOR_DB_PATH
 from common.utils.logger import logger
-from configurations.startup import server_settings
+from configurations.startup import get_server_settings
 from repositories.serialization.access_keys import AccessKeySerializer
 from repositories.vectors import LanceVectorDatabase
 from services.llm.cloud import LLMError, LLMTimeout
@@ -132,7 +132,7 @@ class CloudEmbeddingGenerator:
         *,
         provider: ProviderName,
         model: str,
-        timeout_s: float = server_settings.runtime.default_llm_timeout,
+        timeout_s: float = get_server_settings().runtime.default_llm_timeout,
     ) -> None:
         normalized_provider = (provider or "").strip().lower()
         if normalized_provider not in {"openai", "gemini"}:
@@ -215,14 +215,14 @@ class OllamaEmbeddingGenerator:
         *,
         model: str,
         base_url: str | None = None,
-        timeout_s: float = server_settings.runtime.default_llm_timeout,
+        timeout_s: float = get_server_settings().runtime.default_llm_timeout,
     ) -> None:
         resolved_model = (model or "").strip()
         if not resolved_model:
             raise ValueError("Ollama embedding model is required")
         self.model = resolved_model
         self.base_url = (
-            base_url or server_settings.llm_defaults.ollama_host_default
+            base_url or get_server_settings().llm_defaults.ollama_host_default
         ).rstrip("/")
         self.timeout_s = float(timeout_s)
 
@@ -275,7 +275,7 @@ def select_embedding_provider(
     use_cloud_embeddings: bool = False,
     cloud_provider: str | None = None,
     cloud_embedding_model: str | None = None,
-    timeout_s: float = server_settings.runtime.default_llm_timeout,
+    timeout_s: float = get_server_settings().runtime.default_llm_timeout,
 ) -> CloudEmbeddingGenerator | OllamaEmbeddingGenerator:
     normalized_backend = backend.lower().strip() if backend else "ollama"
     if use_cloud_embeddings:
@@ -374,24 +374,24 @@ class SimilaritySearch:
         *,
         vector_database: LanceVectorDatabase | None = None,
         embedding_generator: EmbeddingGenerator | None = None,
-        default_top_k: int = server_settings.rag.rerank_candidate_k,
+        default_top_k: int = get_server_settings().rag.rerank_candidate_k,
     ) -> None:
         self.default_top_k = max(int(default_top_k), 1)
         self.reranker: Reranker | None = None
         self.vector_database = vector_database or LanceVectorDatabase(
             database_path=VECTOR_DB_PATH,
-            collection_name=server_settings.rag.vector_collection_name,
-            metric=server_settings.rag.vector_index_metric,
-            index_type=server_settings.rag.vector_index_type,
-            stream_batch_size=server_settings.rag.vector_stream_batch_size,
+            collection_name=get_server_settings().rag.vector_collection_name,
+            metric=get_server_settings().rag.vector_index_metric,
+            index_type=get_server_settings().rag.vector_index_type,
+            stream_batch_size=get_server_settings().rag.vector_stream_batch_size,
         )
         self.embedding_generator = embedding_generator or EmbeddingGenerator(
-            backend=server_settings.rag.embedding_backend,
-            ollama_base_url=server_settings.rag.ollama_base_url,
-            ollama_model=server_settings.rag.ollama_embedding_model,
-            use_cloud_embeddings=server_settings.rag.use_cloud_embeddings,
-            cloud_provider=server_settings.rag.cloud_provider,
-            cloud_embedding_model=server_settings.rag.cloud_embedding_model,
+            backend=get_server_settings().rag.embedding_backend,
+            ollama_base_url=get_server_settings().rag.ollama_base_url,
+            ollama_model=get_server_settings().rag.ollama_embedding_model,
+            use_cloud_embeddings=get_server_settings().rag.use_cloud_embeddings,
+            cloud_provider=get_server_settings().rag.cloud_provider,
+            cloud_embedding_model=get_server_settings().rag.cloud_embedding_model,
         )
         try:
             self.vector_database.initialize()
@@ -415,7 +415,7 @@ class SimilaritySearch:
             logger.error("Failed to access LanceDB table: %s", exc)
             return []
         try:
-            if server_settings.rag.use_hybrid_search:
+            if get_server_settings().rag.use_hybrid_search:
                 results = self.hybrid_search(
                     table=table,
                     query=normalized,
@@ -477,8 +477,8 @@ class SimilaritySearch:
         query: str,
     ) -> list[dict[str, Any]]:
         fused: dict[str, dict[str, Any]] = {}
-        vector_weight = float(server_settings.rag.hybrid_vector_weight)
-        text_weight = float(server_settings.rag.hybrid_text_weight)
+        vector_weight = float(get_server_settings().rag.hybrid_vector_weight)
+        text_weight = float(get_server_settings().rag.hybrid_text_weight)
         for rank, entry in enumerate(vector_results, start=1):
             self.add_rank_score(
                 fused,
@@ -607,7 +607,7 @@ class SimilaritySearch:
         resolved_top_n = (
             max(int(final_top_n), 1)
             if final_top_n is not None
-            else max(int(server_settings.rag.rerank_top_n), 1)
+            else max(int(get_server_settings().rag.rerank_top_n), 1)
         )
         resolved_candidate_k = (
             max(int(candidate_k), 1)
@@ -622,7 +622,7 @@ class SimilaritySearch:
             return []
 
         should_rerank = (
-            server_settings.rag.use_reranking
+            get_server_settings().rag.use_reranking
             if use_reranking is None
             else bool(use_reranking)
         )
@@ -675,7 +675,7 @@ class SimilaritySearch:
     # -------------------------------------------------------------------------
     def get_reranker(self) -> Reranker:
         if self.reranker is None:
-            self.reranker = LocalCrossEncoderReranker(server_settings.rag.reranker_model)
+            self.reranker = LocalCrossEncoderReranker(get_server_settings().rag.reranker_model)
         return self.reranker
 
     # -------------------------------------------------------------------------

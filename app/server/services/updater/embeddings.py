@@ -5,7 +5,7 @@ from pathlib import Path
 
 from common.constants import DOCS_PATH, VECTOR_DB_PATH
 from common.utils.logger import logger
-from configurations.startup import server_settings
+from configurations.startup import get_server_settings
 from repositories.serialization.vectors import VectorSerializer
 from repositories.vectors import LanceVectorDatabase
 
@@ -41,59 +41,59 @@ class RagEmbeddingUpdater:
                 "RAG documents_path does not exist or is not a directory."
             )
         self.documents_path = str(resolved_documents_path)
-        default_use_cloud = server_settings.rag.use_cloud_embeddings
+        default_use_cloud = get_server_settings().rag.use_cloud_embeddings
         self.use_cloud_embeddings = (
             default_use_cloud if use_cloud_embeddings is None else use_cloud_embeddings
         )
-        resolved_provider = cloud_provider or server_settings.rag.cloud_provider
+        resolved_provider = cloud_provider or get_server_settings().rag.cloud_provider
         resolved_model = (
-            cloud_embedding_model or server_settings.rag.cloud_embedding_model
+            cloud_embedding_model or get_server_settings().rag.cloud_embedding_model
         )
         self.vector_collection_name = (
-            vector_collection_name or server_settings.rag.vector_collection_name
+            vector_collection_name or get_server_settings().rag.vector_collection_name
         )
         self.chunk_size = int(
-            chunk_size if chunk_size is not None else server_settings.rag.chunk_size
+            chunk_size if chunk_size is not None else get_server_settings().rag.chunk_size
         )
         self.chunk_overlap = int(
             chunk_overlap
             if chunk_overlap is not None
-            else server_settings.rag.chunk_overlap
+            else get_server_settings().rag.chunk_overlap
         )
         self.embedding_batch_size = int(
             embedding_batch_size
             if embedding_batch_size is not None
-            else server_settings.rag.embedding_batch_size
+            else get_server_settings().rag.embedding_batch_size
         )
         self.vector_stream_batch_size = int(
             vector_stream_batch_size
             if vector_stream_batch_size is not None
-            else server_settings.rag.vector_stream_batch_size
+            else get_server_settings().rag.vector_stream_batch_size
         )
         self.embedding_max_workers = int(
             embedding_max_workers
             if embedding_max_workers is not None
-            else server_settings.rag.embedding_max_workers
+            else get_server_settings().rag.embedding_max_workers
         )
         self.embedding_backend = (
-            embedding_backend or server_settings.rag.embedding_backend
+            embedding_backend or get_server_settings().rag.embedding_backend
         )
         self.ollama_embedding_model = (
-            ollama_embedding_model or server_settings.rag.ollama_embedding_model
+            ollama_embedding_model or get_server_settings().rag.ollama_embedding_model
         )
         self.hf_embedding_model = (
-            hf_embedding_model or server_settings.rag.hf_embedding_model
+            hf_embedding_model or get_server_settings().rag.hf_embedding_model
         )
         self.reset_vector_collection = (
-            server_settings.rag.reset_vector_collection
+            get_server_settings().rag.reset_vector_collection
             if reset_vector_collection is None
             else bool(reset_vector_collection)
         )
         self.vector_database = LanceVectorDatabase(
             database_path=VECTOR_DB_PATH,
             collection_name=self.vector_collection_name,
-            metric=server_settings.rag.vector_index_metric,
-            index_type=server_settings.rag.vector_index_type,
+            metric=get_server_settings().rag.vector_index_metric,
+            index_type=get_server_settings().rag.vector_index_type,
             stream_batch_size=self.vector_stream_batch_size,
         )
         self.serializer = VectorSerializer(
@@ -104,7 +104,7 @@ class RagEmbeddingUpdater:
             embedding_batch_size=self.embedding_batch_size,
             embedding_workers=self.embedding_max_workers,
             embedding_backend=self.embedding_backend,
-            ollama_base_url=server_settings.rag.ollama_base_url,
+            ollama_base_url=get_server_settings().rag.ollama_base_url,
             ollama_model=self.ollama_embedding_model,
             hf_model=self.hf_embedding_model,
             use_cloud_embeddings=self.use_cloud_embeddings,

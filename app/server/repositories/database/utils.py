@@ -6,7 +6,7 @@ SQL_IDENTIFIER_RE = re.compile(r"^[A-Za-z_]\w*$", re.ASCII)
 POSTGRES_DATABASE_NAME_RE = re.compile(r"^\w[\w-]{0,62}$", re.ASCII)
 
 
-# -----------------------------------------------------------------------------
+###############################################################################
 def normalize_postgres_engine(engine: str | None) -> str:
     if not engine:
         return "postgresql+psycopg"

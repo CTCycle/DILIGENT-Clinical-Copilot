@@ -393,7 +393,7 @@ def audit_report(
         outcome = "partially_faithful_with_major_issues"
     elif non_blocking_issues:
         outcome = "mostly_faithful_with_minor_issues"
-    discrepancy_report = _render_discrepancy_report(blocking_issues, non_blocking_issues)
+    _ = _render_discrepancy_report(blocking_issues, non_blocking_issues)
     structured_comparison = _build_structured_report_comparison(
         extraction_artifact=extraction_artifact,
         blocking_issues=blocking_issues,

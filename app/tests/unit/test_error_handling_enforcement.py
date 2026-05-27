@@ -218,7 +218,8 @@ def test_ollama_endpoint_sanitizes_provider_error(monkeypatch) -> None:
         async def list_models(self):
             raise OllamaError("stack trace token=internal")
 
-    monkeypatch.setattr(ollama_api, "OllamaClient", FakeOllamaClient)
+    service = get_route_service(ollama_api.router, "/list")
+    monkeypatch.setattr(service, "client_factory", FakeOllamaClient)
 
     with TestClient(server_app_module.app, raise_server_exceptions=False) as client:
         response = client.get("/api/models/list")
