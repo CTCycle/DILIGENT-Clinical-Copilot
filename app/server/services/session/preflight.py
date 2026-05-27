@@ -365,4 +365,4 @@ def _result(
         runtime_settings=runtime_settings,
         extraction_quality=extraction_quality,
     )
-_CLOUD_PROVIDERS = {"openai", "gemini", "openrouter"}
+_CLOUD_PROVIDERS = {"openai", "gemini"}

@@ -17,7 +17,7 @@ from common.utils.languages import (
 )
 from common.utils.logger import logger
 from configurations.llm_configs import LLMRuntimeConfig
-from configurations.startup import server_settings
+from configurations.startup import get_server_settings
 from domain.clinical.entities import (
     ClinicalPipelineValidationError,
     ClinicalSectionExtractionResult,
@@ -49,7 +49,7 @@ from services.session.robust_pipeline import (
 from services.session.session_shared import NarrativeBuilder, run_clinical_job
 from services.text.normalization import normalize_drug_query_name
 
-_CLOUD_PROVIDERS = {"openai", "gemini", "openrouter"}
+_CLOUD_PROVIDERS = {"openai", "gemini"}
 
 
 async def _extract_drugs_from_section(
@@ -724,5 +724,5 @@ def start_clinical_job_workflow(
         job_type=job_status["job_type"],
         status=job_status["status"],
         message="Clinical analysis job started",
-        poll_interval=server_settings.jobs.polling_interval,
+        poll_interval=get_server_settings().jobs.polling_interval,
     )

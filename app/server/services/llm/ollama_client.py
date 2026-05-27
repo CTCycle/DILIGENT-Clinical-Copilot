@@ -1,4 +1,5 @@
 from __future__ import annotations
+# ruff: noqa: E402
 
 import asyncio
 import json
@@ -16,7 +17,7 @@ from langchain_core.messages import (
 )
 from langchain_ollama import ChatOllama, OllamaEmbeddings
 
-from configurations.startup import server_settings
+from configurations.startup import get_server_settings
 from services.llm.structured import (
     StructuredOutputParser,
     T,
@@ -150,13 +151,13 @@ class OllamaClient:
     def __init__(
         self,
         base_url: str | None = None,
-        timeout_s: float = server_settings.runtime.default_llm_timeout,
+        timeout_s: float = get_server_settings().runtime.default_llm_timeout,
         keepalive_connections: int = 10,
         keepalive_max: int = 20,
         default_model: str | None = None,
     ) -> None:
         self.base_url = (
-            base_url or server_settings.llm_defaults.ollama_host_default
+            base_url or get_server_settings().llm_defaults.ollama_host_default
         ).rstrip("/")
         self.default_model = (default_model or "").strip() or None
         self.timeout_s = float(timeout_s)
@@ -555,8 +556,8 @@ class OllamaClient:
     async def start_server(
         self,
         *,
-        wait_timeout_s: float = server_settings.runtime.ollama_server_start_timeout,
-        poll_interval_s: float = server_settings.jobs.polling_interval,
+        wait_timeout_s: float = get_server_settings().runtime.ollama_server_start_timeout,
+        poll_interval_s: float = get_server_settings().jobs.polling_interval,
     ) -> Literal["started", "already_running"]:
         return await ollama_chat.start_server(self, wait_timeout_s=wait_timeout_s, poll_interval_s=poll_interval_s)
 

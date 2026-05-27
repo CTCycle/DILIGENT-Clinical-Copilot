@@ -9,7 +9,7 @@ from sqlalchemy.orm import sessionmaker
 from sqlalchemy.sql.elements import TextClause
 
 from common.utils.logger import logger
-from configurations.startup import server_settings
+from configurations.startup import get_server_settings
 from domain.settings.configuration import DatabaseSettings
 from repositories.database.postgres import PostgresRepository
 from repositories.database.sqlite import SQLiteRepository
@@ -28,7 +28,7 @@ from services.catalogs.runtime import reload_reference_catalog_snapshot
 from services.catalogs.seeder import ReferenceCatalogSeeder
 
 
-# -----------------------------------------------------------------------------
+###############################################################################
 def build_postgres_connect_args(settings: DatabaseSettings) -> dict[str, str | int]:
     connect_args: dict[str, str | int] = {
         "connect_timeout": settings.connect_timeout,
@@ -41,7 +41,7 @@ def build_postgres_connect_args(settings: DatabaseSettings) -> dict[str, str | i
     return connect_args
 
 
-# -----------------------------------------------------------------------------
+###############################################################################
 def build_postgres_url(settings: DatabaseSettings, database_name: str) -> str:
     port = settings.port or 5432
     engine_name = normalize_postgres_engine(settings.engine)
@@ -54,7 +54,7 @@ def build_postgres_url(settings: DatabaseSettings, database_name: str) -> str:
     )
 
 
-# -----------------------------------------------------------------------------
+###############################################################################
 def clone_settings_with_database(
     settings: DatabaseSettings, database_name: str
 ) -> DatabaseSettings:
@@ -76,7 +76,7 @@ def clone_settings_with_database(
     )
 
 
-# -----------------------------------------------------------------------------
+###############################################################################
 def build_postgres_create_database_sql(
     database_name: str,
 ) -> TextClause:
@@ -86,7 +86,7 @@ def build_postgres_create_database_sql(
     )
 
 
-# -----------------------------------------------------------------------------
+###############################################################################
 def initialize_sqlite_database(
     settings: DatabaseSettings,
     *,
@@ -125,7 +125,7 @@ def initialize_sqlite_database(
     logger.info("Initialized SQLite database schema at %s", repository.db_path)
 
 
-# -----------------------------------------------------------------------------
+###############################################################################
 def ensure_postgres_database(
     settings: DatabaseSettings,
     *,
@@ -202,15 +202,14 @@ def ensure_postgres_database(
 
     return target_database
 
-
-# -----------------------------------------------------------------------------
+###############################################################################
 def run_database_initialization(
     *,
     drop_existing: bool = False,
     seed_catalogs: bool = True,
     force_reseed_catalogs: bool = False,
 ) -> None:
-    settings = server_settings.database
+    settings = get_server_settings().database
     init_kwargs = {
         "drop_existing": drop_existing,
         "seed_catalogs": seed_catalogs,
@@ -242,7 +241,7 @@ def run_database_initialization(
         ensure_postgres_database(settings, **init_kwargs)
 
 
-# -----------------------------------------------------------------------------
+###############################################################################
 def initialize_database(
     drop_existing: bool = False,
     seed_catalogs: bool = True,

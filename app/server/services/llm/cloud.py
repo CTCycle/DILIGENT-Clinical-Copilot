@@ -13,7 +13,7 @@ from openai import APIConnectionError, APITimeoutError, AsyncOpenAI, OpenAIError
 from common.constants import GEMINI_API_BASE, OPENAI_API_BASE
 from common.utils.logger import logger
 from configurations.llm_configs import LLMRuntimeConfig
-from configurations.startup import server_settings
+from configurations.startup import get_server_settings
 from repositories.serialization.access_keys import AccessKeySerializer
 from services.llm.structured import (
     StructuredOutputParser,
@@ -47,7 +47,7 @@ class CloudLLMClient:
         *,
         provider: ProviderName = "openai",
         base_url: str | None = None,
-        timeout_s: float = server_settings.runtime.default_llm_timeout,
+        timeout_s: float | None = None,
         keepalive_connections: int = 10,
         keepalive_max: int = 20,
         default_model: str | None = None,
@@ -55,7 +55,8 @@ class CloudLLMClient:
     ) -> None:
         self.provider: ProviderName = provider
         self.default_model = default_model
-        self.timeout_s = float(timeout_s)
+        runtime_timeout = get_server_settings().runtime.default_llm_timeout
+        self.timeout_s = float(runtime_timeout if timeout_s is None else timeout_s)
         provider_access_key = self.resolve_provider_access_key(provider)
         self.provider_access_key = provider_access_key
         self.openai_client: AsyncOpenAI | None = None
@@ -106,25 +107,11 @@ class CloudLLMClient:
 
         access_key_serializer = AccessKeySerializer()
         try:
-            row = access_key_serializer.get_active_key(provider, mark_used=True)
-        except Exception:  # noqa: BLE001
-            # Some environments expose the key store in read-only mode; in that
-            # case, fall back to a read-only fetch without updating last_used_at.
-            try:
-                row = access_key_serializer.get_active_key(provider, mark_used=False)
-            except Exception as fallback_exc:  # noqa: BLE001
-                provider_label = "OpenAI" if provider == "openai" else "Gemini"
-                raise LLMError(
-                    f"Failed to load active {provider_label} access key"
-                ) from fallback_exc
-        if row is None:
-            return None
-        try:
-            return access_key_serializer.decrypt_key_row(row)
+            return access_key_serializer.get_active_key_value(provider)
         except Exception as exc:  # noqa: BLE001
             provider_label = "OpenAI" if provider == "openai" else "Gemini"
             raise LLMError(
-                f"Failed to decrypt active {provider_label} access key"
+                f"Failed to load active {provider_label} access key"
             ) from exc
 
     # ---------------------------------------------------------------------

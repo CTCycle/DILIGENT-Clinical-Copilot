@@ -84,7 +84,7 @@ OllamaEndpoint(
     router=router,
     service=OllamaService(
         job_manager=get_job_manager(),
-        client_factory=lambda: OllamaClient(),
+        client_factory=OllamaClient,
     ),
 ).add_routes()
 

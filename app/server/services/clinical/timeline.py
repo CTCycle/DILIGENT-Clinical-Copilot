@@ -8,7 +8,7 @@ from typing import Any
 from common.constants import CLOUD_MODEL_CHOICES
 from common.utils.logger import logger
 from configurations.llm_configs import LLMRuntimeConfig
-from configurations.startup import server_settings
+from configurations.startup import get_server_settings
 from domain.patient_timeline import (
     PatientTimeline,
     PatientTimelineEvent,
@@ -31,7 +31,7 @@ class PatientTimelineExtractor:
         *,
         client: Any | None = None,
         temperature: float = 0.0,
-        timeout_s: float = server_settings.runtime.default_llm_timeout,
+        timeout_s: float = get_server_settings().runtime.default_llm_timeout,
     ) -> None:
         self.temperature = float(temperature)
         self.timeout_s = float(timeout_s)

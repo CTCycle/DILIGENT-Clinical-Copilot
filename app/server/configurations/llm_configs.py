@@ -4,7 +4,7 @@ from datetime import datetime
 from typing import Literal
 
 from common.constants import CLOUD_MODEL_CHOICES
-from configurations.startup import server_settings
+from configurations.startup import get_server_settings
 from domain.model_configs import ModelConfigSnapshot
 from domain.settings.configuration import LLMRuntimeDefaults
 from repositories.serialization.model_configs import (
@@ -16,7 +16,7 @@ from repositories.serialization.model_configs import (
 class LLMRuntimeConfig:
     @staticmethod
     def _get_defaults() -> LLMRuntimeDefaults:
-        return server_settings.llm_defaults
+        return get_server_settings().llm_defaults
 
     # -------------------------------------------------------------------------
     @staticmethod

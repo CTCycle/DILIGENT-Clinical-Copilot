@@ -12,7 +12,7 @@ from common.constants import (
     LIVERTOX_REQUIRED_COLUMNS,
     RXNORM_CATALOG_COLUMNS,
 )
-from configurations.startup import server_settings
+from configurations.startup import get_server_settings
 from services.text.normalization import coerce_text, normalize_drug_name
 
 # Extracted from the facade module; functions intentionally accept the facade instance.
@@ -122,7 +122,7 @@ def upsert_drugs_catalog_records(
 def resolve_commit_interval(self, override: int | None) -> int:
     if override is not None:
         return max(int(override), 1)
-    return max(int(server_settings.database.insert_commit_interval), 1)
+    return max(int(get_server_settings().database.insert_commit_interval), 1)
 
 def prepare_rxnav_rows(
     self,
@@ -218,9 +218,9 @@ def sanitize_livertox_records(self, records: list[dict[str, Any]]) -> pd.DataFra
 
 def is_valid_drug_name(self, value: str) -> bool:
     normalized = value.strip()
-    min_length = server_settings.ingestion.drug_name_min_length
-    max_length = server_settings.ingestion.drug_name_max_length
-    max_tokens = server_settings.ingestion.drug_name_max_tokens
+    min_length = get_server_settings().ingestion.drug_name_min_length
+    max_length = get_server_settings().ingestion.drug_name_max_length
+    max_tokens = get_server_settings().ingestion.drug_name_max_tokens
     if len(normalized) < min_length or len(normalized) > max_length:
         return False
     if len(normalized.split()) > max_tokens:

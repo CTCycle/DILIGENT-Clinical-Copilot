@@ -9,13 +9,12 @@ from threading import Lock
 from typing import Any, Literal
 
 from common.constants import (
-    ARCHIVES_PATH,
     DOCS_PATH,
     DOCUMENT_SUPPORTED_EXTENSIONS,
     VECTOR_DB_PATH,
 )
 from common.utils.logger import logger
-from configurations.startup import server_settings
+from configurations.startup import get_server_settings
 from domain.clinical.entities import ClinicalSessionRequest
 from domain.inspection import InspectionJobPhase
 from domain.patient_timeline import PatientTimeline
@@ -29,6 +28,12 @@ from services.clinical.timeline import PatientTimelineExtractor
 from services.inspection.normalization import (
     extract_lab_marker as extract_lab_marker_value,
 )
+from services.inspection.revision_helpers import (
+    build_revision_section_validation as build_revision_section_validation_value,
+)
+from services.inspection.revision_helpers import (
+    extract_revision_drug_names as extract_revision_drug_names_value,
+)
 from services.inspection.normalization import (
     first_iso_date as first_iso_date_value,
 )
@@ -38,6 +43,7 @@ from services.inspection.normalization import (
 from services.inspection.timeline import (
     build_fallback_timeline as build_fallback_timeline_value,
 )
+from services.inspection.update_jobs import DataInspectionUpdateJobRunner
 from services.inspection.timeline import (
     generate_session_timeline as generate_session_timeline_value,
 )
@@ -53,31 +59,11 @@ from services.text.vocabulary import (
     list_text_normalization_term_payloads,
     upsert_text_normalization_term_payload,
 )
-from services.updater.embeddings import RagEmbeddingUpdater
-from services.updater.livertox_core import LiverToxUpdater
-from services.updater.rxnav_builder import RxNavDrugCatalogBuilder
-from services.updater.rxnav_client import RxNavClient
 
 PhaseStep = tuple[InspectionJobPhase, int, int, str]
 UpdateTarget = Literal["rxnav", "livertox", "rag"]
 
 
-###############################################################################
-class DataInspectionProgressReporter:
-    def __init__(self, *, service: "DataInspectionService", job_id: str) -> None:
-        self.service = service
-        self.job_id = job_id
-
-    # -------------------------------------------------------------------------
-    def __call__(self, progress: float, message: str) -> None:
-        self.service.report_job_progress(
-            job_id=self.job_id,
-            progress=progress,
-            message=message,
-        )
-
-
-###############################################################################
 class DataInspectionService:
     RXNAV_JOB_TYPE = "rxnav_update"
     LIVERTOX_JOB_TYPE = "livertox_update"
@@ -127,10 +113,17 @@ class DataInspectionService:
         self.timeline_generation_lock = Lock()
         self.timeline_generation_inflight: set[int] = set()
         self.timeline_generation_cooldown_until: dict[int, float] = {}
+        self.update_job_runner = DataInspectionUpdateJobRunner(
+            serializer=self.serializer,
+            jobs=self.jobs,
+            report_phase_by_target=self._report_phase_by_target_for_runner,
+            report_job_progress=self._report_job_progress_for_runner,
+            write_rag_manifest=self._write_rag_manifest_for_runner,
+        )
 
     # -------------------------------------------------------------------------
     def load_runtime_config(self) -> dict[str, Any]:
-        return server_settings.model_dump()
+        return get_server_settings().model_dump()
 
     def rag_manifest_path(self) -> Path:
         return Path(VECTOR_DB_PATH) / self.RAG_MANIFEST_FILE_NAME
@@ -211,19 +204,20 @@ class DataInspectionService:
     # -------------------------------------------------------------------------
     def build_update_config_response(self, target: UpdateTarget) -> dict[str, Any]:
         config = self.load_runtime_config()
+        settings = get_server_settings()
         if target == "rxnav":
             source = config.get("runtime", {})
             defaults = {
                 "rxnav_request_timeout": float(
                     source.get(
                         "rxnav_request_timeout",
-                        server_settings.runtime.rxnav_request_timeout,
+                        settings.runtime.rxnav_request_timeout,
                     )
                 ),
                 "rxnav_max_concurrency": int(
                     source.get(
                         "rxnav_max_concurrency",
-                        server_settings.runtime.rxnav_max_concurrency,
+                        settings.runtime.rxnav_max_concurrency,
                     )
                 ),
             }
@@ -234,13 +228,13 @@ class DataInspectionService:
                 "livertox_monograph_max_workers": int(
                     source.get(
                         "livertox_monograph_max_workers",
-                        server_settings.runtime.livertox_monograph_max_workers,
+                        settings.runtime.livertox_monograph_max_workers,
                     )
                 ),
                 "livertox_archive": str(
                     source.get(
                         "livertox_archive",
-                        server_settings.runtime.livertox_archive,
+                        settings.runtime.livertox_archive,
                     )
                 ),
                 "redownload": False,
@@ -251,62 +245,62 @@ class DataInspectionService:
             defaults = {
                 "documents_path": str(source.get("documents_path", DOCS_PATH)),
                 "chunk_size": int(
-                    source.get("chunk_size", server_settings.rag.chunk_size)
+                    source.get("chunk_size", settings.rag.chunk_size)
                 ),
                 "chunk_overlap": int(
-                    source.get("chunk_overlap", server_settings.rag.chunk_overlap)
+                    source.get("chunk_overlap", settings.rag.chunk_overlap)
                 ),
                 "embedding_batch_size": int(
                     source.get(
-                        "embedding_batch_size", server_settings.rag.embedding_batch_size
+                        "embedding_batch_size", settings.rag.embedding_batch_size
                     )
                 ),
                 "vector_stream_batch_size": int(
                     source.get(
                         "vector_stream_batch_size",
-                        server_settings.rag.vector_stream_batch_size,
+                        settings.rag.vector_stream_batch_size,
                     )
                 ),
                 "embedding_max_workers": int(
                     source.get(
                         "embedding_max_workers",
-                        server_settings.rag.embedding_max_workers,
+                        settings.rag.embedding_max_workers,
                     )
                 ),
                 "embedding_backend": str(
                     source.get(
-                        "embedding_backend", server_settings.rag.embedding_backend
+                        "embedding_backend", settings.rag.embedding_backend
                     )
                 ),
                 "ollama_embedding_model": str(
                     source.get(
                         "ollama_embedding_model",
-                        server_settings.rag.ollama_embedding_model,
+                        settings.rag.ollama_embedding_model,
                     )
                 ),
                 "hf_embedding_model": str(
                     source.get(
-                        "hf_embedding_model", server_settings.rag.hf_embedding_model
+                        "hf_embedding_model", settings.rag.hf_embedding_model
                     )
                 ),
                 "cloud_provider": str(
-                    source.get("cloud_provider", server_settings.rag.cloud_provider)
+                    source.get("cloud_provider", settings.rag.cloud_provider)
                 ),
                 "cloud_embedding_model": str(
                     source.get(
                         "cloud_embedding_model",
-                        server_settings.rag.cloud_embedding_model,
+                        settings.rag.cloud_embedding_model,
                     )
                 ),
                 "use_cloud_embeddings": bool(
                     source.get(
-                        "use_cloud_embeddings", server_settings.rag.use_cloud_embeddings
+                        "use_cloud_embeddings", settings.rag.use_cloud_embeddings
                     )
                 ),
                 "reset_vector_collection": bool(
                     source.get(
                         "reset_vector_collection",
-                        server_settings.rag.reset_vector_collection,
+                        settings.rag.reset_vector_collection,
                     )
                 ),
             }
@@ -442,59 +436,15 @@ class DataInspectionService:
         extracted_sections: dict[str, Any],
         selected_text: str | None,
     ) -> dict[str, Any]:
-        section_keys = ("anamnesis", "drugs", "laboratory_analysis")
-        validation: dict[str, dict[str, Any]] = {}
-        missing_after_revision: list[str] = []
-        changed_after_revision: list[str] = []
-        selected_norm = normalize_text_value(selected_text or "")
-        for key in section_keys:
-            original_text = normalize_text_value(source_sections.get(key))
-            extracted_text = normalize_text_value(extracted_sections.get(key))
-            original_in_scope = not selected_norm or bool(
-                extracted_text
-                or (original_text and selected_norm in original_text)
-                or (original_text and original_text in selected_norm)
-            )
-            changed = bool(original_in_scope and original_text != extracted_text)
-            if original_in_scope and original_text and not extracted_text:
-                missing_after_revision.append(key)
-            if changed:
-                changed_after_revision.append(key)
-            validation[key] = {
-                "original_length": len(original_text),
-                "revised_length": len(extracted_text),
-                "original_in_revision_scope": original_in_scope,
-                "present_after_revision": bool(extracted_text),
-                "changed_after_revision": changed,
-            }
-        return {
-            "sections": validation,
-            "missing_sections_after_revision": missing_after_revision,
-            "changed_sections_after_revision": changed_after_revision,
-        }
+        return build_revision_section_validation_value(
+            source_sections=source_sections,
+            extracted_sections=extracted_sections,
+            selected_text=selected_text,
+        )
 
     # -------------------------------------------------------------------------
     def extract_revision_drug_names(self, payload: dict[str, Any]) -> list[str]:
-        names: list[str] = []
-        for value in payload.get("detected_drugs", []):
-            if isinstance(value, str) and value.strip():
-                names.append(value.strip())
-        for value in payload.get("matched_drugs", []):
-            if not isinstance(value, dict):
-                continue
-            for key in ("raw_drug_name", "matched_drug_name"):
-                candidate = value.get(key)
-                if isinstance(candidate, str) and candidate.strip():
-                    names.append(candidate.strip())
-        unique: list[str] = []
-        seen: set[str] = set()
-        for name in names:
-            normalized = normalize_drug_query_name(name)
-            if not normalized or normalized in seen:
-                continue
-            seen.add(normalized)
-            unique.append(name)
-        return unique
+        return extract_revision_drug_names_value(payload)
 
     # -------------------------------------------------------------------------
     @staticmethod
@@ -826,17 +776,18 @@ class DataInspectionService:
         config = self.load_runtime_config()
         rag_cfg = config.get("rag", {}) if isinstance(config, dict) else {}
         documents_path = self.get_effective_rag_documents_path()
+        settings = get_server_settings()
         collection_name = str(
             rag_cfg.get(
-                "vector_collection_name", server_settings.rag.vector_collection_name
+                "vector_collection_name", settings.rag.vector_collection_name
             )
         )
         vector_db = LanceVectorDatabase(
             database_path=VECTOR_DB_PATH,
             collection_name=collection_name,
-            metric=server_settings.rag.vector_index_metric,
-            index_type=server_settings.rag.vector_index_type,
-            stream_batch_size=server_settings.rag.vector_stream_batch_size,
+            metric=settings.rag.vector_index_metric,
+            index_type=settings.rag.vector_index_type,
+            stream_batch_size=settings.rag.vector_stream_batch_size,
         )
         exists = vector_db.has_collection()
         embedding_count = 0
@@ -861,8 +812,8 @@ class DataInspectionService:
             "distinct_document_count": distinct_document_count,
             "embedding_dimension": embedding_dimension,
             "index_ready": bool(vector_db.index_ready) if exists else False,
-            "configured_metric": server_settings.rag.vector_index_metric,
-            "configured_index_type": server_settings.rag.vector_index_type,
+            "configured_metric": settings.rag.vector_index_metric,
+            "configured_index_type": settings.rag.vector_index_type,
         }
 
     # -------------------------------------------------------------------------
@@ -928,255 +879,57 @@ class DataInspectionService:
         )
 
     # -------------------------------------------------------------------------
+    def _report_phase_by_target_for_runner(
+        self, job_id: str, target: str, progress: int, message: str
+    ) -> None:
+        phase = "update_started"
+        for entry in self.UPDATE_PHASES[target]:  # type: ignore[index]
+            if entry[3] == message:
+                phase = entry[0]
+                break
+        self.report_phase_by_target(
+            job_id=job_id,
+            target=target,  # type: ignore[arg-type]
+            phase=phase,  # type: ignore[arg-type]
+            progress=float(progress),
+            fallback_message=message,
+        )
+
+    # -------------------------------------------------------------------------
+    def _report_job_progress_for_runner(
+        self,
+        job_id: str,
+        progress: float,
+        message: str,
+        extra: Any | None = None,
+    ) -> None:
+        _ = extra
+        self.report_job_progress(job_id=job_id, progress=progress, message=message)
+
+    # -------------------------------------------------------------------------
+    def _write_rag_manifest_for_runner(
+        self, report: dict[str, Any], documents_path: str
+    ) -> Path:
+        self.write_rag_manifest(documents_path=documents_path, summary=report)
+        return self.rag_manifest_path()
+
+    # -------------------------------------------------------------------------
     def run_rxnav_update_job(
         self, job_id: str, overrides: dict[str, Any] | None = None
     ) -> dict[str, Any]:
-        stop_check = partial(self.jobs.should_stop, job_id)
-        progress_callback = DataInspectionProgressReporter(service=self, job_id=job_id)
-        override_values = overrides or {}
-        self.report_phase_by_target(
-            job_id=job_id,
-            target="rxnav",
-            phase="configuration_accepted",
-            progress=1.0,
-            fallback_message="Configuration accepted",
-        )
-        if stop_check():
-            return {}
-        self.report_phase_by_target(
-            job_id=job_id,
-            target="rxnav",
-            phase="update_started",
-            progress=4.0,
-            fallback_message="RxNav update started",
-        )
-        self.report_phase_by_target(
-            job_id=job_id,
-            target="rxnav",
-            phase="source_data_loading",
-            progress=10.0,
-            fallback_message="Downloading source catalog data",
-        )
-        rx_client = RxNavClient(
-            request_timeout=override_values.get("rxnav_request_timeout"),
-            max_concurrency=override_values.get("rxnav_max_concurrency"),
-        )
-        builder = RxNavDrugCatalogBuilder(
-            serializer=self.serializer,
-            rx_client=rx_client,
-        )
-        self.report_phase_by_target(
-            job_id=job_id,
-            target="rxnav",
-            phase="processing_extraction",
-            progress=20.0,
-            fallback_message="Processing aliases and synonyms",
-        )
-        result = builder.update_drug_catalog(
-            progress_callback=progress_callback,
-            should_stop=stop_check,
-        )
-        self.report_phase_by_target(
-            job_id=job_id,
-            target="rxnav",
-            phase="persistence_indexing",
-            progress=88.0,
-            fallback_message="Persisting catalog updates",
-        )
-        self.report_phase_by_target(
-            job_id=job_id,
-            target="rxnav",
-            phase="finalization",
-            progress=96.0,
-            fallback_message="Finalizing update",
-        )
-        self.report_phase_by_target(
-            job_id=job_id,
-            target="rxnav",
-            phase="completed",
-            progress=100.0,
-            fallback_message="Completed",
-        )
-        return {"summary": result}
+        return self.update_job_runner.run_rxnav_update_job(job_id, overrides)
 
     # -------------------------------------------------------------------------
     def run_livertox_update_job(
         self, job_id: str, overrides: dict[str, Any] | None = None
     ) -> dict[str, Any]:
-        stop_check = partial(self.jobs.should_stop, job_id)
-        progress_callback = DataInspectionProgressReporter(service=self, job_id=job_id)
-        override_values = overrides or {}
-        self.report_phase_by_target(
-            job_id=job_id,
-            target="livertox",
-            phase="configuration_accepted",
-            progress=1.0,
-            fallback_message="Configuration accepted",
-        )
-        if stop_check():
-            return {}
-        self.report_phase_by_target(
-            job_id=job_id,
-            target="livertox",
-            phase="update_started",
-            progress=4.0,
-            fallback_message="LiverTox update started",
-        )
-        updater = LiverToxUpdater(
-            ARCHIVES_PATH,
-            redownload=bool(override_values.get("redownload", False)),
-            serializer=self.serializer,
-            archive_name=override_values.get("livertox_archive"),
-            monograph_max_workers=override_values.get("livertox_monograph_max_workers"),
-        )
-        self.report_phase_by_target(
-            job_id=job_id,
-            target="livertox",
-            phase="source_data_loading",
-            progress=10.0,
-            fallback_message="Loading source archive",
-        )
-        result = updater.update_from_livertox(
-            progress_callback=progress_callback,
-            should_stop=stop_check,
-        )
-        self.report_phase_by_target(
-            job_id=job_id,
-            target="livertox",
-            phase="persistence_indexing",
-            progress=88.0,
-            fallback_message="Persisting extracted data",
-        )
-        self.report_phase_by_target(
-            job_id=job_id,
-            target="livertox",
-            phase="finalization",
-            progress=96.0,
-            fallback_message="Finalizing update",
-        )
-        self.report_phase_by_target(
-            job_id=job_id,
-            target="livertox",
-            phase="completed",
-            progress=100.0,
-            fallback_message="Completed",
-        )
-        return {"summary": result}
+        return self.update_job_runner.run_livertox_update_job(job_id, overrides)
 
     # -------------------------------------------------------------------------
     def run_rag_update_job(
         self, job_id: str, overrides: dict[str, Any] | None = None
     ) -> dict[str, Any]:
-        stop_check = partial(self.jobs.should_stop, job_id)
-        override_values = overrides or {}
-        self.report_phase_by_target(
-            job_id=job_id,
-            target="rag",
-            phase="configuration_accepted",
-            progress=1.0,
-            fallback_message="Configuration accepted",
-        )
-        if stop_check():
-            return {}
-        self.report_phase_by_target(
-            job_id=job_id,
-            target="rag",
-            phase="update_started",
-            progress=4.0,
-            fallback_message="RAG update started",
-        )
-        updater = RagEmbeddingUpdater(
-            documents_path=override_values.get("documents_path"),
-            use_cloud_embeddings=override_values.get("use_cloud_embeddings"),
-            cloud_provider=override_values.get("cloud_provider"),
-            cloud_embedding_model=override_values.get("cloud_embedding_model"),
-            chunk_size=override_values.get("chunk_size"),
-            chunk_overlap=override_values.get("chunk_overlap"),
-            embedding_batch_size=override_values.get("embedding_batch_size"),
-            vector_stream_batch_size=override_values.get("vector_stream_batch_size"),
-            embedding_max_workers=override_values.get("embedding_max_workers"),
-            embedding_backend=override_values.get("embedding_backend"),
-            ollama_embedding_model=override_values.get("ollama_embedding_model"),
-            hf_embedding_model=override_values.get("hf_embedding_model"),
-            reset_vector_collection=override_values.get("reset_vector_collection"),
-            progress_callback=lambda progress, message: self.report_job_progress(
-                job_id=job_id,
-                progress=progress,
-                message=message,
-            ),
-        )
-        self.report_phase_by_target(
-            job_id=job_id,
-            target="rag",
-            phase="source_data_loading",
-            progress=12.0,
-            fallback_message="Loading source documents",
-        )
-        updater.prepare_vector_database()
-        if stop_check():
-            return {}
-        self.report_phase_by_target(
-            job_id=job_id,
-            target="rag",
-            phase="processing_extraction",
-            progress=30.0,
-            fallback_message="Generating embeddings",
-        )
-        result = updater.refresh_embeddings()
-        documents_count = int(result.get("documents", 0) or 0)
-        chunks_count = int(result.get("chunks", 0) or 0)
-        supported_files = int(result.get("supported_files", 0) or 0)
-        if chunks_count <= 0:
-            sample_paths = result.get("sample_supported_paths", [])
-            sample_details = ""
-            if isinstance(sample_paths, list) and sample_paths:
-                rendered = ", ".join(str(entry) for entry in sample_paths[:3])
-                sample_details = f" Sample files: {rendered}."
-            if supported_files > 0:
-                raise ValueError(
-                    f"RAG update produced zero chunks from {supported_files} supported files. "
-                    "Verify document text extraction support and source contents."
-                    f"{sample_details}"
-                )
-            raise ValueError(
-                "RAG update found zero supported files in the selected folder."
-            )
-        self.write_rag_manifest(
-            documents_path=updater.documents_path,
-            summary=result,
-        )
-        self.report_phase_by_target(
-            job_id=job_id,
-            target="rag",
-            phase="persistence_indexing",
-            progress=90.0,
-            fallback_message="Persisting embeddings and index",
-        )
-        self.report_phase_by_target(
-            job_id=job_id,
-            target="rag",
-            phase="finalization",
-            progress=96.0,
-            fallback_message="Finalizing update",
-        )
-        self.report_phase_by_target(
-            job_id=job_id,
-            target="rag",
-            phase="completed",
-            progress=100.0,
-            fallback_message="Completed",
-        )
-        backend = (
-            "cloud" if bool(override_values.get("use_cloud_embeddings")) else "local"
-        )
-        result_with_backend = {
-            **result,
-            "backend": backend,
-            "documents": documents_count,
-            "chunks": chunks_count,
-            "supported_files": supported_files,
-        }
-        return {"summary": result_with_backend}
+        return self.update_job_runner.run_rag_update_job(job_id, overrides)
 
     # -------------------------------------------------------------------------
     def start_update_job(
@@ -1197,6 +950,7 @@ class DataInspectionService:
         status_payload = self.jobs.get_job_status(job_id)
         if status_payload is None:
             raise RuntimeError(f"Failed to initialize {job_type} job")
+        status_payload["poll_interval"] = get_server_settings().jobs.polling_interval
         return status_payload
 
     # -------------------------------------------------------------------------

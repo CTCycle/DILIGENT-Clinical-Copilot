@@ -660,7 +660,7 @@ class AccessKey(Base):
 
     __table_args__ = (
         CheckConstraint(
-            "provider IN ('openai', 'gemini', 'openrouter')",
+            "provider IN ('openai', 'gemini', 'brave')",
             name="ck_access_keys_provider",
         ),
         Index("ix_access_keys_provider", "provider"),

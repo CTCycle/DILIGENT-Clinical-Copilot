@@ -154,6 +154,7 @@ Inspection:
   - Endpoint classes are wired inline during router setup and do not retain named module-level service globals.
 - Service layer (`app/server/services/*`)
   - Clinical orchestration, model orchestration, inspection workflows, job control.
+  - Inspection update orchestration is implemented in `app/server/services/inspection/update_jobs.py` through `DataInspectionUpdateJobRunner`, while `DataInspectionService` remains the endpoint-facing facade.
   - `app/server/services/text/vocabulary.py` provides cache-facing text-normalization business access and does not manage SQLAlchemy sessions directly.
 - Domain models (`app/server/domain/*`)
   - Pydantic/domain request-response schemas and typed contracts.
@@ -161,6 +162,7 @@ Inspection:
 - Runtime job state is internal and lives in `app/server/services/runtime/state.py`; it is not a domain contract and must not be imported by endpoints.
 - Repository layer (`app/server/repositories/*`)
   - SQL persistence, serialization, vector store access.
+  - Access key persistence mapping and active key value retrieval stay in `app/server/repositories/serialization/access_keys.py`.
   - Reference catalog persistence/seeding is implemented through `reference_catalog_entries` and `reference_catalog_seed_runs` via `app/server/repositories/serialization/catalogs.py`.
 - Config/common layers (`app/server/configurations/*`, `app/server/common/*`)
   - Runtime settings, constants, environment/bootstrap, logging.
@@ -239,5 +241,7 @@ Endpoint -> service -> repository:
 
 - `/api` is the stable frontend-backend boundary (`API_BASE_URL="/api"` in frontend constants).
 - Runtime settings come from `settings/.env` and `settings/configurations.json`.
+- Runtime settings are accessed through `get_server_settings()` (no `server_settings` proxy alias path).
 - Runtime and security helpers have canonical service modules; transitional shims are not maintained.
+- Supported external access-key providers are `openai`, `gemini`, and `brave`.
 - No containerized runtime is currently implemented (no Dockerfile/compose in repository).
