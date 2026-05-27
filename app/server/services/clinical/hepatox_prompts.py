@@ -160,15 +160,21 @@ class HepatotoxicityPatternAnalyzer:
         score = self.calculate_hepatotoxicity_pattern(lab_timeline)
         if score.r_score is None:
             issue = PipelineIssue(
-                severity="error",
+                severity="warning",
                 code="missing_hepatotoxicity_inputs",
                 message=(
-                    "Provide laboratory data sufficient to determine hepatotoxicity pattern, "
-                    "ideally dated ALT or AST, ALP, and bilirubin."
+                    "Laboratory data are insufficient for a numeric R ratio "
+                    "(ideally ALT/AST, ALP, and bilirubin). Continuing with "
+                    "indeterminate pattern and reduced confidence."
                 ),
                 field="laboratory_analysis",
             )
-            raise ClinicalPipelineValidationError(issues=[issue], message=issue.message)
+            self.r_score = None
+            return HepatotoxicityPatternAssessment(
+                score=score,
+                status="undetermined_due_to_missing_labs",
+                issues=[issue],
+            )
         self.r_score = score.r_score
         return HepatotoxicityPatternAssessment(
             score=score,

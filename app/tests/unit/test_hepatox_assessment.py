@@ -71,12 +71,12 @@ def test_assess_payload_raises_when_labs_missing_and_not_overridden() -> None:
     analyzer = HepatotoxicityPatternAnalyzer()
     timeline = PatientLabTimeline(entries=[])
 
-    with pytest.raises(ClinicalPipelineValidationError) as exc_info:
-        analyzer.assess_payload(timeline)
+    assessment = analyzer.assess_payload(timeline)
 
-    assert any(
-        issue.code == "missing_hepatotoxicity_inputs" for issue in exc_info.value.issues
-    )
+    assert assessment.status == "undetermined_due_to_missing_labs"
+    assert assessment.score.classification == "indeterminate"
+    assert any(issue.code == "missing_hepatotoxicity_inputs" for issue in assessment.issues)
+    assert any(issue.severity == "warning" for issue in assessment.issues)
 
 
 def test_evaluate_suspension_marks_anamnesis_mentions_as_uncertain_exposure() -> None:

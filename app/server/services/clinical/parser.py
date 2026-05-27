@@ -79,6 +79,14 @@ class DrugsParser:
     NON_DRUG_CONTAINS = NON_DRUG_CONTAINS
     WEEKDAY_TOKENS = WEEKDAY_TOKENS
     NON_THERAPY_LINE_PREFIXES = NON_THERAPY_LINE_PREFIXES
+    LAB_MEASUREMENT_NAME_RE = re.compile(
+        r"\b(?:u/l|ui/l|mg/dl|g/l|mmol/l|micromol|µmol|x10\^?\d+|uln)\b",
+        re.IGNORECASE,
+    )
+    LAB_MARKER_NAME_RE = re.compile(
+        r"\b(?:alt|alat|ast|asat|alp|ggt|bilirubin|bilirubina|inr)\b",
+        re.IGNORECASE,
+    )
 
     def __init__(
         self,
@@ -861,6 +869,9 @@ class DrugsParser:
         embedded_aliases = (
             ("co amoxicillina", "Co-Amoxicillina"),
             ("co amoxi", "Co-Amoxicillina"),
+            ("valaciclovir", "Valaciclovir"),
+            ("valacyclovir", "Valaciclovir"),
+            ("bactrim", "Bactrim"),
         )
         for alias, replacement in embedded_aliases:
             if alias in normalized:
@@ -900,6 +911,36 @@ class DrugsParser:
         )
         weekday_tokens = set(self.WEEKDAY_TOKENS) | set(snapshot.drug_weekday_words)
         duration_words = set(snapshot.drug_duration_words)
+        non_drug_tokens = {
+            "il",
+            "dal",
+            "dalla",
+            "dalle",
+            "kg",
+            "mg",
+            "ml",
+            "ui",
+            "per",
+            "os",
+            "iv",
+            "sc",
+            "die",
+            "giorno",
+            "giorni",
+            "settimana",
+            "settimane",
+            "mese",
+            "mesi",
+            "terapia",
+            "terapie",
+            "farmacoterapia",
+            "eseguite",
+            "eseguita",
+            "iniziato",
+            "iniziata",
+            "sospeso",
+            "sospesa",
+        }
         if not normalized:
             return True
         if normalized in non_drug_exact:
@@ -915,6 +956,17 @@ class DrugsParser:
             return True
         if tokens and all(token in weekday_tokens for token in tokens):
             return True
+        if tokens and all(token in non_drug_tokens for token in tokens):
+            return True
+        if len(tokens) <= 3 and tokens[:2] == ["terapie", "eseguite"]:
+            return True
+        if any(char.isdigit() for char in normalized):
+            # Guardrail: numeric-heavy fragments that look like lab measurements
+            # are frequently LLM extraction artefacts, not medication names.
+            if self.LAB_MEASUREMENT_NAME_RE.search(normalized) is not None:
+                return True
+            if self.LAB_MARKER_NAME_RE.search(normalized) is not None:
+                return True
         return False
 
     # -------------------------------------------------------------------------
