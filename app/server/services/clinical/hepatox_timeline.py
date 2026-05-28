@@ -1,4 +1,6 @@
 # ruff: noqa: F405
+from datetime import datetime
+
 from services.clinical.hepatox_assessment import *  # noqa: F403
 
 # Extracted from the facade helper module; functions intentionally accept the facade instance.
