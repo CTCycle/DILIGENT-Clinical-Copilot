@@ -3,7 +3,7 @@ from __future__ import annotations
 import pytest
 from domain.clinical.entities import ClinicalSessionRequest
 from fastapi import HTTPException
-from services.session.session_request_validation import (
+from services.session.request_validation import (
     validate_clinical_session_request,
 )
 

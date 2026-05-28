@@ -14,7 +14,7 @@ ALLOWED_DATACLASS_OUTSIDE_DOMAIN = {
     (SERVER_ROOT / "services" / "runtime" / "state.py").resolve(),
 }
 ALLOWED_FASTAPI_IMPORTS_IN_SERVICES = {
-    (SERVER_ROOT / "services" / "session" / "session_request_validation.py").resolve(),
+    (SERVER_ROOT / "services" / "session" / "request_validation.py").resolve(),
 }
 EXCLUDED_DIRS = {
     "__pycache__",
