@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import asyncio
 from datetime import date
+from types import SimpleNamespace
 from typing import Any
 
 from domain.clinical import (
@@ -53,7 +54,9 @@ class FlakyDiseaseClient:
         )
 
 
-def test_extract_diseases_from_anamnesis_deduplicates_and_keeps_rich_entry() -> None:
+def test_extract_diseases_from_anamnesis_deduplicates_and_keeps_rich_entry(
+    monkeypatch,
+) -> None:
     client = FakeDiseaseClient(
         [
             PatientDiseaseContext(
@@ -89,6 +92,13 @@ def test_extract_diseases_from_anamnesis_deduplicates_and_keeps_rich_entry() -> 
         ]
     )
     extractor = DiseaseExtractor(client=client)
+    monkeypatch.setattr(
+        "services.clinical.disease.extract_deterministic_diseases",
+        lambda _text: SimpleNamespace(
+            context=PatientDiseaseContext(entries=[]),
+            unresolved_lines=["Anamnesis line."] * 300,
+        ),
+    )
     anamnesis = "\n".join(["Anamnesis line."] * 300)
 
     parsed = asyncio.run(extractor.extract_diseases_from_anamnesis(anamnesis))
@@ -107,10 +117,19 @@ def test_extract_diseases_from_anamnesis_deduplicates_and_keeps_rich_entry() -> 
     assert steatosis.hepatic_related is True
 
 
-def test_extract_diseases_from_anamnesis_retries_transient_failures() -> None:
+def test_extract_diseases_from_anamnesis_retries_transient_failures(
+    monkeypatch,
+) -> None:
     client = FlakyDiseaseClient(failures_before_success=1)
     extractor = DiseaseExtractor(client=client)
     extractor.extraction_retry_attempts = 2
+    monkeypatch.setattr(
+        "services.clinical.disease.extract_deterministic_diseases",
+        lambda _text: SimpleNamespace(
+            context=PatientDiseaseContext(entries=[]),
+            unresolved_lines=["Steatosi epatica cronica."],
+        ),
+    )
 
     parsed = asyncio.run(
         extractor.extract_diseases_from_anamnesis("Steatosi epatica cronica.")
@@ -158,10 +177,11 @@ def test_build_structured_clinical_context_includes_disease_timeline() -> None:
         pattern_score=pattern_score,
     )
 
-    assert "# Structured Disease Timeline (from Anamnesis)" in context
-    assert (
-        "Steatosis | occurrence: 2023 | chronic: yes | hepatic-related: yes" in context
-    )
-    assert "# Visit Date Anchor" in context
+    assert "# Disease Timeline" in context
+    assert "Steatosis | time=2023 | chronic=yes | hepatic=yes" in context
+    assert "# Visit Date" in context
+    assert "# Onset Anchor" in context
+    assert "# Pattern" in context
     assert "2025-04-14" in context
+    assert "class=mixed | R=1.67" in context
 

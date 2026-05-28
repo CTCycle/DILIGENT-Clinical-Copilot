@@ -61,3 +61,19 @@ def test_runtime_timeouts_floor_to_positive_values() -> None:
     assert settings["livertox_llm_timeout"] == 1.0
     assert settings["ollama_server_start_timeout"] == 1.0
 
+
+def test_runtime_timeouts_allow_long_clinical_budget_without_legacy_cap() -> None:
+    payload = build_settings_payload_from_json(
+        {
+            "runtime": {
+                "default_llm_timeout": 7200.0,
+                "clinical_llm_timeout": 9000.0,
+            }
+        },
+        _env(),
+    )
+    settings = payload["runtime"]
+
+    assert settings["default_llm_timeout"] == 7200.0
+    assert settings["clinical_llm_timeout"] == 7200.0
+

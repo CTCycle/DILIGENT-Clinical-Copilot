@@ -22,6 +22,8 @@ from services.text.normalization import normalize_drug_query_name
 
 ###############################################################################
 class ClinicalSessionFormattingMixin:
+    NOT_AVAILABLE_TOKEN = "n/a"
+
     @staticmethod
     def serialize_validation_errors(
         errors: Sequence[ErrorDetails],
@@ -99,7 +101,7 @@ class ClinicalSessionFormattingMixin:
     @staticmethod
     def format_structured_diseases(disease_context: PatientDiseaseContext) -> list[str]:
         if not disease_context.entries:
-            return ["- None detected."]
+            return ["- n/a"]
         lines: list[str] = []
         for entry in disease_context.entries:
             if not isinstance(entry, DiseaseContextEntry):
@@ -107,44 +109,52 @@ class ClinicalSessionFormattingMixin:
             occurrence = entry.occurrence_time or "unknown"
             chronic = coerce_bool_or_unknown(entry.chronic)
             hepatic_related = coerce_bool_or_unknown(entry.hepatic_related)
-            evidence = entry.evidence or "Not reported."
+            evidence = entry.evidence or ClinicalSessionFormattingMixin.NOT_AVAILABLE_TOKEN
             lines.append(
-                f"- {entry.name} | occurrence: {occurrence} | chronic: {chronic} | hepatic-related: {hepatic_related} | evidence: {evidence}"
+                f"- {entry.name} | time={occurrence} | chronic={chronic} | hepatic={hepatic_related} | evidence={evidence}"
             )
-        return lines or ["- None detected."]
+        return lines or ["- n/a"]
 
     @staticmethod
     def format_lab_timeline(lab_timeline: PatientLabTimeline) -> list[str]:
         if not lab_timeline.entries:
-            return ["- None extracted."]
+            return ["- n/a"]
         lines: list[str] = []
         for entry in lab_timeline.entries:
             if not isinstance(entry, ClinicalLabEntry):
                 continue
             date_token = entry.sample_date or entry.relative_time or "unknown_time"
             value_token = (
-                entry.value if entry.value is not None else (entry.value_text or "n/a")
+                entry.value
+                if entry.value is not None
+                else (entry.value_text or ClinicalSessionFormattingMixin.NOT_AVAILABLE_TOKEN)
             )
             uln_token = (
                 entry.upper_limit_normal
                 if entry.upper_limit_normal is not None
-                else (entry.upper_limit_text or "n/a")
+                else (
+                    entry.upper_limit_text
+                    or ClinicalSessionFormattingMixin.NOT_AVAILABLE_TOKEN
+                )
             )
             lines.append(
-                f"- {date_token} | {entry.marker_name}: {value_token} (ULN: {uln_token}) | source: {entry.source}"
+                f"- {date_token} | {entry.marker_name}={value_token} | ULN={uln_token} | src={entry.source}"
             )
-        return lines or ["- None extracted."]
+        return lines or ["- n/a"]
 
     @staticmethod
     def format_onset_context(
         onset_context: LiverInjuryOnsetContext | None,
     ) -> list[str]:
         if onset_context is None:
-            return ["- Onset anchor unavailable."]
+            return ["- n/a"]
         return [
-            f"- Onset date: {onset_context.onset_date or 'Not available'}",
-            f"- Onset basis: {onset_context.onset_basis}",
-            f"- Evidence: {onset_context.evidence or 'Not reported.'}",
+            (
+                "- "
+                f"date={onset_context.onset_date or ClinicalSessionFormattingMixin.NOT_AVAILABLE_TOKEN}"
+                f" | basis={onset_context.onset_basis}"
+                f" | evidence={onset_context.evidence or ClinicalSessionFormattingMixin.NOT_AVAILABLE_TOKEN}"
+            ),
         ]
 
     @staticmethod
@@ -169,38 +179,50 @@ class ClinicalSessionFormattingMixin:
             if isinstance(entry.name, str) and entry.name.strip()
         ]
         lines: list[str] = [
-            "# Clinical Context",
-            f"Anamnesis: {(payload.anamnesis or '').strip() or 'Not provided.'}",
+            "# Case Context",
+            f"A: {(payload.anamnesis or '').strip() or ClinicalSessionFormattingMixin.NOT_AVAILABLE_TOKEN}",
             "",
-            "# Laboratory Analysis (Raw)",
-            (payload.laboratory_analysis or "").strip() or "Not provided.",
+            "# Raw Labs",
+            (payload.laboratory_analysis or "").strip()
+            or ClinicalSessionFormattingMixin.NOT_AVAILABLE_TOKEN,
             "",
-            "# Therapy List (Raw)",
-            (payload.drugs or "").strip() or "Not provided.",
+            "# Raw Therapy",
+            (payload.drugs or "").strip()
+            or ClinicalSessionFormattingMixin.NOT_AVAILABLE_TOKEN,
             "",
             "# Detected Drugs",
-            f"- Therapy: {', '.join(therapy_mentions) if therapy_mentions else 'None'}",
-            f"- Anamnesis: {', '.join(anamnesis_mentions) if anamnesis_mentions else 'None'}",
-            "",
-            "# Structured Disease Timeline (from Anamnesis)",
-            *ClinicalSessionFormattingMixin.format_structured_diseases(disease_context),
-            "",
-            "# Longitudinal Laboratory Timeline",
-            *ClinicalSessionFormattingMixin.format_lab_timeline(lab_timeline),
-            "",
-            "# Estimated Liver Injury Onset Anchor",
-            *ClinicalSessionFormattingMixin.format_onset_context(onset_context),
-            "",
-            "# Visit Date Anchor",
             (
-                f"- Visit date: {payload.visit_date.isoformat()}"
-                if payload.visit_date
-                else "- Visit date: Not provided."
+                f"- therapy={', '.join(therapy_mentions)}"
+                if therapy_mentions
+                else f"- therapy={ClinicalSessionFormattingMixin.NOT_AVAILABLE_TOKEN}"
+            ),
+            (
+                f"- anamnesis={', '.join(anamnesis_mentions)}"
+                if anamnesis_mentions
+                else f"- anamnesis={ClinicalSessionFormattingMixin.NOT_AVAILABLE_TOKEN}"
             ),
             "",
-            "# Hepatotoxicity Pattern",
-            f"- Classification: {getattr(pattern_score, 'classification', 'indeterminate')}",
-            f"- R score: {getattr(pattern_score, 'r_score', None)}",
+            "# Disease Timeline",
+            *ClinicalSessionFormattingMixin.format_structured_diseases(disease_context),
+            "",
+            "# Lab Timeline",
+            *ClinicalSessionFormattingMixin.format_lab_timeline(lab_timeline),
+            "",
+            "# Onset Anchor",
+            *ClinicalSessionFormattingMixin.format_onset_context(onset_context),
+            "",
+            "# Visit Date",
+            (
+                f"- {payload.visit_date.isoformat()}"
+                if payload.visit_date
+                else f"- {ClinicalSessionFormattingMixin.NOT_AVAILABLE_TOKEN}"
+            ),
+            "",
+            "# Pattern",
+            (
+                f"- class={getattr(pattern_score, 'classification', 'indeterminate')}"
+                f" | R={getattr(pattern_score, 'r_score', ClinicalSessionFormattingMixin.NOT_AVAILABLE_TOKEN)}"
+            ),
         ]
         return "\n".join(lines).strip()
 

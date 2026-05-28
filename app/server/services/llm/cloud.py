@@ -503,7 +503,6 @@ class CloudLLMClient:
         parser = StructuredOutputParser(schema=schema)
         format_instructions = parser.get_format_instructions()
         resolved_model = model or (self.default_model or "")
-        system_with_format = f"{system_prompt.strip()}\n\n{format_instructions}"
         messages = self.build_structured_messages(
             system_prompt=system_prompt,
             user_prompt=user_prompt,
@@ -514,7 +513,7 @@ class CloudLLMClient:
             try:
                 return await self._structured_openai(
                     model=resolved_model,
-                    system_prompt=system_with_format,
+                    system_prompt=system_prompt,
                     user_prompt=user_prompt,
                     schema=schema,
                     temperature=temperature,
@@ -535,7 +534,7 @@ class CloudLLMClient:
                         else {"temperature": temperature}
                     ),
                     messages=[
-                        {"role": "system", "content": system_with_format},
+                        {"role": "system", "content": system_prompt.strip()},
                         {"role": "user", "content": user_prompt},
                     ],
                     schema=schema,
