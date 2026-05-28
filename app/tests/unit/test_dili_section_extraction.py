@@ -78,6 +78,21 @@ def test_accepts_common_variants() -> None:
     assert missing_required_section_names(sections) == []
 
 
+def test_mixed_language_therapy_heading_is_inferred_from_section_body() -> None:
+    text = (
+        "## Anamnesis\n"
+        "Paziente con anamnesi oncologica complessa.\n\n"
+        "## Terapia farmacologica\n"
+        "Fortecortin 4 mg cpr 1-0-0-0\n"
+        "De-Ursil 150 mg caps 1-0-1-0 per os\n\n"
+        "## Laboratory Analysis\n"
+        "ALT 730 U/L, AST 385 U/L, Bil tot 51.6 umol/L."
+    )
+    sections = extract_required_dili_sections(text)
+    assert missing_required_section_names(sections) == []
+    assert "Fortecortin" in sections["therapy"].text
+
+
 def test_rejects_missing_required_section() -> None:
     text = "## Anamnesis\nA\n\n## Therapy\nT"
     sections = extract_required_dili_sections(text)
