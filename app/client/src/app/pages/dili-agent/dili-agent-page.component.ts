@@ -40,6 +40,14 @@ const STAGE_FALLBACK_LABELS: Record<string, string> = {
   report_composition: 'Step 11/12 - Drafting integrated clinical assessment and recommendations',
   finalization: 'Step 12/12 - Final consistency checks and session persistence',
 };
+const CLINICAL_INPUT_TEMPLATE_FALLBACK = `Chief concern:
+History of present illness:
+Current medications (dose/start date):
+Recent labs (ALT/AST/ALP/Total bilirubin with dates):
+Relevant imaging or procedures:
+Comorbidities / liver risk factors:
+Timeline of symptoms and treatment changes:
+Working clinical question:`;
 
 function isTerminalJobStatus(status: JobStatus | null): boolean {
   return status === 'completed' || status === 'failed' || status === 'cancelled';
@@ -141,9 +149,9 @@ export class DiliAgentPageComponent implements OnDestroy {
         this.clinicalInputTemplate.set(response.template.trim());
         return;
       }
-    } catch {
-      this.clinicalInputTemplate.set('');
     }
+    catch {}
+    this.clinicalInputTemplate.set(CLINICAL_INPUT_TEMPLATE_FALLBACK);
   }
 
   handleVisitDateChange(value: string): void {
