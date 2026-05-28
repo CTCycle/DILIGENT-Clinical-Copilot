@@ -34,4 +34,3 @@ class SessionKnowledgeBundle:
     matched_drugs: list[DrugClinicalAssessment]
     matched_drugs_payload: list[dict[str, Any]]
     clinical_context: str
-

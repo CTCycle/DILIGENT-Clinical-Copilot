@@ -106,4 +106,3 @@ def test_prepare_inputs_handles_missing_livertox_monographs() -> None:
     assert prepared is not None
     payload = next(iter(prepared.resolved_drugs.values()))
     assert "livertox_monographs" in payload
-

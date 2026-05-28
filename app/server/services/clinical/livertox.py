@@ -432,7 +432,7 @@ class LiverToxData:
             return -1
         try:
             return int(value)
-        except (TypeError, ValueError):
+        except TypeError, ValueError:
             return -1
 
     # -------------------------------------------------------------------------
@@ -508,4 +508,3 @@ class LiverToxData:
                 yield SimpleNamespace(**mapping)
             return
         return
-

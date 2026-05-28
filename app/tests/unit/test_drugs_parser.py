@@ -173,7 +173,9 @@ def test_extract_drugs_from_therapy_keeps_continuation_lines_with_drug_blocks() 
     ]
 
 
-def test_extract_drugs_from_therapy_uses_rules_before_llm_for_structured_blocks() -> None:
+def test_extract_drugs_from_therapy_uses_rules_before_llm_for_structured_blocks() -> (
+    None
+):
     parser = DrugsParser(client=FailingStructuredClient())
     therapy_text = """
     ■Fortecortin 4 mg cpr
@@ -320,4 +322,3 @@ def test_post_process_llm_entry_splits_dosage_from_temporal_details() -> None:
     assert parsed.suspension_status is True
     assert parsed.suspension_date == "alla comparsa sintomi"
     assert parsed.temporal_classification == "temporal_known"
-

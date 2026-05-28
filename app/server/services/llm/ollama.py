@@ -323,4 +323,3 @@ class OllamaService:
             return ModelListResponse(models=models, count=len(models))
         except (OllamaTimeout, OllamaError, Exception) as exc:
             self.raise_ollama_service_error(exc, action="listing models")
-

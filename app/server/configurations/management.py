@@ -345,7 +345,9 @@ def _build_rag_settings(
         reranker_model=coerce_str(
             data.get("reranker_model"), "cross-encoder/ms-marco-MiniLM-L-6-v2"
         ),
-        hybrid_vector_weight=max(coerce_float(data.get("hybrid_vector_weight"), 0.65), 0.0),
+        hybrid_vector_weight=max(
+            coerce_float(data.get("hybrid_vector_weight"), 0.65), 0.0
+        ),
         hybrid_text_weight=max(coerce_float(data.get("hybrid_text_weight"), 0.35), 0.0),
         embedding_backend=coerce_str(data.get("embedding_backend"), "ollama"),
         ollama_base_url=coerce_str(
@@ -479,4 +481,3 @@ def build_settings_payload_from_json(
         ).model_dump(),
         "llm_defaults": llm_defaults.model_dump(),
     }
-

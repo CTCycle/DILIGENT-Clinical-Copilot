@@ -55,4 +55,3 @@ def reset_environment_bootstrap_for_tests() -> None:
     with state.bootstrap.lock:
         state.bootstrap.bootstrapped = False
     state.dotenv_injected_keys.clear()
-

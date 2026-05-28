@@ -176,4 +176,3 @@ def test_legacy_text_normalization_routes_are_removed() -> None:
     }
     current_paths = {getattr(route, "path", "") for route in app.routes}
     assert legacy_paths.isdisjoint(current_paths)
-

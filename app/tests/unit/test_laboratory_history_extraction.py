@@ -34,7 +34,9 @@ def test_explicit_hepatic_pattern_overrides_calculated_pattern() -> None:
         ),
     )
     timeline, _ = asyncio.run(extractor.extract_from_payload(payload))
-    explicit = extractor.extract_explicit_hepatic_pattern(payload.laboratory_analysis or "")
+    explicit = extractor.extract_explicit_hepatic_pattern(
+        payload.laboratory_analysis or ""
+    )
     calculated = extractor.calculate_hepatic_pattern_from_lab_timeline(timeline)
     assert explicit == "cholestatic"
     assert calculated in {"hepatocellular", "cholestatic", "mixed", None}
@@ -53,4 +55,3 @@ def test_missing_uln_does_not_fabricate_pattern() -> None:
     )
     timeline, _ = asyncio.run(extractor.extract_from_payload(payload))
     assert extractor.calculate_hepatic_pattern_from_lab_timeline(timeline) is None
-

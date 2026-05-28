@@ -312,4 +312,3 @@ class ModelConfigSerializer:
             return None
         normalized = str(value).strip()
         return normalized or None
-

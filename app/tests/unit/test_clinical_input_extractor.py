@@ -50,7 +50,11 @@ def test_fallback_summarized_is_rejected() -> None:
 
     class FakeClient:
         async def llm_structured_call(self, **_: object) -> object:
-            return {"anamnesis": "summary", "therapy": "summary", "lab_analysis": "summary"}
+            return {
+                "anamnesis": "summary",
+                "therapy": "summary",
+                "lab_analysis": "summary",
+            }
 
     extractor = ClinicalInputExtractor(client=FakeClient())
     with pytest.raises(ClinicalInputExtractionError):
@@ -62,7 +66,11 @@ def test_fallback_missing_section_is_rejected() -> None:
 
     class FakeClient:
         async def llm_structured_call(self, **_: object) -> object:
-            return {"anamnesis": "Anamnesis text.", "therapy": "Therapy text.", "lab_analysis": ""}
+            return {
+                "anamnesis": "Anamnesis text.",
+                "therapy": "Therapy text.",
+                "lab_analysis": "",
+            }
 
     extractor = ClinicalInputExtractor(client=FakeClient())
     with pytest.raises(ClinicalInputExtractionError):

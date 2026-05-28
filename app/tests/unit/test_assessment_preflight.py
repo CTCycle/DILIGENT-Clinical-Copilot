@@ -27,12 +27,21 @@ def _valid_input() -> str:
 def test_missing_visit_date_blocks_job_start_before_preprocess(monkeypatch) -> None:
     service = _build_service()
     monkeypatch.setattr(service, "apply_persisted_runtime_configuration", lambda: None)
-    monkeypatch.setattr(service, "validate_clinical_input", lambda req: type("P", (), {"ready": True, "blocking_issues": []})())
-    monkeypatch.setattr("services.session.session_workflow.LLMRuntimeConfig.is_cloud_enabled", lambda: False)
+    monkeypatch.setattr(
+        service,
+        "validate_clinical_input",
+        lambda req: type("P", (), {"ready": True, "blocking_issues": []})(),
+    )
+    monkeypatch.setattr(
+        "services.session.session_workflow.LLMRuntimeConfig.is_cloud_enabled",
+        lambda: False,
+    )
     monkeypatch.setattr(
         service,
         "preprocess_unified_input",
-        lambda request_payload: (_ for _ in ()).throw(AssertionError("preprocess should not run")),
+        lambda request_payload: (_ for _ in ()).throw(
+            AssertionError("preprocess should not run")
+        ),
     )
     request = ClinicalSessionRequest(clinical_input=_valid_input(), visit_date=None)
     with pytest.raises(ServiceValidationError, match="Visit date is required"):
@@ -42,14 +51,25 @@ def test_missing_visit_date_blocks_job_start_before_preprocess(monkeypatch) -> N
 def test_empty_livertox_catalog_blocks_job_start_before_preprocess(monkeypatch) -> None:
     service = _build_service()
     monkeypatch.setattr(service, "apply_persisted_runtime_configuration", lambda: None)
-    monkeypatch.setattr(service, "validate_clinical_input", lambda req: type("P", (), {"ready": True, "blocking_issues": []})())
-    monkeypatch.setattr("services.session.session_workflow.LLMRuntimeConfig.is_cloud_enabled", lambda: False)
+    monkeypatch.setattr(
+        service,
+        "validate_clinical_input",
+        lambda req: type("P", (), {"ready": True, "blocking_issues": []})(),
+    )
+    monkeypatch.setattr(
+        "services.session.session_workflow.LLMRuntimeConfig.is_cloud_enabled",
+        lambda: False,
+    )
     monkeypatch.setattr(
         service,
         "preprocess_unified_input",
-        lambda request_payload: (_ for _ in ()).throw(AssertionError("preprocess should not run")),
+        lambda request_payload: (_ for _ in ()).throw(
+            AssertionError("preprocess should not run")
+        ),
     )
-    monkeypatch.setattr(service.serializer, "list_livertox_catalog", lambda **kwargs: ([], 0))
+    monkeypatch.setattr(
+        service.serializer, "list_livertox_catalog", lambda **kwargs: ([], 0)
+    )
     request = ClinicalSessionRequest(
         clinical_input=_valid_input(),
         visit_date=date(2025, 1, 15),
@@ -61,10 +81,21 @@ def test_empty_livertox_catalog_blocks_job_start_before_preprocess(monkeypatch) 
 def test_empty_rxnav_catalog_blocks_job_start_before_preprocess(monkeypatch) -> None:
     service = _build_service()
     monkeypatch.setattr(service, "apply_persisted_runtime_configuration", lambda: None)
-    monkeypatch.setattr(service, "validate_clinical_input", lambda req: type("P", (), {"ready": True, "blocking_issues": []})())
-    monkeypatch.setattr("services.session.session_workflow.LLMRuntimeConfig.is_cloud_enabled", lambda: False)
-    monkeypatch.setattr(service.serializer, "list_livertox_catalog", lambda **kwargs: ([{"id": 1}], 1))
-    monkeypatch.setattr(service.serializer, "list_rxnav_catalog", lambda **kwargs: ([], 0))
+    monkeypatch.setattr(
+        service,
+        "validate_clinical_input",
+        lambda req: type("P", (), {"ready": True, "blocking_issues": []})(),
+    )
+    monkeypatch.setattr(
+        "services.session.session_workflow.LLMRuntimeConfig.is_cloud_enabled",
+        lambda: False,
+    )
+    monkeypatch.setattr(
+        service.serializer, "list_livertox_catalog", lambda **kwargs: ([{"id": 1}], 1)
+    )
+    monkeypatch.setattr(
+        service.serializer, "list_rxnav_catalog", lambda **kwargs: ([], 0)
+    )
     request = ClinicalSessionRequest(
         clinical_input=_valid_input(),
         visit_date=date(2025, 1, 15),
@@ -76,24 +107,45 @@ def test_empty_rxnav_catalog_blocks_job_start_before_preprocess(monkeypatch) -> 
 def test_malformed_sections_block_job_start(monkeypatch) -> None:
     service = _build_service()
     monkeypatch.setattr(service, "apply_persisted_runtime_configuration", lambda: None)
-    monkeypatch.setattr(service, "validate_clinical_input", lambda req: type("P", (), {"ready": True, "blocking_issues": []})())
-    monkeypatch.setattr("services.session.session_workflow.LLMRuntimeConfig.is_cloud_enabled", lambda: False)
-    monkeypatch.setattr(service.serializer, "list_livertox_catalog", lambda **kwargs: ([{"id": 1}], 1))
-    monkeypatch.setattr(service.serializer, "list_rxnav_catalog", lambda **kwargs: ([{"id": 1}], 1))
+    monkeypatch.setattr(
+        service,
+        "validate_clinical_input",
+        lambda req: type("P", (), {"ready": True, "blocking_issues": []})(),
+    )
+    monkeypatch.setattr(
+        "services.session.session_workflow.LLMRuntimeConfig.is_cloud_enabled",
+        lambda: False,
+    )
+    monkeypatch.setattr(
+        service.serializer, "list_livertox_catalog", lambda **kwargs: ([{"id": 1}], 1)
+    )
+    monkeypatch.setattr(
+        service.serializer, "list_rxnav_catalog", lambda **kwargs: ([{"id": 1}], 1)
+    )
     request = ClinicalSessionRequest(
         clinical_input="ANAMNESIS\nonly anamnesis\n",
         visit_date=date(2025, 1, 15),
     )
-    with pytest.raises(ServiceValidationError, match="Clinical input sections are invalid"):
+    with pytest.raises(
+        ServiceValidationError, match="Clinical input sections are invalid"
+    ):
         start_clinical_job_workflow(service, request)
 
 
-def test_preflight_returns_deterministic_diagnostics_for_complex_input(monkeypatch) -> None:
+def test_preflight_returns_deterministic_diagnostics_for_complex_input(
+    monkeypatch,
+) -> None:
     service = _build_service()
     monkeypatch.setattr(service, "apply_persisted_runtime_configuration", lambda: None)
-    monkeypatch.setattr(service.serializer, "list_livertox_catalog", lambda **kwargs: ([{"id": 1}], 1))
-    monkeypatch.setattr(service.serializer, "list_rxnav_catalog", lambda **kwargs: ([{"id": 1}], 1))
-    monkeypatch.setattr("services.session.preflight._validate_provider_key", lambda blocking: None)
+    monkeypatch.setattr(
+        service.serializer, "list_livertox_catalog", lambda **kwargs: ([{"id": 1}], 1)
+    )
+    monkeypatch.setattr(
+        service.serializer, "list_rxnav_catalog", lambda **kwargs: ([{"id": 1}], 1)
+    )
+    monkeypatch.setattr(
+        "services.session.preflight._validate_provider_key", lambda blocking: None
+    )
     request = ClinicalSessionRequest(
         visit_date=date(2025, 3, 20),
         selected_model_providers=["openai"],

@@ -112,4 +112,3 @@ def test_collect_monographs_honors_cancellation(tmp_path: Path) -> None:
         livertox_module.collect_monographs(
             updater, str(archive_path), should_stop=lambda: True
         )
-

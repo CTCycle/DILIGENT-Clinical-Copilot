@@ -45,4 +45,6 @@ def test_candidate_selection_accepts_past_localized_therapy_dates() -> None:
             "reason": "Active or plausibly timed exposure with aligned relevance.",
         }
     ]
-    assert [entry.name for entry in selected.ordered_analysis_drugs.entries] == ["Pastimab"]
+    assert [entry.name for entry in selected.ordered_analysis_drugs.entries] == [
+        "Pastimab"
+    ]

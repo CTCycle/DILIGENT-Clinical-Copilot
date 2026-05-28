@@ -75,5 +75,3 @@ def test_sqlite_repository_does_not_seed_catalogs_during_construction(
             select(func.count()).select_from(ReferenceCatalogEntry)
         ).scalar_one()
     assert int(catalog_entries) == 0
-
-

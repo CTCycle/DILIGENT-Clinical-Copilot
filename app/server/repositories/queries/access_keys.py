@@ -11,10 +11,11 @@ AccessKeyTable = type[AccessKey]
 
 ###############################################################################
 class AccessKeyRepositoryQueries:
-
     # -------------------------------------------------------------------------
     @staticmethod
-    def list_for_provider(table: AccessKeyTable, provider: str) -> Select[tuple[AccessKey]]:
+    def list_for_provider(
+        table: AccessKeyTable, provider: str
+    ) -> Select[tuple[AccessKey]]:
         return (
             select(table)
             .where(table.provider == provider)
@@ -34,7 +35,9 @@ class AccessKeyRepositoryQueries:
 
     # -------------------------------------------------------------------------
     @staticmethod
-    def active_for_provider(table: AccessKeyTable, provider: str) -> Select[tuple[AccessKey]]:
+    def active_for_provider(
+        table: AccessKeyTable, provider: str
+    ) -> Select[tuple[AccessKey]]:
         return (
             select(table)
             .where(
@@ -43,4 +46,3 @@ class AccessKeyRepositoryQueries:
             )
             .order_by(table.updated_at.desc(), table.id.desc())
         )
-

@@ -50,7 +50,9 @@ class CatalogSeedResult:
 
 @dataclass(frozen=True)
 class ReferenceCatalogSnapshot:
-    entries_by_scope: MappingProxyType[tuple[str, str, str, str], tuple[CatalogEntry, ...]]
+    entries_by_scope: MappingProxyType[
+        tuple[str, str, str, str], tuple[CatalogEntry, ...]
+    ]
 
     def entries(
         self,
@@ -70,7 +72,8 @@ class ReferenceCatalogSnapshot:
         locale: str = "und",
     ) -> tuple[str, ...]:
         return tuple(
-            entry.value for entry in self.entries(domain, category, key=key, locale=locale)
+            entry.value
+            for entry in self.entries(domain, category, key=key, locale=locale)
         )
 
     def metadata(

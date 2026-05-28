@@ -66,7 +66,13 @@ class EmbeddingGeneratorStub:
         return type(
             "Spec",
             (),
-            {"provider": "ollama", "model_name": "test", "dimension": 2, "mode": "local", "signature": "sig"},
+            {
+                "provider": "ollama",
+                "model_name": "test",
+                "dimension": 2,
+                "mode": "local",
+                "signature": "sig",
+            },
         )()
 
 
@@ -203,4 +209,3 @@ def test_search_with_reranking_falls_back_when_reranker_fails() -> None:
 
     assert [item.get("text") for item in results] == ["alpha", "beta"]
     assert all("rerank_score" not in item for item in results)
-

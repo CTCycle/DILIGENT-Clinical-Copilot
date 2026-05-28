@@ -26,12 +26,15 @@ def get_text_normalization_snapshot() -> TextNormalizationSnapshot:
                 and entry.category == "query_aliases"
                 and entry.active
             ):
-                query_aliases[normalize_catalog_value(entry.value)] = normalize_catalog_value(
-                    entry.key
+                query_aliases[normalize_catalog_value(entry.value)] = (
+                    normalize_catalog_value(entry.key)
                 )
-            if entry.domain == "drug_matching" and entry.category == "catalog_fallback_aliases":
-                brand_combo_preferences[normalize_catalog_value(entry.value)] = normalize_catalog_value(
-                    entry.key
+            if (
+                entry.domain == "drug_matching"
+                and entry.category == "catalog_fallback_aliases"
+            ):
+                brand_combo_preferences[normalize_catalog_value(entry.value)] = (
+                    normalize_catalog_value(entry.key)
                 )
         manufacturer_tokens = frozenset(
             normalize_catalog_value(value)
@@ -61,7 +64,9 @@ def get_text_normalization_snapshot() -> TextNormalizationSnapshot:
                 | set(snapshot.values("text_normalization", "noisy_phrases"))
             ),
             query_aliases=query_aliases,
-            noisy_phrases=frozenset(snapshot.values("text_normalization", "noisy_phrases")),
+            noisy_phrases=frozenset(
+                snapshot.values("text_normalization", "noisy_phrases")
+            ),
             drug_non_mentions=frozenset(
                 snapshot.values("text_normalization", "drug_non_mentions")
             ),
@@ -121,7 +126,9 @@ def list_text_normalization_term_payloads(
                 try:
                     metadata = json.loads(row.metadata_json)
                     if isinstance(metadata, dict):
-                        replacement = str(metadata.get("replacement") or "").strip() or None
+                        replacement = (
+                            str(metadata.get("replacement") or "").strip() or None
+                        )
                 except json.JSONDecodeError:
                     replacement = None
             payloads.append(
@@ -190,4 +197,3 @@ __all__ = [
     "record_text_normalization_observation",
     "upsert_text_normalization_term_payload",
 ]
-

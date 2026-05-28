@@ -543,4 +543,3 @@ class ClinicalKnowledgePreparation:
             "Treat drugs whose known hepatotoxicity pattern matches this classification as stronger causal candidates, and downgrade mismatches."
         )
         return " ".join(segments)
-

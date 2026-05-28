@@ -5,7 +5,9 @@ from services.retrieval.chunking import SmartDocumentChunker
 
 def test_chunk_ids_and_uid_are_stable() -> None:
     chunker = SmartDocumentChunker(target_chars=40, max_chars=80)
-    text = "Heading.\nThis is sentence one. This is sentence two. This is sentence three."
+    text = (
+        "Heading.\nThis is sentence one. This is sentence two. This is sentence three."
+    )
     chunks_a = chunker.chunk_document(
         text=text,
         file_name="doc.txt",

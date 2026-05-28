@@ -184,4 +184,3 @@ def test_build_structured_clinical_context_includes_disease_timeline() -> None:
     assert "# Pattern" in context
     assert "2025-04-14" in context
     assert "class=mixed | R=1.67" in context
-

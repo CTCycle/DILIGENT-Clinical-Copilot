@@ -193,15 +193,16 @@ def test_livertox_updater_has_no_module_forwarding_wrappers() -> None:
             if (
                 isinstance(function, ast.Attribute)
                 and isinstance(function.value, ast.Name)
-                and function.value.id in {
+                and function.value.id
+                in {
                     "livertox_download",
                     "livertox_index",
                     "livertox_parse",
                 }
             ):
                 violations.append(_format_violation(path, item, "facade wrapper"))
-    assert not violations, "LiverToxUpdater facade wrappers are forbidden:\n" + "\n".join(
-        violations
+    assert not violations, (
+        "LiverToxUpdater facade wrappers are forbidden:\n" + "\n".join(violations)
     )
 
 
@@ -293,7 +294,5 @@ def test_services_do_not_import_sqlalchemy_orm_persistence() -> None:
 
     assert not violations, (
         "SQLAlchemy ORM persistence imports are forbidden under app/server/services; "
-        "use repository-layer abstractions instead:\n"
-        + "\n".join(violations)
+        "use repository-layer abstractions instead:\n" + "\n".join(violations)
     )
-

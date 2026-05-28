@@ -160,7 +160,9 @@ def test_postgresql_initialization_path_seeds_after_schema_creation(
     monkeypatch.setattr(
         initializer, "AccessKeyEncryptionMaterialSerializer", FakeMaterialSerializer
     )
-    monkeypatch.setattr(initializer, "ReferenceCatalogSerializer", FakeCatalogSerializer)
+    monkeypatch.setattr(
+        initializer, "ReferenceCatalogSerializer", FakeCatalogSerializer
+    )
     monkeypatch.setattr(
         initializer,
         "ReferenceCatalogSeeder",
@@ -190,5 +192,3 @@ def test_seeding_does_not_create_duplicate_active_rows(tmp_path, monkeypatch) ->
         ).scalar_one()
 
     assert int(count_rows) == 1
-
-

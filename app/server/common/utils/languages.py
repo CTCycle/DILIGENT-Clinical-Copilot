@@ -92,6 +92,7 @@ def get_language_function_hints() -> dict[str, set[str]]:
 def get_language_diacritic_hints() -> dict[str, set[str]]:
     return _catalog_diacritic_hints()
 
+
 VALIDATION_MESSAGE_BUNDLES: dict[str, dict[str, str]] = {
     "en": {
         "missing_anamnesis": "Provide the anamnesis.",

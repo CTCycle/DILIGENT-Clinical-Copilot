@@ -80,4 +80,3 @@ def ensure_timed_therapy_drug(
         field="drugs",
     )
     raise ClinicalPipelineValidationError(issues=[issue], message=issue.message)
-

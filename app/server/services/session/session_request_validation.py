@@ -17,12 +17,18 @@ def validate_clinical_session_request(request: ClinicalSessionRequest) -> None:
     details: list[dict[str, str]] = []
 
     clinical_input = (request.clinical_input or "").strip()
-    providers = [item.strip() for item in request.selected_model_providers if item and item.strip()]
+    providers = [
+        item.strip()
+        for item in request.selected_model_providers
+        if item and item.strip()
+    ]
 
     if request.visit_date is None:
         details.append({"field": "visit_date", "message": "Visit date is required."})
     if not clinical_input:
-        details.append({"field": "clinical_input", "message": "Clinical input is required."})
+        details.append(
+            {"field": "clinical_input", "message": "Clinical input is required."}
+        )
     elif count_words(clinical_input) < 60:
         details.append(
             {
@@ -39,4 +45,6 @@ def validate_clinical_session_request(request: ClinicalSessionRequest) -> None:
         )
 
     if details:
-        raise HTTPException(status_code=status.HTTP_422_UNPROCESSABLE_ENTITY, detail=details)
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY, detail=details
+        )

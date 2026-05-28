@@ -13,4 +13,3 @@ def get_sensitive_error_tokens() -> tuple[str, ...]:
             key="default",
         )
     )
-

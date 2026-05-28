@@ -18,6 +18,7 @@ from common.utils.languages import (
 from domain.clinical.entities import PatientData
 from domain.clinical.language import LanguageDetectionResult
 
+
 ###############################################################################
 class ClinicalLanguageDetector:
     DEFAULT_THRESHOLDS: dict[str, float] = {
@@ -80,7 +81,7 @@ class ClinicalLanguageDetector:
         try:
             with open(CONFIGURATIONS_FILE, encoding="utf-8") as handle:
                 payload = json.load(handle)
-        except (OSError, TypeError, ValueError):
+        except OSError, TypeError, ValueError:
             return thresholds
 
         config = payload.get("clinical_language_detection")
@@ -163,4 +164,3 @@ class ClinicalLanguageDetector:
 
 
 detect_clinical_language = ClinicalLanguageDetector.detect
-

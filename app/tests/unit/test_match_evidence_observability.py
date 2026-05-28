@@ -85,4 +85,3 @@ def test_knowledge_base_unavailable_issue_is_structured_for_persistence() -> Non
     assert issues[0].code == "knowledge_base_unavailable"
     assert issues[0].field == "knowledge_base"
     assert "RxNav/LiverTox knowledge base is unavailable or empty" in issues[0].message
-

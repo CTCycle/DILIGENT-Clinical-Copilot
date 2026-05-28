@@ -73,7 +73,9 @@ def test_phrase_aware_typo_matching_accepts_heading_typos() -> None:
 
 
 def test_accepts_common_variants() -> None:
-    text = "## Clinical history\nA\n\n## Current medications\nT\n\n## Laboratory tests\nL"
+    text = (
+        "## Clinical history\nA\n\n## Current medications\nT\n\n## Laboratory tests\nL"
+    )
     sections = extract_required_dili_sections(text)
     assert missing_required_section_names(sections) == []
 
@@ -100,9 +102,15 @@ def test_rejects_missing_required_section() -> None:
 
 
 def test_rejects_untitled_prose_inference() -> None:
-    text = "The patient has history and therapy and ALT/ALP values in one paragraph only."
+    text = (
+        "The patient has history and therapy and ALT/ALP values in one paragraph only."
+    )
     sections = extract_required_dili_sections(text)
-    assert missing_required_section_names(sections) == ["anamnesis", "therapy", "laboratory_history"]
+    assert missing_required_section_names(sections) == [
+        "anamnesis",
+        "therapy",
+        "laboratory_history",
+    ]
 
 
 def test_duplicate_competing_headings_raise() -> None:

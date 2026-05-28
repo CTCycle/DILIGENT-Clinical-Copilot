@@ -180,4 +180,3 @@ def test_curated_aliases_are_loaded_and_forwarded_to_serializer(
     assert kwargs["curated_aliases_by_canonical"]["metformin"] == [
         ("Metformina", "synonym")
     ]
-

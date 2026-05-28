@@ -76,12 +76,14 @@ def canonicalize_drug_query(value: str | None) -> str:
     canonical = normalize_whitespace(" ".join(kept_tokens))
     return resolve_known_query_alias(canonical)
 
+
 # ---------------------------------------------------------------------------
 def normalize_drug_query_name(value: str | None) -> str:
     canonical = canonicalize_drug_query(value)
     if not canonical:
         return ""
     return normalize_drug_name(canonical)
+
 
 # -----------------------------------------------------------------------------
 def coerce_text(value: Any) -> str | None:
@@ -98,11 +100,13 @@ def coerce_text(value: Any) -> str | None:
     text = str(value).strip()
     return text or None
 
+
 # -----------------------------------------------------------------------------
 def normalize_whitespace(value: str) -> str:
     if not value:
         return ""
     return re.sub(r"\s+", " ", value).strip()
+
 
 # -----------------------------------------------------------------------------
 def normalize_drug_name(value: str) -> str:
@@ -122,6 +126,7 @@ def normalize_token(token: str) -> str:
         return ""
     return re.sub(r"[.,;:]+$", "", token.lower())
 
+
 # -----------------------------------------------------------------------------
 def strip_manufacturer_suffix_tokens(tokens: list[str]) -> list[str]:
     if not tokens:
@@ -140,6 +145,7 @@ def strip_manufacturer_suffix_tokens(tokens: list[str]) -> list[str]:
             continue
         break
     return trimmed
+
 
 # -----------------------------------------------------------------------------
 def strip_trailing_temporal_tokens(tokens: list[str]) -> list[str]:
@@ -180,4 +186,3 @@ __all__ = [
     "normalize_token",
     "normalize_whitespace",
 ]
-

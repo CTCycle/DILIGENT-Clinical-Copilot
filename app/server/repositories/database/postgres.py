@@ -49,4 +49,3 @@ class PostgresRepository:
         )
         self.session_factory = sessionmaker(bind=self.engine, future=True)
         self.catalogs = ReferenceCatalogSerializer(session_factory=self.session_factory)
-

@@ -44,4 +44,3 @@ def test_parallelization_runner_batch_size_enforced() -> None:
     )
     assert result == [1, 2, 3, 4, 5]
     assert peak <= 2
-

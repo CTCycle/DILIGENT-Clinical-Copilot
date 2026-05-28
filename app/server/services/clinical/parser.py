@@ -148,7 +148,9 @@ class DrugsParser:
     # -------------------------------------------------------------------------
     def _build_lab_measurement_pattern(self) -> re.Pattern[str]:
         snapshot = get_reference_catalog_snapshot()
-        values = list(snapshot.values("clinical_extraction", "lab_measurement_indicators"))
+        values = list(
+            snapshot.values("clinical_extraction", "lab_measurement_indicators")
+        )
         values.extend(snapshot.values("clinical_extraction", "laboratory_uln_labels"))
         escaped = [re.escape(value) for value in values if value]
         if not escaped:
@@ -220,7 +222,9 @@ class DrugsParser:
         prepared = self.clean_text(text)
         if not prepared:
             return ""
-        return "\n".join(line.rstrip() for line in prepared.split("\n") if line.rstrip())
+        return "\n".join(
+            line.rstrip() for line in prepared.split("\n") if line.rstrip()
+        )
 
     # -------------------------------------------------------------------------
     def parse_drug_list(self, text: str | None) -> PatientDrugs:
@@ -395,7 +399,8 @@ class DrugsParser:
                 lines = [
                     block.text.strip()
                     for block in isolate_drug_blocks(text)
-                    if block.text.strip() and not self.is_non_therapy_line(block.text.strip())
+                    if block.text.strip()
+                    and not self.is_non_therapy_line(block.text.strip())
                 ]
                 entries = []
                 for line in lines:
@@ -529,7 +534,11 @@ class DrugsParser:
                 if regimen_entries:
                     entries.extend(regimen_entries)
                     continue
-            if line_has_regimen_signal(line) or re.search(r"\b(antibiotic|antibiotic[ao]|farmac|chemioterap|protocollo)\b", line, re.IGNORECASE):
+            if line_has_regimen_signal(line) or re.search(
+                r"\b(antibiotic|antibiotic[ao]|farmac|chemioterap|protocollo)\b",
+                line,
+                re.IGNORECASE,
+            ):
                 unresolved_lines.append(line)
         return DeterministicDrugExtractionResult(
             entries=self.deduplicate_drug_entries(entries),
@@ -1158,4 +1167,3 @@ class DrugsParser:
             except ValueError:
                 return stripped
         return f"{day.zfill(2)}.{month.zfill(2)}"
-

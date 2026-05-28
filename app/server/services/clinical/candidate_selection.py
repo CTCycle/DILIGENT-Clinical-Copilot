@@ -20,7 +20,11 @@ def _score_drug(entry: DrugEntry, visit_date: date | None) -> int:
     if entry.historical_flag:
         score -= 3
     therapy_start_date = _parse_therapy_date(entry.therapy_start_date)
-    if visit_date is not None and therapy_start_date is not None and therapy_start_date > visit_date:
+    if (
+        visit_date is not None
+        and therapy_start_date is not None
+        and therapy_start_date > visit_date
+    ):
         return min(score - 8, -1)
     return score
 
@@ -45,7 +49,9 @@ def select_relevant_candidates(
     *,
     visit_date: date | None,
 ) -> CandidateSelectionResult:
-    candidates = _deduplicate_candidates([*therapy_drugs.entries, *anamnesis_drugs.entries], visit_date)
+    candidates = _deduplicate_candidates(
+        [*therapy_drugs.entries, *anamnesis_drugs.entries], visit_date
+    )
     scored: list[tuple[DrugEntry, int]] = [
         (entry, _score_drug(entry, visit_date))
         for entry in candidates
@@ -105,4 +111,3 @@ def _deduplicate_candidates(
         if _score_drug(entry, visit_date) > _score_drug(existing, visit_date):
             selected[key] = entry
     return [selected[key] for key in order]
-

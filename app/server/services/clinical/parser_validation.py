@@ -6,9 +6,7 @@ _snapshot = get_reference_catalog_snapshot()
 NON_DRUG_EXACT_NAMES = set(
     _snapshot.values("clinical_extraction", "drug_non_name_exact", key="default")
 )
-NON_DRUG_EXACT_NAMES.update(
-    _snapshot.values("text_normalization", "drug_non_mentions")
-)
+NON_DRUG_EXACT_NAMES.update(_snapshot.values("text_normalization", "drug_non_mentions"))
 NON_DRUG_PREFIXES = tuple(
     _snapshot.values("clinical_extraction", "drug_non_name_prefixes", key="default")
 )

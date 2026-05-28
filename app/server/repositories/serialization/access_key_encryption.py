@@ -166,4 +166,3 @@ class AccessKeyEncryptionMaterialSerializer:
             raise
         finally:
             db_session.close()
-

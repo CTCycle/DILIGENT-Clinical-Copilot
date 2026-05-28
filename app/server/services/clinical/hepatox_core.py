@@ -321,7 +321,7 @@ class HepatoxConsultation:
         self.llm_model = model_candidate or LLMRuntimeConfig.get_clinical_model()
         try:
             chat_signature = inspect.signature(self.llm_client.chat)
-        except (TypeError, ValueError):
+        except TypeError, ValueError:
             chat_signature = None
         self.chat_supports_temperature = (
             chat_signature is not None and "temperature" in chat_signature.parameters
@@ -368,7 +368,15 @@ class HepatoxConsultation:
         rucam_bundle: PatientRucamAssessmentBundle | None = None,
         progress_callback: Callable[[str, float], None] | None = None,
     ) -> dict[str, Any] | None:
-        return await hepatox_assessment.run_analysis(self, prepared_inputs=prepared_inputs, visit_date=visit_date, report_language=report_language, rag_query=rag_query, rucam_bundle=rucam_bundle, progress_callback=progress_callback)
+        return await hepatox_assessment.run_analysis(
+            self,
+            prepared_inputs=prepared_inputs,
+            visit_date=visit_date,
+            report_language=report_language,
+            rag_query=rag_query,
+            rucam_bundle=rucam_bundle,
+            progress_callback=progress_callback,
+        )
 
     # -------------------------------------------------------------------------
     async def compile_clinical_assessment(
@@ -383,7 +391,17 @@ class HepatoxConsultation:
         rucam_bundle: PatientRucamAssessmentBundle | None = None,
         progress_callback: Callable[[str, float], None] | None = None,
     ) -> PatientDrugClinicalReport:
-        return await hepatox_assessment.compile_clinical_assessment(self, resolved_drugs, clinical_context=clinical_context, visit_date=visit_date, report_language=report_language, pattern_prompt=pattern_prompt, rag_query=rag_query, rucam_bundle=rucam_bundle, progress_callback=progress_callback)
+        return await hepatox_assessment.compile_clinical_assessment(
+            self,
+            resolved_drugs,
+            clinical_context=clinical_context,
+            visit_date=visit_date,
+            report_language=report_language,
+            pattern_prompt=pattern_prompt,
+            rag_query=rag_query,
+            rucam_bundle=rucam_bundle,
+            progress_callback=progress_callback,
+        )
 
     # -------------------------------------------------------------------------
     @staticmethod
@@ -410,7 +428,9 @@ class HepatoxConsultation:
         coroutine: Any,
         semaphore: asyncio.Semaphore,
     ) -> tuple[int, Any]:
-        return await hepatox_assessment.execute_bounded_job(self, index, coroutine, semaphore)
+        return await hepatox_assessment.execute_bounded_job(
+            self, index, coroutine, semaphore
+        )
 
     # -------------------------------------------------------------------------
     async def prepare_drug_assessment(
@@ -426,7 +446,18 @@ class HepatoxConsultation:
         rag_query: dict[str, str] | None,
         rucam_by_key: dict[str, DrugRucamAssessment],
     ) -> tuple[DrugClinicalAssessment, tuple[int, Any] | None]:
-        return await hepatox_assessment.prepare_drug_assessment(self, idx=idx, drug_entry=drug_entry, resolved_drugs=resolved_drugs, visit_date=visit_date, report_language=report_language, normalized_context=normalized_context, pattern_summary=pattern_summary, rag_query=rag_query, rucam_by_key=rucam_by_key)
+        return await hepatox_assessment.prepare_drug_assessment(
+            self,
+            idx=idx,
+            drug_entry=drug_entry,
+            resolved_drugs=resolved_drugs,
+            visit_date=visit_date,
+            report_language=report_language,
+            normalized_context=normalized_context,
+            pattern_summary=pattern_summary,
+            rag_query=rag_query,
+            rucam_by_key=rucam_by_key,
+        )
 
     # -------------------------------------------------------------------------
     def resolve_livertox_data_for_entry(
@@ -436,7 +467,12 @@ class HepatoxConsultation:
         normalized_key: str,
         resolved_drugs: dict[str, dict[str, Any]],
     ) -> dict[str, Any]:
-        return hepatox_assessment.resolve_livertox_data_for_entry(self, raw_name=raw_name, normalized_key=normalized_key, resolved_drugs=resolved_drugs)
+        return hepatox_assessment.resolve_livertox_data_for_entry(
+            self,
+            raw_name=raw_name,
+            normalized_key=normalized_key,
+            resolved_drugs=resolved_drugs,
+        )
 
     # -------------------------------------------------------------------------
     @staticmethod
@@ -451,7 +487,9 @@ class HepatoxConsultation:
 
     # -------------------------------------------------------------------------
     def record_rag_retrieval_issue(self, *, drug_name: str, error: Exception) -> None:
-        return hepatox_assessment.record_rag_retrieval_issue(self, drug_name=drug_name, error=error)
+        return hepatox_assessment.record_rag_retrieval_issue(
+            self, drug_name=drug_name, error=error
+        )
 
     # -------------------------------------------------------------------------
     def ensure_similarity_search(self) -> bool:
@@ -479,7 +517,9 @@ class HepatoxConsultation:
         distance: Any,
         rerank_score: Any = None,
     ) -> str:
-        return hepatox_prompts.format_similarity_header(index, distance=distance, rerank_score=rerank_score)
+        return hepatox_prompts.format_similarity_header(
+            index, distance=distance, rerank_score=rerank_score
+        )
 
     # -------------------------------------------------------------------------
     def evaluate_suspension(
@@ -620,7 +660,13 @@ class HepatoxConsultation:
         start_interval_days: int | None,
         visit_date: date | None,
     ) -> str:
-        return hepatox_prompts.format_start_note(self, start_reported=start_reported, start_date=start_date, start_interval_days=start_interval_days, visit_date=visit_date)
+        return hepatox_prompts.format_start_note(
+            self,
+            start_reported=start_reported,
+            start_date=start_date,
+            start_interval_days=start_interval_days,
+            visit_date=visit_date,
+        )
 
     # -------------------------------------------------------------------------
     def humanize_interval(self, days: int) -> str:
@@ -717,7 +763,9 @@ class HepatoxConsultation:
         source_text: str,
         report_language: str,
     ) -> str:
-        return await hepatox_assessment.repair_language_once(self, source_text=source_text, report_language=report_language)
+        return await hepatox_assessment.repair_language_once(
+            self, source_text=source_text, report_language=report_language
+        )
 
     # -------------------------------------------------------------------------
     async def request_drug_analysis(
@@ -739,7 +787,24 @@ class HepatoxConsultation:
         knowledge_prompt: str = "No supplemental knowledge prompt available.",
         report_language: str = "en",
     ) -> str:
-        return await hepatox_assessment.request_drug_analysis(self, drug_name=drug_name, canonical_name=canonical_name, origins=origins, extraction_metadata=extraction_metadata, livertox_status=livertox_status, excerpt=excerpt, rag_documents=rag_documents, clinical_context=clinical_context, suspension=suspension, visit_date=visit_date, pattern_summary=pattern_summary, metadata=metadata, rucam=rucam, knowledge_prompt=knowledge_prompt, report_language=report_language)
+        return await hepatox_assessment.request_drug_analysis(
+            self,
+            drug_name=drug_name,
+            canonical_name=canonical_name,
+            origins=origins,
+            extraction_metadata=extraction_metadata,
+            livertox_status=livertox_status,
+            excerpt=excerpt,
+            rag_documents=rag_documents,
+            clinical_context=clinical_context,
+            suspension=suspension,
+            visit_date=visit_date,
+            pattern_summary=pattern_summary,
+            metadata=metadata,
+            rucam=rucam,
+            knowledge_prompt=knowledge_prompt,
+            report_language=report_language,
+        )
 
     # -------------------------------------------------------------------------
     @staticmethod
@@ -775,7 +840,12 @@ class HepatoxConsultation:
         clinical_context: str | None,
         report_language: str,
     ) -> str | None:
-        return await hepatox_assessment.finalize_patient_report(self, entries, clinical_context=clinical_context, report_language=report_language)
+        return await hepatox_assessment.finalize_patient_report(
+            self,
+            entries,
+            clinical_context=clinical_context,
+            report_language=report_language,
+        )
 
     # -------------------------------------------------------------------------
     @staticmethod
@@ -789,7 +859,9 @@ class HepatoxConsultation:
         *,
         report_language: str = "en",
     ) -> str:
-        return hepatox_prompts.render_matched_drug_section(self, entry, report_language=report_language)
+        return hepatox_prompts.render_matched_drug_section(
+            self, entry, report_language=report_language
+        )
 
     # -------------------------------------------------------------------------
     @staticmethod
@@ -827,7 +899,9 @@ class HepatoxConsultation:
         *,
         report_language: str = "en",
     ) -> str | None:
-        return hepatox_prompts.render_unresolved_mentions_section(self, entries, report_language=report_language)
+        return hepatox_prompts.render_unresolved_mentions_section(
+            self, entries, report_language=report_language
+        )
 
     # -------------------------------------------------------------------------
     def describe_unresolved_entry(
@@ -845,7 +919,12 @@ class HepatoxConsultation:
         multi_drug_report: str,
         report_language: str,
     ) -> str | None:
-        return await hepatox_assessment.generate_conclusion(self, clinical_context=clinical_context, multi_drug_report=multi_drug_report, report_language=report_language)
+        return await hepatox_assessment.generate_conclusion(
+            self,
+            clinical_context=clinical_context,
+            multi_drug_report=multi_drug_report,
+            report_language=report_language,
+        )
 
     # -------------------------------------------------------------------------
     def build_excluded_paragraph(
@@ -865,7 +944,9 @@ class HepatoxConsultation:
         entry: DrugClinicalAssessment,
         report_language: str = "en",
     ) -> str:
-        return hepatox_prompts.build_missing_excerpt_paragraph(self, entry, report_language)
+        return hepatox_prompts.build_missing_excerpt_paragraph(
+            self, entry, report_language
+        )
 
     # -------------------------------------------------------------------------
     def build_ambiguous_match_paragraph(
@@ -873,7 +954,9 @@ class HepatoxConsultation:
         entry: DrugClinicalAssessment,
         report_language: str = "en",
     ) -> str:
-        return hepatox_prompts.build_ambiguous_match_paragraph(self, entry, report_language)
+        return hepatox_prompts.build_ambiguous_match_paragraph(
+            self, entry, report_language
+        )
 
     # -------------------------------------------------------------------------
     def build_error_paragraph(
@@ -917,7 +1000,9 @@ class HepatoxConsultation:
             return "\n".join(lines).strip()
         for entry in lab_timeline.entries:
             marker = entry.marker_name
-            value = entry.value if entry.value is not None else (entry.value_text or "?")
+            value = (
+                entry.value if entry.value is not None else (entry.value_text or "?")
+            )
             unit = entry.unit or ""
             lines.append(f"- {marker}: {value} {unit}".strip())
         return "\n".join(lines).strip()
@@ -933,7 +1018,9 @@ class HepatoxConsultation:
             lines.append(phrase("not_available", language))
             return "\n".join(lines).strip()
         for match in matches:
-            name = str(match.get("matched_livertox_name") or match.get("extracted_name") or "").strip()
+            name = str(
+                match.get("matched_livertox_name") or match.get("extracted_name") or ""
+            ).strip()
             strategy = str(match.get("match_strategy") or "unknown").strip()
             rxnav_validated = bool(match.get("rxnav_validated"))
             status = "rxnav_validated" if rxnav_validated else "rxnav_unvalidated"
@@ -945,4 +1032,3 @@ class HepatoxConsultation:
 
     def bibliography_source_label(self) -> str:
         return hepatox_assessment.bibliography_source_label(self)
-

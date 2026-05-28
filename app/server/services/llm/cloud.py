@@ -684,4 +684,3 @@ class CloudLLMClient:
     @staticmethod
     def parse_json(obj_or_text: dict[str, Any] | str) -> dict[str, Any] | None:
         return parse_json_dict(obj_or_text)
-

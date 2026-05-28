@@ -88,4 +88,3 @@ def test_session_learning_promotes_only_direct_high_confidence_aliases() -> None
         ("observed_unpromoted_query", "Furosemide"),
         ("observed_unresolved_query", "Unknown Herb"),
     ]
-

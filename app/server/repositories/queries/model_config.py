@@ -16,4 +16,3 @@ class ModelConfigRepositoryQueries:
     @staticmethod
     def select_runtime_settings() -> Select[tuple[RuntimeSetting]]:
         return select(RuntimeSetting)
-

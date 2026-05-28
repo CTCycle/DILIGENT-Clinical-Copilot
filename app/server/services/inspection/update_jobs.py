@@ -33,7 +33,9 @@ class DataInspectionProgressReporter:
         self.emit(progress, message)
 
     def emit(self, progress: float, message: str) -> None:
-        bounded = min(100.0, max(0.0, self.base_progress + float(progress) * self.scale))
+        bounded = min(
+            100.0, max(0.0, self.base_progress + float(progress) * self.scale)
+        )
         self.jobs.update_progress(self.job_id, bounded)
         payload = self.jobs.get_job_status(self.job_id) or {}
         result = dict(payload.get("result") or {})
@@ -48,7 +50,9 @@ class DataInspectionUpdateJobRunner:
         serializer: DataSerializer,
         jobs: JobManager,
         report_phase_by_target: Callable[[str, str, int, str], None],
-        report_job_progress: Callable[[str, float, str, Mapping[str, object] | None], None],
+        report_job_progress: Callable[
+            [str, float, str, Mapping[str, object] | None], None
+        ],
         write_rag_manifest: Callable[[dict[str, Any], str], Path],
     ) -> None:
         self.serializer = serializer
@@ -61,20 +65,30 @@ class DataInspectionUpdateJobRunner:
         self, job_id: str, overrides: Mapping[str, object] | None = None
     ) -> dict[str, Any]:
         stop_check = partial(self.jobs.should_stop, job_id)
-        progress_callback = DataInspectionProgressReporter(self.jobs, job_id, 20.0, 0.68)
+        progress_callback = DataInspectionProgressReporter(
+            self.jobs, job_id, 20.0, 0.68
+        )
         override_values = dict(overrides or {})
         self.report_phase_by_target(job_id, "rxnav", 1, "Configuration accepted")
         if stop_check():
             return {}
         self.report_phase_by_target(job_id, "rxnav", 4, "RxNav update started")
-        self.report_phase_by_target(job_id, "rxnav", 10, "Downloading source catalog data")
+        self.report_phase_by_target(
+            job_id, "rxnav", 10, "Downloading source catalog data"
+        )
         rx_client = RxNavClient(
             request_timeout=override_values.get("rxnav_request_timeout"),
             max_concurrency=override_values.get("rxnav_max_concurrency"),
         )
-        builder = RxNavDrugCatalogBuilder(serializer=self.serializer, rx_client=rx_client)
-        self.report_phase_by_target(job_id, "rxnav", 20, "Processing aliases and synonyms")
-        result = builder.update_drug_catalog(progress_callback=progress_callback, should_stop=stop_check)
+        builder = RxNavDrugCatalogBuilder(
+            serializer=self.serializer, rx_client=rx_client
+        )
+        self.report_phase_by_target(
+            job_id, "rxnav", 20, "Processing aliases and synonyms"
+        )
+        result = builder.update_drug_catalog(
+            progress_callback=progress_callback, should_stop=stop_check
+        )
         self.report_phase_by_target(job_id, "rxnav", 88, "Persisting catalog updates")
         self.report_phase_by_target(job_id, "rxnav", 96, "Finalizing update")
         self.report_phase_by_target(job_id, "rxnav", 100, "Completed")
@@ -84,7 +98,9 @@ class DataInspectionUpdateJobRunner:
         self, job_id: str, overrides: Mapping[str, object] | None = None
     ) -> dict[str, Any]:
         stop_check = partial(self.jobs.should_stop, job_id)
-        progress_callback = DataInspectionProgressReporter(self.jobs, job_id, 20.0, 0.68)
+        progress_callback = DataInspectionProgressReporter(
+            self.jobs, job_id, 20.0, 0.68
+        )
         override_values = dict(overrides or {})
         self.report_phase_by_target(job_id, "livertox", 1, "Configuration accepted")
         if stop_check():
@@ -98,7 +114,9 @@ class DataInspectionUpdateJobRunner:
             monograph_max_workers=override_values.get("livertox_monograph_max_workers"),
         )
         self.report_phase_by_target(job_id, "livertox", 10, "Loading source archive")
-        result = updater.update_from_livertox(progress_callback=progress_callback, should_stop=stop_check)
+        result = updater.update_from_livertox(
+            progress_callback=progress_callback, should_stop=stop_check
+        )
         self.report_phase_by_target(job_id, "livertox", 88, "Persisting extracted data")
         self.report_phase_by_target(job_id, "livertox", 96, "Finalizing update")
         self.report_phase_by_target(job_id, "livertox", 100, "Completed")
@@ -109,7 +127,9 @@ class DataInspectionUpdateJobRunner:
     ) -> dict[str, Any]:
         stop_check = partial(self.jobs.should_stop, job_id)
         override_values = dict(overrides or {})
-        progress_callback = DataInspectionProgressReporter(self.jobs, job_id, 30.0, 0.60)
+        progress_callback = DataInspectionProgressReporter(
+            self.jobs, job_id, 30.0, 0.60
+        )
         self.report_phase_by_target(job_id, "rag", 1, "Configuration accepted")
         if stop_check():
             return {}
@@ -151,18 +171,28 @@ class DataInspectionUpdateJobRunner:
                     "Verify document text extraction support and source contents."
                     f"{sample_details}"
                 )
-            raise ValueError("RAG update found zero supported files in the selected folder.")
+            raise ValueError(
+                "RAG update found zero supported files in the selected folder."
+            )
         self._write_rag_manifest(result, updater.documents_path)
-        self.report_phase_by_target(job_id, "rag", 90, "Persisting embeddings and index")
+        self.report_phase_by_target(
+            job_id, "rag", 90, "Persisting embeddings and index"
+        )
         self.report_phase_by_target(job_id, "rag", 96, "Finalizing update")
         self.report_phase_by_target(job_id, "rag", 100, "Completed")
-        backend = "cloud" if bool(override_values.get("use_cloud_embeddings")) else "local"
+        backend = (
+            "cloud" if bool(override_values.get("use_cloud_embeddings")) else "local"
+        )
         model_spec = getattr(getattr(updater, "serializer", None), "model_spec", None)
         vector_model = None
         if model_spec is not None:
             provider = str(getattr(model_spec, "provider", "") or "").strip()
             model_name = str(getattr(model_spec, "model_name", "") or "").strip()
-            vector_model = f"{provider}:{model_name}" if provider and model_name else model_name or None
+            vector_model = (
+                f"{provider}:{model_name}"
+                if provider and model_name
+                else model_name or None
+            )
         return {
             "summary": {
                 **result,

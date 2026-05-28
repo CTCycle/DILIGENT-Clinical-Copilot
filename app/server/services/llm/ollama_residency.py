@@ -47,7 +47,7 @@ def _env_float(name: str, default: float) -> float:
         return default
     try:
         return float(raw)
-    except (TypeError, ValueError):
+    except TypeError, ValueError:
         return default
 
 
@@ -119,6 +119,7 @@ def _map_ollama_langchain_exception(exc: Exception) -> OllamaError:
 
 # Extracted from the facade module; functions intentionally accept the facade instance.
 
+
 def get_residency_targets() -> dict[str, str]:
     targets: dict[str, str] = {}
     clinical = (LLMRuntimeConfig.get_clinical_model() or "").strip()
@@ -129,6 +130,7 @@ def get_residency_targets() -> dict[str, str]:
         targets["text_extraction"] = text_extraction
     return targets
 
+
 def dedupe_models(models: list[str]) -> list[str]:
     unique: list[str] = []
     for name in models:
@@ -136,6 +138,7 @@ def dedupe_models(models: list[str]) -> list[str]:
         if value and value not in unique:
             unique.append(value)
     return unique
+
 
 def extract_bytes_from_fields(
     cls,
@@ -158,6 +161,7 @@ def extract_bytes_from_fields(
             maximum = max(maximum, cls.parse_size_to_bytes(block[field]))
     return maximum
 
+
 def extract_footprint_from_payload(
     cls,
     payload: dict[str, Any],
@@ -172,10 +176,11 @@ def extract_footprint_from_payload(
     )
     return ram_bytes, vram_bytes
 
+
 async def list_running_models(self) -> dict[str, dict[str, Any]]:
     try:
         resp = await self.client.get("/api/ps")
-    except (httpx.TimeoutException, httpx.RequestError):
+    except httpx.TimeoutException, httpx.RequestError:
         return {}
     if resp.status_code == 404:
         return {}
@@ -195,6 +200,7 @@ async def list_running_models(self) -> dict[str, dict[str, Any]]:
         if name:
             running[name] = row
     return running
+
 
 async def get_model_footprint_bytes(
     self,
@@ -223,6 +229,7 @@ async def get_model_footprint_bytes(
     if ram_bytes <= 0:
         ram_bytes = self.DEFAULT_MODEL_FOOTPRINT_BYTES
     return ram_bytes, vram_bytes
+
 
 async def evaluate_dual_residency_plan(self) -> dict[str, Any]:
     targets = self.get_residency_targets()
@@ -274,6 +281,7 @@ async def evaluate_dual_residency_plan(self) -> dict[str, Any]:
     )
     return plan
 
+
 async def get_cached_residency_plan(
     self,
     *,
@@ -295,6 +303,7 @@ async def get_cached_residency_plan(
         self.residency_plan_cache_expiry = loop.time() + self.RESIDENCY_PLAN_TTL
         return dict(plan)
 
+
 async def resolve_policy_keep_alive(
     self,
     *,
@@ -311,6 +320,7 @@ async def resolve_policy_keep_alive(
         return self.residency_dual_keep_alive
     return self.residency_single_keep_alive
 
+
 def record_target_usage(self, model: str) -> None:
     now = time.monotonic()
     self.residency_usage_history.append((now, model))
@@ -320,6 +330,7 @@ def record_target_usage(self, model: str) -> None:
         if event_ts >= cutoff:
             break
         self.residency_usage_history.popleft()
+
 
 def predict_next_target_model(
     self,
@@ -350,9 +361,8 @@ def predict_next_target_model(
         (candidate for candidate in candidates if candidate != current_model), None
     )
 
-def _recent_residency_history(
-    self, candidates: list[str]
-) -> list[tuple[float, str]]:
+
+def _recent_residency_history(self, candidates: list[str]) -> list[tuple[float, str]]:
     now = time.monotonic()
     cutoff = now - self.residency_usage_window_s
     return [
@@ -361,12 +371,14 @@ def _recent_residency_history(
         if ts >= cutoff and model in candidates
     ]
 
+
 def _count_residency_frequency(
     history: list[tuple[float, str]],
     frequency: dict[str, int],
 ) -> None:
     for _, model in history:
         frequency[model] += 1
+
 
 def _count_residency_transitions(
     self,
@@ -379,6 +391,7 @@ def _count_residency_transitions(
         key = (prev_model, next_model)
         transitions[key] = transitions.get(key, 0) + 1
     return transitions
+
 
 def _select_target_model(
     *,
@@ -404,12 +417,14 @@ def _select_target_model(
             selected_score = score
     return selected
 
+
 def handle_prefetch_task_done(self, task: asyncio.Task[None]) -> None:
     with contextlib.suppress(asyncio.CancelledError):
         try:
             task.result()
         except Exception as exc:  # noqa: BLE001
             logger.debug("Ollama model prefetch task failed: %s", exc)
+
 
 async def prefetch_model(
     self,
@@ -445,6 +460,7 @@ async def prefetch_model(
     except httpx.RequestError as exc:
         logger.debug("Request error prefetching Ollama model '%s': %s", model, exc)
 
+
 async def maybe_prefetch_target_model(self, *, active_model: str) -> None:
     plan = await self.get_cached_residency_plan()
     models = plan.get("models") or []
@@ -479,6 +495,7 @@ async def maybe_prefetch_target_model(self, *, active_model: str) -> None:
     task.add_done_callback(self.handle_prefetch_task_done)
     self.prefetch_tasks[candidate] = task
 
+
 def parse_size_to_bytes(value: Any) -> int:
     if isinstance(value, (int, float)):
         return int(value)
@@ -510,6 +527,7 @@ def parse_size_to_bytes(value: Any) -> int:
         return int(number * factor)
     return 0
 
+
 def get_available_memory_bytes() -> int:
     for getter in (
         _get_available_memory_windows,
@@ -521,6 +539,7 @@ def get_available_memory_bytes() -> int:
             return available
     return 0
 
+
 def get_available_vram_bytes() -> int:
     env_value = (os.getenv("OLLAMA_AVAILABLE_VRAM_BYTES") or "").strip()
     if env_value:
@@ -528,6 +547,7 @@ def get_available_vram_bytes() -> int:
         if parsed > 0:
             return parsed
     return _get_available_vram_nvidia_smi()
+
 
 def _get_available_vram_nvidia_smi() -> int:
     if shutil.which("nvidia-smi") is None:
@@ -545,7 +565,7 @@ def _get_available_vram_nvidia_smi() -> int:
             text=True,
             timeout=1.5,
         )
-    except (OSError, subprocess.SubprocessError):
+    except OSError, subprocess.SubprocessError:
         return 0
     if result.returncode != 0:
         return 0
@@ -561,6 +581,7 @@ def _get_available_vram_nvidia_smi() -> int:
             continue
         total += mib * 1_048_576
     return total
+
 
 def _get_available_memory_windows() -> int:
     kernel32 = getattr(getattr(ctypes, "windll", None), "kernel32", None)
@@ -587,6 +608,7 @@ def _get_available_memory_windows() -> int:
         return int(status.ullAvailPhys)
     return 0
 
+
 def _get_available_memory_sysconf() -> int:
     sysconf = getattr(os, "sysconf", None)
     if not callable(sysconf):
@@ -600,9 +622,10 @@ def _get_available_memory_sysconf() -> int:
             pages = sysconf("SC_PHYS_PAGES")
         if isinstance(page_size, int) and isinstance(pages, int):
             return page_size * pages
-    except (ValueError, OSError, AttributeError):
+    except ValueError, OSError, AttributeError:
         pass
     return 0
+
 
 def _parse_meminfo_line(line: str) -> int | None:
     if not line.startswith("MemAvailable:"):
@@ -625,6 +648,7 @@ def _parse_meminfo_line(line: str) -> int | None:
     }.get(unit)
     return value * multiplier if multiplier else value
 
+
 def _get_available_memory_proc() -> int:
     try:
         with open("/proc/meminfo", "r", encoding="utf-8") as handle:
@@ -632,6 +656,6 @@ def _get_available_memory_proc() -> int:
                 parsed = _parse_meminfo_line(line)
                 if parsed is not None:
                     return parsed
-    except (FileNotFoundError, PermissionError, ValueError):
+    except FileNotFoundError, PermissionError, ValueError:
         pass
     return 0

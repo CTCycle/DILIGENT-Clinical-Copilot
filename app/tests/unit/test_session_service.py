@@ -23,7 +23,9 @@ def test_preprocess_unified_input_accepts_fragment_aggregated_sections() -> None
     )
     service = _build_service()
     request = ClinicalSessionRequest(clinical_input=input_text)
-    preprocessed, returned_extraction = asyncio.run(service.preprocess_unified_input(request))
+    preprocessed, returned_extraction = asyncio.run(
+        service.preprocess_unified_input(request)
+    )
 
     assert "A1" in (preprocessed.anamnesis or "")
     assert "A2" in (preprocessed.anamnesis or "")
@@ -36,15 +38,23 @@ def test_preprocess_unified_input_rejects_invalid_sections() -> None:
     service = _build_service()
     request = ClinicalSessionRequest(clinical_input="raw input")
 
-    with pytest.raises(ServiceValidationError, match="Clinical input sections are invalid"):
+    with pytest.raises(
+        ServiceValidationError, match="Clinical input sections are invalid"
+    ):
         asyncio.run(service.preprocess_unified_input(request))
 
 
-def test_prepare_structured_clinical_input_returns_patient_payload_and_metadata(monkeypatch) -> None:
+def test_prepare_structured_clinical_input_returns_patient_payload_and_metadata(
+    monkeypatch,
+) -> None:
     service = _build_service()
     monkeypatch.setattr(service, "apply_persisted_runtime_configuration", lambda: None)
-    monkeypatch.setattr(service.serializer, "list_livertox_catalog", lambda **kwargs: ([{"id": 1}], 1))
-    monkeypatch.setattr(service.serializer, "list_rxnav_catalog", lambda **kwargs: ([{"id": 1}], 1))
+    monkeypatch.setattr(
+        service.serializer, "list_livertox_catalog", lambda **kwargs: ([{"id": 1}], 1)
+    )
+    monkeypatch.setattr(
+        service.serializer, "list_rxnav_catalog", lambda **kwargs: ([{"id": 1}], 1)
+    )
     request = ClinicalSessionRequest(
         clinical_input=(
             "## Anamnesis\nHistory text\n\n"
@@ -56,17 +66,24 @@ def test_prepare_structured_clinical_input_returns_patient_payload_and_metadata(
 
     prepared = service.prepare_structured_clinical_input(request)
 
-    assert prepared["section_extraction"].metadata["parser"] == "deterministic_initial_text_sections_v2"
+    assert (
+        prepared["section_extraction"].metadata["parser"]
+        == "deterministic_initial_text_sections_v2"
+    )
     assert prepared["patient_payload"].anamnesis == "History text"
     assert prepared["patient_payload"].drugs == "Drug 10 mg 1-0-0-0"
     assert prepared["patient_payload"].laboratory_analysis == "ALT 120 U/L"
 
 
-def test_start_clinical_job_requires_active_cloud_key_before_extraction(monkeypatch) -> None:
+def test_start_clinical_job_requires_active_cloud_key_before_extraction(
+    monkeypatch,
+) -> None:
     service = _build_service()
 
     class FakeExtractor:
-        async def extract(self, *, clinical_input: str) -> ClinicalSectionExtractionResult:
+        async def extract(
+            self, *, clinical_input: str
+        ) -> ClinicalSectionExtractionResult:
             raise AssertionError("extractor should not run without a cloud key")
 
     class FakeAccessKeyService:
@@ -111,9 +128,7 @@ def test_resolve_runtime_timeout_does_not_apply_legacy_cloud_cap(monkeypatch) ->
 def test_resolve_consultation_timeout_uses_runtime_configuration(monkeypatch) -> None:
     monkeypatch.setattr(
         "services.session.session_service.get_server_settings",
-        lambda: SimpleNamespace(
-            runtime=SimpleNamespace(clinical_llm_timeout=5400.0)
-        ),
+        lambda: SimpleNamespace(runtime=SimpleNamespace(clinical_llm_timeout=5400.0)),
     )
     monkeypatch.setattr(
         "services.session.session_service.LLMRuntimeConfig.is_cloud_enabled",

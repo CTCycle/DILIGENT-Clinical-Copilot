@@ -71,25 +71,39 @@ def test_start_clinical_job_uses_centralized_poll_interval(monkeypatch) -> None:
         staticmethod(lambda: False),
     )
 
-    async def preprocess_unified_input(request_payload: ClinicalSessionRequest) -> tuple[ClinicalSessionRequest, object]:
+    async def preprocess_unified_input(
+        request_payload: ClinicalSessionRequest,
+    ) -> tuple[ClinicalSessionRequest, object]:
         return request_payload, object()
 
-    monkeypatch.setattr(endpoint.service, "preprocess_unified_input", preprocess_unified_input)
+    monkeypatch.setattr(
+        endpoint.service, "preprocess_unified_input", preprocess_unified_input
+    )
     monkeypatch.setattr(
         endpoint.service,
         "validate_assessment_prerequisites_without_llm",
         lambda _: SimpleNamespace(
-                sections={
-                    "anamnesis": SimpleNamespace(text="Clinical context", start_line=1, end_line=1),
-                    "drugs": SimpleNamespace(text="Acetaminophen 500 mg", start_line=2, end_line=2),
-                    "laboratory_analysis": SimpleNamespace(text="ALT 300 U/L", start_line=3, end_line=3),
-                },
+            sections={
+                "anamnesis": SimpleNamespace(
+                    text="Clinical context", start_line=1, end_line=1
+                ),
+                "drugs": SimpleNamespace(
+                    text="Acetaminophen 500 mg", start_line=2, end_line=2
+                ),
+                "laboratory_analysis": SimpleNamespace(
+                    text="ALT 300 U/L", start_line=3, end_line=3
+                ),
+            },
             missing_required_sections=[],
             malformed_sections=[],
         ),
     )
-    monkeypatch.setattr(endpoint.service, "build_patient_payload", lambda request_payload: object())
-    monkeypatch.setattr(endpoint.service, "ensure_submission_requirements", lambda _: None)
+    monkeypatch.setattr(
+        endpoint.service, "build_patient_payload", lambda request_payload: object()
+    )
+    monkeypatch.setattr(
+        endpoint.service, "ensure_submission_requirements", lambda _: None
+    )
 
     response = endpoint.service.start_clinical_job(
         ClinicalSessionRequest(
@@ -141,4 +155,3 @@ def test_clinical_progress_callback_raises_when_stop_requested(monkeypatch) -> N
     except clinical_job_progress.ClinicalJobCancelled:
         return
     raise AssertionError("Expected ClinicalJobCancelled when stop is requested.")
-

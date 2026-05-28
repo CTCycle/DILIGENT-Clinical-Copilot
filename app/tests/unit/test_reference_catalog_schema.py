@@ -50,4 +50,3 @@ def test_reference_catalog_seed_run_unique_constraint_shape() -> None:
 
 def test_legacy_text_normalization_model_removed() -> None:
     assert not hasattr(models, "TextNormalizationTerm")
-

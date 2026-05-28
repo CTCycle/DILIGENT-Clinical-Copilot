@@ -49,7 +49,7 @@ def _env_float(name: str, default: float) -> float:
         return default
     try:
         return float(raw)
-    except (TypeError, ValueError):
+    except TypeError, ValueError:
         return default
 
 
@@ -121,6 +121,7 @@ def _map_ollama_langchain_exception(exc: Exception) -> OllamaError:
 
 # Extracted from the facade module; functions intentionally accept the facade instance.
 
+
 async def collect_structured_fallbacks(self, preferred: list[str]) -> list[str]:
     available: set[str] = set()
     try:
@@ -132,11 +133,7 @@ async def collect_structured_fallbacks(self, preferred: list[str]) -> list[str]:
     fallbacks: list[str] = []
     if available:
         for name in TEXT_EXTRACTION_MODEL_CHOICES:
-            if (
-                name in available
-                and name not in preferred
-                and name not in fallbacks
-            ):
+            if name in available and name not in preferred and name not in fallbacks:
                 fallbacks.append(name)
     else:
         for name in TEXT_EXTRACTION_MODEL_CHOICES:
@@ -144,6 +141,7 @@ async def collect_structured_fallbacks(self, preferred: list[str]) -> list[str]:
                 fallbacks.append(name)
 
     return fallbacks
+
 
 async def llm_structured_call(
     self,
@@ -187,6 +185,7 @@ async def llm_structured_call(
         max_repair_attempts=max_repair_attempts,
     )
 
+
 def build_structured_messages(
     *,
     system_prompt: str,
@@ -201,6 +200,7 @@ def build_structured_messages(
         {"role": "user", "content": user_prompt},
     ]
 
+
 async def resolve_text_extraction_models(self, model: str) -> list[str]:
     preferred: list[str] = []
     for candidate in (
@@ -214,9 +214,11 @@ async def resolve_text_extraction_models(self, model: str) -> list[str]:
         preferred = await self.collect_structured_fallbacks([])
     return preferred
 
+
 def is_missing_model_error(err: OllamaError) -> bool:
     message = str(err).lower()
     return "not found" in message or "404" in message
+
 
 async def _chat_structured_model(
     self,
@@ -238,6 +240,7 @@ async def _chat_structured_model(
             raise
         raise RuntimeError(f"LLM call failed: {err}") from err
 
+
 async def _extend_structured_model_queue(
     self,
     *,
@@ -253,8 +256,10 @@ async def _extend_structured_model_queue(
             queue.append(candidate)
     return fallbacks
 
+
 def _coerce_llm_text(raw: dict[str, Any] | str) -> str:
     return json.dumps(raw) if isinstance(raw, dict) else str(raw)
+
 
 def _raise_structured_models_exhausted(
     *,
@@ -267,9 +272,8 @@ def _raise_structured_models_exhausted(
             "LLM call failed: no local text extraction models were found. "
             f"Tried: {attempted}"
         ) from last_missing_error
-    raise RuntimeError(
-        "LLM call failed: no text extraction model candidates available"
-    )
+    raise RuntimeError("LLM call failed: no text extraction model candidates available")
+
 
 def build_repair_messages(
     *,
@@ -289,6 +293,7 @@ def build_repair_messages(
             ),
         },
     ]
+
 
 async def call_with_structured_models(
     self,
@@ -347,6 +352,7 @@ async def call_with_structured_models(
         missing=missing,
     )
 
+
 async def parse_with_repairs(
     self,
     *,
@@ -388,6 +394,7 @@ async def parse_with_repairs(
 
     raise RuntimeError("No structured output produced by the model")
 
+
 def extract_first_json_object(text: str) -> str | None:
     decoder = json.JSONDecoder()
     for match in re.finditer(r"\{", text):
@@ -399,6 +406,7 @@ def extract_first_json_object(text: str) -> str | None:
         if isinstance(parsed, dict):
             return text[start : start + end]
     return None
+
 
 def parse_json(obj_or_text: dict[str, Any] | str) -> dict[str, Any] | None:
     return parse_json_dict(obj_or_text)

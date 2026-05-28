@@ -75,5 +75,3 @@ def test_sqlite_repository_exposes_orm_session_factory(
 
     assert len(loaded) == 3
     assert [row.role_type for row in loaded] == ["clinical", "cloud", "text_extraction"]
-
-

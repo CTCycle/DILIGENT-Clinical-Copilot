@@ -25,7 +25,9 @@ def test_deterministic_anamnesis_regimen_extraction_captures_oncology_history() 
     assert result.regimen_lines
 
 
-def test_deterministic_disease_extraction_captures_hepatic_and_oncologic_context() -> None:
+def test_deterministic_disease_extraction_captures_hepatic_and_oncologic_context() -> (
+    None
+):
     text = (
         "High grade ovarian serous carcinoma con carcinosi peritoneale.\n"
         "Steatosi epatica cronica documentata.\n"

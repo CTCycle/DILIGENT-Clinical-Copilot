@@ -56,4 +56,3 @@ def conservative_fuzzy_livertox_match(
     if best_score >= 0.93:
         return best_name
     return None
-

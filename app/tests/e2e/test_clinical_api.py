@@ -64,8 +64,12 @@ def test_clinical_requires_sections(api_context: APIRequestContext):
     assert "Clinical input is required." in response.text()
 
 
-def test_clinical_validate_input_returns_deterministic_diagnostics(api_context: APIRequestContext):
-    response = api_context.post("/api/clinical/validate-input", data=build_minimal_payload())
+def test_clinical_validate_input_returns_deterministic_diagnostics(
+    api_context: APIRequestContext,
+):
+    response = api_context.post(
+        "/api/clinical/validate-input", data=build_minimal_payload()
+    )
     assert response.status == 200
     payload = response.json()
     assert payload["ready"] is True

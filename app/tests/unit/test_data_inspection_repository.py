@@ -387,4 +387,3 @@ def test_timeline_generation_persists_and_reuses_payload() -> None:
     assert reused is not None
     assert reused.events[0].title == "Therapy started"
     assert extractor.call_count == 1
-

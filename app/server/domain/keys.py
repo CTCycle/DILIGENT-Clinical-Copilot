@@ -7,11 +7,10 @@ from typing import Literal, cast
 from pydantic import BaseModel, ConfigDict, Field, field_validator
 
 ProviderName = Literal["openai", "gemini", "brave"]
-SUPPORTED_PROVIDERS: frozenset[ProviderName] = frozenset(
-    ("openai", "gemini", "brave")
-)
+SUPPORTED_PROVIDERS: frozenset[ProviderName] = frozenset(("openai", "gemini", "brave"))
 CONTROL_CHARACTERS_RE = re.compile(r"[\x00-\x08\x0B\x0C\x0E-\x1F\x7F]")
 MIN_ACCESS_KEY_LENGTH = 16
+
 
 ###############################################################################
 def normalize_provider_name(provider: str) -> ProviderName:
@@ -19,6 +18,7 @@ def normalize_provider_name(provider: str) -> ProviderName:
     if normalized not in SUPPORTED_PROVIDERS:
         raise ValueError("Unsupported provider")
     return cast(ProviderName, normalized)
+
 
 ###############################################################################
 def normalize_access_key(value: str | None) -> str:

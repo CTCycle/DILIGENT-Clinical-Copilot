@@ -43,7 +43,9 @@ class BoundedCache(Generic[KT, VT]):
     def clear(self) -> None:
         self.store.clear()
 
+
 # Extracted from the facade module; functions intentionally accept the facade instance.
+
 
 def create_matched_result(
     self,
@@ -70,11 +72,10 @@ def create_matched_result(
         reason=reason,
         notes=cleaned_notes,
         candidate_names=[record.drug_name],
-        rejected_candidate_names=list(
-            dict.fromkeys(rejected_candidate_names or [])
-        ),
+        rejected_candidate_names=list(dict.fromkeys(rejected_candidate_names or [])),
         record=record,
     )
+
 
 def create_missing_result(
     self,
@@ -99,6 +100,7 @@ def create_missing_result(
         rejected_candidate_names=[],
         record=None,
     )
+
 
 def create_ambiguous_result(
     self,
@@ -131,6 +133,7 @@ def create_ambiguous_result(
         record=None,
     )
 
+
 def result_sort_key(
     self,
     record: MonographRecord,
@@ -142,6 +145,7 @@ def result_sort_key(
         record.monograph_key or "",
         record.stable_key,
     )
+
 
 def create_match(
     self,

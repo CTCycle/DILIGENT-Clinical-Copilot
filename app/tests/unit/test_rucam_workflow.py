@@ -76,4 +76,3 @@ def test_incomplete_inputs_skip_calculation() -> None:
     )
     assert bundle.entries[0].calculation_method == "not_calculated"
     assert bundle.entries[0].total_score is None
-

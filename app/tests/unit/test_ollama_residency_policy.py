@@ -96,4 +96,3 @@ def test_resolve_policy_keep_alive_uses_dual_setting(monkeypatch) -> None:
     asyncio.run(client.close())
 
     assert keep_alive == "8h"
-

@@ -46,5 +46,3 @@ def test_seed_mapping_categories_are_loaded() -> None:
     assert isinstance(snapshot.lab_marker_aliases, dict)
     assert isinstance(snapshot.brand_combo_preferences, dict)
     assert isinstance(snapshot.knowledge_source_references, dict)
-
-

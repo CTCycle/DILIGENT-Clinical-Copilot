@@ -39,4 +39,3 @@ class RucamStructuredCalculation:
     total_score: int
     components: list[RucamComponentAssessment]
     limitations: list[str]
-

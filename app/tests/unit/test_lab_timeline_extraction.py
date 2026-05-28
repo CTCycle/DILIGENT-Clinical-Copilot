@@ -218,5 +218,7 @@ def test_calculates_pattern_from_alt_alp_with_uln() -> None:
         drugs="Drug A",
     )
     parsed, _ = asyncio.run(extractor.extract_from_payload(timeline))
-    assert extractor.calculate_hepatic_pattern_from_lab_timeline(parsed) == "hepatocellular"
-
+    assert (
+        extractor.calculate_hepatic_pattern_from_lab_timeline(parsed)
+        == "hepatocellular"
+    )

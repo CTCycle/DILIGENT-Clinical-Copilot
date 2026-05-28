@@ -52,4 +52,3 @@ class AccessKeyService:
     # -------------------------------------------------------------------------
     def delete_access_key(self, key_id: int, provider: ProviderName) -> bool:
         return bool(self.serializer.delete_key(key_id, provider=provider))
-

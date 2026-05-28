@@ -23,7 +23,9 @@ class ReferenceCatalogSerializer:
         try:
             rows = (
                 session.execute(
-                    select(ReferenceCatalogEntry).where(ReferenceCatalogEntry.active.is_(True))
+                    select(ReferenceCatalogEntry).where(
+                        ReferenceCatalogEntry.active.is_(True)
+                    )
                 )
                 .scalars()
                 .all()
@@ -61,7 +63,9 @@ class ReferenceCatalogSerializer:
                         priority=entry.priority,
                         match_mode=entry.match_mode,
                         case_sensitive=entry.case_sensitive,
-                        metadata_json=json.dumps(dict(entry.metadata), ensure_ascii=False),
+                        metadata_json=json.dumps(
+                            dict(entry.metadata), ensure_ascii=False
+                        ),
                         active=entry.active,
                     )
                 )

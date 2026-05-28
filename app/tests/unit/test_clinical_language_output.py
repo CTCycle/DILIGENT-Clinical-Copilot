@@ -83,4 +83,3 @@ def test_italian_clinician_report_wrappers_do_not_use_english_labels() -> None:
     assert "Evidence match" not in rendered
     assert "Matched local record" not in rendered
     assert "Bibliography source" not in rendered
-

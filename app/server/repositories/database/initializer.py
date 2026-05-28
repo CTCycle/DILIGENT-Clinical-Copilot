@@ -202,6 +202,7 @@ def ensure_postgres_database(
 
     return target_database
 
+
 ###############################################################################
 def run_database_initialization(
     *,
@@ -259,4 +260,3 @@ def initialize_database(
     except Exception as exc:
         logger.exception("Unexpected error during database initialization.")
         raise SystemExit(1) from exc
-

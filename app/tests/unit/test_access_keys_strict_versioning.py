@@ -95,5 +95,3 @@ def test_unavailable_key_material_version_fails_loudly() -> None:
         assert False, "Expected RuntimeError for unavailable material version"
     except RuntimeError as exc:
         assert "is not available" in str(exc)
-
-

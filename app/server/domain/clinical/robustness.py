@@ -162,7 +162,9 @@ class RunBundleIndex(BaseModel):
     schema_version: str = "1.0"
     run_id: str
     session_id: int | None = None
-    storage: Literal["database_session_result_payload"] = "database_session_result_payload"
+    storage: Literal["database_session_result_payload"] = (
+        "database_session_result_payload"
+    )
     artifacts: dict[str, str] = Field(default_factory=dict)
 
 

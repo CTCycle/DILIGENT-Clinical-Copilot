@@ -36,7 +36,9 @@ def test_preflight_allows_captured_corpus_without_blocking_extraction_errors(
     service = build_clinical_session_service(get_job_manager())
 
     # Preflight regression should not depend on cloud-key state.
-    monkeypatch.setattr(preflight_module, "_validate_provider_key", lambda blocking: None)
+    monkeypatch.setattr(
+        preflight_module, "_validate_provider_key", lambda blocking: None
+    )
 
     runtime_provider = (LLMRuntimeConfig.get_llm_provider() or "").strip()
     selected_model_providers = [runtime_provider] if runtime_provider else []
@@ -55,7 +57,9 @@ def test_preflight_allows_captured_corpus_without_blocking_extraction_errors(
             document = str(item.get("document") or f"row_{index}")
             blocking_results.append((document, codes))
 
-    assert not blocking_results, f"Unexpected preflight blocking issues: {blocking_results}"
+    assert not blocking_results, (
+        f"Unexpected preflight blocking issues: {blocking_results}"
+    )
 
 
 def test_preprocess_unified_input_succeeds_for_all_captured_corpus_cases() -> None:
@@ -93,7 +97,9 @@ def test_preprocess_unified_input_succeeds_for_all_captured_corpus_cases() -> No
         )
         assert extraction is not None, f"Missing extraction metadata for {document}"
         payload = service.build_patient_payload(preprocessed_request)
-        normalized = DocumentNormalizer().normalize(str(item.get("physician_report") or ""))
+        normalized = DocumentNormalizer().normalize(
+            str(item.get("physician_report") or "")
+        )
         extraction_artifact = build_extraction_artifact(
             normalized_document=normalized,
             section_extraction=extraction,

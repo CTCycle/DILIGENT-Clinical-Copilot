@@ -83,7 +83,9 @@ def build_failed_session_payload(
             "unresolved_drugs": [],
             "structured_case": {},
             "section_extraction": (
-                section_extraction.model_dump() if section_extraction is not None else None
+                section_extraction.model_dump()
+                if section_extraction is not None
+                else None
             ),
             "runtime_settings": runtime_settings,
         },
@@ -523,4 +525,3 @@ def run_clinical_job(
     if not result:
         return {}
     return result
-

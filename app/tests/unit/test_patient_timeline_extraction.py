@@ -68,4 +68,3 @@ def test_timeline_extractor_sorts_and_deduplicates_events() -> None:
     assert result.events[0].sort_order == 0
     assert result.events[1].title == "ALT peak"
     assert result.events[1].confidence == 0.9
-

@@ -201,9 +201,7 @@ class ModelConfigService:
         if "text_extraction_model" in fields_set:
             text_extraction_model = self.resolve_role_model_selection(
                 role_name="text_extraction",
-                model_name=self.normalize_optional_text(
-                    payload.text_extraction_model
-                ),
+                model_name=self.normalize_optional_text(payload.text_extraction_model),
                 local_model_names=local_model_names,
                 use_cloud_models=use_cloud_models,
                 cloud_provider=cloud_provider,
@@ -386,8 +384,7 @@ class ModelConfigService:
         now = monotonic()
         is_duplicate = message == self._last_ollama_warning_message
         within_cooldown = (
-            now - self._last_ollama_warning_at
-            < self._OLLAMA_WARNING_COOLDOWN_SECONDS
+            now - self._last_ollama_warning_at < self._OLLAMA_WARNING_COOLDOWN_SECONDS
         )
         if is_duplicate and within_cooldown:
             return
@@ -460,4 +457,3 @@ class ModelConfigService:
             cloud_temperature=snapshot.cloud_temperature,
             ollama_reasoning=snapshot.ollama_reasoning,
         )
-

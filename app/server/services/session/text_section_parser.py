@@ -6,7 +6,11 @@ from domain.clinical.entities import (
     ClinicalSectionExtractionResult,
     ClinicalSectionLineRange,
 )
-from domain.clinical.sections import ClinicalSectionKey, SECTION_DISPLAY_NAMES, SECTION_KEYS
+from domain.clinical.sections import (
+    ClinicalSectionKey,
+    SECTION_DISPLAY_NAMES,
+    SECTION_KEYS,
+)
 from services.session.clinical_section_parsers import (
     parse_required_dili_sections,
 )
@@ -38,11 +42,7 @@ def _map_canonical_key(key: str) -> ClinicalSectionKey | None:
 
 
 def _map_missing_keys(keys: list[str]) -> list[str]:
-    return [
-        mapped
-        for key in keys
-        if (mapped := _map_canonical_key(key)) is not None
-    ]
+    return [mapped for key in keys if (mapped := _map_canonical_key(key)) is not None]
 
 
 def _map_malformed_issue(issue: str) -> str:
@@ -65,7 +65,8 @@ def parse_initial_text_sections(raw_text: str) -> InitialTextSectionParseResult:
         text = section.text.strip()
         parsed[payload_key] = ParsedTextSection(
             key=payload_key,
-            title=section.raw_heading or SECTION_DISPLAY_NAMES.get(payload_key, payload_key),
+            title=section.raw_heading
+            or SECTION_DISPLAY_NAMES.get(payload_key, payload_key),
             text=text,
             start_line=section.line_start,
             end_line=section.line_end,
@@ -73,8 +74,12 @@ def parse_initial_text_sections(raw_text: str) -> InitialTextSectionParseResult:
 
     return InitialTextSectionParseResult(
         sections=parsed,
-        missing_required_sections=_map_missing_keys(parse_result.missing_required_sections),
-        malformed_sections=[_map_malformed_issue(issue) for issue in parse_result.malformed_sections],
+        missing_required_sections=_map_missing_keys(
+            parse_result.missing_required_sections
+        ),
+        malformed_sections=[
+            _map_malformed_issue(issue) for issue in parse_result.malformed_sections
+        ],
     )
 
 
@@ -92,7 +97,9 @@ def build_section_extraction_from_initial_text(
         if section is None:
             continue
         line_ranges[key] = [
-            ClinicalSectionLineRange(start_line=section.start_line, end_line=section.end_line)
+            ClinicalSectionLineRange(
+                start_line=section.start_line, end_line=section.end_line
+            )
         ]
         metadata["source_line_ranges"][key] = {
             "start_line": section.start_line,

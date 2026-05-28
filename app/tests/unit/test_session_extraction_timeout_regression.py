@@ -87,7 +87,8 @@ def test_italian_laboratory_text_uses_deterministic_fallback() -> None:
     timeline, _ = asyncio.run(extractor.extract_from_payload(payload))
 
     observed = {
-        (entry.marker_name, entry.sample_date, entry.value) for entry in timeline.entries
+        (entry.marker_name, entry.sample_date, entry.value)
+        for entry in timeline.entries
     }
     assert ("ALT", "2025-01-10", 345.0) in observed
     assert ("ALP", "2025-01-10", 1055.0) in observed
@@ -107,7 +108,8 @@ def test_lab_llm_chunk_timeout_uses_deterministic_fallback(monkeypatch: Any) -> 
     timeline, _ = asyncio.run(extractor.extract_from_payload(payload))
 
     observed = {
-        (entry.marker_name, entry.sample_date, entry.value) for entry in timeline.entries
+        (entry.marker_name, entry.sample_date, entry.value)
+        for entry in timeline.entries
     }
     assert ("ALT", "2025-01-10", 345.0) in observed
     assert ("ALP", "2025-01-10", 1055.0) in observed

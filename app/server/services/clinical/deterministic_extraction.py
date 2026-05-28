@@ -3,7 +3,11 @@ from __future__ import annotations
 import re
 from dataclasses import dataclass
 
-from domain.clinical.entities import DiseaseContextEntry, DrugEntry, PatientDiseaseContext
+from domain.clinical.entities import (
+    DiseaseContextEntry,
+    DrugEntry,
+    PatientDiseaseContext,
+)
 
 DATE_TOKEN_RE = r"\d{1,2}[./-]\d{1,2}(?:[./-]\d{2,4})?"
 HISTORICAL_RANGE_RE = re.compile(
@@ -159,7 +163,10 @@ def extract_regimen_drug_candidates(
     start_date = normalize_date_token(date_range.group("start")) if date_range else None
     end_date = normalize_date_token(date_range.group("end")) if date_range else None
     if start_date is None:
-        dates = [normalize_date_token(match.group(0)) for match in DATE_SEQUENCE_RE.finditer(stripped)]
+        dates = [
+            normalize_date_token(match.group(0))
+            for match in DATE_SEQUENCE_RE.finditer(stripped)
+        ]
         normalized_dates = [value for value in dates if value]
         if normalized_dates:
             start_date = normalized_dates[0]
@@ -179,7 +186,9 @@ def extract_regimen_drug_candidates(
             name=candidate_name,
             therapy_start_status=True if start_date else None,
             therapy_start_date=start_date,
-            suspension_status=True if end_date else (True if SUSPENSION_SIGNAL_RE.search(stripped) else None),
+            suspension_status=True
+            if end_date
+            else (True if SUSPENSION_SIGNAL_RE.search(stripped) else None),
             suspension_date=end_date,
         )
         normalized = normalize_entry(
@@ -194,7 +203,9 @@ def extract_regimen_drug_candidates(
     return entries
 
 
-def extract_deterministic_diseases(anamnesis: str) -> DeterministicDiseaseExtractionResult:
+def extract_deterministic_diseases(
+    anamnesis: str,
+) -> DeterministicDiseaseExtractionResult:
     lines = [line.strip() for line in (anamnesis or "").splitlines() if line.strip()]
     matched_lines: list[str] = []
     unresolved_lines: list[str] = []
@@ -213,8 +224,12 @@ def extract_deterministic_diseases(anamnesis: str) -> DeterministicDiseaseExtrac
             line_entries.append(
                 DiseaseContextEntry(
                     name=name,
-                    chronic=defaults.get("chronic") if isinstance(defaults.get("chronic"), bool) else None,
-                    hepatic_related=defaults.get("hepatic_related") if isinstance(defaults.get("hepatic_related"), bool) else None,
+                    chronic=defaults.get("chronic")
+                    if isinstance(defaults.get("chronic"), bool)
+                    else None,
+                    hepatic_related=defaults.get("hepatic_related")
+                    if isinstance(defaults.get("hepatic_related"), bool)
+                    else None,
                     evidence=line[:500],
                 )
             )
@@ -238,7 +253,11 @@ def extract_deterministic_diseases(anamnesis: str) -> DeterministicDiseaseExtrac
         if line_entries:
             matched_lines.append(line)
             entries.extend(line_entries)
-        elif re.search(r"\b(carcinom|carcinosi|epatit|cirr|steatosi|colecistit|polmonit|ipertension|diabet|obes)\b", line, re.IGNORECASE):
+        elif re.search(
+            r"\b(carcinom|carcinosi|epatit|cirr|steatosi|colecistit|polmonit|ipertension|diabet|obes)\b",
+            line,
+            re.IGNORECASE,
+        ):
             unresolved_lines.append(line)
 
     return DeterministicDiseaseExtractionResult(

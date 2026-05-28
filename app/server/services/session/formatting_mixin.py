@@ -109,7 +109,9 @@ class ClinicalSessionFormattingMixin:
             occurrence = entry.occurrence_time or "unknown"
             chronic = coerce_bool_or_unknown(entry.chronic)
             hepatic_related = coerce_bool_or_unknown(entry.hepatic_related)
-            evidence = entry.evidence or ClinicalSessionFormattingMixin.NOT_AVAILABLE_TOKEN
+            evidence = (
+                entry.evidence or ClinicalSessionFormattingMixin.NOT_AVAILABLE_TOKEN
+            )
             lines.append(
                 f"- {entry.name} | time={occurrence} | chronic={chronic} | hepatic={hepatic_related} | evidence={evidence}"
             )
@@ -127,7 +129,10 @@ class ClinicalSessionFormattingMixin:
             value_token = (
                 entry.value
                 if entry.value is not None
-                else (entry.value_text or ClinicalSessionFormattingMixin.NOT_AVAILABLE_TOKEN)
+                else (
+                    entry.value_text
+                    or ClinicalSessionFormattingMixin.NOT_AVAILABLE_TOKEN
+                )
             )
             uln_token = (
                 entry.upper_limit_normal
@@ -225,4 +230,3 @@ class ClinicalSessionFormattingMixin:
             ),
         ]
         return "\n".join(lines).strip()
-

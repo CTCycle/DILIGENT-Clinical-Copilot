@@ -20,6 +20,7 @@ SUSPENSION_RE = DRUG_SUSPENSION_RE
 SUSPENSION_DATE_RE = DRUG_SUSPENSION_DATE_RE
 START_DATE_RE = DRUG_START_DATE_RE
 
+
 def _phrase_pattern(values: list[str], *, anchor_word: bool = True) -> re.Pattern[str]:
     escaped = [re.escape(value.strip()) for value in values if value and value.strip()]
     if not escaped:
@@ -95,7 +96,9 @@ def build_trailing_route_token_re() -> re.Pattern[str]:
     escaped = [re.escape(term.strip()) for term in terms if term and term.strip()]
     if not escaped:
         return re.compile(r"$^")
-    return re.compile(r"\b(?:" + "|".join(sorted(set(escaped))) + r")\s*$", re.IGNORECASE)
+    return re.compile(
+        r"\b(?:" + "|".join(sorted(set(escaped))) + r")\s*$", re.IGNORECASE
+    )
 
 
 def build_start_event_re() -> re.Pattern[str]:

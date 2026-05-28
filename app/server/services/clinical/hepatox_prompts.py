@@ -285,6 +285,7 @@ class HepatotoxicityPatternAnalyzer:
 
 # Extracted from the facade module; functions intentionally accept the facade instance.
 
+
 def format_similarity_header(
     index: int,
     *,
@@ -297,6 +298,7 @@ def format_similarity_header(
     if isinstance(distance, (int, float)):
         segments.append(f"Distance: {float(distance):.4f}")
     return f"[{' | '.join(segments)}]"
+
 
 def format_start_note(
     self,
@@ -319,6 +321,7 @@ def format_start_note(
         return f"Therapy started on {start_date.isoformat()}, coinciding with the clinical visit."
     humanized = self.humanize_interval(start_interval_days)
     return f"Therapy started on {start_date.isoformat()}, roughly {humanized} before the visit."
+
 
 def format_suspension_prompt(self, suspension: DrugSuspensionContext) -> str:
     segments: list[str] = []
@@ -348,6 +351,7 @@ def format_suspension_prompt(self, suspension: DrugSuspensionContext) -> str:
 
     return " ".join(segment for segment in segments if segment)
 
+
 def format_start_prompt(self, suspension: DrugSuspensionContext) -> str:
     if suspension.start_note:
         return suspension.start_note
@@ -355,14 +359,14 @@ def format_start_prompt(self, suspension: DrugSuspensionContext) -> str:
         return "Therapy start was reported, but no reliable date was available."
     return "No therapy start information was detected; treat the exposure window as chronic unless contradicted."
 
+
 def format_visit_date_anchor(visit_date: date | None) -> str:
     if visit_date is None:
         return "Not provided."
     return visit_date.isoformat()
 
-def prepare_metadata_prompt(
-    self, metadata: dict[str, Any] | None
-) -> tuple[str, str]:
+
+def prepare_metadata_prompt(self, metadata: dict[str, Any] | None) -> tuple[str, str]:
     score = self.resolve_livertox_score(metadata)
     details: list[str] = [f"- Likelihood score: {score}"]
     if metadata:
@@ -389,6 +393,7 @@ def prepare_metadata_prompt(
         details.append("- No additional LiverTox metadata was available.")
     return score, "\n".join(details)
 
+
 def format_drug_heading(self, drug_name: str, score: str) -> str:
     normalized_name = drug_name.strip() if drug_name else ""
     if not normalized_name:
@@ -397,6 +402,7 @@ def format_drug_heading(self, drug_name: str, score: str) -> str:
     if not normalized_score:
         normalized_score = NOT_AVAILABLE_TEXT
     return f"{normalized_name} - LiverTox score {normalized_score}"
+
 
 def format_rucam_prompt_block(self, rucam: DrugRucamAssessment | None) -> str:
     if rucam is None:
@@ -410,8 +416,10 @@ def format_rucam_prompt_block(self, rucam: DrugRucamAssessment | None) -> str:
         f"- Key limitations: {limitations}"
     )
 
+
 def escape_braces(value: str) -> str:
     return value.replace("{", "{{").replace("}", "}}")
+
 
 def remove_redundant_report_sentence(text: str) -> str:
     if not text:
@@ -427,6 +435,7 @@ def remove_redundant_report_sentence(text: str) -> str:
     cleaned = "\n".join(cleaned_lines).strip()
     return re.sub(r"\n{3,}", "\n\n", cleaned)
 
+
 def render_matched_drug_section(
     self,
     entry: DrugClinicalAssessment,
@@ -437,7 +446,9 @@ def render_matched_drug_section(
     title = self.format_drug_heading(entry.drug_name, score)
     body = self.sanitize_renderable_body(entry)
     if not body:
-        body = self.build_fallback_technical_note(entry, report_language=report_language)
+        body = self.build_fallback_technical_note(
+            entry, report_language=report_language
+        )
     rucam = entry.rucam
     localized_rucam = (
         rucam_summary_text(rucam, report_language)
@@ -459,6 +470,7 @@ def render_matched_drug_section(
         f"**{bibliography_label}**: {self.bibliography_source_label()}"
     ).strip()
 
+
 def render_evidence_quality_lines(
     entry: DrugClinicalAssessment,
     *,
@@ -467,10 +479,10 @@ def render_evidence_quality_lines(
     quality = entry.evidence_quality or phrase("unknown", report_language)
     matched_name = ""
     if isinstance(entry.matched_livertox_row, dict):
-        matched_name = str(
-            entry.matched_livertox_row.get("drug_name") or ""
-        ).strip()
-    target = matched_name or entry.canonical_name or phrase("not_available", report_language)
+        matched_name = str(entry.matched_livertox_row.get("drug_name") or "").strip()
+    target = (
+        matched_name or entry.canonical_name or phrase("not_available", report_language)
+    )
     warnings = (
         "; ".join(entry.evidence_warnings)
         if entry.evidence_warnings
@@ -481,6 +493,7 @@ def render_evidence_quality_lines(
         f"{phrase('matched_local_record', report_language)}: {target}. "
         f"{phrase('warnings', report_language)}: {warnings}."
     )
+
 
 def sanitize_renderable_body(self, entry: DrugClinicalAssessment) -> str:
     text = entry.paragraph.strip() if entry.paragraph else ""
@@ -523,6 +536,7 @@ def sanitize_renderable_body(self, entry: DrugClinicalAssessment) -> str:
         return ""
     return sanitized
 
+
 def build_fallback_technical_note(
     self,
     entry: DrugClinicalAssessment,
@@ -543,6 +557,7 @@ def build_fallback_technical_note(
         )
     return self.build_error_paragraph(entry, report_language=report_language)
 
+
 def render_unresolved_mentions_section(
     self,
     entries: list[DrugClinicalAssessment],
@@ -551,9 +566,14 @@ def render_unresolved_mentions_section(
 ) -> str | None:
     if not entries:
         return None
-    lines: list[str] = [f"## {report_heading('unresolved_mentions', report_language)}", ""]
+    lines: list[str] = [
+        f"## {report_heading('unresolved_mentions', report_language)}",
+        "",
+    ]
     for entry in entries:
-        label = (entry.drug_name or "").strip() or phrase("unnamed_drug", report_language)
+        label = (entry.drug_name or "").strip() or phrase(
+            "unnamed_drug", report_language
+        )
         reason = self.describe_unresolved_entry(entry, report_language=report_language)
         rucam_summary = (
             rucam_summary_text(entry.rucam, report_language)
@@ -562,6 +582,7 @@ def render_unresolved_mentions_section(
         )
         lines.append(f"- **{label}**: {reason} {rucam_summary}.")
     return "\n".join(lines).strip()
+
 
 def describe_unresolved_entry(
     self,
@@ -587,6 +608,7 @@ def describe_unresolved_entry(
     if entry.missing_livertox:
         return phrase("matched_no_excerpt", report_language)
     return phrase("deterministic_section_unavailable", report_language)
+
 
 def build_excluded_paragraph(
     self,
@@ -628,6 +650,7 @@ def build_excluded_paragraph(
     )
     return f"{detail} {recommendation}"
 
+
 def build_missing_excerpt_paragraph(
     self,
     entry: DrugClinicalAssessment,
@@ -635,6 +658,7 @@ def build_missing_excerpt_paragraph(
 ) -> str:
     _ = entry
     return phrase("livertox_missing", report_language)
+
 
 def build_ambiguous_match_paragraph(
     self,
@@ -651,6 +675,7 @@ def build_ambiguous_match_paragraph(
     guidance = phrase("manual_curation", report_language)
     return f"{note} {details} {guidance}"
 
+
 def build_error_paragraph(
     self,
     entry: DrugClinicalAssessment,
@@ -660,9 +685,8 @@ def build_error_paragraph(
     message = phrase("rucam_insufficient_data", report_language)
     return message
 
-def format_similarity_fragment(
-    self, index: int, record: dict[str, Any]
-) -> str | None:
+
+def format_similarity_fragment(self, index: int, record: dict[str, Any]) -> str | None:
     text = str(record.get("text", "")).strip()
     if not text:
         return None
@@ -672,4 +696,3 @@ def format_similarity_fragment(
         rerank_score=record.get("rerank_score"),
     )
     return f"{header}\n{text}"
-

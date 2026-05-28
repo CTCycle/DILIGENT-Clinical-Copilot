@@ -97,7 +97,9 @@ class _RepositorySerializationService:
         drug_id: int,
         row: dict[str, Any],
     ) -> None:
-        return evidence_data.upsert_livertox_monograph(self, db_session=db_session, drug_id=drug_id, row=row)
+        return evidence_data.upsert_livertox_monograph(
+            self, db_session=db_session, drug_id=drug_id, row=row
+        )
 
     # -----------------------------------------------------------------------------
     def try_assign_livertox_nbk_id(
@@ -107,7 +109,9 @@ class _RepositorySerializationService:
         drug: Drug,
         livertox_nbk_id: str,
     ) -> None:
-        return evidence_data.try_assign_livertox_nbk_id(self, db_session, drug=drug, livertox_nbk_id=livertox_nbk_id)
+        return evidence_data.try_assign_livertox_nbk_id(
+            self, db_session, drug=drug, livertox_nbk_id=livertox_nbk_id
+        )
 
     # -----------------------------------------------------------------------------
     def build_livertox_monograph_key(self, row: dict[str, Any]) -> str:
@@ -121,7 +125,12 @@ class _RepositorySerializationService:
         commit_interval: int | None = None,
         curated_aliases_by_canonical: dict[str, list[tuple[str, str]]] | None = None,
     ) -> None:
-        return fda_data.upsert_drugs_catalog_records(self, records, commit_interval=commit_interval, curated_aliases_by_canonical=curated_aliases_by_canonical)
+        return fda_data.upsert_drugs_catalog_records(
+            self,
+            records,
+            commit_interval=commit_interval,
+            curated_aliases_by_canonical=curated_aliases_by_canonical,
+        )
 
     # -----------------------------------------------------------------------------
     def resolve_commit_interval(self, override: int | None) -> int:
@@ -183,7 +192,15 @@ class _RepositorySerializationService:
         offset: int,
         limit: int,
     ) -> tuple[list[dict[str, Any]], int]:
-        return session_result_data.list_sessions(self, search=search, status_filter=status_filter, date_mode=date_mode, filter_date=filter_date, offset=offset, limit=limit)
+        return session_result_data.list_sessions(
+            self,
+            search=search,
+            status_filter=status_filter,
+            date_mode=date_mode,
+            filter_date=filter_date,
+            offset=offset,
+            limit=limit,
+        )
 
     # -----------------------------------------------------------------------------
     def parse_session_result_payload(
@@ -207,7 +224,9 @@ class _RepositorySerializationService:
     def upsert_session_result_payload(
         self, session_id: int, payload: dict[str, Any]
     ) -> bool:
-        return session_result_data.upsert_session_result_payload(self, session_id, payload)
+        return session_result_data.upsert_session_result_payload(
+            self, session_id, payload
+        )
 
     # -----------------------------------------------------------------------------
     def update_session_text_and_metadata(
@@ -244,7 +263,9 @@ class _RepositorySerializationService:
         offset: int,
         limit: int,
     ) -> tuple[list[dict[str, Any]], int]:
-        return evidence_data.list_rxnav_catalog(self, search=search, offset=offset, limit=limit)
+        return evidence_data.list_rxnav_catalog(
+            self, search=search, offset=offset, limit=limit
+        )
 
     # -----------------------------------------------------------------------------
     def get_rxnav_alias_groups(self, drug_id: int) -> dict[str, Any] | None:
@@ -258,7 +279,9 @@ class _RepositorySerializationService:
         offset: int,
         limit: int,
     ) -> tuple[list[dict[str, Any]], int]:
-        return evidence_data.list_livertox_catalog(self, search=search, offset=offset, limit=limit)
+        return evidence_data.list_livertox_catalog(
+            self, search=search, offset=offset, limit=limit
+        )
 
     # -----------------------------------------------------------------------------
     def get_livertox_excerpt(self, drug_id: int) -> dict[str, Any] | None:
@@ -308,19 +331,25 @@ class _RepositorySerializationService:
     def persist_session_sections(
         self, db_session: Session, session_id: int, session_data: dict[str, Any]
     ) -> None:
-        return session_result_data.persist_session_sections(self, db_session, session_id, session_data)
+        return session_result_data.persist_session_sections(
+            self, db_session, session_id, session_data
+        )
 
     # -----------------------------------------------------------------------------
     def persist_session_labs(
         self, db_session: Session, session_id: int, session_data: dict[str, Any]
     ) -> None:
-        return session_result_data.persist_session_labs(self, db_session, session_id, session_data)
+        return session_result_data.persist_session_labs(
+            self, db_session, session_id, session_data
+        )
 
     # -----------------------------------------------------------------------------
     def persist_session_drugs(
         self, db_session: Session, session_id: int, session_data: dict[str, Any]
     ) -> None:
-        return session_result_data.persist_session_drugs(self, db_session, session_id, session_data)
+        return session_result_data.persist_session_drugs(
+            self, db_session, session_id, session_data
+        )
 
     # -----------------------------------------------------------------------------
     def resolve_drug_id_from_match_cache(
@@ -329,7 +358,9 @@ class _RepositorySerializationService:
         *,
         normalized_drug_key: str,
     ) -> int | None:
-        return evidence_data.resolve_drug_id_from_match_cache(self, db_session, normalized_drug_key=normalized_drug_key)
+        return evidence_data.resolve_drug_id_from_match_cache(
+            self, db_session, normalized_drug_key=normalized_drug_key
+        )
 
     # -----------------------------------------------------------------------------
     def upsert_high_confidence_kb_match_cache(
@@ -347,13 +378,28 @@ class _RepositorySerializationService:
         evidence: dict[str, Any],
         ambiguous: bool,
     ) -> None:
-        return evidence_data.upsert_high_confidence_kb_match_cache(self, db_session, raw_drug_name=raw_drug_name, raw_drug_name_norm=raw_drug_name_norm, normalized_drug_key=normalized_drug_key, drug_id=drug_id, rxnorm_rxcui=rxnorm_rxcui, livertox_nbk_id=livertox_nbk_id, source=source, confidence=confidence, evidence=evidence, ambiguous=ambiguous)
+        return evidence_data.upsert_high_confidence_kb_match_cache(
+            self,
+            db_session,
+            raw_drug_name=raw_drug_name,
+            raw_drug_name_norm=raw_drug_name_norm,
+            normalized_drug_key=normalized_drug_key,
+            drug_id=drug_id,
+            rxnorm_rxcui=rxnorm_rxcui,
+            livertox_nbk_id=livertox_nbk_id,
+            source=source,
+            confidence=confidence,
+            evidence=evidence,
+            ambiguous=ambiguous,
+        )
 
     # -----------------------------------------------------------------------------
     def persist_session_result_payload(
         self, db_session: Session, session_id: int, session_data: dict[str, Any]
     ) -> None:
-        return session_result_data.persist_session_result_payload(self, db_session, session_id, session_data)
+        return session_result_data.persist_session_result_payload(
+            self, db_session, session_id, session_data
+        )
 
     # -----------------------------------------------------------------------------
     def serialize_json_payload(self, payload: Any) -> str | None:
@@ -368,7 +414,13 @@ class _RepositorySerializationService:
         rxcui: str | None,
         nbk_id: str | None,
     ) -> int | None:
-        return evidence_aliases.resolve_drug_id(self, db_session, matched_drug_name=matched_drug_name, rxcui=rxcui, nbk_id=nbk_id)
+        return evidence_aliases.resolve_drug_id(
+            self,
+            db_session,
+            matched_drug_name=matched_drug_name,
+            rxcui=rxcui,
+            nbk_id=nbk_id,
+        )
 
     # -----------------------------------------------------------------------------
     def ensure_drug(
@@ -382,7 +434,16 @@ class _RepositorySerializationService:
         rxnav_last_update: str | None = None,
         use_livertox_nbk_lookup: bool = True,
     ) -> Drug:
-        return evidence_aliases.ensure_drug(self, db_session, canonical_name=canonical_name, canonical_name_norm=canonical_name_norm, rxnorm_rxcui=rxnorm_rxcui, livertox_nbk_id=livertox_nbk_id, rxnav_last_update=rxnav_last_update, use_livertox_nbk_lookup=use_livertox_nbk_lookup)
+        return evidence_aliases.ensure_drug(
+            self,
+            db_session,
+            canonical_name=canonical_name,
+            canonical_name_norm=canonical_name_norm,
+            rxnorm_rxcui=rxnorm_rxcui,
+            livertox_nbk_id=livertox_nbk_id,
+            rxnav_last_update=rxnav_last_update,
+            use_livertox_nbk_lookup=use_livertox_nbk_lookup,
+        )
 
     # -----------------------------------------------------------------------------
     def assign_primary_rxcui_if_missing(
@@ -391,7 +452,9 @@ class _RepositorySerializationService:
         drug: Drug,
         incoming_rxcui: str | None,
     ) -> None:
-        return evidence_aliases.assign_primary_rxcui_if_missing(self, drug=drug, incoming_rxcui=incoming_rxcui)
+        return evidence_aliases.assign_primary_rxcui_if_missing(
+            self, drug=drug, incoming_rxcui=incoming_rxcui
+        )
 
     # -----------------------------------------------------------------------------
     def assign_identifier_if_consistent(
@@ -401,7 +464,9 @@ class _RepositorySerializationService:
         field_name: str,
         incoming_value: str | None,
     ) -> None:
-        return evidence_aliases.assign_identifier_if_consistent(self, drug=drug, field_name=field_name, incoming_value=incoming_value)
+        return evidence_aliases.assign_identifier_if_consistent(
+            self, drug=drug, field_name=field_name, incoming_value=incoming_value
+        )
 
     # -----------------------------------------------------------------------------
     def upsert_drug_rxcui(
@@ -411,7 +476,9 @@ class _RepositorySerializationService:
         drug_id: int,
         rxcui: str | None,
     ) -> None:
-        return evidence_aliases.upsert_drug_rxcui(self, db_session, drug_id=drug_id, rxcui=rxcui)
+        return evidence_aliases.upsert_drug_rxcui(
+            self, db_session, drug_id=drug_id, rxcui=rxcui
+        )
 
     # -----------------------------------------------------------------------------
     def get_drug_by_rxcui(
@@ -427,7 +494,9 @@ class _RepositorySerializationService:
         db_session: Session,
         canonical_name_norm: str | None,
     ) -> Drug | None:
-        return evidence_aliases.get_drug_by_canonical_name_norm(self, db_session, canonical_name_norm)
+        return evidence_aliases.get_drug_by_canonical_name_norm(
+            self, db_session, canonical_name_norm
+        )
 
     # -----------------------------------------------------------------------------
     def get_drug_alias_by_norm(
@@ -464,7 +533,15 @@ class _RepositorySerializationService:
         source: str,
         term_type: str | None,
     ) -> None:
-        return evidence_aliases.upsert_drug_alias(self, db_session, drug_id=drug_id, alias=alias, alias_kind=alias_kind, source=source, term_type=term_type)
+        return evidence_aliases.upsert_drug_alias(
+            self,
+            db_session,
+            drug_id=drug_id,
+            alias=alias,
+            alias_kind=alias_kind,
+            source=source,
+            term_type=term_type,
+        )
 
     # -----------------------------------------------------------------------------
     def persist_livertox_aliases(
@@ -674,7 +751,7 @@ class DocumentSerializer:
             try:
                 with open(file_path, "r", encoding=encoding) as handle:
                     text = handle.read()
-            except (OSError, UnicodeDecodeError):
+            except OSError, UnicodeDecodeError:
                 continue
             return text.strip()
         logger.error("Failed to read text file '%s'", file_path)
@@ -700,9 +777,10 @@ class DocumentSerializer:
         document_title: str | None = None,
     ) -> dict[str, Any]:
         document_id = self.compute_document_id(file_path)
-        resolved_title = self.normalize_title(document_title) or os.path.splitext(
-            os.path.basename(file_path)
-        )[0]
+        resolved_title = (
+            self.normalize_title(document_title)
+            or os.path.splitext(os.path.basename(file_path))[0]
+        )
         return {
             "document_id": document_id,
             "source": file_path,
@@ -736,13 +814,14 @@ class DocumentSerializer:
         try:
             core_xml = archive.read("docProps/core.xml")
             tree = ElementTree.fromstring(core_xml)
-        except (KeyError, ElementTree.ParseError):
+        except KeyError, ElementTree.ParseError:
             return os.path.splitext(os.path.basename(file_path))[0]
         namespaces = {"dc": "http://purl.org/dc/elements/1.1/"}
         node = tree.find("dc:title", namespaces)
-        return self.normalize_title(node.text if node is not None else None) or os.path.splitext(
-            os.path.basename(file_path)
-        )[0]
+        return (
+            self.normalize_title(node.text if node is not None else None)
+            or os.path.splitext(os.path.basename(file_path))[0]
+        )
 
     # -------------------------------------------------------------------------
     def extract_first_heading(self, text: str) -> str | None:
@@ -801,7 +880,9 @@ class DocumentChunker:
         return chunks
 
     # -------------------------------------------------------------------------
-    def split_sections(self, text: str) -> list[tuple[str, int, str | None, str | None]]:
+    def split_sections(
+        self, text: str
+    ) -> list[tuple[str, int, str | None, str | None]]:
         sections: list[tuple[str, int, str | None, str | None]] = []
         heading_stack: list[str] = []
         current_lines: list[str] = []
@@ -865,7 +946,9 @@ class DocumentChunker:
         return chunks
 
     # -------------------------------------------------------------------------
-    def split_oversized_text(self, text: str, start_offset: int) -> list[tuple[str, int]]:
+    def split_oversized_text(
+        self, text: str, start_offset: int
+    ) -> list[tuple[str, int]]:
         normalized = text.strip()
         if len(normalized) <= self.chunk_size:
             return [(normalized, start_offset)]
@@ -925,12 +1008,14 @@ class DocumentChunker:
             for chunk in smart_chunks:
                 chunk_metadata = dict(metadata)
                 chunk_metadata.update(chunk.metadata)
-                chunk_metadata["start_index"] = int(chunk.metadata.get("char_start", 0) or 0)
+                chunk_metadata["start_index"] = int(
+                    chunk.metadata.get("char_start", 0) or 0
+                )
                 chunk_metadata["section_title"] = chunk.metadata.get("section_heading")
                 chunk_metadata["heading_path"] = chunk.metadata.get("section_heading")
-                chunks.append(Document(page_content=chunk.text, metadata=chunk_metadata))
+                chunks.append(
+                    Document(page_content=chunk.text, metadata=chunk_metadata)
+                )
         for index, chunk in enumerate(chunks):
             chunk.metadata["chunk_index"] = index
         return chunks
-
-

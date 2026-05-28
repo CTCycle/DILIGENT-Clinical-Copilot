@@ -94,15 +94,20 @@ def build_unified_dataset(
                 if column not in filler.columns:
                     filler[column] = pd.NA
             filler = cast(pd.DataFrame, filler[dataset.columns])
-            dataset = cast(pd.DataFrame, pd.concat([dataset, filler], ignore_index=True))
+            dataset = cast(
+                pd.DataFrame, pd.concat([dataset, filler], ignore_index=True)
+            )
     dataset = cast(pd.DataFrame, dataset[final_columns])
     return sanitize_unified_dataset(self, dataset)
+
 
 def sanitize_unified_dataset(self, frame: pd.DataFrame) -> pd.DataFrame:
     if frame.empty:
         return frame.copy()
     sanitized = frame.copy()
-    sanitized_drug_names = cast(pd.Series, sanitized["drug_name"]).astype(str).str.strip()
+    sanitized_drug_names = (
+        cast(pd.Series, sanitized["drug_name"]).astype(str).str.strip()
+    )
     sanitized["drug_name"] = sanitized_drug_names
     sanitized = cast(pd.DataFrame, sanitized[sanitized_drug_names != ""])
     numeric_mask = cast(pd.Series, sanitized["drug_name"]).str.fullmatch(r"\d+")
@@ -116,14 +121,10 @@ def sanitize_unified_dataset(self, frame: pd.DataFrame) -> pd.DataFrame:
         if column not in sanitized.columns:
             sanitized[column] = pd.NA
         column_values = cast(pd.Series, sanitized[column])
-        sanitized[column] = column_values.where(
-            pd.notnull(column_values), pd.NA
-        )
+        sanitized[column] = column_values.where(pd.notnull(column_values), pd.NA)
         column_values = cast(pd.Series, sanitized[column]).astype(str).str.strip()
         sanitized[column] = column_values
-        sanitized.loc[
-            column_values.isin(["", "nan", "None", "<NA>"]), column
-        ] = pd.NA
+        sanitized.loc[column_values.isin(["", "nan", "None", "<NA>"]), column] = pd.NA
         column_values = cast(pd.Series, sanitized[column])
         invalid_mask = column_values.notna() & column_values.apply(
             lambda value: livertox_parse.contains_symbol(self, value)
@@ -133,11 +134,10 @@ def sanitize_unified_dataset(self, frame: pd.DataFrame) -> pd.DataFrame:
 
     excerpt_values = cast(pd.Series, sanitized["excerpt"]).astype(str).str.strip()
     sanitized["excerpt"] = excerpt_values
-    sanitized.loc[
-        excerpt_values.isin(["", "nan", "None", "NaT"]), "excerpt"
-    ] = pd.NA
+    sanitized.loc[excerpt_values.isin(["", "nan", "None", "NaT"]), "excerpt"] = pd.NA
     sanitized.loc[cast(pd.Series, sanitized["excerpt"]).isna(), "excerpt"] = pd.NA
     return sanitized.reset_index(drop=True)
+
 
 def finalize_dataset(self, frame: pd.DataFrame) -> pd.DataFrame:
     if frame.empty:
@@ -147,9 +147,7 @@ def finalize_dataset(self, frame: pd.DataFrame) -> pd.DataFrame:
         if column == "drug_name":
             continue
         column_values = cast(pd.Series, finalized[column])
-        finalized[column] = column_values.where(
-            pd.notnull(column_values), pd.NA
-        )
+        finalized[column] = column_values.where(pd.notnull(column_values), pd.NA)
         column_values = cast(pd.Series, finalized[column]).astype(str).str.strip()
         finalized[column] = column_values
         finalized.loc[
@@ -198,10 +196,7 @@ def finalize_dataset(self, frame: pd.DataFrame) -> pd.DataFrame:
         .fillna("")
         .astype(str)
         .str.casefold(),
-        _source_url_sort=finalized["source_url"]
-        .fillna("")
-        .astype(str)
-        .str.casefold(),
+        _source_url_sort=finalized["source_url"].fillna("").astype(str).str.casefold(),
         _last_update_sort=finalized["last_update"]
         .fillna("")
         .astype(str)

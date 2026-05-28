@@ -36,4 +36,3 @@ def reload_reference_catalog_snapshot() -> ReferenceCatalogSnapshot:
 
 def reset_reference_catalog_snapshot_for_tests() -> None:
     get_reference_catalog_snapshot.cache_clear()
-

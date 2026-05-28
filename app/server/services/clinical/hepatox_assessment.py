@@ -74,7 +74,6 @@ RATE_LIMIT_WAIT_HINT_RE = re.compile(
 
 ###############################################################################
 class HepatotoxicityPatternCalculator:
-    
     # -------------------------------------------------------------------------
     def calculate(
         self,
@@ -305,6 +304,7 @@ class HepatotoxicityPatternAnalyzer:
 
 # Extracted from the facade module; functions intentionally accept the facade instance.
 
+
 async def run_analysis(
     self,
     *,
@@ -316,9 +316,7 @@ async def run_analysis(
     progress_callback: Callable[[str, float], None] | None = None,
 ) -> dict[str, Any] | None:
     if prepared_inputs is None:
-        logger.info(
-            "No prepared inputs provided; skipping hepatotoxicity consultation"
-        )
+        logger.info("No prepared inputs provided; skipping hepatotoxicity consultation")
         return None
 
     resolved_mapping = prepared_inputs.resolved_drugs
@@ -338,6 +336,7 @@ async def run_analysis(
         progress_callback=progress_callback,
     )
     return report.model_dump()
+
 
 async def compile_clinical_assessment(
     self,
@@ -435,11 +434,13 @@ async def compile_clinical_assessment(
 
     return PatientDrugClinicalReport(entries=entries, final_report=final_report)
 
+
 async def execute_indexed_job(index: int, coroutine: Any) -> tuple[int, Any]:
     try:
         return index, await coroutine
     except Exception as exc:  # noqa: BLE001
         return index, exc
+
 
 async def execute_bounded_job(
     self,
@@ -449,6 +450,7 @@ async def execute_bounded_job(
 ) -> tuple[int, Any]:
     async with semaphore:
         return await self.execute_indexed_job(index, coroutine)
+
 
 async def prepare_drug_assessment(
     self,
@@ -491,9 +493,7 @@ async def prepare_drug_assessment(
     ambiguous_match = bool(livertox_data.get("ambiguous_match"))
     raw_match_status = livertox_data.get("match_status")
     match_status = (
-        str(raw_match_status).strip().lower()
-        if raw_match_status is not None
-        else None
+        str(raw_match_status).strip().lower() if raw_match_status is not None else None
     )
     match_candidates = [
         str(candidate).strip()
@@ -509,7 +509,7 @@ async def prepare_drug_assessment(
     if match_confidence is not None:
         try:
             match_confidence = float(match_confidence)
-        except (TypeError, ValueError):
+        except TypeError, ValueError:
             match_confidence = None
     match_reason = livertox_data.get("match_reason")
     match_quality = classify_match_evidence(
@@ -554,9 +554,7 @@ async def prepare_drug_assessment(
         ambiguous_match=ambiguous_match,
         match_status=match_status,
         match_confidence=match_confidence,
-        match_reason=str(match_reason).strip()
-        if match_reason is not None
-        else None,
+        match_reason=str(match_reason).strip() if match_reason is not None else None,
         match_notes=match_notes,
         evidence_quality=match_quality["evidence_quality"],
         evidence_warnings=match_quality["evidence_warnings"],
@@ -605,6 +603,7 @@ async def prepare_drug_assessment(
     )
     return entry, (idx, job)
 
+
 def resolve_livertox_data_for_entry(
     self,
     *,
@@ -643,6 +642,7 @@ def resolve_livertox_data_for_entry(
         return exact
     return grouped[0]
 
+
 def livertox_payload_rank(payload: dict[str, Any]) -> int:
     status = str(payload.get("match_status") or "").strip().lower()
     if status == "matched_with_excerpt":
@@ -656,6 +656,7 @@ def livertox_payload_rank(payload: dict[str, Any]) -> int:
     if status in {"missing", "missing_match"} or payload.get("missing_livertox"):
         return 1
     return 0
+
 
 async def fetch_rag_documents(
     self, rag_query: dict[str, str] | None, drug_name: str
@@ -687,6 +688,7 @@ async def fetch_rag_documents(
         self.record_rag_retrieval_issue(drug_name=drug_name, error=exc)
         return f"No additional documents provided (reason: RAG retrieval unavailable: {exc})."
 
+
 def record_rag_retrieval_issue(self, *, drug_name: str, error: Exception) -> None:
     issue = PipelineIssue(
         severity="warning",
@@ -702,6 +704,7 @@ def record_rag_retrieval_issue(self, *, drug_name: str, error: Exception) -> Non
         self.pipeline_issues = []
     self.pipeline_issues.append(issue)
 
+
 def ensure_similarity_search(self) -> bool:
     if self.similarity_search is not None:
         return True
@@ -712,6 +715,7 @@ def ensure_similarity_search(self) -> bool:
         self.similarity_search = None
         return False
     return True
+
 
 def select_excerpt(self, excerpts: list[str]) -> str | None:
     excerpts = [chunk.strip() for chunk in excerpts if chunk.strip()]
@@ -726,6 +730,7 @@ def select_excerpt(self, excerpts: list[str]) -> str | None:
     if cutoff > 2000:
         truncated = truncated[:cutoff]
     return truncated.strip()
+
 
 def search_supporting_documents(self, query_text: str | Any) -> str | None:
     if not isinstance(query_text, str):
@@ -754,6 +759,7 @@ def search_supporting_documents(self, query_text: str | Any) -> str | None:
     if not fragments:
         return None
     return "\n".join(fragments)
+
 
 async def repair_language_once(
     self,
@@ -786,6 +792,7 @@ async def repair_language_once(
         chat_kwargs["options"] = {"temperature": 0.0}
     repaired = await self.llm_client.chat(**chat_kwargs)
     return self.coerce_chat_text(repaired).strip()
+
 
 async def request_drug_analysis(
     self,
@@ -893,6 +900,7 @@ async def request_drug_analysis(
             response_text = repaired_text
     return response_text
 
+
 def coerce_chat_text(raw_response: Any) -> str:
     if isinstance(raw_response, str):
         return raw_response.strip()
@@ -904,6 +912,7 @@ def coerce_chat_text(raw_response: Any) -> str:
         return json.dumps(raw_response, ensure_ascii=False)
     return str(raw_response).strip()
 
+
 def extract_rate_limit_wait_hint_seconds(exc: Exception) -> float | None:
     message = str(exc)
     match = RATE_LIMIT_WAIT_HINT_RE.search(message)
@@ -911,22 +920,22 @@ def extract_rate_limit_wait_hint_seconds(exc: Exception) -> float | None:
         return None
     try:
         parsed = float(match.group(1))
-    except (TypeError, ValueError):
+    except TypeError, ValueError:
         return None
     if parsed <= 0:
         return None
     # Add a small safety margin to avoid retrying too early.
     return min(parsed + 0.25, 30.0)
 
-def retry_backoff_seconds(
-    self, attempt: int, *, exc: Exception | None = None
-) -> float:
+
+def retry_backoff_seconds(self, attempt: int, *, exc: Exception | None = None) -> float:
     if exc is not None:
         hinted_wait = self.extract_rate_limit_wait_hint_seconds(exc)
         if hinted_wait is not None:
             return hinted_wait
     normalized_attempt = max(int(attempt), 1)
     return min(8.0, 0.75 * (2 ** (normalized_attempt - 1)))
+
 
 async def finalize_patient_report(
     self,
@@ -977,9 +986,11 @@ async def finalize_patient_report(
             combined_report = f"{combined_report}\n\n## {heading}\n\n{conclusion}"
     return combined_report
 
+
 def should_render_as_matched_drug(entry: DrugClinicalAssessment) -> bool:
     status = (entry.match_status or "").strip().lower()
     return status in {"matched", "matched_with_excerpt", "matched_no_excerpt"}
+
 
 async def generate_conclusion(
     self,
@@ -1045,6 +1056,7 @@ async def generate_conclusion(
             conclusion = repaired
     return conclusion or None
 
+
 def bibliography_source_label(self) -> str:
     return get_text_normalization_snapshot().knowledge_source_references.get(
         "livertox", "LiverTox"
@@ -1052,7 +1064,11 @@ def bibliography_source_label(self) -> str:
 
 
 def summarize_drug_source_context(entry: DrugEntry) -> str:
-    source = (entry.source or "unknown").strip() if isinstance(entry.source, str) else "unknown"
+    source = (
+        (entry.source or "unknown").strip()
+        if isinstance(entry.source, str)
+        else "unknown"
+    )
     if source == "therapy":
         return "Current/past therapy section entry."
     if source == "anamnesis":
@@ -1065,7 +1081,9 @@ def assess_temporal_plausibility(
     lab_timeline: PatientLabTimeline | None,
 ) -> str:
     _ = lab_timeline
-    if entry.therapy_start_date and (entry.suspension_status is not None or entry.suspension_date):
+    if entry.therapy_start_date and (
+        entry.suspension_status is not None or entry.suspension_date
+    ):
         return "Temporal sequence available for plausibility assessment."
     if entry.therapy_start_date:
         return "Therapy start is available; temporal assessment is partially supported."

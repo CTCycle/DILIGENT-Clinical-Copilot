@@ -25,10 +25,12 @@ def test_runtime_snapshot_values_and_metadata() -> None:
             )
         ]
     )
-    assert snapshot.values("text_normalization", "matching_stopwords", key="default") == (
-        "mg",
+    assert snapshot.values(
+        "text_normalization", "matching_stopwords", key="default"
+    ) == ("mg",)
+    assert (
+        snapshot.metadata("text_normalization", "matching_stopwords", "default")[
+            "match_mode"
+        ]
+        == "token"
     )
-    assert snapshot.metadata("text_normalization", "matching_stopwords", "default")[
-        "match_mode"
-    ] == "token"
-

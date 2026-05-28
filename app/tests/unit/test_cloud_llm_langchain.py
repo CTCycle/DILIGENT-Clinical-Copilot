@@ -317,4 +317,3 @@ def test_provider_exception_maps_to_existing_error_types(monkeypatch) -> None:
         assert False, "Expected timeout mapping"
     except cloud_module.LLMTimeout:
         pass
-

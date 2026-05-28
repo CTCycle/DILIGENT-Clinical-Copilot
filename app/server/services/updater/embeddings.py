@@ -33,13 +33,9 @@ class RagEmbeddingUpdater:
         self.documents_path = documents_path or DOCS_PATH
         resolved_documents_path = Path(self.documents_path)
         if not resolved_documents_path.is_absolute():
-            raise ValueError(
-                "RAG documents_path must be an absolute path."
-            )
+            raise ValueError("RAG documents_path must be an absolute path.")
         if not resolved_documents_path.exists() or not resolved_documents_path.is_dir():
-            raise ValueError(
-                "RAG documents_path does not exist or is not a directory."
-            )
+            raise ValueError("RAG documents_path does not exist or is not a directory.")
         self.documents_path = str(resolved_documents_path)
         default_use_cloud = get_server_settings().rag.use_cloud_embeddings
         self.use_cloud_embeddings = (
@@ -53,7 +49,9 @@ class RagEmbeddingUpdater:
             vector_collection_name or get_server_settings().rag.vector_collection_name
         )
         self.chunk_size = int(
-            chunk_size if chunk_size is not None else get_server_settings().rag.chunk_size
+            chunk_size
+            if chunk_size is not None
+            else get_server_settings().rag.chunk_size
         )
         self.chunk_overlap = int(
             chunk_overlap
@@ -141,4 +139,3 @@ class RagEmbeddingUpdater:
 
 
 __all__ = ["RagEmbeddingUpdater"]
-

@@ -213,7 +213,7 @@ class DiseaseExtractor:
             return None
         try:
             parsed = float(match.group(1))
-        except (TypeError, ValueError):
+        except TypeError, ValueError:
             return None
         if parsed <= 0:
             return None
@@ -248,12 +248,16 @@ class DiseaseExtractor:
         unresolved_source = "\n".join(deterministic.unresolved_lines).strip()
         if not unresolved_source:
             self.emit_progress(progress_callback, 1.0)
-            return PatientDiseaseContext(entries=self.deduplicate_entries(accumulated_entries))
+            return PatientDiseaseContext(
+                entries=self.deduplicate_entries(accumulated_entries)
+            )
 
         await self.ensure_client()
         if self.client is None:
             self.emit_progress(progress_callback, 1.0)
-            return PatientDiseaseContext(entries=self.deduplicate_entries(accumulated_entries))
+            return PatientDiseaseContext(
+                entries=self.deduplicate_entries(accumulated_entries)
+            )
 
         chunks = self.chunk_text(unresolved_source)
         raw_entries: list[DiseaseContextEntry] = []
@@ -322,4 +326,3 @@ class DiseaseExtractor:
         )
         self.emit_progress(progress_callback, 1.0)
         return PatientDiseaseContext(entries=deduplicated)
-

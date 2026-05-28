@@ -8,14 +8,7 @@ from services.session.text_section_parser import parse_initial_text_sections
 
 
 def test_parses_required_sections_with_line_ranges() -> None:
-    text = (
-        "ANAMNESIS\n"
-        "history text\n"
-        "DRUGS:\n"
-        "drug row\n"
-        "LABORATORY ANALYSIS\n"
-        "lab row\n"
-    )
+    text = "ANAMNESIS\nhistory text\nDRUGS:\ndrug row\nLABORATORY ANALYSIS\nlab row\n"
     result = parse_initial_text_sections(text)
     assert result.missing_required_sections == []
     assert result.malformed_sections == []

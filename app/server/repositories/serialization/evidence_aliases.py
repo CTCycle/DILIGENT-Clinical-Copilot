@@ -6,11 +6,17 @@ import pandas as pd
 from sqlalchemy.orm import Session
 
 from repositories.queries.drugs import DrugRepositoryQueries
-from repositories.schemas.models import Drug, DrugAlias, DrugRxnormCode, LiverToxMonograph
+from repositories.schemas.models import (
+    Drug,
+    DrugAlias,
+    DrugRxnormCode,
+    LiverToxMonograph,
+)
 from repositories.serialization.evidence_data import normalize_drug_name
 from services.text.synonyms import parse_synonym_list, split_synonym_variants
 
 # Extracted from the facade helper module; functions intentionally accept the facade instance.
+
 
 def resolve_drug_id(
     self,
@@ -35,6 +41,7 @@ def resolve_drug_id(
     if alias is None:
         return None
     return int(alias.drug_id)
+
 
 def ensure_drug(
     self,
@@ -99,6 +106,7 @@ def ensure_drug(
         candidate.rxnav_last_update = normalized_rxnav_last_update
     return candidate
 
+
 def assign_primary_rxcui_if_missing(
     self,
     *,
@@ -110,6 +118,7 @@ def assign_primary_rxcui_if_missing(
     current_rxcui = self.normalize_string(drug.rxnorm_rxcui)
     if current_rxcui is None:
         drug.rxnorm_rxcui = incoming_rxcui
+
 
 def assign_identifier_if_consistent(
     self,
@@ -129,6 +138,7 @@ def assign_identifier_if_consistent(
     if current_value is None:
         setattr(drug, field_name, incoming_value)
 
+
 def upsert_drug_rxcui(
     self,
     db_session: Session,
@@ -140,9 +150,7 @@ def upsert_drug_rxcui(
     if normalized_rxcui is None:
         return
     existing = (
-        db_session.execute(
-            DrugRepositoryQueries.drug_rxcui_mapping(normalized_rxcui)
-        )
+        db_session.execute(DrugRepositoryQueries.drug_rxcui_mapping(normalized_rxcui))
         .scalars()
         .first()
     )
@@ -155,6 +163,7 @@ def upsert_drug_rxcui(
             f"(rxcui='{normalized_rxcui}', existing_drug_id={int(existing.drug_id)}, incoming_drug_id={drug_id})"
         )
 
+
 def get_drug_by_rxcui(
     self,
     db_session: Session,
@@ -164,21 +173,18 @@ def get_drug_by_rxcui(
     if normalized_rxcui is None:
         return None
     mapped = (
-        db_session.execute(
-            DrugRepositoryQueries.drug_by_joined_rxcui(normalized_rxcui)
-        )
+        db_session.execute(DrugRepositoryQueries.drug_by_joined_rxcui(normalized_rxcui))
         .scalars()
         .first()
     )
     if mapped is not None:
         return mapped
     return (
-        db_session.execute(
-            DrugRepositoryQueries.drug_by_rxnorm_rxcui(normalized_rxcui)
-        )
+        db_session.execute(DrugRepositoryQueries.drug_by_rxnorm_rxcui(normalized_rxcui))
         .scalars()
         .first()
     )
+
 
 def get_drug_by_canonical_name_norm(
     self,
@@ -195,6 +201,7 @@ def get_drug_by_canonical_name_norm(
         .first()
     )
 
+
 def get_drug_alias_by_norm(
     self,
     db_session: Session,
@@ -208,6 +215,7 @@ def get_drug_alias_by_norm(
         .first()
     )
 
+
 def get_monograph_by_drug_id(
     self,
     db_session: Session,
@@ -219,6 +227,7 @@ def get_monograph_by_drug_id(
         .first()
     )
 
+
 def get_monograph_by_key(
     self,
     db_session: Session,
@@ -229,6 +238,7 @@ def get_monograph_by_key(
         .scalars()
         .first()
     )
+
 
 def upsert_drug_alias(
     self,
@@ -273,6 +283,7 @@ def upsert_drug_alias(
     if existing.term_type is None and term_type is not None:
         existing.term_type = term_type
 
+
 def persist_livertox_aliases(
     self, db_session: Session, drug_id: int, row: dict[str, Any]
 ) -> None:
@@ -304,6 +315,7 @@ def persist_livertox_aliases(
             term_type=None,
         )
 
+
 def extract_text_candidates(self, value: Any) -> list[str]:
     if value is None:
         return []
@@ -319,11 +331,13 @@ def extract_text_candidates(self, value: Any) -> list[str]:
     collected.extend(split_synonym_variants(text_value))
     return self.unique_text(collected)
 
+
 def extract_synonym_candidates(self, value: Any) -> list[str]:
     collected: list[str] = []
     for item in parse_synonym_list(value):
         collected.extend(split_synonym_variants(item))
     return self.unique_text(collected)
+
 
 def unique_text(self, values: list[str]) -> list[str]:
     unique: dict[str, str] = {}
@@ -335,6 +349,7 @@ def unique_text(self, values: list[str]) -> list[str]:
         if key not in unique:
             unique[key] = normalized
     return list(unique.values())
+
 
 def build_alias_lookup_by_kind(
     self, aliases_frame: pd.DataFrame
@@ -353,6 +368,7 @@ def build_alias_lookup_by_kind(
         values.add(alias)
     return lookup
 
+
 def group_aliases_by_kind(self, aliases: list[DrugAlias]) -> dict[str, set[str]]:
     grouped: dict[str, set[str]] = {}
     for alias in aliases:
@@ -362,6 +378,7 @@ def group_aliases_by_kind(self, aliases: list[DrugAlias]) -> dict[str, set[str]]
             continue
         grouped.setdefault(alias_kind.casefold(), set()).add(alias_value)
     return grouped
+
 
 def alias_values_for_kind(self, aliases: pd.DataFrame, alias_kind: str) -> set[str]:
     if aliases.empty:
@@ -375,6 +392,7 @@ def alias_values_for_kind(self, aliases: pd.DataFrame, alias_kind: str) -> set[s
         if normalized is not None:
             values.add(normalized)
     return values
+
 
 def alias_model_values_for_kind(
     self,
@@ -392,11 +410,11 @@ def alias_model_values_for_kind(
             values.add(normalized)
     return values
 
+
 def first_alias_value(self, aliases: pd.DataFrame, alias_kind: str) -> str | None:
-    values = sorted(
-        self.alias_values_for_kind(aliases, alias_kind), key=str.casefold
-    )
+    values = sorted(self.alias_values_for_kind(aliases, alias_kind), key=str.casefold)
     return values[0] if values else None
+
 
 def first_alias_term_type(self, aliases: pd.DataFrame) -> str | None:
     if aliases.empty or "term_type" not in aliases.columns:
@@ -407,6 +425,7 @@ def first_alias_term_type(self, aliases: pd.DataFrame) -> str | None:
             return normalized
     return None
 
+
 def first_alias_model_value(
     self,
     aliases: list[DrugAlias],
@@ -416,6 +435,7 @@ def first_alias_model_value(
         self.alias_model_values_for_kind(aliases, alias_kind), key=str.casefold
     )
     return values[0] if values else None
+
 
 def first_alias_model_term_type(self, aliases: list[DrugAlias]) -> str | None:
     for alias in aliases:

@@ -47,7 +47,7 @@ def _env_float(name: str, default: float) -> float:
         return default
     try:
         return float(raw)
-    except (TypeError, ValueError):
+    except TypeError, ValueError:
         return default
 
 
@@ -122,6 +122,7 @@ ollama_chat.OllamaError = OllamaError
 ollama_chat.OllamaTimeout = OllamaTimeout
 ollama_chat._map_ollama_langchain_exception = _map_ollama_langchain_exception
 ollama_structured.OllamaError = OllamaError
+
 
 class OllamaClient:
     """
@@ -286,7 +287,9 @@ class OllamaClient:
         *,
         running_models: dict[str, dict[str, Any]] | None = None,
     ) -> tuple[int, int]:
-        return await ollama_residency.get_model_footprint_bytes(self, model, running_models=running_models)
+        return await ollama_residency.get_model_footprint_bytes(
+            self, model, running_models=running_models
+        )
 
     # -------------------------------------------------------------------------
     async def evaluate_dual_residency_plan(self) -> dict[str, Any]:
@@ -298,7 +301,9 @@ class OllamaClient:
         *,
         force_refresh: bool = False,
     ) -> dict[str, Any]:
-        return await ollama_residency.get_cached_residency_plan(self, force_refresh=force_refresh)
+        return await ollama_residency.get_cached_residency_plan(
+            self, force_refresh=force_refresh
+        )
 
     # -------------------------------------------------------------------------
     async def resolve_policy_keep_alive(
@@ -307,7 +312,9 @@ class OllamaClient:
         active_model: str,
         requested_keep_alive: str | None,
     ) -> str | None:
-        return await ollama_residency.resolve_policy_keep_alive(self, active_model=active_model, requested_keep_alive=requested_keep_alive)
+        return await ollama_residency.resolve_policy_keep_alive(
+            self, active_model=active_model, requested_keep_alive=requested_keep_alive
+        )
 
     # -------------------------------------------------------------------------
     def record_target_usage(self, model: str) -> None:
@@ -320,7 +327,9 @@ class OllamaClient:
         current_model: str,
         target_models: list[str],
     ) -> str | None:
-        return ollama_residency.predict_next_target_model(self, current_model=current_model, target_models=target_models)
+        return ollama_residency.predict_next_target_model(
+            self, current_model=current_model, target_models=target_models
+        )
 
     def _recent_residency_history(
         self, candidates: list[str]
@@ -349,7 +358,13 @@ class OllamaClient:
         frequency: dict[str, int],
         transitions: dict[tuple[str, str], int],
     ) -> str | None:
-        return ollama_residency._select_target_model(current_model=current_model, candidates=candidates, history=history, frequency=frequency, transitions=transitions)
+        return ollama_residency._select_target_model(
+            current_model=current_model,
+            candidates=candidates,
+            history=history,
+            frequency=frequency,
+            transitions=transitions,
+        )
 
     # -------------------------------------------------------------------------
     def handle_prefetch_task_done(self, task: asyncio.Task[None]) -> None:
@@ -362,11 +377,15 @@ class OllamaClient:
         model: str,
         keep_alive: str,
     ) -> None:
-        return await ollama_residency.prefetch_model(self, model=model, keep_alive=keep_alive)
+        return await ollama_residency.prefetch_model(
+            self, model=model, keep_alive=keep_alive
+        )
 
     # -------------------------------------------------------------------------
     async def maybe_prefetch_target_model(self, *, active_model: str) -> None:
-        return await ollama_residency.maybe_prefetch_target_model(self, active_model=active_model)
+        return await ollama_residency.maybe_prefetch_target_model(
+            self, active_model=active_model
+        )
 
     # -------------------------------------------------------------------------
     def prepare_generation_parameters(
@@ -376,7 +395,9 @@ class OllamaClient:
         think: bool | None,
         options: dict[str, Any] | None,
     ) -> tuple[float, bool, dict[str, Any] | None]:
-        return ollama_chat.prepare_generation_parameters(self, temperature=temperature, think=think, options=options)
+        return ollama_chat.prepare_generation_parameters(
+            self, temperature=temperature, think=think, options=options
+        )
 
     # -------------------------------------------------------------------------
     @staticmethod
@@ -394,7 +415,9 @@ class OllamaClient:
         options: dict[str, Any] | None,
         keep_alive: str | None,
     ) -> dict[str, Any]:
-        return ollama_chat.compose_payload(payload, format=format, options=options, keep_alive=keep_alive)
+        return ollama_chat.compose_payload(
+            payload, format=format, options=options, keep_alive=keep_alive
+        )
 
     # -------------------------------------------------------------------------
     def build_chat_payload(
@@ -409,7 +432,17 @@ class OllamaClient:
         options: dict[str, Any] | None,
         keep_alive: str | None,
     ) -> dict[str, Any]:
-        return ollama_chat.build_chat_payload(self, model=model, messages=messages, stream=stream, format=format, temperature=temperature, think=think, options=options, keep_alive=keep_alive)
+        return ollama_chat.build_chat_payload(
+            self,
+            model=model,
+            messages=messages,
+            stream=stream,
+            format=format,
+            temperature=temperature,
+            think=think,
+            options=options,
+            keep_alive=keep_alive,
+        )
 
     # -------------------------------------------------------------------------
     def build_generate_payload(
@@ -424,7 +457,17 @@ class OllamaClient:
         options: dict[str, Any] | None,
         keep_alive: str | None,
     ) -> dict[str, Any]:
-        return ollama_chat.build_generate_payload(self, model=model, prompt=prompt, stream=stream, format=format, temperature=temperature, think=think, options=options, keep_alive=keep_alive)
+        return ollama_chat.build_generate_payload(
+            self,
+            model=model,
+            prompt=prompt,
+            stream=stream,
+            format=format,
+            temperature=temperature,
+            think=think,
+            options=options,
+            keep_alive=keep_alive,
+        )
 
     # -------------------------------------------------------------------------
     async def ensure_context_option(
@@ -435,7 +478,9 @@ class OllamaClient:
         prompt: str | None,
         options: dict[str, Any] | None,
     ) -> dict[str, Any] | None:
-        return await ollama_chat.ensure_context_option(self, model=model, messages=messages, prompt=prompt, options=options)
+        return await ollama_chat.ensure_context_option(
+            self, model=model, messages=messages, prompt=prompt, options=options
+        )
 
     # -------------------------------------------------------------------------
     async def prepare_common_options(
@@ -448,7 +493,15 @@ class OllamaClient:
         messages: list[dict[str, str]] | None = None,
         prompt: str | None = None,
     ) -> tuple[str, float, bool, dict[str, Any] | None]:
-        return await ollama_chat.prepare_common_options(self, model=model, temperature=temperature, think=think, options=options, messages=messages, prompt=prompt)
+        return await ollama_chat.prepare_common_options(
+            self,
+            model=model,
+            temperature=temperature,
+            think=think,
+            options=options,
+            messages=messages,
+            prompt=prompt,
+        )
 
     # -------------------------------------------------------------------------
     async def ensure_model_ready(self, name: str) -> None:
@@ -465,7 +518,15 @@ class OllamaClient:
         options: dict[str, Any] | None,
         keep_alive: str | None,
     ) -> ChatOllama:
-        return ollama_chat._build_ollama_chat_model(self, model=model, format=format, temperature=temperature, think=think, options=options, keep_alive=keep_alive)
+        return ollama_chat._build_ollama_chat_model(
+            self,
+            model=model,
+            format=format,
+            temperature=temperature,
+            think=think,
+            options=options,
+            keep_alive=keep_alive,
+        )
 
     # -------------------------------------------------------------------------
     def _build_ollama_embeddings_model(
@@ -524,7 +585,13 @@ class OllamaClient:
         progress_callback: ProgressCb | None = None,
         poll_sleep_s: float = 0.0,
     ) -> None:
-        return await ollama_chat.pull(self, name, stream=stream, progress_callback=progress_callback, poll_sleep_s=poll_sleep_s)
+        return await ollama_chat.pull(
+            self,
+            name,
+            stream=stream,
+            progress_callback=progress_callback,
+            poll_sleep_s=poll_sleep_s,
+        )
 
     # -------------------------------------------------------------------------
     async def pull_stream(
@@ -534,7 +601,12 @@ class OllamaClient:
         progress_callback: ProgressCb | None,
         poll_sleep_s: float,
     ) -> bool:
-        return await ollama_chat.pull_stream(self, payload=payload, progress_callback=progress_callback, poll_sleep_s=poll_sleep_s)
+        return await ollama_chat.pull_stream(
+            self,
+            payload=payload,
+            progress_callback=progress_callback,
+            poll_sleep_s=poll_sleep_s,
+        )
 
     # -------------------------------------------------------------------------
     async def pull_once(self, *, payload: dict[str, Any]) -> bool:
@@ -559,7 +631,9 @@ class OllamaClient:
         wait_timeout_s: float = get_server_settings().runtime.ollama_server_start_timeout,
         poll_interval_s: float = get_server_settings().jobs.polling_interval,
     ) -> Literal["started", "already_running"]:
-        return await ollama_chat.start_server(self, wait_timeout_s=wait_timeout_s, poll_interval_s=poll_interval_s)
+        return await ollama_chat.start_server(
+            self, wait_timeout_s=wait_timeout_s, poll_interval_s=poll_interval_s
+        )
 
     # -------------------------------------------------------------------------
     @staticmethod
@@ -605,7 +679,9 @@ class OllamaClient:
     async def check_model_availability(
         self, name: str, *, auto_pull: bool = True
     ) -> None:
-        return await ollama_chat.check_model_availability(self, name, auto_pull=auto_pull)
+        return await ollama_chat.check_model_availability(
+            self, name, auto_pull=auto_pull
+        )
 
     # -------------------------------------------------------------------------
     async def chat(
@@ -619,7 +695,16 @@ class OllamaClient:
         options: dict[str, Any] | None = None,
         keep_alive: str | None = None,
     ) -> dict[str, Any] | str:
-        return await ollama_chat.chat(self, model=model, messages=messages, format=format, temperature=temperature, think=think, options=options, keep_alive=keep_alive)
+        return await ollama_chat.chat(
+            self,
+            model=model,
+            messages=messages,
+            format=format,
+            temperature=temperature,
+            think=think,
+            options=options,
+            keep_alive=keep_alive,
+        )
 
     # -------------------------------------------------------------------------
     async def chat_stream(
@@ -670,7 +755,15 @@ class OllamaClient:
         padding_tokens: int = 32,
         slack_ratio: float = 0.2,
     ) -> int | None:
-        return await ollama_chat.calculate_context_window(self, model=model, messages=messages, prompt=prompt, min_ctx=min_ctx, padding_tokens=padding_tokens, slack_ratio=slack_ratio)
+        return await ollama_chat.calculate_context_window(
+            self,
+            model=model,
+            messages=messages,
+            prompt=prompt,
+            min_ctx=min_ctx,
+            padding_tokens=padding_tokens,
+            slack_ratio=slack_ratio,
+        )
 
     # -------------------------------------------------------------------------
     async def collect_structured_fallbacks(self, preferred: list[str]) -> list[str]:
@@ -688,7 +781,16 @@ class OllamaClient:
         use_json_mode: bool = True,
         max_repair_attempts: int = 2,
     ) -> T:
-        return await ollama_structured.llm_structured_call(self, model=model, system_prompt=system_prompt, user_prompt=user_prompt, schema=schema, temperature=temperature, use_json_mode=use_json_mode, max_repair_attempts=max_repair_attempts)
+        return await ollama_structured.llm_structured_call(
+            self,
+            model=model,
+            system_prompt=system_prompt,
+            user_prompt=user_prompt,
+            schema=schema,
+            temperature=temperature,
+            use_json_mode=use_json_mode,
+            max_repair_attempts=max_repair_attempts,
+        )
 
     # -------------------------------------------------------------------------
     @staticmethod
@@ -698,7 +800,11 @@ class OllamaClient:
         user_prompt: str,
         format_instructions: str,
     ) -> list[dict[str, str]]:
-        return ollama_structured.build_structured_messages(system_prompt=system_prompt, user_prompt=user_prompt, format_instructions=format_instructions)
+        return ollama_structured.build_structured_messages(
+            system_prompt=system_prompt,
+            user_prompt=user_prompt,
+            format_instructions=format_instructions,
+        )
 
     # -------------------------------------------------------------------------
     async def resolve_text_extraction_models(self, model: str) -> list[str]:
@@ -718,7 +824,13 @@ class OllamaClient:
         use_json_mode: bool,
         temperature: float,
     ) -> dict[str, Any] | str:
-        return await ollama_structured._chat_structured_model(self, active_model=active_model, messages=messages, use_json_mode=use_json_mode, temperature=temperature)
+        return await ollama_structured._chat_structured_model(
+            self,
+            active_model=active_model,
+            messages=messages,
+            use_json_mode=use_json_mode,
+            temperature=temperature,
+        )
 
     # -------------------------------------------------------------------------
     async def _extend_structured_model_queue(
@@ -729,7 +841,13 @@ class OllamaClient:
         tried: set[str],
         fallbacks: list[str] | None,
     ) -> list[str]:
-        return await ollama_structured._extend_structured_model_queue(self, queue=queue, preferred_models=preferred_models, tried=tried, fallbacks=fallbacks)
+        return await ollama_structured._extend_structured_model_queue(
+            self,
+            queue=queue,
+            preferred_models=preferred_models,
+            tried=tried,
+            fallbacks=fallbacks,
+        )
 
     # -------------------------------------------------------------------------
     @staticmethod
@@ -743,7 +861,9 @@ class OllamaClient:
         last_missing_error: Exception | None,
         missing: list[str],
     ) -> NoReturn:
-        return ollama_structured._raise_structured_models_exhausted(last_missing_error=last_missing_error, missing=missing)
+        return ollama_structured._raise_structured_models_exhausted(
+            last_missing_error=last_missing_error, missing=missing
+        )
 
     # -------------------------------------------------------------------------
     @staticmethod
@@ -753,7 +873,11 @@ class OllamaClient:
         format_instructions: str,
         text: str,
     ) -> list[dict[str, str]]:
-        return ollama_structured.build_repair_messages(system_prompt=system_prompt, format_instructions=format_instructions, text=text)
+        return ollama_structured.build_repair_messages(
+            system_prompt=system_prompt,
+            format_instructions=format_instructions,
+            text=text,
+        )
 
     # -------------------------------------------------------------------------
     async def call_with_structured_models(
@@ -768,7 +892,17 @@ class OllamaClient:
         use_json_mode: bool,
         max_repair_attempts: int,
     ) -> T:
-        return await ollama_structured.call_with_structured_models(self, parser=parser, messages=messages, system_prompt=system_prompt, format_instructions=format_instructions, preferred=preferred, temperature=temperature, use_json_mode=use_json_mode, max_repair_attempts=max_repair_attempts)
+        return await ollama_structured.call_with_structured_models(
+            self,
+            parser=parser,
+            messages=messages,
+            system_prompt=system_prompt,
+            format_instructions=format_instructions,
+            preferred=preferred,
+            temperature=temperature,
+            use_json_mode=use_json_mode,
+            max_repair_attempts=max_repair_attempts,
+        )
 
     # -------------------------------------------------------------------------
     async def parse_with_repairs(
@@ -782,7 +916,16 @@ class OllamaClient:
         use_json_mode: bool,
         max_repair_attempts: int,
     ) -> T:
-        return await ollama_structured.parse_with_repairs(self, parser=parser, text=text, active_model=active_model, system_prompt=system_prompt, format_instructions=format_instructions, use_json_mode=use_json_mode, max_repair_attempts=max_repair_attempts)
+        return await ollama_structured.parse_with_repairs(
+            self,
+            parser=parser,
+            text=text,
+            active_model=active_model,
+            system_prompt=system_prompt,
+            format_instructions=format_instructions,
+            use_json_mode=use_json_mode,
+            max_repair_attempts=max_repair_attempts,
+        )
 
     # -------------------------------------------------------------------------
     @staticmethod

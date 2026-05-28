@@ -30,4 +30,3 @@ def test_fetch_rag_documents_degrades_when_embedding_backend_fails() -> None:
     assert issue.code == "rag_retrieval_unavailable"
     assert issue.field == "rag"
     assert "Nivolumab" in issue.raw_line
-
