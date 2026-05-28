@@ -93,6 +93,14 @@ def test_evaluate_suspension_marks_anamnesis_mentions_as_uncertain_exposure() ->
     assert "Active therapy; no suspension reported." not in suspension.note
 
 
+def test_parse_timeline_date_uses_visit_year_for_partial_dates() -> None:
+    consultation = HepatoxConsultation.__new__(HepatoxConsultation)
+
+    parsed = consultation.parse_timeline_date("14-04", visit_date=date(2025, 4, 20))
+
+    assert parsed == date(2025, 4, 14)
+
+
 def test_format_visit_date_anchor_handles_missing_and_present_values() -> None:
     assert HepatoxConsultation.format_visit_date_anchor(None) == "Not provided."
     assert (
