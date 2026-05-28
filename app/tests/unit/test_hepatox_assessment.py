@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import asyncio
 from datetime import date
+from pathlib import Path
 
 import pytest
 from domain.clinical import (
@@ -17,7 +18,11 @@ from services.clinical.hepatox_core import (
     HepatotoxicityPatternAnalyzer,
     HepatoxConsultation,
 )
-from services.llm.prompts import LIVERTOX_CLINICAL_USER_PROMPT
+from services.llm.prompts import (
+    LIVERTOX_CLINICAL_SYSTEM_PROMPT,
+    LIVERTOX_CLINICAL_USER_PROMPT,
+    LIVERTOX_CONCLUSION_SYSTEM_PROMPT,
+)
 
 
 ###############################################################################
@@ -159,24 +164,27 @@ def test_request_drug_analysis_retries_on_transient_failure() -> None:
 
 
 def test_livertox_prompt_removes_per_drug_management_recommendation_directive() -> None:
-    assert (
-        "Provide monitoring or clinical management recommendations"
-        not in LIVERTOX_CLINICAL_USER_PROMPT
-    )
+    assert "Do not speculate, add outside facts" in LIVERTOX_CLINICAL_SYSTEM_PROMPT
+    assert "Use only:" in LIVERTOX_CLINICAL_SYSTEM_PROMPT
+    assert "Language map: en=English, it=Italian, de=German, fr=French, es=Spanish." in LIVERTOX_CLINICAL_SYSTEM_PROMPT
     assert (
         "Do not provide drug-level monitoring or management recommendations"
-        in LIVERTOX_CLINICAL_USER_PROMPT
-    )
-    assert (
-        "Do not add any appendix or extra section after the bibliography line."
         in LIVERTOX_CLINICAL_USER_PROMPT
     )
     assert (
         "Do not output JSON, YAML, XML, tables, or fenced code blocks"
         in LIVERTOX_CLINICAL_USER_PROMPT
     )
-    assert "# Estimated RUCAM" in LIVERTOX_CLINICAL_USER_PROMPT
+    assert "Estimated RUCAM:" in LIVERTOX_CLINICAL_USER_PROMPT
     assert "Integrate the supplied estimated RUCAM" in LIVERTOX_CLINICAL_USER_PROMPT
+    assert "Do not mention drugs that are not present in the supplied report." in LIVERTOX_CONCLUSION_SYSTEM_PROMPT
+
+
+def test_legacy_hepatox_timeline_helper_module_is_removed() -> None:
+    workspace_root = Path(__file__).resolve().parents[3]
+    timeline_module = workspace_root / "app" / "server" / "services" / "clinical" / "hepatox_timeline.py"
+
+    assert not timeline_module.exists()
 
 
 def test_render_matched_drug_section_contains_deterministic_rucam_summary() -> None:

@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import asyncio
 from datetime import date
+from types import SimpleNamespace
 
 import pytest
 from common.exceptions import ServiceValidationError
@@ -94,3 +95,31 @@ def test_start_clinical_job_requires_active_cloud_key_before_extraction(monkeypa
         match="Configure an active Gemini access key before running cloud analysis.",
     ):
         start_clinical_job_workflow(service, request)
+
+
+def test_resolve_runtime_timeout_does_not_apply_legacy_cloud_cap(monkeypatch) -> None:
+    monkeypatch.setattr(
+        "services.session.session_service.LLMRuntimeConfig.is_cloud_enabled",
+        lambda: True,
+    )
+
+    resolved = ClinicalSessionService._resolve_runtime_timeout(base_timeout_s=7200.0)
+
+    assert resolved == 7200.0
+
+
+def test_resolve_consultation_timeout_uses_runtime_configuration(monkeypatch) -> None:
+    monkeypatch.setattr(
+        "services.session.session_service.get_server_settings",
+        lambda: SimpleNamespace(
+            runtime=SimpleNamespace(clinical_llm_timeout=5400.0)
+        ),
+    )
+    monkeypatch.setattr(
+        "services.session.session_service.LLMRuntimeConfig.is_cloud_enabled",
+        lambda: True,
+    )
+
+    resolved = ClinicalSessionService._resolve_consultation_timeout()
+
+    assert resolved == 5400.0
