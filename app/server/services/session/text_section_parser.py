@@ -1,6 +1,5 @@
 from __future__ import annotations
 
-import re
 from typing import NamedTuple
 
 from domain.clinical.entities import (
@@ -8,6 +7,9 @@ from domain.clinical.entities import (
     ClinicalSectionLineRange,
 )
 from domain.clinical.sections import ClinicalSectionKey, SECTION_DISPLAY_NAMES, SECTION_KEYS
+from services.session.clinical_section_parsers import (
+    parse_required_dili_sections,
+)
 
 
 class ParsedTextSection(NamedTuple):
@@ -24,74 +26,55 @@ class InitialTextSectionParseResult(NamedTuple):
     malformed_sections: list[str]
 
 
-_HEADING_KEYWORDS: dict[ClinicalSectionKey, tuple[str, ...]] = {
-    "anamnesis": ("anamnesis",),
-    "drugs": ("drugs", "therapy", "current therapy"),
-    "laboratory_analysis": ("laboratory analysis", "lab analysis", "laboratory", "labs"),
+_CANONICAL_TO_PAYLOAD_KEY: dict[str, ClinicalSectionKey] = {
+    "anamnesis": "anamnesis",
+    "therapy": "drugs",
+    "laboratory_history": "laboratory_analysis",
 }
 
-_REQUIRED_KEYS: tuple[ClinicalSectionKey, ...] = (
-    "anamnesis",
-    "drugs",
-    "laboratory_analysis",
-)
+
+def _map_canonical_key(key: str) -> ClinicalSectionKey | None:
+    return _CANONICAL_TO_PAYLOAD_KEY.get(key)
 
 
-def _normalize_heading(value: str) -> str:
-    cleaned = value.strip()
-    cleaned = re.sub(r"^[#\-\*\s]+", "", cleaned)
-    cleaned = re.sub(r"^\d+[\.\)]\s*", "", cleaned)
-    cleaned = cleaned.rstrip(":")
-    cleaned = re.sub(r"\s+", " ", cleaned)
-    return cleaned.casefold()
+def _map_missing_keys(keys: list[str]) -> list[str]:
+    return [
+        mapped
+        for key in keys
+        if (mapped := _map_canonical_key(key)) is not None
+    ]
 
 
-def _resolve_section_key(line: str) -> ClinicalSectionKey | None:
-    normalized = _normalize_heading(line)
-    for key, aliases in _HEADING_KEYWORDS.items():
-        if normalized in aliases:
-            return key
-    return None
+def _map_malformed_issue(issue: str) -> str:
+    prefix, _, canonical_key = issue.partition(":")
+    payload_key = _map_canonical_key(canonical_key)
+    if not prefix or not payload_key:
+        return issue
+    return f"{prefix}:{payload_key}"
 
 
 def parse_initial_text_sections(raw_text: str) -> InitialTextSectionParseResult:
-    normalized = (raw_text or "").replace("\r\n", "\n").replace("\r", "\n")
-    lines = normalized.split("\n")
-    heading_positions: list[tuple[ClinicalSectionKey, int, str]] = []
-    malformed_sections: list[str] = []
-    seen_required: set[str] = set()
-    for index, line in enumerate(lines, start=1):
-        key = _resolve_section_key(line)
-        if key is None:
-            continue
-        if key in seen_required:
-            malformed_sections.append(f"duplicate:{key}")
-            continue
-        seen_required.add(key)
-        heading_positions.append((key, index, line.strip()))
+    source_text = (raw_text or "").replace("\r\n", "\n").replace("\r", "\n")
+    parse_result = parse_required_dili_sections(source_text)
 
     parsed: dict[str, ParsedTextSection] = {}
-    for idx, (key, start_line, title) in enumerate(heading_positions):
-        next_start = heading_positions[idx + 1][1] if idx + 1 < len(heading_positions) else len(lines) + 1
-        section_lines = lines[start_line: next_start - 1]
-        text = "\n".join(section_lines).strip()
-        if not text and key in _REQUIRED_KEYS:
-            malformed_sections.append(f"empty:{key}")
+    for canonical_key, section in parse_result.sections.items():
+        payload_key = _map_canonical_key(canonical_key)
+        if payload_key is None:
             continue
-        end_line = max(start_line, next_start - 1)
-        parsed[key] = ParsedTextSection(
-            key=key,
-            title=title or SECTION_DISPLAY_NAMES.get(key, key),
+        text = section.text.strip()
+        parsed[payload_key] = ParsedTextSection(
+            key=payload_key,
+            title=section.raw_heading or SECTION_DISPLAY_NAMES.get(payload_key, payload_key),
             text=text,
-            start_line=start_line,
-            end_line=end_line,
+            start_line=section.line_start,
+            end_line=section.line_end,
         )
 
-    missing = [key for key in _REQUIRED_KEYS if key not in parsed]
     return InitialTextSectionParseResult(
         sections=parsed,
-        missing_required_sections=missing,
-        malformed_sections=malformed_sections,
+        missing_required_sections=_map_missing_keys(parse_result.missing_required_sections),
+        malformed_sections=[_map_malformed_issue(issue) for issue in parse_result.malformed_sections],
     )
 
 
@@ -101,7 +84,7 @@ def build_section_extraction_from_initial_text(
 ) -> ClinicalSectionExtractionResult:
     line_ranges: dict[ClinicalSectionKey, list[ClinicalSectionLineRange]] = {}
     metadata: dict[str, object] = {
-        "parser": "deterministic_initial_text_sections_v1",
+        "parser": "deterministic_initial_text_sections_v2",
         "source_line_ranges": {},
     }
     for key in SECTION_KEYS:
@@ -118,9 +101,18 @@ def build_section_extraction_from_initial_text(
 
     return ClinicalSectionExtractionResult(
         source_text=source_text,
-        anamnesis=parse_result.sections.get("anamnesis", ParsedTextSection("anamnesis", "Anamnesis", "", 1, 1)).text,
-        drugs=parse_result.sections.get("drugs", ParsedTextSection("drugs", "Drugs", "", 1, 1)).text,
-        laboratory_analysis=parse_result.sections.get("laboratory_analysis", ParsedTextSection("laboratory_analysis", "Laboratory analysis", "", 1, 1)).text,
+        anamnesis=parse_result.sections.get(
+            "anamnesis",
+            ParsedTextSection("anamnesis", "Anamnesis", "", 1, 1),
+        ).text,
+        drugs=parse_result.sections.get(
+            "drugs",
+            ParsedTextSection("drugs", "Therapy", "", 1, 1),
+        ).text,
+        laboratory_analysis=parse_result.sections.get(
+            "laboratory_analysis",
+            ParsedTextSection("laboratory_analysis", "Laboratory analysis", "", 1, 1),
+        ).text,
         line_ranges=line_ranges,
         confidence=1.0,
         metadata=metadata,

@@ -36,3 +36,19 @@ def test_rejects_duplicate_section_heading() -> None:
     text = "ANAMNESIS\na\nANAMNESIS\nb\nDRUGS\nd\nLABORATORY ANALYSIS\nl\n"
     result = parse_initial_text_sections(text)
     assert "duplicate:anamnesis" in result.malformed_sections
+
+
+def test_parses_mixed_language_therapy_heading_from_live_preflight_path() -> None:
+    text = (
+        "## Anamnesis\n"
+        "History text.\n\n"
+        "## Terapia farmacologica\n"
+        "Fortecortin 4 mg cpr 1-0-0-0\n"
+        "De-Ursil 150 mg caps 1-0-1-0 per os\n\n"
+        "## Laboratory Analysis\n"
+        "ALT 730 U/L, AST 385 U/L, Bil tot 51.6 umol/L.\n"
+    )
+    result = parse_initial_text_sections(text)
+    assert result.missing_required_sections == []
+    assert result.malformed_sections == []
+    assert "Fortecortin" in result.sections["drugs"].text
