@@ -18,6 +18,16 @@ class RecordingStructuredClient:
         self.user_prompts.append(str(kwargs.get("user_prompt", "")))
         return self.response
     
+class RecordingStructuredClient:
+    def __init__(self, response: PatientDrugs) -> None:
+        self.response = response
+        self.user_prompts: list[str] = []
+        self.call_count = 0
+
+    async def llm_structured_call(self, **kwargs: Any) -> PatientDrugs:
+        self.call_count += 1
+        self.user_prompts.append(str(kwargs.get("user_prompt", "")))
+        return self.response
 
 class FakeStructuredClient:
     def __init__(self, responses: Sequence[PatientDrugs]) -> None:
@@ -60,6 +70,32 @@ def test_extract_drugs_from_anamnesis_sends_full_context_to_llm() -> None:
     assert "Carboplatino e Paclitaxel" in combined_prompts
     assert "secondo ciclo." in combined_prompts
     assert "Co-Amoxicillina 1-0-1" in combined_prompts
+    assert [entry.name for entry in parsed.entries if entry.name == "Co-Amoxicillina"]
+
+
+def test_extract_drugs_from_anamnesis_sends_complete_anamnesis_to_llm() -> None:
+    client = RecordingStructuredClient(
+        PatientDrugs(entries=[DrugEntry(name="Co-Amoxicillina")])
+    )
+    parser = DrugsParser(client=client)
+    anamnesis = """
+    Paziente di 68 anni nota per:
+    Dal 17.03.2023 al 30.06.2023 Carboplatino e Paclitaxel, con aggiunta di Bevacizumab dal
+    secondo ciclo.
+    Dal 28.12.2023 al 17.05.2024: Chemioterapia di seconda linea con Carboplatino e Caelyx,
+    eseguiti 6 cicli.
+    Dal 06.07.2024 al 16.07.2024: Terapia con Olaparib, sospeso per PD in sede peritoneale.
+    Dal 10.01.2025 Protocollo con Gemcitabina + Bevacizumab.
+    Nozione di terapia antibiotica con Co-Amoxicillina 1-0-1 dal 18.02 prescritta per 5 giorni.
+    """
+
+    parsed = asyncio.run(parser.extract_drugs_from_anamnesis(anamnesis))
+
+    assert client.call_count == 1
+    combined_prompt = "\n".join(client.user_prompts)
+    assert "Carboplatino e Paclitaxel" in combined_prompt
+    assert "secondo ciclo." in combined_prompt
+    assert "Co-Amoxicillina 1-0-1" in combined_prompt
     assert [entry.name for entry in parsed.entries if entry.name == "Co-Amoxicillina"]
 
 
@@ -114,11 +150,10 @@ def test_extract_drugs_from_anamnesis_rule_fallback_recovers_drug_lines() -> Non
     assert entry.historical_flag is True
 
 
-def test_extract_drugs_from_anamnesis_chunks_long_input() -> None:
+def test_extract_drugs_from_anamnesis_sends_long_input_as_single_chunk() -> None:
     client = FakeStructuredClient(
         [
             PatientDrugs(entries=[DrugEntry(name="Aspirin")]),
-            PatientDrugs(entries=[DrugEntry(name="Metformin")]),
         ]
     )
     parser = DrugsParser(client=client)
@@ -128,9 +163,10 @@ def test_extract_drugs_from_anamnesis_chunks_long_input() -> None:
 
     parsed = asyncio.run(parser.extract_drugs_from_anamnesis(long_text))
 
-    assert client.call_count >= 2
-    assert [entry.name for entry in parsed.entries] == ["Aspirin", "Metformin"]
+    assert client.call_count == 1
+    assert [entry.name for entry in parsed.entries] == ["Aspirin"]
 
+    
 
 def test_extract_drugs_from_anamnesis_filters_non_drug_fragments() -> None:
     fake_client = FakeStructuredClient(
