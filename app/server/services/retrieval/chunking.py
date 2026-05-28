@@ -82,7 +82,9 @@ class SmartDocumentChunker:
                     char_end=char_end,
                 )
                 chunk_index = f"{file_name}::p{span.page_start}-{span.page_end}::l{span.line_start}-{span.line_end}::c{ordinal}"
-                normalized_hash = hashlib.sha256(piece.strip().encode("utf-8")).hexdigest()
+                normalized_hash = hashlib.sha256(
+                    piece.strip().encode("utf-8")
+                ).hexdigest()
                 chunk_uid = hashlib.sha256(
                     f"{relative_path}|{chunk_index}|{normalized_hash}".encode("utf-8")
                 ).hexdigest()
@@ -139,7 +141,9 @@ class SmartDocumentChunker:
         cleaned = text.strip()
         if len(cleaned) <= self.max_chars:
             return [cleaned]
-        sentences = [s.strip() for s in re.split(r"(?<=[\.\!\?])\s+", cleaned) if s.strip()]
+        sentences = [
+            s.strip() for s in re.split(r"(?<=[\.\!\?])\s+", cleaned) if s.strip()
+        ]
         if not sentences:
             return [cleaned[: self.max_chars]]
         result: list[str] = []

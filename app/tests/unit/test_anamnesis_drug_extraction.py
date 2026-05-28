@@ -108,7 +108,9 @@ def test_extract_drugs_from_anamnesis_filters_non_drug_fragments() -> None:
                     DrugEntry(name="Dopo"),
                     DrugEntry(name="Dal"),
                     DrugEntry(name="entrambi e il"),
-                    DrugEntry(name="Nozione di terapia antibiotica con Co-Amoxicillina"),
+                    DrugEntry(
+                        name="Nozione di terapia antibiotica con Co-Amoxicillina"
+                    ),
                     DrugEntry(name="rialzo a"),
                     DrugEntry(name="ulteriore ciclo (originariamente previsto il"),
                 ]
@@ -137,4 +139,3 @@ def test_extract_drugs_from_anamnesis_llm_failure_uses_rule_fallback() -> None:
     assert [entry.name for entry in parsed.entries] == ["Xanax"]
     assert parsed.entries[0].historical_flag is True
     assert parsed.entries[0].source == "anamnesis"
-

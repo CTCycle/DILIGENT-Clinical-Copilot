@@ -153,4 +153,3 @@ class LLMRuntimeConfig:
             cloud_model = (snapshot.cloud_model or "").strip()
             return provider, cloud_model or local_model
         return "ollama", local_model
-

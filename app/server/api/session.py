@@ -29,6 +29,7 @@ class ClinicalSessionEndpoint:
         self.router = router
         self.service = service
 
+    # -------------------------------------------------------------------------
     def start_clinical_job(
         self,
         request_payload: ClinicalSessionRequest = Body(...),
@@ -36,6 +37,7 @@ class ClinicalSessionEndpoint:
         validate_clinical_session_request(request_payload)
         return self.service.start_clinical_job(request_payload)
 
+    # -------------------------------------------------------------------------
     def validate_clinical_input(
         self,
         request_payload: ClinicalSessionRequest = Body(...),
@@ -48,7 +50,9 @@ class ClinicalSessionEndpoint:
         job_id: str,
         response: Response,
     ) -> JobStatusResponse:
-        response.headers["Cache-Control"] = "no-store, no-cache, max-age=0, must-revalidate"
+        response.headers["Cache-Control"] = (
+            "no-store, no-cache, max-age=0, must-revalidate"
+        )
         response.headers["Pragma"] = "no-cache"
         response.headers["Expires"] = "0"
         return self.service.get_clinical_job_status(job_id)

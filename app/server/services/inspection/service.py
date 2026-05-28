@@ -132,7 +132,7 @@ class DataInspectionService:
         manifest_path = self.rag_manifest_path()
         try:
             payload = json.loads(manifest_path.read_text(encoding="utf-8"))
-        except (OSError, json.JSONDecodeError):
+        except OSError, json.JSONDecodeError:
             return {}
         return payload if isinstance(payload, dict) else {}
 
@@ -244,9 +244,7 @@ class DataInspectionService:
             source = config.get("rag", {})
             defaults = {
                 "documents_path": str(source.get("documents_path", DOCS_PATH)),
-                "chunk_size": int(
-                    source.get("chunk_size", settings.rag.chunk_size)
-                ),
+                "chunk_size": int(source.get("chunk_size", settings.rag.chunk_size)),
                 "chunk_overlap": int(
                     source.get("chunk_overlap", settings.rag.chunk_overlap)
                 ),
@@ -268,9 +266,7 @@ class DataInspectionService:
                     )
                 ),
                 "embedding_backend": str(
-                    source.get(
-                        "embedding_backend", settings.rag.embedding_backend
-                    )
+                    source.get("embedding_backend", settings.rag.embedding_backend)
                 ),
                 "ollama_embedding_model": str(
                     source.get(
@@ -279,9 +275,7 @@ class DataInspectionService:
                     )
                 ),
                 "hf_embedding_model": str(
-                    source.get(
-                        "hf_embedding_model", settings.rag.hf_embedding_model
-                    )
+                    source.get("hf_embedding_model", settings.rag.hf_embedding_model)
                 ),
                 "cloud_provider": str(
                     source.get("cloud_provider", settings.rag.cloud_provider)
@@ -387,7 +381,9 @@ class DataInspectionService:
             if isinstance(source_detail.get("sections"), dict)
             else {}
         )
-        extracted_sections = section_extraction if isinstance(section_extraction, dict) else {}
+        extracted_sections = (
+            section_extraction if isinstance(section_extraction, dict) else {}
+        )
         section_validation = self.build_revision_section_validation(
             source_sections=source_sections,
             extracted_sections=extracted_sections,
@@ -517,20 +513,54 @@ class DataInspectionService:
         config_serializer = ModelConfigSerializer()
         previous_snapshot = config_serializer.load_snapshot()
         effective_overrides = {
-            key: value for key, value in (model_overrides or {}).items() if value is not None
+            key: value
+            for key, value in (model_overrides or {}).items()
+            if value is not None
         }
 
         try:
             if effective_overrides:
                 config_serializer.save_snapshot(
-                    clinical_model=self._resolve_override_value(effective_overrides, "clinical_model", previous_snapshot.clinical_model),
-                    text_extraction_model=self._resolve_override_value(effective_overrides, "text_extraction_model", previous_snapshot.text_extraction_model),
-                    use_cloud_models=self._resolve_override_value(effective_overrides, "use_cloud_services", previous_snapshot.use_cloud_models),
-                    cloud_provider=self._resolve_override_value(effective_overrides, "provider", previous_snapshot.cloud_provider),
-                    cloud_model=self._resolve_override_value(effective_overrides, "cloud_model", previous_snapshot.cloud_model),
-                    ollama_temperature=self._resolve_override_value(effective_overrides, "ollama_temperature", previous_snapshot.ollama_temperature),
-                    cloud_temperature=self._resolve_override_value(effective_overrides, "cloud_temperature", previous_snapshot.cloud_temperature),
-                    ollama_reasoning=self._resolve_override_value(effective_overrides, "ollama_reasoning", previous_snapshot.ollama_reasoning),
+                    clinical_model=self._resolve_override_value(
+                        effective_overrides,
+                        "clinical_model",
+                        previous_snapshot.clinical_model,
+                    ),
+                    text_extraction_model=self._resolve_override_value(
+                        effective_overrides,
+                        "text_extraction_model",
+                        previous_snapshot.text_extraction_model,
+                    ),
+                    use_cloud_models=self._resolve_override_value(
+                        effective_overrides,
+                        "use_cloud_services",
+                        previous_snapshot.use_cloud_models,
+                    ),
+                    cloud_provider=self._resolve_override_value(
+                        effective_overrides,
+                        "provider",
+                        previous_snapshot.cloud_provider,
+                    ),
+                    cloud_model=self._resolve_override_value(
+                        effective_overrides,
+                        "cloud_model",
+                        previous_snapshot.cloud_model,
+                    ),
+                    ollama_temperature=self._resolve_override_value(
+                        effective_overrides,
+                        "ollama_temperature",
+                        previous_snapshot.ollama_temperature,
+                    ),
+                    cloud_temperature=self._resolve_override_value(
+                        effective_overrides,
+                        "cloud_temperature",
+                        previous_snapshot.cloud_temperature,
+                    ),
+                    ollama_reasoning=self._resolve_override_value(
+                        effective_overrides,
+                        "ollama_reasoning",
+                        previous_snapshot.ollama_reasoning,
+                    ),
                 )
             clinical_service.apply_persisted_runtime_configuration()
             request = ClinicalSessionRequest(
@@ -542,7 +572,9 @@ class DataInspectionService:
             preprocessed_request, section_extraction = asyncio.run(
                 clinical_service.preprocess_unified_input(request)
             )
-            patient_payload = clinical_service.build_patient_payload(preprocessed_request)
+            patient_payload = clinical_service.build_patient_payload(
+                preprocessed_request
+            )
             result_payload = asyncio.run(
                 clinical_service.process_single_patient(
                     patient_payload,
@@ -559,11 +591,15 @@ class DataInspectionService:
                     },
                     original_session_text=source_text,
                     revision_focus_context=revision_focus_context,
-                    progress_callback=lambda stage, progress: self.report_job_progress(
-                        job_id=job_id or "",
-                        progress=progress,
-                        message=f"Revision: {stage}",
-                    ) if job_id else None,
+                    progress_callback=lambda stage, progress: (
+                        self.report_job_progress(
+                            job_id=job_id or "",
+                            progress=progress,
+                            message=f"Revision: {stage}",
+                        )
+                        if job_id
+                        else None
+                    ),
                     stop_check=None,
                 )
             )
@@ -614,10 +650,7 @@ class DataInspectionService:
                 f"{selected_text}"
             )
         if revision_instruction:
-            chunks.append(
-                "User revision instruction:\n"
-                f"{revision_instruction}"
-            )
+            chunks.append(f"User revision instruction:\n{revision_instruction}")
         return "\n\n".join(chunks) if chunks else None
 
     # -------------------------------------------------------------------------
@@ -802,9 +835,7 @@ class DataInspectionService:
         documents_path = self.get_effective_rag_documents_path()
         settings = get_server_settings()
         collection_name = str(
-            rag_cfg.get(
-                "vector_collection_name", settings.rag.vector_collection_name
-            )
+            rag_cfg.get("vector_collection_name", settings.rag.vector_collection_name)
         )
         vector_db = LanceVectorDatabase(
             database_path=VECTOR_DB_PATH,
@@ -1001,4 +1032,3 @@ class DataInspectionService:
         if payload is None:
             return False
         return self.jobs.cancel_job(job_id) is not None
-

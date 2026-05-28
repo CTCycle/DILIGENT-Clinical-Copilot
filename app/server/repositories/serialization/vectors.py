@@ -263,11 +263,21 @@ class VectorSerializer:
                     "page_reference": metadata.get("page_reference", ""),
                     "line_start": metadata.get("line_start"),
                     "line_end": metadata.get("line_end"),
-                    "seed_matched_keywords": json.dumps(metadata.get("seed_matched_keywords", []), ensure_ascii=False),
-                    "seed_matched_stopwords": json.dumps(metadata.get("seed_matched_stopwords", []), ensure_ascii=False),
-                    "seed_matched_terms": json.dumps(metadata.get("seed_matched_terms", []), ensure_ascii=False),
-                    "seed_matched_term_groups": json.dumps(metadata.get("seed_matched_term_groups", {}), ensure_ascii=False),
-                    "seed_matched_term_counts": json.dumps(metadata.get("seed_matched_term_counts", {}), ensure_ascii=False),
+                    "seed_matched_keywords": json.dumps(
+                        metadata.get("seed_matched_keywords", []), ensure_ascii=False
+                    ),
+                    "seed_matched_stopwords": json.dumps(
+                        metadata.get("seed_matched_stopwords", []), ensure_ascii=False
+                    ),
+                    "seed_matched_terms": json.dumps(
+                        metadata.get("seed_matched_terms", []), ensure_ascii=False
+                    ),
+                    "seed_matched_term_groups": json.dumps(
+                        metadata.get("seed_matched_term_groups", {}), ensure_ascii=False
+                    ),
+                    "seed_matched_term_counts": json.dumps(
+                        metadata.get("seed_matched_term_counts", {}), ensure_ascii=False
+                    ),
                     "vector_model_provider": model_spec.provider,
                     "vector_model_name": model_spec.model_name,
                     "vector_model_dimension": model_spec.dimension,

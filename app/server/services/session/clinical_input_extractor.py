@@ -29,7 +29,10 @@ def validate_extracted_sections_against_source(
     therapy: str,
     lab_analysis: str,
 ) -> bool:
-    return all(section and section in source_text for section in (anamnesis, therapy, lab_analysis))
+    return all(
+        section and section in source_text
+        for section in (anamnesis, therapy, lab_analysis)
+    )
 
 
 class ClinicalInputExtractor:
@@ -55,7 +58,9 @@ class ClinicalInputExtractor:
 
     async def ensure_client(self) -> None:
         revision = LLMRuntimeConfig.get_revision()
-        resolved_provider, resolved_model = LLMRuntimeConfig.resolve_provider_and_model("parser")
+        resolved_provider, resolved_model = LLMRuntimeConfig.resolve_provider_and_model(
+            "parser"
+        )
         provider = self.forced_provider or resolved_provider
         model = self.forced_model or resolved_model
         await ensure_runtime_client(
@@ -73,7 +78,9 @@ class ClinicalInputExtractor:
             ),
         )
 
-    def _deterministic_extract(self, clinical_input: str) -> ClinicalSectionExtractionResult:
+    def _deterministic_extract(
+        self, clinical_input: str
+    ) -> ClinicalSectionExtractionResult:
         sections = extract_required_dili_sections(clinical_input)
         missing = missing_required_section_names(sections)
         if missing:
@@ -97,7 +104,9 @@ class ClinicalInputExtractor:
             lab_analysis=labs.text,
         )
         if not strict_verbatim:
-            raise ClinicalInputExtractionError("Deterministic section extraction failed source grounding.")
+            raise ClinicalInputExtractionError(
+                "Deterministic section extraction failed source grounding."
+            )
         return ClinicalSectionExtractionResult(
             source_text=clinical_input,
             anamnesis=anamnesis.text,
@@ -143,7 +152,9 @@ class ClinicalInputExtractor:
 
     @staticmethod
     def _raise_extraction_failed(reason: str) -> None:
-        raise ClinicalInputExtractionError(f"Unable to extract clinical sections: {reason}")
+        raise ClinicalInputExtractionError(
+            f"Unable to extract clinical sections: {reason}"
+        )
 
     async def extract(
         self,

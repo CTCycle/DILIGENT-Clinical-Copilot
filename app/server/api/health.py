@@ -19,4 +19,3 @@ router.add_api_route(
     response_model=HealthResponse,
     status_code=status.HTTP_200_OK,
 )
-

@@ -78,7 +78,9 @@ class LiverToxUpdater:
             progress=20.0,
             message="Downloading LiverTox archive metadata",
         )
-        archive_metadata = asyncio.run(livertox_download.download_bulk_data(self, self.sources_path))
+        archive_metadata = asyncio.run(
+            livertox_download.download_bulk_data(self, self.sources_path)
+        )
         archive_path = archive_metadata.get("file_path") or os.path.join(
             self.sources_path, get_server_settings().runtime.livertox_archive
         )

@@ -70,7 +70,9 @@ _PROGRESS_SEQUENCE: list[tuple[str, float]] = [
 ]
 
 
-def _emit_progress(progress_callback, stage: str, progress: float, detail: str | None = None) -> None:
+def _emit_progress(
+    progress_callback, stage: str, progress: float, detail: str | None = None
+) -> None:
     if progress_callback is None:
         return
     try:
@@ -94,9 +96,9 @@ async def _extract_drugs_from_section(
         parser_timeout_s = float(getattr(service.drugs_parser, "timeout_s", 30.0))
     try:
         if source == "anamnesis":
-            if not hasattr(service.drugs_parser, "extract_drugs_from_anamnesis") and hasattr(
-                service, "extract_anamnesis_drugs"
-            ):
+            if not hasattr(
+                service.drugs_parser, "extract_drugs_from_anamnesis"
+            ) and hasattr(service, "extract_anamnesis_drugs"):
                 return await service.extract_anamnesis_drugs(
                     anamnesis_text=text,
                     issues=issues,
@@ -203,7 +205,7 @@ def build_single_matched_drug_row_workflow(
     if match_confidence is not None:
         try:
             match_confidence = float(match_confidence)
-        except (TypeError, ValueError):
+        except TypeError, ValueError:
             match_confidence = None
     match_quality = classify_match_evidence(
         match_status=resolved.get("match_status"),
@@ -290,7 +292,12 @@ async def process_single_patient_workflow(
     )
 
     global_start_time = time.perf_counter()
-    _emit_progress(progress_callback, "clinical", _PROGRESS_SEQUENCE[1][1], _PROGRESS_SEQUENCE[1][0])
+    _emit_progress(
+        progress_callback,
+        "clinical",
+        _PROGRESS_SEQUENCE[1][1],
+        _PROGRESS_SEQUENCE[1][0],
+    )
     language_result = ClinicalLanguageDetector.detect(payload)
     report_language = language_result.report_language
     validation_bundle = service.build_validation_bundle_for_payload(payload)
@@ -307,18 +314,37 @@ async def process_single_patient_workflow(
     )
 
     issues = []
-    _emit_progress(progress_callback, "clinical", _PROGRESS_SEQUENCE[2][1], _PROGRESS_SEQUENCE[2][0])
+    _emit_progress(
+        progress_callback,
+        "clinical",
+        _PROGRESS_SEQUENCE[2][1],
+        _PROGRESS_SEQUENCE[2][0],
+    )
     cleaned_therapy_text = service.drugs_parser.clean_text(payload.drugs or "")
     cleaned_anamnesis_text = service.drugs_parser.clean_text(payload.anamnesis or "")
-    therapy_deterministic = service.drugs_parser.extract_drugs_from_therapy_deterministic(
-        cleaned_therapy_text
+    therapy_deterministic = (
+        service.drugs_parser.extract_drugs_from_therapy_deterministic(
+            cleaned_therapy_text
+        )
     )
-    anamnesis_deterministic = service.drugs_parser.extract_drugs_from_anamnesis_deterministic(
-        cleaned_anamnesis_text
+    anamnesis_deterministic = (
+        service.drugs_parser.extract_drugs_from_anamnesis_deterministic(
+            cleaned_anamnesis_text
+        )
     )
     disease_deterministic = extract_deterministic_diseases(cleaned_anamnesis_text)
-    _emit_progress(progress_callback, "clinical", _PROGRESS_SEQUENCE[3][1], _PROGRESS_SEQUENCE[3][0])
-    _emit_progress(progress_callback, "clinical", _PROGRESS_SEQUENCE[4][1], _PROGRESS_SEQUENCE[4][0])
+    _emit_progress(
+        progress_callback,
+        "clinical",
+        _PROGRESS_SEQUENCE[3][1],
+        _PROGRESS_SEQUENCE[3][0],
+    )
+    _emit_progress(
+        progress_callback,
+        "clinical",
+        _PROGRESS_SEQUENCE[4][1],
+        _PROGRESS_SEQUENCE[4][0],
+    )
     preflight = await check_parser_batch_capacity(task_count=2)
     if preflight.concurrency_allowed:
         anamnesis_drugs, therapy_drugs = await asyncio.gather(
@@ -364,23 +390,43 @@ async def process_single_patient_workflow(
             source="therapy",
             issues=issues,
         )
-    _emit_progress(progress_callback, "clinical", _PROGRESS_SEQUENCE[5][1], _PROGRESS_SEQUENCE[5][0])
+    _emit_progress(
+        progress_callback,
+        "clinical",
+        _PROGRESS_SEQUENCE[5][1],
+        _PROGRESS_SEQUENCE[5][0],
+    )
     anamnesis_text = payload.anamnesis or ""
-    _emit_progress(progress_callback, "clinical", _PROGRESS_SEQUENCE[6][1], _PROGRESS_SEQUENCE[6][0])
+    _emit_progress(
+        progress_callback,
+        "clinical",
+        _PROGRESS_SEQUENCE[6][1],
+        _PROGRESS_SEQUENCE[6][0],
+    )
     disease_context = await service.extract_disease_context(
         anamnesis_text=anamnesis_text,
         issues=issues,
         progress_callback=None,
         stop_check=stop_check,
     )
-    _emit_progress(progress_callback, "clinical", _PROGRESS_SEQUENCE[7][1], _PROGRESS_SEQUENCE[7][0])
+    _emit_progress(
+        progress_callback,
+        "clinical",
+        _PROGRESS_SEQUENCE[7][1],
+        _PROGRESS_SEQUENCE[7][0],
+    )
     lab_timeline, onset_context = await service.extract_lab_timeline(
         payload=payload,
         issues=issues,
         progress_callback=None,
         stop_check=stop_check,
     )
-    _emit_progress(progress_callback, "clinical", _PROGRESS_SEQUENCE[8][1], _PROGRESS_SEQUENCE[8][0])
+    _emit_progress(
+        progress_callback,
+        "clinical",
+        _PROGRESS_SEQUENCE[8][1],
+        _PROGRESS_SEQUENCE[8][0],
+    )
     pattern_assessment = service.assess_pattern(
         lab_timeline=lab_timeline,
         validation_bundle=validation_bundle,
@@ -407,7 +453,8 @@ async def process_single_patient_workflow(
         pattern_score.classification = explicit_hepatic_pattern
         pattern_source = "provided"
     temporal_uncertain_count = sum(
-        1 for entry in [*anamnesis_drugs.entries, *therapy_drugs.entries]
+        1
+        for entry in [*anamnesis_drugs.entries, *therapy_drugs.entries]
         if not _has_temporal_information(service, entry)
     )
     filtered_out_count = 0
@@ -430,9 +477,19 @@ async def process_single_patient_workflow(
         anamnesis_drugs=anamnesis_drugs,
         visit_date=payload.visit_date,
     )
-    _emit_progress(progress_callback, "clinical", _PROGRESS_SEQUENCE[9][1], _PROGRESS_SEQUENCE[9][0])
+    _emit_progress(
+        progress_callback,
+        "clinical",
+        _PROGRESS_SEQUENCE[9][1],
+        _PROGRESS_SEQUENCE[9][0],
+    )
     analysis_drugs = candidate_selection.ordered_analysis_drugs
-    _emit_progress(progress_callback, "clinical", _PROGRESS_SEQUENCE[10][1], _PROGRESS_SEQUENCE[10][0])
+    _emit_progress(
+        progress_callback,
+        "clinical",
+        _PROGRESS_SEQUENCE[10][1],
+        _PROGRESS_SEQUENCE[10][0],
+    )
     rucam_bundle = service.estimate_rucam(
         payload=payload,
         analysis_drugs=analysis_drugs,
@@ -461,7 +518,12 @@ async def process_single_patient_workflow(
             "Revision focus context:\n"
             f"{revision_focus_context.strip()}"
         )
-    _emit_progress(progress_callback, "clinical", _PROGRESS_SEQUENCE[11][1], _PROGRESS_SEQUENCE[11][0])
+    _emit_progress(
+        progress_callback,
+        "clinical",
+        _PROGRESS_SEQUENCE[11][1],
+        _PROGRESS_SEQUENCE[11][0],
+    )
     rag_query = service.build_rag_query(
         payload=payload,
         analysis_drugs=analysis_drugs,
@@ -470,7 +532,12 @@ async def process_single_patient_workflow(
         progress_callback=None,
         stop_check=stop_check,
     )
-    _emit_progress(progress_callback, "clinical", _PROGRESS_SEQUENCE[12][1], _PROGRESS_SEQUENCE[12][0])
+    _emit_progress(
+        progress_callback,
+        "clinical",
+        _PROGRESS_SEQUENCE[12][1],
+        _PROGRESS_SEQUENCE[12][0],
+    )
     prepared_inputs = await service.run_livertox_lookup(
         all_detected_drugs=all_detected_drugs,
         structured_context=structured_context,
@@ -479,7 +546,12 @@ async def process_single_patient_workflow(
         progress_callback=None,
         stop_check=stop_check,
     )
-    _emit_progress(progress_callback, "clinical", _PROGRESS_SEQUENCE[13][1], _PROGRESS_SEQUENCE[13][0])
+    _emit_progress(
+        progress_callback,
+        "clinical",
+        _PROGRESS_SEQUENCE[13][1],
+        _PROGRESS_SEQUENCE[13][0],
+    )
     rucam_bundle = service.reestimate_rucam_with_livertox(
         payload=payload,
         analysis_drugs=analysis_drugs,
@@ -493,7 +565,12 @@ async def process_single_patient_workflow(
         rucam_bundle=rucam_bundle,
         issues=issues,
     )
-    _emit_progress(progress_callback, "clinical", _PROGRESS_SEQUENCE[14][1], _PROGRESS_SEQUENCE[14][0])
+    _emit_progress(
+        progress_callback,
+        "clinical",
+        _PROGRESS_SEQUENCE[14][1],
+        _PROGRESS_SEQUENCE[14][0],
+    )
     clinical_session, final_report = await service.run_consultation(
         payload=payload,
         analysis_drugs=analysis_drugs,
@@ -535,15 +612,21 @@ async def process_single_patient_workflow(
             "agreements": ["Unable to parse structured comparison payload."],
             "omissions": ["Comparison payload is not structured JSON."],
             "differences": ["Falling back to raw discrepancy report text."],
-            "unsupported": [faithfulness_audit.discrepancy_report or "No details available."],
-            "manual_review": "yes" if faithfulness_audit.manual_review_required else "no",
+            "unsupported": [
+                faithfulness_audit.discrepancy_report or "No details available."
+            ],
+            "manual_review": "yes"
+            if faithfulness_audit.manual_review_required
+            else "no",
         }
     if faithfulness_audit.blocking_issues:
         issues.extend(
             PipelineIssue(
                 severity="error",
                 code=str(issue.get("code", "faithfulness_gate_blocked")),
-                message=str(issue.get("message", "Faithfulness gate blocked finalization."))[:500],
+                message=str(
+                    issue.get("message", "Faithfulness gate blocked finalization.")
+                )[:500],
             )
             for issue in faithfulness_audit.blocking_issues
         )
@@ -559,8 +642,12 @@ async def process_single_patient_workflow(
     )
     global_elapsed = time.perf_counter() - global_start_time
     detected_drugs = [entry.name for entry in analysis_drugs.entries if entry.name]
-    anamnesis_detected_drugs = [entry.name for entry in anamnesis_drugs.entries if entry.name]
-    anamnesis_detected_diseases = [entry.name for entry in disease_context.entries if entry.name]
+    anamnesis_detected_drugs = [
+        entry.name for entry in anamnesis_drugs.entries if entry.name
+    ]
+    anamnesis_detected_diseases = [
+        entry.name for entry in disease_context.entries if entry.name
+    ]
     matched_drugs_payload = build_matched_drugs_payload_workflow(
         service,
         detected_drugs=detected_drugs,
@@ -616,21 +703,32 @@ async def process_single_patient_workflow(
         },
         "structured_case": {
             "therapy_drugs": [entry.model_dump() for entry in therapy_drugs.entries],
-            "anamnesis_drugs": [entry.model_dump() for entry in anamnesis_drugs.entries],
-            "anamnesis_diseases": [entry.model_dump() for entry in disease_context.entries],
+            "anamnesis_drugs": [
+                entry.model_dump() for entry in anamnesis_drugs.entries
+            ],
+            "anamnesis_diseases": [
+                entry.model_dump() for entry in disease_context.entries
+            ],
         },
         "deterministic_extraction": {
             "therapy": {
-                "entries": [entry.model_dump() for entry in therapy_deterministic.entries],
+                "entries": [
+                    entry.model_dump() for entry in therapy_deterministic.entries
+                ],
                 "unresolved_lines": therapy_deterministic.unresolved_lines,
             },
             "anamnesis": {
-                "entries": [entry.model_dump() for entry in anamnesis_deterministic.entries],
+                "entries": [
+                    entry.model_dump() for entry in anamnesis_deterministic.entries
+                ],
                 "regimen_lines": anamnesis_deterministic.regimen_lines,
                 "unresolved_lines": anamnesis_deterministic.unresolved_lines,
             },
             "diseases": {
-                "entries": [entry.model_dump() for entry in disease_deterministic.context.entries],
+                "entries": [
+                    entry.model_dump()
+                    for entry in disease_deterministic.context.entries
+                ],
                 "matched_lines": disease_deterministic.matched_lines,
                 "unresolved_lines": disease_deterministic.unresolved_lines,
             },
@@ -656,16 +754,23 @@ async def process_single_patient_workflow(
             "extraction_artifact": extraction_artifact.model_dump(),
             "deterministic_extraction": {
                 "therapy": {
-                    "entries": [entry.model_dump() for entry in therapy_deterministic.entries],
+                    "entries": [
+                        entry.model_dump() for entry in therapy_deterministic.entries
+                    ],
                     "unresolved_lines": therapy_deterministic.unresolved_lines,
                 },
                 "anamnesis": {
-                    "entries": [entry.model_dump() for entry in anamnesis_deterministic.entries],
+                    "entries": [
+                        entry.model_dump() for entry in anamnesis_deterministic.entries
+                    ],
                     "regimen_lines": anamnesis_deterministic.regimen_lines,
                     "unresolved_lines": anamnesis_deterministic.unresolved_lines,
                 },
                 "diseases": {
-                    "entries": [entry.model_dump() for entry in disease_deterministic.context.entries],
+                    "entries": [
+                        entry.model_dump()
+                        for entry in disease_deterministic.context.entries
+                    ],
                     "matched_lines": disease_deterministic.matched_lines,
                     "unresolved_lines": disease_deterministic.unresolved_lines,
                 },
@@ -690,7 +795,12 @@ async def process_single_patient_workflow(
     ).model_dump()
     if original_session_text is not None:
         result_payload["original_session_text"] = original_session_text
-    _emit_progress(progress_callback, "clinical", _PROGRESS_SEQUENCE[15][1], _PROGRESS_SEQUENCE[15][0])
+    _emit_progress(
+        progress_callback,
+        "clinical",
+        _PROGRESS_SEQUENCE[15][1],
+        _PROGRESS_SEQUENCE[15][0],
+    )
     persisted_session_id = None
     try:
         persisted_session_id = await asyncio.to_thread(
@@ -708,7 +818,9 @@ async def process_single_patient_workflow(
                 "drugs": payload.drugs,
                 "laboratory_analysis": payload.laboratory_analysis,
                 "section_extraction": (
-                    section_extraction.model_dump() if section_extraction is not None else None
+                    section_extraction.model_dump()
+                    if section_extraction is not None
+                    else None
                 ),
                 "text_extraction_model": getattr(service.drugs_parser, "model", None),
                 "clinical_model": getattr(clinical_session, "llm_model", None),
@@ -733,7 +845,9 @@ async def process_single_patient_workflow(
                 result_payload,
             )
     except Exception as exc:  # noqa: BLE001
-        logger.warning("Session persistence unavailable; returning in-memory result only: %s", exc)
+        logger.warning(
+            "Session persistence unavailable; returning in-memory result only: %s", exc
+        )
     return result_payload
 
 
@@ -776,7 +890,9 @@ def start_clinical_job_workflow(
     try:
         service.ensure_submission_requirements(patient_payload)
     except ClinicalPipelineValidationError as exc:
-        raise ServiceValidationError(service.serialize_pipeline_issues(exc.issues)) from exc
+        raise ServiceValidationError(
+            service.serialize_pipeline_issues(exc.issues)
+        ) from exc
     job_id = service.job_manager.start_job(
         job_type=service.JOB_TYPE,
         runner=run_clinical_job,

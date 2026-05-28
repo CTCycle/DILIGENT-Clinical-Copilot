@@ -715,4 +715,3 @@ def test_preparation_expands_regimen_into_multiple_components() -> None:
             assert "binimetinib|encorafenib" in candidate["regimen_group_ids"]
         if candidate["canonical_name"] in {"dabrafenib", "trametinib"}:
             assert "dabrafenib|trametinib" in candidate["regimen_group_ids"]
-

@@ -111,4 +111,3 @@ def test_rejects_too_short_access_key() -> None:
         pass
     else:
         raise AssertionError("Expected short access key to be rejected")
-

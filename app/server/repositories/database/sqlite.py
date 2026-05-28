@@ -57,5 +57,3 @@ class SQLiteRepository:
             cursor.execute("PRAGMA foreign_keys=ON")
         finally:
             cursor.close()
-
-

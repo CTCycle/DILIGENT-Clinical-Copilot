@@ -101,7 +101,7 @@ class PatientData(BaseModel):
             day = int(str(value.get("day", "")).strip())
             month = int(str(value.get("month", "")).strip())
             year = int(str(value.get("year", "")).strip())
-        except (TypeError, ValueError):
+        except TypeError, ValueError:
             return None
         try:
             return date(year, month, day)
@@ -188,7 +188,9 @@ class ClinicalSessionRequest(BaseModel):
         elif isinstance(value, list):
             raw_values = value
         else:
-            raise ValueError("selected_model_providers must be a string or list of strings")
+            raise ValueError(
+                "selected_model_providers must be a string or list of strings"
+            )
 
         normalized: list[str] = []
         for item in raw_values:
@@ -230,7 +232,9 @@ class LlmClinicalSectionLineRangeDraft(BaseModel):
 class LlmClinicalSectionExtractionDraft(BaseModel):
     anamnesis: list[LlmClinicalSectionLineRangeDraft] = Field(default_factory=list)
     drugs: list[LlmClinicalSectionLineRangeDraft] = Field(default_factory=list)
-    laboratory_analysis: list[LlmClinicalSectionLineRangeDraft] = Field(default_factory=list)
+    laboratory_analysis: list[LlmClinicalSectionLineRangeDraft] = Field(
+        default_factory=list
+    )
     confidence: float = Field(default=0.0, ge=0.0, le=1.0)
 
 
@@ -329,7 +333,7 @@ class DrugEntry(BaseModel):
                 continue
             try:
                 cleaned.append(float(slot))
-            except (TypeError, ValueError):
+            except TypeError, ValueError:
                 continue
         if not cleaned:
             return []

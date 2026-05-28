@@ -238,4 +238,3 @@ class PatientTimelineExtractor:
             generated_at=datetime.now(UTC),
             events=normalized_events,
         )
-

@@ -15,7 +15,7 @@ def try_parse_json(value: str) -> Any:
         return None
     try:
         return json.loads(value)
-    except (TypeError, ValueError):
+    except TypeError, ValueError:
         return None
 
 
@@ -86,4 +86,3 @@ __all__ = [
     "split_synonym_variants",
     "try_parse_json",
 ]
-

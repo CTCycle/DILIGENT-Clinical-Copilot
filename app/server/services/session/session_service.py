@@ -67,7 +67,6 @@ from services.runtime.jobs import (
     JobManager,
 )
 from services.session.clinical_input_extractor import (
-    ClinicalInputExtractionError,
     ClinicalInputExtractor,
 )
 from services.session.document_normalizer import DocumentNormalizer
@@ -117,7 +116,9 @@ class ClinicalSessionService(ClinicalSessionFormattingMixin):
         self.serializer = serializer
         self.payload_sanitizer = payload_sanitizer
         self.input_preparator = input_preparator or ClinicalKnowledgePreparation()
-        self.clinical_input_extractor = clinical_input_extractor or ClinicalInputExtractor()
+        self.clinical_input_extractor = (
+            clinical_input_extractor or ClinicalInputExtractor()
+        )
         self.hepatox_consultation_cls = hepatox_consultation_cls or HepatoxConsultation
         self.job_manager = job_manager
         self.model_config_service = ModelConfigService(
@@ -217,7 +218,8 @@ class ClinicalSessionService(ClinicalSessionFormattingMixin):
             details: list[str] = []
             if parse_result.missing_required_sections:
                 details.append(
-                    "missing sections: " + ", ".join(parse_result.missing_required_sections)
+                    "missing sections: "
+                    + ", ".join(parse_result.missing_required_sections)
                 )
             if parse_result.malformed_sections:
                 details.append(
@@ -271,7 +273,8 @@ class ClinicalSessionService(ClinicalSessionFormattingMixin):
             details: list[str] = []
             if parse_result.missing_required_sections:
                 details.append(
-                    "missing sections: " + ", ".join(parse_result.missing_required_sections)
+                    "missing sections: "
+                    + ", ".join(parse_result.missing_required_sections)
                 )
             if parse_result.malformed_sections:
                 details.append(
@@ -361,7 +364,11 @@ class ClinicalSessionService(ClinicalSessionFormattingMixin):
             # Keep submission permissive when therapy content cannot provide timing.
             return
 
-        lines = [block.text.strip() for block in isolate_drug_blocks(cleaned_therapy_text) if block.text.strip()]
+        lines = [
+            block.text.strip()
+            for block in isolate_drug_blocks(cleaned_therapy_text)
+            if block.text.strip()
+        ]
         parsed_entries = [
             parsed
             for parsed in (self.drugs_parser.parse_line(line) for line in lines)
@@ -706,8 +713,12 @@ class ClinicalSessionService(ClinicalSessionFormattingMixin):
             # Deterministic fallback: recover lab markers directly from text
             # so pattern estimation can still proceed when LLM extraction fails.
             fallback_entries = []
-            primary_labs_text = self.lab_extractor.clean_text(payload.laboratory_analysis)
-            supplemental_anamnesis_text = self.lab_extractor.clean_text(payload.anamnesis)
+            primary_labs_text = self.lab_extractor.clean_text(
+                payload.laboratory_analysis
+            )
+            supplemental_anamnesis_text = self.lab_extractor.clean_text(
+                payload.anamnesis
+            )
             fallback_entries.extend(
                 self.lab_extractor.extract_entries_from_text(
                     text=primary_labs_text,
@@ -1102,6 +1113,7 @@ class ClinicalSessionService(ClinicalSessionFormattingMixin):
             resolved=resolved,
             rucam_entry=rucam_entry,
         )
+
     @staticmethod
     def build_matched_drugs_payload(
         *,
@@ -1115,6 +1127,7 @@ class ClinicalSessionService(ClinicalSessionFormattingMixin):
             prepared_inputs=prepared_inputs,
             rucam_bundle=rucam_bundle,
         )
+
     async def process_single_patient(
         self,
         payload: PatientData,
@@ -1146,6 +1159,7 @@ class ClinicalSessionService(ClinicalSessionFormattingMixin):
             progress_callback=progress_callback,
             stop_check=stop_check,
         )
+
     def start_clinical_job(
         self,
         request_payload: ClinicalSessionRequest,
@@ -1182,4 +1196,3 @@ class ClinicalSessionService(ClinicalSessionFormattingMixin):
             success=success,
             message="Cancellation requested" if success else "Job cannot be cancelled",
         )
-

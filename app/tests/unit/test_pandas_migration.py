@@ -235,4 +235,3 @@ def test_master_list_sanitization_handles_string_dtype_inputs() -> None:
     assert sanitized.iloc[0]["chapter_title"] == "Acetaminophen"
     assert sanitized.iloc[0]["reference_count"] == 2
     assert pd.api.types.is_datetime64_any_dtype(sanitized["last_update"])
-

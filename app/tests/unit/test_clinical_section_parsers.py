@@ -19,7 +19,9 @@ def test_markdown_headings_parse() -> None:
 
 
 def test_variant_headings_parse() -> None:
-    sections = _extract("Clinical history:\nA\nCurrent medications:\nT\nLaboratory tests:\nL")
+    sections = _extract(
+        "Clinical history:\nA\nCurrent medications:\nT\nLaboratory tests:\nL"
+    )
     assert sections is not None
 
 

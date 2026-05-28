@@ -42,4 +42,3 @@ def test_stable_json_routes_declare_response_models() -> None:
             violations.append(f"{methods} {route.path}")
 
     assert not violations, "Routes missing response_model:\n" + "\n".join(violations)
-

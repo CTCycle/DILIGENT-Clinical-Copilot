@@ -1,6 +1,5 @@
 from __future__ import annotations
 
-import asyncio
 from dataclasses import dataclass
 from inspect import isawaitable
 from typing import Any, cast
@@ -167,7 +166,13 @@ def validate_clinical_input_preflight(
                 field="clinical_input",
             )
         )
-        return _result(blocking, non_blocking, runtime_settings, extraction_quality, deterministic_diagnostics)
+        return _result(
+            blocking,
+            non_blocking,
+            runtime_settings,
+            extraction_quality,
+            deterministic_diagnostics,
+        )
     livertox_rows, _ = service.serializer.list_livertox_catalog(
         search=None,
         offset=0,
@@ -225,8 +230,10 @@ def validate_clinical_input_preflight(
         therapy_result = service.drugs_parser.extract_drugs_from_therapy_deterministic(
             service.drugs_parser.clean_text(patient_payload.drugs or "")
         )
-        anamnesis_result = service.drugs_parser.extract_drugs_from_anamnesis_deterministic(
-            service.drugs_parser.clean_text(patient_payload.anamnesis or "")
+        anamnesis_result = (
+            service.drugs_parser.extract_drugs_from_anamnesis_deterministic(
+                service.drugs_parser.clean_text(patient_payload.anamnesis or "")
+            )
         )
         extraction_artifact = build_extraction_artifact(
             normalized_document=normalized_document,
@@ -241,7 +248,9 @@ def validate_clinical_input_preflight(
             "section_coverage": {
                 "anamnesis_chars": len(section_extraction.anamnesis),
                 "therapy_chars": len(section_extraction.drugs),
-                "laboratory_analysis_chars": len(section_extraction.laboratory_analysis),
+                "laboratory_analysis_chars": len(
+                    section_extraction.laboratory_analysis
+                ),
             },
             "therapy": {
                 "drug_count": len(therapy_result.entries),
@@ -344,7 +353,13 @@ def validate_clinical_input_preflight(
                 message=str(exc),
             )
         )
-    return _result(blocking, non_blocking, runtime_settings, extraction_quality, deterministic_diagnostics)
+    return _result(
+        blocking,
+        non_blocking,
+        runtime_settings,
+        extraction_quality,
+        deterministic_diagnostics,
+    )
 
 
 def _validate_ui_metadata(
@@ -441,8 +456,12 @@ def _validate_persistence(
 
 
 def _runtime_settings() -> dict[str, Any]:
-    parser_provider, parser_model = LLMRuntimeConfig.resolve_provider_and_model("parser")
-    clinical_provider, clinical_model = LLMRuntimeConfig.resolve_provider_and_model("clinical")
+    parser_provider, parser_model = LLMRuntimeConfig.resolve_provider_and_model(
+        "parser"
+    )
+    clinical_provider, clinical_model = LLMRuntimeConfig.resolve_provider_and_model(
+        "clinical"
+    )
     return {
         "use_cloud_services": LLMRuntimeConfig.is_cloud_enabled(),
         "llm_provider": LLMRuntimeConfig.get_llm_provider(),
@@ -469,4 +488,6 @@ def _result(
         extraction_quality=extraction_quality,
         deterministic_diagnostics=deterministic_diagnostics,
     )
+
+
 _CLOUD_PROVIDERS = {"openai", "gemini"}

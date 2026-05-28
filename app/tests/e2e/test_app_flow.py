@@ -11,7 +11,9 @@ from playwright.sync_api import Page, Route, expect
 def _fill_required_dili_fields(page: Page) -> None:
     page.get_by_label("Clinical Input").fill(
         "## Anamnesis\n"
-        + " ".join(["Patient reports persistent fatigue nausea and abdominal discomfort."] * 12)
+        + " ".join(
+            ["Patient reports persistent fatigue nausea and abdominal discomfort."] * 12
+        )
         + "\n\n## Therapy\nAmoxicillin 500 mg BID, started on 2026-04-13, stopped on 2026-04-20.\n\n"
         + "## Laboratory history\nALT 210 U/L; AST 180 U/L; ALP 130 U/L."
     )
@@ -26,7 +28,8 @@ def _build_clinical_job_payload() -> dict:
         "clinical_input": (
             "## Anamnesis\n"
             + " ".join(
-                ["Patient reports persistent fatigue nausea and abdominal discomfort."] * 12
+                ["Patient reports persistent fatigue nausea and abdominal discomfort."]
+                * 12
             )
             + "\n\n## Therapy\nAmoxicillin 500 mg BID, started on 2026-04-13, stopped on 2026-04-20.\n\n"
             + "## Laboratory history\nALT 210 U/L; AST 180 U/L; ALP 130 U/L."
@@ -44,7 +47,8 @@ def _build_variant_heading_payload() -> dict:
         "clinical_input": (
             "## Clinical history\n"
             + " ".join(
-                ["Patient reports persistent fatigue nausea and abdominal discomfort."] * 12
+                ["Patient reports persistent fatigue nausea and abdominal discomfort."]
+                * 12
             )
             + "\n\n## Current medications\nAmoxicillin 500 mg BID, started on 2026-04-13, stopped on 2026-04-20.\n\n"
             + "## Laboratory tests\nALT 210 U/L; AST 180 U/L; ALP 130 U/L."
@@ -72,9 +76,9 @@ def test_home_initial_load_has_no_console_errors_or_failed_requests(
 
     page.on(
         "console",
-        lambda message: console_errors.append(message.text)
-        if message.type == "error"
-        else None,
+        lambda message: (
+            console_errors.append(message.text) if message.type == "error" else None
+        ),
     )
     page.on(
         "requestfailed",
@@ -98,9 +102,9 @@ def test_model_config_initial_load_has_no_console_errors_or_failed_requests(
 
     page.on(
         "console",
-        lambda message: console_errors.append(message.text)
-        if message.type == "error"
-        else None,
+        lambda message: (
+            console_errors.append(message.text) if message.type == "error" else None
+        ),
     )
     page.on(
         "requestfailed",
@@ -124,9 +128,9 @@ def test_data_inspection_initial_load_has_no_console_errors_or_failed_requests(
 
     page.on(
         "console",
-        lambda message: console_errors.append(message.text)
-        if message.type == "error"
-        else None,
+        lambda message: (
+            console_errors.append(message.text) if message.type == "error" else None
+        ),
     )
     page.on(
         "requestfailed",
@@ -150,9 +154,9 @@ def test_clinical_sessions_initial_load_has_no_console_errors_or_failed_requests
 
     page.on(
         "console",
-        lambda message: console_errors.append(message.text)
-        if message.type == "error"
-        else None,
+        lambda message: (
+            console_errors.append(message.text) if message.type == "error" else None
+        ),
     )
     page.on(
         "requestfailed",
@@ -177,7 +181,9 @@ def test_timetable_initial_load_has_no_console_errors_or_failed_requests(
     )
     assert sessions_response.status == 200
     sessions_payload = sessions_response.json()
-    items = sessions_payload.get("items") if isinstance(sessions_payload, dict) else None
+    items = (
+        sessions_payload.get("items") if isinstance(sessions_payload, dict) else None
+    )
     session_id: int | None = None
     if isinstance(items, list):
         for item in items:
@@ -198,9 +204,9 @@ def test_timetable_initial_load_has_no_console_errors_or_failed_requests(
 
     page.on(
         "console",
-        lambda message: console_errors.append(message.text)
-        if message.type == "error"
-        else None,
+        lambda message: (
+            console_errors.append(message.text) if message.type == "error" else None
+        ),
     )
     page.on(
         "requestfailed",
@@ -222,7 +228,9 @@ def test_keyboard_navigation_reaches_primary_tabs(page: Page, base_url: str):
     # Move focus using keyboard only until a top-level tab receives focus.
     for _ in range(24):
         page.keyboard.press("Tab")
-        focused_role = page.evaluate("() => document.activeElement?.getAttribute('role') || ''")
+        focused_role = page.evaluate(
+            "() => document.activeElement?.getAttribute('role') || ''"
+        )
         focused_text = page.evaluate(
             "() => (document.activeElement?.textContent || '').replace(/\\s+/g, ' ').trim()"
         )
@@ -233,7 +241,9 @@ def test_keyboard_navigation_reaches_primary_tabs(page: Page, base_url: str):
             "Model Configurations",
         ):
             return
-    raise AssertionError("Keyboard tab traversal did not reach a primary navigation tab.")
+    raise AssertionError(
+        "Keyboard tab traversal did not reach a primary navigation tab."
+    )
 
 
 def test_home_form_labels_are_associated_with_inputs(page: Page, base_url: str):
@@ -372,7 +382,9 @@ def test_dili_run_burst_click_submits_single_job(
     assert submission_count == 1
 
 
-def test_dili_submit_accepts_variant_section_headings(page: Page, base_url: str) -> None:
+def test_dili_submit_accepts_variant_section_headings(
+    page: Page, base_url: str
+) -> None:
     page.goto(base_url)
     payload = _build_variant_heading_payload()
     page.get_by_label("Patient Name").fill(payload["name"])
@@ -487,9 +499,11 @@ def test_model_config_runtime_toggle_enables_save_and_submits_put(
     expect(save_button).to_be_enabled(timeout=15000)
 
     with page.expect_response(
-        lambda response: response.url.endswith("/api/model-config")
-        and response.request.method == "PUT"
-        and response.status == 200
+        lambda response: (
+            response.url.endswith("/api/model-config")
+            and response.request.method == "PUT"
+            and response.status == 200
+        )
     ):
         save_button.click()
 
@@ -503,8 +517,12 @@ def test_timetable_route_load_does_not_autogenerate_timeline(
     )
     assert sessions_response.status == 200
     sessions_payload = sessions_response.json()
-    items = sessions_payload.get("items") if isinstance(sessions_payload, dict) else None
-    assert isinstance(items, list) and items, "No sessions available for timetable route test."
+    items = (
+        sessions_payload.get("items") if isinstance(sessions_payload, dict) else None
+    )
+    assert isinstance(items, list) and items, (
+        "No sessions available for timetable route test."
+    )
     session_id = items[0].get("session_id")
     assert isinstance(session_id, int) and session_id > 0
 
@@ -513,7 +531,11 @@ def test_timetable_route_load_does_not_autogenerate_timeline(
     def count_timeline_posts(route: Route) -> None:
         nonlocal timeline_post_count
         request = route.request
-        if request.method == "POST" and "/api/inspection/sessions/" in request.url and request.url.endswith("/timeline"):
+        if (
+            request.method == "POST"
+            and "/api/inspection/sessions/" in request.url
+            and request.url.endswith("/timeline")
+        ):
             timeline_post_count += 1
         route.continue_()
 
@@ -530,11 +552,15 @@ def test_timetable_invalid_session_id_shows_validation_error(page: Page, base_ur
     expect(page.locator(".error-note")).to_contain_text("Invalid session id.")
 
 
-def test_home_form_state_persists_across_back_forward_navigation(page: Page, base_url: str):
+def test_home_form_state_persists_across_back_forward_navigation(
+    page: Page, base_url: str
+):
     page.goto(base_url)
     page.get_by_label("Patient Name").fill("Back Forward Persist")
     page.get_by_label("Visit Date").fill("2026-05-24")
-    page.get_by_label("Clinical Input").fill("Navigation persistence verification input.")
+    page.get_by_label("Clinical Input").fill(
+        "Navigation persistence verification input."
+    )
 
     page.get_by_role("tab", name="Model Configurations").click()
     expect(page).to_have_url(re.compile(r"/model-config/?$"))
@@ -571,7 +597,9 @@ def test_clinical_sessions_row_selection_loads_matching_detail(
 
         row_label = target_row.inner_text()
         session_id_match = re.search(r"Session\s+(\d+)", row_label)
-        assert session_id_match is not None, f"Unable to parse session id from row label: {row_label!r}"
+        assert session_id_match is not None, (
+            f"Unable to parse session id from row label: {row_label!r}"
+        )
         target_session_id = session_id_match.group(1)
 
         target_row.click()

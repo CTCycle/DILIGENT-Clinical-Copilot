@@ -106,4 +106,3 @@ def validate_manifest(manifest: Mapping[str, Any]) -> None:
                     "duplicate normalized value for manifest/domain/category/key/locale"
                 )
             seen.add(dedupe_key)
-

@@ -21,4 +21,3 @@ def test_file_logging_is_utf8_safe(tmp_path) -> None:  # type: ignore[no-untyped
         logger.handlers = []
 
     assert "→ ≤" in log_path.read_text(encoding="utf-8")
-

@@ -492,4 +492,3 @@ class LanceVectorDatabase:
 
 
 VectorDatabase = LanceVectorDatabase
-

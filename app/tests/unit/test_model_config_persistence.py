@@ -154,7 +154,9 @@ def test_model_config_service_throttles_repeated_ollama_warnings(monkeypatch) ->
             return False
 
         async def list_models(self):
-            raise OllamaError("Failed to list Ollama models: All connection attempts failed")
+            raise OllamaError(
+                "Failed to list Ollama models: All connection attempts failed"
+            )
 
     warnings: list[str] = []
     times = iter([10.0, 20.0, 135.0])
@@ -172,4 +174,3 @@ def test_model_config_service_throttles_repeated_ollama_warnings(monkeypatch) ->
     asyncio.run(service.list_available_ollama_models())
 
     assert len(warnings) == 2
-

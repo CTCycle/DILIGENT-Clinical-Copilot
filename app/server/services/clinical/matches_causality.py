@@ -44,7 +44,9 @@ class BoundedCache(Generic[KT, VT]):
     def clear(self) -> None:
         self.store.clear()
 
+
 # Extracted from the facade module; functions intentionally accept the facade instance.
+
 
 def match_drug_names(self, patient_drugs: list[str]) -> list[LiverToxMatch]:
     results: list[LiverToxMatch] = []
@@ -65,9 +67,7 @@ def match_drug_names(self, patient_drugs: list[str]) -> list[LiverToxMatch]:
 
         cached = self.match_cache.get(normalized_query, CACHE_MISS)
         if cached is not CACHE_MISS:
-            results.append(
-                self.clone_cached_match(cached, raw_name, canonical_query)
-            )
+            results.append(self.clone_cached_match(cached, raw_name, canonical_query))
             continue
 
         alias_entries = self.resolve_alias_candidates(
@@ -115,6 +115,7 @@ def match_drug_names(self, patient_drugs: list[str]) -> list[LiverToxMatch]:
             logger.warning("No LiverTox match for '%s'", raw_name)
     return results
 
+
 def match_query(
     self,
     *,
@@ -132,12 +133,8 @@ def match_query(
             notes=["No alias candidates available."],
         )
 
-    source_backed_aliases = self.resolve_source_backed_query_variants(
-        normalized_query
-    )
-    local_aliases = [
-        alias for alias, from_catalog in alias_entries if not from_catalog
-    ]
+    source_backed_aliases = self.resolve_source_backed_query_variants(normalized_query)
+    local_aliases = [alias for alias, from_catalog in alias_entries if not from_catalog]
     stage1_keys = self.build_unique_keys(
         [canonical_query, *source_backed_aliases, *local_aliases],
         self.canonicalize_query,
@@ -216,6 +213,7 @@ def match_query(
         notes=["No exact, alias, normalized, or unique spelling-correction match."],
     )
 
+
 def clone_cached_match(
     self,
     match: LiverToxMatch,
@@ -236,6 +234,7 @@ def clone_cached_match(
         rejected_candidate_names=list(match.rejected_candidate_names),
         record=match.record,
     )
+
 
 def resolve_stage_matches(
     self,
@@ -260,6 +259,7 @@ def resolve_stage_matches(
     ordered = list(merged.values())
     ordered.sort(key=lambda item: self.result_sort_key(item[0], item[1]))
     return ordered
+
 
 def finalize_stage_result(
     self,
@@ -319,6 +319,7 @@ def finalize_stage_result(
         reason=f"ambiguous_{stage_name}",
         stage_matches=ranked,
     )
+
 
 def diagnose_missing_drug(self, drug_name: str) -> dict[str, Any]:
     normalized = self.normalize_name(drug_name)

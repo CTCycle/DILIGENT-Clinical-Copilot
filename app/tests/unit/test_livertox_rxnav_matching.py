@@ -32,14 +32,20 @@ def _build_livertox_df() -> pd.DataFrame:
 
 
 def test_conservative_fuzzy_livertox_match_high_threshold() -> None:
-    assert conservative_fuzzy_livertox_match(
-        ["acetaminophenn"],
-        ["Acetaminophen", "Omeprazole"],
-    ) == "Acetaminophen"
-    assert conservative_fuzzy_livertox_match(
-        ["zzzzz"],
-        ["Acetaminophen", "Omeprazole"],
-    ) is None
+    assert (
+        conservative_fuzzy_livertox_match(
+            ["acetaminophenn"],
+            ["Acetaminophen", "Omeprazole"],
+        )
+        == "Acetaminophen"
+    )
+    assert (
+        conservative_fuzzy_livertox_match(
+            ["zzzzz"],
+            ["Acetaminophen", "Omeprazole"],
+        )
+        is None
+    )
 
 
 def test_resolve_livertox_match_for_drug_direct() -> None:

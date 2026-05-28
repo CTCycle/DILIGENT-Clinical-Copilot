@@ -103,9 +103,7 @@ class AccessKeySerializer:
             db_session.close()
 
     # -------------------------------------------------------------------------
-    def create_key(
-        self, provider: str, plaintext_key: str
-    ) -> AccessKey:
+    def create_key(self, provider: str, plaintext_key: str) -> AccessKey:
         normalized_provider = self.normalize_provider(provider)
         normalized_key = normalize_access_key(plaintext_key)
         table = self.resolve_table(normalized_provider)
@@ -245,4 +243,3 @@ class AccessKeySerializer:
     @staticmethod
     def normalize_provider(provider: str) -> ProviderName:
         return normalize_provider_name(provider)
-

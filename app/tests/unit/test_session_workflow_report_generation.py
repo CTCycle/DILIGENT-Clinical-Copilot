@@ -19,8 +19,14 @@ from services.session.session_workflow import process_single_patient_workflow
 
 
 class FakePatternAnalyzer:
-    def stringify_scores(self, pattern_score: HepatotoxicityPatternScore) -> dict[str, str]:
-        return {"r_score": f"{pattern_score.r_score:.2f}" if pattern_score.r_score else "Not available"}
+    def stringify_scores(
+        self, pattern_score: HepatotoxicityPatternScore
+    ) -> dict[str, str]:
+        return {
+            "r_score": f"{pattern_score.r_score:.2f}"
+            if pattern_score.r_score
+            else "Not available"
+        }
 
 
 class FakeDrugsParser:
@@ -45,7 +51,9 @@ class FakeClinicalService:
         self.serializer = FakeSerializer()
         self.lab_extractor = SimpleNamespace(
             extract_explicit_hepatic_pattern=lambda text: (
-                "cholestatic" if "Hepatic pattern: cholestatic" in (text or "") else None
+                "cholestatic"
+                if "Hepatic pattern: cholestatic" in (text or "")
+                else None
             )
         )
 
@@ -65,9 +73,7 @@ class FakeClinicalService:
 
     async def extract_therapy_drugs(self, **kwargs: Any) -> PatientDrugs:
         _ = kwargs
-        return PatientDrugs(
-            entries=[DrugEntry(name="Paracetamolo", source="therapy")]
-        )
+        return PatientDrugs(entries=[DrugEntry(name="Paracetamolo", source="therapy")])
 
     async def extract_anamnesis_drugs(self, **kwargs: Any) -> PatientDrugs:
         _ = kwargs
@@ -77,7 +83,9 @@ class FakeClinicalService:
         _ = kwargs
         return SimpleNamespace(entries=[])
 
-    async def extract_lab_timeline(self, **kwargs: Any) -> tuple[PatientLabTimeline, None]:
+    async def extract_lab_timeline(
+        self, **kwargs: Any
+    ) -> tuple[PatientLabTimeline, None]:
         _ = kwargs
         return (
             PatientLabTimeline(
@@ -178,8 +186,13 @@ def test_workflow_keeps_narrative_report_and_stores_audit_report() -> None:
     )
     assert result["final_report"] in result["report"]
     assert "## Report Clinico" in result["pipeline_artifacts"]["generated_report"]
-    assert "### Esposizione ai Farmaci" in result["pipeline_artifacts"]["generated_report"]
+    assert (
+        "### Esposizione ai Farmaci" in result["pipeline_artifacts"]["generated_report"]
+    )
     assert result["pipeline_artifacts"]["generated_report"] != result["final_report"]
     assert result["extraction_metadata"]["hepatic_pattern"]["source"] == "provided"
     assert result["extraction_metadata"]["hepatic_pattern"]["value"] == "cholestatic"
-    assert result["extraction_metadata"]["rucam"]["source"] == "not_calculated_insufficient_data"
+    assert (
+        result["extraction_metadata"]["rucam"]["source"]
+        == "not_calculated_insufficient_data"
+    )

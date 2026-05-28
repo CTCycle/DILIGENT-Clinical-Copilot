@@ -370,4 +370,3 @@ def test_text_normalization_runtime_observation_writes_only_runtime_manifest() -
 
     assert int(entry_count) == 1
     assert len(runtime_observations) == 1
-

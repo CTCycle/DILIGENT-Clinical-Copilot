@@ -50,4 +50,3 @@ def test_load_catalog_manifest_parses_entries(tmp_path) -> None:  # type: ignore
     assert loaded.version == 1
     assert len(loaded.entries) == 2
     assert {entry.value for entry in loaded.entries} == {"mg", "mcg"}
-

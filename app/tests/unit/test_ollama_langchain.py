@@ -183,4 +183,3 @@ def test_ollama_inference_exception_maps_to_existing_error_types(monkeypatch) ->
         assert False, "Expected timeout mapping"
     except providers_module.OllamaTimeout:
         pass
-

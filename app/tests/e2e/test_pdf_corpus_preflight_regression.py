@@ -36,7 +36,9 @@ def _extract_pdf_text(path: Path) -> str:
 )
 def test_pdf_corpus_preflight_and_preprocess_have_no_blockers() -> None:
     corpus_dir = Path(
-        os.environ.get("PDF_CORPUS_DIR", r"C:\Users\Thomas V\Desktop\DILI_analysis\DILI")
+        os.environ.get(
+            "PDF_CORPUS_DIR", r"C:\Users\Thomas V\Desktop\DILI_analysis\DILI"
+        )
     )
     assert corpus_dir.exists(), f"PDF corpus directory not found: {corpus_dir}"
     pdf_files = sorted(corpus_dir.glob("*.pdf"))
@@ -71,7 +73,9 @@ def test_pdf_corpus_preflight_and_preprocess_have_no_blockers() -> None:
                 {
                     "document": pdf_path.name,
                     "stage": "preflight",
-                    "blocking_codes": [issue.code for issue in preflight.blocking_issues],
+                    "blocking_codes": [
+                        issue.code for issue in preflight.blocking_issues
+                    ],
                 }
             )
 
@@ -87,4 +91,3 @@ def test_pdf_corpus_preflight_and_preprocess_have_no_blockers() -> None:
             )
 
     assert not failures, f"PDF corpus regression failures: {failures}"
-

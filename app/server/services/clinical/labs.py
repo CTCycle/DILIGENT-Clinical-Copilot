@@ -32,6 +32,8 @@ NUMERIC_RE = re.compile(r"[-+]?\d+(?:[.,]\d+)?")
 DATE_RE = re.compile(
     r"\b(?:\d{4}[-/.]\d{1,2}[-/.]\d{1,2}|\d{1,2}[-/.]\d{1,2}[-/.]\d{4})\b"
 )
+
+
 def _load_marker_aliases() -> dict[str, tuple[str, ...]]:
     snapshot = get_reference_catalog_snapshot()
     entries = snapshot.entries("clinical_extraction", "laboratory_markers")
@@ -171,14 +173,16 @@ class ClinicalLabExtractor:
         timeline: PatientLabTimeline,
     ) -> str | None:
         alt_entries = [
-            entry for entry in timeline.entries
+            entry
+            for entry in timeline.entries
             if entry.marker_name == "ALT"
             and entry.value is not None
             and entry.upper_limit_normal is not None
             and entry.upper_limit_normal > 0
         ]
         alp_entries = [
-            entry for entry in timeline.entries
+            entry
+            for entry in timeline.entries
             if entry.marker_name == "ALP"
             and entry.value is not None
             and entry.upper_limit_normal is not None
@@ -481,7 +485,7 @@ class ClinicalLabExtractor:
             return None
         try:
             parsed = float(match.group(1))
-        except (TypeError, ValueError):
+        except TypeError, ValueError:
             return None
         if parsed <= 0:
             return None
@@ -716,4 +720,3 @@ class ClinicalLabExtractor:
         normalized.sort(key=self.lab_entry_sort_key)
         self.emit_progress(progress_callback, 1.0)
         return PatientLabTimeline(entries=normalized), onset_context
-

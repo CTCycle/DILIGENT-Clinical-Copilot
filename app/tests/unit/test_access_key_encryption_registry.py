@@ -110,4 +110,3 @@ def test_encrypt_and_decrypt_use_db_seeded_material() -> None:
 
     assert ciphertext != plaintext
     assert restored == plaintext
-

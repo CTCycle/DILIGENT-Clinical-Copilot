@@ -46,7 +46,9 @@ class ClinicalJobProgressCallback:
         self.job_id = job_id
 
     def __call__(self, stage: str, progress: float, detail: str | None = None) -> None:
-        report_clinical_job_progress(self.job_id, stage=stage, progress=progress, detail=detail)
+        report_clinical_job_progress(
+            self.job_id, stage=stage, progress=progress, detail=detail
+        )
 
 
 class ClinicalConsultationProgressCallback:
@@ -62,9 +64,13 @@ class ClinicalConsultationProgressCallback:
             return
         bounded_fraction = min(1.0, max(0.0, float(fraction)))
         if stage == "llm_analysis":
-            self.progress_callback("report.generating", 88.0 + (bounded_fraction * 6.0), None)
+            self.progress_callback(
+                "report.generating", 88.0 + (bounded_fraction * 6.0), None
+            )
         elif stage == "report_composition":
-            self.progress_callback("report.generating", 94.0 + (bounded_fraction * 5.0), None)
+            self.progress_callback(
+                "report.generating", 94.0 + (bounded_fraction * 5.0), None
+            )
 
 
 class StageProgressFractionCallback:
@@ -83,7 +89,9 @@ class StageProgressFractionCallback:
 
     def __call__(self, fraction: float) -> None:
         bounded_fraction = min(1.0, max(0.0, float(fraction)))
-        self.progress_callback(self.stage, self.lower + (self.span * bounded_fraction), None)
+        self.progress_callback(
+            self.stage, self.lower + (self.span * bounded_fraction), None
+        )
 
 
 def build_clinical_progress_message(
@@ -113,7 +121,9 @@ def report_clinical_job_progress(
 ) -> None:
     ensure_clinical_job_not_cancelled(job_id)
     bounded = min(100.0, max(0.0, float(progress)))
-    message = build_clinical_progress_message(stage=stage, progress=bounded, detail=detail)
+    message = build_clinical_progress_message(
+        stage=stage, progress=bounded, detail=detail
+    )
     jobs = get_job_manager()
     jobs.update_progress(job_id, bounded)
     jobs.update_result(

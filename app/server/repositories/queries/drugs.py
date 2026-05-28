@@ -12,7 +12,6 @@ from repositories.schemas.models import (
 
 ###############################################################################
 class DrugRepositoryQueries:
-    
     # -------------------------------------------------------------------------
     @staticmethod
     def drug_rxcui_mapping(rxcui: str) -> Select[tuple[DrugRxnormCode]]:
@@ -65,4 +64,3 @@ class DrugRepositoryQueries:
             DrugAlias.alias_kind == alias_kind,
             DrugAlias.source == source,
         )
-

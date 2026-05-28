@@ -22,4 +22,3 @@ def test_fastapi_app_import_does_not_trigger_database_initializer(monkeypatch) -
     importlib.import_module("app")
 
     assert called["postgres"] is False
-

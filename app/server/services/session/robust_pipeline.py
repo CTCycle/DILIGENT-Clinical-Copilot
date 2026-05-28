@@ -140,7 +140,13 @@ def build_extraction_artifact(
         ),
         labs_embedded_without_dedicated_lab_section=(
             not bool((payload.laboratory_analysis or "").strip())
-            and bool(re.search(r"\b(alt|ast|alp|bilirubin|bilirubina|ggt)\b", normalized_document.raw_text, re.IGNORECASE))
+            and bool(
+                re.search(
+                    r"\b(alt|ast|alp|bilirubin|bilirubina|ggt)\b",
+                    normalized_document.raw_text,
+                    re.IGNORECASE,
+                )
+            )
         ),
     )
     timed_drugs = _extract_timed_drugs(payload)
@@ -168,9 +174,7 @@ def build_extraction_artifact(
     # not optional semantic sections that may be absent in many source formats.
     core_keys = ("anamnesis", "therapy", "laboratory_analysis")
     confidence_values = [
-        sections[key].confidence
-        for key in core_keys
-        if key in sections
+        sections[key].confidence for key in core_keys if key in sections
     ]
     if not confidence_values:
         confidence_values = [section.confidence for section in sections.values()]
@@ -224,10 +228,14 @@ def build_fact_graph(
                 node_id=f"fact-{len(nodes) + 1}",
                 family="causality_statement",
                 value=assessment.model_dump(),
-                source_spans=_section_spans(extraction_artifact, "physician_assessment"),
+                source_spans=_section_spans(
+                    extraction_artifact, "physician_assessment"
+                ),
                 confidence=0.7,
                 origin="derived",
-                supports=[node.node_id for node in nodes if node.family == "drug_exposure"],
+                supports=[
+                    node.node_id for node in nodes if node.family == "drug_exposure"
+                ],
             )
         )
     classification = getattr(pattern_score, "classification", None)
@@ -301,9 +309,15 @@ def render_fact_graph_report(
     if drug_nodes:
         lines.extend(["", f"### {labels['drug_exposure']}"])
         for index, node in enumerate(drug_nodes, start=1):
-            name = node.value.get("name") or node.value.get("drug") or labels["unknown_drug"]
+            name = (
+                node.value.get("name")
+                or node.value.get("drug")
+                or labels["unknown_drug"]
+            )
             status = node.value.get("status") or node.value.get("suspension_status")
-            timing = node.value.get("therapy_start_date") or node.value.get("timing_value")
+            timing = node.value.get("therapy_start_date") or node.value.get(
+                "timing_value"
+            )
             claim_id = f"drug_exposure_{index}"
             parts = [str(name)]
             if timing:
@@ -317,8 +331,15 @@ def render_fact_graph_report(
         lines.extend(["", f"### {labels['laboratory_evidence']}"])
         for index, node in enumerate(lab_nodes, start=1):
             value = node.value
-            label = value.get("marker_name") or value.get("test_name") or value.get("name") or labels["lab_event"]
-            raw_value = value.get("value") or value.get("raw_value") or value.get("result")
+            label = (
+                value.get("marker_name")
+                or value.get("test_name")
+                or value.get("name")
+                or labels["lab_event"]
+            )
+            raw_value = (
+                value.get("value") or value.get("raw_value") or value.get("result")
+            )
             claim_id = f"lab_event_{index}"
             lines.append(
                 f"- {label}: {raw_value if raw_value is not None else labels['reported']} [{claim_id}]"
@@ -374,7 +395,10 @@ def audit_report(
                 "message": "Generated report has no source-linked claims.",
             }
         )
-    if any(issue.get("code") == "timed_drugs_missing" for issue in extraction_artifact.extraction_issues):
+    if any(
+        issue.get("code") == "timed_drugs_missing"
+        for issue in extraction_artifact.extraction_issues
+    ):
         blocking_issues.append(
             {
                 "code": "timed_drugs_missing",
@@ -419,7 +443,9 @@ def audit_report(
     )
 
 
-def build_run_bundle_index(*, run_id: str, session_id: int | None = None) -> RunBundleIndex:
+def build_run_bundle_index(
+    *, run_id: str, session_id: int | None = None
+) -> RunBundleIndex:
     return RunBundleIndex(
         run_id=run_id,
         session_id=session_id,
@@ -516,7 +542,10 @@ def _span_for_text(*, key: str, text: str, source_text: str) -> SourceSpan | Non
 
 def _extract_timed_drugs(payload: PatientData) -> list[TimedDrugMention]:
     mentions: list[TimedDrugMention] = []
-    for key, text in (("therapy", payload.drugs or ""), ("anamnesis", payload.anamnesis or "")):
+    for key, text in (
+        ("therapy", payload.drugs or ""),
+        ("anamnesis", payload.anamnesis or ""),
+    ):
         for line_index, line in enumerate(text.splitlines(), start=1):
             match = TIMING_RE.search(line)
             schedule_match = SCHEDULE_RE.search(line)
@@ -529,7 +558,9 @@ def _extract_timed_drugs(payload: PatientData) -> list[TimedDrugMention]:
                 TimedDrugMention(
                     drug=drug,
                     timing_type="date" if match else "schedule",
-                    timing_value=match.group("date") if match else schedule_match.group("schedule"),
+                    timing_value=match.group("date")
+                    if match
+                    else schedule_match.group("schedule"),
                     status="source_reported",
                     source_span=SourceSpan(
                         span_id=f"{key}-timed-drug-{len(mentions) + 1}",
@@ -550,9 +581,16 @@ def _guess_drug_name(line: str) -> str | None:
         return None
     before_date = TIMING_RE.split(cleaned, maxsplit=1)[0]
     # Prefer the most local token group near the timing marker, not generic section labels.
-    candidate_parts = [part.strip() for part in re.split(r"[,;:()]", before_date) if part.strip()]
+    candidate_parts = [
+        part.strip() for part in re.split(r"[,;:()]", before_date) if part.strip()
+    ]
     candidate = candidate_parts[-1] if candidate_parts else before_date.strip()
-    candidate = re.sub(r"\b(?:terapia|therapy|farmacologica|farmacologic)\b", "", candidate, flags=re.IGNORECASE).strip()
+    candidate = re.sub(
+        r"\b(?:terapia|therapy|farmacologica|farmacologic)\b",
+        "",
+        candidate,
+        flags=re.IGNORECASE,
+    ).strip()
     words = candidate.split()
     if not words:
         return None
@@ -603,10 +641,16 @@ def _render_discrepancy_report(
         return "\n".join(lines)
     if blocking_issues:
         lines.extend(["### Blocking Issues", ""])
-        lines.extend(f"- {issue.get('code')}: {issue.get('message')}" for issue in blocking_issues)
+        lines.extend(
+            f"- {issue.get('code')}: {issue.get('message')}"
+            for issue in blocking_issues
+        )
     if non_blocking_issues:
         lines.extend(["", "### Non-Blocking Issues", ""])
-        lines.extend(f"- {issue.get('code')}: {issue.get('message')}" for issue in non_blocking_issues)
+        lines.extend(
+            f"- {issue.get('code')}: {issue.get('message')}"
+            for issue in non_blocking_issues
+        )
     return "\n".join(lines).strip()
 
 
@@ -634,21 +678,33 @@ def _build_structured_report_comparison(
     unsupported: list[str] = []
 
     if timed_drug_count > 0:
-        agreements.append(f"Detected {timed_drug_count} timed drug mention(s) from source text.")
+        agreements.append(
+            f"Detected {timed_drug_count} timed drug mention(s) from source text."
+        )
     else:
         omissions.append("No timed drug mentions were extracted from source text.")
 
     if confidence >= 0.7:
-        agreements.append(f"Extraction confidence {confidence:.2f} meets comparison threshold.")
+        agreements.append(
+            f"Extraction confidence {confidence:.2f} meets comparison threshold."
+        )
     else:
-        differences.append(f"Extraction confidence {confidence:.2f} is below preferred comparison threshold (0.70).")
+        differences.append(
+            f"Extraction confidence {confidence:.2f} is below preferred comparison threshold (0.70)."
+        )
 
     if contamination.therapy_contaminated_by_bibliography_or_admin:
-        unsupported.append("Therapy section contains probable non-clinical contamination.")
+        unsupported.append(
+            "Therapy section contains probable non-clinical contamination."
+        )
     if contamination.assessment_contaminated_by_non_clinical_content:
-        unsupported.append("Physician assessment section contains probable non-clinical contamination.")
+        unsupported.append(
+            "Physician assessment section contains probable non-clinical contamination."
+        )
     if contamination.labs_embedded_without_dedicated_lab_section:
-        differences.append("Laboratory evidence appears embedded outside a dedicated labs section.")
+        differences.append(
+            "Laboratory evidence appears embedded outside a dedicated labs section."
+        )
 
     for issue in blocking_issues:
         code = str(issue.get("code", "blocking_issue"))
@@ -662,9 +718,12 @@ def _build_structured_report_comparison(
     payload = {
         "outcome": outcome,
         "agreements": agreements or ["No high-confidence agreements identified."],
-        "omissions": omissions or ["No critical omissions detected by structural gates."],
-        "differences": differences or ["No significant structural differences detected."],
-        "unsupported": unsupported or ["No unsupported claims flagged by contamination checks."],
+        "omissions": omissions
+        or ["No critical omissions detected by structural gates."],
+        "differences": differences
+        or ["No significant structural differences detected."],
+        "unsupported": unsupported
+        or ["No unsupported claims flagged by contamination checks."],
         "manual_review": "yes" if manual_review_required else "no",
     }
     return json.dumps(payload, ensure_ascii=False)

@@ -76,4 +76,3 @@ def test_runtime_timeouts_allow_long_clinical_budget_without_legacy_cap() -> Non
 
     assert settings["default_llm_timeout"] == 7200.0
     assert settings["clinical_llm_timeout"] == 7200.0
-

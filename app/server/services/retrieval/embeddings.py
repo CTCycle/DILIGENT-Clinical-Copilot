@@ -36,8 +36,7 @@ class EmbeddingModelMismatchError(RuntimeError):
 
 ###############################################################################
 class Reranker(Protocol):
-    def predict(self, pairs: list[tuple[str, str]]) -> list[float]:
-        ...
+    def predict(self, pairs: list[tuple[str, str]]) -> list[float]: ...
 
 
 ###############################################################################
@@ -484,7 +483,9 @@ class SimilaritySearch:
         return table.search(query_embedding).limit(limit).to_list()
 
     # -------------------------------------------------------------------------
-    def text_search(self, *, table: Any, query: str, limit: int) -> list[dict[str, Any]]:
+    def text_search(
+        self, *, table: Any, query: str, limit: int
+    ) -> list[dict[str, Any]]:
         return table.search(query, query_type="fts").limit(limit).to_list()
 
     # -------------------------------------------------------------------------
@@ -504,7 +505,9 @@ class SimilaritySearch:
         try:
             text_results = self.text_search(table=table, query=query, limit=limit)
         except Exception as exc:  # noqa: BLE001
-            logger.warning("Full-text search unavailable; using vector results: %s", exc)
+            logger.warning(
+                "Full-text search unavailable; using vector results: %s", exc
+            )
             text_results = []
         return self.fuse_results(vector_results, text_results, query=query)[:limit]
 
@@ -534,7 +537,9 @@ class SimilaritySearch:
                 source="text",
             )
         for entry in fused.values():
-            entry["hybrid_score"] = float(entry.get("hybrid_score", 0.0)) + self.metadata_boost(
+            entry["hybrid_score"] = float(
+                entry.get("hybrid_score", 0.0)
+            ) + self.metadata_boost(
                 entry,
                 query,
             )
@@ -715,7 +720,9 @@ class SimilaritySearch:
     # -------------------------------------------------------------------------
     def get_reranker(self) -> Reranker:
         if self.reranker is None:
-            self.reranker = LocalCrossEncoderReranker(get_server_settings().rag.reranker_model)
+            self.reranker = LocalCrossEncoderReranker(
+                get_server_settings().rag.reranker_model
+            )
         return self.reranker
 
     # -------------------------------------------------------------------------
@@ -726,6 +733,7 @@ class SimilaritySearch:
             return float(raw_score)
         return float("-inf")
 
+
 __all__ = [
     "EmbeddingModelMismatchError",
     "CloudEmbeddingGenerator",
@@ -735,4 +743,3 @@ __all__ = [
     "LocalCrossEncoderReranker",
     "SimilaritySearch",
 ]
-

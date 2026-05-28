@@ -300,4 +300,3 @@ def requires_language_repair(text: str, expected_language: str) -> bool:
         return False
     lower = (text or "").lower()
     return "estimated rucam" in lower or "confidence" in lower or "limitations" in lower
-

@@ -9,7 +9,9 @@ from typing import Any
 class SeedTermCatalog(tuple):
     __slots__ = ()
 
-    def __new__(cls, *, keywords: set[str], stopwords: set[str], groups: dict[str, set[str]]):
+    def __new__(
+        cls, *, keywords: set[str], stopwords: set[str], groups: dict[str, set[str]]
+    ):
         return super().__new__(cls, (keywords, stopwords, groups))
 
     @property
@@ -30,7 +32,12 @@ def _normalize(text: str) -> str:
 
 
 def load_seed_term_catalog() -> SeedTermCatalog:
-    path = Path(__file__).resolve().parents[3] / "resources" / "catalogs" / "text_normalization.json"
+    path = (
+        Path(__file__).resolve().parents[3]
+        / "resources"
+        / "catalogs"
+        / "text_normalization.json"
+    )
     payload = json.loads(path.read_text(encoding="utf-8"))
     entries = payload.get("entries", [])
     keywords: set[str] = set()
@@ -52,8 +59,12 @@ def load_seed_term_catalog() -> SeedTermCatalog:
 
 def detect_seed_matches(text: str, catalog: SeedTermCatalog) -> dict[str, Any]:
     normalized = f" {_normalize(text)} "
-    matched_keywords = sorted({term for term in catalog.keywords if f" {term} " in normalized})
-    matched_stopwords = sorted({term for term in catalog.stopwords if f" {term} " in normalized})
+    matched_keywords = sorted(
+        {term for term in catalog.keywords if f" {term} " in normalized}
+    )
+    matched_stopwords = sorted(
+        {term for term in catalog.stopwords if f" {term} " in normalized}
+    )
     matched_terms = sorted(set(matched_keywords) | set(matched_stopwords))
     matched_groups: dict[str, list[str]] = {}
     matched_counts: dict[str, int] = {}

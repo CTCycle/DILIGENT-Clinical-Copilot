@@ -166,7 +166,9 @@ class JobManager:
             state.update(progress=min(100.0, max(0.0, progress)))
 
     # -------------------------------------------------------------------------
-    def update_result(self, job_id: str, patch: dict[str, Any]) -> dict[str, Any] | None:
+    def update_result(
+        self, job_id: str, patch: dict[str, Any]
+    ) -> dict[str, Any] | None:
         with self.lock:
             state = self.jobs.get(job_id)
         if state is None:
@@ -224,7 +226,7 @@ class JobManager:
     def runner_accepts_job_id(self, runner: Callable[..., dict[str, Any]]) -> bool:
         try:
             signature = inspect.signature(runner)
-        except (TypeError, ValueError):
+        except TypeError, ValueError:
             return False
         parameters = list(signature.parameters.values())
         for param in parameters:
@@ -237,4 +239,3 @@ class JobManager:
 @lru_cache(maxsize=1)
 def get_job_manager() -> JobManager:
     return JobManager()
-
