@@ -21,6 +21,7 @@ import {
   pollClinicalJobStatus,
   resolvePollIntervalMs,
   startClinicalJob,
+  validateClinicalInput,
 } from '../../core/services/clinical-api';
 import { MarkdownRendererService } from '../../core/services/markdown-renderer.service';
 
@@ -305,13 +306,25 @@ export class DiliAgentPageComponent implements OnDestroy {
 
     try {
       const payload = buildClinicalPayload(this.vm.form, this.vm.settings);
+      const preflight = await validateClinicalInput(payload);
+      if (!preflight.ready) {
+        this.stateService.updateDiliAgent({
+          isStarting: false,
+          isRunning: false,
+          message: `[ERROR] ${preflight.blocking_issues.map((issue) => issue.message).join(' ')}`,
+        });
+        return;
+      }
+      const preflightWarningSummary = preflight.non_blocking_issues.length
+        ? `[WARN] ${preflight.non_blocking_issues.map((issue) => issue.message).join(' ')}`
+        : null;
       const startResult = await startClinicalJob(payload);
       this.stateService.updateDiliAgent({
         jobId: startResult.job_id,
         jobProgress: 0,
         jobStatus: startResult.status,
         jobStage: 'session_initialization',
-        jobStageMessage: STAGE_FALLBACK_LABELS['session_initialization'],
+        jobStageMessage: preflightWarningSummary ?? STAGE_FALLBACK_LABELS['session_initialization'],
         isStarting: false,
       });
       const intervalMs = resolvePollIntervalMs(startResult.poll_interval);

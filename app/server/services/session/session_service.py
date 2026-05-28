@@ -69,6 +69,7 @@ from services.session.clinical_input_extractor import (
     ClinicalInputExtractionError,
     ClinicalInputExtractor,
 )
+from services.session.document_normalizer import DocumentNormalizer
 from services.session.formatting_mixin import (
     ClinicalSessionFormattingMixin,
 )
@@ -76,6 +77,7 @@ from services.session.payload import PayloadSanitizationService
 from services.session.preflight import validate_clinical_input_preflight
 from services.session.text_section_parser import (
     InitialTextSectionParseResult,
+    build_section_extraction_from_initial_text,
     parse_initial_text_sections,
 )
 from services.session.session_workflow import (
@@ -202,24 +204,25 @@ class ClinicalSessionService(ClinicalSessionFormattingMixin):
     ) -> tuple[ClinicalSessionRequest, ClinicalSectionExtractionResult | None]:
         clinical_input = (request_payload.clinical_input or "").strip()
         if not clinical_input:
-            raise ClinicalInputExtractionError(
-                "Clinical input is required."
-            )
-        try:
-            extraction = await self.clinical_input_extractor.extract(
-                clinical_input=clinical_input
-            )
-        except ClinicalInputExtractionError as exc:
-            raise ServiceValidationError(str(exc)) from exc
-
-        if (
-            not extraction.anamnesis
-            or not extraction.drugs
-            or not extraction.laboratory_analysis
-        ):
+            raise ServiceValidationError("Clinical input is required.")
+        parse_result = parse_initial_text_sections(clinical_input)
+        if parse_result.missing_required_sections or parse_result.malformed_sections:
+            details: list[str] = []
+            if parse_result.missing_required_sections:
+                details.append(
+                    "missing sections: " + ", ".join(parse_result.missing_required_sections)
+                )
+            if parse_result.malformed_sections:
+                details.append(
+                    "malformed sections: " + ", ".join(parse_result.malformed_sections)
+                )
             raise ServiceValidationError(
-                "Clinical input must contain anamnesis, current therapy, and laboratory analysis sections."
+                "Clinical input sections are invalid (" + "; ".join(details) + ")."
             )
+        extraction = build_section_extraction_from_initial_text(
+            parse_result,
+            clinical_input,
+        )
         return (
             request_payload.model_copy(
                 update={
@@ -271,6 +274,48 @@ class ClinicalSessionService(ClinicalSessionFormattingMixin):
                 "Clinical input sections are invalid (" + "; ".join(details) + ")."
             )
         return parse_result
+
+    # -------------------------------------------------------------------------
+    def prepare_structured_clinical_input(
+        self,
+        request_payload: ClinicalSessionRequest,
+    ) -> dict[str, Any]:
+        clinical_input = (request_payload.clinical_input or "").strip()
+        if not clinical_input:
+            raise ServiceValidationError("Clinical input is required.")
+
+        parse_result = self.validate_assessment_prerequisites_without_llm(
+            request_payload
+        )
+        section_extraction = build_section_extraction_from_initial_text(
+            parse_result,
+            clinical_input,
+        )
+        if (
+            not section_extraction.anamnesis
+            or not section_extraction.drugs
+            or not section_extraction.laboratory_analysis
+        ):
+            raise ServiceValidationError(
+                "Clinical input must contain anamnesis, current therapy, and laboratory analysis sections."
+            )
+
+        normalized_document = DocumentNormalizer().normalize(clinical_input)
+        request_with_sections = request_payload.model_copy(
+            update={
+                "anamnesis": section_extraction.anamnesis,
+                "drugs": section_extraction.drugs,
+                "laboratory_analysis": section_extraction.laboratory_analysis,
+            }
+        )
+        patient_payload = self.build_patient_payload(request_with_sections)
+        return {
+            "parse_result": parse_result,
+            "section_extraction": section_extraction,
+            "normalized_document": normalized_document,
+            "request_payload": request_with_sections,
+            "patient_payload": patient_payload,
+        }
 
     # -------------------------------------------------------------------------
     def build_patient_payload(

@@ -47,6 +47,7 @@ function formatTimestamp(value: string | null): string {
   standalone: true,
   imports: [CommonModule, FormsModule, ModalShellComponent, StatusMessageComponent],
   templateUrl: './access-key-modal.component.html',
+  styleUrl: './access-key-modal.component.scss',
 })
 export class AccessKeyModalComponent implements OnChanges {
   @Input() isOpen = false;
@@ -179,6 +180,14 @@ export class AccessKeyModalComponent implements OnChanges {
 
   lastUsedLabel(item: AccessKeyRecord): string {
     return formatTimestamp(item.last_used_at);
+  }
+
+  activateActionLabel(item: AccessKeyRecord): string {
+    return item.is_active ? 'Key is active' : 'Activate key';
+  }
+
+  visibilityActionLabel(item: AccessKeyRecord): string {
+    return this.visibleRows[item.id] ? 'Hide fingerprint' : 'Show fingerprint';
   }
 }
 
