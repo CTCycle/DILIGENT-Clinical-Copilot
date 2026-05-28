@@ -23,9 +23,11 @@ class FakeDiseaseClient:
     def __init__(self, responses: list[PatientDiseaseContext]) -> None:
         self.responses = list(responses)
         self.call_count = 0
+        self.prompts: list[str] = []
 
     async def llm_structured_call(self, **kwargs: Any) -> PatientDiseaseContext:
         self.call_count += 1
+        self.prompts.append(str(kwargs.get("user_prompt", "")))
         schema = kwargs.get("schema", PatientDiseaseContext)
         if self.responses:
             return self.responses.pop(0)
@@ -62,15 +64,6 @@ def test_extract_diseases_from_anamnesis_deduplicates_and_keeps_rich_entry(
             PatientDiseaseContext(
                 entries=[
                     DiseaseContextEntry(
-                        name="Steatosi epatica",
-                        chronic=None,
-                        hepatic_related=None,
-                    )
-                ]
-            ),
-            PatientDiseaseContext(
-                entries=[
-                    DiseaseContextEntry(
                         name="steatosi epatica",
                         occurrence_time="2021",
                         timeline="diagnosed in 2021, persistent thereafter",
@@ -103,7 +96,9 @@ def test_extract_diseases_from_anamnesis_deduplicates_and_keeps_rich_entry(
 
     parsed = asyncio.run(extractor.extract_diseases_from_anamnesis(anamnesis))
 
-    assert client.call_count >= 2
+    assert client.call_count == 1
+    assert "full anamnesis text" in client.prompts[0]
+    assert "[Chunk" not in client.prompts[0]
     assert len(parsed.entries) == 2
     steatosis = parsed.entries[0]
     assert steatosis.name.lower() == "steatosi epatica"

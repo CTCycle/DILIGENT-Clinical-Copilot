@@ -93,7 +93,13 @@ async def _extract_drugs_from_section(
             base_timeout_s=float(getattr(service.drugs_parser, "timeout_s", 1.0))
         )
     else:
-        parser_timeout_s = float(getattr(service.drugs_parser, "timeout_s", 30.0))
+        parser_timeout_s = float(
+            getattr(
+                service.drugs_parser,
+                "timeout_s",
+                get_server_settings().runtime.parser_llm_timeout,
+            )
+        )
     try:
         if source == "anamnesis":
             if not hasattr(
