@@ -230,8 +230,3 @@ def test_ollama_endpoint_sanitizes_provider_error(monkeypatch) -> None:
         payload["detail"]
         == "Ollama service is unavailable. Verify Ollama is running and retry."
     )
-
-
-
-
-

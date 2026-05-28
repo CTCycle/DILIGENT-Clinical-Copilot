@@ -12,7 +12,9 @@ from common.constants import LOGS_PATH
 ###############################################################################
 os.makedirs(LOGS_PATH, exist_ok=True)
 current_timestamp = datetime.now().strftime("%Y%m%d_%H%M%S_%f")
-log_filename = os.path.join(LOGS_PATH, f"DILIGENT_{current_timestamp}_{os.getpid()}.log")
+log_filename = os.path.join(
+    LOGS_PATH, f"DILIGENT_{current_timestamp}_{os.getpid()}.log"
+)
 
 # Define logger configuration
 ###############################################################################
@@ -86,4 +88,3 @@ except ValueError:
     }
     logging.config.dictConfig(fallback_config)
 logger = logging.getLogger()
-

@@ -39,6 +39,7 @@ def process_monograph_payload(
 
 # Extracted from the facade module; functions intentionally accept the facade instance.
 
+
 def sanitize_livertox_master_list(self, data: pd.DataFrame) -> pd.DataFrame | None:
     if data.empty:
         return
@@ -93,9 +94,7 @@ def sanitize_livertox_master_list(self, data: pd.DataFrame) -> pd.DataFrame | No
         data = cast(pd.DataFrame, data[~column_values.isin(values)])
 
     data["last_update"] = pd.to_datetime(data["last_update"], errors="coerce")
-    data["reference_count"] = pd.to_numeric(
-        data["reference_count"], errors="coerce"
-    )
+    data["reference_count"] = pd.to_numeric(data["reference_count"], errors="coerce")
     data["year_approved"] = pd.to_numeric(data["year_approved"], errors="coerce")
 
     data = cast(
@@ -105,10 +104,12 @@ def sanitize_livertox_master_list(self, data: pd.DataFrame) -> pd.DataFrame | No
 
     return data.reset_index(drop=True)
 
+
 def clean_master_list_column(self, series: pd.Series) -> pd.Series:
     cleaned = series.fillna("").astype(str).str.strip()
     cleaned = cleaned.replace("", pd.NA)
     return cleaned
+
 
 def collect_monographs(
     self,
@@ -178,9 +179,7 @@ def collect_monographs(
                 finally:
                     extracted.close()
                 if data:
-                    record = process_monograph_member(
-                        member.name, data
-                    )
+                    record = process_monograph_member(member.name, data)
                     if record:
                         collected.append(record)
                 processed_count += 1
@@ -227,9 +226,7 @@ def collect_monographs(
                         total_payloads=total_payloads,
                     )
                     continue
-                future = executor.submit(
-                    process_monograph_payload, member.name, data
-                )
+                future = executor.submit(process_monograph_payload, member.name, data)
                 in_flight[future] = member.name
                 if len(in_flight) >= max_in_flight:
                     processed_count = drain_monograph_futures(
@@ -256,6 +253,7 @@ def collect_monographs(
             )
     return sort_monograph_records(self, collected)
 
+
 def emit_monograph_progress(
     self,
     *,
@@ -269,6 +267,7 @@ def emit_monograph_progress(
         progress=35.0 + (ratio * 33.0),
         message=f"Processed {processed_count}/{total_payloads} LiverTox files",
     )
+
 
 def drain_monograph_futures(
     self,
@@ -314,9 +313,8 @@ def drain_monograph_futures(
         )
     return processed_count
 
-def sort_monograph_records(
-    self, records: list[dict[str, str]]
-) -> list[dict[str, str]]:
+
+def sort_monograph_records(self, records: list[dict[str, str]]) -> list[dict[str, str]]:
     return sorted(
         records,
         key=lambda item: (
@@ -325,6 +323,7 @@ def sort_monograph_records(
             str(item.get("excerpt", "")).casefold(),
         ),
     )
+
 
 def process_monograph_member(
     member_name: str,
@@ -354,6 +353,7 @@ def process_monograph_member(
         "excerpt": cleaned_text,
     }
 
+
 def convert_member_bytes(
     member_name: str, data: bytes
 ) -> tuple[str, str | None] | None:
@@ -368,11 +368,13 @@ def convert_member_bytes(
     text = html_to_text(markup)
     return text, markup
 
+
 def decode_markup(data: bytes) -> str:
     try:
         return data.decode("utf-8")
     except UnicodeDecodeError:
         return data.decode("latin-1", errors="ignore")
+
 
 def pdf_to_text(data: bytes) -> str:
     buffer = io.BytesIO(data)
@@ -402,6 +404,7 @@ def pdf_to_text(data: bytes) -> str:
     except UnicodeDecodeError:
         return data.decode("latin-1", errors="ignore")
 
+
 def extract_nbk(member_name: str, content: str) -> str | None:
     match = re.search(r"NBK\d+", member_name, re.IGNORECASE)
     if match:
@@ -411,11 +414,13 @@ def extract_nbk(member_name: str, content: str) -> str | None:
         return match.group(0).upper()
     return None
 
+
 def derive_identifier(member_name: str) -> str:
     base = os.path.basename(member_name)
     stem = os.path.splitext(base)[0]
     cleaned = normalize_whitespace(strip_punctuation(stem))
     return cleaned or base
+
 
 def extract_title(html_text: str, plain_text: str, default: str) -> str:
     patterns = (
@@ -425,9 +430,7 @@ def extract_title(html_text: str, plain_text: str, default: str) -> str:
         r"<title[^>]*>(.*?)</title>",
     )
     for pattern in patterns:
-        for match in re.finditer(
-            pattern, html_text, flags=re.IGNORECASE | re.DOTALL
-        ):
+        for match in re.finditer(pattern, html_text, flags=re.IGNORECASE | re.DOTALL):
             fragment = clean_fragment(match.group(1))
             normalized = normalize_extracted_title(fragment)
             if normalized:
@@ -440,8 +443,10 @@ def extract_title(html_text: str, plain_text: str, default: str) -> str:
                 return normalized
     return normalize_extracted_title(default) or default
 
+
 def clean_fragment(fragment: str) -> str:
     return html_to_text(fragment)
+
 
 def normalize_extracted_title(value: str) -> str:
     cleaned = normalize_whitespace(value)
@@ -455,26 +460,25 @@ def normalize_extracted_title(value: str) -> str:
     )
     return normalize_whitespace(cleaned)
 
+
 def html_to_text(html_text: str) -> str:
     # Tempered dot avoids runaway backtracking on malformed HTML.
-    stripped = re.sub(
-        r"(?is)<(script|style)[^>]*>(?:(?!</\1>).)*</\1>", " ", html_text
-    )
+    stripped = re.sub(r"(?is)<(script|style)[^>]*>(?:(?!</\1>).)*</\1>", " ", html_text)
     stripped = re.sub(r"<[^>]+>", " ", stripped)
     unescaped = html.unescape(stripped)
     return normalize_whitespace(unescaped)
+
 
 def strip_punctuation(value: str) -> str:
     normalized = unicodedata.normalize("NFKD", value)
     folded = "".join(char for char in normalized if not unicodedata.combining(char))
     return re.sub(r"[-_,.;:()\[\]{}\/\\]", " ", folded)
 
+
 def sanitize_records(self, entries: list[dict[str, Any]]) -> pd.DataFrame:
     sanitized = self.serializer.sanitize_livertox_records(entries)
     if sanitized.empty:
-        sanitized = pd.DataFrame(
-            columns=["nbk_id", "drug_name", "excerpt", "synonyms"]
-        )
+        sanitized = pd.DataFrame(columns=["nbk_id", "drug_name", "excerpt", "synonyms"])
     sanitized = sanitized.copy()
     drug_names = cast(pd.Series, sanitized["drug_name"]).astype(str).str.strip()
     sanitized["drug_name"] = drug_names
@@ -488,10 +492,9 @@ def sanitize_records(self, entries: list[dict[str, Any]]) -> pd.DataFrame:
     if "synonyms" not in sanitized.columns:
         sanitized["synonyms"] = pd.NA
     synonyms = cast(pd.Series, sanitized["synonyms"])
-    sanitized["synonyms"] = synonyms.where(
-        pd.notnull(synonyms), pd.NA
-    )
+    sanitized["synonyms"] = synonyms.where(pd.notnull(synonyms), pd.NA)
     return sanitized.reset_index(drop=True)
+
 
 def sanitize_excerpt(self, value: Any) -> str | Any:
     if value is None or pd.isna(value):
@@ -504,6 +507,7 @@ def sanitize_excerpt(self, value: Any) -> str | Any:
         return pd.NA
     return cleaned
 
+
 def normalize_nbk_id(self, value: Any) -> str | None:
     if value is None:
         return None
@@ -515,6 +519,7 @@ def normalize_nbk_id(self, value: Any) -> str | None:
     if not livertox_common.NBK_ID_PATTERN.fullmatch(normalized):
         return None
     return normalized
+
 
 def contains_symbol(self, value: str) -> bool:
     if not isinstance(value, str):

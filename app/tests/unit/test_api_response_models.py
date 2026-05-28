@@ -18,4 +18,3 @@ def test_schema_exposed_api_routes_define_response_model() -> None:
             missing_response_models.append(f"{sorted(route.methods)} {route.path}")
 
     assert missing_response_models == []
-

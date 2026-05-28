@@ -33,6 +33,7 @@ from services.text.vocabulary import (
 
 # Extracted from the facade module; functions intentionally accept the facade instance.
 
+
 def save_clinical_session(self, session_data: dict[str, Any]) -> int | None:
     if not session_data:
         logger.warning("Skipping clinical session save; payload is empty")
@@ -48,15 +49,11 @@ def save_clinical_session(self, session_data: dict[str, Any]) -> int | None:
             ),
             version=self.to_int(session_data.get("version")) or 1,
             original_session_id=self.to_int(session_data.get("original_session_id")),
-            hepatic_pattern=self.normalize_string(
-                session_data.get("hepatic_pattern")
-            ),
+            hepatic_pattern=self.normalize_string(session_data.get("hepatic_pattern")),
             text_extraction_model=self.normalize_string(
                 session_data.get("text_extraction_model")
             ),
-            clinical_model=self.normalize_string(
-                session_data.get("clinical_model")
-            ),
+            clinical_model=self.normalize_string(session_data.get("clinical_model")),
             total_duration=self.to_float(session_data.get("total_duration")),
             session_status=self.normalize_session_status(
                 session_data.get("session_status")
@@ -77,6 +74,7 @@ def save_clinical_session(self, session_data: dict[str, Any]) -> int | None:
         raise
     finally:
         db_session.close()
+
 
 def ensure_session_result_table(self) -> None:
     inspector = inspect(self.engine)
@@ -116,9 +114,7 @@ def ensure_session_result_table(self) -> None:
         Drug.__tablename__: {"rxnav_last_update"},
     }
     for table_name, columns in required_columns.items():
-        existing = {
-            str(item.get("name")) for item in inspector.get_columns(table_name)
-        }
+        existing = {str(item.get("name")) for item in inspector.get_columns(table_name)}
         missing = sorted(columns - existing)
         if missing:
             joined = ", ".join(missing)
@@ -126,6 +122,7 @@ def ensure_session_result_table(self) -> None:
                 "Database schema mismatch: "
                 f"missing required column(s) in {table_name}: {joined}"
             )
+
 
 def normalize_session_status(self, value: Any) -> str:
     normalized = self.normalize_string(value)
@@ -136,26 +133,22 @@ def normalize_session_status(self, value: Any) -> str:
         return "failed"
     return "successful"
 
-def persist_patient(
-    self, db_session: Session, session_data: dict[str, Any]
-) -> Patient:
+
+def persist_patient(self, db_session: Session, session_data: dict[str, Any]) -> Patient:
     patient = Patient(
         name=self.normalize_string(session_data.get("patient_name")),
-        visit_date=self.normalize_date_value(
-            session_data.get("patient_visit_date")
-        ),
+        visit_date=self.normalize_date_value(session_data.get("patient_visit_date")),
         anamnesis=self.normalize_string(session_data.get("anamnesis")),
         drugs=self.normalize_string(session_data.get("drugs")),
         laboratory_analysis=self.normalize_string(
             session_data.get("laboratory_analysis")
         ),
-        image_blob=self.decode_patient_image(
-            session_data.get("patient_image_base64")
-        ),
+        image_blob=self.decode_patient_image(session_data.get("patient_image_base64")),
     )
     db_session.add(patient)
     db_session.flush()
     return patient
+
 
 def decode_patient_image(self, value: Any) -> bytes | None:
     normalized = self.normalize_string(value)
@@ -166,9 +159,10 @@ def decode_patient_image(self, value: Any) -> bytes | None:
         payload = payload.split(",", maxsplit=1)[1].strip()
     try:
         return base64.b64decode(payload, validate=True)
-    except (binascii.Error, ValueError):
+    except binascii.Error, ValueError:
         logger.warning("Skipping invalid patient image payload during session save")
         return None
+
 
 def list_sessions(
     self,
@@ -198,9 +192,9 @@ def list_sessions(
         result_payload_match = exists(
             select(1).where(
                 ClinicalSessionResult.session_id == ClinicalSession.id,
-                func.lower(
-                    func.coalesce(ClinicalSessionResult.payload_json, "")
-                ).like(search_pattern, escape="\\"),
+                func.lower(func.coalesce(ClinicalSessionResult.payload_json, "")).like(
+                    search_pattern, escape="\\"
+                ),
             )
         )
         conditions.append(
@@ -307,6 +301,7 @@ def list_sessions(
     finally:
         db_session.close()
 
+
 def get_session_detail(self, session_id: int) -> dict[str, Any] | None:
     self.ensure_session_result_table()
     safe_session_id = int(session_id)
@@ -321,8 +316,9 @@ def get_session_detail(self, session_id: int) -> dict[str, Any] | None:
             return None
         session_row, patient_row = row
         section_rows = db_session.execute(
-            select(ClinicalSessionSection.section_kind, ClinicalSessionSection.content)
-            .where(ClinicalSessionSection.session_id == safe_session_id)
+            select(
+                ClinicalSessionSection.section_kind, ClinicalSessionSection.content
+            ).where(ClinicalSessionSection.session_id == safe_session_id)
         ).all()
         sections = {
             str(kind): self.normalize_string(content) or ""
@@ -341,16 +337,20 @@ def get_session_detail(self, session_id: int) -> dict[str, Any] | None:
             "version": int(session_row.version or 1),
             "original_session_id": self.to_int(session_row.original_session_id),
             "status": self.normalize_session_status(session_row.session_status),
-            "text_extraction_model": self.normalize_string(session_row.text_extraction_model),
+            "text_extraction_model": self.normalize_string(
+                session_row.text_extraction_model
+            ),
             "clinical_model": self.normalize_string(session_row.clinical_model),
             "metadata": metadata,
             "sections": sections,
             "session_text": session_text,
             "result_payload": payload,
-            "report": self.normalize_string(payload.get("report")) or self.normalize_string(sections.get("final_report")),
+            "report": self.normalize_string(payload.get("report"))
+            or self.normalize_string(sections.get("final_report")),
         }
     finally:
         db_session.close()
+
 
 def build_session_text_from_sections(self, sections: dict[str, str]) -> str:
     chunks: list[str] = []
@@ -363,6 +363,7 @@ def build_session_text_from_sections(self, sections: dict[str, str]) -> str:
         if value:
             chunks.append(f"{label}\n{value}")
     return "\n\n".join(chunks)
+
 
 def update_session_text_and_metadata(
     self,
@@ -412,6 +413,7 @@ def update_session_text_and_metadata(
     finally:
         db_session.close()
 
+
 def get_next_session_version(self, original_session_id: int) -> int:
     self.ensure_session_result_table()
     safe_original_id = int(original_session_id)
@@ -429,6 +431,7 @@ def get_next_session_version(self, original_session_id: int) -> int:
     finally:
         db_session.close()
 
+
 def parse_session_result_payload(
     self, payload_json: str | None
 ) -> dict[str, Any] | None:
@@ -440,6 +443,7 @@ def parse_session_result_payload(
     except json.JSONDecodeError:
         return None
     return parsed if isinstance(parsed, dict) else None
+
 
 def get_session_result_payload(self, session_id: int) -> dict[str, Any] | None:
     self.ensure_session_result_table()
@@ -454,6 +458,7 @@ def get_session_result_payload(self, session_id: int) -> dict[str, Any] | None:
         return self.parse_session_result_payload(payload_json)
     finally:
         db_session.close()
+
 
 def upsert_session_result_payload(
     self, session_id: int, payload: dict[str, Any]
@@ -489,6 +494,7 @@ def upsert_session_result_payload(
         raise
     finally:
         db_session.close()
+
 
 def get_session_timeline_source(self, session_id: int) -> dict[str, Any] | None:
     self.ensure_session_result_table()
@@ -545,6 +551,7 @@ def get_session_timeline_source(self, session_id: int) -> dict[str, Any] | None:
     finally:
         db_session.close()
 
+
 def delete_session(self, session_id: int) -> bool:
     self.ensure_session_result_table()
     safe_session_id = int(session_id)
@@ -592,6 +599,7 @@ def delete_session(self, session_id: int) -> bool:
     finally:
         db_session.close()
 
+
 def normalize_string(self, value: Any) -> str | None:
     if isinstance(value, str):
         normalized = value.strip()
@@ -611,6 +619,7 @@ def normalize_string(self, value: Any) -> str | None:
         return None
     return normalized
 
+
 def normalize_flag(self, value: Any) -> int | None:
     normalized = self.normalize_string(value)
     if normalized is None:
@@ -624,9 +633,10 @@ def normalize_flag(self, value: Any) -> int | None:
         return 0
     try:
         numeric = int(normalized)
-    except (TypeError, ValueError):
+    except TypeError, ValueError:
         return None
     return 1 if numeric != 0 else 0
+
 
 def normalize_date(self, value: Any) -> str | None:
     normalized_date = self.normalize_date_value(value)
@@ -634,6 +644,7 @@ def normalize_date(self, value: Any) -> str | None:
         normalized = self.normalize_string(value)
         return normalized or None
     return normalized_date.isoformat()
+
 
 def normalize_date_value(self, value: Any) -> date | None:
     normalized = self.normalize_string(value)
@@ -667,10 +678,12 @@ def normalize_date_value(self, value: Any) -> date | None:
         return None
     return parsed.date()
 
+
 def join_values(self, values: set[str]) -> str | None:
     if not values:
         return None
     return "; ".join(sorted(values))
+
 
 def to_int(self, value: Any) -> int | None:
     normalized = self.normalize_string(value)
@@ -678,8 +691,9 @@ def to_int(self, value: Any) -> int | None:
         return None
     try:
         return int(float(normalized))
-    except (TypeError, ValueError):
+    except TypeError, ValueError:
         return None
+
 
 def to_float(self, value: Any) -> float | None:
     normalized = self.normalize_string(value)
@@ -687,8 +701,9 @@ def to_float(self, value: Any) -> float | None:
         return None
     try:
         return float(normalized)
-    except (TypeError, ValueError):
+    except TypeError, ValueError:
         return None
+
 
 def parse_datetime(self, value: Any) -> Any:
     if value is None:
@@ -701,6 +716,7 @@ def parse_datetime(self, value: Any) -> Any:
     if isinstance(parsed, pd.Timestamp):
         return parsed.to_pydatetime()
     return parsed
+
 
 def persist_session_sections(
     self, db_session: Session, session_id: int, session_data: dict[str, Any]
@@ -729,6 +745,7 @@ def persist_session_sections(
                 content=content,
             )
         )
+
 
 def persist_session_labs(
     self, db_session: Session, session_id: int, session_data: dict[str, Any]
@@ -761,9 +778,9 @@ def persist_session_labs(
         lab_code = persisted_codes.get(marker_name.upper())
         if lab_code is None:
             continue
-        value_raw = self.normalize_string(
-            item.get("value")
-        ) or self.normalize_string(item.get("value_text"))
+        value_raw = self.normalize_string(item.get("value")) or self.normalize_string(
+            item.get("value_text")
+        )
         upper_limit_raw = self.normalize_string(
             item.get("upper_limit_normal")
         ) or self.normalize_string(item.get("upper_limit_text"))
@@ -784,6 +801,7 @@ def persist_session_labs(
                 upper_limit_raw=upper_limit_raw,
             )
         )
+
 
 def persist_session_drugs(
     self, db_session: Session, session_id: int, session_data: dict[str, Any]
@@ -899,6 +917,7 @@ def persist_session_drugs(
     if vocabulary_changed:
         invalidate_text_normalization_snapshot()
 
+
 def persist_session_result_payload(
     self, db_session: Session, session_id: int, session_data: dict[str, Any]
 ) -> None:
@@ -913,6 +932,7 @@ def persist_session_result_payload(
         )
     )
 
+
 def serialize_json_payload(self, payload: Any) -> str | None:
     if payload is None:
         return None
@@ -920,5 +940,5 @@ def serialize_json_payload(self, payload: Any) -> str | None:
         return self.normalize_string(payload)
     try:
         return json.dumps(payload, ensure_ascii=False, default=str)
-    except (TypeError, ValueError):
+    except TypeError, ValueError:
         return self.normalize_string(payload)

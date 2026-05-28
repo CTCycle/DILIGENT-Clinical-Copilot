@@ -87,4 +87,3 @@ OllamaEndpoint(
         client_factory=OllamaClient,
     ),
 ).add_routes()
-

@@ -20,6 +20,7 @@ KT = TypeVar("KT")
 VT = TypeVar("VT")
 CACHE_MISS = object()
 
+
 def _catalog_excluded_term_suffixes() -> tuple[str, ...]:
     values = get_reference_catalog_snapshot().values(
         "drug_matching",
@@ -68,14 +69,18 @@ class DrugsLookup:
     MASTER_CONFIDENCE = get_server_settings().drugs_matcher.master_confidence
     SYNONYM_CONFIDENCE = get_server_settings().drugs_matcher.synonym_confidence
     MIN_CONFIDENCE = get_server_settings().drugs_matcher.min_confidence
-    NORMALIZATION_CACHE_LIMIT = get_server_settings().drugs_matcher.normalization_cache_limit
+    NORMALIZATION_CACHE_LIMIT = (
+        get_server_settings().drugs_matcher.normalization_cache_limit
+    )
     MATCH_CACHE_LIMIT = get_server_settings().drugs_matcher.match_cache_limit
     ALIAS_CACHE_LIMIT = get_server_settings().drugs_matcher.alias_cache_limit
     TOKEN_MIN_LENGTH = get_server_settings().drugs_matcher.token_min_length
     CATALOG_EXCLUDED_TERM_SUFFIXES = _catalog_excluded_term_suffixes()
     CATALOG_INDEX_LIMIT = get_server_settings().drugs_matcher.catalog_index_limit
     SPELLING_CONFIDENCE = get_server_settings().drugs_matcher.spelling_confidence
-    SPELLING_MIN_QUERY_LENGTH = get_server_settings().drugs_matcher.spelling_min_query_length
+    SPELLING_MIN_QUERY_LENGTH = (
+        get_server_settings().drugs_matcher.spelling_min_query_length
+    )
     SPELLING_SHORT_NAME_LENGTH = (
         get_server_settings().drugs_matcher.spelling_short_name_length
     )
@@ -124,7 +129,13 @@ class DrugsLookup:
         normalized_query: str,
         alias_entries: list[tuple[str, bool]],
     ) -> LiverToxMatch:
-        return matches_causality.match_query(self, raw_name=raw_name, canonical_query=canonical_query, normalized_query=normalized_query, alias_entries=alias_entries)
+        return matches_causality.match_query(
+            self,
+            raw_name=raw_name,
+            canonical_query=canonical_query,
+            normalized_query=normalized_query,
+            alias_entries=alias_entries,
+        )
 
     # -------------------------------------------------------------------------
     def canonicalize_query(self, value: str | None) -> str:
@@ -137,7 +148,9 @@ class DrugsLookup:
         raw_name: str,
         canonical_query: str,
     ) -> LiverToxMatch:
-        return matches_causality.clone_cached_match(self, match, raw_name, canonical_query)
+        return matches_causality.clone_cached_match(
+            self, match, raw_name, canonical_query
+        )
 
     # -------------------------------------------------------------------------
     def build_unique_keys(
@@ -160,7 +173,9 @@ class DrugsLookup:
         self,
         normalized_query: str,
     ) -> list[tuple[MonographRecord, float, list[str]]]:
-        return matches_drug.match_authoritative_spelling_candidates(self, normalized_query)
+        return matches_drug.match_authoritative_spelling_candidates(
+            self, normalized_query
+        )
 
     # -------------------------------------------------------------------------
     def is_small_spelling_difference(self, query: str, candidate: str) -> bool:
@@ -196,7 +211,14 @@ class DrugsLookup:
         normalized_query: str,
         stage_matches: list[tuple[MonographRecord, float, list[str]]],
     ) -> LiverToxMatch | None:
-        return matches_causality.finalize_stage_result(self, stage_name=stage_name, raw_name=raw_name, canonical_query=canonical_query, normalized_query=normalized_query, stage_matches=stage_matches)
+        return matches_causality.finalize_stage_result(
+            self,
+            stage_name=stage_name,
+            raw_name=raw_name,
+            canonical_query=canonical_query,
+            normalized_query=normalized_query,
+            stage_matches=stage_matches,
+        )
 
     # -------------------------------------------------------------------------
     def record_identity_key(self, record: MonographRecord) -> str:
@@ -211,7 +233,13 @@ class DrugsLookup:
         canonical_query: str,
         normalized_query: str,
     ) -> list[tuple[MonographRecord, float, list[str]]]:
-        return matches_drug.rank_stage_matches(self, stage_matches=stage_matches, raw_name=raw_name, canonical_query=canonical_query, normalized_query=normalized_query)
+        return matches_drug.rank_stage_matches(
+            self,
+            stage_matches=stage_matches,
+            raw_name=raw_name,
+            canonical_query=canonical_query,
+            normalized_query=normalized_query,
+        )
 
     # -------------------------------------------------------------------------
     def has_strict_rank_winner(
@@ -221,7 +249,12 @@ class DrugsLookup:
         normalized_query: str,
         preferred_combo: str | None,
     ) -> bool:
-        return matches_drug.has_strict_rank_winner(self, stage_matches=stage_matches, normalized_query=normalized_query, preferred_combo=preferred_combo)
+        return matches_drug.has_strict_rank_winner(
+            self,
+            stage_matches=stage_matches,
+            normalized_query=normalized_query,
+            preferred_combo=preferred_combo,
+        )
 
     # -------------------------------------------------------------------------
     def stage_match_score(
@@ -231,7 +264,12 @@ class DrugsLookup:
         normalized_query: str,
         preferred_combo: str | None,
     ) -> tuple[int, int, int, int, float, int]:
-        return matches_drug.stage_match_score(self, item=item, normalized_query=normalized_query, preferred_combo=preferred_combo)
+        return matches_drug.stage_match_score(
+            self,
+            item=item,
+            normalized_query=normalized_query,
+            preferred_combo=preferred_combo,
+        )
 
     # -------------------------------------------------------------------------
     def preferred_combo_name(
@@ -240,7 +278,9 @@ class DrugsLookup:
         canonical_query: str,
         normalized_query: str,
     ) -> str | None:
-        return matches_drug.preferred_combo_name(self, raw_name, canonical_query, normalized_query)
+        return matches_drug.preferred_combo_name(
+            self, raw_name, canonical_query, normalized_query
+        )
 
     # -------------------------------------------------------------------------
     def match_primary_all(
@@ -276,7 +316,17 @@ class DrugsLookup:
         notes: list[str],
         rejected_candidate_names: list[str] | None = None,
     ) -> LiverToxMatch:
-        return matches_serialization.create_matched_result(self, raw_name=raw_name, canonical_query=canonical_query, normalized_query=normalized_query, record=record, confidence=confidence, reason=reason, notes=notes, rejected_candidate_names=rejected_candidate_names)
+        return matches_serialization.create_matched_result(
+            self,
+            raw_name=raw_name,
+            canonical_query=canonical_query,
+            normalized_query=normalized_query,
+            record=record,
+            confidence=confidence,
+            reason=reason,
+            notes=notes,
+            rejected_candidate_names=rejected_candidate_names,
+        )
 
     # -------------------------------------------------------------------------
     def create_missing_result(
@@ -288,7 +338,14 @@ class DrugsLookup:
         reason: str,
         notes: list[str],
     ) -> LiverToxMatch:
-        return matches_serialization.create_missing_result(self, raw_name=raw_name, canonical_query=canonical_query, normalized_query=normalized_query, reason=reason, notes=notes)
+        return matches_serialization.create_missing_result(
+            self,
+            raw_name=raw_name,
+            canonical_query=canonical_query,
+            normalized_query=normalized_query,
+            reason=reason,
+            notes=notes,
+        )
 
     # -------------------------------------------------------------------------
     def create_ambiguous_result(
@@ -300,13 +357,22 @@ class DrugsLookup:
         reason: str,
         stage_matches: list[tuple[MonographRecord, float, list[str]]],
     ) -> LiverToxMatch:
-        return matches_serialization.create_ambiguous_result(self, raw_name=raw_name, canonical_query=canonical_query, normalized_query=normalized_query, reason=reason, stage_matches=stage_matches)
+        return matches_serialization.create_ambiguous_result(
+            self,
+            raw_name=raw_name,
+            canonical_query=canonical_query,
+            normalized_query=normalized_query,
+            reason=reason,
+            stage_matches=stage_matches,
+        )
 
     # -------------------------------------------------------------------------
     def resolve_alias_candidates(
         self, original_name: str, normalized_query: str, *, include_catalog: bool = True
     ) -> list[tuple[str, bool]]:
-        return matches_drug.resolve_alias_candidates(self, original_name, normalized_query, include_catalog=include_catalog)
+        return matches_drug.resolve_alias_candidates(
+            self, original_name, normalized_query, include_catalog=include_catalog
+        )
 
     # -------------------------------------------------------------------------
     def add_alias_entry(
@@ -316,7 +382,9 @@ class DrugsLookup:
         value: str,
         from_catalog: bool,
     ) -> None:
-        return matches_drug.add_alias_entry(self, alias_entries, seen, value, from_catalog)
+        return matches_drug.add_alias_entry(
+            self, alias_entries, seen, value, from_catalog
+        )
 
     # -------------------------------------------------------------------------
     def find_catalog_synonym_match(
@@ -331,7 +399,9 @@ class DrugsLookup:
         from_catalog: bool,
         alias_value: str,
     ) -> tuple[MonographRecord, float, str, list[str]]:
-        return matches_drug.annotate_catalog_match(self, result, from_catalog, alias_value)
+        return matches_drug.annotate_catalog_match(
+            self, result, from_catalog, alias_value
+        )
 
     # -------------------------------------------------------------------------
     def match_primary(
@@ -376,7 +446,9 @@ class DrugsLookup:
         normalized_map: dict[str, str],
         fallback_aliases: list[str],
     ) -> None:
-        return matches_drug.register_catalog_entry(self, entry, normalized_map, fallback_aliases)
+        return matches_drug.register_catalog_entry(
+            self, entry, normalized_map, fallback_aliases
+        )
 
     # -------------------------------------------------------------------------
     def add_catalog_index_entry(
@@ -386,7 +458,9 @@ class DrugsLookup:
         is_synonym: bool,
         original: str,
     ) -> None:
-        return matches_drug.add_catalog_index_entry(self, normalized_value, entry, is_synonym, original)
+        return matches_drug.add_catalog_index_entry(
+            self, normalized_value, entry, is_synonym, original
+        )
 
     # -------------------------------------------------------------------------
     def catalog_term_type_allowed(self, term_type: str | None) -> bool:
@@ -432,7 +506,9 @@ class DrugsLookup:
         reason: str,
         notes: list[str] | None,
     ) -> LiverToxMatch:
-        return matches_serialization.create_match(self, record, confidence, reason, notes)
+        return matches_serialization.create_match(
+            self, record, confidence, reason, notes
+        )
 
     # -------------------------------------------------------------------------
     def diagnose_missing_drug(self, drug_name: str) -> dict[str, Any]:
@@ -482,4 +558,3 @@ class LiverToxMatcher:
         matches: list[LiverToxMatch],
     ) -> list[dict[str, Any]]:
         return self.data.build_drugs_to_excerpt_mapping(patient_drugs, matches)
-

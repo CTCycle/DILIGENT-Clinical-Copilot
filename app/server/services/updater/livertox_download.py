@@ -41,6 +41,7 @@ async def download_file(
 
 # Extracted from the facade module; functions intentionally accept the facade instance.
 
+
 async def download_bulk_data(self, dest_path: str) -> dict[str, Any]:
     url = self.base_url + self.file_name
     async with httpx.AsyncClient(
@@ -94,6 +95,7 @@ async def download_bulk_data(self, dest_path: str) -> dict[str, Any]:
         "source_url": metadata["source_url"],
     }
 
+
 def refresh_master_list(self) -> tuple[dict[str, Any], pd.DataFrame]:
     logger.info("Refreshing LiverTox master list")
     metadata = asyncio.run(download_master_list(self))
@@ -111,9 +113,8 @@ def refresh_master_list(self) -> tuple[dict[str, Any], pd.DataFrame]:
         sanitized = sanitized.copy()
         sanitized["source_url"] = metadata.get("source_url")
         sanitized["source_last_modified"] = metadata.get("last_modified")
-        if (
-            "last_update" in sanitized.columns
-            and pd.api.types.is_datetime64_any_dtype(sanitized["last_update"])
+        if "last_update" in sanitized.columns and pd.api.types.is_datetime64_any_dtype(
+            sanitized["last_update"]
         ):
             sanitized["last_update"] = sanitized["last_update"].dt.strftime(  # type: ignore
                 "%Y-%m-%d"
@@ -121,6 +122,7 @@ def refresh_master_list(self) -> tuple[dict[str, Any], pd.DataFrame]:
     metadata["records"] = len(sanitized.index)
 
     return metadata, sanitized
+
 
 async def download_master_list(self) -> dict[str, Any]:
     async with httpx.AsyncClient(
@@ -160,7 +162,9 @@ async def download_master_list(self) -> dict[str, Any]:
             os.path.basename(self.master_list_path),
             chunk_size=self.chunk_size,
         )
-        livertox_common.save_masterlist_metadata(self.master_list_metadata_path, metadata)
+        livertox_common.save_masterlist_metadata(
+            self.master_list_metadata_path, metadata
+        )
 
     return {
         "file_path": self.master_list_path,
@@ -169,6 +173,7 @@ async def download_master_list(self) -> dict[str, Any]:
         "downloaded": True,
         "source_url": metadata["source_url"],
     }
+
 
 async def resolve_master_list_url(self, client: httpx.AsyncClient) -> str:
     try:
@@ -182,9 +187,8 @@ async def resolve_master_list_url(self, client: httpx.AsyncClient) -> str:
         fallback_url = await resolve_master_list_via_datagov(self, client)
         return fallback_url
 
-async def resolve_master_list_from_bookshelf(
-    self, client: httpx.AsyncClient
-) -> str:
+
+async def resolve_master_list_from_bookshelf(self, client: httpx.AsyncClient) -> str:
     report_url = "https://www.ncbi.nlm.nih.gov/books/NBK571102/?report=excel"
     head_response: httpx.Response | None = None
     try:
@@ -200,18 +204,13 @@ async def resolve_master_list_from_bookshelf(
 
     redirect_statuses = {301, 302, 303, 307, 308}
     if head_response is not None:
-        if (
-            head_response.status_code in redirect_statuses
-            and head_response.headers.get("Location")
+        if head_response.status_code in redirect_statuses and head_response.headers.get(
+            "Location"
         ):
-            candidate = httpx.URL(report_url).join(
-                head_response.headers["Location"]
-            )
+            candidate = httpx.URL(report_url).join(head_response.headers["Location"])
             return await probe_master_list_candidate(self, client, str(candidate))
         content_type = (head_response.headers.get("Content-Type") or "").lower()
-        disposition = (
-            head_response.headers.get("Content-Disposition") or ""
-        ).lower()
+        disposition = (head_response.headers.get("Content-Disposition") or "").lower()
         if "excel" in content_type or ".xlsx" in disposition:
             return await probe_master_list_candidate(
                 self, client, str(head_response.url)
@@ -238,16 +237,13 @@ async def resolve_master_list_from_bookshelf(
             candidate_url = match.group(1)
             candidate = httpx.URL(report_url).join(candidate_url)
             try:
-                return await probe_master_list_candidate(
-                    self, client, str(candidate)
-                )
+                return await probe_master_list_candidate(self, client, str(candidate))
             except Exception as exc:  # pragma: no cover - network dependent
-                logger.debug(
-                    "Bookshelf candidate %s failed: %s", str(candidate), exc
-                )
+                logger.debug("Bookshelf candidate %s failed: %s", str(candidate), exc)
                 continue
 
     raise RuntimeError("Unable to resolve master list via Bookshelf report page")
+
 
 async def resolve_master_list_from_bin(
     self, client: httpx.AsyncClient, base_url: str
@@ -295,12 +291,11 @@ async def resolve_master_list_from_bin(
             if "master" in os.path.basename(human_url).lower():
                 candidates.append((human_url, os.path.basename(human_url)))
     if not candidates:
-        raise RuntimeError(
-            "Unable to locate LiverTox master list link on FTP bin page"
-        )
+        raise RuntimeError("Unable to locate LiverTox master list link on FTP bin page")
     candidates.sort(key=lambda item: item[0])
     chosen_url = candidates[0][0]
     return chosen_url
+
 
 async def resolve_master_list_via_datagov(self, client: httpx.AsyncClient) -> str:
     api_url = "https://catalog.data.gov/api/3/action/package_show"
@@ -309,9 +304,7 @@ async def resolve_master_list_via_datagov(self, client: httpx.AsyncClient) -> st
     try:
         payload = response.json()
     except ValueError as exc:
-        raise RuntimeError(
-            "Unable to resolve FTP folder from Data.gov entry"
-        ) from exc
+        raise RuntimeError("Unable to resolve FTP folder from Data.gov entry") from exc
     result = payload.get("result", {}) if isinstance(payload, dict) else {}
     resources = result.get("resources") if isinstance(result, dict) else None
     if not isinstance(resources, list):
@@ -358,9 +351,7 @@ async def resolve_master_list_via_datagov(self, client: httpx.AsyncClient) -> st
     last_error: Exception | None = None
     for candidate in direct_candidates:
         try:
-            resolved_direct = await probe_master_list_candidate(
-                self, client, candidate
-            )
+            resolved_direct = await probe_master_list_candidate(self, client, candidate)
         except Exception as exc:  # pragma: no cover - network dependent
             last_error = exc
             logger.debug("Candidate Data.gov direct %s failed: %s", candidate, exc)
@@ -373,14 +364,10 @@ async def resolve_master_list_via_datagov(self, client: httpx.AsyncClient) -> st
     original_base = self.base_url
     for base_candidate in folder_candidates:
         try:
-            resolved = await resolve_master_list_from_bin(
-                self, client, base_candidate
-            )
+            resolved = await resolve_master_list_from_bin(self, client, base_candidate)
         except Exception as exc:  # pragma: no cover - network dependent
             last_error = exc
-            logger.debug(
-                "Candidate Data.gov base %s failed: %s", base_candidate, exc
-            )
+            logger.debug("Candidate Data.gov base %s failed: %s", base_candidate, exc)
             continue
         self.base_url = base_candidate
         return resolved
@@ -391,6 +378,7 @@ async def resolve_master_list_via_datagov(self, client: httpx.AsyncClient) -> st
             "Unable to resolve FTP folder from Data.gov entry"
         ) from last_error
     raise RuntimeError("Unable to resolve FTP folder from Data.gov entry")
+
 
 def normalize_datagov_resource_url(self, url: str) -> str | None:
     normalized = url.strip()
@@ -403,6 +391,7 @@ def normalize_datagov_resource_url(self, url: str) -> str | None:
     if normalized.startswith("//"):
         return f"https:{normalized}"
     return None
+
 
 async def probe_master_list_candidate(
     self, client: httpx.AsyncClient, candidate: str
@@ -421,6 +410,7 @@ async def probe_master_list_candidate(
             return str(response.url)
         raise RuntimeError("Candidate does not appear to be an Excel file")
     return str(response.url)
+
 
 async def fetch_candidate_with_get(
     self, client: httpx.AsyncClient, candidate: str
@@ -446,13 +436,12 @@ async def fetch_candidate_with_get(
             raise RuntimeError("Master list candidate returned HTTP error") from exc
     return response
 
+
 def collect_local_archive_info(self, archive_path: str) -> dict[str, Any]:
     if not os.path.isfile(archive_path):
         raise RuntimeError(
             "LiverTox archive not found; enable REDOWNLOAD to fetch a fresh copy."
         )
     size = os.path.getsize(archive_path)
-    modified = datetime.fromtimestamp(
-        os.path.getmtime(archive_path), UTC
-    ).isoformat()
+    modified = datetime.fromtimestamp(os.path.getmtime(archive_path), UTC).isoformat()
     return {"file_path": archive_path, "size": size, "last_modified": modified}

@@ -37,4 +37,3 @@ class DILIQueryBuilder:
             )
 
         return queries
-

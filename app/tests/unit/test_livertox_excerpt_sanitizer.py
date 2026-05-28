@@ -25,4 +25,3 @@ def test_sanitizer_removes_boilerplate_and_preserves_core_content() -> None:
     assert "OTHER REFERENCE LINKS" not in cleaned
     assert "dose-dependent hepatotoxicity" in cleaned
     assert "aminotransferase elevations" in cleaned
-

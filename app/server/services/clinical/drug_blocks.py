@@ -85,7 +85,11 @@ def isolate_drug_blocks(text: str) -> list[DrugBlock]:
         blocks: list[DrugBlock] = []
         for index, match in enumerate(bullet_matches):
             start = match.start()
-            end = bullet_matches[index + 1].start() if index + 1 < len(bullet_matches) else len(source)
+            end = (
+                bullet_matches[index + 1].start()
+                if index + 1 < len(bullet_matches)
+                else len(source)
+            )
             raw = source[start:end].strip()
             if raw:
                 blocks.append(DrugBlock(text=raw, start=start, end=end))
@@ -105,7 +109,11 @@ def isolate_drug_blocks(text: str) -> list[DrugBlock]:
                 continue
             line_end = pos + len(line)
             if _likely_drug_start(line):
-                if current_lines and current_start is not None and current_end is not None:
+                if (
+                    current_lines
+                    and current_start is not None
+                    and current_end is not None
+                ):
                     blocks.append(
                         DrugBlock(
                             text="\n".join(current_lines),

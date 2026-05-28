@@ -20,7 +20,10 @@ CANONICAL_TO_CLINICAL_KEY: Mapping[str, ClinicalSectionKey] = {
 MIN_TYPO_TOKEN_LEN = 7
 MIN_TYPO_SIMILARITY = 0.88
 MIN_TYPO_SHARED_PREFIX_LEN = 4
-HEADING_PREFIX_RE = re.compile(r"^(?:#{1,6}\s*|\d+\s*[.):\-]\s*|[-*+]\s*|(?:[ivxlcdm]+)\s*[.):\-]\s*)", re.IGNORECASE)
+HEADING_PREFIX_RE = re.compile(
+    r"^(?:#{1,6}\s*|\d+\s*[.):\-]\s*|[-*+]\s*|(?:[ivxlcdm]+)\s*[.):\-]\s*)",
+    re.IGNORECASE,
+)
 HEADING_SUFFIX_RE = re.compile(r"[\s:;.,\-_/|]+$")
 NON_ALNUM_RE = re.compile(r"[^0-9a-zA-ZÀ-ÖØ-öø-ÿ ]+")
 WS_RE = re.compile(r"\s+")
@@ -38,9 +41,19 @@ DATE_VALUE_RE = re.compile(r"\b\d{1,2}[./-]\d{1,2}(?:[./-]\d{2,4})?\b")
 GENERIC_HEADING_SEMANTIC_PREFIXES: Mapping[str, tuple[str, ...]] = {
     "anamnesis": ("anamn", "histor", "clinic", "present", "complain"),
     "therapy": ("therap", "terapi", "medicat", "pharmac", "farmac", "drug", "treat"),
-    "laboratory_history": ("labor", "analys", "analy", "blood", "biochem", "chem", "test"),
+    "laboratory_history": (
+        "labor",
+        "analys",
+        "analy",
+        "blood",
+        "biochem",
+        "chem",
+        "test",
+    ),
 }
-SEMANTIC_PREFIX_STOPWORDS = frozenset({"medical", "patient", "physician", "document", "report"})
+SEMANTIC_PREFIX_STOPWORDS = frozenset(
+    {"medical", "patient", "physician", "document", "report"}
+)
 
 
 SectionMatchStrategy = Literal[
@@ -52,6 +65,7 @@ SectionMatchStrategy = Literal[
     "content_inference",
     "fallback_assignment",
 ]
+
 
 def _section_profiles_from_catalog() -> dict[str, dict[str, set[str]]]:
     snapshot = get_reference_catalog_snapshot()
@@ -69,9 +83,13 @@ def _section_profiles_from_catalog() -> dict[str, dict[str, set[str]]]:
         "laboratory_history_supporting": ("laboratory_history", "supporting"),
     }
     for category, (canonical_key, bucket) in category_map.items():
-        values = snapshot.values("clinical_extraction", "section_heading_patterns", key=category)
+        values = snapshot.values(
+            "clinical_extraction", "section_heading_patterns", key=category
+        )
         profiles[canonical_key][bucket].update(
-            normalize_heading_text(value) for value in values if normalize_heading_text(value)
+            normalize_heading_text(value)
+            for value in values
+            if normalize_heading_text(value)
         )
 
     mapped: dict[str, str] = {
@@ -80,9 +98,7 @@ def _section_profiles_from_catalog() -> dict[str, dict[str, set[str]]]:
         "laboratory_analysis": "laboratory_history",
     }
     for backend_key, canonical_key in mapped.items():
-        profiles[canonical_key]["required_any"].add(
-            normalize_heading_text(backend_key)
-        )
+        profiles[canonical_key]["required_any"].add(normalize_heading_text(backend_key))
         profiles[canonical_key]["required_any"].add(
             normalize_heading_text(canonical_key.replace("_", " "))
         )
@@ -93,7 +109,9 @@ def _section_profiles_from_catalog() -> dict[str, dict[str, set[str]]]:
         )
         if aliases:
             profiles[canonical_key]["required_any"].update(
-                normalize_heading_text(alias) for alias in aliases if normalize_heading_text(alias)
+                normalize_heading_text(alias)
+                for alias in aliases
+                if normalize_heading_text(alias)
             )
     return profiles
 
@@ -270,18 +288,21 @@ def _semantic_prefix_score(normalized_heading: str) -> tuple[str, float] | None:
 def _semantic_heading_prefixes() -> dict[str, tuple[str, ...]]:
     profiles = _section_profiles_from_catalog()
     prefixes: dict[str, set[str]] = {
-        key: set(values)
-        for key, values in GENERIC_HEADING_SEMANTIC_PREFIXES.items()
+        key: set(values) for key, values in GENERIC_HEADING_SEMANTIC_PREFIXES.items()
     }
     for canonical_key, profile in profiles.items():
         for phrase in profile["required_any"]:
             for token in tokenize_heading(phrase):
                 if len(token) >= 5 and token not in SEMANTIC_PREFIX_STOPWORDS:
-                    prefixes.setdefault(canonical_key, set()).add(token[: min(len(token), 8)])
+                    prefixes.setdefault(canonical_key, set()).add(
+                        token[: min(len(token), 8)]
+                    )
     return {key: tuple(sorted(values)) for key, values in prefixes.items()}
 
 
-def classify_dili_heading(raw_heading: str, *, line_start: int, line_end: int) -> SectionHeadingMatch | None:
+def classify_dili_heading(
+    raw_heading: str, *, line_start: int, line_end: int
+) -> SectionHeadingMatch | None:
     normalized = normalize_heading_text(raw_heading)
     if not normalized:
         return None
@@ -330,7 +351,9 @@ def is_markdown_heading_line(line: str) -> bool:
     return bool(MARKDOWN_HEADING_RE.match(line or ""))
 
 
-def _accept_heading_match(boundary: HeadingBoundary, match: SectionHeadingMatch) -> bool:
+def _accept_heading_match(
+    boundary: HeadingBoundary, match: SectionHeadingMatch
+) -> bool:
     if boundary.is_markdown_heading:
         return True
     if match.strategy == "exact":
@@ -338,7 +361,9 @@ def _accept_heading_match(boundary: HeadingBoundary, match: SectionHeadingMatch)
     stripped = boundary.raw_heading.strip()
     if stripped.endswith(":"):
         return True
-    words = [token for token in stripped.split() if any(char.isalpha() for char in token)]
+    words = [
+        token for token in stripped.split() if any(char.isalpha() for char in token)
+    ]
     if not words:
         return False
     is_upper = all(word.upper() == word for word in words)
@@ -379,7 +404,10 @@ def _selected_heading_boundaries(raw_text: str) -> list[HeadingBoundary]:
         if match is not None and _accept_heading_match(boundary, match):
             selected.append(boundary)
             continue
-        if boundary.raw_heading.strip().endswith(":") and len(tokenize_heading(boundary.raw_heading)) >= 2:
+        if (
+            boundary.raw_heading.strip().endswith(":")
+            and len(tokenize_heading(boundary.raw_heading)) >= 2
+        ):
             selected.append(boundary)
     return selected
 
@@ -409,7 +437,9 @@ def scan_dili_section_headings(raw_text: str) -> HeadingScanResult:
         )
     return HeadingScanResult(
         section_headings=matches,
-        boundary_line_starts={boundary.line_start for boundary in _selected_heading_boundaries(raw_text)},
+        boundary_line_starts={
+            boundary.line_start for boundary in _selected_heading_boundaries(raw_text)
+        },
     )
 
 
@@ -417,7 +447,9 @@ def find_dili_section_headings(raw_text: str) -> list[SectionHeadingMatch]:
     return scan_dili_section_headings(raw_text).section_headings
 
 
-def resolve_heading_collisions(matches: Sequence[SectionHeadingMatch]) -> list[SectionHeadingMatch]:
+def resolve_heading_collisions(
+    matches: Sequence[SectionHeadingMatch],
+) -> list[SectionHeadingMatch]:
     return resolve_heading_collisions_with_diagnostics(matches)[0]
 
 
@@ -463,7 +495,9 @@ def _therapy_signal_re() -> re.Pattern[str]:
         "drug_frequency_terms",
         "drug_metadata_labels",
     ):
-        values.update(value for value in snapshot.values("clinical_extraction", category) if value)
+        values.update(
+            value for value in snapshot.values("clinical_extraction", category) if value
+        )
     escaped = sorted({re.escape(value) for value in values if len(value.strip()) >= 2})
     if not escaped:
         return re.compile(r"$^")
@@ -481,7 +515,9 @@ def _laboratory_signal_re() -> re.Pattern[str]:
         "lab_measurement_indicators",
         "lab_marker_indicators",
     ):
-        values.update(value for value in snapshot.values("clinical_extraction", category) if value)
+        values.update(
+            value for value in snapshot.values("clinical_extraction", category) if value
+        )
     escaped = sorted({re.escape(value) for value in values if len(value.strip()) >= 2})
     if not escaped:
         return re.compile(r"$^")
@@ -508,8 +544,12 @@ def _score_section_content(raw_heading: str, content: str) -> dict[str, float]:
     lab_value_hits = len(LAB_VALUE_RE.findall(content))
     line_count = max(1, len([line for line in content.splitlines() if line.strip()]))
 
-    scores["therapy"] += min(0.92, therapy_hits * 0.12 + schedule_hits * 0.24 + dosage_hits * 0.18)
-    scores["laboratory_history"] += min(0.94, lab_hits * 0.08 + lab_value_hits * 0.28 + dated_hits * 0.04)
+    scores["therapy"] += min(
+        0.92, therapy_hits * 0.12 + schedule_hits * 0.24 + dosage_hits * 0.18
+    )
+    scores["laboratory_history"] += min(
+        0.94, lab_hits * 0.08 + lab_value_hits * 0.28 + dated_hits * 0.04
+    )
 
     if scores["therapy"] < 0.35 and scores["laboratory_history"] < 0.35:
         scores["anamnesis"] += 0.42
@@ -559,8 +599,7 @@ def parse_required_dili_sections(raw_text: str) -> ParsedDiliSectionsResult:
         scan_result.section_headings
     )
     heading_lookup = {
-        (heading.line_start, heading.line_end): heading
-        for heading in headings
+        (heading.line_start, heading.line_end): heading for heading in headings
     }
     boundaries = _selected_heading_boundaries(raw_text)
     offsets = _line_char_offsets(raw_text)
@@ -591,19 +630,22 @@ def parse_required_dili_sections(raw_text: str) -> ParsedDiliSectionsResult:
         if heading is None:
             unresolved_boundaries.append((boundary, body_start, body_end, content))
             continue
-        coherent = verify_verbatim_section_coherence(raw_text, ClinicalRawSection(
-            canonical_key=heading.canonical_key,
-            raw_heading=heading.raw_heading,
-            normalized_heading=heading.normalized_heading,
-            match_strategy=heading.strategy,
-            confidence_score=heading.score,
-            line_start=heading.line_start,
-            line_end=heading.line_end,
-            body_start=body_start,
-            body_end=body_end,
-            text=content,
-            verbatim_coherent=True,
-        ))
+        coherent = verify_verbatim_section_coherence(
+            raw_text,
+            ClinicalRawSection(
+                canonical_key=heading.canonical_key,
+                raw_heading=heading.raw_heading,
+                normalized_heading=heading.normalized_heading,
+                match_strategy=heading.strategy,
+                confidence_score=heading.score,
+                line_start=heading.line_start,
+                line_end=heading.line_end,
+                body_start=body_start,
+                body_end=body_end,
+                text=content,
+                verbatim_coherent=True,
+            ),
+        )
         if heading.canonical_key in sections:
             malformed_sections.append(f"duplicate:{heading.canonical_key}")
             continue
@@ -621,9 +663,7 @@ def parse_required_dili_sections(raw_text: str) -> ParsedDiliSectionsResult:
             verbatim_coherent=coherent,
         )
 
-    missing_keys = {
-        key for key in REQUIRED_DILI_SECTION_KEYS if key not in sections
-    }
+    missing_keys = {key for key in REQUIRED_DILI_SECTION_KEYS if key not in sections}
     if unresolved_boundaries and missing_keys:
         inferred: list[tuple[SectionHeadingMatch, int, int, str]] = []
         for boundary, body_start, body_end, content in unresolved_boundaries:
@@ -641,19 +681,22 @@ def parse_required_dili_sections(raw_text: str) -> ParsedDiliSectionsResult:
         for match, body_start, body_end, content in inferred:
             if match.canonical_key in sections or match.line_start in used_lines:
                 continue
-            coherent = verify_verbatim_section_coherence(raw_text, ClinicalRawSection(
-                canonical_key=match.canonical_key,
-                raw_heading=match.raw_heading,
-                normalized_heading=match.normalized_heading,
-                match_strategy=match.strategy,
-                confidence_score=match.score,
-                line_start=match.line_start,
-                line_end=match.line_end,
-                body_start=body_start,
-                body_end=body_end,
-                text=content,
-                verbatim_coherent=True,
-            ))
+            coherent = verify_verbatim_section_coherence(
+                raw_text,
+                ClinicalRawSection(
+                    canonical_key=match.canonical_key,
+                    raw_heading=match.raw_heading,
+                    normalized_heading=match.normalized_heading,
+                    match_strategy=match.strategy,
+                    confidence_score=match.score,
+                    line_start=match.line_start,
+                    line_end=match.line_end,
+                    body_start=body_start,
+                    body_end=body_end,
+                    text=content,
+                    verbatim_coherent=True,
+                ),
+            )
             sections[match.canonical_key] = ClinicalRawSection(
                 canonical_key=match.canonical_key,
                 raw_heading=match.raw_heading,
@@ -669,11 +712,14 @@ def parse_required_dili_sections(raw_text: str) -> ParsedDiliSectionsResult:
             )
             used_lines.add(match.line_start)
 
-    remaining_missing = [key for key in REQUIRED_DILI_SECTION_KEYS if key not in sections]
+    remaining_missing = [
+        key for key in REQUIRED_DILI_SECTION_KEYS if key not in sections
+    ]
     remaining_unresolved = [
         (boundary, body_start, body_end, content)
         for boundary, body_start, body_end, content in unresolved_boundaries
-        if boundary.line_start not in {section.line_start for section in sections.values()}
+        if boundary.line_start
+        not in {section.line_start for section in sections.values()}
     ]
     if len(remaining_missing) == 1 and len(remaining_unresolved) == 1:
         missing_key = remaining_missing[0]
@@ -725,24 +771,34 @@ def extract_required_dili_sections(raw_text: str) -> dict[str, ClinicalRawSectio
     return result.sections
 
 
-def _next_boundary_line_start(current_line_start: int, boundary_line_starts: set[int]) -> int | None:
+def _next_boundary_line_start(
+    current_line_start: int, boundary_line_starts: set[int]
+) -> int | None:
     for line_start in sorted(boundary_line_starts):
         if line_start > current_line_start:
             return line_start
     return None
 
 
-def verify_verbatim_section_coherence(raw_text: str, section: ClinicalRawSection) -> bool:
+def verify_verbatim_section_coherence(
+    raw_text: str, section: ClinicalRawSection
+) -> bool:
     if section.body_start < 0 or section.body_end < section.body_start:
         return False
     if section.body_end > len(raw_text):
         return False
-    span_text = raw_text[section.body_start:section.body_end].strip("\r\n")
+    span_text = raw_text[section.body_start : section.body_end].strip("\r\n")
     return span_text == section.text
 
 
-def missing_required_section_names(sections: Mapping[str, ClinicalRawSection]) -> list[str]:
-    return [key for key in REQUIRED_DILI_SECTION_KEYS if key not in sections or not sections[key].text.strip()]
+def missing_required_section_names(
+    sections: Mapping[str, ClinicalRawSection],
+) -> list[str]:
+    return [
+        key
+        for key in REQUIRED_DILI_SECTION_KEYS
+        if key not in sections or not sections[key].text.strip()
+    ]
 
 
 # Compatibility wrappers for current callers/tests.
@@ -750,7 +806,9 @@ def find_section_markers(text: str) -> list[SectionHeadingMatch]:
     return find_dili_section_headings(text)
 
 
-def extract_sections_from_markers(text: str, _markers: list[SectionHeadingMatch]) -> dict[ClinicalSectionKey, str] | None:
+def extract_sections_from_markers(
+    text: str, _markers: list[SectionHeadingMatch]
+) -> dict[ClinicalSectionKey, str] | None:
     try:
         sections = extract_required_dili_sections(text)
     except ValueError:
@@ -764,7 +822,9 @@ def extract_sections_from_markers(text: str, _markers: list[SectionHeadingMatch]
     }
 
 
-def validate_sections_against_source(text: str, sections: dict[ClinicalSectionKey, str]) -> bool:
+def validate_sections_against_source(
+    text: str, sections: dict[ClinicalSectionKey, str]
+) -> bool:
     for key in ("anamnesis", "drugs", "laboratory_analysis"):
         value = (sections.get(key) or "").strip()
         if not value or value not in text:

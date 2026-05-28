@@ -524,4 +524,3 @@ class RxNavClient:
     def is_bracketed(self, value: str) -> bool:
         stripped = value.strip()
         return stripped.startswith("[") and stripped.endswith("]")
-

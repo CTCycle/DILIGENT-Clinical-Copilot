@@ -57,10 +57,13 @@ class BoundedCache(Generic[KT, VT]):
     def clear(self) -> None:
         self.store.clear()
 
+
 # Extracted from the facade module; functions intentionally accept the facade instance.
+
 
 def canonicalize_query(self, value: str | None) -> str:
     return canonicalize_drug_query(value)
+
 
 def build_unique_keys(
     self,
@@ -77,8 +80,10 @@ def build_unique_keys(
         unique.append(key)
     return unique
 
+
 def resolve_source_backed_query_variants(self, normalized_query: str) -> list[str]:
     return []
+
 
 def has_trusted_exact_key(self, normalized_key: str, data: LiverToxData) -> bool:
     return (
@@ -88,6 +93,7 @@ def has_trusted_exact_key(self, normalized_key: str, data: LiverToxData) -> bool
         or normalized_key in data.ingredient_index
         or normalized_key in self.catalog_global_index
     )
+
 
 def match_authoritative_spelling_candidates(
     self,
@@ -142,6 +148,7 @@ def match_authoritative_spelling_candidates(
             )
     return self.dedupe_stage_matches(stage_matches)
 
+
 def is_small_spelling_difference(self, query: str, candidate: str) -> bool:
     if query == candidate:
         return False
@@ -154,9 +161,7 @@ def is_small_spelling_difference(self, query: str, candidate: str) -> bool:
     if len(query_parts) != len(candidate_parts):
         return False
     total_distance = 0
-    for query_part, candidate_part in zip(
-        query_parts, candidate_parts, strict=True
-    ):
+    for query_part, candidate_part in zip(query_parts, candidate_parts, strict=True):
         if abs(len(query_part) - len(candidate_part)) > 2:
             return False
         distance_limit = max(
@@ -177,6 +182,7 @@ def is_small_spelling_difference(self, query: str, candidate: str) -> bool:
         else self.SPELLING_LONG_MAX_DISTANCE
     )
     return 0 < total_distance <= allowed_distance
+
 
 def bounded_edit_distance(left: str, right: str, *, limit: int) -> int:
     if abs(len(left) - len(right)) > limit:
@@ -199,6 +205,7 @@ def bounded_edit_distance(left: str, right: str, *, limit: int) -> int:
         previous = current
     return previous[-1]
 
+
 def dedupe_stage_matches(
     self,
     stage_matches: list[tuple[MonographRecord, float, list[str]]],
@@ -219,8 +226,10 @@ def dedupe_stage_matches(
     ordered.sort(key=lambda item: self.result_sort_key(item[0], item[1]))
     return ordered
 
+
 def record_identity_key(self, record: MonographRecord) -> str:
     return record.stable_key
+
 
 def rank_stage_matches(
     self,
@@ -244,6 +253,7 @@ def rank_stage_matches(
     )
     return ranked
 
+
 def has_strict_rank_winner(
     self,
     *,
@@ -264,6 +274,7 @@ def has_strict_rank_winner(
         preferred_combo=preferred_combo,
     )
     return top_score > next_score
+
 
 def stage_match_score(
     self,
@@ -299,6 +310,7 @@ def stage_match_score(
         alias_priority,
     )
 
+
 def preferred_combo_name(
     self,
     raw_name: str,
@@ -324,6 +336,7 @@ def preferred_combo_name(
         return normalized_query
     return None
 
+
 def match_primary_all(
     self,
     canonical_query: str,
@@ -335,6 +348,7 @@ def match_primary_all(
             continue
         matches.append((record, self.DIRECT_CONFIDENCE, []))
     return matches
+
 
 def match_alias_exact_all(
     self,
@@ -374,6 +388,7 @@ def match_alias_exact_all(
     ordered = list(matches.values())
     ordered.sort(key=lambda item: self.result_sort_key(item[0], item[1]))
     return ordered
+
 
 def match_normalized_all(
     self,
@@ -417,6 +432,7 @@ def match_normalized_all(
     ordered = list(matches.values())
     ordered.sort(key=lambda item: self.result_sort_key(item[0], item[1]))
     return ordered
+
 
 def resolve_alias_candidates(
     self, original_name: str, normalized_query: str, *, include_catalog: bool = True
@@ -474,6 +490,7 @@ def resolve_alias_candidates(
         self.add_alias_entry(alias_entries, seen, variant, False)
     return alias_entries
 
+
 def add_alias_entry(
     self,
     alias_entries: list[tuple[str, bool]],
@@ -487,12 +504,14 @@ def add_alias_entry(
     seen.add(normalized_value)
     alias_entries.append((value, from_catalog))
 
+
 def find_catalog_synonym_match(
     self, normalized_query: str
 ) -> tuple[dict[str, Any], bool, str] | None:
     if not normalized_query:
         return None
     return self.catalog_global_index.get(normalized_query)
+
 
 def annotate_catalog_match(
     self,
@@ -508,6 +527,7 @@ def annotate_catalog_match(
             updated_notes.insert(0, f"catalog_alias='{alias_note}'")
     return record, confidence, reason, updated_notes
 
+
 def match_primary(
     self, normalized_query: str
 ) -> tuple[MonographRecord, float, str, list[str]] | None:
@@ -517,6 +537,7 @@ def match_primary(
         return None
     record = data.records_by_stable_key[records[0]]
     return record, self.DIRECT_CONFIDENCE, "monograph_name", []
+
 
 def match_master_list(
     self, normalized_query: str
@@ -545,6 +566,7 @@ def match_master_list(
             return record, confidence, reason, notes
     return None
 
+
 def match_synonym(
     self, normalized_query: str
 ) -> tuple[MonographRecord, float, str, list[str]] | None:
@@ -556,6 +578,7 @@ def match_synonym(
     record = data.records_by_stable_key[stable_key]
     notes = [f"synonym='{original}'"]
     return record, self.SYNONYM_CONFIDENCE, "synonym_match", notes
+
 
 def match_primary_name(
     self, drug_name: str
@@ -575,6 +598,7 @@ def match_primary_name(
     record = data.records_by_stable_key[stable_key]
     notes = [f"synonym='{original}'"]
     return record, self.SYNONYM_CONFIDENCE, "drug_synonym", notes
+
 
 def prepare_catalog_synonyms(self) -> None:
     data = self.data
@@ -622,9 +646,7 @@ def prepare_catalog_synonyms(self) -> None:
                 continue
             fallback_aliases.append(alias_value)
             fallback_seen.add(alias_value)
-        for brand in self.parse_catalog_brand_names(
-            getattr(row, "brand_names", None)
-        ):
+        for brand in self.parse_catalog_brand_names(getattr(row, "brand_names", None)):
             if brand in fallback_seen:
                 continue
             fallback_aliases.append(brand)
@@ -640,6 +662,7 @@ def prepare_catalog_synonyms(self) -> None:
         }
         self.register_catalog_entry(entry, normalized_map, fallback_aliases)
 
+
 def register_catalog_entry(
     self,
     entry: dict[str, Any],
@@ -653,6 +676,7 @@ def register_catalog_entry(
         if not normalized_alias:
             continue
         self.add_catalog_index_entry(normalized_alias, entry, False, alias)
+
 
 def add_catalog_index_entry(
     self,
@@ -676,6 +700,7 @@ def add_catalog_index_entry(
         original,
     )
 
+
 def catalog_term_type_allowed(self, term_type: str | None) -> bool:
     if term_type is None:
         return True
@@ -683,6 +708,7 @@ def catalog_term_type_allowed(self, term_type: str | None) -> bool:
     if not normalized:
         return True
     return not normalized.endswith(self.CATALOG_EXCLUDED_TERM_SUFFIXES)
+
 
 def parse_catalog_brand_names(self, value: Any) -> list[str]:
     if value is None:
@@ -702,8 +728,10 @@ def parse_catalog_brand_names(self, value: Any) -> list[str]:
             names.append(text)
     return sorted(dict.fromkeys(names), key=str.casefold)
 
+
 def parse_catalog_synonyms(self, value: Any) -> list[str]:
     return sorted(dict.fromkeys(parse_synonym_list(value)), key=str.casefold)
+
 
 def iter_alias_variants(self, value: str) -> list[str]:
     normalized_value = normalize_whitespace(value)
@@ -715,6 +743,7 @@ def iter_alias_variants(self, value: str) -> list[str]:
         if candidate:
             variants.add(candidate)
     return sorted(variants, key=str.casefold)
+
 
 def parse_synonyms(self, value: Any) -> dict[str, str]:
     synonyms: dict[str, str] = {}
@@ -733,19 +762,14 @@ def parse_synonyms(self, value: Any) -> dict[str, str]:
                 normalized = self.normalize_name(variant)
                 if not normalized:
                     continue
-                if (
-                    normalized
-                    in get_text_normalization_snapshot().matching_stopwords
-                ):
+                if normalized in get_text_normalization_snapshot().matching_stopwords:
                     continue
-                if (
-                    len(normalized) < self.TOKEN_MIN_LENGTH
-                    and " " not in normalized
-                ):
+                if len(normalized) < self.TOKEN_MIN_LENGTH and " " not in normalized:
                     continue
                 if normalized not in synonyms:
                     synonyms[normalized] = variant
     return synonyms
+
 
 def expand_variant(self, value: str) -> list[str]:
     normalized = normalize_whitespace(value)
@@ -759,17 +783,20 @@ def expand_variant(self, value: str) -> list[str]:
     result = sorted(variants, key=str.casefold)
     return result
 
+
 def collect_tokens(self, primary: str, synonyms: list[str]) -> set[str]:
     tokens: set[str] = set()
     for source in [primary, *synonyms]:
         tokens.update(self.tokenize(source))
     return tokens
 
+
 def tokenize(self, value: str) -> set[str]:
     normalized = self.normalize_name(value)
     if not normalized:
         return set()
     return {token for token in normalized.split() if self.is_token_valid(token)}
+
 
 def is_token_valid(self, token: str) -> bool:
     if len(token) < self.TOKEN_MIN_LENGTH:
@@ -778,6 +805,7 @@ def is_token_valid(self, token: str) -> bool:
         return False
     return not token.isdigit()
 
+
 def normalize_name(self, name: str) -> str:
     cached = self.normalization_cache.get(name, CACHE_MISS)
     if cached is not CACHE_MISS:
@@ -785,6 +813,7 @@ def normalize_name(self, name: str) -> str:
     normalized = normalize_drug_query_name(name)
     self.normalization_cache.put(name, normalized)
     return normalized
+
 
 def require_data(self) -> LiverToxData:
     if self.data is None:

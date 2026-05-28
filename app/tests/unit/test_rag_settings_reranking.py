@@ -54,4 +54,3 @@ def test_build_rag_settings_enforces_candidate_floor() -> None:
     settings = payload["rag"]
     assert settings["rerank_top_n"] == 10
     assert settings["rerank_candidate_k"] == 10
-

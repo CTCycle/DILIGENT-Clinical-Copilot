@@ -71,7 +71,9 @@ class ClinicalSession(Base):
         nullable=False,
     )
     session_timestamp: Mapped[datetime | None] = mapped_column(DateTime)
-    version: Mapped[int] = mapped_column(Integer, nullable=False, server_default=text("1"))
+    version: Mapped[int] = mapped_column(
+        Integer, nullable=False, server_default=text("1")
+    )
     original_session_id: Mapped[int | None] = mapped_column(
         Integer,
         ForeignKey(CLINICAL_SESSIONS_ID_FK),
@@ -504,11 +506,17 @@ class ReferenceCatalogEntry(Base):
     domain: Mapped[str] = mapped_column(String, nullable=False)
     category: Mapped[str] = mapped_column(String, nullable=False)
     key: Mapped[str] = mapped_column(String, nullable=False)
-    locale: Mapped[str] = mapped_column(String, nullable=False, server_default=text("'und'"))
+    locale: Mapped[str] = mapped_column(
+        String, nullable=False, server_default=text("'und'")
+    )
     value: Mapped[str] = mapped_column(Text, nullable=False)
     normalized_value: Mapped[str] = mapped_column(String, nullable=False)
-    priority: Mapped[int] = mapped_column(Integer, nullable=False, server_default=text("100"))
-    match_mode: Mapped[str] = mapped_column(String, nullable=False, server_default=text("'token'"))
+    priority: Mapped[int] = mapped_column(
+        Integer, nullable=False, server_default=text("100")
+    )
+    match_mode: Mapped[str] = mapped_column(
+        String, nullable=False, server_default=text("'token'")
+    )
     case_sensitive: Mapped[bool] = mapped_column(
         Boolean,
         nullable=False,
@@ -543,7 +551,9 @@ class ReferenceCatalogEntry(Base):
             name="uq_reference_catalog_entries_identity",
         ),
         Index("ix_reference_catalog_entries_manifest", "manifest"),
-        Index("ix_reference_catalog_entries_lookup", "domain", "category", "key", "locale"),
+        Index(
+            "ix_reference_catalog_entries_lookup", "domain", "category", "key", "locale"
+        ),
         Index("ix_reference_catalog_entries_active", "active"),
     )
 

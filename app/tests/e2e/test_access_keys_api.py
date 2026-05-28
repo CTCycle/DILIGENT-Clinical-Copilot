@@ -60,7 +60,9 @@ def test_activate_and_delete_require_provider(api_context: APIRequestContext) ->
         api_context.delete(f"/api/access-keys/{key_id}?provider={provider}")
 
 
-def test_access_key_creation_rejects_short_secret(api_context: APIRequestContext) -> None:
+def test_access_key_creation_rejects_short_secret(
+    api_context: APIRequestContext,
+) -> None:
     response = api_context.post(
         "/api/access-keys",
         data={"provider": "openai", "access_key": "short"},

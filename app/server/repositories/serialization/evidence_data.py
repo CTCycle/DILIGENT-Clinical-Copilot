@@ -28,6 +28,7 @@ from services.text.normalization import normalize_drug_name
 
 # Extracted from the facade module; functions intentionally accept the facade instance.
 
+
 def save_livertox_records(self, records: pd.DataFrame) -> None:
     self.ensure_session_result_table()
     prepared_rows = self.prepare_livertox_rows(records)
@@ -73,6 +74,7 @@ def save_livertox_records(self, records: pd.DataFrame) -> None:
     finally:
         db_session.close()
 
+
 def prepare_livertox_rows(self, records: pd.DataFrame) -> list[dict[str, Any]]:
     frame = records.copy()
     if frame.empty:
@@ -102,6 +104,7 @@ def prepare_livertox_rows(self, records: pd.DataFrame) -> list[dict[str, Any]]:
     prepared_rows.sort(key=self.livertox_row_sort_key)
     return prepared_rows
 
+
 def livertox_row_sort_key(self, row: dict[str, Any]) -> tuple[str, ...]:
     return (
         self.to_sortable_text(row.get("_canonical_name_norm")),
@@ -111,10 +114,12 @@ def livertox_row_sort_key(self, row: dict[str, Any]) -> tuple[str, ...]:
         self.to_sortable_text(row.get("_drug_name")),
     )
 
+
 def to_sortable_text(self, value: Any) -> str:
     if value is None:
         return ""
     return str(value).casefold()
+
 
 def upsert_livertox_monograph(
     self,
@@ -150,13 +155,12 @@ def upsert_livertox_monograph(
         row.get("secondary_classification")
     )
     include_flag = self.normalize_flag(row.get("include_in_livertox"))
-    monograph.include_in_livertox = (
-        None if include_flag is None else include_flag == 1
-    )
+    monograph.include_in_livertox = None if include_flag is None else include_flag == 1
     monograph.source_url = self.normalize_string(row.get("source_url"))
     monograph.source_last_modified = self.normalize_string(
         row.get("source_last_modified")
     )
+
 
 def try_assign_livertox_nbk_id(
     self,
@@ -180,19 +184,18 @@ def try_assign_livertox_nbk_id(
             normalized,
         )
 
+
 def build_livertox_monograph_key(self, row: dict[str, Any]) -> str:
     identity_payload = {
-        "drug_name_norm": self.normalize_string(row.get("_canonical_name_norm"))
-        or "",
+        "drug_name_norm": self.normalize_string(row.get("_canonical_name_norm")) or "",
         "nbk_id": self.normalize_string(row.get("nbk_id")) or "",
         "source_url": self.normalize_string(row.get("source_url")) or "",
-        "source_last_modified": self.normalize_string(
-            row.get("source_last_modified")
-        )
+        "source_last_modified": self.normalize_string(row.get("source_last_modified"))
         or "",
     }
     serialized = json.dumps(identity_payload, sort_keys=True, separators=(",", ":"))
     return hashlib.sha256(serialized.encode("utf-8")).hexdigest()
+
 
 def get_livertox_records(self) -> pd.DataFrame:
     self.ensure_session_result_table()
@@ -237,12 +240,8 @@ def get_livertox_records(self) -> pd.DataFrame:
                     "ingredient": self.join_values(
                         grouped_aliases.get("ingredient", set())
                     ),
-                    "brand_name": self.join_values(
-                        grouped_aliases.get("brand", set())
-                    ),
-                    "synonyms": self.join_values(
-                        grouped_aliases.get("synonym", set())
-                    ),
+                    "brand_name": self.join_values(grouped_aliases.get("brand", set())),
+                    "synonyms": self.join_values(grouped_aliases.get("synonym", set())),
                     "excerpt": self.normalize_string(monograph.excerpt),
                     "likelihood_score": self.normalize_string(
                         monograph.likelihood_score
@@ -272,6 +271,7 @@ def get_livertox_records(self) -> pd.DataFrame:
     frame = frame.where(pd.notnull(frame), cast(Any, None))
     return frame.reindex(columns=LIVERTOX_COLUMNS)
 
+
 def get_livertox_master_list(self) -> pd.DataFrame:
     frame = self.get_livertox_records()
     if frame.empty:
@@ -286,6 +286,7 @@ def get_livertox_master_list(self) -> pd.DataFrame:
         .dropna(subset=["drug_name"])
         .reset_index(drop=True)
     )
+
 
 def get_drugs_catalog(self) -> pd.DataFrame:
     self.ensure_session_result_table()
@@ -320,8 +321,7 @@ def get_drugs_catalog(self) -> pd.DataFrame:
         rxcui_values = {
             normalized_rxcui
             for normalized_rxcui in (
-                self.normalize_string(mapping.rxcui)
-                for mapping in drug.rxnorm_codes
+                self.normalize_string(mapping.rxcui) for mapping in drug.rxnorm_codes
             )
             if normalized_rxcui is not None
         }
@@ -331,25 +331,19 @@ def get_drugs_catalog(self) -> pd.DataFrame:
         if not rxcui_values:
             continue
         raw_name = self.first_alias_model_value(rxnorm_aliases, "raw_name")
-        standard_name = self.first_alias_model_value(
-            rxnorm_aliases, "standard_name"
-        )
+        standard_name = self.first_alias_model_value(rxnorm_aliases, "standard_name")
         term_type = self.first_alias_model_term_type(rxnorm_aliases)
         brand_names = self.join_values(
             self.alias_model_values_for_kind(rxnorm_aliases, "brand")
         )
-        synonyms = sorted(
-            self.alias_model_values_for_kind(rxnorm_aliases, "synonym")
-        )
+        synonyms = sorted(self.alias_model_values_for_kind(rxnorm_aliases, "synonym"))
         for rxcui in sorted(rxcui_values):
             records.append(
                 {
                     "rxcui": rxcui,
-                    "raw_name": raw_name
-                    or self.normalize_string(drug.canonical_name),
+                    "raw_name": raw_name or self.normalize_string(drug.canonical_name),
                     "term_type": term_type,
-                    "name": standard_name
-                    or self.normalize_string(drug.canonical_name),
+                    "name": standard_name or self.normalize_string(drug.canonical_name),
                     "brand_names": brand_names,
                     "synonyms": json.dumps(synonyms, ensure_ascii=False),
                 }
@@ -359,9 +353,8 @@ def get_drugs_catalog(self) -> pd.DataFrame:
     frame = pd.DataFrame(records)
     return frame.reindex(columns=RXNORM_CATALOG_COLUMNS)
 
-def stream_drugs_catalog(
-    self, page_size: int | None = None
-) -> Iterator[pd.DataFrame]:
+
+def stream_drugs_catalog(self, page_size: int | None = None) -> Iterator[pd.DataFrame]:
     chunk_size = (
         get_server_settings().database.select_page_size
         if page_size is None
@@ -375,6 +368,7 @@ def stream_drugs_catalog(
         if not chunk.empty:
             yield chunk.reset_index(drop=True)
 
+
 def build_search_pattern(self, search: str | None) -> str | None:
     normalized = self.normalize_string(search)
     if normalized is None:
@@ -386,6 +380,7 @@ def build_search_pattern(self, search: str | None) -> str | None:
         .replace("_", "\\_")
     )
     return f"%{escaped}%"
+
 
 def list_rxnav_catalog(
     self,
@@ -459,6 +454,7 @@ def list_rxnav_catalog(
     finally:
         db_session.close()
 
+
 def get_rxnav_alias_groups(self, drug_id: int) -> dict[str, Any] | None:
     self.ensure_session_result_table()
     safe_drug_id = int(drug_id)
@@ -499,6 +495,7 @@ def get_rxnav_alias_groups(self, drug_id: int) -> dict[str, Any] | None:
         }
     finally:
         db_session.close()
+
 
 def list_livertox_catalog(
     self,
@@ -573,6 +570,7 @@ def list_livertox_catalog(
     finally:
         db_session.close()
 
+
 def get_livertox_excerpt(self, drug_id: int) -> dict[str, Any] | None:
     self.ensure_session_result_table()
     safe_drug_id = int(drug_id)
@@ -601,6 +599,7 @@ def get_livertox_excerpt(self, drug_id: int) -> dict[str, Any] | None:
         }
     finally:
         db_session.close()
+
 
 def get_drug_knowledge_bundle(self, drug_id: int) -> dict[str, Any]:
     self.ensure_session_result_table()
@@ -654,6 +653,7 @@ def get_drug_knowledge_bundle(self, drug_id: int) -> dict[str, Any]:
     finally:
         db_session.close()
 
+
 def delete_drug_with_cleanup(self, drug_id: int) -> bool:
     self.ensure_session_result_table()
     safe_drug_id = int(drug_id)
@@ -667,16 +667,12 @@ def delete_drug_with_cleanup(self, drug_id: int) -> bool:
             .where(ClinicalSessionDrug.drug_id == safe_drug_id)
             .values(drug_id=None)
         )
-        db_session.execute(
-            delete(DrugAlias).where(DrugAlias.drug_id == safe_drug_id)
-        )
+        db_session.execute(delete(DrugAlias).where(DrugAlias.drug_id == safe_drug_id))
         db_session.execute(
             delete(DrugRxnormCode).where(DrugRxnormCode.drug_id == safe_drug_id)
         )
         db_session.execute(
-            delete(LiverToxMonograph).where(
-                LiverToxMonograph.drug_id == safe_drug_id
-            )
+            delete(LiverToxMonograph).where(LiverToxMonograph.drug_id == safe_drug_id)
         )
         db_session.execute(
             delete(KbMatchCache).where(KbMatchCache.drug_id == safe_drug_id)
@@ -689,6 +685,7 @@ def delete_drug_with_cleanup(self, drug_id: int) -> bool:
         raise
     finally:
         db_session.close()
+
 
 def resolve_drug_id_from_match_cache(
     self,
@@ -703,7 +700,8 @@ def resolve_drug_id_from_match_cache(
         .where(
             KbMatchCache.normalized_drug_key == normalized_drug_key,
             KbMatchCache.invalidated_at.is_(None),
-            KbMatchCache.confidence >= get_server_settings().drugs_matcher.min_confidence,
+            KbMatchCache.confidence
+            >= get_server_settings().drugs_matcher.min_confidence,
         )
         .order_by(KbMatchCache.updated_at.desc(), KbMatchCache.id.desc())
         .limit(1)
@@ -734,6 +732,7 @@ def resolve_drug_id_from_match_cache(
             cache.invalidation_reason = "livertox_monograph_identity_changed"
             return None
     return int(cache.drug_id)
+
 
 def upsert_high_confidence_kb_match_cache(
     self,
@@ -793,9 +792,7 @@ def upsert_high_confidence_kb_match_cache(
                 normalized_drug_key=normalized_drug_key,
                 drug_id=drug_id,
                 rxnorm_rxcui=rxnorm_rxcui,
-                livertox_monograph_key=monograph.monograph_key
-                if monograph
-                else None,
+                livertox_monograph_key=monograph.monograph_key if monograph else None,
                 livertox_nbk_id=livertox_nbk_id,
                 source=source,
                 confidence=confidence,
@@ -817,4 +814,3 @@ def upsert_high_confidence_kb_match_cache(
     existing.invalidated_at = None
     existing.invalidation_reason = None
     existing.updated_at = now
-

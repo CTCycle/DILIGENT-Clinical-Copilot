@@ -63,7 +63,9 @@ def test_insufficient_pattern_labs_raise_blocker() -> None:
     assessment = analyzer.assess_payload(PatientLabTimeline(entries=[]))
     assert assessment.status == "undetermined_due_to_missing_labs"
     assert assessment.score.classification == "indeterminate"
-    assert any(issue.code == "missing_hepatotoxicity_inputs" for issue in assessment.issues)
+    assert any(
+        issue.code == "missing_hepatotoxicity_inputs" for issue in assessment.issues
+    )
 
 
 def test_non_critical_missing_data_does_not_block() -> None:
@@ -108,4 +110,3 @@ def test_non_critical_missing_data_does_not_block() -> None:
         )
     )
     assert assessment.status == "ok"
-

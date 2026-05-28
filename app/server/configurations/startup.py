@@ -97,4 +97,3 @@ __all__ = [
     "reset_environment_bootstrap_for_tests",
     "tauri_mode_enabled",
 ]
-

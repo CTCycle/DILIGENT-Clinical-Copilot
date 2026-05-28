@@ -21,4 +21,3 @@ __all__ = [
     "reload_settings_for_tests",
     "reset_environment_bootstrap_for_tests",
 ]
-

@@ -38,12 +38,14 @@ def _set_retry_attempts(owner: LLMClientRuntimeOwner, provider: str) -> None:
         current = getattr(owner, "extraction_retry_attempts", None)
         try:
             current_attempts = int(current)
-        except (TypeError, ValueError):
+        except TypeError, ValueError:
             current_attempts = default_attempts
         if current_attempts <= 0:
             current_attempts = default_attempts
         # Preserve stricter caller-defined caps (for example fail-fast extractors).
-        setattr(owner, "extraction_retry_attempts", min(current_attempts, default_attempts))
+        setattr(
+            owner, "extraction_retry_attempts", min(current_attempts, default_attempts)
+        )
 
 
 ###############################################################################

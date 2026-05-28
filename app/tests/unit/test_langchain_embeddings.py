@@ -126,4 +126,3 @@ def test_provider_validation_and_exception_mapping(monkeypatch) -> None:
         assert False, "Expected timeout mapping"
     except embeddings_module.LLMTimeout:
         pass
-

@@ -68,4 +68,3 @@ def test_database_settings_are_loaded_from_json_without_env_overlap(
     reset_app_settings_cache()
     settings = get_server_settings()
     assert settings.database.host == "json-host"
-

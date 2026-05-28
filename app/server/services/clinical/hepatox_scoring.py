@@ -277,6 +277,7 @@ class HepatotoxicityPatternAnalyzer:
 
 # Extracted from the facade module; functions intentionally accept the facade instance.
 
+
 def summarize_rucam_components(
     self,
     rucam: DrugRucamAssessment | None,
@@ -288,10 +289,12 @@ def summarize_rucam_components(
         pieces.append(f"{component.label}: {component.score} ({component.status})")
     return "; ".join(pieces)
 
+
 def format_rucam_limitations(self, rucam: DrugRucamAssessment | None) -> str:
     if rucam is None or not rucam.limitations:
         return "None documented."
     return "; ".join(item for item in rucam.limitations if item)
+
 
 def is_materially_in_report_language(text: str, report_language: str) -> bool:
     normalized = (text or "").strip()

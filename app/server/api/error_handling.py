@@ -243,6 +243,7 @@ def register_error_handling(app: FastAPI) -> None:
         FileNotFoundError,
         cast(ExceptionHandler, missing_resource_error_handler),
     )
-    app.add_exception_handler(ServiceError, cast(ExceptionHandler, service_error_handler))
+    app.add_exception_handler(
+        ServiceError, cast(ExceptionHandler, service_error_handler)
+    )
     app.add_exception_handler(Exception, unhandled_error_handler)
-

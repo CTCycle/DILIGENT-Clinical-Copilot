@@ -765,4 +765,3 @@ DataInspectionEndpoint(
     router=router,
     service=DataInspectionService(jobs=get_job_manager()),
 ).add_routes()
-

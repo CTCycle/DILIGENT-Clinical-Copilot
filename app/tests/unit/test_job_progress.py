@@ -41,7 +41,9 @@ def test_old_two_argument_progress_callback_usage_still_works(monkeypatch) -> No
     def fake_report(job_id: str, *, stage: str, progress: float, detail=None) -> None:
         calls.append((job_id, stage, progress, detail))
 
-    monkeypatch.setattr("services.clinical.job_progress.report_clinical_job_progress", fake_report)
+    monkeypatch.setattr(
+        "services.clinical.job_progress.report_clinical_job_progress", fake_report
+    )
     callback = ClinicalJobProgressCallback(job_id="job-1")
     callback("clinical", 12.0)
     assert calls == [("job-1", "clinical", 12.0, None)]

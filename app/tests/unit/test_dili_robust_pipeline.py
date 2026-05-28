@@ -23,7 +23,9 @@ from services.session.robust_pipeline import (
 
 
 def test_document_normalizer_keeps_raw_text_and_labels_bibliography() -> None:
-    raw_text = "Patient: UI metadata\n\nClinical note text\n\nReferences\nDoe et al. doi:123"
+    raw_text = (
+        "Patient: UI metadata\n\nClinical note text\n\nReferences\nDoe et al. doi:123"
+    )
 
     normalized = DocumentNormalizer().normalize(raw_text)
 
@@ -117,7 +119,10 @@ def test_report_metadata_links_claims_to_fact_nodes() -> None:
 
     assert "UI Patient" in report
     assert metadata.claim_references
-    assert build_run_bundle_index(run_id="1", session_id=1).storage == "database_session_result_payload"
+    assert (
+        build_run_bundle_index(run_id="1", session_id=1).storage
+        == "database_session_result_payload"
+    )
 
 
 def test_fact_graph_report_localizes_italian_audit_labels() -> None:
@@ -182,7 +187,9 @@ def test_audit_blocks_report_without_claim_references() -> None:
             ),
         ),
         fact_graph_validation=validate_fact_graph(FactGraph(nodes=[])),
-        report_metadata=ReportMetadata(report_mode="faithful_only", claim_references={}),
+        report_metadata=ReportMetadata(
+            report_mode="faithful_only", claim_references={}
+        ),
     )
 
     assert audit.blocking_issues

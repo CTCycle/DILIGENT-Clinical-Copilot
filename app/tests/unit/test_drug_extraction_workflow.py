@@ -28,9 +28,7 @@ def test_anamnesis_and_therapy_source_fields_are_preserved() -> None:
 def test_conservative_preparation_keeps_bullets_and_multiline_entries() -> None:
     parser = DrugsParser(client=None)
     prepared = parser.conservative_prepare_drug_section_text(
-        "- Ursodeoxycholic acid 300 mg BID\n"
-        "  oral\n\n"
-        "* Prednisone 25 mg/day"
+        "- Ursodeoxycholic acid 300 mg BID\n  oral\n\n* Prednisone 25 mg/day"
     )
     assert "Ursodeoxycholic acid" in prepared
     assert "Prednisone 25 mg/day" in prepared
