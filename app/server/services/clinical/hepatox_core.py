@@ -308,7 +308,7 @@ class HepatoxConsultation:
         drugs: PatientDrugs,
         *,
         patient_name: str | None = None,
-        timeout_s: float = get_server_settings().runtime.default_llm_timeout,
+        timeout_s: float = get_server_settings().runtime.clinical_llm_timeout,
     ) -> None:
         self.drugs = drugs
         self.timeout_s = timeout_s

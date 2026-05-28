@@ -91,7 +91,7 @@ class DrugsParser:
         *,
         client: Any | None = None,
         temperature: float = 0.0,
-        timeout_s: float = get_server_settings().runtime.default_llm_timeout,
+        timeout_s: float = get_server_settings().runtime.parser_llm_timeout,
     ) -> None:
         self.temperature = float(temperature)
         self.timeout_s = float(timeout_s)
@@ -186,6 +186,11 @@ class DrugsParser:
                 )
             ),
         )
+
+    # -------------------------------------------------------------------------
+    @staticmethod
+    def minimum_timeout_s() -> float:
+        return float(get_server_settings().runtime.minimum_llm_timeout)
 
     # -------------------------------------------------------------------------
     @staticmethod
@@ -362,7 +367,7 @@ class DrugsParser:
                     use_json_mode=True,
                     max_repair_attempts=1,
                 ),
-                timeout=max(5.0, float(self.timeout_s)),
+                timeout=max(self.minimum_timeout_s(), float(self.timeout_s)),
             )
             entries.extend(parsed.entries)
             self.emit_progress(
@@ -429,7 +434,7 @@ class DrugsParser:
                     use_json_mode=True,
                     max_repair_attempts=1,
                 ),
-                timeout=max(5.0, float(self.timeout_s)),
+                timeout=max(self.minimum_timeout_s(), float(self.timeout_s)),
             )
             parsed_entries.extend(parsed.entries)
             self.emit_progress(progress_callback, 1.0)

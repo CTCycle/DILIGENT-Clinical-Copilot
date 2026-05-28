@@ -72,16 +72,12 @@ def normalize_lab_marker(marker_name: str, aliases: dict[str, str]) -> str:
 
 ###############################################################################
 class ClinicalLabExtractor:
-    CHUNK_MAX_CHARS = 2600
-    LOCAL_LLM_CHUNK_TIMEOUT_CAP_S = 45.0
-    CLOUD_LLM_CHUNK_TIMEOUT_CAP_S = 30.0
-
     def __init__(
         self,
         *,
         client: Any | None = None,
         temperature: float = 0.0,
-        timeout_s: float = get_server_settings().runtime.default_llm_timeout,
+        timeout_s: float = get_server_settings().runtime.parser_llm_timeout,
     ) -> None:
         self.temperature = float(temperature)
         self.timeout_s = float(timeout_s)
@@ -122,6 +118,21 @@ class ClinicalLabExtractor:
                 )
             ),
         )
+
+    # -------------------------------------------------------------------------
+    @staticmethod
+    def minimum_timeout_s() -> float:
+        return float(get_server_settings().runtime.minimum_llm_timeout)
+
+    # -------------------------------------------------------------------------
+    @staticmethod
+    def cloud_timeout_cap_s() -> float:
+        return float(get_server_settings().runtime.cloud_llm_timeout_cap)
+
+    # -------------------------------------------------------------------------
+    @staticmethod
+    def local_timeout_cap_s() -> float:
+        return float(get_server_settings().runtime.local_llm_timeout_cap)
 
     # -------------------------------------------------------------------------
     @staticmethod
@@ -214,28 +225,6 @@ class ClinicalLabExtractor:
         if r_ratio <= 2.0:
             return "cholestatic"
         return "mixed"
-
-    # -------------------------------------------------------------------------
-    def chunk_text(self, text: str) -> list[str]:
-        normalized = self.clean_text(text)
-        if not normalized:
-            return []
-        lines = [line.strip() for line in normalized.split("\n") if line.strip()]
-        chunks: list[str] = []
-        current_lines: list[str] = []
-        current_size = 0
-        for line in lines:
-            line_size = len(line) + 1
-            if current_lines and current_size + line_size > self.CHUNK_MAX_CHARS:
-                chunks.append("\n".join(current_lines))
-                current_lines = [line]
-                current_size = line_size
-                continue
-            current_lines.append(line)
-            current_size += line_size
-        if current_lines:
-            chunks.append("\n".join(current_lines))
-        return chunks or [normalized]
 
     # -------------------------------------------------------------------------
     @staticmethod
@@ -535,33 +524,31 @@ class ClinicalLabExtractor:
         return has_marker and has_number and has_unit
 
     # -------------------------------------------------------------------------
-    async def llm_extract_chunk(
+    async def llm_extract_full_text(
         self,
         *,
-        chunk: str,
-        chunk_index: int,
-        total_chunks: int,
+        text: str,
         reinforced: bool,
     ) -> LabExtractionPayload:
         user_prompt = (
-            "Extract longitudinal liver-related labs and onset clues from this clinical chunk.\n"
-            f"[Chunk {chunk_index}/{total_chunks}]\n{chunk}"
+            "Extract longitudinal liver-related labs and onset clues from this full clinical laboratory text.\n"
+            f"{text}"
         )
         if reinforced:
             user_prompt = (
                 f"{user_prompt}\n\n"
-                "Important: this chunk contains explicit lab values. "
+                "Important: this text contains explicit lab values. "
                 "Extract every liver-related marker/value pair found (e.g., ALAT/ALT, ASAT/AST, GGT, ALP, "
                 "bilirubina totale/diretta), preserving unit text and available dates."
             )
         parsed: LabExtractionPayload | None = None
         if self.client is None:
             raise RuntimeError("LLM client is not initialized for lab extraction")
-        chunk_timeout_s = min(
-            max(5.0, float(self.timeout_s)),
-            self.CLOUD_LLM_CHUNK_TIMEOUT_CAP_S
+        request_timeout_s = min(
+            max(self.minimum_timeout_s(), float(self.timeout_s)),
+            self.cloud_timeout_cap_s()
             if LLMRuntimeConfig.is_cloud_enabled()
-            else self.LOCAL_LLM_CHUNK_TIMEOUT_CAP_S,
+            else self.local_timeout_cap_s(),
         )
         for attempt in range(1, self.extraction_retry_attempts + 1):
             try:
@@ -575,7 +562,7 @@ class ClinicalLabExtractor:
                         use_json_mode=True,
                         max_repair_attempts=1,
                     ),
-                    timeout=chunk_timeout_s,
+                    timeout=request_timeout_s,
                 )
                 break
             except Exception as exc:
@@ -584,11 +571,9 @@ class ClinicalLabExtractor:
                 delay = self.retry_backoff_seconds(attempt, exc=exc)
                 logger.warning(
                     (
-                        "Retrying clinical lab extraction for chunk %d/%d "
+                        "Retrying clinical lab extraction "
                         "(attempt %d/%d, delay %.2fs): %s"
                     ),
-                    chunk_index,
-                    total_chunks,
                     attempt,
                     self.extraction_retry_attempts,
                     delay,
@@ -596,7 +581,7 @@ class ClinicalLabExtractor:
                 )
                 await asyncio.sleep(delay)
         if parsed is None:
-            raise RuntimeError("Failed to extract clinical labs from chunk")
+            raise RuntimeError("Failed to extract clinical labs from full text")
         return parsed
 
     # -------------------------------------------------------------------------
@@ -634,66 +619,50 @@ class ClinicalLabExtractor:
                     raise RuntimeError(
                         "LLM client is not initialized for lab extraction"
                     )
-                chunks = self.chunk_text(merged_source_text)
-                llm_entries: list[ClinicalLabEntry] = []
-                llm_onset: LiverInjuryOnsetContext | None = None
                 llm_unavailable = False
-                for index, chunk in enumerate(chunks, start=1):
+                try:
+                    parsed = await self.llm_extract_full_text(
+                        text=merged_source_text,
+                        reinforced=False,
+                    )
+                except Exception as exc:
+                    logger.warning(
+                        (
+                            "Clinical lab extraction unavailable "
+                            "after %d attempts; using deterministic parser output only: %s"
+                        ),
+                        self.extraction_retry_attempts,
+                        exc,
+                    )
+                    parsed = LabExtractionPayload(entries=[], onset_context=None)
+                    llm_unavailable = True
+
+                # If the first LLM pass returns empty despite clear lab cues, retry once
+                # with a reinforced instruction before accepting an empty result.
+                if not parsed.entries and self.has_explicit_lab_signal(merged_source_text):
                     try:
-                        parsed = await self.llm_extract_chunk(
-                            chunk=chunk,
-                            chunk_index=index,
-                            total_chunks=len(chunks),
-                            reinforced=False,
+                        reinforced = await self.llm_extract_full_text(
+                            text=merged_source_text,
+                            reinforced=True,
                         )
                     except Exception as exc:
                         logger.warning(
-                            (
-                                "Clinical lab extraction unavailable for chunk %d/%d "
-                                "after %d attempts; using deterministic parser output only: %s"
-                            ),
-                            index,
-                            len(chunks),
-                            self.extraction_retry_attempts,
+                            "Reinforced clinical lab extraction failed: %s",
                             exc,
                         )
-                        parsed = LabExtractionPayload(entries=[], onset_context=None)
-                        llm_unavailable = True
+                    else:
+                        if reinforced.entries:
+                            parsed = reinforced
 
-                    # If the first LLM pass returns empty despite clear lab cues, retry once
-                    # with a reinforced instruction before accepting an empty chunk.
-                    if not parsed.entries and self.has_explicit_lab_signal(chunk):
-                        try:
-                            reinforced = await self.llm_extract_chunk(
-                                chunk=chunk,
-                                chunk_index=index,
-                                total_chunks=len(chunks),
-                                reinforced=True,
-                            )
-                            if reinforced.entries:
-                                parsed = reinforced
-                        except Exception as exc:
-                            logger.warning(
-                                "Reinforced clinical lab extraction failed for chunk %d/%d: %s",
-                                index,
-                                len(chunks),
-                                exc,
-                            )
-
-                    llm_entries.extend(parsed.entries)
-                    if llm_onset is None and parsed.onset_context is not None:
-                        llm_onset = parsed.onset_context
-                    self.emit_progress(
-                        progress_callback, 0.2 + ((index / max(len(chunks), 1)) * 0.5)
-                    )
-                timeline_entries.extend(llm_entries)
-                if llm_unavailable or (not llm_entries and deterministic_entries):
-                    if not llm_entries and deterministic_entries:
+                timeline_entries.extend(parsed.entries)
+                self.emit_progress(progress_callback, 0.7)
+                if llm_unavailable or (not parsed.entries and deterministic_entries):
+                    if not parsed.entries and deterministic_entries:
                         logger.warning(
                             "LLM lab extraction returned no entries despite detectable lab markers; using deterministic lab parser output."
                         )
                     timeline_entries.extend(deterministic_entries)
-                onset_context = llm_onset
+                onset_context = parsed.onset_context
             except Exception as exc:
                 logger.warning(
                     "Clinical lab extraction unavailable; using deterministic parser output only: %s",

@@ -91,7 +91,11 @@ class RuntimeSettings(BaseModel):
     disease_llm_timeout: float
     clinical_llm_timeout: float
     livertox_llm_timeout: float
+    minimum_llm_timeout: float
+    cloud_llm_timeout_cap: float
+    local_llm_timeout_cap: float
     ollama_server_start_timeout: float
+    livertox_download_timeout: float
     livertox_archive: str
     livertox_yield_interval: int
     livertox_skip_deterministic_ratio: float

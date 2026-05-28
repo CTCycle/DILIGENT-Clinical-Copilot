@@ -31,7 +31,6 @@ class RxNavClient:
     MAX_RETRIES = 3
     BACKOFF_TIME = (0.6, 1.2, 2.4)
     RETRY_STATUS = {429, 500, 502, 503, 504}
-    TIMEOUT = 10.0
     TERM_PATTERN = re.compile(r"[A-Za-z0-9]+(?:[-'][A-Za-z0-9]+)*")
     BRACKET_PATTERN = re.compile(r"\[([^\]]+)\]")
 

@@ -23,7 +23,11 @@ def test_runtime_timeouts_respect_values_and_minimums() -> None:
                 "disease_llm_timeout": 55.0,
                 "clinical_llm_timeout": 240.0,
                 "livertox_llm_timeout": 600.0,
+                "minimum_llm_timeout": 7.0,
+                "cloud_llm_timeout_cap": 33.0,
+                "local_llm_timeout_cap": 66.0,
                 "ollama_server_start_timeout": 22.0,
+                "livertox_download_timeout": 44.0,
             }
         },
         _env(),
@@ -31,11 +35,15 @@ def test_runtime_timeouts_respect_values_and_minimums() -> None:
     settings = payload["runtime"]
 
     assert settings["default_llm_timeout"] == 120.0
-    assert settings["parser_llm_timeout"] == 120.0
-    assert settings["disease_llm_timeout"] == 120.0
-    assert settings["clinical_llm_timeout"] == 120.0
+    assert settings["parser_llm_timeout"] == 45.0
+    assert settings["disease_llm_timeout"] == 55.0
+    assert settings["clinical_llm_timeout"] == 240.0
     assert settings["livertox_llm_timeout"] == 600.0
+    assert settings["minimum_llm_timeout"] == 7.0
+    assert settings["cloud_llm_timeout_cap"] == 33.0
+    assert settings["local_llm_timeout_cap"] == 66.0
     assert settings["ollama_server_start_timeout"] == 22.0
+    assert settings["livertox_download_timeout"] == 44.0
 
 
 def test_runtime_timeouts_floor_to_positive_values() -> None:
@@ -47,7 +55,11 @@ def test_runtime_timeouts_floor_to_positive_values() -> None:
                 "disease_llm_timeout": -1.0,
                 "clinical_llm_timeout": 0.0,
                 "livertox_llm_timeout": -5.0,
+                "minimum_llm_timeout": 0.0,
+                "cloud_llm_timeout_cap": -10.0,
+                "local_llm_timeout_cap": 0.0,
                 "ollama_server_start_timeout": 0.0,
+                "livertox_download_timeout": -4.0,
             }
         },
         _env(),
@@ -59,7 +71,11 @@ def test_runtime_timeouts_floor_to_positive_values() -> None:
     assert settings["disease_llm_timeout"] == 1.0
     assert settings["clinical_llm_timeout"] == 1.0
     assert settings["livertox_llm_timeout"] == 1.0
+    assert settings["minimum_llm_timeout"] == 1.0
+    assert settings["cloud_llm_timeout_cap"] == 1.0
+    assert settings["local_llm_timeout_cap"] == 1.0
     assert settings["ollama_server_start_timeout"] == 1.0
+    assert settings["livertox_download_timeout"] == 1.0
 
 
 def test_runtime_timeouts_allow_long_clinical_budget_without_legacy_cap() -> None:
@@ -75,4 +91,22 @@ def test_runtime_timeouts_allow_long_clinical_budget_without_legacy_cap() -> Non
     settings = payload["runtime"]
 
     assert settings["default_llm_timeout"] == 7200.0
-    assert settings["clinical_llm_timeout"] == 7200.0
+    assert settings["clinical_llm_timeout"] == 9000.0
+
+
+def test_runtime_timeout_caps_floor_to_minimum_llm_timeout() -> None:
+    payload = build_settings_payload_from_json(
+        {
+            "runtime": {
+                "minimum_llm_timeout": 8.0,
+                "cloud_llm_timeout_cap": 3.0,
+                "local_llm_timeout_cap": 4.0,
+            }
+        },
+        _env(),
+    )
+    settings = payload["runtime"]
+
+    assert settings["minimum_llm_timeout"] == 8.0
+    assert settings["cloud_llm_timeout_cap"] == 8.0
+    assert settings["local_llm_timeout_cap"] == 8.0

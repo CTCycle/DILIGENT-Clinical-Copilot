@@ -30,14 +30,12 @@ RATE_LIMIT_WAIT_HINT_RE = re.compile(
 
 ###############################################################################
 class DiseaseExtractor:
-    CHUNK_MAX_CHARS = 2600
-
     def __init__(
         self,
         *,
         client: Any | None = None,
         temperature: float = 0.0,
-        timeout_s: float = get_server_settings().runtime.default_llm_timeout,
+        timeout_s: float = get_server_settings().runtime.disease_llm_timeout,
     ) -> None:
         self.temperature = float(temperature)
         self.timeout_s = float(timeout_s)
@@ -81,6 +79,11 @@ class DiseaseExtractor:
 
     # -------------------------------------------------------------------------
     @staticmethod
+    def minimum_timeout_s() -> float:
+        return float(get_server_settings().runtime.minimum_llm_timeout)
+
+    # -------------------------------------------------------------------------
+    @staticmethod
     def emit_progress(
         progress_callback: Callable[[float], None] | None,
         fraction: float,
@@ -102,28 +105,6 @@ class DiseaseExtractor:
             if stripped:
                 lines.append(stripped)
         return "\n".join(lines)
-
-    # -------------------------------------------------------------------------
-    def chunk_text(self, text: str) -> list[str]:
-        normalized = self.clean_text(text)
-        if not normalized:
-            return []
-        lines = [line.strip() for line in normalized.split("\n") if line.strip()]
-        chunks: list[str] = []
-        current_lines: list[str] = []
-        current_size = 0
-        for line in lines:
-            line_size = len(line) + 1
-            if current_lines and current_size + line_size > self.CHUNK_MAX_CHARS:
-                chunks.append("\n".join(current_lines))
-                current_lines = [line]
-                current_size = line_size
-                continue
-            current_lines.append(line)
-            current_size += line_size
-        if current_lines:
-            chunks.append("\n".join(current_lines))
-        return chunks or [normalized]
 
     # -------------------------------------------------------------------------
     def sanitize_text(self, value: str | None, *, max_words: int) -> str | None:
@@ -259,56 +240,49 @@ class DiseaseExtractor:
                 entries=self.deduplicate_entries(accumulated_entries)
             )
 
-        chunks = self.chunk_text(unresolved_source)
         raw_entries: list[DiseaseContextEntry] = []
         self.emit_progress(progress_callback, 0.0)
-        for index, chunk in enumerate(chunks, start=1):
-            user_prompt = (
-                "Extract diseases from this anamnesis chunk, with temporal and hepatic metadata.\n"
-                f"[Chunk {index}/{len(chunks)}]\n{chunk}"
-            )
-            parsed: PatientDiseaseContext | None = None
-            for attempt in range(1, self.extraction_retry_attempts + 1):
-                try:
-                    parsed = await asyncio.wait_for(
-                        self.client.llm_structured_call(
-                            model=self.model,
-                            system_prompt=ANAMNESIS_DISEASE_EXTRACTION_PROMPT.strip(),
-                            user_prompt=user_prompt,
-                            schema=PatientDiseaseContext,
-                            temperature=self.temperature,
-                            use_json_mode=True,
-                            max_repair_attempts=1,
-                        ),
-                        timeout=max(5.0, float(self.timeout_s)),
-                    )
-                    break
-                except Exception as exc:
-                    if attempt >= self.extraction_retry_attempts:
-                        raise RuntimeError(
-                            "Failed to extract diseases from anamnesis"
-                        ) from exc
-                    delay = self.retry_backoff_seconds(attempt, exc=exc)
-                    logger.warning(
-                        (
-                            "Retrying anamnesis disease extraction for chunk %d/%d "
-                            "(attempt %d/%d, delay %.2fs): %s"
-                        ),
-                        index,
-                        len(chunks),
-                        attempt,
-                        self.extraction_retry_attempts,
-                        delay,
-                        exc,
-                    )
-                    await asyncio.sleep(delay)
-            if parsed is None:
-                raise RuntimeError("Failed to extract diseases from anamnesis")
-            raw_entries.extend(parsed.entries)
-            self.emit_progress(
-                progress_callback,
-                (index / max(len(chunks), 1)) * 0.9,
-            )
+        user_prompt = (
+            "Extract diseases from this full anamnesis text, with temporal and hepatic metadata.\n"
+            f"{unresolved_source}"
+        )
+        parsed: PatientDiseaseContext | None = None
+        for attempt in range(1, self.extraction_retry_attempts + 1):
+            try:
+                parsed = await asyncio.wait_for(
+                    self.client.llm_structured_call(
+                        model=self.model,
+                        system_prompt=ANAMNESIS_DISEASE_EXTRACTION_PROMPT.strip(),
+                        user_prompt=user_prompt,
+                        schema=PatientDiseaseContext,
+                        temperature=self.temperature,
+                        use_json_mode=True,
+                        max_repair_attempts=1,
+                    ),
+                    timeout=max(self.minimum_timeout_s(), float(self.timeout_s)),
+                )
+                break
+            except Exception as exc:
+                if attempt >= self.extraction_retry_attempts:
+                    raise RuntimeError(
+                        "Failed to extract diseases from anamnesis"
+                    ) from exc
+                delay = self.retry_backoff_seconds(attempt, exc=exc)
+                logger.warning(
+                    (
+                        "Retrying anamnesis disease extraction "
+                        "(attempt %d/%d, delay %.2fs): %s"
+                    ),
+                    attempt,
+                    self.extraction_retry_attempts,
+                    delay,
+                    exc,
+                )
+                await asyncio.sleep(delay)
+        if parsed is None:
+            raise RuntimeError("Failed to extract diseases from anamnesis")
+        raw_entries.extend(parsed.entries)
+        self.emit_progress(progress_callback, 0.9)
 
         normalized_entries: list[DiseaseContextEntry] = []
         for entry in raw_entries:
