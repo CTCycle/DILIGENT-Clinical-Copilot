@@ -5,7 +5,7 @@ from services.catalogs.runtime import get_reference_catalog_snapshot
 
 
 ###############################################################################
-def get_clinical_section_template(self) -> ClinicalSectionTemplateResponse:
+def get_clinical_section_template() -> ClinicalSectionTemplateResponse:
     snapshot = get_reference_catalog_snapshot()
     section_keys = list(
         snapshot.values("clinical_extraction", "clinical_sections", key="default")
