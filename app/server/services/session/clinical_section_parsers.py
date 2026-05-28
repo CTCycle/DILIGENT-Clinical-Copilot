@@ -418,17 +418,27 @@ def find_dili_section_headings(raw_text: str) -> list[SectionHeadingMatch]:
 
 
 def resolve_heading_collisions(matches: Sequence[SectionHeadingMatch]) -> list[SectionHeadingMatch]:
+    return resolve_heading_collisions_with_diagnostics(matches)[0]
+
+
+def resolve_heading_collisions_with_diagnostics(
+    matches: Sequence[SectionHeadingMatch],
+) -> tuple[list[SectionHeadingMatch], list[str]]:
     by_line: dict[int, list[SectionHeadingMatch]] = {}
     for match in matches:
         by_line.setdefault(match.line_start, []).append(match)
     resolved: list[SectionHeadingMatch] = []
+    diagnostics: list[str] = []
     for _, line_matches in sorted(by_line.items()):
         line_matches.sort(key=lambda item: item.score, reverse=True)
         top = line_matches[0]
         if len(line_matches) > 1 and abs(top.score - line_matches[1].score) <= 0.02:
+            diagnostics.append(
+                f"ambiguous_heading:{top.line_start}:{normalize_heading_text(top.raw_heading)}"
+            )
             continue
         resolved.append(top)
-    return resolved
+    return resolved, diagnostics
 
 
 def _line_char_offsets(raw_text: str) -> list[tuple[int, int]]:
@@ -545,7 +555,9 @@ def _infer_section_match(
 
 def parse_required_dili_sections(raw_text: str) -> ParsedDiliSectionsResult:
     scan_result = scan_dili_section_headings(raw_text)
-    headings = resolve_heading_collisions(scan_result.section_headings)
+    headings, collision_diagnostics = resolve_heading_collisions_with_diagnostics(
+        scan_result.section_headings
+    )
     heading_lookup = {
         (heading.line_start, heading.line_end): heading
         for heading in headings
@@ -697,7 +709,7 @@ def parse_required_dili_sections(raw_text: str) -> ParsedDiliSectionsResult:
     return ParsedDiliSectionsResult(
         sections=sections,
         missing_required_sections=missing_required_section_names(sections),
-        malformed_sections=sorted(set(malformed_sections)),
+        malformed_sections=sorted(set([*malformed_sections, *collision_diagnostics])),
     )
 
 

@@ -31,16 +31,13 @@ from domain.clinical.entities import (
 from domain.clinical.robustness import NormalizedDocument
 from domain.jobs import JobStartResponse
 from services.clinical.candidate_selection import select_relevant_candidates
+from services.clinical.deterministic_extraction import extract_deterministic_diseases
 from services.clinical.language import ClinicalLanguageDetector
 from services.clinical.match_quality import classify_match_evidence
 from services.clinical.report_language import phrase
 from services.security.access_keys import AccessKeyService
 from services.session.clinical_input_extractor import ClinicalInputExtractionError
-from services.session.document_normalizer import DocumentNormalizer
 from services.session.preflight import check_parser_batch_capacity
-from services.session.text_section_parser import (
-    build_section_extraction_from_initial_text,
-)
 from services.session.robust_pipeline import (
     audit_report,
     build_extraction_artifact,
@@ -313,6 +310,13 @@ async def process_single_patient_workflow(
     _emit_progress(progress_callback, "clinical", _PROGRESS_SEQUENCE[2][1], _PROGRESS_SEQUENCE[2][0])
     cleaned_therapy_text = service.drugs_parser.clean_text(payload.drugs or "")
     cleaned_anamnesis_text = service.drugs_parser.clean_text(payload.anamnesis or "")
+    therapy_deterministic = service.drugs_parser.extract_drugs_from_therapy_deterministic(
+        cleaned_therapy_text
+    )
+    anamnesis_deterministic = service.drugs_parser.extract_drugs_from_anamnesis_deterministic(
+        cleaned_anamnesis_text
+    )
+    disease_deterministic = extract_deterministic_diseases(cleaned_anamnesis_text)
     _emit_progress(progress_callback, "clinical", _PROGRESS_SEQUENCE[3][1], _PROGRESS_SEQUENCE[3][0])
     _emit_progress(progress_callback, "clinical", _PROGRESS_SEQUENCE[4][1], _PROGRESS_SEQUENCE[4][0])
     preflight = await check_parser_batch_capacity(task_count=2)
@@ -615,6 +619,22 @@ async def process_single_patient_workflow(
             "anamnesis_drugs": [entry.model_dump() for entry in anamnesis_drugs.entries],
             "anamnesis_diseases": [entry.model_dump() for entry in disease_context.entries],
         },
+        "deterministic_extraction": {
+            "therapy": {
+                "entries": [entry.model_dump() for entry in therapy_deterministic.entries],
+                "unresolved_lines": therapy_deterministic.unresolved_lines,
+            },
+            "anamnesis": {
+                "entries": [entry.model_dump() for entry in anamnesis_deterministic.entries],
+                "regimen_lines": anamnesis_deterministic.regimen_lines,
+                "unresolved_lines": anamnesis_deterministic.unresolved_lines,
+            },
+            "diseases": {
+                "entries": [entry.model_dump() for entry in disease_deterministic.context.entries],
+                "matched_lines": disease_deterministic.matched_lines,
+                "unresolved_lines": disease_deterministic.unresolved_lines,
+            },
+        },
         "section_extraction": (
             section_extraction.model_dump() if section_extraction is not None else None
         ),
@@ -634,6 +654,22 @@ async def process_single_patient_workflow(
         "pipeline_artifacts": {
             "normalized_document": normalized_document.model_dump(),
             "extraction_artifact": extraction_artifact.model_dump(),
+            "deterministic_extraction": {
+                "therapy": {
+                    "entries": [entry.model_dump() for entry in therapy_deterministic.entries],
+                    "unresolved_lines": therapy_deterministic.unresolved_lines,
+                },
+                "anamnesis": {
+                    "entries": [entry.model_dump() for entry in anamnesis_deterministic.entries],
+                    "regimen_lines": anamnesis_deterministic.regimen_lines,
+                    "unresolved_lines": anamnesis_deterministic.unresolved_lines,
+                },
+                "diseases": {
+                    "entries": [entry.model_dump() for entry in disease_deterministic.context.entries],
+                    "matched_lines": disease_deterministic.matched_lines,
+                    "unresolved_lines": disease_deterministic.unresolved_lines,
+                },
+            },
             "fact_graph": fact_graph.model_dump(),
             "fact_graph_validation": fact_graph_validation.model_dump(),
             "generated_report": generated_report,
@@ -731,27 +767,12 @@ def start_clinical_job_workflow(
             )
 
     try:
-        normalized_document = DocumentNormalizer().normalize(
-            request_payload.clinical_input or ""
-        )
-        parse_result = service.validate_assessment_prerequisites_without_llm(
-            request_payload
-        )
-        section_extraction = build_section_extraction_from_initial_text(
-            parse_result,
-            request_payload.clinical_input or "",
-        )
+        prepared = service.prepare_structured_clinical_input(request_payload)
+        normalized_document = prepared["normalized_document"]
+        section_extraction = prepared["section_extraction"]
+        patient_payload = prepared["patient_payload"]
     except ClinicalInputExtractionError as exc:
         raise ServiceValidationError(str(exc)) from exc
-    patient_payload = service.build_patient_payload(
-        request_payload.model_copy(
-            update={
-                "anamnesis": section_extraction.anamnesis,
-                "drugs": section_extraction.drugs,
-                "laboratory_analysis": section_extraction.laboratory_analysis,
-            }
-        )
-    )
     try:
         service.ensure_submission_requirements(patient_payload)
     except ClinicalPipelineValidationError as exc:

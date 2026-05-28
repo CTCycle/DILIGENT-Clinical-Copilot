@@ -443,14 +443,12 @@ export class ModelConfigPageComponent implements OnInit {
       use_cloud_services: draft.useCloudServices,
       llm_provider: this.draftProvider(),
       cloud_model: this.draftCloudModel(),
+      clinical_model: draft.clinicalModel || null,
+      text_extraction_model: draft.textExtractionModel || null,
     };
     if (this.previewTemperatureOverride() === null) {
       patch.ollama_temperature = draft.temperature;
       patch.cloud_temperature = draft.temperature;
-    }
-    if (!draft.useCloudServices) {
-      patch.clinical_model = draft.clinicalModel || null;
-      patch.text_extraction_model = draft.textExtractionModel || null;
     }
     await this.persistConfigPatch(
       patch,
@@ -612,28 +610,12 @@ export class ModelConfigPageComponent implements OnInit {
     return model.available_in_ollama ? 'Installed' : 'Not installed';
   }
 
-  cloudModelForProvider(provider: CloudProvider): string | null {
-    const override = this.previewCloudModelOverrides()[provider];
-    if (override) {
-      return override;
-    }
-    if (this.draftProvider() === provider) {
-      return this.draftCloudModel();
-    }
-    return resolveCloudModel(provider, null, this.cloudChoices());
-  }
-
   selectedClinicalModel(): string {
     return this.draftConfig().clinicalModel || 'Not set';
   }
 
   selectedExtractionModel(): string {
     return this.draftConfig().textExtractionModel || 'Not set';
-  }
-
-  handleProviderModelChange(provider: CloudProvider, modelName: string): void {
-    this.handleProviderChange(provider);
-    this.handleCloudModelChange(modelName);
   }
 
   isModelRoleSelectable(model: ModelConfigStateResponse['local_models'][number]): boolean {

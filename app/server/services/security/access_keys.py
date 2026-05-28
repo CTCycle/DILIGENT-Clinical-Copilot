@@ -17,11 +17,14 @@ class AccessKeyService:
     # -------------------------------------------------------------------------
     @staticmethod
     def to_response(row: AccessKeyRecord) -> AccessKeyResponse:
+        fingerprint = getattr(row, "key_fingerprint", None)
+        if fingerprint is None:
+            fingerprint = getattr(row, "fingerprint")
         return AccessKeyResponse(
             id=int(row.id),
             provider=normalize_provider_name(str(row.provider)),
             is_active=bool(row.is_active),
-            fingerprint=str(row.key_fingerprint),
+            fingerprint=str(fingerprint),
             created_at=row.created_at,
             updated_at=row.updated_at,
             last_used_at=row.last_used_at,

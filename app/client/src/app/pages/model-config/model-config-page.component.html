@@ -324,7 +324,7 @@
         </section>
 
         <section class="model-config-cloud-options">
-          <h2>Cloud Model Options</h2>
+          <h2>Cloud Provider Keys</h2>
           @for (provider of cloudProviderOptions(); track provider) {
             <div class="model-config-cloud-row" [class.is-active]="draftProvider() === provider">
               <div class="model-config-provider-name">
@@ -337,21 +337,9 @@
                 </span>
                 <span>
                   <strong>{{ provider === 'gemini' ? 'Google Gemini' : getProviderLabel(provider) }}</strong>
-                  <small>Access {{ getProviderLabel(provider) }} models via {{ provider === 'gemini' ? 'Google' : getProviderLabel(provider) }} API</small>
+                  <small>Manage the API keys used to access {{ provider === 'gemini' ? 'Google Gemini' : getProviderLabel(provider) }} cloud models.</small>
                 </span>
               </div>
-              <label>
-                <span>Model</span>
-                <select
-                  [ngModel]="cloudModelForProvider(provider)"
-                  (ngModelChange)="handleProviderModelChange(provider, $event)"
-                  [disabled]="isSaving() || isLoading() || !(cloudChoices()[provider] || []).length"
-                >
-                  @for (modelName of cloudChoices()[provider] || []; track modelName) {
-                    <option [value]="modelName">{{ modelName }}</option>
-                  }
-                </select>
-              </label>
               <button type="button" class="model-config-test-btn" (click)="openKeys(provider)" [disabled]="isSaving() || isLoading()">
                 Manage keys
                 <svg viewBox="0 0 24 24" aria-hidden="true">

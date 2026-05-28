@@ -15,9 +15,9 @@ from domain.clinical.robustness import (
     ClinicalInputPreflightIssue,
     ClinicalInputPreflightResult,
 )
+from services.clinical.deterministic_extraction import extract_deterministic_diseases
 from services.llm.provider_factory import select_llm_provider
 from services.security.access_keys import AccessKeyService
-from services.session.document_normalizer import DocumentNormalizer
 from services.session.robust_pipeline import build_extraction_artifact
 from services.session.text_section_parser import parse_initial_text_sections
 
@@ -150,6 +150,7 @@ def validate_clinical_input_preflight(
     blocking: list[ClinicalInputPreflightIssue] = []
     non_blocking: list[ClinicalInputPreflightIssue] = []
     runtime_settings = _runtime_settings()
+    deterministic_diagnostics: dict[str, Any] = {}
     service.apply_persisted_runtime_configuration()
     _validate_ui_metadata(request_payload, blocking)
     _validate_provider_key(blocking)
@@ -166,7 +167,7 @@ def validate_clinical_input_preflight(
                 field="clinical_input",
             )
         )
-        return _result(blocking, non_blocking, runtime_settings, extraction_quality)
+        return _result(blocking, non_blocking, runtime_settings, extraction_quality, deterministic_diagnostics)
     livertox_rows, _ = service.serializer.list_livertox_catalog(
         search=None,
         offset=0,
@@ -216,22 +217,73 @@ def validate_clinical_input_preflight(
                 field="clinical_input",
             )
         )
-    normalized_document = DocumentNormalizer().normalize(clinical_input)
     try:
-        preprocessed_request, section_extraction = asyncio.run(
-            service.preprocess_unified_input(request_payload)
+        prepared = service.prepare_structured_clinical_input(request_payload)
+        section_extraction = prepared["section_extraction"]
+        patient_payload = prepared["patient_payload"]
+        normalized_document = prepared["normalized_document"]
+        therapy_result = service.drugs_parser.extract_drugs_from_therapy_deterministic(
+            service.drugs_parser.clean_text(patient_payload.drugs or "")
         )
-        patient_payload = service.build_patient_payload(preprocessed_request)
+        anamnesis_result = service.drugs_parser.extract_drugs_from_anamnesis_deterministic(
+            service.drugs_parser.clean_text(patient_payload.anamnesis or "")
+        )
         extraction_artifact = build_extraction_artifact(
             normalized_document=normalized_document,
             section_extraction=section_extraction,
             payload=patient_payload,
         )
+        disease_context = extract_deterministic_diseases(
+            service.disease_extractor.clean_text(patient_payload.anamnesis or "")
+        )
+        deterministic_diagnostics = {
+            "parser": section_extraction.metadata,
+            "section_coverage": {
+                "anamnesis_chars": len(section_extraction.anamnesis),
+                "therapy_chars": len(section_extraction.drugs),
+                "laboratory_analysis_chars": len(section_extraction.laboratory_analysis),
+            },
+            "therapy": {
+                "drug_count": len(therapy_result.entries),
+                "unresolved_line_count": len(therapy_result.unresolved_lines),
+            },
+            "anamnesis": {
+                "drug_count": len(anamnesis_result.entries),
+                "regimen_line_count": len(anamnesis_result.regimen_lines),
+                "unresolved_line_count": len(anamnesis_result.unresolved_lines),
+            },
+            "diseases": {
+                "disease_count": len(disease_context.context.entries),
+                "matched_line_count": len(disease_context.matched_lines),
+                "unresolved_line_count": len(disease_context.unresolved_lines),
+            },
+        }
         extraction_quality = {
             "confidence": extraction_artifact.confidence,
             "timed_drug_count": len(extraction_artifact.timed_drugs),
             "contamination_flags": extraction_artifact.contamination_flags.model_dump(),
         }
+        if anamnesis_result.unresolved_lines:
+            non_blocking.append(
+                ClinicalInputPreflightIssue(
+                    severity="non_blocking",
+                    code="anamnesis_regimen_lines_need_review",
+                    message=(
+                        f"{len(anamnesis_result.unresolved_lines)} anamnesis regimen/history lines "
+                        "could not be fully resolved deterministically."
+                    ),
+                    field="anamnesis",
+                )
+            )
+        if not disease_context.context.entries:
+            non_blocking.append(
+                ClinicalInputPreflightIssue(
+                    severity="non_blocking",
+                    code="anamnesis_disease_context_sparse",
+                    message="No deterministic disease/context entries were detected from anamnesis.",
+                    field="anamnesis",
+                )
+            )
         if extraction_artifact.confidence < 0.55:
             non_blocking.append(
                 ClinicalInputPreflightIssue(
@@ -292,7 +344,7 @@ def validate_clinical_input_preflight(
                 message=str(exc),
             )
         )
-    return _result(blocking, non_blocking, runtime_settings, extraction_quality)
+    return _result(blocking, non_blocking, runtime_settings, extraction_quality, deterministic_diagnostics)
 
 
 def _validate_ui_metadata(
@@ -407,6 +459,7 @@ def _result(
     non_blocking: list[ClinicalInputPreflightIssue],
     runtime_settings: dict[str, Any],
     extraction_quality: dict[str, Any],
+    deterministic_diagnostics: dict[str, Any],
 ) -> ClinicalInputPreflightResult:
     return ClinicalInputPreflightResult(
         ready=not blocking,
@@ -414,5 +467,6 @@ def _result(
         non_blocking_issues=non_blocking,
         runtime_settings=runtime_settings,
         extraction_quality=extraction_quality,
+        deterministic_diagnostics=deterministic_diagnostics,
     )
 _CLOUD_PROVIDERS = {"openai", "gemini"}

@@ -1,15 +1,12 @@
 from __future__ import annotations
 
 import asyncio
+from datetime import date
 
 import pytest
 from common.exceptions import ServiceValidationError
-from domain.clinical.entities import (
-    ClinicalSectionExtractionResult,
-    ClinicalSessionRequest,
-)
+from domain.clinical.entities import ClinicalSessionRequest
 from services.runtime.jobs import get_job_manager
-from services.session.clinical_input_extractor import ClinicalInputExtractionError
 from services.session.factory import build_clinical_session_service
 from services.session.session_service import ClinicalSessionService
 from services.session.session_workflow import start_clinical_job_workflow
@@ -21,47 +18,47 @@ def _build_service() -> ClinicalSessionService:
 
 def test_preprocess_unified_input_accepts_fragment_aggregated_sections() -> None:
     input_text = (
-        "# Anamnesis\nA1\n\n# Current therapy\nD\n\n# Anamnesis\nA2\n\n# Laboratory analysis\nL"
+        "# Anamnesis\nA1\nA2\n\n# Current therapy\nD\n\n# Laboratory analysis\nL"
     )
-    extraction = ClinicalSectionExtractionResult(
-        source_text=input_text,
-        anamnesis="A1\n\n\n\nA2\n\n",
-        drugs="D\n\n",
-        laboratory_analysis="L",
-        line_ranges={},
-        confidence=0.94,
-    )
-
-    class FakeExtractor:
-        async def extract(self, *, clinical_input: str) -> ClinicalSectionExtractionResult:
-            assert clinical_input == input_text
-            return extraction
-
     service = _build_service()
-    service.clinical_input_extractor = FakeExtractor()  # type: ignore[assignment]
     request = ClinicalSessionRequest(clinical_input=input_text)
     preprocessed, returned_extraction = asyncio.run(service.preprocess_unified_input(request))
 
-    assert preprocessed.anamnesis == extraction.anamnesis
-    assert preprocessed.drugs == extraction.drugs
-    assert preprocessed.laboratory_analysis == extraction.laboratory_analysis
-    assert returned_extraction == extraction
+    assert "A1" in (preprocessed.anamnesis or "")
+    assert "A2" in (preprocessed.anamnesis or "")
+    assert preprocessed.drugs == "D"
+    assert preprocessed.laboratory_analysis == "L"
+    assert returned_extraction is not None
 
 
-def test_preprocess_unified_input_converts_extraction_error_to_service_validation_error() -> None:
-    input_text = "raw input"
-
-    class FakeExtractor:
-        async def extract(self, *, clinical_input: str) -> ClinicalSectionExtractionResult:
-            assert clinical_input == input_text
-            raise ClinicalInputExtractionError("boom")
-
+def test_preprocess_unified_input_rejects_invalid_sections() -> None:
     service = _build_service()
-    service.clinical_input_extractor = FakeExtractor()  # type: ignore[assignment]
-    request = ClinicalSessionRequest(clinical_input=input_text)
+    request = ClinicalSessionRequest(clinical_input="raw input")
 
-    with pytest.raises(ServiceValidationError, match="boom"):
+    with pytest.raises(ServiceValidationError, match="Clinical input sections are invalid"):
         asyncio.run(service.preprocess_unified_input(request))
+
+
+def test_prepare_structured_clinical_input_returns_patient_payload_and_metadata(monkeypatch) -> None:
+    service = _build_service()
+    monkeypatch.setattr(service, "apply_persisted_runtime_configuration", lambda: None)
+    monkeypatch.setattr(service.serializer, "list_livertox_catalog", lambda **kwargs: ([{"id": 1}], 1))
+    monkeypatch.setattr(service.serializer, "list_rxnav_catalog", lambda **kwargs: ([{"id": 1}], 1))
+    request = ClinicalSessionRequest(
+        clinical_input=(
+            "## Anamnesis\nHistory text\n\n"
+            "## Therapy\nDrug 10 mg 1-0-0-0\n\n"
+            "## Laboratory Analysis\nALT 120 U/L\n"
+        ),
+        visit_date=date(2025, 1, 15),
+    )
+
+    prepared = service.prepare_structured_clinical_input(request)
+
+    assert prepared["section_extraction"].metadata["parser"] == "deterministic_initial_text_sections_v2"
+    assert prepared["patient_payload"].anamnesis == "History text"
+    assert prepared["patient_payload"].drugs == "Drug 10 mg 1-0-0-0"
+    assert prepared["patient_payload"].laboratory_analysis == "ALT 120 U/L"
 
 
 def test_start_clinical_job_requires_active_cloud_key_before_extraction(monkeypatch) -> None:

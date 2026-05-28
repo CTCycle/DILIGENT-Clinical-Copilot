@@ -183,4 +183,4 @@ class ClinicalInputPreflightResult(BaseModel):
     non_blocking_issues: list[ClinicalInputPreflightIssue] = Field(default_factory=list)
     runtime_settings: dict[str, Any] = Field(default_factory=dict)
     extraction_quality: dict[str, Any] = Field(default_factory=dict)
-
+    deterministic_diagnostics: dict[str, Any] = Field(default_factory=dict)

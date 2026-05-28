@@ -682,9 +682,9 @@
 
 .model-config-cloud-row {
   display: grid;
-  grid-template-columns: minmax(220px, 1fr) 150px 140px;
+  grid-template-columns: minmax(220px, 1fr) 140px;
   gap: 12px;
-  align-items: end;
+  align-items: center;
   min-height: 64px;
   border-top: 1px solid color-mix(in srgb, var(--mc-border) 64%, transparent);
   padding: 10px 0;
@@ -727,8 +727,7 @@
 
 
 .model-config-provider-name strong,
-.model-config-provider-name small,
-.model-config-cloud-row label span {
+.model-config-provider-name small {
   display: block;
 }
 
@@ -737,15 +736,9 @@
   font-size: 13px;
 }
 
-.model-config-provider-name small,
-.model-config-cloud-row label span {
+.model-config-provider-name small {
   color: var(--mc-muted);
   font-size: 11px;
-}
-
-.model-config-cloud-row select {
-  margin-top: 5px;
-  padding: 0 10px;
 }
 
 :host-context([data-theme="dark"]) .model-config-runtime-card,

@@ -1,5 +1,9 @@
 from __future__ import annotations
 
+from services.session.clinical_section_parsers import (
+    SectionHeadingMatch,
+    resolve_heading_collisions_with_diagnostics,
+)
 from services.session.text_section_parser import parse_initial_text_sections
 
 
@@ -36,6 +40,33 @@ def test_rejects_duplicate_section_heading() -> None:
     text = "ANAMNESIS\na\nANAMNESIS\nb\nDRUGS\nd\nLABORATORY ANALYSIS\nl\n"
     result = parse_initial_text_sections(text)
     assert "duplicate:anamnesis" in result.malformed_sections
+
+
+def test_reports_ambiguous_heading_collisions() -> None:
+    resolved, diagnostics = resolve_heading_collisions_with_diagnostics(
+        [
+            SectionHeadingMatch(
+                canonical_key="anamnesis",
+                raw_heading="Clinical Therapy",
+                normalized_heading="clinical therapy",
+                score=0.78,
+                strategy="semantic_tokens",
+                line_start=4,
+                line_end=4,
+            ),
+            SectionHeadingMatch(
+                canonical_key="therapy",
+                raw_heading="Clinical Therapy",
+                normalized_heading="clinical therapy",
+                score=0.77,
+                strategy="semantic_tokens",
+                line_start=4,
+                line_end=4,
+            ),
+        ]
+    )
+    assert resolved == []
+    assert diagnostics == ["ambiguous_heading:4:clinical therapy"]
 
 
 def test_parses_mixed_language_therapy_heading_from_live_preflight_path() -> None:

@@ -1,5 +1,6 @@
 import { API_BASE_URL } from "../constants";
 import {
+  ClinicalInputPreflightResponse,
   ClinicalSectionTemplateResponse,
   ClinicalRequestPayload,
   JobCancelResponse,
@@ -41,6 +42,21 @@ export async function fetchClinicalJobStatus(
       },
     },
     timeoutSeconds,
+  );
+}
+
+export async function validateClinicalInput(
+  payload: ClinicalRequestPayload,
+): Promise<ClinicalInputPreflightResponse> {
+  return requestJson<ClinicalInputPreflightResponse>(
+    `${API_BASE_URL}/clinical/validate-input`,
+    {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify(payload),
+    },
   );
 }
 

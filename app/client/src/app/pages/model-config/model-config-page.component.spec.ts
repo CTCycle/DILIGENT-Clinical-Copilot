@@ -1,5 +1,5 @@
 import { ComponentFixture, TestBed } from '@angular/core/testing';
-import { vi } from 'vitest';
+import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { ModelConfigPageComponent } from './model-config-page.component';
 
@@ -16,7 +16,7 @@ describe('ModelConfigPageComponent', () => {
     component = fixture.componentInstance;
   });
 
-  it('builds a cloud save patch after runtime toggle and temperature update', async () => {
+  it('builds a cloud save patch with role assignments after runtime toggle and temperature update', async () => {
     const persistSpy = vi
       .spyOn(component as unknown as { persistConfigPatch: (...args: unknown[]) => Promise<void> }, 'persistConfigPatch')
       .mockResolvedValue();
@@ -44,6 +44,8 @@ describe('ModelConfigPageComponent', () => {
         use_cloud_services: true,
         llm_provider: 'openai',
         cloud_model: 'gpt-4.1-mini',
+        clinical_model: 'gpt-oss:20b',
+        text_extraction_model: 'qwen3:14b',
         ollama_temperature: 0.64,
         cloud_temperature: 0.64,
       },

@@ -36,7 +36,12 @@
         @for (item of sortedKeys; track item.id) {
           <li class="access-key-row" [class.is-active]="item.is_active">
             <div class="access-key-meta">
-              <p class="access-key-fingerprint">{{ fingerprintLabel(item) }}</p>
+              <div class="access-key-meta-top">
+                <p class="access-key-fingerprint">{{ fingerprintLabel(item) }}</p>
+                @if (item.is_active) {
+                  <span class="access-key-state">Active</span>
+                }
+              </div>
               <p class="access-key-timestamp">Last used: {{ lastUsedLabel(item) }}</p>
             </div>
             <div class="access-key-actions">
@@ -45,28 +50,50 @@
                 [class.is-active]="item.is_active"
                 type="button"
                 (click)="activateKey(item.id)"
-                [disabled]="isSaving"
-                [title]="item.is_active ? 'Active key' : 'Activate key'"
+                [disabled]="isSaving || item.is_active"
+                [attr.aria-label]="activateActionLabel(item)"
+                [title]="activateActionLabel(item)"
               >
-                Active
+                <svg viewBox="0 0 24 24" aria-hidden="true">
+                  <path d="m5 12.5 4.2 4.2L19 7" />
+                </svg>
               </button>
               <button
                 class="access-key-action"
                 type="button"
                 (click)="toggleVisibility(item.id)"
                 [disabled]="isSaving"
-                title="Toggle fingerprint view"
+                [attr.aria-label]="visibilityActionLabel(item)"
+                [title]="visibilityActionLabel(item)"
               >
-                View
+                @if (visibleRows[item.id]) {
+                  <svg viewBox="0 0 24 24" aria-hidden="true">
+                    <path d="m3 3 18 18" />
+                    <path d="M10.58 10.58a2 2 0 0 0 2.84 2.84" />
+                    <path d="M9.88 5.09A10.94 10.94 0 0 1 12 4.91c5.27 0 9.27 4.24 10 7.09-.26 1.02-.92 2.32-1.98 3.56" />
+                    <path d="M6.23 6.23C4.17 7.65 2.75 9.74 2 12c.73 2.85 4.73 7.09 10 7.09 1.76 0 3.35-.47 4.74-1.17" />
+                  </svg>
+                } @else {
+                  <svg viewBox="0 0 24 24" aria-hidden="true">
+                    <path d="M2 12c.73-2.85 4.73-7.09 10-7.09S21.27 9.15 22 12c-.73 2.85-4.73 7.09-10 7.09S2.73 14.85 2 12Z" />
+                    <circle cx="12" cy="12" r="3" />
+                  </svg>
+                }
               </button>
               <button
                 class="access-key-action is-danger"
                 type="button"
                 (click)="deleteKey(item.id)"
                 [disabled]="isSaving"
+                aria-label="Delete key"
                 title="Delete key"
               >
-                Delete
+                <svg viewBox="0 0 24 24" aria-hidden="true">
+                  <path d="M4 7h16" />
+                  <path d="M9 7V5.75A1.75 1.75 0 0 1 10.75 4h2.5A1.75 1.75 0 0 1 15 5.75V7" />
+                  <path d="M6.5 7 7.3 19a2 2 0 0 0 2 1.86h5.4a2 2 0 0 0 2-1.86L17.5 7" />
+                  <path d="M10 11v5M14 11v5" />
+                </svg>
               </button>
             </div>
           </li>

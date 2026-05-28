@@ -473,12 +473,9 @@ def test_model_config_runtime_toggle_enables_save_and_submits_put(
     expect(local_option).to_have_class(re.compile(r"\bis-active\b"))
     expect(save_button).to_be_enabled(timeout=10000)
 
-    # Return to cloud mode, tweak temperature to produce a deterministic save payload.
+    # Return to cloud mode and tweak temperature to produce a deterministic save payload.
     cloud_option.click()
     expect(cloud_option).to_have_class(re.compile(r"\bis-active\b"))
-    page.locator(".model-config-cloud-row").first.locator("select").select_option(
-        "gpt-4.1-mini"
-    )
     temperature_input = page.locator("#global-temperature-input")
     current_temperature_raw = temperature_input.input_value().strip()
     try:
