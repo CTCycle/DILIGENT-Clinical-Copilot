@@ -92,7 +92,7 @@ class CloudLLMClient:
             max_keepalive_connections=keepalive_connections,
             max_connections=keepalive_max,
         )
-        timeout = httpx.Timeout(timeout_s)
+        timeout = httpx.Timeout(self.timeout_s)
         self.client = httpx.AsyncClient(
             base_url=self.base_url,
             timeout=timeout,

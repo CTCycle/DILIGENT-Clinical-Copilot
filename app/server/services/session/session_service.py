@@ -167,14 +167,15 @@ class ClinicalSessionService(ClinicalSessionFormattingMixin):
         cloud_cap_s: float | None = None,
         local_cap_s: float | None = None,
     ) -> float:
-        base = max(float(base_timeout_s), 1.0)
+        minimum_timeout_s = float(get_server_settings().runtime.minimum_llm_timeout)
+        base = max(float(base_timeout_s), minimum_timeout_s)
         if LLMRuntimeConfig.is_cloud_enabled():
             requested = cloud_cap_s
         else:
             requested = local_cap_s
         if requested is None:
             return base
-        return max(base, max(float(requested), 1.0))
+        return max(base, max(float(requested), minimum_timeout_s))
 
     # -------------------------------------------------------------------------
     @staticmethod

@@ -12,6 +12,7 @@ import httpx
 import pandas as pd
 
 from common.utils.logger import logger
+from configurations.startup import get_server_settings
 from services.updater import livertox_common, livertox_parse
 
 
@@ -45,7 +46,9 @@ async def download_file(
 async def download_bulk_data(self, dest_path: str) -> dict[str, Any]:
     url = self.base_url + self.file_name
     async with httpx.AsyncClient(
-        timeout=30.0, headers=self.http_headers, follow_redirects=True
+        timeout=get_server_settings().runtime.livertox_download_timeout,
+        headers=self.http_headers,
+        follow_redirects=True,
     ) as client:
         head = await client.head(url)
         head.raise_for_status()
@@ -126,7 +129,9 @@ def refresh_master_list(self) -> tuple[dict[str, Any], pd.DataFrame]:
 
 async def download_master_list(self) -> dict[str, Any]:
     async with httpx.AsyncClient(
-        timeout=30.0, headers=self.http_headers, follow_redirects=True
+        timeout=get_server_settings().runtime.livertox_download_timeout,
+        headers=self.http_headers,
+        follow_redirects=True,
     ) as client:
         master_url = await resolve_master_list_url(self, client)
         head = await client.head(master_url)

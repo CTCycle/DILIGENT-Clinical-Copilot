@@ -18,10 +18,11 @@ class FakeLabClient:
     def __init__(self, responses: list[LabExtractionPayload]) -> None:
         self.responses = list(responses)
         self.call_count = 0
+        self.prompts: list[str] = []
 
     async def llm_structured_call(self, **kwargs: Any) -> LabExtractionPayload:
-        _ = kwargs
         self.call_count += 1
+        self.prompts.append(str(kwargs.get("user_prompt", "")))
         if self.responses:
             return self.responses.pop(0)
         return LabExtractionPayload(entries=[], onset_context=None)
@@ -202,6 +203,21 @@ def test_extracts_onset_clue_context() -> None:
     assert onset_context is not None
     assert onset_context.onset_date == "2025-01-11"
     assert onset_context.onset_basis == "first_symptom"
+
+
+def test_lab_llm_receives_full_text_without_chunk_markers() -> None:
+    client = FakeLabClient([LabExtractionPayload(entries=[], onset_context=None)])
+    extractor = ClinicalLabExtractor(client=client)
+    payload = PatientData(
+        laboratory_analysis="\n".join([f"ALT {index} U/L" for index in range(1, 80)]),
+        drugs="Drug A",
+    )
+
+    asyncio.run(extractor.extract_from_payload(payload))
+
+    assert client.call_count >= 1
+    assert all("full clinical laboratory text" in prompt for prompt in client.prompts)
+    assert all("[Chunk" not in prompt for prompt in client.prompts)
 
 
 def test_extracts_explicit_pattern_and_rucam_score() -> None:

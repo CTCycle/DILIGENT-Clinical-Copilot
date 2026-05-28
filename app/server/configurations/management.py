@@ -376,12 +376,32 @@ def _build_runtime_settings(
         coerce_float(data.get("default_llm_timeout"), fallback_timeout),
         1.0,
     )
-    # Parser and clinical flows share one timeout budget by policy.
-    parser_timeout = unified_llm_timeout
-    disease_timeout = unified_llm_timeout
-    clinical_timeout = unified_llm_timeout
+    parser_timeout = max(
+        coerce_float(data.get("parser_llm_timeout"), unified_llm_timeout),
+        1.0,
+    )
+    disease_timeout = max(
+        coerce_float(data.get("disease_llm_timeout"), unified_llm_timeout),
+        1.0,
+    )
+    clinical_timeout = max(
+        coerce_float(data.get("clinical_llm_timeout"), unified_llm_timeout),
+        1.0,
+    )
     livertox_timeout = max(
         coerce_float(data.get("livertox_llm_timeout"), unified_llm_timeout), 1.0
+    )
+    minimum_llm_timeout = max(
+        coerce_float(data.get("minimum_llm_timeout"), 5.0),
+        1.0,
+    )
+    cloud_llm_timeout_cap = max(
+        coerce_float(data.get("cloud_llm_timeout_cap"), 30.0),
+        minimum_llm_timeout,
+    )
+    local_llm_timeout_cap = max(
+        coerce_float(data.get("local_llm_timeout_cap"), 45.0),
+        minimum_llm_timeout,
     )
     return RuntimeSettings(
         default_llm_timeout=unified_llm_timeout,
@@ -389,8 +409,15 @@ def _build_runtime_settings(
         disease_llm_timeout=disease_timeout,
         clinical_llm_timeout=clinical_timeout,
         livertox_llm_timeout=livertox_timeout,
+        minimum_llm_timeout=minimum_llm_timeout,
+        cloud_llm_timeout_cap=cloud_llm_timeout_cap,
+        local_llm_timeout_cap=local_llm_timeout_cap,
         ollama_server_start_timeout=max(
             coerce_float(data.get("ollama_server_start_timeout"), 15.0), 1.0
+        ),
+        livertox_download_timeout=max(
+            coerce_float(data.get("livertox_download_timeout"), 30.0),
+            1.0,
         ),
         livertox_archive=coerce_str(
             data.get("livertox_archive"), "livertox_NBK547852.tar.gz"
