@@ -80,6 +80,12 @@ def _section_profiles_from_catalog() -> dict[str, dict[str, set[str]]]:
         "laboratory_analysis": "laboratory_history",
     }
     for backend_key, canonical_key in mapped.items():
+        profiles[canonical_key]["required_any"].add(
+            normalize_heading_text(backend_key)
+        )
+        profiles[canonical_key]["required_any"].add(
+            normalize_heading_text(canonical_key.replace("_", " "))
+        )
         aliases = snapshot.values(
             "clinical_extraction",
             "section_aliases",
@@ -132,6 +138,13 @@ class HeadingBoundary:
     line_start: int
     line_end: int
     is_markdown_heading: bool
+
+
+@dataclass(frozen=True)
+class ParsedDiliSectionsResult:
+    sections: dict[str, ClinicalRawSection]
+    missing_required_sections: list[str]
+    malformed_sections: list[str]
 
 
 def normalize_heading_text(value: str) -> str:
@@ -317,6 +330,22 @@ def is_markdown_heading_line(line: str) -> bool:
     return bool(MARKDOWN_HEADING_RE.match(line or ""))
 
 
+def _accept_heading_match(boundary: HeadingBoundary, match: SectionHeadingMatch) -> bool:
+    if boundary.is_markdown_heading:
+        return True
+    if match.strategy == "exact":
+        return True
+    stripped = boundary.raw_heading.strip()
+    if stripped.endswith(":"):
+        return True
+    words = [token for token in stripped.split() if any(char.isalpha() for char in token)]
+    if not words:
+        return False
+    is_upper = all(word.upper() == word for word in words)
+    is_title = all((not word[0].isalpha()) or word[0].isupper() for word in words)
+    return is_upper or is_title
+
+
 def _iter_heading_boundaries(raw_text: str) -> list[HeadingBoundary]:
     boundaries: list[HeadingBoundary] = []
     for line_number, raw_line in enumerate(raw_text.splitlines(keepends=True), start=1):
@@ -342,14 +371,15 @@ def _selected_heading_boundaries(raw_text: str) -> list[HeadingBoundary]:
         return markdown
     selected: list[HeadingBoundary] = []
     for boundary in boundaries:
-        if classify_dili_heading(
+        match = classify_dili_heading(
             boundary.raw_heading,
             line_start=boundary.line_start,
             line_end=boundary.line_end,
-        ) is not None:
+        )
+        if match is not None and _accept_heading_match(boundary, match):
             selected.append(boundary)
             continue
-        if len(tokenize_heading(boundary.raw_heading)) >= 2:
+        if boundary.raw_heading.strip().endswith(":") and len(tokenize_heading(boundary.raw_heading)) >= 2:
             selected.append(boundary)
     return selected
 
@@ -367,7 +397,7 @@ def scan_dili_section_headings(raw_text: str) -> HeadingScanResult:
             line_start=boundary.line_start,
             line_end=boundary.line_end,
         )
-        if match is not None:
+        if match is not None and _accept_heading_match(boundary, match):
             matches.append(match)
             if boundary.is_markdown_heading:
                 markdown_matches.append(match)
@@ -513,7 +543,7 @@ def _infer_section_match(
     )
 
 
-def extract_required_dili_sections(raw_text: str) -> dict[str, ClinicalRawSection]:
+def parse_required_dili_sections(raw_text: str) -> ParsedDiliSectionsResult:
     scan_result = scan_dili_section_headings(raw_text)
     headings = resolve_heading_collisions(scan_result.section_headings)
     heading_lookup = {
@@ -524,6 +554,7 @@ def extract_required_dili_sections(raw_text: str) -> dict[str, ClinicalRawSectio
     offsets = _line_char_offsets(raw_text)
     sections: dict[str, ClinicalRawSection] = {}
     unresolved_boundaries: list[tuple[HeadingBoundary, int, int, str]] = []
+    malformed_sections: list[str] = []
 
     for boundary in boundaries:
         if boundary.line_start - 1 >= len(offsets):
@@ -539,10 +570,12 @@ def extract_required_dili_sections(raw_text: str) -> dict[str, ClinicalRawSectio
             body_end = next_heading_line_start
         else:
             body_end = len(raw_text)
+        heading = heading_lookup.get((boundary.line_start, boundary.line_end))
         content = raw_text[body_start:body_end].strip("\r\n")
         if not content:
+            if heading is not None:
+                malformed_sections.append(f"empty:{heading.canonical_key}")
             continue
-        heading = heading_lookup.get((boundary.line_start, boundary.line_end))
         if heading is None:
             unresolved_boundaries.append((boundary, body_start, body_end, content))
             continue
@@ -560,7 +593,8 @@ def extract_required_dili_sections(raw_text: str) -> dict[str, ClinicalRawSectio
             verbatim_coherent=True,
         ))
         if heading.canonical_key in sections:
-            raise ValueError(f"Duplicate section heading for '{heading.canonical_key}'.")
+            malformed_sections.append(f"duplicate:{heading.canonical_key}")
+            continue
         sections[heading.canonical_key] = ClinicalRawSection(
             canonical_key=heading.canonical_key,
             raw_heading=heading.raw_heading,
@@ -660,7 +694,23 @@ def extract_required_dili_sections(raw_text: str) -> dict[str, ClinicalRawSectio
                 ),
             ),
         )
-    return sections
+    return ParsedDiliSectionsResult(
+        sections=sections,
+        missing_required_sections=missing_required_section_names(sections),
+        malformed_sections=sorted(set(malformed_sections)),
+    )
+
+
+def extract_required_dili_sections(raw_text: str) -> dict[str, ClinicalRawSection]:
+    result = parse_required_dili_sections(raw_text)
+    duplicate_errors = [
+        issue for issue in result.malformed_sections if issue.startswith("duplicate:")
+    ]
+    if duplicate_errors:
+        raise ValueError(
+            f"Duplicate section heading for '{duplicate_errors[0].split(':', 1)[1]}'."
+        )
+    return result.sections
 
 
 def _next_boundary_line_start(current_line_start: int, boundary_line_starts: set[int]) -> int | None:
