@@ -42,7 +42,6 @@ from services.clinical.parser_extraction import (
     build_suspension_event_re,
     build_trailing_route_token_re,
 )
-from services.clinical.parser_prompting import ANAMNESIS_CHUNK_MAX_CHARS
 from services.clinical.parser_validation import (
     NON_DRUG_CONTAINS,
     NON_DRUG_EXACT_NAMES,
@@ -78,8 +77,7 @@ class DrugsParser:
     NAME_TEMPORAL_SPLIT_RE = re.compile(r"$^")
     TRAILING_ROUTE_TOKEN_RE = re.compile(r"$^")
     START_EVENT_RE = re.compile(r"$^")
-    SUSPENSION_EVENT_RE = re.compile(r"$^")
-    ANAMNESIS_CHUNK_MAX_CHARS = ANAMNESIS_CHUNK_MAX_CHARS
+    SUSPENSION_EVENT_RE = re.compile(r"$^") 
     NON_DRUG_EXACT_NAMES = NON_DRUG_EXACT_NAMES
     NON_DRUG_PREFIXES = NON_DRUG_PREFIXES
     NON_DRUG_CONTAINS = NON_DRUG_CONTAINS
@@ -374,6 +372,7 @@ class DrugsParser:
 
         return PatientDrugs(entries=entries)
 
+    # -------------------------------------------------------------------------
     async def llm_extract_drugs_from_section(
         self,
         text: str,
@@ -416,26 +415,24 @@ class DrugsParser:
             return PatientDrugs(entries=entries)
 
         if source == "anamnesis":
-            chunks = self.chunk_anamnesis_text(text)
-            parsed_entries: list[DrugEntry] = []
-            for index, chunk in enumerate(chunks, start=1):
-                parsed = await asyncio.wait_for(
-                    self.client.llm_structured_call(
-                        model=self.model,
-                        system_prompt=ANAMNESIS_DRUG_EXTRACTION_PROMPT.strip(),
-                        user_prompt=(
-                            "Extract all drugs mentioned in the following patient anamnesis chunk:\n\n"
-                            f"[Chunk {index}/{len(chunks)}]\n{chunk}"
-                        ),
-                        schema=PatientDrugs,
-                        temperature=self.temperature,
-                        use_json_mode=True,
-                        max_repair_attempts=1,
+            anamnesis_text = self.clean_text(text)
+            parsed_entries: list[DrugEntry] = []            
+            parsed = await asyncio.wait_for(
+                self.client.llm_structured_call(
+                    model=self.model,
+                    system_prompt=ANAMNESIS_DRUG_EXTRACTION_PROMPT.strip(),
+                    user_prompt=(
+                        f"Extract all drugs mentioned in the following patient anamnesis:\n\n{anamnesis_text}"                        
                     ),
-                    timeout=max(5.0, float(self.timeout_s)),
-                )
-                parsed_entries.extend(parsed.entries)
-                self.emit_progress(progress_callback, index / max(len(chunks), 1))
+                    schema=PatientDrugs,
+                    temperature=self.temperature,
+                    use_json_mode=True,
+                    max_repair_attempts=1,
+                ),
+                timeout=max(5.0, float(self.timeout_s)),
+            )
+            parsed_entries.extend(parsed.entries)
+            self.emit_progress(progress_callback, 1.0)
             normalized_candidates: list[DrugEntry | None] = [
                 self.normalize_entry(
                     entry,
@@ -444,8 +441,8 @@ class DrugsParser:
                 )
                 for entry in parsed_entries
             ]
-            normalized = [entry for entry in normalized_candidates if entry is not None]
-            return PatientDrugs(entries=normalized)
+            filtered_candidates = [entry for entry in normalized_candidates if entry is not None]
+            return PatientDrugs(entries=filtered_candidates)
 
         lines = [
             block.text.strip()
@@ -473,32 +470,8 @@ class DrugsParser:
             )
             if post_processed is not None:
                 normalized.append(post_processed)
-        return PatientDrugs(entries=normalized)
-
-    def chunk_anamnesis_text(self, text: str) -> list[str]:
-        normalized = self.clean_text(text)
-        if not normalized:
-            return []
-        lines = [line.strip() for line in normalized.split("\n") if line.strip()]
-        chunks: list[str] = []
-        current_lines: list[str] = []
-        current_size = 0
-        for line in lines:
-            line_size = len(line) + 1
-            if (
-                current_lines
-                and current_size + line_size > self.ANAMNESIS_CHUNK_MAX_CHARS
-            ):
-                chunks.append("\n".join(current_lines))
-                current_lines = [line]
-                current_size = line_size
-                continue
-            current_lines.append(line)
-            current_size += line_size
-        if current_lines:
-            chunks.append("\n".join(current_lines))
-        return chunks or [normalized]
-
+        return PatientDrugs(entries=normalized)   
+    
     # -------------------------------------------------------------------------
     def extract_drugs_from_anamnesis_rule_based(
         self, anamnesis: str
@@ -631,7 +604,7 @@ class DrugsParser:
         deterministic_result = self.extract_drugs_from_anamnesis_deterministic(
             cleaned_anamnesis
         )
-        
+
         merged_entries = deterministic_result.entries
         raw_llm_entries = 0
         llm_input_text = cleaned_anamnesis.strip()
@@ -647,7 +620,7 @@ class DrugsParser:
                 merged_entries = self.deduplicate_drug_entries(
                     [*merged_entries, *structured.entries]
                 )
-            except Exception as exc:  # noqa: BLE001
+            except Exception as exc:
                 logger.warning(
                     "Anamnesis LLM enrichment failed; keeping deterministic extraction only: %s",
                     exc,
