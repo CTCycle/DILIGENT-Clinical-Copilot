@@ -13,6 +13,7 @@ from domain.clinical.entities import (
     DiseaseContextEntry,
     PatientDiseaseContext,
 )
+from services.clinical.deterministic_extraction import extract_deterministic_diseases
 from services.llm.client_runtime import ensure_runtime_client
 from services.llm.prompts import (
     ANAMNESIS_DISEASE_EXTRACTION_PROMPT,
@@ -240,11 +241,21 @@ class DiseaseExtractor:
         if not cleaned:
             return PatientDiseaseContext(entries=[])
 
+        deterministic = extract_deterministic_diseases(cleaned)
+        accumulated_entries = list(deterministic.context.entries)
+        self.emit_progress(progress_callback, 0.15 if accumulated_entries else 0.0)
+
+        unresolved_source = "\n".join(deterministic.unresolved_lines).strip()
+        if not unresolved_source:
+            self.emit_progress(progress_callback, 1.0)
+            return PatientDiseaseContext(entries=self.deduplicate_entries(accumulated_entries))
+
         await self.ensure_client()
         if self.client is None:
-            raise RuntimeError("LLM client is not initialized for disease extraction")
+            self.emit_progress(progress_callback, 1.0)
+            return PatientDiseaseContext(entries=self.deduplicate_entries(accumulated_entries))
 
-        chunks = self.chunk_text(cleaned)
+        chunks = self.chunk_text(unresolved_source)
         raw_entries: list[DiseaseContextEntry] = []
         self.emit_progress(progress_callback, 0.0)
         for index, chunk in enumerate(chunks, start=1):
@@ -302,10 +313,12 @@ class DiseaseExtractor:
                 normalized_entries.append(normalized)
 
         deduplicated = self.deduplicate_entries(normalized_entries)
+        deduplicated = self.deduplicate_entries([*accumulated_entries, *deduplicated])
         logger.info(
-            "Anamnesis disease extraction produced %s entries (%s raw).",
+            "Anamnesis disease extraction produced %s entries (%s raw LLM entries, %s deterministic entries).",
             len(deduplicated),
             len(raw_entries),
+            len(accumulated_entries),
         )
         self.emit_progress(progress_callback, 1.0)
         return PatientDiseaseContext(entries=deduplicated)

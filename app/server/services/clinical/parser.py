@@ -20,6 +20,11 @@ from domain.clinical.entities import (
     PatientDrugs,
 )
 from services.catalogs.runtime import get_reference_catalog_snapshot
+from services.clinical.deterministic_extraction import (
+    DeterministicDrugExtractionResult,
+    extract_regimen_drug_candidates,
+    line_has_regimen_signal,
+)
 from services.clinical.drug_blocks import isolate_drug_blocks
 from services.clinical.parser_extraction import (
     BRACKET_TRAIL_RE,
@@ -258,13 +263,9 @@ class DrugsParser:
         *,
         progress_callback: Callable[[float], None] | None = None,
     ) -> list[DrugEntry]:
-        lines = [
-            block.text.strip()
-            for block in isolate_drug_blocks(cleaned)
-            if block.text.strip() and not self.is_non_therapy_line(block.text.strip())
-        ]
-        parsed, fallback = self.rule_based_parse(lines)
-        deterministic_entries = [entry for _, entry in parsed]
+        deterministic = self.extract_drugs_from_therapy_deterministic(cleaned)
+        deterministic_entries = deterministic.entries
+        fallback = list(enumerate(deterministic.unresolved_lines))
         if not fallback:
             self.emit_progress(progress_callback, 1.0)
             return self.deduplicate_drug_entries(deterministic_entries)
@@ -301,6 +302,23 @@ class DrugsParser:
             if post_processed is not None:
                 llm_entries.append(post_processed)
         return self.deduplicate_drug_entries([*deterministic_entries, *llm_entries])
+
+    # -------------------------------------------------------------------------
+    def extract_drugs_from_therapy_deterministic(
+        self,
+        cleaned: str,
+    ) -> DeterministicDrugExtractionResult:
+        lines = [
+            block.text.strip()
+            for block in isolate_drug_blocks(cleaned)
+            if block.text.strip() and not self.is_non_therapy_line(block.text.strip())
+        ]
+        parsed, fallback = self.rule_based_parse(lines)
+        return DeterministicDrugExtractionResult(
+            entries=self.deduplicate_drug_entries([entry for _, entry in parsed]),
+            unresolved_lines=[line for _, line in fallback],
+            regimen_lines=[],
+        )
 
     # -------------------------------------------------------------------------
     async def llm_extract_drugs(
@@ -480,20 +498,44 @@ class DrugsParser:
     def extract_drugs_from_anamnesis_rule_based(
         self, anamnesis: str
     ) -> list[DrugEntry]:
+        return self.extract_drugs_from_anamnesis_deterministic(anamnesis).entries
+
+    # -------------------------------------------------------------------------
+    def extract_drugs_from_anamnesis_deterministic(
+        self, anamnesis: str
+    ) -> DeterministicDrugExtractionResult:
         lines = [line.strip() for line in anamnesis.split("\n") if line.strip()]
         entries: list[DrugEntry] = []
+        unresolved_lines: list[str] = []
+        regimen_lines: list[str] = []
         for line in lines:
-            if not self.is_likely_medication_line(line):
-                continue
-            candidate = self.parse_line(line)
-            normalized = self.normalize_entry(
-                candidate,
-                source="anamnesis",
-                historical_flag=True,
-            )
-            if normalized is not None:
-                entries.append(normalized)
-        return entries
+            if self.is_likely_medication_line(line):
+                candidate = self.parse_line(line)
+                normalized = self.normalize_entry(
+                    candidate,
+                    source="anamnesis",
+                    historical_flag=True,
+                )
+                if normalized is not None:
+                    entries.append(normalized)
+                    continue
+            if line_has_regimen_signal(line):
+                regimen_lines.append(line)
+                regimen_entries = extract_regimen_drug_candidates(
+                    line,
+                    normalize_date_token=self.normalize_date_token,
+                    normalize_entry=self.normalize_entry,
+                )
+                if regimen_entries:
+                    entries.extend(regimen_entries)
+                    continue
+            if line_has_regimen_signal(line) or re.search(r"\b(antibiotic|antibiotic[ao]|farmac|chemioterap|protocollo)\b", line, re.IGNORECASE):
+                unresolved_lines.append(line)
+        return DeterministicDrugExtractionResult(
+            entries=self.deduplicate_drug_entries(entries),
+            unresolved_lines=unresolved_lines,
+            regimen_lines=regimen_lines,
+        )
 
     # -------------------------------------------------------------------------
     def is_likely_medication_line(self, line: str) -> bool:
@@ -577,30 +619,34 @@ class DrugsParser:
             else self.conservative_prepare_drug_section_text(anamnesis)
         )
         self.emit_progress(progress_callback, 0.0)
+        deterministic_result = self.extract_drugs_from_anamnesis_deterministic(
+            cleaned_anamnesis
+        )
+        merged_entries = deterministic_result.entries
         raw_llm_entries = 0
-        try:
-            structured = await self.llm_extract_drugs_from_section(
-                cleaned_anamnesis,
-                source="anamnesis",
-                historical_flag=True,
-                progress_callback=progress_callback,
-            )
-            raw_llm_entries = len(structured.entries)
-            merged_entries = self.deduplicate_drug_entries(structured.entries)
-        except Exception as exc:  # noqa: BLE001
-            logger.warning(
-                "Anamnesis LLM extraction failed; using deterministic fallback: %s",
-                exc,
-            )
-            merged_entries = []
-        if not merged_entries:
-            merged_entries = self.extract_drugs_from_anamnesis_rule_based(
-                cleaned_anamnesis
-            )
+        unresolved_text = "\n".join(deterministic_result.unresolved_lines).strip()
+        if unresolved_text:
+            try:
+                structured = await self.llm_extract_drugs_from_section(
+                    unresolved_text,
+                    source="anamnesis",
+                    historical_flag=True,
+                    progress_callback=progress_callback,
+                )
+                raw_llm_entries = len(structured.entries)
+                merged_entries = self.deduplicate_drug_entries(
+                    [*merged_entries, *structured.entries]
+                )
+            except Exception as exc:  # noqa: BLE001
+                logger.warning(
+                    "Anamnesis LLM enrichment failed; keeping deterministic extraction only: %s",
+                    exc,
+                )
         logger.info(
-            "Anamnesis extraction produced %s normalized drugs (%s raw LLM entries)",
+            "Anamnesis extraction produced %s normalized drugs (%s raw LLM entries, %s unresolved lines)",
             len(merged_entries),
             raw_llm_entries,
+            len(deterministic_result.unresolved_lines),
         )
         self.emit_progress(progress_callback, 1.0)
         return PatientDrugs(entries=merged_entries)

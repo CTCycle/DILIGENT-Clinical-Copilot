@@ -77,6 +77,22 @@ export type ClinicalSectionTemplateResponse = {
   template: string;
 };
 
+export type ClinicalInputPreflightIssue = {
+  severity: "blocking" | "non_blocking";
+  code: string;
+  message: string;
+  field?: string | null;
+};
+
+export type ClinicalInputPreflightResponse = {
+  ready: boolean;
+  blocking_issues: ClinicalInputPreflightIssue[];
+  non_blocking_issues: ClinicalInputPreflightIssue[];
+  runtime_settings: Record<string, unknown>;
+  extraction_quality: Record<string, unknown>;
+  deterministic_diagnostics: Record<string, unknown>;
+};
+
 export type ApiResult = {
   message: string;
   json: unknown;

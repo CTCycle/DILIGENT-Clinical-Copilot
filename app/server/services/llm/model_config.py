@@ -139,16 +139,33 @@ class ModelConfigService:
         local_model_names: set[str],
     ) -> dict[str, Any]:
         updates: dict[str, Any] = {}
+        target_use_cloud_models = (
+            bool(payload.use_cloud_services)
+            if "use_cloud_services" in fields_set
+            else bool(snapshot.use_cloud_models)
+        )
+        provider = self.resolve_provider(
+            payload.llm_provider
+            if "llm_provider" in fields_set
+            else snapshot.cloud_provider
+        )
         self._collect_local_model_updates(
             payload=payload,
             fields_set=fields_set,
             local_model_names=local_model_names,
+            use_cloud_models=target_use_cloud_models,
+            cloud_provider=provider,
+            active_cloud_model=(
+                self.normalize_optional_text(payload.cloud_model)
+                if "cloud_model" in fields_set
+                else self.normalize_optional_text(snapshot.cloud_model)
+            ),
             updates=updates,
         )
         self._collect_cloud_model_updates(
             payload=payload,
-            snapshot=snapshot,
             fields_set=fields_set,
+            provider=provider,
             updates=updates,
         )
         self._collect_runtime_option_updates(
@@ -165,25 +182,32 @@ class ModelConfigService:
         payload: ModelConfigUpdateRequest,
         fields_set: set[str],
         local_model_names: set[str],
+        use_cloud_models: bool,
+        cloud_provider: str,
+        active_cloud_model: str | None,
         updates: dict[str, Any],
     ) -> None:
         if "clinical_model" in fields_set:
-            clinical_model = self.normalize_optional_text(payload.clinical_model)
-            self.validate_local_selection(
+            clinical_model = self.resolve_role_model_selection(
                 role_name="clinical",
-                model_name=clinical_model,
+                model_name=self.normalize_optional_text(payload.clinical_model),
                 local_model_names=local_model_names,
+                use_cloud_models=use_cloud_models,
+                cloud_provider=cloud_provider,
+                active_cloud_model=active_cloud_model,
             )
             updates["clinical_model"] = clinical_model
 
         if "text_extraction_model" in fields_set:
-            text_extraction_model = self.normalize_optional_text(
-                payload.text_extraction_model
-            )
-            self.validate_local_selection(
+            text_extraction_model = self.resolve_role_model_selection(
                 role_name="text_extraction",
-                model_name=text_extraction_model,
+                model_name=self.normalize_optional_text(
+                    payload.text_extraction_model
+                ),
                 local_model_names=local_model_names,
+                use_cloud_models=use_cloud_models,
+                cloud_provider=cloud_provider,
+                active_cloud_model=active_cloud_model,
             )
             updates["text_extraction_model"] = text_extraction_model
 
@@ -192,15 +216,10 @@ class ModelConfigService:
         self,
         *,
         payload: ModelConfigUpdateRequest,
-        snapshot: ModelConfigSnapshot,
         fields_set: set[str],
+        provider: str,
         updates: dict[str, Any],
     ) -> None:
-        provider = self.resolve_provider(
-            payload.llm_provider
-            if "llm_provider" in fields_set
-            else snapshot.cloud_provider
-        )
         if "llm_provider" in fields_set:
             updates["cloud_provider"] = provider
 
@@ -238,22 +257,36 @@ class ModelConfigService:
 
     # -------------------------------------------------------------------------
     @staticmethod
-    def validate_local_selection(
+    def resolve_role_model_selection(
         *,
         role_name: str,
         model_name: str | None,
         local_model_names: set[str],
-    ) -> None:
+        use_cloud_models: bool,
+        cloud_provider: str,
+        active_cloud_model: str | None,
+    ) -> str | None:
         if model_name is None:
-            return
+            return None
+        if use_cloud_models:
+            cloud_model_names = set(CLOUD_MODEL_CHOICES.get(cloud_provider, []))
+            if not cloud_model_names:
+                raise ServiceValidationError(
+                    f"No cloud models are available for provider '{cloud_provider}'.",
+                )
+            if model_name not in cloud_model_names:
+                fallback = (active_cloud_model or "").strip()
+                if fallback in cloud_model_names:
+                    return fallback
+                return next(iter(sorted(cloud_model_names)))
+            return model_name
         if not local_model_names:
-            raise ServiceValidationError(
-                "No model catalog entries are available.",
-            )
+            raise ServiceValidationError("No model catalog entries are available.")
         if model_name not in local_model_names:
             raise ServiceValidationError(
                 f"Model '{model_name}' is not supported for role '{role_name}'.",
             )
+        return model_name
 
     # -------------------------------------------------------------------------
     @staticmethod

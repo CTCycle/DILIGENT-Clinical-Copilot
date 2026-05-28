@@ -4,6 +4,7 @@ import asyncio
 from datetime import datetime
 from typing import Any
 
+from domain.model_configs import ModelConfigUpdateRequest
 import services.llm.model_config as model_config_module
 from configurations.llm_configs import LLMRuntimeConfig
 from domain.model_configs import ModelConfigSnapshot
@@ -66,6 +67,68 @@ def test_clinical_service_reads_runtime_from_persisted_config() -> None:
     )
     assert parser_provider
     assert parser_model
+
+
+def test_model_config_service_accepts_cloud_models_for_role_assignments() -> None:
+    serializer = InMemorySerializer(
+        ModelConfigSnapshot(
+            clinical_model="gpt-oss:20b",
+            text_extraction_model="qwen3:14b",
+            use_cloud_models=True,
+            cloud_provider="openai",
+            cloud_model="gpt-4.1-mini",
+            ollama_temperature=0.7,
+            cloud_temperature=0.7,
+            updated_at=datetime.now(),
+        )
+    )
+    service = ModelConfigService(serializer=serializer)
+
+    payload = ModelConfigUpdateRequest(
+        use_cloud_services=True,
+        llm_provider="openai",
+        cloud_model="gpt-4.1-mini",
+        clinical_model="gpt-4.1-mini",
+        text_extraction_model="gpt-4.1",
+    )
+
+    response = asyncio.run(service.update_state(payload))
+
+    assert response.clinical_model == "gpt-4.1-mini"
+    assert response.text_extraction_model == "gpt-4.1"
+    assert serializer.snapshot.clinical_model == "gpt-4.1-mini"
+    assert serializer.snapshot.text_extraction_model == "gpt-4.1"
+
+
+def test_model_config_service_normalizes_stale_local_roles_in_cloud_mode() -> None:
+    serializer = InMemorySerializer(
+        ModelConfigSnapshot(
+            clinical_model="gemma4:31b",
+            text_extraction_model="qwen3.5:9b",
+            use_cloud_models=True,
+            cloud_provider="openai",
+            cloud_model="gpt-4.1-mini",
+            ollama_temperature=0.7,
+            cloud_temperature=0.7,
+            updated_at=datetime.now(),
+        )
+    )
+    service = ModelConfigService(serializer=serializer)
+
+    payload = ModelConfigUpdateRequest(
+        use_cloud_services=True,
+        llm_provider="openai",
+        cloud_model="gpt-4.1-mini",
+        clinical_model="gemma4:31b",
+        text_extraction_model="qwen3.5:9b",
+    )
+
+    response = asyncio.run(service.update_state(payload))
+
+    assert response.clinical_model == "gpt-4.1-mini"
+    assert response.text_extraction_model == "gpt-4.1-mini"
+    assert serializer.snapshot.clinical_model == "gpt-4.1-mini"
+    assert serializer.snapshot.text_extraction_model == "gpt-4.1-mini"
 
 
 def test_model_config_service_throttles_repeated_ollama_warnings(monkeypatch) -> None:
