@@ -24,7 +24,7 @@ from services.llm.provider_factory import (
 DATE_PREFIX_RE = re.compile(r"^\d{4}-\d{2}-\d{2}$")
 DATE_SHORT_RE = re.compile(r"^\d{4}-\d{2}$")
 
-
+################################################################################
 class PatientTimelineExtractor:
     def __init__(
         self,

@@ -631,13 +631,14 @@ class DrugsParser:
         deterministic_result = self.extract_drugs_from_anamnesis_deterministic(
             cleaned_anamnesis
         )
+        
         merged_entries = deterministic_result.entries
         raw_llm_entries = 0
-        unresolved_text = "\n".join(deterministic_result.unresolved_lines).strip()
-        if unresolved_text:
+        llm_input_text = cleaned_anamnesis.strip()
+        if llm_input_text:
             try:
                 structured = await self.llm_extract_drugs_from_section(
-                    unresolved_text,
+                    llm_input_text,
                     source="anamnesis",
                     historical_flag=True,
                     progress_callback=progress_callback,
@@ -651,6 +652,7 @@ class DrugsParser:
                     "Anamnesis LLM enrichment failed; keeping deterministic extraction only: %s",
                     exc,
                 )
+
         logger.info(
             "Anamnesis extraction produced %s normalized drugs (%s raw LLM entries, %s unresolved lines)",
             len(merged_entries),
