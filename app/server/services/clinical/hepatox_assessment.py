@@ -36,7 +36,6 @@ from services.llm.prompts import (
     LIVERTOX_CLINICAL_USER_PROMPT,
     LIVERTOX_CONCLUSION_SYSTEM_PROMPT,
     LIVERTOX_CONCLUSION_USER_PROMPT,
-    LIVERTOX_REPORT_EXAMPLE_TEMPLATE,
 )
 from services.retrieval.embeddings import (
     EmbeddingModelMismatchError,
@@ -75,6 +74,7 @@ RATE_LIMIT_WAIT_HINT_RE = re.compile(
 
 ###############################################################################
 class HepatotoxicityPatternCalculator:
+    
     # -------------------------------------------------------------------------
     def calculate(
         self,
@@ -844,12 +844,6 @@ async def request_drug_analysis(
         knowledge_prompt=self.escape_braces(knowledge_prompt),
         metadata_block=self.escape_braces(metadata_block),
         livertox_score=self.escape_braces(score),
-        bibliography_source=self.escape_braces(self.bibliography_source_label()),
-        example_block=self.escape_braces(
-            LIVERTOX_REPORT_EXAMPLE_TEMPLATE.format(
-                bibliography_source=self.bibliography_source_label()
-            )
-        ),
     )
     messages = [
         {"role": "system", "content": LIVERTOX_CLINICAL_SYSTEM_PROMPT.strip()},

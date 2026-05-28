@@ -243,7 +243,7 @@ def test_openai_structured_call_uses_responses_parse(monkeypatch) -> None:
     assert captured["model"] == "gpt-4.1-mini"
     assert captured["text_format"] is ParsedPayload
     assert captured["input"] == [{"role": "user", "content": "Value is 9."}]
-    assert "JSON schema:" in captured["instructions"]
+    assert captured["instructions"] == "Return strict JSON."
 
 
 # -----------------------------------------------------------------------------

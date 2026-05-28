@@ -13,6 +13,7 @@ from common.exceptions import (
 )
 from common.utils.logger import logger
 from configurations.llm_configs import LLMRuntimeConfig
+from configurations.startup import get_server_settings
 from domain.clinical.entities import (
     ClinicalPipelineValidationError,
     ClinicalSectionExtractionResult,
@@ -92,10 +93,6 @@ from services.text.normalization import normalize_drug_query_name
 ###############################################################################
 class ClinicalSessionService(ClinicalSessionFormattingMixin):
     JOB_TYPE = "clinical"
-    CLOUD_STEP_TIMEOUT_CAP_S = 180.0
-    LOCAL_STEP_TIMEOUT_CAP_S = 1800.0
-    CLOUD_CONSULTATION_TIMEOUT_S = 600.0
-    LOCAL_CONSULTATION_TIMEOUT_S = 3600.0
 
     def __init__(
         self,
@@ -171,10 +168,20 @@ class ClinicalSessionService(ClinicalSessionFormattingMixin):
     ) -> float:
         base = max(float(base_timeout_s), 1.0)
         if LLMRuntimeConfig.is_cloud_enabled():
-            cap = cloud_cap_s if cloud_cap_s is not None else ClinicalSessionService.CLOUD_STEP_TIMEOUT_CAP_S
+            requested = cloud_cap_s
         else:
-            cap = local_cap_s if local_cap_s is not None else ClinicalSessionService.LOCAL_STEP_TIMEOUT_CAP_S
-        return min(base, max(float(cap), 1.0))
+            requested = local_cap_s
+        if requested is None:
+            return base
+        return max(base, max(float(requested), 1.0))
+
+    # -------------------------------------------------------------------------
+    @staticmethod
+    def _resolve_consultation_timeout() -> float:
+        configured = float(get_server_settings().runtime.clinical_llm_timeout)
+        return ClinicalSessionService._resolve_runtime_timeout(
+            base_timeout_s=configured
+        )
 
     def apply_persisted_runtime_configuration(self) -> None:
         self.model_config_service.ensure_defaults()
@@ -958,11 +965,7 @@ class ClinicalSessionService(ClinicalSessionFormattingMixin):
         )
         final_report: str | None = None
         start_time = time.perf_counter()
-        consultation_timeout_s = (
-            self.CLOUD_CONSULTATION_TIMEOUT_S
-            if LLMRuntimeConfig.is_cloud_enabled()
-            else self.LOCAL_CONSULTATION_TIMEOUT_S
-        )
+        consultation_timeout_s = self._resolve_consultation_timeout()
         try:
             consultation_progress_callback = ClinicalConsultationProgressCallback(
                 progress_callback=progress_callback,
