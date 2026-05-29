@@ -66,25 +66,18 @@ Detailed user journeys and feature guidance are documented in `assets/docs/USER_
 
 ### Screenshots
 
-#### Landing Page
-![Landing page](assets/figures/home.png)
-_Main DILI analysis workspace with clinical inputs and patient context panel._
-
 #### Dashboard / Report Output
 ![Dashboard view](assets/figures/dashboard.png)
 _Analysis dashboard focused on the report output area and execution controls._
 
-#### Model Configuration (Settings)
-![Model settings](assets/figures/settings.png)
+#### Sessions overview
+![Model settings](assets/figures/session-inspection.png)
 _Runtime source selection and current model configuration summary._
 
-#### Local Model Catalog (List)
-![Model list](assets/figures/models-list.png)
-_Scrollable local model catalog with install and role-assignment actions._
+#### Model Configuration (Settings)
+![Model settings](assets/figures/model-detail.png)
+_Runtime source selection and current model configuration summary._
 
-#### Provider Access Key Management
-![Provider key detail](assets/figures/model-detail.png)
-_External provider access-key management entry point within the configuration panel._
 
 #### Data Inspection
 ![Data inspection](assets/figures/data-inspection.png)
