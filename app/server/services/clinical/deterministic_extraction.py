@@ -1,10 +1,11 @@
 from __future__ import annotations
 
 import re
-from dataclasses import dataclass
 
 from domain.clinical.entities import (
     DiseaseContextEntry,
+    DeterministicDiseaseExtractionResult,
+    DeterministicDrugExtractionResult,
     DrugEntry,
     PatientDiseaseContext,
 )
@@ -124,20 +125,6 @@ NON_DRUG_TOKENS = frozenset(
 )
 
 
-@dataclass(frozen=True)
-class DeterministicDrugExtractionResult:
-    entries: list[DrugEntry]
-    unresolved_lines: list[str]
-    regimen_lines: list[str]
-
-
-@dataclass(frozen=True)
-class DeterministicDiseaseExtractionResult:
-    context: PatientDiseaseContext
-    matched_lines: list[str]
-    unresolved_lines: list[str]
-
-
 def line_has_regimen_signal(line: str) -> bool:
     stripped = (line or "").strip()
     if not stripped:
@@ -184,6 +171,10 @@ def extract_regimen_drug_candidates(
             continue
         raw_entry = DrugEntry(
             name=candidate_name,
+            dosage=None,
+            administration_mode=None,
+            route=None,
+            administration_pattern=None,
             therapy_start_status=True if start_date else None,
             therapy_start_date=start_date,
             suspension_status=True
@@ -218,18 +209,24 @@ def extract_deterministic_diseases(
             if not pattern.search(line):
                 continue
             name = str(defaults["name"])
+            chronic_value = defaults.get("chronic")
+            chronic: bool | None = (
+                chronic_value if isinstance(chronic_value, bool) else None
+            )
+            hepatic_related_value = defaults.get("hepatic_related")
+            hepatic_related: bool | None = (
+                hepatic_related_value
+                if isinstance(hepatic_related_value, bool)
+                else None
+            )
             key = name.casefold()
             if key in seen:
                 continue
             line_entries.append(
                 DiseaseContextEntry(
                     name=name,
-                    chronic=defaults.get("chronic")
-                    if isinstance(defaults.get("chronic"), bool)
-                    else None,
-                    hepatic_related=defaults.get("hepatic_related")
-                    if isinstance(defaults.get("hepatic_related"), bool)
-                    else None,
+                    chronic=chronic,
+                    hepatic_related=hepatic_related,
                     evidence=line[:500],
                 )
             )

@@ -70,7 +70,10 @@ class LiverToxUpdater:
             progress=5.0,
             message="Refreshing LiverTox master list",
         )
-        master_metadata, master_frame = livertox_download.refresh_master_list(self)
+        master_metadata, master_frame = livertox_download.refresh_master_list(
+            self,
+            progress_callback=progress_callback,
+        )
         if livertox_common.should_cancel(should_stop):
             raise RuntimeError("LiverTox update cancelled by user request")
         livertox_common.emit_progress(
@@ -79,7 +82,11 @@ class LiverToxUpdater:
             message="Downloading LiverTox archive metadata",
         )
         archive_metadata = asyncio.run(
-            livertox_download.download_bulk_data(self, self.sources_path)
+            livertox_download.download_bulk_data(
+                self,
+                self.sources_path,
+                progress_callback=progress_callback,
+            )
         )
         archive_path = archive_metadata.get("file_path") or os.path.join(
             self.sources_path, get_server_settings().runtime.livertox_archive

@@ -55,7 +55,7 @@ class ClinicalConsultationProgressCallback:
     def __init__(
         self,
         *,
-        progress_callback: Callable[[str, float, str | None], None] | None,
+        progress_callback: Callable[..., None] | None,
     ) -> None:
         self.progress_callback = progress_callback
 
@@ -77,7 +77,7 @@ class StageProgressFractionCallback:
     def __init__(
         self,
         *,
-        progress_callback: Callable[[str, float, str | None], None],
+        progress_callback: Callable[..., None],
         stage: str,
         start_value: float,
         end_value: float,

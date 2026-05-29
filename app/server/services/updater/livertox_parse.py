@@ -20,11 +20,12 @@ from typing import Any, cast
 import pandas as pd
 from pdfminer.high_level import extract_text as pdfminer_extract_text
 from pypdf import PdfReader
-from tqdm import tqdm
 
 from common.utils.logger import logger
 from services.text.normalization import normalize_whitespace
 from services.updater import livertox_common
+
+MONOGRAPH_PROGRESS_INTERVAL = 25
 
 
 # -----------------------------------------------------------------------------
@@ -153,25 +154,23 @@ def collect_monographs(
 
     total_payloads = len(selected_members)
     processed_count = 0
+    last_reported_count = 0
     worker_budget = min(max_workers, total_payloads) or 1
 
     if worker_budget == 1:
         with tarfile.open(normalized_path, "r:gz") as archive:
-            for member in tqdm(
-                selected_members,
-                desc="Processing LiverTox files",
-                total=total_payloads,
-            ):
+            for member in selected_members:
                 if livertox_common.should_cancel(should_stop):
                     raise RuntimeError("LiverTox update cancelled by user request")
                 extracted = archive.extractfile(member)
                 if extracted is None:
                     processed_count += 1
-                    emit_monograph_progress(
+                    last_reported_count = emit_monograph_progress(
                         self,
                         progress_callback=progress_callback,
                         processed_count=processed_count,
                         total_payloads=total_payloads,
+                        last_reported_count=last_reported_count,
                     )
                     continue
                 try:
@@ -183,11 +182,12 @@ def collect_monographs(
                     if record:
                         collected.append(record)
                 processed_count += 1
-                emit_monograph_progress(
+                last_reported_count = emit_monograph_progress(
                     self,
                     progress_callback=progress_callback,
                     processed_count=processed_count,
                     total_payloads=total_payloads,
+                    last_reported_count=last_reported_count,
                 )
         return sort_monograph_records(self, collected)
 
@@ -196,21 +196,18 @@ def collect_monographs(
     with ProcessPoolExecutor(max_workers=worker_budget, mp_context=ctx) as executor:
         in_flight: dict[Future[dict[str, str] | None], str] = {}
         with tarfile.open(normalized_path, "r:gz") as archive:
-            for member in tqdm(
-                selected_members,
-                desc="Reading LiverTox files",
-                total=total_payloads,
-            ):
+            for member in selected_members:
                 if livertox_common.should_cancel(should_stop):
                     raise RuntimeError("LiverTox update cancelled by user request")
                 extracted = archive.extractfile(member)
                 if extracted is None:
                     processed_count += 1
-                    emit_monograph_progress(
+                    last_reported_count = emit_monograph_progress(
                         self,
                         progress_callback=progress_callback,
                         processed_count=processed_count,
                         total_payloads=total_payloads,
+                        last_reported_count=last_reported_count,
                     )
                     continue
                 try:
@@ -219,36 +216,39 @@ def collect_monographs(
                     extracted.close()
                 if not data:
                     processed_count += 1
-                    emit_monograph_progress(
+                    last_reported_count = emit_monograph_progress(
                         self,
                         progress_callback=progress_callback,
                         processed_count=processed_count,
                         total_payloads=total_payloads,
+                        last_reported_count=last_reported_count,
                     )
                     continue
                 future = executor.submit(process_monograph_payload, member.name, data)
                 in_flight[future] = member.name
                 if len(in_flight) >= max_in_flight:
-                    processed_count = drain_monograph_futures(
+                    processed_count, last_reported_count = drain_monograph_futures(
                         self,
                         in_flight=in_flight,
                         collected=collected,
                         processed_count=processed_count,
                         total_payloads=total_payloads,
                         progress_callback=progress_callback,
+                        last_reported_count=last_reported_count,
                         wait_for_one=True,
                     )
 
         while in_flight:
             if livertox_common.should_cancel(should_stop):
                 raise RuntimeError("LiverTox update cancelled by user request")
-            processed_count = drain_monograph_futures(
+            processed_count, last_reported_count = drain_monograph_futures(
                 self,
                 in_flight=in_flight,
                 collected=collected,
                 processed_count=processed_count,
                 total_payloads=total_payloads,
                 progress_callback=progress_callback,
+                last_reported_count=last_reported_count,
                 wait_for_one=False,
             )
     return sort_monograph_records(self, collected)
@@ -260,13 +260,25 @@ def emit_monograph_progress(
     progress_callback: Callable[[float, str], None] | None,
     processed_count: int,
     total_payloads: int,
-) -> None:
+    last_reported_count: int,
+) -> int:
+    if (
+        processed_count < total_payloads
+        and (processed_count - last_reported_count) < MONOGRAPH_PROGRESS_INTERVAL
+    ):
+        return last_reported_count
     ratio = min(1.0, max(0.0, processed_count / max(total_payloads, 1)))
     livertox_common.emit_progress(
         progress_callback,
         progress=35.0 + (ratio * 33.0),
         message=f"Processed {processed_count}/{total_payloads} LiverTox files",
     )
+    logger.info(
+        "LiverTox monograph progress: %d/%d files processed",
+        processed_count,
+        total_payloads,
+    )
+    return processed_count
 
 
 def drain_monograph_futures(
@@ -277,10 +289,11 @@ def drain_monograph_futures(
     processed_count: int,
     total_payloads: int,
     progress_callback: Callable[[float, str], None] | None,
+    last_reported_count: int,
     wait_for_one: bool,
-) -> int:
+) -> tuple[int, int]:
     if not in_flight:
-        return processed_count
+        return processed_count, last_reported_count
     return_when = FIRST_COMPLETED if wait_for_one else ALL_COMPLETED
     done, _ = wait(set(in_flight), return_when=return_when)
     for future in done:
@@ -295,23 +308,25 @@ def drain_monograph_futures(
                 exc,
             )
             processed_count += 1
-            emit_monograph_progress(
+            last_reported_count = emit_monograph_progress(
                 self,
                 progress_callback=progress_callback,
                 processed_count=processed_count,
                 total_payloads=total_payloads,
+                last_reported_count=last_reported_count,
             )
             continue
         if record:
             collected.append(record)
         processed_count += 1
-        emit_monograph_progress(
+        last_reported_count = emit_monograph_progress(
             self,
             progress_callback=progress_callback,
             processed_count=processed_count,
             total_payloads=total_payloads,
+            last_reported_count=last_reported_count,
         )
-    return processed_count
+    return processed_count, last_reported_count
 
 
 def sort_monograph_records(self, records: list[dict[str, str]]) -> list[dict[str, str]]:

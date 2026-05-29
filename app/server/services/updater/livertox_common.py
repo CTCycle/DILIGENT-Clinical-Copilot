@@ -7,7 +7,6 @@ from collections.abc import Callable
 from typing import Any
 
 import httpx
-from tqdm import tqdm
 
 SUPPORTED_MONOGRAPH_EXTENSIONS = (".html", ".htm", ".xhtml", ".xml", ".nxml", ".pdf")
 NBK_ID_PATTERN = re.compile(r"^NBK\d+$", re.IGNORECASE)
@@ -17,6 +16,7 @@ DEFAULT_HTTP_HEADERS = {
     )
 }
 DOWNLOAD_CHUNK_SIZE = 262_144
+DOWNLOAD_PROGRESS_BYTE_INTERVAL = 5 * 1024 * 1024
 
 
 def load_json(path: str) -> dict[str, Any] | None:
@@ -48,23 +48,42 @@ async def download_file(
     label: str,
     *,
     chunk_size: int,
+    progress_callback: Callable[[float, str], None] | None = None,
+    progress_start: float = 0.0,
+    progress_span: float = 0.0,
 ) -> None:
     async with client.stream("GET", url) as response:
         response.raise_for_status()
-        with (
-            open(destination, "wb") as output,
-            tqdm(
-                total=total_size,
-                unit="B",
-                unit_scale=True,
-                desc=label,
-                ncols=80,
-            ) as progress,
-        ):
+        downloaded = 0
+        last_reported = 0
+        with open(destination, "wb") as output:
             async for chunk in response.aiter_bytes(chunk_size=chunk_size):
                 if chunk:
                     output.write(chunk)
-                    progress.update(len(chunk))
+                    downloaded += len(chunk)
+                    should_report = (
+                        downloaded >= total_size > 0
+                        or downloaded - last_reported >= DOWNLOAD_PROGRESS_BYTE_INTERVAL
+                    )
+                    if not should_report:
+                        continue
+                    last_reported = downloaded
+                    if progress_callback is None or progress_span <= 0:
+                        continue
+                    if total_size > 0:
+                        ratio = min(1.0, max(0.0, downloaded / total_size))
+                        progress_value = progress_start + (ratio * progress_span)
+                        message = (
+                            f"Downloaded {downloaded:,}/{total_size:,} bytes for {label}"
+                        )
+                    else:
+                        progress_value = progress_start
+                        message = f"Downloaded {downloaded:,} bytes for {label}"
+                    emit_progress(
+                        progress_callback,
+                        progress=progress_value,
+                        message=message,
+                    )
 
 
 def emit_progress(
