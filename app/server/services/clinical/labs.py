@@ -79,8 +79,19 @@ class ClinicalLabExtractor:
         temperature: float = 0.0,
         timeout_s: float = get_server_settings().runtime.parser_llm_timeout,
     ) -> None:
+        runtime_settings = get_server_settings().runtime
         self.temperature = float(temperature)
         self.timeout_s = float(timeout_s)
+        self.minimum_timeout_floor_s = float(
+            getattr(runtime_settings, "minimum_llm_timeout", 1.0)
+        )
+        self.cloud_llm_timeout_cap_s = float(
+            getattr(runtime_settings, "cloud_llm_timeout_cap", self.timeout_s)
+        )
+        self.local_llm_timeout_cap_s = float(
+            getattr(runtime_settings, "local_llm_timeout_cap", self.timeout_s)
+        )
+        self.LOCAL_LLM_CHUNK_TIMEOUT_CAP_S = self.local_llm_timeout_cap_s
         self.client: Any | None = client
         self.model: str = ""
         # Prefer fast deterministic fallback over long retry loops.
@@ -121,18 +132,32 @@ class ClinicalLabExtractor:
 
     # -------------------------------------------------------------------------
     @staticmethod
-    def minimum_timeout_s() -> float:
-        return float(get_server_settings().runtime.minimum_llm_timeout)
+    def minimum_timeout_s_default() -> float:
+        return float(getattr(get_server_settings().runtime, "minimum_llm_timeout", 1.0))
 
     # -------------------------------------------------------------------------
     @staticmethod
-    def cloud_timeout_cap_s() -> float:
-        return float(get_server_settings().runtime.cloud_llm_timeout_cap)
+    def cloud_timeout_cap_s_default() -> float:
+        return float(
+            getattr(get_server_settings().runtime, "cloud_llm_timeout_cap", 1.0)
+        )
 
     # -------------------------------------------------------------------------
     @staticmethod
-    def local_timeout_cap_s() -> float:
-        return float(get_server_settings().runtime.local_llm_timeout_cap)
+    def local_timeout_cap_s_default() -> float:
+        return float(
+            getattr(get_server_settings().runtime, "local_llm_timeout_cap", 1.0)
+        )
+
+    # -------------------------------------------------------------------------
+    def resolve_request_timeout_s(self) -> float:
+        timeout_floor = max(self.minimum_timeout_floor_s, float(self.timeout_s))
+        timeout_cap = (
+            self.cloud_llm_timeout_cap_s
+            if LLMRuntimeConfig.is_cloud_enabled()
+            else float(self.LOCAL_LLM_CHUNK_TIMEOUT_CAP_S)
+        )
+        return min(timeout_floor, max(timeout_cap, self.minimum_timeout_floor_s))
 
     # -------------------------------------------------------------------------
     @staticmethod
@@ -474,7 +499,7 @@ class ClinicalLabExtractor:
             return None
         try:
             parsed = float(match.group(1))
-        except TypeError, ValueError:
+        except (TypeError, ValueError):
             return None
         if parsed <= 0:
             return None
@@ -544,12 +569,7 @@ class ClinicalLabExtractor:
         parsed: LabExtractionPayload | None = None
         if self.client is None:
             raise RuntimeError("LLM client is not initialized for lab extraction")
-        request_timeout_s = min(
-            max(self.minimum_timeout_s(), float(self.timeout_s)),
-            self.cloud_timeout_cap_s()
-            if LLMRuntimeConfig.is_cloud_enabled()
-            else self.local_timeout_cap_s(),
-        )
+        request_timeout_s = self.resolve_request_timeout_s()
         for attempt in range(1, self.extraction_retry_attempts + 1):
             try:
                 parsed = await asyncio.wait_for(

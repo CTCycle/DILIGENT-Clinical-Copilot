@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import re
 from collections.abc import Mapping
+from dataclasses import dataclass
 from datetime import date, datetime
 from typing import Any, Literal
 
@@ -101,7 +102,7 @@ class PatientData(BaseModel):
             day = int(str(value.get("day", "")).strip())
             month = int(str(value.get("month", "")).strip())
             year = int(str(value.get("year", "")).strip())
-        except TypeError, ValueError:
+        except (TypeError, ValueError):
             return None
         try:
             return date(year, month, day)
@@ -333,7 +334,7 @@ class DrugEntry(BaseModel):
                 continue
             try:
                 cleaned.append(float(slot))
-            except TypeError, ValueError:
+            except (TypeError, ValueError):
                 continue
         if not cleaned:
             return []
@@ -409,6 +410,22 @@ class DiseaseContextEntry(BaseModel):
 ###############################################################################
 class PatientDiseaseContext(BaseModel):
     entries: list[DiseaseContextEntry] = Field(default_factory=list)
+
+
+###############################################################################
+@dataclass(frozen=True)
+class DeterministicDrugExtractionResult:
+    entries: list[DrugEntry]
+    unresolved_lines: list[str]
+    regimen_lines: list[str]
+
+
+###############################################################################
+@dataclass(frozen=True)
+class DeterministicDiseaseExtractionResult:
+    context: PatientDiseaseContext
+    matched_lines: list[str]
+    unresolved_lines: list[str]
 
 
 ###############################################################################

@@ -144,7 +144,7 @@ class ClinicalSessionService(ClinicalSessionFormattingMixin):
     # -------------------------------------------------------------------------
     @staticmethod
     def build_stage_progress_callback(
-        progress_callback: Callable[[str, float], None] | None,
+        progress_callback: Callable[..., None] | None,
         *,
         stage: str,
         start_value: float,
@@ -167,7 +167,10 @@ class ClinicalSessionService(ClinicalSessionFormattingMixin):
         cloud_cap_s: float | None = None,
         local_cap_s: float | None = None,
     ) -> float:
-        minimum_timeout_s = float(get_server_settings().runtime.minimum_llm_timeout)
+        runtime_settings = get_server_settings().runtime
+        minimum_timeout_s = float(
+            getattr(runtime_settings, "minimum_llm_timeout", 1.0)
+        )
         base = max(float(base_timeout_s), minimum_timeout_s)
         if LLMRuntimeConfig.is_cloud_enabled():
             requested = cloud_cap_s

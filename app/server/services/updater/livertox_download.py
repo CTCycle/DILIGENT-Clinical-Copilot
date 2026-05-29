@@ -6,6 +6,7 @@ import re
 import sys
 from contextlib import nullcontext
 from datetime import UTC, datetime
+from collections.abc import Callable
 from typing import Any
 
 import httpx
@@ -25,6 +26,9 @@ async def download_file(
     label: str,
     *,
     chunk_size: int,
+    progress_callback: Callable[[float, str], None] | None = None,
+    progress_start: float = 0.0,
+    progress_span: float = 0.0,
 ) -> None:
     _ = sys
     _ = nullcontext
@@ -35,6 +39,9 @@ async def download_file(
         total_size,
         label,
         chunk_size=chunk_size,
+        progress_callback=progress_callback,
+        progress_start=progress_start,
+        progress_span=progress_span,
     )
 
 
@@ -43,7 +50,12 @@ async def download_file(
 # Extracted from the facade module; functions intentionally accept the facade instance.
 
 
-async def download_bulk_data(self, dest_path: str) -> dict[str, Any]:
+async def download_bulk_data(
+    self,
+    dest_path: str,
+    *,
+    progress_callback: Callable[[float, str], None] | None = None,
+) -> dict[str, Any]:
     url = self.base_url + self.file_name
     async with httpx.AsyncClient(
         timeout=get_server_settings().runtime.livertox_download_timeout,
@@ -87,6 +99,9 @@ async def download_bulk_data(self, dest_path: str) -> dict[str, Any]:
             metadata.get("size", 0),
             self.file_name,
             chunk_size=self.chunk_size,
+            progress_callback=progress_callback,
+            progress_start=20.0,
+            progress_span=15.0,
         )
         livertox_common.save_masterlist_metadata(self.archive_metadata_path, metadata)
 
@@ -99,9 +114,15 @@ async def download_bulk_data(self, dest_path: str) -> dict[str, Any]:
     }
 
 
-def refresh_master_list(self) -> tuple[dict[str, Any], pd.DataFrame]:
+def refresh_master_list(
+    self,
+    *,
+    progress_callback: Callable[[float, str], None] | None = None,
+) -> tuple[dict[str, Any], pd.DataFrame]:
     logger.info("Refreshing LiverTox master list")
-    metadata = asyncio.run(download_master_list(self))
+    metadata = asyncio.run(
+        download_master_list(self, progress_callback=progress_callback)
+    )
 
     frame = pd.read_excel(
         metadata["file_path"],
@@ -127,7 +148,11 @@ def refresh_master_list(self) -> tuple[dict[str, Any], pd.DataFrame]:
     return metadata, sanitized
 
 
-async def download_master_list(self) -> dict[str, Any]:
+async def download_master_list(
+    self,
+    *,
+    progress_callback: Callable[[float, str], None] | None = None,
+) -> dict[str, Any]:
     async with httpx.AsyncClient(
         timeout=get_server_settings().runtime.livertox_download_timeout,
         headers=self.http_headers,
@@ -166,6 +191,9 @@ async def download_master_list(self) -> dict[str, Any]:
             metadata.get("size", 0),
             os.path.basename(self.master_list_path),
             chunk_size=self.chunk_size,
+            progress_callback=progress_callback,
+            progress_start=5.0,
+            progress_span=15.0,
         )
         livertox_common.save_masterlist_metadata(
             self.master_list_metadata_path, metadata
