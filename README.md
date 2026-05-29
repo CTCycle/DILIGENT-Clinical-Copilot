@@ -60,7 +60,8 @@ Typical workflow:
 1. Enter anamnesis, exam notes, medications, and lab values.
 2. Choose model/provider settings and optionally enable RAG/web search.
 3. Run analysis and review the generated report.
-4. Use Data Inspection for session history and data-update operations.
+4. Use Data Inspection to explore current knowledge base.
+5. Explore past sessions to modify and revise them.
 
 Detailed user journeys and feature guidance are documented in `assets/docs/USER_MANUAL.md`.
 
@@ -71,13 +72,12 @@ Detailed user journeys and feature guidance are documented in `assets/docs/USER_
 _Analysis dashboard focused on the report output area and execution controls._
 
 #### Sessions overview
-![Model settings](assets/figures/session-inspection.png)
-_Runtime source selection and current model configuration summary._
+![Session dashboard](assets/figures/session-inspection.png)
+_Explore past sessions and improve DILI assessment iteratively._
 
 #### Model Configuration (Settings)
 ![Model settings](assets/figures/model-detail.png)
 _Runtime source selection and current model configuration summary._
-
 
 #### Data Inspection
 ![Data inspection](assets/figures/data-inspection.png)
