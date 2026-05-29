@@ -37,6 +37,7 @@ from services.clinical.match_quality import classify_match_evidence
 from services.clinical.report_language import phrase
 from services.security.access_keys import AccessKeyService
 from services.session.clinical_input_extractor import ClinicalInputExtractionError
+from services.session.document_normalizer import DocumentNormalizer
 from services.session.preflight import check_parser_batch_capacity
 from services.session.robust_pipeline import (
     audit_report,
@@ -79,6 +80,28 @@ def _emit_progress(
         progress_callback(stage, progress, detail)
     except TypeError:
         progress_callback(stage, progress)
+
+
+class _DeterministicDrugExtractionFallback:
+    def __init__(self) -> None:
+        self.entries: list[Any] = []
+        self.unresolved_lines: list[str] = []
+        self.regimen_lines: list[str] = []
+
+
+def _extract_deterministic_drugs(
+    service: Any,
+    *,
+    text: str,
+    source: str,
+) -> Any:
+    parser = getattr(service, "drugs_parser", None)
+    if parser is None:
+        return _DeterministicDrugExtractionFallback()
+    method = getattr(parser, f"extract_drugs_from_{source}_deterministic", None)
+    if callable(method):
+        return method(text)
+    return _DeterministicDrugExtractionFallback()
 
 
 async def _extract_drugs_from_section(
@@ -211,7 +234,7 @@ def build_single_matched_drug_row_workflow(
     if match_confidence is not None:
         try:
             match_confidence = float(match_confidence)
-        except TypeError, ValueError:
+        except (TypeError, ValueError):
             match_confidence = None
     match_quality = classify_match_evidence(
         match_status=resolved.get("match_status"),
@@ -328,15 +351,15 @@ async def process_single_patient_workflow(
     )
     cleaned_therapy_text = service.drugs_parser.clean_text(payload.drugs or "")
     cleaned_anamnesis_text = service.drugs_parser.clean_text(payload.anamnesis or "")
-    therapy_deterministic = (
-        service.drugs_parser.extract_drugs_from_therapy_deterministic(
-            cleaned_therapy_text
-        )
+    therapy_deterministic = _extract_deterministic_drugs(
+        service,
+        text=cleaned_therapy_text,
+        source="therapy",
     )
-    anamnesis_deterministic = (
-        service.drugs_parser.extract_drugs_from_anamnesis_deterministic(
-            cleaned_anamnesis_text
-        )
+    anamnesis_deterministic = _extract_deterministic_drugs(
+        service,
+        text=cleaned_anamnesis_text,
+        source="anamnesis",
     )
     disease_deterministic = extract_deterministic_diseases(cleaned_anamnesis_text)
     _emit_progress(

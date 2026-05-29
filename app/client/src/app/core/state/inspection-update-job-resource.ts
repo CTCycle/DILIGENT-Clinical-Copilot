@@ -37,6 +37,18 @@ type InspectionUpdateTargetState = {
   pollToken: number | null;
 };
 
+export type InspectionUpdateTargetSnapshot = {
+  running: boolean;
+  progress: number;
+  message: string;
+  error: string | null;
+};
+
+type InspectionUpdateTargetSnapshotMap = Record<
+  InspectionUpdateTarget,
+  InspectionUpdateTargetSnapshot
+>;
+
 type InspectionUpdateParseResult<TTarget extends InspectionUpdateTarget> = {
   value: InspectionUpdateOverridesByTarget[TTarget];
   error: string | null;
@@ -162,6 +174,11 @@ function resolveStartedMessage(started: JobStartResponse): string {
 }
 
 export class InspectionUpdateJobResource {
+  readonly targetState = signal<InspectionUpdateTargetSnapshotMap>({
+    rxnav: { running: false, progress: 0, message: '', error: null },
+    livertox: { running: false, progress: 0, message: '', error: null },
+    rag: { running: false, progress: 0, message: '', error: null },
+  });
   readonly activeTarget = signal<InspectionUpdateTarget | null>(null);
   readonly updateConfig = signal<Record<string, unknown> | null>(null);
   readonly updateConfigText = signal('{}');
@@ -423,6 +440,15 @@ export class InspectionUpdateJobResource {
       ...patch,
     };
     this.targetStates.set(target, next);
+    this.targetState.update((current) => ({
+      ...current,
+      [target]: {
+        running: next.running,
+        progress: next.progress,
+        message: next.message,
+        error: next.error,
+      },
+    }));
     if (this.activeTarget() === target) {
       this.applyStateToSignals(next);
     }

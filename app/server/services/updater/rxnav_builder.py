@@ -34,6 +34,7 @@ class RxNavDrugCatalogBuilder:
     TABLE_NAME = "drug_aliases"
     BATCH_SIZE = 200
     SYNONYM_WORKERS = 12
+    PROGRESS_RECORD_INTERVAL = 1_000
     TOKEN_SPLIT_PATTERN = re.compile(r"[^A-Za-z0-9']+")
     SINGLE_TOKEN_DIGIT_PATTERN = re.compile(r"^\d+(?:\.\d+)?$")
     SHORT_TOKEN_EXCEPTIONS = {"id"}
@@ -284,15 +285,13 @@ class RxNavDrugCatalogBuilder:
                 persisted = self.persist_concept_batch(concepts_batch)
                 count += persisted
                 concepts_batch.clear()
-                logger.info("Total records upserted into database: %d", count)
                 self.emit_catalog_progress(progress_callback, count=count)
         if concepts_batch:
             if self.should_cancel(should_stop):
                 raise RuntimeError("RxNav update cancelled by user request")
             persisted = self.persist_concept_batch(concepts_batch)
             count += persisted
-            logger.info("Total records upserted into database: %d", count)
-            self.emit_catalog_progress(progress_callback, count=count)
+            self.emit_catalog_progress(progress_callback, count=count, force=True)
 
         return {"table_name": self.TABLE_NAME, "count": count}
 
@@ -302,7 +301,12 @@ class RxNavDrugCatalogBuilder:
         progress_callback: Callable[[float, str], None] | None,
         *,
         count: int,
+        force: bool = False,
     ) -> None:
+        if not force and (count - self.last_logged_count) < self.PROGRESS_RECORD_INTERVAL:
+            return
+        self.last_logged_count = count
+        logger.info("RxNav catalog progress: %d records upserted", count)
         if progress_callback is None:
             return
         denominator = float(self.total_records or 50_000)

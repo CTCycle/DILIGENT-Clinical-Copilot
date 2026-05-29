@@ -41,6 +41,9 @@
               [searchAriaLabel]="'Search RxNav data'"
               [searchValue]="rxnavSearchInput()"
               [updateButtonLabel]="'Update Catalog'"
+              [updateInProgress]="rxnavUpdateRunning()"
+              [updateProgress]="rxnavUpdateProgress()"
+              [updateProgressMessage]="rxnavUpdateMessage()"
               (searchChange)="updateRxNavSearch($event)"
               (updateClick)="openUpdateModal('rxnav')"
             />
@@ -105,6 +108,9 @@
               [searchAriaLabel]="'Search LiverTox data'"
               [searchValue]="livertoxSearchInput()"
               [updateButtonLabel]="'Update Base'"
+              [updateInProgress]="livertoxUpdateRunning()"
+              [updateProgress]="livertoxUpdateProgress()"
+              [updateProgressMessage]="livertoxUpdateMessage()"
               (searchChange)="updateLiverToxSearch($event)"
               (updateClick)="openUpdateModal('livertox')"
             />

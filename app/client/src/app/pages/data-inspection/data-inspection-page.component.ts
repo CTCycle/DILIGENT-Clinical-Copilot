@@ -1,5 +1,5 @@
 import { CommonModule } from '@angular/common';
-import { Component, ElementRef, OnDestroy, OnInit, ViewChild, inject, signal } from '@angular/core';
+import { Component, ElementRef, OnDestroy, OnInit, ViewChild, computed, inject, signal } from '@angular/core';
 import { FormsModule } from '@angular/forms';
 
 import { InspectionActionIconButtonComponent } from '../../components/inspection-action-icon-button/inspection-action-icon-button.component';
@@ -192,6 +192,13 @@ export class DataInspectionPageComponent implements OnInit, OnDestroy {
   readonly updateProgress = this.updateJob.updateProgress;
   readonly updateMessage = this.updateJob.updateMessage;
   readonly updateError = this.updateJob.updateError;
+  readonly updateTargetState = this.updateJob.targetState;
+  readonly rxnavUpdateRunning = computed(() => this.updateTargetState().rxnav.running);
+  readonly rxnavUpdateProgress = computed(() => this.updateTargetState().rxnav.progress);
+  readonly rxnavUpdateMessage = computed(() => this.updateTargetState().rxnav.message);
+  readonly livertoxUpdateRunning = computed(() => this.updateTargetState().livertox.running);
+  readonly livertoxUpdateProgress = computed(() => this.updateTargetState().livertox.progress);
+  readonly livertoxUpdateMessage = computed(() => this.updateTargetState().livertox.message);
 
   ngOnInit(): void {
     void this.initializePageData();
