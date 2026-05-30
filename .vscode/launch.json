@@ -48,7 +48,7 @@
         "--host",
         "127.0.0.1",
         "--port",
-        "4512"
+        "9847"
       ],
       "console": "integratedTerminal",
       "serverReadyAction": {
