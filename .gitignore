@@ -41,7 +41,6 @@ yarn.lock
 .angular/cache/**
 
 # IDE / OS
-.vscode/
 !.vscode/extensions.json
 .idea/
 .DS_Store
