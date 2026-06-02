@@ -1,8 +1,8 @@
 from __future__ import annotations
 
 import asyncio
-import os
 from collections.abc import Callable
+from pathlib import Path
 from typing import Any
 
 from common.constants import ARCHIVES_PATH, LIVERTOX_BASE_URL
@@ -31,7 +31,7 @@ class LiverToxUpdater:
         self.http_headers = dict(livertox_common.DEFAULT_HTTP_HEADERS)
         self.delay = 0.5
         self.chunk_size = livertox_common.DOWNLOAD_CHUNK_SIZE
-        self.sources_path = os.path.abspath(sources_path)
+        self.sources_path = str(Path(sources_path).resolve())
         self.redownload = redownload
         self.serializer = serializer or DataSerializer()
         self.excerpt_sanitizer = LiverToxExcerptSanitizer()
@@ -48,13 +48,14 @@ class LiverToxUpdater:
                 else get_server_settings().runtime.livertox_monograph_max_workers
             ),
         )
-        self.tar_file_path = os.path.join(ARCHIVES_PATH, self.file_name)
-        self.master_list_path = os.path.join(ARCHIVES_PATH, "LiverTox_Master_List.xlsx")
-        self.master_list_metadata_path = os.path.join(
-            ARCHIVES_PATH, "livertox_master_list.metadata.json"
+        archives_path = Path(ARCHIVES_PATH)
+        self.tar_file_path = str(archives_path / self.file_name)
+        self.master_list_path = str(archives_path / "LiverTox_Master_List.xlsx")
+        self.master_list_metadata_path = str(
+            archives_path / "livertox_master_list.metadata.json"
         )
-        self.archive_metadata_path = os.path.join(
-            ARCHIVES_PATH, "livertox_archive.metadata.json"
+        self.archive_metadata_path = str(
+            archives_path / "livertox_archive.metadata.json"
         )
 
     def update_from_livertox(
@@ -88,8 +89,8 @@ class LiverToxUpdater:
                 progress_callback=progress_callback,
             )
         )
-        archive_path = archive_metadata.get("file_path") or os.path.join(
-            self.sources_path, get_server_settings().runtime.livertox_archive
+        archive_path = archive_metadata.get("file_path") or str(
+            Path(self.sources_path) / get_server_settings().runtime.livertox_archive
         )
         local_info = livertox_download.collect_local_archive_info(self, archive_path)
         livertox_common.emit_progress(

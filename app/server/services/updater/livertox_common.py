@@ -1,9 +1,9 @@
 from __future__ import annotations
 
 import json
-import os
 import re
 from collections.abc import Callable
+from pathlib import Path
 from typing import Any
 
 import httpx
@@ -19,18 +19,19 @@ DOWNLOAD_CHUNK_SIZE = 262_144
 DOWNLOAD_PROGRESS_BYTE_INTERVAL = 5 * 1024 * 1024
 
 
-def load_json(path: str) -> dict[str, Any] | None:
-    if not os.path.isfile(path):
+def load_json(path: str | Path) -> dict[str, Any] | None:
+    metadata_path = Path(path)
+    if not metadata_path.is_file():
         return None
     try:
-        with open(path, "r", encoding="utf-8") as handle:
+        with metadata_path.open("r", encoding="utf-8") as handle:
             return json.load(handle)
     except json.JSONDecodeError, OSError:
         return None
 
 
-def save_masterlist_metadata(path: str, payload: dict[str, Any]) -> None:
-    with open(path, "w", encoding="utf-8") as handle:
+def save_masterlist_metadata(path: str | Path, payload: dict[str, Any]) -> None:
+    with Path(path).open("w", encoding="utf-8") as handle:
         json.dump(payload, handle)
 
 

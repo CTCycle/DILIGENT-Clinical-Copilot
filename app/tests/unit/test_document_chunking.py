@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import hashlib
 from pathlib import Path
 
 from domain.documents import Document
@@ -18,6 +19,22 @@ def test_textual_document_metadata_uses_heading_title_fallback(tmp_path: Path) -
     assert metadata["file_name"] == "study.txt"
     assert metadata["document_title"] == "HEPATOTOXICITY OVERVIEW"
     assert metadata["content_type"] == "txt"
+
+
+def test_document_serializer_accepts_path_objects_and_collects_relative_ids(
+    tmp_path: Path,
+) -> None:
+    nested_dir = tmp_path / "nested"
+    nested_dir.mkdir()
+    file_path = nested_dir / "study.txt"
+    file_path.write_text("TITLE\n\nBody text.", encoding="utf-8")
+
+    serializer = DocumentSerializer(tmp_path)
+
+    assert serializer.collect_document_paths() == [str(file_path)]
+    expected_relative = Path("nested") / "study.txt"
+    expected_id = hashlib.sha256(str(expected_relative).encode("utf-8")).hexdigest()
+    assert serializer.compute_document_id(file_path) == expected_id
 
 
 def test_structure_aware_chunking_preserves_heading_metadata() -> None:
