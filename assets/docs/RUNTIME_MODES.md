@@ -1,6 +1,6 @@
 # Runtime Modes
 
-Last updated: 2026-05-27
+Last updated: 2026-05-31
 
 ## 1. Supported Modes
 
@@ -98,6 +98,7 @@ Non-secret operational settings:
   - Root URL redirects to docs when SPA package path is not active.
 - Tauri packaged mode:
   - Backend serves packaged SPA files from bundled dist assets.
+  - Startup validates that the packaged SPA build is present before serving desktop mode.
   - Runtime resources are bundled under `r/` via `tauri.conf.json`.
 
 Feature toggles/settings:
