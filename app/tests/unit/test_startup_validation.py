@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from pathlib import Path
 from types import SimpleNamespace
 
 import pytest
@@ -50,7 +51,7 @@ def test_run_startup_validations_requires_client_build_in_tauri_mode(
         lambda: SimpleNamespace(entries_by_scope={("domain", "category"): ()}),
     )
     monkeypatch.setattr(startup_validation, "tauri_mode_enabled", lambda: True)
-    monkeypatch.setattr(startup_validation.os.path, "isfile", lambda _path: False)
+    monkeypatch.setattr(Path, "is_file", lambda _path: False)
     monkeypatch.setattr(
         startup_validation,
         "ModelConfigService",

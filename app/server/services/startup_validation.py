@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-import os
+from pathlib import Path
 
 from common.constants import CLIENT_INDEX_FILE_PATH
 from configurations.startup import get_server_settings, tauri_mode_enabled
@@ -13,7 +13,7 @@ from services.llm.model_config import ModelConfigService
 def run_startup_validations(settings: ServerSettings | None = None) -> None:
     resolved_settings = settings or get_server_settings()
 
-    if tauri_mode_enabled() and not os.path.isfile(CLIENT_INDEX_FILE_PATH):
+    if tauri_mode_enabled() and not Path(CLIENT_INDEX_FILE_PATH).is_file():
         raise RuntimeError(
             "Tauri mode requires a packaged client build at "
             f"{CLIENT_INDEX_FILE_PATH}."

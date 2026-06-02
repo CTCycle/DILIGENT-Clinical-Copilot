@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 import json
-import os
+from pathlib import Path
 from typing import Any, Iterator, Literal, cast
 
 import lancedb
@@ -81,13 +81,12 @@ class LanceVectorDatabase:
     # -------------------------------------------------------------------------
     def connect(self) -> DBConnection:
         if self.connection is None:
-            path = self.database_path
-            suffix = os.path.splitext(path)[1]
-            base_directory = os.path.dirname(path) if suffix else path
-            if not base_directory:
-                base_directory = "."
-            os.makedirs(base_directory, exist_ok=True)
-            self.connection = lancedb.connect(self.database_path)
+            database_path = Path(self.database_path)
+            base_directory = database_path.parent if database_path.suffix else database_path
+            if str(base_directory) == "":
+                base_directory = Path(".")
+            base_directory.mkdir(parents=True, exist_ok=True)
+            self.connection = lancedb.connect(str(database_path))
         return self.connection
 
     # -------------------------------------------------------------------------
