@@ -1,6 +1,6 @@
 # Runtime Modes
 
-Last updated: 2026-05-31
+Last updated: 2026-06-02
 
 ## 1. Supported Modes
 
@@ -84,10 +84,12 @@ Main keys:
 
 Non-secret operational settings:
 - `DILIGENT/settings/configurations.json`
-  - database mode/settings
   - jobs polling interval
   - RAG and ingestion settings
   - external timeout/concurrency settings
+- `DILIGENT/settings/.env`
+  - database mode/settings
+  - local host/port values
 - `DILIGENT/app/resources/catalogs/*.json`
   - canonical deterministic reference catalogs (text normalization, extraction, matching, DILI, language, security filters)
 
@@ -103,7 +105,7 @@ Non-secret operational settings:
 
 Feature toggles/settings:
 - Cloud-vs-local model usage is runtime-configured through model configuration APIs.
-- DB mode (embedded SQLite vs PostgreSQL) is controlled by `configurations.json`.
+- DB mode (embedded SQLite vs PostgreSQL) and connection settings are controlled by `settings/.env`.
 - On normal startup, catalog seeding is hash-checked and incremental; forced full reseeding is not performed automatically.
 
 ## 5. Interoperability

@@ -1,6 +1,6 @@
 # DILIGENT Clinical Copilot Architecture
 
-Last updated: 2026-05-31
+Last updated: 2026-06-02
 
 ## 1. System Summary
 
@@ -241,6 +241,7 @@ Endpoint -> service -> repository:
 
 - `/api` is the stable frontend-backend boundary (`API_BASE_URL="/api"` in frontend constants).
 - Runtime settings come from `settings/.env` and `settings/configurations.json`.
+  Database connection and database-mode values are sourced from `settings/.env`.
 - Runtime settings are accessed through `get_server_settings()` (no `server_settings` proxy alias path).
 - Runtime and security helpers have canonical service modules; transitional shims are not maintained.
 - Supported external access-key providers are `openai`, `gemini`, and `brave`.
