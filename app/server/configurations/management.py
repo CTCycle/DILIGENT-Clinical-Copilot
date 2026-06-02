@@ -58,14 +58,15 @@ def ensure_mapping(value: Any) -> dict[str, Any]:
     return {}
 
 
-def load_configuration_data(path: str) -> dict[str, Any]:
-    if not os.path.exists(path):
-        raise RuntimeError(f"Configuration file not found: {path}")
+def load_configuration_data(path: str | Path) -> dict[str, Any]:
+    config_path = Path(path)
+    if not config_path.exists():
+        raise RuntimeError(f"Configuration file not found: {config_path}")
     try:
-        with open(path, "r", encoding="utf-8") as handle:
+        with config_path.open("r", encoding="utf-8") as handle:
             data = json.load(handle)
     except (OSError, json.JSONDecodeError) as exc:
-        raise RuntimeError(f"Unable to load configuration from {path}") from exc
+        raise RuntimeError(f"Unable to load configuration from {config_path}") from exc
     if not isinstance(data, dict):
         raise RuntimeError("Configuration must be a JSON object.")
     return data
@@ -130,7 +131,7 @@ class ConfigurationManager:
 
     def reload(self) -> ServerSettings:
         with self._lock:
-            loaded = load_configuration_data(str(self._config_path))
+            loaded = load_configuration_data(self._config_path)
             payload = build_settings_payload_from_json(
                 loaded,
                 environment_snapshot_from_os_env(),

@@ -4,6 +4,7 @@ import asyncio
 import codecs
 import json
 import os
+from pathlib import Path
 import re
 import time
 import unicodedata
@@ -62,17 +63,17 @@ class RxNavDrugCatalogBuilder:
         self.last_logged_count = 0
         self.serializer = serializer or DataSerializer()
         resolved_path = curated_aliases_path or RXNAV_CURATED_ALIASES_PATH
-        self.curated_aliases_path = os.path.abspath(resolved_path)
+        self.curated_aliases_path = Path(resolved_path).resolve()
         self.curated_aliases_by_canonical = self.load_curated_aliases()
 
     # -------------------------------------------------------------------------
     def load_curated_aliases(self) -> dict[str, list[tuple[str, str]]]:
         path = self.curated_aliases_path
-        if not os.path.exists(path):
+        if not path.exists():
             logger.info("RxNav curated alias file not found at '%s'; skipping", path)
             return {}
         try:
-            with open(path, "r", encoding="utf-8") as handle:
+            with path.open("r", encoding="utf-8") as handle:
                 payload = json.load(handle)
         except (OSError, json.JSONDecodeError) as exc:
             logger.warning(
