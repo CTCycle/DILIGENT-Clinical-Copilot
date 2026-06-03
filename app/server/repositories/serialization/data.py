@@ -1007,8 +1007,9 @@ class DocumentChunker:
             for chunk in smart_chunks:
                 chunk_metadata = dict(metadata)
                 chunk_metadata.update(chunk.metadata)
-                chunk_metadata["start_index"] = int(
-                    chunk.metadata.get("char_start", 0) or 0
+                char_start = chunk.metadata.get("char_start", 0)
+                chunk_metadata["start_index"] = (
+                    int(char_start) if isinstance(char_start, int | float | str) else 0
                 )
                 chunk_metadata["section_title"] = chunk.metadata.get("section_heading")
                 chunk_metadata["heading_path"] = chunk.metadata.get("section_heading")

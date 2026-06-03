@@ -3,10 +3,10 @@ from __future__ import annotations
 import asyncio
 
 from pytest import MonkeyPatch
-from services.retrieval import embeddings as embeddings_module
+import services.retrieval.embeddings as embeddings_module
 
 
-# -----------------------------------------------------------------------------
+###############################################################################
 def test_openai_embedding_provider_selection(monkeypatch: MonkeyPatch) -> None:
     monkeypatch.setattr(
         embeddings_module.CloudEmbeddingGenerator,
@@ -23,7 +23,7 @@ def test_openai_embedding_provider_selection(monkeypatch: MonkeyPatch) -> None:
 
 
 # -----------------------------------------------------------------------------
-def test_gemini_embedding_provider_selection(monkeypatch) -> None:
+def test_gemini_embedding_provider_selection(monkeypatch: MonkeyPatch) -> None:
     monkeypatch.setattr(
         embeddings_module.CloudEmbeddingGenerator,
         "resolve_provider_access_key",
@@ -55,15 +55,21 @@ def test_single_query_embedding_return_shape(monkeypatch) -> None:
         staticmethod(lambda provider: "openai-key"),
     )
 
-    class FakeEmbeddings:
-        def embed_documents(self, texts: list[str]) -> list[list[float]]:
-            return [[1.0, 2.0] for _ in texts]
+    class FakeClient:
+        def __init__(self, **kwargs):
+            self.kwargs = kwargs
 
-    monkeypatch.setattr(
-        embeddings_module,
-        "_build_openai_embeddings_model",
-        lambda **kwargs: FakeEmbeddings(),
-    )
+        async def __aenter__(self):
+            return self
+
+        async def __aexit__(self, exc_type, exc, tb) -> None:
+            return None
+
+        async def embed(self, *, model: str, input_texts: list[str]) -> list[list[float]]:
+            _ = model, input_texts
+            return [[1.0, 2.0] for _ in input_texts]
+
+    monkeypatch.setattr(embeddings_module, "CloudLLMClient", FakeClient)
     generator = embeddings_module.CloudEmbeddingGenerator(
         provider="openai",
         model="text-embedding-3-small",
@@ -75,15 +81,21 @@ def test_single_query_embedding_return_shape(monkeypatch) -> None:
 
 # -----------------------------------------------------------------------------
 def test_batch_embedding_return_shape_and_order_preserved(monkeypatch) -> None:
-    class FakeEmbeddings:
-        def embed_documents(self, texts: list[str]) -> list[list[float]]:
-            return [[float(index)] for index, _ in enumerate(texts)]
+    class FakeClient:
+        def __init__(self, **kwargs):
+            self.kwargs = kwargs
 
-    monkeypatch.setattr(
-        embeddings_module,
-        "_build_ollama_embeddings_model",
-        lambda **kwargs: FakeEmbeddings(),
-    )
+        async def __aenter__(self):
+            return self
+
+        async def __aexit__(self, exc_type, exc, tb) -> None:
+            return None
+
+        async def embed(self, *, model: str, input_texts: list[str]) -> list[list[float]]:
+            _ = model
+            return [[float(index)] for index, _ in enumerate(input_texts)]
+
+    monkeypatch.setattr(embeddings_module, "OllamaClient", FakeClient)
     generator = embeddings_module.OllamaEmbeddingGenerator(model="nomic-embed-text")
     vectors = asyncio.run(generator.embed_texts(["first", "second", "third"]))
     assert vectors == [[0.0], [1.0], [2.0]]
@@ -107,16 +119,21 @@ def test_provider_validation_and_exception_mapping(monkeypatch) -> None:
         staticmethod(lambda provider: "openai-key"),
     )
 
-    class FailingEmbeddings:
-        def embed_documents(self, texts: list[str]) -> list[list[float]]:
-            _ = texts
+    class FailingClient:
+        def __init__(self, **kwargs):
+            self.kwargs = kwargs
+
+        async def __aenter__(self):
+            return self
+
+        async def __aexit__(self, exc_type, exc, tb) -> None:
+            return None
+
+        async def embed(self, *, model: str, input_texts: list[str]) -> list[list[float]]:
+            _ = model, input_texts
             raise TimeoutError("timeout")
 
-    monkeypatch.setattr(
-        embeddings_module,
-        "_build_openai_embeddings_model",
-        lambda **kwargs: FailingEmbeddings(),
-    )
+    monkeypatch.setattr(embeddings_module, "CloudLLMClient", FailingClient)
     generator = embeddings_module.CloudEmbeddingGenerator(
         provider="openai",
         model="text-embedding-3-small",

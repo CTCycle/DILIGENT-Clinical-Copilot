@@ -88,9 +88,10 @@ def build_section_extraction_from_initial_text(
     source_text: str,
 ) -> ClinicalSectionExtractionResult:
     line_ranges: dict[ClinicalSectionKey, list[ClinicalSectionLineRange]] = {}
+    source_line_ranges: dict[str, dict[str, int]] = {}
     metadata: dict[str, object] = {
         "parser": "deterministic_initial_text_sections_v2",
-        "source_line_ranges": {},
+        "source_line_ranges": source_line_ranges,
     }
     for key in SECTION_KEYS:
         section = parse_result.sections.get(key)
@@ -101,7 +102,7 @@ def build_section_extraction_from_initial_text(
                 start_line=section.start_line, end_line=section.end_line
             )
         ]
-        metadata["source_line_ranges"][key] = {
+        source_line_ranges[key] = {
             "start_line": section.start_line,
             "end_line": section.end_line,
         }

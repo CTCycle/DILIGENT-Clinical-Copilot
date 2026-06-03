@@ -360,11 +360,12 @@ class DataInspectionService:
         revision_instruction: str | None,
         effective_overrides: dict[str, Any],
     ) -> dict[str, Any]:
-        source_payload = (
-            source_detail.get("result_payload")
-            if isinstance(source_detail.get("result_payload"), dict)
-            else {}
-        )
+        source_payload_value = source_detail.get("result_payload")
+        source_payload: dict[str, Any]
+        if isinstance(source_payload_value, dict):
+            source_payload = source_payload_value
+        else:
+            source_payload = {}
         original_detected = self.extract_revision_drug_names(source_payload)
         revised_detected = self.extract_revision_drug_names(result_payload)
         original_keys = {
@@ -376,14 +377,17 @@ class DataInspectionService:
         new_drug_keys = sorted(key for key in revised_keys - original_keys if key)
         removed_drug_keys = sorted(key for key in original_keys - revised_keys if key)
         section_extraction = result_payload.get("section_extraction")
-        source_sections = (
-            source_detail.get("sections")
-            if isinstance(source_detail.get("sections"), dict)
-            else {}
-        )
-        extracted_sections = (
-            section_extraction if isinstance(section_extraction, dict) else {}
-        )
+        source_sections_value = source_detail.get("sections")
+        source_sections: dict[str, Any]
+        if isinstance(source_sections_value, dict):
+            source_sections = source_sections_value
+        else:
+            source_sections = {}
+        extracted_sections: dict[str, Any]
+        if isinstance(section_extraction, dict):
+            extracted_sections = section_extraction
+        else:
+            extracted_sections = {}
         section_validation = self.build_revision_section_validation(
             source_sections=source_sections,
             extracted_sections=extracted_sections,

@@ -16,6 +16,26 @@ from services.updater.rxnav_client import RxNavClient
 UpdateTarget = Literal["rxnav", "livertox", "rag"]
 
 
+def _override_float(values: Mapping[str, object], key: str) -> float | None:
+    value = values.get(key)
+    return float(value) if isinstance(value, int | float) else None
+
+
+def _override_int(values: Mapping[str, object], key: str) -> int | None:
+    value = values.get(key)
+    return int(value) if isinstance(value, int | float) else None
+
+
+def _override_str(values: Mapping[str, object], key: str) -> str | None:
+    value = values.get(key)
+    return value if isinstance(value, str) else None
+
+
+def _override_bool(values: Mapping[str, object], key: str) -> bool | None:
+    value = values.get(key)
+    return value if isinstance(value, bool) else None
+
+
 class DataInspectionProgressReporter:
     def __init__(
         self,
@@ -77,8 +97,8 @@ class DataInspectionUpdateJobRunner:
             job_id, "rxnav", 10, "Downloading source catalog data"
         )
         rx_client = RxNavClient(
-            request_timeout=override_values.get("rxnav_request_timeout"),
-            max_concurrency=override_values.get("rxnav_max_concurrency"),
+            request_timeout=_override_float(override_values, "rxnav_request_timeout"),
+            max_concurrency=_override_int(override_values, "rxnav_max_concurrency"),
         )
         builder = RxNavDrugCatalogBuilder(
             serializer=self.serializer, rx_client=rx_client
@@ -108,10 +128,12 @@ class DataInspectionUpdateJobRunner:
         self.report_phase_by_target(job_id, "livertox", 4, "LiverTox update started")
         updater = LiverToxUpdater(
             ARCHIVES_PATH,
-            redownload=bool(override_values.get("redownload", False)),
+            redownload=bool(_override_bool(override_values, "redownload") or False),
             serializer=self.serializer,
-            archive_name=override_values.get("livertox_archive"),
-            monograph_max_workers=override_values.get("livertox_monograph_max_workers"),
+            archive_name=_override_str(override_values, "livertox_archive"),
+            monograph_max_workers=_override_int(
+                override_values, "livertox_monograph_max_workers"
+            ),
         )
         self.report_phase_by_target(job_id, "livertox", 10, "Loading source archive")
         result = updater.update_from_livertox(
@@ -135,19 +157,31 @@ class DataInspectionUpdateJobRunner:
             return {}
         self.report_phase_by_target(job_id, "rag", 4, "RAG update started")
         updater = RagEmbeddingUpdater(
-            documents_path=override_values.get("documents_path"),
-            use_cloud_embeddings=override_values.get("use_cloud_embeddings"),
-            cloud_provider=override_values.get("cloud_provider"),
-            cloud_embedding_model=override_values.get("cloud_embedding_model"),
-            chunk_size=override_values.get("chunk_size"),
-            chunk_overlap=override_values.get("chunk_overlap"),
-            embedding_batch_size=override_values.get("embedding_batch_size"),
-            vector_stream_batch_size=override_values.get("vector_stream_batch_size"),
-            embedding_max_workers=override_values.get("embedding_max_workers"),
-            embedding_backend=override_values.get("embedding_backend"),
-            ollama_embedding_model=override_values.get("ollama_embedding_model"),
-            hf_embedding_model=override_values.get("hf_embedding_model"),
-            reset_vector_collection=override_values.get("reset_vector_collection"),
+            documents_path=_override_str(override_values, "documents_path"),
+            use_cloud_embeddings=_override_bool(
+                override_values, "use_cloud_embeddings"
+            ),
+            cloud_provider=_override_str(override_values, "cloud_provider"),
+            cloud_embedding_model=_override_str(
+                override_values, "cloud_embedding_model"
+            ),
+            chunk_size=_override_int(override_values, "chunk_size"),
+            chunk_overlap=_override_int(override_values, "chunk_overlap"),
+            embedding_batch_size=_override_int(override_values, "embedding_batch_size"),
+            vector_stream_batch_size=_override_int(
+                override_values, "vector_stream_batch_size"
+            ),
+            embedding_max_workers=_override_int(
+                override_values, "embedding_max_workers"
+            ),
+            embedding_backend=_override_str(override_values, "embedding_backend"),
+            ollama_embedding_model=_override_str(
+                override_values, "ollama_embedding_model"
+            ),
+            hf_embedding_model=_override_str(override_values, "hf_embedding_model"),
+            reset_vector_collection=_override_bool(
+                override_values, "reset_vector_collection"
+            ),
             progress_callback=progress_callback,
         )
         self.report_phase_by_target(job_id, "rag", 12, "Loading source documents")

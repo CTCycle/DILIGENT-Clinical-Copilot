@@ -79,7 +79,7 @@ def validate_manifest(manifest: Mapping[str, Any]) -> None:
     if not isinstance(entries, list) or not entries:
         raise ValueError("entries must be a non-empty list")
 
-    seen: set[tuple[str, str, str, str, str]] = set()
+    seen: set[tuple[str, str, str, str, str, str]] = set()
     for entry in entries:
         if not isinstance(entry, dict):
             raise ValueError("entry must be an object")

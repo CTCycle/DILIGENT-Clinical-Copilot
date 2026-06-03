@@ -6,28 +6,22 @@ from collections.abc import Awaitable, Callable
 from typing import Any, Literal, TypeAlias
 
 import httpx
-from langchain_core.messages import (
-    AIMessage,
-    BaseMessage,
-    HumanMessage,
-    SystemMessage,
-)
 
 ProviderName = Literal["openai", "gemini"]
 RuntimePurpose = Literal["clinical", "parser"]
 
-
+###############################################################################
 class OllamaError(RuntimeError):
     pass
 
-
+###############################################################################
 class OllamaTimeout(OllamaError):
     """Raised when requests to Ollama exceed the configured timeout."""
 
 
 ProgressCb: TypeAlias = Callable[[dict[str, Any]], None | Awaitable[None]]
 
-
+###############################################################################
 def env_float(name: str, default: float) -> float:
     raw = os.getenv(name)
     if raw is None:
@@ -37,7 +31,7 @@ def env_float(name: str, default: float) -> float:
     except (TypeError, ValueError):
         return default
 
-
+###############################################################################
 def env_str(name: str, default: str) -> str:
     raw = os.getenv(name)
     if raw is None:
@@ -45,22 +39,24 @@ def env_str(name: str, default: str) -> str:
     value = raw.strip()
     return value or default
 
-
-def build_langchain_messages(messages: list[dict[str, str]]) -> list[BaseMessage]:
-    output: list[BaseMessage] = []
+###############################################################################
+def normalize_ollama_messages(messages: list[dict[str, str]]) -> list[dict[str, str]]:
+    normalized: list[dict[str, str]] = []
     for message in messages:
         role = str(message.get("role", "user")).strip().lower()
         content = str(message.get("content", ""))
         if role == "system":
-            output.append(SystemMessage(content=content))
+            normalized.append({"role": "system", "content": content})
         elif role in {"assistant", "model"}:
-            output.append(AIMessage(content=content))
+            normalized.append({"role": "assistant", "content": content})
         else:
-            output.append(HumanMessage(content=content))
-    return output
+            normalized.append({"role": "user", "content": content})
+    if not normalized:
+        return [{"role": "user", "content": ""}]
+    return normalized
 
-
-def normalize_langchain_content(content: Any) -> dict[str, Any] | str:
+###############################################################################
+def normalize_model_content(content: Any) -> dict[str, Any] | str:
     if isinstance(content, dict):
         return content
     if isinstance(content, list):
@@ -84,16 +80,17 @@ def normalize_langchain_content(content: Any) -> dict[str, Any] | str:
         return loaded if isinstance(loaded, dict) else content
     return str(content)
 
-
-def map_ollama_langchain_exception(exc: Exception) -> OllamaError:
+###############################################################################
+def map_ollama_exception(exc: Exception) -> OllamaError:
     if isinstance(exc, OllamaError):
         return exc
     if isinstance(exc, TimeoutError):
         return OllamaTimeout("Timed out waiting for Ollama response")
     if isinstance(exc, httpx.TimeoutException):
         return OllamaTimeout("Timed out waiting for Ollama response")
+    if isinstance(exc, httpx.RequestError):
+        return OllamaError(f"Ollama request failed: {exc}")
     error_name = exc.__class__.__name__.lower()
     if "timeout" in error_name:
         return OllamaTimeout("Timed out waiting for Ollama response")
     return OllamaError(f"Ollama request failed: {exc}")
-

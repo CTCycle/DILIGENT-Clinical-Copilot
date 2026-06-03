@@ -554,13 +554,19 @@ def _extract_timed_drugs(payload: PatientData) -> list[TimedDrugMention]:
             drug = _guess_drug_name(line)
             if not drug:
                 continue
+            if match is not None:
+                timing_type = "date"
+                timing_value = match.group("date")
+            else:
+                if schedule_match is None:
+                    continue
+                timing_type = "schedule"
+                timing_value = schedule_match.group("schedule")
             mentions.append(
                 TimedDrugMention(
                     drug=drug,
-                    timing_type="date" if match else "schedule",
-                    timing_value=match.group("date")
-                    if match
-                    else schedule_match.group("schedule"),
+                    timing_type=timing_type,
+                    timing_value=timing_value,
                     status="source_reported",
                     source_span=SourceSpan(
                         span_id=f"{key}-timed-drug-{len(mentions) + 1}",
