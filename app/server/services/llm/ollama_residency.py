@@ -337,19 +337,17 @@ async def prefetch_model(
 ) -> None:
     try:
         await self.ensure_model_ready(model)
-        payload = self.compose_payload(
-            {
-                "model": model,
-                "prompt": "",
-                "stream": False,
-                "temperature": 0.0,
-                "think": False,
-            },
+        payload = self.build_chat_payload(
+            model=model,
+            messages=[{"role": "user", "content": ""}],
+            stream=False,
             format=None,
+            temperature=0.0,
+            think=False,
             options={"num_predict": 0},
             keep_alive=keep_alive,
         )
-        resp = await self.client.post("/api/generate", json=payload)
+        resp = await self.client.post("/api/chat", json=payload)
         self.raise_for_status(resp)
         logger.debug(
             "Prefetched Ollama model '%s' with keep_alive='%s'",

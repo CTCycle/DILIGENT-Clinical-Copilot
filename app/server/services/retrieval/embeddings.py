@@ -7,10 +7,6 @@ from typing import Any, Literal, Protocol, cast
 
 import httpx
 import torch
-from langchain_google_genai import GoogleGenerativeAIEmbeddings
-from langchain_ollama import OllamaEmbeddings
-from langchain_openai import OpenAIEmbeddings
-from pydantic import SecretStr
 from transformers import AutoModelForSequenceClassification, AutoTokenizer
 
 from common.constants import CLOUD_MODEL_CHOICES, VECTOR_DB_PATH
@@ -18,8 +14,8 @@ from common.utils.logger import logger
 from configurations.startup import get_server_settings
 from repositories.serialization.access_keys import AccessKeySerializer
 from repositories.vectors import LanceVectorDatabase
-from services.llm.cloud import LLMError, LLMTimeout
-from services.llm.ollama_client import OllamaError, OllamaTimeout
+from services.llm.cloud import CloudLLMClient, LLMError, LLMTimeout
+from services.llm.ollama_client import OllamaClient, OllamaError, OllamaTimeout
 from services.retrieval.embedding_model import (
     EmbeddingModelSpec,
     build_embedding_model_signature,
@@ -65,50 +61,7 @@ class LocalCrossEncoderReranker:
 
 
 ###############################################################################
-def _build_openai_embeddings_model(
-    *,
-    api_key: str,
-    model: str,
-    timeout_s: float,
-) -> OpenAIEmbeddings:
-    return OpenAIEmbeddings(
-        api_key=SecretStr(api_key),
-        model=model,
-        timeout=timeout_s,
-        check_embedding_ctx_length=False,
-    )
-
-
-###############################################################################
-def _build_gemini_embeddings_model(
-    *,
-    api_key: str,
-    model: str,
-    timeout_s: float,
-) -> GoogleGenerativeAIEmbeddings:
-    return GoogleGenerativeAIEmbeddings(
-        google_api_key=SecretStr(api_key),
-        model=model,
-        request_options={"timeout": timeout_s},
-    )
-
-
-###############################################################################
-def _build_ollama_embeddings_model(
-    *,
-    base_url: str,
-    model: str,
-    timeout_s: float,
-) -> OllamaEmbeddings:
-    return OllamaEmbeddings(
-        base_url=base_url,
-        model=model,
-        client_kwargs={"timeout": timeout_s},
-    )
-
-
-###############################################################################
-def _map_langchain_embedding_exception(
+def _map_embedding_exception(
     exc: Exception,
     *,
     provider: str,
@@ -148,7 +101,9 @@ class CloudEmbeddingGenerator:
         resolved_model = (model or "").strip()
         if not resolved_model:
             raise ValueError("Cloud embedding model is required")
-        self.provider = cast(Literal["openai", "gemini"], normalized_provider)
+        self.provider: ProviderName = cast(
+            Literal["openai", "gemini"], normalized_provider
+        )
         self.model = resolved_model
         self.timeout_s = float(timeout_s)
         self.api_key = self.resolve_provider_access_key(self.provider)
@@ -174,23 +129,14 @@ class CloudEmbeddingGenerator:
         if not texts:
             return []
         try:
-            if self.provider == "openai":
-                embeddings_model = _build_openai_embeddings_model(
-                    api_key=self.api_key,
-                    model=self.model,
-                    timeout_s=self.timeout_s,
-                )
-            else:
-                embeddings_model = _build_gemini_embeddings_model(
-                    api_key=self.api_key,
-                    model=self.model,
-                    timeout_s=self.timeout_s,
-                )
-            vectors = await asyncio.to_thread(embeddings_model.embed_documents, texts)
+            async with CloudLLMClient(
+                provider=self.provider,
+                default_model=self.model,
+                timeout_s=self.timeout_s,
+            ) as client:
+                vectors = await client.embed(model=self.model, input_texts=texts)
         except Exception as exc:  # noqa: BLE001
-            raise _map_langchain_embedding_exception(
-                exc, provider=self.provider
-            ) from exc
+            raise _map_embedding_exception(exc, provider=self.provider) from exc
         return self.normalize_embeddings(vectors, expected=len(texts))
 
     # -------------------------------------------------------------------------
@@ -238,15 +184,15 @@ class OllamaEmbeddingGenerator:
     async def embed_texts(self, texts: list[str]) -> list[list[float]]:
         if not texts:
             return []
-        embeddings_model = _build_ollama_embeddings_model(
-            base_url=self.base_url,
-            model=self.model,
-            timeout_s=self.timeout_s,
-        )
         try:
-            vectors = await asyncio.to_thread(embeddings_model.embed_documents, texts)
+            async with OllamaClient(
+                base_url=self.base_url,
+                timeout_s=self.timeout_s,
+                default_model=self.model,
+            ) as client:
+                vectors = await client.embed(model=self.model, input_texts=texts)
         except Exception as exc:  # noqa: BLE001
-            raise _map_langchain_embedding_exception(exc, provider="ollama") from exc
+            raise _map_embedding_exception(exc, provider="ollama") from exc
         return self.normalize_embeddings(vectors, expected=len(texts))
 
     # -------------------------------------------------------------------------

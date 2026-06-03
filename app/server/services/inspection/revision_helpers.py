@@ -41,8 +41,8 @@ def build_revision_section_validation(
     changed_after_revision: list[str] = []
     selected_norm = normalize_text_value(selected_text or "")
     for key in section_keys:
-        original_text = normalize_text_value(source_sections.get(key))
-        extracted_text = normalize_text_value(extracted_sections.get(key))
+        original_text = normalize_text_value(source_sections.get(key)) or ""
+        extracted_text = normalize_text_value(extracted_sections.get(key)) or ""
         original_in_scope = not selected_norm or bool(
             extracted_text
             or (original_text and selected_norm in original_text)

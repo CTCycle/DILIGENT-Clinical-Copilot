@@ -61,12 +61,18 @@ class DataInspectionEndpoint:
         payload: dict[str, object],
         message: str,
     ) -> JobStartResponse:
+        poll_interval_value = payload.get("poll_interval")
+        poll_interval = (
+            float(poll_interval_value)
+            if isinstance(poll_interval_value, int | float)
+            else 1.0
+        )
         return JobStartResponse(
             job_id=str(payload["job_id"]),
             job_type=str(payload["job_type"]),
             status=str(payload["status"]),
             message=message,
-            poll_interval=float(payload.get("poll_interval") or 1.0),
+            poll_interval=poll_interval,
         )
 
     # -------------------------------------------------------------------------

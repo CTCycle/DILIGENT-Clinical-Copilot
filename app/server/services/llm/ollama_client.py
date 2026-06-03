@@ -6,7 +6,6 @@ from collections.abc import AsyncGenerator
 from typing import Any, Literal, NoReturn
 
 import httpx
-from langchain_ollama import ChatOllama, OllamaEmbeddings
 
 from configurations.startup import get_server_settings
 from services.llm import ollama_chat, ollama_residency, ollama_structured
@@ -409,35 +408,6 @@ class OllamaClient:
         return await ollama_chat.ensure_model_ready(self, name)
 
     # -------------------------------------------------------------------------
-    def _build_ollama_chat_model(
-        self,
-        *,
-        model: str,
-        format: str | None,
-        temperature: float,
-        think: bool,
-        options: dict[str, Any] | None,
-        keep_alive: str | None,
-    ) -> ChatOllama:
-        return ollama_chat._build_ollama_chat_model(
-            self,
-            model=model,
-            format=format,
-            temperature=temperature,
-            think=think,
-            options=options,
-            keep_alive=keep_alive,
-        )
-
-    # -------------------------------------------------------------------------
-    def _build_ollama_embeddings_model(
-        self,
-        *,
-        model: str,
-    ) -> OllamaEmbeddings:
-        return ollama_chat._build_ollama_embeddings_model(self, model=model)
-
-    # -------------------------------------------------------------------------
     async def embed(
         self,
         *,
@@ -463,10 +433,10 @@ class OllamaClient:
 
     # -------------------------------------------------------------------------
     @staticmethod
-    async def iter_json_stream_events(
+    def iter_json_stream_events(
         response: httpx.Response,
     ) -> AsyncGenerator[dict[str, Any], None]:
-        return await ollama_chat.iter_json_stream_events(response)
+        return ollama_chat.iter_json_stream_events(response)
 
     # -------------------------------------------------------------------------
     async def list_models(self) -> list[str]:
