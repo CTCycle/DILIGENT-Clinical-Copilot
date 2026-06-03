@@ -13,6 +13,7 @@ All business APIs are mounted under `/api`. The frontend uses `/api` as the stab
 
 ## Session And Clinical Routes
 - `GET /api/health`
+- `GET /api/clinical/section-template`
 - `POST /api/clinical/validate-input`
 - `POST /api/clinical/jobs`
 - `GET /api/clinical/jobs/{job_id}`

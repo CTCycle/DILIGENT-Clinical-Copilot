@@ -26,7 +26,7 @@ def load_json(path: str | Path) -> dict[str, Any] | None:
     try:
         with metadata_path.open("r", encoding="utf-8") as handle:
             return json.load(handle)
-    except json.JSONDecodeError, OSError:
+    except (json.JSONDecodeError, OSError):
         return None
 
 
@@ -103,3 +103,4 @@ def should_cancel(should_stop: Callable[[], bool] | None) -> bool:
     if should_stop is None:
         return False
     return bool(should_stop())
+

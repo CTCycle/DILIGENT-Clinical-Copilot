@@ -5,19 +5,14 @@ import contextlib
 import inspect
 import json
 import math
-import os
 import re
 import shutil
-from collections.abc import AsyncGenerator, Awaitable, Callable
-from typing import Any, Literal, TypeAlias
+from collections.abc import AsyncGenerator
+from typing import Any, Literal
 
 import httpx
 from langchain_core.messages import (
-    AIMessage,
     AIMessageChunk,
-    BaseMessage,
-    HumanMessage,
-    SystemMessage,
 )
 from langchain_ollama import ChatOllama, OllamaEmbeddings
 
@@ -25,97 +20,14 @@ from common.utils.logger import logger
 from common.utils.types import extract_positive_int
 from configurations.llm_configs import LLMRuntimeConfig
 from configurations.startup import get_server_settings
-
-ProviderName = Literal["openai", "gemini"]
-RuntimePurpose = Literal["clinical", "parser"]
-
-
-###############################################################################
-class OllamaError(RuntimeError):
-    pass
-
-
-###############################################################################
-class OllamaTimeout(OllamaError):
-    """Raised when requests to Ollama exceed the configured timeout."""
-
-
-ProgressCb: TypeAlias = Callable[[dict[str, Any]], None | Awaitable[None]]
-
-
-###############################################################################
-def _env_float(name: str, default: float) -> float:
-    raw = os.getenv(name)
-    if raw is None:
-        return default
-    try:
-        return float(raw)
-    except TypeError, ValueError:
-        return default
-
-
-###############################################################################
-def _env_str(name: str, default: str) -> str:
-    raw = os.getenv(name)
-    if raw is None:
-        return default
-    value = raw.strip()
-    return value or default
-
-
-###############################################################################
-def _build_langchain_messages(messages: list[dict[str, str]]) -> list[BaseMessage]:
-    output: list[BaseMessage] = []
-    for message in messages:
-        role = str(message.get("role", "user")).strip().lower()
-        content = str(message.get("content", ""))
-        if role == "system":
-            output.append(SystemMessage(content=content))
-        elif role in {"assistant", "model"}:
-            output.append(AIMessage(content=content))
-        else:
-            output.append(HumanMessage(content=content))
-    return output
-
-
-###############################################################################
-def _normalize_langchain_content(content: Any) -> dict[str, Any] | str:
-    if isinstance(content, dict):
-        return content
-    if isinstance(content, list):
-        chunks: list[str] = []
-        for item in content:
-            if isinstance(item, dict):
-                text = item.get("text")
-                if isinstance(text, str):
-                    chunks.append(text)
-                continue
-            if isinstance(item, str):
-                chunks.append(item)
-                continue
-            chunks.append(str(item))
-        content = "".join(chunks)
-    if isinstance(content, str):
-        try:
-            loaded = json.loads(content)
-        except json.JSONDecodeError:
-            return content
-        return loaded if isinstance(loaded, dict) else content
-    return str(content)
-
-
-###############################################################################
-def _map_ollama_langchain_exception(exc: Exception) -> OllamaError:
-    if isinstance(exc, OllamaError):
-        return exc
-    if isinstance(exc, TimeoutError):
-        return OllamaTimeout("Timed out waiting for Ollama response")
-    if isinstance(exc, httpx.TimeoutException):
-        return OllamaTimeout("Timed out waiting for Ollama response")
-    error_name = exc.__class__.__name__.lower()
-    if "timeout" in error_name:
-        return OllamaTimeout("Timed out waiting for Ollama response")
-    return OllamaError(f"Ollama request failed: {exc}")
+from services.llm.ollama_runtime import (
+    OllamaError,
+    OllamaTimeout,
+    ProgressCb,
+    build_langchain_messages as _build_langchain_messages,
+    map_ollama_langchain_exception as _map_ollama_langchain_exception,
+    normalize_langchain_content as _normalize_langchain_content,
+)
 
 
 ###############################################################################
@@ -221,13 +133,13 @@ def resolve_temperature(
     if temperature is not None:
         try:
             temp_value = float(temperature)
-        except TypeError, ValueError:
+        except (TypeError, ValueError):
             temp_value = default_temp
     if options_payload and "temperature" in options_payload:
         if temperature is None:
             try:
                 temp_value = float(options_payload["temperature"])
-            except TypeError, ValueError:
+            except (TypeError, ValueError):
                 temp_value = default_temp
         options_payload.pop("temperature", None)
         if not options_payload:
@@ -623,7 +535,7 @@ async def is_server_online(self) -> bool:
     try:
         resp = await self.client.get("/api/tags")
         resp.raise_for_status()
-    except httpx.RequestError, httpx.HTTPStatusError:
+    except (httpx.RequestError, httpx.HTTPStatusError):
         return False
     return True
 
@@ -878,3 +790,4 @@ async def calculate_context_window(
         floor = min(limit, min_ctx)
         return max(upper, floor)
     return target
+

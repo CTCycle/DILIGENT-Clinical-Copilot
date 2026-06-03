@@ -132,7 +132,7 @@ class DataInspectionService:
         manifest_path = self.rag_manifest_path()
         try:
             payload = json.loads(manifest_path.read_text(encoding="utf-8"))
-        except OSError, json.JSONDecodeError:
+        except (OSError, json.JSONDecodeError):
             return {}
         return payload if isinstance(payload, dict) else {}
 
@@ -1032,3 +1032,5 @@ class DataInspectionService:
         if payload is None:
             return False
         return self.jobs.cancel_job(job_id) is not None
+
+

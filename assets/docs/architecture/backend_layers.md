@@ -9,6 +9,7 @@ Last updated: 2026-06-03
   - Owns clinical orchestration, model orchestration, inspection workflows, and job control.
   - Inspection update orchestration is implemented in `app/server/services/inspection/update_jobs.py` through `DataInspectionUpdateJobRunner`, while `DataInspectionService` remains the endpoint-facing facade.
   - `app/server/services/text/vocabulary.py` provides cache-facing text normalization business access and does not manage SQLAlchemy sessions directly.
+  - `app/server/services/llm/ollama_runtime.py` owns canonical Ollama runtime aliases, errors, environment helpers, LangChain message normalization, and exception mapping. Ollama service modules must import these definitions instead of duplicating or monkey-patching them.
 - Domain layer: `app/server/domain/*`
   - Owns Pydantic and domain request-response schemas and typed contracts.
   - Clinical extraction schemas used by orchestration live under `app/server/domain/clinical/`.
