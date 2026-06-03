@@ -19,12 +19,19 @@ VECTOR_DB_PATH = str(Path(SOURCES_PATH) / "vectors")
 RXNAV_CURATED_ALIASES_PATH = str(Path(SOURCES_PATH) / "rxnav_curated_aliases.json")
 ENV_FILE_PATH = str(Path(SETTING_PATH) / ".env")
 DATABASE_FILENAME = "database.db"
+CLIENT_DIST_PATH = str(Path(APP_DIR) / "client" / "dist" / "browser")
+CLIENT_ASSETS_PATH = str(Path(CLIENT_DIST_PATH) / "assets")
+CLIENT_INDEX_FILE_PATH = str(Path(CLIENT_DIST_PATH) / "index.html")
 
 ###############################################################################
 CONFIGURATIONS_FILE = str(Path(SETTING_PATH) / "configurations.json")
 
 # [APP DEFAULTS]
 ###############################################################################
+FASTAPI_ROOT_ENDPOINT = "/"
+FASTAPI_API_PREFIX = "/api"
+FASTAPI_ASSETS_ENDPOINT = "/assets"
+FASTAPI_SPA_FALLBACK_ENDPOINT = "/{full_path:path}"
 FASTAPI_TITLE = "DILI Backend"
 FASTAPI_VERSION = "1.0.0"
 FASTAPI_DESCRIPTION = "FastAPI backend"

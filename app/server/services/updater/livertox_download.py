@@ -1,12 +1,12 @@
 from __future__ import annotations
 
 import asyncio
-import os
 import re
 import sys
 from contextlib import nullcontext
-from datetime import UTC, datetime
 from collections.abc import Callable
+from datetime import UTC, datetime
+from pathlib import Path, PurePosixPath
 from typing import Any
 
 import httpx
@@ -69,9 +69,9 @@ async def download_bulk_data(
             "last_modified": head.headers.get("Last-Modified"),
             "source_url": str(head.url),
         }
-        dest_dir = os.path.abspath(dest_path)
-        os.makedirs(dest_dir, exist_ok=True)
-        file_path = os.path.join(dest_dir, self.file_name)
+        dest_dir = Path(dest_path).resolve()
+        dest_dir.mkdir(parents=True, exist_ok=True)
+        file_path = dest_dir / self.file_name
 
         stored_metadata = livertox_common.load_json(self.archive_metadata_path)
         if self.redownload:
@@ -79,12 +79,12 @@ async def download_bulk_data(
 
         if (
             stored_metadata
-            and os.path.isfile(file_path)
+            and file_path.is_file()
             and livertox_common.metadata_matches(stored_metadata, metadata)
         ):
             logger.info("LiverTox archive unchanged; skipping download")
             return {
-                "file_path": file_path,
+                "file_path": str(file_path),
                 "size": metadata.get("size", 0),
                 "last_modified": metadata.get("last_modified"),
                 "downloaded": False,
@@ -95,7 +95,7 @@ async def download_bulk_data(
         await download_file(
             client,
             url,
-            file_path,
+            str(file_path),
             metadata.get("size", 0),
             self.file_name,
             chunk_size=self.chunk_size,
@@ -106,7 +106,7 @@ async def download_bulk_data(
         livertox_common.save_masterlist_metadata(self.archive_metadata_path, metadata)
 
     return {
-        "file_path": file_path,
+        "file_path": str(file_path),
         "size": metadata.get("size", 0),
         "last_modified": metadata.get("last_modified"),
         "downloaded": True,
@@ -171,7 +171,7 @@ async def download_master_list(
             stored_metadata = None
         if (
             stored_metadata
-            and os.path.isfile(self.master_list_path)
+            and Path(self.master_list_path).is_file()
             and livertox_common.metadata_matches(stored_metadata, metadata)
         ):
             logger.info("Master list unchanged; skipping download")
@@ -189,7 +189,7 @@ async def download_master_list(
             master_url,
             self.master_list_path,
             metadata.get("size", 0),
-            os.path.basename(self.master_list_path),
+            Path(self.master_list_path).name,
             chunk_size=self.chunk_size,
             progress_callback=progress_callback,
             progress_start=5.0,
@@ -321,8 +321,9 @@ async def resolve_master_list_from_bin(
                 "https://www.ncbi.nlm.nih.gov/"
             ) and not human_url.startswith(base_url):
                 continue
-            if "master" in os.path.basename(human_url).lower():
-                candidates.append((human_url, os.path.basename(human_url)))
+            candidate_name = PurePosixPath(httpx.URL(human_url).path).name
+            if "master" in candidate_name.lower():
+                candidates.append((human_url, candidate_name))
     if not candidates:
         raise RuntimeError("Unable to locate LiverTox master list link on FTP bin page")
     candidates.sort(key=lambda item: item[0])
@@ -471,10 +472,11 @@ async def fetch_candidate_with_get(
 
 
 def collect_local_archive_info(self, archive_path: str) -> dict[str, Any]:
-    if not os.path.isfile(archive_path):
+    path = Path(archive_path)
+    if not path.is_file():
         raise RuntimeError(
             "LiverTox archive not found; enable REDOWNLOAD to fetch a fresh copy."
         )
-    size = os.path.getsize(archive_path)
-    modified = datetime.fromtimestamp(os.path.getmtime(archive_path), UTC).isoformat()
-    return {"file_path": archive_path, "size": size, "last_modified": modified}
+    size = path.stat().st_size
+    modified = datetime.fromtimestamp(path.stat().st_mtime, UTC).isoformat()
+    return {"file_path": str(path), "size": size, "last_modified": modified}

@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-import os
+from pathlib import Path
 
 import sqlalchemy
 from sqlalchemy import event
@@ -20,11 +20,11 @@ from repositories.serialization.catalogs import ReferenceCatalogSerializer
 ###############################################################################
 class SQLiteRepository:
     def __init__(self, settings: DatabaseSettings) -> None:
-        self.db_path = os.path.join(RESOURCES_PATH, DATABASE_FILENAME)
+        self.db_path = Path(RESOURCES_PATH) / DATABASE_FILENAME
         should_initialize_schema = bool(
-            self.db_path and not os.path.exists(self.db_path)
+            self.db_path and not self.db_path.exists()
         )
-        os.makedirs(os.path.dirname(self.db_path), exist_ok=True)
+        self.db_path.parent.mkdir(parents=True, exist_ok=True)
         self.engine: Engine = sqlalchemy.create_engine(
             f"sqlite:///{self.db_path}",
             echo=False,
@@ -44,7 +44,7 @@ class SQLiteRepository:
             ).ensure_seeded("provider_access_keys")
             logger.info(
                 "SQLite DB file was missing; created and initialized schema at %s",
-                self.db_path,
+                str(self.db_path),
             )
         self.session_factory = sessionmaker(bind=self.engine, future=True)
         self.catalogs = ReferenceCatalogSerializer(session_factory=self.session_factory)

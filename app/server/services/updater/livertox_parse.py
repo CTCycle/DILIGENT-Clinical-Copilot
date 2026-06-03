@@ -3,7 +3,6 @@ from __future__ import annotations
 import html
 import io
 import multiprocessing
-import os
 import re
 import tarfile
 import unicodedata
@@ -15,6 +14,7 @@ from concurrent.futures import (
     ProcessPoolExecutor,
     wait,
 )
+from pathlib import Path, PurePosixPath
 from typing import Any, cast
 
 import pandas as pd
@@ -120,8 +120,8 @@ def collect_monographs(
     progress_callback: Callable[[float, str], None] | None = None,
 ) -> list[dict[str, str]]:
     tar_path = archive_path or self.tar_file_path
-    normalized_path = os.path.abspath(tar_path)
-    if not os.path.isfile(normalized_path):
+    normalized_path = Path(tar_path).resolve()
+    if not normalized_path.is_file():
         raise FileNotFoundError(f"LiverTox archive missing at {normalized_path}")
     if not tarfile.is_tarfile(normalized_path):
         raise RuntimeError(f"Invalid LiverTox archive at {normalized_path}")
@@ -136,14 +136,19 @@ def collect_monographs(
         for member in archive.getmembers():
             if not member.isfile():
                 continue
-            normalized_name = os.path.normpath(member.name)
-            if os.path.isabs(normalized_name) or normalized_name.startswith(".."):
+            normalized_name = str(PurePosixPath(member.name))
+            path_parts = PurePosixPath(normalized_name).parts
+            if (
+                PurePosixPath(normalized_name).is_absolute()
+                or normalized_name.startswith("..")
+                or any(part == ".." for part in path_parts)
+            ):
                 logger.warning("Skipping unsafe archive member: %s", member.name)
                 continue
-            extension = os.path.splitext(normalized_name.lower())[1]
+            extension = PurePosixPath(normalized_name.lower()).suffix
             if extension not in self.supported_extensions:
                 continue
-            base_name = os.path.basename(member.name).lower()
+            base_name = PurePosixPath(member.name).name.lower()
             if base_name in selected_basenames:
                 continue
             selected_basenames.add(base_name)
@@ -298,7 +303,7 @@ def drain_monograph_futures(
     done, _ = wait(set(in_flight), return_when=return_when)
     for future in done:
         member_name = in_flight.pop(future, "")
-        base_name = os.path.basename(member_name).lower()
+        base_name = PurePosixPath(member_name).name.lower()
         try:
             record = future.result()
         except Exception as exc:  # noqa: BLE001
@@ -431,8 +436,8 @@ def extract_nbk(member_name: str, content: str) -> str | None:
 
 
 def derive_identifier(member_name: str) -> str:
-    base = os.path.basename(member_name)
-    stem = os.path.splitext(base)[0]
+    base = PurePosixPath(member_name).name
+    stem = PurePosixPath(base).stem
     cleaned = normalize_whitespace(strip_punctuation(stem))
     return cleaned or base
 
