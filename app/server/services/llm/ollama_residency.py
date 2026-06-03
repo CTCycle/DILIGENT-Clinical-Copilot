@@ -9,110 +9,13 @@ import re
 import shutil
 import subprocess
 import time
-from collections.abc import Awaitable, Callable
-from typing import Any, Literal, TypeAlias
+from typing import Any
 
 import httpx
-from langchain_core.messages import (
-    AIMessage,
-    BaseMessage,
-    HumanMessage,
-    SystemMessage,
-)
 
 from common.utils.logger import logger
 from configurations.llm_configs import LLMRuntimeConfig
-
-ProviderName = Literal["openai", "gemini"]
-RuntimePurpose = Literal["clinical", "parser"]
-
-
-###############################################################################
-class OllamaError(RuntimeError):
-    pass
-
-
-###############################################################################
-class OllamaTimeout(OllamaError):
-    """Raised when requests to Ollama exceed the configured timeout."""
-
-
-ProgressCb: TypeAlias = Callable[[dict[str, Any]], None | Awaitable[None]]
-
-
-###############################################################################
-def _env_float(name: str, default: float) -> float:
-    raw = os.getenv(name)
-    if raw is None:
-        return default
-    try:
-        return float(raw)
-    except TypeError, ValueError:
-        return default
-
-
-###############################################################################
-def _env_str(name: str, default: str) -> str:
-    raw = os.getenv(name)
-    if raw is None:
-        return default
-    value = raw.strip()
-    return value or default
-
-
-###############################################################################
-def _build_langchain_messages(messages: list[dict[str, str]]) -> list[BaseMessage]:
-    output: list[BaseMessage] = []
-    for message in messages:
-        role = str(message.get("role", "user")).strip().lower()
-        content = str(message.get("content", ""))
-        if role == "system":
-            output.append(SystemMessage(content=content))
-        elif role in {"assistant", "model"}:
-            output.append(AIMessage(content=content))
-        else:
-            output.append(HumanMessage(content=content))
-    return output
-
-
-###############################################################################
-def _normalize_langchain_content(content: Any) -> dict[str, Any] | str:
-    if isinstance(content, dict):
-        return content
-    if isinstance(content, list):
-        chunks: list[str] = []
-        for item in content:
-            if isinstance(item, dict):
-                text = item.get("text")
-                if isinstance(text, str):
-                    chunks.append(text)
-                continue
-            if isinstance(item, str):
-                chunks.append(item)
-                continue
-            chunks.append(str(item))
-        content = "".join(chunks)
-    if isinstance(content, str):
-        try:
-            loaded = json.loads(content)
-        except json.JSONDecodeError:
-            return content
-        return loaded if isinstance(loaded, dict) else content
-    return str(content)
-
-
-###############################################################################
-def _map_ollama_langchain_exception(exc: Exception) -> OllamaError:
-    if isinstance(exc, OllamaError):
-        return exc
-    if isinstance(exc, TimeoutError):
-        return OllamaTimeout("Timed out waiting for Ollama response")
-    if isinstance(exc, httpx.TimeoutException):
-        return OllamaTimeout("Timed out waiting for Ollama response")
-    error_name = exc.__class__.__name__.lower()
-    if "timeout" in error_name:
-        return OllamaTimeout("Timed out waiting for Ollama response")
-    return OllamaError(f"Ollama request failed: {exc}")
+from services.llm.ollama_runtime import OllamaError
 
 
 ###############################################################################
@@ -180,7 +83,7 @@ def extract_footprint_from_payload(
 async def list_running_models(self) -> dict[str, dict[str, Any]]:
     try:
         resp = await self.client.get("/api/ps")
-    except httpx.TimeoutException, httpx.RequestError:
+    except (httpx.TimeoutException, httpx.RequestError):
         return {}
     if resp.status_code == 404:
         return {}
@@ -565,7 +468,7 @@ def _get_available_vram_nvidia_smi() -> int:
             text=True,
             timeout=1.5,
         )
-    except OSError, subprocess.SubprocessError:
+    except (OSError, subprocess.SubprocessError):
         return 0
     if result.returncode != 0:
         return 0
@@ -622,7 +525,7 @@ def _get_available_memory_sysconf() -> int:
             pages = sysconf("SC_PHYS_PAGES")
         if isinstance(page_size, int) and isinstance(pages, int):
             return page_size * pages
-    except ValueError, OSError, AttributeError:
+    except (ValueError, OSError, AttributeError):
         pass
     return 0
 
@@ -656,6 +559,7 @@ def _get_available_memory_proc() -> int:
                 parsed = _parse_meminfo_line(line)
                 if parsed is not None:
                     return parsed
-    except FileNotFoundError, PermissionError, ValueError:
+    except (FileNotFoundError, PermissionError, ValueError):
         pass
     return 0
+
