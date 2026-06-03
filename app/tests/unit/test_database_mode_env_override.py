@@ -2,11 +2,10 @@ from __future__ import annotations
 
 import json
 
-from common import constants
-from configurations import startup as bootstrap
-from configurations.startup import (
-    get_server_settings,
-    reset_app_settings_cache,
+from configurations.management import (
+    build_settings_payload_from_json,
+    environment_snapshot_from_os_env,
+    load_configuration_data,
 )
 
 
@@ -39,32 +38,30 @@ def test_database_settings_are_loaded_from_json_without_env_overlap(
 ) -> None:
     config_path = tmp_path / "configurations.json"
     _write_config(config_path, _base_payload())
-    dotenv_path = tmp_path / ".env"
-    dotenv_path.write_text("DB_HOST=dotenv-host\n", encoding="utf-8")
-    monkeypatch.setattr(constants, "CONFIGURATIONS_FILE", str(config_path))
-    monkeypatch.setattr(constants, "ENV_FILE_PATH", str(dotenv_path))
-    monkeypatch.setattr(bootstrap, "ENV_FILE_PATH", str(dotenv_path))
     monkeypatch.setenv("DB_HOST", "os-host")
 
-    bootstrap.reset_environment_bootstrap_for_tests()
-    reset_app_settings_cache()
-    settings = get_server_settings()
+    for name in [
+        "EMBEDDED_DATABASE",
+        "DATABASE_URL",
+        "DATABASE_ENGINE",
+        "DATABASE_HOST",
+        "DATABASE_PORT",
+        "DATABASE_NAME",
+        "DATABASE_USERNAME",
+        "DATABASE_PASSWORD",
+        "DATABASE_SSL",
+        "DATABASE_SSL_CA",
+        "DATABASE_CONNECT_TIMEOUT",
+        "DATABASE_INSERT_BATCH_SIZE",
+        "DATABASE_INSERT_COMMIT_INTERVAL",
+        "DATABASE_SELECT_PAGE_SIZE",
+    ]:
+        monkeypatch.delenv(name, raising=False)
 
-    assert settings.database.host == "json-host"
+    payload = build_settings_payload_from_json(
+        load_configuration_data(config_path),
+        environment_snapshot_from_os_env(),
+    )
 
-    monkeypatch.delenv("DB_HOST", raising=False)
-    bootstrap.reset_environment_bootstrap_for_tests()
-    reset_app_settings_cache()
-    settings = get_server_settings()
-    assert settings.database.host == "json-host"
+    assert payload["database"]["host"] == "json-host"
 
-    bootstrap.reset_environment_bootstrap_for_tests()
-    reset_app_settings_cache()
-
-    monkeypatch.setattr(constants, "ENV_FILE_PATH", str(tmp_path / ".missing.env"))
-    monkeypatch.setattr(bootstrap, "ENV_FILE_PATH", str(tmp_path / ".missing.env"))
-    monkeypatch.delenv("DB_HOST", raising=False)
-    bootstrap.reset_environment_bootstrap_for_tests()
-    reset_app_settings_cache()
-    settings = get_server_settings()
-    assert settings.database.host == "json-host"

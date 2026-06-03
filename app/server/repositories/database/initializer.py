@@ -121,7 +121,7 @@ def initialize_sqlite_database(
             result.manifests_seeded,
             result.entries_written,
         )
-        reload_reference_catalog_snapshot()
+        reload_reference_catalog_snapshot(repository)
     logger.info("Initialized SQLite database schema at %s", repository.db_path)
 
 
@@ -197,7 +197,7 @@ def ensure_postgres_database(
                 result.manifests_seeded,
                 result.entries_written,
             )
-            reload_reference_catalog_snapshot()
+            reload_reference_catalog_snapshot(repository)
     logger.info("Ensured PostgreSQL tables exist in %s", target_database)
 
     return target_database

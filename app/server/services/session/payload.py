@@ -126,7 +126,7 @@ def normalize_visit_date(
             month = int(month_raw)
             year = int(year_raw)
             normalized = date(year, month, day)
-        except TypeError, ValueError:
+        except (TypeError, ValueError):
             return None
 
     elif isinstance(value, datetime):
@@ -208,3 +208,4 @@ class PayloadSanitizationService:
             laboratory_analysis=laboratory_analysis,
             use_rag=use_rag,
         )
+

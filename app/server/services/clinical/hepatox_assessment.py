@@ -509,7 +509,7 @@ async def prepare_drug_assessment(
     if match_confidence is not None:
         try:
             match_confidence = float(match_confidence)
-        except TypeError, ValueError:
+        except (TypeError, ValueError):
             match_confidence = None
     match_reason = livertox_data.get("match_reason")
     match_quality = classify_match_evidence(
@@ -920,7 +920,7 @@ def extract_rate_limit_wait_hint_seconds(exc: Exception) -> float | None:
         return None
     try:
         parsed = float(match.group(1))
-    except TypeError, ValueError:
+    except (TypeError, ValueError):
         return None
     if parsed <= 0:
         return None
@@ -1103,3 +1103,4 @@ def assess_pattern_compatibility(
     if not excerpt_text:
         return f"Pattern '{pattern_value}' available; LiverTox excerpt unavailable."
     return f"Pattern '{pattern_value}' can be compared against LiverTox evidence."
+

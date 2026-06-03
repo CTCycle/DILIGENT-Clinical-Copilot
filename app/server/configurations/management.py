@@ -2,7 +2,6 @@ from __future__ import annotations
 
 import json
 import os
-from dataclasses import dataclass
 from pathlib import Path
 from threading import RLock
 from typing import Any
@@ -50,6 +49,10 @@ from domain.settings.configuration import (
     ServerSettings,
     SessionPipelineSettings,
 )
+from domain.settings.environment import (
+    DatabaseEnvironmentSnapshot,
+    EnvironmentSnapshot,
+)
 
 
 def ensure_mapping(value: Any) -> dict[str, Any]:
@@ -70,41 +73,6 @@ def load_configuration_data(path: str | Path) -> dict[str, Any]:
     if not isinstance(data, dict):
         raise RuntimeError("Configuration must be a JSON object.")
     return data
-
-
-###############################################################################
-###############################################################################
-class EnvironmentSnapshot:
-    def __init__(
-        self,
-        *,
-        ollama_url: str | None,
-        ollama_host: str | None,
-        ollama_port: int | None,
-        database: "DatabaseEnvironmentSnapshot",
-    ) -> None:
-        self.ollama_url = ollama_url
-        self.ollama_host = ollama_host
-        self.ollama_port = ollama_port
-        self.database = database
-
-
-@dataclass(frozen=True)
-class DatabaseEnvironmentSnapshot:
-    embedded_database: str | None
-    url: str | None
-    engine: str | None
-    host: str | None
-    port: str | None
-    database_name: str | None
-    username: str | None
-    password: str | None
-    ssl: str | None
-    ssl_ca: str | None
-    connect_timeout: str | None
-    insert_batch_size: str | None
-    insert_commit_interval: str | None
-    select_page_size: str | None
 
 
 ###############################################################################
@@ -568,6 +536,17 @@ def build_settings_payload_from_json(
 ) -> dict[str, Any]:
     payload = ensure_mapping(config)
     llm_defaults = _default_llm_runtime_defaults(env)
+    database_payload = ensure_mapping(payload.get("database"))
+    database_environment_payload = {
+        **database_payload,
+        **env.database.model_dump(exclude_none=True),
+    }
+    database_environment = DatabaseEnvironmentSnapshot.model_validate(
+        {
+            key: (None if value is None else str(value))
+            for key, value in database_environment_payload.items()
+        }
+    )
     jobs_payload = ensure_mapping(payload.get("jobs"))
     drugs_matcher_payload = ensure_mapping(payload.get("drugs_matcher"))
     rag_payload = ensure_mapping(payload.get("rag"))
@@ -577,7 +556,7 @@ def build_settings_payload_from_json(
     return {
         "fastapi": _build_fastapi_settings().model_dump(),
         "jobs": _build_jobs_settings(jobs_payload).model_dump(),
-        "database": _build_database_settings(env.database).model_dump(),
+        "database": _build_database_settings(database_environment).model_dump(),
         "drugs_matcher": _build_drugs_matcher_settings(
             drugs_matcher_payload
         ).model_dump(),

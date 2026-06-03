@@ -1,127 +1,28 @@
 from __future__ import annotations
-# ruff: noqa: E402
 
 import asyncio
-import json
-import os
 from collections import deque
-from collections.abc import AsyncGenerator, Awaitable, Callable
-from typing import Any, Literal, NoReturn, TypeAlias
+from collections.abc import AsyncGenerator
+from typing import Any, Literal, NoReturn
 
 import httpx
-from langchain_core.messages import (
-    AIMessage,
-    BaseMessage,
-    HumanMessage,
-    SystemMessage,
-)
 from langchain_ollama import ChatOllama, OllamaEmbeddings
 
 from configurations.startup import get_server_settings
+from services.llm import ollama_chat, ollama_residency, ollama_structured
+from services.llm.ollama_runtime import (
+    OllamaError,
+    OllamaTimeout,
+    ProgressCb,
+    env_float as _env_float,
+    env_str as _env_str,
+)
 from services.llm.structured import (
     StructuredOutputParser,
     T,
 )
 
-ProviderName = Literal["openai", "gemini"]
-RuntimePurpose = Literal["clinical", "parser"]
-
-
-###############################################################################
-class OllamaError(RuntimeError):
-    pass
-
-
-###############################################################################
-class OllamaTimeout(OllamaError):
-    """Raised when requests to Ollama exceed the configured timeout."""
-
-
-ProgressCb: TypeAlias = Callable[[dict[str, Any]], None | Awaitable[None]]
-
-
-###############################################################################
-def _env_float(name: str, default: float) -> float:
-    raw = os.getenv(name)
-    if raw is None:
-        return default
-    try:
-        return float(raw)
-    except TypeError, ValueError:
-        return default
-
-
-###############################################################################
-def _env_str(name: str, default: str) -> str:
-    raw = os.getenv(name)
-    if raw is None:
-        return default
-    value = raw.strip()
-    return value or default
-
-
-###############################################################################
-def _build_langchain_messages(messages: list[dict[str, str]]) -> list[BaseMessage]:
-    output: list[BaseMessage] = []
-    for message in messages:
-        role = str(message.get("role", "user")).strip().lower()
-        content = str(message.get("content", ""))
-        if role == "system":
-            output.append(SystemMessage(content=content))
-        elif role in {"assistant", "model"}:
-            output.append(AIMessage(content=content))
-        else:
-            output.append(HumanMessage(content=content))
-    return output
-
-
-###############################################################################
-def _normalize_langchain_content(content: Any) -> dict[str, Any] | str:
-    if isinstance(content, dict):
-        return content
-    if isinstance(content, list):
-        chunks: list[str] = []
-        for item in content:
-            if isinstance(item, dict):
-                text = item.get("text")
-                if isinstance(text, str):
-                    chunks.append(text)
-                continue
-            if isinstance(item, str):
-                chunks.append(item)
-                continue
-            chunks.append(str(item))
-        content = "".join(chunks)
-    if isinstance(content, str):
-        try:
-            loaded = json.loads(content)
-        except json.JSONDecodeError:
-            return content
-        return loaded if isinstance(loaded, dict) else content
-    return str(content)
-
-
-###############################################################################
-def _map_ollama_langchain_exception(exc: Exception) -> OllamaError:
-    if isinstance(exc, OllamaError):
-        return exc
-    if isinstance(exc, TimeoutError):
-        return OllamaTimeout("Timed out waiting for Ollama response")
-    if isinstance(exc, httpx.TimeoutException):
-        return OllamaTimeout("Timed out waiting for Ollama response")
-    error_name = exc.__class__.__name__.lower()
-    if "timeout" in error_name:
-        return OllamaTimeout("Timed out waiting for Ollama response")
-    return OllamaError(f"Ollama request failed: {exc}")
-
-
-###############################################################################
-from services.llm import ollama_chat, ollama_residency, ollama_structured
-
-ollama_chat.OllamaError = OllamaError
-ollama_chat.OllamaTimeout = OllamaTimeout
-ollama_chat._map_ollama_langchain_exception = _map_ollama_langchain_exception
-ollama_structured.OllamaError = OllamaError
+__all__ = ["OllamaClient", "OllamaError", "OllamaTimeout"]
 
 
 class OllamaClient:
@@ -939,3 +840,4 @@ class OllamaClient:
 
 
 ###############################################################################
+

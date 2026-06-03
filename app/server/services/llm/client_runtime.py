@@ -38,7 +38,7 @@ def _set_retry_attempts(owner: LLMClientRuntimeOwner, provider: str) -> None:
         current = getattr(owner, "extraction_retry_attempts", None)
         try:
             current_attempts = int(current)
-        except TypeError, ValueError:
+        except (TypeError, ValueError):
             current_attempts = default_attempts
         if current_attempts <= 0:
             current_attempts = default_attempts
@@ -118,3 +118,4 @@ async def ensure_runtime_client(
             and hasattr(owner.client, "default_model")
         ):
             owner.client.default_model = normalized_model  # type: ignore[attr-defined]
+
