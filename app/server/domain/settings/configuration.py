@@ -63,8 +63,8 @@ class RagSettings(BaseModel):
     embedding_batch_size: int
     use_hybrid_search: bool
     use_reranking: bool
-    rerank_candidate_k: int
-    rerank_top_n: int
+    retrieval_candidate_count: int
+    retrieval_selected_count: int
     reranker_model: str
     hybrid_vector_weight: float
     hybrid_text_weight: float

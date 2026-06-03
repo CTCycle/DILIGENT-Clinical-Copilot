@@ -219,6 +219,8 @@ class VectorSerializer:
                 relative_path=relative_path or file_name,
                 content_type=str(doc.metadata.get("content_type") or ""),
                 page_texts=[doc.page_content],
+                page_start_number=int(doc.metadata.get("page_number") or 1),
+                total_pages=int(doc.metadata.get("total_pages") or 1),
             )
             for chunk in smart_chunks:
                 metadata = dict(doc.metadata)

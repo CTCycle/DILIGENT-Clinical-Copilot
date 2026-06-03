@@ -3,7 +3,7 @@ from __future__ import annotations
 import hashlib
 import re
 import zipfile
-from datetime import date
+from datetime import date, datetime
 from pathlib import Path
 from typing import Any, Iterator
 from xml.etree import ElementTree
@@ -673,6 +673,7 @@ class DocumentSerializer:
             content_type="pdf",
             document_title=self.resolve_pdf_title(reader, file_path),
         )
+        metadata["total_pages"] = len(reader.pages)
         pages: list[Document] = []
         for index, page in enumerate(reader.pages, start=1):
             try:
@@ -786,6 +787,16 @@ class DocumentSerializer:
             "file_name": path.name,
             "document_title": resolved_title,
             "content_type": content_type,
+            "source_relative_path": str(
+                path.resolve().relative_to(self.documents_path.resolve())
+            ).replace("\\", "/"),
+            "source_file_size": path.stat().st_size if path.exists() else 0,
+            "source_last_modified": (
+                datetime.fromtimestamp(path.stat().st_mtime).isoformat()
+                if path.exists()
+                else None
+            ),
+            "total_pages": 1,
         }
 
     # -------------------------------------------------------------------------

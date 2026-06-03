@@ -50,7 +50,7 @@ from services.clinical.parser_validation import (
     WEEKDAY_TOKENS,
 )
 from services.llm.client_runtime import ensure_runtime_client
-from services.llm.prompts import (
+from common.prompts import (
     ANAMNESIS_DRUG_EXTRACTION_PROMPT,
     DRUG_EXTRACTION_PROMPT,
 )

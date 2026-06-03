@@ -8,7 +8,7 @@ from common.constants import (
     UNKNOWN_R_SCORE_TOKEN,
 )
 from domain.clinical.entities import PatientDrugs
-from services.llm.prompts import DILI_RAG_QUERY_PROMPT
+from common.prompts import DILI_RAG_QUERY_PROMPT
 
 
 ###############################################################################

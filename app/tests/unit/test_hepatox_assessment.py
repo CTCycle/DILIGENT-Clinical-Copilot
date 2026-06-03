@@ -18,7 +18,7 @@ from services.clinical.hepatox_core import (
     HepatotoxicityPatternAnalyzer,
     HepatoxConsultation,
 )
-from services.llm.prompts import (
+from common.prompts import (
     LIVERTOX_CLINICAL_SYSTEM_PROMPT,
     LIVERTOX_CLINICAL_USER_PROMPT,
     LIVERTOX_CONCLUSION_SYSTEM_PROMPT,
@@ -167,7 +167,7 @@ def test_request_drug_analysis_retries_on_transient_failure() -> None:
 
 def test_livertox_prompt_removes_per_drug_management_recommendation_directive() -> None:
     assert "Do not speculate, add outside facts" in LIVERTOX_CLINICAL_SYSTEM_PROMPT
-    assert "Use only:" in LIVERTOX_CLINICAL_SYSTEM_PROMPT
+    assert "Use only the provided LiverTox excerpt" in LIVERTOX_CLINICAL_SYSTEM_PROMPT
     assert (
         "Language map: en=English, it=Italian, de=German, fr=French, es=Spanish."
         in LIVERTOX_CLINICAL_SYSTEM_PROMPT
@@ -177,13 +177,13 @@ def test_livertox_prompt_removes_per_drug_management_recommendation_directive() 
         in LIVERTOX_CLINICAL_USER_PROMPT
     )
     assert (
-        "Do not output JSON, YAML, XML, tables, or fenced code blocks"
+        "Do not invent data or output JSON, YAML, XML, tables, or fenced code"
         in LIVERTOX_CLINICAL_USER_PROMPT
     )
     assert "Estimated RUCAM:" in LIVERTOX_CLINICAL_USER_PROMPT
-    assert "Integrate the supplied estimated RUCAM" in LIVERTOX_CLINICAL_USER_PROMPT
+    assert "Treat estimated RUCAM as supportive, not definitive" in LIVERTOX_CLINICAL_USER_PROMPT
     assert (
-        "Do not mention drugs that are not present in the supplied report."
+        "Do not mention drugs absent from the supplied report."
         in LIVERTOX_CONCLUSION_SYSTEM_PROMPT
     )
 

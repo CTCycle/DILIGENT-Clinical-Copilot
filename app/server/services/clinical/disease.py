@@ -15,7 +15,7 @@ from domain.clinical.entities import (
 )
 from services.clinical.deterministic_extraction import extract_deterministic_diseases
 from services.llm.client_runtime import ensure_runtime_client
-from services.llm.prompts import (
+from common.prompts import (
     ANAMNESIS_DISEASE_EXTRACTION_PROMPT,
 )
 from services.llm.provider_factory import select_llm_provider

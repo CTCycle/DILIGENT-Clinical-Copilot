@@ -72,6 +72,26 @@
               <span class="model-config-section-kicker">
                 <strong>RAG pipeline</strong>
               </span>
+              <button
+                class="model-config-rag-settings-btn"
+                type="button"
+                aria-label="Open RAG settings"
+                title="RAG settings"
+                (click)="$event.stopPropagation(); openRagSettingsPanel()"
+                [disabled]="isSaving() || isLoading()"
+              >
+                <svg viewBox="0 0 24 24" aria-hidden="true">
+                  <path d="M4 6h10" />
+                  <path d="M18 6h2" />
+                  <path d="M10 12h10" />
+                  <path d="M4 12h2" />
+                  <path d="M4 18h14" />
+                  <path d="M22 18h-2" />
+                  <circle cx="16" cy="6" r="2" />
+                  <circle cx="8" cy="12" r="2" />
+                  <circle cx="18" cy="18" r="2" />
+                </svg>
+              </button>
               <span class="model-config-rag-state">{{ ragPipelineEnabled() ? 'On' : 'Off' }}</span>
               <span class="model-config-toggle" aria-hidden="true"><i></i></span>
             </span>
@@ -330,9 +350,9 @@
               <div class="model-config-provider-name">
                 <span class="model-config-provider-mark" [class.is-openai]="provider === 'openai'" [class.is-gemini]="provider === 'gemini'">
                   @if (provider === 'openai') {
-                    <img src="logos/openai-mark.svg" alt="OpenAI logo" />
+                    <img src="/logos/openai-mark.svg" alt="OpenAI logo" />
                   } @else {
-                    <img src="logos/google-g.svg" alt="Google logo" />
+                    <img src="/logos/google-g.svg" alt="Google logo" />
                   }
                 </span>
                 <span>
@@ -387,6 +407,10 @@
               <small>{{ ragPipelineEnabled() ? 'Using indexed clinical evidence' : 'Indexed clinical evidence disabled' }}</small>
             </dd>
           </div>
+          <div>
+            <dt>RAG Model</dt>
+            <dd>{{ currentRagModelLabel() }}</dd>
+          </div>
         </dl>
 
         <section class="model-config-parameters" [class.is-disabled]="isSaving() || isLoading()" [attr.aria-disabled]="isSaving() || isLoading()">
@@ -429,4 +453,284 @@
     [providerLabel]="resolveProviderLabel(openProviderModal() || 'openai')"
     (closed)="closeKeys()"
   ></app-access-key-modal>
+
+  @if (ragSettingsModalOpen()) {
+    <div class="model-config-rag-modal-overlay" role="presentation">
+      <section
+        class="model-config-rag-modal"
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby="rag-settings-title"
+        aria-describedby="rag-settings-subtitle"
+      >
+        <header class="model-config-rag-modal-header">
+          <div>
+            <h2 id="rag-settings-title">RAG settings</h2>
+            <p id="rag-settings-subtitle">Configure retrieval, chunking, embeddings, and ranking.</p>
+          </div>
+          <button type="button" class="model-config-rag-modal-close" (click)="closeRagSettingsPanel()">Close</button>
+        </header>
+
+        <div class="model-config-rag-modal-body">
+          <nav class="model-config-rag-modal-tabs" aria-label="RAG settings sections">
+            <button type="button" [class.is-active]="activeRagSettingsSection() === 'general'" (click)="setActiveRagSettingsSection('general')">
+              <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 8.5h16M4 15.5h16M8.5 4v16M15.5 4v16" /></svg>
+              General
+            </button>
+            <button type="button" [class.is-active]="activeRagSettingsSection() === 'chunking'" (click)="setActiveRagSettingsSection('chunking')">
+              <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5 5h8l6 6v8H5V5Z" /><path d="M13 5v6h6" /></svg>
+              Chunking
+            </button>
+            <button type="button" [class.is-active]="activeRagSettingsSection() === 'embeddings'" (click)="setActiveRagSettingsSection('embeddings')">
+              <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5 6h14M5 12h14M5 18h14" /><path d="M8 4v4M16 10v4M11 16v4" /></svg>
+              Embeddings
+            </button>
+            <button type="button" [class.is-active]="activeRagSettingsSection() === 'models'" (click)="setActiveRagSettingsSection('models')">
+              <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6 17V7l6-3 6 3v10l-6 3-6-3Z" /><path d="m9.5 9.5 5 5M14.5 9.5l-5 5" /></svg>
+              Models
+            </button>
+            <button type="button" [class.is-active]="activeRagSettingsSection() === 'advanced'" (click)="setActiveRagSettingsSection('advanced')">
+              <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 4v16M4 12h16" /><circle cx="12" cy="12" r="8" /></svg>
+              Advanced
+            </button>
+            <button type="button" [class.is-active]="activeRagSettingsSection() === 'providers'" (click)="setActiveRagSettingsSection('providers')">
+              <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M8 18h8a5 5 0 0 0 .6-9.96A6.5 6.5 0 0 0 4.8 10.5" /></svg>
+              Cloud & Providers
+            </button>
+            <button type="button" [class.is-active]="activeRagSettingsSection() === 'storage'" (click)="setActiveRagSettingsSection('storage')">
+              <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5 5h14v14H5z" /><path d="M8 9h8M8 13h5" /></svg>
+              Output & Storage
+            </button>
+          </nav>
+
+          <div class="model-config-rag-modal-scroll">
+            @if (activeRagSettingsSection() === 'general') {
+            <section class="model-config-rag-settings-section">
+              <h3>Retrieval Settings</h3>
+              <div class="model-config-rag-setting-row">
+                <label for="rag-candidate-count">
+                  Retrieved documents
+                  <small>Hybrid results collected before reranking</small>
+                </label>
+                <input
+                  id="rag-candidate-count"
+                  type="number"
+                  min="1"
+                  step="1"
+                  [ngModel]="draftRagSettings().retrieval_candidate_count"
+                  (ngModelChange)="setDraftRagNumber('retrieval_candidate_count', $event)"
+                />
+              </div>
+              <div class="model-config-rag-setting-row" [class.is-invalid]="draftRagSettings().retrieval_selected_count > draftRagSettings().retrieval_candidate_count">
+                <label for="rag-selected-count">
+                  Selected documents
+                  <small>Reranked documents added to the LLM context</small>
+                </label>
+                <input
+                  id="rag-selected-count"
+                  type="number"
+                  min="1"
+                  step="1"
+                  [attr.max]="draftRagSettings().retrieval_candidate_count"
+                  [ngModel]="draftRagSettings().retrieval_selected_count"
+                  (ngModelChange)="setDraftRagNumber('retrieval_selected_count', $event)"
+                />
+              </div>
+              <div class="model-config-rag-setting-row">
+                <label for="rag-hybrid-toggle">
+                  Hybrid search
+                  <small>Blend vector similarity with text relevance</small>
+                </label>
+                <input
+                  id="rag-hybrid-toggle"
+                  class="model-config-rag-checkbox"
+                  type="checkbox"
+                  [ngModel]="draftRagSettings().use_hybrid_search"
+                  (ngModelChange)="setDraftRagBoolean('use_hybrid_search', $event)"
+                />
+              </div>
+              <div class="model-config-rag-setting-row">
+                <label for="rag-rerank-toggle">
+                  Reranking
+                  <small>Rank retrieved candidates before context injection</small>
+                </label>
+                <input
+                  id="rag-rerank-toggle"
+                  class="model-config-rag-checkbox"
+                  type="checkbox"
+                  [ngModel]="draftRagSettings().use_reranking"
+                  (ngModelChange)="setDraftRagBoolean('use_reranking', $event)"
+                />
+              </div>
+            </section>
+            }
+
+            @if (activeRagSettingsSection() === 'chunking') {
+            <section class="model-config-rag-settings-section">
+              <h3>Chunking Settings</h3>
+              <div class="model-config-rag-setting-row">
+                <label for="rag-chunk-size">
+                  Chunk size
+                  <small>Target tokens per clinical text chunk</small>
+                </label>
+                <input id="rag-chunk-size" type="number" min="1" step="1" [ngModel]="draftRagSettings().chunk_size" (ngModelChange)="setDraftRagNumber('chunk_size', $event)" />
+              </div>
+              <div class="model-config-rag-setting-row" [class.is-invalid]="draftRagSettings().chunk_overlap >= draftRagSettings().chunk_size">
+                <label for="rag-chunk-overlap">
+                  Chunk overlap
+                  <small>Token overlap between adjacent chunks</small>
+                </label>
+                <input id="rag-chunk-overlap" type="number" min="0" step="1" [ngModel]="draftRagSettings().chunk_overlap" (ngModelChange)="setDraftRagNumber('chunk_overlap', $event)" />
+              </div>
+            </section>
+            }
+
+            @if (activeRagSettingsSection() === 'embeddings') {
+            <section class="model-config-rag-settings-section">
+              <h3>Embedding Settings</h3>
+              <div class="model-config-rag-setting-row">
+                <label for="rag-batch-size">
+                  Embedding batch size
+                  <small>Number of chunks embedded per batch</small>
+                </label>
+                <input id="rag-batch-size" type="number" min="1" step="1" [ngModel]="draftRagSettings().embedding_batch_size" (ngModelChange)="setDraftRagNumber('embedding_batch_size', $event)" />
+              </div>
+              <div class="model-config-rag-setting-row">
+                <label for="rag-max-workers">
+                  Embedding max workers
+                  <small>Maximum concurrent embedding workers</small>
+                </label>
+                <input id="rag-max-workers" type="number" min="1" step="1" [ngModel]="draftRagSettings().embedding_max_workers" (ngModelChange)="setDraftRagNumber('embedding_max_workers', $event)" />
+              </div>
+              <div class="model-config-rag-setting-row">
+                <label for="rag-use-cloud">
+                  Use cloud embeddings
+                  <small>Use the configured cloud embedding service</small>
+                </label>
+                <input id="rag-use-cloud" class="model-config-rag-checkbox" type="checkbox" [ngModel]="draftRagSettings().use_cloud_embeddings" (ngModelChange)="setDraftRagBoolean('use_cloud_embeddings', $event)" />
+              </div>
+              <div class="model-config-rag-setting-row">
+                <label for="rag-cloud-provider">
+                  Cloud provider
+                  <small>Select embedding provider</small>
+                </label>
+                <select id="rag-cloud-provider" [ngModel]="draftRagSettings().cloud_provider" (ngModelChange)="setDraftRagText('cloud_provider', $event)">
+                  <option value="openai">openai</option>
+                  <option value="gemini">gemini</option>
+                </select>
+              </div>
+              <div class="model-config-rag-setting-row">
+                <label for="rag-cloud-model">
+                  Cloud embedding model
+                  <small>Model used for cloud embeddings</small>
+                </label>
+                <input id="rag-cloud-model" type="text" [ngModel]="draftRagSettings().cloud_embedding_model" (ngModelChange)="setDraftRagText('cloud_embedding_model', $event)" />
+              </div>
+              <div class="model-config-rag-setting-row">
+                <label for="rag-ollama-model">
+                  Ollama embedding model
+                  <small>Model used for local embeddings</small>
+                </label>
+                <input id="rag-ollama-model" type="text" [ngModel]="draftRagSettings().ollama_embedding_model" (ngModelChange)="setDraftRagText('ollama_embedding_model', $event)" />
+              </div>
+            </section>
+            }
+
+            @if (activeRagSettingsSection() === 'models') {
+            <section class="model-config-rag-settings-section">
+              <h3>Model Settings</h3>
+              <div class="model-config-rag-setting-row">
+                <label for="rag-reranker-model">
+                  Reranker model
+                  <small>Cross-encoder used to rerank retrieved candidates</small>
+                </label>
+                <input id="rag-reranker-model" type="text" [ngModel]="draftRagSettings().reranker_model" (ngModelChange)="setDraftRagText('reranker_model', $event)" />
+              </div>
+              <div class="model-config-rag-setting-row">
+                <label for="rag-hf-model">
+                  HF embedding model
+                  <small>Optional Hugging Face embedding model</small>
+                </label>
+                <input id="rag-hf-model" type="text" [ngModel]="draftRagSettings().hf_embedding_model" (ngModelChange)="setDraftRagText('hf_embedding_model', $event)" />
+              </div>
+            </section>
+            }
+
+            @if (activeRagSettingsSection() === 'advanced') {
+            <section class="model-config-rag-settings-section">
+              <h3>Advanced Settings</h3>
+              <div class="model-config-rag-setting-row">
+                <label for="rag-embedding-backend">
+                  Embedding backend
+                  <small>Backend used to resolve embedding requests</small>
+                </label>
+                <input id="rag-embedding-backend" type="text" [ngModel]="draftRagSettings().embedding_backend" (ngModelChange)="setDraftRagText('embedding_backend', $event)" />
+              </div>
+              <div class="model-config-rag-setting-row">
+                <label for="rag-reset-collection">
+                  Reset vector collection
+                  <small>Clear indexed vectors before a full re-embedding pass</small>
+                </label>
+                <input id="rag-reset-collection" class="model-config-rag-checkbox" type="checkbox" [ngModel]="draftRagSettings().reset_vector_collection" (ngModelChange)="setDraftRagBoolean('reset_vector_collection', $event)" />
+              </div>
+            </section>
+            }
+
+            @if (activeRagSettingsSection() === 'providers') {
+            <section class="model-config-rag-settings-section">
+              <h3>Cloud Provider Settings</h3>
+              <div class="model-config-rag-setting-row">
+                <label for="rag-cloud-provider">
+                  Cloud provider
+                  <small>Select embedding provider</small>
+                </label>
+                <select id="rag-cloud-provider" [ngModel]="draftRagSettings().cloud_provider" (ngModelChange)="setDraftRagText('cloud_provider', $event)">
+                  <option value="openai">openai</option>
+                  <option value="gemini">gemini</option>
+                </select>
+              </div>
+              <div class="model-config-rag-setting-row">
+                <label for="rag-cloud-model">
+                  Cloud embedding model
+                  <small>Model used when cloud embeddings are enabled</small>
+                </label>
+                <input id="rag-cloud-model" type="text" [ngModel]="draftRagSettings().cloud_embedding_model" (ngModelChange)="setDraftRagText('cloud_embedding_model', $event)" />
+              </div>
+            </section>
+            }
+
+            @if (activeRagSettingsSection() === 'storage') {
+            <section class="model-config-rag-settings-section">
+              <h3>Output & Storage</h3>
+              <div class="model-config-rag-setting-row">
+                <label for="rag-stream-batch">
+                  Vector stream batch
+                  <small>Records streamed per vector write batch</small>
+                </label>
+                <input id="rag-stream-batch" type="number" min="1" step="1" [ngModel]="draftRagSettings().vector_stream_batch_size" (ngModelChange)="setDraftRagNumber('vector_stream_batch_size', $event)" />
+              </div>
+              <div class="model-config-rag-setting-row">
+                <label>
+                  Active RAG model
+                  <small>Embedding model currently detected from the vector store</small>
+                </label>
+                <input type="text" [ngModel]="currentRagModelLabel()" disabled />
+              </div>
+            </section>
+            }
+          </div>
+        </div>
+
+        <footer class="model-config-rag-modal-footer">
+          <span [class.is-error]="ragSettingsValidationMessage()">{{ ragSettingsValidationMessage() || 'Ready to save.' }}</span>
+          <div>
+            <button type="button" class="model-config-rag-modal-primary" (click)="saveRagSettings()" [disabled]="ragSettingsSaveDisabled()">
+              {{ isSaving() ? 'Saving...' : 'Save settings' }}
+            </button>
+            <button type="button" class="model-config-rag-modal-secondary" (click)="closeRagSettingsPanel()">Cancel</button>
+          </div>
+        </footer>
+      </section>
+    </div>
+  }
 </main>

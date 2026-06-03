@@ -6543,3 +6543,284 @@ input[type="date"]::-webkit-calendar-picker-indicator:hover {
 :root[data-theme="dark"] .model-config-page .model-config-preview-a-layout .model-config-save-btn {
   background: linear-gradient(90deg, #1e66b2, #2799d1);
 }
+
+/* Model Configuration RAG settings dialog */
+.model-config-rag-modal-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 50;
+  display: grid;
+  align-content: start;
+  justify-items: center;
+  overflow: auto;
+  padding: 84px 28px 28px;
+  background: rgba(129, 144, 164, 0.34);
+  backdrop-filter: blur(3px);
+}
+
+.model-config-rag-modal {
+  display: grid;
+  grid-template-rows: auto minmax(0, 1fr) auto;
+  width: min(1090px, calc(100vw - 56px));
+  height: min(760px, calc(100vh - 56px));
+  overflow: hidden;
+  border: 1px solid rgba(24, 33, 45, 0.68);
+  border-radius: 8px;
+  background: #ffffff;
+  box-shadow: 0 24px 78px -34px rgba(15, 23, 42, 0.52);
+  color: #111827;
+}
+
+.model-config-rag-modal-header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 16px;
+  min-height: 74px;
+  padding: 20px 26px 14px;
+  border-bottom: 1px solid #d7e2de;
+}
+
+.model-config-rag-modal-header h2 {
+  margin: 0;
+  color: #111827;
+  font-size: 18px;
+  font-weight: 780;
+  line-height: 1.2;
+}
+
+.model-config-rag-modal-header p {
+  margin: 7px 0 0;
+  color: #5e6b75;
+  font-size: 11.5px;
+  line-height: 1.35;
+}
+
+.model-config-rag-modal-close {
+  border: 0;
+  background: transparent;
+  color: #53616b;
+  padding: 1px 0;
+  font-size: 12px;
+  cursor: pointer;
+}
+
+.model-config-rag-modal-body {
+  display: grid;
+  grid-template-columns: 176px minmax(0, 1fr);
+  min-height: 0;
+}
+
+.model-config-rag-modal-tabs {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  min-height: 0;
+  padding: 14px 14px 86px;
+  border-right: 1px solid #d7e2de;
+}
+
+.model-config-rag-modal-tabs button {
+  display: grid;
+  grid-template-columns: 17px minmax(0, 1fr);
+  align-items: center;
+  gap: 8px;
+  width: 100%;
+  min-height: 32px;
+  border: 1px solid transparent;
+  border-radius: 5px;
+  background: transparent;
+  color: #334155;
+  padding: 0 9px;
+  text-align: left;
+  font-size: 11px;
+  font-weight: 650;
+  cursor: pointer;
+}
+
+.model-config-rag-modal-tabs button.is-active {
+  border-color: #94d6bd;
+  background: #daf3e8;
+  color: #087d59;
+}
+
+.model-config-rag-modal-tabs svg {
+  width: 15px;
+  height: 15px;
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 1.9;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+
+.model-config-rag-modal-scroll {
+  min-height: 0;
+  overflow: auto;
+  padding: 12px 20px 28px;
+  scrollbar-gutter: stable;
+}
+
+.model-config-rag-settings-section {
+  margin: 0 0 18px;
+}
+
+.model-config-rag-settings-section h3 {
+  margin: 0 0 8px;
+  color: #111827;
+  font-size: 14px;
+  font-weight: 760;
+  line-height: 1.25;
+}
+
+.model-config-rag-setting-row {
+  display: grid;
+  grid-template-columns: minmax(240px, 1fr) minmax(220px, 390px);
+  align-items: center;
+  min-height: 49px;
+  border: 1px solid #d8e3df;
+  border-bottom: 0;
+  background: rgba(255, 255, 255, 0.96);
+  padding: 7px 10px;
+}
+
+.model-config-rag-setting-row:first-of-type {
+  border-top-left-radius: 6px;
+  border-top-right-radius: 6px;
+}
+
+.model-config-rag-setting-row:last-child {
+  border-bottom: 1px solid #d8e3df;
+  border-bottom-left-radius: 6px;
+  border-bottom-right-radius: 6px;
+}
+
+.model-config-rag-setting-row.is-invalid {
+  border-color: #f2a1a1;
+  background: #fff7f7;
+}
+
+.model-config-rag-setting-row label {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  margin: 0;
+  color: #111827;
+  font-size: 11px;
+  font-weight: 750;
+  line-height: 1.2;
+}
+
+.model-config-rag-setting-row label small {
+  color: #5e6b75;
+  font-size: 10.5px;
+  font-weight: 500;
+}
+
+.model-config-rag-setting-row input:not([type="checkbox"]),
+.model-config-rag-setting-row select {
+  width: 100%;
+  min-height: 31px;
+  border: 1px solid #d8e3df;
+  border-radius: 5px;
+  background: #ffffff;
+  color: #1f2937;
+  padding: 0 11px;
+  font-size: 12px;
+}
+
+.model-config-rag-checkbox {
+  justify-self: end;
+  width: 34px;
+  height: 20px;
+  accent-color: #087d59;
+}
+
+.model-config-rag-modal-footer {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  min-height: 70px;
+  padding: 13px 16px;
+  border-top: 1px solid #d7e2de;
+}
+
+.model-config-rag-modal-footer span {
+  color: #5e6b75;
+  font-size: 11px;
+}
+
+.model-config-rag-modal-footer span.is-error {
+  color: #b42318;
+  font-weight: 700;
+}
+
+.model-config-rag-modal-footer div {
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.model-config-rag-modal-primary,
+.model-config-rag-modal-secondary {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 32px;
+  border-radius: 999px;
+  padding: 0 15px;
+  font-size: 11px;
+  font-weight: 760;
+}
+
+.model-config-rag-modal-primary {
+  border: 1px solid #087d59;
+  background: linear-gradient(180deg, #0aa06f, #087d59);
+  color: #ffffff;
+}
+
+.model-config-rag-modal-primary:disabled {
+  border-color: #9fbab0;
+  background: #c7d8d1;
+  color: #ffffff;
+}
+
+.model-config-rag-modal-secondary {
+  border: 1px solid #d8e3df;
+  background: #ffffff;
+  color: #53616b;
+}
+
+@media (max-width: 760px) {
+  .model-config-rag-modal-overlay {
+    padding: 72px 12px 12px;
+  }
+
+  .model-config-rag-modal {
+    width: calc(100vw - 24px);
+    height: calc(100vh - 24px);
+  }
+
+  .model-config-rag-modal-body {
+    grid-template-columns: 1fr;
+  }
+
+  .model-config-rag-modal-tabs {
+    display: none;
+  }
+
+  .model-config-rag-setting-row {
+    grid-template-columns: 1fr;
+    gap: 8px;
+  }
+
+  .model-config-rag-modal-footer {
+    align-items: stretch;
+    flex-direction: column;
+  }
+
+  .model-config-rag-modal-footer div {
+    justify-content: flex-end;
+  }
+}

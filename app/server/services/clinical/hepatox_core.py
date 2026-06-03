@@ -37,6 +37,7 @@ from services.clinical.report_language import (
 )
 from services.llm.provider_factory import initialize_llm_client
 from services.retrieval.embeddings import SimilaritySearch
+from services.retrieval.settings import build_effective_rag_settings
 
 ###############################################################################
 NOT_AVAILABLE_TEXT = "Not available"
@@ -328,10 +329,11 @@ class HepatoxConsultation:
         )
         self.temperature = LLMRuntimeConfig.get_ollama_temperature()
         self.similarity_search: SimilaritySearch | None = None
-        self.rag_use_reranking = bool(get_server_settings().rag.use_reranking)
-        self.rag_top_n = max(int(get_server_settings().rag.rerank_top_n), 1)
+        rag_settings = build_effective_rag_settings()
+        self.rag_use_reranking = bool(rag_settings.use_reranking)
+        self.rag_top_n = max(int(rag_settings.retrieval_selected_count), 1)
         self.rag_candidate_k = max(
-            int(get_server_settings().rag.rerank_candidate_k), self.rag_top_n
+            int(rag_settings.retrieval_candidate_count), self.rag_top_n
         )
         self.pipeline_issues: list[PipelineIssue] = []
         default_parallel_analyses = 3 if provider == "ollama" else 1
