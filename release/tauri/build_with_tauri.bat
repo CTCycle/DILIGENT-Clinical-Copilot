@@ -7,6 +7,7 @@ set "app_dir=%repo_root%\app"
 set "client_dir=%app_dir%\client"
 set "tauri_dir=%client_dir%\src-tauri"
 set "bundle_source_dir=%tauri_dir%\r"
+set "release_dir=%tauri_dir%\target\release"
 set "bundle_dir=%tauri_dir%\target\release\bundle"
 set "release_export_dir=%repo_root%\release\windows"
 
@@ -92,6 +93,7 @@ call :prepare_bundle_sources || (
   popd >nul
   goto build_error
 )
+call :cleanup_stale_release_payload
 
 echo [STEP 2/2] Building Tauri application
 echo [CMD] "%npm_cmd%" run tauri:build:release
@@ -139,7 +141,14 @@ if errorlevel 1 (
 )
 md "%bundle_source_dir%\app" >nul 2>&1
 md "%bundle_source_dir%\app\client" >nul 2>&1
+md "%bundle_source_dir%\app\client\dist" >nul 2>&1
+md "%bundle_source_dir%\app\resources" >nul 2>&1
+md "%bundle_source_dir%\app\server" >nul 2>&1
+md "%bundle_source_dir%\app\scripts" >nul 2>&1
 md "%bundle_source_dir%\runtimes" >nul 2>&1
+md "%bundle_source_dir%\runtimes\python" >nul 2>&1
+md "%bundle_source_dir%\runtimes\uv" >nul 2>&1
+md "%bundle_source_dir%\settings" >nul 2>&1
 
 copy /y "%app_dir%\server\pyproject.toml" "%bundle_source_dir%\pyproject.toml" >nul
 if errorlevel 1 (
@@ -151,17 +160,21 @@ if errorlevel 1 (
   echo [FATAL] Failed to stage uv.lock for Tauri bundling.
   exit /b 1
 )
+copy /y "%runtime_uv_lock%" "%bundle_source_dir%\runtimes\uv.lock" >nul
+if errorlevel 1 (
+  echo [FATAL] Failed to stage runtimes\uv.lock for Tauri bundling.
+  exit /b 1
+)
 
 if not exist "%client_dir%\dist" md "%client_dir%\dist" >nul 2>&1
 
-call :make_junction "%bundle_source_dir%\app\server" "%app_dir%\server" || exit /b 1
-call :make_junction "%bundle_source_dir%\app\scripts" "%app_dir%\scripts" || exit /b 1
-call :make_junction "%bundle_source_dir%\settings" "%repo_root%\settings" || exit /b 1
-call :make_junction "%bundle_source_dir%\app\client\dist" "%client_dir%\dist" || exit /b 1
-call :make_junction "%bundle_source_dir%\app\resources" "%app_dir%\resources" || exit /b 1
-call :make_junction "%bundle_source_dir%\runtimes\python" "%repo_root%\runtimes\python" || exit /b 1
-call :make_junction "%bundle_source_dir%\runtimes\uv" "%repo_root%\runtimes\uv" || exit /b 1
-call :make_junction "%bundle_source_dir%\runtimes\nodejs" "%repo_root%\runtimes\nodejs" || exit /b 1
+call :copy_server_payload "%app_dir%\server" "%bundle_source_dir%\app\server" || exit /b 1
+call :copy_tree "%app_dir%\scripts" "%bundle_source_dir%\app\scripts" || exit /b 1
+call :copy_tree "%repo_root%\settings" "%bundle_source_dir%\settings" || exit /b 1
+call :copy_tree "%client_dir%\dist" "%bundle_source_dir%\app\client\dist" || exit /b 1
+call :copy_tree "%app_dir%\resources" "%bundle_source_dir%\app\resources" || exit /b 1
+call :copy_tree "%repo_root%\runtimes\python" "%bundle_source_dir%\runtimes\python" || exit /b 1
+call :copy_tree "%repo_root%\runtimes\uv" "%bundle_source_dir%\runtimes\uv" || exit /b 1
 exit /b 0
 
 :check_rust_toolchain
@@ -227,8 +240,34 @@ if errorlevel 1 (
 )
 exit /b 0
 
+:copy_tree
+robocopy "%~1" "%~2" /E /NFL /NDL /NJH /NJS /NP >nul
+set "robocopy_exit=%errorlevel%"
+if %robocopy_exit% GEQ 8 (
+  echo [FATAL] Failed to stage directory "%~1" into "%~2".
+  exit /b 1
+)
+exit /b 0
+
+:copy_server_payload
+robocopy "%~1" "%~2" /E /NFL /NDL /NJH /NJS /NP /XD ".venv" "__pycache__" ".pytest_cache" "target" /XF "*.pyc" >nul
+set "robocopy_exit=%errorlevel%"
+if %robocopy_exit% GEQ 8 (
+  echo [FATAL] Failed to stage server payload from "%~1" to "%~2".
+  exit /b 1
+)
+exit /b 0
+
 :cleanup_bundle_sources
 if exist "%bundle_source_dir%" rd /s /q "%bundle_source_dir%" >nul 2>&1
+exit /b 0
+
+:cleanup_stale_release_payload
+if exist "%release_dir%\r" rd /s /q "%release_dir%\r" >nul 2>&1
+if exist "%release_dir%\resources" rd /s /q "%release_dir%\resources" >nul 2>&1
+if exist "%release_dir%\nsis" rd /s /q "%release_dir%\nsis" >nul 2>&1
+if exist "%release_dir%\wix" rd /s /q "%release_dir%\wix" >nul 2>&1
+if exist "%bundle_dir%" rd /s /q "%bundle_dir%" >nul 2>&1
 exit /b 0
 
 :build_error

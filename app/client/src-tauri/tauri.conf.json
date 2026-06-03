@@ -24,7 +24,7 @@
   },
   "bundle": {
     "active": true,
-    "targets": "all",
+    "targets": ["nsis"],
     "icon": [
       "icons/32x32.png",
       "icons/128x128.png",
@@ -34,16 +34,15 @@
     ],
     "resources": {
       "r/pyproject.toml": "r/pyproject.toml",
-      "r/server": "r/server",
-      "r/scripts": "r/scripts",
+      "r/app/server": "r/app/server",
+      "r/app/scripts": "r/app/scripts",
       "r/settings": "r/settings",
-      "r/client/dist": "r/client/dist",
-      "r/resources/models": "r/resources/models",
-      "r/resources/sources": "r/resources/sources",
+      "r/app/client/dist": "r/app/client/dist",
+      "r/app/resources/models": "r/app/resources/models",
+      "r/app/resources/sources": "r/app/resources/sources",
       "r/runtimes/uv.lock": "r/runtimes/uv.lock",
       "r/runtimes/python": "r/runtimes/python",
-      "r/runtimes/uv": "r/runtimes/uv",
-      "r/runtimes/nodejs": "r/runtimes/nodejs"
+      "r/runtimes/uv": "r/runtimes/uv"
     }
   }
 }
