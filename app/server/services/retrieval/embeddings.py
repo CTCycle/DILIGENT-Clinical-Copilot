@@ -20,6 +20,7 @@ from services.retrieval.embedding_model import (
     EmbeddingModelSpec,
     build_embedding_model_signature,
 )
+from services.retrieval.settings import build_effective_rag_settings
 
 ProviderName = Literal["openai", "gemini"]
 EmbeddingBackend = Literal["ollama", "cloud"]
@@ -352,24 +353,32 @@ class SimilaritySearch:
         *,
         vector_database: LanceVectorDatabase | None = None,
         embedding_generator: EmbeddingGenerator | None = None,
-        default_top_k: int = get_server_settings().rag.rerank_candidate_k,
+        default_top_k: int | None = None,
     ) -> None:
-        self.default_top_k = max(int(default_top_k), 1)
+        rag_settings = build_effective_rag_settings()
+        self.default_top_k = max(
+            int(
+                rag_settings.retrieval_candidate_count
+                if default_top_k is None
+                else default_top_k
+            ),
+            1,
+        )
         self.reranker: Reranker | None = None
         self.vector_database = vector_database or LanceVectorDatabase(
             database_path=VECTOR_DB_PATH,
-            collection_name=get_server_settings().rag.vector_collection_name,
-            metric=get_server_settings().rag.vector_index_metric,
-            index_type=get_server_settings().rag.vector_index_type,
-            stream_batch_size=get_server_settings().rag.vector_stream_batch_size,
+            collection_name=rag_settings.vector_collection_name,
+            metric=rag_settings.vector_index_metric,
+            index_type=rag_settings.vector_index_type,
+            stream_batch_size=rag_settings.vector_stream_batch_size,
         )
         self.embedding_generator = embedding_generator or EmbeddingGenerator(
-            backend=get_server_settings().rag.embedding_backend,
-            ollama_base_url=get_server_settings().rag.ollama_base_url,
-            ollama_model=get_server_settings().rag.ollama_embedding_model,
-            use_cloud_embeddings=get_server_settings().rag.use_cloud_embeddings,
-            cloud_provider=get_server_settings().rag.cloud_provider,
-            cloud_embedding_model=get_server_settings().rag.cloud_embedding_model,
+            backend=rag_settings.embedding_backend,
+            ollama_base_url=rag_settings.ollama_base_url,
+            ollama_model=rag_settings.ollama_embedding_model,
+            use_cloud_embeddings=rag_settings.use_cloud_embeddings,
+            cloud_provider=rag_settings.cloud_provider,
+            cloud_embedding_model=rag_settings.cloud_embedding_model,
         )
         try:
             self.vector_database.initialize()
@@ -400,7 +409,7 @@ class SimilaritySearch:
             logger.error("Failed to access LanceDB table: %s", exc)
             return []
         try:
-            if get_server_settings().rag.use_hybrid_search:
+            if build_effective_rag_settings().use_hybrid_search:
                 results = self.hybrid_search(
                     table=table,
                     query=normalized,
@@ -466,8 +475,9 @@ class SimilaritySearch:
         query: str,
     ) -> list[dict[str, Any]]:
         fused: dict[str, dict[str, Any]] = {}
-        vector_weight = float(get_server_settings().rag.hybrid_vector_weight)
-        text_weight = float(get_server_settings().rag.hybrid_text_weight)
+        rag_settings = build_effective_rag_settings()
+        vector_weight = float(rag_settings.hybrid_vector_weight)
+        text_weight = float(rag_settings.hybrid_text_weight)
         for rank, entry in enumerate(vector_results, start=1):
             self.add_rank_score(
                 fused,
@@ -598,7 +608,7 @@ class SimilaritySearch:
         resolved_top_n = (
             max(int(final_top_n), 1)
             if final_top_n is not None
-            else max(int(get_server_settings().rag.rerank_top_n), 1)
+            else max(int(build_effective_rag_settings().retrieval_selected_count), 1)
         )
         resolved_candidate_k = (
             max(int(candidate_k), 1)
@@ -613,7 +623,7 @@ class SimilaritySearch:
             return []
 
         should_rerank = (
-            get_server_settings().rag.use_reranking
+            build_effective_rag_settings().use_reranking
             if use_reranking is None
             else bool(use_reranking)
         )
@@ -667,7 +677,7 @@ class SimilaritySearch:
     def get_reranker(self) -> Reranker:
         if self.reranker is None:
             self.reranker = LocalCrossEncoderReranker(
-                get_server_settings().rag.reranker_model
+                build_effective_rag_settings().reranker_model
             )
         return self.reranker
 

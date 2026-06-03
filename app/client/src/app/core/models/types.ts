@@ -17,6 +17,28 @@ export type LocalModelCard = {
   available_in_ollama: boolean;
 };
 
+export type RagSettings = {
+  chunk_size: number;
+  chunk_overlap: number;
+  embedding_batch_size: number;
+  use_hybrid_search: boolean;
+  use_reranking: boolean;
+  retrieval_candidate_count: number;
+  retrieval_selected_count: number;
+  reranker_model: string;
+  hybrid_vector_weight: number;
+  hybrid_text_weight: number;
+  embedding_backend: string;
+  ollama_embedding_model: string;
+  hf_embedding_model: string;
+  cloud_provider: string;
+  cloud_embedding_model: string;
+  use_cloud_embeddings: boolean;
+  reset_vector_collection: boolean;
+  vector_stream_batch_size: number;
+  embedding_max_workers: number;
+};
+
 export type ModelConfigStateResponse = {
   status: "success";
   local_models: LocalModelCard[];
@@ -29,6 +51,8 @@ export type ModelConfigStateResponse = {
   ollama_temperature: number;
   cloud_temperature: number;
   ollama_reasoning: boolean;
+  rag_settings: RagSettings;
+  rag_model: string | null;
   updated_at: string | null;
 };
 
@@ -41,6 +65,7 @@ export type ModelConfigUpdateRequest = {
   ollama_temperature?: number;
   cloud_temperature?: number;
   ollama_reasoning?: boolean;
+  rag_settings?: Partial<RagSettings>;
 };
 
 export type AccessKeyProvider = "openai" | "gemini" | "openrouter";

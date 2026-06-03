@@ -17,6 +17,7 @@ class ModelConfigSnapshot:
     ollama_temperature: float
     cloud_temperature: float
     ollama_reasoning: bool = False
+    rag_settings: dict[str, object] | None = None
     updated_at: datetime | None = None
 
 
@@ -42,6 +43,7 @@ class ModelConfigUpdateRequest(BaseModel):
     ollama_temperature: float | None = Field(default=None, ge=0.0, le=2.0)
     cloud_temperature: float | None = Field(default=None, ge=0.0, le=2.0)
     ollama_reasoning: bool | None = None
+    rag_settings: dict[str, object] | None = None
 
 
 ###############################################################################
@@ -56,3 +58,6 @@ class ModelConfigStateResponse(BaseModel):
     ollama_temperature: float = Field(ge=0.0, le=2.0)
     cloud_temperature: float = Field(ge=0.0, le=2.0)
     ollama_reasoning: bool
+    rag_settings: dict[str, object]
+    rag_model: str | None = None
+    updated_at: datetime | None = None

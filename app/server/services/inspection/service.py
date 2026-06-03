@@ -25,6 +25,7 @@ from repositories.serialization.data import (
 from repositories.serialization.model_configs import ModelConfigSerializer
 from repositories.vectors import LanceVectorDatabase
 from services.clinical.timeline import PatientTimelineExtractor
+from services.retrieval.settings import build_effective_rag_settings
 from services.inspection.normalization import (
     extract_lab_marker as extract_lab_marker_value,
 )
@@ -242,61 +243,21 @@ class DataInspectionService:
             allowed_fields = list(defaults.keys())
         else:
             source = config.get("rag", {})
+            rag_settings = build_effective_rag_settings()
             defaults = {
                 "documents_path": str(source.get("documents_path", DOCS_PATH)),
-                "chunk_size": int(source.get("chunk_size", settings.rag.chunk_size)),
-                "chunk_overlap": int(
-                    source.get("chunk_overlap", settings.rag.chunk_overlap)
-                ),
-                "embedding_batch_size": int(
-                    source.get(
-                        "embedding_batch_size", settings.rag.embedding_batch_size
-                    )
-                ),
-                "vector_stream_batch_size": int(
-                    source.get(
-                        "vector_stream_batch_size",
-                        settings.rag.vector_stream_batch_size,
-                    )
-                ),
-                "embedding_max_workers": int(
-                    source.get(
-                        "embedding_max_workers",
-                        settings.rag.embedding_max_workers,
-                    )
-                ),
-                "embedding_backend": str(
-                    source.get("embedding_backend", settings.rag.embedding_backend)
-                ),
-                "ollama_embedding_model": str(
-                    source.get(
-                        "ollama_embedding_model",
-                        settings.rag.ollama_embedding_model,
-                    )
-                ),
-                "hf_embedding_model": str(
-                    source.get("hf_embedding_model", settings.rag.hf_embedding_model)
-                ),
-                "cloud_provider": str(
-                    source.get("cloud_provider", settings.rag.cloud_provider)
-                ),
-                "cloud_embedding_model": str(
-                    source.get(
-                        "cloud_embedding_model",
-                        settings.rag.cloud_embedding_model,
-                    )
-                ),
-                "use_cloud_embeddings": bool(
-                    source.get(
-                        "use_cloud_embeddings", settings.rag.use_cloud_embeddings
-                    )
-                ),
-                "reset_vector_collection": bool(
-                    source.get(
-                        "reset_vector_collection",
-                        settings.rag.reset_vector_collection,
-                    )
-                ),
+                "chunk_size": int(rag_settings.chunk_size),
+                "chunk_overlap": int(rag_settings.chunk_overlap),
+                "embedding_batch_size": int(rag_settings.embedding_batch_size),
+                "vector_stream_batch_size": int(rag_settings.vector_stream_batch_size),
+                "embedding_max_workers": int(rag_settings.embedding_max_workers),
+                "embedding_backend": rag_settings.embedding_backend,
+                "ollama_embedding_model": rag_settings.ollama_embedding_model,
+                "hf_embedding_model": rag_settings.hf_embedding_model,
+                "cloud_provider": rag_settings.cloud_provider,
+                "cloud_embedding_model": rag_settings.cloud_embedding_model,
+                "use_cloud_embeddings": bool(rag_settings.use_cloud_embeddings),
+                "reset_vector_collection": bool(rag_settings.reset_vector_collection),
             }
             allowed_fields = list(defaults.keys())
 
@@ -766,13 +727,13 @@ class DataInspectionService:
         serializer = DocumentSerializer(self.get_effective_rag_documents_path())
         vector_model_by_file: dict[str, str] = {}
         try:
-            settings = get_server_settings()
+            rag_settings = build_effective_rag_settings()
             vector_db = LanceVectorDatabase(
                 database_path=VECTOR_DB_PATH,
-                collection_name=settings.rag.vector_collection_name,
-                metric=settings.rag.vector_index_metric,
-                index_type=settings.rag.vector_index_type,
-                stream_batch_size=settings.rag.vector_stream_batch_size,
+                collection_name=rag_settings.vector_collection_name,
+                metric=rag_settings.vector_index_metric,
+                index_type=rag_settings.vector_index_type,
+                stream_batch_size=rag_settings.vector_stream_batch_size,
             )
             if vector_db.has_collection():
                 for row in vector_db.load_embeddings():
@@ -834,19 +795,15 @@ class DataInspectionService:
 
     # -------------------------------------------------------------------------
     def get_rag_vector_store_summary(self) -> dict[str, Any]:
-        config = self.load_runtime_config()
-        rag_cfg = config.get("rag", {}) if isinstance(config, dict) else {}
         documents_path = self.get_effective_rag_documents_path()
-        settings = get_server_settings()
-        collection_name = str(
-            rag_cfg.get("vector_collection_name", settings.rag.vector_collection_name)
-        )
+        rag_settings = build_effective_rag_settings()
+        collection_name = str(rag_settings.vector_collection_name)
         vector_db = LanceVectorDatabase(
             database_path=VECTOR_DB_PATH,
             collection_name=collection_name,
-            metric=settings.rag.vector_index_metric,
-            index_type=settings.rag.vector_index_type,
-            stream_batch_size=settings.rag.vector_stream_batch_size,
+            metric=rag_settings.vector_index_metric,
+            index_type=rag_settings.vector_index_type,
+            stream_batch_size=rag_settings.vector_stream_batch_size,
         )
         exists = vector_db.has_collection()
         embedding_count = 0
@@ -871,8 +828,8 @@ class DataInspectionService:
             "distinct_document_count": distinct_document_count,
             "embedding_dimension": embedding_dimension,
             "index_ready": bool(vector_db.index_ready) if exists else False,
-            "configured_metric": settings.rag.vector_index_metric,
-            "configured_index_type": settings.rag.vector_index_type,
+            "configured_metric": rag_settings.vector_index_metric,
+            "configured_index_type": rag_settings.vector_index_type,
         }
 
     # -------------------------------------------------------------------------

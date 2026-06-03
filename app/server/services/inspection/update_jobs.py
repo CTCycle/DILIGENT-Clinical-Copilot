@@ -214,9 +214,7 @@ class DataInspectionUpdateJobRunner:
         )
         self.report_phase_by_target(job_id, "rag", 96, "Finalizing update")
         self.report_phase_by_target(job_id, "rag", 100, "Completed")
-        backend = (
-            "cloud" if bool(override_values.get("use_cloud_embeddings")) else "local"
-        )
+        backend = "cloud" if bool(updater.use_cloud_embeddings) else "local"
         model_spec = getattr(getattr(updater, "serializer", None), "model_spec", None)
         vector_model = None
         if model_spec is not None:
