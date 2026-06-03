@@ -5,7 +5,6 @@ from pathlib import Path
 
 from common.constants import DOCS_PATH, VECTOR_DB_PATH
 from common.utils.logger import logger
-from configurations.startup import get_server_settings
 from repositories.serialization.vectors import VectorSerializer
 from repositories.vectors import LanceVectorDatabase
 from services.retrieval.settings import build_effective_rag_settings
