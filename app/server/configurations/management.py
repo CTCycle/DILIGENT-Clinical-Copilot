@@ -2,9 +2,11 @@ from __future__ import annotations
 
 import json
 import os
+from dataclasses import dataclass
 from pathlib import Path
 from threading import RLock
 from typing import Any
+from urllib.parse import urlparse
 
 from pydantic import ValidationError
 
@@ -56,14 +58,15 @@ def ensure_mapping(value: Any) -> dict[str, Any]:
     return {}
 
 
-def load_configuration_data(path: str) -> dict[str, Any]:
-    if not os.path.exists(path):
-        raise RuntimeError(f"Configuration file not found: {path}")
+def load_configuration_data(path: str | Path) -> dict[str, Any]:
+    config_path = Path(path)
+    if not config_path.exists():
+        raise RuntimeError(f"Configuration file not found: {config_path}")
     try:
-        with open(path, "r", encoding="utf-8") as handle:
+        with config_path.open("r", encoding="utf-8") as handle:
             data = json.load(handle)
     except (OSError, json.JSONDecodeError) as exc:
-        raise RuntimeError(f"Unable to load configuration from {path}") from exc
+        raise RuntimeError(f"Unable to load configuration from {config_path}") from exc
     if not isinstance(data, dict):
         raise RuntimeError("Configuration must be a JSON object.")
     return data
@@ -78,10 +81,30 @@ class EnvironmentSnapshot:
         ollama_url: str | None,
         ollama_host: str | None,
         ollama_port: int | None,
+        database: "DatabaseEnvironmentSnapshot",
     ) -> None:
         self.ollama_url = ollama_url
         self.ollama_host = ollama_host
         self.ollama_port = ollama_port
+        self.database = database
+
+
+@dataclass(frozen=True)
+class DatabaseEnvironmentSnapshot:
+    embedded_database: str | None
+    url: str | None
+    engine: str | None
+    host: str | None
+    port: str | None
+    database_name: str | None
+    username: str | None
+    password: str | None
+    ssl: str | None
+    ssl_ca: str | None
+    connect_timeout: str | None
+    insert_batch_size: str | None
+    insert_commit_interval: str | None
+    select_page_size: str | None
 
 
 ###############################################################################
@@ -108,7 +131,7 @@ class ConfigurationManager:
 
     def reload(self) -> ServerSettings:
         with self._lock:
-            loaded = load_configuration_data(str(self._config_path))
+            loaded = load_configuration_data(self._config_path)
             payload = build_settings_payload_from_json(
                 loaded,
                 environment_snapshot_from_os_env(),
@@ -194,6 +217,30 @@ def environment_snapshot_from_os_env() -> EnvironmentSnapshot:
         ollama_url=coerce_str_or_none(os.getenv("OLLAMA_URL")),
         ollama_host=coerce_str_or_none(os.getenv("OLLAMA_HOST")),
         ollama_port=port,
+        database=DatabaseEnvironmentSnapshot(
+            embedded_database=coerce_str_or_none(os.getenv("EMBEDDED_DATABASE")),
+            url=coerce_str_or_none(os.getenv("DATABASE_URL")),
+            engine=coerce_str_or_none(os.getenv("DATABASE_ENGINE")),
+            host=coerce_str_or_none(os.getenv("DATABASE_HOST")),
+            port=coerce_str_or_none(os.getenv("DATABASE_PORT")),
+            database_name=coerce_str_or_none(os.getenv("DATABASE_NAME")),
+            username=coerce_str_or_none(os.getenv("DATABASE_USERNAME")),
+            password=coerce_str_or_none(os.getenv("DATABASE_PASSWORD")),
+            ssl=coerce_str_or_none(os.getenv("DATABASE_SSL")),
+            ssl_ca=coerce_str_or_none(os.getenv("DATABASE_SSL_CA")),
+            connect_timeout=coerce_str_or_none(
+                os.getenv("DATABASE_CONNECT_TIMEOUT")
+            ),
+            insert_batch_size=coerce_str_or_none(
+                os.getenv("DATABASE_INSERT_BATCH_SIZE")
+            ),
+            insert_commit_interval=coerce_str_or_none(
+                os.getenv("DATABASE_INSERT_COMMIT_INTERVAL")
+            ),
+            select_page_size=coerce_str_or_none(
+                os.getenv("DATABASE_SELECT_PAGE_SIZE")
+            ),
+        ),
     )
 
 
@@ -240,11 +287,27 @@ def _build_jobs_settings(data: dict[str, Any]) -> JobsSettings:
     return JobsSettings(polling_interval=polling_interval)
 
 
-def _build_database_settings(payload: dict[str, Any]) -> DatabaseSettings:
-    embedded = coerce_bool(payload.get("embedded_database"), True)
-    insert_batch_size = coerce_int(payload.get("insert_batch_size"), 1000, minimum=1)
-    commit_interval = coerce_int(payload.get("insert_commit_interval"), 5, minimum=1)
-    select_page_size = coerce_int(payload.get("select_page_size"), 2000, minimum=100)
+def _parse_database_url(url: str | None) -> dict[str, Any]:
+    if not url:
+        return {}
+    parsed = urlparse(url)
+    database_name = parsed.path.lstrip("/") or None
+    return {
+        "engine": parsed.scheme or None,
+        "host": parsed.hostname or None,
+        "port": parsed.port,
+        "database_name": database_name,
+        "username": parsed.username or None,
+        "password": parsed.password or None,
+    }
+
+
+def _build_database_settings(environment: DatabaseEnvironmentSnapshot) -> DatabaseSettings:
+    url_payload = _parse_database_url(environment.url)
+    embedded = coerce_bool(environment.embedded_database, True)
+    insert_batch_size = coerce_int(environment.insert_batch_size, 1000, minimum=1)
+    commit_interval = coerce_int(environment.insert_commit_interval, 5, minimum=1)
+    select_page_size = coerce_int(environment.select_page_size, 2000, minimum=100)
     if embedded:
         return DatabaseSettings(
             embedded_database=True,
@@ -256,23 +319,45 @@ def _build_database_settings(payload: dict[str, Any]) -> DatabaseSettings:
             password=None,
             ssl=False,
             ssl_ca=None,
-            connect_timeout=coerce_int(payload.get("connect_timeout"), 10, minimum=1),
+            connect_timeout=coerce_int(environment.connect_timeout, 10, minimum=1),
             insert_batch_size=insert_batch_size,
             insert_commit_interval=commit_interval,
             select_page_size=select_page_size,
         )
-    engine_value = coerce_str_or_none(payload.get("engine")) or "postgres"
+    engine_value = coerce_str_or_none(environment.engine) or coerce_str_or_none(
+        url_payload.get("engine")
+    )
+    host_value = coerce_str_or_none(environment.host) or coerce_str_or_none(
+        url_payload.get("host")
+    )
+    port_value = coerce_int(
+        environment.port if environment.port is not None else url_payload.get("port"),
+        5432,
+        minimum=1,
+        maximum=65535,
+    )
+    database_name = coerce_str_or_none(
+        environment.database_name
+    ) or coerce_str_or_none(url_payload.get("database_name"))
+    username = coerce_str_or_none(environment.username) or coerce_str_or_none(
+        url_payload.get("username")
+    )
+    password = (
+        coerce_str_or_none(environment.password)
+        if environment.password is not None
+        else coerce_str_or_none(url_payload.get("password"))
+    )
     return DatabaseSettings(
         embedded_database=False,
-        engine=engine_value.lower(),
-        host=coerce_str_or_none(payload.get("host")),
-        port=coerce_int(payload.get("port"), 5432, minimum=1, maximum=65535),
-        database_name=coerce_str_or_none(payload.get("database_name")),
-        username=coerce_str_or_none(payload.get("username")),
-        password=coerce_str_or_none(payload.get("password")),
-        ssl=coerce_bool(payload.get("ssl", False), False),
-        ssl_ca=coerce_str_or_none(payload.get("ssl_ca")),
-        connect_timeout=coerce_int(payload.get("connect_timeout"), 10, minimum=1),
+        engine=(engine_value or "postgres").lower(),
+        host=host_value,
+        port=port_value,
+        database_name=database_name,
+        username=username,
+        password=password,
+        ssl=coerce_bool(environment.ssl, False),
+        ssl_ca=coerce_str_or_none(environment.ssl_ca),
+        connect_timeout=coerce_int(environment.connect_timeout, 10, minimum=1),
         insert_batch_size=insert_batch_size,
         insert_commit_interval=commit_interval,
         select_page_size=select_page_size,
@@ -484,7 +569,6 @@ def build_settings_payload_from_json(
     payload = ensure_mapping(config)
     llm_defaults = _default_llm_runtime_defaults(env)
     jobs_payload = ensure_mapping(payload.get("jobs"))
-    database_payload = ensure_mapping(payload.get("database"))
     drugs_matcher_payload = ensure_mapping(payload.get("drugs_matcher"))
     rag_payload = ensure_mapping(payload.get("rag"))
     runtime_payload = ensure_mapping(payload.get("runtime"))
@@ -493,7 +577,7 @@ def build_settings_payload_from_json(
     return {
         "fastapi": _build_fastapi_settings().model_dump(),
         "jobs": _build_jobs_settings(jobs_payload).model_dump(),
-        "database": _build_database_settings(database_payload).model_dump(),
+        "database": _build_database_settings(env.database).model_dump(),
         "drugs_matcher": _build_drugs_matcher_settings(
             drugs_matcher_payload
         ).model_dump(),

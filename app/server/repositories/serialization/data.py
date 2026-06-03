@@ -1,10 +1,10 @@
 from __future__ import annotations
 
 import hashlib
-import os
 import re
 import zipfile
 from datetime import date
+from pathlib import Path
 from typing import Any, Iterator
 from xml.etree import ElementTree
 
@@ -626,19 +626,19 @@ class DataSerializer:
 class DocumentSerializer:
     SUPPORTED_EXTENSIONS = DOCUMENT_SUPPORTED_EXTENSIONS
 
-    def __init__(self, documents_path: str) -> None:
-        self.documents_path = documents_path
+    def __init__(self, documents_path: str | Path) -> None:
+        self.documents_path = Path(documents_path)
 
     # -------------------------------------------------------------------------
     def collect_document_paths(self) -> list[str]:
         collected: list[str] = []
-        for root, _, files in os.walk(self.documents_path):
-            for name in files:
-                extension = os.path.splitext(name)[1].lower()
-                if extension in self.SUPPORTED_EXTENSIONS:
-                    collected.append(os.path.join(root, name))
-                else:
-                    logger.debug("Skipping unsupported document '%s'", name)
+        for candidate in self.documents_path.rglob("*"):
+            if not candidate.is_file():
+                continue
+            if candidate.suffix.lower() in self.SUPPORTED_EXTENSIONS:
+                collected.append(str(candidate))
+            else:
+                logger.debug("Skipping unsupported document '%s'", candidate.name)
         collected.sort()
         return collected
 
@@ -646,7 +646,7 @@ class DocumentSerializer:
     def load_documents(self) -> list[Document]:
         documents: list[Document] = []
         for file_path in self.collect_document_paths():
-            extension = os.path.splitext(file_path)[1].lower()
+            extension = Path(file_path).suffix.lower()
             if extension == ".pdf":
                 documents.extend(self.load_pdf(file_path))
             elif extension == ".docx":
@@ -747,9 +747,10 @@ class DocumentSerializer:
     def read_text_content(self, file_path: str, extension: str) -> str:
         if extension == ".xml":
             return self.read_xml_content(file_path)
+        path = Path(file_path)
         for encoding in TEXT_FILE_FALLBACK_ENCODINGS:
             try:
-                with open(file_path, "r", encoding=encoding) as handle:
+                with path.open("r", encoding=encoding) as handle:
                     text = handle.read()
             except OSError, UnicodeDecodeError:
                 continue
@@ -771,28 +772,26 @@ class DocumentSerializer:
     # -------------------------------------------------------------------------
     def build_metadata(
         self,
-        file_path: str,
+        file_path: str | Path,
         *,
         content_type: str,
         document_title: str | None = None,
     ) -> dict[str, Any]:
+        path = Path(file_path)
         document_id = self.compute_document_id(file_path)
-        resolved_title = (
-            self.normalize_title(document_title)
-            or os.path.splitext(os.path.basename(file_path))[0]
-        )
+        resolved_title = self.normalize_title(document_title) or path.stem
         return {
             "document_id": document_id,
-            "source": file_path,
-            "file_name": os.path.basename(file_path),
+            "source": str(path),
+            "file_name": path.name,
             "document_title": resolved_title,
             "content_type": content_type,
         }
 
     # -------------------------------------------------------------------------
-    def compute_document_id(self, file_path: str) -> str:
-        relative_path = os.path.relpath(file_path, self.documents_path)
-        return hashlib.sha256(relative_path.encode("utf-8")).hexdigest()
+    def compute_document_id(self, file_path: str | Path) -> str:
+        relative_path = Path(file_path).resolve().relative_to(self.documents_path.resolve())
+        return hashlib.sha256(str(relative_path).encode("utf-8")).hexdigest()
 
     # -------------------------------------------------------------------------
     def resolve_pdf_title(self, reader: PdfReader, file_path: str) -> str:
@@ -807,7 +806,7 @@ class DocumentSerializer:
                 candidate = None
             if candidate:
                 return candidate
-        return os.path.splitext(os.path.basename(file_path))[0]
+        return Path(file_path).stem
 
     # -------------------------------------------------------------------------
     def resolve_docx_title(self, archive: zipfile.ZipFile, file_path: str) -> str:
@@ -815,12 +814,12 @@ class DocumentSerializer:
             core_xml = archive.read("docProps/core.xml")
             tree = ElementTree.fromstring(core_xml)
         except KeyError, ElementTree.ParseError:
-            return os.path.splitext(os.path.basename(file_path))[0]
+            return Path(file_path).stem
         namespaces = {"dc": "http://purl.org/dc/elements/1.1/"}
         node = tree.find("dc:title", namespaces)
         return (
             self.normalize_title(node.text if node is not None else None)
-            or os.path.splitext(os.path.basename(file_path))[0]
+            or Path(file_path).stem
         )
 
     # -------------------------------------------------------------------------
