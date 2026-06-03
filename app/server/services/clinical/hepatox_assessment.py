@@ -31,7 +31,7 @@ from services.clinical.preparation import HepatoxPreparedInputs
 from services.clinical.report_language import (
     report_heading,
 )
-from services.llm.prompts import (
+from common.prompts import (
     LIVERTOX_CLINICAL_SYSTEM_PROMPT,
     LIVERTOX_CLINICAL_USER_PROMPT,
     LIVERTOX_CONCLUSION_SYSTEM_PROMPT,
@@ -821,7 +821,11 @@ async def request_drug_analysis(
     )
     visit_date_anchor = self.format_visit_date_anchor(visit_date)
     score, metadata_block = self.prepare_metadata_prompt(metadata)
-    rag_documents = rag_documents or "No additional documents provided."
+    retrieved_documents_block = (
+        f"Retrieved documents:\n{rag_documents.strip()}"
+        if rag_documents and rag_documents.strip()
+        else ""
+    )
     origin_block = ", ".join(origins) if origins else "unknown"
     metadata_items = [
         f"- {json.dumps(item, ensure_ascii=False)}"
@@ -840,7 +844,7 @@ async def request_drug_analysis(
         extraction_metadata=self.escape_braces(extraction_block),
         livertox_status=self.escape_braces(livertox_status),
         excerpt=self.escape_braces(excerpt),
-        documents=self.escape_braces(rag_documents),
+        retrieved_documents_block=self.escape_braces(retrieved_documents_block),
         clinical_context=self.escape_braces(clinical_context),
         visit_date_anchor=self.escape_braces(visit_date_anchor),
         therapy_start_details=self.escape_braces(start_details),

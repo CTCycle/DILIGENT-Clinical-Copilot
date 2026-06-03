@@ -377,10 +377,10 @@ def _build_drugs_matcher_settings(data: dict[str, Any]) -> DrugsMatcherSettings:
 def _build_rag_settings(
     data: dict[str, Any], defaults: LLMRuntimeDefaults
 ) -> RagSettings:
-    rerank_top_n = coerce_positive_int(data.get("rerank_top_n"), 10)
-    rerank_candidate_k = coerce_positive_int(data.get("rerank_candidate_k"), 100)
-    if rerank_candidate_k < rerank_top_n:
-        rerank_candidate_k = rerank_top_n
+    selected_count = coerce_positive_int(data.get("retrieval_selected_count"), 6)
+    candidate_count = coerce_positive_int(data.get("retrieval_candidate_count"), 40)
+    if candidate_count < selected_count:
+        candidate_count = selected_count
     return RagSettings(
         vector_collection_name=coerce_str(
             data.get("vector_collection_name"), "documents"
@@ -393,8 +393,8 @@ def _build_rag_settings(
         ),
         use_hybrid_search=coerce_bool(data.get("use_hybrid_search"), True),
         use_reranking=coerce_bool(data.get("use_reranking"), True),
-        rerank_candidate_k=rerank_candidate_k,
-        rerank_top_n=rerank_top_n,
+        retrieval_candidate_count=candidate_count,
+        retrieval_selected_count=selected_count,
         reranker_model=coerce_str(
             data.get("reranker_model"), "cross-encoder/ms-marco-MiniLM-L-6-v2"
         ),
