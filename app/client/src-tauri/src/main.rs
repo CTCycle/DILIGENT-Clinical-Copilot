@@ -18,6 +18,7 @@ const CREATE_NO_WINDOW: u32 = 0x08000000;
 
 const APP_FOLDER: &str = "app";
 const TAURI_MODE_ENV: &str = "DILIGENT_TAURI_MODE";
+const PACKAGED_RUNTIME_FOLDER: &str = "runtime";
 
 #[derive(Clone)]
 struct BackendChildState {
@@ -212,6 +213,7 @@ fn find_workspace_root(app_handle: &tauri::AppHandle) -> Result<PathBuf, String>
     if let Ok(exe_path) = std::env::current_exe() {
         if let Some(exe_dir) = exe_path.parent() {
             push_with_ancestors(exe_dir, &mut candidates);
+            push_with_ancestors(&exe_dir.join(PACKAGED_RUNTIME_FOLDER), &mut candidates);
         }
     }
 
@@ -221,6 +223,7 @@ fn find_workspace_root(app_handle: &tauri::AppHandle) -> Result<PathBuf, String>
 
     if let Ok(resource_dir) = app_handle.path().resource_dir() {
         push_with_ancestors(&resource_dir, &mut candidates);
+        push_with_ancestors(&resource_dir.join(PACKAGED_RUNTIME_FOLDER), &mut candidates);
     }
 
     if let Ok(exe_path) = std::env::current_exe() {
@@ -479,7 +482,6 @@ fn sync_workspace_payload(workspace_root: &Path, runtime_root: &Path) -> Result<
         "app/resources/sources",
         "runtimes/python",
         "runtimes/uv",
-        "runtimes/nodejs",
     ];
 
     for relative_path in directory_payloads {

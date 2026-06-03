@@ -1,0 +1,55 @@
+# Startup
+Last updated: 2026-06-03
+
+## Recommended Local Startup
+On Windows, use:
+
+```cmd
+start_on_windows.bat
+```
+
+The launcher:
+- ensures portable Python, `uv`, and Node runtimes under `runtimes/`
+- runs `uv sync`
+- installs frontend dependencies if missing
+- builds frontend dist if missing
+- starts the backend via `uv run ... uvicorn`
+- starts the frontend preview server
+
+## Manual Backend Startup
+From repository root:
+
+```powershell
+app/server/.venv/Scripts/python.exe -m uvicorn app:app --app-dir app --host 127.0.0.1 --port 7690 --log-level info
+```
+
+Alternative runtime-managed path:
+
+```powershell
+runtimes\uv\uv.exe run --python runtimes\python\python.exe python -m uvicorn DILIGENT.app:app --host 127.0.0.1 --port 7690
+```
+
+## Manual Frontend Startup
+
+```powershell
+Set-Location app/client
+npm run preview -- --host 127.0.0.1 --port 9847 --strictPort
+```
+
+## Desktop Build
+
+```cmd
+release\tauri\build_with_tauri.bat
+```
+
+Prerequisites:
+- Portable runtimes present
+- Rust and Cargo toolchain available
+- Frontend dependencies installed
+
+## Quick Startup Checklist
+1. Confirm port `7690` is free or intentionally used by the current backend.
+2. Start the backend.
+3. Verify `http://127.0.0.1:7690/docs` responds.
+4. Start the frontend on `9847`.
+5. Open `http://127.0.0.1:9847`.
