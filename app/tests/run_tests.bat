@@ -117,7 +117,7 @@ if /i "%SUITE%"=="e2e" (
 )
 if /i "%SUITE%"=="regression" (
   set "PYTEST_TARGET=%TESTS_DIR%\unit"
-  set "EXTRA_PYTEST_ARGS=-k cloud_llm_langchain or langchain_embeddings or ollama_langchain"
+  set "EXTRA_PYTEST_ARGS=-k cloud_llm_native or native_embeddings or ollama_native"
   goto :suite_done
 )
 if /i "%SUITE%"=="stress" (

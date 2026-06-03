@@ -149,12 +149,15 @@ async def _extend_structured_model_queue(
     tried: set[str],
     fallbacks: list[str] | None,
 ) -> list[str]:
-    if fallbacks is None:
-        fallbacks = await self.collect_structured_fallbacks(preferred_models)
-    for candidate in fallbacks:
+    computed_fallbacks = (
+        await self.collect_structured_fallbacks(preferred_models)
+        if fallbacks is None
+        else fallbacks
+    )
+    for candidate in computed_fallbacks:
         if candidate and candidate not in tried and candidate not in queue:
             queue.append(candidate)
-    return fallbacks
+    return computed_fallbacks
 
 
 def _coerce_llm_text(raw: dict[str, Any] | str) -> str:
@@ -251,6 +254,7 @@ async def call_with_structured_models(
         last_missing_error=last_missing_error,
         missing=missing,
     )
+    raise AssertionError("unreachable")
 
 
 async def parse_with_repairs(

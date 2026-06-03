@@ -6,6 +6,7 @@ from domain.keys import (
     ProviderName,
     normalize_provider_name,
 )
+from repositories.schemas.models import AccessKey
 from repositories.serialization.access_keys import AccessKeySerializer
 
 
@@ -16,7 +17,7 @@ class AccessKeyService:
 
     # -------------------------------------------------------------------------
     @staticmethod
-    def to_response(row: AccessKeyRecord) -> AccessKeyResponse:
+    def to_response(row: AccessKeyRecord | AccessKey) -> AccessKeyResponse:
         fingerprint = getattr(row, "key_fingerprint", None)
         if fingerprint is None:
             fingerprint = getattr(row, "fingerprint")
