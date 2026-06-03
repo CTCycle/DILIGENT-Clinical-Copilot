@@ -14,7 +14,7 @@ This file is the root index for `assets/docs`. Read it first, then open the smal
 ## Naming Rules
 - All files and folders under `assets/docs` use lower-case names.
 - Topic folders group related leaf documents by subject.
-- Root-level files are reserved for entry-point indexes only.
+- Root-level files are reserved for entry-point documents only.
 
 ## Documentation Ontology
 ### Root
@@ -22,8 +22,6 @@ This file is the root index for `assets/docs`. Read it first, then open the smal
   - Entry point and master index for the full documentation tree.
 
 ### Architecture
-- `architecture/index.md`
-  - Architecture branch index.
 - `architecture/system_overview.md`
   - Repository layout, maintained code structure, and entry points.
 - `architecture/api_surface.md`
@@ -36,8 +34,6 @@ This file is the root index for `assets/docs`. Read it first, then open the smal
   - Centralized job lifecycle, polling, cancellation, and active job types.
 
 ### Coding
-- `coding/index.md`
-  - Coding branch index.
 - `coding/shared_rules.md`
   - Cross-language rules for scope, boundaries, imports, and cleanup.
 - `coding/python.md`
@@ -50,8 +46,6 @@ This file is the root index for `assets/docs`. Read it first, then open the smal
   - Failure-class, timeout, logging, cleanup, and safe-error rules.
 
 ### Runtime
-- `runtime/index.md`
-  - Runtime branch index.
 - `runtime/modes.md`
   - Supported runtime targets and differences between local and packaged execution.
 - `runtime/startup.md`
@@ -66,8 +60,6 @@ This file is the root index for `assets/docs`. Read it first, then open the smal
   - Repeatable regression slice for model configuration and app-flow validation.
 
 ### UI
-- `ui/index.md`
-  - UI branch index.
 - `ui/design_tokens.md`
   - Typography, spacing, sizing, and color tokens.
 - `ui/components_and_patterns.md`
@@ -76,8 +68,6 @@ This file is the root index for `assets/docs`. Read it first, then open the smal
   - Core journeys, responsiveness, accessibility, and design principles.
 
 ### User
-- `user/index.md`
-  - User documentation branch index.
 - `user/getting_started.md`
   - Purpose, audience, prerequisites, safety, layout, and startup basics.
 - `user/model_setup.md`
