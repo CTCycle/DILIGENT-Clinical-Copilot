@@ -62,9 +62,9 @@ foreach ($file in $portableExeCandidates) {
   Copy-Item -Path $file.FullName -Destination $portableDir -Force
 }
 
-$portablePayloadSourceDir = Join-Path $tauriDir "r"
-$portablePayloadFallbackDir = Join-Path $releaseDir "r"
-$portablePayloadDestinationDir = Join-Path $portableDir "r"
+$portablePayloadSourceDir = Join-Path $tauriDir "runtime"
+$portablePayloadFallbackDir = Join-Path $releaseDir "runtime"
+$portablePayloadDestinationDir = Join-Path $portableDir "runtime"
 if (Test-Path $portablePayloadSourceDir) {
   Copy-Item -Path $portablePayloadSourceDir -Destination $portablePayloadDestinationDir -Recurse -Force
 } elseif (Test-Path $portablePayloadFallbackDir) {
@@ -72,17 +72,17 @@ if (Test-Path $portablePayloadSourceDir) {
 }
 
 $requiredPortablePaths = @(
-  (Join-Path $portableDir "r"),
-  (Join-Path $portableDir "r\app\server"),
-  (Join-Path $portableDir "r\app\scripts"),
-  (Join-Path $portableDir "r\settings"),
-  (Join-Path $portableDir "r\app\client\dist"),
-  (Join-Path $portableDir "r\app\resources\models"),
-  (Join-Path $portableDir "r\app\resources\sources"),
-  (Join-Path $portableDir "r\runtimes\uv\uv.exe"),
-  (Join-Path $portableDir "r\runtimes\python\python.exe"),
-  (Join-Path $portableDir "r\runtimes\uv.lock"),
-  (Join-Path $portableDir "r\pyproject.toml")
+  (Join-Path $portableDir "runtime"),
+  (Join-Path $portableDir "runtime\app\server"),
+  (Join-Path $portableDir "runtime\app\scripts"),
+  (Join-Path $portableDir "runtime\settings"),
+  (Join-Path $portableDir "runtime\app\client\dist"),
+  (Join-Path $portableDir "runtime\app\resources\models"),
+  (Join-Path $portableDir "runtime\app\resources\sources"),
+  (Join-Path $portableDir "runtime\runtimes\uv\uv.exe"),
+  (Join-Path $portableDir "runtime\runtimes\python\python.exe"),
+  (Join-Path $portableDir "runtime\runtimes\uv.lock"),
+  (Join-Path $portableDir "runtime\pyproject.toml")
 )
 
 foreach ($requiredPath in $requiredPortablePaths) {

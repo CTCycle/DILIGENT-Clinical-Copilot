@@ -6,7 +6,7 @@ for %%I in ("%script_dir%..\..") do set "repo_root=%%~fI"
 set "app_dir=%repo_root%\app"
 set "client_dir=%app_dir%\client"
 set "tauri_dir=%client_dir%\src-tauri"
-set "bundle_source_dir=%tauri_dir%\r"
+set "bundle_source_dir=%tauri_dir%\runtime"
 set "release_dir=%tauri_dir%\target\release"
 set "bundle_dir=%tauri_dir%\target\release\bundle"
 set "release_export_dir=%repo_root%\release\windows"
@@ -263,7 +263,7 @@ if exist "%bundle_source_dir%" rd /s /q "%bundle_source_dir%" >nul 2>&1
 exit /b 0
 
 :cleanup_stale_release_payload
-if exist "%release_dir%\r" rd /s /q "%release_dir%\r" >nul 2>&1
+if exist "%release_dir%\runtime" rd /s /q "%release_dir%\runtime" >nul 2>&1
 if exist "%release_dir%\resources" rd /s /q "%release_dir%\resources" >nul 2>&1
 if exist "%release_dir%\nsis" rd /s /q "%release_dir%\nsis" >nul 2>&1
 if exist "%release_dir%\wix" rd /s /q "%release_dir%\wix" >nul 2>&1
