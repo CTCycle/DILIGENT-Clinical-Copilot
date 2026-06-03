@@ -34,7 +34,7 @@ Last updated: 2026-06-03
 - Local mode serves the frontend from a preview or dev process.
 - Packaged Tauri mode serves bundled SPA assets from the backend.
 - Startup validates packaged SPA presence before desktop mode serves assets.
-- Runtime resources are bundled under `r/` through `tauri.conf.json`.
+- Runtime resources are bundled under `runtime/` through `tauri.conf.json`.
 
 ## Feature Toggles
 - Cloud-versus-local model usage is runtime-configured through model configuration APIs.
