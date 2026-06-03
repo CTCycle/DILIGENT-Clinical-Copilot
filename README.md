@@ -18,7 +18,7 @@ Run:
 start_on_windows.bat
 ```
 
-The launcher prepares local runtimes/dependencies and starts backend plus frontend.
+The launcher prepares local runtimes and dependencies, then starts the backend and frontend on the configured local ports.
 
 ### 2.2 macOS / Linux (Manual)
 Prerequisites:
@@ -29,7 +29,7 @@ Backend:
 ```bash
 cd app/server
 python -m pip install -e ".[test]"
-uvicorn app:app --host 127.0.0.1 --port 8000
+uvicorn app:app --host 127.0.0.1 --port 7690
 ```
 
 Frontend:
@@ -37,8 +37,12 @@ Frontend:
 cd app/client
 npm install
 npm run build
-npm run preview -- --host 127.0.0.1 --port 7861
+npm run preview -- --host 127.0.0.1 --port 9847 --strictPort
 ```
+
+Default local endpoints:
+- UI: `http://127.0.0.1:9847`
+- API health: `http://127.0.0.1:7690/api/health`
 
 ## 3. Runtime Profiles
 DILIGENT is configuration-first and uses one active runtime file: `settings/.env`.
@@ -53,7 +57,7 @@ Switch to local Tauri profile:
 copy /Y settings\.env.local.tauri.example settings\.env
 ```
 
-See `assets/docs/RUNTIME_MODES.md` for full runtime and packaging details.
+See `assets/docs/runtime/modes.md` for full runtime and packaging details.
 
 ## 4. Using the Application
 Typical workflow:
@@ -63,25 +67,25 @@ Typical workflow:
 4. Use Data Inspection to explore current knowledge base.
 5. Explore past sessions to modify and revise them.
 
-Detailed user journeys and feature guidance are documented in `assets/docs/USER_MANUAL.md`.
+Detailed user journeys and feature guidance are documented in `assets/docs/user/getting_started.md`, `assets/docs/user/dili_assessment_workflow.md`, and `assets/docs/user/sessions_timeline_and_data.md`.
 
 ### Screenshots
 
 #### Dashboard / Report Output
 ![Dashboard view](assets/figures/dashboard.png)
-_Analysis dashboard focused on the report output area and execution controls._
+_Clinical intake workspace with structured patient input, visit metadata, and report actions._
 
 #### Sessions overview
 ![Session dashboard](assets/figures/session-inspection.png)
-_Explore past sessions and improve DILI assessment iteratively._
+_Clinical Sessions workspace with the persisted review layout shown and sensitive case content blurred._
 
 #### Model Configuration (Settings)
 ![Model settings](assets/figures/model-detail.png)
-_Runtime source selection and current model configuration summary._
+_Runtime source, local model catalog, and active reasoning pipeline settings._
 
 #### Data Inspection
 ![Data inspection](assets/figures/data-inspection.png)
-_Session inspection table with status, timing, and record actions._
+_Catalog inspection view for curated drug records, update status, and maintenance actions._
 
 ## 5. Desktop Packaging (Tauri)
 Build Windows desktop artifacts:
@@ -92,6 +96,8 @@ release\tauri\build_with_tauri.bat
 Generated outputs:
 - `release/windows/installers`
 - `release/windows/portable`
+
+The packaged Windows release currently exports an NSIS `.exe` installer under `release/windows/installers`.
 
 ## 6. Setup and Maintenance
 Run:
@@ -127,12 +133,12 @@ Equivalent PowerShell runners:
 - Ollama must support the chat-capable `/api/chat` API; `/api/generate` fallback behavior has been removed.
 
 ## 8. Documentation Map
-- `assets/docs/USER_MANUAL.md`: end-user operation, journeys, key commands.
-- `assets/docs/ARCHITECTURE.md`: system boundaries and data flow.
-- `assets/docs/BACKGROUND_JOBS.md`: job lifecycle and semantics.
-- `assets/docs/RUNTIME_MODES.md`: runtime profiles and packaging.
-- `assets/docs/ERROR_HANDLING.md`: backend/frontend error strategy.
-- `assets/docs/UI_STANDARDS.md`: frontend design standards.
+- `assets/docs/project_overview.md`: entry point for the documentation tree.
+- `assets/docs/architecture/system_overview.md`: repository layout and system boundaries.
+- `assets/docs/architecture/background_jobs.md`: job lifecycle and semantics.
+- `assets/docs/runtime/modes.md`: runtime profiles and packaging.
+- `assets/docs/coding/error_handling.md`: backend and frontend error strategy.
+- `assets/docs/ui/components_and_patterns.md`: frontend structure and interface patterns.
 
 ## 9. License
 Non-commercial use is covered by the Polyform Noncommercial License 1.0.0; commercial licensing is available separately. See `LICENSE`.
