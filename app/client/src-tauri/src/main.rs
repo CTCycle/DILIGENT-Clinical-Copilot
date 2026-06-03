@@ -212,6 +212,7 @@ fn find_workspace_root(app_handle: &tauri::AppHandle) -> Result<PathBuf, String>
     if let Ok(exe_path) = std::env::current_exe() {
         if let Some(exe_dir) = exe_path.parent() {
             push_with_ancestors(exe_dir, &mut candidates);
+            push_with_ancestors(&exe_dir.join("r"), &mut candidates);
         }
     }
 
@@ -221,6 +222,7 @@ fn find_workspace_root(app_handle: &tauri::AppHandle) -> Result<PathBuf, String>
 
     if let Ok(resource_dir) = app_handle.path().resource_dir() {
         push_with_ancestors(&resource_dir, &mut candidates);
+        push_with_ancestors(&resource_dir.join("r"), &mut candidates);
     }
 
     if let Ok(exe_path) = std::env::current_exe() {
@@ -479,7 +481,6 @@ fn sync_workspace_payload(workspace_root: &Path, runtime_root: &Path) -> Result<
         "app/resources/sources",
         "runtimes/python",
         "runtimes/uv",
-        "runtimes/nodejs",
     ];
 
     for relative_path in directory_payloads {
