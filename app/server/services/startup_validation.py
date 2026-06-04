@@ -15,8 +15,7 @@ def run_startup_validations(settings: ServerSettings | None = None) -> None:
 
     if tauri_mode_enabled() and not Path(CLIENT_INDEX_FILE_PATH).is_file():
         raise RuntimeError(
-            "Tauri mode requires a packaged client build at "
-            f"{CLIENT_INDEX_FILE_PATH}."
+            f"Tauri mode requires a packaged client build at {CLIENT_INDEX_FILE_PATH}."
         )
 
     catalog_snapshot = get_reference_catalog_snapshot()

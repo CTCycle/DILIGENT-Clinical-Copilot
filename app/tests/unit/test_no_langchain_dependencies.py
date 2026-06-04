@@ -16,9 +16,11 @@ def test_no_forbidden_dependency_strings_remain() -> None:
         repo_root / ".github",
     )
 
-    pyproject_text = (repo_root / "app/server/pyproject.toml").read_text(
-        encoding="utf-8", errors="ignore"
-    ).casefold()
+    pyproject_text = (
+        (repo_root / "app/server/pyproject.toml")
+        .read_text(encoding="utf-8", errors="ignore")
+        .casefold()
+    )
     for term in casefolded_terms:
         assert term not in pyproject_text
 
@@ -27,7 +29,9 @@ def test_no_forbidden_dependency_strings_remain() -> None:
         if not root.exists():
             continue
         for path in root.rglob("*"):
-            if any(part in {"__pycache__", ".pytest_cache", ".venv"} for part in path.parts):
+            if any(
+                part in {"__pycache__", ".pytest_cache", ".venv"} for part in path.parts
+            ):
                 continue
             if not path.is_file() or path.suffix.lower() not in text_suffixes:
                 continue

@@ -21,7 +21,9 @@ def _runtime_rag_settings() -> dict[str, object]:
     return dict(snapshot.rag_settings or {})
 
 
-def build_effective_rag_settings(overrides: dict[str, object] | None = None) -> RagSettings:
+def build_effective_rag_settings(
+    overrides: dict[str, object] | None = None,
+) -> RagSettings:
     base = get_server_settings().rag
     data = {**_runtime_rag_settings(), **dict(overrides or {})}
 
@@ -49,9 +51,13 @@ def build_effective_rag_settings(overrides: dict[str, object] | None = None) -> 
             "use_reranking": coerce_bool(data.get("use_reranking"), base.use_reranking),
             "retrieval_candidate_count": candidate_count,
             "retrieval_selected_count": selected_count,
-            "reranker_model": coerce_str(data.get("reranker_model"), base.reranker_model),
+            "reranker_model": coerce_str(
+                data.get("reranker_model"), base.reranker_model
+            ),
             "hybrid_vector_weight": max(
-                coerce_float(data.get("hybrid_vector_weight"), base.hybrid_vector_weight),
+                coerce_float(
+                    data.get("hybrid_vector_weight"), base.hybrid_vector_weight
+                ),
                 0.0,
             ),
             "hybrid_text_weight": max(
@@ -67,7 +73,9 @@ def build_effective_rag_settings(overrides: dict[str, object] | None = None) -> 
             "hf_embedding_model": coerce_str(
                 data.get("hf_embedding_model"), base.hf_embedding_model
             ),
-            "cloud_provider": coerce_str(data.get("cloud_provider"), base.cloud_provider),
+            "cloud_provider": coerce_str(
+                data.get("cloud_provider"), base.cloud_provider
+            ),
             "cloud_embedding_model": coerce_str(
                 data.get("cloud_embedding_model"), base.cloud_embedding_model
             ),

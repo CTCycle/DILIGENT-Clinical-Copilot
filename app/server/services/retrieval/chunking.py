@@ -205,7 +205,9 @@ class SmartDocumentChunker:
         if not separators:
             return [
                 text[start : start + self.max_chars].strip()
-                for start in range(0, len(text), max(self.max_chars - self.overlap_chars, 1))
+                for start in range(
+                    0, len(text), max(self.max_chars - self.overlap_chars, 1)
+                )
                 if text[start : start + self.max_chars].strip()
             ]
         separator = separators[0]

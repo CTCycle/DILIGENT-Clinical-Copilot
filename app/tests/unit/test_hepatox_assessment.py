@@ -181,7 +181,10 @@ def test_livertox_prompt_removes_per_drug_management_recommendation_directive() 
         in LIVERTOX_CLINICAL_USER_PROMPT
     )
     assert "Estimated RUCAM:" in LIVERTOX_CLINICAL_USER_PROMPT
-    assert "Treat estimated RUCAM as supportive, not definitive" in LIVERTOX_CLINICAL_USER_PROMPT
+    assert (
+        "Treat estimated RUCAM as supportive, not definitive"
+        in LIVERTOX_CLINICAL_USER_PROMPT
+    )
     assert (
         "Do not mention drugs absent from the supplied report."
         in LIVERTOX_CONCLUSION_SYSTEM_PROMPT

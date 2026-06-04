@@ -121,4 +121,3 @@ async def ensure_runtime_client(
             and hasattr(owner.client, "default_model")
         ):
             owner.client.default_model = normalized_model  # type: ignore[attr-defined]
-

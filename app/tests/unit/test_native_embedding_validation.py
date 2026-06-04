@@ -28,7 +28,9 @@ def test_ollama_embedding_payload_returns_normalized_float_vectors(monkeypatch) 
     monkeypatch.setattr(client, "raise_for_status", lambda resp: None)
     monkeypatch.setattr(client.client, "post", fake_post)
 
-    vectors = asyncio.run(client.embed(model="nomic-embed-text", input_texts=["a", "bb"]))
+    vectors = asyncio.run(
+        client.embed(model="nomic-embed-text", input_texts=["a", "bb"])
+    )
     assert vectors == [[1.0, 2.0], [3.5, 4.0]]
     assert captured["path"] == "/api/embed"
     assert captured["json"] == {"model": "nomic-embed-text", "input": ["a", "bb"]}
@@ -69,7 +71,9 @@ def test_openai_embedding_response_sorting_by_index_is_preserved(monkeypatch) ->
         "resolve_provider_access_key",
         lambda self, provider: "openai-key",
     )
-    client = cloud_module.CloudLLMClient(provider="openai", default_model="text-embedding-3-small")
+    client = cloud_module.CloudLLMClient(
+        provider="openai", default_model="text-embedding-3-small"
+    )
     monkeypatch.setattr(client, "raise_for_status", lambda resp: None)
 
     class FakeResponse:
@@ -122,7 +126,9 @@ def test_gemini_embedding_response_count_mismatch_raises(monkeypatch) -> None:
         "resolve_provider_access_key",
         lambda self, provider: "gemini-key",
     )
-    client = cloud_module.CloudLLMClient(provider="gemini", default_model="gemini-2.5-pro")
+    client = cloud_module.CloudLLMClient(
+        provider="gemini", default_model="gemini-2.5-pro"
+    )
     monkeypatch.setattr(client, "raise_for_status", lambda resp: None)
 
     class FakeResponse:

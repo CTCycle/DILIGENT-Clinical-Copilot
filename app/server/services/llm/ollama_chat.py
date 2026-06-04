@@ -129,13 +129,13 @@ def resolve_temperature(
     if temperature is not None:
         try:
             temp_value = float(temperature)
-        except (TypeError, ValueError):
+        except TypeError, ValueError:
             temp_value = default_temp
     if options_payload and "temperature" in options_payload:
         if temperature is None:
             try:
                 temp_value = float(options_payload["temperature"])
-            except (TypeError, ValueError):
+            except TypeError, ValueError:
                 temp_value = default_temp
         options_payload.pop("temperature", None)
         if not options_payload:
@@ -501,7 +501,7 @@ async def is_server_online(self) -> bool:
     try:
         resp = await self.client.get("/api/tags")
         resp.raise_for_status()
-    except (httpx.RequestError, httpx.HTTPStatusError):
+    except httpx.RequestError, httpx.HTTPStatusError:
         return False
     return True
 
@@ -696,7 +696,9 @@ async def chat_stream(
     except httpx.TimeoutException as exc:
         raise OllamaTimeout("Timed out during streamed chat response") from exc
     except httpx.RequestError as exc:  # noqa: PERF203 - convert to domain error
-        raise OllamaError(f"Failed to request streamed Ollama chat response: {exc}") from exc
+        raise OllamaError(
+            f"Failed to request streamed Ollama chat response: {exc}"
+        ) from exc
     except Exception as exc:  # noqa: BLE001
         mapped = map_ollama_exception(exc)
         if isinstance(mapped, OllamaTimeout):
@@ -780,4 +782,3 @@ async def calculate_context_window(
         floor = min(limit, min_ctx)
         return max(upper, floor)
     return target
-

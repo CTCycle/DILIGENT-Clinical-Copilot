@@ -65,7 +65,9 @@ def test_single_query_embedding_return_shape(monkeypatch) -> None:
         async def __aexit__(self, exc_type, exc, tb) -> None:
             return None
 
-        async def embed(self, *, model: str, input_texts: list[str]) -> list[list[float]]:
+        async def embed(
+            self, *, model: str, input_texts: list[str]
+        ) -> list[list[float]]:
             _ = model, input_texts
             return [[1.0, 2.0] for _ in input_texts]
 
@@ -91,7 +93,9 @@ def test_batch_embedding_return_shape_and_order_preserved(monkeypatch) -> None:
         async def __aexit__(self, exc_type, exc, tb) -> None:
             return None
 
-        async def embed(self, *, model: str, input_texts: list[str]) -> list[list[float]]:
+        async def embed(
+            self, *, model: str, input_texts: list[str]
+        ) -> list[list[float]]:
             _ = model
             return [[float(index)] for index, _ in enumerate(input_texts)]
 
@@ -129,7 +133,9 @@ def test_provider_validation_and_exception_mapping(monkeypatch) -> None:
         async def __aexit__(self, exc_type, exc, tb) -> None:
             return None
 
-        async def embed(self, *, model: str, input_texts: list[str]) -> list[list[float]]:
+        async def embed(
+            self, *, model: str, input_texts: list[str]
+        ) -> list[list[float]]:
             _ = model, input_texts
             raise TimeoutError("timeout")
 
