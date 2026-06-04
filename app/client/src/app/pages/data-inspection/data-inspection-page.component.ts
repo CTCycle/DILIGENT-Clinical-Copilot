@@ -33,13 +33,14 @@ import {
   InspectionLiverToxExcerptResponse,
   InspectionLiverToxItem,
   InspectionRagDocumentRow,
+  InspectionRagVectorizationSummary,
   InspectionRagVectorStoreSummary,
   InspectionRxNavItem,
   InspectionUpdateTarget,
 } from '../../core/models/types';
 import { InspectionDetailResource } from '../../core/state/inspection-detail-resource';
 import { InspectionPagedResource } from '../../core/state/inspection-paged-resource';
-import { InspectionUpdateJobResource, InspectionUpdateTargetActionsMap } from '../../core/state/inspection-update-job-resource';
+import { InspectionUpdateJobResource, InspectionUpdateTargetActionsMap, isRecord } from '../../core/state/inspection-update-job-resource';
 import {
   InspectionViewId,
   InspectionViewOption,
@@ -52,6 +53,24 @@ const INSPECTION_VIEWS: InspectionViewOption[] = [
   { id: 'rxnav', label: 'Drug Catalog' },
   { id: 'livertox', label: 'LiverTox' },
   { id: 'rag', label: 'RAG' },
+];
+
+const RAG_SUMMARY_FIELDS: ReadonlyArray<{
+  key: keyof InspectionRagVectorizationSummary;
+  label: string;
+}> = [
+  { key: 'chunk_size', label: 'Chunk size' },
+  { key: 'chunk_overlap', label: 'Chunk overlap' },
+  { key: 'embedding_batch_size', label: 'Embedding batch size' },
+  { key: 'vector_stream_batch_size', label: 'Vector stream batch size' },
+  { key: 'embedding_max_workers', label: 'Embedding max workers' },
+  { key: 'embedding_backend', label: 'Embedding backend' },
+  { key: 'ollama_embedding_model', label: 'Ollama embedding model' },
+  { key: 'hf_embedding_model', label: 'Hugging Face embedding model' },
+  { key: 'cloud_provider', label: 'Cloud provider' },
+  { key: 'cloud_embedding_model', label: 'Cloud embedding model' },
+  { key: 'use_cloud_embeddings', label: 'Use cloud embeddings' },
+  { key: 'reset_vector_collection', label: 'Reset vector collection' },
 ];
 
 function normalizeFolderSeparators(value: string): string {
@@ -193,6 +212,26 @@ export class DataInspectionPageComponent implements OnInit, OnDestroy {
   readonly updateMessage = this.updateJob.updateMessage;
   readonly updateError = this.updateJob.updateError;
   readonly updateTargetState = this.updateJob.targetState;
+  readonly isRagUpdateModal = computed(() => this.activeUpdateTarget() === 'rag');
+  readonly updateModalSubtitle = computed(() =>
+    this.isRagUpdateModal()
+      ? 'Review current vectorization settings. Modify RAG settings only from Model Configurations.'
+      : 'Configure overrides, run, monitor progress, and cancel if needed.',
+  );
+  readonly ragUpdateSummaryEntries = computed(() => {
+    if (!this.isRagUpdateModal()) {
+      return [];
+    }
+    const config = this.updateConfig();
+    if (!isRecord(config)) {
+      return [];
+    }
+    return RAG_SUMMARY_FIELDS.map(({ key, label }) => ({
+      key,
+      label,
+      value: this.formatRagSummaryValue(config[key]),
+    }));
+  });
   readonly rxnavUpdateRunning = computed(() => this.updateTargetState().rxnav.running);
   readonly rxnavUpdateProgress = computed(() => this.updateTargetState().rxnav.progress);
   readonly rxnavUpdateMessage = computed(() => this.updateTargetState().rxnav.message);
@@ -428,6 +467,20 @@ export class DataInspectionPageComponent implements OnInit, OnDestroy {
 
   async cancelUpdateJob(): Promise<void> {
     await this.updateJob.cancel();
+  }
+
+  private formatRagSummaryValue(value: unknown): string {
+    if (typeof value === 'boolean') {
+      return value ? 'Yes' : 'No';
+    }
+    if (typeof value === 'number' && Number.isFinite(value)) {
+      return String(value);
+    }
+    if (typeof value === 'string') {
+      const normalized = value.trim();
+      return normalized || 'Not set';
+    }
+    return 'Not set';
   }
 }
 
