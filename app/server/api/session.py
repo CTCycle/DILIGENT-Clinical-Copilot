@@ -61,7 +61,7 @@ class ClinicalSessionEndpoint:
 
     # -------------------------------------------------------------------------
     def cancel_clinical_job(self, job_id: str) -> JobCancelResponse:
-        return self.service.cancel_clinical_job(job_id)    
+        return self.service.cancel_clinical_job(job_id)
 
     # -------------------------------------------------------------------------
     def add_routes(self) -> None:

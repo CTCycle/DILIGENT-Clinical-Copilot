@@ -42,7 +42,9 @@ def patch_access_key(monkeypatch, key: str = "provider-key") -> None:
 
 
 # -----------------------------------------------------------------------------
-def test_cloud_llm_native_openai_chat_uses_responses_api_and_normalizes_text(monkeypatch) -> None:
+def test_cloud_llm_native_openai_chat_uses_responses_api_and_normalizes_text(
+    monkeypatch,
+) -> None:
     captured: dict[str, Any] = {}
 
     class FakeResponses:
@@ -121,7 +123,9 @@ def test_cloud_llm_native_openai_gpt5_chat_omits_sampling_options(monkeypatch) -
 
 
 # -----------------------------------------------------------------------------
-def test_cloud_llm_native_gemini_chat_uses_generate_content_and_normalizes_json(monkeypatch) -> None:
+def test_cloud_llm_native_gemini_chat_uses_generate_content_and_normalizes_json(
+    monkeypatch,
+) -> None:
     captured: dict[str, Any] = {}
 
     class FakeModels:
@@ -200,7 +204,9 @@ def test_cloud_llm_native_llm_text_call_uses_openai_responses_api(monkeypatch) -
 
 
 # -----------------------------------------------------------------------------
-def test_cloud_llm_native_openai_structured_call_uses_responses_parse(monkeypatch) -> None:
+def test_cloud_llm_native_openai_structured_call_uses_responses_parse(
+    monkeypatch,
+) -> None:
     captured: dict[str, Any] = {}
 
     class FakeResponses:
@@ -247,7 +253,9 @@ def test_cloud_llm_native_openai_structured_call_uses_responses_parse(monkeypatc
 
 
 # -----------------------------------------------------------------------------
-def test_cloud_llm_native_gemini_structured_call_passes_response_schema(monkeypatch) -> None:
+def test_cloud_llm_native_gemini_structured_call_passes_response_schema(
+    monkeypatch,
+) -> None:
     captured: dict[str, Any] = {}
 
     class FakeModels:
@@ -289,7 +297,9 @@ def test_cloud_llm_native_gemini_structured_call_passes_response_schema(monkeypa
 
 
 # -----------------------------------------------------------------------------
-def test_cloud_llm_native_provider_exception_maps_to_existing_error_types(monkeypatch) -> None:
+def test_cloud_llm_native_provider_exception_maps_to_existing_error_types(
+    monkeypatch,
+) -> None:
     class FakeResponses:
         async def create(self, **kwargs: Any) -> FakeOpenAIResponse:
             _ = kwargs

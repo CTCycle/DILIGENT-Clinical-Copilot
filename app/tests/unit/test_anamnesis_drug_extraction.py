@@ -7,6 +7,7 @@ from typing import Any
 from domain.clinical import DrugEntry, PatientDrugs
 from services.clinical.parser import DrugsParser
 
+
 class RecordingStructuredClient:
     def __init__(self, response: PatientDrugs) -> None:
         self.response = response
@@ -17,7 +18,8 @@ class RecordingStructuredClient:
         self.call_count += 1
         self.user_prompts.append(str(kwargs.get("user_prompt", "")))
         return self.response
-    
+
+
 class RecordingStructuredClient:
     def __init__(self, response: PatientDrugs) -> None:
         self.response = response
@@ -28,6 +30,7 @@ class RecordingStructuredClient:
         self.call_count += 1
         self.user_prompts.append(str(kwargs.get("user_prompt", "")))
         return self.response
+
 
 class FakeStructuredClient:
     def __init__(self, responses: Sequence[PatientDrugs]) -> None:
@@ -166,7 +169,6 @@ def test_extract_drugs_from_anamnesis_sends_long_input_as_single_chunk() -> None
     assert client.call_count == 1
     assert [entry.name for entry in parsed.entries] == ["Aspirin"]
 
-    
 
 def test_extract_drugs_from_anamnesis_filters_non_drug_fragments() -> None:
     fake_client = FakeStructuredClient(

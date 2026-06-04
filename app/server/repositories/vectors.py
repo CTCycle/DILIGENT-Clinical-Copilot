@@ -82,7 +82,9 @@ class LanceVectorDatabase:
     def connect(self) -> DBConnection:
         if self.connection is None:
             database_path = Path(self.database_path)
-            base_directory = database_path.parent if database_path.suffix else database_path
+            base_directory = (
+                database_path.parent if database_path.suffix else database_path
+            )
             if str(base_directory) == "":
                 base_directory = Path(".")
             base_directory.mkdir(parents=True, exist_ok=True)

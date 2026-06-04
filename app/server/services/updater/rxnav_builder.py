@@ -247,7 +247,7 @@ class RxNavDrugCatalogBuilder:
         headers = response.headers
         try:
             content_length = int(headers.get("Content-Length", 0) or 0)
-        except (TypeError, ValueError):
+        except TypeError, ValueError:
             content_length = 0
         payload = {
             "source_url": str(response.request.url)
@@ -303,7 +303,10 @@ class RxNavDrugCatalogBuilder:
         count: int,
         force: bool = False,
     ) -> None:
-        if not force and (count - self.last_logged_count) < self.PROGRESS_RECORD_INTERVAL:
+        if (
+            not force
+            and (count - self.last_logged_count) < self.PROGRESS_RECORD_INTERVAL
+        ):
             return
         self.last_logged_count = count
         logger.info("RxNav catalog progress: %d records upserted", count)
@@ -871,4 +874,3 @@ class RxNavDrugCatalogBuilder:
         if len(formatted) == 1:
             return formatted[0]
         return ", ".join(formatted)
-

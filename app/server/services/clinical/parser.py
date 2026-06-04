@@ -77,7 +77,7 @@ class DrugsParser:
     NAME_TEMPORAL_SPLIT_RE = re.compile(r"$^")
     TRAILING_ROUTE_TOKEN_RE = re.compile(r"$^")
     START_EVENT_RE = re.compile(r"$^")
-    SUSPENSION_EVENT_RE = re.compile(r"$^") 
+    SUSPENSION_EVENT_RE = re.compile(r"$^")
     NON_DRUG_EXACT_NAMES = NON_DRUG_EXACT_NAMES
     NON_DRUG_PREFIXES = NON_DRUG_PREFIXES
     NON_DRUG_CONTAINS = NON_DRUG_CONTAINS
@@ -421,13 +421,13 @@ class DrugsParser:
 
         if source == "anamnesis":
             anamnesis_text = self.clean_text(text)
-            parsed_entries: list[DrugEntry] = []            
+            parsed_entries: list[DrugEntry] = []
             parsed = await asyncio.wait_for(
                 self.client.llm_structured_call(
                     model=self.model,
                     system_prompt=ANAMNESIS_DRUG_EXTRACTION_PROMPT.strip(),
                     user_prompt=(
-                        f"Extract all drugs mentioned in the following patient anamnesis:\n\n{anamnesis_text}"                        
+                        f"Extract all drugs mentioned in the following patient anamnesis:\n\n{anamnesis_text}"
                     ),
                     schema=PatientDrugs,
                     temperature=self.temperature,
@@ -446,7 +446,9 @@ class DrugsParser:
                 )
                 for entry in parsed_entries
             ]
-            filtered_candidates = [entry for entry in normalized_candidates if entry is not None]
+            filtered_candidates = [
+                entry for entry in normalized_candidates if entry is not None
+            ]
             return PatientDrugs(entries=filtered_candidates)
 
         lines = [
@@ -475,8 +477,8 @@ class DrugsParser:
             )
             if post_processed is not None:
                 normalized.append(post_processed)
-        return PatientDrugs(entries=normalized)   
-    
+        return PatientDrugs(entries=normalized)
+
     # -------------------------------------------------------------------------
     def extract_drugs_from_anamnesis_rule_based(
         self, anamnesis: str

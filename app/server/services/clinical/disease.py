@@ -194,7 +194,7 @@ class DiseaseExtractor:
             return None
         try:
             parsed = float(match.group(1))
-        except (TypeError, ValueError):
+        except TypeError, ValueError:
             return None
         if parsed <= 0:
             return None
@@ -300,4 +300,3 @@ class DiseaseExtractor:
         )
         self.emit_progress(progress_callback, 1.0)
         return PatientDiseaseContext(entries=deduplicated)
-

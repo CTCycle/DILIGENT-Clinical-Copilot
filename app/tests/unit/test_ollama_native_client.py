@@ -115,7 +115,9 @@ def test_chat_stream_preserves_stream_behavior(monkeypatch) -> None:
             '{"done":true}',
         ]
     )
-    monkeypatch.setattr(client.client, "stream", lambda *args, **kwargs: FakeStreamContext(response))
+    monkeypatch.setattr(
+        client.client, "stream", lambda *args, **kwargs: FakeStreamContext(response)
+    )
     monkeypatch.setattr(client, "raise_for_status", lambda resp: None)
 
     async def gather() -> list[dict[str, Any]]:

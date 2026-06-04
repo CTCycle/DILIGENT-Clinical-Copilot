@@ -64,4 +64,3 @@ def test_database_settings_are_loaded_from_json_without_env_overlap(
     )
 
     assert payload["database"]["host"] == "json-host"
-

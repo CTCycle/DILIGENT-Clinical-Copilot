@@ -302,7 +302,9 @@ class ModelConfigService:
                 "Selected RAG documents cannot exceed retrieved RAG documents."
             )
         return {
-            "chunk_size": coerce_positive_int(payload.get("chunk_size"), current.chunk_size),
+            "chunk_size": coerce_positive_int(
+                payload.get("chunk_size"), current.chunk_size
+            ),
             "chunk_overlap": coerce_positive_int(
                 payload.get("chunk_overlap"), current.chunk_overlap
             ),
@@ -317,7 +319,9 @@ class ModelConfigService:
             ),
             "retrieval_candidate_count": candidate_count,
             "retrieval_selected_count": selected_count,
-            "reranker_model": coerce_str(payload.get("reranker_model"), current.reranker_model),
+            "reranker_model": coerce_str(
+                payload.get("reranker_model"), current.reranker_model
+            ),
             "hybrid_vector_weight": max(
                 coerce_float(
                     payload.get("hybrid_vector_weight"), current.hybrid_vector_weight
@@ -325,7 +329,9 @@ class ModelConfigService:
                 0.0,
             ),
             "hybrid_text_weight": max(
-                coerce_float(payload.get("hybrid_text_weight"), current.hybrid_text_weight),
+                coerce_float(
+                    payload.get("hybrid_text_weight"), current.hybrid_text_weight
+                ),
                 0.0,
             ),
             "embedding_backend": coerce_str(
@@ -337,7 +343,9 @@ class ModelConfigService:
             "hf_embedding_model": coerce_str(
                 payload.get("hf_embedding_model"), current.hf_embedding_model
             ),
-            "cloud_provider": coerce_str(payload.get("cloud_provider"), current.cloud_provider),
+            "cloud_provider": coerce_str(
+                payload.get("cloud_provider"), current.cloud_provider
+            ),
             "cloud_embedding_model": coerce_str(
                 payload.get("cloud_embedding_model"), current.cloud_embedding_model
             ),
@@ -348,7 +356,8 @@ class ModelConfigService:
                 payload.get("reset_vector_collection"), current.reset_vector_collection
             ),
             "vector_stream_batch_size": coerce_positive_int(
-                payload.get("vector_stream_batch_size"), current.vector_stream_batch_size
+                payload.get("vector_stream_batch_size"),
+                current.vector_stream_batch_size,
             ),
             "embedding_max_workers": coerce_positive_int(
                 payload.get("embedding_max_workers"), current.embedding_max_workers

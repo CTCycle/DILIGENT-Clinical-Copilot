@@ -21,9 +21,7 @@ from repositories.serialization.catalogs import ReferenceCatalogSerializer
 class SQLiteRepository:
     def __init__(self, settings: DatabaseSettings) -> None:
         self.db_path = Path(RESOURCES_PATH) / DATABASE_FILENAME
-        should_initialize_schema = bool(
-            self.db_path and not self.db_path.exists()
-        )
+        should_initialize_schema = bool(self.db_path and not self.db_path.exists())
         self.db_path.parent.mkdir(parents=True, exist_ok=True)
         self.engine: Engine = sqlalchemy.create_engine(
             f"sqlite:///{self.db_path}",
