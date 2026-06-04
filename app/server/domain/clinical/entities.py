@@ -265,7 +265,6 @@ class ClinicalSectionExtractionResult(BaseModel):
 
 
 ###############################################################################
-###############################################################################
 class DrugEntry(BaseModel):
     """A single drug prescription extracted from text."""
 
