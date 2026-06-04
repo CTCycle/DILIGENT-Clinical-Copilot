@@ -132,7 +132,7 @@
           <button type="button" [class.is-active]="activeSection() === 'preview'" (click)="setSection('preview')">Preview</button>
           <button type="button" [class.is-active]="activeSection() === 'editor'" (click)="setSection('editor')">Text Editor</button>
           <button type="button" [class.is-active]="activeSection() === 'metadata'" (click)="setSection('metadata')">Metadata</button>
-          <button type="button" [class.is-active]="activeSection() === 'revision'" (click)="setSection('revision')">Revision Mode</button>
+          <button type="button" [class.is-active]="activeSection() === 'revision'" (click)="setSection('revision')">Revision</button>
           <button type="button" [class.is-active]="activeSection() === 'timeline'" (click)="setSection('timeline')">Timeline</button>
         </nav>
 
@@ -450,52 +450,63 @@
                 (ngModelChange)="updateRevisionInstruction($event)"
               ></textarea>
             </label>
-            <section class="clinical-session-revision-settings" aria-label="Revision model settings">
-              <div class="clinical-session-settings-row">
+            <div class="clinical-session-revision-layout">
+              <section class="clinical-session-revision-settings" aria-label="Revision model settings">
                 <label>
                   <span>Model provider</span>
                   <select [ngModel]="revisionModelProvider()" (ngModelChange)="updateRevisionModelProvider($event)">
-                    <option value="local">Local</option>
-                    <option value="cloud">Cloud</option>
+                    <option value="ollama">Ollama</option>
+                    <option value="gemini">Gemini</option>
+                    <option value="openai">OpenAI</option>
                   </select>
                 </label>
                 <label>
                   <span>Clinical model</span>
-                  <input
-                    type="text"
-                    placeholder="Default clinical model"
-                    [ngModel]="revisionClinicalModel()"
-                    (ngModelChange)="updateRevisionClinicalModel($event)"
-                  />
+                  <select [ngModel]="revisionClinicalModel()" (ngModelChange)="updateRevisionClinicalModel($event)">
+                    @for (model of revisionClinicalModelOptions(); track model) {
+                      <option [value]="model">{{ model }}</option>
+                    }
+                    @if (!revisionClinicalModelOptions().length) {
+                      <option value="">No models available</option>
+                    }
+                  </select>
                 </label>
                 <label>
                   <span>Text parsing model</span>
-                  <input
-                    type="text"
-                    placeholder="Default parser model"
-                    [ngModel]="revisionTextParsingModel()"
-                    (ngModelChange)="updateRevisionTextParsingModel($event)"
-                  />
+                  <select [ngModel]="revisionTextParsingModel()" (ngModelChange)="updateRevisionTextParsingModel($event)">
+                    @for (model of revisionTextParsingModelOptions(); track model) {
+                      <option [value]="model">{{ model }}</option>
+                    }
+                    @if (!revisionTextParsingModelOptions().length) {
+                      <option value="">No models available</option>
+                    }
+                  </select>
                 </label>
-              </div>
-              <label class="clinical-session-checkbox-setting">
-                <input
-                  type="checkbox"
-                  [ngModel]="revisionRagSearch()"
-                  (ngModelChange)="updateRevisionRagSearch($event)"
-                />
-                <span>Use RAG search during revision</span>
-              </label>
-            </section>
-            <div class="clinical-session-revision-footer">
-              <button class="btn btn-primary" type="button" (click)="startRevision()">Run Revision Pass</button>
+                <label class="clinical-session-checkbox-setting">
+                  <input
+                    type="checkbox"
+                    [ngModel]="revisionRagSearch()"
+                    (ngModelChange)="updateRevisionRagSearch($event)"
+                  />
+                  <span>Use RAG search during revision</span>
+                </label>
+              </section>
+              <section class="clinical-session-revision-actions" aria-label="Revision action controls">
+                <div class="clinical-session-revision-copy">
+                  <strong>Second-pass editorial revision</strong>
+                  <p>Use this pass to sharpen the clinical narrative, improve structure, and tighten terminology before final review. The selected models re-check phrasing, evidence alignment, and overall readability without changing the rest of the workspace layout.</p>
+                </div>
+                @if (revisionStatus()) {
+                  <div class="clinical-session-progress" role="status">
+                    <span>{{ revisionStatus() }}</span>
+                    <progress max="100" [value]="revisionProgress()"></progress>
+                  </div>
+                }
+                <div class="clinical-session-revision-footer">
+                  <button class="btn btn-primary" type="button" (click)="startRevision()">Run Revision Pass</button>
+                </div>
+              </section>
             </div>
-            @if (revisionStatus()) {
-              <div class="clinical-session-progress" role="status">
-                <span>{{ revisionStatus() }}</span>
-                <progress max="100" [value]="revisionProgress()"></progress>
-              </div>
-            }
           </div>
         }
 
