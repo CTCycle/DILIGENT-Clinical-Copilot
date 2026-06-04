@@ -1,5 +1,5 @@
 # Runtime Troubleshooting
-Last updated: 2026-06-03
+Last updated: 2026-06-04
 
 ## Scope
 This file covers recurring local startup and launch failures.
@@ -75,3 +75,30 @@ From repository root:
 ```powershell
 app/server/.venv/Scripts/python.exe -m uvicorn app:app --app-dir app --host 127.0.0.1 --port 7690 --log-level info
 ```
+
+## Angular Build Fails With `spawn EPERM`
+### Symptom
+
+```text
+ng build
+Building...
+[FAILED: spawn EPERM]
+```
+
+### Cause
+In this repository, Angular CLI child-process spawning can fail inside the Codex sandbox even when the project and dependencies are otherwise healthy.
+
+### Fix
+1. First confirm the code still type-checks from `app/client`:
+
+```powershell
+..\..\runtimes\nodejs\node.exe .\node_modules\typescript\bin\tsc -p .\tsconfig.app.json --noEmit
+```
+
+2. If the TypeScript check passes but `ng build` still fails with `spawn EPERM`, rerun the build outside the sandbox:
+
+```powershell
+..\..\runtimes\nodejs\npm.cmd run build
+```
+
+3. Treat this as an environment-execution issue, not an automatic signal that the Angular code is broken.

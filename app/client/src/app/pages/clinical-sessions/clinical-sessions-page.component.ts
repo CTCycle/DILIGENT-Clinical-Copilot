@@ -24,12 +24,16 @@ import {
   startClinicalSessionRevisionJob,
   updateClinicalSession,
 } from '../../core/services/inspection-api';
+import { fetchModelConfigState } from '../../core/services/model-config-api';
 import {
   ClinicalSessionDetail,
+  CloudProvider,
   InspectionSessionItem,
   InspectionSessionStatus,
   JobStatus,
+  LocalModelCard,
 } from '../../core/models/types';
+import { resolveCloudChoices } from '../../core/model-config';
 import { MarkdownRendererService } from '../../core/services/markdown-renderer.service';
 import { formatErrorMessage, formatUnknownError } from '../../core/utils';
 
@@ -55,6 +59,8 @@ type LabTimelineRow = {
 type DrugEvidenceDraft = DetectedDrugEvidence & {
   hasPersistedMatch: boolean;
 };
+
+type RevisionProvider = 'ollama' | CloudProvider;
 
 @Component({
   selector: 'app-clinical-sessions-page',
@@ -116,10 +122,28 @@ export class ClinicalSessionsPageComponent implements OnInit, OnDestroy {
   readonly metadataText = signal('{\n  "documents": [],\n  "images": []\n}');
   readonly revisionSelection = signal('');
   readonly revisionInstruction = signal('');
-  readonly revisionModelProvider = signal<'local' | 'cloud'>('local');
+  readonly revisionModelProvider = signal<RevisionProvider>('ollama');
   readonly revisionClinicalModel = signal('');
   readonly revisionTextParsingModel = signal('');
   readonly revisionRagSearch = signal(false);
+  readonly revisionLocalModels = signal<LocalModelCard[]>([]);
+  readonly revisionCloudChoices = signal(resolveCloudChoices(undefined));
+  readonly revisionModelDefaults = signal({ clinicalModel: '', textExtractionModel: '' });
+  readonly revisionAvailableModels = computed(() => {
+    const provider = this.revisionModelProvider();
+    if (provider === 'ollama') {
+      return this.revisionLocalModels()
+        .filter((model) => model.available_in_ollama)
+        .map((model) => model.name);
+    }
+    return this.revisionCloudChoices()[provider] || [];
+  });
+  readonly revisionClinicalModelOptions = computed(() =>
+    this.revisionModelOptionList(this.revisionClinicalModel(), this.revisionModelDefaults().clinicalModel),
+  );
+  readonly revisionTextParsingModelOptions = computed(() =>
+    this.revisionModelOptionList(this.revisionTextParsingModel(), this.revisionModelDefaults().textExtractionModel),
+  );
   readonly activeSection = signal<'preview' | 'editor' | 'metadata' | 'revision' | 'timeline'>('preview');
   readonly saveStatus = signal('');
   readonly deletingSessionId = signal<number | null>(null);
@@ -133,6 +157,7 @@ export class ClinicalSessionsPageComponent implements OnInit, OnDestroy {
   readonly hepatotoxicityPattern = signal<string>('N/A');
 
   ngOnInit(): void {
+    void this.loadRevisionModelCatalog();
     void this.loadSessions();
   }
 
@@ -169,10 +194,11 @@ export class ClinicalSessionsPageComponent implements OnInit, OnDestroy {
       this.metadataText.set(JSON.stringify(this.normalizeMetadata(detail.metadata || {}), null, 2));
       this.revisionSelection.set('');
       this.revisionInstruction.set('');
-      this.revisionModelProvider.set(detail.result_payload?.['cloud_model'] ? 'cloud' : 'local');
+      this.revisionModelProvider.set(this.resolveRevisionProvider(detail));
       this.revisionClinicalModel.set(detail.clinical_model || '');
       this.revisionTextParsingModel.set(detail.text_extraction_model || '');
       this.revisionRagSearch.set(Boolean(detail.metadata?.['use_rag']));
+      this.syncRevisionModelSelections();
       this.activeSection.set('preview');
       this.detectedDiseases.set(this.previewDetectedDiseases(detail));
       this.labSummary.set(this.previewLaboratorySummary(detail));
@@ -354,8 +380,9 @@ export class ClinicalSessionsPageComponent implements OnInit, OnDestroy {
     this.activeSection.set(section);
   }
 
-  updateRevisionModelProvider(value: 'local' | 'cloud'): void {
+  updateRevisionModelProvider(value: RevisionProvider): void {
     this.revisionModelProvider.set(value);
+    this.syncRevisionModelSelections();
   }
 
   updateRevisionClinicalModel(value: string): void {
@@ -996,12 +1023,83 @@ export class ClinicalSessionsPageComponent implements OnInit, OnDestroy {
   }
 
   private revisionModelOverrides(): Record<string, unknown> {
+    const provider = this.revisionModelProvider();
+    const useCloudServices = provider !== 'ollama';
     return {
-      provider: this.revisionModelProvider(),
+      provider: useCloudServices ? provider : null,
+      use_cloud_services: useCloudServices,
       clinical_model: this.revisionClinicalModel().trim() || null,
       text_extraction_model: this.revisionTextParsingModel().trim() || null,
       use_rag: this.revisionRagSearch(),
     };
+  }
+
+  private async loadRevisionModelCatalog(): Promise<void> {
+    try {
+      const payload = await fetchModelConfigState(true);
+      this.revisionLocalModels.set(payload.local_models || []);
+      this.revisionCloudChoices.set(resolveCloudChoices(payload.cloud_model_choices));
+      this.revisionModelDefaults.set({
+        clinicalModel: payload.clinical_model || '',
+        textExtractionModel: payload.text_extraction_model || '',
+      });
+      if (!this.selected()) {
+        this.revisionModelProvider.set(payload.use_cloud_services ? payload.llm_provider : 'ollama');
+      }
+      this.syncRevisionModelSelections();
+    } catch {
+      // Keep existing revision form values if the shared model catalog cannot be loaded.
+    }
+  }
+
+  private resolveRevisionProvider(detail: ClinicalSessionDetail): RevisionProvider {
+    const payloadProvider = this.stringValue(detail.result_payload?.['cloud_provider'])
+      || this.stringValue(detail.result_payload?.['llm_provider']);
+    if (payloadProvider === 'openai' || payloadProvider === 'gemini') {
+      return payloadProvider;
+    }
+    return detail.result_payload?.['cloud_model'] ? 'openai' : 'ollama';
+  }
+
+  private revisionModelOptionList(currentValue: string, defaultValue: string): string[] {
+    const options = [...this.revisionAvailableModels()];
+    for (const candidate of [currentValue.trim(), defaultValue.trim()]) {
+      if (candidate && !options.includes(candidate)) {
+        options.unshift(candidate);
+      }
+    }
+    return options;
+  }
+
+  private syncRevisionModelSelections(): void {
+    const options = this.revisionAvailableModels();
+    this.revisionClinicalModel.set(
+      this.resolveRevisionModelSelection(
+        this.revisionClinicalModel(),
+        this.revisionModelDefaults().clinicalModel,
+        options,
+      ),
+    );
+    this.revisionTextParsingModel.set(
+      this.resolveRevisionModelSelection(
+        this.revisionTextParsingModel(),
+        this.revisionModelDefaults().textExtractionModel,
+        options,
+      ),
+    );
+  }
+
+  private resolveRevisionModelSelection(
+    currentValue: string,
+    defaultValue: string,
+    options: string[],
+  ): string {
+    const current = currentValue.trim();
+    if (current && options.includes(current)) return current;
+    const preferred = defaultValue.trim();
+    if (preferred && options.includes(preferred)) return preferred;
+    if (options.length) return options[0];
+    return current || preferred;
   }
 
   private revisedSessionId(result: Record<string, unknown> | null): number | null {
