@@ -49,13 +49,13 @@ This file is the root index for `assets/docs`. Read it first, then open the smal
 - `runtime/modes.md`
   - Supported runtime targets and differences between local and packaged execution.
 - `runtime/startup.md`
-  - Launcher and manual startup procedures.
+  - Launcher-first startup procedures for local development, Codex sessions, browser-driven UI work, and manual fallback commands only when the launcher path is unsuitable or already diagnosed as failing.
 - `runtime/configuration.md`
   - Environment variables, ports, runtime settings, and catalog inputs.
 - `runtime/deployment.md`
   - Packaging constraints, release outputs, and dependency notes.
 - `runtime/troubleshooting.md`
-  - Startup failures, port conflicts, and backend launch recovery steps.
+  - Startup failures, port conflicts, backend launch recovery steps, and Angular sandbox-build fallback guidance for `spawn EPERM`.
 - `runtime/qa_regression.md`
   - Repeatable regression slice for model configuration and app-flow validation.
 

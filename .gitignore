@@ -26,6 +26,7 @@ dist/
 build/
 .coverage
 htmlcov/
+__pycache__/
 
 # Node / JS
 **/node_modules/
@@ -45,8 +46,6 @@ yarn.lock
 .idea/
 .DS_Store
 Thumbs.db
-
-
 
 # Misc
 Cargo.toml
