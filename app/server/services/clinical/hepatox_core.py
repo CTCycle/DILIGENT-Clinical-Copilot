@@ -322,7 +322,7 @@ class HepatoxConsultation:
         self.llm_model = model_candidate or LLMRuntimeConfig.get_clinical_model()
         try:
             chat_signature = inspect.signature(self.llm_client.chat)
-        except (TypeError, ValueError):
+        except TypeError, ValueError:
             chat_signature = None
         self.chat_supports_temperature = (
             chat_signature is not None and "temperature" in chat_signature.parameters
@@ -1034,4 +1034,3 @@ class HepatoxConsultation:
 
     def bibliography_source_label(self) -> str:
         return hepatox_assessment.bibliography_source_label(self)
-

@@ -196,18 +196,14 @@ def environment_snapshot_from_os_env() -> EnvironmentSnapshot:
             password=coerce_str_or_none(os.getenv("DATABASE_PASSWORD")),
             ssl=coerce_str_or_none(os.getenv("DATABASE_SSL")),
             ssl_ca=coerce_str_or_none(os.getenv("DATABASE_SSL_CA")),
-            connect_timeout=coerce_str_or_none(
-                os.getenv("DATABASE_CONNECT_TIMEOUT")
-            ),
+            connect_timeout=coerce_str_or_none(os.getenv("DATABASE_CONNECT_TIMEOUT")),
             insert_batch_size=coerce_str_or_none(
                 os.getenv("DATABASE_INSERT_BATCH_SIZE")
             ),
             insert_commit_interval=coerce_str_or_none(
                 os.getenv("DATABASE_INSERT_COMMIT_INTERVAL")
             ),
-            select_page_size=coerce_str_or_none(
-                os.getenv("DATABASE_SELECT_PAGE_SIZE")
-            ),
+            select_page_size=coerce_str_or_none(os.getenv("DATABASE_SELECT_PAGE_SIZE")),
         ),
     )
 
@@ -270,7 +266,9 @@ def _parse_database_url(url: str | None) -> dict[str, Any]:
     }
 
 
-def _build_database_settings(environment: DatabaseEnvironmentSnapshot) -> DatabaseSettings:
+def _build_database_settings(
+    environment: DatabaseEnvironmentSnapshot,
+) -> DatabaseSettings:
     url_payload = _parse_database_url(environment.url)
     embedded = coerce_bool(environment.embedded_database, True)
     insert_batch_size = coerce_int(environment.insert_batch_size, 1000, minimum=1)
@@ -304,9 +302,9 @@ def _build_database_settings(environment: DatabaseEnvironmentSnapshot) -> Databa
         minimum=1,
         maximum=65535,
     )
-    database_name = coerce_str_or_none(
-        environment.database_name
-    ) or coerce_str_or_none(url_payload.get("database_name"))
+    database_name = coerce_str_or_none(environment.database_name) or coerce_str_or_none(
+        url_payload.get("database_name")
+    )
     username = coerce_str_or_none(environment.username) or coerce_str_or_none(
         url_payload.get("username")
     )

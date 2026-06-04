@@ -753,7 +753,7 @@ class DocumentSerializer:
             try:
                 with path.open("r", encoding=encoding) as handle:
                     text = handle.read()
-            except (OSError, UnicodeDecodeError):
+            except OSError, UnicodeDecodeError:
                 continue
             return text.strip()
         logger.error("Failed to read text file '%s'", file_path)
@@ -801,7 +801,9 @@ class DocumentSerializer:
 
     # -------------------------------------------------------------------------
     def compute_document_id(self, file_path: str | Path) -> str:
-        relative_path = Path(file_path).resolve().relative_to(self.documents_path.resolve())
+        relative_path = (
+            Path(file_path).resolve().relative_to(self.documents_path.resolve())
+        )
         return hashlib.sha256(str(relative_path).encode("utf-8")).hexdigest()
 
     # -------------------------------------------------------------------------
@@ -824,7 +826,7 @@ class DocumentSerializer:
         try:
             core_xml = archive.read("docProps/core.xml")
             tree = ElementTree.fromstring(core_xml)
-        except (KeyError, ElementTree.ParseError):
+        except KeyError, ElementTree.ParseError:
             return Path(file_path).stem
         namespaces = {"dc": "http://purl.org/dc/elements/1.1/"}
         node = tree.find("dc:title", namespaces)
@@ -1030,4 +1032,3 @@ class DocumentChunker:
         for index, chunk in enumerate(chunks):
             chunk.metadata["chunk_index"] = index
         return chunks
-

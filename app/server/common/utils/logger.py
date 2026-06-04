@@ -13,9 +13,7 @@ from common.constants import LOGS_PATH
 ###############################################################################
 Path(LOGS_PATH).mkdir(parents=True, exist_ok=True)
 current_timestamp = datetime.now().strftime("%Y%m%d_%H%M%S_%f")
-log_filename = str(
-    Path(LOGS_PATH) / f"DILIGENT_{current_timestamp}_{os.getpid()}.log"
-)
+log_filename = str(Path(LOGS_PATH) / f"DILIGENT_{current_timestamp}_{os.getpid()}.log")
 
 # Define logger configuration
 ###############################################################################

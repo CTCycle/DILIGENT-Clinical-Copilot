@@ -499,7 +499,7 @@ class ClinicalLabExtractor:
             return None
         try:
             parsed = float(match.group(1))
-        except (TypeError, ValueError):
+        except TypeError, ValueError:
             return None
         if parsed <= 0:
             return None
@@ -659,7 +659,9 @@ class ClinicalLabExtractor:
 
                 # If the first LLM pass returns empty despite clear lab cues, retry once
                 # with a reinforced instruction before accepting an empty result.
-                if not parsed.entries and self.has_explicit_lab_signal(merged_source_text):
+                if not parsed.entries and self.has_explicit_lab_signal(
+                    merged_source_text
+                ):
                     try:
                         reinforced = await self.llm_extract_full_text(
                             text=merged_source_text,
