@@ -351,6 +351,8 @@ export type InspectionUpdateConfigResponse = {
   target: InspectionUpdateTarget;
   defaults: Record<string, unknown>;
   allowed_fields: string[];
+  summary: Record<string, unknown>;
+  read_only: boolean;
 };
 
 export type InspectionRxNavOverrideRequest = {
@@ -364,20 +366,23 @@ export type InspectionLiverToxOverrideRequest = {
   redownload?: boolean;
 };
 
-export type InspectionRagOverrideRequest = {
+export type InspectionRagVectorizationSummary = {
+  chunk_size: number;
+  chunk_overlap: number;
+  embedding_batch_size: number;
+  vector_stream_batch_size: number;
+  embedding_max_workers: number;
+  embedding_backend: string;
+  ollama_embedding_model: string;
+  hf_embedding_model: string;
+  cloud_provider: CloudProvider;
+  cloud_embedding_model: string;
+  use_cloud_embeddings: boolean;
+  reset_vector_collection: boolean;
+};
+
+export type InspectionRagUpdateRequest = {
   documents_path?: string;
-  chunk_size?: number;
-  chunk_overlap?: number;
-  embedding_batch_size?: number;
-  vector_stream_batch_size?: number;
-  embedding_max_workers?: number;
-  embedding_backend?: string;
-  ollama_embedding_model?: string;
-  hf_embedding_model?: string;
-  cloud_provider?: CloudProvider;
-  cloud_embedding_model?: string;
-  use_cloud_embeddings?: boolean;
-  reset_vector_collection?: boolean;
 };
 
 export type InspectionRagDocumentRow = {

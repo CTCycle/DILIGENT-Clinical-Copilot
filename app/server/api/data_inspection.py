@@ -11,7 +11,7 @@ from domain.inspection import (
     DeleteEntityResponse,
     DrugAliasesResponse,
     InspectionLiverToxOverrideRequest,
-    InspectionRagOverrideRequest,
+    InspectionRagUpdateRequest,
     InspectionRxNavOverrideRequest,
     InspectionUpdateConfigResponse,
     LanceVectorStoreSummaryResponse,
@@ -467,13 +467,13 @@ class DataInspectionEndpoint:
     # -------------------------------------------------------------------------
     def start_rag_update_job(
         self,
-        overrides: InspectionRagOverrideRequest | None = Body(default=None),
+        request: InspectionRagUpdateRequest | None = Body(default=None),
     ) -> JobStartResponse:
-        overrides = overrides or InspectionRagOverrideRequest()
+        request = request or InspectionRagUpdateRequest()
         return self.start_update_job(
             job_type=self.service.RAG_JOB_TYPE,
             message="RAG embeddings update job started",
-            overrides=overrides.model_dump(exclude_none=True),
+            overrides=request.model_dump(exclude_none=True),
         )
 
     # -------------------------------------------------------------------------

@@ -204,6 +204,8 @@ class InspectionUpdateConfigResponse(BaseModel):
     target: InspectionUpdateTarget
     defaults: dict[str, Any] = Field(default_factory=dict)
     allowed_fields: list[str] = Field(default_factory=list)
+    summary: dict[str, Any] = Field(default_factory=dict)
+    read_only: bool = False
 
 
 ###############################################################################
@@ -235,43 +237,9 @@ class InspectionLiverToxOverrideRequest(BaseModel):
 
 
 ###############################################################################
-class InspectionRagOverrideRequest(BaseModel):
+class InspectionRagUpdateRequest(BaseModel):
     model_config = ConfigDict(extra="forbid")
     documents_path: str | None = Field(default=None, max_length=1024)
-    chunk_size: int | None = Field(default=None, ge=64, le=8192)
-    chunk_overlap: int | None = Field(default=None, ge=0, le=2048)
-    embedding_batch_size: int | None = Field(default=None, ge=1, le=4096)
-    vector_stream_batch_size: int | None = Field(default=None, ge=1, le=16384)
-    embedding_max_workers: int | None = Field(default=None, ge=1, le=64)
-    embedding_backend: str | None = Field(default=None, max_length=32)
-    ollama_embedding_model: str | None = Field(default=None, max_length=200)
-    hf_embedding_model: str | None = Field(default=None, max_length=200)
-    cloud_provider: str | None = Field(default=None, max_length=32)
-    cloud_embedding_model: str | None = Field(default=None, max_length=200)
-    use_cloud_embeddings: bool | None = None
-    reset_vector_collection: bool | None = None
-
-    # -------------------------------------------------------------------------
-    @field_validator("embedding_backend")
-    @classmethod
-    def validate_embedding_backend(cls, value: str | None) -> str | None:
-        if value is None:
-            return None
-        normalized = value.strip().lower()
-        if normalized not in {"ollama", "huggingface", "cloud"}:
-            raise ValueError("Unsupported embedding_backend")
-        return normalized
-
-    # -------------------------------------------------------------------------
-    @field_validator("cloud_provider")
-    @classmethod
-    def validate_cloud_provider(cls, value: str | None) -> str | None:
-        if value is None:
-            return None
-        normalized = value.strip().lower()
-        if normalized not in {"openai", "gemini"}:
-            raise ValueError("Unsupported cloud_provider")
-        return normalized
 
 
 ###############################################################################

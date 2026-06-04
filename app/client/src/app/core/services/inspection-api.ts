@@ -7,7 +7,7 @@ import {
   InspectionLiverToxExcerptResponse,
   InspectionLiverToxOverrideRequest,
   InspectionRagDocumentsResponse,
-  InspectionRagOverrideRequest,
+  InspectionRagUpdateRequest,
   InspectionRagVectorStoreSummary,
   InspectionRxNavCatalogResponse,
   InspectionRxNavOverrideRequest,
@@ -301,7 +301,7 @@ export async function fetchInspectionRagVectorStore(): Promise<InspectionRagVect
 }
 
 export async function startInspectionRagUpdateJob(
-  payload: InspectionRagOverrideRequest = {},
+  payload: InspectionRagUpdateRequest = {},
 ): Promise<JobStartResponse> {
   return requestJson<JobStartResponse>(`${API_BASE_URL}/inspection/rag/jobs`, {
     method: "POST",

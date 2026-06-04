@@ -8,7 +8,7 @@ from domain.inspection import (
     MAX_SEARCH_LENGTH,
     CatalogListFilters,
     InspectionLiverToxOverrideRequest,
-    InspectionRagOverrideRequest,
+    InspectionRagUpdateRequest,
     InspectionRxNavOverrideRequest,
     SessionListFilters,
 )
@@ -93,12 +93,8 @@ def test_new_inspection_models_validate_shapes() -> None:
     )
     assert livertox_request.redownload is True
 
-    rag_request = InspectionRagOverrideRequest(
-        chunk_size=512,
-        chunk_overlap=64,
-        use_cloud_embeddings=False,
-    )
-    assert rag_request.chunk_size == 512
+    rag_request = InspectionRagUpdateRequest(documents_path="C:/data/rag")
+    assert rag_request.documents_path == "C:/data/rag"
 
 
 # -----------------------------------------------------------------------------
@@ -137,6 +133,62 @@ def test_livertox_update_config_exposes_only_supported_overrides() -> None:
     assert payload["target"] == "livertox"
     assert "redownload" in payload["allowed_fields"]
     assert "redownload" in payload["defaults"]
+
+
+# -----------------------------------------------------------------------------
+def test_rag_update_config_exposes_read_only_vectorization_summary() -> None:
+    service = object.__new__(DataInspectionService)
+
+    payload = service.build_update_config_response("rag")
+
+    assert payload["target"] == "rag"
+    assert payload["read_only"] is True
+    assert payload["defaults"] == {}
+    assert payload["allowed_fields"] == []
+    assert "chunk_size" in payload["summary"]
+    assert "documents_path" not in payload["summary"]
+    assert "retrieval_candidate_count" not in payload["summary"]
+
+
+# -----------------------------------------------------------------------------
+def test_rag_update_job_route_rejects_removed_vectorization_overrides() -> None:
+    class ServiceStub:
+        RAG_JOB_TYPE = "rag_update"
+
+        @staticmethod
+        def start_update_job(
+            job_type: str, overrides: dict[str, object] | None = None
+        ) -> dict[str, object]:
+            assert job_type == "rag_update"
+            assert overrides == {"documents_path": "C:/data/rag"}
+            return {
+                "job_id": "job-1",
+                "job_type": "rag_update",
+                "status": "pending",
+                "poll_interval": 1.0,
+            }
+
+    app = FastAPI()
+    endpoint = get_route_owner(data_inspection.router, "/rag/jobs")
+    original_service = endpoint.service
+    endpoint.service = ServiceStub()  # type: ignore[assignment]
+    try:
+        app.include_router(data_inspection.router)
+        client = TestClient(app)
+        rejected = client.post(
+            "/inspection/rag/jobs",
+            json={"chunk_size": 256},
+        )
+        accepted = client.post(
+            "/inspection/rag/jobs",
+            json={"documents_path": "C:/data/rag"},
+        )
+    finally:
+        endpoint.service = original_service
+
+    assert rejected.status_code == 422
+    assert accepted.status_code == 202
+    assert accepted.json()["job_type"] == "rag_update"
 
 
 # -----------------------------------------------------------------------------

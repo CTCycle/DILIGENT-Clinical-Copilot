@@ -242,10 +242,10 @@ class DataInspectionService:
             }
             allowed_fields = list(defaults.keys())
         else:
-            source = config.get("rag", {})
             rag_settings = build_effective_rag_settings()
-            defaults = {
-                "documents_path": str(source.get("documents_path", DOCS_PATH)),
+            defaults = {}
+            allowed_fields = []
+            summary = {
                 "chunk_size": int(rag_settings.chunk_size),
                 "chunk_overlap": int(rag_settings.chunk_overlap),
                 "embedding_batch_size": int(rag_settings.embedding_batch_size),
@@ -259,12 +259,20 @@ class DataInspectionService:
                 "use_cloud_embeddings": bool(rag_settings.use_cloud_embeddings),
                 "reset_vector_collection": bool(rag_settings.reset_vector_collection),
             }
-            allowed_fields = list(defaults.keys())
+            return {
+                "target": target,
+                "defaults": defaults,
+                "allowed_fields": allowed_fields,
+                "summary": summary,
+                "read_only": True,
+            }
 
         return {
             "target": target,
             "defaults": defaults,
             "allowed_fields": allowed_fields,
+            "summary": {},
+            "read_only": False,
         }
 
     # -------------------------------------------------------------------------
