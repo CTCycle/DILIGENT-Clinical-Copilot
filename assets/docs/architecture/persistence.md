@@ -1,8 +1,9 @@
 # Persistence
-Last updated: 2026-06-04
+Last updated: 2026-06-05
 
 ## Relational Database
 - SQLAlchemy-backed storage
+- Database mode and connection settings are sourced only from `settings/.env`
 - SQLite file at `app/resources/database.db` when `database.embedded_database=true`
 - PostgreSQL when external DB mode is configured
 

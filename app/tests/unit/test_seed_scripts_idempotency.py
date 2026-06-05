@@ -20,7 +20,7 @@ from sqlalchemy import create_engine, func, select
 from sqlalchemy.orm import sessionmaker
 
 
-# -----------------------------------------------------------------------------
+###############################################################################
 def build_serializer() -> tuple[Any, Any]:
     engine = create_engine("sqlite+pysqlite:///:memory:", future=True)
     Base.metadata.create_all(engine)
@@ -28,7 +28,7 @@ def build_serializer() -> tuple[Any, Any]:
     return serializer, engine
 
 
-# -----------------------------------------------------------------------------
+###############################################################################
 def fetch_counts(engine: Any) -> tuple[int, int, int, int]:
     factory = sessionmaker(bind=engine, future=True)
     with factory() as db_session:
@@ -39,7 +39,7 @@ def fetch_counts(engine: Any) -> tuple[int, int, int, int]:
     return drugs, rxcui_codes, aliases, monographs
 
 
-# -----------------------------------------------------------------------------
+###############################################################################
 def test_rxnav_upsert_idempotent_twice() -> None:
     serializer, engine = build_serializer()
     payload = [
@@ -69,7 +69,7 @@ def test_rxnav_upsert_idempotent_twice() -> None:
     assert first_counts == second_counts
 
 
-# -----------------------------------------------------------------------------
+###############################################################################
 def test_rxnav_upsert_allows_multiple_rxcui_for_same_canonical() -> None:
     serializer, engine = build_serializer()
     payload = [
@@ -102,7 +102,7 @@ def test_rxnav_upsert_allows_multiple_rxcui_for_same_canonical() -> None:
     assert sorted(code.rxcui for code in rxcui_codes) == ["1098122", "1098124"]
 
 
-# -----------------------------------------------------------------------------
+###############################################################################
 def test_rxnav_upsert_persists_curated_aliases_with_separate_provenance() -> None:
     serializer, engine = build_serializer()
     payload = [
@@ -146,7 +146,7 @@ def test_rxnav_upsert_persists_curated_aliases_with_separate_provenance() -> Non
     assert all(row.source == "curated" for row in curated)
 
 
-# -----------------------------------------------------------------------------
+###############################################################################
 def test_rxnav_upsert_commits_by_interval() -> None:
     serializer, engine = build_serializer()
     factory = sessionmaker(bind=engine, future=True)
@@ -196,7 +196,7 @@ def test_rxnav_upsert_commits_by_interval() -> None:
     assert len(drugs) == 3
 
 
-# -----------------------------------------------------------------------------
+###############################################################################
 def test_livertox_upsert_idempotent_twice() -> None:
     serializer, engine = build_serializer()
     frame = pd.DataFrame(
@@ -230,7 +230,7 @@ def test_livertox_upsert_idempotent_twice() -> None:
     assert first_counts == second_counts
 
 
-# -----------------------------------------------------------------------------
+###############################################################################
 def test_livertox_duplicate_nbk_is_nulled() -> None:
     serializer, _ = build_serializer()
     updater = LiverToxUpdater(sources_path=".", redownload=False, serializer=serializer)
@@ -266,7 +266,7 @@ def test_livertox_duplicate_nbk_is_nulled() -> None:
     assert finalized["nbk_id"].isna().all()
 
 
-# -----------------------------------------------------------------------------
+###############################################################################
 def test_livertox_does_not_match_by_nbk() -> None:
     serializer, engine = build_serializer()
     factory = sessionmaker(bind=engine, future=True)
@@ -300,7 +300,7 @@ def test_livertox_does_not_match_by_nbk() -> None:
         assert drugs[1].livertox_nbk_id is None
 
 
-# -----------------------------------------------------------------------------
+###############################################################################
 def test_ensure_drug_conflict_raises() -> None:
     serializer, engine = build_serializer()
     factory = sessionmaker(bind=engine, future=True)

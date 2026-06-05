@@ -85,7 +85,7 @@ def normalize_drug_query_name(value: str | None) -> str:
     return normalize_drug_name(canonical)
 
 
-# -----------------------------------------------------------------------------
+###############################################################################
 def coerce_text(value: Any) -> str | None:
     if value is None:
         return None
@@ -101,14 +101,14 @@ def coerce_text(value: Any) -> str | None:
     return text or None
 
 
-# -----------------------------------------------------------------------------
+###############################################################################
 def normalize_whitespace(value: str) -> str:
     if not value:
         return ""
     return re.sub(r"\s+", " ", value).strip()
 
 
-# -----------------------------------------------------------------------------
+###############################################################################
 def normalize_drug_name(value: str) -> str:
     if not value:
         return ""
@@ -120,14 +120,14 @@ def normalize_drug_name(value: str) -> str:
     return normalize_whitespace(normalized)
 
 
-# -----------------------------------------------------------------------------
+###############################################################################
 def normalize_token(token: str) -> str:
     if not token:
         return ""
     return re.sub(r"[.,;:]+$", "", token.lower())
 
 
-# -----------------------------------------------------------------------------
+###############################################################################
 def strip_manufacturer_suffix_tokens(tokens: list[str]) -> list[str]:
     if not tokens:
         return []
@@ -147,7 +147,7 @@ def strip_manufacturer_suffix_tokens(tokens: list[str]) -> list[str]:
     return trimmed
 
 
-# -----------------------------------------------------------------------------
+###############################################################################
 def strip_trailing_temporal_tokens(tokens: list[str]) -> list[str]:
     if not tokens:
         return []
@@ -161,7 +161,7 @@ def strip_trailing_temporal_tokens(tokens: list[str]) -> list[str]:
     return trimmed
 
 
-# -----------------------------------------------------------------------------
+###############################################################################
 def resolve_known_query_alias(value: str) -> str:
     normalized = normalize_drug_name(value)
     if not normalized:

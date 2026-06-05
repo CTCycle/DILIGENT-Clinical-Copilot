@@ -28,14 +28,14 @@ def get_route_owner(router: Any, route_path: str) -> Any:
     raise AssertionError(f"Route not found: {route_path}")
 
 
-# -----------------------------------------------------------------------------
+###############################################################################
 def test_session_search_filter_strips_control_characters() -> None:
     filters = SessionListFilters(search=" \x00  metformin\t\n ")
 
     assert filters.search == "metformin"
 
 
-# -----------------------------------------------------------------------------
+###############################################################################
 def test_catalog_search_filter_rejects_oversized_values() -> None:
     oversized = "a" * (MAX_SEARCH_LENGTH + 1)
 
@@ -43,7 +43,7 @@ def test_catalog_search_filter_rejects_oversized_values() -> None:
         CatalogListFilters(search=oversized)
 
 
-# -----------------------------------------------------------------------------
+###############################################################################
 def test_search_pattern_escapes_like_wildcards() -> None:
     service = object.__new__(_RepositorySerializationService)
 
@@ -52,7 +52,7 @@ def test_search_pattern_escapes_like_wildcards() -> None:
     assert pattern == r"%100\%\_match\\check%"
 
 
-# -----------------------------------------------------------------------------
+###############################################################################
 def test_new_inspection_models_validate_shapes() -> None:
     rxnav_request = InspectionRxNavOverrideRequest(
         rxnav_request_timeout=10.0,
@@ -70,7 +70,7 @@ def test_new_inspection_models_validate_shapes() -> None:
     assert rag_request.documents_path == "C:/data/rag"
 
 
-# -----------------------------------------------------------------------------
+###############################################################################
 def test_livertox_update_config_route_is_not_shadowed() -> None:
     class ServiceStub:
         @staticmethod
@@ -97,7 +97,7 @@ def test_livertox_update_config_route_is_not_shadowed() -> None:
     assert response.json()["target"] == "livertox"
 
 
-# -----------------------------------------------------------------------------
+###############################################################################
 def test_livertox_update_config_exposes_only_supported_overrides() -> None:
     service = object.__new__(DataInspectionService)
 
@@ -108,7 +108,7 @@ def test_livertox_update_config_exposes_only_supported_overrides() -> None:
     assert "redownload" in payload["defaults"]
 
 
-# -----------------------------------------------------------------------------
+###############################################################################
 def test_rag_update_config_exposes_read_only_vectorization_summary() -> None:
     service = object.__new__(DataInspectionService)
 
@@ -123,7 +123,7 @@ def test_rag_update_config_exposes_read_only_vectorization_summary() -> None:
     assert "retrieval_candidate_count" not in payload["summary"]
 
 
-# -----------------------------------------------------------------------------
+###############################################################################
 def test_rag_update_job_route_rejects_removed_vectorization_overrides() -> None:
     class ServiceStub:
         RAG_JOB_TYPE = "rag_update"
@@ -164,7 +164,7 @@ def test_rag_update_job_route_rejects_removed_vectorization_overrides() -> None:
     assert accepted.json()["job_type"] == "rag_update"
 
 
-# -----------------------------------------------------------------------------
+###############################################################################
 def test_rag_cancel_route_uses_delete_only() -> None:
     app = FastAPI()
     app.include_router(data_inspection.router)
@@ -178,7 +178,7 @@ def test_rag_cancel_route_uses_delete_only() -> None:
     assert ("POST", "/inspection/rag/jobs/{job_id}/cancel") not in routes
 
 
-# -----------------------------------------------------------------------------
+###############################################################################
 def test_reference_catalog_runtime_observation_routes_are_registered() -> None:
     app = FastAPI()
     app.include_router(data_inspection.router)
@@ -204,7 +204,7 @@ def test_reference_catalog_runtime_observation_routes_are_registered() -> None:
     ) in routes
 
 
-# -----------------------------------------------------------------------------
+###############################################################################
 def test_legacy_text_normalization_routes_are_removed() -> None:
     app = FastAPI()
     app.include_router(data_inspection.router)
