@@ -12,7 +12,6 @@ from pydantic import ValidationError
 from common.constants import (
     CLINICAL_MODEL_CHOICES,
     CLOUD_MODEL_CHOICES,
-    CONFIGURATIONS_FILE,
     DEFAULT_DRUG_MATCH_CATALOG_INDEX_LIMIT,
     DEFAULT_DRUG_MATCH_SPELLING_CONFIDENCE,
     DEFAULT_DRUG_MATCH_SPELLING_LONG_MAX_DISTANCE,
@@ -29,6 +28,7 @@ from common.constants import (
     OLLAMA_DEFAULT_SCHEME,
     TEXT_EXTRACTION_MODEL_CHOICES,
 )
+from common.paths import CONFIGURATIONS_FILE
 from common.utils.types import (
     coerce_bool,
     coerce_float,

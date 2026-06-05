@@ -30,12 +30,8 @@ def test_sqlite_repository_initializes_schema_when_db_file_missing(
     monkeypatch, tmp_path: Path
 ) -> None:  # type: ignore[no-untyped-def]
     monkeypatch.setattr(
-        "repositories.database.sqlite.RESOURCES_PATH",
-        str(tmp_path),
-    )
-    monkeypatch.setattr(
-        "repositories.database.sqlite.DATABASE_FILENAME",
-        "missing.db",
+        "repositories.database.sqlite.DATABASE_FILE_PATH",
+        tmp_path / "missing.db",
     )
 
     repository = SQLiteRepository(_build_settings())
@@ -56,12 +52,8 @@ def test_sqlite_repository_does_not_seed_catalogs_during_construction(
     engine.dispose()
 
     monkeypatch.setattr(
-        "repositories.database.sqlite.RESOURCES_PATH",
-        str(tmp_path),
-    )
-    monkeypatch.setattr(
-        "repositories.database.sqlite.DATABASE_FILENAME",
-        "existing.db",
+        "repositories.database.sqlite.DATABASE_FILE_PATH",
+        db_path,
     )
 
     repository = SQLiteRepository(_build_settings())

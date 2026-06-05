@@ -5,7 +5,8 @@ from collections.abc import Callable
 from pathlib import Path
 from typing import Any
 
-from common.constants import ARCHIVES_PATH, LIVERTOX_BASE_URL
+from common.constants import LIVERTOX_BASE_URL
+from common.paths import ARCHIVES_PATH
 from configurations.startup import get_server_settings
 from repositories.serialization.data import DataSerializer
 from services.updater import (
@@ -48,7 +49,7 @@ class LiverToxUpdater:
                 else get_server_settings().runtime.livertox_monograph_max_workers
             ),
         )
-        archives_path = Path(ARCHIVES_PATH)
+        archives_path = ARCHIVES_PATH
         self.tar_file_path = str(archives_path / self.file_name)
         self.master_list_path = str(archives_path / "LiverTox_Master_List.xlsx")
         self.master_list_metadata_path = str(

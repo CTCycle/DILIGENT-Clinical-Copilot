@@ -5,7 +5,7 @@ from functools import partial
 from pathlib import Path
 from typing import Any, Literal
 
-from common.constants import ARCHIVES_PATH
+from common.paths import ARCHIVES_PATH
 from repositories.serialization.data import DataSerializer
 from services.runtime.jobs import JobManager
 from services.updater.embeddings import RagEmbeddingUpdater
@@ -127,7 +127,7 @@ class DataInspectionUpdateJobRunner:
             return {}
         self.report_phase_by_target(job_id, "livertox", 4, "LiverTox update started")
         updater = LiverToxUpdater(
-            ARCHIVES_PATH,
+            str(ARCHIVES_PATH),
             redownload=bool(_override_bool(override_values, "redownload") or False),
             serializer=self.serializer,
             archive_name=_override_str(override_values, "livertox_archive"),

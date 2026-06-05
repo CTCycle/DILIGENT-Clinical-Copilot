@@ -6,10 +6,10 @@ from pathlib import Path
 from types import MappingProxyType
 from typing import Any, Mapping
 
-from common.constants import RESOURCES_PATH
+from common.paths import CATALOGS_PATH
 from domain.catalogs import CatalogEntry, CatalogManifest, normalize_catalog_value
 
-CATALOG_MANIFEST_DIR = Path(RESOURCES_PATH) / "catalogs"
+CATALOG_MANIFEST_DIR = CATALOGS_PATH
 
 
 def iter_catalog_manifest_paths() -> list[Path]:

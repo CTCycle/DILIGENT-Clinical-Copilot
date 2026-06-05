@@ -6,6 +6,7 @@ from typing import Any, Protocol, cast
 
 from common.constants import CLOUD_MODEL_CHOICES
 from common.exceptions import ServiceValidationError
+from common.paths import VECTOR_DB_PATH
 from common.utils.catalog_loader import CatalogLoader
 from common.utils.logger import logger
 from configurations.llm_configs import LLMRuntimeConfig
@@ -15,7 +16,6 @@ from common.utils.types import (
     coerce_positive_int,
     coerce_str,
 )
-from common.constants import VECTOR_DB_PATH
 from domain.model_configs import (
     LocalModelCard,
     ModelConfigSnapshot,

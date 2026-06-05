@@ -6,7 +6,7 @@ from pathlib import Path
 
 from dotenv import load_dotenv
 
-from common import constants
+from common import paths
 from common.utils.logger import logger
 from domain.bootstrap import EnvironmentBootstrapState
 
@@ -26,7 +26,7 @@ def ensure_environment_loaded(*, force: bool = False) -> Path | None:
     state = _runtime_state()
 
     with state.bootstrap.lock:
-        env_path = Path(constants.ENV_FILE_PATH)
+        env_path = paths.ENV_FILE_PATH
         if state.bootstrap.bootstrapped and not force:
             return env_path if env_path.exists() else None
 
