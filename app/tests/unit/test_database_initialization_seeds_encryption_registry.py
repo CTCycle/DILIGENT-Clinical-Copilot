@@ -32,8 +32,8 @@ def make_sqlite_settings() -> DatabaseSettings:
 # -----------------------------------------------------------------------------
 def test_sqlite_fresh_creation_seeds_registry_once(tmp_path, monkeypatch) -> None:  # type: ignore[no-untyped-def]
     monkeypatch.setattr(
-        "repositories.database.sqlite.RESOURCES_PATH",
-        str(tmp_path),
+        "repositories.database.sqlite.DATABASE_FILE_PATH",
+        tmp_path / "database.db",
     )
 
     repository = SQLiteRepository(make_sqlite_settings())
@@ -58,8 +58,8 @@ def test_sqlite_fresh_creation_seeds_registry_once(tmp_path, monkeypatch) -> Non
 # -----------------------------------------------------------------------------
 def test_sqlite_reopen_with_existing_db_does_not_reseed(tmp_path, monkeypatch) -> None:  # type: ignore[no-untyped-def]
     monkeypatch.setattr(
-        "repositories.database.sqlite.RESOURCES_PATH",
-        str(tmp_path),
+        "repositories.database.sqlite.DATABASE_FILE_PATH",
+        tmp_path / "database.db",
     )
 
     first = SQLiteRepository(make_sqlite_settings())
@@ -178,8 +178,8 @@ def test_postgresql_initialization_path_seeds_after_schema_creation(
 # -----------------------------------------------------------------------------
 def test_seeding_does_not_create_duplicate_active_rows(tmp_path, monkeypatch) -> None:  # type: ignore[no-untyped-def]
     monkeypatch.setattr(
-        "repositories.database.sqlite.RESOURCES_PATH",
-        str(tmp_path),
+        "repositories.database.sqlite.DATABASE_FILE_PATH",
+        tmp_path / "database.db",
     )
 
     repository = SQLiteRepository(make_sqlite_settings())

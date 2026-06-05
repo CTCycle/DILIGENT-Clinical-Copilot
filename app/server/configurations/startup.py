@@ -6,8 +6,8 @@ from pathlib import Path
 from threading import RLock
 from typing import Any
 
-from common import constants
-from common.constants import ENV_FILE_PATH, TRUTHY_ENV_VALUES
+from common import paths
+from common.constants import TRUTHY_ENV_VALUES
 from configurations.environment import (
     ensure_environment_loaded,
     reset_environment_bootstrap_for_tests,
@@ -42,7 +42,7 @@ def get_configuration_manager(config_path: str | None = None) -> ConfigurationMa
         return _build_settings_manager(config_path=config_path)
 
     state = _runtime_state()
-    default_path = Path(constants.CONFIGURATIONS_FILE)
+    default_path = paths.CONFIGURATIONS_FILE
     with state.lock:
         if state.manager is None or state.manager.config_path != default_path:
             state.manager = _build_settings_manager(config_path=str(default_path))
@@ -84,7 +84,7 @@ def initialize_settings() -> None:
 
 
 __all__ = [
-    "ENV_FILE_PATH",
+    "paths",
     "ensure_environment_loaded",
     "get_configuration_manager",
     "get_configuration_block",

@@ -8,11 +8,8 @@ from pathlib import Path
 from threading import Lock
 from typing import Any, Literal
 
-from common.constants import (
-    DOCS_PATH,
-    DOCUMENT_SUPPORTED_EXTENSIONS,
-    VECTOR_DB_PATH,
-)
+from common.constants import DOCUMENT_SUPPORTED_EXTENSIONS
+from common.paths import DOCS_PATH, VECTOR_DB_PATH
 from common.utils.logger import logger
 from configurations.startup import get_server_settings
 from domain.clinical.entities import ClinicalSessionRequest
@@ -127,7 +124,7 @@ class DataInspectionService:
         return get_server_settings().model_dump()
 
     def rag_manifest_path(self) -> Path:
-        return Path(VECTOR_DB_PATH) / self.RAG_MANIFEST_FILE_NAME
+        return VECTOR_DB_PATH / self.RAG_MANIFEST_FILE_NAME
 
     def read_rag_manifest(self) -> dict[str, Any]:
         manifest_path = self.rag_manifest_path()

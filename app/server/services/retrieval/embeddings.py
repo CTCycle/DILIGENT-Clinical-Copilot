@@ -9,7 +9,8 @@ import httpx
 import torch
 from transformers import AutoModelForSequenceClassification, AutoTokenizer
 
-from common.constants import CLOUD_MODEL_CHOICES, VECTOR_DB_PATH
+from common.constants import CLOUD_MODEL_CHOICES
+from common.paths import VECTOR_DB_PATH
 from common.utils.logger import logger
 from configurations.startup import get_server_settings
 from repositories.serialization.access_keys import AccessKeySerializer

@@ -5,7 +5,7 @@ import math
 from functools import lru_cache
 from typing import Any
 
-from common.constants import CONFIGURATIONS_FILE
+from common.paths import CONFIGURATIONS_FILE
 from common.utils.languages import (
     SUPPORTED_REPORT_LANGUAGES,
     TOKEN_PATTERN,
@@ -79,7 +79,7 @@ class ClinicalLanguageDetector:
     def load_thresholds(cls) -> dict[str, float]:
         thresholds = dict(cls.DEFAULT_THRESHOLDS)
         try:
-            with open(CONFIGURATIONS_FILE, encoding="utf-8") as handle:
+            with CONFIGURATIONS_FILE.open("r", encoding="utf-8") as handle:
                 payload = json.load(handle)
         except OSError, TypeError, ValueError:
             return thresholds

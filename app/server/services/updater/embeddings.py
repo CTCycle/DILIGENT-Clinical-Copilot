@@ -3,7 +3,7 @@ from __future__ import annotations
 from collections.abc import Callable
 from pathlib import Path
 
-from common.constants import DOCS_PATH, VECTOR_DB_PATH
+from common.paths import DOCS_PATH, VECTOR_DB_PATH
 from common.utils.logger import logger
 from repositories.serialization.vectors import VectorSerializer
 from repositories.vectors import LanceVectorDatabase
@@ -50,8 +50,7 @@ class RagEmbeddingUpdater:
                 if value is not None
             }
         )
-        self.documents_path = documents_path or DOCS_PATH
-        resolved_documents_path = Path(self.documents_path)
+        resolved_documents_path = Path(documents_path) if documents_path else DOCS_PATH
         if not resolved_documents_path.is_absolute():
             raise ValueError("RAG documents_path must be an absolute path.")
         if not resolved_documents_path.exists() or not resolved_documents_path.is_dir():
@@ -73,7 +72,7 @@ class RagEmbeddingUpdater:
         self.hf_embedding_model = rag_settings.hf_embedding_model
         self.reset_vector_collection = bool(rag_settings.reset_vector_collection)
         self.vector_database = LanceVectorDatabase(
-            database_path=VECTOR_DB_PATH,
+            database_path=str(VECTOR_DB_PATH),
             collection_name=self.vector_collection_name,
             metric=rag_settings.vector_index_metric,
             index_type=rag_settings.vector_index_type,
