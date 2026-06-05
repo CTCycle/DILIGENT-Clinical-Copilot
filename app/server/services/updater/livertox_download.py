@@ -47,7 +47,6 @@ async def download_file(
 
 ###############################################################################
 
-# Extracted from the facade module; functions intentionally accept the facade instance.
 
 
 async def download_bulk_data(

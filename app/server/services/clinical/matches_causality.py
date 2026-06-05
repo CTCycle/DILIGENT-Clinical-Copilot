@@ -45,7 +45,6 @@ class BoundedCache(Generic[KT, VT]):
         self.store.clear()
 
 
-# Extracted from the facade module; functions intentionally accept the facade instance.
 
 
 def match_drug_names(self, patient_drugs: list[str]) -> list[LiverToxMatch]:

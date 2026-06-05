@@ -17,12 +17,20 @@ from domain.inspection import (
     LanceVectorStoreSummaryResponse,
     LiverToxCatalogResponse,
     LiverToxExcerptResponse,
+    ManualReportEditAudit,
+    ManualReportEditRequest,
+    ManualReportEditResponse,
     RagDocumentListResponse,
     ReferenceCatalogRuntimeObservationResponse,
     ReferenceCatalogRuntimeObservationUpsertRequest,
+    RevisionPipelineRunResponse,
+    RevisionPipelineStepListResponse,
+    RevisionArtifactListResponse,
     RxNavCatalogResponse,
     SessionCatalogResponse,
     SessionDetailResponse,
+    SessionVersionDetailResponse,
+    SessionVersionListResponse,
     SessionListFilters,
     SessionRevisionRequest,
     SessionStatus,
@@ -183,6 +191,10 @@ class DataInspectionEndpoint:
         detail = self.service.update_session(
             session_id,
             session_text=request.session_text,
+            report_text=request.report_text,
+            edited_fields=request.edited_fields,
+            reviewer_note=request.reviewer_note,
+            edited_by=request.edited_by,
             metadata=request.metadata,
         )
         if detail is None:
@@ -191,6 +203,54 @@ class DataInspectionEndpoint:
                 detail="Session not found.",
             )
         return SessionDetailResponse(**detail)
+
+    # -------------------------------------------------------------------------
+    def list_session_versions(self, session_id: int) -> SessionVersionListResponse:
+        items = self.service.list_session_versions(session_id)
+        return SessionVersionListResponse(items=items)
+
+    # -------------------------------------------------------------------------
+    def get_session_version(
+        self,
+        session_id: int,
+        version_id: int,
+    ) -> SessionVersionDetailResponse:
+        payload = self.service.get_session_version_detail(
+            session_id,
+            version_id=version_id,
+        )
+        if payload is None:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail="Session version not found.",
+            )
+        return SessionVersionDetailResponse(**payload)
+
+    # -------------------------------------------------------------------------
+    def list_manual_edits(self, session_id: int) -> list[ManualReportEditAudit]:
+        payload = self.service.list_manual_report_edits(session_id)
+        return [ManualReportEditAudit(**row) for row in payload]
+
+    # -------------------------------------------------------------------------
+    def manual_edit_session_report(
+        self,
+        session_id: int,
+        request: ManualReportEditRequest,
+    ) -> ManualReportEditResponse:
+        response = self.service.manual_edit_report(
+            session_id,
+            report_text=request.report_text,
+            edited_fields=request.edited_fields,
+            reviewer_note=request.reviewer_note,
+            edited_by=request.edited_by,
+            metadata=request.metadata,
+        )
+        if response is None:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail="Session not found.",
+            )
+        return ManualReportEditResponse(**response)
 
     # -------------------------------------------------------------------------
     def start_session_revision(
@@ -235,6 +295,69 @@ class DataInspectionEndpoint:
             job_id=job_id,
             job_type=self.service.REVISION_JOB_TYPE,
         )
+
+    # -------------------------------------------------------------------------
+    def get_revision_pipeline_run(
+        self,
+        pipeline_run_id: str,
+    ) -> RevisionPipelineRunResponse:
+        payload = self.service.get_revision_run(pipeline_run_id)
+        if payload is None:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail="Revision pipeline run not found.",
+            )
+        return RevisionPipelineRunResponse(**payload)
+
+    # -------------------------------------------------------------------------
+    def retry_revision_pipeline_run(
+        self,
+        pipeline_run_id: str,
+    ) -> JobStartResponse:
+        try:
+            payload = self.service.retry_revision_job(pipeline_run_id)
+        except ValueError as exc:
+            detail = str(exc)
+            error_status = (
+                status.HTTP_409_CONFLICT
+                if "already running" in detail
+                else status.HTTP_404_NOT_FOUND
+                if "not found" in detail.casefold()
+                else status.HTTP_422_UNPROCESSABLE_ENTITY
+            )
+            raise HTTPException(status_code=error_status, detail=detail) from exc
+        return self.build_job_start_response(
+            payload=payload,
+            message="Session revision retry job started",
+        )
+
+    # -------------------------------------------------------------------------
+    def list_revision_pipeline_steps(
+        self,
+        pipeline_run_id: str,
+    ) -> RevisionPipelineStepListResponse:
+        payload = self.service.list_revision_steps(pipeline_run_id)
+        return RevisionPipelineStepListResponse(items=payload)
+
+    # -------------------------------------------------------------------------
+    def list_session_revision_artifacts(
+        self,
+        session_id: int,
+        version_id: int,
+    ) -> RevisionArtifactListResponse:
+        detail = self.service.get_session_version_detail(
+            session_id,
+            version_id=version_id,
+        )
+        if detail is None:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail="Session version not found.",
+            )
+        payload = self.service.list_revision_artifacts(
+            revision_version_id=version_id,
+        )
+        return RevisionArtifactListResponse(items=payload)
 
     # -------------------------------------------------------------------------
     def get_session_timeline(self, session_id: int) -> PatientTimeline:
@@ -547,10 +670,38 @@ class DataInspectionEndpoint:
             status_code=status.HTTP_200_OK,
         )
         self.router.add_api_route(
+            "/sessions/{session_id}/versions",
+            self.list_session_versions,
+            methods=["GET"],
+            response_model=SessionVersionListResponse,
+            status_code=status.HTTP_200_OK,
+        )
+        self.router.add_api_route(
+            "/sessions/{session_id}/versions/{version_id}",
+            self.get_session_version,
+            methods=["GET"],
+            response_model=SessionVersionDetailResponse,
+            status_code=status.HTTP_200_OK,
+        )
+        self.router.add_api_route(
             "/sessions/{session_id}",
             self.update_session,
             methods=["PUT"],
             response_model=SessionDetailResponse,
+            status_code=status.HTTP_200_OK,
+        )
+        self.router.add_api_route(
+            "/sessions/{session_id}/report",
+            self.manual_edit_session_report,
+            methods=["PUT"],
+            response_model=ManualReportEditResponse,
+            status_code=status.HTTP_200_OK,
+        )
+        self.router.add_api_route(
+            "/sessions/{session_id}/manual-edits",
+            self.list_manual_edits,
+            methods=["GET"],
+            response_model=list[ManualReportEditAudit],
             status_code=status.HTTP_200_OK,
         )
         self.router.add_api_route(
@@ -572,6 +723,34 @@ class DataInspectionEndpoint:
             self.cancel_session_revision,
             methods=["DELETE"],
             response_model=JobCancelResponse,
+            status_code=status.HTTP_200_OK,
+        )
+        self.router.add_api_route(
+            "/sessions/revision/pipeline-runs/{pipeline_run_id}",
+            self.get_revision_pipeline_run,
+            methods=["GET"],
+            response_model=RevisionPipelineRunResponse,
+            status_code=status.HTTP_200_OK,
+        )
+        self.router.add_api_route(
+            "/sessions/revision/pipeline-runs/{pipeline_run_id}/retry",
+            self.retry_revision_pipeline_run,
+            methods=["POST"],
+            response_model=JobStartResponse,
+            status_code=status.HTTP_202_ACCEPTED,
+        )
+        self.router.add_api_route(
+            "/sessions/revision/pipeline-runs/{pipeline_run_id}/steps",
+            self.list_revision_pipeline_steps,
+            methods=["GET"],
+            response_model=RevisionPipelineStepListResponse,
+            status_code=status.HTTP_200_OK,
+        )
+        self.router.add_api_route(
+            "/sessions/{session_id}/versions/{version_id}/artifacts",
+            self.list_session_revision_artifacts,
+            methods=["GET"],
+            response_model=RevisionArtifactListResponse,
             status_code=status.HTTP_200_OK,
         )
         self.router.add_api_route(

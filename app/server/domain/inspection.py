@@ -70,14 +70,21 @@ class SessionDetailResponse(BaseModel):
     metadata: dict[str, Any] = Field(default_factory=dict)
     sections: dict[str, str] = Field(default_factory=dict)
     session_text: str = ""
+    source_clinical_text: str = ""
     result_payload: dict[str, Any] = Field(default_factory=dict)
     report: str | None = None
+    official_report_text: str | None = None
+    manual_edit_history: list["ManualReportEditAudit"] = Field(default_factory=list)
 
 
 ###############################################################################
 class SessionUpdateRequest(BaseModel):
     model_config = ConfigDict(extra="forbid")
     session_text: str | None = Field(default=None, max_length=100000)
+    report_text: str | None = Field(default=None, max_length=200000)
+    edited_fields: list[str] = Field(default_factory=lambda: ["report_text"])
+    reviewer_note: str | None = Field(default=None, max_length=2000)
+    edited_by: str | None = Field(default=None, max_length=200)
     metadata: dict[str, Any] | None = None
 
 
@@ -88,6 +95,193 @@ class SessionRevisionRequest(BaseModel):
     revision_instruction: str | None = Field(default=None, max_length=4000)
     model_overrides: dict[str, Any] = Field(default_factory=dict)
     metadata: dict[str, Any] = Field(default_factory=dict)
+
+
+###############################################################################
+class ManualReportEditRequest(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+    report_text: str = Field(..., min_length=1, max_length=200000)
+    edited_fields: list[str] = Field(default_factory=lambda: ["report_text"])
+    reviewer_note: str | None = Field(default=None, max_length=2000)
+    edited_by: str | None = Field(default=None, max_length=200)
+    metadata: dict[str, Any] = Field(default_factory=dict)
+
+
+###############################################################################
+class ManualReportEditAudit(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+    session_id: int
+    current_version_id: int
+    edited_by: str | None = None
+    actor_id: str | None = None
+    actor_display_name: str | None = None
+    actor_source: Literal[
+        "authenticated_user", "local_profile", "manual_entry", "system", "unknown"
+    ]
+    actor_confidence: Literal["verified", "unverified", "system"]
+    edited_at: datetime
+    previous_text_hash: str
+    new_text_hash: str
+    edited_fields: list[str] = Field(default_factory=list)
+    reviewer_note: str | None = None
+    metadata: dict[str, Any] = Field(default_factory=dict)
+
+
+###############################################################################
+class ManualReportEditResponse(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+    session: SessionDetailResponse
+    audit: ManualReportEditAudit
+
+
+###############################################################################
+class SessionVersionSummary(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+    version_id: int
+    session_id: int | None = None
+    root_session_id: int
+    source_version_id: int | None = None
+    revision_version_id: int
+    version_number: int
+    version_status: Literal[
+        "current",
+        "superseded",
+        "draft_revision",
+        "pending_qa",
+        "qa_failed",
+        "requires_human_review",
+        "llm_qa_passed",
+        "human_approved",
+        "human_rejected",
+    ]
+    revision_kind: Literal["original", "manual_edit", "llm_assisted_revision"]
+    llm_qa_status: Literal[
+        "not_run",
+        "pending",
+        "passed",
+        "passed_with_warnings",
+        "failed",
+        "requires_human_review",
+    ]
+    clinical_review_status: Literal[
+        "not_reviewed",
+        "under_review",
+        "approved_by_human",
+        "rejected_by_human",
+    ]
+    pipeline_run_id: str | None = None
+    model_configuration: dict[str, Any] = Field(default_factory=dict)
+    created_at: datetime
+    updated_at: datetime
+    completed_at: datetime | None = None
+
+
+###############################################################################
+class SessionVersionListResponse(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+    items: list[SessionVersionSummary] = Field(default_factory=list)
+
+
+###############################################################################
+class SessionVersionDetailResponse(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+    version: SessionVersionSummary
+    session: SessionDetailResponse | None = None
+
+
+###############################################################################
+class RevisionPipelineRunResponse(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+    pipeline_run_id: str
+    session_id: int
+    root_session_id: int
+    source_version_id: int
+    target_revision_version_id: int | None = None
+    revision_mode: str
+    revision_kind: Literal["original", "manual_edit", "llm_assisted_revision"]
+    configuration: dict[str, Any] = Field(default_factory=dict)
+    reviewer_note: str | None = None
+    initiated_by: str | None = None
+    actor_id: str | None = None
+    actor_display_name: str | None = None
+    actor_source: Literal[
+        "authenticated_user", "local_profile", "manual_entry", "system", "unknown"
+    ]
+    actor_confidence: Literal["verified", "unverified", "system"]
+    started_at: datetime
+    completed_at: datetime | None = None
+    status: str
+    error: dict[str, Any] | None = None
+    token_usage: dict[str, Any] | None = None
+    latency_ms: int | None = None
+    cost_estimate: float | None = None
+    trace_id: str | None = None
+    created_at: datetime
+    updated_at: datetime
+
+
+###############################################################################
+class RevisionPipelineStepResponse(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+    pipeline_run_id: str
+    step_name: str
+    step_index: int
+    step_count: int
+    attempt_number: int
+    status: str
+    input_hash: str | None = None
+    output_hash: str | None = None
+    input_summary: dict[str, Any] | None = None
+    output_summary: dict[str, Any] | None = None
+    output_payload: dict[str, Any] | None = None
+    schema_name: str | None = None
+    schema_version: str | None = None
+    prompt_version: str | None = None
+    parser_version: str | None = None
+    model_provider: str | None = None
+    model_name: str | None = None
+    token_usage: dict[str, Any] | None = None
+    latency_ms: int | None = None
+    retry_count: int
+    error: dict[str, Any] | None = None
+    started_at: datetime | None = None
+    completed_at: datetime | None = None
+    superseded_at: datetime | None = None
+    created_at: datetime
+    updated_at: datetime
+
+
+###############################################################################
+class RevisionPipelineStepListResponse(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+    items: list[RevisionPipelineStepResponse] = Field(default_factory=list)
+
+
+###############################################################################
+class RevisionArtifactResponse(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+    revision_version_id: int
+    pipeline_run_id: str
+    artifact_kind: Literal[
+        "structured_case_entity",
+        "llm_qa_output",
+        "report_comparison",
+        "pipeline_artifact",
+    ]
+    artifact_key: str | None = None
+    entity_type: str | None = None
+    entity_name: str | None = None
+    status: str | None = None
+    schema_version: str | None = None
+    payload: dict[str, Any] | None = None
+    created_at: datetime
+    updated_at: datetime
+
+
+###############################################################################
+class RevisionArtifactListResponse(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+    items: list[RevisionArtifactResponse] = Field(default_factory=list)
 
 
 ###############################################################################
