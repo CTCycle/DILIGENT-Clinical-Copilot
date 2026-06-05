@@ -533,11 +533,12 @@ class DataInspectionService:
                     ),
                 )
             clinical_service.apply_persisted_runtime_configuration()
+            revision_use_rag = bool(metadata.get("use_rag"))
             request = ClinicalSessionRequest(
                 name=session_detail.get("patient_name"),
                 visit_date=session_detail.get("visit_date"),
                 clinical_input=source_text,
-                use_rag=True,
+                use_rag=revision_use_rag,
             )
             preprocessed_request, section_extraction = asyncio.run(
                 clinical_service.preprocess_unified_input(request)
@@ -553,6 +554,7 @@ class DataInspectionService:
                     original_session_id=root_session_id,
                     session_metadata={
                         **metadata,
+                        "use_rag": revision_use_rag,
                         "revision_mode": True,
                         "focused_selection": bool(selected_focus_text),
                         "revision_instruction": focus_instruction,

@@ -699,6 +699,10 @@ async def process_single_patient_workflow(
         issues=issues,
         final_report=final_report,
     )
+    persisted_session_metadata = {
+        **(session_metadata or {}),
+        "use_rag": bool(payload.use_rag),
+    }
     result_payload = {
         "report": narrative,
         "final_report": final_report,
@@ -774,6 +778,7 @@ async def process_single_patient_workflow(
             "ollama_temperature": LLMRuntimeConfig.get_ollama_temperature(),
             "cloud_temperature": LLMRuntimeConfig.get_cloud_temperature(),
             "ollama_reasoning": LLMRuntimeConfig.is_ollama_reasoning_enabled(),
+            "use_rag": bool(payload.use_rag),
         },
         "manual_review_required": faithfulness_audit.manual_review_required,
         "blocking_issues": faithfulness_audit.blocking_issues,
@@ -814,7 +819,7 @@ async def process_single_patient_workflow(
         "revision": {
             "version": session_version,
             "original_session_id": original_session_id,
-            "metadata": session_metadata or {},
+            "metadata": persisted_session_metadata,
             "focus_context": revision_focus_context,
         },
     }
@@ -841,7 +846,7 @@ async def process_single_patient_workflow(
                 "session_timestamp": datetime.now(),
                 "version": session_version,
                 "original_session_id": original_session_id,
-                "metadata": session_metadata or {},
+                "metadata": persisted_session_metadata,
                 "hepatic_pattern": pattern_score.classification,
                 "anamnesis": payload.anamnesis,
                 "drugs": payload.drugs,
