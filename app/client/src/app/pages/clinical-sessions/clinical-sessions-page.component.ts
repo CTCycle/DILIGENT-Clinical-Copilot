@@ -138,12 +138,8 @@ export class ClinicalSessionsPageComponent implements OnInit, OnDestroy {
     }
     return this.revisionCloudChoices()[provider] || [];
   });
-  readonly revisionClinicalModelOptions = computed(() =>
-    this.revisionModelOptionList(this.revisionClinicalModel(), this.revisionModelDefaults().clinicalModel),
-  );
-  readonly revisionTextParsingModelOptions = computed(() =>
-    this.revisionModelOptionList(this.revisionTextParsingModel(), this.revisionModelDefaults().textExtractionModel),
-  );
+  readonly revisionClinicalModelOptions = computed(() => this.revisionAvailableModels());
+  readonly revisionTextParsingModelOptions = computed(() => this.revisionAvailableModels());
   readonly activeSection = signal<'preview' | 'editor' | 'metadata' | 'revision' | 'timeline'>('preview');
   readonly saveStatus = signal('');
   readonly deletingSessionId = signal<number | null>(null);
@@ -197,7 +193,7 @@ export class ClinicalSessionsPageComponent implements OnInit, OnDestroy {
       this.revisionModelProvider.set(this.resolveRevisionProvider(detail));
       this.revisionClinicalModel.set(detail.clinical_model || '');
       this.revisionTextParsingModel.set(detail.text_extraction_model || '');
-      this.revisionRagSearch.set(Boolean(detail.metadata?.['use_rag']));
+      this.revisionRagSearch.set(this.resolvePersistedRagPreference(detail));
       this.syncRevisionModelSelections();
       this.activeSection.set('preview');
       this.detectedDiseases.set(this.previewDetectedDiseases(detail));
@@ -1058,17 +1054,30 @@ export class ClinicalSessionsPageComponent implements OnInit, OnDestroy {
     if (payloadProvider === 'openai' || payloadProvider === 'gemini') {
       return payloadProvider;
     }
-    return detail.result_payload?.['cloud_model'] ? 'openai' : 'ollama';
-  }
 
-  private revisionModelOptionList(currentValue: string, defaultValue: string): string[] {
-    const options = [...this.revisionAvailableModels()];
-    for (const candidate of [currentValue.trim(), defaultValue.trim()]) {
-      if (candidate && !options.includes(candidate)) {
-        options.unshift(candidate);
+    const selectedModels = [
+      this.stringValue(detail.clinical_model),
+      this.stringValue(detail.text_extraction_model),
+    ].filter((value): value is string => Boolean(value));
+
+    const localModels = new Set(
+      this.revisionLocalModels()
+        .filter((model) => model.available_in_ollama)
+        .map((model) => model.name),
+    );
+    if (selectedModels.length && selectedModels.every((model) => localModels.has(model))) {
+      return 'ollama';
+    }
+
+    const cloudChoices = this.revisionCloudChoices();
+    for (const provider of ['openai', 'gemini'] as const) {
+      const providerModels = new Set(cloudChoices[provider] || []);
+      if (selectedModels.some((model) => providerModels.has(model))) {
+        return provider;
       }
     }
-    return options;
+
+    return detail.result_payload?.['cloud_model'] ? 'openai' : 'ollama';
   }
 
   private syncRevisionModelSelections(): void {
@@ -1099,7 +1108,33 @@ export class ClinicalSessionsPageComponent implements OnInit, OnDestroy {
     const preferred = defaultValue.trim();
     if (preferred && options.includes(preferred)) return preferred;
     if (options.length) return options[0];
-    return current || preferred;
+    return '';
+  }
+
+  private resolvePersistedRagPreference(detail: ClinicalSessionDetail): boolean {
+    const directMetadata = this.booleanValue(detail.metadata?.['use_rag']);
+    if (directMetadata !== null) return directMetadata;
+
+    const revisionRecord = this.recordValue(detail.result_payload?.['revision']);
+    const revisionMetadata = this.recordValue(revisionRecord?.['metadata']);
+    const revisionMetadataValue = this.booleanValue(revisionMetadata?.['use_rag']);
+    if (revisionMetadataValue !== null) return revisionMetadataValue;
+
+    const overrideRecord = this.recordValue(revisionMetadata?.['model_overrides']);
+    const overrideValue = this.booleanValue(overrideRecord?.['use_rag']);
+    if (overrideValue !== null) return overrideValue;
+
+    return false;
+  }
+
+  private booleanValue(value: unknown): boolean | null {
+    if (typeof value === 'boolean') return value;
+    if (typeof value === 'string') {
+      const normalized = value.trim().toLowerCase();
+      if (normalized === 'true') return true;
+      if (normalized === 'false') return false;
+    }
+    return null;
   }
 
   private revisedSessionId(result: Record<string, unknown> | null): number | null {
