@@ -30,7 +30,6 @@ from services.text.normalization import normalize_drug_name
 
 
 def save_livertox_records(self, records: pd.DataFrame) -> None:
-    self.ensure_session_result_table()
     prepared_rows = self.prepare_livertox_rows(records)
     if not prepared_rows:
         return
@@ -198,7 +197,6 @@ def build_livertox_monograph_key(self, row: dict[str, Any]) -> str:
 
 
 def get_livertox_records(self) -> pd.DataFrame:
-    self.ensure_session_result_table()
     db_session = self.session_factory()
     try:
         drugs = (
@@ -289,7 +287,6 @@ def get_livertox_master_list(self) -> pd.DataFrame:
 
 
 def get_drugs_catalog(self) -> pd.DataFrame:
-    self.ensure_session_result_table()
     db_session = self.session_factory()
     try:
         drugs = (
@@ -325,9 +322,6 @@ def get_drugs_catalog(self) -> pd.DataFrame:
             )
             if normalized_rxcui is not None
         }
-        primary_rxcui = self.normalize_string(drug.rxnorm_rxcui)
-        if primary_rxcui is not None:
-            rxcui_values.add(primary_rxcui)
         if not rxcui_values:
             continue
         raw_name = self.first_alias_model_value(rxnorm_aliases, "raw_name")
@@ -389,12 +383,10 @@ def list_rxnav_catalog(
     offset: int,
     limit: int,
 ) -> tuple[list[dict[str, Any]], int]:
-    self.ensure_session_result_table()
     safe_offset = max(int(offset), 0)
     safe_limit = max(int(limit), 1)
     search_pattern = self.build_search_pattern(search)
     has_rxnav_data = or_(
-        Drug.rxnorm_rxcui.is_not(None),
         exists(
             select(1).where(
                 DrugRxnormCode.drug_id == Drug.id,
@@ -456,7 +448,6 @@ def list_rxnav_catalog(
 
 
 def get_rxnav_alias_groups(self, drug_id: int) -> dict[str, Any] | None:
-    self.ensure_session_result_table()
     safe_drug_id = int(drug_id)
     db_session = self.session_factory()
     try:
@@ -504,7 +495,6 @@ def list_livertox_catalog(
     offset: int,
     limit: int,
 ) -> tuple[list[dict[str, Any]], int]:
-    self.ensure_session_result_table()
     safe_offset = max(int(offset), 0)
     safe_limit = max(int(limit), 1)
     search_pattern = self.build_search_pattern(search)
@@ -572,7 +562,6 @@ def list_livertox_catalog(
 
 
 def get_livertox_excerpt(self, drug_id: int) -> dict[str, Any] | None:
-    self.ensure_session_result_table()
     safe_drug_id = int(drug_id)
     db_session = self.session_factory()
     try:
@@ -602,7 +591,6 @@ def get_livertox_excerpt(self, drug_id: int) -> dict[str, Any] | None:
 
 
 def get_drug_knowledge_bundle(self, drug_id: int) -> dict[str, Any]:
-    self.ensure_session_result_table()
     safe_drug_id = int(drug_id)
     db_session = self.session_factory()
     try:
@@ -655,7 +643,6 @@ def get_drug_knowledge_bundle(self, drug_id: int) -> dict[str, Any]:
 
 
 def delete_drug_with_cleanup(self, drug_id: int) -> bool:
-    self.ensure_session_result_table()
     safe_drug_id = int(drug_id)
     db_session = self.session_factory()
     try:

@@ -161,6 +161,60 @@ def test_session_list_filters_and_search() -> None:
 
 
 # -----------------------------------------------------------------------------
+def test_session_report_and_text_use_result_payload_only() -> None:
+    serializer, _ = build_serializer()
+    serializer.save_clinical_session(
+        {
+            "patient_name": "Payload Only",
+            "session_timestamp": datetime(2025, 1, 1, 8, 30),
+            "anamnesis": "Original anamnesis",
+            "drugs": "acetaminophen",
+            "final_report": "Legacy section report",
+            "session_result_payload": {
+                "report": "Payload report",
+                "original_session_text": "Payload session text",
+            },
+        }
+    )
+    serializer.save_clinical_session(
+        {
+            "patient_name": "Legacy Only",
+            "session_timestamp": datetime(2025, 1, 2, 8, 30),
+            "anamnesis": "Legacy anamnesis",
+            "drugs": "ibuprofen",
+            "final_report": "Section-only report",
+            "session_result_payload": {},
+        }
+    )
+
+    items, _ = serializer.list_sessions(
+        search=None,
+        status_filter=None,
+        date_mode=None,
+        filter_date=None,
+        offset=0,
+        limit=10,
+    )
+    items_by_name = {item["patient_name"]: item for item in items}
+    assert items_by_name["Payload Only"]["has_report"] is True
+    assert items_by_name["Legacy Only"]["has_report"] is False
+
+    payload_detail = serializer.get_session_detail(
+        int(items_by_name["Payload Only"]["session_id"])
+    )
+    assert payload_detail is not None
+    assert payload_detail["report"] == "Payload report"
+    assert payload_detail["session_text"] == "Payload session text"
+
+    legacy_detail = serializer.get_session_detail(
+        int(items_by_name["Legacy Only"]["session_id"])
+    )
+    assert legacy_detail is not None
+    assert legacy_detail["report"] is None
+    assert legacy_detail["session_text"] == ""
+
+
+# -----------------------------------------------------------------------------
 def test_catalog_search_and_drug_delete_cleanup() -> None:
     serializer, engine = build_serializer()
     session_factory = sessionmaker(bind=engine, future=True)

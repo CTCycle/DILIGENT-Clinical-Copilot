@@ -1,5 +1,5 @@
 # API Surface
-Last updated: 2026-06-03
+Last updated: 2026-06-04
 
 ## Stable Boundary
 All business APIs are mounted under `/api`. The frontend uses `/api` as the stable frontend-backend boundary.
@@ -68,7 +68,7 @@ All business APIs are mounted under `/api`. The frontend uses `/api` as the stab
 - `GET /api/inspection/rag/vector-store`
 - `POST /api/inspection/rag/jobs`
 - `GET /api/inspection/rag/jobs/{job_id}`
-- `POST /api/inspection/rag/jobs/{job_id}/cancel`
+- `DELETE /api/inspection/rag/jobs/{job_id}`
 
 ## Notes
 - Clinical and inspection workflows rely on job polling for long-running work.

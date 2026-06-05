@@ -24,13 +24,11 @@ def test_session_learning_promotes_only_direct_high_confidence_aliases() -> None
         atorvastatin = Drug(
             canonical_name="atorvastatin",
             canonical_name_norm="atorvastatin",
-            rxnorm_rxcui=None,
             livertox_nbk_id=None,
         )
         loop_diuretics = Drug(
             canonical_name="Loop Diuretics",
             canonical_name_norm="loop diuretics",
-            rxnorm_rxcui=None,
             livertox_nbk_id=None,
         )
         patient = Patient(name="Test", visit_date=None)

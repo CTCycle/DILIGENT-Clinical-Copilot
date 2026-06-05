@@ -55,11 +55,6 @@ class _RepositorySerializationService:
     def save_clinical_session(self, session_data: dict[str, Any]) -> int | None:
         return session_result_data.save_clinical_session(self, session_data)
 
-    # -----------------------------------------------------------------------------
-    def ensure_session_result_table(self) -> None:
-        return session_result_data.ensure_session_result_table(self)
-
-    # -----------------------------------------------------------------------------
     def normalize_session_status(self, value: Any) -> str:
         return session_result_data.normalize_session_status(self, value)
 
@@ -216,11 +211,6 @@ class _RepositorySerializationService:
     def get_session_detail(self, session_id: int) -> dict[str, Any] | None:
         return session_result_data.get_session_detail(self, session_id)
 
-    # -----------------------------------------------------------------------------
-    def build_session_text_from_sections(self, sections: dict[str, str]) -> str:
-        return session_result_data.build_session_text_from_sections(self, sections)
-
-    # -----------------------------------------------------------------------------
     def upsert_session_result_payload(
         self, session_id: int, payload: dict[str, Any]
     ) -> bool:
@@ -445,18 +435,6 @@ class _RepositorySerializationService:
             use_livertox_nbk_lookup=use_livertox_nbk_lookup,
         )
 
-    # -----------------------------------------------------------------------------
-    def assign_primary_rxcui_if_missing(
-        self,
-        *,
-        drug: Drug,
-        incoming_rxcui: str | None,
-    ) -> None:
-        return evidence_aliases.assign_primary_rxcui_if_missing(
-            self, drug=drug, incoming_rxcui=incoming_rxcui
-        )
-
-    # -----------------------------------------------------------------------------
     def assign_identifier_if_consistent(
         self,
         *,

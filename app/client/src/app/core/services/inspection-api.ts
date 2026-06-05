@@ -325,7 +325,7 @@ export async function cancelInspectionRagUpdateJob(
   jobId: string,
 ): Promise<JobCancelResponse> {
   return requestJson<JobCancelResponse>(
-    `${API_BASE_URL}/inspection/rag/jobs/${encodeURIComponent(jobId)}/cancel`,
-    { method: "POST" },
+    `${API_BASE_URL}/inspection/rag/jobs/${encodeURIComponent(jobId)}`,
+    { method: "DELETE" },
   );
 }
