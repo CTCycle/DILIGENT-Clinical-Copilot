@@ -46,7 +46,7 @@ class FakeStreamContext:
         return None
 
 
-# -----------------------------------------------------------------------------
+###############################################################################
 def _patch_generation_prep(monkeypatch, client: providers_module.OllamaClient) -> None:
     async def fake_prepare_common_options(
         **kwargs: Any,
@@ -72,7 +72,7 @@ def _patch_generation_prep(monkeypatch, client: providers_module.OllamaClient) -
     monkeypatch.setattr(client, "maybe_prefetch_target_model", fake_prefetch)
 
 
-# -----------------------------------------------------------------------------
+###############################################################################
 def test_chat_uses_native_ollama_chat_endpoint(monkeypatch) -> None:
     client = providers_module.OllamaClient(base_url="http://127.0.0.1:11434")
     _patch_generation_prep(monkeypatch, client)
@@ -103,7 +103,7 @@ def test_chat_uses_native_ollama_chat_endpoint(monkeypatch) -> None:
     asyncio.run(client.close())
 
 
-# -----------------------------------------------------------------------------
+###############################################################################
 def test_chat_stream_preserves_stream_behavior(monkeypatch) -> None:
     client = providers_module.OllamaClient(base_url="http://127.0.0.1:11434")
     _patch_generation_prep(monkeypatch, client)
@@ -137,7 +137,7 @@ def test_chat_stream_preserves_stream_behavior(monkeypatch) -> None:
     asyncio.run(client.close())
 
 
-# -----------------------------------------------------------------------------
+###############################################################################
 def test_embed_uses_native_ollama_embed_endpoint(monkeypatch) -> None:
     client = providers_module.OllamaClient(base_url="http://127.0.0.1:11434")
 
@@ -163,7 +163,7 @@ def test_embed_uses_native_ollama_embed_endpoint(monkeypatch) -> None:
     asyncio.run(client.close())
 
 
-# -----------------------------------------------------------------------------
+###############################################################################
 def test_structured_output_repair_loop_still_works(monkeypatch) -> None:
     client = providers_module.OllamaClient(base_url="http://127.0.0.1:11434")
     parser = StructuredOutputParser(schema=FakeSchema)
@@ -189,7 +189,7 @@ def test_structured_output_repair_loop_still_works(monkeypatch) -> None:
     asyncio.run(client.close())
 
 
-# -----------------------------------------------------------------------------
+###############################################################################
 def test_ollama_native_timeout_maps_to_existing_error_type(monkeypatch) -> None:
     client = providers_module.OllamaClient(base_url="http://127.0.0.1:11434")
     _patch_generation_prep(monkeypatch, client)

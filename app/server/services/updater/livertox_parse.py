@@ -28,7 +28,7 @@ from services.updater import livertox_common
 MONOGRAPH_PROGRESS_INTERVAL = 25
 
 
-# -----------------------------------------------------------------------------
+###############################################################################
 def process_monograph_payload(
     member_name: str,
     data: bytes,
@@ -37,10 +37,6 @@ def process_monograph_payload(
 
 
 ###############################################################################
-
-# Extracted from the facade module; functions intentionally accept the facade instance.
-
-
 def sanitize_livertox_master_list(self, data: pd.DataFrame) -> pd.DataFrame | None:
     if data.empty:
         return

@@ -61,7 +61,7 @@ class MatcherStub:
         }
 
 
-# -----------------------------------------------------------------------------
+###############################################################################
 def test_prepare_inputs_enriches_resolved_drugs_with_knowledge() -> None:
     preparation = object.__new__(ClinicalKnowledgePreparation)
     preparation.serializer = SerializerStub()  # type: ignore[assignment]
@@ -86,7 +86,7 @@ def test_prepare_inputs_enriches_resolved_drugs_with_knowledge() -> None:
     assert payload["knowledge_prompt"]
 
 
-# -----------------------------------------------------------------------------
+###############################################################################
 def test_prepare_inputs_handles_missing_livertox_monographs() -> None:
     preparation = object.__new__(ClinicalKnowledgePreparation)
     preparation.serializer = SerializerStub()  # type: ignore[assignment]

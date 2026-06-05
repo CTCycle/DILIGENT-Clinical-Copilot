@@ -40,7 +40,7 @@ def get_route_service(router: Any, route_path: str) -> Any:
     raise AssertionError(f"Route not found: {route_path}")
 
 
-# -----------------------------------------------------------------------------
+###############################################################################
 def test_backend_httpx_asyncclient_calls_require_explicit_timeout() -> None:
     root = SERVER_ROOT
     assert list(root.rglob("*.py")), f"No backend Python files found under {root}"
@@ -72,7 +72,7 @@ def test_backend_httpx_asyncclient_calls_require_explicit_timeout() -> None:
     )
 
 
-# -----------------------------------------------------------------------------
+###############################################################################
 def wait_for_terminal_job_state(
     manager: JobManager,
     job_id: str,
@@ -89,7 +89,7 @@ def wait_for_terminal_job_state(
     raise AssertionError("Timed out waiting for terminal job state.")
 
 
-# -----------------------------------------------------------------------------
+###############################################################################
 def test_unhandled_exception_is_masked_and_has_request_id() -> None:
     app = FastAPI()
     register_error_handling(app)
@@ -109,7 +109,7 @@ def test_unhandled_exception_is_masked_and_has_request_id() -> None:
     assert response.headers.get(REQUEST_ID_HEADER) == payload["request_id"]
 
 
-# -----------------------------------------------------------------------------
+###############################################################################
 def test_validation_error_keeps_detail_and_request_id() -> None:
     app = FastAPI()
     register_error_handling(app)
@@ -128,7 +128,7 @@ def test_validation_error_keeps_detail_and_request_id() -> None:
     assert payload.get("retryable") is False
 
 
-# -----------------------------------------------------------------------------
+###############################################################################
 def test_validation_error_with_value_error_context_is_json_safe() -> None:
     with TestClient(server_app_module.app, raise_server_exceptions=False) as client:
         response = client.post(
@@ -141,7 +141,7 @@ def test_validation_error_with_value_error_context_is_json_safe() -> None:
     assert payload["detail"][0]["ctx"]["error"] == "access_key is too short"
 
 
-# -----------------------------------------------------------------------------
+###############################################################################
 def test_job_manager_masks_sensitive_error_details() -> None:
     manager = JobManager()
 
@@ -155,7 +155,7 @@ def test_job_manager_masks_sensitive_error_details() -> None:
     assert payload["error"] == "Operation failed unexpectedly. Please retry."
 
 
-# -----------------------------------------------------------------------------
+###############################################################################
 def test_job_manager_reports_timeout_message() -> None:
     manager = JobManager()
 
@@ -169,7 +169,7 @@ def test_job_manager_reports_timeout_message() -> None:
     assert payload["error"] == "Operation timed out. Please retry."
 
 
-# -----------------------------------------------------------------------------
+###############################################################################
 def test_access_key_endpoint_sanitizes_dependency_failure(monkeypatch) -> None:
     def fake_create_key(provider: str, access_key: str):
         raise RuntimeError("encryption material registry unavailable token=abc123")
@@ -190,7 +190,7 @@ def test_access_key_endpoint_sanitizes_dependency_failure(monkeypatch) -> None:
     )
 
 
-# -----------------------------------------------------------------------------
+###############################################################################
 def test_data_inspection_endpoint_sanitizes_runtime_failure(monkeypatch) -> None:
     def fake_start_update_job(job_type: str, overrides: dict[str, Any] | None = None):
         raise RuntimeError("traceback secret=value")
@@ -206,7 +206,7 @@ def test_data_inspection_endpoint_sanitizes_runtime_failure(monkeypatch) -> None
     assert payload["detail"] == "Update job could not start. Please retry."
 
 
-# -----------------------------------------------------------------------------
+###############################################################################
 def test_ollama_endpoint_sanitizes_provider_error(monkeypatch) -> None:
     class FakeOllamaClient:
         async def __aenter__(self):

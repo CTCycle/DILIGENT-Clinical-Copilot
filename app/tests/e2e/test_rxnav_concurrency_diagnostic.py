@@ -30,7 +30,7 @@ class RequestMetric:
     error: str | None
 
 
-# -----------------------------------------------------------------------------
+###############################################################################
 async def perform_request(
     client: httpx.AsyncClient,
     *,
@@ -64,7 +64,7 @@ async def perform_request(
         )
 
 
-# -----------------------------------------------------------------------------
+###############################################################################
 def make_workload(total_requests: int) -> list[tuple[str, str]]:
     payload: list[tuple[str, str]] = []
     while len(payload) < total_requests:
@@ -79,7 +79,7 @@ def make_workload(total_requests: int) -> list[tuple[str, str]]:
     return payload
 
 
-# -----------------------------------------------------------------------------
+###############################################################################
 async def run_probe(
     *,
     concurrency: int,
@@ -112,7 +112,7 @@ async def run_probe(
     return metrics
 
 
-# -----------------------------------------------------------------------------
+###############################################################################
 def summarize(metrics: list[RequestMetric]) -> dict[str, object]:
     status_counts: dict[int, int] = {}
     error_counts: dict[str, int] = {}
@@ -136,12 +136,12 @@ def summarize(metrics: list[RequestMetric]) -> dict[str, object]:
     }
 
 
-# -----------------------------------------------------------------------------
+###############################################################################
 def enabled() -> bool:
     return os.environ.get("RUN_RXNAV_CONCURRENCY_DIAGNOSTIC", "").strip() == "1"
 
 
-# -----------------------------------------------------------------------------
+###############################################################################
 @pytest.mark.skipif(
     not enabled(),
     reason="Set RUN_RXNAV_CONCURRENCY_DIAGNOSTIC=1 to run RxNav concurrency diagnostics.",
