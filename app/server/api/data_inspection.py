@@ -759,9 +759,9 @@ class DataInspectionEndpoint:
             status_code=status.HTTP_200_OK,
         )
         self.router.add_api_route(
-            "/rag/jobs/{job_id}/cancel",
+            "/rag/jobs/{job_id}",
             self.cancel_rag_update_job,
-            methods=["POST"],
+            methods=["DELETE"],
             response_model=JobCancelResponse,
             status_code=status.HTTP_200_OK,
         )

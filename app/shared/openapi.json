@@ -2526,11 +2526,9 @@
         "tags": [
           "inspection"
         ]
-      }
-    },
-    "/api/inspection/rag/jobs/{job_id}/cancel": {
-      "post": {
-        "operationId": "cancel_rag_update_job_api_inspection_rag_jobs__job_id__cancel_post",
+      },
+      "delete": {
+        "operationId": "cancel_rag_update_job_api_inspection_rag_jobs__job_id__delete",
         "parameters": [
           {
             "in": "path",

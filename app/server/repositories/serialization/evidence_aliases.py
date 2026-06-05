@@ -74,7 +74,6 @@ def ensure_drug(
         candidate = Drug(
             canonical_name=canonical_name,
             canonical_name_norm=canonical_name_norm,
-            rxnorm_rxcui=rxnorm_rxcui,
             livertox_nbk_id=livertox_nbk_id if use_livertox_nbk_lookup else None,
             rxnav_last_update=self.normalize_date(rxnav_last_update),
         )
@@ -86,10 +85,6 @@ def ensure_drug(
             rxcui=rxnorm_rxcui,
         )
         return candidate
-    self.assign_primary_rxcui_if_missing(
-        drug=candidate,
-        incoming_rxcui=rxnorm_rxcui,
-    )
     self.upsert_drug_rxcui(
         db_session,
         drug_id=int(candidate.id),
@@ -105,19 +100,6 @@ def ensure_drug(
     if normalized_rxnav_last_update is not None:
         candidate.rxnav_last_update = normalized_rxnav_last_update
     return candidate
-
-
-def assign_primary_rxcui_if_missing(
-    self,
-    *,
-    drug: Drug,
-    incoming_rxcui: str | None,
-) -> None:
-    if incoming_rxcui is None:
-        return
-    current_rxcui = self.normalize_string(drug.rxnorm_rxcui)
-    if current_rxcui is None:
-        drug.rxnorm_rxcui = incoming_rxcui
 
 
 def assign_identifier_if_consistent(
@@ -172,15 +154,8 @@ def get_drug_by_rxcui(
     normalized_rxcui = self.normalize_string(rxcui)
     if normalized_rxcui is None:
         return None
-    mapped = (
-        db_session.execute(DrugRepositoryQueries.drug_by_joined_rxcui(normalized_rxcui))
-        .scalars()
-        .first()
-    )
-    if mapped is not None:
-        return mapped
     return (
-        db_session.execute(DrugRepositoryQueries.drug_by_rxnorm_rxcui(normalized_rxcui))
+        db_session.execute(DrugRepositoryQueries.drug_by_joined_rxcui(normalized_rxcui))
         .scalars()
         .first()
     )

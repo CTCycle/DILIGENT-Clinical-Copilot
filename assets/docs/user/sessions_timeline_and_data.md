@@ -1,5 +1,5 @@
 # Sessions, Timeline, And Data
-Last updated: 2026-06-03
+Last updated: 2026-06-05
 
 ## Review Saved Clinical Sessions
 Open **Clinical Sessions** from the sidebar.
@@ -59,7 +59,7 @@ Some resources or embeddings may require initialization or refresh through:
 setup_and_maintenance.bat
 ```
 
-Use its menu options for database initialization, dependency maintenance, or embedding updates.
+Use its menu options for database initialization, dependency maintenance, Python cache cleanup, or embedding updates.
 
 Expected result:
 - progress is reported

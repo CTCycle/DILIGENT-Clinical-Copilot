@@ -8,7 +8,7 @@ from datetime import date, datetime, timedelta
 from typing import Any
 
 import pandas as pd
-from sqlalchemy import and_, delete, exists, func, inspect, or_, select
+from sqlalchemy import and_, delete, exists, func, or_, select
 from sqlalchemy.orm import Session
 
 from common.utils.logger import logger
@@ -18,11 +18,6 @@ from repositories.schemas.models import (
     ClinicalSessionLab,
     ClinicalSessionResult,
     ClinicalSessionSection,
-    Drug,
-    DrugAlias,
-    DrugRxnormCode,
-    KbMatchCache,
-    LiverToxMonograph,
     Patient,
 )
 from repositories.serialization.catalogs import ReferenceCatalogSerializer
@@ -38,7 +33,6 @@ def save_clinical_session(self, session_data: dict[str, Any]) -> int | None:
     if not session_data:
         logger.warning("Skipping clinical session save; payload is empty")
         return None
-    self.ensure_session_result_table()
     db_session = self.session_factory()
     try:
         persisted_patient = self.persist_patient(db_session, session_data)
@@ -74,54 +68,6 @@ def save_clinical_session(self, session_data: dict[str, Any]) -> int | None:
         raise
     finally:
         db_session.close()
-
-
-def ensure_session_result_table(self) -> None:
-    inspector = inspect(self.engine)
-    required_tables = (
-        Patient.__tablename__,
-        ClinicalSession.__tablename__,
-        ClinicalSessionSection.__tablename__,
-        ClinicalSessionLab.__tablename__,
-        ClinicalSessionDrug.__tablename__,
-        ClinicalSessionResult.__tablename__,
-        Drug.__tablename__,
-        LiverToxMonograph.__tablename__,
-        DrugRxnormCode.__tablename__,
-        DrugAlias.__tablename__,
-        KbMatchCache.__tablename__,
-    )
-    missing_tables = [
-        table_name
-        for table_name in required_tables
-        if not inspector.has_table(table_name)
-    ]
-    if missing_tables:
-        joined = ", ".join(missing_tables)
-        raise RuntimeError(
-            f"Database schema mismatch: missing required table(s): {joined}"
-        )
-
-    required_columns = {
-        Patient.__tablename__: {"image_blob"},
-        ClinicalSession.__tablename__: {
-            "patient_id",
-            "session_status",
-            "version",
-            "original_session_id",
-            "metadata_json",
-        },
-        Drug.__tablename__: {"rxnav_last_update"},
-    }
-    for table_name, columns in required_columns.items():
-        existing = {str(item.get("name")) for item in inspector.get_columns(table_name)}
-        missing = sorted(columns - existing)
-        if missing:
-            joined = ", ".join(missing)
-            raise RuntimeError(
-                "Database schema mismatch: "
-                f"missing required column(s) in {table_name}: {joined}"
-            )
 
 
 def normalize_session_status(self, value: Any) -> str:
@@ -174,7 +120,6 @@ def list_sessions(
     offset: int,
     limit: int,
 ) -> tuple[list[dict[str, Any]], int]:
-    self.ensure_session_result_table()
     safe_offset = max(int(offset), 0)
     safe_limit = max(int(limit), 1)
     conditions: list[Any] = []
@@ -270,14 +215,6 @@ def list_sessions(
                 parsed_timeline = parsed_payload.get("patient_timeline")
                 if isinstance(parsed_timeline, dict):
                     timeline_session_ids.add(int(result_session_id))
-            section_report_rows = db_session.execute(
-                select(ClinicalSessionSection.session_id).where(
-                    ClinicalSessionSection.session_id.in_(session_ids),
-                    ClinicalSessionSection.section_kind == "final_report",
-                )
-            ).all()
-            for (section_session_id,) in section_report_rows:
-                report_session_ids.add(int(section_session_id))
         items = [
             {
                 "session_id": int(session_row.id),
@@ -303,7 +240,6 @@ def list_sessions(
 
 
 def get_session_detail(self, session_id: int) -> dict[str, Any] | None:
-    self.ensure_session_result_table()
     safe_session_id = int(session_id)
     db_session = self.session_factory()
     try:
@@ -326,9 +262,7 @@ def get_session_detail(self, session_id: int) -> dict[str, Any] | None:
         }
         payload = self.get_session_result_payload(safe_session_id) or {}
         metadata = self.parse_session_result_payload(session_row.metadata_json) or {}
-        session_text = self.normalize_string(
-            payload.get("original_session_text")
-        ) or self.build_session_text_from_sections(sections)
+        session_text = self.normalize_string(payload.get("original_session_text")) or ""
         return {
             "session_id": safe_session_id,
             "patient_name": self.normalize_string(patient_row.name),
@@ -345,24 +279,10 @@ def get_session_detail(self, session_id: int) -> dict[str, Any] | None:
             "sections": sections,
             "session_text": session_text,
             "result_payload": payload,
-            "report": self.normalize_string(payload.get("report"))
-            or self.normalize_string(sections.get("final_report")),
+            "report": self.normalize_string(payload.get("report")),
         }
     finally:
         db_session.close()
-
-
-def build_session_text_from_sections(self, sections: dict[str, str]) -> str:
-    chunks: list[str] = []
-    for key, label in (
-        ("anamnesis", "ANAMNESIS"),
-        ("drugs", "THERAPY"),
-        ("laboratory_analysis", "LABORATORY ANALYSIS"),
-    ):
-        value = self.normalize_string(sections.get(key))
-        if value:
-            chunks.append(f"{label}\n{value}")
-    return "\n\n".join(chunks)
 
 
 def update_session_text_and_metadata(
@@ -372,7 +292,6 @@ def update_session_text_and_metadata(
     session_text: str | None,
     metadata: dict[str, Any] | None,
 ) -> dict[str, Any] | None:
-    self.ensure_session_result_table()
     safe_session_id = int(session_id)
     db_session = self.session_factory()
     try:
@@ -415,7 +334,6 @@ def update_session_text_and_metadata(
 
 
 def get_next_session_version(self, original_session_id: int) -> int:
-    self.ensure_session_result_table()
     safe_original_id = int(original_session_id)
     db_session = self.session_factory()
     try:
@@ -446,7 +364,6 @@ def parse_session_result_payload(
 
 
 def get_session_result_payload(self, session_id: int) -> dict[str, Any] | None:
-    self.ensure_session_result_table()
     safe_session_id = int(session_id)
     db_session = self.session_factory()
     try:
@@ -463,7 +380,6 @@ def get_session_result_payload(self, session_id: int) -> dict[str, Any] | None:
 def upsert_session_result_payload(
     self, session_id: int, payload: dict[str, Any]
 ) -> bool:
-    self.ensure_session_result_table()
     safe_session_id = int(session_id)
     serialized_payload = self.serialize_json_payload(payload)
     if serialized_payload is None:
@@ -497,7 +413,6 @@ def upsert_session_result_payload(
 
 
 def get_session_timeline_source(self, session_id: int) -> dict[str, Any] | None:
-    self.ensure_session_result_table()
     safe_session_id = int(session_id)
     db_session = self.session_factory()
     try:
@@ -553,7 +468,6 @@ def get_session_timeline_source(self, session_id: int) -> dict[str, Any] | None:
 
 
 def delete_session(self, session_id: int) -> bool:
-    self.ensure_session_result_table()
     safe_session_id = int(session_id)
     db_session = self.session_factory()
     try:

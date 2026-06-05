@@ -15,12 +15,8 @@ from domain.inspection import (
 from fastapi import FastAPI
 from fastapi.testclient import TestClient
 from pydantic import ValidationError
-from repositories.schemas.models import Base
-from repositories.serialization.data import (
-    _RepositorySerializationService,
-)
+from repositories.serialization.data import _RepositorySerializationService
 from services.inspection import DataInspectionService
-from sqlalchemy import create_engine
 
 
 def get_route_owner(router: Any, route_path: str) -> Any:
@@ -54,29 +50,6 @@ def test_search_pattern_escapes_like_wildcards() -> None:
     pattern = service.build_search_pattern(r"  100%_match\check  ")
 
     assert pattern == r"%100\%\_match\\check%"
-
-
-# -----------------------------------------------------------------------------
-def test_schema_guard_rejects_missing_required_columns() -> None:
-    engine = create_engine("sqlite+pysqlite:///:memory:", future=True)
-    Base.metadata.create_all(engine)
-    with engine.begin() as connection:
-        connection.exec_driver_sql("DROP TABLE drugs")
-        connection.exec_driver_sql(
-            "CREATE TABLE drugs ("
-            "id INTEGER NOT NULL PRIMARY KEY, "
-            "canonical_name TEXT NOT NULL, "
-            "canonical_name_norm VARCHAR NOT NULL, "
-            "rxnorm_rxcui VARCHAR, "
-            "livertox_nbk_id VARCHAR"
-            ")"
-        )
-
-    service = object.__new__(_RepositorySerializationService)
-    service.engine = engine
-
-    with pytest.raises(RuntimeError, match="missing required column"):
-        service.ensure_session_result_table()
 
 
 # -----------------------------------------------------------------------------
@@ -189,6 +162,20 @@ def test_rag_update_job_route_rejects_removed_vectorization_overrides() -> None:
     assert rejected.status_code == 422
     assert accepted.status_code == 202
     assert accepted.json()["job_type"] == "rag_update"
+
+
+# -----------------------------------------------------------------------------
+def test_rag_cancel_route_uses_delete_only() -> None:
+    app = FastAPI()
+    app.include_router(data_inspection.router)
+    routes = {
+        (method, getattr(route, "path", ""))
+        for route in app.routes
+        for method in getattr(route, "methods", set()) or set()
+    }
+
+    assert ("DELETE", "/inspection/rag/jobs/{job_id}") in routes
+    assert ("POST", "/inspection/rag/jobs/{job_id}/cancel") not in routes
 
 
 # -----------------------------------------------------------------------------

@@ -155,7 +155,6 @@ class Drug(Base):
     id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
     canonical_name: Mapped[str] = mapped_column(Text, nullable=False)
     canonical_name_norm: Mapped[str] = mapped_column(String, nullable=False)
-    rxnorm_rxcui: Mapped[str | None] = mapped_column(String, nullable=True)
     livertox_nbk_id: Mapped[str | None] = mapped_column(String, nullable=True)
     rxnav_last_update: Mapped[str | None] = mapped_column(String, nullable=True)
 
@@ -182,8 +181,6 @@ class Drug(Base):
 
     __table_args__ = (
         UniqueConstraint("canonical_name_norm", name="uq_drugs_canonical_name_norm"),
-        UniqueConstraint("rxnorm_rxcui", name="uq_drugs_rxnorm_rxcui"),
-        Index("ix_drugs_rxnorm_rxcui", "rxnorm_rxcui"),
         Index("ix_drugs_livertox_nbk_id", "livertox_nbk_id"),
     )
 
