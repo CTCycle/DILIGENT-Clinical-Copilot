@@ -16,6 +16,7 @@ from repositories.schemas.models import (
     ClinicalSession,
     ClinicalSessionDrug,
     ClinicalSessionLab,
+    ClinicalSessionManualEdit,
     ClinicalSessionResult,
     ClinicalSessionSection,
     Patient,
@@ -26,7 +27,6 @@ from services.text.vocabulary import (
     invalidate_text_normalization_snapshot,
 )
 
-# Extracted from the facade module; functions intentionally accept the facade instance.
 
 
 def save_clinical_session(self, session_data: dict[str, Any]) -> int | None:
@@ -263,6 +263,37 @@ def get_session_detail(self, session_id: int) -> dict[str, Any] | None:
         payload = self.get_session_result_payload(safe_session_id) or {}
         metadata = self.parse_session_result_payload(session_row.metadata_json) or {}
         session_text = self.normalize_string(payload.get("original_session_text")) or ""
+        official_report_text = self.normalize_string(payload.get("report"))
+        manual_edit_rows = db_session.execute(
+            select(ClinicalSessionManualEdit)
+            .where(ClinicalSessionManualEdit.session_id == safe_session_id)
+            .order_by(
+                ClinicalSessionManualEdit.edited_at.desc(),
+                ClinicalSessionManualEdit.id.desc(),
+            )
+        ).scalars()
+        manual_edit_history = [
+            {
+                "session_id": int(edit.session_id),
+                "current_version_id": int(edit.current_version_id),
+                "edited_by": self.normalize_string(edit.edited_by),
+                "actor_id": self.normalize_string(edit.actor_id),
+                "actor_display_name": self.normalize_string(edit.actor_display_name),
+                "actor_source": edit.actor_source,
+                "actor_confidence": edit.actor_confidence,
+                "edited_at": edit.edited_at,
+                "previous_text_hash": edit.previous_text_hash,
+                "new_text_hash": edit.new_text_hash,
+                "edited_fields": (
+                    json.loads(edit.edited_fields_json)
+                    if self.normalize_string(edit.edited_fields_json) is not None
+                    else []
+                ),
+                "reviewer_note": self.normalize_string(edit.reviewer_note),
+                "metadata": self.parse_session_result_payload(edit.metadata_json) or {},
+            }
+            for edit in manual_edit_rows
+        ]
         return {
             "session_id": safe_session_id,
             "patient_name": self.normalize_string(patient_row.name),
@@ -278,8 +309,11 @@ def get_session_detail(self, session_id: int) -> dict[str, Any] | None:
             "metadata": metadata,
             "sections": sections,
             "session_text": session_text,
+            "source_clinical_text": session_text,
             "result_payload": payload,
-            "report": self.normalize_string(payload.get("report")),
+            "report": official_report_text,
+            "official_report_text": official_report_text,
+            "manual_edit_history": manual_edit_history,
         }
     finally:
         db_session.close()
@@ -298,32 +332,9 @@ def update_session_text_and_metadata(
         existing = db_session.get(ClinicalSession, safe_session_id)
         if existing is None:
             return None
+        _ = session_text
         if metadata is not None:
-            existing.metadata_json = self.serialize_json_payload(metadata)
-        if session_text is not None:
-            result = db_session.execute(
-                select(ClinicalSessionResult).where(
-                    ClinicalSessionResult.session_id == safe_session_id
-                )
-            ).scalar_one_or_none()
-            payload = (
-                self.parse_session_result_payload(result.payload_json)
-                if result is not None
-                else {}
-            ) or {}
-            payload["original_session_text"] = session_text
-            payload["manual_edit_saved_at"] = datetime.now().isoformat()
-            serialized_payload = self.serialize_json_payload(payload)
-            if serialized_payload is not None:
-                if result is None:
-                    db_session.add(
-                        ClinicalSessionResult(
-                            session_id=safe_session_id,
-                            payload_json=serialized_payload,
-                        )
-                    )
-                else:
-                    result.payload_json = serialized_payload
+            existing.metadata_json = self.serialize_json_payload(metadata or {})
         db_session.commit()
         return self.get_session_detail(safe_session_id)
     except Exception:

@@ -15,7 +15,6 @@ from repositories.schemas.models import (
 from repositories.serialization.evidence_data import normalize_drug_name
 from services.text.synonyms import parse_synonym_list, split_synonym_variants
 
-# Extracted from the facade helper module; functions intentionally accept the facade instance.
 
 
 def resolve_drug_id(

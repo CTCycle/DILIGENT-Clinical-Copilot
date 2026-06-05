@@ -26,7 +26,6 @@ from repositories.schemas.models import (
 )
 from services.text.normalization import normalize_drug_name
 
-# Extracted from the facade module; functions intentionally accept the facade instance.
 
 
 def save_livertox_records(self, records: pd.DataFrame) -> None:

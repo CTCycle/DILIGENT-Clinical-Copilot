@@ -4,7 +4,7 @@ import asyncio
 import json
 import time
 from datetime import datetime
-from typing import Any, cast
+from typing import Any, Literal, cast
 
 from common.exceptions import (
     ServiceConflictError,
@@ -313,6 +313,75 @@ async def process_single_patient_workflow(
     revision_focus_context: str | None = None,
     progress_callback=None,
     stop_check=None,
+) -> dict[str, Any]:
+    return await _process_patient_workflow_internal(
+        service,
+        payload,
+        patient_image_base64=patient_image_base64,
+        section_extraction=section_extraction,
+        normalized_document=normalized_document,
+        report_mode=report_mode,
+        session_version=session_version,
+        original_session_id=original_session_id,
+        session_metadata=session_metadata,
+        original_session_text=original_session_text,
+        revision_focus_context=revision_focus_context,
+        progress_callback=progress_callback,
+        stop_check=stop_check,
+        execution_mode="standard",
+    )
+
+
+async def process_revision_patient_workflow(
+    service: Any,
+    payload: PatientData,
+    *,
+    patient_image_base64: str | None = None,
+    section_extraction: ClinicalSectionExtractionResult | None = None,
+    normalized_document: NormalizedDocument | None = None,
+    report_mode: str = "faithful_only",
+    session_version: int = 1,
+    original_session_id: int | None = None,
+    session_metadata: dict[str, Any] | None = None,
+    original_session_text: str | None = None,
+    revision_focus_context: str | None = None,
+    progress_callback=None,
+    stop_check=None,
+) -> dict[str, Any]:
+    return await _process_patient_workflow_internal(
+        service,
+        payload,
+        patient_image_base64=patient_image_base64,
+        section_extraction=section_extraction,
+        normalized_document=normalized_document,
+        report_mode=report_mode,
+        session_version=session_version,
+        original_session_id=original_session_id,
+        session_metadata=session_metadata,
+        original_session_text=original_session_text,
+        revision_focus_context=revision_focus_context,
+        progress_callback=progress_callback,
+        stop_check=stop_check,
+        execution_mode="revision",
+    )
+
+
+async def _process_patient_workflow_internal(
+    service: Any,
+    payload: PatientData,
+    *,
+    patient_image_base64: str | None = None,
+    section_extraction: ClinicalSectionExtractionResult | None = None,
+    normalized_document: NormalizedDocument | None = None,
+    report_mode: str = "faithful_only",
+    session_version: int = 1,
+    original_session_id: int | None = None,
+    session_metadata: dict[str, Any] | None = None,
+    original_session_text: str | None = None,
+    revision_focus_context: str | None = None,
+    progress_callback=None,
+    stop_check=None,
+    execution_mode: Literal["standard", "revision"] = "standard",
 ) -> dict[str, Any]:
     service.run_stop_check(stop_check)
     logger.info(
@@ -821,6 +890,7 @@ async def process_single_patient_workflow(
             "original_session_id": original_session_id,
             "metadata": persisted_session_metadata,
             "focus_context": revision_focus_context,
+            "execution_mode": execution_mode,
         },
     }
     result_payload["run_bundle_index"] = build_run_bundle_index(

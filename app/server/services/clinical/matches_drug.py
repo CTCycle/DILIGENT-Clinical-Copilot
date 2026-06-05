@@ -58,7 +58,6 @@ class BoundedCache(Generic[KT, VT]):
         self.store.clear()
 
 
-# Extracted from the facade module; functions intentionally accept the facade instance.
 
 
 def canonicalize_query(self, value: str | None) -> str:

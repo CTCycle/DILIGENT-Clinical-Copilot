@@ -20,8 +20,16 @@ import {
   JobCancelResponse,
   JobStartResponse,
   ClinicalSessionDetail,
+  ManualReportEditAudit,
+  ManualReportEditRequest,
+  ManualReportEditResponse,
   ClinicalSessionRevisionRequest,
   ClinicalSessionUpdateRequest,
+  RevisionArtifactListResponse,
+  RevisionPipelineRun,
+  RevisionPipelineStepListResponse,
+  SessionVersionDetailResponse,
+  SessionVersionListResponse,
 } from "../models/types";
 import { buildQueryString, requestJson } from "./http-api";
 
@@ -49,6 +57,44 @@ export async function fetchClinicalSessionDetail(
 ): Promise<ClinicalSessionDetail> {
   return requestJson<ClinicalSessionDetail>(
     `${API_BASE_URL}/inspection/sessions/${encodeURIComponent(String(sessionId))}`,
+    { method: "GET" },
+  );
+}
+
+export async function fetchClinicalSessionManualEdits(
+  sessionId: number,
+): Promise<ManualReportEditAudit[]> {
+  return requestJson<ManualReportEditAudit[]>(
+    `${API_BASE_URL}/inspection/sessions/${encodeURIComponent(String(sessionId))}/manual-edits`,
+    { method: "GET" },
+  );
+}
+
+export async function fetchClinicalSessionVersions(
+  sessionId: number,
+): Promise<SessionVersionListResponse> {
+  return requestJson<SessionVersionListResponse>(
+    `${API_BASE_URL}/inspection/sessions/${encodeURIComponent(String(sessionId))}/versions`,
+    { method: "GET" },
+  );
+}
+
+export async function fetchClinicalSessionVersionDetail(
+  sessionId: number,
+  versionId: number,
+): Promise<SessionVersionDetailResponse> {
+  return requestJson<SessionVersionDetailResponse>(
+    `${API_BASE_URL}/inspection/sessions/${encodeURIComponent(String(sessionId))}/versions/${encodeURIComponent(String(versionId))}`,
+    { method: "GET" },
+  );
+}
+
+export async function fetchClinicalSessionRevisionArtifacts(
+  sessionId: number,
+  versionId: number,
+): Promise<RevisionArtifactListResponse> {
+  return requestJson<RevisionArtifactListResponse>(
+    `${API_BASE_URL}/inspection/sessions/${encodeURIComponent(String(sessionId))}/versions/${encodeURIComponent(String(versionId))}/artifacts`,
     { method: "GET" },
   );
 }
@@ -100,6 +146,33 @@ export async function cancelClinicalSessionRevisionJob(
   return requestJson<JobCancelResponse>(
     `${API_BASE_URL}/inspection/sessions/revision/jobs/${encodeURIComponent(jobId)}`,
     { method: "DELETE" },
+  );
+}
+
+export async function fetchClinicalSessionRevisionPipelineRun(
+  pipelineRunId: string,
+): Promise<RevisionPipelineRun> {
+  return requestJson<RevisionPipelineRun>(
+    `${API_BASE_URL}/inspection/sessions/revision/pipeline-runs/${encodeURIComponent(pipelineRunId)}`,
+    { method: "GET" },
+  );
+}
+
+export async function fetchClinicalSessionRevisionPipelineSteps(
+  pipelineRunId: string,
+): Promise<RevisionPipelineStepListResponse> {
+  return requestJson<RevisionPipelineStepListResponse>(
+    `${API_BASE_URL}/inspection/sessions/revision/pipeline-runs/${encodeURIComponent(pipelineRunId)}/steps`,
+    { method: "GET" },
+  );
+}
+
+export async function retryClinicalSessionRevisionPipelineRun(
+  pipelineRunId: string,
+): Promise<JobStartResponse> {
+  return requestJson<JobStartResponse>(
+    `${API_BASE_URL}/inspection/sessions/revision/pipeline-runs/${encodeURIComponent(pipelineRunId)}/retry`,
+    { method: "POST" },
   );
 }
 
@@ -327,5 +400,21 @@ export async function cancelInspectionRagUpdateJob(
   return requestJson<JobCancelResponse>(
     `${API_BASE_URL}/inspection/rag/jobs/${encodeURIComponent(jobId)}`,
     { method: "DELETE" },
+  );
+}
+
+export async function manualEditClinicalSessionReport(
+  sessionId: number,
+  payload: ManualReportEditRequest,
+): Promise<ManualReportEditResponse> {
+  return requestJson<ManualReportEditResponse>(
+    `${API_BASE_URL}/inspection/sessions/${encodeURIComponent(String(sessionId))}/report`,
+    {
+      method: "PUT",
+      headers: {
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify(payload),
+    },
   );
 }

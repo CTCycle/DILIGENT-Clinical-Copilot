@@ -19,7 +19,6 @@ from services.llm.structured import (
 
 ###############################################################################
 
-# Extracted from the facade module; functions intentionally accept the facade instance.
 
 
 async def collect_structured_fallbacks(self, preferred: list[str]) -> list[str]:

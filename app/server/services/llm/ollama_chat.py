@@ -28,7 +28,6 @@ from services.llm.ollama_runtime import (
 
 ###############################################################################
 
-# Extracted from the facade module; functions intentionally accept the facade instance.
 
 
 def resolve_model_name(self, name: str | None) -> str:
